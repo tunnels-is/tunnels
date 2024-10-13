@@ -4,6 +4,7 @@
 
 # Tunnels
 ... don't worry, we are writing this right now.
+... We will be addding an open source license to this soon (tm)
 
 
 [forks-shield]: https://img.shields.io/github/forks/tunnels-is/tunnels?style=for-the-badge&logo=github
