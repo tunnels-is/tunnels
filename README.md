@@ -6,6 +6,30 @@
 ... don't worry, we are writing this right now.
 ... We will be addding an open source license to this soon (tm)
 
+# Linux
+## Binary permissions
+sudo setcap 'cap_net_raw,cap_net_bind_service,cap_net_admin+eip' main
+
+# Windows
+Needs to run as admin
+
+# MacOS
+Needs to run as sudo
+
+# private server
+ - run server with custom cert generation
+ - create server in UI with serial
+ - create tunnels for server
+    - assign server to tunnel
+    - give tunnel ip + port
+
+# Test server
+93.95.231.66:444
+cert: certs/test-server.crt
+- it's not always running
+
+
+
 
 [forks-shield]: https://img.shields.io/github/forks/tunnels-is/tunnels?style=for-the-badge&logo=github
 [forks-url]: https://github.com/tunnels-is/tunnels/network/members
