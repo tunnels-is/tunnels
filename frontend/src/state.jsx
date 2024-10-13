@@ -619,12 +619,8 @@ export var STATE = {
 			} else {
 				STATE.Servers?.forEach(s => {
 					if (s._id === c.ServerID) {
-						if (!connectionRequest.ServerIP) {
-							connectionRequest.ServerIP = s.IP
-						}
-						if (!connectionRequest.ServerPort) {
-							connectionRequest.ServerPort = s.Port
-						}
+						connectionRequest.ServerIP = s.IP
+						connectionRequest.ServerPort = s.Port
 					}
 				})
 			}
