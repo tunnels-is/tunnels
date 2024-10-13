@@ -550,7 +550,7 @@ func PublicConnect(UICR UIConnectRequest) (code int, errm error) {
 	FinalCR.SeverID = UICR.SeverID
 	FinalCR.EncType = UICR.EncType
 
-	if UICR.SeverID == "" {
+	if !tunnel.Meta.Private && UICR.SeverID == "" {
 		ERROR("No server selected")
 		return 400, errors.New("No server selected")
 	} else if tunnel.Meta.ServerID != UICR.SeverID {
@@ -581,13 +581,12 @@ func PublicConnect(UICR UIConnectRequest) (code int, errm error) {
 			ERROR("Unable to load private cert: ", errm)
 			return 502, errors.New("Unable to load private cert: " + tunnel.Meta.PrivateCert)
 		}
-	} else {
-		tc.RootCAs = CertPool
 	}
 
 	qc := &quic.Config{
 		TLSConfig:                tc,
 		HandshakeTimeout:         time.Duration(10 * time.Second),
+		RequireAddressValidation: false,
 		KeepAlivePeriod:          0,
 		MaxUniRemoteStreams:      100,
 		MaxBidiRemoteStreams:     100,
@@ -611,6 +610,7 @@ func PublicConnect(UICR UIConnectRequest) (code int, errm error) {
 		qc,
 	)
 	if err != nil {
+		x.Close(context.Background())
 		DEBUG("ConnectionError:", err)
 		return 502, errors.New("unable to connect to server")
 	}
@@ -628,7 +628,9 @@ func PublicConnect(UICR UIConnectRequest) (code int, errm error) {
 	bytesFromController, code := ForwardConnectToController(FR)
 	DEBUG("CodeFromController:", code)
 	if code != 200 {
-		DEBUG("ErrFromController:", string(bytesFromController))
+		x.Close(context.Background())
+		con.Abort(errors.New(""))
+		ERROR("ErrFromController:", string(bytesFromController))
 		ER := new(ErrorResponse)
 		err := json.Unmarshal(bytesFromController, ER)
 		if err != nil {
@@ -642,12 +644,21 @@ func PublicConnect(UICR UIConnectRequest) (code int, errm error) {
 
 	s, err := con.NewStream(context.Background())
 	if err != nil {
+		x.Close(context.Background())
+		con.Abort(errors.New(""))
 		DEBUG("StreamError:", err)
 		return 502, errors.New("unable to make stream")
 	}
 
+	closeAll := func() {
+		s.Close()
+		con.Close()
+		x.Close(context.Background())
+	}
+
 	_, err = s.Write(bytesFromController)
 	if err != nil {
+		closeAll()
 		DEBUG("WriteError:", err)
 		return 502, errors.New("unable to write connection request data to server")
 	}
@@ -655,6 +666,7 @@ func PublicConnect(UICR UIConnectRequest) (code int, errm error) {
 
 	tunnel.EH, err = crypt.NewEncryptionHandler(UICR.EncType)
 	if err != nil {
+		closeAll()
 		ERROR("unable to create encryption handler: ", err)
 		return 502, errors.New("Unable to secure connection")
 	}
@@ -663,6 +675,7 @@ func PublicConnect(UICR UIConnectRequest) (code int, errm error) {
 
 	err = tunnel.EH.ReceiveHandshake()
 	if err != nil {
+		con.Abort(errors.New(""))
 		ERROR("Handshakte initialization failed", err)
 		return 502, errors.New("Unable to finalize handshake")
 	}
@@ -673,6 +686,7 @@ func PublicConnect(UICR UIConnectRequest) (code int, errm error) {
 	DEBUG("(RAW)ConnectionRequestResponse:", string(resp[:n]))
 	if err != nil {
 		if err != io.EOF {
+			closeAll()
 			ERROR("Unable to receive connection response", err)
 			return 500, errors.New("Did not receive connection response from server")
 		}
@@ -680,13 +694,12 @@ func PublicConnect(UICR UIConnectRequest) (code int, errm error) {
 
 	err = json.Unmarshal(resp[:n], &CRR)
 	if err != nil {
+		closeAll()
 		ERROR("Unable to parse connection response", err)
 		return 502, errors.New("Unable to open data from server.. disconnecting..")
 	}
 
-	s.Close()
-	con.Close()
-	x.Close(context.Background())
+	closeAll()
 
 	DEBUG("ConnectionRequestResponse:", CRR)
 	tunnel.CRR = CRR
