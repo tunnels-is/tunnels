@@ -1,0 +1,17 @@
+cmd/service/service
+
+build/*
+
+cmd/main/dist
+cmd/main/files
+cmd/main/*.exe
+cmd/main/main
+*.exe
+
+node_modules
+frontend/dist
+files
+
+.DS_Store
+*.DS_Store
+.idea
