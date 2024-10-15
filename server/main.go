@@ -5,9 +5,9 @@ import (
 	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/json"
 	"encoding/pem"
 	"errors"
-	"fmt"
 	"log"
 	"net"
 	"os"
@@ -17,7 +17,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/jackpal/gateway"
 	"github.com/tunnels-is/tunnels/certs"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"golang.org/x/net/quic"
 )
 
@@ -61,6 +63,13 @@ func main() {
 		}
 	}()
 
+	if len(os.Args) > 1 {
+		if os.Args[1] == "config" {
+			makeConfigAndCertificates()
+		}
+		os.Exit(1)
+	}
+
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	var err error
 
@@ -80,55 +89,14 @@ func main() {
 
 	controlCertificate, err = tls.LoadX509KeyPair(Config.ControlCert, Config.ControlKey)
 	if err != nil {
-		if Config.AutoCert {
-			if Config.Cert != nil {
-				controlCertificate, err = certs.MakeCert(
-					certs.RSA,
-					Config.ControlCert,
-					Config.ControlKey,
-					Config.Cert.IPs,
-					Config.Cert.Domains,
-					Config.Cert.Org,
-					Config.Cert.Expires,
-					true,
-				)
-				if err != nil {
-					panic(err)
-				}
-			} else {
-				controlCertificate, err = certs.MakeCert(
-					certs.RSA,
-					Config.ControlCert,
-					Config.ControlKey,
-					[]string{Config.ControlIP, Config.InterfaceIP},
-					[]string{""},
-					"",
-					time.Time{},
-					true,
-				)
-				if err != nil {
-					panic(err)
-				}
-			}
-		} else {
-			panic(err)
-		}
+		panic(err)
 	}
-
-	masterSerial := certs.ExtractSerialNumberHex(controlCertificate)
 
 	controlConfig = &tls.Config{
 		MinVersion:       tls.VersionTLS13,
 		MaxVersion:       tls.VersionTLS13,
 		CurvePreferences: []tls.CurveID{tls.CurveP521},
 		Certificates:     []tls.Certificate{controlCertificate},
-		VerifyConnection: func(cs tls.ConnectionState) error {
-			if len(cs.PeerCertificates) > 0 {
-				Serial := fmt.Sprintf("%x", cs.PeerCertificates[0].SerialNumber)
-				fmt.Println(Serial, " <> ", masterSerial)
-			}
-			return nil
-		},
 	}
 
 	quicConfig = &quic.Config{
@@ -215,6 +183,66 @@ func main() {
 				go DataSocketListener(SIGNAL)
 			}
 		}
+	}
+}
+
+func makeConfigAndCertificates() {
+	InterfaceIP, err := gateway.DiscoverInterface()
+	if err != nil {
+		panic(err)
+	}
+
+	sc := new(Server)
+	sc.ID = primitive.ObjectID{}
+	sc.ControlIP = InterfaceIP.String()
+	sc.InterfaceIP = InterfaceIP.String()
+	sc.ControlPort = "444"
+	sc.DataPort = "443"
+	sc.StartPort = 2000
+	sc.EndPort = 65500
+	sc.UserMaxConnections = 4
+	sc.AvailableMbps = 1000
+	sc.AvailableUserMbps = 10
+	sc.InternetAccess = true
+	sc.LocalNetworkAccess = true
+	sc.DNSAllowCustomOnly = false
+	sc.DNS = make([]*ServerDNS, 0)
+	sc.Networks = make([]*ServerNetwork, 0)
+	sc.DNSServers = []string{"1.1.1.1", "8.8.8.8"}
+	sc.ControlCert = "./server.crt"
+	sc.ControlKey = "./server.key"
+	sc.SignKey = "./controller.crt"
+
+	N := new(ServerNetwork)
+	N.Network = InterfaceIP.String() + "/24"
+	N.Nat = "10.10.10.1/24"
+	sc.Networks = append(sc.Networks, N)
+
+	outConfig, err := json.Marshal(sc)
+	if err != nil {
+		panic(err)
+	}
+	f, err := os.Create("./server.json")
+	if err != nil {
+		panic(err)
+	}
+	_, err = f.Write(outConfig)
+	if err != nil {
+		panic(err)
+	}
+
+	_, err = certs.MakeCert(
+		certs.ECDSA,
+		sc.ControlCert,
+		sc.ControlKey,
+		[]string{InterfaceIP.String()},
+		[]string{""},
+		"",
+		time.Time{},
+		true,
+	)
+	if err != nil {
+		panic(err)
 	}
 }
 
