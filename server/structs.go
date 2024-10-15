@@ -41,7 +41,6 @@ type Server struct {
 	ControlIP          string             `json:"ControlIP"`
 	ControlPort        string             `json:"ControlPort"`
 	UserMaxConnections int                `json:"UserMaxConnections"`
-	ProxyAddress       string             `json:"ProxyIP"`
 	InterfaceIP        string             `json:"InterfaceIP"`
 	DataPort           string             `json:"DataPort"`
 	StartPort          int                `json:"StartPort"`
@@ -55,18 +54,9 @@ type Server struct {
 	Networks           []*ServerNetwork   `json:"Networks"`
 	DNSServers         []string           `json:"DNSServers"`
 
-	AutoCert    bool   `json:"AutoCert"`
-	Cert        *Cert  `json:"Cert"`
 	ControlCert string `json:"ControlCert"`
 	ControlKey  string `json:"ControlKey"`
 	SignKey     string `json:"SignKey"`
-}
-
-type Cert struct {
-	IPs     []string  `json:"IPs"`
-	Domains []string  `json:"Domains"`
-	Org     string    `json:"Org"`
-	Expires time.Time `json:"Expires"`
 }
 
 type ServerDNS struct {

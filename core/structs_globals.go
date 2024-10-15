@@ -357,13 +357,12 @@ type TunnelMETA struct {
 	ServerID string
 
 	// controlled by user only
-	DNSBlocking     bool
-	AutomaticRouter bool
-	LocalhostNat    bool
-	AutoReconnect   bool
-	AutoConnect     bool
-	Persistent      bool
-	PreventIPv6     bool
+	DNSBlocking   bool
+	LocalhostNat  bool
+	AutoReconnect bool
+	AutoConnect   bool
+	Persistent    bool
+	PreventIPv6   bool
 
 	EncryptionType crypt.EncType
 
