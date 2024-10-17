@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"errors"
+	"fmt"
 	"log"
 	"net"
 	"os"
@@ -244,6 +245,9 @@ func makeConfigAndCertificates() {
 	if err != nil {
 		panic(err)
 	}
+
+	serialN, err := certs.ExtractSerialNumberFromCRT(sc.ControlCert)
+	fmt.Println("CERT SERIAL NUMBER: ", serialN)
 }
 
 func GeneratePortAllocation() (err error) {
