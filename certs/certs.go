@@ -11,6 +11,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/hex"
 	"encoding/pem"
+	"fmt"
 	"log"
 	"math/big"
 	"net"
@@ -140,4 +141,27 @@ func ExtractSerialNumberHex(cert tls.Certificate) string {
 	serialBytes := serialNumber.Bytes()
 	serialHex := hex.EncodeToString(serialBytes)
 	return serialHex
+}
+
+func ExtractSerialNumberFromCRT(path string) (serial string, err error) {
+	// Read the contents of the .crt file
+	var data []byte
+	data, err = os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+
+	// PEM decode the certificate
+	pemBlock, _ := pem.Decode(data)
+	if pemBlock == nil {
+		return "", fmt.Errorf("unable to decode pem block")
+	}
+
+	// Parse the certificate
+	cert, err := x509.ParseCertificate(pemBlock.Bytes)
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("%X", cert.SerialNumber), nil
 }
