@@ -22,15 +22,11 @@ var WS = {
 	GetURL: (route) => {
 		// console.log("connecting socket...")
 		let host = window.location.origin
-		let port = STORE.Cache.Get("api_port")
-		let ip = STORE.Cache.Get("api_ip")
-		host = host.replace("http://", "ws://")
+		// let port = STORE.Cache.Get("api_port")
+		// let ip = STORE.Cache.Get("api_ip")
+		host = host.replace("http://", "wss://")
 		host = host.replace("https://", "wss://")
-		if (host.includes("wails")) {
-			host = "ws://" + ip + ":" + port
-		} else {
-			host = host.replace("5173", "7777")
-		}
+		host = host.replace("5173", "7777")
 		return host + "/" + route
 	},
 	NewSocket: (url, tag, messageHandler) => {

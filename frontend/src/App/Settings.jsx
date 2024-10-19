@@ -16,7 +16,6 @@ const Settings = () => {
 	let InfoLogging = state.getKey("Config", "InfoLogging")
 
 	let DarkMode = state.getKey("Config", "DarkMode")
-	let AutoTLS = state.getKey("Config", "APIAutoTLS")
 
 	let APICertDomains = state.getKey("Config", "APICertDomains")
 	let APICertIPs = state.getKey("Config", "APICertIPs")
@@ -114,6 +113,76 @@ const Settings = () => {
 
 			</div>
 
+			< div className="general panel">
+				<div className="title">General Settings</div>
+
+				<CustomToggle
+					label={"Dark Mode"}
+					value={DarkMode}
+					toggle={() => {
+						state.toggleDarkMode()
+						state.globalRerender()
+					}}
+				/>
+
+
+				<CustomToggle
+					label="Basic Logging"
+					value={InfoLogging}
+					toggle={() => {
+						state.toggleKeyAndReloadDom("Config", "InfoLogging")
+						state.renderPage("settings")
+					}}
+				/>
+
+				<CustomToggle
+					label="Error Logging"
+					value={ErrorLogging}
+					toggle={() => {
+						state.toggleKeyAndReloadDom("Config", "ErrorLogging")
+						state.renderPage("settings")
+					}}
+				/>
+
+				<CustomToggle
+					label="Debug Logging"
+					value={DebugLogging}
+					toggle={() => {
+						state.toggleKeyAndReloadDom("Config", "DebugLogging")
+						state.renderPage("settings")
+					}}
+				/>
+
+				<CustomToggle
+					label="Debug Mode"
+					value={state?.debug}
+					toggle={() => {
+						state.toggleDebug()
+						state.renderPage("settings")
+					}}
+				/>
+
+				<CustomToggle
+					label={"Tracing"}
+					value={ConnectionTracer}
+					toggle={() => {
+						state.toggleKeyAndReloadDom("Config", "ConnectionTracer")
+						state.renderPage("settings")
+					}}
+				/>
+
+
+
+				<div
+					className="danger-button button"
+					onClick={() => state.resetApp()}
+				>
+					Reset Everything
+				</div>
+
+			</div>
+
+
 			<div className="advanced panel">
 				<div className="title" onClick={() => {
 					openConfigEditor(state.Config)
@@ -210,91 +279,7 @@ const Settings = () => {
 
 			</div>
 
-			< div className="general panel">
-				<div className="title">General Settings</div>
 
-				<CustomToggle
-					label={"Dark Mode"}
-					value={DarkMode}
-					toggle={() => {
-						state.toggleDarkMode()
-						state.globalRerender()
-					}}
-				/>
-
-				<CustomToggle
-					label={"Auto TLS"}
-					value={AutoTLS}
-					toggle={() => {
-						state.toggleKeyAndReloadDom("Config", "APIAutoTLS")
-						state.renderPage("settings")
-					}}
-				/>
-
-				<CustomToggle
-					label="Basic Logging"
-					value={InfoLogging}
-					toggle={() => {
-						state.toggleKeyAndReloadDom("Config", "InfoLogging")
-						state.renderPage("settings")
-					}}
-				/>
-
-				<CustomToggle
-					label="Error Logging"
-					value={ErrorLogging}
-					toggle={() => {
-						state.toggleKeyAndReloadDom("Config", "ErrorLogging")
-						state.renderPage("settings")
-					}}
-				/>
-
-				<CustomToggle
-					label="Debug Logging"
-					value={DebugLogging}
-					toggle={() => {
-						state.toggleKeyAndReloadDom("Config", "DebugLogging")
-						state.renderPage("settings")
-					}}
-				/>
-
-			</div>
-
-			{/* The classname of this div should probably change to advanced but it have functions and 
-			styling that also need to be changed. And then then above div should be renamed to just general*/}
-
-
-			<div className="debugging panel">
-				<div className="title">Debugging</div>
-
-				<CustomToggle
-					label={"Tracing"}
-					value={ConnectionTracer}
-					toggle={() => {
-						state.toggleKeyAndReloadDom("Config", "ConnectionTracer")
-						state.renderPage("settings")
-					}}
-				/>
-
-
-
-				<CustomToggle
-					label="Debug Mode"
-					value={state?.debug}
-					toggle={() => {
-						state.toggleDebug()
-						state.renderPage("settings")
-					}}
-				/>
-
-				<div
-					className="danger-button button"
-					onClick={() => state.resetApp()}
-				>
-					Reset Everything
-				</div>
-
-			</div>
 		</div>
 	)
 }

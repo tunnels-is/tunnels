@@ -1,10 +1,10 @@
 {
-	"ID": "66c07bba1f4c7f0424496666",
-	"InterfaceIP": "192.168.1.12",
-	"DataPort": "443",
-	"ControlIP": "0.0.0.0",
+	"ID": "66c07bba1f4c7f0424496d5c",
+	"ControlIP": "93.95.231.66",
 	"ControlPort": "444",
-	"UserMaxConnections": 10,
+	"UserMaxConnections": 4,
+	"InterfaceIP": "93.95.231.66",
+	"DataPort": "443",
 	"StartPort": 2000,
 	"EndPort": 65500,
 	"AvailableMbps": 1000,
@@ -12,24 +12,19 @@
 	"InternetAccess": true,
 	"LocalNetworkAccess": true,
 	"DNSAllowCustomOnly": false,
-	"ControlCert": "../certs/server.crt",
-	"ControlKey": "../certs/server.key",
-	"SignKey": "../certs/publicca.crt",
 	"DNS": [],
-	"Networks": [],
-	"DNSServers": [
-		"9.9.9.9",
-		"1.1.1.1"
+	"Networks": [
+		{
+			"Tag": "",
+			"Network": "93.95.231.66/24",
+			"Nat": "10.10.10.1/24",
+			"Routes": null
+		}
 	],
-	"AutoCert": true,
-	"Cert": {
-		"IPs": [
-			"192.168.1.12",
-			"127.0.0.1"
-		],
-		"Domains": [
-			""
-		],
-		"Org": "Tunnels EHF"
-	}
+	"DNSServers": [
+		"1.1.1.1",
+		"8.8.8.8"
+	],
+	"ControlCert": "./server.crt",
+	"ControlKey": "./server.key"
 }
