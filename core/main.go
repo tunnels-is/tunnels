@@ -14,6 +14,8 @@ import (
 	"runtime/debug"
 	"syscall"
 	"time"
+
+	"github.com/tunnels-is/tunnels/certs"
 	// _ "net/http/pprof"
 )
 
@@ -263,10 +265,6 @@ func LoadConfig() {
 		DEBUG("Generating a new default config")
 
 		NC := new(Config)
-		// NC.Version = ""
-		NC.RouterFilePath = ""
-		NC.RouterDialTimeoutSeconds = 10
-
 		NC.DebugLogging = false
 		NC.InfoLogging = true
 		NC.ErrorLogging = true
@@ -284,11 +282,8 @@ func LoadConfig() {
 
 		NC.APIIP = "127.0.0.1"
 		NC.APIPort = "7777"
-		NC.APIKey = ""
-		NC.APICert = ""
-		NC.APICertDomains = []string{"tunnels.app", "app.tunnels.is"}
-		NC.APICertIPs = []string{"127.0.0.1"}
-		NC.APICertType = RSA
+		applyCertificateDefaults(NC)
+		NC.APICertType = certs.ECDSA
 
 		newCon := createDefaultTunnelMeta()
 		NC.Connections = make([]*TunnelMETA, 0)
@@ -346,6 +341,8 @@ func LoadConfig() {
 
 	}
 
+	applyCertificateDefaults(C)
+
 	GLOBAL_STATE.C = C
 	GLOBAL_STATE.ConfigInitialized = true
 	DEBUG("Configurations loaded")
@@ -354,6 +351,24 @@ func LoadConfig() {
 func SwapConfig(newConfig *Config) {
 	C = newConfig
 	GLOBAL_STATE.C = C
+}
+
+func applyCertificateDefaults(cfg *Config) {
+	if cfg.APIKey == "" {
+		cfg.APIKey = "./api.key"
+	}
+	if cfg.APICert == "" {
+		cfg.APICert = "./api.crt"
+	}
+
+	if cfg.APICertIPs == nil || len(cfg.APICertIPs) < 1 {
+		cfg.APICertIPs = []string{"127.0.0.1"}
+	}
+
+	if cfg.APICertDomains == nil || len(cfg.APICertDomains) < 1 {
+		cfg.APICertDomains = []string{"tunnels.app", "app.tunnels.is"}
+	}
+	return
 }
 
 func LoadDNSWhitelist() (err error) {

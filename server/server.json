@@ -26,6 +26,5 @@
 		"8.8.8.8"
 	],
 	"ControlCert": "./server.crt",
-	"ControlKey": "./server.key",
-	"SignKey": "./controller.crt"
+	"ControlKey": "./server.key"
 }

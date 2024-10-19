@@ -56,7 +56,6 @@ type Server struct {
 
 	ControlCert string `json:"ControlCert"`
 	ControlKey  string `json:"ControlKey"`
-	SignKey     string `json:"SignKey"`
 }
 
 type ServerDNS struct {
