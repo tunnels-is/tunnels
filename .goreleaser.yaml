@@ -12,17 +12,28 @@ before:
   hooks:
     # You may remove this if you don't use go modules.
     - go mod tidy
-    - ./../../build-ui.sh
+    - ./build-ui.sh
 
 builds:
   - env:
       - CGO_ENABLED=0
+
+  - id: tunnels
+    binary: tunnels
     goos:
       - linux
       - windows
       - darwin
+    main: ./cmd/main
 
-dist: ../../builds
+  - id: server
+    binary: server
+    goos:
+      - linux
+    main: ./server
+
+
+dist: ./builds
 
 archives:
   - format: tar.gz
@@ -53,12 +64,12 @@ changelog:
       - "^docs:"
       - "^test:"
 
-announce:
-  webhook:
-    enabled: true
-    skip_tls_verify: true
-    message_template: '{ "username": "RELEASE", "content":"Release {{.Tag}} is out"}'
-    content_type: "application/json"
-    endpoint_url: "https://discord.com/api/webhooks/1297177799508885545/MffN0DtZz-DL1Jt9egcqM980-_mNs3Rjbab1o8ezAhHC-f0ng7w3-JZCFdVMDToHrmEJ"
-    headers:
-      User-Agent: "goreleaser"
+# announce:
+#   webhook:
+#     enabled: true
+#     skip_tls_verify: true
+#     message_template: '{ "username": "RELEASE", "content":"Release {{.Tag}} is out"}'
+#     content_type: "application/json"
+#     endpoint_url: "https://discord.com/api/webhooks/1297177799508885545/MffN0DtZz-DL1Jt9egcqM980-_mNs3Rjbab1o8ezAhHC-f0ng7w3-JZCFdVMDToHrmEJ"
+#     headers:
+#       User-Agent: "goreleaser"
