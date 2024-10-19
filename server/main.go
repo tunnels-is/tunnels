@@ -21,6 +21,8 @@ import (
 
 	"github.com/jackpal/gateway"
 	"github.com/tunnels-is/tunnels/certs"
+	"github.com/tunnels-is/tunnels/iptables"
+	"github.com/tunnels-is/tunnels/setcap"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"golang.org/x/net/quic"
 )
@@ -100,8 +102,14 @@ func main() {
 			ERR(r, string(debug.Stack()))
 		}
 	}()
+	runtime.GOMAXPROCS(runtime.NumCPU())
 
-	flag.StringVar(&id, "id", "xx", "Include your servers ID. This ID can be found in the Tunnels UI")
+	err := setcap.CheckCapabilities()
+	if err != nil {
+		panic(err)
+	}
+
+	flag.StringVar(&id, "id", "", "Include your servers ID. This ID can be found in the Tunnels UI")
 	flag.BoolVar(&config, "config", false, "Generate a config")
 	flag.Parse()
 
@@ -114,12 +122,18 @@ func main() {
 		os.Exit(1)
 	}
 
-	runtime.GOMAXPROCS(runtime.NumCPU())
-	var err error
-
 	Config, err = GetServerConfig(serverConfigPath)
 	if err != nil {
 		panic(err)
+	}
+
+	var existed bool
+	err, existed = iptables.SetIPTablesRSTDropFilter(Config.InterfaceIP)
+	if err != nil {
+		panic(err)
+	}
+	if !existed {
+		fmt.Println("> added iptables rule")
 	}
 
 	if Config.UserMaxConnections < 1 {
@@ -155,11 +169,6 @@ func main() {
 		MaxConnReadBufferSize:    70000,
 		MaxIdleTimeout:           60 * time.Second,
 	}
-
-	// _, err = GetServersFromFile()
-	// if err != nil {
-	// 	panic(err)
-	// }
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -260,7 +269,6 @@ func makeConfigAndCertificates() {
 	sc.DNSServers = []string{"1.1.1.1", "8.8.8.8"}
 	sc.ControlCert = "./server.crt"
 	sc.ControlKey = "./server.key"
-	sc.SignKey = "./controller.crt"
 
 	N := new(ServerNetwork)
 	N.Network = InterfaceIP.String() + "/24"

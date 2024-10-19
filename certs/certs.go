@@ -20,14 +20,14 @@ import (
 	"time"
 )
 
-type certType int
+type CertType int
 
 const (
-	RSA certType = iota
+	RSA CertType = iota
 	ECDSA
 )
 
-func MakeCert(ct certType, certPath string, keyPath string, ips []string, domains []string, org string, expirationDate time.Time, saveToDisk bool) (c tls.Certificate, err error) {
+func MakeCert(ct CertType, certPath string, keyPath string, ips []string, domains []string, org string, expirationDate time.Time, saveToDisk bool) (c tls.Certificate, err error) {
 	defer func() {
 		r := recover()
 		if r != nil {
@@ -43,7 +43,7 @@ func MakeCert(ct certType, certPath string, keyPath string, ips []string, domain
 	var keyFile *os.File
 
 	if saveToDisk {
-		keyFile, err = os.Create("server.key")
+		keyFile, err = os.Create(keyPath)
 		if err != nil {
 			return c, err
 		}
@@ -122,7 +122,7 @@ func MakeCert(ct certType, certPath string, keyPath string, ips []string, domain
 	pem.Encode(cb, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
 
 	if saveToDisk {
-		certFile, err := os.Create("server.crt")
+		certFile, err := os.Create(certPath)
 		if err != nil {
 			return c, err
 		}
