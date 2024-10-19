@@ -51,10 +51,14 @@ archives:
       - goos: windows
         format: zip
 
+  - id: a1
+    build: [tunnels]
     allow_different_binary_count: true
-
-  - id: server
+    name_tamplate: tunnels
+  - id: a2
+    build: [server]
     allow_different_binary_count: true
+    name_tamplate: server
 
 release:
    draft: true  
