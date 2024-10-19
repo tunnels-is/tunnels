@@ -12,7 +12,7 @@ before:
   hooks:
     # You may remove this if you don't use go modules.
     - go mod tidy
-    - ./build-ui.sh
+    - ./../../build-ui.sh
 
 builds:
   - env:
@@ -21,7 +21,8 @@ builds:
       - linux
       - windows
       - darwin
-    main: ./cmd/main
+
+dist: ../../builds
 
 archives:
   - format: tar.gz
@@ -37,6 +38,13 @@ archives:
     format_overrides:
       - goos: windows
         format: zip
+
+release:
+   draft: true  
+   replace_existing_draft: true
+   replace_existing_artifacts: true
+   prerelease: auto
+   mode: replace
 
 changelog:
   sort: asc
