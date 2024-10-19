@@ -37,19 +37,37 @@ builds:
 dist: ./builds
 
 archives:
-  - format: tar.gz
     # this name template makes the OS and Arch compatible with the results of `uname`.
+    # use zip for windows archives
+
+  - id: a1
+    builds: [tunnels]
+    format: tar.gz
     name_template: >-
-      {{ .ProjectName }}_
+      tunnels_
+      {{- title .Version}}_
       {{- title .Os }}_
       {{- if eq .Arch "amd64" }}x86_64
       {{- else if eq .Arch "386" }}i386
       {{- else }}{{ .Arch }}{{ end }}
       {{- if .Arm }}v{{ .Arm }}{{ end }}
-    # use zip for windows archives
+    allow_different_binary_count: true
     format_overrides:
       - goos: windows
         format: zip
+
+  - id: a2
+    builds: [server]
+    format: tar.gz
+    name_template: >-
+      server_
+      {{- title .Version }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+      {{- if .Arm }}v{{ .Arm }}{{ end }}
+    allow_different_binary_count: true
 
 release:
    draft: true  
