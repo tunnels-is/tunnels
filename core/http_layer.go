@@ -6,12 +6,14 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"os"
 	"runtime/debug"
 	"strings"
 	"time"
 
 	"github.com/labstack/echo/v4"
 	m "github.com/labstack/echo/v4/middleware"
+	"github.com/tunnels-is/tunnels/certs"
 	"golang.org/x/net/websocket"
 )
 
@@ -61,22 +63,33 @@ func StartAPI(MONITOR chan int) {
 
 	tlsConfig := new(tls.Config)
 	tlsConfig.MinVersion = tls.VersionTLS13
-	if C.APIAutoTLS && !NATIVE {
 
-		if C.APICertIPs == nil || len(C.APICertIPs) < 1 {
-			C.APICertIPs = []string{"127.0.0.1"}
-		}
+	certsExist := true
+	_, err := os.Stat(C.APICert)
+	if err != nil {
+		certsExist = false
+	}
+	_, err = os.Stat(C.APIKey)
+	if err != nil {
+		certsExist = false
+	}
 
-		if C.APICertDomains == nil || len(C.APICertDomains) < 1 {
-			C.APICertDomains = []string{"tunnels.app", "app.tunnels.is"}
-		}
+	if !certsExist {
 
-		certs, err := MakeCert(C.APICertType, C.APICertIPs, C.APICertDomains)
+		_, err := certs.MakeCert(
+			C.APICertType,
+			C.APICert,
+			C.APIKey,
+			C.APICertIPs,
+			C.APICertDomains,
+			"",
+			time.Time{},
+			true,
+		)
 		if err != nil {
 			ERROR("Certificate error:", err)
 			return
 		}
-		tlsConfig.Certificates = []tls.Certificate{certs}
 	}
 
 	API_SERVER = http.Server{
@@ -123,19 +136,15 @@ func StartAPI(MONITOR chan int) {
 	INFO("Cert: ", C.APICert)
 	INFO("===========================")
 
-	if C.APICert != "" && C.APIKey != "" {
-		if err := API_SERVER.ServeTLS(ln, C.APICert, C.APIKey); err != http.ErrServerClosed {
-			ERROR("api start error: ", err)
-		}
-	} else if C.APIAutoTLS {
-		if err := API_SERVER.ServeTLS(ln, "", ""); err != http.ErrServerClosed {
-			ERROR("api start error: ", err)
-		}
-	} else {
-		if err := API_SERVER.Serve(ln); err != http.ErrServerClosed {
-			ERROR("api start error: ", err)
-		}
+	// if C.APICert != "" && C.APIKey != "" {
+	if err := API_SERVER.ServeTLS(ln, C.APICert, C.APIKey); err != http.ErrServerClosed {
+		ERROR("api start error: ", err)
 	}
+	// } else {
+	// 	if err := API_SERVER.Serve(ln); err != http.ErrServerClosed {
+	// 		ERROR("api start error: ", err)
+	// 	}
+	// }
 }
 
 func serveMethod(e echo.Context) error {

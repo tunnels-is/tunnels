@@ -1320,17 +1320,10 @@ export var STATE = {
 	StateFetchInProgress: false,
 	GetURL: () => {
 		let host = window.location.origin
-		let port = STORE.Cache.Get("api_port")
-		let ip = STORE.Cache.Get("api_ip")
-		// host = host.replace("http://", "https://")
-		if (host.includes("wails")) {
-			host = "http://" + ip + ":" + port
-		} else {
-			if (STATE.debug) {
-				host = host.replace("5173", "7777")
-			}
-		}
-
+		// let port = STORE.Cache.Get("api_port")
+		// let ip = STORE.Cache.Get("api_ip")
+		host = host.replace("http://", "https://")
+		host = host.replace("5173", "7777")
 		return host
 
 	},

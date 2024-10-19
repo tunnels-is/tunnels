@@ -23,10 +23,20 @@ Needs to run as sudo
     - assign server to tunnel
     - give tunnel ip + port
 
+# notes
+InterfaceIP == vpn outgoing IP
+
+# iptables
+$ iptables -I OUTPUT -p tcp --src {interface_IP} --tcp-flags ACK,RST RST -j DROP
+
+
 # Test server
 93.95.231.66:444
 cert: certs/test-server.crt
+consoller sign cert: certs/controller.crt
+serial: 1ebad4235e13f3dbc437d0a6804fc03f
 - it's not always running
+
 
 
 

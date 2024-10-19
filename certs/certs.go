@@ -11,6 +11,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/hex"
 	"encoding/pem"
+	"fmt"
 	"log"
 	"math/big"
 	"net"
@@ -19,14 +20,14 @@ import (
 	"time"
 )
 
-type certType int
+type CertType int
 
 const (
-	RSA certType = iota
+	RSA CertType = iota
 	ECDSA
 )
 
-func MakeCert(ct certType, certPath string, keyPath string, ips []string, domains []string, org string, expirationDate time.Time, saveToDisk bool) (c tls.Certificate, err error) {
+func MakeCert(ct CertType, certPath string, keyPath string, ips []string, domains []string, org string, expirationDate time.Time, saveToDisk bool) (c tls.Certificate, err error) {
 	defer func() {
 		r := recover()
 		if r != nil {
@@ -42,7 +43,7 @@ func MakeCert(ct certType, certPath string, keyPath string, ips []string, domain
 	var keyFile *os.File
 
 	if saveToDisk {
-		keyFile, err = os.Create("server.key")
+		keyFile, err = os.Create(keyPath)
 		if err != nil {
 			return c, err
 		}
@@ -121,7 +122,7 @@ func MakeCert(ct certType, certPath string, keyPath string, ips []string, domain
 	pem.Encode(cb, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
 
 	if saveToDisk {
-		certFile, err := os.Create("server.crt")
+		certFile, err := os.Create(certPath)
 		if err != nil {
 			return c, err
 		}
@@ -140,4 +141,27 @@ func ExtractSerialNumberHex(cert tls.Certificate) string {
 	serialBytes := serialNumber.Bytes()
 	serialHex := hex.EncodeToString(serialBytes)
 	return serialHex
+}
+
+func ExtractSerialNumberFromCRT(path string) (serial string, err error) {
+	// Read the contents of the .crt file
+	var data []byte
+	data, err = os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+
+	// PEM decode the certificate
+	pemBlock, _ := pem.Decode(data)
+	if pemBlock == nil {
+		return "", fmt.Errorf("unable to decode pem block")
+	}
+
+	// Parse the certificate
+	cert, err := x509.ParseCertificate(pemBlock.Bytes)
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("%X", cert.SerialNumber), nil
 }

@@ -278,10 +278,6 @@ func validateConfig(config *Config) (err error) {
 		return errors.New("IP Address on default connection is invalid")
 	}
 
-	if NATIVE {
-		config.APIAutoTLS = false
-	}
-
 	return nil
 }
 
