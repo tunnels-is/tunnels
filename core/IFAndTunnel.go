@@ -5,7 +5,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/zveinn/crypt"
 )
 
@@ -124,27 +123,8 @@ func Disconnect(GUID string, remove bool, switching bool) (err error) {
 }
 
 func createRandomTunnel() (Cfg *Config, err error) {
-	ls := strconv.Itoa(len(C.Connections))
-	ifAndTag := "newconnection" + ls
-
 	M := new(TunnelMETA)
-	M.AutomaticRouter = true
-	M.IPv4Address = "777.777.777.777"
-	M.NetMask = "255.255.255.255"
-	M.DNSBlocking = false
-	M.PreventIPv6 = false
-	M.Tag = ifAndTag
-	M.IFName = ifAndTag
-	M.TxQueueLen = 3000
-	M.MTU = 1426
-	M.AutoReconnect = false
-	M.CloseConnectionsOnConnect = false
-	M.WindowsGUID = CreateConnectionUUID()
-
-	M.DNSServers = []string{}
-	M.DNS = []*ServerDNS{}
-	M.Networks = []*ServerNetwork{}
-
+	M = createTunnel()
 	C.Connections = append(C.Connections, M)
 	Cfg = C
 
@@ -156,28 +136,40 @@ func createRandomTunnel() (Cfg *Config, err error) {
 	return
 }
 
+func createTunnel() (T *TunnelMETA) {
+	T = new(TunnelMETA)
+	ls := strconv.Itoa(len(C.Connections))
+	ifAndTag := "newconnection" + ls
+	T.Tag = ifAndTag
+	T.IFName = ifAndTag
+	T.EnableDefaultRoute = false
+	T.IPv4Address = "777.777.777.777"
+	T.NetMask = "255.255.255.255"
+
+	T.EncryptionType = crypt.CHACHA20
+	T.DNSBlocking = false
+	T.PreventIPv6 = false
+	T.TxQueueLen = 3000
+	T.MTU = 1426
+	T.ServerID = ""
+	T.AutoReconnect = false
+	T.AutoConnect = false
+	T.CloseConnectionsOnConnect = false
+	T.Networks = make([]*ServerNetwork, 0)
+	T.DNSServers = make([]string, 0)
+	T.DNS = make([]*ServerDNS, 0)
+	T.WindowsGUID = CreateConnectionUUID()
+	return
+}
+
 func createDefaultTunnelMeta() (M *TunnelMETA) {
 	M = new(TunnelMETA)
-	M.AutomaticRouter = true
-	M.EncryptionType = crypt.CHACHA20
+	M = createTunnel()
 	M.IPv4Address = "172.22.22.22"
 	M.NetMask = "255.255.255.255"
-	M.DNSBlocking = false
-	M.PreventIPv6 = false
 	M.Tag = DefaultTunnelName
 	M.IFName = DefaultTunnelName
-	M.TxQueueLen = 3000
-	M.MTU = 1426
-	M.ServerID = ""
-	M.AutoReconnect = false
-	M.AutoConnect = false
-	M.CloseConnectionsOnConnect = false
 	M.EnableDefaultRoute = true
-	M.Networks = make([]*ServerNetwork, 0)
-	M.DNSServers = make([]string, 0)
-	M.DNS = make([]*ServerDNS, 0)
-	M.WindowsGUID = "{" + strings.ToUpper(uuid.NewString()) + "}"
-
 	return
 }
 

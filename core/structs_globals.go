@@ -12,6 +12,7 @@ import (
 
 	"github.com/go-ping/ping"
 	"github.com/miekg/dns"
+	"github.com/tunnels-is/tunnels/certs"
 	"github.com/zveinn/crypt"
 )
 
@@ -357,13 +358,12 @@ type TunnelMETA struct {
 	ServerID string
 
 	// controlled by user only
-	DNSBlocking     bool
-	AutomaticRouter bool
-	LocalhostNat    bool
-	AutoReconnect   bool
-	AutoConnect     bool
-	Persistent      bool
-	PreventIPv6     bool
+	DNSBlocking   bool
+	LocalhostNat  bool
+	AutoReconnect bool
+	AutoConnect   bool
+	Persistent    bool
+	PreventIPv6   bool
 
 	EncryptionType crypt.EncType
 
@@ -523,50 +523,41 @@ type Tunnel struct {
 }
 
 type Config struct {
-	DNS1Default    string   `json:"DNS1Default"`
-	DNS2Default    string   `json:"DNS2Default"`
-	DNSOverHTTPS   bool     `json:"DNSOverHTTPS"`
-	APICert        string   `json:"APICert"`
-	APIKey         string   `json:"APIKey"`
-	APICertDomains []string `json:"APICertDomains"`
-	APICertIPs     []string `json:"APICertIPs"`
-	APICertType    certType `json:"APICertType"`
-	APIAutoTLS     bool     `json:"APIAutoTLS"`
-	// AutoReconnect        bool
-	// KillSwitch           bool
-	// ManualRouter         bool
-	DebugLogging   bool
-	ConsoleLogging bool
-	InfoLogging    bool
-	ErrorLogging   bool
-
-	DNSstats bool
+	Connections []*TunnelMETA
 
 	DarkMode bool
-
-	RouterFilePath string
 
 	// Security settings
 	IsolationMode bool
 
-	// DNS Blocking
-	DomainWhitelist   string
-	EnabledBlockLists []string
+	// API Setting
+	APIIP          string
+	APIPort        string
+	APICert        string
+	APIKey         string
+	APICertDomains []string
+	APICertIPs     []string
+	APICertType    certs.CertType
+
+	// Optional Debugging Settings
 	LogBlockedDomains bool
 	LogAllDomains     bool
-	DNSServerIP       string
-	DNSServerPort     string
+	DebugLogging      bool
+	ConsoleLogging    bool
+	InfoLogging       bool
+	ErrorLogging      bool
+	ConnectionTracer  bool
 
-	APIIP   string
-	APIPort string
-
-	ConnectionTracer bool
-
+	// DNS Settings
+	DNS1Default         string
+	DNS2Default         string
+	DNSOverHTTPS        bool
+	DNSstats            bool
+	DNSServerIP         string
+	DNSServerPort       string
+	DomainWhitelist     string
+	EnabledBlockLists   []string
 	AvailableBlockLists []*BlockList
-
-	// Connections
-	Connections              []*TunnelMETA
-	RouterDialTimeoutSeconds int
 }
 
 var (

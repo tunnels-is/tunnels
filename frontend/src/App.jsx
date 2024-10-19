@@ -33,14 +33,13 @@ import STORE from "./store";
 import DNSAnswers from "./App/component/DNSAnswers";
 
 // Use this to automatically turn on debug 
-//STORE.Cache.Set("debug", true)
+STORE.Cache.Set("debug", true)
 
 const appElement = document.getElementById('app')
 const root = createRoot(appElement);
 
 const LaunchApp = () => {
 	const state = GLOBAL_STATE("root")
-	//	state.debug = true
 
 	let configChanged = state.modifiedLists !== undefined
 	if (!configChanged) {
