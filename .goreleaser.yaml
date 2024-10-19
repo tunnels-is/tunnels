@@ -17,21 +17,22 @@ before:
 builds:
   - env:
       - CGO_ENABLED=0
-
-  - id: tunnels
-    binary: tunnels
     goos:
       - linux
       - windows
       - darwin
+    goarch:
+      - amd64
+      - arm64
     main: ./cmd/main
 
   - id: server
-    binary: server
     goos:
       - linux
+    goarch:
+      - amd64
+      - arm64
     main: ./server
-
 
 dist: ./builds
 
