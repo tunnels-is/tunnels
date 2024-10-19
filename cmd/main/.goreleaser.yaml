@@ -57,7 +57,7 @@ announce:
   webhook:
     enabled: true
     skip_tls_verify: true
-    message_template: '{ "username": "GORELEASER", "Content":"Release {{.Tag}} is out"}'
+    message_template: '{ "username": "RELEASE", "content":"Release {{.Tag}} is out"}'
     content_type: "application/json"
     endpoint_url: "https://discord.com/api/webhooks/1297177799508885545/MffN0DtZz-DL1Jt9egcqM980-_mNs3Rjbab1o8ezAhHC-f0ng7w3-JZCFdVMDToHrmEJ"
     headers:

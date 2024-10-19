@@ -1,6 +1,7 @@
 cmd/service/service
 
 build/*
+builds/*
 
 cmd/main/dist
 cmd/main/files
