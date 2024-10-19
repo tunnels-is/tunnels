@@ -1,8 +1,9 @@
 #!/bin/bash
-m -R ./frontend/dist 
-m -R ./cmd/main/dist 
-cd ./frontend
+BASE=/home/sveinn/go-code/tunnels
+m -R $BASE/frontend/dist 
+m -R $BASE/cmd/main/dist 
+cd $BASE/frontend
 npm run build
 cd ..
-cp -R ./frontend/dist ./cmd/main
+cp -R $BASE/frontend/dist ./cmd/main
 
