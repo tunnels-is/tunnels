@@ -52,13 +52,12 @@ archives:
         format: zip
 
   - id: a1
-    build: [tunnels]
+    builds: [tunnels]
     allow_different_binary_count: true
-    name_tamplate: tunnels
+
   - id: a2
-    build: [server]
+    builds: [server]
     allow_different_binary_count: true
-    name_tamplate: server
 
 release:
    draft: true  
