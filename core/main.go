@@ -361,6 +361,8 @@ func applyCertificateDefaults(cfg *Config) {
 		cfg.APICert = "./api.crt"
 	}
 
+	cfg.APICertType = certs.RSA
+
 	if cfg.APICertIPs == nil || len(cfg.APICertIPs) < 1 {
 		cfg.APICertIPs = []string{"127.0.0.1"}
 	}
