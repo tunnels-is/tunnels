@@ -139,7 +139,7 @@ func createRandomTunnel() (Cfg *Config, err error) {
 func createTunnel() (T *TunnelMETA) {
 	T = new(TunnelMETA)
 	ls := strconv.Itoa(len(C.Connections))
-	ifAndTag := "newconnection" + ls
+	ifAndTag := "newtunnel" + ls
 	T.Tag = ifAndTag
 	T.IFName = ifAndTag
 	T.EnableDefaultRoute = false

@@ -364,7 +364,7 @@ export var STATE = {
 	DeleteConnection: async (id) => {
 		STATE.Config?.Connections.forEach((c, index) => {
 			if (c.WindowsGUID === id) {
-				console.log("SPLICING:", c.WindowsGUID)
+				// console.log("SPLICING:", c.WindowsGUID)
 				STATE.Config?.Connections.splice(index, 1)
 			} else if (c.WindowsGUID === "") {
 				STATE.Config?.Connections.splice(index, 1)
@@ -372,7 +372,7 @@ export var STATE = {
 		})
 		STATE.modifiedConfig?.Connections.forEach((c, index) => {
 			if (c.WindowsGUID === id) {
-				console.log("SPLICING:", c.WindowsGUID)
+				// console.log("SPLICING:", c.WindowsGUID)
 				STATE.modifiedConfig?.Connections.splice(index, 1)
 			} else if (c.WindowsGUID === "") {
 				STATE.modifiedConfig?.Connections.splice(index, 1)

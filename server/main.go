@@ -271,6 +271,7 @@ func makeConfigAndCertificates() {
 	sc.ControlKey = "./server.key"
 
 	N := new(ServerNetwork)
+	N.Tag = "default"
 	N.Network = InterfaceIP.String() + "/24"
 	N.Nat = "10.10.10.1/24"
 	sc.Networks = append(sc.Networks, N)
