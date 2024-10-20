@@ -201,6 +201,8 @@ func StartLogQueueProcessor(MONITOR chan int) {
 		select {
 		case APILogQueue <- line:
 		default:
+			APILogQueue = nil
+			APILogQueue = make(chan string, 1000)
 			fmt.Println("Log API queue full")
 		}
 
