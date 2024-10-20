@@ -39,6 +39,7 @@ const PrivateServers = () => {
 					}
 				},
 				{ type: "text", value: server._id },
+				{ type: "text", value: server.Serial },
 				{
 					type: "select",
 					opts: opts,
@@ -64,6 +65,7 @@ const PrivateServers = () => {
 	const headers = [
 		{ value: "Tag" },
 		{ value: "ID" },
+		{ value: "Cert Serial" },
 		{ value: "Tunnel" },
 	]
 
