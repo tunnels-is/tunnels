@@ -517,6 +517,7 @@ func ResolveDNSAsHTTPS(m *dns.Msg, w dns.ResponseWriter) {
 
 	newx := new(dns.Msg)
 	newx.Unpack(bb)
+	CacheDnsReply(newx)
 	err = w.WriteMsg(newx)
 	w.Close()
 	if err != nil {
