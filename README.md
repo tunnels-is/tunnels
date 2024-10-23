@@ -37,6 +37,11 @@ consoller sign cert: certs/controller.crt
 serial: 1ebad4235e13f3dbc437d0a6804fc03f
 - it's not always running
 
+# Building
+ - toggle debug to false in app.jsx
+ - $ goreleaser release --clean ( add GITHUB_TOKEN )
+ - $ goreleaser build --snapchot --clean 
+
 
 
 
