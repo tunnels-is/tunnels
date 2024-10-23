@@ -117,15 +117,20 @@ func printInfo() {
 	fmt.Println("=======================================================================")
 	fmt.Println("======================= HELPFUL INFORMATION ===========================")
 	fmt.Println("=======================================================================")
-	fmt.Println("- Tunnels request network admin to run, but it does NOT need sudo or root.")
+	fmt.Println("")
+	fmt.Println("- Tunnels request network admin permissions to run.")
 	fmt.Println("- Remember to configure your DNS servers if you want to use Tunnels DNS functionality.")
 	fmt.Println("- The GUI can be found here: "+C.APIIP+":"+C.APIPort, " -- This might change depending on settings.")
-	fmt.Println("- Remember to turn all logging off if you are concerned about privacy")
-	fmt.Println("- There is a --basePath flag that can let you reconfigure the base directory for logs and configs")
-	fmt.Println("- Automatic router selection is configured for all new connections. Turn it off if you want to manualy select a router")
+	fmt.Println("- Remember to turn all logging off if you are concerned about privacy.")
+	fmt.Println("- There is a --basePath flag that can let you reconfigure the base directory for logs and configs.")
+	fmt.Println("")
 	fmt.Println("=======================================================================")
 	fmt.Println("=======================================================================")
+	fmt.Println("")
+	fmt.Println("NOTE: If the app closes without any logs/errors you will need to delete your config")
 }
+
+type X *bool
 
 var (
 	routineMonitor   = make(chan int, 200)
