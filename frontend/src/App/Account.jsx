@@ -143,11 +143,9 @@ const Account = () => {
 							value={state.LicenseKey} />
 					</div>
 
-					{state.LicenseKey !== "" &&
-						<div className="item full-width-item" key={state?.LicenseKey}>
-							<div className="card-button" onClick={() => state.ActivateLicense()} >Activate Key</div>
-						</div>
-					}
+					<div className="item full-width-item" key={state?.LicenseKey}>
+						<div className="card-button" onClick={() => state.ActivateLicense()} >Activate Key</div>
+					</div>
 
 
 				</div>
