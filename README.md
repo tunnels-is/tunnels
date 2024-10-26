@@ -2,6 +2,13 @@
 [![Stargazers][stars-shield]][stars-url]
 [![Issues][issues-shield]][issues-url]
 
+# Block List Source
+https://github.com/n00bady/bluam
+Special thanks to Kazaboo from twitch!
+
+# Live Development
+https://twitch.tv/keyb1nd_
+
 # Tunnels
 ... don't worry, we are writing this right now.
 ... We will be addding an open source license to this soon (tm)
