@@ -120,7 +120,7 @@ func printInfo() {
 	fmt.Println("")
 	fmt.Println("- Tunnels request network admin permissions to run.")
 	fmt.Println("- Remember to configure your DNS servers if you want to use Tunnels DNS functionality.")
-	fmt.Println("- The GUI can be found here: "+C.APIIP+":"+C.APIPort, " -- This might change depending on settings.")
+	fmt.Println("- The UI can be found here: https://"+C.APIIP+":"+C.APIPort, " -- This might change depending on settings.")
 	fmt.Println("- Remember to turn all logging off if you are concerned about privacy.")
 	fmt.Println("- There is a --basePath flag that can let you reconfigure the base directory for logs and configs.")
 	fmt.Println("")
