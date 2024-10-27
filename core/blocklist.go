@@ -61,10 +61,11 @@ func ReBuildBlockLists(config *Config) (listError error) {
 		if CheckIfURL(bl.FullPath) {
 			_, err := os.Stat(bl.DiskPath)
 			if err != nil {
+				DEBUG("Could not find DNS blocklist on disk, downloading: ", bl.DiskPath)
 				bl.LastRefresh = time.Now().AddDate(-2, 0, 0)
 			}
 
-			if time.Since(bl.LastRefresh).Hours() > (1 * time.Hour).Hours() {
+			if time.Since(bl.LastRefresh).Hours() > 12 {
 				listBytes, err = downloadList(bl.FullPath)
 				if err != nil {
 					listError = err
@@ -142,7 +143,7 @@ func ReBuildBlockLists(config *Config) (listError error) {
 			return err
 		}
 
-		bl.LastRefresh = time.Now()
+		config.AvailableBlockLists[index].LastRefresh = time.Now()
 		if badLines > 0 {
 			DEBUG(badLines, " invalid lines in list: ", bl.FullPath)
 		}

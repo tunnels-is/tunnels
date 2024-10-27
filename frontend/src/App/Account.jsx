@@ -95,18 +95,22 @@ const Account = () => {
 					<KeyValue label={"Last Update"} value={
 						dayjs(state.User.Updated).format("DD-MM-YYYY HH:mm:ss")
 					} />
-					<KeyValue label={"ID"} value={state.User?._id} />
+					<KeyValue label={"ID"} value={state.User._id} />
 					<KeyValue label={"API Key"} value={state.getKey("User", "APIKey")} />
 
 
-					{(state.User?.OrgID === "000000000000000000000000" || state.User?.OrgID === undefined) &&
+					{(state.User.OrgID === "000000000000000000000000" || state.User.OrgID === undefined) &&
 						<>
-							<KeyValue label={"Subscription Expires"} value={dayjs(state.User.SubExpiration).format("DD-MM-YYYY HH:mm:ss")} />
+							{state.User.SubExpiration &&
+								<>
+									<KeyValue label={"Subscription Expires"} value={dayjs(state.User.SubExpiration).format("DD-MM-YYYY HH:mm:ss")} />
+								</>
+							}
 						</>
 					}
 
-					{state.User?.Key &&
-						<KeyValue label={"License"} value={state.User?.Key.Key} />
+					{state.User.Key &&
+						<KeyValue label={"License"} value={state.User.Key.Key} />
 					}
 
 					<div className="button-and-text-seperator"></div>
