@@ -145,8 +145,13 @@ const Connections = () => {
 		let eb = 0
 		let ibs = "B/s"
 		let ebs = "B/s"
+		let stocms = "?"
+		let roundms = "?"
 
 		if (s) {
+			stocms = String(s.ServerToClientMicro / 1000)
+			roundms = stocms * 2
+
 			eb = s.EgressBytes
 			ib = s.IngressBytes
 			if (s.EgressBytes > 1000) {
@@ -237,6 +242,8 @@ const Connections = () => {
 						<KeyValue label={"Download"} value={s.IngressString} />
 						<div className="button-and-text-seperator"></div>
 						<KeyValue label={"Last Ping"} value={dayjs(s.PingTime).format('HH:mm:ss')} />
+						<KeyValue label={"Server to Client"} value={stocms + " ms"} />
+						<KeyValue label={"Round Trip"} value={roundms + " ms"} />
 						<KeyValue label={"Memory"} value={s.MEM + " %"} />
 						<KeyValue label={"Disk"} value={s.DISK + " %"} />
 						<KeyValue label={"CPU"} value={s.CPU + " %"} />

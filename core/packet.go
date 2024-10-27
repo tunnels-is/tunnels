@@ -2,6 +2,7 @@ package core
 
 import (
 	"encoding/binary"
+	"time"
 )
 
 type packetDebugOut struct {
@@ -11,6 +12,15 @@ type packetDebugOut struct {
 	DstIP   []byte
 	Flags   byte
 	TCPH    []byte
+}
+
+func (V *Tunnel) RegisterPing(packet []byte) {
+	defer RecoverAndLogToFile()
+	V.TunnelSTATS.PingTime = time.Now()
+	V.TunnelSTATS.CPU = packet[0]
+	V.TunnelSTATS.MEM = packet[1]
+	V.TunnelSTATS.DISK = packet[2]
+	V.TunnelSTATS.ServerToClientMicro = time.Since(time.Unix(0, int64(binary.BigEndian.Uint64(packet[3:])))).Microseconds()
 }
 
 func debugProcessPacket(packet []byte) (P *packetDebugOut) {
