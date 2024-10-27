@@ -2,6 +2,7 @@ package core
 
 import (
 	"crypto/tls"
+	"encoding/json"
 	"io/fs"
 	"log"
 	"net"
@@ -11,8 +12,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/labstack/echo/v4"
-	m "github.com/labstack/echo/v4/middleware"
 	"github.com/tunnels-is/tunnels/certs"
 	"golang.org/x/net/websocket"
 )
@@ -26,44 +25,9 @@ func getFileSystem() http.FileSystem {
 	return http.FS(fsys)
 }
 
-func StartAPI(MONITOR chan int) {
-	defer func() {
-		r := recover()
-		if r != nil {
-			log.Println(r, string(debug.Stack()))
-		}
-		time.Sleep(2 * time.Second)
-		MONITOR <- 2
-	}()
-
-	E := echo.New()
-
-	E.Use(m.SecureWithConfig(m.DefaultSecureConfig))
-
-	corsConfig := m.CORSConfig{
-		Skipper:      m.DefaultSkipper,
-		AllowOrigins: []string{"*"},
-		AllowMethods: []string{"POST", "GET", "OPTIONS"},
-		AllowHeaders: []string{"*"},
-	}
-
-	E.Use(m.CORSWithConfig(corsConfig))
-
-	if !NATIVE {
-		assetHandler := http.FileServer(getFileSystem())
-		E.GET("/", echo.WrapHandler(assetHandler))
-		E.GET("/assets/*", echo.WrapHandler(assetHandler))
-	}
-
-	// E.GET("/state", WS_STATE)
-	E.GET("/logs", WS_LOGS)
-
-	v1 := E.Group("/v1")
-	v1.POST("/method/:method", serveMethod)
-
-	tlsConfig := new(tls.Config)
-	tlsConfig.MinVersion = tls.VersionTLS13
-
+func makeTLSConfig() (tc *tls.Config) {
+	tc = new(tls.Config)
+	tc.MinVersion = tls.VersionTLS13
 	certsExist := true
 	_, err := os.Stat(C.APICert)
 	if err != nil {
@@ -91,10 +55,28 @@ func StartAPI(MONITOR chan int) {
 			return
 		}
 	}
+	return
+}
 
+func LaunchAPI(MONITOR chan int) {
+	defer func() {
+		r := recover()
+		if r != nil {
+			log.Println(r, string(debug.Stack()))
+		}
+		time.Sleep(2 * time.Second)
+		MONITOR <- 2
+	}()
+	assetHandler := http.FileServer(getFileSystem())
+
+	mux := http.NewServeMux()
+	mux.Handle("/logs", websocket.Handler(handleWebSocket))
+	mux.Handle("/", assetHandler)
+	mux.Handle("/assets/", assetHandler)
+	mux.HandleFunc("/v1/method/{method}", HTTPhandler)
 	API_SERVER = http.Server{
-		Handler:   E,
-		TLSConfig: tlsConfig,
+		Handler:   mux,
+		TLSConfig: makeTLSConfig(),
 	}
 
 	ip := C.APIIP
@@ -136,177 +118,225 @@ func StartAPI(MONITOR chan int) {
 	INFO("Cert: ", C.APICert)
 	INFO("===========================")
 
-	// if C.APICert != "" && C.APIKey != "" {
 	if err := API_SERVER.ServeTLS(ln, C.APICert, C.APIKey); err != http.ErrServerClosed {
 		ERROR("api start error: ", err)
 	}
-	// } else {
-	// 	if err := API_SERVER.Serve(ln); err != http.ErrServerClosed {
-	// 		ERROR("api start error: ", err)
-	// 	}
-	// }
 }
 
-func serveMethod(e echo.Context) error {
-	method := e.Param("method")
+func setupCORS(w *http.ResponseWriter, _ *http.Request) {
+	(*w).Header().Set("Access-Control-Allow-Origin", "*")
+	(*w).Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
+	(*w).Header().Set("Access-Control-Allow-Headers", "*")
+}
+
+func HTTPhandler(w http.ResponseWriter, r *http.Request) {
+	setupCORS(&w, r)
+	if (*r).Method == "OPTIONS" {
+		w.WriteHeader(204)
+		r.Body.Close()
+		return
+	}
+
+	method := r.PathValue("method")
 	switch method {
 	case "connectPrivate":
-		return HTTP_ConnectPrivate(e)
+		HTTP_ConnectPrivate(w, r)
+		return
 	case "connect":
-		return HTTP_Connect(e)
+		HTTP_Connect(w, r)
+		return
 	case "disconnect":
-		return HTTP_Disconnect(e)
+		HTTP_Disconnect(w, r)
+		return
 	case "resetNetwork":
-		return HTTP_ResetNetwork(e)
+		HTTP_ResetNetwork(w, r)
+		return
 	case "setConfig":
-		return HTTP_SetConfig(e)
+		HTTP_SetConfig(w, r)
+		return
 	case "getQRCode":
-		return HTTP_GetQRCode(e)
+		HTTP_GetQRCode(w, r)
+		return
 	case "forwardToController":
-		return HTTP_ForwardToController(e)
+		HTTP_ForwardToController(w, r)
+		return
 	case "createConnection":
-		return HTTP_CreateConnection(e)
-
+		HTTP_CreateConnection(w, r)
+		return
 	case "getState":
-		return HTTP_GetState(e)
+		HTTP_GetState(w, r)
+		return
 	default:
 	}
-	return e.JSON(200, nil)
+	w.WriteHeader(200)
+	r.Body.Close()
+	return
 }
 
 var LogSocket *websocket.Conn
 
-func WS_LOGS(c echo.Context) error {
-	websocket.Handler(func(ws *websocket.Conn) {
-		defer func() {
-			r := recover()
-			if r != nil {
-				DEBUG(r, string(debug.Stack()))
-			}
-			ws.Close()
-		}()
-		LogSocket = ws
-		for {
-			select {
-			case event := <-APILogQueue:
-				err := websocket.Message.Send(ws, event)
-				if err != nil {
-					// Make an attempt to delive this log line to the new LogSocket.
-					// if delivery fails, the event will be found in the log file.
-					_ = websocket.Message.Send(LogSocket, event)
-					ERROR("Logging websocket error: ", err)
-					return
-				}
-			}
-		}
-	}).ServeHTTP(c.Response(), c.Request())
-	return nil
-}
-
-func HTTP_GetState(e echo.Context) (err error) {
+func handleWebSocket(ws *websocket.Conn) {
 	defer func() {
 		r := recover()
 		if r != nil {
-			log.Println(r, string(debug.Stack()))
+			DEBUG(r, string(debug.Stack()))
+		}
+		ws.Close()
+	}()
+	LogSocket = ws
+	for {
+		select {
+		case event := <-APILogQueue:
+			err := websocket.Message.Send(ws, event)
+			if err != nil {
+				// Make an attempt to delive this log line to the new LogSocket.
+				// if delivery fails, the event will be found in the log file.
+				_ = websocket.Message.Send(LogSocket, event)
+				ERROR("Logging websocket error: ", err)
+				return
+			}
+		}
+	}
+}
+
+func Bind[I any](form I, r *http.Request) (err error) {
+	decoder := json.NewDecoder(r.Body)
+	err = decoder.Decode(form)
+	return
+}
+
+func STRING(w http.ResponseWriter, r *http.Request, code int, data string) {
+	w.Write([]byte(data))
+	w.WriteHeader(code)
+}
+
+func JSON(w http.ResponseWriter, r *http.Request, code int, data interface{}) {
+	defer func() {
+		rec := recover()
+		if rec != nil {
+			log.Println(rec, string(debug.Stack()))
+		}
+		if r.Body != nil {
+			r.Body.Close()
 		}
 	}()
-	form := new(FORWARD_REQUEST)
-	err = e.Bind(form)
+	encoder := json.NewEncoder(w)
+	err := encoder.Encode(data)
 	if err != nil {
-		return e.JSON(400, err)
+		ERROR("Unable to write encoded json to response writer:", err)
+		return
+	}
+	w.WriteHeader(code)
+}
+
+func HTTP_GetState(w http.ResponseWriter, r *http.Request) {
+	form := new(FORWARD_REQUEST)
+	err := Bind(form, r)
+	if err != nil {
+		JSON(w, r, 400, err)
+		return
 	}
 
 	_ = PrepareState()
-	return e.JSON(200, GLOBAL_STATE)
+	JSON(w, r, 200, GLOBAL_STATE)
 }
 
-func HTTP_ConnectPrivate(e echo.Context) (err error) {
+func HTTP_ConnectPrivate(w http.ResponseWriter, r *http.Request) {
 	ns := new(ConnectionRequest)
-	err = e.Bind(ns)
+	err := Bind(ns, r)
 	if err != nil {
-		return e.JSON(400, err)
+		JSON(w, r, 400, err)
+		return
 	}
 
 	// code, err := ConnectToPrivateNode(*ns)
 	// if err != nil {
 	// 	return e.String(code, err.Error())
 	// }
-	return e.JSON(0, nil)
+	JSON(w, r, 0, nil)
 }
 
-func HTTP_Connect(e echo.Context) (err error) {
+func HTTP_Connect(w http.ResponseWriter, r *http.Request) {
 	ns := new(UIConnectRequest)
-	err = e.Bind(ns)
+	err := Bind(ns, r)
 	if err != nil {
-		return e.JSON(400, err)
+		JSON(w, r, 400, err)
+		return
 	}
 
 	code, err := PublicConnect(*ns)
 	if err != nil {
-		return e.String(code, err.Error())
+		STRING(w, r, code, err.Error())
+		return
 	}
-	return e.JSON(code, nil)
+	JSON(w, r, code, nil)
 }
 
-func HTTP_Disconnect(e echo.Context) (err error) {
+func HTTP_Disconnect(w http.ResponseWriter, r *http.Request) {
 	DF := new(DisconnectForm)
-	err = e.Bind(DF)
+	err := Bind(DF, r)
 	if err != nil {
-		return e.JSON(400, err)
+		JSON(w, r, 400, err)
+		return
 	}
 	err = Disconnect(DF.GUID, true, false)
 	if err != nil {
-		return e.JSON(400, err)
+		JSON(w, r, 400, err)
+		return
 	}
-	return e.JSON(200, nil)
+	JSON(w, r, 200, nil)
 }
 
-func HTTP_ResetNetwork(e echo.Context) (err error) {
+func HTTP_ResetNetwork(w http.ResponseWriter, r *http.Request) {
 	ResetEverything()
-	return e.JSON(200, nil)
+	JSON(w, r, 200, nil)
 }
 
-func HTTP_SetConfig(e echo.Context) (err error) {
+func HTTP_SetConfig(w http.ResponseWriter, r *http.Request) {
 	config := new(Config)
-	err = e.Bind(config)
+	err := Bind(config, r)
 	if err != nil {
-		return e.JSON(400, err.Error())
+		JSON(w, r, 400, err.Error())
+		return
 	}
 
 	err = SetConfig(config)
 	if err != nil {
-		return e.JSON(400, err.Error())
+		JSON(w, r, 400, err.Error())
+		return
 	}
-	return e.JSON(200, nil)
+	JSON(w, r, 200, nil)
 }
 
-func HTTP_GetQRCode(e echo.Context) (err error) {
+func HTTP_GetQRCode(w http.ResponseWriter, r *http.Request) {
 	form := new(TWO_FACTOR_CONFIRM)
-	err = e.Bind(form)
+	err := Bind(form, r)
 	if err != nil {
-		return e.JSON(400, err)
+		JSON(w, r, 400, err)
 	}
 	QR, err := GetQRCode(form)
 	if err != nil {
-		return e.JSON(400, err)
+		JSON(w, r, 400, err)
+		return
 	}
-	return e.JSON(200, QR)
+	JSON(w, r, 200, QR)
 }
 
-func HTTP_CreateConnection(e echo.Context) (err error) {
+func HTTP_CreateConnection(w http.ResponseWriter, r *http.Request) {
 	config, err := createRandomTunnel()
 	if err != nil {
-		return e.String(400, err.Error())
+		STRING(w, r, 400, err.Error())
+		return
 	}
-	return e.JSON(200, config)
+	JSON(w, r, 200, config)
 }
 
-func HTTP_ForwardToController(e echo.Context) (err error) {
+func HTTP_ForwardToController(w http.ResponseWriter, r *http.Request) {
 	form := new(FORWARD_REQUEST)
-	err = e.Bind(form)
+	err := Bind(form, r)
 	if err != nil {
-		return e.JSON(400, err)
+		JSON(w, r, 400, err)
 	}
 	data, code := ForwardToController(form)
-	return e.JSON(code, data)
+	JSON(w, r, code, data)
 }
