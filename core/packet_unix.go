@@ -119,10 +119,7 @@ func (V *Tunnel) ReadFromServeTunnel() {
 			return
 		}
 		if len(packet) < 20 {
-			V.TunnelSTATS.PingTime = time.Now()
-			V.TunnelSTATS.CPU = packet[1]
-			V.TunnelSTATS.MEM = packet[2]
-			V.TunnelSTATS.DISK = packet[3]
+			go V.RegisterPing(CopySlice(packet))
 			continue
 		}
 

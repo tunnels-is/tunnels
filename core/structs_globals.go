@@ -417,10 +417,11 @@ type TunnelSTATS struct {
 	Nonce2 uint64
 
 	// FROM NODE
-	CPU      byte
-	DISK     byte
-	MEM      byte
-	PingTime time.Time
+	CPU                 byte
+	DISK                byte
+	MEM                 byte
+	ServerToClientMicro int64
+	PingTime            time.Time
 }
 
 type Tunnel struct {

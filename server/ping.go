@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/binary"
 	"syscall"
 	"time"
 
@@ -9,7 +10,7 @@ import (
 	"github.com/shirou/gopsutil/mem"
 )
 
-var PingPongStatsBuffer = []byte{101, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+var PingPongStatsBuffer = []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
 
 func PopulatePingBufferWithStats() {
 	cpuPercent, err := cpu.Percent(0, false)
@@ -17,7 +18,7 @@ func PopulatePingBufferWithStats() {
 		ERR(3, "Unable to get cpu percent", err)
 		return
 	}
-	PingPongStatsBuffer[1] = byte(int(cpuPercent[0]))
+	PingPongStatsBuffer[0] = byte(int(cpuPercent[0]))
 
 	memStats, err := mem.VirtualMemory()
 	if err != nil {
@@ -25,17 +26,14 @@ func PopulatePingBufferWithStats() {
 		return
 
 	}
-	PingPongStatsBuffer[2] = byte(int(memStats.UsedPercent))
+	PingPongStatsBuffer[1] = byte(int(memStats.UsedPercent))
 
 	diskUsage, err := disk.Usage("/")
 	if err != nil {
 		ERR(3, "Unable to get disk usage", err)
 		return
 	}
-	PingPongStatsBuffer[3] = byte(int(diskUsage.UsedPercent))
-
-	PingPongStatsBuffer[4] = 255
-	PingPongStatsBuffer[5] = 255
+	PingPongStatsBuffer[2] = byte(int(diskUsage.UsedPercent))
 }
 
 func NukeClient(index int) {
@@ -78,6 +76,7 @@ func pingActiveUsers(SIGNAL *SIGNAL) {
 			continue
 		}
 
+		binary.BigEndian.PutUint64(PingPongStatsBuffer[3:], uint64(time.Now().UnixNano()))
 		out := u.EH.SEAL.Seal2(PingPongStatsBuffer, u.Uindex)
 		// fmt.Println("Ping to user:", PingPongStatsBuffer, "||", out)
 		err := syscall.Sendto(dataSocketFD, out, 0, u.Addr)
