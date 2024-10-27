@@ -405,18 +405,19 @@ func PrepareState() (err error) {
 		}
 
 		GLOBAL_STATE.ConnectionStats = append(GLOBAL_STATE.ConnectionStats, TunnelSTATS{
-			Nonce1:        ConList[i].EH.SEAL.Nonce1U.Load(),
-			Nonce2:        n2,
-			StartPort:     ConList[i].StartPort,
-			EndPort:       ConList[i].EndPort,
-			IngressString: BandwidthBytesToString(uint64(ConList[i].IngressBytes)),
-			EgressString:  BandwidthBytesToString(uint64(ConList[i].EgressBytes)),
-			EgressBytes:   ConList[i].EgressBytes,
-			StatsTag:      ConList[i].Meta.Tag,
-			DISK:          ConList[i].TunnelSTATS.DISK,
-			MEM:           ConList[i].TunnelSTATS.MEM,
-			CPU:           ConList[i].TunnelSTATS.CPU,
-			PingTime:      ConList[i].TunnelSTATS.PingTime,
+			Nonce1:              ConList[i].EH.SEAL.Nonce1U.Load(),
+			Nonce2:              n2,
+			StartPort:           ConList[i].StartPort,
+			EndPort:             ConList[i].EndPort,
+			IngressString:       BandwidthBytesToString(uint64(ConList[i].IngressBytes)),
+			EgressString:        BandwidthBytesToString(uint64(ConList[i].EgressBytes)),
+			EgressBytes:         ConList[i].EgressBytes,
+			StatsTag:            ConList[i].Meta.Tag,
+			DISK:                ConList[i].TunnelSTATS.DISK,
+			MEM:                 ConList[i].TunnelSTATS.MEM,
+			CPU:                 ConList[i].TunnelSTATS.CPU,
+			ServerToClientMicro: ConList[i].TunnelSTATS.ServerToClientMicro,
+			PingTime:            ConList[i].TunnelSTATS.PingTime,
 		})
 
 	}
