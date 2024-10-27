@@ -2,6 +2,22 @@
 [![Stargazers][stars-shield]][stars-url]
 [![Issues][issues-shield]][issues-url]
 
+# Liecens
+We are still deciding on a license, but it will be an open source ( non-commercial ) one.
+
+# Main golang module licenses
+go-ping: MIT
+google/uuid: BSD 3-Clause "New" or "Revised" License
+jackpal/gateway: Using a copy of googles BSD 3-Claus license (not a valid license)
+labstack/echo: MIT
+github.com/miekg/dns: BSD 3-Clause "New" or "Revised" License
+github.com/shirou/gopsutil: BSD license
+github.com/vishvananda/netlink: Apache License 2.0
+github.com/xlzd/gotp: MIT
+go.mongodb.org/mongo-driver: Apache License 2.0
+kernel.org/pub/linux/libs/security/libcap/cap: BSD-3-Clause OR GPL-2.0-only
+ - https://sites.google.com/site/fullycapable
+
 # Block List Source
 https://github.com/n00bady/bluam
 Special thanks to Kazaboo from twitch!
