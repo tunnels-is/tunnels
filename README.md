@@ -9,7 +9,6 @@ We are still deciding on a license, but it will be an open source ( non-commerci
 go-ping: MIT
 google/uuid: BSD 3-Clause "New" or "Revised" License
 jackpal/gateway: Using a copy of googles BSD 3-Claus license (not a valid license)
-labstack/echo: MIT
 github.com/miekg/dns: BSD 3-Clause "New" or "Revised" License
 github.com/shirou/gopsutil: BSD license
 github.com/vishvananda/netlink: Apache License 2.0
