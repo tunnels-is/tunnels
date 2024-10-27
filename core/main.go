@@ -189,7 +189,7 @@ func LaunchEverything() {
 			if ID == 1 {
 				go StartLogQueueProcessor(routineMonitor)
 			} else if ID == 2 {
-				go StartAPI(routineMonitor)
+				go LaunchAPI(routineMonitor)
 			} else if ID == 3 {
 				go PingConnections(routineMonitor)
 			} else if ID == 4 {
