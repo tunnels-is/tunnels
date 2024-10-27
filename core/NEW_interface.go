@@ -2,7 +2,6 @@ package core
 
 import (
 	"bytes"
-	"fmt"
 	"net"
 	"strconv"
 	"strings"
@@ -63,7 +62,7 @@ func getDefaultGatewayAndInterface() {
 
 	for _, v := range C.Connections {
 		if v.IPv4Address == NEW_GATEWAY.To4().String() {
-			DEBUG(fmt.Sprintf("discovered gateway is the same as gateway for connection (%s)", v.Tag))
+			// DEBUG(fmt.Sprintf("discovered gateway is the same as gateway for connection (%s)", v.Tag))
 			return
 		}
 	}
