@@ -36,9 +36,9 @@ func InitService() error {
 	if C.InfoLogging {
 		printInfo()
 	}
+	InitBlockListPath()
 
 	go func() {
-		InitBlockListPath()
 		err := ReBuildBlockLists(C)
 		if err == nil {
 			SaveConfig(C)
