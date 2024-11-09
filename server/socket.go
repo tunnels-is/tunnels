@@ -140,31 +140,6 @@ func acceptUserUDPTLSSocket(conn *quic.Conn) {
 		return
 	}
 
-	// var sw crypt.SignedConnectRequest
-	// sw, err = crypt.ValidateSignature(buff[:n], publicSigningKey)
-	// if err != nil {
-	// 	// ConnectResponseWithErrorCode(ES, CR, 401, GlobalError)
-	// 	WARN("Invalid payload signature:", err)
-	// 	return
-	// }
-	//
-	// CR := new(structs.ConnectRequest)
-	// err = json.Unmarshal(sw.Payload, &CR)
-	// if err != nil {
-	// 	WARN("Invalid connect request(unmarshal):", err)
-	// 	return
-	// }
-	//
-	// if Config.ID != CR.SeverID {
-	// 	ERR("Invalid server, current id: ", Config.ID, " provided id: ", CR.SeverID)
-	// 	return
-	// }
-	//
-	// if time.Since(CR.Created).Seconds() > 20 {
-	// 	ERR("Expired connection request", err)
-	// 	return
-	// }
-
 	var EH *crypt.SocketWrapper
 	EH, err = crypt.NewEncryptionHandler(CR.EncType)
 	if err != nil {
@@ -180,9 +155,6 @@ func acceptUserUDPTLSSocket(conn *quic.Conn) {
 		return
 	}
 
-	// DO SESSION ..
-	// TODO .. consider total users on
-	// server during port allocation
 	CRR := CreateCRRFromServer(Config)
 	index, err := CreateClientPortMapping(CRR, CR, EH)
 	if err != nil {
@@ -196,8 +168,6 @@ func acceptUserUDPTLSSocket(conn *quic.Conn) {
 		return
 	}
 
-	// fmt.Println("SENDING...")
-	// fmt.Println(string(CRRB))
 	n, err = s.Write(CRRB)
 	if err != nil {
 		ERR("Unable to write CRRB", err)
