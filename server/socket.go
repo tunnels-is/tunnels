@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"crypto/x509"
 	"encoding/binary"
@@ -539,7 +538,6 @@ func fromUserChannel(index int) {
 			return
 		}
 
-		fmt.Println("PAYLOAD:", payload.data)
 		if len(payload.data) > len(staging) {
 			panic("PAYLOAD BIGGER THEN STAGING .. THIS SHOULD NEVR HAPPEN")
 		}
@@ -550,6 +548,7 @@ func fromUserChannel(index int) {
 			staging[:0],
 			payload.data[0:2],
 		)
+		fmt.Println("PAYLOAD:", PACKET)
 		if err != nil {
 			ERR("Authentication error:", err)
 			continue
@@ -675,9 +674,9 @@ func toUserChannel(index int) {
 	}
 
 	var PACKET []byte
-	var DIP net.IP
+	// var DIP net.IP
 	var err error
-	IFipTo4 := InterfaceIP.To4()
+	// IFipTo4 := InterfaceIP.To4()
 	var ok bool
 	var out []byte
 	var S4 [4]byte
@@ -705,7 +704,7 @@ func toUserChannel(index int) {
 			continue
 		}
 
-		DIP = PACKET[16:20]
+		// DIP = PACKET[16:20]
 		fmt.Println("VPLTo:", VPLEnabled)
 		if VPLEnabled {
 			S4[0] = PACKET[12]
@@ -727,9 +726,10 @@ func toUserChannel(index int) {
 			}
 		}
 
-		if !bytes.Equal(DIP, IFipTo4) {
-			continue
-		}
+		// Use contrack instead
+		// if !bytes.Equal(DIP, IFipTo4) {
+		// 	continue
+		// }
 
 		out = CM.EH.SEAL.Seal2(PACKET, CM.Uindex)
 		// fmt.Println("----- TO USER -----")

@@ -145,20 +145,20 @@ func (V *Tunnel) ProcessIngressPacket(packet []byte) bool {
 	V.IP_DstPort[0] = V.IP_TPHeader[2]
 	V.IP_DstPort[1] = V.IP_TPHeader[3]
 
-	V.IP_NAT_IP, V.IP_NAT_OK = V.REVERSE_NAT_CACHE[V.IP_SrcIP]
-	if V.IP_NAT_OK {
-		V.IP_IPv4Header[12] = V.IP_NAT_IP[0]
-		V.IP_IPv4Header[13] = V.IP_NAT_IP[1]
-		V.IP_IPv4Header[14] = V.IP_NAT_IP[2]
-		V.IP_IPv4Header[15] = V.IP_NAT_IP[3]
-
-		V.IP_SrcIP[0] = V.IP_NAT_IP[0]
-		V.IP_SrcIP[1] = V.IP_NAT_IP[1]
-		V.IP_SrcIP[2] = V.IP_NAT_IP[2]
-		V.IP_SrcIP[3] = V.IP_NAT_IP[3]
-	}
-
 	if !V.IsIngressVPLIP(V.IP_SrcIP) {
+		V.IP_NAT_IP, V.IP_NAT_OK = V.REVERSE_NAT_CACHE[V.IP_SrcIP]
+		if V.IP_NAT_OK {
+			V.IP_IPv4Header[12] = V.IP_NAT_IP[0]
+			V.IP_IPv4Header[13] = V.IP_NAT_IP[1]
+			V.IP_IPv4Header[14] = V.IP_NAT_IP[2]
+			V.IP_IPv4Header[15] = V.IP_NAT_IP[3]
+
+			V.IP_SrcIP[0] = V.IP_NAT_IP[0]
+			V.IP_SrcIP[1] = V.IP_NAT_IP[1]
+			V.IP_SrcIP[2] = V.IP_NAT_IP[2]
+			V.IP_SrcIP[3] = V.IP_NAT_IP[3]
+		}
+
 		if V.IP_Protocol == 6 {
 			V.IP_MP = V.getIngressPortMapping(V.TCP_M, packet[12:16], V.IP_DstPort)
 			if V.IP_MP == nil {
@@ -189,6 +189,16 @@ func (V *Tunnel) ProcessIngressPacket(packet []byte) bool {
 		V.IP_IPv4Header[18] = V.IP_MP.OriginalSourceIP[2]
 		V.IP_IPv4Header[19] = V.IP_MP.OriginalSourceIP[3]
 
+	} else {
+		// if DST == ME ON VPL .. then DST == 127.0.0.1
+		// V.IP_IPv4Header[16] = 127
+		// V.IP_IPv4Header[17] = 0
+		// V.IP_IPv4Header[18] = 0
+		// V.IP_IPv4Header[19] = 1
+		V.IP_IPv4Header[16] = V.LOCAL_IF_IP[0]
+		V.IP_IPv4Header[17] = V.LOCAL_IF_IP[1]
+		V.IP_IPv4Header[18] = V.LOCAL_IF_IP[2]
+		V.IP_IPv4Header[19] = V.LOCAL_IF_IP[3]
 	}
 
 	RecalculateAndReplaceIPv4HeaderChecksum(V.IP_IPv4Header)

@@ -457,6 +457,8 @@ type Tunnel struct {
 	Exiting                bool
 
 	// VPN NODE
+	LOCAL_IF_IP [4]byte
+
 	// CRR     *VPNNode
 	PingBuffer [8]byte
 
