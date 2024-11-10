@@ -230,14 +230,6 @@ type LogoutForm struct {
 	Email       string
 	DeviceToken string
 }
-type LoginForm struct {
-	Email       string
-	Password    string
-	DeviceName  string
-	DeviceToken string
-	Digits      string
-	Recovery    string
-}
 
 type State struct {
 	C    *Config `json:"C"`
@@ -483,6 +475,11 @@ type Tunnel struct {
 	EP_MP  *Mapping
 	IP_MP  *Mapping
 	EP_SYN byte
+
+	// VPL
+	VPL_IP    [4]byte
+	VPL_E_MAP map[[4]byte]struct{} `json:"-"`
+	VPL_I_MAP map[[4]byte]struct{} `json:"-"`
 
 	//  NAT
 	NAT_CACHE         map[[4]byte][4]byte `json:"-"`

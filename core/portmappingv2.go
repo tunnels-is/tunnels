@@ -169,6 +169,7 @@ func (V *Tunnel) CreateNEWPortMapping(Emap map[[10]byte]*Mapping, PortMap []VPNP
 	for i := uint16(0); i < l; i++ {
 		PortMap[i].L.Lock()
 		m, ok := PortMap[i].M[Emap[EID].DestinationIP]
+		fmt.Println("Mapping?:", ok, m)
 		if !ok || m == nil {
 			PortMap[i].M[Emap[EID].DestinationIP] = Emap[EID]
 			PortMap[i].L.Unlock()
@@ -187,6 +188,7 @@ func (V *Tunnel) CreateNEWPortMapping(Emap map[[10]byte]*Mapping, PortMap []VPNP
 	}
 
 	if Emap[EID].LocalPort == [2]byte{0, 0} {
+		fmt.Println("0port", Emap[EID], Emap[EID].LocalPort)
 		Emap[EID] = nil
 		return nil
 	}

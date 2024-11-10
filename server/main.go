@@ -154,13 +154,16 @@ func main() {
 		switch enabledFeatures[i] {
 		case VPNFeature:
 			VPNEnabled = true
+			fmt.Println("Enabling VPN Feature..")
 		case VPLFeature:
 			VPLEnabled = true
+			fmt.Println("Enabling VPL Feature..")
 			if Config.VPL == nil {
 				fmt.Println("VPL Configuration missing")
 				os.Exit(1)
 			}
 		case DNSFeature:
+			fmt.Println("Enabling DNS Feature..")
 			fmt.Println("DNS Feature is in development")
 			DNSEnabled = true
 		default:
@@ -289,6 +292,10 @@ func initializeVPL() (err error) {
 	err = generateDHCPMap()
 	if err != nil {
 		return
+	}
+
+	if Config.VPL != nil {
+		AllowAll = Config.VPL.AllowAll
 	}
 	return
 }

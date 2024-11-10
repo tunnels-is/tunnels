@@ -206,8 +206,8 @@ func Bind[I any](form I, r *http.Request) (err error) {
 }
 
 func STRING(w http.ResponseWriter, r *http.Request, code int, data string) {
-	w.Write([]byte(data))
 	w.WriteHeader(code)
+	w.Write([]byte(data))
 }
 
 func JSON(w http.ResponseWriter, r *http.Request, code int, data interface{}) {
@@ -220,13 +220,13 @@ func JSON(w http.ResponseWriter, r *http.Request, code int, data interface{}) {
 			r.Body.Close()
 		}
 	}()
+	w.WriteHeader(code)
 	encoder := json.NewEncoder(w)
 	err := encoder.Encode(data)
 	if err != nil {
 		ERROR("Unable to write encoded json to response writer:", err)
 		return
 	}
-	w.WriteHeader(code)
 }
 
 func HTTP_GetState(w http.ResponseWriter, r *http.Request) {

@@ -197,7 +197,7 @@ func ForwardToController(FR *FORWARD_REQUEST) (interface{}, int) {
 	}
 
 	if strings.Contains(FR.Path, "login") {
-		if len(responseBytes) != 0 {
+		if len(responseBytes) != 0 && code == 200 {
 			INFO("LOGIN DETECTED!")
 			err = json.Unmarshal(responseBytes, &GLOBAL_STATE.User)
 			if err != nil {
@@ -435,7 +435,7 @@ func PrepareState() (err error) {
 	return
 }
 
-func InitializeTunnelFromCRR(TUN *Tunnel) error {
+func InitializeTunnelFromCRR(TUN *Tunnel) (err error) {
 	BLOCK_DNS_QUERIES = true
 	defer func() {
 		RecoverAndLogToFile()
@@ -465,6 +465,13 @@ func InitializeTunnelFromCRR(TUN *Tunnel) error {
 	TUN.EP_VPNSrcIP[2] = to4[2]
 	TUN.EP_VPNSrcIP[3] = to4[3]
 
+	if TUN.CRR.DHCP != nil {
+		TUN.VPL_IP[0] = TUN.CRR.DHCP.IP[0]
+		TUN.VPL_IP[1] = TUN.CRR.DHCP.IP[1]
+		TUN.VPL_IP[2] = TUN.CRR.DHCP.IP[2]
+		TUN.VPL_IP[3] = TUN.CRR.DHCP.IP[3]
+	}
+
 	if !TUN.Meta.LocalhostNat {
 		NN := new(ServerNetwork)
 		NN.Network = "127.0.0.1/32"
@@ -483,6 +490,15 @@ func InitializeTunnelFromCRR(TUN *Tunnel) error {
 	}
 	if len(TUN.CRR.DNSServers) < 1 {
 		TUN.CRR.DNSServers = []string{C.DNS1Default, C.DNS2Default}
+	}
+
+	err = TUN.InitVPLMap()
+	if err != nil {
+		return err
+	}
+	err = TUN.InitNatMaps()
+	if err != nil {
+		return err
 	}
 
 	DEBUG(fmt.Sprintf(
@@ -715,7 +731,7 @@ func PublicConnect(UICR UIConnectRequest) (code int, errm error) {
 
 	err = InitializeTunnelFromCRR(tunnel)
 	if err != nil {
-		return 0, err
+		return 502, err
 	}
 
 	DEBUG("Opening data tunnel:", net.JoinHostPort(UICR.ServerIP, CRR.DataPort))
@@ -752,10 +768,6 @@ func PublicConnect(UICR UIConnectRequest) (code int, errm error) {
 	// Create cross-pointers
 	tunnel.Interface.tunnel.Store(&tunnel)
 
-	err = tunnel.InitNatMaps()
-	if err != nil {
-		return 502, err
-	}
 	tunnel.Connected = true
 	tunnel.TunnelSTATS.PingTime = time.Now()
 

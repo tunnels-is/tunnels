@@ -3,6 +3,7 @@
 package core
 
 import (
+	"fmt"
 	"runtime/debug"
 	"time"
 )
@@ -45,6 +46,7 @@ func (T *TunnelInterface) ReadFromTunnelInterface() {
 			ERROR("error in tun/tap reader loop:", err)
 			return
 		}
+		fmt.Println("P", tempBytes[:packetLength])
 
 		if packetLength == 0 {
 			DEBUG("tun/tap read size was 0")
@@ -60,6 +62,7 @@ func (T *TunnelInterface) ReadFromTunnelInterface() {
 		packet = tempBytes[:packetLength]
 
 		sendRemote = Tun.ProcessEgressPacket(&packet)
+		fmt.Println("SEND?:", sendRemote, "P:", packet)
 		if !sendRemote {
 			continue
 		}
@@ -72,7 +75,9 @@ func (T *TunnelInterface) ReadFromTunnelInterface() {
 			ERROR("router write error: ", err)
 			continue
 		}
-		Tun.EP_MP.egressBytes += writtenBytes
+		if Tun.EP_MP != nil {
+			Tun.EP_MP.egressBytes += writtenBytes
+		}
 		Tun.EgressBytes += writtenBytes
 	}
 }
@@ -129,7 +134,9 @@ func (V *Tunnel) ReadFromServeTunnel() {
 			debugMissingIngressMapping(packet)
 			continue
 		}
-		V.IP_MP.ingressBytes += n
+		if V.IP_MP != nil {
+			V.IP_MP.ingressBytes += n
+		}
 
 		_, writeErr = V.Interface.RWC.Write(packet)
 		if writeErr != nil {

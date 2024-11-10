@@ -539,6 +539,7 @@ func fromUserChannel(index int) {
 			return
 		}
 
+		fmt.Println("PAYLOAD:", payload.data)
 		if len(payload.data) > len(staging) {
 			panic("PAYLOAD BIGGER THEN STAGING .. THIS SHOULD NEVR HAPPEN")
 		}
@@ -574,6 +575,7 @@ func fromUserChannel(index int) {
 		}
 
 		NIP = PACKET[16:20]
+		fmt.Println("VPLFrom:", VPLEnabled)
 		if VPLEnabled {
 			D4[0] = NIP[0]
 			D4[1] = NIP[1]
@@ -591,8 +593,10 @@ func fromUserChannel(index int) {
 				}
 			}
 			if ok {
+				fmt.Println("SENDING TO:", D4)
 				select {
 				case clientCache[D4] <- CopySlice(PACKET):
+					fmt.Println("SENT TO:", D4)
 				default:
 					fmt.Println("deleting:", D4)
 					delete(clientCache, D4)
@@ -685,6 +689,7 @@ func toUserChannel(index int) {
 			return
 		}
 
+		fmt.Println("PACKET:", PACKET)
 		if len(PACKET) < 20 {
 			switch PACKET[0] {
 			case allowIP:
@@ -701,6 +706,7 @@ func toUserChannel(index int) {
 		}
 
 		DIP = PACKET[16:20]
+		fmt.Println("VPLTo:", VPLEnabled)
 		if VPLEnabled {
 			S4[0] = PACKET[12]
 			S4[1] = PACKET[13]
@@ -711,9 +717,11 @@ func toUserChannel(index int) {
 				allowed, ok := CM.AllowedIPs[S4]
 				if ok {
 					if !allowed {
+						fmt.Println("NOT ALLOWED:", S4)
 						continue
 					}
 				} else {
+					fmt.Println("NOT FOUND:", S4)
 					continue
 				}
 			}

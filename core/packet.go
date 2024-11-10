@@ -2,6 +2,7 @@ package core
 
 import (
 	"encoding/binary"
+	"fmt"
 	"time"
 )
 
@@ -68,51 +69,60 @@ func (V *Tunnel) ProcessEgressPacket(p *[]byte) (sendRemote bool) {
 	V.EP_DstPort[0] = V.EP_TPHeader[2]
 	V.EP_DstPort[1] = V.EP_TPHeader[3]
 
-	if V.EP_Protocol == 6 {
+	if !V.IsEgressVPLIP(V.EP_DstIP) {
+		if V.EP_Protocol == 6 {
 
-		V.EP_SYN = V.EP_TPHeader[13] & 0x2
+			V.EP_SYN = V.EP_TPHeader[13] & 0x2
 
-		V.EP_MP = V.CreateNEWPortMapping(V.TCP_EM, V.TCP_M, packet[12:20], V.EP_TPHeader[0:4])
-		if V.EP_MP == nil {
-			debugMissingEgressMapping(packet)
-			return false
+			V.EP_MP = V.CreateNEWPortMapping(V.TCP_EM, V.TCP_M, packet[12:20], V.EP_TPHeader[0:4])
+			if V.EP_MP == nil {
+				debugMissingEgressMapping(packet)
+				return false
+			}
+
+		} else if V.EP_Protocol == 17 {
+
+			V.EP_MP = V.CreateNEWPortMapping(V.UDP_EM, V.UDP_M, packet[12:20], V.EP_TPHeader[0:4])
+			if V.EP_MP == nil {
+				debugMissingEgressMapping(packet)
+				return false
+			}
+
 		}
 
-	} else if V.EP_Protocol == 17 {
-
-		V.EP_MP = V.CreateNEWPortMapping(V.UDP_EM, V.UDP_M, packet[12:20], V.EP_TPHeader[0:4])
-		if V.EP_MP == nil {
-			debugMissingEgressMapping(packet)
-			return false
+		if V.EP_Protocol == 6 {
+			V.EP_MP.ERST = V.EP_TPHeader[13] & 0x4
+			if V.EP_MP.EFIN == 0 {
+				V.EP_MP.EFIN = V.EP_TPHeader[13] & 0x1
+			}
+			if V.EP_MP.ERST == 4 {
+				V.EP_TPHeader[13] = 0b00010100
+			}
 		}
 
+		V.EP_NAT_IP, V.EP_NAT_OK = V.TransLateIP(V.EP_DstIP)
+
+		V.EP_IPv4Header[12] = V.EP_VPNSrcIP[0]
+		V.EP_IPv4Header[13] = V.EP_VPNSrcIP[1]
+		V.EP_IPv4Header[14] = V.EP_VPNSrcIP[2]
+		V.EP_IPv4Header[15] = V.EP_VPNSrcIP[3]
+
+	} else {
+		V.EP_NAT_IP, V.EP_NAT_OK = V.TransLateVPLIP(V.EP_DstIP)
+
+		V.EP_IPv4Header[12] = V.VPL_IP[0]
+		V.EP_IPv4Header[13] = V.VPL_IP[1]
+		V.EP_IPv4Header[14] = V.VPL_IP[2]
+		V.EP_IPv4Header[15] = V.VPL_IP[3]
+		fmt.Println("OUT:", V.VPL_IP, V.EP_NAT_IP)
 	}
 
-	if V.EP_Protocol == 6 {
-		V.EP_MP.ERST = V.EP_TPHeader[13] & 0x4
-		if V.EP_MP.EFIN == 0 {
-			V.EP_MP.EFIN = V.EP_TPHeader[13] & 0x1
-		}
-		if V.EP_MP.ERST == 4 {
-			V.EP_TPHeader[13] = 0b00010100
-		}
-	}
-
-	V.EP_NAT_IP, V.EP_NAT_OK = V.TransLateIP(V.EP_DstIP)
 	if V.EP_NAT_OK {
 		V.EP_IPv4Header[16] = V.EP_NAT_IP[0]
 		V.EP_IPv4Header[17] = V.EP_NAT_IP[1]
 		V.EP_IPv4Header[18] = V.EP_NAT_IP[2]
 		V.EP_IPv4Header[19] = V.EP_NAT_IP[3]
 	}
-
-	V.EP_TPHeader[0] = V.EP_MP.VPNPort[0]
-	V.EP_TPHeader[1] = V.EP_MP.VPNPort[1]
-
-	V.EP_IPv4Header[12] = V.EP_VPNSrcIP[0]
-	V.EP_IPv4Header[13] = V.EP_VPNSrcIP[1]
-	V.EP_IPv4Header[14] = V.EP_VPNSrcIP[2]
-	V.EP_IPv4Header[15] = V.EP_VPNSrcIP[3]
 
 	RecalculateAndReplaceIPv4HeaderChecksum(V.EP_IPv4Header)
 	RecalculateAndReplaceTransportChecksum(V.EP_IPv4Header, V.EP_TPHeader)
@@ -148,35 +158,38 @@ func (V *Tunnel) ProcessIngressPacket(packet []byte) bool {
 		V.IP_SrcIP[3] = V.IP_NAT_IP[3]
 	}
 
-	if V.IP_Protocol == 6 {
-		V.IP_MP = V.getIngressPortMapping(V.TCP_M, packet[12:16], V.IP_DstPort)
-		if V.IP_MP == nil {
-			return false
+	if !V.IsIngressVPLIP(V.IP_SrcIP) {
+		if V.IP_Protocol == 6 {
+			V.IP_MP = V.getIngressPortMapping(V.TCP_M, packet[12:16], V.IP_DstPort)
+			if V.IP_MP == nil {
+				return false
+			}
+
+		} else if V.IP_Protocol == 17 {
+			V.IP_MP = V.getIngressPortMapping(V.UDP_M, packet[12:16], V.IP_DstPort)
+			if V.IP_MP == nil {
+				return false
+			}
 		}
 
-	} else if V.IP_Protocol == 17 {
-		V.IP_MP = V.getIngressPortMapping(V.UDP_M, packet[12:16], V.IP_DstPort)
-		if V.IP_MP == nil {
-			return false
+		if V.IP_Protocol == 6 {
+			if V.IP_MP.IRST == 0 {
+				V.IP_MP.IRST = V.IP_TPHeader[13] & 0x4
+			}
+			if V.IP_MP.IFIN == 0 {
+				V.IP_MP.IFIN = V.IP_TPHeader[13] & 0x1
+			}
 		}
+
+		V.IP_TPHeader[2] = V.IP_MP.LocalPort[0]
+		V.IP_TPHeader[3] = V.IP_MP.LocalPort[1]
+
+		V.IP_IPv4Header[16] = V.IP_MP.OriginalSourceIP[0]
+		V.IP_IPv4Header[17] = V.IP_MP.OriginalSourceIP[1]
+		V.IP_IPv4Header[18] = V.IP_MP.OriginalSourceIP[2]
+		V.IP_IPv4Header[19] = V.IP_MP.OriginalSourceIP[3]
+
 	}
-
-	if V.IP_Protocol == 6 {
-		if V.IP_MP.IRST == 0 {
-			V.IP_MP.IRST = V.IP_TPHeader[13] & 0x4
-		}
-		if V.IP_MP.IFIN == 0 {
-			V.IP_MP.IFIN = V.IP_TPHeader[13] & 0x1
-		}
-	}
-
-	V.IP_TPHeader[2] = V.IP_MP.LocalPort[0]
-	V.IP_TPHeader[3] = V.IP_MP.LocalPort[1]
-
-	V.IP_IPv4Header[16] = V.IP_MP.OriginalSourceIP[0]
-	V.IP_IPv4Header[17] = V.IP_MP.OriginalSourceIP[1]
-	V.IP_IPv4Header[18] = V.IP_MP.OriginalSourceIP[2]
-	V.IP_IPv4Header[19] = V.IP_MP.OriginalSourceIP[3]
 
 	RecalculateAndReplaceIPv4HeaderChecksum(V.IP_IPv4Header)
 	RecalculateAndReplaceTransportChecksum(V.IP_IPv4Header, V.IP_TPHeader)
