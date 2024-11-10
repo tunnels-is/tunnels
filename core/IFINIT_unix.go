@@ -308,6 +308,10 @@ func (t *TunnelInterface) Connect(V *Tunnel) (err error) {
 		t.addRoutes(V, n)
 	}
 
+	if V.CRR.VPLNetwork != nil {
+		t.addRoutes(V, V.CRR.VPLNetwork)
+	}
+
 	return
 }
 
@@ -320,7 +324,7 @@ func (t *TunnelInterface) addRoutes(_ *Tunnel, n *ServerNetwork) (err error) {
 	}
 
 	for _, v := range n.Routes {
-		if strings.ToLower(v.Address) == "default" || strings.Contains(v.Address, "0.0.0.0") {
+		if strings.ToLower(v.Address) == "default" || strings.HasPrefix(v.Address, "0.0.0.0") {
 			continue
 		}
 

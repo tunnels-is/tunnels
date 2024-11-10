@@ -486,12 +486,21 @@ func InitializeTunnelFromCRR(TUN *Tunnel) error {
 	}
 
 	DEBUG(fmt.Sprintf(
-		"Connection info: Addr(%s) StartPort(%d) EndPort(%d) srcIP(%s)",
+		"Connection info: Addr(%s) StartPort(%d) EndPort(%d) srcIP(%s) ",
 		TUN.Meta.IPv4Address,
 		TUN.CRR.StartPort,
 		TUN.CRR.EndPort,
 		TUN.CRR.InterfaceIP,
 	))
+
+	if TUN.CRR.VPLNetwork != nil {
+		DEBUG(fmt.Sprintf(
+			"DHCP/VPL info: Addr(%s) Network:(%s) Token(%s) ",
+			TUN.CRR.DHCP.IP,
+			TUN.CRR.VPLNetwork.Network,
+			TUN.CRR.DHCP.Token,
+		))
+	}
 
 	return nil
 }
@@ -546,6 +555,9 @@ func PublicConnect(UICR UIConnectRequest) (code int, errm error) {
 	FinalCR.UserID = UICR.UserID
 	FinalCR.SeverID = UICR.SeverID
 	FinalCR.EncType = UICR.EncType
+
+	FinalCR.RequestingPorts = false
+	FinalCR.DHCPToken = ""
 
 	if !tunnel.Meta.Private && UICR.SeverID == "" {
 		ERROR("No server selected")
@@ -678,7 +690,7 @@ func PublicConnect(UICR UIConnectRequest) (code int, errm error) {
 	}
 
 	CRR := new(ConnectRequestResponse)
-	resp := make([]byte, 70000)
+	resp := make([]byte, 100000)
 	n, err := s.Read(resp)
 	DEBUG("(RAW)ConnectionRequestResponse:", string(resp[:n]))
 	if err != nil {

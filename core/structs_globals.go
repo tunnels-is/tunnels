@@ -58,6 +58,9 @@ type ConnectionRequest struct {
 	Version int       `json:"Version"`
 	UUID    string    `json:"UUID"`
 	Created time.Time `json:"Created"`
+
+	RequestingPorts bool   `json:"RequestingPorts"`
+	DHCPToken       string `json:"DHCPToken"`
 }
 
 type ErrorResponse struct {
@@ -79,13 +82,24 @@ type ConnectRequestResponse struct {
 
 	DataPort    string `json:"DataPort"`
 	InterfaceIP string `json:"InterfaceIP"`
-	StartPort   uint16 `json:"StartPort"`
-	EndPort     uint16 `json:"EndPort"`
+
+	// Normal VPN
+	StartPort uint16 `json:"StartPort"`
+	EndPort   uint16 `json:"EndPort"`
 
 	DNS                []*ServerDNS     `json:"DNS"`
 	Networks           []*ServerNetwork `json:"Networks"`
 	DNSServers         []string         `json:"DNSServers"`
 	DNSAllowCustomOnly bool             `json:"DNSAllowCustomOnly"`
+
+	// VPL Mapping
+	DHCP       *DHCPRecord    `json:"DHCP"`
+	VPLNetwork *ServerNetwork `json:"VPLNetwork"`
+}
+
+type DHCPRecord struct {
+	IP    [4]byte
+	Token string
 }
 
 var (

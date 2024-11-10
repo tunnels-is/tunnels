@@ -11,11 +11,14 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"math"
 	"net"
 	"os"
 	"os/signal"
 	"runtime"
 	"runtime/debug"
+	"slices"
+	"strings"
 	"syscall"
 	"time"
 
@@ -91,9 +94,25 @@ func loadPublicSigningCert() (err error) {
 }
 
 var (
-	id     string
-	config bool
+	id              string
+	config          bool
+	features        string
+	enabledFeatures []string
+
+	VPLEnabled bool = false
+	VPNEnabled bool = false
+	DNSEnabled bool = false
 )
+
+const (
+	VPNFeature string = "VPN"
+	VPLFeature string = "VPL"
+	DNSFeature string = "DNS"
+)
+
+func isFeatureEnabled(feature string) bool {
+	return slices.Contains(enabledFeatures, feature)
+}
 
 func main() {
 	defer func() {
@@ -104,13 +123,9 @@ func main() {
 	}()
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
-	err := setcap.CheckCapabilities()
-	if err != nil {
-		panic(err)
-	}
-
 	flag.StringVar(&id, "id", "", "Include your servers ID. This ID can be found in the Tunnels UI")
-	flag.BoolVar(&config, "config", false, "Generate a config")
+	flag.BoolVar(&config, "config", false, "Generate a config and make certificates ( Remember to copy the serial number ! )")
+	flag.StringVar(&features, "features", "VPN,VPL", "Select enabled features. Available: VPN,VPL")
 	flag.Parse()
 
 	if config {
@@ -122,25 +137,164 @@ func main() {
 		os.Exit(1)
 	}
 
-	Config, err = GetServerConfig(serverConfigPath)
-	if err != nil {
-		panic(err)
+	enabledFeatures = strings.Split(features, ",")
+	if len(features) == 0 {
+		fmt.Println("you need to enabled at least one feature use --help for more information")
+		os.Exit(1)
 	}
 
-	var existed bool
-	err, existed = iptables.SetIPTablesRSTDropFilter(Config.InterfaceIP)
+	var err error
+	Config, err = GetServerConfig(serverConfigPath)
 	if err != nil {
-		panic(err)
+		fmt.Println("Error loading config: ", err)
+		os.Exit(1)
 	}
-	if !existed {
-		fmt.Println("> added iptables rule")
+
+	for i := range enabledFeatures {
+		switch enabledFeatures[i] {
+		case VPNFeature:
+			VPNEnabled = true
+		case VPLFeature:
+			VPLEnabled = true
+			if Config.VPL == nil {
+				fmt.Println("VPL Configuration missing")
+				os.Exit(1)
+			}
+		case DNSFeature:
+			fmt.Println("DNS Feature is in development")
+			DNSEnabled = true
+		default:
+			fmt.Println("Unknown feature: ", enabledFeatures[i])
+			os.Exit(1)
+		}
+	}
+
+	if VPNEnabled {
+		initializeVPN()
+	}
+
+	if VPLEnabled {
+		initializeVPL()
 	}
 
 	if Config.UserMaxConnections < 1 {
 		Config.UserMaxConnections = 2
 	}
 
-	err = loadPublicSigningCert()
+	initializeCertsAndTLSConfig()
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// GENERIC ROUTINES
+	SignalMonitor <- NewSignal(ctx, 1)
+	SignalMonitor <- NewSignal(ctx, 2)
+	SignalMonitor <- NewSignal(ctx, 3)
+	SignalMonitor <- NewSignal(ctx, 4)
+	SignalMonitor <- NewSignal(ctx, 5)
+
+	if VPNEnabled {
+		SignalMonitor <- NewSignal(ctx, 10)
+		SignalMonitor <- NewSignal(ctx, 11)
+		SignalMonitor <- NewSignal(ctx, 12)
+	}
+
+	if VPLEnabled {
+		SignalMonitor <- NewSignal(ctx, 20)
+		SignalMonitor <- NewSignal(ctx, 21)
+		SignalMonitor <- NewSignal(ctx, 22)
+	}
+
+	for {
+		select {
+		case signal := <-quit:
+
+			cancel()
+			WARN("EXIT", signal)
+			return
+
+		case index := <-toUserChannelMonitor:
+			go toUserChannel(index)
+		case index := <-fromUserChannelMonitor:
+			go fromUserChannel(index)
+
+		case SIGNAL := <-SignalMonitor:
+			LOG(SIGNAL)
+
+			switch SIGNAL.ID {
+			case 1:
+				go pingActiveUsers(SIGNAL)
+			case 2:
+				go ControlSocketListener(SIGNAL)
+			case 3:
+				go DataSocketListener(SIGNAL)
+			case 4:
+			case 5:
+
+			// VPN
+			case 10:
+				go ExternalUDPListener(SIGNAL)
+			case 11:
+				go ExternalTCPListener(SIGNAL)
+			case 12:
+
+			// VPL
+			case 20:
+			case 21:
+			case 22:
+
+			}
+		}
+	}
+}
+
+func initializeVPN() {
+	err := setcap.CheckCapabilities()
+	if err != nil {
+		fmt.Println("Tunnels server is missing capabilities, err:", err)
+		os.Exit(1)
+	}
+
+	var existed bool
+	err, existed = iptables.SetIPTablesRSTDropFilter(Config.InterfaceIP)
+	if err != nil {
+		fmt.Println("Error applying iptables rule: ", err)
+		os.Exit(1)
+	}
+	if !existed {
+		fmt.Println("> added iptables rule")
+	}
+
+	InterfaceIP = net.ParseIP(Config.InterfaceIP)
+	if InterfaceIP == nil {
+		ERR("Interface IP not parsable")
+		os.Exit(1)
+	}
+	InterfaceIP = InterfaceIP.To4()
+
+	_, _, err = createRawTCPSocket()
+	if err != nil {
+		panic(err)
+	}
+	_, _, err = createRawUDPSocket()
+	if err != nil {
+		panic(err)
+	}
+
+	GeneratePortAllocation()
+}
+
+func initializeVPL() (err error) {
+	err = generateDHCPMap()
+	if err != nil {
+		return
+	}
+	return
+}
+
+func initializeCertsAndTLSConfig() {
+	err := loadPublicSigningCert()
 	if err != nil {
 		panic(err)
 	}
@@ -168,74 +322,6 @@ func main() {
 		MaxStreamWriteBufferSize: 70000,
 		MaxConnReadBufferSize:    70000,
 		MaxIdleTimeout:           60 * time.Second,
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-
-	SignalMonitor <- NewSignal(ctx, 1)
-	SignalMonitor <- NewSignal(ctx, 2)
-	SignalMonitor <- NewSignal(ctx, 3)
-	SignalMonitor <- NewSignal(ctx, 100)
-	SignalMonitor <- NewSignal(ctx, 101)
-	SignalMonitor <- NewSignal(ctx, 102)
-	SignalMonitor <- NewSignal(ctx, 443)
-	SignalMonitor <- NewSignal(ctx, 444)
-
-	InterfaceIP = net.ParseIP(Config.InterfaceIP)
-	if InterfaceIP == nil {
-		ERR("Interface IP not parsable")
-		os.Exit(1)
-	}
-	InterfaceIP = InterfaceIP.To4()
-
-	_, _, err = createRawTCPSocket()
-	if err != nil {
-		panic(err)
-	}
-	_, _, err = createRawUDPSocket()
-	if err != nil {
-		panic(err)
-	}
-
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
-
-	GeneratePortAllocation()
-
-	for {
-		select {
-		case signal := <-quit:
-
-			cancel()
-			WARN("EXIT", signal)
-			return
-
-		case index := <-toUserChannelMonitor:
-			go toUserChannel(index)
-		case index := <-fromUserChannelMonitor:
-			go fromUserChannel(index)
-
-		case SIGNAL := <-SignalMonitor:
-			LOG(SIGNAL)
-
-			if SIGNAL.ID == 1 {
-				//
-			} else if SIGNAL.ID == 2 {
-				//
-			} else if SIGNAL.ID == 3 {
-				go pingActiveUsers(SIGNAL)
-			} else if SIGNAL.ID == 100 {
-				go ExternalUDPListener(SIGNAL)
-			} else if SIGNAL.ID == 101 {
-				go ExternalTCPListener(SIGNAL)
-			} else if SIGNAL.ID == 102 {
-				//
-			} else if SIGNAL.ID == 443 {
-				go ControlSocketListener(SIGNAL)
-			} else if SIGNAL.ID == 444 {
-				go DataSocketListener(SIGNAL)
-			}
-		}
 	}
 }
 
@@ -276,18 +362,43 @@ func makeConfigAndCertificates() {
 	N.Nat = "10.10.10.1/24"
 	sc.Networks = append(sc.Networks, N)
 
-	outConfig, err := json.Marshal(sc)
-	if err != nil {
-		panic(err)
+	sc.VPL = new(VPLSettings)
+	sc.VPL.Network = new(ServerNetwork)
+	sc.VPL.Network.Tag = "VPL"
+	sc.VPL.Network.Network = "10.0.0.0/16"
+	sc.VPL.Network.Nat = ""
+	sc.VPL.Network.Routes = []*Route{
+		{
+			Address: "10.0.0.0/16",
+			Metric:  "0",
+		},
 	}
+
+	sc.VPL.MaxDevices = math.MaxUint16
+	sc.VPL.AllowAll = true
+
+	// outConfig, err := json.Marshal(sc)
+	// if err != nil {
+	// 	panic(err)
+	// }
 	f, err := os.Create("./server.json")
 	if err != nil {
 		panic(err)
 	}
-	_, err = f.Write(outConfig)
-	if err != nil {
-		panic(err)
+	defer f.Close()
+	encoder := json.NewEncoder(f)
+	encoder.SetIndent("", "    ")
+
+	// Encode the config to the file
+	if err := encoder.Encode(sc); err != nil {
+		fmt.Println("Error encoding JSON:", err)
+	} else {
+		fmt.Println("Config file has been written successfully.")
 	}
+	// _, err = f.Write(outConfig)
+	// if err != nil {
+	// 	panic(err)
+	// }
 
 	_, err = certs.MakeCert(
 		certs.ECDSA,
@@ -334,16 +445,16 @@ func GeneratePortAllocation() (err error) {
 				return errors.New("end port is too big")
 			}
 
-			if PortToUserMapping[i] != nil {
-				if PortToUserMapping[i].StartPort < PR.StartPort {
+			if PortToCoreMapping[i] != nil {
+				if PortToCoreMapping[i].StartPort < PR.StartPort {
 					return errors.New("start port is too small")
 				}
-				if PortToUserMapping[i].StartPort < PR.EndPort {
+				if PortToCoreMapping[i].StartPort < PR.EndPort {
 					return errors.New("end port is too big")
 				}
 			}
 
-			PortToUserMapping[i] = PR
+			PortToCoreMapping[i] = PR
 		}
 
 		currentPort = PR.EndPort + 1
