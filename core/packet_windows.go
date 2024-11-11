@@ -52,7 +52,7 @@ func (T *TunnelInterface) ReadFromTunnelInterface() {
 				waitForTimeout = time.Now()
 			}
 			// V.Tun.ReleaseReceivePacket(packet)
-			time.Sleep(10 * time.Millisecond)
+			time.Sleep(100 * time.Millisecond)
 			continue
 
 		} else if readError == windows.ERROR_HANDLE_EOF {

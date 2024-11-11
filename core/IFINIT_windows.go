@@ -607,6 +607,7 @@ exitLoop:
 			}
 		case _ = <-exitTimeout.C:
 			ERROR("timed out waiting for reader and writer to exit")
+			return
 		}
 	}
 	return
@@ -617,6 +618,9 @@ func (t *TunnelInterface) Disconnect(V *Tunnel) (err error) {
 
 	t.shouldRestart = false
 	t.shouldExit = true
+	if V.Con != nil {
+		V.Con.Close()
+	}
 
 	for _, n := range V.CRR.Networks {
 		t.deleteRoutes(V, n)
