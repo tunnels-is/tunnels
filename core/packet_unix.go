@@ -46,7 +46,6 @@ func (T *TunnelInterface) ReadFromTunnelInterface() {
 			ERROR("error in tun/tap reader loop:", err)
 			return
 		}
-		fmt.Println("P", tempBytes[:packetLength])
 
 		if packetLength == 0 {
 			DEBUG("tun/tap read size was 0")
@@ -62,7 +61,6 @@ func (T *TunnelInterface) ReadFromTunnelInterface() {
 		packet = tempBytes[:packetLength]
 
 		sendRemote = Tun.ProcessEgressPacket(&packet)
-		fmt.Println("SEND?:", sendRemote, "P:", packet)
 		if !sendRemote {
 			continue
 		}

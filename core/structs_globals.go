@@ -910,18 +910,19 @@ type DEVICE_TOKEN struct {
 
 // use struct you get from the login request
 type User struct {
-	ID                    string          `json:"_id,omitempty" bson:"_id,omitempty"`
-	APIKey                string          `bson:"AK" json:"APIKey"`
-	Email                 string          `bson:"E"`
-	DeviceToken           *DEVICE_TOKEN   `json:",omitempty" bson:"-"`
-	Tokens                []*DEVICE_TOKEN `json:"Tokens" bson:"Tokens"`
-	OrgID                 string          `json:"OrgID" bson:"OrgID"`
-	Key                   *LicenseKey     `json:"Key" bson:"Key"`
-	Trial                 bool            `json:"Trial" bson:"Trial"`
-	Disabled              bool            `json:"Disabled" bson:"Disabled"`
-	TwoFactorEnabled      bool            `json:"TwoFactorEnabled" bson:"TwoFactorEnabled"`
-	Updated               time.Time       `json:"Updated" bson:"Updated"`
-	AdditionalInformation string          `json:"AdditionalInformation,omitempty" bson:"AdditionalInformation"`
+	ID                    string          `json:"_id,omitempty"`
+	APIKey                string          `json:"APIKey"`
+	Email                 string          `json:"Email"`
+	DeviceToken           *DEVICE_TOKEN   `json:",omitempty"`
+	Tokens                []*DEVICE_TOKEN `json:"Tokens"`
+	OrgID                 string          `json:"OrgID" `
+	Key                   *LicenseKey     `json:"Key"`
+	Trial                 bool            `json:"Trial"`
+	Disabled              bool            `json:"Disabled"`
+	TwoFactorEnabled      bool            `json:"TwoFactorEnabled"`
+	Updated               time.Time       `json:"Updated"`
+	SubExpiration         time.Time       `json:"SubExpiration"`
+	AdditionalInformation string          `json:"AdditionalInformation,omitempty"`
 }
 
 type LicenseKey struct {

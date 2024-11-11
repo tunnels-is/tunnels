@@ -16,8 +16,13 @@ type packetDebugOut struct {
 }
 
 func (V *Tunnel) RegisterPing(packet []byte) {
-	defer RecoverAndLogToFile()
 	V.TunnelSTATS.PingTime = time.Now()
+	if len(packet) < 11 {
+		ERROR("Received malformed ping from server, please contact system admins")
+		return
+	}
+
+	defer RecoverAndLogToFile()
 	V.TunnelSTATS.CPU = packet[0]
 	V.TunnelSTATS.MEM = packet[1]
 	V.TunnelSTATS.DISK = packet[2]
@@ -102,6 +107,9 @@ func (V *Tunnel) ProcessEgressPacket(p *[]byte) (sendRemote bool) {
 
 		V.EP_NAT_IP, V.EP_NAT_OK = V.TransLateIP(V.EP_DstIP)
 
+		V.EP_TPHeader[0] = V.EP_MP.VPNPort[0]
+		V.EP_TPHeader[1] = V.EP_MP.VPNPort[1]
+
 		V.EP_IPv4Header[12] = V.EP_VPNSrcIP[0]
 		V.EP_IPv4Header[13] = V.EP_VPNSrcIP[1]
 		V.EP_IPv4Header[14] = V.EP_VPNSrcIP[2]
@@ -114,7 +122,6 @@ func (V *Tunnel) ProcessEgressPacket(p *[]byte) (sendRemote bool) {
 		V.EP_IPv4Header[13] = V.VPL_IP[1]
 		V.EP_IPv4Header[14] = V.VPL_IP[2]
 		V.EP_IPv4Header[15] = V.VPL_IP[3]
-		fmt.Println("OUT:", V.VPL_IP, V.EP_NAT_IP)
 	}
 
 	if V.EP_NAT_OK {

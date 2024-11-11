@@ -145,7 +145,7 @@ const Enable2FA = (props) => {
 					<div className="codes">
 						{code.Recovery}
 					</div>
-					<div className="notice">DO NOT STORE THESE CODES WITH YOUR PASSWORD</div>
+					<div className="notice title">DO NOT STORE THESE CODES WITH YOUR PASSWORD</div>
 				</div>
 			}
 

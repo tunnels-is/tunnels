@@ -572,7 +572,7 @@ func PublicConnect(UICR UIConnectRequest) (code int, errm error) {
 	FinalCR.SeverID = UICR.SeverID
 	FinalCR.EncType = UICR.EncType
 
-	FinalCR.RequestingPorts = false
+	FinalCR.RequestingPorts = true
 	FinalCR.DHCPToken = ""
 
 	if !tunnel.Meta.Private && UICR.SeverID == "" {
