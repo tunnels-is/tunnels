@@ -618,12 +618,13 @@ func (t *TunnelInterface) Disconnect(V *Tunnel) (err error) {
 
 	t.shouldRestart = false
 	t.shouldExit = true
-	if V.Con != nil {
-		V.Con.Close()
-	}
 
 	for _, n := range V.CRR.Networks {
 		t.deleteRoutes(V, n)
+	}
+
+	if V.Con != nil {
+		V.Con.Close()
 	}
 
 	t.CloseReadAndWriteLoop()

@@ -361,6 +361,9 @@ func (t *TunnelInterface) Disconnect(V *Tunnel) (err error) {
 	defer RecoverAndLogToFile()
 
 	t.shouldRestart = false
+	if V.Con != nil {
+		V.Con.Close()
+	}
 
 	for _, n := range V.CRR.Networks {
 		t.deleteRoutes(V, n)
@@ -377,6 +380,11 @@ func (t *TunnelInterface) Disconnect(V *Tunnel) (err error) {
 	err = t.Close()
 	if err != nil {
 		ERROR("unable to close the interface", err)
+	}
+
+	err = t.Delete()
+	if err != nil {
+		ERROR("unable to delete the interface", err)
 	}
 
 	RemoveTunnelInterface(t)

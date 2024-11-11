@@ -367,6 +367,10 @@ func (t *TunnelInterface) Disconnect(V *Tunnel) (err error) {
 		t.deleteRoutes(V, n)
 	}
 
+	if V.Con != nil {
+		V.Con.Close()
+	}
+
 	if IsDefaultConnection(V.Meta.IFName) || V.Meta.EnableDefaultRoute {
 		err = IP_DelRoute("default", t.IPv4Address, "0")
 	}
