@@ -2,7 +2,6 @@ package core
 
 import (
 	"encoding/binary"
-	"fmt"
 	"time"
 )
 
@@ -17,16 +16,14 @@ type packetDebugOut struct {
 
 func (V *Tunnel) RegisterPing(packet []byte) {
 	V.TunnelSTATS.PingTime = time.Now()
-	if len(packet) < 11 {
-		ERROR("Received malformed ping from server, please contact system admins")
-		return
-	}
 
 	defer RecoverAndLogToFile()
 	V.TunnelSTATS.CPU = packet[0]
 	V.TunnelSTATS.MEM = packet[1]
 	V.TunnelSTATS.DISK = packet[2]
-	V.TunnelSTATS.ServerToClientMicro = time.Since(time.Unix(0, int64(binary.BigEndian.Uint64(packet[3:])))).Microseconds()
+	if len(packet) > 10 {
+		V.TunnelSTATS.ServerToClientMicro = time.Since(time.Unix(0, int64(binary.BigEndian.Uint64(packet[3:])))).Microseconds()
+	}
 }
 
 func debugProcessPacket(packet []byte) (P *packetDebugOut) {

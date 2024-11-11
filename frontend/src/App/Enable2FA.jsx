@@ -135,6 +135,7 @@ const Enable2FA = (props) => {
 						For Example: google authenticator or Aegis app
 					</div>
 				</div>
+
 			}
 
 			{code.Recovery &&
