@@ -70,7 +70,9 @@ func (T *TunnelInterface) ReadFromTunnelInterface() {
 			ERROR("socket write errir: ", err)
 			return
 		}
-		Tun.EP_MP.egressBytes += writtenBytes
+		if Tun.EP_MP != nil {
+			Tun.EP_MP.egressBytes += writtenBytes
+		}
 		Tun.EgressBytes += writtenBytes
 	}
 }
@@ -122,7 +124,9 @@ func (V *Tunnel) ReadFromServeTunnel() {
 			debugMissingIngressMapping(packet)
 			continue
 		}
-		V.IP_MP.ingressBytes += n
+		if V.IP_MP != nil {
+			V.IP_MP.ingressBytes += n
+		}
 
 		prePend = append(prePend[:4], packet...)
 		_, writeErr = V.Interface.RWC.Write(prePend[:len(packet)+4])

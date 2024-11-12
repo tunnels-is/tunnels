@@ -4,36 +4,91 @@ import (
 	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
+	"fmt"
 	"io"
+	"math"
 	"net"
+	"sync"
+	"syscall"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/zveinn/crypt"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"golang.org/x/net/quic"
 )
 
 var (
-	Config                       = new(Server)
-	InterfaceIP                  net.IP
-	PortMappingResponseDurations = time.Duration(30 * time.Second)
-	serverConfigPath             = "./server.json"
-	publicPath                   string
-	privatePath                  string
-	publicSigningCert            *x509.Certificate
-	publicSigningKey             *rsa.PublicKey
-	controlCertificate           tls.Certificate
-	controlConfig                *tls.Config
-	quicConfig                   *quic.Config
-	dataSocketFD                 int
-	rawUDPSockFD                 int
-	rawTCPSockFD                 int
-	slots                        int
+	serverConfigPath = "./server.json"
+	Config           = new(Server)
+	slots            int
 
-	TCPRWC                 io.ReadWriteCloser
-	UDPRWC                 io.ReadWriteCloser
+	publicPath         string
+	privatePath        string
+	publicSigningCert  *x509.Certificate
+	publicSigningKey   *rsa.PublicKey
+	controlCertificate tls.Certificate
+	controlConfig      *tls.Config
+	quicConfig         *quic.Config
+
+	dataSocketFD int
+	rawUDPSockFD int
+	rawTCPSockFD int
+	InterfaceIP  net.IP
+	TCPRWC       io.ReadWriteCloser
+	UDPRWC       io.ReadWriteCloser
+
 	toUserChannelMonitor   = make(chan int, 10000)
 	fromUserChannelMonitor = make(chan int, 10000)
+
+	PortMappingResponseDurations = time.Duration(30 * time.Second)
+
+	ClientCoreMappings [math.MaxUint16 + 1]*UserCoreMapping
+	PortToCoreMapping  [math.MaxUint16 + 1]*PortRange
+	COREm              = sync.Mutex{}
+
+	VPLNetwork      *net.IPNet
+	DHCPMapping     [math.MaxUint16 + 1]*DHCPRecord
+	IPToCoreMapping = make(map[[4]byte]*UserCoreMapping)
+	IPm             = sync.Mutex{}
+
+	// Routing Settings
+	AllowAll bool
+)
+
+type DHCPRecord struct {
+	m        sync.Mutex `json:"-"`
+	IP       [4]byte
+	Token    string
+	Activity time.Time `json:"-"`
+}
+
+func (d *DHCPRecord) Assign() (ok bool) {
+	if d.Token != "" {
+		return
+	}
+	d.m.Lock()
+	defer d.m.Unlock()
+	if d.Token == "" {
+		d.Token = uuid.NewString()
+		fmt.Println("NDHCP:", d.Token)
+		d.Activity = time.Now()
+		ok = true
+		return
+	}
+	return
+}
+
+const (
+	ping byte = 0
+	ok   byte = 1
+	fail byte = 2
+
+	// router
+
+	// firewall
+	allowIP    = 21
+	disallowIP = 22
 )
 
 type Server struct {
@@ -49,13 +104,24 @@ type Server struct {
 	AvailableUserMbps  int                `json:"AvailableUserMbps"`
 	InternetAccess     bool               `json:"InternetAccess,required"`
 	LocalNetworkAccess bool               `json:"LocalNetworkAccess"`
-	DNSAllowCustomOnly bool               `json:"DNSAllowCustomOnly"`
-	DNS                []*ServerDNS       `json:"DNS"`
-	Networks           []*ServerNetwork   `json:"Networks"`
-	DNSServers         []string           `json:"DNSServers"`
 
-	ControlCert string `json:"ControlCert"`
-	ControlKey  string `json:"ControlKey"`
+	ControlCert string           `json:"ControlCert"`
+	ControlKey  string           `json:"ControlKey"`
+	Networks    []*ServerNetwork `json:"Networks"`
+
+	// Shared Settings
+	DNSAllowCustomOnly bool         `json:"DNSAllowCustomOnly"`
+	DNS                []*ServerDNS `json:"DNS"`
+	DNSServers         []string     `json:"DNSServers"`
+
+	// Virtual Private Lan/Layer
+	VPL *VPLSettings `json:"VPL"`
+}
+
+type VPLSettings struct {
+	Network    *ServerNetwork `json:"VPLNetwork"`
+	MaxDevices int            `json:"MaxDevices"`
+	AllowAll   bool           `json:"AllowAll"`
 }
 
 type ServerDNS struct {
@@ -95,6 +161,9 @@ type ConnectRequestResponse struct {
 	Networks           []*ServerNetwork `json:"Networks"`
 	DNSServers         []string         `json:"DNSServers"`
 	DNSAllowCustomOnly bool             `json:"DNSAllowCustomOnly"`
+
+	DHCP       *DHCPRecord    `json:"DHCP"`
+	VPLNetwork *ServerNetwork `json:"VPLNetwork"`
 }
 
 func CreateCRRFromServer(S *Server) (CRR *ConnectRequestResponse) {
@@ -117,6 +186,7 @@ func CreateCRRFromServer(S *Server) (CRR *ConnectRequestResponse) {
 
 type ConnectRequest struct {
 	DeviceToken string             `json:"DeviceToken"`
+	APIToken    string             `json:"APIToken"`
 	EncType     crypt.EncType      `json:"EncType"`
 	UserID      primitive.ObjectID `json:"UserID"`
 	SeverID     primitive.ObjectID `json:"ServerID"`
@@ -124,8 +194,39 @@ type ConnectRequest struct {
 
 	Version int       `json:"Version"`
 	Created time.Time `json:"Created"`
+
+	// DHCP
+	RequestingPorts bool   `json:"RequestingPorts"`
+	DHCPToken       string `json:"DHCPToken"`
 }
 
 type ErrorResponse struct {
 	Error string `json:"Error"`
+}
+
+type PortRange struct {
+	StartPort uint16
+	EndPort   uint16
+	Client    *UserCoreMapping
+}
+
+type UserCoreMapping struct {
+	ID                 string
+	Version            int
+	PortRange          *PortRange
+	LastPingFromClient time.Time
+	EH                 *crypt.SocketWrapper
+	Uindex             []byte
+	Created            time.Time
+
+	ToUser   chan []byte
+	FromUser chan Packet
+
+	Addr syscall.Sockaddr
+
+	// VPL
+	APIToken   string
+	Allowedm   sync.Mutex
+	AllowedIPs map[[4]byte]bool
+	DHCP       *DHCPRecord
 }

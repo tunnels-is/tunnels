@@ -111,7 +111,7 @@ const DNS = () => {
 					value: value.tag,
 					tooltip: true,
 				},
-				{ type: "text", value: dayjs(value.FirstSeent).format(state.DNSListDateFormat) },
+				{ type: "text", value: dayjs(value.FirstSeen).format(state.DNSListDateFormat) },
 				{ type: "text", value: dayjs(value.LastSeen).format(state.DNSListDateFormat) },
 				{ type: "text", value: value.Count },
 			]

@@ -1405,18 +1405,17 @@ export var STATE = {
 					STATE.errorNotification(response?.data?.Error)
 				}
 
-				if (response?.status === 401) {
-					STATE.Logout()
-					return
-				}
 
 				return response
 			} catch (error) {
 				console.dir(error)
 
-				if (error?.response?.status === 401) {
-					STATE.Logout()
-					return
+
+				if (!noLogout || noLogout === false) {
+					if (error?.response?.status === 401) {
+						STATE.Logout()
+						return
+					}
 				}
 
 				if (error?.response?.data?.Message) {
