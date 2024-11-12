@@ -78,14 +78,14 @@ const SideBar = () => {
 			{
 				title: "Support",
 				items: [
-					{ icon: InfoCircledIcon, label: "Help", route: "help", user: false, },
+					{ icon: InfoCircledIcon, label: "Chat", route: "help", user: false, },
 					{
 						icon: AccessibilityIcon,
 						label: "Guides",
 						route: "guides",
 						user: false,
 
-						click: () => OpenWindowURL("https://www.tunnels.is")
+						click: () => OpenWindowURL("https://www.tunnels.is/#/docs")
 					},
 					{
 						icon: QuestionMarkCircledIcon,

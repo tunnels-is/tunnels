@@ -38,30 +38,37 @@ func PopulatePingBufferWithStats() {
 
 func NukeClient(index int) {
 	LOG("Removing index:", index)
-	pm := UserPortMappings[index]
-	if pm == nil {
+	cm := ClientCoreMappings[index]
+	if cm == nil {
 		ERR("Nuke client on nill index", index)
 		return
 	}
 
-	for i, v := range PortToUserMapping {
-		if v == nil {
-			continue
-		}
+	if cm.PortRange != nil {
+		for i, v := range PortToCoreMapping {
+			if v == nil {
+				continue
+			}
 
-		if v.StartPort == pm.PortRange.StartPort {
-			PortToUserMapping[i].Client = nil
+			if v.StartPort == cm.PortRange.StartPort {
+				PortToCoreMapping[i].Client = nil
+			}
 		}
 	}
 
-	UserPortMappings[index] = nil
+	if ClientCoreMappings[index].DHCP != nil {
+		IPToCoreMapping[ClientCoreMappings[index].DHCP.IP] = nil
+	}
+	close(ClientCoreMappings[index].ToUser)
+	close(ClientCoreMappings[index].FromUser)
+	ClientCoreMappings[index] = nil
 }
 
 func pingActiveUsers(SIGNAL *SIGNAL) {
 	defer RecoverAndReturnID(SIGNAL, 10)
 	PopulatePingBufferWithStats()
 
-	for index, u := range UserPortMappings {
+	for index, u := range ClientCoreMappings {
 		if u == nil {
 			continue
 		}

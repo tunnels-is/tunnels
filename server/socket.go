@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"crypto/x509"
 	"encoding/binary"
@@ -13,7 +12,6 @@ import (
 	"net"
 	"runtime/debug"
 	"strconv"
-	"sync"
 	"syscall"
 	"time"
 
@@ -116,54 +114,26 @@ func acceptUserUDPTLSSocket(conn *quic.Conn) {
 		return
 	}
 
-	totalConnections := 0
-	totalUserConnection := 0
-	for i := range UserPortMappings {
-		if UserPortMappings[i] == nil {
-			continue
-		}
+	totalC, totalUserC := countConnections(CR.UserID.Hex())
 
-		if UserPortMappings[i].ID == CR.UserID.Hex() {
-			totalUserConnection++
+	if CR.RequestingPorts {
+		if totalC >= slots {
+			WARN("Server is full", totalUserC, totalC, slots)
+			return
 		}
-
-		totalConnections++
 	}
 
-	if totalConnections >= slots {
-		WARN("Server is full", totalUserConnection, totalConnections, slots)
+	if totalUserC > Config.UserMaxConnections {
+		WARN("User has more then 4 connections", totalUserC)
 		return
 	}
 
-	if totalUserConnection > Config.UserMaxConnections {
-		WARN("User has more then 4 connections", totalUserConnection)
-		return
+	if Config.VPL != nil {
+		if totalUserC > Config.VPL.MaxDevices {
+			WARN("Max devices reached", totalUserC)
+			return
+		}
 	}
-
-	// var sw crypt.SignedConnectRequest
-	// sw, err = crypt.ValidateSignature(buff[:n], publicSigningKey)
-	// if err != nil {
-	// 	// ConnectResponseWithErrorCode(ES, CR, 401, GlobalError)
-	// 	WARN("Invalid payload signature:", err)
-	// 	return
-	// }
-	//
-	// CR := new(structs.ConnectRequest)
-	// err = json.Unmarshal(sw.Payload, &CR)
-	// if err != nil {
-	// 	WARN("Invalid connect request(unmarshal):", err)
-	// 	return
-	// }
-	//
-	// if Config.ID != CR.SeverID {
-	// 	ERR("Invalid server, current id: ", Config.ID, " provided id: ", CR.SeverID)
-	// 	return
-	// }
-	//
-	// if time.Since(CR.Created).Seconds() > 20 {
-	// 	ERR("Expired connection request", err)
-	// 	return
-	// }
 
 	var EH *crypt.SocketWrapper
 	EH, err = crypt.NewEncryptionHandler(CR.EncType)
@@ -180,11 +150,8 @@ func acceptUserUDPTLSSocket(conn *quic.Conn) {
 		return
 	}
 
-	// DO SESSION ..
-	// TODO .. consider total users on
-	// server during port allocation
 	CRR := CreateCRRFromServer(Config)
-	index, err := CreateClientPortMapping(CRR, CR, EH)
+	index, err := CreateClientCoreMapping(CRR, CR, EH)
 	if err != nil {
 		ERR("Port allocation failed", err)
 		return
@@ -196,8 +163,6 @@ func acceptUserUDPTLSSocket(conn *quic.Conn) {
 		return
 	}
 
-	// fmt.Println("SENDING...")
-	// fmt.Println(string(CRRB))
 	n, err = s.Write(CRRB)
 	if err != nil {
 		ERR("Unable to write CRRB", err)
@@ -213,32 +178,22 @@ func acceptUserUDPTLSSocket(conn *quic.Conn) {
 	go fromUserChannel(index)
 }
 
-type PortRange struct {
-	StartPort uint16
-	EndPort   uint16
-	Client    *UserPortMapping
+func countConnections(id string) (count int, userCount int) {
+	for i := range ClientCoreMappings {
+		if ClientCoreMappings[i] == nil {
+			continue
+		}
+
+		if ClientCoreMappings[i].ID == id {
+			userCount++
+		}
+
+		count++
+	}
+	return
 }
 
-type UserPortMapping struct {
-	ID                 string
-	Version            int
-	PortRange          *PortRange
-	ToUser             chan []byte
-	FromUser           chan Packet
-	LastPingFromClient time.Time
-	EH                 *crypt.SocketWrapper
-	Uindex             []byte
-	Addr               syscall.Sockaddr
-	Created            time.Time
-}
-
-var (
-	UserPortMappings  [math.MaxUint16 + 1]*UserPortMapping
-	PortMappingLock   = sync.Mutex{}
-	PortToUserMapping [math.MaxUint16 + 1]*PortRange
-)
-
-func CreateClientPortMapping(CRR *ConnectRequestResponse, CR *ConnectRequest, EH *crypt.SocketWrapper) (index int, err error) {
+func CreateClientCoreMapping(CRR *ConnectRequestResponse, CR *ConnectRequest, EH *crypt.SocketWrapper) (index int, err error) {
 	defer func() {
 		r := recover()
 		if r != nil {
@@ -247,58 +202,60 @@ func CreateClientPortMapping(CRR *ConnectRequestResponse, CR *ConnectRequest, EH
 	}()
 
 	wasAllocated := false
-	for i := range UserPortMappings {
-		if UserPortMappings[i] == nil {
-			wasAllocated = true
+	for i := range ClientCoreMappings {
+		if ClientCoreMappings[i] == nil {
 			index = i
-			PortMappingLock.Lock()
-			UserPortMappings[i] = new(UserPortMapping)
-			PortMappingLock.Unlock()
 
-			UserPortMappings[i].ID = CR.UserID.Hex()
-			UserPortMappings[i].EH = EH
-			UserPortMappings[i].Created = time.Now()
-			UserPortMappings[i].ToUser = make(chan []byte, 300000)
-			UserPortMappings[i].FromUser = make(chan Packet, 300000)
-			UserPortMappings[i].LastPingFromClient = time.Now()
-			UserPortMappings[i].Uindex = make([]byte, 2)
-			binary.BigEndian.PutUint16(UserPortMappings[i].Uindex, uint16(index))
+			COREm.Lock()
+			if ClientCoreMappings[i] == nil {
+				ClientCoreMappings[i] = new(UserCoreMapping)
+				wasAllocated = true
+			}
+			COREm.Unlock()
+			if !wasAllocated {
+				continue
+			}
+
+			ClientCoreMappings[i].ID = CR.UserID.Hex()
+			ClientCoreMappings[i].EH = EH
+			ClientCoreMappings[i].Created = time.Now()
+			ClientCoreMappings[i].ToUser = make(chan []byte, 300000)
+			ClientCoreMappings[i].FromUser = make(chan Packet, 300000)
+			ClientCoreMappings[i].LastPingFromClient = time.Now()
+			ClientCoreMappings[i].Uindex = make([]byte, 2)
+			binary.BigEndian.PutUint16(ClientCoreMappings[i].Uindex, uint16(index))
 
 			break
 		}
 	}
+
 	if !wasAllocated {
 		return 0, errors.New("No session slots available on the server")
 	}
 
-	var PR *PortRange
-	for i := range PortToUserMapping {
-		if i < int(Config.StartPort) {
-			continue
-		}
-
-		if PortToUserMapping[i] == nil {
-			// WARN("PORT TO CLIENT MAPPING IS NIL: ", i)
-			continue
-		}
-
-		if PortToUserMapping[i].Client == nil {
-			PortToUserMapping[i].Client = UserPortMappings[index]
-			UserPortMappings[index].PortRange = PortToUserMapping[i]
-			PR = PortToUserMapping[i]
-			break
-		}
-	}
-
-	if PR == nil {
-		WARN("Unable to assign user to port mapping, no available space")
-		return 0, errors.New("No port mappings available on the server")
-	}
-
-	CRR.StartPort = PR.StartPort
-	CRR.EndPort = PR.EndPort
 	CRR.Index = index
 
+	if VPLEnabled {
+		err = assignDHCP(CR, CRR, index)
+		if err != nil {
+			WARN("Unable to assign DHCP address")
+			NukeClient(index)
+			return 0, err
+		}
+	}
+
+	if CR.RequestingPorts {
+		err := allocatePorts(CRR, index)
+		if err != nil {
+			NukeClient(index)
+			WARN("Unable to assign user to port mapping, no available space")
+			return 0, err
+		}
+	}
+
+	CRR.VPLNetwork = Config.VPL.Network
+
+	fmt.Println(CRR)
 	return
 }
 
@@ -365,7 +322,7 @@ func ExternalTCPListener(SIGNAL *SIGNAL) {
 		// TODO .. use mask
 		IHL = ((buffer[0] << 4) >> 4) * 4
 		DSTP = binary.BigEndian.Uint16(buffer[IHL+2 : IHL+4])
-		PM = PortToUserMapping[DSTP]
+		PM = PortToCoreMapping[DSTP]
 		if PM == nil || PM.Client == nil {
 			continue
 		}
@@ -451,7 +408,7 @@ func ExternalUDPListener(SIGNAL *SIGNAL) {
 		// TODO .. use mask
 		IHL = ((buffer[0] << 4) >> 4) * 4
 		DSTP = binary.BigEndian.Uint16(buffer[IHL+2 : IHL+4])
-		PM = PortToUserMapping[DSTP]
+		PM = PortToCoreMapping[DSTP]
 		if PM == nil || PM.Client == nil {
 			continue
 		}
@@ -528,10 +485,13 @@ func DataSocketListener(SIGNAL *SIGNAL) {
 		// fmt.Println("------------------------------------")
 		id = binary.BigEndian.Uint16(buff[0:2])
 
-		// IF PROXY
-		// --- send forward to next server.
-		if UserPortMappings[id] != nil {
-			UserPortMappings[id].FromUser <- Packet{
+		if ClientCoreMappings[id] != nil {
+			// in4, ok := addr.(*syscall.SockaddrInet4)
+			// if !ok {
+			// 	continue
+			// }
+
+			ClientCoreMappings[id].FromUser <- Packet{
 				addr: addr,
 				data: CopySlice(buff[:n]),
 			}
@@ -558,18 +518,20 @@ func fromUserChannel(index int) {
 		}
 	}()
 
-	CM := UserPortMappings[index]
+	CM := ClientCoreMappings[index]
 	if CM == nil {
 		shouldRestart = false
 		return
 	}
 
 	var payload Packet
-	var packet []byte
-	var NETIP net.IP
+	var PACKET []byte
+	var NIP net.IP
 	var err error
 	var ok bool
-	staging := make([]byte, 70000)
+	staging := make([]byte, 100000)
+	clientCache := make(map[[4]byte]chan []byte)
+	var D4 [4]byte
 
 	for {
 		payload, ok = <-CM.FromUser
@@ -578,44 +540,92 @@ func fromUserChannel(index int) {
 			return
 		}
 
-		packet, err = CM.EH.SEAL.Open1(
+		if len(payload.data) > len(staging) {
+			panic("PAYLOAD BIGGER THEN STAGING .. THIS SHOULD NEVR HAPPEN")
+		}
+
+		PACKET, err = CM.EH.SEAL.Open1(
 			payload.data[10:],
 			payload.data[2:10],
 			staging[:0],
 			payload.data[0:2],
 		)
+		// fmt.Println("PAYLOAD:", PACKET)
 		if err != nil {
 			ERR("Authentication error:", err)
 			continue
 		}
 
 		CM.Addr = payload.addr
-		if len(packet) < 20 {
-			CM.LastPingFromClient = time.Now()
+		if len(PACKET) < 20 {
+			switch PACKET[0] {
+			case ping:
+				CM.LastPingFromClient = time.Now()
+				if CM.DHCP != nil {
+					CM.DHCP.Activity = time.Now()
+				}
+			case allowIP, disallowIP:
+				select {
+				case CM.ToUser <- PACKET:
+				default:
+				}
+			default:
+				CM.LastPingFromClient = time.Now()
+			}
 			continue
 		}
 
-		NETIP = packet[16:20]
+		NIP = PACKET[16:20]
+		// fmt.Println("VPLFrom:", VPLEnabled)
+		if VPLEnabled {
+			D4[0] = NIP[0]
+			D4[1] = NIP[1]
+			D4[2] = NIP[2]
+			D4[3] = NIP[3]
+			_, ok := clientCache[D4]
+			if !ok {
+				// fmt.Println("cache hit:", D4)
+				IPm.Lock()
+				targetCM, _ := IPToCoreMapping[D4]
+				IPm.Unlock()
+				if targetCM != nil {
+					clientCache[D4] = targetCM.ToUser
+					ok = true
+				}
+			}
+			if ok {
+				// fmt.Println("SENDING TO:", D4)
+				select {
+				case clientCache[D4] <- CopySlice(PACKET):
+					// fmt.Println("SENT TO:", D4)
+				default:
+					// fmt.Println("deleting:", D4)
+					delete(clientCache, D4)
+				}
+				continue
+			}
+		}
+
 		if !Config.LocalNetworkAccess {
-			if IS_LOCAL(NETIP) {
+			if IS_LOCAL(NIP) {
 				continue
 			}
 		}
 
 		if !Config.InternetAccess {
-			if !IS_LOCAL(NETIP) {
+			if !IS_LOCAL(NIP) {
 				continue
 			}
 		}
 
-		if packet[9] == 17 {
-			_, err = UDPRWC.Write(packet)
+		if PACKET[9] == 17 {
+			_, err = UDPRWC.Write(PACKET)
 			if err != nil {
 				WARN("UDPRWC err:", err)
 				continue
 			}
 		} else {
-			_, err = TCPRWC.Write(packet)
+			_, err = TCPRWC.Write(PACKET)
 			if err != nil {
 				WARN("TCPRWC err:", err)
 				continue
@@ -659,18 +669,19 @@ func toUserChannel(index int) {
 		}
 	}()
 
-	CM := UserPortMappings[index]
+	CM := ClientCoreMappings[index]
 	if CM == nil {
 		shouldRestart = false
 		return
 	}
 
 	var PACKET []byte
-	var NETIP net.IP
+	// var DIP net.IP
 	var err error
-	IFipTo4 := InterfaceIP.To4()
+	// IFipTo4 := InterfaceIP.To4()
 	var ok bool
 	var out []byte
+	var S4 [4]byte
 
 	for {
 		PACKET, ok = <-CM.ToUser
@@ -679,7 +690,15 @@ func toUserChannel(index int) {
 			return
 		}
 
+		// fmt.Println("PACKET:", PACKET)
 		if len(PACKET) < 20 {
+			switch PACKET[0] {
+			case allowIP:
+				CM.AllowedIPs[[4]byte{PACKET[1], PACKET[2], PACKET[3], PACKET[4]}] = true
+			case disallowIP:
+				CM.AllowedIPs[[4]byte{PACKET[1], PACKET[2], PACKET[3], PACKET[4]}] = false
+			default:
+			}
 			continue
 		}
 
@@ -687,9 +706,31 @@ func toUserChannel(index int) {
 			continue
 		}
 
-		NETIP = PACKET[16:20]
-		if !bytes.Equal(NETIP, IFipTo4) {
-			continue
+		// DIP = PACKET[16:20]
+		// fmt.Println("VPLTo:", VPLEnabled)
+		if VPLEnabled {
+			S4[0] = PACKET[12]
+			S4[1] = PACKET[13]
+			S4[2] = PACKET[14]
+			S4[3] = PACKET[15]
+
+			if !AllowAll {
+				allowed, ok := CM.AllowedIPs[S4]
+				if ok {
+					if !allowed {
+						// fmt.Println("NOT ALLOWED:", S4)
+						continue
+					}
+				} else {
+					// fmt.Println("NOT FOUND:", S4)
+					continue
+				}
+			}
+		} else {
+			// Use contrack instead
+			// if !bytes.Equal(DIP, IFipTo4) {
+			// 	continue
+			// }
 		}
 
 		out = CM.EH.SEAL.Seal2(PACKET, CM.Uindex)

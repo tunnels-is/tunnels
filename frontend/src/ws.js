@@ -11,8 +11,8 @@ var WS = {
 		if (!STATE.logs) {
 			STATE.logs = []
 		}
-		if (STATE.logs.length > 1000) {
-			STATE.logs.splice(100, 5000);
+		if (STATE.logs.length > 400) {
+			STATE.logs.splice(0, 5000);
 		}
 		STATE.logs.push(event.data)
 		STORE.Cache.SetObject("logs", STATE.logs)

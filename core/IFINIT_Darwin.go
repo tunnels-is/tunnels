@@ -287,7 +287,7 @@ func (t *TunnelInterface) addRoutes(V *Tunnel, n *ServerNetwork) (err error) {
 	}
 
 	for _, v := range n.Routes {
-		if strings.ToLower(v.Address) == "default" || strings.Contains(v.Address, "0.0.0.0") {
+		if strings.ToLower(v.Address) == "default" || strings.HasPrefix(v.Address, "0.0.0.0") {
 			continue
 		}
 
@@ -346,6 +346,10 @@ func (t *TunnelInterface) Connect(V *Tunnel) (err error) {
 		}
 	}
 
+	if V.CRR.VPLNetwork != nil {
+		t.addRoutes(V, V.CRR.VPLNetwork)
+	}
+
 	for _, n := range V.CRR.Networks {
 		t.addRoutes(V, n)
 	}
@@ -357,6 +361,9 @@ func (t *TunnelInterface) Disconnect(V *Tunnel) (err error) {
 	defer RecoverAndLogToFile()
 
 	t.shouldRestart = false
+	if V.Con != nil {
+		V.Con.Close()
+	}
 
 	for _, n := range V.CRR.Networks {
 		t.deleteRoutes(V, n)
@@ -373,6 +380,11 @@ func (t *TunnelInterface) Disconnect(V *Tunnel) (err error) {
 	err = t.Close()
 	if err != nil {
 		ERROR("unable to close the interface", err)
+	}
+
+	err = t.Delete()
+	if err != nil {
+		ERROR("unable to delete the interface", err)
 	}
 
 	RemoveTunnelInterface(t)

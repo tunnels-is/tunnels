@@ -1,0 +1,11 @@
+{
+	"tag": "RST packet firewall",
+	"filter": "firewall",
+	"cmd": [
+		{
+			"run": "iptables -I OUTPUT -p tcp --src {[server.variables.interfaceIP]} --tcp-flags ACK,RST RST -j DROP",
+			"filter": "rst",
+			"async": true
+		}
+	]
+}

@@ -2507,10 +2507,12 @@ button {
     }
 
     .codes {
+      color: var(--c-shade6);
       margin-top: 20px;
     }
 
     .notice {
+
       color: $error-color;
       margin-top: 20px;
     }
@@ -3558,7 +3560,7 @@ button {
     flex-direction: column;
     height: fit-content;
     width: fit-content !important;
-    max-width: 500px;
+    max-width: 540px;
 
     .header {
       display: flex;

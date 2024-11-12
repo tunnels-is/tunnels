@@ -2,6 +2,7 @@ package core
 
 import (
 	"errors"
+	"net"
 	"strconv"
 	"strings"
 
@@ -20,6 +21,12 @@ func EnsureOrCreateInterface(TUN *Tunnel) (err error, created bool) {
 	} else {
 		DEBUG("Interface already exists: ", TUN.Meta.IFName)
 	}
+
+	metaIP := net.ParseIP(TUN.Meta.IPv4Address).To4()
+	TUN.LOCAL_IF_IP[0] = metaIP[0]
+	TUN.LOCAL_IF_IP[1] = metaIP[1]
+	TUN.LOCAL_IF_IP[2] = metaIP[2]
+	TUN.LOCAL_IF_IP[3] = metaIP[3]
 
 	return
 }

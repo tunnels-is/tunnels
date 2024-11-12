@@ -1,0 +1,39 @@
+{
+	"tag": "Server Prep",
+	"filter": "prep",
+	"cmd": [
+		{
+			"run": "touch /root/.hushlogin",
+			"filter": "hush",
+			"async": true
+		},
+		{
+			"file": {
+				"local": "files/sshd_config",
+				"remote": "/etc/ssh/sshd_config",
+				"mode": "0600"
+			},
+			"filter": "ssh",
+			"async": true
+		},
+		{
+			"run": "apt install iptables supervisor htop net-tools tcpdump -y",
+			"filter": "basics",
+			"async": false
+		},
+		{
+			"file": {
+				"local": "./files/sysctl.conf",
+				"remote": "/etc/sysctl.conf",
+				"mode": "0600"
+			},
+			"filter": "sysctl",
+			"async": false
+		},
+		{
+			"run": "sysctl -p",
+			"filter": "sysctl",
+			"async": false
+		}
+	]
+}

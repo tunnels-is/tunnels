@@ -1,0 +1,46 @@
+{
+	"tag": "Server install",
+	"filter": "config",
+	"cmd": [
+		{
+			"run": "rm /var/log/tunnels{[server.variables.id]}/server.crt",
+			"filter": "rmcrt",
+			"async": false
+		},
+		{
+			"run": "rm /var/log/tunnels{[server.variables.id]}/server.key",
+			"filter": "rmkey",
+			"async": false
+		},
+		{
+			"run": "rm /var/log/tunnels{[server.variables.id]}/server.json",
+			"filter": "rmconfig",
+			"async": false
+		},
+		{
+			"run": "/opt/tunnels{[server.variables.id]}/server --config --interfaceIP {[server.variables.interfaceIP]}",
+			"filter": "create",
+			"async": false
+		},
+		{
+			"local": true,
+			"run": "scp -i {[server.key]} {[server.user]}@{[server.ip]}:/opt/tunnels{[server.variables.id]}/server.crt .",
+			"filter": "download",
+			"async": false
+		},
+		{
+			"file": {
+				"local": "{[server.variables.config]}",
+				"remote": "/opt/tunnels{[server.variables.id]}/server.json",
+				"mode": "0600"
+			},
+			"filter": "overwrite",
+			"async": false
+		},
+		{
+			"run": "supervisorctl restart tunnels{[server.variables.id]}",
+			"filter": "restart",
+			"async": false
+		}
+	]
+}
