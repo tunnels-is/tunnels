@@ -89,6 +89,7 @@ const Servers = () => {
 						popEditor(server)
 					}
 				},
+				{ type: "text", value: server.Server ? server.Server : "Unknown" },
 				{ type: "text", value: server.IP },
 				{
 					type: "select",
@@ -121,6 +122,7 @@ const Servers = () => {
 	const headers = [
 		{ value: "" },
 		{ value: "Tag" },
+		{ value: "Server" },
 		{ value: "IP" },
 		{ value: "Connection" },
 		{ value: "" }
