@@ -1,9 +1,9 @@
 {
-	"ID": "66c07bba1f4c7f0424496d5c",
-	"ControlIP": "192.168.1.12",
+	"ID": "[TUNNELS_ID]",
+	"ControlIP": "[EXTERNAL_FACING_IP_FOR_CONNECTING]",
 	"ControlPort": "444",
 	"UserMaxConnections": 4,
-	"InterfaceIP": "192.168.1.12",
+	"InterfaceIP": "[EXTERNAL_FACING_IP_FOR_PACKET_FLOW]",
 	"DataPort": "443",
 	"StartPort": 2000,
 	"EndPort": 65500,
@@ -16,9 +16,14 @@
 	"Networks": [
 		{
 			"Tag": "default",
-			"Network": "192.168.1.12/24",
-			"Nat": "10.10.10.1/24",
-			"Routes": null
+			"Network": "[LOCAL_NETWORK]/24",
+			"Nat": "10.10.10.0/24",
+			"Routes": [
+				{
+					"Address": "10.10.10.0/24",
+					"Metric": "0"
+				}
+			]
 		}
 	],
 	"DNSAllowCustomOnly": false,
@@ -32,7 +37,12 @@
 			"Tag": "VPL",
 			"Network": "10.0.0.0/16",
 			"Nat": "",
-			"Routes": null
+			"Routes": [
+				{
+					"Address": "10.0.0.0/16",
+					"Metric": "0"
+				}
+			]
 		},
 		"MaxDevices": 65535,
 		"AllowAll": true

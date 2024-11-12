@@ -515,7 +515,7 @@ func (t *TunnelInterface) addRoutes(V *Tunnel, n *ServerNetwork) (err error) {
 
 	for _, v := range n.Routes {
 		// default routes are not allowed on windows
-		if strings.ToLower(v.Address) == "default" || strings.Contains(v.Address, "0.0.0.0") {
+		if strings.ToLower(v.Address) == "default" || strings.HasPrefix(v.Address, "0.0.0.0") {
 			continue
 		}
 
@@ -583,6 +583,10 @@ func (t *TunnelInterface) Connect(V *Tunnel) (err error) {
 	// _ = DNS_Del(strconv.Itoa(DEFAULT_INTERFACE_ID))
 	// err = DNS_Set(strconv.Itoa(DEFAULT_INTERFACE_ID), "127.0.0.1", "1")
 
+	if V.CRR.VPLNetwork != nil {
+		t.addRoutes(V, V.CRR.VPLNetwork)
+	}
+
 	for _, n := range V.CRR.Networks {
 		t.addRoutes(V, n)
 	}
@@ -603,6 +607,7 @@ exitLoop:
 			}
 		case _ = <-exitTimeout.C:
 			ERROR("timed out waiting for reader and writer to exit")
+			return
 		}
 	}
 	return
@@ -616,6 +621,10 @@ func (t *TunnelInterface) Disconnect(V *Tunnel) (err error) {
 
 	for _, n := range V.CRR.Networks {
 		t.deleteRoutes(V, n)
+	}
+
+	if V.Con != nil {
+		V.Con.Close()
 	}
 
 	t.CloseReadAndWriteLoop()

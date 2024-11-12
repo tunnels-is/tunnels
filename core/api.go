@@ -21,7 +21,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/xlzd/gotp"
 	"github.com/zveinn/crypt"
 	"golang.org/x/net/quic"
@@ -197,7 +196,7 @@ func ForwardToController(FR *FORWARD_REQUEST) (interface{}, int) {
 	}
 
 	if strings.Contains(FR.Path, "login") {
-		if len(responseBytes) != 0 {
+		if len(responseBytes) != 0 && code == 200 {
 			INFO("LOGIN DETECTED!")
 			err = json.Unmarshal(responseBytes, &GLOBAL_STATE.User)
 			if err != nil {
@@ -435,7 +434,7 @@ func PrepareState() (err error) {
 	return
 }
 
-func InitializeTunnelFromCRR(TUN *Tunnel) error {
+func InitializeTunnelFromCRR(TUN *Tunnel) (err error) {
 	BLOCK_DNS_QUERIES = true
 	defer func() {
 		RecoverAndLogToFile()
@@ -465,6 +464,13 @@ func InitializeTunnelFromCRR(TUN *Tunnel) error {
 	TUN.EP_VPNSrcIP[2] = to4[2]
 	TUN.EP_VPNSrcIP[3] = to4[3]
 
+	if TUN.CRR.DHCP != nil {
+		TUN.VPL_IP[0] = TUN.CRR.DHCP.IP[0]
+		TUN.VPL_IP[1] = TUN.CRR.DHCP.IP[1]
+		TUN.VPL_IP[2] = TUN.CRR.DHCP.IP[2]
+		TUN.VPL_IP[3] = TUN.CRR.DHCP.IP[3]
+	}
+
 	if !TUN.Meta.LocalhostNat {
 		NN := new(ServerNetwork)
 		NN.Network = "127.0.0.1/32"
@@ -485,13 +491,31 @@ func InitializeTunnelFromCRR(TUN *Tunnel) error {
 		TUN.CRR.DNSServers = []string{C.DNS1Default, C.DNS2Default}
 	}
 
+	err = TUN.InitVPLMap()
+	if err != nil {
+		return err
+	}
+	err = TUN.InitNatMaps()
+	if err != nil {
+		return err
+	}
+
 	DEBUG(fmt.Sprintf(
-		"Connection info: Addr(%s) StartPort(%d) EndPort(%d) srcIP(%s)",
+		"Connection info: Addr(%s) StartPort(%d) EndPort(%d) srcIP(%s) ",
 		TUN.Meta.IPv4Address,
 		TUN.CRR.StartPort,
 		TUN.CRR.EndPort,
 		TUN.CRR.InterfaceIP,
 	))
+
+	if TUN.CRR.VPLNetwork != nil && TUN.CRR.DHCP != nil {
+		DEBUG(fmt.Sprintf(
+			"DHCP/VPL info: Addr(%s) Network:(%s) Token(%s) ",
+			TUN.CRR.DHCP.IP,
+			TUN.CRR.VPLNetwork.Network,
+			TUN.CRR.DHCP.Token,
+		))
+	}
 
 	return nil
 }
@@ -538,7 +562,6 @@ func PublicConnect(UICR UIConnectRequest) (code int, errm error) {
 
 	FinalCR := new(ConnectionRequest)
 	FinalCR.Version = API_VERSION
-	FinalCR.UUID = uuid.NewString()
 	FinalCR.Created = time.Now()
 
 	// from GUI connect request
@@ -546,6 +569,9 @@ func PublicConnect(UICR UIConnectRequest) (code int, errm error) {
 	FinalCR.UserID = UICR.UserID
 	FinalCR.SeverID = UICR.SeverID
 	FinalCR.EncType = UICR.EncType
+
+	FinalCR.RequestingPorts = true
+	FinalCR.DHCPToken = ""
 
 	if !tunnel.Meta.Private && UICR.SeverID == "" {
 		ERROR("No server selected")
@@ -678,7 +704,7 @@ func PublicConnect(UICR UIConnectRequest) (code int, errm error) {
 	}
 
 	CRR := new(ConnectRequestResponse)
-	resp := make([]byte, 70000)
+	resp := make([]byte, 100000)
 	n, err := s.Read(resp)
 	DEBUG("(RAW)ConnectionRequestResponse:", string(resp[:n]))
 	if err != nil {
@@ -703,7 +729,7 @@ func PublicConnect(UICR UIConnectRequest) (code int, errm error) {
 
 	err = InitializeTunnelFromCRR(tunnel)
 	if err != nil {
-		return 0, err
+		return 502, err
 	}
 
 	DEBUG("Opening data tunnel:", net.JoinHostPort(UICR.ServerIP, CRR.DataPort))
@@ -740,10 +766,6 @@ func PublicConnect(UICR UIConnectRequest) (code int, errm error) {
 	// Create cross-pointers
 	tunnel.Interface.tunnel.Store(&tunnel)
 
-	err = tunnel.InitNatMaps()
-	if err != nil {
-		return 502, err
-	}
 	tunnel.Connected = true
 	tunnel.TunnelSTATS.PingTime = time.Now()
 

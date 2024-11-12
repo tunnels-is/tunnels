@@ -56,8 +56,10 @@ type ConnectionRequest struct {
 
 	// These are added by the golang client
 	Version int       `json:"Version"`
-	UUID    string    `json:"UUID"`
 	Created time.Time `json:"Created"`
+
+	RequestingPorts bool   `json:"RequestingPorts"`
+	DHCPToken       string `json:"DHCPToken"`
 }
 
 type ErrorResponse struct {
@@ -79,13 +81,24 @@ type ConnectRequestResponse struct {
 
 	DataPort    string `json:"DataPort"`
 	InterfaceIP string `json:"InterfaceIP"`
-	StartPort   uint16 `json:"StartPort"`
-	EndPort     uint16 `json:"EndPort"`
+
+	// Normal VPN
+	StartPort uint16 `json:"StartPort"`
+	EndPort   uint16 `json:"EndPort"`
 
 	DNS                []*ServerDNS     `json:"DNS"`
 	Networks           []*ServerNetwork `json:"Networks"`
 	DNSServers         []string         `json:"DNSServers"`
 	DNSAllowCustomOnly bool             `json:"DNSAllowCustomOnly"`
+
+	// VPL Mapping
+	DHCP       *DHCPRecord    `json:"DHCP"`
+	VPLNetwork *ServerNetwork `json:"VPLNetwork"`
+}
+
+type DHCPRecord struct {
+	IP    [4]byte
+	Token string
 }
 
 var (
@@ -215,14 +228,6 @@ type LogItem struct {
 type LogoutForm struct {
 	Email       string
 	DeviceToken string
-}
-type LoginForm struct {
-	Email       string
-	Password    string
-	DeviceName  string
-	DeviceToken string
-	Digits      string
-	Recovery    string
 }
 
 type State struct {
@@ -451,6 +456,8 @@ type Tunnel struct {
 	Exiting                bool
 
 	// VPN NODE
+	LOCAL_IF_IP [4]byte
+
 	// CRR     *VPNNode
 	PingBuffer [8]byte
 
@@ -469,6 +476,11 @@ type Tunnel struct {
 	EP_MP  *Mapping
 	IP_MP  *Mapping
 	EP_SYN byte
+
+	// VPL
+	VPL_IP    [4]byte
+	VPL_E_MAP map[[4]byte]struct{} `json:"-"`
+	VPL_I_MAP map[[4]byte]struct{} `json:"-"`
 
 	//  NAT
 	NAT_CACHE         map[[4]byte][4]byte `json:"-"`
@@ -897,18 +909,19 @@ type DEVICE_TOKEN struct {
 
 // use struct you get from the login request
 type User struct {
-	ID                    string          `json:"_id,omitempty" bson:"_id,omitempty"`
-	APIKey                string          `bson:"AK" json:"APIKey"`
-	Email                 string          `bson:"E"`
-	DeviceToken           *DEVICE_TOKEN   `json:",omitempty" bson:"-"`
-	Tokens                []*DEVICE_TOKEN `json:"Tokens" bson:"Tokens"`
-	OrgID                 string          `json:"OrgID" bson:"OrgID"`
-	Key                   *LicenseKey     `json:"Key" bson:"Key"`
-	Trial                 bool            `json:"Trial" bson:"Trial"`
-	Disabled              bool            `json:"Disabled" bson:"Disabled"`
-	TwoFactorEnabled      bool            `json:"TwoFactorEnabled" bson:"TwoFactorEnabled"`
-	Updated               time.Time       `json:"Updated" bson:"Updated"`
-	AdditionalInformation string          `json:"AdditionalInformation,omitempty" bson:"AdditionalInformation"`
+	ID                    string          `json:"_id,omitempty"`
+	APIKey                string          `json:"APIKey"`
+	Email                 string          `json:"Email"`
+	DeviceToken           *DEVICE_TOKEN   `json:",omitempty"`
+	Tokens                []*DEVICE_TOKEN `json:"Tokens"`
+	OrgID                 string          `json:"OrgID" `
+	Key                   *LicenseKey     `json:"Key"`
+	Trial                 bool            `json:"Trial"`
+	Disabled              bool            `json:"Disabled"`
+	TwoFactorEnabled      bool            `json:"TwoFactorEnabled"`
+	Updated               time.Time       `json:"Updated"`
+	SubExpiration         time.Time       `json:"SubExpiration"`
+	AdditionalInformation string          `json:"AdditionalInformation,omitempty"`
 }
 
 type LicenseKey struct {
