@@ -508,7 +508,7 @@ func InitializeTunnelFromCRR(TUN *Tunnel) (err error) {
 		TUN.CRR.InterfaceIP,
 	))
 
-	if TUN.CRR.VPLNetwork != nil {
+	if TUN.CRR.VPLNetwork != nil && TUN.CRR.DHCP != nil {
 		DEBUG(fmt.Sprintf(
 			"DHCP/VPL info: Addr(%s) Network:(%s) Token(%s) ",
 			TUN.CRR.DHCP.IP,

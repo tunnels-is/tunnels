@@ -550,7 +550,7 @@ func fromUserChannel(index int) {
 			staging[:0],
 			payload.data[0:2],
 		)
-		fmt.Println("PAYLOAD:", PACKET)
+		// fmt.Println("PAYLOAD:", PACKET)
 		if err != nil {
 			ERR("Authentication error:", err)
 			continue
@@ -576,7 +576,7 @@ func fromUserChannel(index int) {
 		}
 
 		NIP = PACKET[16:20]
-		fmt.Println("VPLFrom:", VPLEnabled)
+		// fmt.Println("VPLFrom:", VPLEnabled)
 		if VPLEnabled {
 			D4[0] = NIP[0]
 			D4[1] = NIP[1]
@@ -584,7 +584,7 @@ func fromUserChannel(index int) {
 			D4[3] = NIP[3]
 			_, ok := clientCache[D4]
 			if !ok {
-				fmt.Println("cache hit:", D4)
+				// fmt.Println("cache hit:", D4)
 				IPm.Lock()
 				targetCM, _ := IPToCoreMapping[D4]
 				IPm.Unlock()
@@ -594,12 +594,12 @@ func fromUserChannel(index int) {
 				}
 			}
 			if ok {
-				fmt.Println("SENDING TO:", D4)
+				// fmt.Println("SENDING TO:", D4)
 				select {
 				case clientCache[D4] <- CopySlice(PACKET):
-					fmt.Println("SENT TO:", D4)
+					// fmt.Println("SENT TO:", D4)
 				default:
-					fmt.Println("deleting:", D4)
+					// fmt.Println("deleting:", D4)
 					delete(clientCache, D4)
 				}
 				continue
@@ -690,7 +690,7 @@ func toUserChannel(index int) {
 			return
 		}
 
-		fmt.Println("PACKET:", PACKET)
+		// fmt.Println("PACKET:", PACKET)
 		if len(PACKET) < 20 {
 			switch PACKET[0] {
 			case allowIP:
@@ -707,7 +707,7 @@ func toUserChannel(index int) {
 		}
 
 		// DIP = PACKET[16:20]
-		fmt.Println("VPLTo:", VPLEnabled)
+		// fmt.Println("VPLTo:", VPLEnabled)
 		if VPLEnabled {
 			S4[0] = PACKET[12]
 			S4[1] = PACKET[13]
@@ -718,11 +718,11 @@ func toUserChannel(index int) {
 				allowed, ok := CM.AllowedIPs[S4]
 				if ok {
 					if !allowed {
-						fmt.Println("NOT ALLOWED:", S4)
+						// fmt.Println("NOT ALLOWED:", S4)
 						continue
 					}
 				} else {
-					fmt.Println("NOT FOUND:", S4)
+					// fmt.Println("NOT FOUND:", S4)
 					continue
 				}
 			}
