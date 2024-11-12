@@ -56,7 +56,6 @@ type ConnectionRequest struct {
 
 	// These are added by the golang client
 	Version int       `json:"Version"`
-	UUID    string    `json:"UUID"`
 	Created time.Time `json:"Created"`
 
 	RequestingPorts bool   `json:"RequestingPorts"`
