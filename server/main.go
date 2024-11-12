@@ -95,6 +95,7 @@ func loadPublicSigningCert() (err error) {
 
 var (
 	id              string
+	interfaceIP     string
 	config          bool
 	features        string
 	enabledFeatures []string
@@ -123,16 +124,13 @@ func main() {
 	}()
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
-	flag.StringVar(&id, "id", "", "Include your servers ID. This ID can be found in the Tunnels UI")
+	flag.StringVar(&id, "id", "", "Tunnels ID used when generating the config. NOTE: not including and id will skip config generation but the certificate will still be generated.")
+	flag.StringVar(&interfaceIP, "interfaceIP", "", "InterfaceIP used when generating config and certificates")
 	flag.BoolVar(&config, "config", false, "Generate a config and make certificates ( Remember to copy the serial number ! )")
 	flag.StringVar(&features, "features", "VPN,VPL", "Select enabled features. Available: VPN,VPL")
 	flag.Parse()
 
 	if config {
-		if id == "" {
-			fmt.Println("--id missing")
-			os.Exit(1)
-		}
 		makeConfigAndCertificates()
 		os.Exit(1)
 	}
@@ -140,14 +138,14 @@ func main() {
 	enabledFeatures = strings.Split(features, ",")
 	if len(features) == 0 {
 		fmt.Println("you need to enabled at least one feature use --help for more information")
-		os.Exit(1)
+		os.Exit(0)
 	}
 
 	var err error
 	Config, err = GetServerConfig(serverConfigPath)
 	if err != nil {
 		fmt.Println("Error loading config: ", err)
-		os.Exit(1)
+		os.Exit(0)
 	}
 
 	for i := range enabledFeatures {
@@ -160,7 +158,7 @@ func main() {
 			fmt.Println("Enabling VPL Feature..")
 			if Config.VPL == nil {
 				fmt.Println("VPL Configuration missing")
-				os.Exit(1)
+				os.Exit(0)
 			}
 		case DNSFeature:
 			fmt.Println("Enabling DNS Feature..")
@@ -168,7 +166,7 @@ func main() {
 			DNSEnabled = true
 		default:
 			fmt.Println("Unknown feature: ", enabledFeatures[i])
-			os.Exit(1)
+			os.Exit(0)
 		}
 	}
 
@@ -333,85 +331,91 @@ func initializeCertsAndTLSConfig() {
 }
 
 func makeConfigAndCertificates() {
-	InterfaceIP, err := gateway.DiscoverInterface()
+	ep, err := os.Executable()
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
+	}
+	eps := strings.Split(ep, "/")
+	ep = strings.Join(eps[:len(eps)-1], "/")
+	ep += "/"
+
+	if interfaceIP == "" {
+		IFIP, err := gateway.DiscoverInterface()
+		if err != nil {
+			panic(err)
+		}
+		interfaceIP = IFIP.String()
 	}
 
-	oid, err := primitive.ObjectIDFromHex(id)
-	if err != nil {
-		fmt.Printf("--id invalid, err: %s", err)
-		os.Exit(1)
+	if id != "" {
+		oid, err := primitive.ObjectIDFromHex(id)
+		if err != nil {
+			fmt.Printf("--id invalid, err: %s", err)
+			os.Exit(1)
+		}
+		sc := new(Server)
+		sc.ID = oid
+		sc.ControlIP = interfaceIP
+		sc.InterfaceIP = interfaceIP
+		sc.ControlPort = "444"
+		sc.DataPort = "443"
+		sc.StartPort = 2000
+		sc.EndPort = 65500
+		sc.UserMaxConnections = 4
+		sc.AvailableMbps = 1000
+		sc.AvailableUserMbps = 10
+		sc.InternetAccess = true
+		sc.LocalNetworkAccess = true
+		sc.DNSAllowCustomOnly = false
+		sc.DNS = make([]*ServerDNS, 0)
+		sc.Networks = make([]*ServerNetwork, 0)
+		sc.DNSServers = []string{"1.1.1.1", "8.8.8.8"}
+		sc.ControlCert = ep + "server.crt"
+		sc.ControlKey = ep + "server.key"
+
+		N := new(ServerNetwork)
+		N.Tag = "default"
+		N.Network = interfaceIP + "/24"
+		N.Nat = "10.10.10.1/24"
+		sc.Networks = append(sc.Networks, N)
+
+		sc.VPL = new(VPLSettings)
+		sc.VPL.Network = new(ServerNetwork)
+		sc.VPL.Network.Tag = "VPL"
+		sc.VPL.Network.Network = "10.0.0.0/16"
+		sc.VPL.Network.Nat = ""
+		sc.VPL.Network.Routes = []*Route{
+			{
+				Address: "10.0.0.0/16",
+				Metric:  "0",
+			},
+		}
+
+		sc.VPL.MaxDevices = math.MaxUint16
+		sc.VPL.AllowAll = true
+
+		f, err := os.Create(ep + "server.json")
+		if err != nil {
+			panic(err)
+		}
+		defer f.Close()
+		encoder := json.NewEncoder(f)
+		encoder.SetIndent("", "    ")
+
+		// Encode the config to the file
+		if err := encoder.Encode(sc); err != nil {
+			fmt.Println("Error encoding JSON:", err)
+		} else {
+			fmt.Println("Config file has been written successfully.")
+		}
+
 	}
-	sc := new(Server)
-	sc.ID = oid
-	sc.ControlIP = InterfaceIP.String()
-	sc.InterfaceIP = InterfaceIP.String()
-	sc.ControlPort = "444"
-	sc.DataPort = "443"
-	sc.StartPort = 2000
-	sc.EndPort = 65500
-	sc.UserMaxConnections = 4
-	sc.AvailableMbps = 1000
-	sc.AvailableUserMbps = 10
-	sc.InternetAccess = true
-	sc.LocalNetworkAccess = true
-	sc.DNSAllowCustomOnly = false
-	sc.DNS = make([]*ServerDNS, 0)
-	sc.Networks = make([]*ServerNetwork, 0)
-	sc.DNSServers = []string{"1.1.1.1", "8.8.8.8"}
-	sc.ControlCert = "./server.crt"
-	sc.ControlKey = "./server.key"
-
-	N := new(ServerNetwork)
-	N.Tag = "default"
-	N.Network = InterfaceIP.String() + "/24"
-	N.Nat = "10.10.10.1/24"
-	sc.Networks = append(sc.Networks, N)
-
-	sc.VPL = new(VPLSettings)
-	sc.VPL.Network = new(ServerNetwork)
-	sc.VPL.Network.Tag = "VPL"
-	sc.VPL.Network.Network = "10.0.0.0/16"
-	sc.VPL.Network.Nat = ""
-	sc.VPL.Network.Routes = []*Route{
-		{
-			Address: "10.0.0.0/16",
-			Metric:  "0",
-		},
-	}
-
-	sc.VPL.MaxDevices = math.MaxUint16
-	sc.VPL.AllowAll = true
-
-	// outConfig, err := json.Marshal(sc)
-	// if err != nil {
-	// 	panic(err)
-	// }
-	f, err := os.Create("./server.json")
-	if err != nil {
-		panic(err)
-	}
-	defer f.Close()
-	encoder := json.NewEncoder(f)
-	encoder.SetIndent("", "    ")
-
-	// Encode the config to the file
-	if err := encoder.Encode(sc); err != nil {
-		fmt.Println("Error encoding JSON:", err)
-	} else {
-		fmt.Println("Config file has been written successfully.")
-	}
-	// _, err = f.Write(outConfig)
-	// if err != nil {
-	// 	panic(err)
-	// }
 
 	_, err = certs.MakeCert(
 		certs.ECDSA,
-		sc.ControlCert,
-		sc.ControlKey,
-		[]string{InterfaceIP.String()},
+		ep+"server.crt",
+		ep+"server.key",
+		[]string{interfaceIP},
 		[]string{""},
 		"",
 		time.Time{},
@@ -421,8 +425,19 @@ func makeConfigAndCertificates() {
 		panic(err)
 	}
 
-	serialN, err := certs.ExtractSerialNumberFromCRT(sc.ControlCert)
+	serialN, err := certs.ExtractSerialNumberFromCRT(ep + "server.crt")
 	fmt.Println("CERT SERIAL NUMBER: ", serialN)
+	f, err := os.Create(ep + "serial")
+	if err != nil {
+		panic("unable to create folder for serial number")
+	}
+	if f != nil {
+		defer f.Close()
+	}
+	_, err = f.WriteString(serialN)
+	if err != nil {
+		panic("unable to write serial number to file")
+	}
 }
 
 func GeneratePortAllocation() (err error) {
