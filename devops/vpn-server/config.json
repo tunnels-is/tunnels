@@ -1,0 +1,50 @@
+{
+	"ID": "[TUNNELS_ID]",
+	"ControlIP": "[EXTERNAL_FACING_IP_FOR_CONNECTING]",
+	"ControlPort": "444",
+	"UserMaxConnections": 4,
+	"InterfaceIP": "[EXTERNAL_FACING_IP_FOR_PACKET_FLOW]",
+	"DataPort": "443",
+	"StartPort": 2000,
+	"EndPort": 65500,
+	"AvailableMbps": 1000,
+	"AvailableUserMbps": 10,
+	"InternetAccess": true,
+	"LocalNetworkAccess": true,
+	"ControlCert": "./server.crt",
+	"ControlKey": "./server.key",
+	"Networks": [
+		{
+			"Tag": "default",
+			"Network": "[LOCAL_NETWORK]/24",
+			"Nat": "10.10.10.0/24",
+			"Routes": [
+				{
+					"Address": "10.10.10.0/24",
+					"Metric": "0"
+				}
+			]
+		}
+	],
+	"DNSAllowCustomOnly": false,
+	"DNS": [],
+	"DNSServers": [
+		"1.1.1.1",
+		"8.8.8.8"
+	],
+	"VPL": {
+		"VPLNetwork": {
+			"Tag": "VPL",
+			"Network": "10.0.0.0/16",
+			"Nat": "",
+			"Routes": [
+				{
+					"Address": "10.0.0.0/16",
+					"Metric": "0"
+				}
+			]
+		},
+		"MaxDevices": 65535,
+		"AllowAll": true
+	}
+}
