@@ -219,8 +219,8 @@ func CreateClientCoreMapping(CRR *ConnectRequestResponse, CR *ConnectRequest, EH
 			ClientCoreMappings[i].ID = CR.UserID.Hex()
 			ClientCoreMappings[i].EH = EH
 			ClientCoreMappings[i].Created = time.Now()
-			ClientCoreMappings[i].ToUser = make(chan []byte, 200000)
-			ClientCoreMappings[i].FromUser = make(chan Packet, 200000)
+			ClientCoreMappings[i].ToUser = make(chan []byte, 300000)
+			ClientCoreMappings[i].FromUser = make(chan Packet, 300000)
 			ClientCoreMappings[i].LastPingFromClient = time.Now()
 			ClientCoreMappings[i].Uindex = make([]byte, 2)
 			binary.BigEndian.PutUint16(ClientCoreMappings[i].Uindex, uint16(index))
@@ -235,11 +235,13 @@ func CreateClientCoreMapping(CRR *ConnectRequestResponse, CR *ConnectRequest, EH
 
 	CRR.Index = index
 
-	err = assignDHCP(CR, CRR, index)
-	if err != nil {
-		WARN("Unable to assign DHCP address")
-		NukeClient(index)
-		return 0, err
+	if VPLEnabled {
+		err = assignDHCP(CR, CRR, index)
+		if err != nil {
+			WARN("Unable to assign DHCP address")
+			NukeClient(index)
+			return 0, err
+		}
 	}
 
 	if CR.RequestingPorts {
@@ -724,12 +726,12 @@ func toUserChannel(index int) {
 					continue
 				}
 			}
+		} else {
+			// Use contrack instead
+			// if !bytes.Equal(DIP, IFipTo4) {
+			// 	continue
+			// }
 		}
-
-		// Use contrack instead
-		// if !bytes.Equal(DIP, IFipTo4) {
-		// 	continue
-		// }
 
 		out = CM.EH.SEAL.Seal2(PACKET, CM.Uindex)
 		// fmt.Println("----- TO USER -----")
