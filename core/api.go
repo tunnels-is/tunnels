@@ -21,7 +21,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/xlzd/gotp"
 	"github.com/zveinn/crypt"
 	"golang.org/x/net/quic"
@@ -563,7 +562,6 @@ func PublicConnect(UICR UIConnectRequest) (code int, errm error) {
 
 	FinalCR := new(ConnectionRequest)
 	FinalCR.Version = API_VERSION
-	FinalCR.UUID = uuid.NewString()
 	FinalCR.Created = time.Now()
 
 	// from GUI connect request
