@@ -103,7 +103,7 @@ type DHCPRecord struct {
 
 var (
 	PRODUCTION  = true
-	APP_VERSION = "1.0.4"
+	APP_VERSION = "1.0.3"
 	API_VERSION = 1
 )
 
