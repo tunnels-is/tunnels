@@ -1,5 +1,8 @@
 cmd/service/service
 
+*/server.crt
+server.crt
+
 build/*
 builds/*
 
