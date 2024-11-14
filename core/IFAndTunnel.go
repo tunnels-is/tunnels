@@ -180,7 +180,7 @@ func createDefaultTunnelMeta() (M *TunnelMETA) {
 	return
 }
 
-func FindMETAForConnectRequest(CC *UIConnectRequest) *TunnelMETA {
+func FindMETAForConnectRequest(CC *ConnectionRequest) *TunnelMETA {
 	for i, v := range GLOBAL_STATE.C.Connections {
 		if strings.EqualFold(v.Tag, CC.Tag) {
 			return GLOBAL_STATE.C.Connections[i]
