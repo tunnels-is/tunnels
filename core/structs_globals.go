@@ -26,6 +26,9 @@ var (
 	DNSCache        = make(map[string]*DNSReply)
 	DNSCacheLock    = sync.Mutex{}
 	UsePrimaryDNS   = true
+
+	// Minimal client settings
+	ConsoleLogOnly bool
 )
 
 type DNSStats struct {
@@ -35,7 +38,7 @@ type DNSStats struct {
 	Answers   []string
 }
 
-type UIConnectRequest struct {
+type ConnectionRequest struct {
 	// Only present client side
 	Tag         string        `json:"Tag"`
 	DeviceToken string        `json:"DeviceToken"`
@@ -46,8 +49,11 @@ type UIConnectRequest struct {
 	EncType     crypt.EncType `json:"EncType"`
 }
 
-type ConnectionRequest struct {
+type RemoteConnectionRequest struct {
 	// These are delivered by the user
+	DeviceKey string `json:"DeviceKey"`
+	OrgID     string `json:"OrgID"`
+
 	DeviceToken string        `json:"DeviceToken"`
 	EncType     crypt.EncType `json:"EncType"`
 	UserID      string        `json:"UserID"`
@@ -433,7 +439,7 @@ type Tunnel struct {
 	Meta *TunnelMETA
 	TunnelSTATS
 	CRR  *ConnectRequestResponse
-	UICR UIConnectRequest
+	UICR ConnectionRequest
 	Con  net.Conn
 
 	// TUN/TAP

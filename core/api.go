@@ -531,7 +531,7 @@ func PreConnectCheck() (int, error) {
 	return 0, nil
 }
 
-func PublicConnect(UICR UIConnectRequest) (code int, errm error) {
+func PublicConnect(UICR ConnectionRequest) (code int, errm error) {
 	defer RecoverAndLogToFile()
 	start := time.Now()
 	defer func() {
@@ -560,7 +560,7 @@ func PublicConnect(UICR UIConnectRequest) (code int, errm error) {
 		return 400, errors.New("IPV6 Enabled but should be disabled")
 	}
 
-	FinalCR := new(ConnectionRequest)
+	FinalCR := new(RemoteConnectionRequest)
 	FinalCR.Version = API_VERSION
 	FinalCR.Created = time.Now()
 
