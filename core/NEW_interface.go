@@ -10,6 +10,20 @@ import (
 	"github.com/jackpal/gateway"
 )
 
+func AutoConnect(MONITOR chan int) {
+	defer func() {
+		time.Sleep(30 * time.Second)
+		MONITOR <- 5
+	}()
+
+	for {
+		// get api key .. or device key + orgID
+		// use public connect with ConnectionRequest
+
+		break
+	}
+}
+
 func PingConnections(MONITOR chan int) {
 	defer func() {
 		time.Sleep(30 * time.Second)

@@ -495,3 +495,59 @@ func CleanupOnClose() {
 //
 // 	}
 // }
+
+func LaunchIOT() {
+	defer func() {
+		r := recover()
+		if r != nil {
+			log.Println(r, string(debug.Stack()))
+		}
+	}()
+
+	CancelContext, CancelFunc = context.WithCancel(GlobalContext)
+	quit = make(chan os.Signal, 10)
+
+	signal.Notify(
+		quit,
+		os.Interrupt,
+		syscall.SIGTERM,
+		syscall.SIGQUIT,
+		syscall.SIGILL,
+	)
+
+	routineMonitor <- 1
+	routineMonitor <- 3
+	routineMonitor <- 4
+	routineMonitor <- 5
+	routineMonitor <- 6
+
+	for {
+		select {
+		case sig := <-quit:
+			DEBUG("", "exit signal caught: ", sig)
+			CancelFunc()
+			CleanupOnClose()
+			os.Exit(1)
+
+		case IF := <-interfaceMonitor:
+			go IF.ReadFromTunnelInterface()
+		case Tun := <-tunnelMonitor:
+			go Tun.ReadFromServeTunnel()
+
+		case ID := <-routineMonitor:
+			if ID == 1 {
+				go StartLogQueueProcessor(routineMonitor)
+			} else if ID == 3 {
+				go PingConnections(routineMonitor)
+			} else if ID == 4 {
+				go GetDefaultGateway(routineMonitor)
+			} else if ID == 5 {
+				go AutoConnect(routineMonitor)
+			} else if ID == 6 {
+				go CleanPortsForAllConnections(routineMonitor)
+			}
+		default:
+			time.Sleep(200 * time.Millisecond)
+		}
+	}
+}
