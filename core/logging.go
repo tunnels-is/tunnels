@@ -198,7 +198,7 @@ func StartLogQueueProcessor(MONITOR chan int) {
 			fmt.Println(line)
 		}
 
-		if ConsoleLogOnly {
+		if C.ConsoleLogOnly {
 			continue
 		}
 

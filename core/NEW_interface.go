@@ -2,6 +2,7 @@ package core
 
 import (
 	"bytes"
+	"fmt"
 	"net"
 	"strconv"
 	"strings"
@@ -16,9 +17,52 @@ func AutoConnect(MONITOR chan int) {
 		MONITOR <- 5
 	}()
 
+	C.ConsoleLogOnly = true
+	C.ConsoleLogging = true
+
 	for {
+		// ONLY IF TUNNEL IS NOT CONNECTED
 		// get api key .. or device key + orgID
 		// use public connect with ConnectionRequest
+	next:
+		for _, v := range C.Connections {
+			if v == nil || !v.AutoConnect {
+				continue
+			}
+			fmt.Println("checking connections")
+			for _, vc := range ConList {
+				if vc == nil {
+					continue
+				}
+				if vc.Interface != nil {
+					fmt.Println("loading interface")
+					x := *vc.Interface.tunnel.Load()
+					if x == nil {
+						continue
+					}
+					fmt.Println("Comparing:", v.Tag)
+					if x.Meta.Tag == v.Tag {
+						fmt.Println("Already connected:", v.Tag)
+						continue next
+					}
+				}
+			}
+
+			fmt.Println("CONNECTING TO:", v.Tag)
+			fmt.Println("META:", v)
+			code, err := PublicConnect(ConnectionRequest{
+				DeviceKey:  v.DeviceKey,
+				OrgID:      v.OrgID,
+				Tag:        v.Tag,
+				SeverID:    v.ServerID,
+				ServerIP:   v.PrivateIP,
+				ServerPort: v.PrivatePort,
+				EncType:    v.EncryptionType,
+			})
+			if err != nil {
+				ERROR("Unable to connect, return code: ", code, " // error: ", err)
+			}
+		}
 
 		break
 	}
@@ -94,8 +138,10 @@ func getDefaultGatewayAndInterface() {
 		return
 	} else {
 
-		DNSClient.Dialer.LocalAddr = &net.UDPAddr{
-			IP: DEFAULT_INTERFACE,
+		if DNSClient != nil && DNSClient.Dialer != nil {
+			DNSClient.Dialer.LocalAddr = &net.UDPAddr{
+				IP: DEFAULT_INTERFACE,
+			}
 		}
 
 		ifList, _ := net.Interfaces()
