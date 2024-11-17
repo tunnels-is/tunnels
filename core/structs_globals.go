@@ -28,7 +28,6 @@ var (
 	UsePrimaryDNS   = true
 
 	// Minimal client settings
-	ConsoleLogOnly bool
 )
 
 type DNSStats struct {
@@ -39,18 +38,20 @@ type DNSStats struct {
 }
 
 type ConnectionRequest struct {
-	// Only present client side
-	Tag         string        `json:"Tag"`
-	DeviceToken string        `json:"DeviceToken"`
-	UserID      string        `json:"UserID"`
-	SeverID     string        `json:"ServerID"`
-	ServerIP    string        `json:"ServerIP"`
-	ServerPort  string        `json:"ServerPort"`
-	EncType     crypt.EncType `json:"EncType"`
+	DeviceKey string `json:"DeviceKey"`
+	OrgID     string `json:"OrgID"`
+
+	DeviceToken string `json:"DeviceToken"`
+	UserID      string `json:"UserID"`
+
+	Tag        string        `json:"Tag"`
+	SeverID    string        `json:"ServerID"`
+	ServerIP   string        `json:"ServerIP"`
+	ServerPort string        `json:"ServerPort"`
+	EncType    crypt.EncType `json:"EncType"`
 }
 
 type RemoteConnectionRequest struct {
-	// These are delivered by the user
 	DeviceKey string `json:"DeviceKey"`
 	OrgID     string `json:"OrgID"`
 
@@ -118,6 +119,13 @@ var (
 	DLL_EMBED  embed.FS
 )
 
+func initializeMinimalGlobalVariables() {
+	C = new(Config)
+	C.DebugLogging = true
+	C.InfoLogging = true
+	C.ConsoleLogOnly = true
+}
+
 func initializeGlobalVariables() {
 	C = new(Config)
 	C.DebugLogging = true
@@ -145,6 +153,11 @@ var (
 
 	// IS NATIVE GUI
 	NATIVE bool
+
+	// Device Flags
+	// CLIDeviceKey string
+	// CLIOrgId     string
+
 	// Base Path Overwrite
 	BASE_PATH string
 
@@ -358,10 +371,14 @@ type ActiveConnectionMeta struct {
 }
 
 type TunnelMETA struct {
-	Private     bool
-	PrivateIP   string
-	PrivatePort string
-	PrivateCert string
+	Private      bool
+	PrivateIP    string
+	PrivatePort  string
+	PrivateCert  string
+	DNSDiscovery string
+
+	OrgID     string
+	DeviceKey string
 
 	// NEW
 	WindowsGUID string
@@ -565,6 +582,7 @@ type Config struct {
 	ConsoleLogging    bool
 	InfoLogging       bool
 	ErrorLogging      bool
+	ConsoleLogOnly    bool
 	ConnectionTracer  bool
 
 	// DNS Settings

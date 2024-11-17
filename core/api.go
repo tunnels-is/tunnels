@@ -19,6 +19,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/xlzd/gotp"
@@ -82,6 +83,7 @@ func SendRequestToController(method string, route string, data interface{}, time
 		}
 	}
 
+	fmt.Println("OUT:", string(body))
 	var req *http.Request
 	if method == "POST" {
 		req, err = http.NewRequest(method, "https://api.nicelandvpn.is/"+route, bytes.NewBuffer(body))
@@ -520,6 +522,34 @@ func InitializeTunnelFromCRR(TUN *Tunnel) (err error) {
 	return nil
 }
 
+func GetServerInfoFromDNS(d string) (ip, port, id string, err error) {
+	txt, err := net.LookupTXT(d)
+	if err != nil {
+		DEBUG("Could not use DNS discovery to find VPN server: ", err)
+		err = errors.New("Failed DNS Discovery: " + err.Error())
+		return
+	}
+
+	if len(txt) < 1 {
+		DEBUG("Could not use DNS discovery to find VPN server: no records returned")
+		err = errors.New("Failed DNS Discovery: no records found")
+		return
+	}
+
+	ds := strings.Split(txt[0], ":")
+	if len(ds) < 3 {
+		DEBUG("Could not use DNS discovery to find VPN server: invalid TXT record: ", txt[0])
+		err = errors.New("Failed DNS Discovery: invalid TXT record")
+		return
+	}
+
+	id = txt[0]
+	ip = txt[1]
+	port = txt[2]
+
+	return
+}
+
 func PreConnectCheck() (int, error) {
 	if !GLOBAL_STATE.ConfigInitialized {
 		return 502, errors.New("the application is still initializing default configurations, please wait a few seconds")
@@ -531,17 +561,20 @@ func PreConnectCheck() (int, error) {
 	return 0, nil
 }
 
+var IsConnecting = atomic.Bool{}
+
 func PublicConnect(UICR ConnectionRequest) (code int, errm error) {
-	defer RecoverAndLogToFile()
+	if !IsConnecting.CompareAndSwap(false, true) {
+		INFO("Already connecting to another connection, please wait a moment")
+		return 400, errors.New("Already connecting to another connection, please wait a moment")
+	}
+
 	start := time.Now()
 	defer func() {
+		IsConnecting.Store(false)
 		runtime.GC()
 	}()
-
-	if UICR.ServerIP == "" || UICR.ServerPort == "" {
-		ERROR("Missing server or port in connect request")
-		return 400, errors.New("Server IP or Port missing")
-	}
+	defer RecoverAndLogToFile()
 
 	code, errm = PreConnectCheck()
 	if errm != nil {
@@ -554,6 +587,28 @@ func PublicConnect(UICR ConnectionRequest) (code int, errm error) {
 	if tunnel.Meta == nil {
 		ERROR("vpn connection metadata not found for tag: ", UICR.Tag)
 		return 400, errors.New("error in router tunnel")
+	}
+
+	if tunnel.Meta.DNSDiscovery != "" {
+		sid, sip, sport, err := GetServerInfoFromDNS(tunnel.Meta.DNSDiscovery)
+		if err != nil {
+			return 400, err
+		}
+		UICR.ServerPort = sport
+		UICR.ServerIP = sip
+		UICR.SeverID = sid
+	} else {
+		if !tunnel.Meta.Private && UICR.SeverID == "" {
+			ERROR("No server selected")
+			return 400, errors.New("No server selected")
+		} else if tunnel.Meta.ServerID != UICR.SeverID {
+			tunnel.Meta.ServerID = UICR.SeverID
+		}
+	}
+
+	if UICR.ServerIP == "" || UICR.ServerPort == "" {
+		ERROR("Missing server or port in connect request")
+		return 400, errors.New("Server IP or Port missing")
 	}
 
 	if tunnel.Meta.PreventIPv6 && IPv6Enabled() {
@@ -569,16 +624,11 @@ func PublicConnect(UICR ConnectionRequest) (code int, errm error) {
 	FinalCR.UserID = UICR.UserID
 	FinalCR.SeverID = UICR.SeverID
 	FinalCR.EncType = UICR.EncType
+	FinalCR.OrgID = UICR.OrgID
+	FinalCR.DeviceKey = UICR.DeviceKey
 
 	FinalCR.RequestingPorts = true
 	FinalCR.DHCPToken = ""
-
-	if !tunnel.Meta.Private && UICR.SeverID == "" {
-		ERROR("No server selected")
-		return 400, errors.New("No server selected")
-	} else if tunnel.Meta.ServerID != UICR.SeverID {
-		tunnel.Meta.ServerID = UICR.SeverID
-	}
 
 	DEBUG("ConnectRequestFromClient", UICR)
 
@@ -641,7 +691,11 @@ func PublicConnect(UICR ConnectionRequest) (code int, errm error) {
 	FR := new(FORWARD_REQUEST)
 	FR.Method = "POST"
 	if tunnel.Meta.Private {
-		FR.Path = "v3/session/private"
+		if UICR.OrgID != "" && UICR.DeviceKey != "" {
+			FR.Path = "v3/session/device"
+		} else {
+			FR.Path = "v3/session/private"
+		}
 	} else {
 		FR.Path = "v3/session/public"
 	}

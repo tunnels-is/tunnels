@@ -34,6 +34,14 @@ builds:
       - arm64
     main: ./server
 
+  - id: cli
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    main: ./server
+
 dist: ./builds
 
 archives:
@@ -58,6 +66,19 @@ archives:
 
   - id: a2
     builds: [server]
+    format: tar.gz
+    name_template: >-
+      server_
+      {{- title .Version }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+      {{- if .Arm }}v{{ .Arm }}{{ end }}
+    allow_different_binary_count: true
+
+  - id: a3
+    builds: [cli]
     format: tar.gz
     name_template: >-
       server_
