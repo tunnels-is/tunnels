@@ -458,9 +458,9 @@ type TunnelSTATS struct {
 type Tunnel struct {
 	Meta *TunnelMETA
 	TunnelSTATS
-	CRR  *ConnectRequestResponse
-	UICR ConnectionRequest
-	Con  net.Conn
+	CRR      *ConnectRequestResponse
+	ClientCR ConnectionRequest
+	Con      net.Conn
 
 	// TUN/TAP
 	Index        []byte

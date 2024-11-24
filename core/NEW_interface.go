@@ -88,7 +88,7 @@ func PingConnections(MONITOR chan int) {
 		if time.Since(v.TunnelSTATS.PingTime).Seconds() > 30 || err != nil {
 			if v.Meta.AutoReconnect {
 				DEBUG("30+ Seconds since ping from ", v.Meta.Tag, " attempting reconnection")
-				_, _ = PublicConnect(v.UICR)
+				_, _ = PublicConnect(v.ClientCR)
 			} else {
 				DEBUG("30+ Seconds since ping from ", v.Meta.Tag, " disconnecting")
 				_ = Disconnect(v.Meta.WindowsGUID, true, false)
