@@ -118,6 +118,8 @@ func printInfo() {
 	fmt.Println("======================= HELPFUL INFORMATION ===========================")
 	fmt.Println("=======================================================================")
 	fmt.Println("")
+	fmt.Println("BASE PATH:", GLOBAL_STATE.BasePath)
+	fmt.Println("")
 	fmt.Println("- Tunnels request network admin permissions to run.")
 	fmt.Println("- Remember to configure your DNS servers if you want to use Tunnels DNS functionality.")
 	fmt.Println("- The UI can be found here: https://"+C.APIIP+":"+C.APIPort, " -- This might change depending on settings.")
@@ -338,17 +340,17 @@ func LoadConfig() {
 			return
 		}
 
-		if len(C.AvailableBlockLists) == 0 {
-			C.AvailableBlockLists = GetDefaultBlockLists()
-			GLOBAL_STATE.C.AvailableBlockLists = C.AvailableBlockLists
-			SaveConfig(C)
-		}
-
 	}
 
 	applyCertificateDefaults(C)
 
 	GLOBAL_STATE.C = C
+	if len(C.AvailableBlockLists) == 0 {
+		C.AvailableBlockLists = GetDefaultBlockLists()
+		GLOBAL_STATE.C.AvailableBlockLists = C.AvailableBlockLists
+		SaveConfig(C)
+	}
+
 	GLOBAL_STATE.ConfigInitialized = true
 	DEBUG("Configurations loaded")
 }

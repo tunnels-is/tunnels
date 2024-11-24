@@ -18,7 +18,7 @@ func main() {
 	// }
 
 	if core.BASE_PATH == "" {
-		core.BASE_PATH = "./"
+		core.BASE_PATH = "."
 	}
 
 	core.NATIVE = false

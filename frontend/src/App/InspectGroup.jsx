@@ -12,6 +12,7 @@ const InspectGroup = () => {
 	const [groupID, setGroupID] = useState(id)
 	const [users, setUsers] = useState([])
 	const [servers, setServers] = useState([])
+	const [devices, setDevices] = useState([])
 	const [group, setGroup] = useState()
 	const state = GLOBAL_STATE("groups")
 	const navigate = useNavigate()
@@ -27,31 +28,35 @@ const InspectGroup = () => {
 		let group = {}
 		group.Nodes = {}
 		group.Users = {}
+		group.Devices = {}
 		group.Tag = tag
 		group.OrgID = user.OrgID
 
-		let resp = await state.API_CreateGroup(group)
-		if (resp?.status === 200) {
-			setGroup(resp.data)
-			setGroupID(resp.data._id)
-			state.renderPage("groups")
-			navigate("/inspect/group/" + resp.data._id)
-		}
+		await state.API_CreateGroup(group)
+		state.renderPage("groups")
 	}
 
 	const Save = async () => {
+
 		let newUsers = {}
 		users.forEach(u => {
 			newUsers[u._id] = { Email: u.Email, Added: u.Added }
 		})
-		group.Users = newUsers
 
 		let newServers = {}
 		servers.forEach(n => {
 			newServers[n._id] = { Added: n.Added }
 		})
+
+		let newDevices = {}
+		devices.forEach(n => {
+			newDevices[n._id] = { tag: n.Tag, Added: n.Added }
+		})
+
+		group.Devices = newDevices
 		group.Users = newUsers
 		group.Servers = newServers
+		group.Tag = tag
 		await state.API_UpdateGroup(group)
 	}
 
@@ -60,22 +65,15 @@ const InspectGroup = () => {
 		let org = state?.Org
 		let group = undefined
 		if (org) {
-			state.ModifiedGroups.forEach(g => {
+			org?.Groups?.forEach(g => {
 				if (g._id === groupID) {
 					group = g
 					return
 				}
 			})
-			if (!group) {
-				org?.Groups?.forEach(g => {
-					if (g._id === groupID) {
-						group = g
-						return
-					}
-				})
-			}
 			if (group) {
 				setGroup(group)
+				setTag(group.Tag)
 				if (users.length === 0 && group.Users) {
 					Object.keys(group.Users).forEach(k => {
 						users.push({ ...group.Users[k], _id: k })
@@ -84,6 +82,11 @@ const InspectGroup = () => {
 				if (servers.length === 0 && group.Servers) {
 					Object.keys(group.Servers).forEach(k => {
 						servers.push({ ...group.Servers[k], _id: k })
+					})
+				}
+				if (devices.length === 0 && group.Devices) {
+					Object.keys(group.Devices).forEach(k => {
+						devices.push({ ...group.Devices[k], _id: k })
 					})
 				}
 			}
@@ -115,6 +118,12 @@ const InspectGroup = () => {
 		state.rerender()
 	}
 
+	const devicesInputChange = (e, id, key) => {
+		devices[id][key] = e.target.value
+		setDevices(devices)
+		state.rerender()
+	}
+
 	const serversInputChange = (e, id, key) => {
 		servers[id][key] = e.target.value
 		setServers(servers)
@@ -131,6 +140,7 @@ const InspectGroup = () => {
 		setServers(newServers)
 		state.rerender()
 	}
+
 	const usersRemove = (id) => {
 		let newUsers = []
 		users.forEach((u) => {
@@ -141,6 +151,17 @@ const InspectGroup = () => {
 		setUsers(newUsers)
 		state.rerender()
 	}
+	const devicesRemove = (id) => {
+		let newDevices = []
+		devices.forEach((u) => {
+			if (u._id !== id) {
+				newDevices.push(u)
+			}
+		})
+		setDevices(newDevices)
+		state.rerender()
+	}
+
 	const generateServerTable = (servers) => {
 		let rows = []
 		servers.forEach((s, i) => {
@@ -196,6 +217,30 @@ const InspectGroup = () => {
 		return rows
 	}
 
+	const generateDevicesTables = (devices) => {
+		let rows = []
+		devices.forEach((s, i) => {
+			let row = {}
+			row.items = [
+				{
+					originalValue: s.Tag,
+					value: <input onChange={(e) => devicesInputChange(e, i, "Tag")} type="text" value={s.Tag} />
+				},
+				{
+					originalValue: s._id,
+					value: <input onChange={(e) => devicesInputChange(e, i, "_id")} type="text" value={s._id} />
+				},
+				{ value: s.Added },
+				{
+					value: <div className="deleteable" onClick={() => devicesRemove(s._id)} >Delete</div >,
+				},
+			]
+			rows.push(row)
+		});
+
+		return rows
+	}
+
 	let usersRows = generateUsersTable(users)
 	const usersHeaders = [
 		{ value: "Email" },
@@ -211,13 +256,21 @@ const InspectGroup = () => {
 		{ value: "" }
 	]
 
+	let deviceRows = generateDevicesTables(devices)
+	const deviceHeader = [
+		{ value: "Tag" },
+		{ value: "ID" },
+		{ value: "" }
+	]
+
 	return (
 		<div className="ab group-wrapper">
-			<div className="title">{group.Tag}</div>
+			<div className="title">{tag}</div>
 
 			<FormKeyValue label={"Tag"} value={
-				<input type="text" value={group.Tag} onChange={(e) => {
-					state.UpdateModifiedGroup(group, "Tag", e.target.value)
+				<input type="text" value={tag} onChange={(e) => {
+					// state.UpdateModifiedGroup(group, "Tag", e.target.value)
+					setTag(e.target.value)
 				}} />
 			} />
 
@@ -252,6 +305,22 @@ const InspectGroup = () => {
 						text: "Add",
 						click: function(e) {
 							setUsers([...users, { Email: "", _id: users.length + 1, Added: dayjs().format() }])
+						}
+					}}
+				/>
+			</div>
+
+			<div className="nodes">
+				<InteractiveTable
+					title={"Devices"}
+					className="group-table"
+					header={deviceHeader}
+					rows={deviceRows}
+					placeholder={"Search.."}
+					newButton={{
+						text: "Add",
+						click: function(e) {
+							setDevices([...devices, { Tag: "", _id: devices.length + 1, Added: dayjs().format() }])
 						}
 					}}
 				/>

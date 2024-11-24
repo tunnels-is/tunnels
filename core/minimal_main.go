@@ -22,6 +22,7 @@ func InitMinimal() error {
 	AdminCheck()
 	InitPaths()
 	CreateBaseFolder()
+	go StartLogQueueProcessor(routineMonitor)
 	LoadConfig()
 	if C.InfoLogging {
 		printInfo()
@@ -61,7 +62,7 @@ func LaunchMinimal() {
 		syscall.SIGILL,
 	)
 
-	routineMonitor <- 1
+	// routineMonitor <- 1
 	routineMonitor <- 3
 	routineMonitor <- 4
 	routineMonitor <- 5
