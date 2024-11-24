@@ -386,6 +386,11 @@ export var STATE = {
 			STATE[type] = {}
 		}
 	},
+	createArrayIfEmpty: (type) => {
+		if (STATE[type] === undefined) {
+			STATE[type] = []
+		}
+	},
 	modifiedLists: STORE.Cache.GetObject("modifiedLists"),
 	toggleBlocklist: (list) => {
 		list.Enabled = !list.Enabled
@@ -1210,33 +1215,15 @@ export var STATE = {
 		STATE.GetOrgInProgress = false
 		STATE.toggleLoading(undefined)
 	},
-	Groups: STORE.Cache.GetObject("groups"),
-	ModifiedGroups: [],
-	UpdateModifiedGroup: function(group, key, value) {
-		let found = false
-		console.log("uipdate!", group._id, key, value)
-		STATE.ModifiedGroups.forEach((g, i) => {
-			if (g._id === group._id) {
-				STATE.ModifiedGroups[i][key] = value
-				found = true
-				return
-			}
-		})
-		if (!found) {
-			group[key] = value
-			STATE.ModifiedGroups.push(group)
-		}
-		STATE.rerender()
-	},
-	updateGroups: () => {
-		STORE.Cache.SetObject("groups", STATE.Groups)
-	},
 	UpdateGroup: (group) => {
-		STATE.Groups?.forEach((g, i) => {
-			if (g._id === group._id) {
-				STATE.Groups[i] = group
-			}
-		});
+		if (STATE.Org) {
+			STATE.Org.Groups?.forEach((g, i) => {
+				if (g._id === group._id) {
+					STATE.Org.Groups[i] = group
+					STATE.updateOrg(STATE.Org)
+				}
+			});
+		}
 	},
 	API_UpdateGroup: async (group) => {
 
@@ -1303,11 +1290,7 @@ export var STATE = {
 
 			resp = await STATE.API.method("forwardToController", FR)
 			if (resp?.status === 200) {
-				if (!STATE.Groups) {
-					STATE.Groups = []
-				}
-				STATE.Groups.push(resp.data)
-				STATE.updateGroups()
+				STATE.UpdateGroup(group)
 			}
 		} catch (error) {
 			console.dir(error)
