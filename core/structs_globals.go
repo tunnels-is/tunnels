@@ -152,11 +152,13 @@ var (
 	DEFAULT_CONNECTION *TunnelMETA
 
 	// IS NATIVE GUI
-	NATIVE bool
+	NATIVE  bool
+	MINIMAL bool
 
 	// Device Flags
-	// CLIDeviceKey string
-	// CLIOrgId     string
+	CLIDeviceKey string
+	CLIOrgId     string
+	CLIDNS       string
 
 	// Base Path Overwrite
 	BASE_PATH string
@@ -371,11 +373,12 @@ type ActiveConnectionMeta struct {
 }
 
 type TunnelMETA struct {
-	Private      bool
-	PrivateIP    string
-	PrivatePort  string
-	PrivateCert  string
-	DNSDiscovery string
+	Private          bool
+	PrivateIP        string
+	PrivatePort      string
+	PrivateCert      string
+	PrivateCertBytes []byte `json:"-"`
+	DNSDiscovery     string
 
 	OrgID     string
 	DeviceKey string
@@ -961,4 +964,10 @@ type BlockList struct {
 	Enabled     bool
 	Count       int
 	LastRefresh time.Time
+}
+
+type DNSInfo struct {
+	cert []byte
+	IP   string
+	Port string
 }

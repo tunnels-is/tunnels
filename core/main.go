@@ -29,14 +29,27 @@ func InitService() error {
 	_ = OSSpecificInit()
 	AdminCheck()
 	InitPaths()
-	CreateBaseFolder()
-	InitLogfile()
-	LoadConfig()
-	InitDNSHandler()
+
 	if C.InfoLogging {
 		printInfo()
 	}
-	InitBlockListPath()
+
+	if !MINIMAL {
+		CreateBaseFolder()
+		InitLogfile()
+	}
+	go StartLogQueueProcessor(routineMonitor)
+
+	if MINIMAL && CLIDNS != "" {
+		LoadMinimalConfig()
+	} else {
+		LoadConfig()
+	}
+
+	if !MINIMAL {
+		InitDNSHandler()
+		InitBlockListPath()
+	}
 
 	go func() {
 		err := ReBuildBlockLists(C)
@@ -96,6 +109,19 @@ BXYclK7t+CCarFAwmQ439SQ2a/x0c9w+oDDV9PI2YqYWaqsqNtuLaq3rrUwh9unI
 LAbdR4NFNWbV4vO+lXTrvwEtlJE8WsSwvpCMZABs6CzRpAnZgOq350ZKEf1V0yfI
 PRsYUYN/Y3GAN8csBfs=
 -----END CERTIFICATE-----`
+
+func (m *TunnelMETA) LoadPrivateCerts() (p *x509.CertPool, err error) {
+	if len(m.PrivateCertBytes) > 0 {
+		return LoadPrivateCertFromBytes(m.PrivateCertBytes)
+	}
+	return LoadPrivateCert(m.PrivateCert)
+}
+
+func LoadPrivateCertFromBytes(data []byte) (pool *x509.CertPool, err error) {
+	certPool := x509.NewCertPool()
+	certPool.AppendCertsFromPEM(data)
+	return certPool, nil
+}
 
 func LoadPrivateCert(path string) (pool *x509.CertPool, err error) {
 	certPool := x509.NewCertPool()
@@ -159,20 +185,23 @@ func LaunchEverything() {
 		syscall.SIGILL,
 	)
 
-	routineMonitor <- 1
+	// already stared
+	// routineMonitor <- 1
+
 	routineMonitor <- 2
 	routineMonitor <- 3
 	routineMonitor <- 4
 	routineMonitor <- 5
 	routineMonitor <- 6
-	routineMonitor <- 7
-	routineMonitor <- 8
-	routineMonitor <- 9
 
-	routineMonitor <- 101
-	routineMonitor <- 102
-	routineMonitor <- 103
-	routineMonitor <- 104
+	if !MINIMAL {
+		routineMonitor <- 7
+
+		// DNS
+		routineMonitor <- 101
+		routineMonitor <- 102
+		routineMonitor <- 103
+	}
 
 	for {
 		select {
@@ -246,7 +275,51 @@ func SaveConfig(c *Config) (err error) {
 	return
 }
 
-// var GLOBAL_STATE.ConfigPath string
+func LoadMinimalConfig() {
+	defer func() {
+		r := recover()
+		if r != nil {
+			ERROR(r, string(debug.Stack()))
+		}
+	}()
+
+	DEBUG("Generating a new default config")
+
+	C := new(Config)
+	C.InfoLogging = true
+	C.ErrorLogging = true
+
+	newCon := createMinimalConnectgion()
+	newCon.Private = true
+
+	if CLIDNS != "" {
+		info, err := ResolveMetaTXT(CLIDNS)
+		if err != nil {
+			///
+			return
+		}
+		newCon.PrivateIP = info.IP
+		newCon.PrivatePort = info.Port
+		newCon.PrivateCertBytes = info.cert
+	}
+
+	if newCon.OrgID == "" {
+		newCon.OrgID = CLIOrgId
+	}
+	if newCon.DeviceKey == "" {
+		newCon.DeviceKey = CLIDeviceKey
+	}
+
+	C.Connections = make([]*TunnelMETA, 0)
+	C.Connections = append(C.Connections, newCon)
+
+	C.DNSstats = false
+	C.AvailableBlockLists = make([]*BlockList, 0)
+
+	GLOBAL_STATE.C = C
+	GLOBAL_STATE.ConfigInitialized = true
+	DEBUG("Configurations loaded")
+}
 
 func LoadConfig() {
 	defer func() {

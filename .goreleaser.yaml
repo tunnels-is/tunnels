@@ -32,15 +32,17 @@ builds:
     goarch:
       - amd64
       - arm64
+      - arm
     main: ./server
 
-  - id: cli
+  - id: iot
     goos:
       - linux
     goarch:
       - amd64
       - arm64
-    main: ./server
+      - arm
+    main: ./cmd/iot
 
 dist: ./builds
 
@@ -78,10 +80,10 @@ archives:
     allow_different_binary_count: true
 
   - id: a3
-    builds: [cli]
+    builds: [iot]
     format: tar.gz
     name_template: >-
-      server_
+      iot
       {{- title .Version }}_
       {{- title .Os }}_
       {{- if eq .Arch "amd64" }}x86_64

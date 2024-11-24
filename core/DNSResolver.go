@@ -2,6 +2,7 @@ package core
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -564,5 +565,31 @@ func IncrementDNSStats(domain string, blocked bool, answers []dns.RR) {
 	for _, v := range answers {
 		s.Answers = append(s.Answers, v.String())
 	}
+	return
+}
+
+func ResolveMetaTXT(domain string) (info *DNSInfo, err error) {
+	txt, err := net.LookupTXT(domain)
+	if err != nil {
+		return nil, err
+	}
+	var txts []string
+	if len(txt) > 0 {
+		txts = strings.Split(txt[0], ":")
+	}
+	if len(txts) < 3 {
+		return nil, errors.New("length of text record was less then 3")
+	}
+
+	info = new(DNSInfo)
+	info.IP = txts[0]
+	info.Port = txts[1]
+
+	txt, err = net.LookupTXT(txts[3] + "." + domain)
+	if err != nil {
+		return nil, err
+	}
+	info.cert = []byte(strings.Join(txt, ""))
+
 	return
 }
