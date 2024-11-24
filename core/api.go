@@ -649,7 +649,7 @@ func PublicConnect(UICR ConnectionRequest) (code int, errm error) {
 	}
 
 	if tunnel.Meta.Private {
-		tc.RootCAs, errm = LoadPrivateCert(tunnel.Meta.PrivateCert)
+		tc.RootCAs, errm = tunnel.Meta.LoadPrivateCerts()
 		if errm != nil {
 			ERROR("Unable to load private cert: ", errm)
 			return 502, errors.New("Unable to load private cert: " + tunnel.Meta.PrivateCert)
