@@ -563,7 +563,7 @@ func PreConnectCheck() (int, error) {
 
 var IsConnecting = atomic.Bool{}
 
-func PublicConnect(UICR ConnectionRequest) (code int, errm error) {
+func PublicConnect(ClientCR ConnectionRequest) (code int, errm error) {
 	if !IsConnecting.CompareAndSwap(false, true) {
 		INFO("Already connecting to another connection, please wait a moment")
 		return 400, errors.New("Already connecting to another connection, please wait a moment")
@@ -582,10 +582,10 @@ func PublicConnect(UICR ConnectionRequest) (code int, errm error) {
 	}
 
 	tunnel := new(Tunnel)
-	tunnel.UICR = UICR
-	tunnel.Meta = FindMETAForConnectRequest(&UICR)
+	tunnel.ClientCR = ClientCR
+	tunnel.Meta = FindMETAForConnectRequest(&ClientCR)
 	if tunnel.Meta == nil {
-		ERROR("vpn connection metadata not found for tag: ", UICR.Tag)
+		ERROR("vpn connection metadata not found for tag: ", ClientCR.Tag)
 		return 400, errors.New("error in router tunnel")
 	}
 
@@ -594,19 +594,19 @@ func PublicConnect(UICR ConnectionRequest) (code int, errm error) {
 		if err != nil {
 			return 400, err
 		}
-		UICR.ServerPort = sport
-		UICR.ServerIP = sip
-		UICR.SeverID = sid
+		ClientCR.ServerPort = sport
+		ClientCR.ServerIP = sip
+		ClientCR.SeverID = sid
 	} else {
-		if !tunnel.Meta.Private && UICR.SeverID == "" {
+		if !tunnel.Meta.Private && ClientCR.SeverID == "" {
 			ERROR("No server selected")
 			return 400, errors.New("No server selected")
-		} else if tunnel.Meta.ServerID != UICR.SeverID {
-			tunnel.Meta.ServerID = UICR.SeverID
+		} else if tunnel.Meta.ServerID != ClientCR.SeverID {
+			tunnel.Meta.ServerID = ClientCR.SeverID
 		}
 	}
 
-	if UICR.ServerIP == "" || UICR.ServerPort == "" {
+	if ClientCR.ServerIP == "" || ClientCR.ServerPort == "" {
 		ERROR("Missing server or port in connect request")
 		return 400, errors.New("Server IP or Port missing")
 	}
@@ -620,17 +620,17 @@ func PublicConnect(UICR ConnectionRequest) (code int, errm error) {
 	FinalCR.Created = time.Now()
 
 	// from GUI connect request
-	FinalCR.DeviceToken = UICR.DeviceToken
-	FinalCR.UserID = UICR.UserID
-	FinalCR.SeverID = UICR.SeverID
-	FinalCR.EncType = UICR.EncType
-	FinalCR.OrgID = UICR.OrgID
-	FinalCR.DeviceKey = UICR.DeviceKey
+	FinalCR.DeviceToken = ClientCR.DeviceToken
+	FinalCR.UserID = ClientCR.UserID
+	FinalCR.SeverID = ClientCR.SeverID
+	FinalCR.EncType = ClientCR.EncType
+	FinalCR.OrgID = ClientCR.OrgID
+	FinalCR.DeviceKey = ClientCR.DeviceKey
 
 	FinalCR.RequestingPorts = true
 	FinalCR.DHCPToken = ""
 
-	DEBUG("ConnectRequestFromClient", UICR)
+	DEBUG("ConnectRequestFromClient", ClientCR)
 
 	tc := &tls.Config{
 		RootCAs:            CertPool,
@@ -675,11 +675,11 @@ func PublicConnect(UICR ConnectionRequest) (code int, errm error) {
 		return 502, errors.New("Unable to create udp listener")
 	}
 
-	DEBUG("ConnectingTo:", net.JoinHostPort(UICR.ServerIP, UICR.ServerPort))
+	DEBUG("ConnectingTo:", net.JoinHostPort(ClientCR.ServerIP, ClientCR.ServerPort))
 	con, err := x.Dial(
 		context.Background(),
 		"udp4",
-		net.JoinHostPort(UICR.ServerIP, UICR.ServerPort),
+		net.JoinHostPort(ClientCR.ServerIP, ClientCR.ServerPort),
 		qc,
 	)
 	if err != nil {
@@ -691,7 +691,7 @@ func PublicConnect(UICR ConnectionRequest) (code int, errm error) {
 	FR := new(FORWARD_REQUEST)
 	FR.Method = "POST"
 	if tunnel.Meta.Private {
-		if UICR.OrgID != "" && UICR.DeviceKey != "" {
+		if ClientCR.OrgID != "" && ClientCR.DeviceKey != "" {
 			FR.Path = "v3/session/device"
 		} else {
 			FR.Path = "v3/session/private"
@@ -741,7 +741,7 @@ func PublicConnect(UICR ConnectionRequest) (code int, errm error) {
 	}
 	s.Flush()
 
-	tunnel.EH, err = crypt.NewEncryptionHandler(UICR.EncType)
+	tunnel.EH, err = crypt.NewEncryptionHandler(ClientCR.EncType)
 	if err != nil {
 		closeAll()
 		ERROR("unable to create encryption handler: ", err)
@@ -786,12 +786,12 @@ func PublicConnect(UICR ConnectionRequest) (code int, errm error) {
 		return 502, err
 	}
 
-	DEBUG("Opening data tunnel:", net.JoinHostPort(UICR.ServerIP, CRR.DataPort))
+	DEBUG("Opening data tunnel:", net.JoinHostPort(ClientCR.ServerIP, CRR.DataPort))
 
-	IP_AddRoute(UICR.ServerIP+"/32", "", DEFAULT_GATEWAY.To4().String(), "0")
+	IP_AddRoute(ClientCR.ServerIP+"/32", "", DEFAULT_GATEWAY.To4().String(), "0")
 	tunnel.Con, err = net.Dial(
 		"udp4",
-		net.JoinHostPort(UICR.ServerIP, CRR.DataPort),
+		net.JoinHostPort(ClientCR.ServerIP, CRR.DataPort),
 	)
 	if err != nil {
 		DEBUG("Unable to open data tunnel: ", err)
