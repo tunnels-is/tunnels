@@ -197,12 +197,12 @@ const useForm = (props) => {
 			hasErrors = true
 		}
 
-		if (inputs["email"]) {
-			if (!inputs["email"].includes(".") || !inputs["email"].includes("@")) {
-				errors["email"] = "Email address format is incorrect"
-				hasErrors = true
-			}
-		}
+		// if (inputs["email"]) {
+		// 	if (!inputs["email"].includes(".") || !inputs["email"].includes("@")) {
+		// 		errors["email"] = "Email address format is incorrect"
+		// 		hasErrors = true
+		// 	}
+		// }
 
 		if (!inputs["password"]) {
 			errors["password"] = "Password missing"
