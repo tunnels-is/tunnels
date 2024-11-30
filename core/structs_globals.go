@@ -69,6 +69,7 @@ type RemoteConnectionRequest struct {
 
 	RequestingPorts bool   `json:"RequestingPorts"`
 	DHCPToken       string `json:"DHCPToken"`
+	Hostname        string `json:"Hostname"`
 }
 
 type ErrorResponse struct {
@@ -156,6 +157,7 @@ var (
 	CLIDeviceKey string
 	CLIOrgId     string
 	CLIDNS       string
+	CLIHostname  string
 
 	// Base Path Overwrite
 	BASE_PATH string
@@ -381,6 +383,7 @@ type TunnelMETA struct {
 	DeviceKey string
 	DHCPToken string
 	ServerID  string
+	Hostname  string
 
 	WindowsGUID string
 

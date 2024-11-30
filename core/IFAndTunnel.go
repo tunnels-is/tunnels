@@ -180,7 +180,7 @@ func createDefaultTunnelMeta() (M *TunnelMETA) {
 	return
 }
 
-func createMinimalConnectgion() (M *TunnelMETA) {
+func createMinimalConnection() (M *TunnelMETA) {
 	M = new(TunnelMETA)
 	M = createTunnel()
 	M.IPv4Address = "172.22.22.22"
