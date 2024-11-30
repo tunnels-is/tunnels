@@ -20,9 +20,6 @@ func AutoConnect(MONITOR chan int) {
 		MONITOR <- 5
 	}()
 
-	C.ConsoleLogOnly = true
-	C.ConsoleLogging = true
-
 	for {
 		// ONLY IF TUNNEL IS NOT CONNECTED
 		// get api key .. or device key + orgID
@@ -32,18 +29,15 @@ func AutoConnect(MONITOR chan int) {
 			if v == nil || !v.AutoConnect {
 				continue
 			}
-			fmt.Println("checking connections")
 			for _, vc := range ConList {
 				if vc == nil {
 					continue
 				}
 				if vc.Interface != nil {
-					fmt.Println("loading interface")
 					x := *vc.Interface.tunnel.Load()
 					if x == nil {
 						continue
 					}
-					fmt.Println("Comparing:", v.Tag)
 					if x.Meta.Tag == v.Tag {
 						fmt.Println("Already connected:", v.Tag)
 						continue next
