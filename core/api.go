@@ -202,6 +202,7 @@ func ForwardToController(FR *FORWARD_REQUEST) (interface{}, int) {
 			GLOBAL_STATE.User = User{}
 		}
 	}
+
 	if strings.Contains(FR.Path, "login") {
 		if len(responseBytes) != 0 && code == 200 {
 			INFO("LOGIN DETECTED!")
@@ -631,6 +632,7 @@ func PublicConnect(ClientCR ConnectionRequest) (code int, errm error) {
 	FinalCR.EncType = ClientCR.EncType
 	FinalCR.OrgID = ClientCR.OrgID
 	FinalCR.DeviceKey = ClientCR.DeviceKey
+	FinalCR.Hostname = tunnel.Meta.Hostname
 
 	if !IOT {
 		FinalCR.RequestingPorts = true

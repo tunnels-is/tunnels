@@ -39,7 +39,7 @@ func InitService() error {
 	go StartLogQueueProcessor(routineMonitor)
 
 	if IOT && CLIDNS != "" {
-		LoadMinimalConfig()
+		LoadIOTConfig()
 	} else {
 		LoadConfig()
 	}
@@ -198,19 +198,23 @@ func LaunchEverything() {
 	// already stared
 	// routineMonitor <- 1
 
-	routineMonitor <- 2
 	routineMonitor <- 3
 	routineMonitor <- 4
 	routineMonitor <- 5
 	routineMonitor <- 6
 
 	if !IOT {
+		routineMonitor <- 2
 		routineMonitor <- 7
 
 		// DNS
 		routineMonitor <- 101
 		routineMonitor <- 102
 		routineMonitor <- 103
+	}
+
+	if IOT {
+		routineMonitor <- 200
 	}
 
 	for {
@@ -236,7 +240,6 @@ func LaunchEverything() {
 			} else if ID == 4 {
 				go GetDefaultGateway(routineMonitor)
 			} else if ID == 5 {
-				go AutoConnect(routineMonitor)
 			} else if ID == 6 {
 				go CleanPortsForAllConnections(routineMonitor)
 			} else if ID == 7 {
@@ -247,6 +250,8 @@ func LaunchEverything() {
 				// go StartTCPDNSHandler(routineMonitor)
 			} else if ID == 103 {
 				go StartUDPDNSHandler(routineMonitor)
+			} else if ID == 200 {
+				go AutoConnect(routineMonitor)
 			}
 		default:
 			time.Sleep(200 * time.Millisecond)
@@ -286,7 +291,7 @@ func SaveConfig(c *Config) (err error) {
 	return
 }
 
-func LoadMinimalConfig() {
+func LoadIOTConfig() {
 	defer func() {
 		r := recover()
 		if r != nil {
@@ -299,14 +304,16 @@ func LoadMinimalConfig() {
 	C := new(Config)
 	C.InfoLogging = true
 	C.ErrorLogging = true
+	C.ConsoleLogOnly = true
+	C.ConsoleLogging = true
 
-	newCon := createMinimalConnectgion()
+	newCon := createMinimalConnection()
 	newCon.Private = true
 
 	if CLIDNS != "" {
 		info, err := ResolveMetaTXT(CLIDNS)
 		if err != nil {
-			///
+			ERROR("Unable to resolve Meta: ", err)
 			return
 		}
 		newCon.PrivateIP = info.IP
@@ -320,6 +327,16 @@ func LoadMinimalConfig() {
 	if newCon.DeviceKey == "" {
 		newCon.DeviceKey = CLIDeviceKey
 	}
+	if newCon.Hostname == "" {
+		newCon.Hostname = CLIHostname
+	}
+	fmt.Println("HOST:", newCon.Hostname)
+	fmt.Println("HOST:", newCon.Hostname)
+	fmt.Println("HOST:", newCon.Hostname)
+	fmt.Println("HOST:", newCon.Hostname)
+	fmt.Println("HOST:", newCon.Hostname)
+	fmt.Println("HOST:", newCon.Hostname)
+	fmt.Println("HOST:", newCon.Hostname)
 
 	C.Connections = make([]*TunnelMETA, 0)
 	C.Connections = append(C.Connections, newCon)
@@ -329,6 +346,7 @@ func LoadMinimalConfig() {
 
 	GLOBAL_STATE.C = C
 	GLOBAL_STATE.ConfigInitialized = true
+	SaveConfig(C)
 	DEBUG("Configurations loaded")
 }
 
@@ -347,6 +365,11 @@ func LoadConfig() {
 			_ = config.Close()
 		}
 	}()
+
+	if GLOBAL_STATE.C != nil {
+		DEBUG("Config already loaded")
+		return
+	}
 
 	GLOBAL_STATE.ConfigPath = GLOBAL_STATE.BasePath + "config.json"
 	DEBUG("Loading config from: ", GLOBAL_STATE.ConfigPath)
