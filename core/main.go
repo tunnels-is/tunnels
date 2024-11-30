@@ -30,34 +30,34 @@ func InitService() error {
 	AdminCheck()
 	InitPaths()
 
-	if C.InfoLogging {
-		printInfo()
-	}
+	printInfo1()
 
-	if !MINIMAL {
+	if !IOT {
 		CreateBaseFolder()
 		InitLogfile()
 	}
 	go StartLogQueueProcessor(routineMonitor)
 
-	if MINIMAL && CLIDNS != "" {
+	if IOT && CLIDNS != "" {
 		LoadMinimalConfig()
 	} else {
 		LoadConfig()
 	}
 
-	if !MINIMAL {
+	printInfo2()
+
+	if !IOT {
 		InitDNSHandler()
 		InitBlockListPath()
-	}
 
-	go func() {
-		err := ReBuildBlockLists(C)
-		if err == nil {
-			SaveConfig(C)
-			SwapConfig(C)
-		}
-	}()
+		go func() {
+			err := ReBuildBlockLists(C)
+			if err == nil {
+				SaveConfig(C)
+				SwapConfig(C)
+			}
+		}()
+	}
 
 	if GLOBAL_STATE.C == nil {
 		ERROR("", "Global state could not be set.. possible config issue")
@@ -139,23 +139,33 @@ func LoadCA() (err error) {
 	return
 }
 
-func printInfo() {
+func printInfo1() {
+	fmt.Println("")
+	fmt.Println("")
+	fmt.Println("==============================================================")
+	fmt.Println("======================= TUNNELS.IS ===========================")
+	fmt.Println("==============================================================")
+	fmt.Println("NOTE: If the app closes without any logs/errors you might need to delete your config and try again")
+	fmt.Println("")
+}
+
+func printInfo2() {
+	fmt.Println("")
 	fmt.Println("=======================================================================")
 	fmt.Println("======================= HELPFUL INFORMATION ===========================")
 	fmt.Println("=======================================================================")
+	fmt.Println("")
+	fmt.Printf("APP: https://%s:%s\n", C.APIIP, C.APIPort)
 	fmt.Println("")
 	fmt.Println("BASE PATH:", GLOBAL_STATE.BasePath)
 	fmt.Println("")
 	fmt.Println("- Tunnels request network admin permissions to run.")
 	fmt.Println("- Remember to configure your DNS servers if you want to use Tunnels DNS functionality.")
-	fmt.Println("- The UI can be found here: https://"+C.APIIP+":"+C.APIPort, " -- This might change depending on settings.")
 	fmt.Println("- Remember to turn all logging off if you are concerned about privacy.")
 	fmt.Println("- There is a --basePath flag that can let you reconfigure the base directory for logs and configs.")
 	fmt.Println("")
 	fmt.Println("=======================================================================")
 	fmt.Println("=======================================================================")
-	fmt.Println("")
-	fmt.Println("NOTE: If the app closes without any logs/errors you will need to delete your config")
 }
 
 type X *bool
@@ -194,7 +204,7 @@ func LaunchEverything() {
 	routineMonitor <- 5
 	routineMonitor <- 6
 
-	if !MINIMAL {
+	if !IOT {
 		routineMonitor <- 7
 
 		// DNS
@@ -226,6 +236,7 @@ func LaunchEverything() {
 			} else if ID == 4 {
 				go GetDefaultGateway(routineMonitor)
 			} else if ID == 5 {
+				go AutoConnect(routineMonitor)
 			} else if ID == 6 {
 				go CleanPortsForAllConnections(routineMonitor)
 			} else if ID == 7 {

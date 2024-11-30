@@ -56,11 +56,45 @@ var (
 	AllowAll bool
 )
 
+type DeviceListResponse struct {
+	Devices      []*listDevice
+	DHCPAssigned int
+	DHCPFree     int
+}
+
+type listDevice struct {
+	DHCP         *DHCPRecord
+	AllowedIPs   []string
+	CPU          byte
+	RAM          byte
+	Disk         byte
+	IngressQueue int
+	EgressQueue  int
+	Created      time.Time
+	StartPort    uint16
+	EndPort      uint16
+}
+
 type DHCPRecord struct {
 	m        sync.Mutex `json:"-"`
 	IP       [4]byte
+	Hostname string
 	Token    string
 	Activity time.Time `json:"-"`
+}
+
+func (d *DHCPRecord) AssignHostname(host string) {
+	if defaultHostname != "" {
+		if host == "" {
+			host = fmt.Sprintf("%d-%d-%d-%d",
+				d.IP[0],
+				d.IP[1],
+				d.IP[2],
+				d.IP[3],
+			)
+		}
+		d.Hostname = host + "." + defaultHostname
+	}
 }
 
 func (d *DHCPRecord) Assign() (ok bool) {
@@ -95,6 +129,7 @@ type Server struct {
 	ID                 primitive.ObjectID `json:"ID"`
 	ControlIP          string             `json:"ControlIP"`
 	ControlPort        string             `json:"ControlPort"`
+	APIPort            string             `json:"APIPort"`
 	UserMaxConnections int                `json:"UserMaxConnections"`
 	InterfaceIP        string             `json:"InterfaceIP"`
 	DataPort           string             `json:"DataPort"`
@@ -107,6 +142,7 @@ type Server struct {
 
 	ControlCert string           `json:"ControlCert"`
 	ControlKey  string           `json:"ControlKey"`
+	APIKey      string           `json:"APIKey"`
 	Networks    []*ServerNetwork `json:"Networks"`
 
 	// Shared Settings
@@ -196,6 +232,7 @@ type ConnectRequest struct {
 	Created time.Time `json:"Created"`
 
 	// DHCP
+	Hostname        string `json:"Hostname"`
 	RequestingPorts bool   `json:"RequestingPorts"`
 	DHCPToken       string `json:"DHCPToken"`
 }
@@ -229,4 +266,9 @@ type UserCoreMapping struct {
 	Allowedm   sync.Mutex
 	AllowedIPs map[[4]byte]bool
 	DHCP       *DHCPRecord
+
+	// IOT Client Only
+	CPU  byte
+	RAM  byte
+	Disk byte
 }

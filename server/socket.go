@@ -564,6 +564,11 @@ func fromUserChannel(index int) {
 				if CM.DHCP != nil {
 					CM.DHCP.Activity = time.Now()
 				}
+				if len(PACKET) > 4 {
+					CM.CPU = PACKET[1]
+					CM.RAM = PACKET[2]
+					CM.Disk = PACKET[3]
+				}
 			case allowIP, disallowIP:
 				select {
 				case CM.ToUser <- PACKET:
