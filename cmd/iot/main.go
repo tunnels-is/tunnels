@@ -37,6 +37,6 @@ func main() {
 	}
 
 	core.NATIVE = false
-	core.MINIMAL = true
+	core.IOT = true
 	service.Start()
 }
