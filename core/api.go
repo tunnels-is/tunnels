@@ -196,6 +196,12 @@ func ForwardToController(FR *FORWARD_REQUEST) (interface{}, int) {
 		}
 	}
 
+	if strings.Contains(FR.Path, "logout") {
+		if len(responseBytes) != 0 && code == 200 {
+			INFO("LOGOUT DETECTED!")
+			GLOBAL_STATE.User = User{}
+		}
+	}
 	if strings.Contains(FR.Path, "login") {
 		if len(responseBytes) != 0 && code == 200 {
 			INFO("LOGIN DETECTED!")
