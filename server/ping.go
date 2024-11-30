@@ -15,14 +15,14 @@ var PingPongStatsBuffer = []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
 func PopulatePingBufferWithStats() {
 	cpuPercent, err := cpu.Percent(0, false)
 	if err != nil {
-		ERR(3, "Unable to get cpu percent", err)
+		ERR("Unable to get cpu percent", err)
 		return
 	}
 	PingPongStatsBuffer[0] = byte(int(cpuPercent[0]))
 
 	memStats, err := mem.VirtualMemory()
 	if err != nil {
-		ERR(3, "Unable to get mem stats", err)
+		ERR("Unable to get mem stats", err)
 		return
 
 	}
@@ -30,7 +30,7 @@ func PopulatePingBufferWithStats() {
 
 	diskUsage, err := disk.Usage("/")
 	if err != nil {
-		ERR(3, "Unable to get disk usage", err)
+		ERR("Unable to get disk usage", err)
 		return
 	}
 	PingPongStatsBuffer[2] = byte(int(diskUsage.UsedPercent))
@@ -57,7 +57,9 @@ func NukeClient(index int) {
 	}
 
 	if ClientCoreMappings[index].DHCP != nil {
+		IPm.Lock()
 		IPToCoreMapping[ClientCoreMappings[index].DHCP.IP] = nil
+		IPm.Unlock()
 	}
 	close(ClientCoreMappings[index].ToUser)
 	close(ClientCoreMappings[index].FromUser)

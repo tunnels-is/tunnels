@@ -9,6 +9,9 @@ import (
 	"time"
 
 	"github.com/jackpal/gateway"
+	"github.com/shirou/gopsutil/cpu"
+	"github.com/shirou/gopsutil/disk"
+	"github.com/shirou/gopsutil/mem"
 )
 
 func AutoConnect(MONITOR chan int) {
@@ -68,12 +71,41 @@ func AutoConnect(MONITOR chan int) {
 	}
 }
 
+var PingPongStatsBuffer = []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+
+func PopulatePingBufferWithStats() {
+	cpuPercent, err := cpu.Percent(0, false)
+	if err != nil {
+		ERROR("Unable to get cpu percent", err)
+		return
+	}
+	PingPongStatsBuffer[1] = byte(int(cpuPercent[0]))
+
+	memStats, err := mem.VirtualMemory()
+	if err != nil {
+		ERROR("Unable to get mem stats", err)
+		return
+
+	}
+	PingPongStatsBuffer[2] = byte(int(memStats.UsedPercent))
+
+	diskUsage, err := disk.Usage("/")
+	if err != nil {
+		ERROR("Unable to get disk usage", err)
+		return
+	}
+	PingPongStatsBuffer[3] = byte(int(diskUsage.UsedPercent))
+}
+
 func PingConnections(MONITOR chan int) {
 	defer func() {
 		time.Sleep(30 * time.Second)
 		MONITOR <- 3
 	}()
 	defer RecoverAndLogToFile()
+	if IOT {
+		PopulatePingBufferWithStats()
+	}
 	for _, v := range ConList {
 		if v == nil {
 			continue
@@ -81,8 +113,10 @@ func PingConnections(MONITOR chan int) {
 
 		var err error
 		if v.EH != nil {
-			out := v.EH.SEAL.Seal1([]byte{255, 255, 255, 255}, v.Index)
-			_, err = v.Con.Write(out)
+			out := v.EH.SEAL.Seal1(PingPongStatsBuffer, v.Index)
+			if len(out) > 0 {
+				_, err = v.Con.Write(out)
+			}
 		}
 
 		if time.Since(v.TunnelSTATS.PingTime).Seconds() > 30 || err != nil {

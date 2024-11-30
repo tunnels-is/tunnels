@@ -17,6 +17,10 @@ import (
 )
 
 var (
+	PRODUCTION  = true
+	APP_VERSION = "1.0.4"
+	API_VERSION = 1
+
 	DefaultTunnelName = "tunnels"
 	CertPool          *x509.CertPool
 
@@ -26,8 +30,6 @@ var (
 	DNSCache        = make(map[string]*DNSReply)
 	DNSCacheLock    = sync.Mutex{}
 	UsePrimaryDNS   = true
-
-	// Minimal client settings
 )
 
 type DNSStats struct {
@@ -104,15 +106,10 @@ type ConnectRequestResponse struct {
 }
 
 type DHCPRecord struct {
-	IP    [4]byte
-	Token string
+	IP       [4]byte
+	Token    string
+	Hostname string
 }
-
-var (
-	PRODUCTION  = true
-	APP_VERSION = "1.0.3"
-	API_VERSION = 1
-)
 
 var (
 	DIST_EMBED embed.FS
@@ -152,8 +149,8 @@ var (
 	DEFAULT_CONNECTION *TunnelMETA
 
 	// IS NATIVE GUI
-	NATIVE  bool
-	MINIMAL bool
+	NATIVE bool
+	IOT    bool
 
 	// Device Flags
 	CLIDeviceKey string
@@ -382,11 +379,10 @@ type TunnelMETA struct {
 
 	OrgID     string
 	DeviceKey string
+	DHCPToken string
+	ServerID  string
 
-	// NEW
 	WindowsGUID string
-
-	ServerID string
 
 	// controlled by user only
 	DNSBlocking   bool

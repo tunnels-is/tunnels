@@ -83,7 +83,6 @@ func SendRequestToController(method string, route string, data interface{}, time
 		}
 	}
 
-	fmt.Println("OUT:", string(body))
 	var req *http.Request
 	if method == "POST" {
 		req, err = http.NewRequest(method, "https://api.nicelandvpn.is/"+route, bytes.NewBuffer(body))
@@ -627,8 +626,10 @@ func PublicConnect(ClientCR ConnectionRequest) (code int, errm error) {
 	FinalCR.OrgID = ClientCR.OrgID
 	FinalCR.DeviceKey = ClientCR.DeviceKey
 
-	FinalCR.RequestingPorts = true
-	FinalCR.DHCPToken = ""
+	if !IOT {
+		FinalCR.RequestingPorts = true
+	}
+	FinalCR.DHCPToken = tunnel.Meta.DHCPToken
 
 	DEBUG("ConnectRequestFromClient", ClientCR)
 
@@ -661,8 +662,8 @@ func PublicConnect(ClientCR ConnectionRequest) (code int, errm error) {
 		HandshakeTimeout:         time.Duration(10 * time.Second),
 		RequireAddressValidation: false,
 		KeepAlivePeriod:          0,
-		MaxUniRemoteStreams:      100,
-		MaxBidiRemoteStreams:     100,
+		MaxUniRemoteStreams:      10,
+		MaxBidiRemoteStreams:     10,
 		MaxStreamReadBufferSize:  70000,
 		MaxStreamWriteBufferSize: 70000,
 		MaxConnReadBufferSize:    70000,
@@ -828,7 +829,7 @@ func PublicConnect(ClientCR ConnectionRequest) (code int, errm error) {
 	_ = PrepareState()
 	go tunnel.ReadFromServeTunnel()
 
-	out := tunnel.EH.SEAL.Seal1([]byte{255, 255, 255, 255}, tunnel.Index)
+	out := tunnel.EH.SEAL.Seal1(PingPongStatsBuffer, tunnel.Index)
 	_, err = tunnel.Con.Write(out)
 	if err != nil {
 		return 502, errors.New("unable to send initial ping to server")
@@ -845,6 +846,11 @@ func PublicConnect(ClientCR ConnectionRequest) (code int, errm error) {
 				return 502, errors.New("Unable to place new interface on monitor channel")
 			}
 		}
+	}
+
+	if CRR.DHCP != nil {
+		tunnel.Meta.DHCPToken = CRR.DHCP.Token
+		SaveConfig(GLOBAL_STATE.C)
 	}
 
 	DEBUG("Session is ready - it took ", fmt.Sprintf("%.0f", math.Abs(time.Since(start).Seconds())), " seconds to connect")
