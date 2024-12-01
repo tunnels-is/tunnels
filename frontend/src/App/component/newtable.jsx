@@ -1,6 +1,5 @@
 import React, { useState } from "react";
-import GLOBAL_STATE, { STATE } from "../../state";
-import { v4 as uuidv4 } from 'uuid';
+import GLOBAL_STATE from "../../state";
 import STORE from "../../store";
 
 const NewTable = (props) => {
@@ -155,8 +154,8 @@ const NewTable = (props) => {
 
 			<div className={`${props.className} ab table`}>
 
-				<tr className="ab header">
-					{props?.header?.map(l => {
+				<div className="ab header">
+					{props?.header?.map((l, i) => {
 						let cs = {}
 
 						if (l.color) {
@@ -176,20 +175,20 @@ const NewTable = (props) => {
 
 						return (
 							<div
-								key={l.value}
+								key={l.value + i}
 								style={cs}
 								className="ab column">{l.value}
 							</div>
 						)
 
 					})}
-				</tr>
+				</div>
 
 				{indexes.map(ind => {
 					let r = finalRows[ind]
 
 					return (
-						<div className="row">
+						<div className="row" key={"row" + ind}>
 							{r.items.map((i, index) => {
 								let cs = {}
 								let clicky = function() {
@@ -221,7 +220,7 @@ const NewTable = (props) => {
 								if (i.type === "text") {
 									return (
 										<div
-											key={i.value + index}
+											key={i.value + String(index)}
 											style={cs}
 											onClick={(e) => clicky(e)}
 											className={`ab tooltip column ${classNames} ${i.click ? "clickable" : ""}`}>
@@ -234,7 +233,7 @@ const NewTable = (props) => {
 								} else if (i.type === "select") {
 									return (
 										<div
-											key={i.value + index}
+											key={i.value + String(index)}
 											style={cs} className={` ${classNames} ab column`}>
 											{i.value}
 										</div>
@@ -242,7 +241,7 @@ const NewTable = (props) => {
 								} else if (i.type === "img") {
 									return (
 										<div
-											key={i.value + index}
+											key={i.value + String(index)}
 											style={cs} className={` ${classNames} ab column`}>
 											<img src={i.value} alt="x" />
 										</div>

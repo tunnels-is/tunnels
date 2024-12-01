@@ -64,51 +64,16 @@ func InitService() error {
 		return errors.New("unable to create global state.. possible config error")
 	}
 
-	err := LoadCA()
+	var err error
+	CertPool, err = certs.LoadTunnelsCACertPool()
 	if err != nil {
-		INFO("", "Could not load root CA")
-		return errors.New("could not load root CA")
+		DEBUG("Could not load root CA:", err)
+		return err
 	}
 
 	INFO("Tunnels is ready")
 	return nil
 }
-
-var CAcert = `-----BEGIN CERTIFICATE-----
-MIIGCjCCA76gAwIBAgIUbOdy8n2a9Ao6Qdy3ar4DncTmax0wQQYJKoZIhvcNAQEK
-MDSgDzANBglghkgBZQMEAgEFAKEcMBoGCSqGSIb3DQEBCDANBglghkgBZQMEAgEF
-AKIDAgEgMFkxCzAJBgNVBAYTAklTMRAwDgYDVQQIDAdJY2VsYW5kMRAwDgYDVQQH
-DAdJY2VsYW5kMRQwEgYDVQQKDAtUdW5uZWxzIEVIRjEQMA4GA1UEAwwHdHVubmVs
-czAeFw0yNDA3MDUwMzEzNDlaFw0zNDA3MDMwMzEzNDlaMFkxCzAJBgNVBAYTAklT
-MRAwDgYDVQQIDAdJY2VsYW5kMRAwDgYDVQQHDAdJY2VsYW5kMRQwEgYDVQQKDAtU
-dW5uZWxzIEVIRjEQMA4GA1UEAwwHdHVubmVsczCCAiIwDQYJKoZIhvcNAQEBBQAD
-ggIPADCCAgoCggIBALWEnLmsnBeGs80H9cowNK5naFsxpmOm0D3FZINupNPqeGnp
-Z7WUSfPp8p8HEhEoQQkuZLW+pyP7dBIt5S1gcM8hccQKVZsD16B5d/YC9znjDAZP
-Vq7FX6aOJzqVNPMdtzSqjj+nN2+T8rQFv3JRPjrzTyUJSQo6WviI8usu6st2CplV
-5bsYQYV/HADU5i8DfjQ5jK8hnR+66EYu9epW20pKjJ0iNsBU9UwJk+IazrjE8gf3
-ZDGc/cv2KN9hGslIIXRSb3KXmCalPncDNB1VExLc7nJg+8jBn3hTinReREE043IP
-4YITNR3twj1+JVkkAjoH4sT7BL7tPf9U1w6vFbXQhuEo2mjVVqW+TUSqFzLqwGrD
-yeGTRvQTSL41vpNO6tpYYKjKjfFyhojrP6iCCRe+kh6qiEmjNGCaxJmxgrWg3knC
-j6eAJOZ/w7YDfdWAfI8zwIQ0VwfiR3eGbEku3Jrl/492gM/6efLbmLGglKwWzfhK
-/Njm3xWglDi5UTXNWzJJ544RZeVPcXFdAO14Szz+vgDBvYvCQQTvOvexeS9qhykI
-z24TCiXwrGQ3frP9G1bowxdX+lTInMLOkvb4sxazG4uZUuXvvmDFATZc2C6WR24H
-GCIS6bALJdp1UWdZHNtFd/O7HrOX2W5H171Ip2NGL0uSqHZCtOS9U8BTStBPAgMB
-AAGjYjBgMAwGA1UdEwQFMAMBAf8wMQYDVR0RBCowKIISYXBpLm5pY2VsYW5kdnBu
-LmlzghJhcGkubmljZWxhbmR2cG4uaXMwHQYDVR0OBBYEFKIGZWqHbki/3IvXeLpu
-NNPupEcGMEEGCSqGSIb3DQEBCjA0oA8wDQYJYIZIAWUDBAIBBQChHDAaBgkqhkiG
-9w0BAQgwDQYJYIZIAWUDBAIBBQCiAwIBIAOCAgEAp7kRHI2IrLswy4NSLOsMs+xR
-zr4k1N1dyF2vVFAQbv5wlvkLKBDtb9DvahEZjbuGW/uT4SI1UxTm1Z/BaeTNqIuz
-QIbcPfC6hJ2kOkO6Uzo7rGFiZbYJ1/vZLLx89yc03bnf3Vp7FFRG0y5d9VscSSVq
-jVFGebYb/MoF7l70Rx7a5Rkv/rCJ/xawl/y1mctRA1o4FSVwcwHVpzxyytcblQwn
-Ybiy/cLBNU8s3Epoj7hB2ruOY02FBLDkozG34NYJUrq95eL+a0LYb+AKdHzWts0M
-/U8kE5sbQpSVYxidiBS33q6uTKxrE1yYizRKGfyykeovRraRVu6wIOwDaVKZi4AX
-pgdqDFJFBbrAd5KZtJMlwI2eoDmY3pOsi63ecSxwOSSr+0ZZ009vFFNsY92XzVMZ
-baJKJuGkKFcpWoF2CMcoe52Hj1SuRA+3yYtMYQfZE8p77mVWnEORoVkgXX96fWjq
-tQBsxq4Nb6GrkR4M4Ql7aYlcj47y0ILBTjeTMhAPb/qxSrUYhIAxeMOjCcvzQtaF
-BXYclK7t+CCarFAwmQ439SQ2a/x0c9w+oDDV9PI2YqYWaqsqNtuLaq3rrUwh9unI
-LAbdR4NFNWbV4vO+lXTrvwEtlJE8WsSwvpCMZABs6CzRpAnZgOq350ZKEf1V0yfI
-PRsYUYN/Y3GAN8csBfs=
------END CERTIFICATE-----`
 
 func (m *TunnelMETA) LoadPrivateCerts() (p *x509.CertPool, err error) {
 	if len(m.PrivateCertBytes) > 0 {
@@ -131,12 +96,6 @@ func LoadPrivateCert(path string) (pool *x509.CertPool, err error) {
 	}
 	certPool.AppendCertsFromPEM(certData)
 	return certPool, nil
-}
-
-func LoadCA() (err error) {
-	CertPool = x509.NewCertPool()
-	CertPool.AppendCertsFromPEM([]byte(CAcert))
-	return
 }
 
 func printInfo1() {

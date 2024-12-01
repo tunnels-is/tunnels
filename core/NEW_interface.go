@@ -128,27 +128,32 @@ func PingConnections(MONITOR chan int) {
 func getDefaultGatewayAndInterface() {
 	defer RecoverAndLogToFile()
 	var err error
+	var onDefault bool = false
+
+	for _, v := range GLOBAL_STATE.ActiveConnections {
+		if v.Tag == DefaultTunnelName {
+			onDefault = true
+		}
+	}
 
 	OLD_GATEWAY := make([]byte, 4)
 	var NEW_GATEWAY net.IP
 	copy(OLD_GATEWAY, DEFAULT_GATEWAY.To4())
 
-	// DEFAULT_GATEWAY, err = FindGateway()
 	NEW_GATEWAY, err = gateway.DiscoverGateway()
 	if err != nil {
-		DEBUG("default gateway not found", err)
-		return
-	}
-
-	for _, v := range GLOBAL_STATE.ActiveConnections {
-		if v.Tag == "DEFAULT" {
-			return
+		if !onDefault {
+			con, err2 := net.Dial("tcp4", "9.9.9.9")
+			if err2 == nil {
+				NEW_GATEWAY = net.ParseIP(strings.Split(con.LocalAddr().String(), ":")[0])
+			}
+			ERROR("default gateway not found, err:", err, "//  dial err:", err2)
 		}
+		return
 	}
 
 	for _, v := range C.Connections {
 		if v.IPv4Address == NEW_GATEWAY.To4().String() {
-			// DEBUG(fmt.Sprintf("discovered gateway is the same as gateway for connection (%s)", v.Tag))
 			return
 		}
 	}
@@ -164,32 +169,30 @@ func getDefaultGatewayAndInterface() {
 	if err != nil {
 		ERROR("could not find default interface", err)
 		return
-	} else {
+	}
 
-		if DNSClient != nil && DNSClient.Dialer != nil {
-			DNSClient.Dialer.LocalAddr = &net.UDPAddr{
-				IP: DEFAULT_INTERFACE,
+	if DNSClient != nil && DNSClient.Dialer != nil {
+		DNSClient.Dialer.LocalAddr = &net.UDPAddr{
+			IP: DEFAULT_INTERFACE,
+		}
+	}
+
+	ifList, _ := net.Interfaces()
+
+LOOP:
+	for _, v := range ifList {
+		addrs, e := v.Addrs()
+		if e != nil {
+			continue
+		}
+		for _, iv := range addrs {
+			if strings.Split(iv.String(), "/")[0] == DEFAULT_INTERFACE.To4().String() {
+				DEFAULT_INTERFACE_ID = v.Index
+				DEFAULT_INTERFACE_NAME = v.Name
+				_ = GetDNSServers(strconv.Itoa(v.Index))
+				break LOOP
 			}
 		}
-
-		ifList, _ := net.Interfaces()
-
-	LOOP:
-		for _, v := range ifList {
-			addrs, e := v.Addrs()
-			if e != nil {
-				continue
-			}
-			for _, iv := range addrs {
-				if strings.Split(iv.String(), "/")[0] == DEFAULT_INTERFACE.To4().String() {
-					DEFAULT_INTERFACE_ID = v.Index
-					DEFAULT_INTERFACE_NAME = v.Name
-					_ = GetDNSServers(strconv.Itoa(v.Index))
-					break LOOP
-				}
-			}
-		}
-
 	}
 
 	if DEFAULT_DNS_SERVERS == nil {
