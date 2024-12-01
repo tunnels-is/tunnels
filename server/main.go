@@ -2,11 +2,8 @@ package main
 
 import (
 	"context"
-	"crypto/rsa"
 	"crypto/tls"
-	"crypto/x509"
 	"encoding/json"
-	"encoding/pem"
 	"errors"
 	"flag"
 	"fmt"
@@ -30,42 +27,6 @@ import (
 	"golang.org/x/net/quic"
 )
 
-var ControlCert = `-----BEGIN CERTIFICATE-----
-MIIGHTCCA9GgAwIBAgIUaYKyHX+VENcRlOYAYzC9K8wR7kEwQQYJKoZIhvcNAQEK
-MDSgDzANBglghkgBZQMEAgEFAKEcMBoGCSqGSIb3DQEBCDANBglghkgBZQMEAgEF
-AKIDAgEgMFkxCzAJBgNVBAYTAklTMRAwDgYDVQQIDAdJY2VsYW5kMRAwDgYDVQQH
-DAdJY2VsYW5kMRQwEgYDVQQKDAtUdW5uZWxzIEVIRjEQMA4GA1UEAwwHdHVubmVs
-czAeFw0yNDA3MDUwMzI0MDRaFw0yNTA3MDUwMzI0MDRaMFkxCzAJBgNVBAYTAklT
-MRAwDgYDVQQIDAdJY2VsYW5kMRAwDgYDVQQHDAdJY2VsYW5kMRQwEgYDVQQKDAtU
-dW5uZWxzIEVIRjEQMA4GA1UEAwwHdHVubmVsczCCAiIwDQYJKoZIhvcNAQEBBQAD
-ggIPADCCAgoCggIBAKXjj42VHvfRdp8NSRYA+5k3B45mwBxRM45iLrrdCLXwyNKY
-cLhq8tkTz9CmXS8ie9OSJk93UV1BJdBnC/c/WVHfGxVwAwivYdiAqkziikD2GvR6
-qVY5kwdy9wa2uXrTsJmdZW99sNwwhzg2ckKdn4Gy8fZPvu2/eCUZhrO5zRY0VvZP
-/ZufpSj3+8tBjtXcUZMh3MEebfigSGcEsVfqp+RsHrvD9K3A832uKCPhm7jXoOY5
-ZC82Pi9nNwUg4s82FQjWhX8rx70LhHoWZTJpzjAB+LUYi8cutifEXHVcI7/urQH1
-hJkrHEP/fLHilsPONleZXtPzfZmfQRHjwl+7iTVvQCfc3YW1vvrjukVBgPGoapxa
-IDqbvPlevfIZMNRJm0ojXErE8C2L6Y2gwzyJnQX8eXrSWsLkOlsc+uwMtQiQEoxQ
-A9V/gYrERvF+I58oJjlJsS+R8cChjYN9B70DrxcxyPtHvY35uBKv3RHFQXHBWEgN
-q40x/8PQkluFFIkvcQV8LqFI8e3xN+YOuwdn5SC+Ta15v13vuNtJYBEcx5xCqsyY
-3jGMm7I3p3HRz5xlOBVEgym1cwi3rS3EtqmQRg0YoFDsFwifRzjUixkdJAYRuCOs
-Zwfmhr8jQvmsJy5I87i//TxtkX1Lck5kX2pchFZLYkiYWkDvVWGmQMYiFbg/AgMB
-AAGjdTBzMDEGA1UdEQQqMCiCEmFwaS5uaWNlbGFuZHZwbi5pc4ISYXBpLm5pY2Vs
-YW5kdnBuLmlzMB0GA1UdDgQWBBS/0qLiotvYAhjF9OMCDkw+nzd++DAfBgNVHSME
-GDAWgBSiBmVqh25Iv9yL13i6bjTT7qRHBjBBBgkqhkiG9w0BAQowNKAPMA0GCWCG
-SAFlAwQCAQUAoRwwGgYJKoZIhvcNAQEIMA0GCWCGSAFlAwQCAQUAogMCASADggIB
-AJEt122JR3uCgU1Plc+J/uhTT/nOD1sYuOtU9jbEg+xrHnnl2tYY5sqzGV/CUGOm
-Ppytn2OVVcnc8i9UphnV6iyqeUXTpKpSqpLEhEexcFnUI7T1aEsC8oFQtL7/Wdcx
-NBH4h3e9qf8Q+qLvNgqn0n+WSnVlL1dUbICJnaYURpcWx4I1l5B+i1akoiL17jcl
-aL5nesSwEFR3V23/VZo4cNKACholpli9xtD62W1d+JevZ+mD63Hb0RSpO7MDxva8
-TW5T0Njw986CsDDVF6BXbBNGjrv7qB3iT5Zp+gohRRA0mSGt/38/tIM0oQ4W4rlM
-RAAqpugBWOUbVGiypP2PeUKD+/6hB2RHGK+5BESFRDo95ljrNPSEZQy2E/pE7204
-CvDQNLN2HnLXQt30X56EsD6qG1GgJhJIn0wWDFkis06jINNX2QLvxhdkrSHtssQs
-z64P4TlHNsTeCQypVi4bvTMnjFJwOWBfqTYCrQn6Bg9UnNeH8chtO59XH8WN1NXm
-vTi4XyNu6gHrJPqtndMULABA6Py1Y/PW/HpEgAR1r/FdSErbrTV1lGIXrc9bHAfu
-y0z4Mr0BVwDPksFyvq9YTc00n04CcWYgvSPsSleNxWs+Xs3FJ+JCBA32JjRAmGhq
-uERvglh4s+Yi3Ugkn+BpytXJMJCNmSqxRVV55Sd/5Tpu
------END CERTIFICATE-----`
-
 func LOG(x ...any) {
 	log.Println(x...)
 }
@@ -80,17 +41,6 @@ func WARN(x ...any) {
 
 func ERR(x ...any) {
 	log.Println(x...)
-}
-
-func loadPublicSigningCert() (err error) {
-	pubKeyBlock, _ := pem.Decode([]byte(ControlCert))
-	publicSigningCert, err = x509.ParseCertificate(pubKeyBlock.Bytes)
-	if err != nil {
-		return err
-	}
-	publicSigningKey = publicSigningCert.PublicKey.(*rsa.PublicKey)
-
-	return
 }
 
 var (
@@ -309,7 +259,8 @@ func initializeVPL() (err error) {
 }
 
 func initializeCertsAndTLSConfig() {
-	err := loadPublicSigningCert()
+	var err error
+	publicSigningCert, publicSigningKey, err = certs.LoadServerSignCertAndKey()
 	if err != nil {
 		panic(err)
 	}

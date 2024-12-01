@@ -40,6 +40,16 @@ func LoadTunnelsCACertPool() (pool *x509.CertPool, err error) {
 	return
 }
 
+func LoadServerSignCertAndKey() (c *x509.Certificate, k *rsa.PublicKey, err error) {
+	pubKeyBlock, _ := pem.Decode([]byte(ControlCert))
+	c, err = x509.ParseCertificate(pubKeyBlock.Bytes)
+	if err != nil {
+		return nil, nil, err
+	}
+	k = c.PublicKey.(*rsa.PublicKey)
+	return
+}
+
 func MakeCert(ct CertType, certPath string, keyPath string, ips []string, domains []string, org string, expirationDate time.Time, saveToDisk bool) (c tls.Certificate, err error) {
 	defer func() {
 		r := recover()
