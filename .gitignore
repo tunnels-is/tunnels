@@ -3,16 +3,23 @@ cmd/service/service
 */server.crt
 server.crt
 
+cmd/iot/*.key
+cmd/iot/*.crt
+cmd/iot/config.json
+cmd/iot/iot
+
 build/*
 builds/*
+
+devops/build/tunnels
+server/server
 
 cmd/main/dist
 cmd/main/files
 cmd/main/*.exe
 cmd/main/main
-cmd/main/api.key
-cmd/main/api.crt
-cmd/main/private.crt
+cmd/main/*.key
+cmd/main/*.crt
 *.exe
 
 node_modules
