@@ -144,31 +144,32 @@ export var STATE = {
 
 			// Without timeout the "Saving Config..." msg
 			// blinks on/off too fast imo it's better if it's about 1sec
-			const to = setTimeout(() => {
-				STATE.loading = undefined
-			}, 1000)
-			return () => {
-				STATE.renderPage("loader")
-				clearTimeout(to)
-			}
+			// const to = setTimeout(() => {
+			STATE.loading = undefined
+			// }, 1000)
+			// return () => {
+			STATE.renderPage("loader")
+			// 	clearTimeout(to)
+			// }
+			return
 		}
 		if (object?.show) {
 			STATE.loading = object
 			STATE.renderPage("loader")
 
-			const to = setTimeout(() => {
-				STATE.loading = undefined
-				STATE.renderPage("loader")
-				clearTimeout(to)
-			}, object.timeout ? object.timeout : 10000)
+			// const to = setTimeout(() => {
+			// STATE.loading = undefined
+			// STATE.renderPage("loader")
+			// 	clearTimeout(to)
+			// }, object.timeout ? object.timeout : 10000)
 
 			return
 		} else {
 			STATE.loading = undefined
-			return () => {
-				STATE.renderPage("loader")
-				clearTimeout(to)
-			}
+			// return () => {
+			STATE.renderPage("loader")
+			// 	clearTimeout(to)
+			// }
 		}
 	},
 	toggleError: (e) => {
