@@ -452,6 +452,9 @@ type TunnelSTATS struct {
 	MEM                 byte
 	ServerToClientMicro int64
 	PingTime            time.Time
+
+	DHCP       *DHCPRecord
+	VPLNetwork *ServerNetwork
 }
 
 type Tunnel struct {
@@ -597,6 +600,8 @@ type Config struct {
 	DomainWhitelist     string
 	EnabledBlockLists   []string
 	AvailableBlockLists []*BlockList
+
+	CustomDNSRecords []*ServerDNS
 }
 
 var (

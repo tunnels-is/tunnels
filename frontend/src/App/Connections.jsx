@@ -236,6 +236,10 @@ const Connections = () => {
 				{s &&
 					<>
 						<div className="button-and-text-seperator"></div>
+						<KeyValue value={String(s.VPLNetwork?.Network)} label={"VPL Network"} />
+						<KeyValue value={String(s.DHCP?.IP).replaceAll(",", ".")} label={"IP"} />
+						<KeyValue value={String(s.DHCP?.Hostname)} label={"Host"} />
+						<div className="button-and-text-seperator"></div>
 						<KeyValue label={"Up Nonce"} value={s.Nonce1} />
 						<KeyValue label={"Upload"} value={s.EgressString} />
 						<KeyValue label={"Down Nonce"} value={s.Nonce2} />

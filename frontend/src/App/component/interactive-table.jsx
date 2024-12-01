@@ -1,9 +1,8 @@
-import React, { useEffect, useState } from "react";
-import { COLORS } from "../../theme";
+import React, { useState } from "react";
 
 const InteractiveTable = (props) => {
 	const [filter, setFilter] = useState("")
-	console.dir(props)
+	// console.dir(props)
 
 	return (
 		<div className="table-frame">
@@ -35,14 +34,14 @@ const InteractiveTable = (props) => {
 			<table className={`${props.className} ab table`}>
 
 				{props?.rows?.length > 0 &&
-					<tr className="ab header">
+					<div className="ab header">
 						{props?.header?.map((l) => {
 							return (
 								<th key={l.value} className="ab column content">{l.value}
 								</th>
 							)
 						})}
-					</tr>
+					</div>
 				}
 
 				{props?.rows?.map(r => {
