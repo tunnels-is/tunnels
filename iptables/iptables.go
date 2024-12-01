@@ -38,6 +38,7 @@ func SetIPTablesRSTDropFilter(interfaceIP string) (err error, exists bool) {
 	}
 
 	params := []string{"-I", "OUTPUT", "-p", "tcp", "--src", interfaceIP, "--tcp-flags", "ACK,RST", "RST", "-j", "DROP"}
+	fmt.Println("APPLYING: ", params)
 	cmd = exec.Command("sudo", append([]string{"iptables"}, params...)...)
 	out, cerr := cmd.CombinedOutput()
 	if cerr != nil {
@@ -45,7 +46,7 @@ func SetIPTablesRSTDropFilter(interfaceIP string) (err error, exists bool) {
 			cmd = exec.Command("iptables", params...)
 			out, cerr := cmd.CombinedOutput()
 			if cerr != nil {
-				err = fmt.Errorf("Unable to apply iptables rule, err:\n %s", out)
+				err = fmt.Errorf("Unable to apply iptables rule(no sudo), err:\n %s", out)
 				return
 			}
 		} else {
