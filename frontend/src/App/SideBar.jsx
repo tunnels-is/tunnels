@@ -78,15 +78,7 @@ const SideBar = () => {
 			{
 				title: "Support",
 				items: [
-					{ icon: InfoCircledIcon, label: "Chat", route: "help", user: false, },
-					{
-						icon: AccessibilityIcon,
-						label: "Guides",
-						route: "guides",
-						user: false,
-
-						click: () => OpenWindowURL("https://www.tunnels.is/#/docs")
-					},
+					{ icon: InfoCircledIcon, label: "Support", route: "help", user: false, },
 					{
 						icon: QuestionMarkCircledIcon,
 						label: "FAQ",
