@@ -255,7 +255,7 @@ func CreateClientCoreMapping(CRR *ConnectRequestResponse, CR *ConnectRequest, EH
 
 	CRR.VPLNetwork = Config.VPL.Network
 
-	fmt.Println(CRR)
+	// fmt.Println(CRR)
 	return
 }
 
@@ -314,7 +314,7 @@ func ExternalTCPListener(SIGNAL *SIGNAL) {
 
 		version = buffer[0] >> 4
 		if version != 4 {
-			fmt.Println("ignoring none v4", version)
+			// fmt.Println("ignoring none v4", version)
 			continue
 		}
 		// fmt.Println(buffer[:n])
