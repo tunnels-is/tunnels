@@ -105,7 +105,7 @@ func (d *DHCPRecord) Assign() (ok bool) {
 	defer d.m.Unlock()
 	if d.Token == "" {
 		d.Token = uuid.NewString()
-		fmt.Println("NDHCP:", d.Token)
+		// fmt.Println("NDHCP:", d.Token)
 		d.Activity = time.Now()
 		ok = true
 		return
