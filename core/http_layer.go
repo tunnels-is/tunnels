@@ -189,7 +189,7 @@ func handleWebSocket(ws *websocket.Conn) {
 				// Make an attempt to delive this log line to the new LogSocket.
 				// if delivery fails, the event will be found in the log file.
 				_ = websocket.Message.Send(LogSocket, event)
-				ERROR("Logging websocket error: ", err)
+				// ERROR("Logging websocket error: ", err)
 				return
 			}
 		}
