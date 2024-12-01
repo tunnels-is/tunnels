@@ -85,9 +85,9 @@ func SendRequestToController(method string, route string, data interface{}, time
 
 	var req *http.Request
 	if method == "POST" {
-		req, err = http.NewRequest(method, "https://api.nicelandvpn.is/"+route, bytes.NewBuffer(body))
+		req, err = http.NewRequest(method, "https://api.tunnels.is/"+route, bytes.NewBuffer(body))
 	} else if method == "GET" {
-		req, err = http.NewRequest(method, "https://api.nicelandvpn.is/"+route, nil)
+		req, err = http.NewRequest(method, "https://api.tunnels.is/"+route, nil)
 	} else {
 		return nil, 0, errors.New("method not supported:" + method)
 	}
@@ -411,7 +411,7 @@ func PrepareState() (err error) {
 			n2 = binary.BigEndian.Uint64(ConList[i].Nonce2Bytes)
 		}
 
-		GLOBAL_STATE.ConnectionStats = append(GLOBAL_STATE.ConnectionStats, TunnelSTATS{
+		x := TunnelSTATS{
 			Nonce1:              ConList[i].EH.SEAL.Nonce1U.Load(),
 			Nonce2:              n2,
 			StartPort:           ConList[i].StartPort,
@@ -425,8 +425,16 @@ func PrepareState() (err error) {
 			CPU:                 ConList[i].TunnelSTATS.CPU,
 			ServerToClientMicro: ConList[i].TunnelSTATS.ServerToClientMicro,
 			PingTime:            ConList[i].TunnelSTATS.PingTime,
-		})
+		}
 
+		if ConList[i].DHCP != nil {
+			x.DHCP = ConList[i].DHCP
+		}
+		if ConList[i].VPLNetwork != nil {
+			x.VPLNetwork = ConList[i].CRR.VPLNetwork
+		}
+
+		GLOBAL_STATE.ConnectionStats = append(GLOBAL_STATE.ConnectionStats, x)
 	}
 
 	if GLOBAL_STATE.C.DNSstats {
@@ -854,6 +862,11 @@ func PublicConnect(ClientCR ConnectionRequest) (code int, errm error) {
 				return 502, errors.New("Unable to place new interface on monitor channel")
 			}
 		}
+	}
+
+	if tunnel.CRR.VPLNetwork != nil {
+		tunnel.TunnelSTATS.VPLNetwork = tunnel.CRR.VPLNetwork
+		tunnel.TunnelSTATS.DHCP = tunnel.CRR.DHCP
 	}
 
 	if CRR.DHCP != nil {
