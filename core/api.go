@@ -19,6 +19,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/xlzd/gotp"
@@ -84,9 +85,9 @@ func SendRequestToController(method string, route string, data interface{}, time
 
 	var req *http.Request
 	if method == "POST" {
-		req, err = http.NewRequest(method, "https://api.nicelandvpn.is/"+route, bytes.NewBuffer(body))
+		req, err = http.NewRequest(method, "https://api.tunnels.is/"+route, bytes.NewBuffer(body))
 	} else if method == "GET" {
-		req, err = http.NewRequest(method, "https://api.nicelandvpn.is/"+route, nil)
+		req, err = http.NewRequest(method, "https://api.tunnels.is/"+route, nil)
 	} else {
 		return nil, 0, errors.New("method not supported:" + method)
 	}
@@ -192,6 +193,13 @@ func ForwardToController(FR *FORWARD_REQUEST) (interface{}, int) {
 			ERROR("Could not parse response data: ", err)
 			er.Error = "Unable to open response from controller"
 			return er, code
+		}
+	}
+
+	if strings.Contains(FR.Path, "logout") {
+		if len(responseBytes) != 0 && code == 200 {
+			INFO("LOGOUT DETECTED!")
+			GLOBAL_STATE.User = User{}
 		}
 	}
 
@@ -403,7 +411,7 @@ func PrepareState() (err error) {
 			n2 = binary.BigEndian.Uint64(ConList[i].Nonce2Bytes)
 		}
 
-		GLOBAL_STATE.ConnectionStats = append(GLOBAL_STATE.ConnectionStats, TunnelSTATS{
+		x := TunnelSTATS{
 			Nonce1:              ConList[i].EH.SEAL.Nonce1U.Load(),
 			Nonce2:              n2,
 			StartPort:           ConList[i].StartPort,
@@ -417,8 +425,16 @@ func PrepareState() (err error) {
 			CPU:                 ConList[i].TunnelSTATS.CPU,
 			ServerToClientMicro: ConList[i].TunnelSTATS.ServerToClientMicro,
 			PingTime:            ConList[i].TunnelSTATS.PingTime,
-		})
+		}
 
+		if ConList[i].DHCP != nil {
+			x.DHCP = ConList[i].DHCP
+		}
+		if ConList[i].VPLNetwork != nil {
+			x.VPLNetwork = ConList[i].CRR.VPLNetwork
+		}
+
+		GLOBAL_STATE.ConnectionStats = append(GLOBAL_STATE.ConnectionStats, x)
 	}
 
 	if GLOBAL_STATE.C.DNSstats {
@@ -520,6 +536,34 @@ func InitializeTunnelFromCRR(TUN *Tunnel) (err error) {
 	return nil
 }
 
+func GetServerInfoFromDNS(d string) (ip, port, id string, err error) {
+	txt, err := net.LookupTXT(d)
+	if err != nil {
+		DEBUG("Could not use DNS discovery to find VPN server: ", err)
+		err = errors.New("Failed DNS Discovery: " + err.Error())
+		return
+	}
+
+	if len(txt) < 1 {
+		DEBUG("Could not use DNS discovery to find VPN server: no records returned")
+		err = errors.New("Failed DNS Discovery: no records found")
+		return
+	}
+
+	ds := strings.Split(txt[0], ":")
+	if len(ds) < 3 {
+		DEBUG("Could not use DNS discovery to find VPN server: invalid TXT record: ", txt[0])
+		err = errors.New("Failed DNS Discovery: invalid TXT record")
+		return
+	}
+
+	id = txt[0]
+	ip = txt[1]
+	port = txt[2]
+
+	return
+}
+
 func PreConnectCheck() (int, error) {
 	if !GLOBAL_STATE.ConfigInitialized {
 		return 502, errors.New("the application is still initializing default configurations, please wait a few seconds")
@@ -531,17 +575,20 @@ func PreConnectCheck() (int, error) {
 	return 0, nil
 }
 
-func PublicConnect(UICR UIConnectRequest) (code int, errm error) {
-	defer RecoverAndLogToFile()
+var IsConnecting = atomic.Bool{}
+
+func PublicConnect(ClientCR ConnectionRequest) (code int, errm error) {
+	if !IsConnecting.CompareAndSwap(false, true) {
+		INFO("Already connecting to another connection, please wait a moment")
+		return 400, errors.New("Already connecting to another connection, please wait a moment")
+	}
+
 	start := time.Now()
 	defer func() {
+		IsConnecting.Store(false)
 		runtime.GC()
 	}()
-
-	if UICR.ServerIP == "" || UICR.ServerPort == "" {
-		ERROR("Missing server or port in connect request")
-		return 400, errors.New("Server IP or Port missing")
-	}
+	defer RecoverAndLogToFile()
 
 	code, errm = PreConnectCheck()
 	if errm != nil {
@@ -549,38 +596,58 @@ func PublicConnect(UICR UIConnectRequest) (code int, errm error) {
 	}
 
 	tunnel := new(Tunnel)
-	tunnel.UICR = UICR
-	tunnel.Meta = FindMETAForConnectRequest(&UICR)
+	tunnel.ClientCR = ClientCR
+	tunnel.Meta = FindMETAForConnectRequest(&ClientCR)
 	if tunnel.Meta == nil {
-		ERROR("vpn connection metadata not found for tag: ", UICR.Tag)
+		ERROR("vpn connection metadata not found for tag: ", ClientCR.Tag)
 		return 400, errors.New("error in router tunnel")
+	}
+
+	if tunnel.Meta.DNSDiscovery != "" {
+		sid, sip, sport, err := GetServerInfoFromDNS(tunnel.Meta.DNSDiscovery)
+		if err != nil {
+			return 400, err
+		}
+		ClientCR.ServerPort = sport
+		ClientCR.ServerIP = sip
+		ClientCR.SeverID = sid
+	} else {
+		if !tunnel.Meta.Private && ClientCR.SeverID == "" {
+			ERROR("No server selected")
+			return 400, errors.New("No server selected")
+		} else if tunnel.Meta.ServerID != ClientCR.SeverID {
+			tunnel.Meta.ServerID = ClientCR.SeverID
+		}
+	}
+
+	if ClientCR.ServerIP == "" || ClientCR.ServerPort == "" {
+		ERROR("Missing server or port in connect request")
+		return 400, errors.New("Server IP or Port missing")
 	}
 
 	if tunnel.Meta.PreventIPv6 && IPv6Enabled() {
 		return 400, errors.New("IPV6 Enabled but should be disabled")
 	}
 
-	FinalCR := new(ConnectionRequest)
+	FinalCR := new(RemoteConnectionRequest)
 	FinalCR.Version = API_VERSION
 	FinalCR.Created = time.Now()
 
 	// from GUI connect request
-	FinalCR.DeviceToken = UICR.DeviceToken
-	FinalCR.UserID = UICR.UserID
-	FinalCR.SeverID = UICR.SeverID
-	FinalCR.EncType = UICR.EncType
+	FinalCR.DeviceToken = ClientCR.DeviceToken
+	FinalCR.UserID = ClientCR.UserID
+	FinalCR.SeverID = ClientCR.SeverID
+	FinalCR.EncType = ClientCR.EncType
+	FinalCR.OrgID = ClientCR.OrgID
+	FinalCR.DeviceKey = ClientCR.DeviceKey
+	FinalCR.Hostname = tunnel.Meta.Hostname
 
-	FinalCR.RequestingPorts = true
-	FinalCR.DHCPToken = ""
-
-	if !tunnel.Meta.Private && UICR.SeverID == "" {
-		ERROR("No server selected")
-		return 400, errors.New("No server selected")
-	} else if tunnel.Meta.ServerID != UICR.SeverID {
-		tunnel.Meta.ServerID = UICR.SeverID
+	if !IOT {
+		FinalCR.RequestingPorts = true
 	}
+	FinalCR.DHCPToken = tunnel.Meta.DHCPToken
 
-	DEBUG("ConnectRequestFromClient", UICR)
+	DEBUG("ConnectRequestFromClient", ClientCR)
 
 	tc := &tls.Config{
 		RootCAs:            CertPool,
@@ -599,7 +666,7 @@ func PublicConnect(UICR UIConnectRequest) (code int, errm error) {
 	}
 
 	if tunnel.Meta.Private {
-		tc.RootCAs, errm = LoadPrivateCert(tunnel.Meta.PrivateCert)
+		tc.RootCAs, errm = tunnel.Meta.LoadPrivateCerts()
 		if errm != nil {
 			ERROR("Unable to load private cert: ", errm)
 			return 502, errors.New("Unable to load private cert: " + tunnel.Meta.PrivateCert)
@@ -611,8 +678,8 @@ func PublicConnect(UICR UIConnectRequest) (code int, errm error) {
 		HandshakeTimeout:         time.Duration(10 * time.Second),
 		RequireAddressValidation: false,
 		KeepAlivePeriod:          0,
-		MaxUniRemoteStreams:      100,
-		MaxBidiRemoteStreams:     100,
+		MaxUniRemoteStreams:      10,
+		MaxBidiRemoteStreams:     10,
 		MaxStreamReadBufferSize:  70000,
 		MaxStreamWriteBufferSize: 70000,
 		MaxConnReadBufferSize:    70000,
@@ -625,11 +692,11 @@ func PublicConnect(UICR UIConnectRequest) (code int, errm error) {
 		return 502, errors.New("Unable to create udp listener")
 	}
 
-	DEBUG("ConnectingTo:", net.JoinHostPort(UICR.ServerIP, UICR.ServerPort))
+	DEBUG("ConnectingTo:", net.JoinHostPort(ClientCR.ServerIP, ClientCR.ServerPort))
 	con, err := x.Dial(
 		context.Background(),
 		"udp4",
-		net.JoinHostPort(UICR.ServerIP, UICR.ServerPort),
+		net.JoinHostPort(ClientCR.ServerIP, ClientCR.ServerPort),
 		qc,
 	)
 	if err != nil {
@@ -641,7 +708,11 @@ func PublicConnect(UICR UIConnectRequest) (code int, errm error) {
 	FR := new(FORWARD_REQUEST)
 	FR.Method = "POST"
 	if tunnel.Meta.Private {
-		FR.Path = "v3/session/private"
+		if ClientCR.OrgID != "" && ClientCR.DeviceKey != "" {
+			FR.Path = "v3/session/device"
+		} else {
+			FR.Path = "v3/session/private"
+		}
 	} else {
 		FR.Path = "v3/session/public"
 	}
@@ -687,7 +758,7 @@ func PublicConnect(UICR UIConnectRequest) (code int, errm error) {
 	}
 	s.Flush()
 
-	tunnel.EH, err = crypt.NewEncryptionHandler(UICR.EncType)
+	tunnel.EH, err = crypt.NewEncryptionHandler(ClientCR.EncType)
 	if err != nil {
 		closeAll()
 		ERROR("unable to create encryption handler: ", err)
@@ -732,12 +803,12 @@ func PublicConnect(UICR UIConnectRequest) (code int, errm error) {
 		return 502, err
 	}
 
-	DEBUG("Opening data tunnel:", net.JoinHostPort(UICR.ServerIP, CRR.DataPort))
+	DEBUG("Opening data tunnel:", net.JoinHostPort(ClientCR.ServerIP, CRR.DataPort))
 
-	IP_AddRoute(UICR.ServerIP+"/32", "", DEFAULT_GATEWAY.To4().String(), "0")
+	IP_AddRoute(ClientCR.ServerIP+"/32", "", DEFAULT_GATEWAY.To4().String(), "0")
 	tunnel.Con, err = net.Dial(
 		"udp4",
-		net.JoinHostPort(UICR.ServerIP, CRR.DataPort),
+		net.JoinHostPort(ClientCR.ServerIP, CRR.DataPort),
 	)
 	if err != nil {
 		DEBUG("Unable to open data tunnel: ", err)
@@ -774,7 +845,7 @@ func PublicConnect(UICR UIConnectRequest) (code int, errm error) {
 	_ = PrepareState()
 	go tunnel.ReadFromServeTunnel()
 
-	out := tunnel.EH.SEAL.Seal1([]byte{255, 255, 255, 255}, tunnel.Index)
+	out := tunnel.EH.SEAL.Seal1(PingPongStatsBuffer, tunnel.Index)
 	_, err = tunnel.Con.Write(out)
 	if err != nil {
 		return 502, errors.New("unable to send initial ping to server")
@@ -791,6 +862,16 @@ func PublicConnect(UICR UIConnectRequest) (code int, errm error) {
 				return 502, errors.New("Unable to place new interface on monitor channel")
 			}
 		}
+	}
+
+	if tunnel.CRR.VPLNetwork != nil {
+		tunnel.TunnelSTATS.VPLNetwork = tunnel.CRR.VPLNetwork
+		tunnel.TunnelSTATS.DHCP = tunnel.CRR.DHCP
+	}
+
+	if CRR.DHCP != nil {
+		tunnel.Meta.DHCPToken = CRR.DHCP.Token
+		SaveConfig(GLOBAL_STATE.C)
 	}
 
 	DEBUG("Session is ready - it took ", fmt.Sprintf("%.0f", math.Abs(time.Since(start).Seconds())), " seconds to connect")

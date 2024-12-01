@@ -59,6 +59,7 @@ const Org = () => {
 				<KeyValue label={"Phone"} value={state?.Org?.Phone} />
 				<KeyValue label={"Domains"} value={state?.Org?.Domains?.join(", ")} />
 				<KeyValue label={"Information"} value={state?.Org?.Informatgion} />
+				<KeyValue label={"ID"} value={state?.Org?._id} />
 			</div>
 
 

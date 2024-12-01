@@ -29,73 +29,64 @@ func InitService() error {
 	_ = OSSpecificInit()
 	AdminCheck()
 	InitPaths()
-	CreateBaseFolder()
-	InitLogfile()
-	LoadConfig()
-	InitDNSHandler()
-	if C.InfoLogging {
-		printInfo()
-	}
-	InitBlockListPath()
 
-	go func() {
-		err := ReBuildBlockLists(C)
-		if err == nil {
-			SaveConfig(C)
-			SwapConfig(C)
-		}
-	}()
+	printInfo1()
+
+	if !IOT {
+		CreateBaseFolder()
+		InitLogfile()
+	}
+	go StartLogQueueProcessor(routineMonitor)
+
+	if IOT && CLIDNS != "" {
+		LoadIOTConfig()
+	} else {
+		LoadConfig()
+	}
+
+	printInfo2()
+
+	if !IOT {
+		InitDNSHandler()
+		InitBlockListPath()
+
+		go func() {
+			err := ReBuildBlockLists(C)
+			if err == nil {
+				SaveConfig(C)
+				SwapConfig(C)
+			}
+		}()
+	}
 
 	if GLOBAL_STATE.C == nil {
 		ERROR("", "Global state could not be set.. possible config issue")
 		return errors.New("unable to create global state.. possible config error")
 	}
 
-	err := LoadCA()
+	var err error
+	CertPool, err = certs.LoadTunnelsCACertPool()
 	if err != nil {
-		INFO("", "Could not load root CA")
-		return errors.New("could not load root CA")
+		DEBUG("Could not load root CA:", err)
+		return err
 	}
 
 	INFO("Tunnels is ready")
 	return nil
 }
 
-var CAcert = `-----BEGIN CERTIFICATE-----
-MIIGCjCCA76gAwIBAgIUbOdy8n2a9Ao6Qdy3ar4DncTmax0wQQYJKoZIhvcNAQEK
-MDSgDzANBglghkgBZQMEAgEFAKEcMBoGCSqGSIb3DQEBCDANBglghkgBZQMEAgEF
-AKIDAgEgMFkxCzAJBgNVBAYTAklTMRAwDgYDVQQIDAdJY2VsYW5kMRAwDgYDVQQH
-DAdJY2VsYW5kMRQwEgYDVQQKDAtUdW5uZWxzIEVIRjEQMA4GA1UEAwwHdHVubmVs
-czAeFw0yNDA3MDUwMzEzNDlaFw0zNDA3MDMwMzEzNDlaMFkxCzAJBgNVBAYTAklT
-MRAwDgYDVQQIDAdJY2VsYW5kMRAwDgYDVQQHDAdJY2VsYW5kMRQwEgYDVQQKDAtU
-dW5uZWxzIEVIRjEQMA4GA1UEAwwHdHVubmVsczCCAiIwDQYJKoZIhvcNAQEBBQAD
-ggIPADCCAgoCggIBALWEnLmsnBeGs80H9cowNK5naFsxpmOm0D3FZINupNPqeGnp
-Z7WUSfPp8p8HEhEoQQkuZLW+pyP7dBIt5S1gcM8hccQKVZsD16B5d/YC9znjDAZP
-Vq7FX6aOJzqVNPMdtzSqjj+nN2+T8rQFv3JRPjrzTyUJSQo6WviI8usu6st2CplV
-5bsYQYV/HADU5i8DfjQ5jK8hnR+66EYu9epW20pKjJ0iNsBU9UwJk+IazrjE8gf3
-ZDGc/cv2KN9hGslIIXRSb3KXmCalPncDNB1VExLc7nJg+8jBn3hTinReREE043IP
-4YITNR3twj1+JVkkAjoH4sT7BL7tPf9U1w6vFbXQhuEo2mjVVqW+TUSqFzLqwGrD
-yeGTRvQTSL41vpNO6tpYYKjKjfFyhojrP6iCCRe+kh6qiEmjNGCaxJmxgrWg3knC
-j6eAJOZ/w7YDfdWAfI8zwIQ0VwfiR3eGbEku3Jrl/492gM/6efLbmLGglKwWzfhK
-/Njm3xWglDi5UTXNWzJJ544RZeVPcXFdAO14Szz+vgDBvYvCQQTvOvexeS9qhykI
-z24TCiXwrGQ3frP9G1bowxdX+lTInMLOkvb4sxazG4uZUuXvvmDFATZc2C6WR24H
-GCIS6bALJdp1UWdZHNtFd/O7HrOX2W5H171Ip2NGL0uSqHZCtOS9U8BTStBPAgMB
-AAGjYjBgMAwGA1UdEwQFMAMBAf8wMQYDVR0RBCowKIISYXBpLm5pY2VsYW5kdnBu
-LmlzghJhcGkubmljZWxhbmR2cG4uaXMwHQYDVR0OBBYEFKIGZWqHbki/3IvXeLpu
-NNPupEcGMEEGCSqGSIb3DQEBCjA0oA8wDQYJYIZIAWUDBAIBBQChHDAaBgkqhkiG
-9w0BAQgwDQYJYIZIAWUDBAIBBQCiAwIBIAOCAgEAp7kRHI2IrLswy4NSLOsMs+xR
-zr4k1N1dyF2vVFAQbv5wlvkLKBDtb9DvahEZjbuGW/uT4SI1UxTm1Z/BaeTNqIuz
-QIbcPfC6hJ2kOkO6Uzo7rGFiZbYJ1/vZLLx89yc03bnf3Vp7FFRG0y5d9VscSSVq
-jVFGebYb/MoF7l70Rx7a5Rkv/rCJ/xawl/y1mctRA1o4FSVwcwHVpzxyytcblQwn
-Ybiy/cLBNU8s3Epoj7hB2ruOY02FBLDkozG34NYJUrq95eL+a0LYb+AKdHzWts0M
-/U8kE5sbQpSVYxidiBS33q6uTKxrE1yYizRKGfyykeovRraRVu6wIOwDaVKZi4AX
-pgdqDFJFBbrAd5KZtJMlwI2eoDmY3pOsi63ecSxwOSSr+0ZZ009vFFNsY92XzVMZ
-baJKJuGkKFcpWoF2CMcoe52Hj1SuRA+3yYtMYQfZE8p77mVWnEORoVkgXX96fWjq
-tQBsxq4Nb6GrkR4M4Ql7aYlcj47y0ILBTjeTMhAPb/qxSrUYhIAxeMOjCcvzQtaF
-BXYclK7t+CCarFAwmQ439SQ2a/x0c9w+oDDV9PI2YqYWaqsqNtuLaq3rrUwh9unI
-LAbdR4NFNWbV4vO+lXTrvwEtlJE8WsSwvpCMZABs6CzRpAnZgOq350ZKEf1V0yfI
-PRsYUYN/Y3GAN8csBfs=
------END CERTIFICATE-----`
+func (m *TunnelMETA) LoadPrivateCerts() (p *x509.CertPool, err error) {
+	if len(m.PrivateCertBytes) > 0 {
+		return LoadPrivateCertFromBytes(m.PrivateCertBytes)
+	}
+	return LoadPrivateCert(m.PrivateCert)
+}
+
+func LoadPrivateCertFromBytes(data []byte) (pool *x509.CertPool, err error) {
+	certPool := x509.NewCertPool()
+	certPool.AppendCertsFromPEM(data)
+	return certPool, nil
+}
 
 func LoadPrivateCert(path string) (pool *x509.CertPool, err error) {
 	certPool := x509.NewCertPool()
@@ -107,27 +98,33 @@ func LoadPrivateCert(path string) (pool *x509.CertPool, err error) {
 	return certPool, nil
 }
 
-func LoadCA() (err error) {
-	CertPool = x509.NewCertPool()
-	CertPool.AppendCertsFromPEM([]byte(CAcert))
-	return
+func printInfo1() {
+	fmt.Println("")
+	fmt.Println("")
+	fmt.Println("==============================================================")
+	fmt.Println("======================= TUNNELS.IS ===========================")
+	fmt.Println("==============================================================")
+	fmt.Println("NOTE: If the app closes without any logs/errors you might need to delete your config and try again")
+	fmt.Println("")
 }
 
-func printInfo() {
+func printInfo2() {
+	fmt.Println("")
 	fmt.Println("=======================================================================")
 	fmt.Println("======================= HELPFUL INFORMATION ===========================")
 	fmt.Println("=======================================================================")
 	fmt.Println("")
+	fmt.Printf("APP: https://%s:%s\n", C.APIIP, C.APIPort)
+	fmt.Println("")
+	fmt.Println("BASE PATH:", GLOBAL_STATE.BasePath)
+	fmt.Println("")
 	fmt.Println("- Tunnels request network admin permissions to run.")
 	fmt.Println("- Remember to configure your DNS servers if you want to use Tunnels DNS functionality.")
-	fmt.Println("- The UI can be found here: https://"+C.APIIP+":"+C.APIPort, " -- This might change depending on settings.")
 	fmt.Println("- Remember to turn all logging off if you are concerned about privacy.")
 	fmt.Println("- There is a --basePath flag that can let you reconfigure the base directory for logs and configs.")
 	fmt.Println("")
 	fmt.Println("=======================================================================")
 	fmt.Println("=======================================================================")
-	fmt.Println("")
-	fmt.Println("NOTE: If the app closes without any logs/errors you will need to delete your config")
 }
 
 type X *bool
@@ -157,20 +154,27 @@ func LaunchEverything() {
 		syscall.SIGILL,
 	)
 
-	routineMonitor <- 1
-	routineMonitor <- 2
+	// already stared
+	// routineMonitor <- 1
+
 	routineMonitor <- 3
 	routineMonitor <- 4
 	routineMonitor <- 5
 	routineMonitor <- 6
-	routineMonitor <- 7
-	routineMonitor <- 8
-	routineMonitor <- 9
 
-	routineMonitor <- 101
-	routineMonitor <- 102
-	routineMonitor <- 103
-	routineMonitor <- 104
+	if !IOT {
+		routineMonitor <- 2
+		routineMonitor <- 7
+
+		// DNS
+		routineMonitor <- 101
+		routineMonitor <- 102
+		routineMonitor <- 103
+	}
+
+	if IOT {
+		routineMonitor <- 200
+	}
 
 	for {
 		select {
@@ -205,6 +209,8 @@ func LaunchEverything() {
 				// go StartTCPDNSHandler(routineMonitor)
 			} else if ID == 103 {
 				go StartUDPDNSHandler(routineMonitor)
+			} else if ID == 200 {
+				go AutoConnect(routineMonitor)
 			}
 		default:
 			time.Sleep(200 * time.Millisecond)
@@ -244,7 +250,64 @@ func SaveConfig(c *Config) (err error) {
 	return
 }
 
-// var GLOBAL_STATE.ConfigPath string
+func LoadIOTConfig() {
+	defer func() {
+		r := recover()
+		if r != nil {
+			ERROR(r, string(debug.Stack()))
+		}
+	}()
+
+	DEBUG("Generating a new default config")
+
+	C := new(Config)
+	C.InfoLogging = true
+	C.ErrorLogging = true
+	C.ConsoleLogOnly = true
+	C.ConsoleLogging = true
+
+	newCon := createMinimalConnection()
+	newCon.Private = true
+
+	if CLIDNS != "" {
+		info, err := ResolveMetaTXT(CLIDNS)
+		if err != nil {
+			ERROR("Unable to resolve Meta: ", err)
+			return
+		}
+		newCon.PrivateIP = info.IP
+		newCon.PrivatePort = info.Port
+		newCon.PrivateCertBytes = info.cert
+	}
+
+	if newCon.OrgID == "" {
+		newCon.OrgID = CLIOrgId
+	}
+	if newCon.DeviceKey == "" {
+		newCon.DeviceKey = CLIDeviceKey
+	}
+	if newCon.Hostname == "" {
+		newCon.Hostname = CLIHostname
+	}
+	fmt.Println("HOST:", newCon.Hostname)
+	fmt.Println("HOST:", newCon.Hostname)
+	fmt.Println("HOST:", newCon.Hostname)
+	fmt.Println("HOST:", newCon.Hostname)
+	fmt.Println("HOST:", newCon.Hostname)
+	fmt.Println("HOST:", newCon.Hostname)
+	fmt.Println("HOST:", newCon.Hostname)
+
+	C.Connections = make([]*TunnelMETA, 0)
+	C.Connections = append(C.Connections, newCon)
+
+	C.DNSstats = false
+	C.AvailableBlockLists = make([]*BlockList, 0)
+
+	GLOBAL_STATE.C = C
+	GLOBAL_STATE.ConfigInitialized = true
+	SaveConfig(C)
+	DEBUG("Configurations loaded")
+}
 
 func LoadConfig() {
 	defer func() {
@@ -261,6 +324,11 @@ func LoadConfig() {
 			_ = config.Close()
 		}
 	}()
+
+	if GLOBAL_STATE.C != nil {
+		DEBUG("Config already loaded")
+		return
+	}
 
 	GLOBAL_STATE.ConfigPath = GLOBAL_STATE.BasePath + "config.json"
 	DEBUG("Loading config from: ", GLOBAL_STATE.ConfigPath)
@@ -338,17 +406,17 @@ func LoadConfig() {
 			return
 		}
 
-		if len(C.AvailableBlockLists) == 0 {
-			C.AvailableBlockLists = GetDefaultBlockLists()
-			GLOBAL_STATE.C.AvailableBlockLists = C.AvailableBlockLists
-			SaveConfig(C)
-		}
-
 	}
 
 	applyCertificateDefaults(C)
 
 	GLOBAL_STATE.C = C
+	if len(C.AvailableBlockLists) == 0 {
+		C.AvailableBlockLists = GetDefaultBlockLists()
+		GLOBAL_STATE.C.AvailableBlockLists = C.AvailableBlockLists
+		SaveConfig(C)
+	}
+
 	GLOBAL_STATE.ConfigInitialized = true
 	DEBUG("Configurations loaded")
 }

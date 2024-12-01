@@ -1,16 +1,16 @@
 import { HashRouter, Route, Routes } from "react-router-dom";
-import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
+import React, { useEffect } from "react";
 
 import { Toaster } from 'react-hot-toast';
 
 import "./assets/style/app.scss";
-
 import '@fontsource-variable/inter';
 
 import InspectBlocklist from "./App/InspectBlocklist";
 import InspectConnection from "./App/InspectConnection";
 import InspectJSON from "./App/component/InspectJSON";
+import DNSAnswers from "./App/component/DNSAnswers";
 import PrivateServers from "./App/PrivateServers";
 import InspectServer from "./App/InspectServer";
 import ScreenLoader from "./App/ScreenLoader";
@@ -26,11 +26,10 @@ import Login from "./App/Login";
 import Org from "./App/Org";
 import DNS from "./App/dns";
 
-import WS from "./ws";
-import { STATE } from "./state";
 import GLOBAL_STATE from "./state";
+import { STATE } from "./state";
 import STORE from "./store";
-import DNSAnswers from "./App/component/DNSAnswers";
+import WS from "./ws";
 
 // Use this to automatically turn on debug 
 STORE.Cache.Set("debug", false)

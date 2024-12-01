@@ -139,9 +139,6 @@ func HTTPhandler(w http.ResponseWriter, r *http.Request) {
 
 	method := r.PathValue("method")
 	switch method {
-	case "connectPrivate":
-		HTTP_ConnectPrivate(w, r)
-		return
 	case "connect":
 		HTTP_Connect(w, r)
 		return
@@ -241,23 +238,8 @@ func HTTP_GetState(w http.ResponseWriter, r *http.Request) {
 	JSON(w, r, 200, GLOBAL_STATE)
 }
 
-func HTTP_ConnectPrivate(w http.ResponseWriter, r *http.Request) {
-	ns := new(ConnectionRequest)
-	err := Bind(ns, r)
-	if err != nil {
-		JSON(w, r, 400, err)
-		return
-	}
-
-	// code, err := ConnectToPrivateNode(*ns)
-	// if err != nil {
-	// 	return e.String(code, err.Error())
-	// }
-	JSON(w, r, 0, nil)
-}
-
 func HTTP_Connect(w http.ResponseWriter, r *http.Request) {
-	ns := new(UIConnectRequest)
+	ns := new(ConnectionRequest)
 	err := Bind(ns, r)
 	if err != nil {
 		JSON(w, r, 400, err)

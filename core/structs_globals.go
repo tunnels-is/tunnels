@@ -17,6 +17,10 @@ import (
 )
 
 var (
+	PRODUCTION  = true
+	APP_VERSION = "1.0.4"
+	API_VERSION = 1
+
 	DefaultTunnelName = "tunnels"
 	CertPool          *x509.CertPool
 
@@ -35,19 +39,24 @@ type DNSStats struct {
 	Answers   []string
 }
 
-type UIConnectRequest struct {
-	// Only present client side
-	Tag         string        `json:"Tag"`
-	DeviceToken string        `json:"DeviceToken"`
-	UserID      string        `json:"UserID"`
-	SeverID     string        `json:"ServerID"`
-	ServerIP    string        `json:"ServerIP"`
-	ServerPort  string        `json:"ServerPort"`
-	EncType     crypt.EncType `json:"EncType"`
+type ConnectionRequest struct {
+	DeviceKey string `json:"DeviceKey"`
+	OrgID     string `json:"OrgID"`
+
+	DeviceToken string `json:"DeviceToken"`
+	UserID      string `json:"UserID"`
+
+	Tag        string        `json:"Tag"`
+	SeverID    string        `json:"ServerID"`
+	ServerIP   string        `json:"ServerIP"`
+	ServerPort string        `json:"ServerPort"`
+	EncType    crypt.EncType `json:"EncType"`
 }
 
-type ConnectionRequest struct {
-	// These are delivered by the user
+type RemoteConnectionRequest struct {
+	DeviceKey string `json:"DeviceKey"`
+	OrgID     string `json:"OrgID"`
+
 	DeviceToken string        `json:"DeviceToken"`
 	EncType     crypt.EncType `json:"EncType"`
 	UserID      string        `json:"UserID"`
@@ -60,6 +69,7 @@ type ConnectionRequest struct {
 
 	RequestingPorts bool   `json:"RequestingPorts"`
 	DHCPToken       string `json:"DHCPToken"`
+	Hostname        string `json:"Hostname"`
 }
 
 type ErrorResponse struct {
@@ -97,20 +107,22 @@ type ConnectRequestResponse struct {
 }
 
 type DHCPRecord struct {
-	IP    [4]byte
-	Token string
+	IP       [4]byte
+	Token    string
+	Hostname string
 }
-
-var (
-	PRODUCTION  = true
-	APP_VERSION = "1.0.3"
-	API_VERSION = 1
-)
 
 var (
 	DIST_EMBED embed.FS
 	DLL_EMBED  embed.FS
 )
+
+func initializeMinimalGlobalVariables() {
+	C = new(Config)
+	C.DebugLogging = true
+	C.InfoLogging = true
+	C.ConsoleLogOnly = true
+}
 
 func initializeGlobalVariables() {
 	C = new(Config)
@@ -139,6 +151,14 @@ var (
 
 	// IS NATIVE GUI
 	NATIVE bool
+	IOT    bool
+
+	// Device Flags
+	CLIDeviceKey string
+	CLIOrgId     string
+	CLIDNS       string
+	CLIHostname  string
+
 	// Base Path Overwrite
 	BASE_PATH string
 
@@ -352,15 +372,20 @@ type ActiveConnectionMeta struct {
 }
 
 type TunnelMETA struct {
-	Private     bool
-	PrivateIP   string
-	PrivatePort string
-	PrivateCert string
+	Private          bool
+	PrivateIP        string
+	PrivatePort      string
+	PrivateCert      string
+	PrivateCertBytes []byte `json:"-"`
+	DNSDiscovery     string
 
-	// NEW
+	OrgID     string
+	DeviceKey string
+	DHCPToken string
+	ServerID  string
+	Hostname  string
+
 	WindowsGUID string
-
-	ServerID string
 
 	// controlled by user only
 	DNSBlocking   bool
@@ -427,14 +452,17 @@ type TunnelSTATS struct {
 	MEM                 byte
 	ServerToClientMicro int64
 	PingTime            time.Time
+
+	DHCP       *DHCPRecord
+	VPLNetwork *ServerNetwork
 }
 
 type Tunnel struct {
 	Meta *TunnelMETA
 	TunnelSTATS
-	CRR  *ConnectRequestResponse
-	UICR UIConnectRequest
-	Con  net.Conn
+	CRR      *ConnectRequestResponse
+	ClientCR ConnectionRequest
+	Con      net.Conn
 
 	// TUN/TAP
 	Index        []byte
@@ -559,6 +587,7 @@ type Config struct {
 	ConsoleLogging    bool
 	InfoLogging       bool
 	ErrorLogging      bool
+	ConsoleLogOnly    bool
 	ConnectionTracer  bool
 
 	// DNS Settings
@@ -571,6 +600,8 @@ type Config struct {
 	DomainWhitelist     string
 	EnabledBlockLists   []string
 	AvailableBlockLists []*BlockList
+
+	CustomDNSRecords []*ServerDNS
 }
 
 var (
@@ -937,4 +968,10 @@ type BlockList struct {
 	Enabled     bool
 	Count       int
 	LastRefresh time.Time
+}
+
+type DNSInfo struct {
+	cert []byte
+	IP   string
+	Port string
 }

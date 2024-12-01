@@ -1,5 +1,7 @@
 {
 	"ID": "[TUNNELS_ID]",
+	"APIPort": "445",
+	"APIKey": "[SUPER_SECRET_API_KEY]",
 	"ControlIP": "[EXTERNAL_FACING_IP_FOR_CONNECTING]",
 	"ControlPort": "444",
 	"UserMaxConnections": 4,

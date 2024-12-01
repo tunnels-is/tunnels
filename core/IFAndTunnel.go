@@ -180,7 +180,18 @@ func createDefaultTunnelMeta() (M *TunnelMETA) {
 	return
 }
 
-func FindMETAForConnectRequest(CC *UIConnectRequest) *TunnelMETA {
+func createMinimalConnection() (M *TunnelMETA) {
+	M = new(TunnelMETA)
+	M = createTunnel()
+	M.IPv4Address = "172.22.22.22"
+	M.NetMask = "255.255.255.255"
+	M.Tag = DefaultTunnelName
+	M.IFName = DefaultTunnelName
+	M.EnableDefaultRoute = true
+	return
+}
+
+func FindMETAForConnectRequest(CC *ConnectionRequest) *TunnelMETA {
 	for i, v := range GLOBAL_STATE.C.Connections {
 		if strings.EqualFold(v.Tag, CC.Tag) {
 			return GLOBAL_STATE.C.Connections[i]

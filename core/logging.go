@@ -198,6 +198,10 @@ func StartLogQueueProcessor(MONITOR chan int) {
 			fmt.Println(line)
 		}
 
+		if C.ConsoleLogOnly {
+			continue
+		}
+
 		select {
 		case APILogQueue <- line:
 		default:

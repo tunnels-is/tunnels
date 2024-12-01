@@ -98,17 +98,20 @@ var (
 	interfaceIP     string
 	config          bool
 	features        string
+	defaultHostname string
 	enabledFeatures []string
 
 	VPLEnabled bool = false
 	VPNEnabled bool = false
 	DNSEnabled bool = false
+	APIEnabled bool = false
 )
 
 const (
 	VPNFeature string = "VPN"
 	VPLFeature string = "VPL"
 	DNSFeature string = "DNS"
+	APIFeature string = "API"
 )
 
 func isFeatureEnabled(feature string) bool {
@@ -127,7 +130,8 @@ func main() {
 	flag.StringVar(&id, "id", "", "Tunnels ID used when generating the config. NOTE: not including and id will skip config generation but the certificate will still be generated.")
 	flag.StringVar(&interfaceIP, "interfaceIP", "", "InterfaceIP used when generating config and certificates")
 	flag.BoolVar(&config, "config", false, "Generate a config and make certificates ( Remember to copy the serial number ! )")
-	flag.StringVar(&features, "features", "VPN,VPL", "Select enabled features. Available: VPN,VPL")
+	flag.StringVar(&features, "features", "", "Select enabled features. Available: VPN,VPL,API")
+	flag.StringVar(&defaultHostname, "hostname", "", "Main domain/hostname for DHCP devices")
 	flag.Parse()
 
 	if config {
@@ -150,6 +154,9 @@ func main() {
 
 	for i := range enabledFeatures {
 		switch enabledFeatures[i] {
+		case APIFeature:
+			APIEnabled = true
+			fmt.Println("Enabling API Feature..")
 		case VPNFeature:
 			VPNEnabled = true
 			fmt.Println("Enabling VPN Feature..")
@@ -231,6 +238,9 @@ func main() {
 			case 3:
 				go DataSocketListener(SIGNAL)
 			case 4:
+				if APIEnabled {
+					go startAPI(SIGNAL)
+				}
 			case 5:
 
 			// VPN
@@ -357,6 +367,7 @@ func makeConfigAndCertificates() {
 		sc.ID = oid
 		sc.ControlIP = interfaceIP
 		sc.InterfaceIP = interfaceIP
+		sc.APIPort = "444"
 		sc.ControlPort = "444"
 		sc.DataPort = "443"
 		sc.StartPort = 2000

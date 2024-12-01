@@ -2,6 +2,10 @@
 [![Stargazers][stars-shield]][stars-url]
 [![Issues][issues-shield]][issues-url]
 
+# Tunnels
+... don't worry, we are writing this right now.
+... We will be addding an business source license to this soon (tm)
+
 # Liecens
 We are still deciding on a license, but it will be an open source ( non-commercial ) one.
 
@@ -24,9 +28,6 @@ Special thanks to Kazaboo from twitch!
 # Live Development
 https://twitch.tv/keyb1nd_
 
-# Tunnels
-... don't worry, we are writing this right now.
-... We will be addding an open source license to this soon (tm)
 
 # Linux
 ## Binary permissions
@@ -52,17 +53,22 @@ InterfaceIP == vpn outgoing IP
 $ iptables -I OUTPUT -p tcp --src {interface_IP} --tcp-flags ACK,RST RST -j DROP
 
 
-# Test server
-93.95.231.66:444
-cert: certs/test-server.crt
-consoller sign cert: certs/controller.crt
-serial: 1ebad4235e13f3dbc437d0a6804fc03f
-- it's not always running
-
 # Building
  - toggle debug to false in app.jsx
  - $ goreleaser release --clean ( add GITHUB_TOKEN )
  - $ goreleaser build --snapchot --clean 
+
+# Setting up a dev environment 
+## GUI
+the entire gui is located in ./fronend just run `npm run dev` from that dir
+## Backend
+We have two backends, one is the `iot` client and the other is the full client.
+The full client can be found in: `cmd/main` just run `go build .` and then start the client.
+
+NOTE: macos requies sudo, windows requires admin, linux requires set cap:
+```bash
+$ sudo setcap 'cap_net_raw,cap_net_bind_service,cap_net_admin+eip' main
+```
 
 
 

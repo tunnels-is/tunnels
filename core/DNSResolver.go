@@ -2,6 +2,7 @@ package core
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -301,6 +302,8 @@ func DNSQuery(w dns.ResponseWriter, m *dns.Msg) {
 		}
 	}
 
+	ServerDNS = DNSAMapping(C.CustomDNSRecords, m.Question[0].Name)
+
 	if blocked && ServerDNS == nil {
 		if GLOBAL_STATE.C.DNSstats {
 			IncrementDNSStats(m.Question[0].Name, true, nil)
@@ -332,12 +335,15 @@ func DNSQuery(w dns.ResponseWriter, m *dns.Msg) {
 			// Redirect DNS query to local VPN network if we
 			// have the domain on record but no records.
 			ResolveDomainLocal(Connection, m, w)
-
 			return
 		}
 
 		if GLOBAL_STATE.C.LogAllDomains {
-			INFO("DNS @ node:", Connection.Meta.Tag, " >> ", m.Question[0].Name, " >> local record found")
+			if Connection != nil {
+				INFO("DNS @ server:", Connection.Meta.Tag, " >> ", m.Question[0].Name, " >> local record found")
+			} else {
+				INFO("DNS @ local:", m.Question[0].Name, " >> local record found")
+			}
 		}
 
 		outMsg := ProcessDNSMsg(m, ServerDNS)
@@ -346,6 +352,9 @@ func DNSQuery(w dns.ResponseWriter, m *dns.Msg) {
 			ERROR("Unable to  write dns reply:", err)
 		}
 		w.Close()
+		if GLOBAL_STATE.C.DNSstats {
+			IncrementDNSStats(m.Question[0].Name, false, outMsg.Answer)
+		}
 		return
 
 	}
@@ -564,5 +573,31 @@ func IncrementDNSStats(domain string, blocked bool, answers []dns.RR) {
 	for _, v := range answers {
 		s.Answers = append(s.Answers, v.String())
 	}
+	return
+}
+
+func ResolveMetaTXT(domain string) (info *DNSInfo, err error) {
+	txt, err := net.LookupTXT(domain)
+	if err != nil {
+		return nil, err
+	}
+	var txts []string
+	if len(txt) > 0 {
+		txts = strings.Split(txt[0], ":")
+	}
+	if len(txts) < 3 {
+		return nil, errors.New("length of text record was less then 3")
+	}
+
+	info = new(DNSInfo)
+	info.IP = txts[0]
+	info.Port = txts[1]
+
+	txt, err = net.LookupTXT(txts[3] + "." + domain)
+	if err != nil {
+		return nil, err
+	}
+	info.cert = []byte(strings.Join(txt, ""))
+
 	return
 }
