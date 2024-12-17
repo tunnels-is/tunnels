@@ -83,7 +83,7 @@ archives:
     builds: [iot]
     format: tar.gz
     name_template: >-
-      iot
+      iot_
       {{- title .Version }}_
       {{- title .Os }}_
       {{- if eq .Arch "amd64" }}x86_64

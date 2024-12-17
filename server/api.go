@@ -14,7 +14,12 @@ func startAPI(SIGNAL *SIGNAL) {
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("/", HTTP_HealthCheck)
-	mux.HandleFunc("/devices", HTTP_ListDevices)
+	if VPLEnabled {
+		mux.HandleFunc("/firewall", HTTP_Firewall)
+	}
+	if APIEnabled {
+		mux.HandleFunc("/devices", HTTP_ListDevices)
+	}
 
 	apiServer := http.Server{
 		Handler: mux,
@@ -63,7 +68,7 @@ func HTTP_ListDevices(w http.ResponseWriter, r *http.Request) {
 		d := new(listDevice)
 		d.AllowedIPs = make([]string, 0)
 		ClientCoreMappings[i].Allowedm.Lock()
-		for i := range ClientCoreMappings[i].AllowedIPs {
+		for i := range ClientCoreMappings[i].AllowedHosts {
 			d.AllowedIPs = append(d.AllowedIPs,
 				fmt.Sprintf("%d-%d-%d-%d",
 					i[0],
@@ -96,9 +101,51 @@ func HTTP_ListDevices(w http.ResponseWriter, r *http.Request) {
 
 	err := json.NewEncoder(w).Encode(response)
 	if err != nil {
-		fmt.Fprintf(w, "Encoding error: %s", err)
 		w.WriteHeader(500)
+		fmt.Fprintf(w, "Encoding error: %s", err)
 	}
+	r.Body.Close()
+	return
+}
+
+type FirewallRequest struct {
+	// for validation
+	DHCPToken string
+	IP        string
+
+	Cmd   string
+	Hosts []string
+}
+
+func HTTP_Firewall(w http.ResponseWriter, r *http.Request) {
+	fr := new(FirewallRequest)
+	err := json.NewDecoder(r.Body).Decode(fr)
+	if err != nil {
+		w.WriteHeader(500)
+		fmt.Fprintf(w, "Decoding error: %s", err)
+		return
+	}
+
+	mapping := validateDHCPTokenAndIP(fr)
+	if mapping == nil {
+		w.WriteHeader(401)
+		return
+	}
+
+	out := syncFirewallState(fr, mapping)
+	if len(out) > 0 {
+		outb, err := json.Marshal(out)
+		if err != nil {
+			w.WriteHeader(500)
+			fmt.Fprintf(w, "Encoding error: %s", err)
+			return
+		}
+		w.WriteHeader(400)
+		w.Write(outb)
+		return
+	}
+
+	w.WriteHeader(200)
 	r.Body.Close()
 	return
 }
