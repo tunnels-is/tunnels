@@ -35,14 +35,14 @@ builds:
       - arm
     main: ./server
 
-  - id: iot
+  - id: min
     goos:
       - linux
     goarch:
       - amd64
       - arm64
       - arm
-    main: ./cmd/iot
+    main: ./cmd/min
 
 dist: ./builds
 
@@ -80,10 +80,10 @@ archives:
     allow_different_binary_count: true
 
   - id: a3
-    builds: [iot]
+    builds: [min]
     format: tar.gz
     name_template: >-
-      iot_
+      min_
       {{- title .Version }}_
       {{- title .Os }}_
       {{- if eq .Arch "amd64" }}x86_64
