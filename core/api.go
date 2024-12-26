@@ -591,11 +591,11 @@ func PublicConnect(ClientCR ConnectionRequest) (code int, errm error) {
 		tunnel.Meta.Private = true
 
 	} else {
-		if !tunnel.Meta.Private && ClientCR.SeverID == "" {
+		if !tunnel.Meta.Private && ClientCR.ServerID == "" {
 			ERROR("No server selected")
 			return 400, errors.New("No server selected")
-		} else if tunnel.Meta.ServerID != ClientCR.SeverID {
-			tunnel.Meta.ServerID = ClientCR.SeverID
+		} else if tunnel.Meta.ServerID != ClientCR.ServerID {
+			tunnel.Meta.ServerID = ClientCR.ServerID
 		}
 	}
 
@@ -615,9 +615,9 @@ func PublicConnect(ClientCR ConnectionRequest) (code int, errm error) {
 	// from GUI connect request
 	FinalCR.DeviceToken = ClientCR.DeviceToken
 	FinalCR.UserID = ClientCR.UserID
-	FinalCR.SeverID = ClientCR.SeverID
+	FinalCR.SeverID = ClientCR.ServerID
 	FinalCR.EncType = ClientCR.EncType
-	FinalCR.OrgID = ClientCR.OrgID
+	// FinalCR.OrgID = ClientCR.OrgID
 	FinalCR.DeviceKey = ClientCR.DeviceKey
 	// FinalCR.Hostname = tunnel.Meta.Hostname
 
@@ -687,16 +687,16 @@ func PublicConnect(ClientCR ConnectionRequest) (code int, errm error) {
 	FR := new(FORWARD_REQUEST)
 	FR.Method = "POST"
 	if tunnel.Meta.Private {
-		if ClientCR.OrgID != "" && ClientCR.DeviceKey != "" {
-			FR.Path = "v3/session/device"
-		} else {
-			FR.Path = "v3/session/private"
-		}
+		FR.Path = "v3/session/private"
 	} else {
 		FR.Path = "v3/session/public"
 	}
+	if ClientCR.ServerID != "" && ClientCR.DeviceKey != "" {
+		FR.Path += "/min"
+	}
+
 	FR.JSONData = FinalCR
-	FR.Timeout = 15000
+	FR.Timeout = 25000
 
 	bytesFromController, code := ForwardConnectToController(FR)
 	DEBUG("CodeFromController:", code)

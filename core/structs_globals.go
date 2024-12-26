@@ -47,7 +47,7 @@ type ConnectionRequest struct {
 	UserID      string `json:"UserID"`
 
 	Tag        string        `json:"Tag"`
-	SeverID    string        `json:"ServerID"`
+	ServerID   string        `json:"ServerID"`
 	ServerIP   string        `json:"ServerIP"`
 	ServerPort string        `json:"ServerPort"`
 	EncType    crypt.EncType `json:"EncType"`
@@ -55,7 +55,7 @@ type ConnectionRequest struct {
 
 type RemoteConnectionRequest struct {
 	DeviceKey string `json:"DeviceKey"`
-	OrgID     string `json:"OrgID"`
+	// OrgID     string `json:"OrgID"`
 
 	DeviceToken string        `json:"DeviceToken"`
 	EncType     crypt.EncType `json:"EncType"`
@@ -158,6 +158,7 @@ var (
 	CLIDNS       string
 	CLIHost      string
 	CLIPort      string
+	CLIServerID  string
 
 	// Base Path Overwrite
 	BASE_PATH string
