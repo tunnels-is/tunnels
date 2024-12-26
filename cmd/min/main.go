@@ -13,6 +13,7 @@ func main() {
 	flag.StringVar(&core.CLIDeviceKey, "deviceKey", "", "Device Key used to authenticate your account")
 	flag.StringVar(&core.CLIHost, "host", "", "Custom host ( not needed if dns is used )")
 	flag.StringVar(&core.CLIPort, "port", "", "Custom port ( not needed if dns is used )")
+	flag.StringVar(&core.CLIServerID, "serverID", "", "Server ID ( not needed if dns is used )")
 
 	flag.StringVar(&core.BASE_PATH, "basePath", "", "manualy set base path for the config and log files ( optional, default: ./ )")
 	flag.Parse()
