@@ -115,14 +115,8 @@ func (d *DHCPRecord) Assign() (ok bool) {
 
 const (
 	ping byte = 0
-	ok   byte = 1
-	fail byte = 2
-
-	// router
-
-	// firewall
-	allowIP    = 21
-	disallowIP = 22
+	// ok   byte = 1
+	// fail byte = 2
 )
 
 type Server struct {
@@ -262,10 +256,10 @@ type UserCoreMapping struct {
 	Addr syscall.Sockaddr
 
 	// VPL
-	APIToken   string
-	Allowedm   sync.Mutex
-	AllowedIPs map[[4]byte]bool
-	DHCP       *DHCPRecord
+	APIToken     string
+	Allowedm     sync.Mutex
+	AllowedHosts map[[4]byte]bool
+	DHCP         *DHCPRecord
 
 	// IOT Client Only
 	CPU  byte

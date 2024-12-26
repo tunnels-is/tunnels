@@ -121,7 +121,7 @@ func (V *Tunnel) ReadFromServeTunnel() {
 			return
 		}
 		if len(packet) < 20 {
-			go V.RegisterPing(CopySlice(packet))
+			V.RegisterPing(CopySlice(packet))
 			continue
 		}
 

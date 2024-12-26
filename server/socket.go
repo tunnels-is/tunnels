@@ -569,11 +569,11 @@ func fromUserChannel(index int) {
 					CM.RAM = PACKET[2]
 					CM.Disk = PACKET[3]
 				}
-			case allowIP, disallowIP:
-				select {
-				case CM.ToUser <- PACKET:
-				default:
-				}
+			// case allowIP, disallowIP:
+			// 	select {
+			// 	case CM.ToUser <- PACKET:
+			// 	default:
+			// 	}
 			default:
 				CM.LastPingFromClient = time.Now()
 			}
@@ -695,18 +695,6 @@ func toUserChannel(index int) {
 			return
 		}
 
-		// fmt.Println("PACKET:", PACKET)
-		if len(PACKET) < 20 {
-			switch PACKET[0] {
-			case allowIP:
-				CM.AllowedIPs[[4]byte{PACKET[1], PACKET[2], PACKET[3], PACKET[4]}] = true
-			case disallowIP:
-				CM.AllowedIPs[[4]byte{PACKET[1], PACKET[2], PACKET[3], PACKET[4]}] = false
-			default:
-			}
-			continue
-		}
-
 		if PACKET[9] != 6 && PACKET[9] != 17 {
 			continue
 		}
@@ -714,13 +702,15 @@ func toUserChannel(index int) {
 		// DIP = PACKET[16:20]
 		// fmt.Println("VPLTo:", VPLEnabled)
 		if VPLEnabled {
-			S4[0] = PACKET[12]
-			S4[1] = PACKET[13]
-			S4[2] = PACKET[14]
-			S4[3] = PACKET[15]
-
 			if !AllowAll {
-				allowed, ok := CM.AllowedIPs[S4]
+
+				S4[0] = PACKET[12]
+				S4[1] = PACKET[13]
+				S4[2] = PACKET[14]
+				S4[3] = PACKET[15]
+				CM.Allowedm.Lock()
+				allowed, ok := CM.AllowedHosts[S4]
+				CM.Allowedm.Unlock()
 				if ok {
 					if !allowed {
 						// fmt.Println("NOT ALLOWED:", S4)
@@ -730,12 +720,8 @@ func toUserChannel(index int) {
 					// fmt.Println("NOT FOUND:", S4)
 					continue
 				}
+
 			}
-		} else {
-			// Use contrack instead
-			// if !bytes.Equal(DIP, IFipTo4) {
-			// 	continue
-			// }
 		}
 
 		out = CM.EH.SEAL.Seal2(PACKET, CM.Uindex)

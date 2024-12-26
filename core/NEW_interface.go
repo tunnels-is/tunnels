@@ -91,6 +91,16 @@ func PopulatePingBufferWithStats() {
 	PingPongStatsBuffer[3] = byte(int(diskUsage.UsedPercent))
 }
 
+var prevAllowedHosts = []string{}
+
+func applyFirewallRules(t *Tunnel) {
+	defer RecoverAndLogToFile()
+	out := t.EH.SEAL.Seal1(PingPongStatsBuffer, t.Index)
+	if len(out) > 0 {
+		_, _ = t.Con.Write(out)
+	}
+}
+
 func PingConnections(MONITOR chan int) {
 	defer func() {
 		time.Sleep(30 * time.Second)
@@ -110,7 +120,11 @@ func PingConnections(MONITOR chan int) {
 			out := v.EH.SEAL.Seal1(PingPongStatsBuffer, v.Index)
 			if len(out) > 0 {
 				_, err = v.Con.Write(out)
+				if err != nil {
+					// apply firewall rules
+				}
 			}
+
 		}
 
 		if time.Since(v.TunnelSTATS.PingTime).Seconds() > 30 || err != nil {

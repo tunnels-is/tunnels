@@ -675,7 +675,7 @@ func PublicConnect(ClientCR ConnectionRequest) (code int, errm error) {
 
 	qc := &quic.Config{
 		TLSConfig:                tc,
-		HandshakeTimeout:         time.Duration(10 * time.Second),
+		HandshakeTimeout:         time.Duration(15 * time.Second),
 		RequireAddressValidation: false,
 		KeepAlivePeriod:          0,
 		MaxUniRemoteStreams:      10,
