@@ -69,7 +69,7 @@ type RemoteConnectionRequest struct {
 
 	RequestingPorts bool   `json:"RequestingPorts"`
 	DHCPToken       string `json:"DHCPToken"`
-	Hostname        string `json:"Hostname"`
+	// Hostname        string `json:"Hostname"`
 }
 
 type ErrorResponse struct {
@@ -150,14 +150,14 @@ var (
 	DEFAULT_CONNECTION *TunnelMETA
 
 	// IS NATIVE GUI
-	NATIVE bool
-	IOT    bool
+	NATIVE  bool
+	MINIMAL bool
 
 	// Device Flags
 	CLIDeviceKey string
-	CLIOrgId     string
 	CLIDNS       string
-	CLIHostname  string
+	CLIHost      string
+	CLIPort      string
 
 	// Base Path Overwrite
 	BASE_PATH string
@@ -383,7 +383,7 @@ type TunnelMETA struct {
 	DeviceKey string
 	DHCPToken string
 	ServerID  string
-	Hostname  string
+	// Hostname  string
 
 	WindowsGUID string
 
