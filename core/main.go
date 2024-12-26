@@ -32,21 +32,22 @@ func InitService() error {
 
 	printInfo()
 
-	if !IOT {
+	if !MINIMAL {
 		CreateBaseFolder()
 		InitLogfile()
 	}
+
 	go StartLogQueueProcessor(routineMonitor)
 
-	if IOT && CLIDNS != "" {
-		LoadIOTConfig()
+	if MINIMAL && CLIDNS != "" {
+		LoadMinimalConfig()
 	} else {
 		LoadConfig()
 	}
 
 	printInfo2()
 
-	if !IOT {
+	if !MINIMAL {
 		InitDNSHandler()
 		InitBlockListPath()
 
@@ -162,7 +163,7 @@ func LaunchEverything() {
 	routineMonitor <- 5
 	routineMonitor <- 6
 
-	if !IOT {
+	if !MINIMAL {
 		routineMonitor <- 2
 		routineMonitor <- 7
 
@@ -172,7 +173,7 @@ func LaunchEverything() {
 		routineMonitor <- 103
 	}
 
-	if IOT {
+	if MINIMAL {
 		routineMonitor <- 200
 	}
 
@@ -251,7 +252,7 @@ func SaveConfig(c *Config) (err error) {
 	return
 }
 
-func LoadIOTConfig() {
+func LoadMinimalConfig() {
 	defer func() {
 		r := recover()
 		if r != nil {
@@ -259,7 +260,7 @@ func LoadIOTConfig() {
 		}
 	}()
 
-	DEBUG("Generating a new default config")
+	DEBUG("Generating a new minimal config")
 
 	C := new(Config)
 	C.InfoLogging = true
@@ -269,31 +270,9 @@ func LoadIOTConfig() {
 
 	newCon := createMinimalConnection()
 	newCon.Private = true
-
 	if CLIDNS != "" {
-		info, err := certs.ResolveMetaTXT(CLIDNS)
-		if err != nil {
-			ERROR("Unable to resolve Meta: ", err)
-			return
-		}
-		newCon.OrgID = info.OrgID
-		newCon.PrivateIP = info.IP
-		newCon.PrivatePort = info.Port
-		newCon.PrivateCertBytes = info.Cert
+		newCon.DNSDiscovery = CLIDNS
 	}
-
-	if newCon.OrgID == "" {
-		newCon.OrgID = CLIOrgId
-	}
-	if newCon.DeviceKey == "" {
-		newCon.DeviceKey = CLIDeviceKey
-	}
-	if newCon.Hostname == "" {
-		newCon.Hostname = CLIHostname
-	}
-	fmt.Println("HOST:", newCon.Hostname)
-	fmt.Println("HOST:", newCon.Hostname)
-	fmt.Println("HOST:", newCon.Hostname)
 
 	C.Connections = make([]*TunnelMETA, 0)
 	C.Connections = append(C.Connections, newCon)
