@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"runtime"
 	"runtime/debug"
 
@@ -11,6 +12,27 @@ func Start() {
 	defer func() {
 		if r := recover(); r != nil {
 			core.ERROR(r, string(debug.Stack()))
+		}
+	}()
+
+	runtime.GOMAXPROCS(runtime.NumCPU())
+	err := core.InitService()
+	if err != nil {
+		panic(err)
+	}
+	core.LaunchEverything()
+}
+
+func StartWithExternalMonitor(ctx context.Context, id int, monitor chan int) {
+	defer func() {
+		if r := recover(); r != nil {
+			core.ERROR(r, string(debug.Stack()))
+		}
+		if ctx.Err() != nil {
+			select {
+			case monitor <- id:
+			default:
+			}
 		}
 	}()
 

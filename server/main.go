@@ -238,9 +238,7 @@ func main() {
 			case 3:
 				go DataSocketListener(SIGNAL)
 			case 4:
-				if APIEnabled {
-					go startAPI(SIGNAL)
-				}
+				go startAPI(SIGNAL)
 			case 5:
 
 			// VPN
