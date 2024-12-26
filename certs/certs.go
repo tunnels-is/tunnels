@@ -215,6 +215,15 @@ func ResolveMetaTXT(domain string) (info *DNSInfo, err error) {
 		}
 		certParts[index] = []byte(strings.Join(split[1:], ""))
 	}
+	if info.IP == "" {
+		return nil, errors.New("bad dns format, IP is empty")
+	}
+	if info.Port == "" {
+		return nil, errors.New("bad dns format, Port is empty")
+	}
+	if info.OrgID == "" {
+		return nil, errors.New("bad dns format, OrgID is empty")
+	}
 
 	preCert := make([]byte, 0)
 	clen := 0
