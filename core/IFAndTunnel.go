@@ -188,6 +188,7 @@ func createMinimalConnection() (M *TunnelMETA) {
 	M.Tag = DefaultTunnelName
 	M.IFName = DefaultTunnelName
 	M.EnableDefaultRoute = true
+	M.AutoConnect = true
 	return
 }
 

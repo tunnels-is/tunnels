@@ -22,6 +22,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/tunnels-is/tunnels/certs"
 	"github.com/xlzd/gotp"
 	"github.com/zveinn/crypt"
 	"golang.org/x/net/quic"
@@ -536,34 +537,6 @@ func InitializeTunnelFromCRR(TUN *Tunnel) (err error) {
 	return nil
 }
 
-func GetServerInfoFromDNS(d string) (ip, port, id string, err error) {
-	txt, err := net.LookupTXT(d)
-	if err != nil {
-		DEBUG("Could not use DNS discovery to find VPN server: ", err)
-		err = errors.New("Failed DNS Discovery: " + err.Error())
-		return
-	}
-
-	if len(txt) < 1 {
-		DEBUG("Could not use DNS discovery to find VPN server: no records returned")
-		err = errors.New("Failed DNS Discovery: no records found")
-		return
-	}
-
-	ds := strings.Split(txt[0], ":")
-	if len(ds) < 3 {
-		DEBUG("Could not use DNS discovery to find VPN server: invalid TXT record: ", txt[0])
-		err = errors.New("Failed DNS Discovery: invalid TXT record")
-		return
-	}
-
-	id = txt[0]
-	ip = txt[1]
-	port = txt[2]
-
-	return
-}
-
 func PreConnectCheck() (int, error) {
 	if !GLOBAL_STATE.ConfigInitialized {
 		return 502, errors.New("the application is still initializing default configurations, please wait a few seconds")
@@ -604,13 +577,19 @@ func PublicConnect(ClientCR ConnectionRequest) (code int, errm error) {
 	}
 
 	if tunnel.Meta.DNSDiscovery != "" {
-		sid, sip, sport, err := GetServerInfoFromDNS(tunnel.Meta.DNSDiscovery)
+		DEBUG("looking for connection info @ ", tunnel.Meta.DNSDiscovery)
+		dnsInfo, err := certs.ResolveMetaTXT(tunnel.Meta.DNSDiscovery)
 		if err != nil {
+			ERROR("error looking up connection info: ", err)
 			return 400, err
 		}
-		ClientCR.ServerPort = sport
-		ClientCR.ServerIP = sip
-		ClientCR.SeverID = sid
+		DEBUG("DNS Info: ", dnsInfo.IP, dnsInfo.Port, dnsInfo.OrgID, "cert length: ", len(dnsInfo.Cert))
+		ClientCR.ServerPort = dnsInfo.Port
+		ClientCR.ServerIP = dnsInfo.IP
+		ClientCR.OrgID = dnsInfo.OrgID
+		tunnel.Meta.PrivateCertBytes = dnsInfo.Cert
+		tunnel.Meta.Private = true
+
 	} else {
 		if !tunnel.Meta.Private && ClientCR.SeverID == "" {
 			ERROR("No server selected")
@@ -640,9 +619,9 @@ func PublicConnect(ClientCR ConnectionRequest) (code int, errm error) {
 	FinalCR.EncType = ClientCR.EncType
 	FinalCR.OrgID = ClientCR.OrgID
 	FinalCR.DeviceKey = ClientCR.DeviceKey
-	FinalCR.Hostname = tunnel.Meta.Hostname
+	// FinalCR.Hostname = tunnel.Meta.Hostname
 
-	if !IOT {
+	if !MINIMAL {
 		FinalCR.RequestingPorts = true
 	}
 	FinalCR.DHCPToken = tunnel.Meta.DHCPToken

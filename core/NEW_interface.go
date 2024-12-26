@@ -21,9 +21,6 @@ func AutoConnect(MONITOR chan int) {
 	}()
 
 	for {
-		// ONLY IF TUNNEL IS NOT CONNECTED
-		// get api key .. or device key + orgID
-		// use public connect with ConnectionRequest
 	next:
 		for _, v := range C.Connections {
 			if v == nil || !v.AutoConnect {
@@ -48,12 +45,10 @@ func AutoConnect(MONITOR chan int) {
 			fmt.Println("CONNECTING TO:", v.Tag)
 			fmt.Println("META:", v)
 			code, err := PublicConnect(ConnectionRequest{
-				DeviceKey:  v.DeviceKey,
-				OrgID:      v.OrgID,
 				Tag:        v.Tag,
-				SeverID:    v.ServerID,
-				ServerIP:   v.PrivateIP,
-				ServerPort: v.PrivatePort,
+				DeviceKey:  CLIDeviceKey,
+				ServerIP:   CLIHost,
+				ServerPort: CLIPort,
 				EncType:    v.EncryptionType,
 			})
 			if err != nil {
@@ -107,7 +102,7 @@ func PingConnections(MONITOR chan int) {
 		MONITOR <- 3
 	}()
 	defer RecoverAndLogToFile()
-	if IOT {
+	if MINIMAL {
 		PopulatePingBufferWithStats()
 	}
 	for _, v := range ConList {
