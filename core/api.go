@@ -583,10 +583,10 @@ func PublicConnect(ClientCR ConnectionRequest) (code int, errm error) {
 			ERROR("error looking up connection info: ", err)
 			return 400, err
 		}
-		DEBUG("DNS Info: ", dnsInfo.IP, dnsInfo.Port, dnsInfo.OrgID, "cert length: ", len(dnsInfo.Cert))
+		DEBUG("DNS Info: ", dnsInfo.IP, dnsInfo.Port, dnsInfo.ServerID, "cert length: ", len(dnsInfo.Cert))
 		ClientCR.ServerPort = dnsInfo.Port
 		ClientCR.ServerIP = dnsInfo.IP
-		ClientCR.OrgID = dnsInfo.OrgID
+		ClientCR.ServerID = dnsInfo.ServerID
 		tunnel.Meta.PrivateCertBytes = dnsInfo.Cert
 		tunnel.Meta.Private = true
 

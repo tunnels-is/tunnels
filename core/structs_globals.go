@@ -41,7 +41,6 @@ type DNSStats struct {
 
 type ConnectionRequest struct {
 	DeviceKey string `json:"DeviceKey"`
-	OrgID     string `json:"OrgID"`
 
 	DeviceToken string `json:"DeviceToken"`
 	UserID      string `json:"UserID"`
