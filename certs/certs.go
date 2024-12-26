@@ -184,10 +184,10 @@ func ExtractSerialNumberFromCRT(path string) (serial string, err error) {
 }
 
 type DNSInfo struct {
-	Cert  []byte
-	IP    string
-	Port  string
-	OrgID string
+	Cert     []byte
+	IP       string
+	Port     string
+	ServerID string
 }
 
 func ResolveMetaTXT(domain string) (info *DNSInfo, err error) {
@@ -206,7 +206,7 @@ func ResolveMetaTXT(domain string) (info *DNSInfo, err error) {
 			}
 			info.IP = split[1]
 			info.Port = split[2]
-			info.OrgID = split[3]
+			info.ServerID = split[3]
 			continue
 		}
 		index, err := strconv.Atoi(split[0])
@@ -221,8 +221,8 @@ func ResolveMetaTXT(domain string) (info *DNSInfo, err error) {
 	if info.Port == "" {
 		return nil, errors.New("bad dns format, Port is empty")
 	}
-	if info.OrgID == "" {
-		return nil, errors.New("bad dns format, OrgID is empty")
+	if info.ServerID == "" {
+		return nil, errors.New("bad dns format, ServerID is empty")
 	}
 
 	preCert := make([]byte, 0)
