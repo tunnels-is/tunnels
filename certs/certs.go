@@ -9,14 +9,18 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"log"
 	"math/big"
 	"net"
 	"os"
 	"runtime/debug"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -177,4 +181,57 @@ func ExtractSerialNumberFromCRT(path string) (serial string, err error) {
 	}
 
 	return fmt.Sprintf("%X", cert.SerialNumber), nil
+}
+
+type DNSInfo struct {
+	Cert  []byte
+	IP    string
+	Port  string
+	OrgID string
+}
+
+func ResolveMetaTXT(domain string) (info *DNSInfo, err error) {
+	txt, err := net.LookupTXT(domain)
+	if err != nil {
+		return nil, err
+	}
+	certParts := make([][]byte, 100)
+	info = new(DNSInfo)
+
+	for _, v := range txt {
+		split := strings.Split(v, ":")
+		if split[0] == "0" {
+			if len(split) < 4 {
+				return nil, errors.New("bad dns format, 0: field is less then 4 in length")
+			}
+			info.IP = split[1]
+			info.Port = split[2]
+			info.OrgID = split[3]
+			continue
+		}
+		index, err := strconv.Atoi(split[0])
+		if err != nil {
+			return nil, err
+		}
+		certParts[index] = []byte(strings.Join(split[1:], ""))
+	}
+
+	preCert := make([]byte, 0)
+	clen := 0
+	for _, dnsTxt := range certParts {
+		for _, certBytes := range dnsTxt {
+			preCert = append(preCert, certBytes)
+			clen = len(preCert)
+		}
+	}
+
+	// We could use a formula to find the aprox. length of encoded
+	// content, or we can just make sure the slice is big enough
+	// and strip the end.
+	info.Cert = make([]byte, clen+500)
+	base64.RawStdEncoding.Decode(info.Cert, preCert)
+	info.Cert = bytes.ReplaceAll(info.Cert, []byte{0}, []byte{})
+	fmt.Println(info.IP, info.Port, info.OrgID)
+	fmt.Println(string(info.Cert))
+	return
 }

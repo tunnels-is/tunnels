@@ -412,12 +412,20 @@ type TunnelMETA struct {
 	IPv6Address string
 	NetMask     string
 
+	// VPL Firewall
+	AllowedHosts []string
+
 	// This overwrites or adds to settings
 	// that are applied to the Node
 	EnableDefaultRoute bool
 	DNSServers         []string
 	DNS                []*ServerDNS
 	Networks           []*ServerNetwork
+}
+
+type AllowedHost struct {
+	Host    string
+	Expires time.Time
 }
 
 // func (VC *VPNConnection) Initialize() {
@@ -968,10 +976,4 @@ type BlockList struct {
 	Enabled     bool
 	Count       int
 	LastRefresh time.Time
-}
-
-type DNSInfo struct {
-	cert []byte
-	IP   string
-	Port string
 }
