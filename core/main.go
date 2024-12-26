@@ -276,6 +276,7 @@ func LoadIOTConfig() {
 			ERROR("Unable to resolve Meta: ", err)
 			return
 		}
+		newCon.OrgID = info.OrgID
 		newCon.PrivateIP = info.IP
 		newCon.PrivatePort = info.Port
 		newCon.PrivateCertBytes = info.Cert
