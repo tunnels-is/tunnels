@@ -432,7 +432,7 @@ func PrepareState() (err error) {
 			x.DHCP = ConList[i].DHCP
 		}
 		if ConList[i].VPLNetwork != nil {
-			x.VPLNetwork = ConList[i].CRR.VPLNetwork
+			x.VPLNetwork = ConList[i].VPLNetwork
 		}
 
 		GLOBAL_STATE.ConnectionStats = append(GLOBAL_STATE.ConnectionStats, x)
@@ -614,14 +614,13 @@ func PublicConnect(ClientCR ConnectionRequest) (code int, errm error) {
 
 	// from GUI connect request
 	FinalCR.DeviceToken = ClientCR.DeviceToken
+	FinalCR.Hostname = tunnel.Meta.Hostname
 	FinalCR.UserID = ClientCR.UserID
 	FinalCR.SeverID = ClientCR.ServerID
 	FinalCR.EncType = ClientCR.EncType
-	// FinalCR.OrgID = ClientCR.OrgID
 	FinalCR.DeviceKey = ClientCR.DeviceKey
-	// FinalCR.Hostname = tunnel.Meta.Hostname
 
-	if !MINIMAL {
+	if !tunnel.Meta.Private || tunnel.Meta.RequestVPNPorts {
 		FinalCR.RequestingPorts = true
 	}
 	FinalCR.DHCPToken = tunnel.Meta.DHCPToken
@@ -844,8 +843,10 @@ func PublicConnect(ClientCR ConnectionRequest) (code int, errm error) {
 	}
 
 	if tunnel.CRR.VPLNetwork != nil {
-		tunnel.TunnelSTATS.VPLNetwork = tunnel.CRR.VPLNetwork
-		tunnel.TunnelSTATS.DHCP = tunnel.CRR.DHCP
+		tunnel.VPLNetwork = tunnel.CRR.VPLNetwork
+	}
+	if tunnel.CRR.DHCP != nil {
+		tunnel.DHCP = tunnel.CRR.DHCP
 	}
 
 	if CRR.DHCP != nil {
