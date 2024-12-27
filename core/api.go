@@ -817,7 +817,7 @@ func PublicConnect(ClientCR ConnectionRequest) (code int, errm error) {
 			select {
 			case interfaceMonitor <- tunnel.Interface:
 			default:
-				tunnel.Interface.Close()
+				tunnel.Interface.Disconnect(tunnel)
 				RemoveTunnelInterfaceFromList(tunnel.Interface)
 				ERROR(3, "Interface monitor channel is full!")
 				return 502, errors.New("Unable to place new interface on monitor channel")
