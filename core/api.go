@@ -847,9 +847,6 @@ func PublicConnect(ClientCR ConnectionRequest) (code int, errm error) {
 	}
 	if tunnel.CRR.DHCP != nil {
 		tunnel.DHCP = tunnel.CRR.DHCP
-	}
-
-	if CRR.DHCP != nil {
 		tunnel.Meta.DHCPToken = CRR.DHCP.Token
 		SaveConfig(GLOBAL_STATE.C)
 	}
