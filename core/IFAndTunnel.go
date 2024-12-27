@@ -172,6 +172,7 @@ func createTunnel() (T *TunnelMETA) {
 func createDefaultTunnelMeta() (M *TunnelMETA) {
 	M = new(TunnelMETA)
 	M = createTunnel()
+	M.RequestVPNPorts = true
 	M.IPv4Address = "172.22.22.22"
 	M.NetMask = "255.255.255.255"
 	M.Tag = DefaultTunnelName
@@ -183,6 +184,7 @@ func createDefaultTunnelMeta() (M *TunnelMETA) {
 func createMinimalConnection() (M *TunnelMETA) {
 	M = new(TunnelMETA)
 	M = createTunnel()
+	M.RequestVPNPorts = true
 	M.IPv4Address = "172.22.22.22"
 	M.NetMask = "255.255.255.255"
 	M.Tag = DefaultTunnelName
