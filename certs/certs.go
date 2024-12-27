@@ -240,7 +240,7 @@ func ResolveMetaTXT(domain string) (info *DNSInfo, err error) {
 	info.Cert = make([]byte, clen+500)
 	base64.RawStdEncoding.Decode(info.Cert, preCert)
 	info.Cert = bytes.ReplaceAll(info.Cert, []byte{0}, []byte{})
-	fmt.Println(info.IP, info.Port, info.OrgID)
+	fmt.Println(info.IP, info.Port, info.ServerID)
 	fmt.Println(string(info.Cert))
 	return
 }

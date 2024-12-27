@@ -68,7 +68,7 @@ type RemoteConnectionRequest struct {
 
 	RequestingPorts bool   `json:"RequestingPorts"`
 	DHCPToken       string `json:"DHCPToken"`
-	// Hostname        string `json:"Hostname"`
+	Hostname        string `json:"Hostname"`
 }
 
 type ErrorResponse struct {
@@ -156,6 +156,7 @@ var (
 	CLIDeviceKey string
 	CLIDNS       string
 	CLIHost      string
+	CLIHostname  string
 	CLIPort      string
 	CLIServerID  string
 
@@ -383,17 +384,18 @@ type TunnelMETA struct {
 	DeviceKey string
 	DHCPToken string
 	ServerID  string
-	// Hostname  string
+	Hostname  string
 
 	WindowsGUID string
 
 	// controlled by user only
-	DNSBlocking   bool
-	LocalhostNat  bool
-	AutoReconnect bool
-	AutoConnect   bool
-	Persistent    bool
-	PreventIPv6   bool
+	DNSBlocking     bool
+	LocalhostNat    bool
+	AutoReconnect   bool
+	AutoConnect     bool
+	Persistent      bool
+	PreventIPv6     bool
+	RequestVPNPorts bool
 
 	EncryptionType crypt.EncType
 
@@ -413,7 +415,7 @@ type TunnelMETA struct {
 	NetMask     string
 
 	// VPL Firewall
-	AllowedHosts []string
+	// AllowedHosts []string
 
 	// This overwrites or adds to settings
 	// that are applied to the Node
