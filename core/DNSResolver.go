@@ -277,7 +277,7 @@ func DNSQuery(w dns.ResponseWriter, m *dns.Msg) {
 
 	var Connection *Tunnel
 	var ServerDNS *ServerDNS
-	for i, con := range ConList {
+	for i, con := range TunList {
 		if con == nil {
 			continue
 		}
@@ -296,7 +296,7 @@ func DNSQuery(w dns.ResponseWriter, m *dns.Msg) {
 
 		ServerDNS = DNSAMapping(con.CRR.DNS, m.Question[0].Name)
 		if ServerDNS != nil {
-			Connection = ConList[i]
+			Connection = TunList[i]
 			break
 		}
 	}

@@ -461,7 +461,7 @@ func LoadDNSWhitelist() (err error) {
 func CleanupOnClose() {
 	defer RecoverAndLogToFile()
 	// CleanupWithStateLock()
-	for _, v := range ConList {
+	for _, v := range TunList {
 		if v == nil {
 			continue
 		}

@@ -317,9 +317,9 @@ func CleanPortsForAllConnections(MONITOR chan int) {
 		MONITOR <- 6
 	}()
 	defer RecoverAndLogToFile()
-	for i := range ConList {
-		if ConList[i] != nil {
-			ConList[i].cleanPortMap()
+	for i := range TunList {
+		if TunList[i] != nil {
+			TunList[i].cleanPortMap()
 		}
 	}
 }
