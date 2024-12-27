@@ -829,7 +829,11 @@ func PublicConnect(ClientCR ConnectionRequest) (code int, errm error) {
 			// TODO .. leave unchanged if no change is detected
 			if oldTunnel.Meta.IFName == tunnel.Meta.IFName {
 				oldTunnel.Interface.RemoveRoutes(oldTunnel, tunnel.Meta.EnableDefaultRoute)
-				tunnel.Interface.ApplyRoutes(tunnel)
+				err = tunnel.Interface.ApplyRoutes(tunnel)
+				if err != nil {
+					ERROR("unable to apply routes: ", err)
+					return 502, fmt.Errorf("unable to apply routes: %s", err)
+				}
 			} else {
 				defer func() {
 					if err == nil {
