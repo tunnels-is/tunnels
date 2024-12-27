@@ -60,7 +60,7 @@ func ControllerDirectDial(ctx context.Context, _ string, addr string) (net.Conn,
 func ResetEverything() {
 	defer RecoverAndLogToFile()
 
-	for _, v := range ConList {
+	for _, v := range TunList {
 		if v == nil {
 			continue
 		}
@@ -401,38 +401,38 @@ func PrepareState() (err error) {
 	GLOBAL_STATE.ConnectionStats = make([]TunnelSTATS, 0)
 	GLOBAL_STATE.Version = APP_VERSION
 
-	for i := range ConList {
-		if ConList[i] == nil {
+	for i := range TunList {
+		if TunList[i] == nil {
 			continue
 		}
 
-		GLOBAL_STATE.ActiveConnections = append(GLOBAL_STATE.ActiveConnections, ConList[i].Meta)
+		GLOBAL_STATE.ActiveConnections = append(GLOBAL_STATE.ActiveConnections, TunList[i].Meta)
 		var n2 uint64 = 0
-		if len(ConList[i].Nonce2Bytes) > 7 {
-			n2 = binary.BigEndian.Uint64(ConList[i].Nonce2Bytes)
+		if len(TunList[i].Nonce2Bytes) > 7 {
+			n2 = binary.BigEndian.Uint64(TunList[i].Nonce2Bytes)
 		}
 
 		x := TunnelSTATS{
-			Nonce1:              ConList[i].EH.SEAL.Nonce1U.Load(),
+			Nonce1:              TunList[i].EH.SEAL.Nonce1U.Load(),
 			Nonce2:              n2,
-			StartPort:           ConList[i].StartPort,
-			EndPort:             ConList[i].EndPort,
-			IngressString:       BandwidthBytesToString(uint64(ConList[i].IngressBytes)),
-			EgressString:        BandwidthBytesToString(uint64(ConList[i].EgressBytes)),
-			EgressBytes:         ConList[i].EgressBytes,
-			StatsTag:            ConList[i].Meta.Tag,
-			DISK:                ConList[i].TunnelSTATS.DISK,
-			MEM:                 ConList[i].TunnelSTATS.MEM,
-			CPU:                 ConList[i].TunnelSTATS.CPU,
-			ServerToClientMicro: ConList[i].TunnelSTATS.ServerToClientMicro,
-			PingTime:            ConList[i].TunnelSTATS.PingTime,
+			StartPort:           TunList[i].StartPort,
+			EndPort:             TunList[i].EndPort,
+			IngressString:       BandwidthBytesToString(uint64(TunList[i].IngressBytes)),
+			EgressString:        BandwidthBytesToString(uint64(TunList[i].EgressBytes)),
+			EgressBytes:         TunList[i].EgressBytes,
+			StatsTag:            TunList[i].Meta.Tag,
+			DISK:                TunList[i].TunnelSTATS.DISK,
+			MEM:                 TunList[i].TunnelSTATS.MEM,
+			CPU:                 TunList[i].TunnelSTATS.CPU,
+			ServerToClientMicro: TunList[i].TunnelSTATS.ServerToClientMicro,
+			PingTime:            TunList[i].TunnelSTATS.PingTime,
 		}
 
-		if ConList[i].DHCP != nil {
-			x.DHCP = ConList[i].DHCP
+		if TunList[i].DHCP != nil {
+			x.DHCP = TunList[i].DHCP
 		}
-		if ConList[i].VPLNetwork != nil {
-			x.VPLNetwork = ConList[i].VPLNetwork
+		if TunList[i].VPLNetwork != nil {
+			x.VPLNetwork = TunList[i].VPLNetwork
 		}
 
 		GLOBAL_STATE.ConnectionStats = append(GLOBAL_STATE.ConnectionStats, x)
@@ -486,6 +486,14 @@ func InitializeTunnelFromCRR(TUN *Tunnel) (err error) {
 		TUN.VPL_IP[1] = TUN.CRR.DHCP.IP[1]
 		TUN.VPL_IP[2] = TUN.CRR.DHCP.IP[2]
 		TUN.VPL_IP[3] = TUN.CRR.DHCP.IP[3]
+
+		TUN.DHCP = TUN.CRR.DHCP
+		TUN.Meta.DHCPToken = TUN.CRR.DHCP.Token
+		SaveConfig(GLOBAL_STATE.C)
+	}
+
+	if TUN.CRR.VPLNetwork != nil {
+		TUN.VPLNetwork = TUN.CRR.VPLNetwork
 	}
 
 	if !TUN.Meta.LocalhostNat {
@@ -794,22 +802,44 @@ func PublicConnect(ClientCR ConnectionRequest) (code int, errm error) {
 	}
 
 	var createdNewInterface bool
-	err, createdNewInterface = EnsureOrCreateInterface(tunnel)
+	err, createdNewInterface = FindOrCreateInterface(tunnel)
 	if err != nil {
 		return 502, err
 	}
 
-	oldTunnel := tunnel.Interface.tunnel.Load()
-	if oldTunnel == nil {
+	if createdNewInterface {
 		err = tunnel.Interface.Connect(tunnel)
 		if err != nil {
 			ERROR("unable to configure tunnel interface: ", err)
 			return 502, errors.New("Unable to connect to tunnel interface")
 		}
+		if AddTunnelInterfaceToList(tunnel.Interface) {
+			select {
+			case interfaceMonitor <- tunnel.Interface:
+			default:
+				tunnel.Interface.Close()
+				RemoveTunnelInterfaceFromList(tunnel.Interface)
+				ERROR(3, "Interface monitor channel is full!")
+				return 502, errors.New("Unable to place new interface on monitor channel")
+			}
+		}
 	} else {
-		// TRANSITION TUNNELS
-		// - make sure to not remove dup. routes
-		// - make sure route state is accurate
+		oldTunnel := *tunnel.Interface.tunnel.Load()
+		if oldTunnel != nil {
+			// TODO .. leave unchanged if no change is detected
+			if oldTunnel.Meta.IFName == tunnel.Meta.IFName {
+				oldTunnel.Interface.RemoveRoutes(oldTunnel, tunnel.Meta.EnableDefaultRoute)
+				tunnel.Interface.ApplyRoutes(tunnel)
+			} else {
+				defer func() {
+					if err == nil {
+						oldTunnel.Interface.Disconnect(oldTunnel)
+					} else {
+						tunnel.Interface.Disconnect(tunnel)
+					}
+				}()
+			}
+		}
 	}
 
 	// Create cross-pointers
@@ -818,10 +848,8 @@ func PublicConnect(ClientCR ConnectionRequest) (code int, errm error) {
 	tunnel.Connected = true
 	tunnel.TunnelSTATS.PingTime = time.Now()
 
-	AddConnection(tunnel)
-
+	AddTunnelToList(tunnel)
 	_ = PrepareState()
-	go tunnel.ReadFromServeTunnel()
 
 	out := tunnel.EH.SEAL.Seal1(PingPongStatsBuffer, tunnel.Index)
 	_, err = tunnel.Con.Write(out)
@@ -829,27 +857,7 @@ func PublicConnect(ClientCR ConnectionRequest) (code int, errm error) {
 		return 502, errors.New("unable to send initial ping to server")
 	}
 
-	if createdNewInterface {
-		if AddTunnelInterface(tunnel.Interface) {
-			select {
-			case interfaceMonitor <- tunnel.Interface:
-			default:
-				tunnel.Interface.Close()
-				RemoveTunnelInterface(tunnel.Interface)
-				ERROR(3, "Interface monitor channel is full!")
-				return 502, errors.New("Unable to place new interface on monitor channel")
-			}
-		}
-	}
-
-	if tunnel.CRR.VPLNetwork != nil {
-		tunnel.VPLNetwork = tunnel.CRR.VPLNetwork
-	}
-	if tunnel.CRR.DHCP != nil {
-		tunnel.DHCP = tunnel.CRR.DHCP
-		tunnel.Meta.DHCPToken = CRR.DHCP.Token
-		SaveConfig(GLOBAL_STATE.C)
-	}
+	go tunnel.ReadFromServeTunnel()
 
 	DEBUG("Session is ready - it took ", fmt.Sprintf("%.0f", math.Abs(time.Since(start).Seconds())), " seconds to connect")
 

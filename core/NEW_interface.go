@@ -26,7 +26,7 @@ func AutoConnect(MONITOR chan int) {
 			if v == nil || !v.AutoConnect {
 				continue
 			}
-			for _, vc := range ConList {
+			for _, vc := range TunList {
 				if vc == nil {
 					continue
 				}
@@ -105,7 +105,7 @@ func PingConnections(MONITOR chan int) {
 	if MINIMAL {
 		PopulatePingBufferWithStats()
 	}
-	for _, v := range ConList {
+	for _, v := range TunList {
 		if v == nil {
 			continue
 		}

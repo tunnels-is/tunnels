@@ -325,7 +325,7 @@ type CONFIG_FORM struct {
 }
 
 var (
-	ConList [1000]*Tunnel
+	TunList [1000]*Tunnel
 	ConLock = sync.Mutex{}
 	IFList  [1000]*TunnelInterface
 	IFLock  = sync.Mutex{}

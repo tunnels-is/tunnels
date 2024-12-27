@@ -9,7 +9,7 @@ import (
 	"github.com/zveinn/crypt"
 )
 
-func EnsureOrCreateInterface(TUN *Tunnel) (err error, created bool) {
+func FindOrCreateInterface(TUN *Tunnel) (err error, created bool) {
 	TUN.Interface = FindTunnelInterfaceByName(TUN.Meta.IFName)
 	if TUN.Interface == nil {
 		TUN.Interface, err = CreateNewTunnelInterface(TUN)
@@ -43,7 +43,7 @@ func FindTunnelInterfaceByName(name string) *TunnelInterface {
 	return nil
 }
 
-func RemoveTunnelInterface(T *TunnelInterface) {
+func RemoveTunnelInterfaceFromList(T *TunnelInterface) {
 	for i := range IFList {
 		if IFList[i] != nil {
 			if IFList[i].Name == T.Name {
@@ -53,7 +53,7 @@ func RemoveTunnelInterface(T *TunnelInterface) {
 	}
 }
 
-func AddTunnelInterface(T *TunnelInterface) (assigned bool) {
+func AddTunnelInterfaceToList(T *TunnelInterface) (assigned bool) {
 	IFLock.Lock()
 	defer IFLock.Unlock()
 
@@ -68,35 +68,35 @@ func AddTunnelInterface(T *TunnelInterface) (assigned bool) {
 	return false
 }
 
-func RemoveTunnel(GUID string) {
-	for i := range ConList {
-		if ConList[i] == nil {
+func RemoveTunnelFromList(GUID string) {
+	for i := range TunList {
+		if TunList[i] == nil {
 			continue
 		}
-		if ConList[i].Meta.WindowsGUID == GUID {
+		if TunList[i].Meta.WindowsGUID == GUID {
 			DEBUG("RemovingConnection:", GUID)
-			ConList[i] = nil
+			TunList[i] = nil
 		}
 	}
 }
 
-func AddConnection(T *Tunnel) (assigned bool) {
+func AddTunnelToList(T *Tunnel) (assigned bool) {
 	ConLock.Lock()
 	defer ConLock.Unlock()
 
-	for i := range ConList {
-		if ConList[i] != nil {
-			if ConList[i].Meta.WindowsGUID == T.Meta.WindowsGUID {
+	for i := range TunList {
+		if TunList[i] != nil {
+			if TunList[i].Meta.WindowsGUID == T.Meta.WindowsGUID {
 				DEBUG("RemovingConnection:", T.Meta.WindowsGUID)
-				ConList[i] = nil
+				TunList[i] = nil
 			}
 		}
 	}
 
-	for i := range ConList {
-		if ConList[i] == nil {
+	for i := range TunList {
+		if TunList[i] == nil {
 			DEBUG("New Connection @ index (", i, ") GUID (", T.Meta.WindowsGUID, ")")
-			ConList[i] = T
+			TunList[i] = T
 			return true
 		}
 	}
@@ -123,7 +123,7 @@ func Disconnect(GUID string, remove bool, switching bool) (err error) {
 	CON.Con.Close()
 
 	if remove {
-		RemoveTunnel(GUID)
+		RemoveTunnelFromList(GUID)
 	}
 
 	return
@@ -204,13 +204,13 @@ func FindMETAForConnectRequest(CC *ConnectionRequest) *TunnelMETA {
 }
 
 func findTunnelByGUID(GUID string) (CON *Tunnel) {
-	for i := range ConList {
-		if ConList[i] == nil {
+	for i := range TunList {
+		if TunList[i] == nil {
 			continue
 		}
-		if ConList[i].Meta.WindowsGUID == GUID {
+		if TunList[i].Meta.WindowsGUID == GUID {
 			DEBUG("FoundConnection:", GUID)
-			CON = ConList[i]
+			CON = TunList[i]
 			return
 		}
 	}
