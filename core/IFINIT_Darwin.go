@@ -318,6 +318,51 @@ func (t *TunnelInterface) deleteRoutes(V *Tunnel, n *ServerNetwork) (err error) 
 	return nil
 }
 
+func (t *TunnelInterface) ApplyRoutes(V *Tunnel) (err error) {
+	if IsDefaultConnection(V.Meta.IFName) || V.Meta.EnableDefaultRoute {
+		// _ = IP_DelDefaultRoute()
+		err = IP_AddDefaultRoute(t.IPv4Address)
+		if err != nil {
+			return
+		}
+	}
+
+	for _, n := range V.CRR.Networks {
+		t.addRoutes(V, n)
+	}
+
+	if V.CRR.VPLNetwork != nil {
+		t.addRoutes(V, V.CRR.VPLNetwork)
+	}
+
+	return
+}
+
+func (t *TunnelInterface) RemoveRoutes(V *Tunnel, preserve bool) (err error) {
+	defer RecoverAndLogToFile()
+
+	for _, n := range V.CRR.Networks {
+		t.deleteRoutes(V, n)
+	}
+
+	if V.CRR.VPLNetwork != nil {
+		t.deleteRoutes(V, V.CRR.VPLNetwork)
+	}
+
+	if !preserve {
+		if IsDefaultConnection(V.Meta.IFName) || V.Meta.EnableDefaultRoute {
+			_ = IP_DelDefaultRoute()
+			err = IP_AddDefaultRoute(DEFAULT_GATEWAY.To4().String())
+			if err != nil {
+				ERROR("unable to restore default route", err)
+			}
+
+		}
+	}
+
+	return
+}
+
 func (t *TunnelInterface) Connect(V *Tunnel) (err error) {
 	// if !t.Persistent {
 	err = t.Addr()
@@ -369,6 +414,10 @@ func (t *TunnelInterface) Disconnect(V *Tunnel) (err error) {
 		t.deleteRoutes(V, n)
 	}
 
+	if V.CRR.VPLNetwork != nil {
+		t.deleteRoutes(V, V.CRR.VPLNetwork)
+	}
+
 	if IsDefaultConnection(V.Meta.IFName) || V.Meta.EnableDefaultRoute {
 		_ = IP_DelDefaultRoute()
 		err = IP_AddDefaultRoute(DEFAULT_GATEWAY.To4().String())
@@ -387,7 +436,7 @@ func (t *TunnelInterface) Disconnect(V *Tunnel) (err error) {
 		ERROR("unable to delete the interface", err)
 	}
 
-	RemoveTunnelInterface(t)
+	RemoveTunnelInterfaceFromList(t)
 
 	return nil
 }

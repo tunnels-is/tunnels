@@ -47,7 +47,7 @@ func (T *TunnelInterface) ReadFromTunnelInterface() {
 		}
 
 		if packetLength == 0 {
-			DEBUG("tun/tap read size was 0")
+			DEEP("tun/tap read size was 0")
 			continue
 		}
 
@@ -120,17 +120,19 @@ func (V *Tunnel) ReadFromServeTunnel() {
 			ERROR("Packet authentication error: ", err)
 			return
 		}
+
+		V.IngressBytes += n
+
 		if len(packet) < 20 {
 			V.RegisterPing(CopySlice(packet))
 			continue
 		}
 
-		V.IngressBytes += n
-
 		if !V.ProcessIngressPacket(packet) {
 			debugMissingIngressMapping(packet)
 			continue
 		}
+
 		if V.IP_MP != nil {
 			V.IP_MP.ingressBytes += n
 		}

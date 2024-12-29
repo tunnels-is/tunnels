@@ -86,6 +86,7 @@ func (V *Tunnel) IsIngressVPLIP(ip [4]byte) (ok bool) {
 }
 
 func (V *Tunnel) InitVPLMap() (err error) {
+	DEBUG("Initializing VPL/NAT maps for tunnel:", V.Meta.IFName)
 	if V.CRR.VPLNetwork == nil {
 		return nil
 	}
