@@ -1,6 +1,5 @@
 import React, { useEffect } from "react";
 import GLOBAL_STATE from "../state";
-import CustomTable from "./component/table";
 import CustomSelect from "./component/CustomSelect";
 import NewTable from "./component/newtable";
 
@@ -134,7 +133,8 @@ const Servers = () => {
 			<NewTable
 				tableID={"public-servers"}
 				className="router-table"
-				placeholder={"Search for a server.."}
+				placeholder={"Search for a server .."}
+				background={true}
 				header={headers}
 				rows={rows}
 			/>

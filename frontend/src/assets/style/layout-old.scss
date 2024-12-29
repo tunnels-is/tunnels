@@ -2862,7 +2862,7 @@ button {
 
 .button-and-text-seperator {
   height: 10px;
-  border-bottom: 1px solid var(--c-shade3);
+  border-bottom: 1px solid var(--c-shade2);
   margin-bottom: 10px;
   margin-top: 10px;
 }
@@ -3398,12 +3398,13 @@ button {
 
 .dns-page {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   justify-content: flex-start;
   height: fit-content;
   width: 100%;
   flex-wrap: wrap;
-  gap: 50px;
+  gap: 20px;
+
 
   .custom-label {
     user-select: none;
@@ -3435,7 +3436,7 @@ button {
     margin-left: 10%;
   }
 
-  .panel {
+  .basic-info {
     /* padding: 20px; */
     /* background: $main-bg-color; */
     /* background: $c-shade2; */
@@ -3443,8 +3444,8 @@ button {
     flex-direction: column;
     height: fit-content;
     max-width: 500px;
-    margin-bottom: 30px;
-    margin-right: 20px;
+    /* margin-bottom: 30px; */
+    /* margin-right: 20px; */
 
     .header {
       display: flex;
