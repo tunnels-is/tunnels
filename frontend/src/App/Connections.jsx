@@ -84,17 +84,15 @@ const Connections = () => {
 
 		state.editorExtraButtons = []
 		state.editorExtraButtons.push({
-			func: function(data) {
-				console.dir(data)
+			func: function() {
 				let ed = state.editorData
-				console.dir(ed)
 				if (ed === undefined) {
 					console.log("no data!")
 					return
 				}
 				if (ed.Networks.length < 1) {
 					ed.Networks.push({
-						Tag: "base-network",
+						Tag: "new-network",
 						Network: "",
 						Nat: "",
 						Routes: []
@@ -107,16 +105,46 @@ const Connections = () => {
 					}
 				)
 
-				// state.SaveConnectionsToModifiedConfig(modCons)
 				state.globalRerender()
 			},
 			title: "+Route"
 		})
 		state.editorExtraButtons.push({
-			func: function(data) {
-				console.dir(data)
+			func: function() {
+				let ed = state.editorData
+				if (ed === undefined) {
+					console.log("no data!")
+					return
+				}
+				ed.Networks.push({
+					Tag: "new-network",
+					Network: "",
+					Nat: "",
+					Routes: []
+				})
+
+				state.globalRerender()
 			},
 			title: "+Network"
+		})
+		state.editorExtraButtons.push({
+			func: function() {
+				let ed = state.editorData
+				if (ed === undefined) {
+					console.log("no data!")
+					return
+				}
+				ed.DNS.push({
+					Domain: "mydomain.local",
+					Wildcard: true,
+					IP: ["127.0.0.1"],
+					TXT: ["this is a text record"],
+					CNAME: "",
+				})
+
+				state.globalRerender()
+			},
+			title: "+DNS"
 		})
 
 
