@@ -446,7 +446,7 @@ func DNSCacheCheck(m *dns.Msg, w dns.ResponseWriter) bool {
 			" | TYPE: ",
 			strconv.FormatUint(uint64(m.Question[0].Qtype), 10),
 			" | Expires(seconds): ",
-			time.Until(cachedReply.Expires).Seconds(),
+			fmt.Sprintf("%.2f", time.Until(cachedReply.Expires).Seconds()),
 		)
 	}
 
