@@ -1,7 +1,6 @@
 import React, { useEffect } from "react";
 import GLOBAL_STATE from "../state";
 import KeyValue from "./component/keyvalue";
-import CustomTable from "./component/table";
 import { useNavigate } from "react-router-dom";
 import NewTable from "./component/newtable";
 

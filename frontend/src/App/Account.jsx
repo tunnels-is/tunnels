@@ -4,7 +4,6 @@ import GLOBAL_STATE from "../state";
 import dayjs from "dayjs";
 import KeyValue from "./component/keyvalue";
 import Label from "./component/label";
-import CustomTable from "./component/table";
 import NewTable from "./component/newtable";
 
 const Account = () => {
@@ -156,6 +155,7 @@ const Account = () => {
 				title={"Logins"}
 				className="logins-list-table"
 				placeholder={"Search for a device.."}
+				background={true}
 				header={headers}
 				rows={rows}
 			/>

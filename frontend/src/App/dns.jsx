@@ -1,8 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import CustomToggle from "./component/CustomToggle";
 import FormKeyValue from "./component/formkeyvalue";
-import CustomTable from "./component/table";
-import Label from "./component/label";
 import { useNavigate } from "react-router-dom";
 import NewTable from "./component/newtable";
 import dayjs from "dayjs";
@@ -184,7 +182,7 @@ const DNS = () => {
 	return (
 		<div className="dns-page">
 
-			<div className="panel">
+			<div className="basic-info panel">
 				<div className="title">Settings</div>
 				<div className="warn-msg">Use {DNSServerIP} as your DNS server to enable these settings.</div>
 				<div className="warn-msg">Enabling blocklists will increase memory usage.</div>
@@ -279,7 +277,7 @@ const DNS = () => {
 				tableID="dns-lists"
 				title={"Block Lists"}
 				className="domain-list-table"
-				placeholder={"Search for a list.."}
+				background={true}
 				header={headers}
 				rows={rows}
 				button={{
@@ -296,28 +294,18 @@ const DNS = () => {
 						tableID="dns-blocked"
 						title={"Blocked Domains"}
 						className="dns-stats"
+						background={true}
 						header={headersDNSstats}
 						rows={rowsDNSstats}
-						button={{
-							text: "Refresh",
-							click: function() {
-								state.GetBackendState()
-							}
-						}}
 					/>
 
 					<NewTable
 						tableID="dns-resolved"
 						title={"Resolved Domains"}
 						className="dns-stats"
+						background={true}
 						header={headerDNSresolves}
 						rows={rowsDNSresolves}
-						button={{
-							text: "Refresh",
-							click: function() {
-								state.GetBackendState()
-							}
-						}}
 					/>
 				</>
 			}

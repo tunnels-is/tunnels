@@ -1,6 +1,5 @@
 import React, { useEffect } from "react";
 import GLOBAL_STATE from "../state";
-import CustomTable from "./component/table";
 import CustomSelect from "./component/CustomSelect";
 import { useNavigate } from "react-router-dom";
 import NewTable from "./component/newtable";
@@ -77,6 +76,7 @@ const PrivateServers = () => {
 				className="router-table"
 				placeholder={"Search for a server.."}
 				header={headers}
+				background={true}
 				rows={rows}
 				button={{
 					text: "Create",
