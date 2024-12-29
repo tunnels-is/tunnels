@@ -81,6 +81,45 @@ const Connections = () => {
 			state.SaveConnectionsToModifiedConfig(modCons)
 			state.globalRerender()
 		}
+
+		state.editorExtraButtons = []
+		state.editorExtraButtons.push({
+			func: function(data) {
+				console.dir(data)
+				let ed = state.editorData
+				console.dir(ed)
+				if (ed === undefined) {
+					console.log("no data!")
+					return
+				}
+				if (ed.Networks.length < 1) {
+					ed.Networks.push({
+						Tag: "base-network",
+						Network: "",
+						Nat: "",
+						Routes: []
+					})
+				}
+				ed.Networks[0].Routes.push(
+					{
+						Address: "0.0.0.0/32",
+						Metric: "0"
+					}
+				)
+
+				// state.SaveConnectionsToModifiedConfig(modCons)
+				state.globalRerender()
+			},
+			title: "+Route"
+		})
+		state.editorExtraButtons.push({
+			func: function(data) {
+				console.dir(data)
+			},
+			title: "+Network"
+		})
+
+
 		state.globalRerender()
 
 	}

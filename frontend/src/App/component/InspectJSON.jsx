@@ -10,32 +10,40 @@ import CodeMirror from '@uiw/react-codemirror';
 const InspectJSON = () => {
 	const state = GLOBAL_STATE()
 	const [error, setError] = useState(false)
-	const [useVim, setUseVim] = useState(true)
-	const [original, setOriginal] = useState({})
-	const [editorRerender, setEditorRerender] = useState(0)
-	// console.log("INSPECT")
-	//
+	const [useVim, setUseVim] = useState(false)
+	const [rerend, setRerend] = useState(undefined)
 
 	const reset = () => {
-		setOriginal(state.editorData)
+		state.editorData = JSON.parse(JSON.stringify(state.editorOriginal))
 		state.editorError = ""
-		setEditorRerender(editorRerender + 1)
+		// state.editorRerender = state.editorRerender + 1
+		setRerend(rerend + 1)
+		state.globalRerender()
 	}
 
 	const close = () => {
-		setOriginal(undefined)
+		// setOriginal(undefined)
+		state.editorOriginal = undefined
+		state.editorData = undefined
 		state.resetEditor()
 		state.globalRerender()
 	}
 
 	useEffect(() => {
-		setOriginal(state?.editorData)
-	}, [])
+		if (state.editorOriginal === undefined) {
+			console.log("reset! useeff")
+			state.editorOriginal = JSON.parse(JSON.stringify(state.editorData))
+		}
+		console.dir(state.editorOriginal)
+		console.dir(state.editorData)
+		// setOriginal(state?.editorData)
+	}, [rerend])
 
 	let ext = [json()]
 	if (useVim) {
 		ext.push(vim())
 	}
+
 
 	return (
 		<div className="editor-popup">
@@ -46,10 +54,20 @@ const InspectJSON = () => {
 				{state.editorSave &&
 					<div className="save" onClick={() => state.editorSave()}>Save</div>
 				}
+				<div className="close" onClick={() => close()}>Close</div>
 				{!state.editorReadOnly &&
 					<div className="reset" onClick={() => reset()}>Reset</div>
 				}
-				<div className="close" onClick={() => close()}>Close</div>
+
+
+
+				{state.editorExtraButtons.map((b) => {
+					return (
+						<div className="extra" onClick={() => {
+							b.func()
+						}}>{b.title}</div>
+					)
+				})}
 				{state.editorDelete &&
 					<div className="delete" onClick={() => {
 						state.editorDelete()
@@ -61,8 +79,8 @@ const InspectJSON = () => {
 				<div className="error">{state.editorError}</div>
 			}
 			<CodeMirror
-				key={editorRerender}
-				value={JSON.stringify(original, null, 4)}
+				key={rerend}
+				value={JSON.stringify(state.editorData, null, 4)}
 				onChange={(newValue) => state?.editorOnChange(newValue)}
 				theme={state.getDarkMode() ? githubDark : githubLight}
 				extensions={ext}

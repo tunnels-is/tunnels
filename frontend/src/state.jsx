@@ -220,11 +220,14 @@ export var STATE = {
 	ModifiedNodeMap: new Map(),
 	OpenNodes: new Map(),
 	editorData: undefined,
+	editorOriginal: undefined,
 	editorReset: undefined,
 	editorOnChange: undefined,
 	editorSave: undefined,
 	editorError: undefined,
 	editorReadOnly: false,
+	editorExtraButtons: [],
+	editorRerender: 0,
 	resetEditor: () => {
 		STATE.editorData = undefined
 		STATE.editorReset = undefined

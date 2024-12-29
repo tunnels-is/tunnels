@@ -72,9 +72,10 @@ const PrivateServers = () => {
 		<div className="ab private-server-wrapper">
 
 			<NewTable
+				title={"Private VPN Servers"}
 				tableID={"private-servers"}
 				className="router-table"
-				placeholder={"Search for a server.."}
+				placeholder={"Search .."}
 				header={headers}
 				background={true}
 				rows={rows}
