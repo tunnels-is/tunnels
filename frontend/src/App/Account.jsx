@@ -47,7 +47,7 @@ const Account = () => {
 
 			let row = {}
 			row.items = [
-				{ type: "text", value: current ? "THIS DEVICE" : token.N },
+				{ type: "text", value: current ? token.N + " (this device)" : token.N },
 				{ type: "text", value: dayjs(token.Created).format("DD-MM-YYYY HH:mm:ss") },
 				{
 					type: "text",
@@ -154,7 +154,6 @@ const Account = () => {
 				tableID={"devices"}
 				title={"Logins"}
 				className="logins-list-table"
-				placeholder={"Search for a device.."}
 				background={true}
 				header={headers}
 				rows={rows}
