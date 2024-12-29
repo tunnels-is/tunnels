@@ -149,7 +149,7 @@ const NewTable = (props) => {
 				}
 
 			</div>
-			<div className={`${finalRows.length > 0 ? "" : "hide"} top-bar`}>
+			<div className={` top-bar`}>
 				<div className="search-bar">
 					<input
 						onChange={(e) => setFilter(e.target.value)}
@@ -161,7 +161,7 @@ const NewTable = (props) => {
 
 			{finalRows.length < 1 &&
 				<div className="waiting">
-					Waiting for data ..
+					No data ..
 				</div>
 
 			}
