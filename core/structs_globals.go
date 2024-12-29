@@ -594,6 +594,7 @@ type Config struct {
 	LogBlockedDomains bool
 	LogAllDomains     bool
 	DebugLogging      bool
+	DeepDebugLoggin   bool
 	ConsoleLogging    bool
 	InfoLogging       bool
 	ErrorLogging      bool

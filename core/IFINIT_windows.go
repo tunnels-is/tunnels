@@ -546,6 +546,49 @@ func (t *TunnelInterface) deleteRoutes(V *Tunnel, n *ServerNetwork) (err error) 
 	return nil
 }
 
+func (t *TunnelInterface) ApplyRoutes(V *Tunnel) (err error) {
+	if IsDefaultConnection(V.Meta.IFName) || V.Meta.EnableDefaultRoute {
+		t.GatewayMetric = "1"
+		err = IP_RouteMetric("0.0.0.0/0", t.Name, "1")
+		if err != nil {
+			return
+		}
+	}
+
+	for _, n := range V.CRR.Networks {
+		t.addRoutes(V, n)
+	}
+
+	if V.CRR.VPLNetwork != nil {
+		t.addRoutes(V, V.CRR.VPLNetwork)
+	}
+
+	return
+}
+
+func (t *TunnelInterface) RemoveRoutes(V *Tunnel, preserve bool) (err error) {
+	defer RecoverAndLogToFile()
+
+	for _, n := range V.CRR.Networks {
+		t.deleteRoutes(V, n)
+	}
+
+	if V.CRR.VPLNetwork != nil {
+		t.deleteRoutes(V, V.CRR.VPLNetwork)
+	}
+	if !preserve {
+		if IsDefaultConnection(V.Meta.IFName) || V.Meta.EnableDefaultRoute {
+			t.GatewayMetric = "2000"
+			err = IP_RouteMetric("0.0.0.0/0", t.Name, "2000")
+			if err != nil {
+				return
+			}
+		}
+	}
+
+	return
+}
+
 func (t *TunnelInterface) Connect(V *Tunnel) (err error) {
 	err = t.CreateOrOpen()
 	if err != nil {
@@ -623,6 +666,10 @@ func (t *TunnelInterface) Disconnect(V *Tunnel) (err error) {
 		t.deleteRoutes(V, n)
 	}
 
+	if V.CRR.VPLNetwork != nil {
+		t.deleteRoutes(V, V.CRR.VPLNetwork)
+	}
+
 	if V.Con != nil {
 		V.Con.Close()
 	}
@@ -634,7 +681,7 @@ func (t *TunnelInterface) Disconnect(V *Tunnel) (err error) {
 		ERROR("unable to delete the interface", err)
 	}
 
-	RemoveTunnelInterface(t)
+	RemoveTunnelInterfaceFromList(t)
 	return
 }
 
