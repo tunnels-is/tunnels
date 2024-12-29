@@ -68,12 +68,14 @@ const InspectJSON = () => {
 						}}>{b.title}</div>
 					)
 				})}
+
 				{state.editorDelete &&
 					<div className="delete" onClick={() => {
 						state.editorDelete()
 						close()
 					}}>Delete</div>
 				}
+
 			</div>
 			{state?.editorError &&
 				<div className="error">{state.editorError}</div>
