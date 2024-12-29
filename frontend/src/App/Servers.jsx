@@ -131,9 +131,10 @@ const Servers = () => {
 		<div className="ab router-wrapper">
 
 			<NewTable
+				title={"Public VPN Servers"}
 				tableID={"public-servers"}
 				className="router-table"
-				placeholder={"Search for a server .."}
+				placeholder={"Search .."}
 				background={true}
 				header={headers}
 				rows={rows}
