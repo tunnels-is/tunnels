@@ -30,8 +30,8 @@ $editor-shadow: 4px 4px 15px 3px rgba(0, 0, 0, 0.66);
 
   --input-hover: var(--c-shade3);
 
-  --label-border-radius: 5px;
-  --button-border-radius: 5px;
+  --label-border-radius: 2px;
+  --button-border-radius: 2px;
   --label-width: 140px;
 
   --button-color: var(--c-blue);
@@ -62,8 +62,8 @@ $editor-shadow: 4px 4px 15px 3px rgba(0, 0, 0, 0.66);
 
   --input-hover: #454545;
 
-  --label-border-radius: 5px;
-  --button-border-radius: 5px;
+  --label-border-radius: 2px;
+  --button-border-radius: 2px;
   --label-width: 140px;
 
   --button-color: var(--c-blue);
@@ -91,6 +91,7 @@ $editor-shadow: 4px 4px 15px 3px rgba(0, 0, 0, 0.66);
   background: var(--c-shade1);
   padding: 20px;
   border-radius: 3px;
+  min-width: 300px;
   /* box-shadow: 0 0 2px rgba(0, 0, 0, 0.66); */
 }
 
@@ -147,9 +148,11 @@ body::-webkit-scrollbar {
   cursor: pointer;
   border-radius: var(--button-border-radius);
   align-content: center;
+  text-align: center;
   color: var(--c-white);
   padding: 5px 10px 5px 10px;
-  width: fit-content;
+  /* width: fit-content; */
+  width: 100%;
   font-weight: 700;
   background: var(--button-color);
 }
@@ -362,6 +365,8 @@ body::-webkit-scrollbar {
     margin-left: 10px;
     color: var(--c-shade6);
     word-break: break-all;
+    display: flex;
+    align-items: end;
   }
 
 }
@@ -774,8 +779,8 @@ body::-webkit-scrollbar {
   .top-bar {
     position: relative;
     display: flex;
-    padding-bottom: 10px;
-    margin-bottom: 5px;
+    /* padding-bottom: 10px; */
+    margin-bottom: 10px;
     padding-left: 10px;
 
     .title {
@@ -795,12 +800,15 @@ body::-webkit-scrollbar {
 
     .search-bar {
       display: flex;
-      /* width: 100%; */
-      flex: 1;
+      width: 98%;
+      /* flex: 1; */
       border-bottom: 2px solid var(--c-shade2);
+      background: var(--c-shade2);
+      padding: 5px;
+      margin-bottom: 10px;
 
       input {
-        font-size: 23px;
+        font-size: 20px;
         width: 100%;
         background: none !important;
         outline: none !important;
@@ -1271,8 +1279,9 @@ body::-webkit-scrollbar {
     flex-wrap: wrap;
     background: var(--c-white);
     padding-top: 5px;
-    padding-bottom: 3px;
+    padding-bottom: 5px;
     padding-left: 14px;
+    font-size: 20px;
 
     div {
       margin-right: 14px;
@@ -1294,6 +1303,12 @@ body::-webkit-scrollbar {
     }
 
     .vim {
+      color: var(--c-blue);
+      cursor: pointer;
+    }
+
+    .extra {
+      float: right;
       color: var(--c-blue);
       cursor: pointer;
     }

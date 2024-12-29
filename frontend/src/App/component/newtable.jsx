@@ -161,7 +161,7 @@ const NewTable = (props) => {
 
 			{finalRows.length < 1 &&
 				<div className="waiting">
-					No data ..
+					nothing found
 				</div>
 
 			}
