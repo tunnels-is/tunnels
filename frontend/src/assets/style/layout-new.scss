@@ -765,7 +765,7 @@ body::-webkit-scrollbar {
   }
 
   .waiting {
-    color: var(--c-shade3);
+    color: var(--c-shade4);
     font-size: 20px;
     font-weight: 500;
     margin-left: 20px;
@@ -776,7 +776,6 @@ body::-webkit-scrollbar {
     display: flex;
     padding-bottom: 10px;
     margin-bottom: 5px;
-    /* border-bottom: 2px solid var(--c-shade2); */
     padding-left: 10px;
 
     .title {
@@ -798,6 +797,7 @@ body::-webkit-scrollbar {
       display: flex;
       /* width: 100%; */
       flex: 1;
+      border-bottom: 2px solid var(--c-shade2);
 
       input {
         font-size: 23px;
@@ -809,7 +809,7 @@ body::-webkit-scrollbar {
       }
 
       input::placeholder {
-        color: var(--c-shade3);
+        color: var(--c-shade4);
       }
     }
 
@@ -1307,26 +1307,18 @@ body::-webkit-scrollbar {
 }
 
 .add-connection {
-  position: relative;
+  position: absolute;
   display: flex;
   flex-direction: column;
-  width: 50px;
+  top: 20px;
+  width: 300px;
   height: 50px;
-  font-size: 38px !important;
+  font-size: 24px !important;
   font-weight: 600;
-  text-align: center;
+  text-align: left;
   vertical-align: center;
-}
-
-.add-button {
-  border-radius: var(--button-border-radius);
-  background: var(--button-color);
-  color: var(--c-white) !important;
+  color: var(--c-blue) !important;
   cursor: pointer;
-
-  display: inline-block;
-  height: 50px;
-  width: 50px;
 }
 
 .add-button:hover {

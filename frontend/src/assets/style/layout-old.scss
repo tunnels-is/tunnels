@@ -2868,7 +2868,7 @@ button {
 }
 
 .connections {
-  margin-top: 10px;
+  margin-top: 40px;
   display: flex;
   flex-direction: row;
   justify-content: left;
@@ -2907,7 +2907,7 @@ button {
     padding-top: 15px;
     border-radius: $card-border-radius;
     position: relative;
-    box-shadow: $base-shadow;
+    /* box-shadow: $base-shadow; */
 
     .subtitle:hover {
       color: var(--c-blue)
@@ -2993,7 +2993,7 @@ button {
 
     .button-and-text-seperator {
       height: 10px;
-      border-bottom: 1px solid var(--c-shade3);
+      border-bottom: 1px solid var(--c-shade2);
       margin-bottom: 10px;
     }
 

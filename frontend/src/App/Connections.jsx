@@ -307,15 +307,18 @@ const Connections = () => {
 				/>
 			}
 
+			<div className="add-connection"
+				onClick={() =>
+					addConnection()
+				}
+			>
+				New Tunnel
+			</div>
+
 			{state.Config?.Connections?.map((c) => {
 				return renderConnection(c)
 			})}
 
-			<div className="add-connection">
-				<div className="add-button" onClick={() =>
-					addConnection()
-				}>+</div>
-			</div>
 		</div>
 	);
 }
