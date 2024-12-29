@@ -97,7 +97,7 @@ const NewTable = (props) => {
 	}
 
 	return (
-		<div className="new-table">
+		<div className={`new-table ${props.background ? "table-bg" : ""}`}>
 
 			<div className="top-bar">
 
@@ -105,12 +105,23 @@ const NewTable = (props) => {
 					<div className="title">{props.title}</div>
 				}
 
+				{props?.button &&
+					<div onClick={(e) => props.button.click(e)} className="text-button clickable">
+						{props.button.text}
+					</div>
+				}
+
+
 				{(pg.TotalPages > 1 || pg.TableSize === finalRows.length) &&
 					<div className="pagination-bar">
 						<div className="left-arrow" onClick={() => setPageWrap(pg.PrevPage, finalRows.length)}>
 							prev
 						</div>
+						<div className="right-arrow" onClick={() => setPageWrap(pg.NextPage, finalRows.length)}>
+							next
+						</div>
 						<div className="pages">
+							items
 							<select
 								className="page-selection"
 								value={originalSize}
@@ -124,6 +135,7 @@ const NewTable = (props) => {
 							</select>
 						</div>
 						<div className="pages">
+							page
 							<select
 								className="page-selection"
 								value={pg.CurrentPage}
@@ -133,28 +145,30 @@ const NewTable = (props) => {
 								))}
 							</select>
 						</div>
-						<div className="right-arrow" onClick={() => setPageWrap(pg.NextPage, finalRows.length)}>
-							next
-						</div>
 					</div>
 				}
 
+			</div>
+			<div className={`${finalRows.length > 0 ? "" : "hide"} top-bar`}>
 				<div className="search-bar">
 					<input
 						onChange={(e) => setFilter(e.target.value)}
-						placeholder={props?.placeholder ? props.placeholder : "Search.."}
+						placeholder={props?.placeholder ? props.placeholder : "Search .."}
 						className="ab" />
-					{props?.button &&
-						<div onClick={(e) => props.button.click(e)} className="text-button clickable">
-							{props.button.text}
-						</div>
-					}
 				</div>
+
 			</div>
+
+			{finalRows.length < 1 &&
+				<div className="waiting">
+					Waiting for data ..
+				</div>
+
+			}
 
 			<div className={`${props.className} ab table`}>
 
-				<div className="ab header">
+				<div className={`ab header ${finalRows.length < 1 ? "hide" : ""}`}>
 					{props?.header?.map((l, i) => {
 						let cs = {}
 
