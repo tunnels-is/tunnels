@@ -2994,7 +2994,7 @@ button {
     .button-and-text-seperator {
       height: 10px;
       border-bottom: 1px solid var(--c-shade2);
-      margin-bottom: 10px;
+      margin-bottom: 12px;
     }
 
     .con-select {
@@ -3049,7 +3049,7 @@ button {
 
       .tag {
         cursor: pointer;
-        font-size: 24px;
+        font-size: 30px;
         width: 100%;
         text-align: center;
         color: var(--c-blue)
@@ -3406,6 +3406,7 @@ button {
   gap: 20px;
 
 
+
   .custom-label {
     user-select: none;
     cursor: pointer;
@@ -3434,6 +3435,12 @@ button {
     border-bottom: 2px solid grey;
     width: 80%;
     margin-left: 10%;
+  }
+
+  .full-page {
+    margin-top: 30px;
+    width: 100%;
+    margin-bottom: 0px;
   }
 
   .basic-info {

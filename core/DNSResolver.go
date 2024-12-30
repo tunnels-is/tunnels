@@ -259,6 +259,7 @@ func GlobalBlockEnabled(m *dns.Msg, w dns.ResponseWriter) bool {
 }
 
 func DNSQuery(w dns.ResponseWriter, m *dns.Msg) {
+	defer RecoverAndLogToFile()
 	// ip := strings.Split(w.RemoteAddr().String(), ":")[0]
 
 	if isAppDNS(m, w) {
