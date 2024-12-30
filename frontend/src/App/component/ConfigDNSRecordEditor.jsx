@@ -7,12 +7,22 @@ import CustomToggle from "./CustomToggle";
 const ConfigDNSRecordEditor = () => {
 	const state = GLOBAL_STATE("DNSRecordForm")
 
+	const addRecord = () => {
+		state.Config?.CustomDNSRecords.push({
+			Domain: "domain.local",
+			IP: [],
+			TXT: [],
+			CNAME: "",
+			Wildcard: true,
+		})
+		state.renderPage("DNSRecordForm")
+	}
 	const saveAll = () => {
 		state.ConfigSave()
 		state.renderPage("DNSRecordForm")
 	}
 	const deleteRecord = (index) => {
-		delete state.Config?.CustomDNSRecords[index]
+		state.Config.CustomDNSRecords = state.Config.CustomDNSRecords.splice(index, 1)
 		state.renderPage("DNSRecordForm")
 	}
 
@@ -104,6 +114,9 @@ const ConfigDNSRecordEditor = () => {
 	return (
 		<div className="ab config-dns-editor">
 			{state.Config?.CustomDNSRecords?.map((r, i) => {
+				if (!r) {
+					return (<></>)
+				}
 				return (
 					<>
 						<div className="dns-record panel">
@@ -140,7 +153,7 @@ const ConfigDNSRecordEditor = () => {
 				)
 			})}
 
-			<div className="add-record">+</div>
+			<div className="add-record" onClick={() => addRecord()}>+</div>
 
 
 		</div >
