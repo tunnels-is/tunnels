@@ -92,6 +92,7 @@ $editor-shadow: 4px 4px 15px 3px rgba(0, 0, 0, 0.66);
   padding: 20px;
   border-radius: 3px;
   min-width: 300px;
+  height: fit-content;
   /* box-shadow: 0 0 2px rgba(0, 0, 0, 0.66); */
 }
 
@@ -802,17 +803,32 @@ body::-webkit-scrollbar {
         color: var(--c-shade6);
       }
 
+
       .remove {
         background: var(--c-dark-red);
       }
 
+      .remove:hover {
+        background: var(--c-red);
+        color: var(--c-shade5) !important;
+      }
+
       .save {
-        /* background: var(--c-green); */
         background: var(--c-dark-green);
+      }
+
+      .save:hover {
+        background: var(--c-green);
+        color: var(--c-shade5) !important;
       }
 
       .add {
         background: var(--c-dark-blue);
+      }
+
+      .add:hover {
+        background: var(--c-blue);
+        color: var(--c-shade5) !important;
       }
     }
 
