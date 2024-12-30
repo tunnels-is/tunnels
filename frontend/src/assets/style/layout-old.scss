@@ -604,11 +604,11 @@
 
 .card-button {
   background: var(--button-color);
-  color: var(--c-white) !important;
+  color: var(--c-shade6) !important;
   border-radius: var(--button-border-radius);
-  font-weight: 600;
-  font-size: 18px !important;
+  font-size: 22px !important;
   padding: 5px !important;
+  font-weight: bold;
   padding-top: 7px !important;
   padding-left: 10px !important;
   padding-right: 10px !important;
@@ -623,7 +623,7 @@
 
 .card-button:hover {
   background: var(--button-hover-color);
-  color: var(--c-white) !important;
+  color: var(--c-shade5) !important;
 }
 
 button {
@@ -3038,11 +3038,11 @@ button {
       }
 
       .connect {
-        background: var(--c-green) !important;
+        background: var(--c-dark-green) !important;
       }
 
       .connect:hover {
-        background: var(--c-dark-green) !important;
+        background: var(--c-green) !important;
 
       }
 
