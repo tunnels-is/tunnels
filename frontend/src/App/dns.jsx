@@ -6,6 +6,7 @@ import NewTable from "./component/newtable";
 import dayjs from "dayjs";
 
 import GLOBAL_STATE from "../state";
+import ConfigDNSRecordEditor from "./component/ConfigDNSRecordEditor";
 
 const DNSSort = (a, b) => {
 	if (dayjs(a.LastSeen).unix() < dayjs(b.LastSeen).unix()) {
@@ -75,7 +76,7 @@ const DNS = () => {
 				{
 					type: "text",
 					value: <div
-						className={`${isDefault(i.Tag) ? "hide" : "red"} clickable`}
+						className={`${isDefault(i.Tag) ? "disabled" : "red"} clickable`}
 						onClick={() => { state.deleteBlocklist(i) }}
 					>Remove</div>
 				}
@@ -273,6 +274,7 @@ const DNS = () => {
 				/>
 			</div>
 
+
 			<NewTable
 				tableID="dns-lists"
 				title={"Block Lists"}
@@ -309,6 +311,10 @@ const DNS = () => {
 					/>
 				</>
 			}
+			<div className="title full-page">
+				DNS Records
+			</div>
+			<ConfigDNSRecordEditor />
 		</div >
 	)
 }

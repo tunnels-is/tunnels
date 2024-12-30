@@ -122,6 +122,12 @@ func DNSAMapping(DNS []*ServerDNS, fullDomain string) *ServerDNS {
 	domain = strings.TrimSuffix(domain, ".")
 
 	for i, record := range DNS {
+		// There is a slight chance someone might
+		// saves something like "null" into the array.
+		// the record == nil will make sure we do not crash on it.
+		if record == nil {
+			continue
+		}
 		if subdomain != "" {
 			if record.Domain == subdomain+"."+domain {
 				return DNS[i]

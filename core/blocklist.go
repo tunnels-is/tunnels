@@ -5,22 +5,16 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"runtime"
-	"runtime/debug"
 	"strings"
 	"sync"
 	"time"
 )
 
 func InitBlockListPath() {
-	defer func() {
-		if r := recover(); r != nil {
-			log.Println(r, string(debug.Stack()))
-		}
-	}()
+	defer RecoverAndLogToFile()
 
 	GLOBAL_STATE.BlockListPath = GLOBAL_STATE.BasePath + "blocklists" + string(os.PathSeparator)
 
