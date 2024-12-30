@@ -48,9 +48,13 @@ const LaunchApp = () => {
 	if (state.getDarkMode()) {
 		appElement.classList.remove("light")
 		appElement.classList.add("dark")
+		document.documentElement.classList.add("dark")
+		document.documentElement.classList.remove("light")
 	} else {
 		appElement.classList.remove("dark")
 		appElement.classList.add("light")
+		document.documentElement.classList.add("light")
+		document.documentElement.classList.remove("dark")
 	}
 
 	useEffect(() => {
