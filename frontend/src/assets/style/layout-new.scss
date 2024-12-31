@@ -25,8 +25,8 @@ $editor-shadow: 4px 4px 15px 3px rgba(0, 0, 0, 0.66);
   --c-green: #28ad85;
   --c-dark-green: #1c916e;
   --c-orange: #eb8718;
-  --c-red: #e45b5b;
-  --c-dark-red: #d33d3d;
+  --c-dark-red: #e45b5b;
+  --c-red: #d33d3d;
 
   --input-hover: var(--c-shade3);
 
@@ -34,11 +34,11 @@ $editor-shadow: 4px 4px 15px 3px rgba(0, 0, 0, 0.66);
   --button-border-radius: 2px;
   --label-width: 140px;
 
-  --button-color: var(--c-blue);
-  --button-hover-color: var(--c-dark-blue);
+  --button-color: var(--c-dark-blue);
+  --button-hover-color: var(--c-blue);
 
-  --button-danger: var(--c-red);
-  --button-hover-danger: var(--c-dark-red);
+  --button-danger: var(--c-dark-red);
+  --button-hover-danger: var(--c-red);
 
   --line-border: #dedede;
 }
@@ -57,8 +57,8 @@ $editor-shadow: 4px 4px 15px 3px rgba(0, 0, 0, 0.66);
   --c-green: #28ad85;
   --c-dark-green: #1c916e;
   --c-orange: #eb8718;
-  --c-red: #e45b5b;
-  --c-dark-red: #d33d3d;
+  --c-dark-red: #e45b5b;
+  --c-red: #d33d3d;
 
   --input-hover: #454545;
 
@@ -66,11 +66,11 @@ $editor-shadow: 4px 4px 15px 3px rgba(0, 0, 0, 0.66);
   --button-border-radius: 2px;
   --label-width: 140px;
 
-  --button-color: var(--c-blue);
-  --button-hover-color: var(--c-dark-blue);
+  --button-color: var(--c-dark-blue);
+  --button-hover-color: var(--c-blue);
 
-  --button-danger: var(--c-red);
-  --button-hover-danger: var(--c-dark-red);
+  --button-danger: var(--c-dark-red);
+  --button-hover-danger: var(--c-red);
 
   --line-border: #333333;
 }
@@ -145,6 +145,27 @@ body::-webkit-scrollbar {
   /* font-weight: 700; */
 }
 
+.plus-button {
+  display: flex;
+  flex-direction: column;
+  width: 55px;
+  height: 50px;
+  font-size: 34px !important;
+  font-weight: 600;
+  text-align: center;
+  color: var(--c-white) !important;
+  background: var(--c-dark-blue);
+  cursor: pointer;
+  padding-top: 4px;
+  border-radius: var(--button-border-radius);
+  margin-top: 1px;
+}
+
+.plus-button:hover {
+  background: var(--c-blue);
+}
+
+
 .button {
   cursor: pointer;
   border-radius: var(--button-border-radius);
@@ -163,13 +184,53 @@ body::-webkit-scrollbar {
   background: var(--button-hover-color);
 }
 
-.card-button-danger-color {
-  color: $c-red !important;
+.card-button {
+  background: var(--button-color);
+  color: var(--c-shade1) !important;
+  border-radius: var(--button-border-radius);
+  font-size: 22px !important;
+  padding: 5px !important;
+  font-weight: bold;
+  padding-top: 7px !important;
+  padding-left: 10px !important;
+  padding-right: 10px !important;
+  cursor: pointer;
+  width: 100% !important;
+  text-align: center;
+  margin-top: 20px;
+  -webkit-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
 }
 
-.card-button-warning-color {
-  color: $c-orange !important;
+.card-button:hover {
+  background: var(--button-hover-color);
 }
+
+.red {
+  background: var(--c-dark-red);
+}
+
+.red:hover {
+  background: var(--c-red);
+}
+
+.green {
+  background: var(--c-dark-green);
+}
+
+.green:hover {
+  background: var(--c-green);
+}
+
+.blue {
+  background: var(--c-dark-blue);
+}
+
+.blue:hover {
+  background: var(--c-blue);
+}
+
 
 .connection-editor-menu {
   background: $menu-background;
@@ -291,7 +352,7 @@ body::-webkit-scrollbar {
   width: fit-content;
   padding: 3px 7px 3px 7px;
   border-radius: var(--label-border-radius);
-  font-size: 16px;
+  font-size: 20px;
   color: var(--c-white);
   text-align: right;
 }
@@ -455,7 +516,7 @@ body::-webkit-scrollbar {
   width: $frame-width;
   margin-left: 230px;
   padding-left: 30px;
-  padding-top: 20px;
+  padding-top: 30px;
   padding-bottom: 300px;
   background: var(--c-white);
 }
@@ -791,7 +852,7 @@ body::-webkit-scrollbar {
       flex-direction: row;
 
       .item {
-        border: 1px solid black;
+        border: 1px solid var(--c-shade1);
         /* border-radius: var(--button-border-radius); */
         flex: 3;
         text-align: center;
@@ -800,62 +861,22 @@ body::-webkit-scrollbar {
         font-size: 22px;
         padding: 5px;
         width: 50% !important;
-        color: var(--c-shade6);
+        margin-top: 0px !important;
       }
 
 
-      .remove {
-        background: var(--c-dark-red);
-      }
-
-      .remove:hover {
-        background: var(--c-red);
-        color: var(--c-shade5) !important;
-      }
-
-      .save {
-        background: var(--c-dark-green);
-      }
-
-      .save:hover {
-        background: var(--c-green);
-        color: var(--c-shade5) !important;
-      }
-
-      .add {
-        background: var(--c-dark-blue);
-      }
-
-      .add:hover {
-        background: var(--c-blue);
-        color: var(--c-shade5) !important;
-      }
     }
 
 
   }
 
-  .add-record {
-    display: flex;
-    flex-direction: column;
-    width: 55px;
-    height: 50px;
-    font-size: 34px !important;
-    font-weight: 600;
-    text-align: center;
-    color: var(--c-white) !important;
-    background: var(--c-blue);
-    cursor: pointer;
-    padding-top: 4px;
-    border-radius: var(--button-border-radius);
-  }
 
 }
 
 .new-table {
   width: 90%;
   min-width: fit-content;
-  max-width: 1000px;
+  max-width: 820px;
   /* min-width: 25%; */
   display: flex;
   flex-direction: column;

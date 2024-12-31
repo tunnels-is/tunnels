@@ -303,7 +303,7 @@ func DNSQuery(w dns.ResponseWriter, m *dns.Msg) {
 	}
 
 	if ServerDNS == nil {
-		ServerDNS = DNSAMapping(C.CustomDNSRecords, m.Question[0].Name)
+		ServerDNS = DNSAMapping(C.DNSRecords, m.Question[0].Name)
 	}
 
 	if blocked && ServerDNS == nil {

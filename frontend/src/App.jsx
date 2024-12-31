@@ -40,10 +40,14 @@ const root = createRoot(appElement);
 const LaunchApp = () => {
 	const state = GLOBAL_STATE("root")
 
-	let configChanged = state.modifiedLists !== undefined
-	if (!configChanged) {
-		configChanged = state.modifiedConfig !== undefined
+	let configModified = state.modifiedLists !== undefined
+	if (!configModified) {
+		configModified = state.modifiedConfig !== undefined
 	}
+	if (!configModified) {
+		configModified = state.IsConfigModified()
+	}
+
 
 	if (state.getDarkMode()) {
 		appElement.classList.remove("light")
@@ -88,7 +92,7 @@ const LaunchApp = () => {
 			<ScreenLoader />
 			<div className="ab app-wrapper">
 
-				{configChanged &&
+				{configModified &&
 					<div className="save-bar">
 						<div className="text">Your config has unsaved changes</div>
 						<div className="button"

@@ -241,6 +241,12 @@ export var STATE = {
 	modifiedUser: STORE.Cache.GetObject("modifiedUser"),
 	Config: STORE.Cache.GetObject("config"),
 	modifiedConfig: STORE.Cache.GetObject("modifiedConfig"),
+	SetConfigModifiedState: (state) => {
+		STORE.Cache.Set("configIsModified", state)
+	},
+	IsConfigModified: () => {
+		return STORE.Cache.GetBool("configIsModified")
+	},
 	UserSaveModifiedSate: () => {
 		STORE.Cache.SetObject("modifiedUser", STATE.modifiedUser)
 	},
@@ -325,6 +331,7 @@ export var STATE = {
 				STATE.RemoveModifiedConfig()
 				STATE.RemoveModifiedLists()
 				STATE.successNotification("Config saved", undefined)
+				STATE.SetConfigModifiedState(false)
 			}
 		} catch (error) {
 			console.dir(error)
