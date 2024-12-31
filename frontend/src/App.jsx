@@ -30,6 +30,8 @@ import GLOBAL_STATE from "./state";
 import { STATE } from "./state";
 import STORE from "./store";
 import WS from "./ws";
+import Routing from "./App/Routing";
+import ConnectionTable from "./App/ConnectionTable";
 
 // Use this to automatically turn on debug 
 STORE.Cache.Set("debug", true)
@@ -130,8 +132,9 @@ const LaunchApp = () => {
 							<Route path="inspect/group/:id" element={<InspectGroup />} />
 							<Route path="inspect/group" element={<InspectGroup />} />
 
-							<Route path="tunnels" element={<Connections />} />
+							<Route path="tunnels" element={<ConnectionTable />} />
 							<Route path="inspect/connection/:id" element={<InspectConnection />} />
+							<Route path="routing" element={<ConnectionTable />} />
 
 							<Route path="dns" element={<DNS />} />
 							<Route path="dns/answers/:domain" element={<DNSAnswers />} />
