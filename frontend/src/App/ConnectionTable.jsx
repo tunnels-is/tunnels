@@ -36,6 +36,12 @@ const ConnectionTable = () => {
 		})
 	}
 
+	const popEditor = (r) => {
+		state.editorData = r
+		state.editorReadOnly = true
+		state.globalRerender()
+	}
+
 	const openConnectionEditor = (con) => {
 		state.editorData = con
 		state.editorReadOnly = false
@@ -166,11 +172,20 @@ const ConnectionTable = () => {
 			}
 		})
 
+		let active = false
+		state.State.ActiveConnections?.map((x) => {
+			if (x.WindowsGUID === c.WindowsGUID) {
+				active = true
+				return
+			}
+		})
+
 		row.items.push({
 			type: "text",
 			align: "left",
 			className: "tag",
 			value: c.IFName,
+			color: active ? "green" : "red",
 		})
 
 		row.items.push({
@@ -178,6 +193,26 @@ const ConnectionTable = () => {
 			align: "left",
 			className: "type",
 			value: c.Private ? "private" : "public",
+		})
+
+		row.items.push({
+			type: "text",
+			align: "left",
+			className: "dns",
+			value: c.DNS.length,
+		})
+
+
+		let routeCount = 0
+		c.Networks?.map(n => {
+			routeCount += n.Routes.length
+		})
+
+		row.items.push({
+			type: "text",
+			align: "left",
+			className: "dns",
+			value: routeCount,
 		})
 
 		let server = undefined
@@ -200,7 +235,11 @@ const ConnectionTable = () => {
 			type: "text",
 			align: "left",
 			className: "server",
-			value: server ? server.Tag : "",
+			value: server ? server.Server : "",
+			color: "blue",
+			click: function() {
+				popEditor(server)
+			}
 		})
 
 		row.items.push({
@@ -208,23 +247,13 @@ const ConnectionTable = () => {
 			align: "left",
 			className: "serverip",
 			value: server ? server.IP : "",
-		})
-
-		let active = false
-		state.State.ActiveConnections?.map((x) => {
-			if (x.WindowsGUID === c.WindowsGUID) {
-				active = true
-				return
+			color: "blue",
+			click: function() {
+				popEditor(server)
 			}
 		})
 
-		row.items.push({
-			type: "text",
-			align: "left",
-			className: "state",
-			value: active ? "connected" : "disconnected",
-			color: active ? "green" : "red",
-		})
+
 
 		rows.push(row)
 
@@ -234,9 +263,10 @@ const ConnectionTable = () => {
 		{ value: "Tag", align: "left" },
 		{ value: "Interface", align: "left" },
 		{ value: "Type", align: "left" },
+		{ value: "DNS", align: "left" },
+		{ value: "Routes", align: "left" },
 		{ value: "Server", align: "left" },
-		{ value: "Server IP", align: "left" },
-		{ value: "", align: "left" },
+		{ value: "IP", align: "left" },
 	]
 
 
