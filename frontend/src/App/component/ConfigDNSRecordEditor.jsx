@@ -8,7 +8,11 @@ const ConfigDNSRecordEditor = () => {
 	const state = GLOBAL_STATE("DNSRecordForm")
 
 	const addRecord = () => {
-		state.Config?.CustomDNSRecords.push({
+		if (!state.Config.DNSRecords) {
+			state.Config.DNSRecords = []
+
+		}
+		state.Config?.DNSRecords.push({
 			Domain: "domain.local",
 			IP: [],
 			TXT: [],
@@ -22,7 +26,14 @@ const ConfigDNSRecordEditor = () => {
 		state.renderPage("DNSRecordForm")
 	}
 	const deleteRecord = (index) => {
-		state.Config.CustomDNSRecords = state.Config.CustomDNSRecords.splice(index, 1)
+		if (state.Config.DNSRecords.length === 1) {
+			state.Config.DNSRecords = []
+			state.SetConfigModifiedState(true)
+			state.globalRerender()
+		} else {
+			state.Config.DNSRecords = state.Config.DNSRecords.splice(index, 1)
+		}
+
 		state.renderPage("DNSRecordForm")
 	}
 
@@ -30,33 +41,33 @@ const ConfigDNSRecordEditor = () => {
 		console.log("update:", index, subindex, key, value)
 		if (key === "IP") {
 			try {
-				state.Config.CustomDNSRecords[index].IP[subindex] = value
+				state.Config.DNSRecords[index].IP[subindex] = value
 			} catch (error) {
 				console.dir(error)
 			}
 		} else if (key === "TXT") {
 			try {
-				state.Config.CustomDNSRecords[index].TXT[subindex] = value
+				state.Config.DNSRecords[index].TXT[subindex] = value
 			} catch (error) {
 				console.dir(error)
 			}
 
 		} else if (key === "Wildcard") {
-			state.Config.CustomDNSRecords[index].Wildcard = value
+			state.Config.DNSRecords[index].Wildcard = value
 
 		} else {
-			state.Config.CustomDNSRecords[index][key] = value
+			state.Config.DNSRecords[index][key] = value
 		}
 
 		state.renderPage("DNSRecordForm")
 	}
 
 	const addIP = (index) => {
-		state.Config?.CustomDNSRecords[index].IP.push("0.0.0.0")
+		state.Config?.DNSRecords[index].IP.push("0.0.0.0")
 		state.renderPage("DNSRecordForm")
 	}
 	const addTXT = (index) => {
-		state.Config?.CustomDNSRecords[index].TXT.push("new text record")
+		state.Config?.DNSRecords[index].TXT.push("new text record")
 		state.renderPage("DNSRecordForm")
 	}
 
@@ -113,7 +124,7 @@ const ConfigDNSRecordEditor = () => {
 
 	return (
 		<div className="ab config-dns-editor">
-			{state.Config?.CustomDNSRecords?.map((r, i) => {
+			{state.Config?.DNSRecords?.map((r, i) => {
 				if (!r) {
 					return (<></>)
 				}
@@ -128,19 +139,19 @@ const ConfigDNSRecordEditor = () => {
 							{makeInput(i, 0, "CNAME", r.CNAME, "text")}
 							{makeInput(i, 0, "Wildcard", r.Wildcard, "toggle")}
 							<div className="buttons buttons-first">
-								<div className="item add" onClick={() => addIP(i)}>New IP</div>
-								<div className="item add" onClick={() => addTXT(i)}>New TXT</div>
+								<div className="item card-button blue" onClick={() => addIP(i)}>New IP</div>
+								<div className="item card-button blue" onClick={() => addTXT(i)}>New TXT</div>
 							</div>
 							<div className="buttons">
 
-								<div className="item save"
+								<div className="item card-button green"
 									onClick={() => {
 										saveAll()
 									}}>
 									Save
 								</div>
 
-								<div className="item remove"
+								<div className="item card-button red"
 									onClick={() => {
 										deleteRecord(i)
 									}}>
@@ -153,7 +164,7 @@ const ConfigDNSRecordEditor = () => {
 				)
 			})}
 
-			<div className="add-record" onClick={() => addRecord()}>+</div>
+			<div className="plus-button" onClick={() => addRecord()}>+</div>
 
 
 		</div >

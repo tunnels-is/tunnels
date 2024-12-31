@@ -602,30 +602,6 @@
 
 
 
-.card-button {
-  background: var(--button-color);
-  color: var(--c-shade6) !important;
-  border-radius: var(--button-border-radius);
-  font-size: 22px !important;
-  padding: 5px !important;
-  font-weight: bold;
-  padding-top: 7px !important;
-  padding-left: 10px !important;
-  padding-right: 10px !important;
-  cursor: pointer;
-  width: 100% !important;
-  text-align: center;
-  margin-top: 10px;
-  -webkit-user-select: none;
-  -ms-user-select: none;
-  user-select: none;
-}
-
-.card-button:hover {
-  background: var(--button-hover-color);
-  color: var(--c-shade5) !important;
-}
-
 button {
   height: fit-content; // height: 45px;
   width: fit-content;
@@ -2868,7 +2844,7 @@ button {
 }
 
 .connections {
-  margin-top: 40px;
+  /* margin-top: 40px; */
   display: flex;
   flex-direction: row;
   justify-content: left;
@@ -3412,22 +3388,14 @@ button {
     cursor: pointer;
   }
 
-
-  .green {
-    color: var(--c-green) !important;
+  .enabled {
+    color: var(--c-green);
   }
 
-  .red {
-    color: var(--c-red)
+  .disabled {
+    color: var(--c-red);
   }
 
-  .danger {
-    color: var(--c-red) !important;
-  }
-
-  .warning {
-    color: var(--c-orange) !important;
-  }
 
   .seperator {
     margin-top: 10px;
@@ -3544,7 +3512,7 @@ button {
 
 .account-page {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   justify-content: flex-start;
   height: fit-content;
   width: 100%;
@@ -3602,6 +3570,10 @@ button {
 
       .dialtimeout {
         width: 65px;
+      }
+
+      .card-button {
+        margin-top: 10px;
       }
 
       .toggle {

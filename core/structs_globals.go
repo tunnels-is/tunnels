@@ -612,7 +612,7 @@ type Config struct {
 	EnabledBlockLists   []string
 	AvailableBlockLists []*BlockList
 
-	CustomDNSRecords []*ServerDNS
+	DNSRecords []*ServerDNS
 }
 
 var (
