@@ -80,7 +80,7 @@ const PrivateServers = () => {
 				background={true}
 				rows={rows}
 				button={{
-					text: "Create",
+					text: "New Server",
 					click: function() {
 						navigate("/inspect/server")
 					}
