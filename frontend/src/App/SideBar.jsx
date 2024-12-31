@@ -13,6 +13,7 @@ import {
 	PersonIcon,
 	QuestionMarkCircledIcon,
 	Share1Icon,
+	SymbolIcon,
 } from '@radix-ui/react-icons'
 
 import GLOBAL_STATE from "../state";
@@ -64,6 +65,7 @@ const SideBar = () => {
 					{ icon: GlobeIcon, label: "Public", route: "servers", user: true, },
 					{ icon: MobileIcon, label: "Private", route: "private", user: true, },
 					{ icon: Share1Icon, label: "Tunnels", route: "tunnels", user: true, },
+					// { icon: SymbolIcon, label: "Routing", route: "routing", user: true, },
 				]
 			},
 			{
