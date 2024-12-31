@@ -138,19 +138,20 @@ export var STATE = {
 	loading: undefined,
 	toggleLoading: (object) => {
 		if (object === undefined) {
-			// STATE.loading = undefined
-			// STATE.renderPage("loader")
+			STATE.loading = undefined
+			STATE.renderPage("loader")
 			// return
 
 			// Without timeout the "Saving Config..." msg
 			// blinks on/off too fast imo it's better if it's about 1sec
-			const to = setTimeout(() => {
-				STATE.loading = undefined
-			}, 1000)
-			return () => {
-				STATE.renderPage("loader")
-				clearTimeout(to)
-			}
+			//
+			// const to = setTimeout(() => {
+			// 	STATE.loading = undefined
+			// }, 1000)
+			// return () => {
+			// 	STATE.renderPage("loader")
+			// 	clearTimeout(to)
+			// }
 		}
 		if (object?.show) {
 			STATE.loading = object

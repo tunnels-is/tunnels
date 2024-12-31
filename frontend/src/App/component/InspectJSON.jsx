@@ -31,11 +31,11 @@ const InspectJSON = () => {
 
 	useEffect(() => {
 		if (state.editorOriginal === undefined) {
-			console.log("reset! useeff")
+			// console.log("reset! useeff")
 			state.editorOriginal = JSON.parse(JSON.stringify(state.editorData))
 		}
-		console.dir(state.editorOriginal)
-		console.dir(state.editorData)
+		// console.dir(state.editorOriginal)
+		// console.dir(state.editorData)
 		// setOriginal(state?.editorData)
 	}, [rerend])
 
