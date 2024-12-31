@@ -62,6 +62,7 @@ const Connections = () => {
 				} else {
 					state.editorError = "Invalid JSON"
 				}
+				state.globalRerender()
 				return
 			}
 

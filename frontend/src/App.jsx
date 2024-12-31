@@ -70,18 +70,15 @@ const LaunchApp = () => {
 		< HashRouter >
 
 			<Toaster
-				containerStyle={{
-					left: "20px", bottom: "280px", position: 'fixed',
-				}}
 				toastOptions={{
 					className: 'toast',
-					position: "bottom-left",
+					position: "top-right",
 					success: {
-						duration: 4000,
+						duration: 5000,
 					},
 					icon: null,
 					error: {
-						duration: 4000,
+						duration: 5000,
 					},
 				}}
 			/>
