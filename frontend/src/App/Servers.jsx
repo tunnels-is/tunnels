@@ -105,7 +105,7 @@ const Servers = () => {
 				},
 				{
 					type: "text",
-					value: con ? "Disconnect" : "Connect",
+					value: <div className={con ? "disconnect" : "connect"}>{con ? "Disconnect" : "Connect"}</div>,
 					color: con ? "red" : "green",
 					click: conButton,
 				},
