@@ -175,7 +175,7 @@ const Settings = () => {
 
 
 				<div
-					className="danger-button button"
+					className="red card-button"
 					onClick={() => state.resetApp()}
 				>
 					Reset Everything

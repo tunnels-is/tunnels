@@ -109,6 +109,20 @@ const Account = () => {
 					<KeyValue label={"License"} value={state.User.Key?.Key} />
 
 					<div className="button-and-text-seperator"></div>
+					<div className="item">
+						<input
+							onChange={(e) => { state.UpdateLicenseInput(e.target.value) }}
+							name="license"
+							className="input license"
+							placeholder="Insert License Key"
+							value={state.LicenseKey} />
+					</div>
+
+					<div className="item full-width-item" key={state?.LicenseKey}>
+						<div className="card-button" onClick={() => state.ActivateLicense()} >Activate Key</div>
+					</div>
+
+					<div className="button-and-text-seperator"></div>
 
 					<div className="item full-width-item">
 						<div className="card-button red"
@@ -132,19 +146,6 @@ const Account = () => {
 					</div>
 
 
-					<div className="button-and-text-seperator"></div>
-					<div className="item">
-						<input
-							onChange={(e) => { state.UpdateLicenseInput(e.target.value) }}
-							name="license"
-							className="input license"
-							placeholder="Insert License Key"
-							value={state.LicenseKey} />
-					</div>
-
-					<div className="item full-width-item" key={state?.LicenseKey}>
-						<div className="card-button" onClick={() => state.ActivateLicense()} >Activate Key</div>
-					</div>
 
 
 				</div>

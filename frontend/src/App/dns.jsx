@@ -23,12 +23,8 @@ const DNS = () => {
 	const navigate = useNavigate()
 	let LogBlockedDomains = state.getKey("Config", "LogBlockedDomains")
 	let LogAllDomains = state.getKey("Config", "LogAllDomains")
-	let configChanged = state.modifiedLists !== undefined
 	let dnsStats = state.getKey("Config", "DNSstats")
 
-	if (!configChanged) {
-		configChanged = state.modifiedConfig !== undefined
-	}
 
 	let DNS1 = state.getKey("Config", "DNS1Default")
 	let DNS2 = state.getKey("Config", "DNS2Default")
@@ -67,7 +63,7 @@ const DNS = () => {
 				{
 					type: "text",
 					value: <div
-						className={`${i.Enabled ? "green" : "red"} clickable`}
+						className={`${i.Enabled ? "enabled" : "disabled"} clickable`}
 						onClick={() => { state.toggleBlocklist(i) }}
 					>	{i.Enabled ? "Blocked" : "Allowed"}</div>
 				},
