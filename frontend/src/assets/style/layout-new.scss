@@ -731,18 +731,28 @@ body::-webkit-scrollbar {
 
   .formkeyvalue,
   .keyvalue {
+
     .label {
-      /* width: 70px; */
+      width: 70px !important;
+      min-width: fit-content;
     }
   }
 
+  .panel {
+    display: flex;
+    flex-direction: column;
+    height: fit-content;
+    width: fit-content !important;
+    max-width: 1040px;
+
+  }
 
   .nodes {
-    margin-top: 50px;
+    margin-top: 30px;
   }
 
   .users {
-    margin-top: 50px;
+    margin-top: 30px;
   }
 }
 
@@ -918,7 +928,7 @@ body::-webkit-scrollbar {
     .title {
       margin: 0px;
       /* padding-top: 15px; */
-      margin-right: 20px;
+      margin-right: auto;
     }
 
 
@@ -926,7 +936,7 @@ body::-webkit-scrollbar {
     .text-button {
       font-size: 20px;
       text-align: left;
-      margin-left: auto;
+      margin-left: 20px;
       /* margin-right: 14px; */
       padding-top: 2px;
     }
@@ -1082,10 +1092,10 @@ body::-webkit-scrollbar {
       .column {
         color: var(--c-shade5);
         padding-left: 10px;
-        padding-right: 10px;
-        /* width: fit-content; */
+        /* padding-right: 10px; */
         /* flex-basis: 100%; */
         flex: 1;
+        height: 100%;
         /* max-width: 50px; */
         /* word-wrap: break-word; */
         overflow-x: hidden;

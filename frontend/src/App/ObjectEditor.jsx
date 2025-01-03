@@ -25,7 +25,7 @@ const ObjectEditor = () => {
 	}, [])
 
 	console.dir(EDITOR)
-	// let data = EDITOR.original
+	// let xxx = EDITOR.original
 	let xxx = { ...state?.Config }
 
 	const save = () => {
@@ -70,7 +70,7 @@ const ObjectEditor = () => {
 			title = data["Name"]
 		}
 
-		console.log('TITLE:', title)
+		// console.log('TITLE:', title)
 		return React.createElement("div", { key: id, className: "obj-grp" },
 			title !== undefined ? React.createElement("div", { key: id + "_title", className: "title" }, title) : null,
 			...Object.keys(data).map(v => {
