@@ -1518,3 +1518,80 @@ body::-webkit-scrollbar {
 .tooltip:hover .tooltiptext {
   display: inline;
 }
+
+
+
+
+.object-editor {
+  flex-wrap: wrap;
+  color: white;
+  font-size: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+
+
+
+  .title {
+    flex-basis: 100%;
+    width: 100% !important;
+  }
+
+  .arr-grp {
+    padding: 5px;
+    flex-wrap: wrap;
+    border: 1px solid green;
+    display: flex;
+    flex-direction: row;
+    gap: 10px;
+    min-height: 50px;
+    width: fit-content;
+    /* max-width: 1000px; */
+  }
+
+  .obj-grp:first-of-type {
+    border: none;
+    background: none;
+  }
+
+  .obj-grp {
+    flex-grow: 1;
+    padding: 10px;
+    flex-wrap: wrap;
+    /* border: 1px solid orange; */
+    background: var(--c-shade2);
+    display: flex;
+    gap: 10px;
+    flex-direction: column;
+    width: fit-content;
+    height: fit-content;
+    /* max-width: 1000px; */
+  }
+
+  .input-wrap {
+    display: flex;
+    flex-direction: row;
+
+    .label {
+      color: var(--c-blue);
+    }
+
+    input {
+      margin-left: 10px;
+      color: var(--c-shade6);
+      background: none;
+      height: fit-content;
+      width: fit-content;
+      background: none !important;
+      outline: none !important;
+      border: none !important;
+      border-bottom: 1px solid var(--c-shade1) !important;
+    }
+
+
+
+
+  }
+
+}

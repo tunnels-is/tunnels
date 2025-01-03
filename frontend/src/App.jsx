@@ -32,6 +32,7 @@ import STORE from "./store";
 import WS from "./ws";
 import Routing from "./App/Routing";
 import ConnectionTable from "./App/ConnectionTable";
+import ObjectEditor from "./App/ObjectEditor";
 
 // Use this to automatically turn on debug 
 STORE.Cache.Set("debug", true)
@@ -148,6 +149,7 @@ const LaunchApp = () => {
 
 							<Route path="login" element={<Login />} />
 							<Route path="help" element={<Welcome />} />
+							<Route path="test" element={<ObjectEditor />} />
 
 							<Route path="*" element={<Servers />} />
 						</>
