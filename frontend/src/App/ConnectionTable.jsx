@@ -5,9 +5,11 @@ import Loader from "react-spinners/ScaleLoader";
 import STORE from "../store";
 import GLOBAL_STATE from "../state";
 import NewTable from "./component/newtable";
+import CustomSelect from "./component/CustomSelect";
 
 const ConnectionTable = () => {
 	const state = GLOBAL_STATE("connections")
+	const navigate = useNavigate()
 
 	let user = STORE.GetUser()
 
@@ -185,7 +187,7 @@ const ConnectionTable = () => {
 			align: "left",
 			className: "tag",
 			value: c.IFName,
-			color: active ? "green" : "red",
+			color: "blue",
 		})
 
 		row.items.push({
@@ -215,32 +217,46 @@ const ConnectionTable = () => {
 			value: routeCount,
 		})
 
+		let opts = []
+
 		let server = undefined
 		state.Servers?.map((x) => {
 			if (x._id === c.ServerID) {
+				opts.push({ value: x.Server, key: x._id, selected: true })
 				server = x
 				return
+			} else {
+				opts.push({ value: x.Server, key: x._id, selected: false })
+
 			}
 		})
 
 		if (!server) {
 			state.PrivateServers?.map((x) => {
 				if (x._id === c.ServerID) {
+					opts.push({ value: x.Server, key: x._id, selected: true })
 					server = x
 					return
+				} else {
+					opts.push({ value: x.Server, key: x._id, selected: false })
 				}
 			})
 		}
+
 		row.items.push({
-			type: "text",
-			align: "left",
-			className: "server",
-			value: server ? server.Server : "",
-			color: "blue",
-			click: function() {
-				popEditor(server)
-			}
+			type: "select",
+			opts: opts,
+			value: <CustomSelect
+				parentkey={c.Tag}
+				className={"clickable"}
+				placeholder={"Assign"}
+				setValue={(opt) => {
+					state.changeServerOnConnection(c.Tag, opt.key)
+				}}
+				options={opts}
+			></CustomSelect>,
 		})
+
 
 		row.items.push({
 			type: "text",
@@ -248,11 +264,42 @@ const ConnectionTable = () => {
 			className: "serverip",
 			value: server ? server.IP : "",
 			color: "blue",
-			click: function() {
+			click: () => {
 				popEditor(server)
 			}
 		})
 
+		row.items.push({
+			type: "text",
+			align: "right",
+			className: "serverip",
+			value: active ? "disconnect" : server ? "connect" : "",
+			color: active ? "red" : "green",
+			click: () => {
+				if (active) {
+					state.ConfirmAndExecute(
+						"success",
+						"disconnect",
+						10000,
+						"",
+						"Disconnect from " + c.Tag,
+						() => {
+							state.disconnectFromVPN(c)
+						})
+				} else {
+					state.ConfirmAndExecute(
+						"success",
+						"connect",
+						10000,
+						"",
+						"Connect to " + c.Tag,
+						() => {
+							state.connectToVPN(c)
+						})
+
+				}
+			}
+		})
 
 
 		rows.push(row)
@@ -267,6 +314,7 @@ const ConnectionTable = () => {
 		{ value: "Routes", align: "left" },
 		{ value: "Server", align: "left" },
 		{ value: "IP", align: "left" },
+		{ value: "", align: "right" },
 	]
 
 
