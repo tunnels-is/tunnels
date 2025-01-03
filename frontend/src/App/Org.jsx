@@ -63,6 +63,7 @@ const Org = () => {
 
 
 			<NewTable
+				background={true}
 				tableID={"org-groups"}
 				title={"Groups"}
 				className="group-table"

@@ -106,8 +106,13 @@ const NewTable = (props) => {
 				}
 
 				{props?.button &&
-					<div onClick={(e) => props.button.click(e)} className="text-button clickable">
+					<div style={{ color: "var(--c-" + props.button.color ? props.button.color : "blue" + ")" }} onClick={(e) => props.button.click(e)} className="text-button clickable">
 						{props.button.text}
+					</div>
+				}
+				{props?.button2 &&
+					<div style={{ color: "var(--c-" + props.button2.color ? props.button2.color : "blue" + ")" }} onClick={(e) => props.button2.click(e)} className="text-button clickable">
+						{props.button2.text}
 					</div>
 				}
 
@@ -182,11 +187,16 @@ const NewTable = (props) => {
 							cs.justifyContent = l.align
 							cs.display = "flex"
 						}
+						if (l.minWidth) {
+							cs.minWidth = l.minWidth
+						}
 
 						if (l.width) {
 							cs.flex = "0 1 " + String(l.width) + "%"
 						}
 
+						console.log("HS")
+						console.dir(cs)
 						return (
 							<div
 								key={l.value + i}
@@ -225,6 +235,9 @@ const NewTable = (props) => {
 								let classNames = ""
 								if (i.className !== undefined) {
 									classNames = i.className
+								}
+								if (i.minWidth) {
+									cs.minWidth = i.minWidth
 								}
 
 								if (i.width) {
