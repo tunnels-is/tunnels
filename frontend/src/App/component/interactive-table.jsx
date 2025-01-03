@@ -5,7 +5,7 @@ const InteractiveTable = (props) => {
 	// console.dir(props)
 
 	return (
-		<div className="table-frame">
+		<div className={`table-frame ${props.background ? "table-bg" : ""}`}>
 
 			<div className="top-bar">
 				{props?.title &&
@@ -34,14 +34,14 @@ const InteractiveTable = (props) => {
 			<table className={`${props.className} ab table`}>
 
 				{props?.rows?.length > 0 &&
-					<div className="ab header">
+					<tr className="ab header">
 						{props?.header?.map((l) => {
 							return (
 								<th key={l.value} className="ab column content">{l.value}
 								</th>
 							)
 						})}
-					</div>
+					</tr>
 				}
 
 				{props?.rows?.map(r => {

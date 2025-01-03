@@ -169,9 +169,6 @@ const ConnectionTable = () => {
 			align: "left",
 			className: "tag",
 			value: c.Tag,
-			click: () => {
-				openConnectionEditor(c)
-			}
 		})
 
 		let active = false
@@ -188,6 +185,9 @@ const ConnectionTable = () => {
 			className: "tag",
 			value: c.IFName,
 			color: "blue",
+			click: () => {
+				openConnectionEditor(c)
+			}
 		})
 
 		row.items.push({
@@ -197,25 +197,6 @@ const ConnectionTable = () => {
 			value: c.Private ? "private" : "public",
 		})
 
-		row.items.push({
-			type: "text",
-			align: "left",
-			className: "dns",
-			value: c.DNS.length,
-		})
-
-
-		let routeCount = 0
-		c.Networks?.map(n => {
-			routeCount += n.Routes.length
-		})
-
-		row.items.push({
-			type: "text",
-			align: "left",
-			className: "dns",
-			value: routeCount,
-		})
 
 		let opts = []
 
@@ -231,17 +212,15 @@ const ConnectionTable = () => {
 			}
 		})
 
-		if (!server) {
-			state.PrivateServers?.map((x) => {
-				if (x._id === c.ServerID) {
-					opts.push({ value: x.Server, key: x._id, selected: true })
-					server = x
-					return
-				} else {
-					opts.push({ value: x.Server, key: x._id, selected: false })
-				}
-			})
-		}
+		state.PrivateServers?.map((x) => {
+			if (x._id === c.ServerID) {
+				opts.push({ value: x.Tag, key: x._id, selected: true })
+				server = x
+				return
+			} else {
+				opts.push({ value: x.Tag, key: x._id, selected: false })
+			}
+		})
 
 		row.items.push({
 			type: "select",
@@ -262,7 +241,7 @@ const ConnectionTable = () => {
 			type: "text",
 			align: "left",
 			className: "serverip",
-			value: server ? server.IP : "",
+			value: server ? server.IP ? server.IP : c.PrivateIP : "",
 			color: "blue",
 			click: () => {
 				popEditor(server)
@@ -310,8 +289,6 @@ const ConnectionTable = () => {
 		{ value: "Tag", align: "left" },
 		{ value: "Interface", align: "left" },
 		{ value: "Type", align: "left" },
-		{ value: "DNS", align: "left" },
-		{ value: "Routes", align: "left" },
 		{ value: "Server", align: "left" },
 		{ value: "IP", align: "left" },
 		{ value: "", align: "right" },
