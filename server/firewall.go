@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"net"
 	"runtime/debug"
@@ -14,27 +13,61 @@ func syncFirewallState(fr *FirewallRequest, mapping *UserCoreMapping) (errors []
 			log.Println(r, string(debug.Stack()))
 		}
 	}()
-	hostMap := make(map[[4]byte]bool)
 
-	for _, v := range fr.Hosts {
-		ip := net.ParseIP(v)
-		if ip != nil {
-			ip = ip.To4()
-			hostMap[[4]byte{ip[0], ip[1], ip[2], ip[3]}] = true
-			continue
-		}
+	for i := range mapping.AllowedHosts {
+		found := false
+		for ii := range fr.Hosts {
+			ip4, ok := getIP4FromHostOrDHCP(fr.Hosts[i])
+			if !ok {
+				continue
+			}
 
-		ip4b, ok := getHostnameFromDHCP(v)
-		if !ok {
-			errors = append(errors, fmt.Sprintf("invalid host/ip (%s)", v))
-			continue
+			if ip4 == mapping.AllowedHosts[ii].IP && mapping.AllowedHosts[ii].Type == "manual" {
+				found = true
+				break
+			}
+
+			if !found {
+				mapping.DelHost(ip4, "manual")
+			}
 		}
-		hostMap[ip4b] = true
 	}
 
-	mapping.Allowedm.Lock()
-	mapping.AllowedHosts = hostMap
-	mapping.Allowedm.Unlock()
+	for i := range fr.Hosts {
+		ip4, ok := getIP4FromHostOrDHCP(fr.Hosts[i])
+		if !ok {
+			continue
+		}
+
+		found := false
+		for ii := range mapping.AllowedHosts {
+			if ip4 == mapping.AllowedHosts[ii].IP {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			mapping.AddHost(ip4, [2]byte{}, "manual")
+		}
+
+	}
+
+	return
+}
+
+func getIP4FromHostOrDHCP(host string) (ip4 [4]byte, ok bool) {
+	ip := net.ParseIP(host)
+	if ip != nil {
+		ip = ip.To4()
+		ip4[0] = ip[0]
+		ip4[1] = ip[1]
+		ip4[2] = ip[2]
+		ip4[3] = ip[3]
+		ok = true
+	} else {
+		ip4, ok = getHostnameFromDHCP(host)
+	}
 	return
 }
 

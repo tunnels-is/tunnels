@@ -258,11 +258,65 @@ type UserCoreMapping struct {
 	// VPL
 	APIToken     string
 	Allowedm     sync.Mutex
-	AllowedHosts map[[4]byte]bool
+	AllowedHosts []*AllowedHost
 	DHCP         *DHCPRecord
 
 	// IOT Client Only
 	CPU  byte
 	RAM  byte
 	Disk byte
+}
+
+type AllowedHost struct {
+	IP   [4]byte
+	PORT [2]byte
+	Type string
+}
+
+func (u *UserCoreMapping) IsHostAllowed(host [4]byte, port [2]byte) bool {
+	for _, v := range u.AllowedHosts {
+		if v.IP == host {
+			if v.Type == "manual" {
+				return true
+			} else if v.PORT == port {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func (u *UserCoreMapping) AddHost(host [4]byte, port [2]byte, t string) {
+	found := false
+	for i := range u.AllowedHosts {
+		if u.AllowedHosts[i].IP == host {
+			if u.AllowedHosts[i].Type == "manual" {
+				found = true
+			} else if u.AllowedHosts[i].PORT == port {
+				found = true
+			}
+			break
+		}
+	}
+	if !found {
+		u.Allowedm.Lock()
+		u.AllowedHosts = append(u.AllowedHosts,
+			&AllowedHost{
+				IP:   host,
+				PORT: port,
+				Type: t,
+			})
+		u.Allowedm.Unlock()
+	}
+}
+
+func (u *UserCoreMapping) DelHost(host [4]byte, t string) {
+	u.Allowedm.Lock()
+	defer u.Allowedm.Unlock()
+	for i := range u.AllowedHosts {
+		if u.AllowedHosts[i].IP == host && u.AllowedHosts[i].Type == t {
+			u.AllowedHosts[i] = u.AllowedHosts[len(u.AllowedHosts)-1]
+			u.AllowedHosts = u.AllowedHosts[:len(u.AllowedHosts)-1]
+		}
+	}
 }

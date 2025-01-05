@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 
 import Loader from "react-spinners/ScaleLoader";
@@ -6,9 +6,11 @@ import STORE from "../store";
 import GLOBAL_STATE from "../state";
 import NewTable from "./component/newtable";
 import CustomSelect from "./component/CustomSelect";
+import ObjectEditor from "./ObjectEditor";
 
 const ConnectionTable = () => {
 	const state = GLOBAL_STATE("connections")
+	const [con, setCon] = useState(undefined)
 	const navigate = useNavigate()
 
 	let user = STORE.GetUser()
@@ -25,6 +27,7 @@ const ConnectionTable = () => {
 		x()
 	}, [])
 
+
 	const addConnection = () => {
 		let new_conn = {
 			Tag: "newtag",
@@ -36,6 +39,64 @@ const ConnectionTable = () => {
 				state.renderPage("connections")
 			}
 		})
+	}
+
+	const saveConnection = () => {
+		let modCons = state.GetModifiedConnections()
+		let found = false
+		modCons.forEach((n, i) => {
+			if (n.WindowsGUID === con.WindowsGUID) {
+				modCons[i] = x
+				found = true
+			}
+		})
+		if (!found) {
+			modCons.push(con)
+		}
+
+		state.SaveConnectionsToModifiedConfig(modCons)
+		state.ConfigSave()
+		state.renderPage("connections")
+	}
+
+	const editorOpts = {
+		baseClass: "connection-object-editor",
+		maxDepth: 1000,
+		onlyKeys: false,
+		defaults: {
+			root_AllowedHosts: [],
+		},
+		titles: {
+			root_DNSServers: "DNS Servers",
+			root_DNS: "DNS Records",
+			root_DNS_IP: "IP Addresses",
+			root_DNS_TXT: "TXT Records"
+		},
+		newButtons: {
+			root_DNS: (obj) => {
+				obj.push({ Domain: "MEOW", Wildcard: true, CNAME: "", IP: [], TXT: [] })
+			},
+			root_DNS_IP: (obj) => {
+				obj.push("0.0.0.0")
+			},
+			root_DNS_TXT: (obj) => {
+				obj.push("new text record")
+			},
+			root_Networks: (obj) => {
+				obj.push({ Tag: "new-network", Network: "", Nat: "", Routes: [] })
+			},
+			root_Networks_Routes: (obj) => {
+				obj.push({ Address: "0.0.0.0/0", Metric: "9999" })
+			},
+			root_AllowedHosts: (obj) => {
+				obj.push("0.0.0.0")
+			},
+			root_DNSServers: (obj) => {
+				obj.push("9.9.9.9")
+			},
+		},
+		delButtons: [],
+		saveButton: saveConnection,
 	}
 
 	const popEditor = (r) => {
@@ -85,6 +146,7 @@ const ConnectionTable = () => {
 			}
 
 			state.SaveConnectionsToModifiedConfig(modCons)
+			state.ConfigSave()
 			state.globalRerender()
 		}
 
@@ -186,7 +248,9 @@ const ConnectionTable = () => {
 			value: c.IFName,
 			color: "blue",
 			click: () => {
-				openConnectionEditor(c)
+				setCon(c)
+				state.renderPage("connections")
+				// openConnectionEditor(c)
 			}
 		})
 
@@ -294,6 +358,17 @@ const ConnectionTable = () => {
 		{ value: "", align: "right" },
 	]
 
+	if (con !== undefined) {
+		return (
+			<div className="connections">
+				<div className="back" onClick={() => setCon(undefined)}>Back to tunnels</div>
+				<ObjectEditor
+					opts={editorOpts}
+					object={con}
+				/>
+			</div>
+		)
+	}
 
 	return (
 		<div className="connections" >
