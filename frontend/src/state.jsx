@@ -349,6 +349,7 @@ export var STATE = {
 		STATE.modifiedConfig = undefined
 		STATE.modifiedLists = undefined
 		STATE.ConfigSaveModifiedSate()
+		STATE.SetConfigModifiedState(false)
 		STATE.globalRerender()
 	},
 	SaveModifiedLists: () => {

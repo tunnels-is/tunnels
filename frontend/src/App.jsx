@@ -10,12 +10,13 @@ import '@fontsource-variable/inter';
 import InspectBlocklist from "./App/InspectBlocklist";
 import InspectConnection from "./App/InspectConnection";
 import InspectJSON from "./App/component/InspectJSON";
+import ConnectionTable from "./App/ConnectionTable";
 import DNSAnswers from "./App/component/DNSAnswers";
 import PrivateServers from "./App/PrivateServers";
 import InspectServer from "./App/InspectServer";
+import ObjectEditor from "./App/ObjectEditor";
 import ScreenLoader from "./App/ScreenLoader";
 import InspectGroup from "./App/InspectGroup";
-import Connections from "./App/Connections";
 import Enable2FA from "./App/Enable2FA";
 import Settings from "./App/Settings";
 import Account from "./App/Account";
@@ -30,9 +31,6 @@ import GLOBAL_STATE from "./state";
 import { STATE } from "./state";
 import STORE from "./store";
 import WS from "./ws";
-import Routing from "./App/Routing";
-import ConnectionTable from "./App/ConnectionTable";
-import ObjectEditor from "./App/ObjectEditor";
 
 // Use this to automatically turn on debug 
 STORE.Cache.Set("debug", true)

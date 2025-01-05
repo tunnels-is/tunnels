@@ -327,6 +327,9 @@ func SetConfig(config *Config) error {
 		}
 	}
 
+	// IF hostlist is modified...
+	// TODO..
+
 	err = SaveConfig(config)
 	if err != nil {
 		ERROR("Unable to save config: ", err)
