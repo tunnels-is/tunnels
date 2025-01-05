@@ -2851,6 +2851,12 @@ button {
   gap: 20px;
   flex-wrap: wrap;
 
+  .back {
+    font-size: 26px;
+    color: var(--c-blue);
+    cursor: pointer;
+  }
+
   .search-wrapper {
     margin-bottom: 20px;
   }

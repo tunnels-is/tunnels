@@ -31,10 +31,11 @@ const ConfigDNSRecordEditor = () => {
 			state.SetConfigModifiedState(true)
 			state.globalRerender()
 		} else {
-			state.Config.DNSRecords = state.Config.DNSRecords.splice(index, 1)
+			state.Config.DNSRecords.splice(index, 1)
+			state.SetConfigModifiedState(true)
+			state.globalRerender()
 		}
 
-		state.renderPage("DNSRecordForm")
 	}
 
 	const updateRecord = (index, subindex, key, value) => {

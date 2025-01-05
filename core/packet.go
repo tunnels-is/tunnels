@@ -56,7 +56,8 @@ func (V *Tunnel) ProcessEgressPacket(p *[]byte) (sendRemote bool) {
 		return false
 	}
 
-	V.EP_IPv4HeaderLength = (packet[0] << 4 >> 4) * 4
+	// V.EP_IPv4HeaderLength = (packet[0] << 4 >> 4) * 4
+	V.EP_IPv4HeaderLength = (packet[0] & 0x0F) * 4
 
 	V.EP_IPv4Header = packet[:V.EP_IPv4HeaderLength]
 	V.EP_TPHeader = packet[V.EP_IPv4HeaderLength:]

@@ -415,7 +415,7 @@ type TunnelMETA struct {
 	NetMask     string
 
 	// VPL Firewall
-	// AllowedHosts []string
+	AllowedHosts []string
 
 	// This overwrites or adds to settings
 	// that are applied to the Node
