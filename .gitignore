@@ -15,7 +15,6 @@ cmd/main/private.crt
 *.exe
 
 node_modules
-frontend/dist
 files
 
 .DS_Store
