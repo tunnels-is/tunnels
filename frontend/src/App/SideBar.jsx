@@ -42,12 +42,6 @@ const SideBar = () => {
 		}
 	}
 
-	const hasOrg = () => {
-		if (state.User?.OrgID !== "000000000000000000000000" && state.User?.OrgID !== undefined) {
-			return true
-		}
-		return false
-	}
 
 	const showLogin = () => {
 		if (!state.User || state.User?.Email === "") {
@@ -74,7 +68,7 @@ const SideBar = () => {
 					{ icon: LockOpen1Icon, label: "Login", route: "login", user: false, shouldRender: showLogin },
 					{ icon: PersonIcon, label: "Profile", route: "account", user: true, },
 					{ icon: GearIcon, label: "Setting", route: "settings", user: false, },
-					{ icon: HomeIcon, label: "Organization", route: "org", user: true, shouldRender: hasOrg },
+					{ icon: HomeIcon, label: "Organization", route: "org", user: true, },
 				]
 			},
 			{

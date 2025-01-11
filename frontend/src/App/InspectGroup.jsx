@@ -5,10 +5,11 @@ import GLOBAL_STATE from "../state"
 import KeyValue from "./component/keyvalue";
 import dayjs from "dayjs";
 import NewTable from "./component/newtable";
+import ObjectEditor from "./ObjectEditor";
 
 const InspectGroup = () => {
 	const { id } = useParams()
-	const [tag, setTag] = useState("")
+	// const [tag, setTag] = useState("")
 	const [groupID, setGroupID] = useState(id)
 	const [users, setUsers] = useState([])
 	const [servers, setServers] = useState([])
@@ -19,22 +20,38 @@ const InspectGroup = () => {
 
 	let org = state?.Org
 
-	const Create = async () => {
-		let user = state.User
-		if (!user) {
-			console.log("LUL")
-			return
-		}
-		let group = {}
-		group.Nodes = {}
-		group.Users = {}
-		group.Devices = {}
-		group.Tag = tag
-		group.OrgID = user.OrgID
-
-		await state.API_CreateGroup(group)
-		state.renderPage("groups")
+	const dummyGroup = {
+		Tag: ""
 	}
+
+	const createOpts = {
+		baseClass: "group-object-editor",
+		maxDepth: 1000,
+		onlyKeys: false,
+		titles: {
+		},
+		hidden: {
+		},
+		newButtons: {
+		},
+		saveButton: async () => {
+			let user = state.User
+			if (!user) {
+				return
+			}
+
+			dummyGroup.Nodes = {}
+			dummyGroup.Users = {}
+			dummyGroup.Devices = {}
+			dummyGroup.OrgID = user.OrgID
+
+			console.log('Update ORG')
+			console.dir(dummyGroup)
+			await state.API_CreateGroup(dummyGroup)
+			navigate("/org")
+		}
+	}
+
 
 	const Save = async () => {
 
@@ -67,6 +84,7 @@ const InspectGroup = () => {
 		if (org) {
 			org?.Groups?.forEach(g => {
 				if (g._id === groupID) {
+					console.log("FOUND GROUP!")
 					group = g
 					return
 				}
@@ -96,9 +114,10 @@ const InspectGroup = () => {
 	if (!groupID) {
 		return (
 			<div className="ab group-wrapper">
-				<div className="title">Create Group</div>
-				<FormKeyValue label={"Tag"} value={<input onChange={(e) => setTag(e.target.value)} type="text" />} />
-				<div className="button" onClick={(e) => Create()}>Create</div>
+				<ObjectEditor
+					opts={createOpts}
+					object={dummyGroup}
+				/>
 			</div>
 		)
 	}
@@ -214,16 +233,16 @@ const InspectGroup = () => {
 				{
 					type: "text",
 					color: "blue",
-					minWidth: "250px",
 					value: <input onChange={(e) => usersInputChange(e, i, "Email")} type="text" value={u.Email} />
 				},
 				{
 					type: "text",
+					minWidth: "250px",
 					value: <input onChange={(e) => usersInputChange(e, i, "_id")} type="text" value={u._id} />
 				},
 				{
 					type: "text",
-					value: dayjs(s.Added).format("DD-MM-YYYY HH:mm:ss"),
+					value: dayjs(u.Added).format("DD-MM-YYYY HH:mm:ss"),
 				},
 				{
 					type: "text",
