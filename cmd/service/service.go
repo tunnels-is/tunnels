@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"runtime"
 	"runtime/debug"
+	"time"
 
 	"github.com/tunnels-is/tunnels/core"
 )
@@ -19,6 +20,7 @@ func Start() {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	err := core.InitService()
 	if err != nil {
+		time.Sleep(5 * time.Second)
 		panic(err)
 	}
 	core.LaunchEverything()

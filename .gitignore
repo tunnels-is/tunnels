@@ -6,7 +6,6 @@ server.crt
 build/*
 builds/*
 
-cmd/main/dist
 cmd/main/files
 cmd/main/*.exe
 cmd/main/main

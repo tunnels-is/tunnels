@@ -1171,6 +1171,92 @@ export var STATE = {
 			STATE.rerender()
 		}
 	},
+	UpdateOrgInProgress: false,
+	API_UpdateOrg: async (org) => {
+		if (STATE.UpdateOrgInProgress) {
+			return
+		}
+		STATE.UpdateOrgInProgress = true
+
+		let resp = undefined
+		try {
+			let FR = {
+				Path: "v3/org/update",
+				Method: "POST",
+				Timeout: 10000,
+			}
+
+			if (STATE.User) {
+				FR.JSONData = {
+					UID: STATE.User._id,
+					DeviceToken: STATE.User.DeviceToken.DT,
+					Org: org
+				}
+			} else {
+				STATE.UpdateOrgInProgress = false
+				return undefined
+			}
+
+			STATE.toggleLoading({
+				tag: "ORG_UPDATE",
+				show: true,
+				msg: "updating organization ..."
+			})
+
+			resp = await STATE.API.method("forwardToController", FR)
+			if (resp?.status === 200) {
+				STATE.updateOrg(org)
+			}
+		} catch (error) {
+			console.dir(error)
+		}
+
+		STATE.toggleLoading(undefined)
+		STATE.UpdateOrgInProgress = false
+	},
+	CreateOrgInProgress: false,
+	API_CreateOrg: async (org) => {
+		if (STATE.CreateOrgInProgress) {
+			return
+		}
+		STATE.CreateOrgInProgress = true
+
+		let resp = undefined
+		try {
+			let FR = {
+				Path: "v3/org/create",
+				Method: "POST",
+				Timeout: 10000,
+			}
+
+			if (STATE.User) {
+				FR.JSONData = {
+					UID: STATE.User._id,
+					DeviceToken: STATE.User.DeviceToken.DT,
+					Org: org
+				}
+			} else {
+				STATE.CreateOrgInProgress = false
+				return undefined
+			}
+
+			STATE.toggleLoading({
+				tag: "ORG_CREATE",
+				show: true,
+				msg: "creating organization ..."
+			})
+
+			resp = await STATE.API.method("forwardToController", FR)
+			if (resp?.status === 200) {
+				STATE.updateOrg(resp.data)
+			}
+		} catch (error) {
+			console.dir(error)
+		}
+
+		STATE.toggleLoading(undefined)
+		STATE.CreateOrgInProgress = false
+	},
 	GetOrgInProgress: false,
 	API_GetOrg: async () => {
 		if (!STATE.User) {
@@ -1230,12 +1316,23 @@ export var STATE = {
 	},
 	UpdateGroup: (group) => {
 		if (STATE.Org) {
+			if (!STATE.Org.Groups) {
+				STATE.Org.Groups = [group]
+				STATE.updateOrg(STATE.Org)
+				return
+			}
+			let found = false
 			STATE.Org.Groups?.forEach((g, i) => {
 				if (g._id === group._id) {
+					found = true
 					STATE.Org.Groups[i] = group
 					STATE.updateOrg(STATE.Org)
 				}
 			});
+			if (found === false) {
+				STATE.Org.Groups.push(group)
+				STATE.updateOrg(STATE.Org)
+			}
 		}
 	},
 	API_UpdateGroup: async (group) => {
@@ -1296,21 +1393,21 @@ export var STATE = {
 			}
 
 			STATE.toggleLoading({
-				tag: "ORG_FETCH",
+				tag: "GROUP_CREATE",
 				show: true,
-				msg: "searching ..."
+				msg: "creating group ..."
 			})
 
 			resp = await STATE.API.method("forwardToController", FR)
 			if (resp?.status === 200) {
-				STATE.UpdateGroup(group)
+				STATE.UpdateGroup(resp.data)
 			}
 		} catch (error) {
 			console.dir(error)
 		}
 
 		STATE.toggleLoading(undefined)
-		return resp
+		return resp.data
 	},
 	State: STORE.Cache.GetObject("state"),
 	StateFetchInProgress: false,

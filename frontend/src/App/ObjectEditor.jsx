@@ -78,7 +78,7 @@ const ObjectEditor = (props) => {
 			}
 		}
 
-		if (props.opts.titles[x.ns] !== undefined) {
+		if (props.opts.titles && props.opts.titles[x.ns] !== undefined) {
 			if (x.index !== undefined && x.index !== "") {
 				x.title = props.opts.titles[x.ns + "_" + x.index]
 			} else {
@@ -97,9 +97,13 @@ const ObjectEditor = (props) => {
 		}
 
 
-		x.delButton = opts.delButtons[ns]
+		if (opts.delButtons !== undefined) {
+			x.delButton = opts.delButtons[ns]
+		}
 		if (x.index === undefined) {
-			x.newButton = opts.newButtons[ns]
+			if (opts.newButtons !== undefined) {
+				x.newButton = opts.newButtons[ns]
+			}
 		}
 
 		if (parent.type === "array" && x.delButton === undefined) {
@@ -253,10 +257,10 @@ const ObjectEditor = (props) => {
 		}
 
 
-		console.log("basetype", bt)
+		// console.log("basetype", bt)
 		if (bt === "object") {
 			Object.keys(data).forEach(k => {
-				if (data[k] === null || data[k] === undefined) {
+				if ((data[k] === null || data[k] === undefined) && props.opts.defaults) {
 					let def = props.opts.defaults["root_" + k]
 					if (def) {
 						data[k] = def
@@ -288,7 +292,7 @@ const ObjectEditor = (props) => {
 						}
 					} else {
 						if (gt === "array") {
-							console.log("KEY:", k)
+							// console.log("KEY:", k)
 							opts.meta.index = undefined
 							walkA(data[k], k, "root", opts.meta, opts)
 						} else if (gt === "object") {
@@ -341,11 +345,14 @@ const ObjectEditor = (props) => {
 		}
 
 
-		console.log("META")
-		console.dir(opts.meta)
+		// console.log("META")
+		// console.dir(opts.meta)
 	}
 
 	const makeInput = (x) => {
+		if (props.opts.hidden && props.opts.hidden["root_" + x.id] === true) {
+			return
+		}
 		let input = null
 		let label = null
 		if (x.type === "boolean") {
@@ -368,6 +375,7 @@ const ObjectEditor = (props) => {
 					className: "input",
 					value: x.parent.origin[x.id],
 					type: transformType(x.type),
+					disabled: props.opts.disabled ? props.opts.disabled["root_" + x.id] : false,
 					onChange: (e) => {
 						// console.log("change")
 						// console.dir(x.id)
@@ -424,6 +432,10 @@ const ObjectEditor = (props) => {
 
 		} else {
 			return makeInput(x)
+		}
+
+		if (props.opts.hidden && props.opts.hidden["root_" + x.id] === true) {
+			return
 		}
 
 		let titleD = null
@@ -535,7 +547,7 @@ const ObjectEditor = (props) => {
 
 
 	makeMeta(props.object, props.opts)
-	console.log(props.opts.meta)
+	// console.log(props.opts.meta)
 	// console.log("config")
 	// console.dir(state.Config)
 	return (<>
