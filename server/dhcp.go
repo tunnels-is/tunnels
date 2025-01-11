@@ -35,9 +35,8 @@ func assignDHCP(CR *ConnectRequest, CRR *ConnectRequestResponse, index int) (err
 				continue
 			}
 
-			fmt.Println("TC:", DHCPMapping[i].Token, CR.DHCPToken)
 			if DHCPMapping[i].Token == CR.DHCPToken {
-				fmt.Println("FOUND IT!")
+				fmt.Println("FOUND IT!", CR.DHCPToken)
 				DHCPMapping[i].AssignHostname(CR.Hostname)
 				DHCPMapping[i].Activity = time.Now()
 

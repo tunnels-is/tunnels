@@ -107,12 +107,9 @@ func HTTP_ListDevices(w http.ResponseWriter, r *http.Request) {
 }
 
 type FirewallRequest struct {
-	// for validation
 	DHCPToken string
 	IP        string
-
-	// Cmd   string
-	Hosts []string
+	Hosts     []string
 }
 
 func HTTP_Firewall(w http.ResponseWriter, r *http.Request) {

@@ -72,6 +72,57 @@ func ResetEverything() {
 	RestoreSaneDNSDefaults()
 }
 
+func sendFirewallToServer(serverIP string, DHCPToken string, DHCPIP string, allowedHosts []string) (err error) {
+	FR := new(FirewallRequest)
+	FR.DHCPToken = DHCPToken
+	FR.IP = DHCPIP
+	FR.Hosts = allowedHosts
+
+	var body []byte
+	body, err = json.Marshal(FR)
+	if err != nil {
+		return err
+	}
+
+	DEBUG("Sending firewall info to server: ", serverIP)
+	req, err := http.NewRequest("POST", "https://"+serverIP+":444/firewall", bytes.NewBuffer(body))
+	if err != nil {
+		return err
+	}
+
+	client := http.Client{
+		Timeout: time.Duration(5000) * time.Millisecond,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				CurvePreferences:   []tls.CurveID{tls.CurveP521},
+				RootCAs:            CertPool,
+				MinVersion:         tls.VersionTLS13,
+				InsecureSkipVerify: true,
+			},
+		},
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+
+	client.CloseIdleConnections()
+	if resp != nil {
+		if resp.Body != nil {
+			defer resp.Body.Close()
+		}
+
+		if resp.StatusCode != 200 {
+			return fmt.Errorf("error from server (%s) while applying firewall rules, code: %d", serverIP, resp.StatusCode)
+		}
+	} else {
+		return fmt.Errorf("no response from server(%s) while applying firewall rules", serverIP)
+	}
+
+	return nil
+}
+
 func SendRequestToController(method string, route string, data interface{}, timeoutMS int) ([]byte, int, error) {
 	defer RecoverAndLogToFile()
 
@@ -327,8 +378,10 @@ func SetConfig(config *Config) error {
 		}
 	}
 
-	// IF hostlist is modified...
-	// TODO..
+	err = applyNewFirewallRules(C, config)
+	if err != nil {
+		return err
+	}
 
 	err = SaveConfig(config)
 	if err != nil {
@@ -394,6 +447,27 @@ func BandwidthBytesToString(b uint64) string {
 	}
 
 	return "???"
+}
+
+func applyNewFirewallRules(originalConfig *Config, newConfig *Config) error {
+	for _, oc := range originalConfig.Connections {
+		for _, nc := range newConfig.Connections {
+			if oc.WindowsGUID == nc.WindowsGUID {
+				if !slices.Equal(oc.AllowedHosts, nc.AllowedHosts) {
+					t := findTunnelByGUID(nc.WindowsGUID)
+					if t != nil {
+						sendFirewallToServer(
+							t.ClientCR.ServerIP,
+							t.DHCP.Token,
+							net.IP(t.DHCP.IP[:]).String(),
+							nc.AllowedHosts,
+						)
+					}
+				}
+			}
+		}
+	}
+	return nil
 }
 
 func PrepareState() (err error) {
@@ -807,6 +881,7 @@ func PublicConnect(ClientCR ConnectionRequest) (code int, errm error) {
 	var createdNewInterface bool
 	err, createdNewInterface = FindOrCreateInterface(tunnel)
 	if err != nil {
+		ERROR("Unable to initialize interface: ", err)
 		return 502, err
 	}
 
@@ -865,6 +940,20 @@ func PublicConnect(ClientCR ConnectionRequest) (code int, errm error) {
 	}
 
 	go tunnel.ReadFromServeTunnel()
+
+	if tunnel.CRR.DHCP != nil {
+		if len(tunnel.Meta.AllowedHosts) > 0 {
+			err = sendFirewallToServer(
+				tunnel.ClientCR.ServerIP,
+				tunnel.DHCP.Token,
+				net.IP(tunnel.DHCP.IP[:]).String(),
+				tunnel.Meta.AllowedHosts,
+			)
+			if err != nil {
+				ERROR("unable to update firewall: ", err)
+			}
+		}
+	}
 
 	DEBUG("Session is ready - it took ", fmt.Sprintf("%.0f", math.Abs(time.Since(start).Seconds())), " seconds to connect")
 

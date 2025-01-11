@@ -1531,7 +1531,9 @@ body::-webkit-scrollbar {
 
 
 .connection-object-editor {
-  .root_keys {}
+  .root_keys {
+    min-width: 550px;
+  }
 }
 
 .object-editor-save {

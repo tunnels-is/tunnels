@@ -2851,6 +2851,10 @@ button {
   gap: 20px;
   flex-wrap: wrap;
 
+  .new-table {
+    min-width: 800px;
+  }
+
   .back {
     font-size: 26px;
     color: var(--c-blue);

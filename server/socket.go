@@ -90,7 +90,7 @@ func acceptUserUDPTLSSocket(conn *quic.Conn) {
 		}
 	}()
 
-	buff := make([]byte, 1500)
+	buff := make([]byte, 10000)
 	var err error
 	var n int
 
@@ -106,7 +106,7 @@ func acceptUserUDPTLSSocket(conn *quic.Conn) {
 		return
 	}
 
-	// fmt.Println("CR+HANDSHAKE:", string(buff[:n]))
+	fmt.Println("CR+HANDSHAKE:", string(buff[:n]))
 
 	_, CR, err := validateSignatureAndExtractConnectRequest(buff[:n])
 	if err != nil {

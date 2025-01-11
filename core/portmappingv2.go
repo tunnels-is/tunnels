@@ -301,7 +301,7 @@ func (V *Tunnel) cleanPortMap() {
 			}
 
 			if !isDNS {
-				if time.Since(v.LastActivity) > time.Second*120 {
+				if time.Since(v.LastActivity) > time.Second*150 {
 					debugMappStream(v)
 					delete(V.UDP_M[i].M, k)
 				}
