@@ -210,38 +210,38 @@ func (V *Tunnel) BuildNATMap() (err error) {
 }
 
 func (V *Tunnel) GetNatIP(originalIP []byte) ([4]byte, bool) {
-	xxx, ok := V.NAT_CACHE[[4]byte{originalIP[0], originalIP[1], originalIP[2], originalIP[3]}]
+	ipAddr := (net.IP)(originalIP[:])
+	newIP := make([]byte, len(originalIP))
+	copy(newIP, ipAddr)
+	xxx, ok := V.NAT_CACHE[[4]byte{ipAddr[0], ipAddr[1], ipAddr[2], ipAddr[3]}]
 	if ok {
 		return xxx, true
 	}
 
-	logNATMappingDebug(fmt.Sprintf("Missing NAT mapping for IP: %v", originalIP))
+	logNATMappingDebug(fmt.Sprintf("Missing NAT mapping for IP: %v", ipAddr))
 
-	originalIP := (net.IP)(originalIP[:])
-	newIP := make([]byte, len(originalIP))
-	copy(newIP, originalIP)
 	for _, v := range V.CRR.Networks {
 		if v.Nat == "" {
 			continue
 		}
 
-		if !v.NatIPNet.Contains(originalIP) {
+		if !v.NatIPNet.Contains(ipAddr) {
 			continue
 		}
 
 		if strings.HasSuffix(v.Network, "/32") {
-			for i := range originalIP[:4] {
-				newIP[i] = v.NetIPNet.IP[i]&v.NetIPNet.Mask[i] | originalIP[i]&^v.NetIPNet.Mask[i]
+			for i := range ipAddr[:4] {
+				newIP[i] = v.NetIPNet.IP[i]&v.NetIPNet.Mask[i] | ipAddr[i]&^v.NetIPNet.Mask[i]
 			}
 		} else {
-			for i := range originalIP[:3] {
-				newIP[i] = v.NetIPNet.IP[i]&v.NetIPNet.Mask[i] | originalIP[i]&^v.NetIPNet.Mask[i]
+			for i := range ipAddr[:3] {
+				newIP[i] = v.NetIPNet.IP[i]&v.NetIPNet.Mask[i] | ipAddr[i]&^v.NetIPNet.Mask[i]
 			}
 		}
 
-		V.NAT_CACHE[[4]byte{originalIP[0], originalIP[1], originalIP[2], originalIP[3]}] = [4]byte{newIP[0], newIP[1], newIP[2], newIP[3]}
+		V.NAT_CACHE[[4]byte{ipAddr[0], ipAddr[1], ipAddr[2], ipAddr[3]}] = [4]byte{newIP[0], newIP[1], newIP[2], newIP[3]}
 
-		V.REVERSE_NAT_CACHE[[4]byte{newIP[0], newIP[1], newIP[2], newIP[3]}] = [4]byte{originalIP[0], originalIP[1], originalIP[2], originalIP[3]}
+		V.REVERSE_NAT_CACHE[[4]byte{newIP[0], newIP[1], newIP[2], newIP[3]}] = [4]byte{ipAddr[0], ipAddr[1], ipAddr[2], ipAddr[3]}
 		break
 	}
 
