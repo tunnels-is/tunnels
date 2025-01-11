@@ -14,6 +14,7 @@ const InspectGroup = () => {
 	const [users, setUsers] = useState([])
 	const [servers, setServers] = useState([])
 	const [devices, setDevices] = useState([])
+	const [tag, setTag] = useState([])
 	const [group, setGroup] = useState()
 	const state = GLOBAL_STATE("groups")
 	const navigate = useNavigate()

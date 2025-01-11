@@ -9,6 +9,9 @@
 # Liecens
 We are still deciding on a license, but it will be an open source ( non-commercial ) one.
 
+# Special Mentioned
+ - n00bady ( creator of bluam )
+
 # Main golang module licenses
 go-ping: MIT
 google/uuid: BSD 3-Clause "New" or "Revised" License
