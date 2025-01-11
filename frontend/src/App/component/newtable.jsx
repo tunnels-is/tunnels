@@ -195,8 +195,6 @@ const NewTable = (props) => {
 							cs.flex = "0 1 " + String(l.width) + "%"
 						}
 
-						console.log("HS")
-						console.dir(cs)
 						return (
 							<div
 								key={l.value + i}

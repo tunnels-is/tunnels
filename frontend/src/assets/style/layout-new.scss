@@ -240,6 +240,7 @@ body::-webkit-scrollbar {
   font-size: 24px;
   font-weight: 800;
   color: var(--c-shade4);
+  margin-bottom: 20px;
 }
 
 .subtitle {
@@ -1548,7 +1549,12 @@ body::-webkit-scrollbar {
   align-content: center;
   color: var(--c-white);
   font-weight: bold;
-  background: var(--c-green)
+  background: var(--c-green);
+  cursor: pointer;
+}
+
+.object-editor-save:hover {
+  background: var(--c-dark-green);
 }
 
 .object-editor {
@@ -1577,10 +1583,12 @@ body::-webkit-scrollbar {
 
     .title {
       margin-right: 20px;
+      margin-bottom: 0px;
+      margin-top: 10px;
     }
 
     .new_button {
-      margin-top: 5px;
+      margin-top: 15px;
       color: var(--c-blue);
       cursor: pointer;
     }

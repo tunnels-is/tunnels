@@ -658,7 +658,7 @@ func PublicConnect(ClientCR ConnectionRequest) (code int, errm error) {
 	tunnel.Meta = FindMETAForConnectRequest(&ClientCR)
 	if tunnel.Meta == nil {
 		ERROR("vpn connection metadata not found for tag: ", ClientCR.Tag)
-		return 400, errors.New("error in router tunnel")
+		return 400, errors.New("error fetching connection meta")
 	}
 
 	if tunnel.Meta.DNSDiscovery != "" {
