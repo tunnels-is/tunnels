@@ -12,11 +12,10 @@ import (
 
 var (
 	// STREAM_DEBUG    = false
-	streamDebugChan   = make(chan Mapping, 1000)
-	noMappingChan     = make(chan []byte, 1000)
-	portMapLogLimiter = time.NewTicker(5 * time.Second)
-	portMapLogCount   = 0
-	portMapLogMutex   sync.Mutex
+	streamDebugChan    = make(chan Mapping, 1000)
+	noMappingChan      = make(chan []byte, 1000)
+	lastPortMapLogTime time.Time
+	portMapLogMutex    sync.Mutex
 )
 
 func StartTraceProcessor(MONITOR chan int) {
@@ -214,18 +213,13 @@ func debugMissingEgressMapping(packet []byte) {
 		portMapLogMutex.Lock()
 		defer portMapLogMutex.Unlock()
 
-		select {
-		case <-portMapLogLimiter.C:
-			if portMapLogCount > 0 {
-				if len(packet) > 60 {
-					DEBUG(fmt.Sprintf("Missing egress mappings (%d occurrences): %v", portMapLogCount, packet[0:60]))
-				} else {
-					DEBUG(fmt.Sprintf("Missing egress mappings (%d occurrences): %v", portMapLogCount, packet[0:len(packet)-1]))
-				}
-				portMapLogCount = 0
+		if time.Since(lastPortMapLogTime) > 5*time.Second {
+			if len(packet) > 60 {
+				DEBUG(fmt.Sprintf("Missing egress mapping: %v", packet[0:60]))
+			} else {
+				DEBUG(fmt.Sprintf("Missing egress mapping: %v", packet))
 			}
-		default:
-			portMapLogCount++
+			lastPortMapLogTime = time.Now()
 		}
 		return
 	}
@@ -233,12 +227,12 @@ func debugMissingEgressMapping(packet []byte) {
 	select {
 	case noMappingChan <- packet:
 	default:
-		// Only log ERROR once per 5 seconds
-		select {
-		case <-portMapLogLimiter.C:
+		portMapLogMutex.Lock()
+		if time.Since(lastPortMapLogTime) > 5*time.Second {
 			ERROR("NO EGRESS MAPPING!")
-		default:
+			lastPortMapLogTime = time.Now()
 		}
+		portMapLogMutex.Unlock()
 	}
 }
 
@@ -247,18 +241,13 @@ func debugMissingIngressMapping(packet []byte) {
 		portMapLogMutex.Lock()
 		defer portMapLogMutex.Unlock()
 
-		select {
-		case <-portMapLogLimiter.C:
-			if portMapLogCount > 0 {
-				if len(packet) > 60 {
-					DEBUG(fmt.Sprintf("Missing ingress mappings (%d occurrences): %v", portMapLogCount, packet[0:60]))
-				} else {
-					DEBUG(fmt.Sprintf("Missing ingress mappings (%d occurrences): %v", portMapLogCount, packet[0:len(packet)-1]))
-				}
-				portMapLogCount = 0
+		if time.Since(lastPortMapLogTime) > 5*time.Second {
+			if len(packet) > 60 {
+				DEBUG(fmt.Sprintf("Missing ingress mapping: %v", packet[0:60]))
+			} else {
+				DEBUG(fmt.Sprintf("Missing ingress mapping: %v", packet))
 			}
-		default:
-			portMapLogCount++
+			lastPortMapLogTime = time.Now()
 		}
 		return
 	}

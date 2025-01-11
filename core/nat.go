@@ -9,9 +9,8 @@ import (
 )
 
 var (
-	natLogLimiter = time.NewTicker(5 * time.Second)
-	natLogCount   = 0
-	natLogMutex   sync.Mutex
+	lastNATLogTime time.Time
+	natLogMutex    sync.Mutex
 )
 
 func inc(ip net.IP) {
@@ -27,14 +26,9 @@ func logNATMappingDebug(msg string) {
 	natLogMutex.Lock()
 	defer natLogMutex.Unlock()
 
-	select {
-	case <-natLogLimiter.C:
-		if natLogCount > 0 {
-			DEBUG(fmt.Sprintf("NAT mapping debug (%d occurrences): %s", natLogCount, msg))
-			natLogCount = 0
-		}
-	default:
-		natLogCount++
+	if time.Since(lastNATLogTime) > 5*time.Second {
+		DEBUG(fmt.Sprintf("NAT mapping debug: %s", msg))
+		lastNATLogTime = time.Now()
 	}
 }
 
