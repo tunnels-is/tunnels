@@ -467,6 +467,12 @@ type TunnelSTATS struct {
 	VPLNetwork *ServerNetwork
 }
 
+type FirewallRequest struct {
+	DHCPToken string
+	IP        string
+	Hosts     []string
+}
+
 type Tunnel struct {
 	Meta *TunnelMETA
 	TunnelSTATS
@@ -496,7 +502,6 @@ type Tunnel struct {
 	// VPN NODE
 	LOCAL_IF_IP [4]byte
 
-	// CRR     *VPNNode
 	PingBuffer [8]byte
 
 	// DNS1Bytes     [4]byte `json:"-"`

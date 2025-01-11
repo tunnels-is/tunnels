@@ -2,6 +2,7 @@ package core
 
 import (
 	"errors"
+	"fmt"
 	"net"
 	"strconv"
 	"strings"
@@ -23,6 +24,9 @@ func FindOrCreateInterface(TUN *Tunnel) (err error, created bool) {
 	}
 
 	metaIP := net.ParseIP(TUN.Meta.IPv4Address).To4()
+	if metaIP == nil {
+		return fmt.Errorf("invalid IP (%s) in tunnel (%s) options", TUN.Meta.IPv4Address, TUN.Meta.Tag), false
+	}
 	TUN.LOCAL_IF_IP[0] = metaIP[0]
 	TUN.LOCAL_IF_IP[1] = metaIP[1]
 	TUN.LOCAL_IF_IP[2] = metaIP[2]
@@ -184,12 +188,12 @@ func createDefaultTunnelMeta() (M *TunnelMETA) {
 func createMinimalConnection() (M *TunnelMETA) {
 	M = new(TunnelMETA)
 	M = createTunnel()
-	M.RequestVPNPorts = true
+	M.RequestVPNPorts = false
 	M.IPv4Address = "172.22.22.22"
 	M.NetMask = "255.255.255.255"
-	M.Tag = DefaultTunnelName
-	M.IFName = DefaultTunnelName
-	M.EnableDefaultRoute = true
+	M.Tag = DefaultTunnelName + "-min"
+	M.IFName = DefaultTunnelName + "-min"
+	M.EnableDefaultRoute = false
 	M.AutoConnect = true
 	return
 }

@@ -2,7 +2,6 @@ package core
 
 import (
 	"bytes"
-	"fmt"
 	"net"
 	"strconv"
 	"strings"
@@ -17,7 +16,7 @@ import (
 func AutoConnect(MONITOR chan int) {
 	defer func() {
 		time.Sleep(30 * time.Second)
-		MONITOR <- 5
+		MONITOR <- 200
 	}()
 
 	for {
@@ -36,14 +35,11 @@ func AutoConnect(MONITOR chan int) {
 						continue
 					}
 					if x.Meta.Tag == v.Tag {
-						fmt.Println("Already connected:", v.Tag)
 						continue next
 					}
 				}
 			}
 
-			fmt.Println("CONNECTING TO:", v.Tag)
-			fmt.Println("META:", v)
 			code, err := PublicConnect(ConnectionRequest{
 				Tag:        v.Tag,
 				DeviceKey:  CLIDeviceKey,

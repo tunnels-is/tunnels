@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"runtime"
 	"runtime/debug"
 
@@ -11,7 +12,7 @@ import (
 func Start() {
 	defer func() {
 		if r := recover(); r != nil {
-			core.ERROR(r, string(debug.Stack()))
+			fmt.Println(r, string(debug.Stack()))
 		}
 	}()
 

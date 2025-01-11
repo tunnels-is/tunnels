@@ -315,8 +315,14 @@ func (u *UserCoreMapping) DelHost(host [4]byte, t string) {
 	defer u.Allowedm.Unlock()
 	for i := range u.AllowedHosts {
 		if u.AllowedHosts[i].IP == host && u.AllowedHosts[i].Type == t {
-			u.AllowedHosts[i] = u.AllowedHosts[len(u.AllowedHosts)-1]
-			u.AllowedHosts = u.AllowedHosts[:len(u.AllowedHosts)-1]
+			if len(u.AllowedHosts) < 2 {
+				u.AllowedHosts = make([]*AllowedHost, 0)
+				break
+			} else {
+				u.AllowedHosts[i] = u.AllowedHosts[len(u.AllowedHosts)-1]
+				u.AllowedHosts = u.AllowedHosts[:len(u.AllowedHosts)-1]
+				break
+			}
 		}
 	}
 }
