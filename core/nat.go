@@ -39,40 +39,45 @@ func (V *Tunnel) TransLateVPLIP(ip [4]byte) ([4]byte, bool) {
 }
 
 func (V *Tunnel) TransLateIP(ip [4]byte) ([4]byte, bool) {
-	originalIP := (net.IP)(ip[:])
-	xxx, ok := V.NAT_CACHE[[4]byte{originalIP[0], originalIP[1], originalIP[2], originalIP[3]}]
-	if ok {
+	if xxx, ok := V.NAT_CACHE[ip]; ok {
 		return xxx, true
 	}
 
-	newIP := make([]byte, len(originalIP))
-	copy(newIP, originalIP)
+	if len(V.CRR.Networks) == 0 {
+		return ip, true
+	}
+
+	var newIP [4]byte
 	for _, v := range V.CRR.Networks {
 		if v.Nat == "" {
 			continue
 		}
 
-		if !v.NatIPNet.Contains(originalIP) {
+		if !v.NatIPNet.Contains(net.IP(ip[:])) {
 			continue
 		}
 
 		if strings.HasSuffix(v.Network, "/32") {
-			for i := range ip[:4] {
+			for i := 0; i < 4; i++ {
 				newIP[i] = v.NetIPNet.IP[i]&v.NetIPNet.Mask[i] | ip[i]&^v.NetIPNet.Mask[i]
 			}
 		} else {
-			for i := range ip[:3] {
+			for i := 0; i < 3; i++ {
 				newIP[i] = v.NetIPNet.IP[i]&v.NetIPNet.Mask[i] | ip[i]&^v.NetIPNet.Mask[i]
 			}
+			newIP[3] = ip[3]
 		}
 
-		V.NAT_CACHE[[4]byte{originalIP[0], originalIP[1], originalIP[2], originalIP[3]}] = [4]byte{newIP[0], newIP[1], newIP[2], newIP[3]}
-
-		V.REVERSE_NAT_CACHE[[4]byte{newIP[0], newIP[1], newIP[2], newIP[3]}] = [4]byte{originalIP[0], originalIP[1], originalIP[2], originalIP[3]}
+		V.NAT_CACHE[ip] = newIP
+		V.REVERSE_NAT_CACHE[newIP] = ip
 		break
 	}
 
-	return [4]byte{newIP[0], newIP[1], newIP[2], newIP[3]}, true
+	if newIP == [4]byte{0, 0, 0, 0} {
+		newIP = ip
+	}
+
+	return newIP, true
 }
 
 func (V *Tunnel) IsEgressVPLIP(ip [4]byte) (ok bool) {
