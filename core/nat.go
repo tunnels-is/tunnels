@@ -1,8 +1,17 @@
 package core
 
 import (
+	"fmt"
 	"net"
 	"strings"
+	"sync"
+	"time"
+)
+
+var (
+	natLogLimiter = time.NewTicker(5 * time.Second)
+	natLogCount   = 0
+	natLogMutex   sync.Mutex
 )
 
 func inc(ip net.IP) {
@@ -11,6 +20,21 @@ func inc(ip net.IP) {
 		if ip[j] > 0 {
 			break
 		}
+	}
+}
+
+func logNATMappingDebug(msg string) {
+	natLogMutex.Lock()
+	defer natLogMutex.Unlock()
+
+	select {
+	case <-natLogLimiter.C:
+		if natLogCount > 0 {
+			DEBUG(fmt.Sprintf("NAT mapping debug (%d occurrences): %s", natLogCount, msg))
+			natLogCount = 0
+		}
+	default:
+		natLogCount++
 	}
 }
 
@@ -189,4 +213,43 @@ func (V *Tunnel) BuildNATMap() (err error) {
 
 	}
 	return
+}
+
+func (V *Tunnel) GetNatIP(originalIP []byte) ([4]byte, bool) {
+	xxx, ok := V.NAT_CACHE[[4]byte{originalIP[0], originalIP[1], originalIP[2], originalIP[3]}]
+	if ok {
+		return xxx, true
+	}
+
+	logNATMappingDebug(fmt.Sprintf("Missing NAT mapping for IP: %v", originalIP))
+
+	originalIP := (net.IP)(originalIP[:])
+	newIP := make([]byte, len(originalIP))
+	copy(newIP, originalIP)
+	for _, v := range V.CRR.Networks {
+		if v.Nat == "" {
+			continue
+		}
+
+		if !v.NatIPNet.Contains(originalIP) {
+			continue
+		}
+
+		if strings.HasSuffix(v.Network, "/32") {
+			for i := range originalIP[:4] {
+				newIP[i] = v.NetIPNet.IP[i]&v.NetIPNet.Mask[i] | originalIP[i]&^v.NetIPNet.Mask[i]
+			}
+		} else {
+			for i := range originalIP[:3] {
+				newIP[i] = v.NetIPNet.IP[i]&v.NetIPNet.Mask[i] | originalIP[i]&^v.NetIPNet.Mask[i]
+			}
+		}
+
+		V.NAT_CACHE[[4]byte{originalIP[0], originalIP[1], originalIP[2], originalIP[3]}] = [4]byte{newIP[0], newIP[1], newIP[2], newIP[3]}
+
+		V.REVERSE_NAT_CACHE[[4]byte{newIP[0], newIP[1], newIP[2], newIP[3]}] = [4]byte{originalIP[0], originalIP[1], originalIP[2], originalIP[3]}
+		break
+	}
+
+	return [4]byte{newIP[0], newIP[1], newIP[2], newIP[3]}, true
 }
