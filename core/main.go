@@ -32,15 +32,15 @@ func InitService() error {
 
 	printInfo()
 
-	if !MINIMAL {
-		CreateBaseFolder()
-		InitLogfile()
-	}
+	// if !MINIMAL {
+	CreateBaseFolder()
+	InitLogfile()
+	// }
 
 	go StartLogQueueProcessor(routineMonitor)
 
 	if MINIMAL && CLIDNS != "" {
-		LoadMinimalConfig()
+		LoadDNSConfig()
 	} else {
 		LoadConfig()
 	}
@@ -62,16 +62,20 @@ func InitService() error {
 
 	if GLOBAL_STATE.C == nil {
 		ERROR("", "Global state could not be set.. possible config issue")
+		time.Sleep(3 * time.Second)
 		return errors.New("unable to create global state.. possible config error")
 	}
 
 	var err error
+	INFO("Loading certificates")
 	CertPool, err = certs.LoadTunnelsCACertPool()
 	if err != nil {
 		DEBUG("Could not load root CA:", err)
+		time.Sleep(3 * time.Second)
 		return err
 	}
 
+	fmt.Println("LENCPOSTSTART:", len(C.Connections))
 	INFO("Tunnels is ready")
 	return nil
 }
@@ -252,7 +256,7 @@ func SaveConfig(c *Config) (err error) {
 	return
 }
 
-func LoadMinimalConfig() {
+func LoadDNSConfig() {
 	defer func() {
 		r := recover()
 		if r != nil {
@@ -260,13 +264,14 @@ func LoadMinimalConfig() {
 		}
 	}()
 
-	DEBUG("Generating a new minimal config")
-
-	C := new(Config)
+	C = new(Config)
 	C.InfoLogging = true
 	C.ErrorLogging = true
 	C.ConsoleLogOnly = true
 	C.ConsoleLogging = true
+	C.DebugLogging = true
+
+	DEBUG("Generating a new minimal config")
 
 	newCon := createMinimalConnection()
 	newCon.Private = true
@@ -274,8 +279,8 @@ func LoadMinimalConfig() {
 		newCon.DNSDiscovery = CLIDNS
 	}
 
-	C.Connections = make([]*TunnelMETA, 0)
-	C.Connections = append(C.Connections, newCon)
+	fmt.Println("APPEND CONNECTION")
+	C.Connections = []*TunnelMETA{newCon}
 
 	C.DNSstats = false
 	C.AvailableBlockLists = make([]*BlockList, 0)

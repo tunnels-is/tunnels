@@ -9,7 +9,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
-	"encoding/base64"
 	"encoding/hex"
 	"encoding/pem"
 	"errors"
@@ -19,7 +18,6 @@ import (
 	"net"
 	"os"
 	"runtime/debug"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -193,27 +191,26 @@ type DNSInfo struct {
 func ResolveMetaTXT(domain string) (info *DNSInfo, err error) {
 	txt, err := net.LookupTXT(domain)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error in base lookup: %s", err)
 	}
-	certParts := make([][]byte, 100)
+	// certParts := make([][]byte, 100)
 	info = new(DNSInfo)
+	info.Cert = make([]byte, 0)
 
 	for _, v := range txt {
-		split := strings.Split(v, ":")
-		if split[0] == "0" {
-			if len(split) < 4 {
+		if strings.Contains(v, "----") {
+			info.Cert = []byte(v)
+			// info.Cert = bytes.Replace(info.Cert, []byte("\n"), []byte{}, -1)
+		} else {
+			split := strings.Split(v, ":")
+			if len(split) < 3 {
 				return nil, errors.New("bad dns format, 0: field is less then 4 in length")
 			}
-			info.IP = split[1]
-			info.Port = split[2]
-			info.ServerID = split[3]
+			info.IP = split[0]
+			info.Port = split[1]
+			info.ServerID = split[2]
 			continue
 		}
-		index, err := strconv.Atoi(split[0])
-		if err != nil {
-			return nil, err
-		}
-		certParts[index] = []byte(strings.Join(split[1:], ""))
 	}
 	if info.IP == "" {
 		return nil, errors.New("bad dns format, IP is empty")
@@ -225,22 +222,10 @@ func ResolveMetaTXT(domain string) (info *DNSInfo, err error) {
 		return nil, errors.New("bad dns format, ServerID is empty")
 	}
 
-	preCert := make([]byte, 0)
-	clen := 0
-	for _, dnsTxt := range certParts {
-		for _, certBytes := range dnsTxt {
-			preCert = append(preCert, certBytes)
-			clen = len(preCert)
-		}
-	}
-
-	// We could use a formula to find the aprox. length of encoded
-	// content, or we can just make sure the slice is big enough
-	// and strip the end.
-	info.Cert = make([]byte, clen+500)
-	base64.RawStdEncoding.Decode(info.Cert, preCert)
-	info.Cert = bytes.ReplaceAll(info.Cert, []byte{0}, []byte{})
-	fmt.Println(info.IP, info.Port, info.ServerID)
-	fmt.Println(string(info.Cert))
+	// fmt.Println("-----------------")
+	// fmt.Println(info.IP, info.Port, info.ServerID)
+	// fmt.Println("-----------------")
+	// fmt.Println(string(info.Cert))
+	// fmt.Println("-----------------")
 	return
 }
