@@ -42,7 +42,8 @@ func StartWithExternalMonitor(ctx context.Context, id int, monitor chan int) {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	err := core.InitService()
 	if err != nil {
-		panic(err)
+		fmt.Println("Error initializing tunnels service:", err)
+		return
 	}
 	core.LaunchEverything()
 }

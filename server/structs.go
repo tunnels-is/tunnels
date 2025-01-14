@@ -84,16 +84,19 @@ type DHCPRecord struct {
 }
 
 func (d *DHCPRecord) AssignHostname(host string) {
+	if host == "" {
+		host = fmt.Sprintf("%d-%d-%d-%d",
+			d.IP[0],
+			d.IP[1],
+			d.IP[2],
+			d.IP[3],
+		)
+	}
+
 	if defaultHostname != "" {
-		if host == "" {
-			host = fmt.Sprintf("%d-%d-%d-%d",
-				d.IP[0],
-				d.IP[1],
-				d.IP[2],
-				d.IP[3],
-			)
-		}
 		d.Hostname = host + "." + defaultHostname
+	} else {
+		d.Hostname = host
 	}
 }
 

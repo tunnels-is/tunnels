@@ -369,12 +369,14 @@ func SetConfig(config *Config) error {
 	oldCertIPs := GLOBAL_STATE.C.APICertIPs
 	oldBlocklists := GLOBAL_STATE.C.AvailableBlockLists
 
-	if len(oldBlocklists) != len(config.AvailableBlockLists) || !CheckBlockListsEquality(oldBlocklists, config.AvailableBlockLists) {
-		DEBUG("Updating DNS Blocklists...")
-		err := ReBuildBlockLists(config)
-		if err != nil {
-			ERROR("Error updating DNS block lists ", err)
-			return err
+	if !CLIDisableBlockLists {
+		if len(oldBlocklists) != len(config.AvailableBlockLists) || !CheckBlockListsEquality(oldBlocklists, config.AvailableBlockLists) {
+			DEBUG("Updating DNS Blocklists...")
+			err := ReBuildBlockLists(config)
+			if err != nil {
+				ERROR("Error updating DNS block lists ", err)
+				return err
+			}
 		}
 	}
 

@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"log"
 	"os"
 	"os/signal"
@@ -264,6 +263,35 @@ func LoadDNSConfig() {
 		}
 	}()
 
+	err := LoadExistingConfig()
+	if err == nil {
+		for i := range C.Connections {
+			if C.Connections[i] == nil {
+				continue
+			}
+			if C.Connections[i].Tag == DefaultTunnelNameMin {
+				changed := false
+				if C.Connections[i].Hostname != CLIHostname {
+					C.Connections[i].Hostname = CLIHostname
+					DEBUG("Updated hostname to: ", CLIHostname)
+					changed = true
+				}
+				if C.Connections[i].DNSDiscovery != CLIDNS {
+					C.Connections[i].DNSDiscovery = CLIDNS
+					DEBUG("Updated DNS Discovery to: ", CLIDNS)
+					changed = true
+				}
+				if changed {
+					SaveConfig(C)
+					break
+				}
+			}
+		}
+
+		DEBUG("Loaded configurations from disk")
+		return
+	}
+
 	C = new(Config)
 	C.InfoLogging = true
 	C.ErrorLogging = true
@@ -274,14 +302,9 @@ func LoadDNSConfig() {
 	DEBUG("Generating a new minimal config")
 
 	newCon := createMinimalConnection()
-	newCon.Private = true
-	if CLIDNS != "" {
-		newCon.DNSDiscovery = CLIDNS
-	}
 
 	fmt.Println("APPEND CONNECTION")
 	C.Connections = []*TunnelMETA{newCon}
-
 	C.DNSstats = false
 	C.AvailableBlockLists = make([]*BlockList, 0)
 
@@ -289,6 +312,22 @@ func LoadDNSConfig() {
 	GLOBAL_STATE.ConfigInitialized = true
 	SaveConfig(C)
 	DEBUG("Configurations loaded")
+}
+
+func LoadExistingConfig() (err error) {
+	GLOBAL_STATE.ConfigPath = GLOBAL_STATE.BasePath + "config.json"
+	config, err := os.ReadFile(GLOBAL_STATE.ConfigPath)
+	if err != nil {
+		return
+	}
+
+	err = json.Unmarshal(config, C)
+	if err != nil {
+		ERROR("Unable to turn config file into config object: ", err)
+		return
+	}
+
+	return
 }
 
 func LoadConfig() {
@@ -312,9 +351,10 @@ func LoadConfig() {
 		return
 	}
 
-	GLOBAL_STATE.ConfigPath = GLOBAL_STATE.BasePath + "config.json"
+	// GLOBAL_STATE.ConfigPath = GLOBAL_STATE.BasePath + "config.json"
 	DEBUG("Loading config from: ", GLOBAL_STATE.ConfigPath)
-	config, err = os.Open(GLOBAL_STATE.ConfigPath)
+	// config, err = os.Open(GLOBAL_STATE.ConfigPath)
+	err = LoadExistingConfig()
 	if err != nil {
 
 		DEBUG("Generating a new default config")
@@ -373,27 +413,12 @@ func LoadConfig() {
 		}
 
 		C = NC
-	} else {
-
-		var cb []byte
-		cb, err = io.ReadAll(config)
-		if err != nil {
-			ERROR("Unable to read bytes from config file: ", err)
-			return
-		}
-
-		err = json.Unmarshal(cb, C)
-		if err != nil {
-			ERROR("Unable to turn config file into config object: ", err)
-			return
-		}
-
 	}
 
 	applyCertificateDefaults(C)
 
 	GLOBAL_STATE.C = C
-	if len(C.AvailableBlockLists) == 0 {
+	if len(C.AvailableBlockLists) == 0 && !CLIDisableBlockLists {
 		C.AvailableBlockLists = GetDefaultBlockLists()
 		GLOBAL_STATE.C.AvailableBlockLists = C.AvailableBlockLists
 		SaveConfig(C)
