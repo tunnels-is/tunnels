@@ -61,10 +61,25 @@ func HTTP_ListDevices(w http.ResponseWriter, r *http.Request) {
 
 	response := new(DeviceListResponse)
 	response.Devices = make([]*listDevice, 0)
+outerloop:
 	for i := range ClientCoreMappings {
 		if ClientCoreMappings[i] == nil {
 			continue
 		}
+
+		// fmt.Println("Checking:", ClientCoreMappings[i].DHCP)
+		if ClientCoreMappings[i].DHCP != nil {
+			for _, v := range response.Devices {
+				// fmt.Println("Checking D:", v.DHCP)
+				if v.DHCP != nil {
+					// fmt.Println("DHCP", v.DHCP.Token, ClientCoreMappings[i].DHCP.Token)
+					if v.DHCP.Token == ClientCoreMappings[i].DHCP.Token {
+						continue outerloop
+					}
+				}
+			}
+		}
+
 		d := new(listDevice)
 		d.AllowedIPs = make([]string, 0)
 		for _, v := range ClientCoreMappings[i].AllowedHosts {
