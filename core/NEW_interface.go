@@ -40,13 +40,15 @@ func AutoConnect(MONITOR chan int) {
 				}
 			}
 
-			code, err := PublicConnect(ConnectionRequest{
+			CR := ConnectionRequest{
 				Tag:        v.Tag,
 				DeviceKey:  CLIDeviceKey,
 				ServerIP:   CLIHost,
 				ServerPort: CLIPort,
 				EncType:    v.EncryptionType,
-			})
+			}
+
+			code, err := PublicConnect(CR)
 			if err != nil {
 				ERROR("Unable to connect, return code: ", code, " // error: ", err)
 			}
