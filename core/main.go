@@ -273,16 +273,24 @@ func LoadDNSConfig() {
 			}
 			if C.Connections[i].Tag == DefaultTunnelNameMin {
 				changed := false
-				if C.Connections[i].Hostname != CLIHostname {
+				if C.Connections[i].DeviceKey != CLIDeviceKey && CLIDeviceKey != "" {
+					C.Connections[i].Hostname = CLIDeviceKey
+					DEBUG("Updated device key to: ", CLIDeviceKey)
+					changed = true
+				}
+
+				if C.Connections[i].Hostname != CLIHostname && CLIHostname != "" {
 					C.Connections[i].Hostname = CLIHostname
 					DEBUG("Updated hostname to: ", CLIHostname)
 					changed = true
 				}
-				if C.Connections[i].DNSDiscovery != CLIDNS {
+
+				if C.Connections[i].DNSDiscovery != CLIDNS && CLIDNS != "" {
 					C.Connections[i].DNSDiscovery = CLIDNS
 					DEBUG("Updated DNS Discovery to: ", CLIDNS)
 					changed = true
 				}
+
 				if changed {
 					GLOBAL_STATE.C = C
 					SaveConfig(C)
