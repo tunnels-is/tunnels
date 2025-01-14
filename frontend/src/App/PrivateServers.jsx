@@ -12,6 +12,7 @@ const PrivateServers = () => {
 		state.GetPrivateServers()
 	}, [])
 
+
 	const generateServerTable = () => {
 		let rows = []
 		state.PrivateServers?.forEach(server => {
@@ -37,8 +38,8 @@ const PrivateServers = () => {
 						navigate("/inspect/server/" + server._id)
 					}
 				},
-				{ type: "text", value: server._id },
-				{ type: "text", value: server.Serial },
+				{ type: "text", minWidth: "300px", value: server._id },
+				{ type: "text", minWidth: "350px", value: server.Serial },
 				{
 					type: "select",
 					opts: opts,
@@ -63,10 +64,11 @@ const PrivateServers = () => {
 	let rows = generateServerTable()
 	const headers = [
 		{ value: "Tag" },
-		{ value: "ID" },
-		{ value: "Cert Serial" },
+		{ value: "ID", minWidth: "300px" },
+		{ value: "Cert Serial", minWidth: "350px" },
 		{ value: "Tunnel" },
 	]
+
 
 	return (
 		<div className="ab private-server-wrapper">

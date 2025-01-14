@@ -434,16 +434,16 @@ func BandwidthBytesToString(b uint64) string {
 		return intS + " B"
 	} else if b <= 999_999 {
 		intF := float64(b)
-		return fmt.Sprintf("%.2f KB", intF/1000)
+		return fmt.Sprintf("%.0f KB", intF/1000)
 	} else if b <= 999_999_999 {
 		intF := float64(b)
-		return fmt.Sprintf("%.2f MB", intF/1_000_000)
+		return fmt.Sprintf("%.1f MB", intF/1_000_000)
 	} else if b <= 999_999_999_999 {
 		intF := float64(b)
-		return fmt.Sprintf("%.2f GB", intF/1_000_000_000)
+		return fmt.Sprintf("%.1f GB", intF/1_000_000_000)
 	} else if b <= 999_999_999_999_999 {
 		intF := float64(b)
-		return fmt.Sprintf("%.2f TB", intF/1_000_000_000_000)
+		return fmt.Sprintf("%.1f TB", intF/1_000_000_000_000)
 	}
 
 	return "???"
@@ -470,7 +470,7 @@ func applyNewFirewallRules(originalConfig *Config, newConfig *Config) error {
 	return nil
 }
 
-func PrepareState() (err error) {
+func GenerateState() (err error) {
 	defer RecoverAndLogToFile()
 	DEBUG("Generating state object")
 
@@ -496,6 +496,7 @@ func PrepareState() (err error) {
 			EndPort:             TunList[i].EndPort,
 			IngressString:       BandwidthBytesToString(uint64(TunList[i].IngressBytes)),
 			EgressString:        BandwidthBytesToString(uint64(TunList[i].EgressBytes)),
+			IngressBytes:        TunList[i].IngressBytes,
 			EgressBytes:         TunList[i].EgressBytes,
 			StatsTag:            TunList[i].Meta.Tag,
 			DISK:                TunList[i].TunnelSTATS.DISK,
@@ -931,7 +932,7 @@ func PublicConnect(ClientCR ConnectionRequest) (code int, errm error) {
 	tunnel.TunnelSTATS.PingTime = time.Now()
 
 	AddTunnelToList(tunnel)
-	_ = PrepareState()
+	_ = GenerateState()
 
 	out := tunnel.EH.SEAL.Seal1(PingPongStatsBuffer, tunnel.Index)
 	_, err = tunnel.Con.Write(out)

@@ -7,6 +7,7 @@ import GLOBAL_STATE from "../state";
 import NewTable from "./component/newtable";
 import CustomSelect from "./component/CustomSelect";
 import ObjectEditor from "./ObjectEditor";
+import dayjs from "dayjs";
 
 const ConnectionTable = () => {
 	const state = GLOBAL_STATE("connections")
@@ -198,7 +199,7 @@ const ConnectionTable = () => {
 		row.items.push({
 			type: "text",
 			align: "right",
-			className: "serverip",
+			className: "connect-button",
 			value: active ? "disconnect" : server ? "connect" : "",
 			color: active ? "red" : "green",
 			click: () => {
@@ -232,13 +233,60 @@ const ConnectionTable = () => {
 
 	});
 
+	const generateStatsTable = () => {
+		let rows = []
+
+		state?.State?.ConnectionStats?.map(cs => {
+
+			let stocms = Math.floor(String(cs.ServerToClientMicro / 1000))
+			let nonce = cs.Nonce1
+			if (cs.Nonce2 > cs.Nonce1) {
+				nonce = cs.Nonce2
+			}
+
+			let row = { items: [] }
+			row.items.push({ type: "text", align: "left", className: "tag", value: cs.StatsTag, })
+			row.items.push({ type: "text", align: "left", className: "egress", value: cs.EgressString, })
+			row.items.push({ type: "text", align: "left", className: "ingress", value: cs.IngressString, })
+			row.items.push({ type: "text", align: "left", className: "CPU", value: cs.CPU, })
+			row.items.push({ type: "text", align: "left", className: "Mem", value: cs.MEM, })
+			row.items.push({ type: "text", align: "left", className: "Disk", value: cs.DISK, })
+			row.items.push({ type: "text", align: "left", className: "Ping", value: dayjs(cs.PingTime).format('HH:mm:ss') })
+			row.items.push({ type: "text", align: "left", className: "Disk", value: stocms + "ms" })
+
+			row.items.push({ type: "text", align: "left", className: "Disk", value: nonce })
+
+			rows.push(row)
+			console.dir(cs)
+			// if (cs.StatsTag === c.Tag) {
+			// 	s = cs
+			// 	return
+			// }
+		})
+
+		return rows
+	}
+
+	let statsRows = generateStatsTable()
+	const statsHeaders = [
+		{ value: "Tag", align: "left" },
+		{ value: "Egress", align: "left" },
+		{ value: "Ingress", align: "left" },
+		{ value: "CPU", align: "left" },
+		{ value: "Mem", align: "left" },
+		{ value: "Disk", align: "left" },
+		{ value: "Ping", align: "left" },
+		{ value: "MS", align: "left" },
+		{ value: "Nonce", align: "left" },
+	]
+
 	const headers = [
 		{ value: "Tag", align: "left" },
 		{ value: "Interface", align: "left" },
 		{ value: "Type", align: "left" },
 		{ value: "Server", align: "left" },
 		{ value: "IP", align: "left" },
-		{ value: "", align: "right" },
+		{ value: "", align: "right", className: "connect-header" },
 	]
 
 	if (con !== undefined) {
@@ -276,6 +324,24 @@ const ConnectionTable = () => {
 					background={true}
 					header={headers}
 					rows={rows}
+					button={{
+						text: "New Tunnel",
+						click: function() {
+							addConnection()
+						}
+					}}
+				/>
+			}
+
+			{statsRows.length > 0 &&
+				<NewTable
+					title={"Connection Stats"}
+					tableID={"connection-stats"}
+					className="connection-stats"
+					placeholder={"Search .."}
+					background={true}
+					header={statsHeaders}
+					rows={statsRows}
 					button={{
 						text: "New Tunnel",
 						click: function() {
