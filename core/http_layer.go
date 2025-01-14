@@ -234,7 +234,7 @@ func HTTP_GetState(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_ = PrepareState()
+	_ = GenerateState()
 	JSON(w, r, 200, GLOBAL_STATE)
 }
 
