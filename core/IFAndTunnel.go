@@ -191,8 +191,15 @@ func createMinimalConnection() (M *TunnelMETA) {
 	M.RequestVPNPorts = false
 	M.IPv4Address = "172.22.22.22"
 	M.NetMask = "255.255.255.255"
-	M.Tag = DefaultTunnelName + "-min"
-	M.IFName = DefaultTunnelName + "-min"
+	M.Tag = DefaultTunnelNameMin
+	M.IFName = DefaultTunnelNameMin
+	if CLIHostname != "" {
+		M.Hostname = CLIHostname
+	}
+	if CLIDNS != "" {
+		M.DNSDiscovery = CLIDNS
+	}
+	M.Private = true
 	M.EnableDefaultRoute = false
 	M.AutoConnect = true
 	return
