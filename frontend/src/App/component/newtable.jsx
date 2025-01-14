@@ -194,12 +194,16 @@ const NewTable = (props) => {
 						if (l.width) {
 							cs.flex = "0 1 " + String(l.width) + "%"
 						}
+						let classNames = ""
+						if (l.className !== undefined) {
+							classNames = l.className
+						}
 
 						return (
 							<div
 								key={l.value + i}
 								style={cs}
-								className="ab column">{l.value}
+								className={`ab column ` + classNames}>{l.value}
 							</div>
 						)
 

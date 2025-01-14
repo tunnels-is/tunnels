@@ -2851,6 +2851,17 @@ button {
   gap: 20px;
   flex-wrap: wrap;
 
+  .tunnels-table {
+    .connect-button {
+      margin-right: 10px;
+    }
+
+    .connect-header {
+      margin-right: 10px;
+    }
+
+  }
+
   .new-table {
     min-width: 800px;
   }
