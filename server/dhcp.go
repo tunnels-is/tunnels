@@ -2,7 +2,6 @@ package main
 
 import (
 	"errors"
-	"fmt"
 	"net"
 	"time"
 )
@@ -28,7 +27,7 @@ func generateDHCPMap() (err error) {
 }
 
 func assignDHCP(CR *ConnectRequest, CRR *ConnectRequestResponse, index int) (err error) {
-	var ok bool
+	var assigned bool
 	if CR.DHCPToken != "" {
 		for i := range DHCPMapping {
 			if DHCPMapping[i] == nil {
@@ -36,13 +35,12 @@ func assignDHCP(CR *ConnectRequest, CRR *ConnectRequestResponse, index int) (err
 			}
 
 			if DHCPMapping[i].Token == CR.DHCPToken {
-				fmt.Println("FOUND IT!", CR.DHCPToken)
 				DHCPMapping[i].AssignHostname(CR.Hostname)
 				DHCPMapping[i].Activity = time.Now()
 
 				CRR.DHCP = DHCPMapping[i]
 
-				ok = true
+				assigned = true
 				ClientCoreMappings[index].DHCP = DHCPMapping[i]
 
 				IPm.Lock()
@@ -54,7 +52,7 @@ func assignDHCP(CR *ConnectRequest, CRR *ConnectRequestResponse, index int) (err
 		}
 	}
 
-	if !ok {
+	if !assigned {
 		for i := range DHCPMapping {
 			if DHCPMapping[i] == nil {
 				continue
@@ -65,8 +63,8 @@ func assignDHCP(CR *ConnectRequest, CRR *ConnectRequestResponse, index int) (err
 				continue
 			}
 
-			ok = DHCPMapping[i].Assign()
-			if ok {
+			assigned = DHCPMapping[i].Assign()
+			if assigned {
 				DHCPMapping[i].AssignHostname(CR.Hostname)
 				CRR.DHCP = DHCPMapping[i]
 				ClientCoreMappings[index].DHCP = DHCPMapping[i]
@@ -80,7 +78,7 @@ func assignDHCP(CR *ConnectRequest, CRR *ConnectRequestResponse, index int) (err
 		}
 	}
 
-	if !ok {
+	if !assigned {
 		return errors.New("No DHCP ip address available")
 	}
 
