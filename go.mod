@@ -13,7 +13,7 @@ require (
 	github.com/zveinn/crypt v0.0.1
 	github.com/zveinn/tunnels v0.0.4
 	go.mongodb.org/mongo-driver v1.17.1
-	golang.org/x/net v0.30.0
+	golang.org/x/net v0.33.0
 	golang.org/x/sys v0.28.0
 	golang.org/x/term v0.27.0
 	kernel.org/pub/linux/libs/security/libcap/cap v1.2.70
