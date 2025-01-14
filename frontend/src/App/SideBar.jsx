@@ -13,6 +13,7 @@ import {
 	PersonIcon,
 	QuestionMarkCircledIcon,
 	Share1Icon,
+	SymbolIcon,
 } from '@radix-ui/react-icons'
 
 import GLOBAL_STATE from "../state";
@@ -41,12 +42,6 @@ const SideBar = () => {
 		}
 	}
 
-	const hasOrg = () => {
-		if (state.User?.OrgID !== "000000000000000000000000" && state.User?.OrgID !== undefined) {
-			return true
-		}
-		return false
-	}
 
 	const showLogin = () => {
 		if (!state.User || state.User?.Email === "") {
@@ -64,6 +59,7 @@ const SideBar = () => {
 					{ icon: GlobeIcon, label: "Public", route: "servers", user: true, },
 					{ icon: MobileIcon, label: "Private", route: "private", user: true, },
 					{ icon: Share1Icon, label: "Tunnels", route: "tunnels", user: true, },
+					// { icon: SymbolIcon, label: "Routing", route: "routing", user: true, },
 				]
 			},
 			{
@@ -72,7 +68,7 @@ const SideBar = () => {
 					{ icon: LockOpen1Icon, label: "Login", route: "login", user: false, shouldRender: showLogin },
 					{ icon: PersonIcon, label: "Profile", route: "account", user: true, },
 					{ icon: GearIcon, label: "Setting", route: "settings", user: false, },
-					{ icon: HomeIcon, label: "Organization", route: "org", user: true, shouldRender: hasOrg },
+					{ icon: HomeIcon, label: "Organization", route: "org", user: true, },
 				]
 			},
 			{

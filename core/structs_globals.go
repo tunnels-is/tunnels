@@ -41,13 +41,12 @@ type DNSStats struct {
 
 type ConnectionRequest struct {
 	DeviceKey string `json:"DeviceKey"`
-	OrgID     string `json:"OrgID"`
 
 	DeviceToken string `json:"DeviceToken"`
 	UserID      string `json:"UserID"`
 
 	Tag        string        `json:"Tag"`
-	SeverID    string        `json:"ServerID"`
+	ServerID   string        `json:"ServerID"`
 	ServerIP   string        `json:"ServerIP"`
 	ServerPort string        `json:"ServerPort"`
 	EncType    crypt.EncType `json:"EncType"`
@@ -55,7 +54,7 @@ type ConnectionRequest struct {
 
 type RemoteConnectionRequest struct {
 	DeviceKey string `json:"DeviceKey"`
-	OrgID     string `json:"OrgID"`
+	// OrgID     string `json:"OrgID"`
 
 	DeviceToken string        `json:"DeviceToken"`
 	EncType     crypt.EncType `json:"EncType"`
@@ -150,14 +149,16 @@ var (
 	DEFAULT_CONNECTION *TunnelMETA
 
 	// IS NATIVE GUI
-	NATIVE bool
-	IOT    bool
+	NATIVE  bool
+	MINIMAL bool
 
 	// Device Flags
 	CLIDeviceKey string
-	CLIOrgId     string
 	CLIDNS       string
+	CLIHost      string
 	CLIHostname  string
+	CLIPort      string
+	CLIServerID  string
 
 	// Base Path Overwrite
 	BASE_PATH string
@@ -324,7 +325,7 @@ type CONFIG_FORM struct {
 }
 
 var (
-	ConList [1000]*Tunnel
+	TunList [1000]*Tunnel
 	ConLock = sync.Mutex{}
 	IFList  [1000]*TunnelInterface
 	IFLock  = sync.Mutex{}
@@ -388,12 +389,13 @@ type TunnelMETA struct {
 	WindowsGUID string
 
 	// controlled by user only
-	DNSBlocking   bool
-	LocalhostNat  bool
-	AutoReconnect bool
-	AutoConnect   bool
-	Persistent    bool
-	PreventIPv6   bool
+	DNSBlocking     bool
+	LocalhostNat    bool
+	AutoReconnect   bool
+	AutoConnect     bool
+	Persistent      bool
+	PreventIPv6     bool
+	RequestVPNPorts bool
 
 	EncryptionType crypt.EncType
 
@@ -465,6 +467,12 @@ type TunnelSTATS struct {
 	VPLNetwork *ServerNetwork
 }
 
+type FirewallRequest struct {
+	DHCPToken string
+	IP        string
+	Hosts     []string
+}
+
 type Tunnel struct {
 	Meta *TunnelMETA
 	TunnelSTATS
@@ -494,7 +502,6 @@ type Tunnel struct {
 	// VPN NODE
 	LOCAL_IF_IP [4]byte
 
-	// CRR     *VPNNode
 	PingBuffer [8]byte
 
 	// DNS1Bytes     [4]byte `json:"-"`
@@ -592,6 +599,7 @@ type Config struct {
 	LogBlockedDomains bool
 	LogAllDomains     bool
 	DebugLogging      bool
+	DeepDebugLoggin   bool
 	ConsoleLogging    bool
 	InfoLogging       bool
 	ErrorLogging      bool
@@ -609,7 +617,7 @@ type Config struct {
 	EnabledBlockLists   []string
 	AvailableBlockLists []*BlockList
 
-	CustomDNSRecords []*ServerDNS
+	DNSRecords []*ServerDNS
 }
 
 var (

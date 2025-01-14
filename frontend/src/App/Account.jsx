@@ -4,7 +4,6 @@ import GLOBAL_STATE from "../state";
 import dayjs from "dayjs";
 import KeyValue from "./component/keyvalue";
 import Label from "./component/label";
-import CustomTable from "./component/table";
 import NewTable from "./component/newtable";
 
 const Account = () => {
@@ -48,7 +47,7 @@ const Account = () => {
 
 			let row = {}
 			row.items = [
-				{ type: "text", value: current ? "THIS DEVICE" : token.N },
+				{ type: "text", value: current ? token.N + " (this device)" : token.N },
 				{ type: "text", value: dayjs(token.Created).format("DD-MM-YYYY HH:mm:ss") },
 				{
 					type: "text",
@@ -110,6 +109,20 @@ const Account = () => {
 					<KeyValue label={"License"} value={state.User.Key?.Key} />
 
 					<div className="button-and-text-seperator"></div>
+					<div className="item">
+						<input
+							onChange={(e) => { state.UpdateLicenseInput(e.target.value) }}
+							name="license"
+							className="input license"
+							placeholder="Insert License Key"
+							value={state.LicenseKey} />
+					</div>
+
+					<div className="item full-width-item" key={state?.LicenseKey}>
+						<div className="card-button" onClick={() => state.ActivateLicense()} >Activate Key</div>
+					</div>
+
+					<div className="button-and-text-seperator"></div>
 
 					<div className="item full-width-item">
 						<div className="card-button red"
@@ -133,19 +146,6 @@ const Account = () => {
 					</div>
 
 
-					<div className="button-and-text-seperator"></div>
-					<div className="item">
-						<input
-							onChange={(e) => { state.UpdateLicenseInput(e.target.value) }}
-							name="license"
-							className="input license"
-							placeholder="Insert License Key"
-							value={state.LicenseKey} />
-					</div>
-
-					<div className="item full-width-item" key={state?.LicenseKey}>
-						<div className="card-button" onClick={() => state.ActivateLicense()} >Activate Key</div>
-					</div>
 
 
 				</div>
@@ -155,7 +155,7 @@ const Account = () => {
 				tableID={"devices"}
 				title={"Logins"}
 				className="logins-list-table"
-				placeholder={"Search for a device.."}
+				background={true}
 				header={headers}
 				rows={rows}
 			/>

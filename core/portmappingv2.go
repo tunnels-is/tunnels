@@ -209,9 +209,9 @@ func (V *Tunnel) getIngressPortMapping(VPNPortMap []VPNPort, dstIP []byte, port 
 func debugMissingEgressMapping(packet []byte) {
 	if !GLOBAL_STATE.C.ConnectionTracer {
 		if len(packet) > 60 {
-			DEBUG("Missing egress mapping: ", packet[0:60])
+			DEEP("Missing egress mapping: ", packet[0:60])
 		} else {
-			DEBUG("Missing egress mapping: ", packet[0:len(packet)-1])
+			DEEP("Missing egress mapping: ", packet[0:len(packet)-1])
 		}
 		return
 	}
@@ -219,16 +219,16 @@ func debugMissingEgressMapping(packet []byte) {
 	select {
 	case noMappingChan <- packet:
 	default:
-		ERROR("NO EGRESS MAPPING!")
+		DEEP("noMappingChan full")
 	}
 }
 
 func debugMissingIngressMapping(packet []byte) {
 	if !GLOBAL_STATE.C.ConnectionTracer {
 		if len(packet) > 60 {
-			DEBUG("Missing ingress mapping: ", packet[0:60])
+			DEEP("Missing ingress mapping: ", packet[0:60])
 		} else {
-			DEBUG("Missing ingress mapping: ", packet[0:len(packet)-1])
+			DEEP("Missing ingress mapping: ", packet[0:len(packet)-1])
 		}
 		return
 	}
@@ -301,7 +301,7 @@ func (V *Tunnel) cleanPortMap() {
 			}
 
 			if !isDNS {
-				if time.Since(v.LastActivity) > time.Second*120 {
+				if time.Since(v.LastActivity) > time.Second*150 {
 					debugMappStream(v)
 					delete(V.UDP_M[i].M, k)
 				}
@@ -317,9 +317,9 @@ func CleanPortsForAllConnections(MONITOR chan int) {
 		MONITOR <- 6
 	}()
 	defer RecoverAndLogToFile()
-	for i := range ConList {
-		if ConList[i] != nil {
-			ConList[i].cleanPortMap()
+	for i := range TunList {
+		if TunList[i] != nil {
+			TunList[i].cleanPortMap()
 		}
 	}
 }

@@ -10,12 +10,13 @@ import '@fontsource-variable/inter';
 import InspectBlocklist from "./App/InspectBlocklist";
 import InspectConnection from "./App/InspectConnection";
 import InspectJSON from "./App/component/InspectJSON";
+import ConnectionTable from "./App/ConnectionTable";
 import DNSAnswers from "./App/component/DNSAnswers";
 import PrivateServers from "./App/PrivateServers";
 import InspectServer from "./App/InspectServer";
+import ObjectEditor from "./App/ObjectEditor";
 import ScreenLoader from "./App/ScreenLoader";
 import InspectGroup from "./App/InspectGroup";
-import Connections from "./App/Connections";
 import Enable2FA from "./App/Enable2FA";
 import Settings from "./App/Settings";
 import Account from "./App/Account";
@@ -32,7 +33,7 @@ import STORE from "./store";
 import WS from "./ws";
 
 // Use this to automatically turn on debug 
-STORE.Cache.Set("debug", false)
+STORE.Cache.Set("debug", true)
 
 const appElement = document.getElementById('app')
 const root = createRoot(appElement);
@@ -40,17 +41,25 @@ const root = createRoot(appElement);
 const LaunchApp = () => {
 	const state = GLOBAL_STATE("root")
 
-	let configChanged = state.modifiedLists !== undefined
-	if (!configChanged) {
-		configChanged = state.modifiedConfig !== undefined
+	let configModified = state.modifiedLists !== undefined
+	if (!configModified) {
+		configModified = state.modifiedConfig !== undefined
 	}
+	if (!configModified) {
+		configModified = state.IsConfigModified()
+	}
+
 
 	if (state.getDarkMode()) {
 		appElement.classList.remove("light")
 		appElement.classList.add("dark")
+		document.documentElement.classList.add("dark")
+		document.documentElement.classList.remove("light")
 	} else {
 		appElement.classList.remove("dark")
 		appElement.classList.add("light")
+		document.documentElement.classList.add("light")
+		document.documentElement.classList.remove("dark")
 	}
 
 	useEffect(() => {
@@ -62,18 +71,15 @@ const LaunchApp = () => {
 		< HashRouter >
 
 			<Toaster
-				containerStyle={{
-					left: "20px", bottom: "280px", position: 'fixed',
-				}}
 				toastOptions={{
 					className: 'toast',
-					position: "bottom-left",
+					position: "top-right",
 					success: {
-						duration: 4000,
+						duration: 5000,
 					},
 					icon: null,
 					error: {
-						duration: 4000,
+						duration: 5000,
 					},
 				}}
 			/>
@@ -84,7 +90,7 @@ const LaunchApp = () => {
 			<ScreenLoader />
 			<div className="ab app-wrapper">
 
-				{configChanged &&
+				{configModified &&
 					<div className="save-bar">
 						<div className="text">Your config has unsaved changes</div>
 						<div className="button"
@@ -125,8 +131,9 @@ const LaunchApp = () => {
 							<Route path="inspect/group/:id" element={<InspectGroup />} />
 							<Route path="inspect/group" element={<InspectGroup />} />
 
-							<Route path="tunnels" element={<Connections />} />
+							<Route path="tunnels" element={<ConnectionTable />} />
 							<Route path="inspect/connection/:id" element={<InspectConnection />} />
+							<Route path="routing" element={<ConnectionTable />} />
 
 							<Route path="dns" element={<DNS />} />
 							<Route path="dns/answers/:domain" element={<DNSAnswers />} />
@@ -140,6 +147,7 @@ const LaunchApp = () => {
 
 							<Route path="login" element={<Login />} />
 							<Route path="help" element={<Welcome />} />
+							<Route path="test" element={<ObjectEditor />} />
 
 							<Route path="*" element={<Servers />} />
 						</>

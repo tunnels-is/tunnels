@@ -1,6 +1,5 @@
 import React, { useEffect } from "react";
 import GLOBAL_STATE from "../state";
-import CustomTable from "./component/table";
 import CustomSelect from "./component/CustomSelect";
 import NewTable from "./component/newtable";
 
@@ -106,7 +105,7 @@ const Servers = () => {
 				},
 				{
 					type: "text",
-					value: con ? "Disconnect" : "Connect",
+					value: <div className={con ? "disconnect" : "connect"}>{con ? "Disconnect" : "Connect"}</div>,
 					color: con ? "red" : "green",
 					click: conButton,
 				},
@@ -132,9 +131,11 @@ const Servers = () => {
 		<div className="ab router-wrapper">
 
 			<NewTable
+				title={"Public VPN Servers"}
 				tableID={"public-servers"}
 				className="router-table"
-				placeholder={"Search for a server.."}
+				placeholder={"Search .."}
+				background={true}
 				header={headers}
 				rows={rows}
 			/>

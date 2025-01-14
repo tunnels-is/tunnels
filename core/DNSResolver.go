@@ -260,6 +260,7 @@ func GlobalBlockEnabled(m *dns.Msg, w dns.ResponseWriter) bool {
 }
 
 func DNSQuery(w dns.ResponseWriter, m *dns.Msg) {
+	defer RecoverAndLogToFile()
 	// ip := strings.Split(w.RemoteAddr().String(), ":")[0]
 
 	if isAppDNS(m, w) {
@@ -278,7 +279,7 @@ func DNSQuery(w dns.ResponseWriter, m *dns.Msg) {
 
 	var Connection *Tunnel
 	var ServerDNS *ServerDNS
-	for i, con := range ConList {
+	for i, con := range TunList {
 		if con == nil {
 			continue
 		}
@@ -297,12 +298,14 @@ func DNSQuery(w dns.ResponseWriter, m *dns.Msg) {
 
 		ServerDNS = DNSAMapping(con.CRR.DNS, m.Question[0].Name)
 		if ServerDNS != nil {
-			Connection = ConList[i]
+			Connection = TunList[i]
 			break
 		}
 	}
 
-	ServerDNS = DNSAMapping(C.CustomDNSRecords, m.Question[0].Name)
+	if ServerDNS == nil {
+		ServerDNS = DNSAMapping(C.DNSRecords, m.Question[0].Name)
+	}
 
 	if blocked && ServerDNS == nil {
 		if GLOBAL_STATE.C.DNSstats {
@@ -445,7 +448,7 @@ func DNSCacheCheck(m *dns.Msg, w dns.ResponseWriter) bool {
 			" | TYPE: ",
 			strconv.FormatUint(uint64(m.Question[0].Qtype), 10),
 			" | Expires(seconds): ",
-			time.Until(cachedReply.Expires).Seconds(),
+			fmt.Sprintf("%.2f", time.Until(cachedReply.Expires).Seconds()),
 		)
 	}
 

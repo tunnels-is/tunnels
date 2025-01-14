@@ -602,30 +602,6 @@
 
 
 
-.card-button {
-  background: var(--button-color);
-  color: var(--c-white) !important;
-  border-radius: var(--button-border-radius);
-  font-weight: 600;
-  font-size: 18px !important;
-  padding: 5px !important;
-  padding-top: 7px !important;
-  padding-left: 10px !important;
-  padding-right: 10px !important;
-  cursor: pointer;
-  width: fit-content !important;
-  text-align: center;
-  margin-top: 10px;
-  -webkit-user-select: none;
-  -ms-user-select: none;
-  user-select: none;
-}
-
-.card-button:hover {
-  background: var(--button-hover-color);
-  color: var(--c-white) !important;
-}
-
 button {
   height: fit-content; // height: 45px;
   width: fit-content;
@@ -2862,18 +2838,39 @@ button {
 
 .button-and-text-seperator {
   height: 10px;
-  border-bottom: 1px solid var(--c-shade3);
+  border-bottom: 1px solid var(--c-shade2);
   margin-bottom: 10px;
   margin-top: 10px;
 }
 
 .connections {
-  margin-top: 10px;
+  /* margin-top: 40px; */
   display: flex;
   flex-direction: row;
   justify-content: left;
   gap: 20px;
   flex-wrap: wrap;
+
+  .tunnels-table {
+    .connect-button {
+      margin-right: 10px;
+    }
+
+    .connect-header {
+      margin-right: 10px;
+    }
+
+  }
+
+  .new-table {
+    min-width: 800px;
+  }
+
+  .back {
+    font-size: 26px;
+    color: var(--c-blue);
+    cursor: pointer;
+  }
 
   .search-wrapper {
     margin-bottom: 20px;
@@ -2907,7 +2904,7 @@ button {
     padding-top: 15px;
     border-radius: $card-border-radius;
     position: relative;
-    box-shadow: $base-shadow;
+    /* box-shadow: $base-shadow; */
 
     .subtitle:hover {
       color: var(--c-blue)
@@ -2993,8 +2990,8 @@ button {
 
     .button-and-text-seperator {
       height: 10px;
-      border-bottom: 1px solid var(--c-shade3);
-      margin-bottom: 10px;
+      border-bottom: 1px solid var(--c-shade2);
+      margin-bottom: 12px;
     }
 
     .con-select {
@@ -3038,18 +3035,18 @@ button {
       }
 
       .connect {
-        background: var(--c-green) !important;
+        background: var(--c-dark-green) !important;
       }
 
       .connect:hover {
-        background: var(--c-dark-green) !important;
+        background: var(--c-green) !important;
 
       }
 
 
       .tag {
         cursor: pointer;
-        font-size: 24px;
+        font-size: 30px;
         width: 100%;
         text-align: center;
         color: var(--c-blue)
@@ -3398,34 +3395,28 @@ button {
 
 .dns-page {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   justify-content: flex-start;
   height: fit-content;
   width: 100%;
   flex-wrap: wrap;
-  gap: 50px;
+  gap: 20px;
+
+
 
   .custom-label {
     user-select: none;
     cursor: pointer;
   }
 
-
-  .green {
-    color: var(--c-green) !important;
+  .enabled {
+    color: var(--c-green);
   }
 
-  .red {
-    color: var(--c-red)
+  .disabled {
+    color: var(--c-red);
   }
 
-  .danger {
-    color: var(--c-red) !important;
-  }
-
-  .warning {
-    color: var(--c-orange) !important;
-  }
 
   .seperator {
     margin-top: 10px;
@@ -3435,7 +3426,13 @@ button {
     margin-left: 10%;
   }
 
-  .panel {
+  .full-page {
+    margin-top: 30px;
+    width: 100%;
+    margin-bottom: 0px;
+  }
+
+  .basic-info {
     /* padding: 20px; */
     /* background: $main-bg-color; */
     /* background: $c-shade2; */
@@ -3443,8 +3440,8 @@ button {
     flex-direction: column;
     height: fit-content;
     max-width: 500px;
-    margin-bottom: 30px;
-    margin-right: 20px;
+    /* margin-bottom: 30px; */
+    /* margin-right: 20px; */
 
     .header {
       display: flex;
@@ -3536,7 +3533,7 @@ button {
 
 .account-page {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   justify-content: flex-start;
   height: fit-content;
   width: 100%;
@@ -3594,6 +3591,10 @@ button {
 
       .dialtimeout {
         width: 65px;
+      }
+
+      .card-button {
+        margin-top: 10px;
       }
 
       .toggle {

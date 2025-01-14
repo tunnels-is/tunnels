@@ -17,19 +17,16 @@ import (
 func AutoConnect(MONITOR chan int) {
 	defer func() {
 		time.Sleep(30 * time.Second)
-		MONITOR <- 5
+		MONITOR <- 200
 	}()
 
 	for {
-		// ONLY IF TUNNEL IS NOT CONNECTED
-		// get api key .. or device key + orgID
-		// use public connect with ConnectionRequest
 	next:
 		for _, v := range C.Connections {
 			if v == nil || !v.AutoConnect {
 				continue
 			}
-			for _, vc := range ConList {
+			for _, vc := range TunList {
 				if vc == nil {
 					continue
 				}
@@ -39,21 +36,16 @@ func AutoConnect(MONITOR chan int) {
 						continue
 					}
 					if x.Meta.Tag == v.Tag {
-						fmt.Println("Already connected:", v.Tag)
 						continue next
 					}
 				}
 			}
 
-			fmt.Println("CONNECTING TO:", v.Tag)
-			fmt.Println("META:", v)
 			code, err := PublicConnect(ConnectionRequest{
-				DeviceKey:  v.DeviceKey,
-				OrgID:      v.OrgID,
 				Tag:        v.Tag,
-				SeverID:    v.ServerID,
-				ServerIP:   v.PrivateIP,
-				ServerPort: v.PrivatePort,
+				DeviceKey:  CLIDeviceKey,
+				ServerIP:   CLIHost,
+				ServerPort: CLIPort,
 				EncType:    v.EncryptionType,
 			})
 			if err != nil {
@@ -107,10 +99,10 @@ func PingConnections(MONITOR chan int) {
 		MONITOR <- 3
 	}()
 	defer RecoverAndLogToFile()
-	if IOT {
+	if MINIMAL {
 		PopulatePingBufferWithStats()
 	}
-	for _, v := range ConList {
+	for _, v := range TunList {
 		if v == nil {
 			continue
 		}

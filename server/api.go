@@ -67,17 +67,15 @@ func HTTP_ListDevices(w http.ResponseWriter, r *http.Request) {
 		}
 		d := new(listDevice)
 		d.AllowedIPs = make([]string, 0)
-		ClientCoreMappings[i].Allowedm.Lock()
-		for i := range ClientCoreMappings[i].AllowedHosts {
+		for _, v := range ClientCoreMappings[i].AllowedHosts {
 			d.AllowedIPs = append(d.AllowedIPs,
 				fmt.Sprintf("%d-%d-%d-%d",
-					i[0],
-					i[1],
-					i[2],
-					i[3],
+					v.IP[0],
+					v.IP[1],
+					v.IP[2],
+					v.IP[3],
 				))
 		}
-		ClientCoreMappings[i].Allowedm.Unlock()
 
 		d.RAM = ClientCoreMappings[i].RAM
 		d.CPU = ClientCoreMappings[i].CPU
@@ -109,12 +107,9 @@ func HTTP_ListDevices(w http.ResponseWriter, r *http.Request) {
 }
 
 type FirewallRequest struct {
-	// for validation
 	DHCPToken string
 	IP        string
-
-	Cmd   string
-	Hosts []string
+	Hosts     []string
 }
 
 func HTTP_Firewall(w http.ResponseWriter, r *http.Request) {

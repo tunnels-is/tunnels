@@ -1,6 +1,5 @@
 import React, { useEffect } from "react";
 import GLOBAL_STATE from "../state";
-import CustomTable from "./component/table";
 import CustomSelect from "./component/CustomSelect";
 import { useNavigate } from "react-router-dom";
 import NewTable from "./component/newtable";
@@ -12,6 +11,7 @@ const PrivateServers = () => {
 	useEffect(() => {
 		state.GetPrivateServers()
 	}, [])
+
 
 	const generateServerTable = () => {
 		let rows = []
@@ -38,8 +38,8 @@ const PrivateServers = () => {
 						navigate("/inspect/server/" + server._id)
 					}
 				},
-				{ type: "text", value: server._id },
-				{ type: "text", value: server.Serial },
+				{ type: "text", minWidth: "300px", value: server._id },
+				{ type: "text", minWidth: "350px", value: server.Serial },
 				{
 					type: "select",
 					opts: opts,
@@ -64,22 +64,25 @@ const PrivateServers = () => {
 	let rows = generateServerTable()
 	const headers = [
 		{ value: "Tag" },
-		{ value: "ID" },
-		{ value: "Cert Serial" },
+		{ value: "ID", minWidth: "300px" },
+		{ value: "Cert Serial", minWidth: "350px" },
 		{ value: "Tunnel" },
 	]
+
 
 	return (
 		<div className="ab private-server-wrapper">
 
 			<NewTable
+				title={"Private VPN Servers"}
 				tableID={"private-servers"}
 				className="router-table"
-				placeholder={"Search for a server.."}
+				placeholder={"Search .."}
 				header={headers}
+				background={true}
 				rows={rows}
 				button={{
-					text: "Create",
+					text: "New Server",
 					click: function() {
 						navigate("/inspect/server")
 					}

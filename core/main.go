@@ -32,21 +32,22 @@ func InitService() error {
 
 	printInfo()
 
-	if !IOT {
-		CreateBaseFolder()
-		InitLogfile()
-	}
+	// if !MINIMAL {
+	CreateBaseFolder()
+	InitLogfile()
+	// }
+
 	go StartLogQueueProcessor(routineMonitor)
 
-	if IOT && CLIDNS != "" {
-		LoadIOTConfig()
+	if MINIMAL && CLIDNS != "" {
+		LoadDNSConfig()
 	} else {
 		LoadConfig()
 	}
 
 	printInfo2()
 
-	if !IOT {
+	if !MINIMAL {
 		InitDNSHandler()
 		InitBlockListPath()
 
@@ -61,16 +62,20 @@ func InitService() error {
 
 	if GLOBAL_STATE.C == nil {
 		ERROR("", "Global state could not be set.. possible config issue")
+		time.Sleep(3 * time.Second)
 		return errors.New("unable to create global state.. possible config error")
 	}
 
 	var err error
+	INFO("Loading certificates")
 	CertPool, err = certs.LoadTunnelsCACertPool()
 	if err != nil {
 		DEBUG("Could not load root CA:", err)
+		time.Sleep(3 * time.Second)
 		return err
 	}
 
+	fmt.Println("LENCPOSTSTART:", len(C.Connections))
 	INFO("Tunnels is ready")
 	return nil
 }
@@ -162,7 +167,7 @@ func LaunchEverything() {
 	routineMonitor <- 5
 	routineMonitor <- 6
 
-	if !IOT {
+	if !MINIMAL {
 		routineMonitor <- 2
 		routineMonitor <- 7
 
@@ -172,7 +177,7 @@ func LaunchEverything() {
 		routineMonitor <- 103
 	}
 
-	if IOT {
+	if MINIMAL {
 		routineMonitor <- 200
 	}
 
@@ -251,7 +256,7 @@ func SaveConfig(c *Config) (err error) {
 	return
 }
 
-func LoadIOTConfig() {
+func LoadDNSConfig() {
 	defer func() {
 		r := recover()
 		if r != nil {
@@ -259,47 +264,23 @@ func LoadIOTConfig() {
 		}
 	}()
 
-	DEBUG("Generating a new default config")
-
-	C := new(Config)
+	C = new(Config)
 	C.InfoLogging = true
 	C.ErrorLogging = true
 	C.ConsoleLogOnly = true
 	C.ConsoleLogging = true
+	C.DebugLogging = true
+
+	DEBUG("Generating a new minimal config")
 
 	newCon := createMinimalConnection()
 	newCon.Private = true
-
 	if CLIDNS != "" {
-		info, err := ResolveMetaTXT(CLIDNS)
-		if err != nil {
-			ERROR("Unable to resolve Meta: ", err)
-			return
-		}
-		newCon.PrivateIP = info.IP
-		newCon.PrivatePort = info.Port
-		newCon.PrivateCertBytes = info.cert
+		newCon.DNSDiscovery = CLIDNS
 	}
 
-	if newCon.OrgID == "" {
-		newCon.OrgID = CLIOrgId
-	}
-	if newCon.DeviceKey == "" {
-		newCon.DeviceKey = CLIDeviceKey
-	}
-	if newCon.Hostname == "" {
-		newCon.Hostname = CLIHostname
-	}
-	fmt.Println("HOST:", newCon.Hostname)
-	fmt.Println("HOST:", newCon.Hostname)
-	fmt.Println("HOST:", newCon.Hostname)
-	fmt.Println("HOST:", newCon.Hostname)
-	fmt.Println("HOST:", newCon.Hostname)
-	fmt.Println("HOST:", newCon.Hostname)
-	fmt.Println("HOST:", newCon.Hostname)
-
-	C.Connections = make([]*TunnelMETA, 0)
-	C.Connections = append(C.Connections, newCon)
+	fmt.Println("APPEND CONNECTION")
+	C.Connections = []*TunnelMETA{newCon}
 
 	C.DNSstats = false
 	C.AvailableBlockLists = make([]*BlockList, 0)
@@ -485,7 +466,7 @@ func LoadDNSWhitelist() (err error) {
 func CleanupOnClose() {
 	defer RecoverAndLogToFile()
 	// CleanupWithStateLock()
-	for _, v := range ConList {
+	for _, v := range TunList {
 		if v == nil {
 			continue
 		}

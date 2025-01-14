@@ -1,13 +1,12 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import CustomToggle from "./component/CustomToggle";
 import FormKeyValue from "./component/formkeyvalue";
-import CustomTable from "./component/table";
-import Label from "./component/label";
 import { useNavigate } from "react-router-dom";
 import NewTable from "./component/newtable";
 import dayjs from "dayjs";
 
 import GLOBAL_STATE from "../state";
+import ConfigDNSRecordEditor from "./component/ConfigDNSRecordEditor";
 
 const DNSSort = (a, b) => {
 	if (dayjs(a.LastSeen).unix() < dayjs(b.LastSeen).unix()) {
@@ -24,12 +23,8 @@ const DNS = () => {
 	const navigate = useNavigate()
 	let LogBlockedDomains = state.getKey("Config", "LogBlockedDomains")
 	let LogAllDomains = state.getKey("Config", "LogAllDomains")
-	let configChanged = state.modifiedLists !== undefined
 	let dnsStats = state.getKey("Config", "DNSstats")
 
-	if (!configChanged) {
-		configChanged = state.modifiedConfig !== undefined
-	}
 
 	let DNS1 = state.getKey("Config", "DNS1Default")
 	let DNS2 = state.getKey("Config", "DNS2Default")
@@ -68,7 +63,7 @@ const DNS = () => {
 				{
 					type: "text",
 					value: <div
-						className={`${i.Enabled ? "green" : "red"} clickable`}
+						className={`${i.Enabled ? "enabled" : "disabled"} clickable`}
 						onClick={() => { state.toggleBlocklist(i) }}
 					>	{i.Enabled ? "Blocked" : "Allowed"}</div>
 				},
@@ -77,7 +72,7 @@ const DNS = () => {
 				{
 					type: "text",
 					value: <div
-						className={`${isDefault(i.Tag) ? "hide" : "red"} clickable`}
+						className={`${isDefault(i.Tag) ? "disabled" : "red"} clickable`}
 						onClick={() => { state.deleteBlocklist(i) }}
 					>Remove</div>
 				}
@@ -184,7 +179,7 @@ const DNS = () => {
 	return (
 		<div className="dns-page">
 
-			<div className="panel">
+			<div className="basic-info panel">
 				<div className="title">Settings</div>
 				<div className="warn-msg">Use {DNSServerIP} as your DNS server to enable these settings.</div>
 				<div className="warn-msg">Enabling blocklists will increase memory usage.</div>
@@ -275,11 +270,12 @@ const DNS = () => {
 				/>
 			</div>
 
+
 			<NewTable
 				tableID="dns-lists"
 				title={"Block Lists"}
 				className="domain-list-table"
-				placeholder={"Search for a list.."}
+				background={true}
 				header={headers}
 				rows={rows}
 				button={{
@@ -296,31 +292,25 @@ const DNS = () => {
 						tableID="dns-blocked"
 						title={"Blocked Domains"}
 						className="dns-stats"
+						background={true}
 						header={headersDNSstats}
 						rows={rowsDNSstats}
-						button={{
-							text: "Refresh",
-							click: function() {
-								state.GetBackendState()
-							}
-						}}
 					/>
 
 					<NewTable
 						tableID="dns-resolved"
 						title={"Resolved Domains"}
 						className="dns-stats"
+						background={true}
 						header={headerDNSresolves}
 						rows={rowsDNSresolves}
-						button={{
-							text: "Refresh",
-							click: function() {
-								state.GetBackendState()
-							}
-						}}
 					/>
 				</>
 			}
+			<div className="title full-page">
+				DNS Records
+			</div>
+			<ConfigDNSRecordEditor />
 		</div >
 	)
 }

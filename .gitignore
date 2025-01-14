@@ -13,8 +13,6 @@ builds/*
 
 devops/build/tunnels
 server/server
-
-cmd/main/dist
 cmd/main/files
 cmd/main/*.exe
 cmd/main/main
@@ -23,7 +21,6 @@ cmd/main/*.crt
 *.exe
 
 node_modules
-frontend/dist
 files
 
 .DS_Store

@@ -1,9 +1,9 @@
-import React, { useDebugValue, useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 
 import Loader from "react-spinners/ScaleLoader";
 import STORE from "../store";
-import GLOBAL_STATE, { STATE } from "../state";
+import GLOBAL_STATE from "../state";
 import dayjs from "dayjs";
 import KeyValue from "./component/keyvalue";
 
@@ -62,6 +62,7 @@ const Connections = () => {
 				} else {
 					state.editorError = "Invalid JSON"
 				}
+				state.globalRerender()
 				return
 			}
 
@@ -81,6 +82,73 @@ const Connections = () => {
 			state.SaveConnectionsToModifiedConfig(modCons)
 			state.globalRerender()
 		}
+
+		state.editorExtraButtons = []
+		state.editorExtraButtons.push({
+			func: function() {
+				let ed = state.editorData
+				if (ed === undefined) {
+					console.log("no data!")
+					return
+				}
+				if (ed.Networks.length < 1) {
+					ed.Networks.push({
+						Tag: "new-network",
+						Network: "",
+						Nat: "",
+						Routes: []
+					})
+				}
+				ed.Networks[0].Routes.push(
+					{
+						Address: "0.0.0.0/32",
+						Metric: "0"
+					}
+				)
+
+				state.globalRerender()
+			},
+			title: "+Route"
+		})
+		state.editorExtraButtons.push({
+			func: function() {
+				let ed = state.editorData
+				if (ed === undefined) {
+					console.log("no data!")
+					return
+				}
+				ed.Networks.push({
+					Tag: "new-network",
+					Network: "",
+					Nat: "",
+					Routes: []
+				})
+
+				state.globalRerender()
+			},
+			title: "+Network"
+		})
+		state.editorExtraButtons.push({
+			func: function() {
+				let ed = state.editorData
+				if (ed === undefined) {
+					console.log("no data!")
+					return
+				}
+				ed.DNS.push({
+					Domain: "mydomain.local",
+					Wildcard: true,
+					IP: ["127.0.0.1"],
+					TXT: ["this is a text record"],
+					CNAME: "",
+				})
+
+				state.globalRerender()
+			},
+			title: "+DNS"
+		})
+
+
 		state.globalRerender()
 
 	}
@@ -235,6 +303,14 @@ const Connections = () => {
 
 				{s &&
 					<>
+						{s.DHCP &&
+							<>
+								<div className="button-and-text-seperator"></div>
+								<KeyValue value={String(s.VPLNetwork?.Network)} label={"VPL Network"} />
+								<KeyValue value={String(s.DHCP?.IP).replaceAll(",", ".")} label={"IP"} />
+								<KeyValue value={String(s.DHCP?.Hostname)} label={"Host"} />
+							</>
+						}
 						<div className="button-and-text-seperator"></div>
 						<KeyValue value={String(s.VPLNetwork?.Network)} label={"VPL Network"} />
 						<KeyValue value={String(s.DHCP?.IP).replaceAll(",", ".")} label={"IP"} />
@@ -303,15 +379,19 @@ const Connections = () => {
 				/>
 			}
 
+
 			{state.Config?.Connections?.map((c) => {
 				return renderConnection(c)
 			})}
 
-			<div className="add-connection">
-				<div className="add-button" onClick={() =>
+			<div className="plus-button"
+				onClick={() =>
 					addConnection()
-				}>+</div>
+				}
+			>
+				+
 			</div>
+
 		</div>
 	);
 }

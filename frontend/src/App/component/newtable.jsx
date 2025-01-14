@@ -97,7 +97,7 @@ const NewTable = (props) => {
 	}
 
 	return (
-		<div className="new-table">
+		<div className={`new-table ${props.background ? "table-bg" : ""}`}>
 
 			<div className="top-bar">
 
@@ -105,12 +105,28 @@ const NewTable = (props) => {
 					<div className="title">{props.title}</div>
 				}
 
+				{props?.button &&
+					<div style={{ color: "var(--c-" + props.button.color ? props.button.color : "blue" + ")" }} onClick={(e) => props.button.click(e)} className="text-button clickable">
+						{props.button.text}
+					</div>
+				}
+				{props?.button2 &&
+					<div style={{ color: "var(--c-" + props.button2.color ? props.button2.color : "blue" + ")" }} onClick={(e) => props.button2.click(e)} className="text-button clickable">
+						{props.button2.text}
+					</div>
+				}
+
+
 				{(pg.TotalPages > 1 || pg.TableSize === finalRows.length) &&
 					<div className="pagination-bar">
 						<div className="left-arrow" onClick={() => setPageWrap(pg.PrevPage, finalRows.length)}>
 							prev
 						</div>
+						<div className="right-arrow" onClick={() => setPageWrap(pg.NextPage, finalRows.length)}>
+							next
+						</div>
 						<div className="pages">
+							items
 							<select
 								className="page-selection"
 								value={originalSize}
@@ -124,6 +140,7 @@ const NewTable = (props) => {
 							</select>
 						</div>
 						<div className="pages">
+							page
 							<select
 								className="page-selection"
 								value={pg.CurrentPage}
@@ -133,28 +150,30 @@ const NewTable = (props) => {
 								))}
 							</select>
 						</div>
-						<div className="right-arrow" onClick={() => setPageWrap(pg.NextPage, finalRows.length)}>
-							next
-						</div>
 					</div>
 				}
 
+			</div>
+			<div className={` top-bar`}>
 				<div className="search-bar">
 					<input
 						onChange={(e) => setFilter(e.target.value)}
-						placeholder={props?.placeholder ? props.placeholder : "Search.."}
+						placeholder={props?.placeholder ? props.placeholder : "Search .."}
 						className="ab" />
-					{props?.button &&
-						<div onClick={(e) => props.button.click(e)} className="text-button clickable">
-							{props.button.text}
-						</div>
-					}
 				</div>
+
 			</div>
+
+			{finalRows.length < 1 &&
+				<div className="waiting">
+					nothing found
+				</div>
+
+			}
 
 			<div className={`${props.className} ab table`}>
 
-				<div className="ab header">
+				<div className={`ab header ${finalRows.length < 1 ? "hide" : ""}`}>
 					{props?.header?.map((l, i) => {
 						let cs = {}
 
@@ -168,16 +187,23 @@ const NewTable = (props) => {
 							cs.justifyContent = l.align
 							cs.display = "flex"
 						}
+						if (l.minWidth) {
+							cs.minWidth = l.minWidth
+						}
 
 						if (l.width) {
 							cs.flex = "0 1 " + String(l.width) + "%"
+						}
+						let classNames = ""
+						if (l.className !== undefined) {
+							classNames = l.className
 						}
 
 						return (
 							<div
 								key={l.value + i}
 								style={cs}
-								className="ab column">{l.value}
+								className={`ab column ` + classNames}>{l.value}
 							</div>
 						)
 
@@ -211,6 +237,9 @@ const NewTable = (props) => {
 								let classNames = ""
 								if (i.className !== undefined) {
 									classNames = i.className
+								}
+								if (i.minWidth) {
+									cs.minWidth = i.minWidth
 								}
 
 								if (i.width) {

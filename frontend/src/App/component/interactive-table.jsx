@@ -5,7 +5,7 @@ const InteractiveTable = (props) => {
 	// console.dir(props)
 
 	return (
-		<div className="table-frame">
+		<div className={`table-frame ${props.background ? "table-bg" : ""}`}>
 
 			<div className="top-bar">
 				{props?.title &&

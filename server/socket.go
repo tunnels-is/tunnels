@@ -90,7 +90,7 @@ func acceptUserUDPTLSSocket(conn *quic.Conn) {
 		}
 	}()
 
-	buff := make([]byte, 1500)
+	buff := make([]byte, 10000)
 	var err error
 	var n int
 
@@ -106,7 +106,7 @@ func acceptUserUDPTLSSocket(conn *quic.Conn) {
 		return
 	}
 
-	// fmt.Println("CR+HANDSHAKE:", string(buff[:n]))
+	fmt.Println("CR+HANDSHAKE:", string(buff[:n]))
 
 	_, CR, err := validateSignatureAndExtractConnectRequest(buff[:n])
 	if err != nil {
@@ -530,8 +530,9 @@ func fromUserChannel(index int) {
 	var err error
 	var ok bool
 	staging := make([]byte, 100000)
-	clientCache := make(map[[4]byte]chan []byte)
+	clientCache := make(map[[4]byte]*UserCoreMapping)
 	var D4 [4]byte
+	var D4Port [2]byte
 
 	for {
 		payload, ok = <-CM.FromUser
@@ -587,26 +588,32 @@ func fromUserChannel(index int) {
 			D4[1] = NIP[1]
 			D4[2] = NIP[2]
 			D4[3] = NIP[3]
-			_, ok := clientCache[D4]
-			if !ok {
+			l := (PACKET[0] & 0x0F) * 4
+			D4Port[0] = l + 2
+			D4Port[1] = l + 3
+			// D4[4] = PACKET[20]
+			um, ok := clientCache[D4]
+			if !ok || um == nil {
 				// fmt.Println("cache hit:", D4)
 				IPm.Lock()
 				targetCM, _ := IPToCoreMapping[D4]
 				IPm.Unlock()
 				if targetCM != nil {
-					clientCache[D4] = targetCM.ToUser
-					ok = true
+					clientCache[D4] = targetCM
 				}
 			}
-			if ok {
+			if clientCache[D4] != nil {
 				// fmt.Println("SENDING TO:", D4)
+				CM.AddHost(D4, D4Port, "NAT")
 				select {
-				case clientCache[D4] <- CopySlice(PACKET):
+				case clientCache[D4].ToUser <- CopySlice(PACKET):
 					// fmt.Println("SENT TO:", D4)
 				default:
-					// fmt.Println("deleting:", D4)
-					delete(clientCache, D4)
+					WARN("Client channel full:", PACKET[12:16], ">", D4)
 				}
+				continue
+			} else {
+				CM.DelHost(D4, "NAT")
 				continue
 			}
 		}
@@ -687,6 +694,7 @@ func toUserChannel(index int) {
 	var ok bool
 	var out []byte
 	var S4 [4]byte
+	var S4Port [2]byte
 
 	for {
 		PACKET, ok = <-CM.ToUser
@@ -703,21 +711,16 @@ func toUserChannel(index int) {
 		// fmt.Println("VPLTo:", VPLEnabled)
 		if VPLEnabled {
 			if !AllowAll {
-
 				S4[0] = PACKET[12]
 				S4[1] = PACKET[13]
 				S4[2] = PACKET[14]
 				S4[3] = PACKET[15]
-				CM.Allowedm.Lock()
-				allowed, ok := CM.AllowedHosts[S4]
-				CM.Allowedm.Unlock()
-				if ok {
-					if !allowed {
-						// fmt.Println("NOT ALLOWED:", S4)
-						continue
-					}
-				} else {
-					// fmt.Println("NOT FOUND:", S4)
+				l := (PACKET[0] & 0x0F) * 4
+				S4Port[0] = l
+				S4Port[1] = l + 1
+				allowed := CM.IsHostAllowed(S4, S4Port)
+				if !allowed {
+					// fmt.Println("NOT ALLOWED:", S4)
 					continue
 				}
 

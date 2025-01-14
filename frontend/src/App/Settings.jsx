@@ -37,6 +37,7 @@ const Settings = () => {
 	}
 
 	const openConfigEditor = (config) => {
+		state.resetEditor()
 		state.editorData = config
 		state.editorReadOnly = false
 		state.editorDelete = undefined
@@ -174,7 +175,7 @@ const Settings = () => {
 
 
 				<div
-					className="danger-button button"
+					className="red card-button"
 					onClick={() => state.resetApp()}
 				>
 					Reset Everything

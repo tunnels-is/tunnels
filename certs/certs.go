@@ -11,12 +11,14 @@ import (
 	"crypto/x509/pkix"
 	"encoding/hex"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"log"
 	"math/big"
 	"net"
 	"os"
 	"runtime/debug"
+	"strings"
 	"time"
 )
 
@@ -37,16 +39,6 @@ func LoadTunnelsCACertPool() (pool *x509.CertPool, err error) {
 	if !ok {
 		return nil, fmt.Errorf("Unable to load second CA certificate")
 	}
-	return
-}
-
-func LoadServerSignCertAndKey() (c *x509.Certificate, k *rsa.PublicKey, err error) {
-	pubKeyBlock, _ := pem.Decode([]byte(ControlCert))
-	c, err = x509.ParseCertificate(pubKeyBlock.Bytes)
-	if err != nil {
-		return nil, nil, err
-	}
-	k = c.PublicKey.(*rsa.PublicKey)
 	return
 }
 
@@ -187,4 +179,53 @@ func ExtractSerialNumberFromCRT(path string) (serial string, err error) {
 	}
 
 	return fmt.Sprintf("%X", cert.SerialNumber), nil
+}
+
+type DNSInfo struct {
+	Cert     []byte
+	IP       string
+	Port     string
+	ServerID string
+}
+
+func ResolveMetaTXT(domain string) (info *DNSInfo, err error) {
+	txt, err := net.LookupTXT(domain)
+	if err != nil {
+		return nil, fmt.Errorf("error in base lookup: %s", err)
+	}
+	// certParts := make([][]byte, 100)
+	info = new(DNSInfo)
+	info.Cert = make([]byte, 0)
+
+	for _, v := range txt {
+		if strings.Contains(v, "----") {
+			info.Cert = []byte(v)
+			// info.Cert = bytes.Replace(info.Cert, []byte("\n"), []byte{}, -1)
+		} else {
+			split := strings.Split(v, ":")
+			if len(split) < 3 {
+				return nil, errors.New("bad dns format, 0: field is less then 4 in length")
+			}
+			info.IP = split[0]
+			info.Port = split[1]
+			info.ServerID = split[2]
+			continue
+		}
+	}
+	if info.IP == "" {
+		return nil, errors.New("bad dns format, IP is empty")
+	}
+	if info.Port == "" {
+		return nil, errors.New("bad dns format, Port is empty")
+	}
+	if info.ServerID == "" {
+		return nil, errors.New("bad dns format, ServerID is empty")
+	}
+
+	// fmt.Println("-----------------")
+	// fmt.Println(info.IP, info.Port, info.ServerID)
+	// fmt.Println("-----------------")
+	// fmt.Println(string(info.Cert))
+	// fmt.Println("-----------------")
+	return
 }

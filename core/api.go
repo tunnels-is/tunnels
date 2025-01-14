@@ -22,6 +22,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/tunnels-is/tunnels/certs"
 	"github.com/xlzd/gotp"
 	"github.com/zveinn/crypt"
 	"golang.org/x/net/quic"
@@ -59,7 +60,7 @@ func ControllerDirectDial(ctx context.Context, _ string, addr string) (net.Conn,
 func ResetEverything() {
 	defer RecoverAndLogToFile()
 
-	for _, v := range ConList {
+	for _, v := range TunList {
 		if v == nil {
 			continue
 		}
@@ -69,6 +70,57 @@ func ResetEverything() {
 	}
 
 	RestoreSaneDNSDefaults()
+}
+
+func sendFirewallToServer(serverIP string, DHCPToken string, DHCPIP string, allowedHosts []string) (err error) {
+	FR := new(FirewallRequest)
+	FR.DHCPToken = DHCPToken
+	FR.IP = DHCPIP
+	FR.Hosts = allowedHosts
+
+	var body []byte
+	body, err = json.Marshal(FR)
+	if err != nil {
+		return err
+	}
+
+	DEBUG("Sending firewall info to server: ", serverIP)
+	req, err := http.NewRequest("POST", "https://"+serverIP+":444/firewall", bytes.NewBuffer(body))
+	if err != nil {
+		return err
+	}
+
+	client := http.Client{
+		Timeout: time.Duration(5000) * time.Millisecond,
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				CurvePreferences:   []tls.CurveID{tls.CurveP521},
+				RootCAs:            CertPool,
+				MinVersion:         tls.VersionTLS13,
+				InsecureSkipVerify: true,
+			},
+		},
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+
+	client.CloseIdleConnections()
+	if resp != nil {
+		if resp.Body != nil {
+			defer resp.Body.Close()
+		}
+
+		if resp.StatusCode != 200 {
+			return fmt.Errorf("error from server (%s) while applying firewall rules, code: %d", serverIP, resp.StatusCode)
+		}
+	} else {
+		return fmt.Errorf("no response from server(%s) while applying firewall rules", serverIP)
+	}
+
+	return nil
 }
 
 func SendRequestToController(method string, route string, data interface{}, timeoutMS int) ([]byte, int, error) {
@@ -326,6 +378,11 @@ func SetConfig(config *Config) error {
 		}
 	}
 
+	err = applyNewFirewallRules(C, config)
+	if err != nil {
+		return err
+	}
+
 	err = SaveConfig(config)
 	if err != nil {
 		ERROR("Unable to save config: ", err)
@@ -377,22 +434,43 @@ func BandwidthBytesToString(b uint64) string {
 		return intS + " B"
 	} else if b <= 999_999 {
 		intF := float64(b)
-		return fmt.Sprintf("%.2f KB", intF/1000)
+		return fmt.Sprintf("%.0f KB", intF/1000)
 	} else if b <= 999_999_999 {
 		intF := float64(b)
-		return fmt.Sprintf("%.2f MB", intF/1_000_000)
+		return fmt.Sprintf("%.1f MB", intF/1_000_000)
 	} else if b <= 999_999_999_999 {
 		intF := float64(b)
-		return fmt.Sprintf("%.2f GB", intF/1_000_000_000)
+		return fmt.Sprintf("%.1f GB", intF/1_000_000_000)
 	} else if b <= 999_999_999_999_999 {
 		intF := float64(b)
-		return fmt.Sprintf("%.2f TB", intF/1_000_000_000_000)
+		return fmt.Sprintf("%.1f TB", intF/1_000_000_000_000)
 	}
 
 	return "???"
 }
 
-func PrepareState() (err error) {
+func applyNewFirewallRules(originalConfig *Config, newConfig *Config) error {
+	for _, oc := range originalConfig.Connections {
+		for _, nc := range newConfig.Connections {
+			if oc.WindowsGUID == nc.WindowsGUID {
+				if !slices.Equal(oc.AllowedHosts, nc.AllowedHosts) {
+					t := findTunnelByGUID(nc.WindowsGUID)
+					if t != nil {
+						sendFirewallToServer(
+							t.ClientCR.ServerIP,
+							t.DHCP.Token,
+							net.IP(t.DHCP.IP[:]).String(),
+							nc.AllowedHosts,
+						)
+					}
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func GenerateState() (err error) {
 	defer RecoverAndLogToFile()
 	DEBUG("Generating state object")
 
@@ -400,38 +478,39 @@ func PrepareState() (err error) {
 	GLOBAL_STATE.ConnectionStats = make([]TunnelSTATS, 0)
 	GLOBAL_STATE.Version = APP_VERSION
 
-	for i := range ConList {
-		if ConList[i] == nil {
+	for i := range TunList {
+		if TunList[i] == nil {
 			continue
 		}
 
-		GLOBAL_STATE.ActiveConnections = append(GLOBAL_STATE.ActiveConnections, ConList[i].Meta)
+		GLOBAL_STATE.ActiveConnections = append(GLOBAL_STATE.ActiveConnections, TunList[i].Meta)
 		var n2 uint64 = 0
-		if len(ConList[i].Nonce2Bytes) > 7 {
-			n2 = binary.BigEndian.Uint64(ConList[i].Nonce2Bytes)
+		if len(TunList[i].Nonce2Bytes) > 7 {
+			n2 = binary.BigEndian.Uint64(TunList[i].Nonce2Bytes)
 		}
 
 		x := TunnelSTATS{
-			Nonce1:              ConList[i].EH.SEAL.Nonce1U.Load(),
+			Nonce1:              TunList[i].EH.SEAL.Nonce1U.Load(),
 			Nonce2:              n2,
-			StartPort:           ConList[i].StartPort,
-			EndPort:             ConList[i].EndPort,
-			IngressString:       BandwidthBytesToString(uint64(ConList[i].IngressBytes)),
-			EgressString:        BandwidthBytesToString(uint64(ConList[i].EgressBytes)),
-			EgressBytes:         ConList[i].EgressBytes,
-			StatsTag:            ConList[i].Meta.Tag,
-			DISK:                ConList[i].TunnelSTATS.DISK,
-			MEM:                 ConList[i].TunnelSTATS.MEM,
-			CPU:                 ConList[i].TunnelSTATS.CPU,
-			ServerToClientMicro: ConList[i].TunnelSTATS.ServerToClientMicro,
-			PingTime:            ConList[i].TunnelSTATS.PingTime,
+			StartPort:           TunList[i].StartPort,
+			EndPort:             TunList[i].EndPort,
+			IngressString:       BandwidthBytesToString(uint64(TunList[i].IngressBytes)),
+			EgressString:        BandwidthBytesToString(uint64(TunList[i].EgressBytes)),
+			IngressBytes:        TunList[i].IngressBytes,
+			EgressBytes:         TunList[i].EgressBytes,
+			StatsTag:            TunList[i].Meta.Tag,
+			DISK:                TunList[i].TunnelSTATS.DISK,
+			MEM:                 TunList[i].TunnelSTATS.MEM,
+			CPU:                 TunList[i].TunnelSTATS.CPU,
+			ServerToClientMicro: TunList[i].TunnelSTATS.ServerToClientMicro,
+			PingTime:            TunList[i].TunnelSTATS.PingTime,
 		}
 
-		if ConList[i].DHCP != nil {
-			x.DHCP = ConList[i].DHCP
+		if TunList[i].DHCP != nil {
+			x.DHCP = TunList[i].DHCP
 		}
-		if ConList[i].VPLNetwork != nil {
-			x.VPLNetwork = ConList[i].CRR.VPLNetwork
+		if TunList[i].VPLNetwork != nil {
+			x.VPLNetwork = TunList[i].VPLNetwork
 		}
 
 		GLOBAL_STATE.ConnectionStats = append(GLOBAL_STATE.ConnectionStats, x)
@@ -485,6 +564,14 @@ func InitializeTunnelFromCRR(TUN *Tunnel) (err error) {
 		TUN.VPL_IP[1] = TUN.CRR.DHCP.IP[1]
 		TUN.VPL_IP[2] = TUN.CRR.DHCP.IP[2]
 		TUN.VPL_IP[3] = TUN.CRR.DHCP.IP[3]
+
+		TUN.DHCP = TUN.CRR.DHCP
+		TUN.Meta.DHCPToken = TUN.CRR.DHCP.Token
+		SaveConfig(GLOBAL_STATE.C)
+	}
+
+	if TUN.CRR.VPLNetwork != nil {
+		TUN.VPLNetwork = TUN.CRR.VPLNetwork
 	}
 
 	if !TUN.Meta.LocalhostNat {
@@ -600,23 +687,29 @@ func PublicConnect(ClientCR ConnectionRequest) (code int, errm error) {
 	tunnel.Meta = FindMETAForConnectRequest(&ClientCR)
 	if tunnel.Meta == nil {
 		ERROR("vpn connection metadata not found for tag: ", ClientCR.Tag)
-		return 400, errors.New("error in router tunnel")
+		return 400, errors.New("error fetching connection meta")
 	}
 
 	if tunnel.Meta.DNSDiscovery != "" {
-		sid, sip, sport, err := GetServerInfoFromDNS(tunnel.Meta.DNSDiscovery)
+		DEBUG("looking for connection info @ ", tunnel.Meta.DNSDiscovery)
+		dnsInfo, err := certs.ResolveMetaTXT(tunnel.Meta.DNSDiscovery)
 		if err != nil {
+			ERROR("error looking up connection info: ", err)
 			return 400, err
 		}
-		ClientCR.ServerPort = sport
-		ClientCR.ServerIP = sip
-		ClientCR.SeverID = sid
+		DEBUG("DNS Info: ", dnsInfo.IP, dnsInfo.Port, dnsInfo.ServerID, "cert length: ", len(dnsInfo.Cert))
+		ClientCR.ServerPort = dnsInfo.Port
+		ClientCR.ServerIP = dnsInfo.IP
+		ClientCR.ServerID = dnsInfo.ServerID
+		tunnel.Meta.PrivateCertBytes = dnsInfo.Cert
+		tunnel.Meta.Private = true
+
 	} else {
-		if !tunnel.Meta.Private && ClientCR.SeverID == "" {
+		if !tunnel.Meta.Private && ClientCR.ServerID == "" {
 			ERROR("No server selected")
 			return 400, errors.New("No server selected")
-		} else if tunnel.Meta.ServerID != ClientCR.SeverID {
-			tunnel.Meta.ServerID = ClientCR.SeverID
+		} else if tunnel.Meta.ServerID != ClientCR.ServerID {
+			tunnel.Meta.ServerID = ClientCR.ServerID
 		}
 	}
 
@@ -635,14 +728,13 @@ func PublicConnect(ClientCR ConnectionRequest) (code int, errm error) {
 
 	// from GUI connect request
 	FinalCR.DeviceToken = ClientCR.DeviceToken
-	FinalCR.UserID = ClientCR.UserID
-	FinalCR.SeverID = ClientCR.SeverID
-	FinalCR.EncType = ClientCR.EncType
-	FinalCR.OrgID = ClientCR.OrgID
-	FinalCR.DeviceKey = ClientCR.DeviceKey
 	FinalCR.Hostname = tunnel.Meta.Hostname
+	FinalCR.UserID = ClientCR.UserID
+	FinalCR.SeverID = ClientCR.ServerID
+	FinalCR.EncType = ClientCR.EncType
+	FinalCR.DeviceKey = ClientCR.DeviceKey
 
-	if !IOT {
+	if !tunnel.Meta.Private || tunnel.Meta.RequestVPNPorts {
 		FinalCR.RequestingPorts = true
 	}
 	FinalCR.DHCPToken = tunnel.Meta.DHCPToken
@@ -716,8 +808,12 @@ func PublicConnect(ClientCR ConnectionRequest) (code int, errm error) {
 	} else {
 		FR.Path = "v3/session/public"
 	}
+	if ClientCR.ServerID != "" && ClientCR.DeviceKey != "" {
+		FR.Path += "/min"
+	}
+
 	FR.JSONData = FinalCR
-	FR.Timeout = 15000
+	FR.Timeout = 25000
 
 	bytesFromController, code := ForwardConnectToController(FR)
 	DEBUG("CodeFromController:", code)
@@ -816,22 +912,49 @@ func PublicConnect(ClientCR ConnectionRequest) (code int, errm error) {
 	}
 
 	var createdNewInterface bool
-	err, createdNewInterface = EnsureOrCreateInterface(tunnel)
+	err, createdNewInterface = FindOrCreateInterface(tunnel)
 	if err != nil {
+		ERROR("Unable to initialize interface: ", err)
 		return 502, err
 	}
 
-	oldTunnel := tunnel.Interface.tunnel.Load()
-	if oldTunnel == nil {
+	if createdNewInterface {
 		err = tunnel.Interface.Connect(tunnel)
 		if err != nil {
 			ERROR("unable to configure tunnel interface: ", err)
 			return 502, errors.New("Unable to connect to tunnel interface")
 		}
+		if AddTunnelInterfaceToList(tunnel.Interface) {
+			select {
+			case interfaceMonitor <- tunnel.Interface:
+			default:
+				tunnel.Interface.Disconnect(tunnel)
+				RemoveTunnelInterfaceFromList(tunnel.Interface)
+				ERROR(3, "Interface monitor channel is full!")
+				return 502, errors.New("Unable to place new interface on monitor channel")
+			}
+		}
 	} else {
-		// TRANSITION TUNNELS
-		// - make sure to not remove dup. routes
-		// - make sure route state is accurate
+		oldTunnel := *tunnel.Interface.tunnel.Load()
+		if oldTunnel != nil {
+			// TODO .. leave unchanged if no change is detected
+			if oldTunnel.Meta.IFName == tunnel.Meta.IFName {
+				oldTunnel.Interface.RemoveRoutes(oldTunnel, tunnel.Meta.EnableDefaultRoute)
+				err = tunnel.Interface.ApplyRoutes(tunnel)
+				if err != nil {
+					ERROR("unable to apply routes: ", err)
+					return 502, fmt.Errorf("unable to apply routes: %s", err)
+				}
+			} else {
+				defer func() {
+					if err == nil {
+						oldTunnel.Interface.Disconnect(oldTunnel)
+					} else {
+						tunnel.Interface.Disconnect(tunnel)
+					}
+				}()
+			}
+		}
 	}
 
 	// Create cross-pointers
@@ -840,10 +963,8 @@ func PublicConnect(ClientCR ConnectionRequest) (code int, errm error) {
 	tunnel.Connected = true
 	tunnel.TunnelSTATS.PingTime = time.Now()
 
-	AddConnection(tunnel)
-
-	_ = PrepareState()
-	go tunnel.ReadFromServeTunnel()
+	AddTunnelToList(tunnel)
+	_ = GenerateState()
 
 	out := tunnel.EH.SEAL.Seal1(PingPongStatsBuffer, tunnel.Index)
 	_, err = tunnel.Con.Write(out)
@@ -851,15 +972,18 @@ func PublicConnect(ClientCR ConnectionRequest) (code int, errm error) {
 		return 502, errors.New("unable to send initial ping to server")
 	}
 
-	if createdNewInterface {
-		if AddTunnelInterface(tunnel.Interface) {
-			select {
-			case interfaceMonitor <- tunnel.Interface:
-			default:
-				tunnel.Interface.Close()
-				RemoveTunnelInterface(tunnel.Interface)
-				ERROR(3, "Interface monitor channel is full!")
-				return 502, errors.New("Unable to place new interface on monitor channel")
+	go tunnel.ReadFromServeTunnel()
+
+	if tunnel.CRR.DHCP != nil {
+		if len(tunnel.Meta.AllowedHosts) > 0 {
+			err = sendFirewallToServer(
+				tunnel.ClientCR.ServerIP,
+				tunnel.DHCP.Token,
+				net.IP(tunnel.DHCP.IP[:]).String(),
+				tunnel.Meta.AllowedHosts,
+			)
+			if err != nil {
+				ERROR("unable to update firewall: ", err)
 			}
 		}
 	}

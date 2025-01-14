@@ -3,38 +3,56 @@ import { useNavigate, useParams } from "react-router-dom";
 import FormKeyValue from "./component/formkeyvalue";
 import GLOBAL_STATE from "../state"
 import KeyValue from "./component/keyvalue";
-import InteractiveTable from "./component/interactive-table";
 import dayjs from "dayjs";
+import NewTable from "./component/newtable";
+import ObjectEditor from "./ObjectEditor";
 
 const InspectGroup = () => {
 	const { id } = useParams()
-	const [tag, setTag] = useState("")
+	// const [tag, setTag] = useState("")
 	const [groupID, setGroupID] = useState(id)
 	const [users, setUsers] = useState([])
 	const [servers, setServers] = useState([])
 	const [devices, setDevices] = useState([])
+	const [tag, setTag] = useState([])
 	const [group, setGroup] = useState()
 	const state = GLOBAL_STATE("groups")
 	const navigate = useNavigate()
 
 	let org = state?.Org
 
-	const Create = async () => {
-		let user = state.User
-		if (!user) {
-			console.log("LUL")
-			return
-		}
-		let group = {}
-		group.Nodes = {}
-		group.Users = {}
-		group.Devices = {}
-		group.Tag = tag
-		group.OrgID = user.OrgID
-
-		await state.API_CreateGroup(group)
-		state.renderPage("groups")
+	const dummyGroup = {
+		Tag: ""
 	}
+
+	const createOpts = {
+		baseClass: "group-object-editor",
+		maxDepth: 1000,
+		onlyKeys: false,
+		titles: {
+		},
+		hidden: {
+		},
+		newButtons: {
+		},
+		saveButton: async () => {
+			let user = state.User
+			if (!user) {
+				return
+			}
+
+			dummyGroup.Nodes = {}
+			dummyGroup.Users = {}
+			dummyGroup.Devices = {}
+			dummyGroup.OrgID = user.OrgID
+
+			console.log('Update ORG')
+			console.dir(dummyGroup)
+			await state.API_CreateGroup(dummyGroup)
+			navigate("/org")
+		}
+	}
+
 
 	const Save = async () => {
 
@@ -50,7 +68,7 @@ const InspectGroup = () => {
 
 		let newDevices = {}
 		devices.forEach(n => {
-			newDevices[n._id] = { tag: n.Tag, Added: n.Added }
+			newDevices[n._id] = { Tag: n.Tag, Added: n.Added }
 		})
 
 		group.Devices = newDevices
@@ -67,6 +85,7 @@ const InspectGroup = () => {
 		if (org) {
 			org?.Groups?.forEach(g => {
 				if (g._id === groupID) {
+					console.log("FOUND GROUP!")
 					group = g
 					return
 				}
@@ -96,9 +115,10 @@ const InspectGroup = () => {
 	if (!groupID) {
 		return (
 			<div className="ab group-wrapper">
-				<div className="title">Create Group</div>
-				<FormKeyValue label={"Tag"} value={<input onChange={(e) => setTag(e.target.value)} type="text" />} />
-				<div className="button" onClick={(e) => Create()}>Create</div>
+				<ObjectEditor
+					opts={createOpts}
+					object={dummyGroup}
+				/>
 			</div>
 		)
 	}
@@ -175,16 +195,29 @@ const InspectGroup = () => {
 			let row = {}
 			row.items = [
 				{
-					originalValue: tag,
-					value: <div className="clickable" onClick={(e) => navigate("/inspect/server/" + s._id)}> {tag}</div >,
+					type: "text",
+					color: "blue",
+					click: () => {
+						navigate("/inspect/server/" + s._id)
+					},
+					value: tag,
 				},
 				{
-					originalValue: s._id,
+					minWidth: "250px",
+					type: "text",
 					value: <input onChange={(e) => serversInputChange(e, i, "_id")} type="text" value={s._id} />
 				},
-				{ value: s.Added },
 				{
-					value: <div className="deleteable" onClick={() => serversRemove(s._id)} >Delete</div >,
+					type: "text",
+					value: dayjs(s.Added).format("DD-MM-YYYY HH:mm:ss"),
+				},
+				{
+					type: "text",
+					color: "red",
+					click: () => {
+						serversRemove(s._id)
+					},
+					value: "Delete"
 				},
 			]
 			rows.push(row)
@@ -199,16 +232,26 @@ const InspectGroup = () => {
 			let row = {}
 			row.items = [
 				{
-					originalValue: u.Email,
+					type: "text",
+					color: "blue",
 					value: <input onChange={(e) => usersInputChange(e, i, "Email")} type="text" value={u.Email} />
 				},
 				{
-					originalValue: u._id,
+					type: "text",
+					minWidth: "250px",
 					value: <input onChange={(e) => usersInputChange(e, i, "_id")} type="text" value={u._id} />
 				},
-				{ value: u.Added },
 				{
-					value: <div className="deleteable" onClick={() => usersRemove(u._id)} >Delete</div >,
+					type: "text",
+					value: dayjs(u.Added).format("DD-MM-YYYY HH:mm:ss"),
+				},
+				{
+					type: "text",
+					color: "red",
+					click: () => {
+						usersRemove(u._id)
+					},
+					value: "Delete"
 				},
 			]
 			rows.push(row)
@@ -223,16 +266,27 @@ const InspectGroup = () => {
 			let row = {}
 			row.items = [
 				{
-					originalValue: s.Tag,
+					type: "text",
+					color: "blue",
 					value: <input onChange={(e) => devicesInputChange(e, i, "Tag")} type="text" value={s.Tag} />
 				},
 				{
-					originalValue: s._id,
+					type: "text",
+					minWidth: "310px",
 					value: <input onChange={(e) => devicesInputChange(e, i, "_id")} type="text" value={s._id} />
 				},
-				{ value: s.Added },
 				{
-					value: <div className="deleteable" onClick={() => devicesRemove(s._id)} >Delete</div >,
+					minWidth: "200px",
+					type: "text",
+					value: dayjs(s.Added).format("DD-MM-YYYY HH:mm:ss"),
+				},
+				{
+					type: "text",
+					color: "red",
+					click: () => {
+						devicesRemove(s._id)
+					},
+					value: "Delete"
 				},
 			]
 			rows.push(row)
@@ -244,7 +298,7 @@ const InspectGroup = () => {
 	let usersRows = generateUsersTable(users)
 	const usersHeaders = [
 		{ value: "Email" },
-		{ value: "ID" },
+		{ value: "ID", minWidth: "250px" },
 		{ value: "Added" },
 		{ value: "" }
 	]
@@ -252,75 +306,104 @@ const InspectGroup = () => {
 	let nodesRows = generateServerTable(servers)
 	const nodesHeaders = [
 		{ value: "Tag" },
-		{ value: "ID" },
+		{ value: "ID", minWidth: "250px" },
+		{ value: "Added" },
 		{ value: "" }
 	]
 
 	let deviceRows = generateDevicesTables(devices)
 	const deviceHeader = [
 		{ value: "Tag" },
-		{ value: "ID" },
+		{ value: "ID", minWidth: "310px" },
+		{ value: "Added", minWidth: "200px" },
 		{ value: "" }
 	]
 
 	return (
 		<div className="ab group-wrapper">
-			<div className="title">{tag}</div>
+			<div className="panel">
+				<div className="title">{tag}</div>
 
-			<FormKeyValue label={"Tag"} value={
-				<input type="text" value={tag} onChange={(e) => {
-					// state.UpdateModifiedGroup(group, "Tag", e.target.value)
-					setTag(e.target.value)
-				}} />
-			} />
+				<FormKeyValue label={"Tag"} value={
+					<input type="text" value={tag} onChange={(e) => {
+						// state.UpdateModifiedGroup(group, "Tag", e.target.value)
+						setTag(e.target.value)
+					}} />
+				} />
 
-			<KeyValue label={"ID"} value={group._id} />
-			<KeyValue label={"Org"} value={org.Name} />
-			<div className="button" onClick={() => Save()}>Update</div>
+				<KeyValue label={"ID"} value={group._id} />
+				<KeyValue label={"Org"} value={org.Name} />
+				<div className="button" onClick={() => Save()}>Update</div>
+
+			</div>
 
 			<div className="nodes">
-				<InteractiveTable
+				<NewTable
+					background={true}
 					title={"Servers"}
 					className="group-table"
 					header={nodesHeaders}
 					rows={nodesRows}
 					placeholder={"Search.."}
-					newButton={{
+					button={{
 						text: "Add",
 						click: function(e) {
 							setServers([...servers, { _id: servers.length + 1, Added: dayjs().format() }])
 						}
 					}}
-				/>
-			</div>
-
-			<div className="nodes">
-				<InteractiveTable
-					title={"Users"}
-					className="group-table"
-					header={usersHeaders}
-					rows={usersRows}
-					placeholder={"Search.."}
-					newButton={{
-						text: "Add",
-						click: function(e) {
-							setUsers([...users, { Email: "", _id: users.length + 1, Added: dayjs().format() }])
+					button2={{
+						color: "green",
+						text: "Save",
+						click: function() {
+							Save()
 						}
 					}}
 				/>
 			</div>
 
 			<div className="nodes">
-				<InteractiveTable
+				<NewTable
+					background={true}
+					title={"Users"}
+					className="group-table"
+					header={usersHeaders}
+					rows={usersRows}
+					placeholder={"Search.."}
+					button={{
+						text: "Add",
+						click: function(e) {
+							setUsers([...users, { Email: "", _id: users.length + 1, Added: dayjs().format() }])
+						}
+					}}
+					button2={{
+						color: "green",
+						text: "Save",
+						click: function() {
+							Save()
+						}
+					}}
+				/>
+			</div>
+
+			<div className="nodes">
+				<NewTable
+					background={true}
 					title={"Devices"}
 					className="group-table"
 					header={deviceHeader}
 					rows={deviceRows}
 					placeholder={"Search.."}
-					newButton={{
+					button={{
 						text: "Add",
 						click: function(e) {
 							setDevices([...devices, { Tag: "", _id: devices.length + 1, Added: dayjs().format() }])
+						}
+					}}
+					button2={{
+						color: "green",
+						text: "Save",
+						click: function() {
+							Save()
 						}
 					}}
 				/>
