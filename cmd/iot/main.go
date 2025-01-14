@@ -10,14 +10,15 @@ import (
 
 // vpn.domain.com
 // ip:port:cert_sub_domain
-// cert_sub_domain.vpn.domain.com
+// cert.vpn.domain.com
+// cert bytes..
+// cert bytes..
 
 // CONST: orgID - ??
 // CONST: DeviceKey - ??
 
 func main() {
-	flag.StringVar(&core.CLIOrgId, "DNS", "", "Tunnels will use this DNS to fetch connection info ( optional )")
-
+	flag.StringVar(&core.CLIDNS, "DNS", "", "Tunnels will use this DNS to fetch connection info ( optional )")
 	flag.StringVar(&core.CLIOrgId, "orgID", "", "Organization ID (only use if DNS is enabled)")
 	flag.StringVar(&core.CLIDeviceKey, "deviceKey", "", "Device Key (only use if DNS is enabled)")
 	flag.StringVar(&core.CLIHostname, "hostname", "", "Custom hostname for this device")

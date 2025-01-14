@@ -30,7 +30,7 @@ func InitService() error {
 	AdminCheck()
 	InitPaths()
 
-	printInfo1()
+	printInfo()
 
 	if !IOT {
 		CreateBaseFolder()
@@ -98,7 +98,7 @@ func LoadPrivateCert(path string) (pool *x509.CertPool, err error) {
 	return certPool, nil
 }
 
-func printInfo1() {
+func printInfo() {
 	fmt.Println("")
 	fmt.Println("")
 	fmt.Println("==============================================================")
@@ -199,6 +199,7 @@ func LaunchEverything() {
 			} else if ID == 4 {
 				go GetDefaultGateway(routineMonitor)
 			} else if ID == 5 {
+				//
 			} else if ID == 6 {
 				go CleanPortsForAllConnections(routineMonitor)
 			} else if ID == 7 {
@@ -206,7 +207,7 @@ func LaunchEverything() {
 			} else if ID == 101 {
 				go CleanDNSCache(routineMonitor)
 			} else if ID == 102 {
-				// go StartTCPDNSHandler(routineMonitor)
+				//
 			} else if ID == 103 {
 				go StartUDPDNSHandler(routineMonitor)
 			} else if ID == 200 {
@@ -492,7 +493,8 @@ func CleanupOnClose() {
 			_ = v.Interface.Disconnect(v)
 		}
 	}
-	RestoreDNSOnClose()
+	// Keeping this here for now
+	// RestoreDNSOnClose()
 	_ = LogFile.Close()
 }
 
