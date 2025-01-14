@@ -31,10 +31,10 @@ func InitService() error {
 
 	printInfo()
 
-	// if !MINIMAL {
 	CreateBaseFolder()
-	InitLogfile()
-	// }
+	if !MINIMAL {
+		InitLogfile()
+	}
 
 	go StartLogQueueProcessor(routineMonitor)
 
