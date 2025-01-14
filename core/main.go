@@ -265,6 +265,7 @@ func LoadDNSConfig() {
 
 	err := LoadExistingConfig()
 	GLOBAL_STATE.C = C
+	GLOBAL_STATE.ConfigInitialized = true
 	if err == nil {
 		for i := range C.Connections {
 			if C.Connections[i] == nil {
