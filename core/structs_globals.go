@@ -21,8 +21,9 @@ var (
 	APP_VERSION = "1.0.4"
 	API_VERSION = 1
 
-	DefaultTunnelName = "tunnels"
-	CertPool          *x509.CertPool
+	DefaultTunnelName    = "tunnels"
+	DefaultTunnelNameMin = "tunnels-min"
+	CertPool             *x509.CertPool
 
 	DNSLock         = sync.Mutex{}
 	DNSBlockedList  = make(map[string]*DNSStats)
@@ -53,14 +54,17 @@ type ConnectionRequest struct {
 }
 
 type RemoteConnectionRequest struct {
+	// CLI/MIN
 	DeviceKey string `json:"DeviceKey"`
-	// OrgID     string `json:"OrgID"`
 
-	DeviceToken string        `json:"DeviceToken"`
-	EncType     crypt.EncType `json:"EncType"`
-	UserID      string        `json:"UserID"`
-	SeverID     string        `json:"ServerID"`
-	Serial      string        `json:"Serial"`
+	// GUI
+	DeviceToken string `json:"DeviceToken"`
+	UserID      string `json:"UserID"`
+
+	// General
+	EncType crypt.EncType `json:"EncType"`
+	SeverID string        `json:"ServerID"`
+	Serial  string        `json:"Serial"`
 
 	// These are added by the golang client
 	Version int       `json:"Version"`
@@ -153,12 +157,13 @@ var (
 	MINIMAL bool
 
 	// Device Flags
-	CLIDeviceKey string
-	CLIDNS       string
-	CLIHost      string
-	CLIHostname  string
-	CLIPort      string
-	CLIServerID  string
+	CLIDeviceKey         string
+	CLIDNS               string
+	CLIHost              string
+	CLIHostname          string
+	CLIPort              string
+	CLIServerID          string
+	CLIDisableBlockLists bool
 
 	// Base Path Overwrite
 	BASE_PATH string
