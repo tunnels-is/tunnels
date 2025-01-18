@@ -30,8 +30,8 @@ $editor-shadow: 4px 4px 15px 3px rgba(0, 0, 0, 0.66);
 
   --input-hover: var(--c-shade3);
 
-  --label-border-radius: 2px;
-  --button-border-radius: 2px;
+  --label-border-radius: 3px;
+  --button-border-radius: 3px;
   --label-width: 140px;
 
   --button-color: var(--c-dark-blue);
@@ -62,8 +62,8 @@ $editor-shadow: 4px 4px 15px 3px rgba(0, 0, 0, 0.66);
 
   --input-hover: #454545;
 
-  --label-border-radius: 2px;
-  --button-border-radius: 2px;
+  --label-border-radius: 3px;
+  --button-border-radius: 3px;
   --label-width: 140px;
 
   --button-color: var(--c-dark-blue);
@@ -848,7 +848,7 @@ body::-webkit-scrollbar {
   }
 
   .dns-record {
-    padding: 20px 20px 20px 0px;
+    padding: 20px 20px 10px 0px;
     background: var(--c-shade1);
 
     .dns-title {

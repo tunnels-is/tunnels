@@ -22,6 +22,8 @@ const ConnectionTable = () => {
 
 	useEffect(() => {
 		let x = async () => {
+			state.GetPrivateServers()
+			state.GetServers()
 			await state.GetBackendState()
 			await state.GetServers()
 		}
@@ -248,9 +250,9 @@ const ConnectionTable = () => {
 			row.items.push({ type: "text", align: "left", className: "tag", value: cs.StatsTag, })
 			row.items.push({ type: "text", align: "left", className: "egress", value: cs.EgressString, })
 			row.items.push({ type: "text", align: "left", className: "ingress", value: cs.IngressString, })
-			row.items.push({ type: "text", align: "left", className: "CPU", value: cs.CPU, })
-			row.items.push({ type: "text", align: "left", className: "Mem", value: cs.MEM, })
-			row.items.push({ type: "text", align: "left", className: "Disk", value: cs.DISK, })
+			row.items.push({ type: "text", align: "left", className: "CPU", value: String(cs.CPU) + " %", })
+			row.items.push({ type: "text", align: "left", className: "Mem", value: String(cs.MEM) + " %", })
+			row.items.push({ type: "text", align: "left", className: "Disk", value: String(cs.DISK) + " %", })
 			row.items.push({ type: "text", align: "left", className: "Ping", value: dayjs(cs.PingTime).format('HH:mm:ss') })
 			row.items.push({ type: "text", align: "left", className: "Disk", value: stocms + "ms" })
 
@@ -342,12 +344,6 @@ const ConnectionTable = () => {
 					background={true}
 					header={statsHeaders}
 					rows={statsRows}
-					button={{
-						text: "New Tunnel",
-						click: function() {
-							addConnection()
-						}
-					}}
 				/>
 			}
 
