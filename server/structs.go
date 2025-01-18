@@ -301,6 +301,7 @@ func (u *UserCoreMapping) AddHost(host [4]byte, port [2]byte, t string) {
 			break
 		}
 	}
+
 	if !found {
 		u.Allowedm.Lock()
 		u.AllowedHosts = append(u.AllowedHosts,

@@ -74,7 +74,6 @@ func InitService() error {
 		return err
 	}
 
-	fmt.Println("LENCPOSTSTART:", len(C.Connections))
 	INFO("Tunnels is ready")
 	return nil
 }
