@@ -93,22 +93,17 @@ const Settings = () => {
 				</div>
 
 				<KeyValue label="Version" value={version} />
-				<KeyValue label="Base Path" value={state.State?.BasePath} />
 				<KeyValue label="Log Path" value={logPath} />
-				<KeyValue label="Log File" value={logFileName} />
 				<KeyValue label="Config File" value={configPath} />
 				<KeyValue label="Trace Path" value={tracePath} />
 				<KeyValue label="Trace File" value={traceFileName} />
+				<KeyValue label="Log File" value={logFileName} />
+				<KeyValue label="Base Path" value={state.State?.BasePath} />
 
 				<div className="label-wrapper">
 					<Label
 						className={state.State?.IsAdmin ? "ok" : "warn"}
-						value={state.State?.IsAdmin ? "Tunnels is running as admin" : "Tunnels Needs to run as administrator"}
-					/>
-
-					<Label
-						className={state.State?.BaseFolderInitialized ? "ok" : "warn"}
-						value={state.State?.BaseFolderInitialized ? "Base directory present" : "Base directory missing"}
+						value={state.State?.IsAdmin ? "Tunnels has the correct permissions" : "Tunnels is missing permissions"}
 					/>
 				</div>
 

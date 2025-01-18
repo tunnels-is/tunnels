@@ -17,7 +17,6 @@ const PrivateServers = () => {
 		let rows = []
 		state.PrivateServers?.forEach(server => {
 
-
 			let opts = []
 			state?.Config?.Connections?.map(c => {
 				if (c.ServerID === server._id) {
@@ -26,7 +25,6 @@ const PrivateServers = () => {
 					opts.push({ value: c.Tag, key: c.Tag, selected: false })
 				}
 			})
-
 
 			let row = {}
 			row.items = [
