@@ -479,18 +479,8 @@ func DataSocketListener(SIGNAL *SIGNAL) {
 			fmt.Println(err)
 			return
 		}
-		// fmt.Println("------------------------------------")
-		// fmt.Println(n, addr, err)
-		// fmt.Println(buff[:n])
-		// fmt.Println("------------------------------------")
 		id = binary.BigEndian.Uint16(buff[0:2])
-
 		if ClientCoreMappings[id] != nil {
-			// in4, ok := addr.(*syscall.SockaddrInet4)
-			// if !ok {
-			// 	continue
-			// }
-
 			ClientCoreMappings[id].FromUser <- Packet{
 				addr: addr,
 				data: CopySlice(buff[:n]),
@@ -551,6 +541,7 @@ func fromUserChannel(index int) {
 			staging[:0],
 			payload.data[0:2],
 		)
+		fmt.Println("F:", len(PACKET))
 		// fmt.Println("PAYLOAD:", PACKET)
 		if err != nil {
 			ERR("Authentication error:", err)
@@ -577,7 +568,6 @@ func fromUserChannel(index int) {
 		}
 
 		NIP = PACKET[16:20]
-		// fmt.Println("VPLFrom:", VPLEnabled)
 		if VPLEnabled {
 			D4[0] = NIP[0]
 			D4[1] = NIP[1]
@@ -586,10 +576,8 @@ func fromUserChannel(index int) {
 			l := (PACKET[0] & 0x0F) * 4
 			D4Port[0] = l + 2
 			D4Port[1] = l + 3
-			// D4[4] = PACKET[20]
 			um, ok := clientCache[D4]
 			if !ok || um == nil {
-				// fmt.Println("cache hit:", D4)
 				IPm.Lock()
 				targetCM, _ := IPToCoreMapping[D4]
 				IPm.Unlock()
@@ -597,12 +585,11 @@ func fromUserChannel(index int) {
 					clientCache[D4] = targetCM
 				}
 			}
+
 			if clientCache[D4] != nil {
-				// fmt.Println("SENDING TO:", D4)
 				CM.AddHost(D4, D4Port, "NAT")
 				select {
 				case clientCache[D4].ToUser <- CopySlice(PACKET):
-					// fmt.Println("SENT TO:", D4)
 				default:
 					WARN("Client channel full:", PACKET[12:16], ">", D4)
 				}
@@ -683,9 +670,7 @@ func toUserChannel(index int) {
 	}
 
 	var PACKET []byte
-	// var DIP net.IP
 	var err error
-	// IFipTo4 := InterfaceIP.To4()
 	var ok bool
 	var out []byte
 	var S4 [4]byte
@@ -701,9 +686,8 @@ func toUserChannel(index int) {
 		if PACKET[9] != 6 && PACKET[9] != 17 {
 			continue
 		}
+		fmt.Println("T:", len(PACKET))
 
-		// DIP = PACKET[16:20]
-		// fmt.Println("VPLTo:", VPLEnabled)
 		if VPLEnabled {
 			if !AllowAll {
 				S4[0] = PACKET[12]
@@ -715,20 +699,12 @@ func toUserChannel(index int) {
 				S4Port[1] = l + 1
 				allowed := CM.IsHostAllowed(S4, S4Port)
 				if !allowed {
-					// fmt.Println("NOT ALLOWED:", S4)
 					continue
 				}
-
 			}
 		}
 
 		out = CM.EH.SEAL.Seal2(PACKET, CM.Uindex)
-		// fmt.Println("----- TO USER -----")
-		// fmt.Println(dataSocketFD)
-		// fmt.Println(CM.Addr)
-		// fmt.Println(out)
-		// fmt.Println("------------------")
-
 		err = syscall.Sendto(dataSocketFD, out, 0, CM.Addr)
 		if err != nil {
 			WARN("dataSocketFD sendTo err:", err)
@@ -770,12 +746,9 @@ func createRawTCPSocket() (
 func findInterfaceName() (name string) {
 	ifs, _ := net.Interfaces()
 	for _, v := range ifs {
-		// fmt.Println(i, v)
 		addrs, _ := v.Addrs()
 		for _, vv := range addrs {
-			// fmt.Println(ii, vv)
 			_, ipnetA, _ := net.ParseCIDR(vv.String())
-			// fmt.Println(ipnetA, ipnetA.Contains(INTERFACE_IP))
 			if ipnetA.Contains(InterfaceIP) {
 				name = v.Name
 			}
