@@ -179,16 +179,12 @@ var (
 	DEFAULT_INTERFACE_NAME  string
 	ROUTER_PROBE_TIMEOUT_MS = 60000
 	LAST_ROUTER_PROBE       = time.Now().AddDate(0, 0, -1)
-	// LAST_GOOD_ROUTER_INDEX  = 777777
 
-	// STATISTICS
 	CURRENT_UBBS           = 0
 	CURRENT_DBBS           = 0
 	EGRESS_PACKETS  uint64 = 0
 	INGRESS_PACKETS uint64 = 0
 
-	// LOG RELATED
-	// L           = new(Logs)
 	LogQueue          = make(chan string, 1000)
 	APILogQueue       = make(chan string, 1000)
 	TAG_ERROR         = "ERROR"
