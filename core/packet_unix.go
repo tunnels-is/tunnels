@@ -72,6 +72,7 @@ func (T *TunnelInterface) ReadFromTunnelInterface() {
 			ERROR("router write error: ", err)
 			continue
 		}
+
 		if Tun.EP_MP != nil {
 			Tun.EP_MP.egressBytes += writtenBytes
 		}

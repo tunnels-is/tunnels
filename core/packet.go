@@ -129,8 +129,8 @@ func (V *Tunnel) ProcessEgressPacket(p *[]byte) (sendRemote bool) {
 		V.EP_IPv4Header[19] = V.EP_NAT_IP[3]
 	}
 
-	RecalculateAndReplaceIPv4HeaderChecksum(V.EP_IPv4Header)
-	RecalculateAndReplaceTransportChecksum(V.EP_IPv4Header, V.EP_TPHeader)
+	RecalculateIPv4HeaderChecksum(V.EP_IPv4Header)
+	RecalculateTransportChecksum(V.EP_IPv4Header, V.EP_TPHeader)
 
 	return true
 }
@@ -206,13 +206,31 @@ func (V *Tunnel) ProcessIngressPacket(packet []byte) bool {
 		V.IP_IPv4Header[19] = V.LOCAL_IF_IP[3]
 	}
 
-	RecalculateAndReplaceIPv4HeaderChecksum(V.IP_IPv4Header)
-	RecalculateAndReplaceTransportChecksum(V.IP_IPv4Header, V.IP_TPHeader)
+	RecalculateIPv4HeaderChecksum(V.IP_IPv4Header)
+	RecalculateTransportChecksum(V.IP_IPv4Header, V.IP_TPHeader)
 
 	return true
 }
 
-func RecalculateAndReplaceIPv4HeaderChecksum(bytes []byte) {
+func RecalculateIPv4HeaderChecksum(bytes []byte) {
+	bytes[10] = 0
+	bytes[11] = 0
+
+	var csum uint32
+
+	for i := 0; i < len(bytes)-1; i += 2 {
+		csum += uint32(bytes[i])<<8 | uint32(bytes[i+1])
+	}
+
+	for csum > 0xFFFF {
+		csum = (csum >> 16) + (csum & 0xFFFF)
+	}
+
+	bytes[10] = byte(^csum >> 8)
+	bytes[11] = byte(^csum & 0xFF)
+}
+
+func RecalculateAndReplaceIPv4HeaderChecksum_old_donotremoveyet(bytes []byte) {
 	bytes[10] = 0
 	bytes[11] = 0
 
@@ -231,7 +249,8 @@ func RecalculateAndReplaceIPv4HeaderChecksum(bytes []byte) {
 	binary.BigEndian.PutUint16(bytes[10:12], ^uint16(csum))
 }
 
-func RecalculateAndReplaceTransportChecksum(IPv4Header []byte, TPPacket []byte) {
+func RecalculateTransportChecksum(IPv4Header []byte, TPPacket []byte) {
+	// wipe the old checksum before calculating
 	if IPv4Header[9] == 6 {
 		TPPacket[16] = 0
 		TPPacket[17] = 0
