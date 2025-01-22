@@ -73,6 +73,12 @@ NOTE: macos requies sudo, windows requires admin, linux requires set cap:
 $ sudo setcap 'cap_net_raw,cap_net_bind_service,cap_net_admin+eip' main
 ```
 
+# Special mentiones
+These are the real MVPs:
+
+    - n00bady: creator of bluam
+    - 0xMALVEE: for being the first contributor
+    - keyb1nd_'s twitch chat for the backseat debugging and support!
 
 
 
