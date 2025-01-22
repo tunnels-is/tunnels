@@ -12,7 +12,7 @@ import dayjs from "dayjs";
 const ConnectionTable = () => {
 	const state = GLOBAL_STATE("connections")
 	const [con, setCon] = useState(undefined)
-	const navigate = useNavigate()
+	const [pserver, setPServer] = useState(undefined)
 
 	let user = STORE.GetUser()
 
@@ -77,7 +77,7 @@ const ConnectionTable = () => {
 		},
 		newButtons: {
 			root_DNS: (obj) => {
-				obj.push({ Domain: "MEOW", Wildcard: true, CNAME: "", IP: [], TXT: [] })
+				obj.push({ Domain: "mydomain.com", Wildcard: true, CNAME: "", IP: [], TXT: [] })
 			},
 			root_DNS_IP: (obj) => {
 				obj.push("0.0.0.0")
@@ -102,10 +102,11 @@ const ConnectionTable = () => {
 		saveButton: saveConnection,
 	}
 
-	const popEditor = (r) => {
-		state.editorData = r
-		state.editorReadOnly = true
-		state.globalRerender()
+	const serverOpts = {
+		baseClass: "private-server-object-editor",
+		maxDepth: 1000,
+		onlyKeys: false,
+		readOnly: true,
 	}
 
 	let rows = []
@@ -136,7 +137,6 @@ const ConnectionTable = () => {
 			click: () => {
 				setCon(c)
 				state.renderPage("connections")
-				// openConnectionEditor(c)
 			}
 		})
 
@@ -194,7 +194,8 @@ const ConnectionTable = () => {
 			value: server ? server.IP ? server.IP : c.PrivateIP : "",
 			color: "blue",
 			click: () => {
-				popEditor(server)
+				setPServer(server)
+				state.renderPage("connections")
 			}
 		})
 
@@ -259,7 +260,7 @@ const ConnectionTable = () => {
 			row.items.push({ type: "text", align: "left", className: "Disk", value: nonce })
 
 			rows.push(row)
-			console.dir(cs)
+			// console.dir(cs)
 			// if (cs.StatsTag === c.Tag) {
 			// 	s = cs
 			// 	return
@@ -298,6 +299,18 @@ const ConnectionTable = () => {
 				<ObjectEditor
 					opts={editorOpts}
 					object={con}
+				/>
+			</div>
+		)
+	}
+
+	if (pserver !== undefined) {
+		return (
+			<div className="connections">
+				<div className="back" onClick={() => setPServer(undefined)}>Back to tunnels</div>
+				<ObjectEditor
+					opts={serverOpts}
+					object={pserver}
 				/>
 			</div>
 		)
