@@ -17,6 +17,7 @@ func main() {
 	flag.StringVar(&core.CLIHostname, "hostname", "", "Custom host ( not needed if dns is used )")
 	flag.StringVar(&core.CLIPort, "port", "", "Custom port ( not needed if dns is used )")
 	flag.StringVar(&core.CLIServerID, "serverID", "", "Server ID ( not needed if dns is used )")
+	flag.BoolVar(&core.CLIDisableVPLFirewall, "disableVPLFirewall", false, "Disable the VPL firewall, allowing all devices to communicate with this device")
 
 	flag.StringVar(&core.BASE_PATH, "basePath", "", "manualy set base path for the config and log files ( optional, default location is in the binary dir )")
 	flag.Parse()
