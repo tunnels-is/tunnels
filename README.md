@@ -7,7 +7,7 @@
 ... We will be addding an business source license to this soon (tm)
 
 # Liecens
-We are still deciding on a license, but it will be an open source ( non-commercial ) one.
+soon (tm)
 
 # Special Mentioned
  - n00bady ( creator of bluam )
