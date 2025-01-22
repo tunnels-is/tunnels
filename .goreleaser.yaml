@@ -13,6 +13,7 @@ before:
     # You may remove this if you don't use go modules.
     - go mod tidy
     - ./build-ui.sh
+    - ./build-parser.sh
 
 builds:
   - env:
