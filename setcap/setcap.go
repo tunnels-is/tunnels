@@ -2,6 +2,7 @@ package setcap
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"strings"
@@ -25,6 +26,7 @@ func CheckCapabilities() (err error) {
 	if !on {
 		missingFlags = true
 	}
+	fmt.Println("THIS SHOULD NOT BE HERE")
 
 	on, _ = c.GetFlag(cap.Permitted, cap.NET_ADMIN)
 	if !on {
@@ -40,8 +42,8 @@ func CheckCapabilities() (err error) {
 		return
 	}
 
-	fmt.Println("Tunnels needs access to manage network capabilities, this access does NOT include root/sudo access to the system")
-	fmt.Println("Enter Password: ")
+	log.Println("Tunnels needs access to manage network capabilities, this access does NOT include root/sudo access to the system")
+	log.Println("Enter Password: ")
 
 	bytePassword, err := term.ReadPassword(int(syscall.Stdin))
 	if err == nil {
@@ -52,9 +54,9 @@ func CheckCapabilities() (err error) {
 		err = cmd.Run()
 		_ = exec.Command("sudo", "-kK")
 		if err != nil {
-			fmt.Println("Unable to setcap: ", err)
-			fmt.Println("RUN: `sudo setcap 'cap_net_raw,cap_net_bind_service,cap_net_admin+eip' [BINARY]` in order to give it permissions to change and manage networks")
-			fmt.Println("RUN: `sudo setcap 'cap_net_raw,cap_net_bind_service,cap_net_admin+eip' [BINARY]` in order to give it permissions to change and manage networks")
+			log.Println("Unable to setcap: ", err)
+			log.Println("RUN: `sudo setcap 'cap_net_raw,cap_net_bind_service,cap_net_admin+eip' [BINARY]` in order to give it permissions to change and manage networks")
+			log.Println("RUN: `sudo setcap 'cap_net_raw,cap_net_bind_service,cap_net_admin+eip' [BINARY]` in order to give it permissions to change and manage networks")
 		} else {
 			// Reload binary after applying set cap
 			argv0, _ := exec.LookPath(os.Args[0])
