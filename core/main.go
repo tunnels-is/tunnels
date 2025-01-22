@@ -6,7 +6,6 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -102,32 +101,32 @@ func LoadPrivateCert(path string) (pool *x509.CertPool, err error) {
 }
 
 func printInfo() {
-	fmt.Println("")
-	fmt.Println("")
-	fmt.Println("==============================================================")
-	fmt.Println("======================= TUNNELS.IS ===========================")
-	fmt.Println("==============================================================")
-	fmt.Println("NOTE: If the app closes without any logs/errors you might need to delete your config and try again")
-	fmt.Println("")
+	log.Println("")
+	log.Println("")
+	log.Println("==============================================================")
+	log.Println("======================= TUNNELS.IS ===========================")
+	log.Println("==============================================================")
+	log.Println("NOTE: If the app closes without any logs/errors you might need to delete your config and try again")
+	log.Println("")
 }
 
 func printInfo2() {
-	fmt.Println("")
-	fmt.Println("=======================================================================")
-	fmt.Println("======================= HELPFUL INFORMATION ===========================")
-	fmt.Println("=======================================================================")
-	fmt.Println("")
-	fmt.Printf("APP: https://%s:%s\n", C.APIIP, C.APIPort)
-	fmt.Println("")
-	fmt.Println("BASE PATH:", GLOBAL_STATE.BasePath)
-	fmt.Println("")
-	fmt.Println("- Tunnels request network admin permissions to run.")
-	fmt.Println("- Remember to configure your DNS servers if you want to use Tunnels DNS functionality.")
-	fmt.Println("- Remember to turn all logging off if you are concerned about privacy.")
-	fmt.Println("- There is a --basePath flag that can let you reconfigure the base directory for logs and configs.")
-	fmt.Println("")
-	fmt.Println("=======================================================================")
-	fmt.Println("=======================================================================")
+	log.Println("")
+	log.Println("=======================================================================")
+	log.Println("======================= HELPFUL INFORMATION ===========================")
+	log.Println("=======================================================================")
+	log.Println("")
+	log.Printf("APP: https://%s:%s\n", C.APIIP, C.APIPort)
+	log.Println("")
+	log.Println("BASE PATH:", GLOBAL_STATE.BasePath)
+	log.Println("")
+	log.Println("- Tunnels request network admin permissions to run.")
+	log.Println("- Remember to configure your DNS servers if you want to use Tunnels DNS functionality.")
+	log.Println("- Remember to turn all logging off if you are concerned about privacy.")
+	log.Println("- There is a --basePath flag that can let you reconfigure the base directory for logs and configs.")
+	log.Println("")
+	log.Println("=======================================================================")
+	log.Println("=======================================================================")
 }
 
 type X *bool
@@ -313,7 +312,6 @@ func LoadDNSConfig() {
 
 	newCon := createMinimalConnection()
 
-	fmt.Println("APPEND CONNECTION")
 	C.Connections = []*TunnelMETA{newCon}
 	C.DNSstats = false
 	C.AvailableBlockLists = make([]*BlockList, 0)

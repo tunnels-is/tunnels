@@ -46,11 +46,12 @@ type ConnectionRequest struct {
 	DeviceToken string `json:"DeviceToken"`
 	UserID      string `json:"UserID"`
 
-	Tag        string        `json:"Tag"`
-	ServerID   string        `json:"ServerID"`
-	ServerIP   string        `json:"ServerIP"`
-	ServerPort string        `json:"ServerPort"`
-	EncType    crypt.EncType `json:"EncType"`
+	Tag        string          `json:"Tag"`
+	ServerID   string          `json:"ServerID"`
+	ServerIP   string          `json:"ServerIP"`
+	ServerPort string          `json:"ServerPort"`
+	EncType    crypt.EncType   `json:"EncType"`
+	CurveType  crypt.CurveType `json:"CurveType"`
 }
 
 type RemoteConnectionRequest struct {
@@ -62,9 +63,10 @@ type RemoteConnectionRequest struct {
 	UserID      string `json:"UserID"`
 
 	// General
-	EncType crypt.EncType `json:"EncType"`
-	SeverID string        `json:"ServerID"`
-	Serial  string        `json:"Serial"`
+	EncType   crypt.EncType   `json:"EncType"`
+	CurveType crypt.CurveType `json:"CurveType"`
+	SeverID   string          `json:"ServerID"`
+	Serial    string          `json:"Serial"`
 
 	// These are added by the golang client
 	Version int       `json:"Version"`
@@ -157,13 +159,14 @@ var (
 	MINIMAL bool
 
 	// Device Flags
-	CLIDeviceKey         string
-	CLIDNS               string
-	CLIHost              string
-	CLIHostname          string
-	CLIPort              string
-	CLIServerID          string
-	CLIDisableBlockLists bool
+	CLIDeviceKey          string
+	CLIDNS                string
+	CLIHost               string
+	CLIHostname           string
+	CLIPort               string
+	CLIServerID           string
+	CLIDisableBlockLists  bool
+	CLIDisableVPLFirewall bool
 
 	// Base Path Overwrite
 	BASE_PATH string
@@ -235,12 +238,6 @@ type RemotePort struct {
 	Mapped       uint16
 	LastActivity time.Time
 }
-
-type LoggerInterface struct{}
-
-// type Logs struct {
-// 	LOGS [1000]string
-// }
 
 type LogItem struct {
 	Type string
@@ -399,6 +396,7 @@ type TunnelMETA struct {
 	RequestVPNPorts bool
 
 	EncryptionType crypt.EncType
+	CurveType      crypt.CurveType
 
 	// EXPERIMENTAL
 	CloseConnectionsOnConnect bool
@@ -416,7 +414,12 @@ type TunnelMETA struct {
 	NetMask     string
 
 	// VPL Firewall
-	AllowedHosts []string
+	AllowedHosts    []string
+	DisableFirewall bool
+
+	// Port blocking
+	BlockedPorts       []int
+	ParsedBlockedPorts [][]byte
 
 	// This overwrites or adds to settings
 	// that are applied to the Node
@@ -469,9 +472,10 @@ type TunnelSTATS struct {
 }
 
 type FirewallRequest struct {
-	DHCPToken string
-	IP        string
-	Hosts     []string
+	DHCPToken       string
+	IP              string
+	Hosts           []string
+	DisableFirewall bool
 }
 
 type Tunnel struct {

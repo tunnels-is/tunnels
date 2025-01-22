@@ -173,12 +173,11 @@ func HTTPhandler(w http.ResponseWriter, r *http.Request) {
 var LogSocket *websocket.Conn
 
 func handleWebSocket(ws *websocket.Conn) {
+	defer RecoverAndLogToFile()
 	defer func() {
-		r := recover()
-		if r != nil {
-			DEBUG(r, string(debug.Stack()))
+		if ws != nil {
+			ws.Close()
 		}
-		ws.Close()
 	}()
 	LogSocket = ws
 	for {
@@ -208,11 +207,8 @@ func STRING(w http.ResponseWriter, r *http.Request, code int, data string) {
 }
 
 func JSON(w http.ResponseWriter, r *http.Request, code int, data interface{}) {
+	defer RecoverAndLogToFile()
 	defer func() {
-		rec := recover()
-		if rec != nil {
-			log.Println(rec, string(debug.Stack()))
-		}
 		if r.Body != nil {
 			r.Body.Close()
 		}
