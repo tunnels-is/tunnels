@@ -418,8 +418,8 @@ type TunnelMETA struct {
 	DisableFirewall bool
 
 	// Port blocking
-	BlockedPorts       []int
-	ParsedBlockedPorts [][]byte
+	// BlockedPorts       []int
+	// ParsedBlockedPorts [][]byte
 
 	// This overwrites or adds to settings
 	// that are applied to the Node
