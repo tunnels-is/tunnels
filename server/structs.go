@@ -108,7 +108,6 @@ func (d *DHCPRecord) Assign() (ok bool) {
 	defer d.m.Unlock()
 	if d.Token == "" {
 		d.Token = uuid.NewString()
-		// fmt.Println("NDHCP:", d.Token)
 		d.Activity = time.Now()
 		ok = true
 		return
@@ -221,6 +220,7 @@ type ConnectRequest struct {
 	DeviceToken string             `json:"DeviceToken"`
 	APIToken    string             `json:"APIToken"`
 	EncType     crypt.EncType      `json:"EncType"`
+	CurveType   crypt.CurveType    `json:"CurveType"`
 	UserID      primitive.ObjectID `json:"UserID"`
 	SeverID     primitive.ObjectID `json:"ServerID"`
 	Serial      string             `json:"Serial"`
@@ -259,10 +259,11 @@ type UserCoreMapping struct {
 	Addr syscall.Sockaddr
 
 	// VPL
-	APIToken     string
-	Allowedm     sync.Mutex
-	AllowedHosts []*AllowedHost
-	DHCP         *DHCPRecord
+	APIToken        string
+	Allowedm        sync.Mutex
+	AllowedHosts    []*AllowedHost
+	DHCP            *DHCPRecord
+	DisableFirewall bool
 
 	// IOT Client Only
 	CPU  byte
@@ -274,19 +275,37 @@ type AllowedHost struct {
 	IP   [4]byte
 	PORT [2]byte
 	Type string
+	FFIN bool
+	TFIN bool
 }
 
-func (u *UserCoreMapping) IsHostAllowed(host [4]byte, port [2]byte) bool {
-	for _, v := range u.AllowedHosts {
+func (u *UserCoreMapping) IsHostAllowed(host [4]byte, port [2]byte) *AllowedHost {
+	for i, v := range u.AllowedHosts {
 		if v.IP == host {
 			if v.Type == "manual" {
-				return true
+				return u.AllowedHosts[i]
 			} else if v.PORT == port {
-				return true
+				return u.AllowedHosts[i]
 			}
 		}
 	}
-	return false
+	return nil
+}
+
+func (u *UserCoreMapping) SetFin(host [4]byte, port [2]byte, fromUser bool) {
+	for i := range u.AllowedHosts {
+		if u.AllowedHosts[i].IP == host {
+			if u.AllowedHosts[i].PORT == port {
+				if fromUser {
+					u.AllowedHosts[i].FFIN = true
+				} else {
+					u.AllowedHosts[i].TFIN = true
+				}
+			}
+			break
+		}
+	}
+	return
 }
 
 func (u *UserCoreMapping) AddHost(host [4]byte, port [2]byte, t string) {

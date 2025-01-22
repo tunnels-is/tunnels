@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 	"net"
 	"runtime/debug"
 )
@@ -10,12 +9,14 @@ func syncFirewallState(fr *FirewallRequest, mapping *UserCoreMapping) (errors []
 	defer func() {
 		r := recover()
 		if r != nil {
-			log.Println(r, string(debug.Stack()))
+			ERR(r, string(debug.Stack()))
 		}
 	}()
 
 	originalList := make([]*AllowedHost, len(mapping.AllowedHosts))
 	copy(originalList, mapping.AllowedHosts)
+
+	mapping.DisableFirewall = fr.DisableFirewall
 
 	for i := range originalList {
 		found := false
@@ -45,7 +46,7 @@ func syncFirewallState(fr *FirewallRequest, mapping *UserCoreMapping) (errors []
 
 		found := false
 		for ii := range mapping.AllowedHosts {
-			if ip4 == mapping.AllowedHosts[ii].IP {
+			if ip4 == originalList[ii].IP && originalList[ii].Type == "manual" {
 				found = true
 				break
 			}

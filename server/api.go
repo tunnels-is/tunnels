@@ -67,12 +67,9 @@ outerloop:
 			continue
 		}
 
-		// fmt.Println("Checking:", ClientCoreMappings[i].DHCP)
 		if ClientCoreMappings[i].DHCP != nil {
 			for _, v := range response.Devices {
-				// fmt.Println("Checking D:", v.DHCP)
 				if v.DHCP != nil {
-					// fmt.Println("DHCP", v.DHCP.Token, ClientCoreMappings[i].DHCP.Token)
 					if v.DHCP.Token == ClientCoreMappings[i].DHCP.Token {
 						continue outerloop
 					}
@@ -122,9 +119,10 @@ outerloop:
 }
 
 type FirewallRequest struct {
-	DHCPToken string
-	IP        string
-	Hosts     []string
+	DHCPToken       string
+	IP              string
+	Hosts           []string
+	DisableFirewall bool
 }
 
 func HTTP_Firewall(w http.ResponseWriter, r *http.Request) {

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 	"net"
 	"runtime/debug"
 	"strings"
@@ -22,7 +21,7 @@ type Ratelimiter struct {
 func Ratelimit(conn net.Conn) (allowed bool) {
 	defer func() {
 		if r := recover(); r != nil {
-			log.Println(r, string(debug.Stack()))
+			ERR(r, string(debug.Stack()))
 		}
 		RatelimitLock.Unlock()
 	}()
