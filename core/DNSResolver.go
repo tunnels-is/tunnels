@@ -4,10 +4,8 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"net/http"
-	"runtime/debug"
 	"strconv"
 	"strings"
 	"time"
@@ -544,13 +542,8 @@ func ResolveDNSAsHTTPS(m *dns.Msg, w dns.ResponseWriter) {
 
 func IncrementDNSStats(domain string, blocked bool, answers []dns.RR) {
 	DNSLock.Lock()
-	defer func() {
-		r := recover()
-		if r != nil {
-			log.Println(r, string(debug.Stack()))
-		}
-		DNSLock.Unlock()
-	}()
+	defer RecoverAndLogToFile()
+	defer DNSLock.Unlock()
 
 	var s *DNSStats
 	var ok bool
