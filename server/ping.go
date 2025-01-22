@@ -87,7 +87,6 @@ func pingActiveUsers(SIGNAL *SIGNAL) {
 
 		binary.BigEndian.PutUint64(PingPongStatsBuffer[3:], uint64(time.Now().UnixNano()))
 		out := u.EH.SEAL.Seal2(PingPongStatsBuffer, u.Uindex)
-		// fmt.Println("Ping to user:", PingPongStatsBuffer, "||", out)
 		err := syscall.Sendto(dataSocketFD, out, 0, u.Addr)
 		if err != nil {
 			LOG("Index ping error: ", index, err)

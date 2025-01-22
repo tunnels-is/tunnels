@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"math/rand"
 	"os"
 	"runtime/debug"
@@ -23,7 +22,7 @@ var RAND_SOURCE = rand.NewSource(time.Now().UnixNano())
 
 func BasicRecover() {
 	if r := recover(); r != nil {
-		fmt.Println("PANIC", r, true, nil)
+		ERR(r, string(debug.Stack()))
 	}
 }
 
@@ -36,17 +35,17 @@ func CopySlice(in []byte) (out []byte) {
 // TODO .. make sure it's catching the context of the initiator
 func RecoverAndReturnID(SIGNAL *SIGNAL, sleepTimeInSeconds int) {
 	if r := recover(); r != nil {
-		fmt.Println(r, string(debug.Stack()))
+		ERR(r, string(debug.Stack()))
 	}
 
 	if SIGNAL.Ctx.Err() != nil {
-		fmt.Println("Signal context err:", SIGNAL.ID, SIGNAL.Ctx.Err())
+		INFO("Signal context err:", SIGNAL.ID, SIGNAL.Ctx.Err())
 		return
 	}
 
 	select {
 	case <-SIGNAL.Ctx.Done():
-		fmt.Println("Signal context done:", SIGNAL.ID, SIGNAL.Ctx.Err())
+		INFO("Signal context done:", SIGNAL.ID, SIGNAL.Ctx.Err())
 		return
 	default:
 	}

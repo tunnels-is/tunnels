@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"math"
 	"net"
 	"runtime/debug"
@@ -80,7 +79,7 @@ func acceptUserUDPTLSSocket(conn *quic.Conn) {
 	defer func() {
 		r := recover()
 		if r != nil {
-			log.Println(r, string(debug.Stack()))
+			ERR(r, string(debug.Stack()))
 		}
 		if s != nil {
 			s.Close()
@@ -105,8 +104,6 @@ func acceptUserUDPTLSSocket(conn *quic.Conn) {
 		ERR("Unable to read from client:", err)
 		return
 	}
-
-	fmt.Println("CR+HANDSHAKE:", string(buff[:n]))
 
 	_, CR, err := validateSignatureAndExtractConnectRequest(buff[:n])
 	if err != nil {
@@ -135,8 +132,11 @@ func acceptUserUDPTLSSocket(conn *quic.Conn) {
 		}
 	}
 
+	fmt.Println("TYPES")
+	fmt.Println(CR.EncType)
+	fmt.Println(CR.CurveType)
 	var EH *crypt.SocketWrapper
-	EH, err = crypt.NewEncryptionHandler(CR.EncType)
+	EH, err = crypt.NewEncryptionHandler(CR.EncType, CR.CurveType)
 	if err != nil {
 		ERR("unable to create encryption handler", err)
 		return
@@ -255,7 +255,6 @@ func CreateClientCoreMapping(CRR *ConnectRequestResponse, CR *ConnectRequest, EH
 
 	CRR.VPLNetwork = Config.VPL.Network
 
-	// fmt.Println(CRR)
 	return
 }
 
@@ -264,9 +263,8 @@ func ExternalTCPListener(SIGNAL *SIGNAL) {
 	defer func() {
 		r := recover()
 		if r != nil {
-			log.Println(r, string(debug.Stack()))
+			ERR(r, string(debug.Stack()))
 		}
-		fmt.Println("tcp LISTENER EXITING")
 	}()
 
 	var err error
@@ -277,7 +275,7 @@ func ExternalTCPListener(SIGNAL *SIGNAL) {
 	)
 	if err != nil {
 		syscall.Close(rawTCPSockFD)
-		fmt.Println("Unable to make raw socket err:", err)
+		ERR("Unable to make raw socket err:", err)
 		return
 	}
 
@@ -294,7 +292,7 @@ func ExternalTCPListener(SIGNAL *SIGNAL) {
 	err = syscall.Bind(rawTCPSockFD, addr)
 	if err != nil {
 		syscall.Close(rawTCPSockFD)
-		fmt.Println("Unable to bind net listener socket err:", err)
+		ERR("Unable to bind net listener socket err:", err)
 		return
 	}
 
@@ -308,16 +306,14 @@ func ExternalTCPListener(SIGNAL *SIGNAL) {
 	for {
 		n, _, err = syscall.Recvfrom(rawTCPSockFD, buffer, 0)
 		if err != nil {
-			fmt.Println("Error reading from raw TCP sock:", err)
+			ERR("Error reading from raw TCP sock:", err)
 			return
 		}
 
 		version = buffer[0] >> 4
 		if version != 4 {
-			// fmt.Println("ignoring none v4", version)
 			continue
 		}
-		// fmt.Println(buffer[:n])
 
 		// TODO .. use mask
 		IHL = ((buffer[0] << 4) >> 4) * 4
@@ -332,13 +328,8 @@ func ExternalTCPListener(SIGNAL *SIGNAL) {
 			continue
 		}
 
-		// fmt.Println(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
-		// fmt.Println(n)
-		// fmt.Println(buffer[:n])
-		// fmt.Println(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
 		select {
 		case PM.Client.ToUser <- CopySlice(buffer[:n]):
-			// fmt.Println("UDPIN:", len(buffer[:n]))
 		default:
 			WARN("TCP: packet channel full: ", DSTP)
 		}
@@ -350,9 +341,9 @@ func ExternalUDPListener(SIGNAL *SIGNAL) {
 	defer func() {
 		r := recover()
 		if r != nil {
-			log.Println(r, string(debug.Stack()))
+			ERR(r, string(debug.Stack()))
 		}
-		fmt.Println("UPD LISTENER EXITING")
+		ERR("UPD LISTENER EXITING")
 	}()
 
 	var err error
@@ -363,7 +354,7 @@ func ExternalUDPListener(SIGNAL *SIGNAL) {
 	)
 	if err != nil {
 		syscall.Close(rawUDPSockFD)
-		fmt.Println("Unable to make raw socket err:", err)
+		ERR("Unable to make raw socket err:", err)
 		return
 	}
 
@@ -380,7 +371,7 @@ func ExternalUDPListener(SIGNAL *SIGNAL) {
 	err = syscall.Bind(rawUDPSockFD, addr)
 	if err != nil {
 		syscall.Close(rawUDPSockFD)
-		fmt.Println("Unable to bind net listener socket err:", err)
+		ERR("Unable to bind net listener socket err:", err)
 		return
 	}
 
@@ -394,16 +385,14 @@ func ExternalUDPListener(SIGNAL *SIGNAL) {
 	for {
 		n, _, err = syscall.Recvfrom(rawUDPSockFD, buffer, 0)
 		if err != nil {
-			fmt.Println("Error reading from raw UDP sock:", err)
+			ERR("Error reading from raw UDP sock:", err)
 			return
 		}
 
 		version = buffer[0] >> 4
 		if version != 4 {
-			// fmt.Println("ignoring none v4", version)
 			continue
 		}
-		// fmt.Println(buffer[:n])
 
 		// TODO .. use mask
 		IHL = ((buffer[0] << 4) >> 4) * 4
@@ -418,13 +407,8 @@ func ExternalUDPListener(SIGNAL *SIGNAL) {
 			continue
 		}
 
-		// fmt.Println(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
-		// fmt.Println(n)
-		// fmt.Println(buffer[:n])
-		// fmt.Println(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
 		select {
 		case PM.Client.ToUser <- CopySlice(buffer[:n]):
-			// fmt.Println("UDPIN:", len(buffer[:n]))
 		default:
 			WARN("UDP: packet channel full: ", DSTP)
 		}
@@ -476,7 +460,7 @@ func DataSocketListener(SIGNAL *SIGNAL) {
 	for {
 		n, addr, err := syscall.Recvfrom(dataSocketFD, buff, 0)
 		if err != nil {
-			fmt.Println(err)
+			ERR(err)
 			return
 		}
 		id = binary.BigEndian.Uint16(buff[0:2])
@@ -523,6 +507,9 @@ func fromUserChannel(index int) {
 	clientCache := make(map[[4]byte]*UserCoreMapping)
 	var D4 [4]byte
 	var D4Port [2]byte
+	var RST byte
+	var FIN byte
+	var SYN byte
 
 	for {
 		payload, ok = <-CM.FromUser
@@ -541,8 +528,6 @@ func fromUserChannel(index int) {
 			staging[:0],
 			payload.data[0:2],
 		)
-		fmt.Println("F:", len(PACKET))
-		// fmt.Println("PAYLOAD:", PACKET)
 		if err != nil {
 			ERR("Authentication error:", err)
 			continue
@@ -574,8 +559,13 @@ func fromUserChannel(index int) {
 			D4[2] = NIP[2]
 			D4[3] = NIP[3]
 			l := (PACKET[0] & 0x0F) * 4
-			D4Port[0] = l + 2
-			D4Port[1] = l + 3
+			D4Port[0] = PACKET[l+2]
+			D4Port[1] = PACKET[l+3]
+
+			RST = PACKET[l+13] & 0x4
+			FIN = PACKET[l+13] & 0x1
+			SYN = PACKET[l+13] & 0x2
+
 			um, ok := clientCache[D4]
 			if !ok || um == nil {
 				IPm.Lock()
@@ -587,7 +577,14 @@ func fromUserChannel(index int) {
 			}
 
 			if clientCache[D4] != nil {
-				CM.AddHost(D4, D4Port, "NAT")
+				if RST > 0 {
+					CM.DelHost(D4, "auto")
+				} else if SYN > 0 {
+					CM.AddHost(D4, D4Port, "auto")
+				} else if FIN > 0 {
+					CM.SetFin(D4, D4Port, true)
+				}
+
 				select {
 				case clientCache[D4].ToUser <- CopySlice(PACKET):
 				default:
@@ -595,7 +592,7 @@ func fromUserChannel(index int) {
 				}
 				continue
 			} else {
-				CM.DelHost(D4, "NAT")
+				CM.DelHost(D4, "auto")
 				continue
 			}
 		}
@@ -675,6 +672,8 @@ func toUserChannel(index int) {
 	var out []byte
 	var S4 [4]byte
 	var S4Port [2]byte
+	var FIN byte
+	var RST byte
 
 	for {
 		PACKET, ok = <-CM.ToUser
@@ -686,20 +685,32 @@ func toUserChannel(index int) {
 		if PACKET[9] != 6 && PACKET[9] != 17 {
 			continue
 		}
-		fmt.Println("T:", len(PACKET))
 
 		if VPLEnabled {
-			if !AllowAll {
+			if !AllowAll && !CM.DisableFirewall {
 				S4[0] = PACKET[12]
 				S4[1] = PACKET[13]
 				S4[2] = PACKET[14]
 				S4[3] = PACKET[15]
 				l := (PACKET[0] & 0x0F) * 4
-				S4Port[0] = l
-				S4Port[1] = l + 1
-				allowed := CM.IsHostAllowed(S4, S4Port)
-				if !allowed {
+				S4Port[0] = PACKET[l]
+				S4Port[1] = PACKET[l+1]
+
+				RST = PACKET[l+13] & 0x4
+				FIN = PACKET[l+13] & 0x1
+
+				host := CM.IsHostAllowed(S4, S4Port)
+				if host == nil {
 					continue
+				}
+				if RST > 0 {
+					CM.DelHost(S4, "auto")
+				} else if FIN > 0 {
+					if host.FFIN {
+						CM.DelHost(S4, "auto")
+					} else {
+						CM.SetFin(S4, S4Port, false)
+					}
 				}
 			}
 		}

@@ -9,7 +9,6 @@ import (
 	"encoding/pem"
 	"errors"
 	"flag"
-	"fmt"
 	"log"
 	"math"
 	"net"
@@ -105,14 +104,14 @@ func main() {
 
 	enabledFeatures = strings.Split(features, ",")
 	if len(features) == 0 {
-		fmt.Println("you need to enabled at least one feature use --help for more information")
+		ERR("you need to enabled at least one feature use --help for more information")
 		os.Exit(0)
 	}
 
 	var err error
 	Config, err = GetServerConfig(serverConfigPath)
 	if err != nil {
-		fmt.Println("Error loading config: ", err)
+		ERR("Error loading config: ", err)
 		os.Exit(0)
 	}
 
@@ -120,23 +119,23 @@ func main() {
 		switch enabledFeatures[i] {
 		case APIFeature:
 			APIEnabled = true
-			fmt.Println("Enabling API Feature..")
+			INFO("Enabling API Feature..")
 		case VPNFeature:
 			VPNEnabled = true
-			fmt.Println("Enabling VPN Feature..")
+			INFO("Enabling VPN Feature..")
 		case VPLFeature:
 			VPLEnabled = true
-			fmt.Println("Enabling VPL Feature..")
+			INFO("Enabling VPL Feature..")
 			if Config.VPL == nil {
-				fmt.Println("VPL Configuration missing")
+				INFO("VPL Configuration missing")
 				os.Exit(0)
 			}
 		case DNSFeature:
-			fmt.Println("Enabling DNS Feature..")
-			fmt.Println("DNS Feature is in development")
+			INFO("Enabling DNS Feature..")
+			WARN("DNS Feature is in development")
 			DNSEnabled = true
 		default:
-			fmt.Println("Unknown feature: ", enabledFeatures[i])
+			ERR("Unknown feature: ", enabledFeatures[i])
 			os.Exit(0)
 		}
 	}
@@ -225,18 +224,18 @@ func main() {
 func initializeVPN() {
 	err := setcap.CheckCapabilities()
 	if err != nil {
-		fmt.Println("Tunnels server is missing capabilities, err:", err)
+		ERR("Tunnels server is missing capabilities, err:", err)
 		os.Exit(1)
 	}
 
 	var existed bool
 	err, existed = iptables.SetIPTablesRSTDropFilter(Config.InterfaceIP)
 	if err != nil {
-		fmt.Println("Error applying iptables rule: ", err)
+		ERR("Error applying iptables rule: ", err)
 		os.Exit(1)
 	}
 	if !existed {
-		fmt.Println("> added iptables rule")
+		INFO("> added iptables rule")
 	}
 
 	InterfaceIP = net.ParseIP(Config.InterfaceIP)
@@ -322,7 +321,7 @@ func makeConfigAndCertificates() {
 	if id != "" {
 		oid, err := primitive.ObjectIDFromHex(id)
 		if err != nil {
-			fmt.Printf("--id invalid, err: %s", err)
+			ERR("--id invalid, err:", err)
 			os.Exit(1)
 		}
 		sc := new(Server)
@@ -377,9 +376,9 @@ func makeConfigAndCertificates() {
 
 		// Encode the config to the file
 		if err := encoder.Encode(sc); err != nil {
-			fmt.Println("Error encoding JSON:", err)
+			ERR("Error encoding JSON:", err)
 		} else {
-			fmt.Println("Config file has been written successfully.")
+			INFO("Config file has been written successfully.")
 		}
 
 	}
@@ -399,7 +398,7 @@ func makeConfigAndCertificates() {
 	}
 
 	serialN, err := certs.ExtractSerialNumberFromCRT(ep + "server.crt")
-	fmt.Println("CERT SERIAL NUMBER: ", serialN)
+	INFO("CERT SERIAL NUMBER: ", serialN)
 	f, err := os.Create(ep + "serial")
 	if err != nil {
 		panic("unable to create folder for serial number")
@@ -431,7 +430,6 @@ func GeneratePortAllocation() (err error) {
 		PR.StartPort = uint16(currentPort)
 		PR.EndPort = PR.StartPort + uint16(portPerUser)
 
-		// log.Println("ASSIGNING PORTS: ", PR.StartPort, " >> ", PR.EndPort)
 		for i := PR.StartPort; i <= PR.EndPort; i++ {
 
 			if i < PR.StartPort {
