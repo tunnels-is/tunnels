@@ -222,10 +222,5 @@ func ResolveMetaTXT(domain string) (info *DNSInfo, err error) {
 		return nil, errors.New("bad dns format, ServerID is empty")
 	}
 
-	// fmt.Println("-----------------")
-	// fmt.Println(info.IP, info.Port, info.ServerID)
-	// fmt.Println("-----------------")
-	// fmt.Println(string(info.Cert))
-	// fmt.Println("-----------------")
 	return
 }
