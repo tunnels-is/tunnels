@@ -16,7 +16,5 @@ func NewSignal(ctx context.Context, ID int) (S *SIGNAL) {
 	S.ID = ID
 	S.Ctx = ctx
 	S.OK = make(chan byte, 100)
-	// SIGNAL_LIST[S.ID] = S
-
 	return
 }
