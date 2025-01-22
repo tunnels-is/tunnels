@@ -807,13 +807,13 @@ export var STATE = {
 		}
 		STATE.renderPage("inspect-server")
 	},
-	API_UpdateServer: async (id) => {
-		let server = undefined
-		STATE.ModifiedServers?.forEach(s => {
-			if (s._id === id) {
-				server = s
-			}
-		})
+	API_UpdateServer: async (server) => {
+		// let server = undefined
+		// STATE.ModifiedServers?.forEach(s => {
+		// 	if (s._id === id) {
+		// 		server = s
+		// 	}
+		// })
 
 		if (!server) {
 			return
@@ -833,7 +833,6 @@ export var STATE = {
 				Server: server
 			}
 
-
 			STATE.toggleLoading({
 				tag: "SERVER_UPDATE",
 				show: true,
@@ -843,17 +842,18 @@ export var STATE = {
 			resp = await STATE.API.method("forwardToController", FR)
 			if (resp?.status === 200) {
 
-				STATE.ModifiedServers?.forEach((s, i) => {
-					if (s._id === id) {
-						STATE.ModifiedServers.splice(i, 1)
-					}
-				})
+				// STATE.ModifiedServers?.forEach((s, i) => {
+				// 	if (s._id === id) {
+				// 		STATE.ModifiedServers.splice(i, 1)
+				// 	}
+				// })
 
 				STATE.PrivateServers.forEach((s, i) => {
-					if (s._id === id) {
+					if (s._id === server._id) {
 						STATE.PrivateServers[i] = server
 					}
 				})
+				STATE.updatePrivateServers()
 			}
 		} catch (error) {
 			console.dir(error)

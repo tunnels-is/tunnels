@@ -369,13 +369,20 @@ const ObjectEditor = (props) => {
 					},
 				})
 		} else {
+			let disabled = false
+			if (props.opts.disabled && props.opts.disabled["root_" + x.id] === true) {
+				disabled = true
+			} else if (props.opts.readOnly === true) {
+				disabled = true
+			}
 			input = React.createElement("input",
 				{
 					key: x.key + "_input",
 					className: "input",
 					value: x.parent.origin[x.id],
 					type: transformType(x.type),
-					disabled: props.opts.disabled ? props.opts.disabled["root_" + x.id] : false,
+					// disabled: props.opts.disabled ? props.opts.disabled["root_" + x.id] : false,
+					disabled: disabled,
 					onChange: (e) => {
 						// console.log("change")
 						// console.dir(x.id)
