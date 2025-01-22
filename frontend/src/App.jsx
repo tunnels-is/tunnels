@@ -13,7 +13,6 @@ import InspectJSON from "./App/component/InspectJSON";
 import ConnectionTable from "./App/ConnectionTable";
 import DNSAnswers from "./App/component/DNSAnswers";
 import PrivateServers from "./App/PrivateServers";
-import InspectServer from "./App/InspectServer";
 import ObjectEditor from "./App/ObjectEditor";
 import ScreenLoader from "./App/ScreenLoader";
 import InspectGroup from "./App/InspectGroup";
@@ -140,8 +139,6 @@ const LaunchApp = () => {
 
 							<Route path="servers" element={<Servers />} />
 							<Route path="private" element={<PrivateServers />} />
-							<Route path="inspect/server/" element={<InspectServer />} />
-							<Route path="inspect/server/:id" element={<InspectServer />} />
 
 							<Route path="inspect/blocklist/" element={<InspectBlocklist />} />
 

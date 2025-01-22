@@ -1,15 +1,18 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import GLOBAL_STATE from "../state";
 import CustomSelect from "./component/CustomSelect";
 import NewTable from "./component/newtable";
+import ObjectEditor from "./ObjectEditor";
 
 const Servers = () => {
 	const state = GLOBAL_STATE("servers")
+	const [server, setServer] = useState(undefined)
 
-	const popEditor = (r) => {
-		state.editorData = r
-		state.editorReadOnly = true
-		state.globalRerender()
+	const editorOpts = {
+		baseClass: "server-object-editor",
+		maxDepth: 1000,
+		onlyKeys: false,
+		readOnly: true,
 	}
 
 	useEffect(() => {
@@ -18,7 +21,6 @@ const Servers = () => {
 
 	const generateServerTable = () => {
 		let rows = []
-
 
 		state.Servers?.forEach(server => {
 
@@ -85,7 +87,9 @@ const Servers = () => {
 					value: server.Tag,
 					color: "blue",
 					click: function() {
-						popEditor(server)
+						// popEditor(server)
+						setServer(server)
+						state.renderPage("servers")
 					}
 				},
 				{ type: "text", value: server.Server ? server.Server : "Unknown" },
@@ -116,7 +120,6 @@ const Servers = () => {
 		return rows
 	}
 
-
 	let rows = generateServerTable()
 	const headers = [
 		{ value: "" },
@@ -126,6 +129,17 @@ const Servers = () => {
 		{ value: "Connection" },
 		{ value: "" }
 	]
+	if (server !== undefined) {
+		return (
+			<div className="connections">
+				<div className="back" onClick={() => setServer(undefined)}>Back to Servers</div>
+				<ObjectEditor
+					opts={editorOpts}
+					object={server}
+				/>
+			</div>
+		)
+	}
 
 	return (
 		<div className="ab router-wrapper">

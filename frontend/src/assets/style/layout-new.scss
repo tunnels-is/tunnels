@@ -715,6 +715,32 @@ body::-webkit-scrollbar {
 
 }
 
+.new-server-wrapper {
+  .info {
+    width: fit-content;
+    padding-right: 30px;
+  }
+
+  .panel {
+    max-width: 700px;
+
+    .formkeyvalue,
+    .keyvalue {
+      .label {
+        width: 70px !important;
+        min-width: fit-content;
+      }
+    }
+
+    .formkeyvalue {
+      input {
+        min-width: 330px;
+      }
+    }
+  }
+
+}
+
 .org-wrapper {
   .info {
     width: fit-content;
