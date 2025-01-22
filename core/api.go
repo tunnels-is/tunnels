@@ -72,17 +72,25 @@ func ResetEverything() {
 	RestoreSaneDNSDefaults()
 }
 
-func sendFirewallToServer(serverIP string, DHCPToken string, DHCPIP string, allowedHosts []string) (err error) {
+func sendFirewallToServer(serverIP string, DHCPToken string, DHCPIP string, allowedHosts []string, disableFirewall bool) (err error) {
 	FR := new(FirewallRequest)
 	FR.DHCPToken = DHCPToken
 	FR.IP = DHCPIP
 	FR.Hosts = allowedHosts
+
+	if CLIDisableVPLFirewall {
+		FR.DisableFirewall = true
+	} else {
+		FR.DisableFirewall = disableFirewall
+	}
 
 	var body []byte
 	body, err = json.Marshal(FR)
 	if err != nil {
 		return err
 	}
+
+	DEBUG("Firewall disabled:", FR.DisableFirewall, ">> allowed hosts:", FR.Hosts)
 
 	DEBUG("Sending firewall info to server: ", serverIP)
 	req, err := http.NewRequest("POST", "https://"+serverIP+":444/firewall", bytes.NewBuffer(body))
@@ -463,6 +471,7 @@ func applyNewFirewallRules(originalConfig *Config, newConfig *Config) error {
 							t.DHCP.Token,
 							net.IP(t.DHCP.IP[:]).String(),
 							nc.AllowedHosts,
+							nc.DisableFirewall,
 						)
 					}
 				}
@@ -677,6 +686,7 @@ func PublicConnect(ClientCR ConnectionRequest) (code int, errm error) {
 		ClientCR.ServerID = dnsInfo.ServerID
 		tunnel.Meta.PrivateCertBytes = dnsInfo.Cert
 		tunnel.Meta.Private = true
+		tunnel.ClientCR = ClientCR
 
 	} else {
 		if !tunnel.Meta.Private && ClientCR.ServerID == "" {
@@ -706,6 +716,7 @@ func PublicConnect(ClientCR ConnectionRequest) (code int, errm error) {
 	FinalCR.UserID = ClientCR.UserID
 	FinalCR.SeverID = ClientCR.ServerID
 	FinalCR.EncType = ClientCR.EncType
+	FinalCR.CurveType = ClientCR.CurveType
 	FinalCR.DeviceKey = ClientCR.DeviceKey
 
 	if !tunnel.Meta.Private || tunnel.Meta.RequestVPNPorts {
@@ -824,7 +835,10 @@ func PublicConnect(ClientCR ConnectionRequest) (code int, errm error) {
 	}
 	s.Flush()
 
-	tunnel.EH, err = crypt.NewEncryptionHandler(ClientCR.EncType)
+	fmt.Println("TYPES:")
+	fmt.Println(ClientCR.EncType)
+	fmt.Println(ClientCR.CurveType)
+	tunnel.EH, err = crypt.NewEncryptionHandler(ClientCR.EncType, ClientCR.CurveType)
 	if err != nil {
 		closeAll()
 		ERROR("unable to create encryption handler: ", err)
@@ -945,16 +959,15 @@ func PublicConnect(ClientCR ConnectionRequest) (code int, errm error) {
 	go tunnel.ReadFromServeTunnel()
 
 	if tunnel.CRR.DHCP != nil {
-		if len(tunnel.Meta.AllowedHosts) > 0 {
-			err = sendFirewallToServer(
-				tunnel.ClientCR.ServerIP,
-				tunnel.DHCP.Token,
-				net.IP(tunnel.DHCP.IP[:]).String(),
-				tunnel.Meta.AllowedHosts,
-			)
-			if err != nil {
-				ERROR("unable to update firewall: ", err)
-			}
+		err = sendFirewallToServer(
+			tunnel.ClientCR.ServerIP,
+			tunnel.DHCP.Token,
+			net.IP(tunnel.DHCP.IP[:]).String(),
+			tunnel.Meta.AllowedHosts,
+			tunnel.Meta.DisableFirewall,
+		)
+		if err != nil {
+			ERROR("unable to update firewall: ", err)
 		}
 	}
 

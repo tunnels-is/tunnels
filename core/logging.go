@@ -10,48 +10,6 @@ import (
 	"time"
 )
 
-func (l *LoggerInterface) Print(message string) {
-	if !PRODUCTION {
-		log.Println(message)
-	}
-}
-
-func (l *LoggerInterface) Trace(message string) {
-	if !PRODUCTION {
-		log.Println(message)
-	}
-}
-
-func (l *LoggerInterface) Debug(message string) {
-	if !PRODUCTION {
-		log.Println(message)
-	}
-}
-
-func (l *LoggerInterface) Info(message string) {
-	if !PRODUCTION {
-		log.Println(message)
-	}
-}
-
-func (l *LoggerInterface) Warning(message string) {
-	if !PRODUCTION {
-		log.Println(message)
-	}
-}
-
-func (l *LoggerInterface) Error(message string) {
-	if !PRODUCTION {
-		log.Println(message)
-	}
-}
-
-func (l *LoggerInterface) Fatal(message string) {
-	if !PRODUCTION {
-		log.Println(message)
-	}
-}
-
 func InitPacketTraceFile() {
 	defer func() {
 		if r := recover(); r != nil {
@@ -229,7 +187,7 @@ func StartLogQueueProcessor(MONITOR chan int) {
 		default:
 			APILogQueue = nil
 			APILogQueue = make(chan string, 1000)
-			fmt.Println("Log API queue full")
+			log.Println("Log API queue full")
 		}
 
 		if LogFile != nil {

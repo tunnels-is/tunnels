@@ -46,6 +46,7 @@ func AutoConnect(MONITOR chan int) {
 				ServerIP:   CLIHost,
 				ServerPort: CLIPort,
 				EncType:    v.EncryptionType,
+				CurveType:  v.CurveType,
 			}
 
 			code, err := PublicConnect(CR)
