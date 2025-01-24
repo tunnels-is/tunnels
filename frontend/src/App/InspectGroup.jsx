@@ -9,7 +9,6 @@ import ObjectEditor from "./ObjectEditor";
 
 const InspectGroup = () => {
 	const { id } = useParams()
-	// const [tag, setTag] = useState("")
 	const [groupID, setGroupID] = useState(id)
 	const [users, setUsers] = useState([])
 	const [servers, setServers] = useState([])
