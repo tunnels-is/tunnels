@@ -6,7 +6,6 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"math"
 	"net"
 	"runtime/debug"
@@ -132,9 +131,6 @@ func acceptUserUDPTLSSocket(conn *quic.Conn) {
 		}
 	}
 
-	fmt.Println("TYPES")
-	fmt.Println(CR.EncType)
-	fmt.Println(CR.CurveType)
 	var EH *crypt.SocketWrapper
 	EH, err = crypt.NewEncryptionHandler(CR.EncType, CR.CurveType)
 	if err != nil {
