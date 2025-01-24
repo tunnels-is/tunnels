@@ -37,7 +37,7 @@ const Servers = () => {
 					})
 			}
 
-			state.State.ActiveConnections?.forEach((x) => {
+			state.State?.ActiveConnections?.forEach((x) => {
 				if (x.ServerID === server._id) {
 					con = x
 					return
