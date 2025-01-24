@@ -66,7 +66,7 @@ $ sudo setcap 'cap_net_raw,cap_net_bind_service,cap_net_admin+eip' main
 ```
 
 # Live Development
-[https://twitch.tv/keyb1nd_](Keyb1nd_ twitch stream)
+(Keyb1nd_ twitch stream)[https://twitch.tv/keyb1nd_]
 
 # Special mentiones
 These are the real MVPs:
