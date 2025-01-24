@@ -26,7 +26,6 @@ func CheckCapabilities() (err error) {
 	if !on {
 		missingFlags = true
 	}
-	fmt.Println("THIS SHOULD NOT BE HERE")
 
 	on, _ = c.GetFlag(cap.Permitted, cap.NET_ADMIN)
 	if !on {

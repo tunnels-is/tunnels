@@ -835,9 +835,6 @@ func PublicConnect(ClientCR ConnectionRequest) (code int, errm error) {
 	}
 	s.Flush()
 
-	fmt.Println("TYPES:")
-	fmt.Println(ClientCR.EncType)
-	fmt.Println(ClientCR.CurveType)
 	tunnel.EH, err = crypt.NewEncryptionHandler(ClientCR.EncType, ClientCR.CurveType)
 	if err != nil {
 		closeAll()
