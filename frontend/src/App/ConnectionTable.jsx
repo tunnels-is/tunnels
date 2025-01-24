@@ -121,7 +121,7 @@ const ConnectionTable = () => {
 		})
 
 		let active = false
-		state.State.ActiveConnections?.map((x) => {
+		state.State?.ActiveConnections?.map((x) => {
 			if (x.WindowsGUID === c.WindowsGUID) {
 				active = true
 				return

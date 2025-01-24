@@ -446,6 +446,9 @@ export var STATE = {
 		}
 		try {
 			// console.log("get:", STATE[type][key])
+			if (!STATE[type]) {
+				return ""
+			}
 			return String(STATE[type][key])
 		} catch (error) {
 			console.dir(error)
