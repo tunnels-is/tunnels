@@ -15,6 +15,10 @@ import (
 	"golang.org/x/sys/windows"
 )
 
+func openURL(url string) error {
+	return windows.ShellExecute(0, nil, windows.StringToUTF16Ptr(url), nil, nil, windows.SW_SHOWNORMAL)
+}
+
 func stripSuffix(domain string) string {
 	if strings.HasSuffix(domain, ".lan.lan.") {
 		domain = strings.TrimSuffix(domain, ".lan.")
