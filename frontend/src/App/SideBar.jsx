@@ -1,5 +1,5 @@
 import { useNavigate, useLocation } from "react-router-dom";
-import React, { useEffect } from "react";
+import React from "react";
 
 import {
 	AccessibilityIcon,
@@ -11,9 +11,8 @@ import {
 	LockOpen1Icon,
 	MobileIcon,
 	PersonIcon,
-	QuestionMarkCircledIcon,
 	Share1Icon,
-	SymbolIcon,
+	GitHubLogoIcon,
 } from '@radix-ui/react-icons'
 
 import GLOBAL_STATE from "../state";
@@ -84,12 +83,12 @@ const SideBar = () => {
 						click: () => OpenWindowURL("https://www.tunnels.is/#/docs")
 					},
 					{
-						icon: QuestionMarkCircledIcon,
-						label: "FAQ",
-						route: "guides",
+						icon: GitHubLogoIcon,
+						label: "Github",
+						route: "github",
 						user: false,
 
-						click: () => OpenWindowURL("https://www.tunnels.is/#/docs")
+						click: () => OpenWindowURL("https://www.github.com/tunnels-is/tunnels")
 					},
 					// { icon: Share1Icon, label: "Logs", route: "logs", user: false, advanced: false },
 				]
