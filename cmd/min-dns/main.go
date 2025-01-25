@@ -14,9 +14,9 @@ func main() {
 
 	core.BASE_PATH = "./"
 	core.MINIMAL = true
-	core.NATIVE = false
+	core.POPUI = false
 
-	core.NATIVE = false
+	core.POPUI = false
 	core.MINIMAL = true
 	service.Start()
 }

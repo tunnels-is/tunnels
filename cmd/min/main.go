@@ -30,7 +30,7 @@ func main() {
 		core.BASE_PATH = "."
 	}
 
-	core.NATIVE = false
+	core.POPUI = false
 	core.MINIMAL = true
 	service.Start()
 }
