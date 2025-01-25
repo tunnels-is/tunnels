@@ -4,7 +4,6 @@ package core
 
 import (
 	"os"
-	"path/filepath"
 )
 
 func OSSpecificInit() error {
@@ -21,17 +20,17 @@ func GenerateBaseFolderPath() string {
 		return BASE_PATH + string(os.PathSeparator)
 	}
 
-	if !NATIVE {
-		base := "."
-		ex, err := os.Executable()
-		if err != nil {
-			ERROR("Unable to find working directory: ", err.Error())
-		} else {
-			base = filepath.Dir(ex)
-		}
-
-		return base + string(os.PathSeparator) + "files" + string(os.PathSeparator)
-	}
+	// if !NATIVE {
+	// 	base := "."
+	// 	ex, err := os.Executable()
+	// 	if err != nil {
+	// 		ERROR("Unable to find working directory: ", err.Error())
+	// 	} else {
+	// 		base = filepath.Dir(ex)
+	// 	}
+	//
+	// 	return base + string(os.PathSeparator) + "files" + string(os.PathSeparator)
+	// }
 
 	return GetPWD() + string(os.PathSeparator) + "tunnels" + string(os.PathSeparator)
 }
