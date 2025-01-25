@@ -114,12 +114,14 @@ func (V *Tunnel) ReadFromServeTunnel() {
 			ERROR("Packet authentication error: ", err)
 			return
 		}
-		if packet[0] == 101 {
-			go V.RegisterPing(CopySlice(packet))
+
+		V.IngressBytes += n
+
+		if len(packet) < 20 {
+			V.RegisterPing(CopySlice(packet))
 			continue
 		}
 
-		V.IngressBytes += n
 		if !V.ProcessIngressPacket(packet) {
 			debugMissingIngressMapping(packet)
 			continue
