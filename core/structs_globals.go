@@ -154,8 +154,10 @@ var (
 	// DEFAULT CONNECTION
 	DEFAULT_CONNECTION *TunnelMETA
 
-	// IS NATIVE GUI
-	NATIVE  bool
+	// IS POPUI GUI
+	POPUI  bool
+	uiChan = make(chan struct{}, 1)
+
 	MINIMAL bool
 
 	// Device Flags
