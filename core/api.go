@@ -585,7 +585,7 @@ func InitializeTunnelFromCRR(TUN *Tunnel) (err error) {
 		TUN.VPLNetwork = TUN.CRR.VPLNetwork
 	}
 
-	if !TUN.Meta.LocalhostNat {
+	if TUN.Meta.LocalhostNat {
 		NN := new(ServerNetwork)
 		NN.Network = "127.0.0.1/32"
 		NN.Nat = to4.String() + "/32"
