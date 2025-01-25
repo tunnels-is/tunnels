@@ -245,7 +245,8 @@ func (t *TunnelInterface) Down() (err error) {
 }
 
 func (t *TunnelInterface) Addr() (err error) {
-	return t.Up()
+	// not needed on macos
+	return nil
 }
 
 func (t *TunnelInterface) SetMTU() (err error) {
