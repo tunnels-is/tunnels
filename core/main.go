@@ -521,36 +521,25 @@ func CleanupOnClose() {
 	_ = LogFile.Close()
 }
 
-func popUI() error {
+func popUI() {
 	defer RecoverAndLogToFile()
 	<-uiChan
 	time.Sleep(2 * time.Second)
-	var cmd string
-	var args []string
 
 	url := "https://" + API_SERVER.Addr
 	INFO("opening UI @ ", url)
 
 	switch runtime.GOOS {
 	case "windows":
-		cmd = "cmd"
-		args = []string{"/c", "start"}
+		openURL(url)
 	case "darwin":
-		cmd = "open"
-		args = []string{url}
+		openURL(url)
 	default:
-		if isWSL() {
-			cmd = "cmd.exe"
-			args = []string{"/c", "start", url}
-		} else {
-			cmd = "xdg-open"
-			args = []string{url}
+		if !isWSL() {
+			openURL(url)
 		}
+
 	}
-	if len(args) > 1 {
-		args = append(args[:1], append([]string{""}, args[1:]...)...)
-	}
-	return exec.Command(cmd, args...).Start()
 }
 
 func isWSL() bool {
