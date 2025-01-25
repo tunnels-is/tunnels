@@ -882,6 +882,11 @@ func PublicConnect(ClientCR ConnectionRequest) (code int, errm error) {
 
 	DEBUG("Opening data tunnel:", net.JoinHostPort(ClientCR.ServerIP, CRR.DataPort))
 
+	// ensure gateway is not incorrect
+	if isGatewayATunnel(DEFAULT_GATEWAY) {
+		return 502, errors.New("default gateway is a tunnel, please retry in a moment")
+	}
+
 	IP_AddRoute(ClientCR.ServerIP+"/32", "", DEFAULT_GATEWAY.To4().String(), "0")
 	tunnel.Con, err = net.Dial(
 		"udp4",
