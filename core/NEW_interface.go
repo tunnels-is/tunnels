@@ -133,6 +133,16 @@ func PingConnections(MONITOR chan int) {
 	}
 }
 
+func isGatewayATunnel(gateway net.IP) (isTunnel bool) {
+	for _, v := range C.Connections {
+		if v.IPv4Address == gateway.To4().String() {
+			DEBUG("Gateway is on tunnel: ", v.Tag)
+			return true
+		}
+	}
+	return false
+}
+
 func getDefaultGatewayAndInterface() {
 	defer RecoverAndLogToFile()
 	var err error
@@ -153,17 +163,18 @@ func getDefaultGatewayAndInterface() {
 		if !onDefault {
 			con, err2 := net.Dial("tcp4", "9.9.9.9")
 			if err2 == nil {
-				NEW_GATEWAY = net.ParseIP(strings.Split(con.LocalAddr().String(), ":")[0])
+				newGate := net.ParseIP(strings.Split(con.LocalAddr().String(), ":")[0])
+				if !isGatewayATunnel(newGate) {
+					NEW_GATEWAY = newGate
+				}
 			}
 			ERROR("default gateway not found, err:", err, "//  dial err:", err2)
 		}
 		return
 	}
 
-	for _, v := range C.Connections {
-		if v.IPv4Address == NEW_GATEWAY.To4().String() {
-			return
-		}
+	if isGatewayATunnel(NEW_GATEWAY) {
+		return
 	}
 
 	if bytes.Equal(OLD_GATEWAY, NEW_GATEWAY.To4()) {
