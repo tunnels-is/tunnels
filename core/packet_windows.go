@@ -156,12 +156,12 @@ func (V *Tunnel) ReadFromServeTunnel() {
 			return
 		}
 
+		V.IngressBytes += n
+
 		if len(packet) < 20 {
 			go V.RegisterPing(CopySlice(packet))
 			continue
 		}
-
-		V.IngressBytes += n
 
 		if !V.ProcessIngressPacket(packet) {
 			debugMissingIngressMapping(packet)
