@@ -32,7 +32,7 @@ import STORE from "./store";
 import WS from "./ws";
 
 // Use this to automatically turn on debug 
-STORE.Cache.Set("debug", true)
+STORE.Cache.Set("debug", false)
 
 const appElement = document.getElementById('app')
 const root = createRoot(appElement);
