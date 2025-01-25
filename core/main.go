@@ -528,8 +528,8 @@ func popUI() error {
 	var cmd string
 	var args []string
 
-	url := API_SERVER.Addr
-	DEBUG("opening UI @ ", url)
+	url := "https://" + API_SERVER.Addr
+	INFO("opening UI @ ", url)
 
 	switch runtime.GOOS {
 	case "windows":
