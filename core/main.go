@@ -8,8 +8,11 @@ import (
 	"errors"
 	"log"
 	"os"
+	"os/exec"
 	"os/signal"
+	"runtime"
 	"runtime/debug"
+	"strings"
 	"syscall"
 	"time"
 
@@ -178,6 +181,10 @@ func LaunchEverything() {
 		routineMonitor <- 200
 	}
 
+	if POPUI {
+		routineMonitor <- 1337
+	}
+
 	for {
 		select {
 		case sig := <-quit:
@@ -214,6 +221,8 @@ func LaunchEverything() {
 				go StartUDPDNSHandler(routineMonitor)
 			} else if ID == 200 {
 				go AutoConnect(routineMonitor)
+			} else if ID == 1337 {
+				go popUI()
 			}
 		default:
 			time.Sleep(200 * time.Millisecond)
@@ -512,70 +521,42 @@ func CleanupOnClose() {
 	_ = LogFile.Close()
 }
 
-// func REF_PingRouter(routerIP, gateway string) (*ping.Statistics, error) {
-// 	defer RecoverAndLogToFile()
-//
-// 	DEBUG("PING: ", routerIP, " || gateway: ", gateway)
-//
-// 	pinger, err := ping.NewPinger(routerIP)
-// 	if err != nil {
-// 		ERROR("unable to create a new pinger: ", routerIP, err)
-// 		return nil, err
-// 	}
-// 	defer pinger.Stop()
-//
-// 	// routeAdded := false
-// 	_ = IP_AddRoute(
-// 		routerIP+"/32",
-// 		strconv.Itoa(DEFAULT_INTERFACE_ID),
-// 		DEFAULT_GATEWAY.To4().String(),
-// 		"0",
-// 	)
-// 	// if err == nil {
-// 	// routeAdded = true
-// 	// }
-//
-// 	pinger.SetPrivileged(true)
-// 	pinger.Count = 1
-// 	pinger.Timeout = time.Second * 3
-// 	err = pinger.Run()
-// 	if err != nil {
-// 		ERROR("PING ERROR: ", routerIP, err)
-// 		return nil, err
-// 	}
-//
-// 	// if routeAdded {
-// 	// err = tunnels.IP_DelRoute(routerIP, gateway, "10")
-// 	// if err != nil {
-// 	// 	ERROR("unable to delete route to: ", routerIP, err)
-// 	// }
-// 	// }
-//
-// 	return pinger.Statistics(), nil
-// }
+func popUI() error {
+	defer RecoverAndLogToFile()
+	<-uiChan
+	time.Sleep(2 * time.Second)
+	var cmd string
+	var args []string
 
-// func PingAllServers() {
-// 	defer RecoverAndLogToFile()
-//
-// 	for i := range GLOBAL_STATE.Servers {
-// 		if GLOBAL_STATE.Servers[i] == nil {
-// 			continue
-// 		}
-//
-// 		stats, err := REF_PingRouter(GLOBAL_STATE.Servers[i].IP, DEFAULT_GATEWAY.To4().String())
-// 		if err != nil {
-// 			continue
-// 		}
-//
-// 		if stats.AvgRtt.Microseconds() == 0 {
-// 			INFO(GLOBAL_STATE.Servers[i].IP, " // OFFLINE")
-// 			GLOBAL_STATE.Servers[i].PingStats = *stats
-// 			GLOBAL_STATE.Servers[i].MS = 9999
-// 		} else {
-// 			GLOBAL_STATE.Servers[i].PingStats = *stats
-// 			GLOBAL_STATE.Servers[i].MS = uint64(stats.AvgRtt.Milliseconds())
-// 			INFO(GLOBAL_STATE.Servers[i].IP, " // MS: ", GLOBAL_STATE.Servers[i].PingStats.AvgRtt)
-// 		}
-//
-// 	}
-// }
+	url := API_SERVER.Addr
+	DEBUG("opening UI @ ", url)
+
+	switch runtime.GOOS {
+	case "windows":
+		cmd = "cmd"
+		args = []string{"/c", "start"}
+	case "darwin":
+		cmd = "open"
+		args = []string{url}
+	default:
+		if isWSL() {
+			cmd = "cmd.exe"
+			args = []string{"/c", "start", url}
+		} else {
+			cmd = "xdg-open"
+			args = []string{url}
+		}
+	}
+	if len(args) > 1 {
+		args = append(args[:1], append([]string{""}, args[1:]...)...)
+	}
+	return exec.Command(cmd, args...).Start()
+}
+
+func isWSL() bool {
+	releaseData, err := exec.Command("uname", "-r").Output()
+	if err != nil {
+		return false
+	}
+	return strings.Contains(strings.ToLower(string(releaseData)), "microsoft")
+}

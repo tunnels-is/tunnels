@@ -93,9 +93,6 @@ func LaunchAPI(MONITOR chan int) {
 
 	// if we are running wails, we want
 	// the computer to select a port for us.
-	if NATIVE {
-		port = "0"
-	}
 
 	API_SERVER.Addr = ip + ":" + port
 	ln, err := net.Listen("tcp4", API_SERVER.Addr)
@@ -117,6 +114,11 @@ func LaunchAPI(MONITOR chan int) {
 	INFO("Key: ", C.APIKey)
 	INFO("Cert: ", C.APICert)
 	INFO("===========================")
+
+	select {
+	case uiChan <- struct{}{}:
+	default:
+	}
 
 	if err := API_SERVER.ServeTLS(ln, C.APICert, C.APIKey); err != http.ErrServerClosed {
 		ERROR("api start error: ", err)
