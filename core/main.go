@@ -148,6 +148,10 @@ func LaunchEverything() {
 		}
 	}()
 
+	if MINIMAL {
+		CLIDisableBlockLists = true
+	}
+
 	CancelContext, CancelFunc = context.WithCancel(GlobalContext)
 	quit = make(chan os.Signal, 10)
 
@@ -181,7 +185,7 @@ func LaunchEverything() {
 		routineMonitor <- 200
 	}
 
-	if POPUI {
+	if POPUI && !MINIMAL {
 		routineMonitor <- 1337
 	}
 
