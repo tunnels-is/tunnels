@@ -20,6 +20,9 @@ func main() {
 	core.CLIDNS = "vpn.your-domain.com"
 	core.CLIDeviceKey = "your-device-key"
 
+	// disable ingress firewall ( optional )
+	core.CLIDisableVPLFirewall = true
+
 	go service.StartWithExternalMonitor(ctx, 1, monitor)
 	for {
 		select {
