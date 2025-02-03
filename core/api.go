@@ -259,6 +259,12 @@ func ForwardToController(FR *FORWARD_REQUEST) (interface{}, int) {
 	if strings.Contains(FR.Path, "logout") {
 		if len(responseBytes) != 0 && code == 200 {
 			INFO("LOGOUT DETECTED!")
+			for i := range GLOBAL_STATE.ActiveConnections {
+				if GLOBAL_STATE.ActiveConnections[i] == nil {
+					continue
+				}
+				Disconnect(GLOBAL_STATE.ActiveConnections[i].WindowsGUID, true, false)
+			}
 			GLOBAL_STATE.User = User{}
 		}
 	}
