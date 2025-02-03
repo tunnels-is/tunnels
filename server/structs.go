@@ -63,7 +63,7 @@ type DeviceListResponse struct {
 }
 
 type listDevice struct {
-	DHCP         *DHCPRecord
+	DHCP         DHCPRecord
 	AllowedIPs   []string
 	CPU          byte
 	RAM          byte

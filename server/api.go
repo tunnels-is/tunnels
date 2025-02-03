@@ -69,10 +69,8 @@ outerloop:
 
 		if ClientCoreMappings[i].DHCP != nil {
 			for _, v := range response.Devices {
-				if v.DHCP != nil {
-					if v.DHCP.Token == ClientCoreMappings[i].DHCP.Token {
-						continue outerloop
-					}
+				if v.DHCP.Token == ClientCoreMappings[i].DHCP.Token {
+					continue outerloop
 				}
 			}
 		}
@@ -80,6 +78,9 @@ outerloop:
 		d := new(listDevice)
 		d.AllowedIPs = make([]string, 0)
 		for _, v := range ClientCoreMappings[i].AllowedHosts {
+			if v.Type == "auto" {
+				continue
+			}
 			d.AllowedIPs = append(d.AllowedIPs,
 				fmt.Sprintf("%d-%d-%d-%d",
 					v.IP[0],
@@ -94,7 +95,7 @@ outerloop:
 		d.Disk = ClientCoreMappings[i].Disk
 		if ClientCoreMappings[i].DHCP != nil {
 			response.DHCPAssigned++
-			d.DHCP = ClientCoreMappings[i].DHCP
+			d.DHCP = *ClientCoreMappings[i].DHCP
 		}
 
 		d.IngressQueue = len(ClientCoreMappings[i].ToUser)
@@ -108,6 +109,10 @@ outerloop:
 	}
 
 	response.DHCPFree = len(DHCPMapping) - response.DHCPAssigned
+
+	for i := range response.Devices {
+		response.Devices[i].DHCP.Token = "redacted"
+	}
 
 	err := json.NewEncoder(w).Encode(response)
 	if err != nil {
