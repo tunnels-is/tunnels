@@ -528,24 +528,14 @@ export var STATE = {
 
 		), { id: id, duration: duration })
 	},
-	Logout: async () => {
-
-		try {
-			await STATE.disconnectAllConnections()
-		} catch (error) {
-			console.dir(error)
-		}
-
+	FinalizeLogout: async () => {
 		let theme = STATE.darkMode
 		STORE.Cache.Clear()
 		STORE.Cache.Set("darkMode", theme)
+		STATE.GetBackendState()
 		window.location.replace("/#/login")
 		window.location.reload()
 	},
-	// API
-	// API
-	// API
-	// API
 	UpdateUser: async () => {
 		try {
 
@@ -662,16 +652,6 @@ export var STATE = {
 		STATE.toggleLoading(undefined)
 		STATE.GetBackendState()
 	},
-	disconnectAllConnections: async () => {
-		STATE.State.ActiveConnections.forEach(c => {
-			try {
-				STATE.disconnectFromVPN(c)
-			} catch (error) {
-				console.dir(error)
-			}
-		})
-		STATE.GetBackendState()
-	},
 	disconnectFromVPN: async (c) => {
 
 		try {
@@ -717,13 +697,18 @@ export var STATE = {
 				undefined,
 			)
 
-			STATE.Logout()
+			STATE.FinalizeLogout()
 
 		} else {
 			STATE.errorNotification(
 				"Unable to log out device",
 				undefined,
 			)
+		}
+	},
+	LogoutCurrentToken: async () => {
+		if (STATE.User !== undefined) {
+			STATE.LogoutToken(STATE.User.DeviceToken?.DT)
 		}
 	},
 	LogoutToken: async (token) => {
@@ -752,7 +737,7 @@ export var STATE = {
 			)
 			let u = STORE.Cache.GetObject("user")
 			if (u?.DeviceToken.DT === token.DT) {
-				STATE.Logout()
+				STATE.FinalizeLogout()
 				return
 			}
 
@@ -1506,10 +1491,9 @@ export var STATE = {
 			} catch (error) {
 				console.dir(error)
 
-
 				if (!noLogout || noLogout === false) {
 					if (error?.response?.status === 401) {
-						STATE.Logout()
+						STATE.LogoutCurrentToken()
 						return
 					}
 				}
