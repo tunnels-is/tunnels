@@ -15,27 +15,26 @@ func inc(ip net.IP) {
 }
 
 func (V *Tunnel) TransLateVPLIP(ip [4]byte) ([4]byte, bool) {
-	originalIP := (net.IP)(ip[:])
-	xxx, ok := V.NAT_CACHE[[4]byte{originalIP[0], originalIP[1], originalIP[2], originalIP[3]}]
-	if ok {
+	if xxx, ok := V.NAT_CACHE[ip]; ok {
 		return xxx, true
 	}
-	newIP := make([]byte, len(originalIP))
-	copy(newIP, originalIP)
+
 	if V.CRR.VPLNetwork == nil {
-		return [4]byte{newIP[0], newIP[1], newIP[2], newIP[3]}, true
+		return ip, true
 	}
 
 	v := V.CRR.VPLNetwork
+	var newIP [4]byte
 
-	for i := range ip[:3] {
+	for i := 0; i < 3; i++ {
 		newIP[i] = v.NetIPNet.IP[i]&v.NetIPNet.Mask[i] | ip[i]&^v.NetIPNet.Mask[i]
 	}
-	// return
-	V.NAT_CACHE[[4]byte{originalIP[0], originalIP[1], originalIP[2], originalIP[3]}] = [4]byte{newIP[0], newIP[1], newIP[2], newIP[3]}
+	newIP[3] = ip[3]
 
-	V.REVERSE_NAT_CACHE[[4]byte{newIP[0], newIP[1], newIP[2], newIP[3]}] = [4]byte{originalIP[0], originalIP[1], originalIP[2], originalIP[3]}
-	return [4]byte{newIP[0], newIP[1], newIP[2], newIP[3]}, true
+	V.NAT_CACHE[ip] = newIP
+	V.REVERSE_NAT_CACHE[newIP] = ip
+
+	return newIP, true
 }
 
 func (V *Tunnel) TransLateIP(ip [4]byte) ([4]byte, bool) {
