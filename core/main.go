@@ -212,7 +212,7 @@ func LaunchEverything() {
 			} else if ID == 4 {
 				go GetDefaultGateway(routineMonitor)
 			} else if ID == 5 {
-				//
+				go CleanUniqueLogMap(routineMonitor)
 			} else if ID == 6 {
 				go CleanPortsForAllConnections(routineMonitor)
 			} else if ID == 7 {

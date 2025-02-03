@@ -1,14 +1,57 @@
 package core
 
 import (
+	"crypto/md5"
 	"fmt"
 	"log"
 	"os"
 	"runtime"
 	"runtime/debug"
 	"strings"
+	"sync"
 	"time"
 )
+
+type uniqueLog struct {
+	date time.Time
+}
+
+var (
+	seenLogs = make(map[[md5.Size]byte]uniqueLog)
+	logMutex = &sync.Mutex{}
+)
+
+func checkLogUniqueness(log *string) (shouldLog bool) {
+	hash := md5.Sum([]byte(*log))
+	logMutex.Lock()
+	_, exists := seenLogs[hash]
+	if !exists {
+		seenLogs[hash] = uniqueLog{
+			date: time.Now(),
+		}
+		logMutex.Unlock()
+		return true
+	}
+	logMutex.Unlock()
+	return false
+}
+
+func CleanUniqueLogMap(MONITOR chan int) {
+	defer func() {
+		RecoverAndLogToFile()
+		time.Sleep(10 * time.Second)
+		MONITOR <- 5
+	}()
+
+	logMutex.Lock()
+	defer logMutex.Unlock()
+
+	for i := range seenLogs {
+		if time.Since(seenLogs[i].date).Seconds() > 8 {
+			delete(seenLogs, i)
+		}
+	}
+}
 
 func InitPacketTraceFile() {
 	defer func() {
@@ -129,6 +172,7 @@ func ERROR(Line ...interface{}) {
 	for _, v := range Line {
 		x += fmt.Sprintf(" %v", v)
 	}
+	checkLogUniqueness(&x)
 
 	select {
 	case LogQueue <- fmt.Sprintf(

@@ -115,7 +115,7 @@ func PingConnections(MONITOR chan int) {
 			if len(out) > 0 {
 				_, err = v.Con.Write(out)
 				if err != nil {
-					// apply firewall rules
+					ERROR("unable to ping tunnel: ", v.Meta.Tag)
 				}
 			}
 
@@ -136,7 +136,6 @@ func PingConnections(MONITOR chan int) {
 func isGatewayATunnel(gateway net.IP) (isTunnel bool) {
 	for _, v := range C.Connections {
 		if v.IPv4Address == gateway.To4().String() {
-			DEBUG("Gateway is on tunnel: ", v.Tag)
 			return true
 		}
 	}
