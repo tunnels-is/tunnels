@@ -30,19 +30,27 @@ import (
 )
 
 func LOG(x ...any) {
-	log.Println(x...)
+	if !disableLogs {
+		log.Println(x...)
+	}
 }
 
 func INFO(x ...any) {
-	log.Println(x...)
+	if !disableLogs {
+		log.Println(x...)
+	}
 }
 
 func WARN(x ...any) {
-	log.Println(x...)
+	if !disableLogs {
+		log.Println(x...)
+	}
 }
 
 func ERR(x ...any) {
-	log.Println(x...)
+	if !disableLogs {
+		log.Println(x...)
+	}
 }
 
 func loadPublicSigningCert() (err error) {
@@ -63,6 +71,7 @@ var (
 	features        string
 	defaultHostname string
 	enabledFeatures []string
+	disableLogs     bool
 
 	VPLEnabled bool = false
 	VPNEnabled bool = false
@@ -95,6 +104,7 @@ func main() {
 	flag.BoolVar(&config, "config", false, "Generate a config and make certificates ( Remember to copy the serial number ! )")
 	flag.StringVar(&features, "features", "", "Select enabled features. Available: VPN,VPL,API")
 	flag.StringVar(&defaultHostname, "hostname", "", "Main domain/hostname for DHCP devices")
+	flag.BoolVar(&disableLogs, "disableLogs", false, "Disable all logging")
 	flag.Parse()
 
 	if config {
@@ -191,7 +201,7 @@ func main() {
 			go fromUserChannel(index)
 
 		case SIGNAL := <-SignalMonitor:
-			LOG(SIGNAL)
+			LOG(SIGNAL.ID)
 
 			switch SIGNAL.ID {
 			case 1:
