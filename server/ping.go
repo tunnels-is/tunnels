@@ -57,9 +57,8 @@ func NukeClient(index int) {
 	}
 
 	if ClientCoreMappings[index].DHCP != nil {
-		IPm.Lock()
-		IPToCoreMapping[ClientCoreMappings[index].DHCP.IP] = nil
-		IPm.Unlock()
+		ip := ClientCoreMappings[index].DHCP.IP
+		VPLIPToCore[ip[0]][ip[1]][ip[2]][ip[3]] = nil
 	}
 	close(ClientCoreMappings[index].ToUser)
 	close(ClientCoreMappings[index].FromUser)

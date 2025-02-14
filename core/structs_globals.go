@@ -35,6 +35,7 @@ var (
 
 type DNSStats struct {
 	Count     int
+	Tag       string
 	LastSeen  time.Time
 	FirstSeen time.Time
 	Answers   []string
@@ -628,7 +629,7 @@ type Config struct {
 }
 
 var (
-	DNSBlockList = make(map[string]struct{})
+	DNSBlockList = make(map[string]string)
 	DNSBlockLock = sync.Mutex{}
 )
 

@@ -60,7 +60,7 @@ const InspectBlocklist = () => {
 					<input name="FullPath" id="fullpath" value={newBlocklist.FullPath} onChange={handleChange} type="text" />}
 				/>
 
-				<div className="button" onClick={() => Add()}>Add</div>
+				<div className="card-button" onClick={() => Add()}>Add</div>
 			</div>
 		</div>
 	)

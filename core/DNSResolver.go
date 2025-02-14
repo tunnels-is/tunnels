@@ -114,7 +114,7 @@ func ResolveDomainLocal(V *Tunnel, m *dns.Msg, w dns.ResponseWriter) {
 				INFO("DNS: ", m.Question[0].Name, fmt.Sprintf("(%d)ms ", time.Since(start).Milliseconds()), " @ ", V.Meta.Tag, " @ ", server)
 			}
 			if GLOBAL_STATE.C.DNSstats {
-				IncrementDNSStats(m.Question[0].Name, false, r.Answer)
+				IncrementDNSStats(m.Question[0].Name, false, "", r.Answer)
 			}
 		}
 	}()
@@ -159,7 +159,7 @@ func ResolveDomain(m *dns.Msg, w dns.ResponseWriter) {
 				INFO("DNS: ", m.Question[0].Name, fmt.Sprintf("(%d)ms ", time.Since(start).Milliseconds()), " @  ", server)
 			}
 			if GLOBAL_STATE.C.DNSstats {
-				IncrementDNSStats(m.Question[0].Name, false, r.Answer)
+				IncrementDNSStats(m.Question[0].Name, false, "", r.Answer)
 			}
 		}
 	}()
@@ -272,7 +272,7 @@ func DNSQuery(w dns.ResponseWriter, m *dns.Msg) {
 		return
 	}
 
-	blocked := isBlocked(m)
+	blocked, tag := isBlocked(m)
 
 	var Connection *Tunnel
 	var ServerDNS *ServerDNS
@@ -306,7 +306,7 @@ func DNSQuery(w dns.ResponseWriter, m *dns.Msg) {
 
 	if blocked && ServerDNS == nil {
 		if GLOBAL_STATE.C.DNSstats {
-			IncrementDNSStats(m.Question[0].Name, true, nil)
+			IncrementDNSStats(m.Question[0].Name, true, tag, nil)
 		}
 
 		if GLOBAL_STATE.C.LogBlockedDomains {
@@ -353,7 +353,7 @@ func DNSQuery(w dns.ResponseWriter, m *dns.Msg) {
 		}
 		w.Close()
 		if GLOBAL_STATE.C.DNSstats {
-			IncrementDNSStats(m.Question[0].Name, false, outMsg.Answer)
+			IncrementDNSStats(m.Question[0].Name, false, tag, outMsg.Answer)
 		}
 		return
 
@@ -449,17 +449,17 @@ func DNSCacheCheck(m *dns.Msg, w dns.ResponseWriter) bool {
 		)
 	}
 
-	IncrementDNSStats(m.Question[0].Name, false, cachedReply.A)
+	IncrementDNSStats(m.Question[0].Name, false, "", cachedReply.A)
 	return true
 }
 
-func isBlocked(m *dns.Msg) bool {
+func isBlocked(m *dns.Msg) (bool, string) {
 	name := strings.TrimSuffix(m.Question[0].Name, ".")
 	DNSBlockLock.Lock()
-	_, ok := DNSBlockList[name]
+	tag, ok := DNSBlockList[name]
 	DNSBlockLock.Unlock()
 
-	return ok
+	return ok, tag
 }
 
 func ResolveDNSAsHTTPS(m *dns.Msg, w dns.ResponseWriter) {
@@ -536,11 +536,11 @@ func ResolveDNSAsHTTPS(m *dns.Msg, w dns.ResponseWriter) {
 
 	INFO("DNS(https): ", m.Question[0].Name, fmt.Sprintf("(%d)ms ", time.Since(start).Milliseconds()), " @  ", server)
 	if GLOBAL_STATE.C.DNSstats {
-		IncrementDNSStats(m.Question[0].Name, false, newx.Answer)
+		IncrementDNSStats(m.Question[0].Name, false, "", newx.Answer)
 	}
 }
 
-func IncrementDNSStats(domain string, blocked bool, answers []dns.RR) {
+func IncrementDNSStats(domain string, blocked bool, tag string, answers []dns.RR) {
 	DNSLock.Lock()
 	defer RecoverAndLogToFile()
 	defer DNSLock.Unlock()
@@ -552,6 +552,7 @@ func IncrementDNSStats(domain string, blocked bool, answers []dns.RR) {
 		if !ok {
 			DNSBlockedList[domain] = new(DNSStats)
 			s = DNSBlockedList[domain]
+			s.Tag = tag
 			s.FirstSeen = time.Now()
 		}
 	} else {
@@ -559,6 +560,7 @@ func IncrementDNSStats(domain string, blocked bool, answers []dns.RR) {
 		if !ok {
 			DNSResolvedList[domain] = new(DNSStats)
 			s = DNSResolvedList[domain]
+			s.Tag = tag
 			s.FirstSeen = time.Now()
 		}
 	}
