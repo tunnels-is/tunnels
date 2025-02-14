@@ -38,8 +38,8 @@ var (
 	TCPRWC       io.ReadWriteCloser
 	UDPRWC       io.ReadWriteCloser
 
-	toUserChannelMonitor   = make(chan int, 10000)
-	fromUserChannelMonitor = make(chan int, 10000)
+	toUserChannelMonitor   = make(chan int, 100000)
+	fromUserChannelMonitor = make(chan int, 100000)
 
 	PortMappingResponseDurations = time.Duration(30 * time.Second)
 
@@ -47,11 +47,11 @@ var (
 	PortToCoreMapping  [math.MaxUint16 + 1]*PortRange
 	COREm              = sync.Mutex{}
 
-	VPLNetwork      *net.IPNet
-	DHCPMapping     [math.MaxUint16 + 1]*DHCPRecord
-	IPToCoreMapping = make(map[[4]byte]*UserCoreMapping)
-	IPm             = sync.Mutex{}
+	VPLNetwork  *net.IPNet
+	DHCPMapping [math.MaxUint16 + 1]*DHCPRecord
 
+	// IPToCoreMapping = make(map[[4]byte]*UserCoreMapping)
+	VPLIPToCore = make([][][][]*UserCoreMapping, 255)
 	// Routing Settings
 	AllowAll bool
 )

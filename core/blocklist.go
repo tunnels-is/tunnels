@@ -34,7 +34,7 @@ func ReBuildBlockLists(config *Config) (listError error) {
 	defer runtime.GC()
 
 	mapLock := new(sync.Mutex)
-	newMap := make(map[string]struct{})
+	newMap := make(map[string]string)
 
 	wg := new(sync.WaitGroup)
 
@@ -121,7 +121,7 @@ func ReBuildBlockLists(config *Config) (listError error) {
 				}
 				if bl.Enabled {
 					mapLock.Lock()
-					newMap[d] = struct{}{}
+					newMap[d] = config.AvailableBlockLists[index].Tag
 					mapLock.Unlock()
 				}
 				bl.Count++

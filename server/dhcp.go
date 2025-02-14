@@ -43,9 +43,8 @@ func assignDHCP(CR *ConnectRequest, CRR *ConnectRequestResponse, index int) (err
 				assigned = true
 				ClientCoreMappings[index].DHCP = DHCPMapping[i]
 
-				IPm.Lock()
-				IPToCoreMapping[ClientCoreMappings[index].DHCP.IP] = ClientCoreMappings[index]
-				IPm.Unlock()
+				ip := ClientCoreMappings[index].DHCP.IP
+				VPLIPToCore[ip[0]][ip[1]][ip[2]][ip[3]] = ClientCoreMappings[index]
 
 				break
 			}
@@ -69,9 +68,8 @@ func assignDHCP(CR *ConnectRequest, CRR *ConnectRequestResponse, index int) (err
 				CRR.DHCP = DHCPMapping[i]
 				ClientCoreMappings[index].DHCP = DHCPMapping[i]
 
-				IPm.Lock()
-				IPToCoreMapping[ClientCoreMappings[index].DHCP.IP] = ClientCoreMappings[index]
-				IPm.Unlock()
+				ip := ClientCoreMappings[index].DHCP.IP
+				VPLIPToCore[ip[0]][ip[1]][ip[2]][ip[3]] = ClientCoreMappings[index]
 
 				break
 			}
