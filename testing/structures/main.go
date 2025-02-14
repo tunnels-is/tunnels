@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"net"
 	"runtime"
 	"time"
 )
@@ -25,40 +24,40 @@ var x [][][][]*xc
 // 	}
 // }
 
+//		10.0.255.255
+
 func alloc() {
-	x = make([][][][]*xc, 255)
-	fmt.Println(x[100])
+	x = make([][][][]*xc, 256)
+	x[10] = make([][][]*xc, 11)
+	x[10][0] = make([][]*xc, 256)
+
+	for ii := 0; ii < 256; ii++ {
+		x[10][0][ii] = make([]*xc, 256)
+
+		for iii := 0; iii < 256; iii++ {
+			x[10][0][ii][iii] = &xc{IP: fmt.Sprintf("%d.%d.%d.%d", 10, 0, ii, iii)}
+		}
+	}
 }
 
 var testMap = make(map[[4]byte]struct{})
 
 func main() {
-	ip, VPLNetwork, err := net.ParseCIDR("10.0.0.0/16")
-	if err != nil {
-		panic(err)
-	}
+	alloc()
 
-	ip = ip.Mask(VPLNetwork.Mask)
-
-	for VPLNetwork.Contains(ip) {
-		testMap[[4]byte{ip[0], ip[1], ip[2], ip[3]}] = struct{}{}
-		inc(ip)
-	}
-
+	count := 1
 	for {
 		time.Sleep(1 * time.Second)
+		if count > 200 {
+			count = 1
+		}
+		count++
+
+		fmt.Println(x[10][0][0][1])
+		fmt.Println(x[10][0][255][255])
 		PrintMemUsage()
 		fmt.Println(len(testMap))
 
-	}
-}
-
-func inc(ip net.IP) {
-	for j := len(ip) - 1; j >= 0; j-- {
-		ip[j]++
-		if ip[j] > 0 {
-			break
-		}
 	}
 }
 

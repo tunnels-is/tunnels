@@ -101,11 +101,8 @@ const DNS = () => {
 		stats.forEach(value => {
 			let row = {}
 			row.items = [
-				{
-					type: "text",
-					value: value.tag,
-					tooltip: true,
-				},
+				{ type: "text", value: value.tag, tooltip: true, },
+				{ type: "text", value: value.Tag, tooltip: true, },
 				{ type: "text", value: dayjs(value.FirstSeen).format(state.DNSListDateFormat) },
 				{ type: "text", value: dayjs(value.LastSeen).format(state.DNSListDateFormat) },
 				{ type: "text", value: value.Count },
@@ -163,6 +160,7 @@ const DNS = () => {
 	let rowsDNSstats = generateBlocksTable()
 	const headersDNSstats = [
 		{ value: "Domain" },
+		{ value: "List" },
 		{ value: "First Seen" },
 		{ value: "Last Seen" },
 		{ value: "Blocked" },

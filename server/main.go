@@ -213,6 +213,7 @@ func main() {
 			case 4:
 				go startAPI(SIGNAL)
 			case 5:
+				go ReloadConfig(SIGNAL)
 
 			// VPN
 			case 10:
@@ -228,6 +229,18 @@ func main() {
 
 			}
 		}
+	}
+}
+
+func ReloadConfig(SIGNAL *SIGNAL) {
+	defer RecoverAndReturnID(SIGNAL, 30)
+	newConf, err := GetServerConfig(serverConfigPath)
+	if err != nil {
+		ERR("Error loading config: ", err)
+		os.Exit(0)
+	}
+	if newConf != nil {
+		Config = newConf
 	}
 }
 
@@ -265,6 +278,7 @@ func initializeVPN() {
 	}
 
 	GeneratePortAllocation()
+	GenerateVPLCoreMappings()
 }
 
 func initializeVPL() (err error) {
@@ -419,6 +433,19 @@ func makeConfigAndCertificates() {
 	_, err = f.WriteString(serialN)
 	if err != nil {
 		panic("unable to write serial number to file")
+	}
+}
+
+func GenerateVPLCoreMappings() {
+	VPLIPToCore[10] = make([][][]*UserCoreMapping, 11)
+	VPLIPToCore[10][0] = make([][]*UserCoreMapping, 256)
+
+	for ii := 0; ii < 256; ii++ {
+		VPLIPToCore[10][0][ii] = make([]*UserCoreMapping, 256)
+
+		for iii := 0; iii < 256; iii++ {
+			VPLIPToCore[10][0][ii][iii] = nil
+		}
 	}
 }
 

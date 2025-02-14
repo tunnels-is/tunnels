@@ -500,12 +500,13 @@ func fromUserChannel(index int) {
 	var err error
 	var ok bool
 	staging := make([]byte, 100000)
-	clientCache := make(map[[4]byte]*UserCoreMapping)
+	// clientCache := make(map[[4]byte]*UserCoreMapping)
 	var D4 [4]byte
 	var D4Port [2]byte
 	var RST byte
 	var FIN byte
 	var SYN byte
+	var targetCM *UserCoreMapping
 
 	for {
 		payload, ok = <-CM.FromUser
@@ -562,35 +563,26 @@ func fromUserChannel(index int) {
 			FIN = PACKET[l+13] & 0x1
 			SYN = PACKET[l+13] & 0x2
 
-			um, ok := clientCache[D4]
-			if !ok || um == nil {
-				IPm.Lock()
-				targetCM, _ := IPToCoreMapping[D4]
-				IPm.Unlock()
-				if targetCM != nil {
-					clientCache[D4] = targetCM
-				}
-			}
-
-			if clientCache[D4] != nil {
-				if RST > 0 {
-					CM.DelHost(D4, "auto")
-				} else if SYN > 0 {
-					CM.AddHost(D4, D4Port, "auto")
-				} else if FIN > 0 {
-					CM.SetFin(D4, D4Port, true)
-				}
-
-				select {
-				case clientCache[D4].ToUser <- CopySlice(PACKET):
-				default:
-					WARN("Client channel full:", PACKET[12:16], ">", D4)
-				}
-				continue
-			} else {
+			targetCM = VPLIPToCore[D4[0]][D4[1]][D4[2]][D4[3]]
+			if targetCM == nil {
 				CM.DelHost(D4, "auto")
-				continue
+				return
 			}
+
+			if RST > 0 {
+				CM.DelHost(D4, "auto")
+			} else if SYN > 0 {
+				CM.AddHost(D4, D4Port, "auto")
+			} else if FIN > 0 {
+				CM.SetFin(D4, D4Port, true)
+			}
+
+			select {
+			case targetCM.ToUser <- CopySlice(PACKET):
+			default:
+				WARN("Client channel full:", PACKET[12:16], ">", D4)
+			}
+			continue
 		}
 
 		if !Config.LocalNetworkAccess {
