@@ -136,10 +136,11 @@ type Server struct {
 	InternetAccess     bool               `json:"InternetAccess,required"`
 	LocalNetworkAccess bool               `json:"LocalNetworkAccess"`
 
-	ControlCert string           `json:"ControlCert"`
-	ControlKey  string           `json:"ControlKey"`
-	APIKey      string           `json:"APIKey"`
-	Networks    []*ServerNetwork `json:"Networks"`
+	ControlCert   string           `json:"ControlCert"`
+	ControlKey    string           `json:"ControlKey"`
+	APIKey        string           `json:"APIKey"`
+	Networks      []*ServerNetwork `json:"Networks"`
+	AdminEntities []string         `json:"AdminEntities"`
 
 	// Shared Settings
 	DNSAllowCustomOnly bool         `json:"DNSAllowCustomOnly"`
@@ -246,6 +247,7 @@ type PortRange struct {
 
 type UserCoreMapping struct {
 	ID                 string
+	DeviceToken        string
 	Version            int
 	PortRange          *PortRange
 	LastPingFromClient time.Time
