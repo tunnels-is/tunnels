@@ -110,25 +110,28 @@ func acceptUserUDPTLSSocket(conn *quic.Conn) {
 		return
 	}
 
-	totalC, totalUserC := countConnections(CR.UserID.Hex())
+	if !CR.UserID.IsZero() {
+		totalC, totalUserC := countConnections(CR.UserID.Hex())
 
-	if CR.RequestingPorts {
-		if totalC >= slots {
-			WARN("Server is full", totalUserC, totalC, slots)
+		if CR.RequestingPorts {
+			if totalC >= slots {
+				WARN("Server is full", totalUserC, totalC, slots)
+				return
+			}
+		}
+
+		if totalUserC > Config.UserMaxConnections {
+			WARN("User has more then 4 connections", totalUserC)
 			return
 		}
-	}
-
-	if totalUserC > Config.UserMaxConnections {
-		WARN("User has more then 4 connections", totalUserC)
-		return
-	}
-
-	if Config.VPL != nil {
-		if totalUserC > Config.VPL.MaxDevices {
-			WARN("Max devices reached", totalUserC)
-			return
-		}
+	} else {
+		// this might not be needed.
+		// if Config.VPL != nil {
+		// 	if totalUserC > Config.VPL.MaxDevices {
+		// 		WARN("Max devices reached", totalUserC)
+		// 		return
+		// 	}
+		// }
 	}
 
 	var EH *crypt.SocketWrapper
@@ -213,6 +216,7 @@ func CreateClientCoreMapping(CRR *ConnectRequestResponse, CR *ConnectRequest, EH
 			}
 
 			ClientCoreMappings[i].ID = CR.UserID.Hex()
+			ClientCoreMappings[i].DeviceToken = CR.DeviceToken
 			ClientCoreMappings[i].EH = EH
 			ClientCoreMappings[i].Created = time.Now()
 			ClientCoreMappings[i].ToUser = make(chan []byte, 300000)
@@ -662,6 +666,8 @@ func toUserChannel(index int) {
 	var S4Port [2]byte
 	var FIN byte
 	var RST byte
+	var originCM *UserCoreMapping
+	var skipFirewall bool
 
 	for {
 		PACKET, ok = <-CM.ToUser
@@ -675,11 +681,23 @@ func toUserChannel(index int) {
 		}
 
 		if VPLEnabled {
-			if !AllowAll && !CM.DisableFirewall {
-				S4[0] = PACKET[12]
-				S4[1] = PACKET[13]
-				S4[2] = PACKET[14]
-				S4[3] = PACKET[15]
+			S4[0] = PACKET[12]
+			S4[1] = PACKET[13]
+			S4[2] = PACKET[14]
+			S4[3] = PACKET[15]
+			originCM = VPLIPToCore[S4[0]][S4[1]][S4[2]][S4[3]]
+			skipFirewall = false
+			if originCM != nil {
+				for _, entity := range Config.AdminEntities {
+					if entity == originCM.DeviceToken || entity == originCM.ID {
+						skipFirewall = true
+						break
+					}
+				}
+			}
+
+			if !AllowAll && !CM.DisableFirewall && !skipFirewall {
+
 				l := (PACKET[0] & 0x0F) * 4
 				S4Port[0] = PACKET[l]
 				S4Port[1] = PACKET[l+1]
