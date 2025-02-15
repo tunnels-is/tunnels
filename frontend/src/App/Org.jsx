@@ -15,6 +15,10 @@ const Org = () => {
 		baseClass: "org-object-editor",
 		maxDepth: 1000,
 		onlyKeys: false,
+		disabled: {
+			root__id: true,
+
+		},
 		titles: {
 			root_Information: "Additional Info",
 			root_MangerID: "Manager ID"
