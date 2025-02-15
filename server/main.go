@@ -307,7 +307,7 @@ func initializeCertsAndTLSConfig() {
 	controlConfig = &tls.Config{
 		MinVersion:       tls.VersionTLS13,
 		MaxVersion:       tls.VersionTLS13,
-		CurvePreferences: []tls.CurveID{tls.CurveP521},
+		CurvePreferences: []tls.CurveID{tls.X25519MLKEM768, tls.CurveP521},
 		Certificates:     []tls.Certificate{controlCertificate},
 	}
 
