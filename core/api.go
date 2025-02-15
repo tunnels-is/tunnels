@@ -735,7 +735,7 @@ func PublicConnect(ClientCR ConnectionRequest) (code int, errm error) {
 	tc := &tls.Config{
 		RootCAs:            CertPool,
 		MinVersion:         tls.VersionTLS13,
-		CurvePreferences:   []tls.CurveID{tls.CurveP521},
+		CurvePreferences:   []tls.CurveID{tls.X25519MLKEM768},
 		InsecureSkipVerify: false,
 		VerifyPeerCertificate: func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
 			return nil
