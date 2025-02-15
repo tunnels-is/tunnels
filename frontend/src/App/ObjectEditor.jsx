@@ -429,7 +429,7 @@ const ObjectEditor = (props) => {
 
 		let sub = []
 		if (x.type === "object" || x.type === "array") {
-			if (x.nested.length < 1) {
+			if (x.nested?.length < 1) {
 				sub.push(noItems)
 			} else {
 				x.nested?.map(xx => {
