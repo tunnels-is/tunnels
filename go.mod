@@ -1,6 +1,6 @@
 module github.com/tunnels-is/tunnels
 
-go 1.22.4
+go 1.24.0
 
 require (
 	github.com/go-ping/ping v1.1.0
@@ -10,7 +10,7 @@ require (
 	github.com/shirou/gopsutil v3.21.11+incompatible
 	github.com/vishvananda/netlink v1.3.0
 	github.com/xlzd/gotp v0.1.0
-	github.com/zveinn/crypt v0.0.3
+	github.com/zveinn/crypt v0.0.4
 	github.com/zveinn/tunnels v0.0.4
 	go.mongodb.org/mongo-driver v1.17.1
 	golang.org/x/crypto v0.31.0
