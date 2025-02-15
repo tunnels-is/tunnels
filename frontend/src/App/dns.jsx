@@ -102,7 +102,7 @@ const DNS = () => {
 			let row = {}
 			row.items = [
 				{ type: "text", value: value.tag, tooltip: true, },
-				{ type: "text", value: value.Tag, tooltip: true, },
+				{ type: "text", value: value.Tag, },
 				{ type: "text", value: dayjs(value.FirstSeen).format(state.DNSListDateFormat) },
 				{ type: "text", value: dayjs(value.LastSeen).format(state.DNSListDateFormat) },
 				{ type: "text", value: value.Count },
