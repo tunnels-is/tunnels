@@ -39,14 +39,14 @@ const DNSAnswers = (props) => {
 				classes += " bold"
 			} else if (index === 0) {
 				isFirst = true
-				classes += " blue  cursor"
+				classes += " cblue  cursor"
 			} else {
 				classes += " dimmed"
 			}
 			if (a === "A" || a === "AAAA") {
-				classes += " green"
+				classes += " cgreen"
 			} else if (a === "CNAME") {
-				classes += " green"
+				classes += " cgreen"
 			}
 			if (isFirst) {
 				let urlvalue = ""
