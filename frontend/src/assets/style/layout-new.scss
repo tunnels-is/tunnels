@@ -745,8 +745,21 @@ body::-webkit-scrollbar {
   .info {
     width: fit-content;
     padding-right: 30px;
+
+    .title {
+      color: var(--c-blue);
+      cursor: pointer;
+    }
+
+
   }
 
+  .back {
+    font-size: 26px;
+    color: var(--c-blue);
+    cursor: pointer;
+    margin-bottom: 20px;
+  }
 }
 
 .group-wrapper {
@@ -1570,8 +1583,8 @@ body::-webkit-scrollbar {
 
 .object-editor-save {
   position: fixed;
-  top: 0px;
-  right: 0px;
+  top: 10px;
+  right: 10px;
   height: 50px;
   width: fit-content;
   padding: 0px 20px 0px 20px;
@@ -1582,6 +1595,8 @@ body::-webkit-scrollbar {
   font-weight: bold;
   background: var(--c-green);
   cursor: pointer;
+  border-radius: 5px;
+  color: var(--c-shade6);
 }
 
 .object-editor-save:hover {

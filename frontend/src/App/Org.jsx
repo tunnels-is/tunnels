@@ -110,11 +110,16 @@ const Org = () => {
 	]
 
 	if (editOrg) {
+
 		return (
-			<ObjectEditor
-				opts={updateOpts}
-				object={editOrg}
-			/>
+			<div className="ab org-wrapper">
+				<div className="back" onClick={() => setEditOrg(undefined)}>Back to Organization</div>
+				<ObjectEditor
+					opts={updateOpts}
+					object={editOrg}
+				/>
+
+			</div>
 		)
 	}
 
