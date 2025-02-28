@@ -7,7 +7,6 @@ import ObjectEditor from "./ObjectEditor";
 
 const PrivateServers = () => {
 	const state = GLOBAL_STATE("pservers")
-	const navigate = useNavigate()
 	const [pserver, setPServer] = useState(undefined)
 	const [nserver, setNServer] = useState(undefined)
 
@@ -16,8 +15,8 @@ const PrivateServers = () => {
 	}, [])
 
 	const UpdateServer = async () => {
-		console.log("mewo")
-		console.dir(pserver)
+		// console.log("mewo")
+		// console.dir(pserver)
 		let resp = await state.API_UpdateServer(pserver)
 		if (resp?.status === 200) {
 			state.renderPage("pservers")
@@ -65,14 +64,63 @@ const PrivateServers = () => {
 		let rows = []
 		state.PrivateServers?.forEach(server => {
 
+			let servertun = undefined
 			let opts = []
 			state?.Config?.Connections?.map(c => {
 				if (c.ServerID === server._id) {
+					servertun = c
 					opts.push({ value: c.Tag, key: c.Tag, selected: true })
 				} else {
 					opts.push({ value: c.Tag, key: c.Tag, selected: false })
 				}
 			})
+
+			let con = undefined
+			let conButton = function() {
+				state.ConfirmAndExecute(
+					"success",
+					"connect",
+					10000,
+					"",
+					"Connect to " + server.Tag,
+					() => {
+						console.log("SERVER")
+						console.dir(server)
+						if (server.IP !== "") {
+							console.log("22222")
+							console.dir(server)
+							state.connectToVPN(undefined, server)
+						} else if (servertun !== undefined) {
+							console.log("1111")
+							console.dir(servertun)
+							state.connectToVPN(servertun, undefined)
+						}
+					})
+			}
+
+			state.State?.ActiveConnections?.forEach((x) => {
+				if (x.ServerID === server._id) {
+					con = x
+					return
+				}
+			})
+
+			if (con) {
+				conButton = function() {
+					state.ConfirmAndExecute(
+						"success",
+						"disconnect",
+						10000,
+						"",
+						"Disconnect from " + server.Tag,
+						() => {
+							state.disconnectFromVPN(con)
+						})
+				}
+
+			}
+
+
 
 			let row = {}
 			row.items = [
@@ -81,26 +129,31 @@ const PrivateServers = () => {
 					value: server.Tag,
 					color: "blue",
 					click: function() {
-						// navigate("/inspect/server/" + server._id)
 						setPServer(server)
 						state.renderPage("pservers")
 					}
 				},
-				{ type: "text", minWidth: "300px", value: server._id },
-				{ type: "text", minWidth: "350px", value: server.Serial },
+				{ type: "text", value: server.IP },
+				{ type: "text", minWidth: "380px", value: server.Serial },
 				{
 					type: "select",
 					opts: opts,
 					value: <CustomSelect
 						parentkey={server._id}
-						className={""}
+						className={"clickable"}
 						placeholder={"Assign"}
 						setValue={(opt) => {
 							state.changeServerOnConnection(opt.value, server._id)
 						}}
 						options={opts}
 					></CustomSelect>,
-				}
+				},
+				{
+					type: "text",
+					value: <div className={con ? "disconnect" : "connect"}>{con ? "Disconnect" : "Connect"}</div>,
+					color: con ? "red" : "green",
+					click: conButton,
+				},
 			]
 			rows.push(row)
 		})
@@ -112,9 +165,10 @@ const PrivateServers = () => {
 	let rows = generateServerTable()
 	const headers = [
 		{ value: "Tag" },
-		{ value: "ID", minWidth: "300px" },
-		{ value: "Cert Serial", minWidth: "350px" },
+		{ value: "IP", },
+		{ value: "Cert Serial", minWidth: "380px" },
 		{ value: "Tunnel" },
+		{ value: "" }
 	]
 
 	if (nserver !== undefined) {
