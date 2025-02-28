@@ -15,8 +15,6 @@ const PrivateServers = () => {
 	}, [])
 
 	const UpdateServer = async () => {
-		// console.log("mewo")
-		// console.dir(pserver)
 		let resp = await state.API_UpdateServer(pserver)
 		if (resp?.status === 200) {
 			state.renderPage("pservers")
