@@ -87,7 +87,6 @@ const Servers = () => {
 					value: server.Tag,
 					color: "blue",
 					click: function() {
-						// popEditor(server)
 						setServer(server)
 						state.renderPage("servers")
 					}
@@ -126,7 +125,7 @@ const Servers = () => {
 		{ value: "Tag" },
 		{ value: "Server" },
 		{ value: "IP" },
-		{ value: "Connection" },
+		{ value: "Tunnel" },
 		{ value: "" }
 	]
 	if (server !== undefined) {

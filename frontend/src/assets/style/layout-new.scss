@@ -853,6 +853,10 @@ body::-webkit-scrollbar {
   height: auto;
   max-width: 100%;
 
+  .new-table {
+    max-width: 1400px;
+  }
+
 
 }
 
@@ -936,7 +940,7 @@ body::-webkit-scrollbar {
 .new-table {
   width: 90%;
   min-width: fit-content;
-  max-width: 1000px;
+  max-width: 1400px;
   /* min-width: 25%; */
   display: flex;
   flex-direction: column;
