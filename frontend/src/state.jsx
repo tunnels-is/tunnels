@@ -623,16 +623,21 @@ export var STATE = {
 				connectionRequest.ServerID = server._id
 				connectionRequest.ServerIP = server.IP
 				connectionRequest.ServerPort = server.Port
-			} else if (c.Private === true) {
-				connectionRequest.ServerIP = c.PrivateIP
-				connectionRequest.ServerPort = c.PrivatePort
-			} else {
+			} else if (c) {
+				STATE.PrivateServers?.forEach(s => {
+					if (s._id === c.ServerID) {
+						connectionRequest.ServerIP = s.IP
+						connectionRequest.ServerPort = s.Port
+					}
+				})
 				STATE.Servers?.forEach(s => {
 					if (s._id === c.ServerID) {
 						connectionRequest.ServerIP = s.IP
 						connectionRequest.ServerPort = s.Port
 					}
 				})
+			} else {
+				STATE.errorNotification("No server or connection defined during connection, please check your settings")
 			}
 
 			let resp = await STATE.API.method(method, connectionRequest)
