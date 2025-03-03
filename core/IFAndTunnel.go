@@ -160,8 +160,8 @@ func createTunnel() (T *TunnelMETA) {
 	T.EncryptionType = crypt.CHACHA20
 	T.DNSBlocking = false
 	T.PreventIPv6 = false
-	T.TxQueueLen = 3000
-	T.MTU = 1426
+	T.TxQueueLen = 1000
+	T.MTU = 1420
 	T.ServerID = ""
 	T.AutoReconnect = false
 	T.AutoConnect = false
