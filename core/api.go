@@ -28,10 +28,6 @@ import (
 	"golang.org/x/net/quic"
 )
 
-func ControllerDirectDial(ctx context.Context, _ string, addr string) (net.Conn, error) {
-	return net.Dial("tcp", "192.168.1.12:443")
-}
-
 // func OpenProxyTunnelToRouter() (TcpConn net.Conn, err error) {
 // 	dialer := net.Dialer{Timeout: time.Duration(5 * time.Second)}
 // 	routerIndexForConnection := 0
