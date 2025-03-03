@@ -201,7 +201,7 @@ func main() {
 			go fromUserChannel(index)
 
 		case SIGNAL := <-SignalMonitor:
-			LOG(SIGNAL.ID)
+			// LOG(SIGNAL.ID)
 
 			switch SIGNAL.ID {
 			case 1:
