@@ -58,12 +58,6 @@ func validateSignatureAndExtractConnectRequest(buff []byte) (scr crypt.SignedCon
 		return
 	}
 
-	if Config.ID != cr.SeverID {
-		ERR("Invalid server, current id: ", Config.ID, " provided id: ", cr.SeverID)
-		err = errors.New("invalid server id")
-		return
-	}
-
 	if time.Since(cr.Created).Seconds() > 20 {
 		ERR("Expired connection request", err)
 		err = errors.New("invalid cr timer")

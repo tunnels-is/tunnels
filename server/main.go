@@ -25,7 +25,6 @@ import (
 	"github.com/tunnels-is/tunnels/certs"
 	"github.com/tunnels-is/tunnels/iptables"
 	"github.com/tunnels-is/tunnels/setcap"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"golang.org/x/net/quic"
 )
 
@@ -343,13 +342,7 @@ func makeConfigAndCertificates() {
 	}
 
 	if id != "" {
-		oid, err := primitive.ObjectIDFromHex(id)
-		if err != nil {
-			ERR("--id invalid, err:", err)
-			os.Exit(1)
-		}
 		sc := new(Server)
-		sc.ID = oid
 		sc.ControlIP = interfaceIP
 		sc.InterfaceIP = interfaceIP
 		sc.APIPort = "444"

@@ -122,19 +122,19 @@ const (
 )
 
 type Server struct {
-	ID                 primitive.ObjectID `json:"ID"`
-	ControlIP          string             `json:"ControlIP"`
-	ControlPort        string             `json:"ControlPort"`
-	APIPort            string             `json:"APIPort"`
-	UserMaxConnections int                `json:"UserMaxConnections"`
-	InterfaceIP        string             `json:"InterfaceIP"`
-	DataPort           string             `json:"DataPort"`
-	StartPort          int                `json:"StartPort"`
-	EndPort            int                `json:"EndPort"`
-	AvailableMbps      int                `json:"AvailableMbps"`
-	AvailableUserMbps  int                `json:"AvailableUserMbps"`
-	InternetAccess     bool               `json:"InternetAccess,required"`
-	LocalNetworkAccess bool               `json:"LocalNetworkAccess"`
+	// ID                 primitive.ObjectID `json:"ID"`
+	ControlIP          string `json:"ControlIP"`
+	ControlPort        string `json:"ControlPort"`
+	APIPort            string `json:"APIPort"`
+	UserMaxConnections int    `json:"UserMaxConnections"`
+	InterfaceIP        string `json:"InterfaceIP"`
+	DataPort           string `json:"DataPort"`
+	StartPort          int    `json:"StartPort"`
+	EndPort            int    `json:"EndPort"`
+	AvailableMbps      int    `json:"AvailableMbps"`
+	AvailableUserMbps  int    `json:"AvailableUserMbps"`
+	InternetAccess     bool   `json:"InternetAccess,required"`
+	LocalNetworkAccess bool   `json:"LocalNetworkAccess"`
 
 	ControlCert   string           `json:"ControlCert"`
 	ControlKey    string           `json:"ControlKey"`
