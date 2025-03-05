@@ -77,7 +77,6 @@ func InitPacketTraceFile() {
 	}
 
 	DEBUG("New trace created: ", TraceFile.Name())
-	GLOBAL_STATE.TraceFileInitialized = true
 }
 
 func InitLogfile() {
@@ -104,7 +103,6 @@ func InitLogfile() {
 	}
 
 	DEBUG("New log file created: ", LogFile.Name())
-	GLOBAL_STATE.LogFileInitialized = true
 }
 
 func GET_FUNC(skip int) string {

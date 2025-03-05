@@ -31,7 +31,6 @@ type TunnelInterface struct {
 	Persistent  bool
 	Gateway     string
 
-	// linux ?
 	Multiqueue bool
 	User       uint
 	Group      uint
@@ -478,7 +477,7 @@ func StartDefaultInterface() (err error) {
 		return
 	}
 
-	GLOBAL_STATE.DefaultInterfaceOnline = true
+	// GLOBAL_STATE.DefaultInterfaceOnline = true
 
 	return
 }
