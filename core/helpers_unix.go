@@ -56,8 +56,6 @@ func CreateBaseFolder() {
 			return
 		}
 	}
-
-	GLOBAL_STATE.BaseFolderInitialized = true
 }
 
 func AdminCheck() {

@@ -276,7 +276,6 @@ func LoadDNSConfig() {
 
 	err := LoadExistingConfig()
 	GLOBAL_STATE.C = C
-	GLOBAL_STATE.ConfigInitialized = true
 	if err == nil {
 		for i := range C.Connections {
 			if C.Connections[i] == nil {
@@ -330,7 +329,6 @@ func LoadDNSConfig() {
 	C.AvailableBlockLists = make([]*BlockList, 0)
 
 	GLOBAL_STATE.C = C
-	GLOBAL_STATE.ConfigInitialized = true
 	SaveConfig(C)
 	DEBUG("Configurations loaded")
 }
@@ -445,7 +443,6 @@ func LoadConfig() {
 		SaveConfig(C)
 	}
 
-	GLOBAL_STATE.ConfigInitialized = true
 	DEBUG("Configurations loaded")
 }
 
