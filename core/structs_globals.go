@@ -10,7 +10,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/go-ping/ping"
 	"github.com/miekg/dns"
 	"github.com/tunnels-is/tunnels/certs"
 	"github.com/zveinn/crypt"
@@ -217,17 +216,6 @@ var (
 	IGNORE_NEXT_BUFFER_ERROR bool
 )
 
-// NETWORKING STUFF
-var (
-	TCP_MAP      = make(map[[4]byte]*IP)
-	TCP_MAP_LOCK = sync.RWMutex{}
-)
-
-var (
-	UDP_MAP      = make(map[[4]byte]*IP)
-	UDP_MAP_LOCK = sync.RWMutex{}
-)
-
 var DNSWhitelist = make(map[string]bool)
 
 type IP struct {
@@ -253,8 +241,9 @@ type LogoutForm struct {
 }
 
 type State struct {
-	C    *Config `json:"C"`
-	User User
+	IsAdmin bool    `json:"IsAdmin"`
+	C       *Config `json:"C"`
+	User    User
 
 	UMbps           int    `json:"UMbps"`
 	DMbps           int    `json:"DMbps"`
@@ -264,18 +253,10 @@ type State struct {
 	EgressPackets   uint64 `json:"EgressPackets"`
 	ConnectionStats []TunnelSTATS
 
-	IsAdmin                bool `json:"IsAdmin"`
-	BaseFolderInitialized  bool `json:"BaseFolderInitialized"`
-	LogFileInitialized     bool `json:"LogFileInitialized"`
-	TraceFileInitialized   bool `json:"TraceFileInitialized"`
-	ConfigInitialized      bool `json:"ConfigInitialized"`
-	DefaultInterfaceOnline bool `json:"DefaultInterfaceOnline"`
-
 	LastNodeUpdate         time.Time
 	SecondsUntilNodeUpdate int
 
 	AvailableCountries []string `json:"AvailableCountries"`
-	// Servers            []*Server `json:"Servers"`
 
 	// FILE PATHS
 	BlockListPath string `json:"BlockListPath"`
@@ -288,9 +269,6 @@ type State struct {
 	Version       string `json:"Version"`
 
 	ActiveConnections []*TunnelMETA `json:"ActiveConnections"`
-
-	// BLOCKING AND PARENTAL CONTROLS
-	// AvailableBlockLists []*List `json:"AvailableBlockLists"`
 
 	// DNS stats
 	DNSBlocksMap   map[string]*DNSStats `json:"DNSBlocks"`
@@ -651,11 +629,6 @@ type DEBUG_OUT struct {
 	File  string
 }
 
-type CONTROLL_PUBLIC_DEVCE_RESPONSE struct {
-	Routers      []*Server
-	AccessPoints []*VPNNode
-}
-
 type FORWARD_REQUEST struct {
 	Path    string
 	Method  string
@@ -663,263 +636,6 @@ type FORWARD_REQUEST struct {
 	Authed  bool
 	// Data     []byte
 	JSONData interface{}
-}
-
-//	type CONNECTION_SETTINGS struct {
-//		DNS1          string
-//		DNS2          string
-//		AutoDNS       bool
-//		IP6Method     string
-//		IPV6Enabled   bool
-//		IFName        string
-//		DefaultRouter string
-//		AdapterName   string
-//	}
-//
-//	type INTERFACE_SETTINGS struct {
-//		Index           int
-//		Flags           net.Flags
-//		MTU             int
-//		HardwareAddress net.HardwareAddr
-//		OIF             net.Interface
-//		Hop             string
-//		Metric          int
-//	}
-type Server struct {
-	ID      string `json:"ID"`
-	IP      string `json:"IP"`
-	Tag     string `json:"Tag"`
-	Country string `json:"Country"`
-
-	// TCPControllerConnection net.Conn `json:"-"`
-	// TCPTunnelConnection     net.Conn `json:"-"`
-
-	// ROUTER_STATS
-
-	// Online    bool   `json:"Online"`
-	// Score             int    `json:"Score"`
-	// AvailableSlots    int `json:"AvailableSlots"`
-	LastPing  time.Time       `json:"-"`
-	PingStats ping.Statistics `json:"-"`
-
-	MS                 uint64 `json:"MS"`
-	Slots              int    `json:"Slots"`
-	AvailableMbps      int    `json:"AvailableMbps"`
-	AvailableUserMbps  int    `json:"AvailableUserMbps"`
-	InternetAccess     bool   `json:"InternetAccess"`
-	LocalNetworkAccess bool   `json:"LocalNetworkAccess"`
-
-	DNSAllowCustomOnly bool `json:"DNSAllowCustomOnly"`
-
-	DNSServers []string         `json:"DNSServers"`
-	DNS        []*ServerDNS     `json:"DNS"`
-	Networks   []*ServerNetwork `json:"Networks"`
-}
-
-type ROUTER_STATS struct {
-	AEBP      float64
-	AIBP      float64
-	CPUP      int
-	RAMUsage  int
-	DiskUsage int
-}
-
-type FullConnectResponse struct {
-	Node    *VPNNode
-	Session *SessionFromNode
-}
-
-// type CONTROLLER_SESSION_REQUEST struct {
-// UserID      primitive.ObjectID `json:"UserID"`
-// DeviceToken string             `json:"DeviceToken"`
-//
-// RouterIndex int                `json:"RouterIndex"`
-// NodeIndex   int                `json:"NodeIndex"`
-// NodePrivate primitive.ObjectID `json:"NodePrivate"`
-
-// QUICK CONNECT
-// Country string `json:"Country,omitempty"`
-
-// COMES BACK ON SUCCESS
-// ID         primitive.ObjectID `json:"_id,omitempty"`
-// ProxyIndex int                `json:"ProxyIndex,omitempty"`
-
-// MAYBE USE LATER
-// SLOTID int
-// Type   string `json:",omitempty"`
-// Permanent bool `json:",omitempty"`
-// Count     int  `json:",omitempty"`
-// Proto string `json:"Proto,omitempty"`
-// Port  string `json:"Port,omitempty"`
-// }
-
-type SessionFromNode struct {
-	UUID        string `json:",omitempty"`
-	Version     int    `json:"Version"`
-	Created     time.Time
-	StartPort   uint16
-	EndPort     uint16
-	InterfaceIP net.IP
-	Type        crypt.EncType
-}
-
-//type CONTROLLER_SESSION struct {
-//	UserID primitive.ObjectID `bson:"UID"`
-//	ID     primitive.ObjectID `bson:"_id"`
-//
-//	Permanent bool `bson:"P"`
-//	Count     int  `bson:"C"`
-//	SLOTID    int  `bson:"SLOTID"`
-//
-//	GROUP     uint8 `bson:"G"`
-//	ROUTERID  uint8 `bson:"RID"`
-//	SESSIONID uint8 `bson:"SID"`
-//
-//	XGROUP    uint8 `bson:"XG"`
-//	XROUTERID uint8 `bson:"XRID"`
-//	DEVICEID  uint8 `bson:"APID"`
-//
-//	Assigned     time.Time `bson:"A"`
-//	ShouldDelete bool      `bson:"-"`
-//}
-
-type VPNNode struct {
-	// DELIVERED WITH INITIAL LIST
-	Tag               string `json:"Tag"`
-	ListIndex         int    `json:"ListIndex"`
-	IP                string `json:"IP"`
-	InterfaceIP       string `json:"InterfaceIP"`
-	Status            int    `json:"Status"`
-	Country           string `json:"Country"`
-	AvailableMbps     int    `json:"AvailableMbps"`
-	Slots             int    `json:"Slots"`
-	AvailableUserMbps int    `json:"AvailableUserMbps"`
-
-	// PARSED AFTER LIST DELIVERY
-	MS int `json:"MS"`
-
-	// DELIVERED ON CONNECT
-	// UID            primitive.ObjectID `json:"-"`
-	// ID             primitive.ObjectID `json:"_id,omitempty"`
-	AvailableSlots int `json:"AvailableSlots"`
-
-	Access             []*DeviceUserRegistration `json:"Access"`
-	Updated            time.Time                 `json:"Updated"`
-	InternetAccess     bool                      `json:"InternetAccess"`
-	LocalNetworkAccess bool                      `json:"LocalNetworkAccess"`
-	Public             bool                      `json:"Public"`
-
-	Online     bool      `json:"Online"`
-	LastOnline time.Time `json:"LastOnline"`
-
-	DNSAllowCustomOnly bool             `json:"DNSAllowCustomOnly"`
-	DNSServers         []string         `json:"DNSServers" bson:"DNSServers"`
-	DNS                []*ServerDNS     `json:"DNS"`
-	Networks           []*ServerNetwork `json:"Networks"`
-	EncryptionProtocol int              `json:"EncryptionProtocol"` // default 3 (AES256)
-}
-
-type DeviceUserRegistration struct {
-	// UID primitive.ObjectID `json:"UID" bson:"UID"`
-	Tag string `json:"Tag" bson:"T"`
-}
-
-type AP_GEO_DB struct {
-	Updated     time.Time `json:"Updated" bson:"U"`
-	IPV         string    `bson:"IPV" json:"-"`
-	Country     string    `bson:"Country" json:"Country"`
-	CountryFull string    `bson:"CountryFull" json:"CountryFull"`
-	City        string    `bson:"City" json:"City"`
-	// ASN     string `bson:"ASN" json:"ASN"`
-	ISP   string `bson:"ISP" json:"-"`
-	Proxy bool   `bson:"Proxy" json:"Proxy"`
-	Tor   bool   `bson:"Tor" json:"Tor"`
-}
-
-var PS_IFLIST []*PS_DEFAULT_ROUTES
-
-type PS_DEFAULT_ROUTES struct {
-	// CimClass struct {
-	// 	CimSuperClassName string `json:"CimSuperClassName,omitempty"`
-	// 	CimSuperClass     struct {
-	// 		CimSuperClassName   string `json:"CimSuperClassName"`
-	// 		CimSuperClass       string `json:"CimSuperClass"`
-	// 		CimClassProperties  string `json:"CimClassProperties"`
-	// 		CimClassQualifiers  string `json:"CimClassQualifiers"`
-	// 		CimClassMethods     string `json:"CimClassMethods"`
-	// 		CimSystemProperties string `json:"CimSystemProperties"`
-	// 	} `json:"CimSuperClass,omitempty"`
-	// 	CimClassProperties  []string `json:"CimClassProperties,omitempty"`
-	// 	CimClassQualifiers  []string `json:"CimClassQualifiers,omitempty"`
-	// 	CimClassMethods     []string `json:"CimClassMethods,omitempty"`
-	// 	CimSystemProperties struct {
-	// 		Namespace  string      `json:"Namespace"`
-	// 		ServerName string      `json:"ServerName"`
-	// 		ClassName  string      `json:"ClassName"`
-	// 		Path       interface{} `json:"Path"`
-	// 	} `json:"CimSystemProperties,omitempty"`
-	// } `json:"CimClass,omitempty"`
-	// CimInstanceProperties []struct {
-	// 	Name            string      `json:"Name"`
-	// 	Value           interface{} `json:"Value"`
-	// 	CimType         int         `json:"CimType"`
-	// 	Flags           string      `json:"Flags"`
-	// 	IsValueModified bool        `json:"IsValueModified"`
-	// } `json:"CimInstanceProperties,omitempty"`
-	// CimSystemProperties struct {
-	// 	Namespace  string      `json:"Namespace"`
-	// 	ServerName string      `json:"ServerName"`
-	// 	ClassName  string      `json:"ClassName"`
-	// 	Path       interface{} `json:"Path"`
-	// } `json:"CimSystemProperties,omitempty"`
-	// Publish            int         `json:"Publish"`
-	// Protocol           int         `json:"Protocol"`
-	// Store              int         `json:"Store"`
-	// AddressFamily      int         `json:"AddressFamily"`
-	// State              int         `json:"State"`
-	// IfIndex int `json:"ifIndex"`
-	// Caption            interface{} `json:"Caption"`
-	// Description        interface{} `json:"Description"`
-	// ElementName        interface{} `json:"ElementName"`
-	// InstanceID         string      `json:"InstanceID"`
-	// AdminDistance      interface{} `json:"AdminDistance"`
-	// DestinationAddress interface{} `json:"DestinationAddress"`
-	// IsStatic           interface{} `json:"IsStatic"`
-	RouteMetric int `json:"RouteMetric"`
-	// TypeOfRoute        int         `json:"TypeOfRoute"`
-	// CompartmentID      int         `json:"CompartmentId"`
-	DestinationPrefix string `json:"DestinationPrefix"`
-	InterfaceAlias    string `json:"InterfaceAlias"`
-	InterfaceIndex    int    `json:"InterfaceIndex"`
-	InterfaceMetric   int    `json:"InterfaceMetric"`
-	NextHop           string `json:"NextHop"`
-	// PreferredLifetime  struct {
-	// 	Ticks             int64   `json:"Ticks"`
-	// 	Days              int     `json:"Days"`
-	// 	Hours             int     `json:"Hours"`
-	// 	Milliseconds      int     `json:"Milliseconds"`
-	// 	Minutes           int     `json:"Minutes"`
-	// 	Seconds           int     `json:"Seconds"`
-	// 	TotalDays         float64 `json:"TotalDays"`
-	// 	TotalHours        float64 `json:"TotalHours"`
-	// 	TotalMilliseconds int64   `json:"TotalMilliseconds"`
-	// 	TotalMinutes      float64 `json:"TotalMinutes"`
-	// 	TotalSeconds      float64 `json:"TotalSeconds"`
-	// } `json:"PreferredLifetime"`
-	// ValidLifetime struct {
-	// 	Ticks             int64   `json:"Ticks"`
-	// 	Days              int     `json:"Days"`
-	// 	Hours             int     `json:"Hours"`
-	// 	Milliseconds      int     `json:"Milliseconds"`
-	// 	Minutes           int     `json:"Minutes"`
-	// 	Seconds           int     `json:"Seconds"`
-	// 	TotalDays         float64 `json:"TotalDays"`
-	// 	TotalHours        float64 `json:"TotalHours"`
-	// 	TotalMilliseconds int64   `json:"TotalMilliseconds"`
-	// 	TotalMinutes      float64 `json:"TotalMinutes"`
-	// 	TotalSeconds      float64 `json:"TotalSeconds"`
-	// } `json:"ValidLifetime"`
-	// PSComputerName interface{} `json:"PSComputerName"`
 }
 
 type TWO_FACTOR_CONFIRM struct {
@@ -932,28 +648,6 @@ type QR_CODE struct {
 	Value string
 	// Recovery string
 }
-
-// var CurrentOpenSockets []*OpenSockets
-
-//	type OpenSockets struct {
-//		RemoteAddress string  `json:"RemoteAddress"`
-//		RemoteIP      [4]byte `json:"-"`
-//		LocalPort     uint16  `json:"LocalPort"`
-//		RemotePort    uint16  `json:"RemotePort"`
-//	}
-// type MIB_TCPROW_OWNER_PID struct {
-// 	dwState      uint32
-// 	dwLocalAddr  uint32
-// 	dwLocalPort  uint32
-// 	dwRemoteAddr uint32
-// 	dwRemotePort uint32
-// 	dwOwningPid  uint32
-// }
-//
-// type MIB_TCPTABLE_OWNER_PID struct {
-// 	dwNumEntries uint32
-// 	table        [30000]MIB_TCPROW_OWNER_PID
-// }
 
 // Device token struct need for the login respons from user scruct
 type DEVICE_TOKEN struct {

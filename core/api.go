@@ -254,7 +254,6 @@ func ForwardToController(FR *FORWARD_REQUEST) (interface{}, int) {
 
 	if strings.Contains(FR.Path, "logout") {
 		if len(responseBytes) != 0 && code == 200 {
-			INFO("LOGOUT DETECTED!")
 			for i := range GLOBAL_STATE.ActiveConnections {
 				if GLOBAL_STATE.ActiveConnections[i] == nil {
 					continue
@@ -267,7 +266,6 @@ func ForwardToController(FR *FORWARD_REQUEST) (interface{}, int) {
 
 	if strings.Contains(FR.Path, "login") {
 		if len(responseBytes) != 0 && code == 200 {
-			INFO("LOGIN DETECTED!")
 			err = json.Unmarshal(responseBytes, &GLOBAL_STATE.User)
 			if err != nil {
 				ERROR("login detected but not registered in background service: ", err)
@@ -637,10 +635,6 @@ func InitializeTunnelFromCRR(TUN *Tunnel) (err error) {
 }
 
 func PreConnectCheck() (int, error) {
-	if !GLOBAL_STATE.ConfigInitialized {
-		return 502, errors.New("the application is still initializing default configurations, please wait a few seconds")
-	}
-
 	if !GLOBAL_STATE.IsAdmin {
 		return 400, errors.New("tunnels needs to run as Administrator or root")
 	}
