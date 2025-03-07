@@ -3,7 +3,6 @@ module github.com/tunnels-is/tunnels
 go 1.24.0
 
 require (
-	github.com/go-ping/ping v1.1.0
 	github.com/google/uuid v1.6.0
 	github.com/jackpal/gateway v1.0.15
 	github.com/miekg/dns v1.1.62

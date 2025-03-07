@@ -490,24 +490,6 @@ func tunnelCtl(fd uintptr, request uintptr, argp uintptr) error {
 	return nil
 }
 
-func socketCtlv6(request uintptr, argp uintptr) error {
-	fd, err := syscall.Socket(
-		syscall.AF_INET6,
-		syscall.SOCK_DGRAM,
-		syscall.IPPROTO_IP,
-	)
-	defer syscall.Close(fd)
-	if err != nil {
-		return err
-	}
-
-	_, _, errno := syscall.Syscall(syscall.SYS_IOCTL, uintptr(fd), uintptr(request), argp)
-	if errno != 0 {
-		return os.NewSyscallError("ioctl", errno)
-	}
-	return nil
-}
-
 func socketCtl(request uintptr, argp uintptr) error {
 	fd, err := syscall.Socket(
 		syscall.AF_INET,
