@@ -7,14 +7,6 @@ import (
 	"time"
 )
 
-func stripSuffix(domain string) string {
-	// if strings.Contains(domain, ".lan") {
-	// 	domain = strings.TrimSuffix(domain, ".lan.")
-	// 	domain += "."
-	// }
-	return domain
-}
-
 func (T *TunnelInterface) ReadFromTunnelInterface() {
 	defer func() {
 		if r := recover(); r != nil {

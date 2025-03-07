@@ -1,7 +1,6 @@
 package core
 
 import (
-	"context"
 	"crypto/x509"
 	"embed"
 	"net"
@@ -122,13 +121,6 @@ var (
 	DLL_EMBED  embed.FS
 )
 
-func initializeMinimalGlobalVariables() {
-	C = new(Config)
-	C.DebugLogging = true
-	C.InfoLogging = true
-	C.ConsoleLogOnly = true
-}
-
 func initializeGlobalVariables() {
 	C = new(Config)
 	C.DebugLogging = true
@@ -139,13 +131,9 @@ func initializeGlobalVariables() {
 }
 
 var (
-	AppStartTime  = time.Now()
-	C             = new(Config)
-	GLOBAL_STATE  = new(State)
-	quit          = make(chan os.Signal, 10)
-	GlobalContext = context.Background()
-	CancelContext context.Context
-	CancelFunc    context.CancelFunc
+	AppStartTime = time.Now()
+	C            = new(Config)
+	GLOBAL_STATE = new(State)
 
 	DEFAULT_TUNNEL      *TunnelInterface
 	DEFAULT_DNS_SERVERS []string
@@ -190,8 +178,6 @@ var (
 	EGRESS_PACKETS  uint64 = 0
 	INGRESS_PACKETS uint64 = 0
 
-	LogQueue          = make(chan string, 1000)
-	APILogQueue       = make(chan string, 1000)
 	TAG_ERROR         = "ERROR"
 	TAG_GENERAL       = "GENERAL"
 	LogFile           *os.File
@@ -630,12 +616,11 @@ type DEBUG_OUT struct {
 }
 
 type FORWARD_REQUEST struct {
-	Path    string
-	Method  string
-	Timeout int
-	Authed  bool
-	// Data     []byte
-	JSONData interface{}
+	Path     string
+	Method   string
+	Timeout  int
+	Authed   bool
+	JSONData any
 }
 
 type TWO_FACTOR_CONFIRM struct {
