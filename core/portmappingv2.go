@@ -17,14 +17,14 @@ var (
 )
 
 func StartTraceProcessor() {
-	s := STATE.Load()
+	c := CONFIG.Load()
 	defer func() {
-		if !s.ConnectionTracer {
+		if !c.ConnectionTracer {
 			time.Sleep(10 * time.Second)
 		}
 	}()
 
-	if !s.ConnectionTracer {
+	if !c.ConnectionTracer {
 		return
 	}
 
@@ -34,8 +34,9 @@ func StartTraceProcessor() {
 	var M Mapping
 	var err error
 
+	s := STATE.Load()
 	if TraceFile == nil {
-		TraceFile, err = CreateFile(*s.LogFileName.Load())
+		TraceFile, err = CreateFile(*s.TraceFileName.Load())
 		if err != nil {
 			return
 		}
@@ -212,7 +213,8 @@ func (V *Tunnel) getIngressPortMapping(VPNPortMap []VPNPort, dstIP []byte, port 
 }
 
 func debugMissingEgressMapping(packet []byte) {
-	if !STATEOLD.C.ConnectionTracer {
+	c := CONFIG.Load()
+	if !c.ConnectionTracer {
 		if len(packet) > 60 {
 			DEEP("Missing egress mapping: ", packet[0:60])
 		} else {
@@ -229,7 +231,8 @@ func debugMissingEgressMapping(packet []byte) {
 }
 
 func debugMissingIngressMapping(packet []byte) {
-	if !STATEOLD.C.ConnectionTracer {
+	c := CONFIG.Load()
+	if !c.ConnectionTracer {
 		if len(packet) > 60 {
 			DEEP("Missing ingress mapping: ", packet[0:60])
 		} else {
@@ -245,7 +248,8 @@ func debugMissingIngressMapping(packet []byte) {
 }
 
 func debugMappStream(M *Mapping) {
-	if !STATEOLD.C.ConnectionTracer {
+	c := CONFIG.Load()
+	if !c.ConnectionTracer {
 		return
 	}
 	select {
@@ -254,53 +258,53 @@ func debugMappStream(M *Mapping) {
 	}
 }
 
-func (V *Tunnel) cleanPortMap() {
-	for i := range V.TCP_M {
-		V.TCP_M[i].L.Lock()
-		for k, v := range V.TCP_M[i].M {
+func (t *TUN) cleanPortMap() {
+	for i := range t.TCP_M {
+		t.TCP_M[i].L.Lock()
+		for k, v := range t.TCP_M[i].M {
 			switch {
 			case v.EFIN > 0 && v.IFIN > 0:
 				if time.Since(v.LastActivity) > time.Second*10 {
 					debugMappStream(v)
-					delete(V.TCP_M[i].M, k)
+					delete(t.TCP_M[i].M, k)
 				}
 			case v.ERST > 0 || v.IRST > 0:
 				if time.Since(v.LastActivity) > time.Second*10 {
 					debugMappStream(v)
-					delete(V.TCP_M[i].M, k)
+					delete(t.TCP_M[i].M, k)
 				}
 			default:
 				if time.Since(v.LastActivity) > time.Second*360 {
 					debugMappStream(v)
-					delete(V.TCP_M[i].M, k)
+					delete(t.TCP_M[i].M, k)
 				}
 			}
 		}
-		V.TCP_M[i].L.Unlock()
+		t.TCP_M[i].L.Unlock()
 	}
 
-	for i := range V.UDP_M {
-		V.UDP_M[i].L.Lock()
-		for k, v := range V.UDP_M[i].M {
+	for i := range t.UDP_M {
+		t.UDP_M[i].L.Lock()
+		for k, v := range t.UDP_M[i].M {
 			dnsL := 0
-			if V.CRR != nil {
-				dnsL = len(V.CRR.DNSServers)
+			if t.crReponse != nil {
+				dnsL = len(t.crReponse.DNSServers)
 			}
 
 			isDNS := false
 			if dnsL > 0 {
-				if bytes.Equal(v.DestinationIP[:], net.ParseIP(V.CRR.DNSServers[0]).To4()) {
+				if bytes.Equal(v.DestinationIP[:], net.ParseIP(t.crReponse.DNSServers[0]).To4()) {
 					isDNS = true
 				}
 				if dnsL > 1 && !isDNS {
-					if bytes.Equal(v.DestinationIP[:], net.ParseIP(V.CRR.DNSServers[1]).To4()) {
+					if bytes.Equal(v.DestinationIP[:], net.ParseIP(t.crReponse.DNSServers[1]).To4()) {
 						isDNS = true
 					}
 				}
 				if isDNS {
 					if time.Since(v.LastActivity) > time.Second*15 {
 						debugMappStream(v)
-						delete(V.UDP_M[i].M, k)
+						delete(t.UDP_M[i].M, k)
 					}
 				}
 			}
@@ -308,11 +312,11 @@ func (V *Tunnel) cleanPortMap() {
 			if !isDNS {
 				if time.Since(v.LastActivity) > time.Second*150 {
 					debugMappStream(v)
-					delete(V.UDP_M[i].M, k)
+					delete(t.UDP_M[i].M, k)
 				}
 			}
 		}
-		V.UDP_M[i].L.Unlock()
+		t.UDP_M[i].L.Unlock()
 	}
 }
 
@@ -321,9 +325,8 @@ func CleanPortsForAllConnections() {
 		time.Sleep(10 * time.Second)
 	}()
 	defer RecoverAndLogToFile()
-	for i := range TunList {
-		if TunList[i] != nil {
-			TunList[i].cleanPortMap()
-		}
-	}
+	tunnelMapRange(func(tun *TUN) bool {
+		tun.cleanPortMap()
+		return true
+	})
 }
