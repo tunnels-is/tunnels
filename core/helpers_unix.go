@@ -3,9 +3,12 @@
 package core
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
+	"time"
 
 	"github.com/tunnels-is/tunnels/setcap"
 )
@@ -30,27 +33,70 @@ func ValidateAdapterID(meta *TunnelMETA) error {
 	return nil
 }
 
-func GenerateBaseFolderPath() string {
+func InitBaseFoldersAndPaths() {
 	defer RecoverAndLogToFile()
-	if BASE_PATH != "" {
-		return BASE_PATH + string(os.PathSeparator)
-	}
+	DEBUG("Creating base folders and paths")
+	s := STATE.Load()
+	cli := CLI.Load()
 
-	base := "."
-	ex, err := os.Executable()
-	if err != nil {
-		ERROR("Unable to find working directory: ", err.Error())
+	basePath := cli.BasePath
+	basePath, _ = strings.CutSuffix(basePath, string(os.PathSeparator))
+
+	if basePath != "" {
+		basePath = s.BasePath + string(os.PathSeparator)
 	} else {
-		base = filepath.Dir(ex)
+		ex, err := os.Executable()
+		if err != nil {
+			wd, err := os.Getwd()
+			if err != nil {
+				fmt.Println("Unable to find working directory!", err.Error())
+				panic(err)
+			}
+			basePath = wd + string(os.PathSeparator)
+		} else {
+			basePath = filepath.Dir(ex) + string(os.PathSeparator)
+		}
 	}
 
-	return base + string(os.PathSeparator) + "files" + string(os.PathSeparator)
+	CreateFolder(s.BasePath)
+	s.ConfigFileName = s.BasePath + string(os.PathSeparator) + "tunnels.json"
+
+	s.LogPath = s.BasePath + string(os.PathSeparator) + "logs" + string(os.PathSeparator)
+	CreateFolder(s.LogPath)
+
+	s.BlockListPath = s.BasePath + string(os.PathSeparator) + "blocklists" + string(os.PathSeparator)
+	CreateFolder(s.BlockListPath)
+
+	logFileName := s.LogPath + time.Now().Format("2006-01-02") + ".log"
+	s.LogFileName.Store(&logFileName)
+
+	traceFileName := s.LogPath + time.Now().Format("2006-01-02-15-04-05") + ".trace.log"
+	s.TraceFileName.Store(&traceFileName)
+
+	return
 }
 
-func CreateBaseFolder() {
-	_, err := os.Stat(GLOBAL_STATE.BasePath)
+func CreateFile(file string) (f *os.File, err error) {
+	f, err = os.OpenFile(file, os.O_APPEND|os.O_CREATE|os.O_RDWR, 0o777)
 	if err != nil {
-		err = os.Mkdir(GLOBAL_STATE.BasePath, 0o777)
+		ERROR("Unable to create file: ", err)
+		return
+	}
+
+	// err = os.Chmod(file, 0o777)
+	// if err != nil {
+	// 	ERROR("Unable to change ownership of file: ", err)
+	// 	return
+	// }
+
+	DEBUG("New file created: ", f.Name())
+	return
+}
+
+func CreateFolder(path string) {
+	_, err := os.Stat(path)
+	if err != nil {
+		err = os.Mkdir(path, 0o777)
 		if err != nil {
 			ERROR("Unable to create base folder: ", err)
 			return
@@ -63,6 +109,7 @@ func AdminCheck() {
 	if err != nil {
 		ERROR("Tunnels does not have the proper permissions: ", err)
 	} else {
-		GLOBAL_STATE.IsAdmin = true
+		s := STATE.Load()
+		s.adminState = true
 	}
 }

@@ -13,11 +13,11 @@ import (
 	"github.com/shirou/gopsutil/mem"
 )
 
-func AutoConnect(MONITOR chan int) {
+func AutoConnect() {
 	defer func() {
 		time.Sleep(30 * time.Second)
-		MONITOR <- 200
 	}()
+	defer RecoverAndLogToFile()
 
 	for {
 	next:
@@ -87,15 +87,17 @@ func PopulatePingBufferWithStats() {
 
 var prevAllowedHosts = []string{}
 
-func PingConnections(MONITOR chan int) {
+func PingConnections() {
 	defer func() {
 		time.Sleep(30 * time.Second)
-		MONITOR <- 3
 	}()
 	defer RecoverAndLogToFile()
+
+	// Only send statistics for minimal clients
 	if MINIMAL {
 		PopulatePingBufferWithStats()
 	}
+
 	for _, v := range TunList {
 		if v == nil {
 			continue
@@ -139,7 +141,7 @@ func getDefaultGatewayAndInterface() {
 	var err error
 	var onDefault bool = false
 
-	for _, v := range GLOBAL_STATE.ActiveConnections {
+	for _, v := range STATEOLD.ActiveConnections {
 		if v.Tag == DefaultTunnelName {
 			onDefault = true
 		}
@@ -221,15 +223,13 @@ LOOP:
 	)
 }
 
-func GetDefaultGateway(MONITOR chan int) {
+func GetDefaultGateway() {
 	defer func() {
 		if DEFAULT_GATEWAY != nil {
 			time.Sleep(5 * time.Second)
 		} else {
 			time.Sleep(2 * time.Second)
 		}
-
-		MONITOR <- 4
 	}()
 	getDefaultGatewayAndInterface()
 }

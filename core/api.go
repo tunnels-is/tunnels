@@ -254,19 +254,19 @@ func ForwardToController(FR *FORWARD_REQUEST) (interface{}, int) {
 
 	if strings.Contains(FR.Path, "logout") {
 		if len(responseBytes) != 0 && code == 200 {
-			for i := range GLOBAL_STATE.ActiveConnections {
-				if GLOBAL_STATE.ActiveConnections[i] == nil {
+			for i := range STATEOLD.ActiveConnections {
+				if STATEOLD.ActiveConnections[i] == nil {
 					continue
 				}
-				Disconnect(GLOBAL_STATE.ActiveConnections[i].WindowsGUID, true, false)
+				Disconnect(STATEOLD.ActiveConnections[i].WindowsGUID, true, false)
 			}
-			GLOBAL_STATE.User = User{}
+			STATEOLD.User = User{}
 		}
 	}
 
 	if strings.Contains(FR.Path, "login") {
 		if len(responseBytes) != 0 && code == 200 {
-			err = json.Unmarshal(responseBytes, &GLOBAL_STATE.User)
+			err = json.Unmarshal(responseBytes, &STATEOLD.User)
 			if err != nil {
 				ERROR("login detected but not registered in background service: ", err)
 			} else {
@@ -367,15 +367,15 @@ func SetConfig(config *Config) error {
 		}
 	}
 
-	oldDNSIP := GLOBAL_STATE.C.DNSServerIP
-	oldDNSPort := GLOBAL_STATE.C.DNSServerPort
-	oldAPIIP := GLOBAL_STATE.C.APIIP
-	oldAPIPort := GLOBAL_STATE.C.APIPort
-	oldAPICert := GLOBAL_STATE.C.APICert
-	oldAPIKey := GLOBAL_STATE.C.APIKey
-	oldCertDomains := GLOBAL_STATE.C.APICertDomains
-	oldCertIPs := GLOBAL_STATE.C.APICertIPs
-	oldBlocklists := GLOBAL_STATE.C.AvailableBlockLists
+	oldDNSIP := STATEOLD.C.DNSServerIP
+	oldDNSPort := STATEOLD.C.DNSServerPort
+	oldAPIIP := STATEOLD.C.APIIP
+	oldAPIPort := STATEOLD.C.APIPort
+	oldAPICert := STATEOLD.C.APICert
+	oldAPIKey := STATEOLD.C.APIKey
+	oldCertDomains := STATEOLD.C.APICertDomains
+	oldCertIPs := STATEOLD.C.APICertIPs
+	oldBlocklists := STATEOLD.C.AvailableBlockLists
 
 	if !CLIDisableBlockLists {
 		if len(oldBlocklists) != len(config.AvailableBlockLists) || !CheckBlockListsEquality(oldBlocklists, config.AvailableBlockLists) {
@@ -485,16 +485,16 @@ func GenerateState() (err error) {
 	defer RecoverAndLogToFile()
 	DEBUG("Generating state object")
 
-	GLOBAL_STATE.ActiveConnections = make([]*TunnelMETA, 0)
-	GLOBAL_STATE.ConnectionStats = make([]TunnelSTATS, 0)
-	GLOBAL_STATE.Version = APP_VERSION
+	STATEOLD.ActiveConnections = make([]*TunnelMETA, 0)
+	STATEOLD.ConnectionStats = make([]TunnelSTATS, 0)
+	STATEOLD.Version = APP_VERSION
 
 	for i := range TunList {
 		if TunList[i] == nil {
 			continue
 		}
 
-		GLOBAL_STATE.ActiveConnections = append(GLOBAL_STATE.ActiveConnections, TunList[i].Meta)
+		STATEOLD.ActiveConnections = append(STATEOLD.ActiveConnections, TunList[i].Meta)
 		var n2 uint64 = 0
 		if len(TunList[i].Nonce2Bytes) > 7 {
 			n2 = binary.BigEndian.Uint64(TunList[i].Nonce2Bytes)
@@ -524,16 +524,16 @@ func GenerateState() (err error) {
 			x.VPLNetwork = TunList[i].VPLNetwork
 		}
 
-		GLOBAL_STATE.ConnectionStats = append(GLOBAL_STATE.ConnectionStats, x)
+		STATEOLD.ConnectionStats = append(STATEOLD.ConnectionStats, x)
 	}
 
-	if GLOBAL_STATE.C.DNSstats {
+	if STATEOLD.C.DNSstats {
 
 		for i, v := range DNSBlockedList {
-			GLOBAL_STATE.DNSBlocksMap[i] = v
+			STATEOLD.DNSBlocksMap[i] = v
 		}
 		for i, v := range DNSResolvedList {
-			GLOBAL_STATE.DNSResolvesMap[i] = v
+			STATEOLD.DNSResolvesMap[i] = v
 		}
 	}
 
@@ -578,7 +578,7 @@ func InitializeTunnelFromCRR(TUN *Tunnel) (err error) {
 
 		TUN.DHCP = TUN.CRR.DHCP
 		TUN.Meta.DHCPToken = TUN.CRR.DHCP.Token
-		SaveConfig(GLOBAL_STATE.C)
+		SaveConfig(STATEOLD.C)
 	}
 
 	if TUN.CRR.VPLNetwork != nil {
@@ -635,7 +635,7 @@ func InitializeTunnelFromCRR(TUN *Tunnel) (err error) {
 }
 
 func PreConnectCheck() (int, error) {
-	if !GLOBAL_STATE.IsAdmin {
+	if !STATEOLD.IsAdmin {
 		return 400, errors.New("tunnels needs to run as Administrator or root")
 	}
 	return 0, nil

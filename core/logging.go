@@ -4,11 +4,8 @@ import (
 	"crypto/md5"
 	"fmt"
 	"log"
-	"os"
 	"runtime"
-	"runtime/debug"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -16,93 +13,24 @@ type uniqueLog struct {
 	date time.Time
 }
 
-var (
-	seenLogs = make(map[[md5.Size]byte]uniqueLog)
-	logMutex = &sync.Mutex{}
-)
-
 func checkLogUniqueness(log *string) (shouldLog bool) {
 	hash := md5.Sum([]byte(*log))
-	logMutex.Lock()
-	_, exists := seenLogs[hash]
+	_, exists := logRecordHash.Load(hash)
 	if !exists {
-		seenLogs[hash] = uniqueLog{
+		logRecordHash.Store(hash, uniqueLog{
 			date: time.Now(),
-		}
-		logMutex.Unlock()
+		})
 		return true
 	}
-	logMutex.Unlock()
 	return false
 }
 
-func CleanUniqueLogMap(MONITOR chan int) {
+func CleanUniqueLogMap() {
 	defer func() {
-		RecoverAndLogToFile()
 		time.Sleep(10 * time.Second)
-		MONITOR <- 5
 	}()
-
-	logMutex.Lock()
-	defer logMutex.Unlock()
-
-	for i := range seenLogs {
-		if time.Since(seenLogs[i].date).Seconds() > 8 {
-			delete(seenLogs, i)
-		}
-	}
-}
-
-func InitPacketTraceFile() {
-	defer func() {
-		if r := recover(); r != nil {
-			log.Println(r, string(debug.Stack()))
-		}
-	}()
-
-	GLOBAL_STATE.TracePath = GLOBAL_STATE.BasePath
-	GLOBAL_STATE.TraceFileName = GLOBAL_STATE.TracePath + time.Now().Format("15-04-05") + ".trace.log"
-
-	var err error
-	TraceFile, err = os.Create(GLOBAL_STATE.TraceFileName)
-	if err != nil {
-		ERROR("Unable to create trace file: ", err)
-		return
-	}
-
-	err = os.Chmod(GLOBAL_STATE.TraceFileName, 0o777)
-	if err != nil {
-		ERROR("Unable to change mode of trace file: ", err)
-		return
-	}
-
-	DEBUG("New trace created: ", TraceFile.Name())
-}
-
-func InitLogfile() {
-	defer func() {
-		if r := recover(); r != nil {
-			log.Println(r, string(debug.Stack()))
-		}
-	}()
-
-	GLOBAL_STATE.LogPath = GLOBAL_STATE.BasePath
-	GLOBAL_STATE.LogFileName = GLOBAL_STATE.LogPath + time.Now().Format("2006-01-02-15-04-05") + ".log"
-
-	var err error
-	LogFile, err = os.Create(GLOBAL_STATE.LogFileName)
-	if err != nil {
-		ERROR("Unable to create log file: ", err)
-		return
-	}
-
-	err = os.Chmod(GLOBAL_STATE.LogFileName, 0o777)
-	if err != nil {
-		ERROR("Unable to change ownership of log file: ", err)
-		return
-	}
-
-	DEBUG("New log file created: ", LogFile.Name())
+	defer RecoverAndLogToFile()
+	logRecordHash.Clear()
 }
 
 func GET_FUNC(skip int) string {
@@ -118,7 +46,8 @@ func GET_FUNC(skip int) string {
 }
 
 func DEEP(Line ...interface{}) {
-	if !C.DeepDebugLoggin {
+	s := STATE.Load()
+	if !s.DeepDebugLoggin {
 		return
 	}
 
@@ -140,7 +69,8 @@ func DEEP(Line ...interface{}) {
 }
 
 func DEBUG(Line ...interface{}) {
-	if !C.DebugLogging {
+	s := STATE.Load()
+	if !s.DebugLogging {
 		return
 	}
 
@@ -162,7 +92,8 @@ func DEBUG(Line ...interface{}) {
 }
 
 func ERROR(Line ...interface{}) {
-	if !C.ErrorLogging {
+	s := STATE.Load()
+	if !s.ErrorLogging {
 		return
 	}
 
@@ -185,7 +116,8 @@ func ERROR(Line ...interface{}) {
 }
 
 func INFO(Line ...interface{}) {
-	if !C.InfoLogging {
+	s := STATE.Load()
+	if !s.InfoLogging {
 		return
 	}
 
@@ -206,21 +138,19 @@ func INFO(Line ...interface{}) {
 	}
 }
 
-func StartLogQueueProcessor(MONITOR chan int) {
-	defer func() {
-		MONITOR <- 1
-	}()
+func StartLogQueueProcessor() {
 	defer RecoverAndLogToFile()
-	DEBUG("Logging module started")
+	DEBUG("Starting the log processor")
 
 	var line string
 	for {
 		line = <-LogQueue
-		if C.ConsoleLogging {
+		s := STATE.Load()
+		if s.ConsoleLogging {
 			fmt.Println(line)
 		}
 
-		if C.ConsoleLogOnly {
+		if s.ConsoleLogOnly {
 			continue
 		}
 
