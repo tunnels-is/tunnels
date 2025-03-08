@@ -22,13 +22,6 @@ var (
 	DefaultTunnelName    = "tunnels"
 	DefaultTunnelNameMin = "tunnels-min"
 	CertPool             *x509.CertPool
-
-	DNSLock         = sync.Mutex{}
-	DNSBlockedList  = make(map[string]*DNSStats)
-	DNSResolvedList = make(map[string]*DNSStats)
-	DNSCache        = make(map[string]*DNSReply)
-	DNSCacheLock    = sync.Mutex{}
-	UsePrimaryDNS   = true
 )
 
 type DNSStats struct {
@@ -121,20 +114,10 @@ var (
 	DLL_EMBED  embed.FS
 )
 
-func initializeGlobalVariables() {
-	C = new(Config)
-	C.DebugLogging = true
-	C.InfoLogging = true
-
-	GLOBAL_STATE.DNSBlocksMap = make(map[string]*DNSStats)
-	GLOBAL_STATE.DNSResolvesMap = make(map[string]*DNSStats)
-}
-
 var (
 	AppStartTime = time.Now()
-	C            = new(Config)
-	GLOBAL_STATE = new(State)
-
+	// C                   = new(Config)
+	STATEOLD            = STATE.Load()
 	DEFAULT_TUNNEL      *TunnelInterface
 	DEFAULT_DNS_SERVERS []string
 	DNSClient           = new(dns.Client)
@@ -148,18 +131,8 @@ var (
 
 	MINIMAL bool
 
-	// Device Flags
-	CLIDeviceKey          string
-	CLIDNS                string
-	CLIHost               string
-	CLIHostname           string
-	CLIPort               string
-	CLIServerID           string
-	CLIDisableBlockLists  bool
-	CLIDisableVPLFirewall bool
-
 	// Base Path Overwrite
-	BASE_PATH string
+	// BASE_PATH string
 
 	// HTTP
 	API_SERVER http.Server
@@ -591,11 +564,6 @@ type Config struct {
 
 	DNSRecords []*ServerDNS
 }
-
-var (
-	DNSBlockList = make(map[string]string)
-	DNSBlockLock = sync.Mutex{}
-)
 
 type LOADING_LOGS_RESPONSE struct {
 	Lines [100]string

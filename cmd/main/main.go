@@ -15,8 +15,9 @@ var DIST embed.FS
 var DLL embed.FS
 
 func main() {
+	s := core.STATE.Load()
 	createConfig := flag.Bool("createConfig", false, "generate a default config and exit")
-	flag.StringVar(&core.BASE_PATH, "basePath", "", "manualy set base path for the config and log files")
+	flag.StringVar(&s.BasePath, "basePath", "", "manualy set base path for the config and log files")
 	flag.Parse()
 
 	core.CreateConfig(createConfig)

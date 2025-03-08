@@ -4,11 +4,9 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"io/fs"
-	"log"
 	"net"
 	"net/http"
 	"os"
-	"runtime/debug"
 	"strings"
 	"time"
 
@@ -58,15 +56,9 @@ func makeTLSConfig() (tc *tls.Config) {
 	return
 }
 
-func LaunchAPI(MONITOR chan int) {
-	defer func() {
-		r := recover()
-		if r != nil {
-			log.Println(r, string(debug.Stack()))
-		}
-		time.Sleep(2 * time.Second)
-		MONITOR <- 2
-	}()
+func LaunchAPI() {
+	defer RecoverAndLogToFile()
+
 	assetHandler := http.FileServer(getFileSystem())
 
 	mux := http.NewServeMux()
@@ -81,13 +73,13 @@ func LaunchAPI(MONITOR chan int) {
 
 	ip := C.APIIP
 	if ip == "" {
-		GLOBAL_STATE.C.APIIP = "127.0.0.1"
+		STATEOLD.C.APIIP = "127.0.0.1"
 		ip = "127.0.0.1"
 	}
 
 	port := C.APIPort
 	if port == "" {
-		GLOBAL_STATE.C.APIPort = "7777"
+		STATEOLD.C.APIPort = "7777"
 		port = "7777"
 	}
 
@@ -233,7 +225,7 @@ func HTTP_GetState(w http.ResponseWriter, r *http.Request) {
 	}
 
 	_ = GenerateState()
-	JSON(w, r, 200, GLOBAL_STATE)
+	JSON(w, r, 200, STATEOLD)
 }
 
 func HTTP_Connect(w http.ResponseWriter, r *http.Request) {

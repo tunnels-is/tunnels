@@ -13,44 +13,28 @@ import (
 	"time"
 )
 
-func InitBlockListPath() {
-	defer RecoverAndLogToFile()
-
-	GLOBAL_STATE.BlockListPath = GLOBAL_STATE.BasePath + "blocklists" + string(os.PathSeparator)
-
-	err := os.Mkdir(GLOBAL_STATE.BlockListPath, 0o777)
-	if err != nil {
-		if !strings.Contains(err.Error(), "exists") {
-			ERROR("Unable to create blocklist path", err)
-		}
-		return
-	}
-
-	DEBUG("Block list path initialized: ", GLOBAL_STATE.BlockListPath)
-}
-
-func ReBuildBlockLists(config *Config) (listError error) {
+func ReBuildBlockLists() (listError error) {
 	defer RecoverAndLogToFile()
 	defer runtime.GC()
-
-	mapLock := new(sync.Mutex)
-	newMap := make(map[string]string)
+	DEBUG("Loading DNS block lists")
+	s := STATE.Load()
 
 	wg := new(sync.WaitGroup)
+	newMap := new(sync.Map)
 
 	doList := func(index int) (err error) {
 		defer func() {
 			wg.Done()
 		}()
+		defer RecoverAndLogToFile()
 
 		var listFile *os.File
 		var didDownload bool
 		var listBytes []byte
 		var badLines int
 
-		defer RecoverAndLogToFile()
 		badLines = 0
-		bl := config.AvailableBlockLists[index]
+		bl := s.AvailableBlockLists[index]
 
 		if CheckIfURL(bl.FullPath) {
 			_, err := os.Stat(bl.DiskPath)
@@ -69,7 +53,7 @@ func ReBuildBlockLists(config *Config) (listError error) {
 				didDownload = true
 
 				fileName := fmt.Sprintf("%s%s.txt",
-					GLOBAL_STATE.BlockListPath,
+					STATEOLD.BlockListPath,
 					bl.Tag,
 				)
 
@@ -120,9 +104,7 @@ func ReBuildBlockLists(config *Config) (listError error) {
 					}
 				}
 				if bl.Enabled {
-					mapLock.Lock()
-					newMap[d] = config.AvailableBlockLists[index].Tag
-					mapLock.Unlock()
+					newMap.Store(d, s.AvailableBlockLists[index])
 				}
 				bl.Count++
 			} else {
@@ -137,23 +119,21 @@ func ReBuildBlockLists(config *Config) (listError error) {
 			return err
 		}
 
-		config.AvailableBlockLists[index].LastRefresh = time.Now()
+		s.AvailableBlockLists[index].LastRefresh = time.Now()
 		if badLines > 0 {
 			DEBUG(badLines, " invalid lines in list: ", bl.FullPath)
 		}
 		return
 	}
 
-	for i := range config.AvailableBlockLists {
+	for i := range s.AvailableBlockLists {
 		wg.Add(1)
 		go doList(i)
 	}
 
 	wg.Wait()
 
-	DNSBlockLock.Lock()
-	DNSBlockList = newMap
-	DNSBlockLock.Unlock()
+	DNSBlockList.Store(newMap)
 
 	return listError
 }
