@@ -7,54 +7,11 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/tunnels-is/tunnels/certs"
 	"golang.org/x/net/websocket"
 )
-
-func getFileSystem() http.FileSystem {
-	fsys, err := fs.Sub(DIST_EMBED, "dist")
-	if err != nil {
-		panic(err)
-	}
-
-	return http.FS(fsys)
-}
-
-func makeTLSConfig() (tc *tls.Config) {
-	tc = new(tls.Config)
-	tc.MinVersion = tls.VersionTLS13
-	certsExist := true
-	_, err := os.Stat(C.APICert)
-	if err != nil {
-		certsExist = false
-	}
-	_, err = os.Stat(C.APIKey)
-	if err != nil {
-		certsExist = false
-	}
-
-	if !certsExist {
-
-		_, err := certs.MakeCert(
-			C.APICertType,
-			C.APICert,
-			C.APIKey,
-			C.APICertIPs,
-			C.APICertDomains,
-			"",
-			time.Time{},
-			true,
-		)
-		if err != nil {
-			ERROR("Certificate error:", err)
-			return
-		}
-	}
-	return
-}
 
 func LaunchAPI() {
 	defer RecoverAndLogToFile()
@@ -71,20 +28,17 @@ func LaunchAPI() {
 		TLSConfig: makeTLSConfig(),
 	}
 
-	ip := C.APIIP
+	conf := CONFIG.Load()
+
+	ip := conf.APIIP
 	if ip == "" {
-		STATEOLD.C.APIIP = "127.0.0.1"
-		ip = "127.0.0.1"
+		ip = DefaultAPIIP
 	}
 
-	port := C.APIPort
+	port := conf.APIPort
 	if port == "" {
-		STATEOLD.C.APIPort = "7777"
-		port = "7777"
+		port = DefaultAPIPort
 	}
-
-	// if we are running wails, we want
-	// the computer to select a port for us.
 
 	API_SERVER.Addr = ip + ":" + port
 	ln, err := net.Listen("tcp4", API_SERVER.Addr)
@@ -93,18 +47,19 @@ func LaunchAPI() {
 		return
 	}
 
-	addr := strings.Split(ln.Addr().String(), ":")
-	API_PORT = addr[len(addr)-1]
-	C.APIPort = API_PORT
-	if C.APIIP != "0.0.0.0" {
-		C.APIIP = addr[0]
-	}
+	// addr := strings.Split(ln.Addr().String(), ":")
+	// API_PORT = addr[len(addr)-1]
+	// C.APIPort = API_PORT
+	// if C.APIIP != "0.0.0.0" {
+	// 	C.APIIP = addr[0]
+	// }
+
 	INFO("====== API SERVER =========")
 	INFO("ADDR: ", ln.Addr())
-	INFO("PORT: ", C.APIPort)
-	INFO("IP: ", C.APIIP)
-	INFO("Key: ", C.APIKey)
-	INFO("Cert: ", C.APICert)
+	INFO("PORT: ", ip)
+	INFO("IP: ", port)
+	INFO("Key: ", conf.APIKey)
+	INFO("Cert: ", conf.APICert)
 	INFO("===========================")
 
 	select {
@@ -112,9 +67,52 @@ func LaunchAPI() {
 	default:
 	}
 
-	if err := API_SERVER.ServeTLS(ln, C.APICert, C.APIKey); err != http.ErrServerClosed {
+	if err := API_SERVER.ServeTLS(ln, conf.APICert, conf.APIKey); err != http.ErrServerClosed {
 		ERROR("api start error: ", err)
 	}
+}
+
+func getFileSystem() http.FileSystem {
+	fsys, err := fs.Sub(DIST_EMBED, "dist")
+	if err != nil {
+		panic(err)
+	}
+
+	return http.FS(fsys)
+}
+
+func makeTLSConfig() (tc *tls.Config) {
+	conf := CONFIG.Load()
+	tc = new(tls.Config)
+	tc.MinVersion = tls.VersionTLS13
+	certsExist := true
+	_, err := os.Stat(conf.APICert)
+	if err != nil {
+		certsExist = false
+	}
+	_, err = os.Stat(conf.APIKey)
+	if err != nil {
+		certsExist = false
+	}
+
+	if !certsExist {
+
+		_, err := certs.MakeCert(
+			conf.APICertType,
+			conf.APICert,
+			conf.APIKey,
+			conf.APICertIPs,
+			conf.APICertDomains,
+			"",
+			time.Time{},
+			true,
+		)
+		if err != nil {
+			ERROR("Certificate error:", err)
+			return
+		}
+	}
+	return
 }
 
 func setupCORS(w *http.ResponseWriter, _ *http.Request) {

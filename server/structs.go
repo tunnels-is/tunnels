@@ -50,10 +50,8 @@ var (
 	VPLNetwork  *net.IPNet
 	DHCPMapping [math.MaxUint16 + 1]*DHCPRecord
 
-	// IPToCoreMapping = make(map[[4]byte]*UserCoreMapping)
 	VPLIPToCore = make([][][][]*UserCoreMapping, 255)
-	// Routing Settings
-	AllowAll bool
+	AllowAll    bool
 )
 
 type DeviceListResponse struct {

@@ -409,12 +409,6 @@ func ExternalUDPListener(SIGNAL *SIGNAL) {
 	}
 }
 
-func htons(v uint16) uint16 {
-	b := make([]byte, 2)
-	binary.BigEndian.PutUint16(b, v)
-	return binary.LittleEndian.Uint16(b)
-}
-
 func DataSocketListener(SIGNAL *SIGNAL) {
 	defer RecoverAndReturnID(SIGNAL, 1)
 

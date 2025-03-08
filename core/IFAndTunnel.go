@@ -3,8 +3,8 @@ package core
 import (
 	"errors"
 	"fmt"
+	"math/rand"
 	"net"
-	"strconv"
 	"strings"
 
 	"github.com/zveinn/crypt"
@@ -133,29 +133,25 @@ func Disconnect(GUID string, remove bool, switching bool) (err error) {
 	return
 }
 
-func createRandomTunnel() (Cfg *Config, err error) {
+func createRandomTunnel() {
 	M := new(TunnelMETA)
 	M = createTunnel()
-	C.Connections = append(C.Connections, M)
-	Cfg = C
-
-	err = SaveConfig(Cfg)
-	if err != nil {
-		return nil, err
-	}
-
+	TunnelMetaMap.Store(M.Tag, M)
 	return
 }
 
 func createTunnel() (T *TunnelMETA) {
 	T = new(TunnelMETA)
-	ls := strconv.Itoa(len(C.Connections))
-	ifAndTag := "newtunnel" + ls
+	b := make([]rune, 16)
+	for i := range b {
+		b[i] = letterRunes[rand.Intn(len(letterRunes))]
+	}
+	ifAndTag := string(b)
 	T.Tag = ifAndTag
 	T.IFName = ifAndTag
 	T.EnableDefaultRoute = false
-	T.IPv4Address = "777.777.777.777"
-	T.NetMask = "255.255.255.255"
+	T.IPv4Address = ""
+	T.NetMask = ""
 
 	T.EncryptionType = crypt.CHACHA20
 	T.DNSBlocking = false
@@ -177,31 +173,11 @@ func createDefaultTunnelMeta() (M *TunnelMETA) {
 	M = new(TunnelMETA)
 	M = createTunnel()
 	M.RequestVPNPorts = true
-	M.IPv4Address = "172.22.22.22"
-	M.NetMask = "255.255.255.255"
+	M.IPv4Address = ""
+	M.NetMask = ""
 	M.Tag = DefaultTunnelName
 	M.IFName = DefaultTunnelName
 	M.EnableDefaultRoute = true
-	return
-}
-
-func createMinimalConnection() (M *TunnelMETA) {
-	M = new(TunnelMETA)
-	M = createTunnel()
-	M.RequestVPNPorts = false
-	M.IPv4Address = "172.22.22.22"
-	M.NetMask = "255.255.255.255"
-	M.Tag = DefaultTunnelNameMin
-	M.IFName = DefaultTunnelNameMin
-	if CLIHostname != "" {
-		M.Hostname = CLIHostname
-	}
-	if CLIDNS != "" {
-		M.DNSDiscovery = CLIDNS
-	}
-	M.Private = true
-	M.EnableDefaultRoute = false
-	M.AutoConnect = true
 	return
 }
 

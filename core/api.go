@@ -74,11 +74,8 @@ func sendFirewallToServer(serverIP string, DHCPToken string, DHCPIP string, allo
 	FR.IP = DHCPIP
 	FR.Hosts = allowedHosts
 
-	if CLIDisableVPLFirewall {
-		FR.DisableFirewall = true
-	} else {
-		FR.DisableFirewall = disableFirewall
-	}
+	conf := CONFIG.Load()
+	FR.DisableFirewall = conf.DisableVPLFirewall
 
 	var body []byte
 	body, err = json.Marshal(FR)
@@ -393,7 +390,7 @@ func SetConfig(config *Config) error {
 		return err
 	}
 
-	err = SaveConfig(config)
+	err = writeConfigToDisk(config)
 	if err != nil {
 		ERROR("Unable to save config: ", err)
 		return errors.New("unable to save config")
@@ -578,7 +575,7 @@ func InitializeTunnelFromCRR(TUN *Tunnel) (err error) {
 
 		TUN.DHCP = TUN.CRR.DHCP
 		TUN.Meta.DHCPToken = TUN.CRR.DHCP.Token
-		SaveConfig(STATEOLD.C)
+		writeConfigToDisk(STATEOLD.C)
 	}
 
 	if TUN.CRR.VPLNetwork != nil {
@@ -635,15 +632,16 @@ func InitializeTunnelFromCRR(TUN *Tunnel) (err error) {
 }
 
 func PreConnectCheck() (int, error) {
-	if !STATEOLD.IsAdmin {
-		return 400, errors.New("tunnels needs to run as Administrator or root")
+	s := STATE.Load()
+	if !s.adminState {
+		return 400, errors.New("tunnels does not have the correct access permissions")
 	}
 	return 0, nil
 }
 
 var IsConnecting = atomic.Bool{}
 
-func PublicConnect(ClientCR ConnectionRequest) (code int, errm error) {
+func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	if !IsConnecting.CompareAndSwap(false, true) {
 		INFO("Already connecting to another connection, please wait a moment")
 		return 400, errors.New("Already connecting to another connection, please wait a moment")
@@ -652,6 +650,7 @@ func PublicConnect(ClientCR ConnectionRequest) (code int, errm error) {
 	start := time.Now()
 	defer func() {
 		IsConnecting.Store(false)
+		DEBUG("Session creation finished in: ", fmt.Sprintf("%.0f", math.Abs(time.Since(start).Seconds())), " seconds")
 		runtime.GC()
 	}()
 	defer RecoverAndLogToFile()
@@ -661,64 +660,94 @@ func PublicConnect(ClientCR ConnectionRequest) (code int, errm error) {
 		return
 	}
 
-	tunnel := new(Tunnel)
-	tunnel.ClientCR = ClientCR
-	tunnel.Meta = FindMETAForConnectRequest(&ClientCR)
-	if tunnel.Meta == nil {
+	var meta *TunnelMETA
+	tunnelMetaMapRange(func(tun *TunnelMETA) bool {
+		if ClientCR.Tag == "" {
+			if tun.Tag == DefaultTunnelName {
+				meta = tun
+				return false
+			}
+		} else if ClientCR.Tag != "" {
+			if tun.Tag == ClientCR.Tag {
+				meta = tun
+				return false
+			}
+		}
+		return true
+	})
+	if meta == nil {
 		ERROR("vpn connection metadata not found for tag: ", ClientCR.Tag)
 		return 400, errors.New("error fetching connection meta")
 	}
 
-	if tunnel.Meta.DNSDiscovery != "" {
-		DEBUG("looking for connection info @ ", tunnel.Meta.DNSDiscovery)
-		dnsInfo, err := certs.ResolveMetaTXT(tunnel.Meta.DNSDiscovery)
+	if meta.PreventIPv6 && IPv6Enabled() {
+		return 400, errors.New("IPV6 Enabled, please disable before connecting")
+	}
+
+	isConnected := false
+	tunnelMapRange(func(tun *TUN) bool {
+		if tun.tag == meta.Tag {
+			if tun.GetState() >= TUN_Connected {
+				isConnected = true
+			}
+			return false
+		}
+
+		return true
+	})
+	if isConnected {
+		ERROR("Already connected to ", ClientCR.Tag)
+		return 400, errors.New("Already connected to " + ClientCR.Tag)
+	}
+
+	tunnel := new(TUN)
+	tunnel.meta.Store(meta)
+	tunnel.cr = ClientCR
+
+	if meta.DNSDiscovery != "" {
+		DEBUG("looking for connection info @ ", meta.DNSDiscovery)
+		dnsInfo, err := certs.ResolveMetaTXT(meta.DNSDiscovery)
 		if err != nil {
 			ERROR("error looking up connection info: ", err)
 			return 400, err
 		}
+
 		DEBUG("DNS Info: ", dnsInfo.IP, dnsInfo.Port, dnsInfo.ServerID, "cert length: ", len(dnsInfo.Cert))
 		ClientCR.ServerPort = dnsInfo.Port
 		ClientCR.ServerIP = dnsInfo.IP
 		ClientCR.ServerID = dnsInfo.ServerID
-		tunnel.Meta.PrivateCertBytes = dnsInfo.Cert
-		tunnel.Meta.Private = true
-		tunnel.ClientCR = ClientCR
-
-	} else {
-		if !tunnel.Meta.Private && ClientCR.ServerID == "" {
-			ERROR("No server selected")
-			return 400, errors.New("No server selected")
-		} else if tunnel.Meta.ServerID != ClientCR.ServerID {
-			tunnel.Meta.ServerID = ClientCR.ServerID
-		}
+		tunnel.ServerCertBytes = dnsInfo.Cert
+		meta.Public = false
 	}
 
-	if ClientCR.ServerIP == "" || ClientCR.ServerPort == "" {
-		ERROR("Missing server or port in connect request")
-		return 400, errors.New("Server IP or Port missing")
+	if ClientCR.ServerIP != "" {
+		ERROR("No Server IPAddress found when connecting: ", ClientCR)
+		return 400, errors.New("no ip address found when connecting")
 	}
-
-	if tunnel.Meta.PreventIPv6 && IPv6Enabled() {
-		return 400, errors.New("IPV6 Enabled but should be disabled")
+	if ClientCR.ServerPort != "" {
+		ERROR("No Server Port found when connecting: ", ClientCR)
+		return 400, errors.New("no server port found when connecting")
+	}
+	if ClientCR.ServerID != "" {
+		ERROR("No Server id found when connecting: ", ClientCR)
+		return 400, errors.New("no server id found when connecting")
 	}
 
 	FinalCR := new(RemoteConnectionRequest)
-	FinalCR.Version = API_VERSION
+	FinalCR.Version = apiVersion
 	FinalCR.Created = time.Now()
-
-	// from GUI connect request
-	FinalCR.DeviceToken = ClientCR.DeviceToken
-	FinalCR.Hostname = tunnel.Meta.Hostname
 	FinalCR.UserID = ClientCR.UserID
 	FinalCR.SeverID = ClientCR.ServerID
 	FinalCR.EncType = ClientCR.EncType
 	FinalCR.CurveType = ClientCR.CurveType
 	FinalCR.DeviceKey = ClientCR.DeviceKey
+	FinalCR.UserToken = ClientCR.UserToken
 
-	if !tunnel.Meta.Private || tunnel.Meta.RequestVPNPorts {
+	if meta.RequestVPNPorts {
 		FinalCR.RequestingPorts = true
 	}
-	FinalCR.DHCPToken = tunnel.Meta.DHCPToken
+
+	FinalCR.DHCPToken = meta.DHCPToken
 
 	DEBUG("ConnectRequestFromClient", ClientCR)
 
@@ -738,11 +767,11 @@ func PublicConnect(ClientCR ConnectionRequest) (code int, errm error) {
 		},
 	}
 
-	if tunnel.Meta.Private {
-		tc.RootCAs, errm = tunnel.Meta.LoadPrivateCerts()
+	if !meta.Public {
+		tc.RootCAs, errm = meta.LoadPrivateCerts()
 		if errm != nil {
 			ERROR("Unable to load private cert: ", errm)
-			return 502, errors.New("Unable to load private cert: " + tunnel.Meta.PrivateCert)
+			return 502, errors.New("Unable to load private cert: " + meta.ServerCert)
 		}
 	}
 
@@ -780,12 +809,13 @@ func PublicConnect(ClientCR ConnectionRequest) (code int, errm error) {
 
 	FR := new(FORWARD_REQUEST)
 	FR.Method = "POST"
-	if tunnel.Meta.Private {
+	if !meta.Public {
 		FR.Path = "v3/session/private"
 	} else {
 		FR.Path = "v3/session/public"
 	}
-	if ClientCR.ServerID != "" && ClientCR.DeviceKey != "" {
+
+	if ClientCR.DeviceKey != "" {
 		FR.Path += "/min"
 	}
 
@@ -968,8 +998,6 @@ func PublicConnect(ClientCR ConnectionRequest) (code int, errm error) {
 			ERROR("unable to update firewall: ", err)
 		}
 	}
-
-	DEBUG("Session is ready - it took ", fmt.Sprintf("%.0f", math.Abs(time.Since(start).Seconds())), " seconds to connect")
 
 	return 200, nil
 }

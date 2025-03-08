@@ -433,10 +433,10 @@ func GenerateVPLCoreMappings() {
 	VPLIPToCore[10] = make([][][]*UserCoreMapping, 11)
 	VPLIPToCore[10][0] = make([][]*UserCoreMapping, 256)
 
-	for ii := 0; ii < 256; ii++ {
+	for ii := range 256 {
 		VPLIPToCore[10][0][ii] = make([]*UserCoreMapping, 256)
 
-		for iii := 0; iii < 256; iii++ {
+		for iii := range 256 {
 			VPLIPToCore[10][0][ii][iii] = nil
 		}
 	}

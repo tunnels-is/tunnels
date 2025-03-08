@@ -3,7 +3,6 @@ package core
 import (
 	"bytes"
 	"net"
-	"strconv"
 	"strings"
 	"time"
 
@@ -19,44 +18,21 @@ func AutoConnect() {
 	}()
 	defer RecoverAndLogToFile()
 
-	for {
-	next:
-		for _, v := range C.Connections {
-			if v == nil || !v.AutoConnect {
-				continue
-			}
-			for _, vc := range TunList {
-				if vc == nil {
-					continue
-				}
-				if vc.Interface != nil {
-					x := *vc.Interface.tunnel.Load()
-					if x == nil {
-						continue
-					}
-					if x.Meta.Tag == v.Tag {
-						continue next
-					}
-				}
-			}
-
-			CR := ConnectionRequest{
-				Tag:        v.Tag,
-				DeviceKey:  CLIDeviceKey,
-				ServerIP:   CLIHost,
-				ServerPort: CLIPort,
-				EncType:    v.EncryptionType,
-				CurveType:  v.CurveType,
-			}
-
-			code, err := PublicConnect(CR)
-			if err != nil {
-				ERROR("Unable to connect, return code: ", code, " // error: ", err)
-			}
+	tunnelMetaMapRange(func(meta *TunnelMETA) bool {
+		if !meta.AutoConnect {
+			return true
 		}
-
-		break
-	}
+		code, err := PublicConnect(&ConnectionRequest{
+			Tag:        meta.Tag,
+			DeviceKey:  meta.deviceKey,
+			ServerIP:   meta.ServerIP,
+			ServerPort: meta.ServerPort,
+		})
+		if err != nil {
+			ERROR("Unable to connect, return code: ", code, " // error: ", err)
+		}
+		return true
+	})
 }
 
 var PingPongStatsBuffer = []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
@@ -93,99 +69,86 @@ func PingConnections() {
 	}()
 	defer RecoverAndLogToFile()
 
+	conf := CONFIG.Load()
+
 	// Only send statistics for minimal clients
-	if MINIMAL {
+	if conf.Minimal {
 		PopulatePingBufferWithStats()
 	}
 
-	for _, v := range TunList {
-		if v == nil {
-			continue
+	tunnelMapRange(func(tun *TUN) bool {
+		meta := tun.meta.Load()
+		if meta == nil {
+			return true
 		}
 
 		var err error
-		if v.EH != nil {
-			out := v.EH.SEAL.Seal1(PingPongStatsBuffer, v.Index)
+		if tun.encWrapper != nil {
+			out := tun.encWrapper.SEAL.Seal1(PingPongStatsBuffer, tun.Index)
 			if len(out) > 0 {
-				_, err = v.Con.Write(out)
+				_, err = tun.connection.Write(out)
 				if err != nil {
-					ERROR("unable to ping tunnel: ", v.Meta.Tag)
+					ERROR("unable to ping tunnel: ", tun.id, meta.Tag)
 				}
 			}
 
 		}
 
-		if time.Since(v.TunnelSTATS.PingTime).Seconds() > 30 || err != nil {
-			if v.Meta.AutoReconnect {
-				DEBUG("30+ Seconds since ping from ", v.Meta.Tag, " attempting reconnection")
-				_, _ = PublicConnect(v.ClientCR)
+		if time.Since(tun.pingTime).Seconds() > 30 || err != nil {
+			if meta.AutoReconnect {
+				DEBUG("30+ Seconds since ping from ", meta.Tag, " attempting reconnection")
+				_, _ = PublicConnect(tun.cr)
 			} else {
-				DEBUG("30+ Seconds since ping from ", v.Meta.Tag, " disconnecting")
-				_ = Disconnect(v.Meta.WindowsGUID, true, false)
+				DEBUG("30+ Seconds since ping from ", meta.Tag, " disconnecting")
+				_ = Disconnect(meta.WindowsGUID, true, false)
 			}
 		}
-	}
+
+		return true
+	})
 }
 
 func isGatewayATunnel(gateway net.IP) (isTunnel bool) {
-	for _, v := range C.Connections {
-		if v.IPv4Address == gateway.To4().String() {
+	tunnelMapRange(func(tun *TUN) bool {
+		tunnel := tun.tunnel.Load()
+		if tunnel == nil {
 			return true
 		}
-	}
-	return false
+
+		if tunnel.IPv4Address == gateway.To4().String() {
+			isTunnel = true
+			return false
+		}
+		return true
+	})
+
+	return
 }
 
-func getDefaultGatewayAndInterface() {
+func loadDefaultInterface() {
 	defer RecoverAndLogToFile()
+	s := STATE.Load()
+	oldInterface := make([]byte, 4)
+	var newInterface net.IP
+	copy(oldInterface, s.DefaultInterface.To4())
+
 	var err error
-	var onDefault bool = false
-
-	for _, v := range STATEOLD.ActiveConnections {
-		if v.Tag == DefaultTunnelName {
-			onDefault = true
-		}
-	}
-
-	OLD_GATEWAY := make([]byte, 4)
-	var NEW_GATEWAY net.IP
-	copy(OLD_GATEWAY, DEFAULT_GATEWAY.To4())
-
-	NEW_GATEWAY, err = gateway.DiscoverGateway()
+	newInterface, err = gateway.DiscoverInterface()
 	if err != nil {
-		if !onDefault {
-			con, err2 := net.Dial("tcp4", "9.9.9.9")
-			if err2 == nil {
-				newGate := net.ParseIP(strings.Split(con.LocalAddr().String(), ":")[0])
-				if !isGatewayATunnel(newGate) {
-					NEW_GATEWAY = newGate
-				}
-			}
-			ERROR("default gateway not found, err:", err, "//  dial err:", err2)
-		}
+		ERROR("Error looking for default interface", err)
 		return
 	}
 
-	if isGatewayATunnel(NEW_GATEWAY) {
+	if bytes.Equal(oldInterface, newInterface.To4()) {
 		return
 	}
 
-	if bytes.Equal(OLD_GATEWAY, NEW_GATEWAY.To4()) {
-		return
-	}
-
-	DEBUG("new gateway discovered", NEW_GATEWAY)
-	DEFAULT_GATEWAY = NEW_GATEWAY
-
-	DEFAULT_INTERFACE, err = gateway.DiscoverInterface()
-	if err != nil {
-		ERROR("could not find default interface", err)
-		return
-	}
+	DEBUG("new defailt interface discovered", newInterface.To4())
+	s.DefaultInterface = newInterface
 
 	if DNSClient != nil && DNSClient.Dialer != nil {
 		DNSClient.Dialer.LocalAddr = &net.UDPAddr{
-			IP: DEFAULT_INTERFACE,
+			IP: s.DefaultInterface,
 		}
 	}
 
@@ -198,38 +161,63 @@ LOOP:
 			continue
 		}
 		for _, iv := range addrs {
-			if strings.Split(iv.String(), "/")[0] == DEFAULT_INTERFACE.To4().String() {
-				DEFAULT_INTERFACE_ID = v.Index
-				DEFAULT_INTERFACE_NAME = v.Name
-				_ = GetDNSServers(strconv.Itoa(v.Index))
+			if strings.Split(iv.String(), "/")[0] == s.DefaultInterface.To4().String() {
+				s.DefaultInterfaceID = v.Index
+				s.DefaultInterfaceName = v.Name
 				break LOOP
 			}
 		}
 	}
 
-	if DEFAULT_DNS_SERVERS == nil {
-		if C.DNS2Default != "" {
-			DEFAULT_DNS_SERVERS = []string{C.DNS1Default, C.DNS2Default}
-		} else {
-			DEFAULT_DNS_SERVERS = []string{C.DNS1Default}
-		}
-	}
-
 	DEBUG(
 		"Default interface",
-		DEFAULT_INTERFACE_NAME,
-		DEFAULT_INTERFACE_ID,
-		DEFAULT_INTERFACE,
+		s.DefaultInterfaceName,
+		s.DefaultInterfaceID,
+		s.DefaultInterface,
+	)
+}
+
+func loadDefaultGateway() {
+	defer RecoverAndLogToFile()
+	s := STATE.Load()
+
+	var err error
+	oldGateway := make([]byte, 4)
+	var newGateway net.IP
+	copy(oldGateway, s.DefaultGateway.To4())
+
+	newGateway, err = gateway.DiscoverGateway()
+	if err != nil {
+		ERROR("Error looking for default gateway:", err)
+		return
+	}
+
+	if isGatewayATunnel(newGateway.To4()) {
+		return
+	}
+
+	if bytes.Equal(oldGateway, newGateway.To4()) {
+		return
+	}
+
+	DEBUG("new defailt gateway discovered", newGateway.To4())
+	s.DefaultGateway = newGateway
+
+	DEBUG(
+		"Default Gateway",
+		s.DefaultGateway,
 	)
 }
 
 func GetDefaultGateway() {
+	s := STATE.Load()
 	defer func() {
-		if DEFAULT_GATEWAY != nil {
+		if s.DefaultGateway != nil {
 			time.Sleep(5 * time.Second)
 		} else {
 			time.Sleep(2 * time.Second)
 		}
 	}()
-	getDefaultGatewayAndInterface()
+	loadDefaultGateway()
+	loadDefaultInterface()
 }
