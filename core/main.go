@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/x509"
 	"encoding/json"
-	"errors"
 	"log"
 	"os"
 	"os/exec"
@@ -17,63 +16,63 @@ import (
 	"time"
 
 	"github.com/tunnels-is/tunnels/certs"
-	// _ "net/http/pprof"
 )
 
 func InitService() error {
 	defer RecoverAndLogToFile()
+	INFO("Starting Tunnels")
+	cli := CLI.Load()
 
-	INFO("loader", "Starting Tunnels")
+	InitBaseFoldersAndPaths()
 
-	initializeGlobalVariables()
-
-	_ = OSSpecificInit()
-	AdminCheck()
-	InitPaths()
-
-	printInfo()
-
-	CreateBaseFolder()
-	if !MINIMAL {
-		InitLogfile()
-	}
-
-	go StartLogQueueProcessor(routineMonitor)
-
-	if MINIMAL && CLIDNS != "" {
+	if cli.DNS != "" {
 		LoadDNSConfig()
 	} else {
 		LoadConfig()
 	}
 
+	s := STATE.Load()
+
+	if !s.ConsoleLogOnly {
+		var err error
+		LogFile, err = CreateFile(*s.LogFileName.Load())
+		if err != nil {
+			return err
+		}
+
+		// TraceFile, err = CreateFile(*s.TraceFileName.Load())
+		// if err != nil {
+		// 	panic(err)
+		// }
+	}
+
+	INFO("Operating specific initializations")
+	_ = OSSpecificInit()
+	INFO("Checking permissins")
+	AdminCheck()
+
+	// TODO ..
+	printInfo()
 	printInfo2()
 
-	if !MINIMAL {
-		InitDNSHandler()
-		InitBlockListPath()
+	InitDNSHandler()
 
-		go func() {
-			err := ReBuildBlockLists(C)
-			if err == nil {
-				SaveConfig(C)
-				SwapConfig(C)
-			}
-		}()
-	}
-
-	if GLOBAL_STATE.C == nil {
-		ERROR("", "Global state could not be set.. possible config issue")
-		time.Sleep(3 * time.Second)
-		return errors.New("unable to create global state.. possible config error")
-	}
+	INFO("Loading certificates")
 
 	var err error
-	INFO("Loading certificates")
 	CertPool, err = certs.LoadTunnelsCACertPool()
 	if err != nil {
 		DEBUG("Could not load root CA:", err)
-		time.Sleep(3 * time.Second)
 		return err
+	}
+
+	if !MINIMAL {
+		doEvent(highPriorityChannel, func() {
+			err := ReBuildBlockLists()
+			if err == nil {
+				SaveConfig()
+			}
+		})
 	}
 
 	INFO("Tunnels is ready")
@@ -114,31 +113,26 @@ func printInfo() {
 }
 
 func printInfo2() {
+	s := STATE.Load()
 	log.Println("")
 	log.Println("=======================================================================")
 	log.Println("======================= HELPFUL INFORMATION ===========================")
 	log.Println("=======================================================================")
 	log.Println("")
-	log.Printf("APP: https://%s:%s\n", C.APIIP, C.APIPort)
+	log.Printf("APP: https://%s:%s\n", s.APIIP, s.APIPort)
 	log.Println("")
-	log.Println("BASE PATH:", GLOBAL_STATE.BasePath)
+	log.Println("BASE PATH:", s.BasePath)
 	log.Println("")
 	log.Println("- Tunnels request network admin permissions to run.")
-	log.Println("- Remember to configure your DNS servers if you want to use Tunnels DNS functionality.")
+	log.Println("- Remember to configure your DNS servers if you want to prevent DNS leaks.")
 	log.Println("- Remember to turn all logging off if you are concerned about privacy.")
-	log.Println("- There is a --basePath flag that can let you reconfigure the base directory for logs and configs.")
+	log.Println("- There is a --basePath flag that can let you reconfigure the base directory for logs and configs, the default location is where you placed tunnels.")
 	log.Println("")
 	log.Println("=======================================================================")
 	log.Println("=======================================================================")
 }
 
 type X *bool
-
-var (
-	routineMonitor   = make(chan int, 200)
-	interfaceMonitor = make(chan *TunnelInterface, 200)
-	tunnelMonitor    = make(chan *Tunnel, 200)
-)
 
 func LaunchEverything() {
 	defer func() {
@@ -147,10 +141,6 @@ func LaunchEverything() {
 			log.Println(r, string(debug.Stack()))
 		}
 	}()
-
-	if MINIMAL {
-		CLIDisableBlockLists = true
-	}
 
 	CancelContext, CancelFunc = context.WithCancel(GlobalContext)
 	quit = make(chan os.Signal, 10)
@@ -163,33 +153,66 @@ func LaunchEverything() {
 		syscall.SIGILL,
 	)
 
-	// already stared
-	// routineMonitor <- 1
-
-	routineMonitor <- 3
-	routineMonitor <- 4
-	routineMonitor <- 5
-	routineMonitor <- 6
+	newConcurrentSignal("LogProcessor", CancelContext, func() {
+		StartLogQueueProcessor()
+	})
 
 	if !MINIMAL {
-		routineMonitor <- 2
-		routineMonitor <- 7
-
-		// DNS
-		routineMonitor <- 101
-		routineMonitor <- 102
-		routineMonitor <- 103
+		newConcurrentSignal("APIServer", CancelContext, func() {
+			LaunchAPI()
+		})
+		newConcurrentSignal("UDPDNSHandler", CancelContext, func() {
+			StartUDPDNSHandler()
+		})
+		newConcurrentSignal("OpenUI", CancelContext, func() {
+			popUI()
+		})
 	}
 
-	if MINIMAL {
-		routineMonitor <- 200
-	}
+	newConcurrentSignal("Pinger", CancelContext, func() {
+		PingConnections()
+	})
 
-	if POPUI && !MINIMAL {
-		routineMonitor <- 1337
-	}
+	newConcurrentSignal("GatewayChecker", CancelContext, func() {
+		GetDefaultGateway()
+	})
 
+	newConcurrentSignal("LogMapCleaner", CancelContext, func() {
+		CleanUniqueLogMap()
+	})
+
+	newConcurrentSignal("CleanPortAllocs", CancelContext, func() {
+		CleanPortsForAllConnections()
+	})
+
+	newConcurrentSignal("StartTraceWorker", CancelContext, func() {
+		StartTraceProcessor()
+	})
+
+	newConcurrentSignal("CleanDNSCache", CancelContext, func() {
+		CleanDNSCache()
+	})
+
+	newConcurrentSignal("AutoConnect", CancelContext, func() {
+		AutoConnect()
+	})
+
+mainLoop:
 	for {
+
+		select {
+		case high := <-highPriorityChannel:
+			high.method()
+			continue mainLoop
+		case med := <-mediumPriorityChannel:
+			med.method()
+			continue mainLoop
+		case low := <-lowPriorityChannel:
+			low.method()
+			continue mainLoop
+		default:
+		}
+
 		select {
 		case sig := <-quit:
 			DEBUG("", "exit signal caught: ", sig)
@@ -202,62 +225,34 @@ func LaunchEverything() {
 		case Tun := <-tunnelMonitor:
 			go Tun.ReadFromServeTunnel()
 
-		case ID := <-routineMonitor:
-			if ID == 1 {
-				go StartLogQueueProcessor(routineMonitor)
-			} else if ID == 2 {
-				go LaunchAPI(routineMonitor)
-			} else if ID == 3 {
-				go PingConnections(routineMonitor)
-			} else if ID == 4 {
-				go GetDefaultGateway(routineMonitor)
-			} else if ID == 5 {
-				go CleanUniqueLogMap(routineMonitor)
-			} else if ID == 6 {
-				go CleanPortsForAllConnections(routineMonitor)
-			} else if ID == 7 {
-				go StartTraceProcessor(routineMonitor)
-			} else if ID == 101 {
-				go CleanDNSCache(routineMonitor)
-			} else if ID == 102 {
-				//
-			} else if ID == 103 {
-				go StartUDPDNSHandler(routineMonitor)
-			} else if ID == 200 {
-				go AutoConnect(routineMonitor)
-			} else if ID == 1337 {
-				go popUI()
-			}
+		case signal := <-concurrencyMonitor:
+			DEBUG(signal.tag)
+			go signal.execute()
+
 		default:
 			time.Sleep(200 * time.Millisecond)
 		}
 	}
 }
 
-func SaveConfig(c *Config) (err error) {
-	var config *os.File
-	defer func() {
-		if config != nil {
-			_ = config.Close()
-		}
-	}()
+func SaveConfig() (err error) {
 	defer RecoverAndLogToFile()
+	s := STATE.Load()
 
-	// c.Version = GLOBAL_STATE.Version
-
-	cb, err := json.Marshal(c)
+	cb, err := json.Marshal(s)
 	if err != nil {
 		ERROR("Unable to marshal config into bytes: ", err)
 		return err
 	}
 
-	config, err = os.Create(GLOBAL_STATE.ConfigPath)
+	f, err := CreateFile(s.ConfigFileName)
 	if err != nil {
 		ERROR("Unable to create new config", err)
 		return err
 	}
+	defer f.Close()
 
-	_, err = config.Write(cb)
+	_, err = f.Write(cb)
 	if err != nil {
 		ERROR("Unable to write config bytes to new config file: ", err)
 		return err
@@ -273,9 +268,10 @@ func LoadDNSConfig() {
 			ERROR(r, string(debug.Stack()))
 		}
 	}()
+	DEBUG("Loading DNS Configurations")
 
 	err := LoadExistingConfig()
-	GLOBAL_STATE.C = C
+	STATEOLD.C = C
 	if err == nil {
 		for i := range C.Connections {
 			if C.Connections[i] == nil {
@@ -302,7 +298,7 @@ func LoadDNSConfig() {
 				}
 
 				if changed {
-					GLOBAL_STATE.C = C
+					STATEOLD.C = C
 					SaveConfig(C)
 					break
 				}
@@ -328,14 +324,14 @@ func LoadDNSConfig() {
 	C.DNSstats = false
 	C.AvailableBlockLists = make([]*BlockList, 0)
 
-	GLOBAL_STATE.C = C
+	STATEOLD.C = C
 	SaveConfig(C)
 	DEBUG("Configurations loaded")
 }
 
 func LoadExistingConfig() (err error) {
-	GLOBAL_STATE.ConfigPath = GLOBAL_STATE.BasePath + "config.json"
-	config, err := os.ReadFile(GLOBAL_STATE.ConfigPath)
+	STATEOLD.ConfigFileName = STATEOLD.BasePath + "config.json"
+	config, err := os.ReadFile(STATEOLD.ConfigFileName)
 	if err != nil {
 		return
 	}
@@ -356,6 +352,7 @@ func LoadConfig() {
 			ERROR(r, string(debug.Stack()))
 		}
 	}()
+	DEBUG("Loading configurations from file")
 
 	var config *os.File
 	var err error
@@ -365,13 +362,13 @@ func LoadConfig() {
 		}
 	}()
 
-	if GLOBAL_STATE.C != nil {
+	if STATEOLD.C != nil {
 		DEBUG("Config already loaded")
 		return
 	}
 
 	// GLOBAL_STATE.ConfigPath = GLOBAL_STATE.BasePath + "config.json"
-	DEBUG("Loading config from: ", GLOBAL_STATE.ConfigPath)
+	DEBUG("Loading config from: ", STATEOLD.ConfigFileName)
 	// config, err = os.Open(GLOBAL_STATE.ConfigPath)
 	err = LoadExistingConfig()
 	if err != nil {
@@ -413,13 +410,13 @@ func LoadConfig() {
 			return
 		}
 
-		config, err = os.Create(GLOBAL_STATE.ConfigPath)
+		config, err = os.Create(STATEOLD.ConfigFileName)
 		if err != nil {
 			ERROR("Unable to create new config file: ", err)
 			return
 		}
 
-		err = os.Chmod(GLOBAL_STATE.ConfigPath, 0o777)
+		err = os.Chmod(STATEOLD.ConfigFileName, 0o777)
 		if err != nil {
 			ERROR("Unable to change ownership of log file: ", err)
 			return
@@ -436,19 +433,14 @@ func LoadConfig() {
 
 	applyCertificateDefaults(C)
 
-	GLOBAL_STATE.C = C
+	STATEOLD.C = C
 	if len(C.AvailableBlockLists) == 0 && !CLIDisableBlockLists {
 		C.AvailableBlockLists = GetDefaultBlockLists()
-		GLOBAL_STATE.C.AvailableBlockLists = C.AvailableBlockLists
+		STATEOLD.C.AvailableBlockLists = C.AvailableBlockLists
 		SaveConfig(C)
 	}
 
 	DEBUG("Configurations loaded")
-}
-
-func SwapConfig(newConfig *Config) {
-	C = newConfig
-	GLOBAL_STATE.C = C
 }
 
 func applyCertificateDefaults(cfg *Config) {

@@ -8,38 +8,55 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/tunnels-is/tunnels/certs"
 	"github.com/zveinn/crypt"
 )
 
 func init() {
 	STATE.Store(&stateV2{})
-}
-
-func GetState() (s *stateV2) {
-	s = STATE.Load()
-	if s == nil {
-		STATE.Store(&stateV2{})
-		s = STATE.Load()
-	}
-	return
+	CLI.Store(&cliParameters{})
 }
 
 var (
-	version = "x.x.x"
+	version = "2.0.0"
 	STATE   atomic.Pointer[stateV2]
-	TUNNELS []atomic.Pointer[TUN]
+	CLI     atomic.Pointer[cliParameters]
+	TUNNELS sync.Map
 
-	LogQueue    = make(chan string, 1000)
-	APILogQueue = make(chan string, 1000)
+	LogQueue      = make(chan string, 1000)
+	APILogQueue   = make(chan string, 1000)
+	logRecordHash sync.Map
+
+	// routineMonitor     = make(chan int, 200)
+	concurrencyMonitor = make(chan *goSignal, 1000)
+	interfaceMonitor   = make(chan *TunnelInterface, 200)
+	tunnelMonitor      = make(chan *Tunnel, 200)
+
+	// testing
+	highPriorityChannel   = make(chan *event, 100)
+	mediumPriorityChannel = make(chan *event, 100)
+	lowPriorityChannel    = make(chan *event, 100)
 
 	quit          = make(chan os.Signal, 10)
 	GlobalContext = context.Background()
 	CancelContext context.Context
 	CancelFunc    context.CancelFunc
+
+	// DNS
+	DNSBlockList   atomic.Pointer[sync.Map]
+	DNSBlocksMap   map[string]*DNSStats
+	DNSResolvesMap map[string]*DNSStats
+
+	DNSLock         = sync.Mutex{}
+	DNSBlockedList  = make(map[string]*DNSStats)
+	DNSResolvedList = make(map[string]*DNSStats)
+	DNSCache        = make(map[string]*DNSReply)
+	DNSCacheLock    = sync.Mutex{}
+	UsePrimaryDNS   = true
 )
 
-type CLIParameters struct {
+type cliParameters struct {
 	DeviceKey          string
 	DNS                string
 	Host               string
@@ -48,18 +65,12 @@ type CLIParameters struct {
 	ServerID           string
 	DisableBlockLists  bool
 	DisableVPLFirewall bool
+	BasePath           string
 }
 
-type paths string
-
-const (
-	Path_base   paths = "basePath"
-	Path_config paths = "configPath"
-	Path_log    paths = "logPath"
-)
-
 type stateV2 struct {
-	CLI CLIParameters
+	// ??
+	adminState bool
 
 	// Networking parameters
 	DefaultGateway     atomic.Pointer[net.IP]
@@ -67,11 +78,10 @@ type stateV2 struct {
 	DefaultInterfaceID atomic.Pointer[int]
 
 	// Disk Paths and filenames
-	BlockListPath string
-	// LogPath       string
-	// ConfigPath    string
-	Paths sync.Map
-	// BasePath      atomic.Pointer[string]
+	BlockListPath  string
+	LogPath        string
+	ConfigFileName string
+	BasePath       string
 
 	TraceFileName atomic.Pointer[string]
 	TracePath     atomic.Pointer[string]
@@ -121,20 +131,13 @@ const (
 	TUN_Error
 )
 
-func loopTunnels(do func(index int, t *TUN) bool) {
-	for i := range TUNNELS {
-		t := TUNNELS[i].Load()
-		if t != nil {
-			do(i, t)
-		}
-	}
-}
-
 type TUN struct {
+	id    uuid.UUID
 	state TunnelState
-	meta  atomic.Pointer[TunnelMETA]
-	// server atomic.Pointer[any]
-	tunif atomic.Pointer[TunnelInterface]
+
+	meta   atomic.Pointer[TunnelMETA]
+	server atomic.Pointer[any]
+	tunif  atomic.Pointer[TunnelInterface]
 
 	// Network connection to server
 	con net.Conn

@@ -26,11 +26,10 @@ func FullCleanDNSCache() {
 	DNSCache = make(map[string]*DNSReply)
 }
 
-func CleanDNSCache(MONITOR chan int) {
+func CleanDNSCache() {
 	defer func() {
 		DNSCacheLock.Unlock()
 		time.Sleep(60 * time.Second)
-		MONITOR <- 101
 	}()
 	DNSCacheLock.Lock()
 	defer RecoverAndLogToFile()
@@ -45,6 +44,7 @@ func CleanDNSCache(MONITOR chan int) {
 }
 
 func InitDNSHandler() {
+	DEBUG("Starting DNS Handler")
 	DNSClient.Dialer = new(net.Dialer)
 	DNSClient.Dialer.Resolver = new(net.Resolver)
 	DNSClient.Dialer.Resolver.PreferGo = false
@@ -54,21 +54,17 @@ func InitDNSHandler() {
 	DNSClient.ReadTimeout = time.Duration(5 * time.Second)
 }
 
-func StartUDPDNSHandler(MONITOR chan int) {
-	defer func() {
-		RecoverAndLogToFile()
-		time.Sleep(1 * time.Second)
-		MONITOR <- 103
-	}()
+func StartUDPDNSHandler() {
+	defer RecoverAndLogToFile()
 
 	udpHandler := dns.NewServeMux()
 	udpHandler.HandleFunc(".", DNSQuery)
 
-	ip := GLOBAL_STATE.C.DNSServerIP
+	ip := STATEOLD.C.DNSServerIP
 	if ip == "" {
 		ip = "127.0.0.1"
 	}
-	port := GLOBAL_STATE.C.DNSServerPort
+	port := STATEOLD.C.DNSServerPort
 	if port == "" {
 		port = "53"
 	}
@@ -110,10 +106,10 @@ func ResolveDomainLocal(V *Tunnel, m *dns.Msg, w dns.ResponseWriter) {
 		if err != nil {
 			ERROR("DNS: ", m.Question[0].Name, " || ", fmt.Sprintf("(%d)ms ", time.Since(start).Milliseconds()), " || ", V.Meta.Tag, " || ", err)
 		} else {
-			if GLOBAL_STATE.C.LogAllDomains {
+			if STATEOLD.C.LogAllDomains {
 				INFO("DNS: ", m.Question[0].Name, fmt.Sprintf("(%d)ms ", time.Since(start).Milliseconds()), " @ ", V.Meta.Tag, " @ ", server)
 			}
-			if GLOBAL_STATE.C.DNSstats {
+			if STATEOLD.C.DNSstats {
 				IncrementDNSStats(m.Question[0].Name, false, "", r.Answer)
 			}
 		}
@@ -155,10 +151,10 @@ func ResolveDomain(m *dns.Msg, w dns.ResponseWriter) {
 		if err != nil {
 			ERROR("DNS: ", m.Question[0].Name, " || ", fmt.Sprintf("(%d)ms ", time.Since(start).Milliseconds()), " || ", err)
 		} else {
-			if GLOBAL_STATE.C.LogAllDomains {
+			if STATEOLD.C.LogAllDomains {
 				INFO("DNS: ", m.Question[0].Name, fmt.Sprintf("(%d)ms ", time.Since(start).Milliseconds()), " @  ", server)
 			}
-			if GLOBAL_STATE.C.DNSstats {
+			if STATEOLD.C.DNSstats {
 				IncrementDNSStats(m.Question[0].Name, false, "", r.Answer)
 			}
 		}
@@ -305,11 +301,11 @@ func DNSQuery(w dns.ResponseWriter, m *dns.Msg) {
 	}
 
 	if blocked && ServerDNS == nil {
-		if GLOBAL_STATE.C.DNSstats {
+		if STATEOLD.C.DNSstats {
 			IncrementDNSStats(m.Question[0].Name, true, tag, nil)
 		}
 
-		if GLOBAL_STATE.C.LogBlockedDomains {
+		if STATEOLD.C.LogBlockedDomains {
 			INFO("DNS BLOCKED: ", m.Question[0].Name)
 		}
 		err := w.WriteMsg(m)
@@ -338,7 +334,7 @@ func DNSQuery(w dns.ResponseWriter, m *dns.Msg) {
 			return
 		}
 
-		if GLOBAL_STATE.C.LogAllDomains {
+		if STATEOLD.C.LogAllDomains {
 			if Connection != nil {
 				INFO("DNS @ server:", Connection.Meta.Tag, " >> ", m.Question[0].Name, " >> local record found")
 			} else {
@@ -352,7 +348,7 @@ func DNSQuery(w dns.ResponseWriter, m *dns.Msg) {
 			ERROR("Unable to  write dns reply:", err)
 		}
 		w.Close()
-		if GLOBAL_STATE.C.DNSstats {
+		if STATEOLD.C.DNSstats {
 			IncrementDNSStats(m.Question[0].Name, false, tag, outMsg.Answer)
 		}
 		return
@@ -438,7 +434,7 @@ func DNSCacheCheck(m *dns.Msg, w dns.ResponseWriter) bool {
 
 	_ = w.WriteMsg(m)
 	w.Close()
-	if GLOBAL_STATE.C.LogAllDomains {
+	if STATEOLD.C.LogAllDomains {
 		INFO(
 			"DNS CACHE: ",
 			m.Question[0].Name,
@@ -535,7 +531,7 @@ func ResolveDNSAsHTTPS(m *dns.Msg, w dns.ResponseWriter) {
 	}
 
 	INFO("DNS(https): ", m.Question[0].Name, fmt.Sprintf("(%d)ms ", time.Since(start).Milliseconds()), " @  ", server)
-	if GLOBAL_STATE.C.DNSstats {
+	if STATEOLD.C.DNSstats {
 		IncrementDNSStats(m.Question[0].Name, false, "", newx.Answer)
 	}
 }

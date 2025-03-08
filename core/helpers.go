@@ -23,17 +23,12 @@ func IsAlphanumeric(s string) bool {
 }
 
 func CreateConfig(flag *bool) {
-	C.DebugLogging = true
 	if *flag {
-		InitPaths()
+		InitBaseFoldersAndPaths()
 		CreateBaseFolder()
 		LoadConfig()
 		os.Exit(1)
 	}
-}
-
-func InitPaths() {
-	GLOBAL_STATE.BasePath = GenerateBaseFolderPath()
 }
 
 const (

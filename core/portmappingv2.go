@@ -16,15 +16,15 @@ var (
 	noMappingChan   = make(chan []byte, 1000)
 )
 
-func StartTraceProcessor(MONITOR chan int) {
+func StartTraceProcessor() {
+	s := STATE.Load()
 	defer func() {
-		if !GLOBAL_STATE.C.ConnectionTracer {
+		if !s.ConnectionTracer {
 			time.Sleep(10 * time.Second)
 		}
-		MONITOR <- 7
 	}()
 
-	if !GLOBAL_STATE.C.ConnectionTracer {
+	if !s.ConnectionTracer {
 		return
 	}
 
@@ -32,10 +32,15 @@ func StartTraceProcessor(MONITOR chan int) {
 	DEBUG("Tracing module started")
 	var P []byte
 	var M Mapping
+	var err error
 
 	if TraceFile == nil {
-		InitPacketTraceFile()
+		TraceFile, err = CreateFile(*s.LogFileName.Load())
+		if err != nil {
+			return
+		}
 	}
+
 	var ISP bool
 	var ISM bool
 
@@ -207,7 +212,7 @@ func (V *Tunnel) getIngressPortMapping(VPNPortMap []VPNPort, dstIP []byte, port 
 }
 
 func debugMissingEgressMapping(packet []byte) {
-	if !GLOBAL_STATE.C.ConnectionTracer {
+	if !STATEOLD.C.ConnectionTracer {
 		if len(packet) > 60 {
 			DEEP("Missing egress mapping: ", packet[0:60])
 		} else {
@@ -224,7 +229,7 @@ func debugMissingEgressMapping(packet []byte) {
 }
 
 func debugMissingIngressMapping(packet []byte) {
-	if !GLOBAL_STATE.C.ConnectionTracer {
+	if !STATEOLD.C.ConnectionTracer {
 		if len(packet) > 60 {
 			DEEP("Missing ingress mapping: ", packet[0:60])
 		} else {
@@ -240,7 +245,7 @@ func debugMissingIngressMapping(packet []byte) {
 }
 
 func debugMappStream(M *Mapping) {
-	if !GLOBAL_STATE.C.ConnectionTracer {
+	if !STATEOLD.C.ConnectionTracer {
 		return
 	}
 	select {
@@ -311,10 +316,9 @@ func (V *Tunnel) cleanPortMap() {
 	}
 }
 
-func CleanPortsForAllConnections(MONITOR chan int) {
+func CleanPortsForAllConnections() {
 	defer func() {
 		time.Sleep(10 * time.Second)
-		MONITOR <- 6
 	}()
 	defer RecoverAndLogToFile()
 	for i := range TunList {

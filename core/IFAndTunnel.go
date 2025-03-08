@@ -206,9 +206,9 @@ func createMinimalConnection() (M *TunnelMETA) {
 }
 
 func FindMETAForConnectRequest(CC *ConnectionRequest) *TunnelMETA {
-	for i, v := range GLOBAL_STATE.C.Connections {
+	for i, v := range STATEOLD.C.Connections {
 		if strings.EqualFold(v.Tag, CC.Tag) {
-			return GLOBAL_STATE.C.Connections[i]
+			return STATEOLD.C.Connections[i]
 		}
 	}
 	return nil
@@ -229,14 +229,14 @@ func findTunnelByGUID(GUID string) (CON *Tunnel) {
 }
 
 func findDefaultTunnelMeta() (M *TunnelMETA) {
-	for i := range GLOBAL_STATE.C.Connections {
-		if GLOBAL_STATE.C.Connections[i] == nil {
+	for i := range STATEOLD.C.Connections {
+		if STATEOLD.C.Connections[i] == nil {
 			continue
 		}
-		c := GLOBAL_STATE.C.Connections[i]
+		c := STATEOLD.C.Connections[i]
 
 		if strings.ToLower(c.IFName) == DefaultTunnelName {
-			return GLOBAL_STATE.C.Connections[i]
+			return STATEOLD.C.Connections[i]
 		}
 	}
 
