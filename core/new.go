@@ -15,20 +15,24 @@ import (
 
 func init() {
 	STATE.Store(&stateV2{})
-	CLI.Store(&cliParameters{})
 }
 
 var (
-	version = "2.0.0"
-	STATE   atomic.Pointer[stateV2]
-	CLI     atomic.Pointer[cliParameters]
-	TUNNELS sync.Map
+	apiVersion = 1
+	version    = "2.0.0"
+	STATE      atomic.Pointer[stateV2]
+	CONFIG     atomic.Pointer[ConfigV2]
 
+	// Tunnels, Servers, Meta
+	TunnelMetaMap sync.Map
+	TunnelMap     sync.Map
+
+	// Logs stuff
 	LogQueue      = make(chan string, 1000)
 	APILogQueue   = make(chan string, 1000)
 	logRecordHash sync.Map
 
-	// routineMonitor     = make(chan int, 200)
+	// Go Routine monitors
 	concurrencyMonitor = make(chan *goSignal, 1000)
 	interfaceMonitor   = make(chan *TunnelInterface, 200)
 	tunnelMonitor      = make(chan *Tunnel, 200)
@@ -38,25 +42,29 @@ var (
 	mediumPriorityChannel = make(chan *event, 100)
 	lowPriorityChannel    = make(chan *event, 100)
 
+	// Context
 	quit          = make(chan os.Signal, 10)
 	GlobalContext = context.Background()
 	CancelContext context.Context
 	CancelFunc    context.CancelFunc
 
-	// DNS
-	DNSBlockList   atomic.Pointer[sync.Map]
-	DNSBlocksMap   map[string]*DNSStats
-	DNSResolvesMap map[string]*DNSStats
+	// API
+	DefaultAPIIP   = "127.0.0.1"
+	DefaultAPIPort = "7777"
 
-	DNSLock         = sync.Mutex{}
-	DNSBlockedList  = make(map[string]*DNSStats)
-	DNSResolvedList = make(map[string]*DNSStats)
-	DNSCache        = make(map[string]*DNSReply)
-	DNSCacheLock    = sync.Mutex{}
-	UsePrimaryDNS   = true
+	// DNS
+	DefaultDNSIP   = "127.0.0.1"
+	DefaultDNSPort = "53"
+	DNSGlobalBlock atomic.Bool
+	DNSBlockList   atomic.Pointer[sync.Map]
+	DNSCache       sync.Map
+	DNSStatsMap    sync.Map
 )
 
-type cliParameters struct {
+type ConfigV2 struct {
+	Minimal bool
+	OpenUI  bool
+
 	DeviceKey          string
 	DNS                string
 	Host               string
@@ -65,29 +73,17 @@ type cliParameters struct {
 	ServerID           string
 	DisableBlockLists  bool
 	DisableVPLFirewall bool
-	BasePath           string
-}
 
-type stateV2 struct {
-	// ??
-	adminState bool
+	// API Setting
+	APIIP          string
+	APIPort        string
+	APICert        string
+	APIKey         string
+	APICertDomains []string
+	APICertIPs     []string
+	APICertType    certs.CertType
 
-	// Networking parameters
-	DefaultGateway     atomic.Pointer[net.IP]
-	DefaultInterface   atomic.Pointer[net.IP]
-	DefaultInterfaceID atomic.Pointer[int]
-
-	// Disk Paths and filenames
-	BlockListPath  string
-	LogPath        string
-	ConfigFileName string
-	BasePath       string
-
-	TraceFileName atomic.Pointer[string]
-	TracePath     atomic.Pointer[string]
-	LogFileName   atomic.Pointer[string]
-
-	// Generic configurations
+	// Generic
 	DarkMode          bool
 	LogBlockedDomains bool
 	LogAllDomains     bool
@@ -99,25 +95,36 @@ type stateV2 struct {
 	ConsoleLogOnly    bool
 	ConnectionTracer  bool
 
-	// DNS configurations
-	DNS1Default         atomic.Pointer[string]
-	DNS2Default         atomic.Pointer[string]
-	DNSOverHTTPS        atomic.Bool
-	DNSstats            atomic.Bool
-	DNSServerIP         atomic.Pointer[string]
-	DNSServerPort       atomic.Pointer[string]
+	// DNS
+	DNS1Default         string
+	DNS2Default         string
+	DNSOverHTTPS        bool
+	DNSstats            bool
+	DNSServerIP         string
+	DNSServerPort       string
 	EnabledBlockLists   []string
 	AvailableBlockLists []*BlockList
 	DNSRecords          []*ServerDNS
+}
 
-	// API Setting
-	APIIP          string
-	APIPort        string
-	APICert        string
-	APIKey         string
-	APICertDomains []string
-	APICertIPs     []string
-	APICertType    certs.CertType
+type stateV2 struct {
+	adminState bool
+
+	// Networking parameters
+	DefaultGateway       net.IP
+	DefaultInterface     net.IP
+	DefaultInterfaceID   int
+	DefaultInterfaceName string
+
+	// Disk Paths and filenames
+	BlockListPath  string
+	LogPath        string
+	ConfigFileName string
+	BasePath       string
+	TunnelsPath    string
+	TraceFileName  atomic.Pointer[string]
+	TracePath      atomic.Pointer[string]
+	LogFileName    atomic.Pointer[string]
 }
 
 type TunnelState int
@@ -125,29 +132,41 @@ type TunnelState int
 const (
 	TUN_NotReady TunnelState = iota
 	TUN_Ready
-	TUN_Connecting
-	TUN_Connected
-	TUN_Disconnected
 	TUN_Error
+	TUN_Disconnected
+	// >= TUN_Connected is reserved for connected or potentially connected states
+	TUN_Connected
+	TUN_Connecting
 )
+
+func (t *TUN) GetState() TunnelState {
+	ts := t.state.Load()
+	if ts == nil {
+		return TUN_NotReady
+	}
+
+	return *ts
+}
 
 type TUN struct {
 	id    uuid.UUID
-	state TunnelState
+	state atomic.Pointer[TunnelState]
+	tag   string
 
 	meta   atomic.Pointer[TunnelMETA]
 	server atomic.Pointer[any]
-	tunif  atomic.Pointer[TunnelInterface]
+	tunnel atomic.Pointer[TunnelInterface]
 
-	// Network connection to server
-	con net.Conn
+	// encWrapper wraps connection with encryption
+	encWrapper      *crypt.SocketWrapper
+	connection      net.Conn
+	ServerCertBytes []byte `json:"-"`
 
-	// Connection Requests
-	cr        ConnectionRequest
-	crReponse ConnectRequestResponse
+	// Connection Requests + Response
+	cr        *ConnectionRequest
+	crReponse *ConnectRequestResponse
 
 	// Stats
-	tag           string
 	egressBytes   int
 	egressString  string
 	ingressBytes  int
@@ -169,9 +188,6 @@ type TUN struct {
 	mEM                 byte
 	derverToClientMicro int64
 	pingTime            time.Time
-
-	// Encryption
-	EncryptionHandler *crypt.SocketWrapper
 
 	// Random mappint stuff
 	LOCAL_IF_IP [4]byte

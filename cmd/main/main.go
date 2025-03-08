@@ -24,6 +24,5 @@ func main() {
 
 	core.DIST_EMBED = DIST
 	core.DLL_EMBED = DLL
-	core.POPUI = true
 	service.Start()
 }

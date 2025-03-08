@@ -1,16 +1,12 @@
 package core
 
 import (
-	"fmt"
-	"net"
 	"os"
 	"regexp"
 	"runtime/debug"
 	"strings"
-	"time"
 
 	"github.com/google/uuid"
-	"github.com/miekg/dns"
 )
 
 func CreateConnectionUUID() string {
@@ -26,7 +22,7 @@ func CreateConfig(flag *bool) {
 	if *flag {
 		InitBaseFoldersAndPaths()
 		CreateBaseFolder()
-		LoadConfig()
+		loadConfigFromDisk()
 		os.Exit(1)
 	}
 }
@@ -66,48 +62,51 @@ func GetDomainAndSubDomain(domain string) (d, s string) {
 	return
 }
 
-func isAppDNS(m *dns.Msg, w dns.ResponseWriter) bool {
-	domain, subdomain := GetDomainAndSubDomain(m.Question[0].Name)
-	if domain == "" {
-		return false
-	}
-
-	start := time.Now()
-	rm := new(dns.Msg)
-	rm.SetReply(m)
-	rm.Authoritative = true
-	rm.Compress = true
-	var full string
-	if subdomain != "" {
-		full = subdomain + "." + domain
-	} else {
-		full = domain
-	}
-
-	for _, v := range C.APICertDomains {
-		if full == v+"." {
-			rm.Answer = append(rm.Answer, &dns.A{
-				Hdr: dns.RR_Header{
-					Class:  dns.TypeA,
-					Rrtype: dns.ClassINET,
-					Name:   rm.Question[0].Name,
-					Ttl:    5,
-				},
-				A: net.ParseIP(C.APICertIPs[0]).To4(),
-			})
-			err := w.WriteMsg(rm)
-			if err != nil {
-				ERROR("Unable to write app dns reply:", err)
-			} else {
-				INFO("DNS: ", m.Question[0].Name, fmt.Sprintf("(%d)ms ", time.Since(start).Milliseconds()), " @ local")
-			}
-			w.Close()
-			return true
-		}
-	}
-
-	return false
-}
+// We don't want to use this yet, but I want to keep it around for now.
+// We don't want to use this yet, but I want to keep it around for now.
+// We don't want to use this yet, but I want to keep it around for now.
+// func isAppDNS(m *dns.Msg, w dns.ResponseWriter) bool {
+// 	domain, subdomain := GetDomainAndSubDomain(m.Question[0].Name)
+// 	if domain == "" {
+// 		return false
+// 	}
+//
+// 	start := time.Now()
+// 	rm := new(dns.Msg)
+// 	rm.SetReply(m)
+// 	rm.Authoritative = true
+// 	rm.Compress = true
+// 	var full string
+// 	if subdomain != "" {
+// 		full = subdomain + "." + domain
+// 	} else {
+// 		full = domain
+// 	}
+//
+// 	for _, v := range C.APICertDomains {
+// 		if full == v+"." {
+// 			rm.Answer = append(rm.Answer, &dns.A{
+// 				Hdr: dns.RR_Header{
+// 					Class:  dns.TypeA,
+// 					Rrtype: dns.ClassINET,
+// 					Name:   rm.Question[0].Name,
+// 					Ttl:    5,
+// 				},
+// 				A: net.ParseIP(C.APICertIPs[0]).To4(),
+// 			})
+// 			err := w.WriteMsg(rm)
+// 			if err != nil {
+// 				ERROR("Unable to write app dns reply:", err)
+// 			} else {
+// 				INFO("DNS: ", m.Question[0].Name, fmt.Sprintf("(%d)ms ", time.Since(start).Milliseconds()), " @ local")
+// 			}
+// 			w.Close()
+// 			return true
+// 		}
+// 	}
+//
+// 	return false
+// }
 
 func DNSAMapping(DNS []*ServerDNS, fullDomain string) *ServerDNS {
 	domain, subdomain := GetDomainAndSubDomain(fullDomain)

@@ -8,7 +8,6 @@ import (
 	"net"
 	"os"
 	"os/exec"
-	"runtime/debug"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -607,16 +606,11 @@ func RestoreSaneDNSDefaults() {
 	// not implemented for unix
 }
 
-func GetDNSServers(id string) error {
-	// not implemented for unix
-	DEFAULT_DNS_SERVERS = nil
-	return nil
-}
-
 func IPv6Enabled() bool {
-	out, err := exec.Command("bash", "-c", "cat /proc/sys/net/ipv6/conf/"+DEFAULT_INTERFACE_NAME+"/disable_ipv6").CombinedOutput()
+	s := STATE.Load()
+	out, err := exec.Command("bash", "-c", "cat /proc/sys/net/ipv6/conf/"+s.DefaultInterfaceName+"/disable_ipv6").CombinedOutput()
 	if err != nil {
-		ERROR("Error getting ipv6 settings for interface: ", DEFAULT_INTERFACE_NAME, " || msg: ", err, " || output: ", string(out))
+		ERROR("Error getting ipv6 settings for interface: ", s.DefaultInterfaceName, " || msg: ", err, " || output: ", string(out))
 		return true
 	}
 
@@ -627,23 +621,17 @@ func IPv6Enabled() bool {
 }
 
 func AdjustRoutersForTunneling() (err error) {
-	defer func() {
-		r := recover()
-		if r != nil {
-			ERROR(r, string(debug.Stack()))
-		}
-	}()
-	DEBUG("Adjusting route metrics")
+	defer RecoverAndLogToFile()
 
 	links, _ := netlink.LinkList()
 	for _, v := range links {
 		routes, _ := netlink.RouteList(v, 4)
 		for _, r := range routes {
 			if r.Dst == nil && r.Priority < 2 {
-				DEBUG("ADJUST DEFAULT ROUTE: ", r)
+				DEBUG("Adjusting Default Route: ", r)
 				_ = netlink.RouteDel(&r)
 				r.Priority = 100
-				_ = netlink.RouteDel(&r)
+				_ = netlink.RouteAdd(&r)
 				return
 			}
 		}

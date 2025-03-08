@@ -15,32 +15,31 @@ import (
 )
 
 func FullCleanDNSCache() {
-	defer func() {
-		RecoverAndLogToFile()
-		DNSCacheLock.Unlock()
-	}()
-	DNSCacheLock.Lock()
-
+	defer RecoverAndLogToFile()
 	INFO("Dumping DNS cache")
-	DNSCache = nil
-	DNSCache = make(map[string]*DNSReply)
+	DNSCache.Clear()
 }
 
 func CleanDNSCache() {
 	defer func() {
-		DNSCacheLock.Unlock()
-		time.Sleep(60 * time.Second)
+		time.Sleep(30 * time.Second)
 	}()
-	DNSCacheLock.Lock()
 	defer RecoverAndLogToFile()
 
-	INFO("cleaning DNS cache")
+	INFO("Cleaning DNS cache")
 
-	for i, v := range DNSCache {
-		if time.Since(v.Expires).Seconds() > 1 {
-			delete(DNSCache, i)
+	DNSCache.Range(func(key, value any) bool {
+		dr, ok := value.(*DNSReply)
+		if !ok {
+			return true
 		}
-	}
+
+		if time.Since(dr.Expires).Seconds() > 1 {
+			DNSCache.Delete(key)
+		}
+
+		return true
+	})
 }
 
 func InitDNSHandler() {
@@ -60,13 +59,15 @@ func StartUDPDNSHandler() {
 	udpHandler := dns.NewServeMux()
 	udpHandler.HandleFunc(".", DNSQuery)
 
-	ip := STATEOLD.C.DNSServerIP
+	conf := CONFIG.Load()
+	ip := conf.DNSServerIP
 	if ip == "" {
-		ip = "127.0.0.1"
+		ip = DefaultDNSIP
 	}
-	port := STATEOLD.C.DNSServerPort
+
+	port := conf.DNSServerPort
 	if port == "" {
-		port = "53"
+		port = DefaultDNSPort
 	}
 
 	UDPDNSServer = &dns.Server{
@@ -83,10 +84,11 @@ func StartUDPDNSHandler() {
 	}
 }
 
-func ResolveDomainLocal(V *Tunnel, m *dns.Msg, w dns.ResponseWriter) {
+func ResolveDomainLocal(V *TUN, m *dns.Msg, w dns.ResponseWriter) {
 	if GlobalBlockEnabled(m, w) {
 		return
 	}
+
 	dialer := new(net.Dialer)
 	dialer.LocalAddr = &net.UDPAddr{
 		IP: DEFAULT_INTERFACE.To4(),
@@ -101,15 +103,16 @@ func ResolveDomainLocal(V *Tunnel, m *dns.Msg, w dns.ResponseWriter) {
 	var r *dns.Msg
 	var err error
 	var server string
+	conf := CONFIG.Load()
 
 	defer func() {
 		if err != nil {
 			ERROR("DNS: ", m.Question[0].Name, " || ", fmt.Sprintf("(%d)ms ", time.Since(start).Milliseconds()), " || ", V.Meta.Tag, " || ", err)
 		} else {
-			if STATEOLD.C.LogAllDomains {
+			if conf.LogAllDomains {
 				INFO("DNS: ", m.Question[0].Name, fmt.Sprintf("(%d)ms ", time.Since(start).Milliseconds()), " @ ", V.Meta.Tag, " @ ", server)
 			}
-			if STATEOLD.C.DNSstats {
+			if conf.DNSstats {
 				IncrementDNSStats(m.Question[0].Name, false, "", r.Answer)
 			}
 		}
@@ -147,24 +150,26 @@ func ResolveDomain(m *dns.Msg, w dns.ResponseWriter) {
 	var err error
 	var r *dns.Msg
 	var server string
+	conf := CONFIG.Load()
+
 	defer func() {
 		if err != nil {
 			ERROR("DNS: ", m.Question[0].Name, " || ", fmt.Sprintf("(%d)ms ", time.Since(start).Milliseconds()), " || ", err)
 		} else {
-			if STATEOLD.C.LogAllDomains {
+			if conf.LogAllDomains {
 				INFO("DNS: ", m.Question[0].Name, fmt.Sprintf("(%d)ms ", time.Since(start).Milliseconds()), " @  ", server)
 			}
-			if STATEOLD.C.DNSstats {
+			if conf.DNSstats {
 				IncrementDNSStats(m.Question[0].Name, false, "", r.Answer)
 			}
 		}
 	}()
 
-	r, _, err = DNSClient.Exchange(m, C.DNS1Default+":53")
-	server = C.DNS1Default
-	if err != nil && C.DNS2Default != "" {
-		r, _, err = DNSClient.Exchange(m, C.DNS2Default+":53")
-		server = C.DNS2Default
+	r, _, err = DNSClient.Exchange(m, conf.DNS1Default+":53")
+	server = conf.DNS1Default
+	if err != nil && conf.DNS2Default != "" {
+		r, _, err = DNSClient.Exchange(m, conf.DNS2Default+":53")
+		server = conf.DNS2Default
 	}
 
 	if err != nil {
@@ -243,7 +248,7 @@ func ProcessDNSMsg(m *dns.Msg, DNS *ServerDNS) (rm *dns.Msg) {
 }
 
 func GlobalBlockEnabled(m *dns.Msg, w dns.ResponseWriter) bool {
-	if BLOCK_DNS_QUERIES {
+	if DNSGlobalBlock.Load() {
 		_ = w.WriteMsg(m)
 		w.Close()
 		INFO("DNS BLOCKED (connection switching in progress): ", m.Question[0].Name)
@@ -254,11 +259,10 @@ func GlobalBlockEnabled(m *dns.Msg, w dns.ResponseWriter) bool {
 
 func DNSQuery(w dns.ResponseWriter, m *dns.Msg) {
 	defer RecoverAndLogToFile()
-	// ip := strings.Split(w.RemoteAddr().String(), ":")[0]
 
-	if isAppDNS(m, w) {
-		return
-	}
+	// if isAppDNS(m, w) {
+	// 	return
+	// }
 
 	if !isValidDomain(m, w) {
 		return
@@ -270,44 +274,49 @@ func DNSQuery(w dns.ResponseWriter, m *dns.Msg) {
 
 	blocked, tag := isBlocked(m)
 
-	var Connection *Tunnel
+	var DNSTunnel *TUN
 	var ServerDNS *ServerDNS
-	for i, con := range TunList {
-		if con == nil {
-			continue
+	tunnelMapRange(func(tun *TUN) bool {
+		if tun.GetState() != TUN_Connected {
+			return true
 		}
 
-		if !con.Connected {
-			continue
+		meta := tun.meta.Load()
+		if meta == nil {
+			return true
 		}
 
-		if con.Meta.DNSBlocking && blocked {
-			continue
+		if meta.DNSBlocking && blocked {
+			return true
 		}
 
-		if con.CRR == nil {
-			continue
+		if tun.crReponse == nil {
+			return true
 		}
 
-		ServerDNS = DNSAMapping(con.CRR.DNS, m.Question[0].Name)
+		ServerDNS = DNSAMapping(tun.crReponse.DNS, m.Question[0].Name)
 		if ServerDNS != nil {
-			Connection = TunList[i]
-			break
+			DNSTunnel = tun
+			return false
 		}
-	}
 
+		return true
+	})
+
+	conf := CONFIG.Load()
 	if ServerDNS == nil {
-		ServerDNS = DNSAMapping(C.DNSRecords, m.Question[0].Name)
+		ServerDNS = DNSAMapping(conf.DNSRecords, m.Question[0].Name)
 	}
 
 	if blocked && ServerDNS == nil {
-		if STATEOLD.C.DNSstats {
+		if conf.DNSstats {
 			IncrementDNSStats(m.Question[0].Name, true, tag, nil)
 		}
 
-		if STATEOLD.C.LogBlockedDomains {
+		if conf.LogBlockedDomains {
 			INFO("DNS BLOCKED: ", m.Question[0].Name)
 		}
+
 		err := w.WriteMsg(m)
 		if err != nil {
 			ERROR("Unable to  write dns reply:", err)
@@ -330,13 +339,13 @@ func DNSQuery(w dns.ResponseWriter, m *dns.Msg) {
 			DEBUG("Redirect DNS to VPN: ", m.Question[0].Name)
 			// Redirect DNS query to local VPN network if we
 			// have the domain on record but no records.
-			ResolveDomainLocal(Connection, m, w)
+			ResolveDomainLocal(DNSTunnel, m, w)
 			return
 		}
 
-		if STATEOLD.C.LogAllDomains {
-			if Connection != nil {
-				INFO("DNS @ server:", Connection.Meta.Tag, " >> ", m.Question[0].Name, " >> local record found")
+		if conf.LogAllDomains {
+			if DNSTunnel != nil {
+				INFO("DNS @ server:", DNSTunnel.Meta.Tag, " >> ", m.Question[0].Name, " >> local record found")
 			} else {
 				INFO("DNS @ local:", m.Question[0].Name, " >> local record found")
 			}
@@ -347,8 +356,9 @@ func DNSQuery(w dns.ResponseWriter, m *dns.Msg) {
 		if err != nil {
 			ERROR("Unable to  write dns reply:", err)
 		}
+
 		w.Close()
-		if STATEOLD.C.DNSstats {
+		if conf.DNSstats {
 			IncrementDNSStats(m.Question[0].Name, false, tag, outMsg.Answer)
 		}
 		return
@@ -366,7 +376,7 @@ func DNSQuery(w dns.ResponseWriter, m *dns.Msg) {
 		return
 	}
 
-	if C.DNSOverHTTPS {
+	if conf.DNSOverHTTPS {
 		ResolveDNSAsHTTPS(m, w)
 	} else {
 		ResolveDomain(m, w)
@@ -390,7 +400,7 @@ DONE:
 	if shouldDrop {
 		_ = w.WriteMsg(m)
 		w.Close()
-		INFO("Invalid domain: ", m.Question[0].Name)
+		DEBUG("Invalid domain: ", m.Question[0].Name)
 		return false
 	}
 
@@ -408,17 +418,17 @@ func CacheDnsReply(reply *dns.Msg) {
 	copy(RP.A, reply.Answer)
 	TTL := int(reply.Answer[0].Header().Ttl)
 	RP.Expires = time.Now().Add(time.Second * time.Duration(TTL))
-	DNSCacheLock.Lock()
-	DNSCache[name] = RP
-	DNSCacheLock.Unlock()
+	DNSCache.Store(name, RP)
 }
 
 func DNSCacheCheck(m *dns.Msg, w dns.ResponseWriter) bool {
 	nameAndType := m.Question[0].Name + strconv.FormatUint(uint64(m.Question[0].Qtype), 10)
 
-	DNSCacheLock.Lock()
-	cachedReply, ok := DNSCache[nameAndType]
-	DNSCacheLock.Unlock()
+	value, ok := DNSCache.Load(nameAndType)
+	if !ok {
+		return false
+	}
+	cachedReply, ok := value.(*DNSReply)
 	if !ok {
 		return false
 	}
@@ -434,7 +444,8 @@ func DNSCacheCheck(m *dns.Msg, w dns.ResponseWriter) bool {
 
 	_ = w.WriteMsg(m)
 	w.Close()
-	if STATEOLD.C.LogAllDomains {
+	conf := CONFIG.Load()
+	if conf.LogAllDomains {
 		INFO(
 			"DNS CACHE: ",
 			m.Question[0].Name,
@@ -449,11 +460,17 @@ func DNSCacheCheck(m *dns.Msg, w dns.ResponseWriter) bool {
 	return true
 }
 
-func isBlocked(m *dns.Msg) (bool, string) {
+func isBlocked(m *dns.Msg) (ok bool, tag string) {
 	name := strings.TrimSuffix(m.Question[0].Name, ".")
-	DNSBlockLock.Lock()
-	tag, ok := DNSBlockList[name]
-	DNSBlockLock.Unlock()
+	bl := DNSBlockList.Load()
+	if bl == nil {
+		return true, ""
+	}
+
+	tagint, ok := bl.Load(name)
+	if ok {
+		tag = tagint.(string)
+	}
 
 	return ok, tag
 }
@@ -462,6 +479,7 @@ func ResolveDNSAsHTTPS(m *dns.Msg, w dns.ResponseWriter) {
 	if GlobalBlockEnabled(m, w) {
 		return
 	}
+	conf := CONFIG.Load()
 	start := time.Now()
 	x, err := m.Pack()
 	if err != nil {
@@ -479,8 +497,8 @@ func ResolveDNSAsHTTPS(m *dns.Msg, w dns.ResponseWriter) {
 
 	var req1 *http.Request
 	var req2 *http.Request
-	server := C.DNS1Default
-	req1, err = http.NewRequest("POST", "https://"+C.DNS1Default+"/dns-query", bytes.NewBuffer(x))
+	server := conf.DNS1Default
+	req1, err = http.NewRequest("POST", "https://"+conf.DNS1Default+"/dns-query", bytes.NewBuffer(x))
 	if err != nil {
 		ERROR("unable to create http.request for DNS query")
 		return
@@ -491,9 +509,9 @@ func ResolveDNSAsHTTPS(m *dns.Msg, w dns.ResponseWriter) {
 	resp, err := cln.Do(req1)
 	if err != nil {
 
-		if C.DNS2Default != "" {
-			server = C.DNS2Default
-			req2, err = http.NewRequest("POST", "https://"+C.DNS2Default+"/dns-query", bytes.NewBuffer(x))
+		if conf.DNS2Default != "" {
+			server = conf.DNS2Default
+			req2, err = http.NewRequest("POST", "https://"+conf.DNS2Default+"/dns-query", bytes.NewBuffer(x))
 			if err != nil {
 				ERROR("unable to create http.request for DNS query")
 				return
@@ -531,40 +549,36 @@ func ResolveDNSAsHTTPS(m *dns.Msg, w dns.ResponseWriter) {
 	}
 
 	INFO("DNS(https): ", m.Question[0].Name, fmt.Sprintf("(%d)ms ", time.Since(start).Milliseconds()), " @  ", server)
-	if STATEOLD.C.DNSstats {
+	if conf.DNSstats {
 		IncrementDNSStats(m.Question[0].Name, false, "", newx.Answer)
 	}
 }
 
 func IncrementDNSStats(domain string, blocked bool, tag string, answers []dns.RR) {
-	DNSLock.Lock()
 	defer RecoverAndLogToFile()
-	defer DNSLock.Unlock()
 
-	var s *DNSStats
-	var ok bool
-	if blocked {
-		s, ok = DNSBlockedList[domain]
-		if !ok {
-			DNSBlockedList[domain] = new(DNSStats)
-			s = DNSBlockedList[domain]
-			s.Tag = tag
-			s.FirstSeen = time.Now()
-		}
+	var dnsStats *DNSStats
+	dnsint, ok := DNSStatsMap.Load(domain)
+	if !ok {
+		DNSStatsMap.Store(domain, &DNSStats{})
+		dnsint, _ = DNSStatsMap.Load(domain)
+		dnsStats = dnsint.(*DNSStats)
+		dnsStats.Tag = tag
+		dnsStats.FirstSeen = time.Now()
 	} else {
-		s, ok = DNSResolvedList[domain]
-		if !ok {
-			DNSResolvedList[domain] = new(DNSStats)
-			s = DNSResolvedList[domain]
-			s.Tag = tag
-			s.FirstSeen = time.Now()
-		}
+		dnsStats = dnsint.(*DNSStats)
 	}
 
-	s.Count++
-	s.LastSeen = time.Now()
+	if blocked {
+		dnsStats.LastBlocked = time.Now()
+	} else {
+		dnsStats.LastResolved = time.Now()
+	}
+
+	dnsStats.Count++
+	dnsStats.LastSeen = time.Now()
 	for _, v := range answers {
-		s.Answers = append(s.Answers, v.String())
+		dnsStats.Answers = append(dnsStats.Answers, v.String())
 	}
 	return
 }

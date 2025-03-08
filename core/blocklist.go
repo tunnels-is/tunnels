@@ -17,6 +17,7 @@ func ReBuildBlockLists() (listError error) {
 	defer RecoverAndLogToFile()
 	defer runtime.GC()
 	DEBUG("Loading DNS block lists")
+	conf := CONFIG.Load()
 	s := STATE.Load()
 
 	wg := new(sync.WaitGroup)
@@ -34,7 +35,7 @@ func ReBuildBlockLists() (listError error) {
 		var badLines int
 
 		badLines = 0
-		bl := s.AvailableBlockLists[index]
+		bl := conf.AvailableBlockLists[index]
 
 		if CheckIfURL(bl.FullPath) {
 			_, err := os.Stat(bl.DiskPath)
@@ -53,11 +54,10 @@ func ReBuildBlockLists() (listError error) {
 				didDownload = true
 
 				fileName := fmt.Sprintf("%s%s.txt",
-					STATEOLD.BlockListPath,
+					s.BlockListPath,
 					bl.Tag,
 				)
 
-				_ = os.Remove(fileName)
 				listFile, err = os.Create(fileName)
 				if err != nil {
 					listError = err
@@ -104,7 +104,7 @@ func ReBuildBlockLists() (listError error) {
 					}
 				}
 				if bl.Enabled {
-					newMap.Store(d, s.AvailableBlockLists[index])
+					newMap.Store(d, conf.AvailableBlockLists[index])
 				}
 				bl.Count++
 			} else {
@@ -119,14 +119,14 @@ func ReBuildBlockLists() (listError error) {
 			return err
 		}
 
-		s.AvailableBlockLists[index].LastRefresh = time.Now()
+		conf.AvailableBlockLists[index].LastRefresh = time.Now()
 		if badLines > 0 {
 			DEBUG(badLines, " invalid lines in list: ", bl.FullPath)
 		}
 		return
 	}
 
-	for i := range s.AvailableBlockLists {
+	for i := range conf.AvailableBlockLists {
 		wg.Add(1)
 		go doList(i)
 	}
@@ -134,7 +134,6 @@ func ReBuildBlockLists() (listError error) {
 	wg.Wait()
 
 	DNSBlockList.Store(newMap)
-
 	return listError
 }
 

@@ -1,16 +1,16 @@
 package core
 
 import (
-	"bufio"
 	"context"
 	"crypto/x509"
 	"encoding/json"
+	"io/fs"
 	"log"
 	"os"
 	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"runtime"
-	"runtime/debug"
 	"strings"
 	"syscall"
 	"time"
@@ -20,34 +20,26 @@ import (
 
 func InitService() error {
 	defer RecoverAndLogToFile()
+
 	INFO("Starting Tunnels")
-	cli := CLI.Load()
-
 	InitBaseFoldersAndPaths()
+	loadConfigFromDisk()
+	loadTunnelsFromDisk()
 
-	if cli.DNS != "" {
-		LoadDNSConfig()
-	} else {
-		LoadConfig()
-	}
-
+	set := CONFIG.Load()
 	s := STATE.Load()
 
-	if !s.ConsoleLogOnly {
+	if !set.ConsoleLogOnly {
 		var err error
 		LogFile, err = CreateFile(*s.LogFileName.Load())
 		if err != nil {
 			return err
 		}
-
-		// TraceFile, err = CreateFile(*s.TraceFileName.Load())
-		// if err != nil {
-		// 	panic(err)
-		// }
 	}
 
 	INFO("Operating specific initializations")
 	_ = OSSpecificInit()
+
 	INFO("Checking permissins")
 	AdminCheck()
 
@@ -66,40 +58,17 @@ func InitService() error {
 		return err
 	}
 
-	if !MINIMAL {
+	if !set.Minimal {
 		doEvent(highPriorityChannel, func() {
 			err := ReBuildBlockLists()
 			if err == nil {
-				SaveConfig()
+				writeConfigToDisk()
 			}
 		})
 	}
 
 	INFO("Tunnels is ready")
 	return nil
-}
-
-func (m *TunnelMETA) LoadPrivateCerts() (p *x509.CertPool, err error) {
-	if len(m.PrivateCertBytes) > 0 {
-		return LoadPrivateCertFromBytes(m.PrivateCertBytes)
-	}
-	return LoadPrivateCert(m.PrivateCert)
-}
-
-func LoadPrivateCertFromBytes(data []byte) (pool *x509.CertPool, err error) {
-	certPool := x509.NewCertPool()
-	certPool.AppendCertsFromPEM(data)
-	return certPool, nil
-}
-
-func LoadPrivateCert(path string) (pool *x509.CertPool, err error) {
-	certPool := x509.NewCertPool()
-	certData, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-	certPool.AppendCertsFromPEM(certData)
-	return certPool, nil
 }
 
 func printInfo() {
@@ -113,13 +82,14 @@ func printInfo() {
 }
 
 func printInfo2() {
+	conf := CONFIG.Load()
 	s := STATE.Load()
 	log.Println("")
 	log.Println("=======================================================================")
 	log.Println("======================= HELPFUL INFORMATION ===========================")
 	log.Println("=======================================================================")
 	log.Println("")
-	log.Printf("APP: https://%s:%s\n", s.APIIP, s.APIPort)
+	log.Printf("APP: https://%s:%s\n", conf.APIIP, conf.APIPort)
 	log.Println("")
 	log.Println("BASE PATH:", s.BasePath)
 	log.Println("")
@@ -132,15 +102,9 @@ func printInfo2() {
 	log.Println("=======================================================================")
 }
 
-type X *bool
-
 func LaunchEverything() {
-	defer func() {
-		r := recover()
-		if r != nil {
-			log.Println(r, string(debug.Stack()))
-		}
-	}()
+	defer RecoverAndLogToFile()
+	conf := CONFIG.Load()
 
 	CancelContext, CancelFunc = context.WithCancel(GlobalContext)
 	quit = make(chan os.Signal, 10)
@@ -157,10 +121,11 @@ func LaunchEverything() {
 		StartLogQueueProcessor()
 	})
 
-	if !MINIMAL {
+	if !conf.Minimal {
 		newConcurrentSignal("APIServer", CancelContext, func() {
 			LaunchAPI()
 		})
+
 		newConcurrentSignal("UDPDNSHandler", CancelContext, func() {
 			StartUDPDNSHandler()
 		})
@@ -173,9 +138,10 @@ func LaunchEverything() {
 		PingConnections()
 	})
 
-	newConcurrentSignal("GatewayChecker", CancelContext, func() {
-		GetDefaultGateway()
-	})
+	// newConcurrentSignal("GatewayChecker", CancelContext, func() {
+	// loadDefaultGateway()
+	// loadDefaultInterface()
+	// })
 
 	newConcurrentSignal("LogMapCleaner", CancelContext, func() {
 		CleanUniqueLogMap()
@@ -235,11 +201,12 @@ mainLoop:
 	}
 }
 
-func SaveConfig() (err error) {
+func writeConfigToDisk() (err error) {
 	defer RecoverAndLogToFile()
+	conf := CONFIG.Load()
 	s := STATE.Load()
 
-	cb, err := json.Marshal(s)
+	cb, err := json.Marshal(conf)
 	if err != nil {
 		ERROR("Unable to marshal config into bytes: ", err)
 		return err
@@ -261,189 +228,158 @@ func SaveConfig() (err error) {
 	return
 }
 
-func LoadDNSConfig() {
-	defer func() {
-		r := recover()
-		if r != nil {
-			ERROR(r, string(debug.Stack()))
-		}
-	}()
-	DEBUG("Loading DNS Configurations")
-
-	err := LoadExistingConfig()
-	STATEOLD.C = C
-	if err == nil {
-		for i := range C.Connections {
-			if C.Connections[i] == nil {
-				continue
-			}
-			if C.Connections[i].Tag == DefaultTunnelNameMin {
-				changed := false
-				if C.Connections[i].DeviceKey != CLIDeviceKey && CLIDeviceKey != "" {
-					C.Connections[i].Hostname = CLIDeviceKey
-					DEBUG("Updated device key to: ", CLIDeviceKey)
-					changed = true
-				}
-
-				if C.Connections[i].Hostname != CLIHostname && CLIHostname != "" {
-					C.Connections[i].Hostname = CLIHostname
-					DEBUG("Updated hostname to: ", CLIHostname)
-					changed = true
-				}
-
-				if C.Connections[i].DNSDiscovery != CLIDNS && CLIDNS != "" {
-					C.Connections[i].DNSDiscovery = CLIDNS
-					DEBUG("Updated DNS Discovery to: ", CLIDNS)
-					changed = true
-				}
-
-				if changed {
-					STATEOLD.C = C
-					SaveConfig(C)
-					break
-				}
-			}
-		}
-
-		DEBUG("Loaded configurations from disk")
-		return
+func (m *TunnelMETA) LoadPrivateCerts() (p *x509.CertPool, err error) {
+	if len(m.PrivateCertBytes) > 0 {
+		return LoadPrivateCertFromBytes(m.PrivateCertBytes)
 	}
-
-	C = new(Config)
-	C.InfoLogging = true
-	C.ErrorLogging = true
-	C.ConsoleLogOnly = true
-	C.ConsoleLogging = true
-	C.DebugLogging = true
-
-	DEBUG("Generating a new minimal config")
-
-	newCon := createMinimalConnection()
-
-	C.Connections = []*TunnelMETA{newCon}
-	C.DNSstats = false
-	C.AvailableBlockLists = make([]*BlockList, 0)
-
-	STATEOLD.C = C
-	SaveConfig(C)
-	DEBUG("Configurations loaded")
+	return LoadPrivateCert(m.PrivateCert)
 }
 
-func LoadExistingConfig() (err error) {
-	STATEOLD.ConfigFileName = STATEOLD.BasePath + "config.json"
-	config, err := os.ReadFile(STATEOLD.ConfigFileName)
+func LoadPrivateCertFromBytes(data []byte) (pool *x509.CertPool, err error) {
+	certPool := x509.NewCertPool()
+	certPool.AppendCertsFromPEM(data)
+	return certPool, nil
+}
+
+func LoadPrivateCert(path string) (pool *x509.CertPool, err error) {
+	certPool := x509.NewCertPool()
+	certData, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	certPool.AppendCertsFromPEM(certData)
+	return certPool, nil
+}
+
+func ReadConfigFileFromDisk() (err error) {
+	state := STATE.Load()
+	config, err := os.ReadFile(state.ConfigFileName)
 	if err != nil {
 		return
 	}
 
-	err = json.Unmarshal(config, C)
+	Conf := new(ConfigV2)
+	err = json.Unmarshal(config, Conf)
 	if err != nil {
 		ERROR("Unable to turn config file into config object: ", err)
 		return
 	}
 
+	CONFIG.Store(Conf)
+
 	return
 }
 
-func LoadConfig() {
-	defer func() {
-		r := recover()
-		if r != nil {
-			ERROR(r, string(debug.Stack()))
+func writeTunnelsToDisk() {
+	s := STATE.Load()
+	TunnelMetaMap.Range(func(key, value any) bool {
+		t, ok := value.(*TunnelMETA)
+		if !ok {
+			ERROR("Unable to save tunnel to disk: unable to cast any to meta")
 		}
-	}()
+		tb, err := json.Marshal(value)
+		if err != nil {
+			ERROR("Unable to transform tunnel to json:", err)
+		}
+		tf, err := CreateFile(s.TunnelsPath + string(os.PathSeparator) + t.Tag + ".tunnel")
+		if err != nil {
+			ERROR("Unable to save tunnel to disk:", err)
+		}
+		_, err = tf.Write(tb)
+		if err != nil {
+			ERROR("Unable to write tunnel json to file:", err)
+		}
+
+		return true
+	})
+}
+
+func loadTunnelsFromDisk() {
+	s := STATE.Load()
+	foundDefault := false
+	err := filepath.WalkDir(s.TunnelsPath, func(path string, d fs.DirEntry, err error) error {
+		if d.IsDir() {
+			return nil
+		}
+		if !d.Type().IsRegular() {
+			return nil
+		}
+
+		if !strings.HasSuffix(path, ".tunnel") {
+			return nil
+		}
+
+		tb, err := os.ReadFile(path)
+		if err != nil {
+			ERROR("Unable to read tunnel file:", err)
+			return err
+		}
+
+		tunnel := new(TunnelMETA)
+		err = json.Unmarshal(tb, tunnel)
+		TunnelMetaMap.Store(tunnel.Tag, tunnel)
+		DEBUG("Loaded tunnel:", tunnel.Tag)
+		if tunnel.Tag == DefaultTunnelName {
+			foundDefault = true
+		}
+
+		return nil
+	})
+	if err != nil {
+		ERROR("Unable to walk tunnel path:", err)
+	}
+
+	if !foundDefault {
+		newTun := createDefaultTunnelMeta()
+		TunnelMetaMap.Store(newTun.Tag, newTun)
+		writeTunnelsToDisk()
+	}
+}
+
+func loadConfigFromDisk() {
+	defer RecoverAndLogToFile()
 	DEBUG("Loading configurations from file")
 
-	var config *os.File
-	var err error
-	defer func() {
-		if config != nil {
-			_ = config.Close()
+	err := ReadConfigFileFromDisk()
+	if err == nil {
+		conf := CONFIG.Load()
+		applyCertificateDefaultsToConfig(conf)
+		if len(conf.AvailableBlockLists) == 0 && !conf.DisableBlockLists {
+			conf.AvailableBlockLists = GetDefaultBlockLists()
+			writeConfigToDisk()
 		}
-	}()
-
-	if STATEOLD.C != nil {
-		DEBUG("Config already loaded")
 		return
 	}
 
-	// GLOBAL_STATE.ConfigPath = GLOBAL_STATE.BasePath + "config.json"
-	DEBUG("Loading config from: ", STATEOLD.ConfigFileName)
-	// config, err = os.Open(GLOBAL_STATE.ConfigPath)
-	err = LoadExistingConfig()
-	if err != nil {
+	DEBUG("Generating a new default config")
 
-		DEBUG("Generating a new default config")
+	Conf := new(ConfigV2)
+	Conf.DarkMode = true
 
-		NC := new(Config)
-		NC.DebugLogging = false
-		NC.InfoLogging = true
-		NC.ErrorLogging = true
-		NC.IsolationMode = false
-		NC.ConnectionTracer = false
+	Conf.DebugLogging = true
+	Conf.InfoLogging = true
+	Conf.ErrorLogging = true
+	Conf.ConnectionTracer = false
 
-		NC.DarkMode = false
+	Conf.DNSServerIP = "127.0.0.1"
+	Conf.DNSServerPort = "53"
+	Conf.DNS1Default = "1.1.1.1"
+	Conf.DNS2Default = "8.8.8.8"
+	Conf.LogBlockedDomains = true
+	Conf.LogAllDomains = true
+	Conf.DNSstats = true
+	Conf.AvailableBlockLists = GetDefaultBlockLists()
 
-		NC.DNSServerIP = "127.0.0.1"
-		NC.DNSServerPort = "53"
-		NC.DNS1Default = "1.1.1.1"
-		NC.DNS2Default = "8.8.8.8"
-		NC.LogBlockedDomains = true
-		NC.LogAllDomains = true
+	Conf.APIIP = "127.0.0.1"
+	Conf.APIPort = "7777"
+	applyCertificateDefaultsToConfig(Conf)
+	Conf.APICertType = certs.ECDSA
 
-		NC.APIIP = "127.0.0.1"
-		NC.APIPort = "7777"
-		applyCertificateDefaults(NC)
-		NC.APICertType = certs.ECDSA
-
-		newCon := createDefaultTunnelMeta()
-		NC.Connections = make([]*TunnelMETA, 0)
-		NC.Connections = append(NC.Connections, newCon)
-
-		NC.DNSstats = false
-		NC.AvailableBlockLists = GetDefaultBlockLists()
-
-		var cb []byte
-		cb, err = json.Marshal(NC)
-		if err != nil {
-			ERROR("Unable to turn new config into bytes: ", err)
-			return
-		}
-
-		config, err = os.Create(STATEOLD.ConfigFileName)
-		if err != nil {
-			ERROR("Unable to create new config file: ", err)
-			return
-		}
-
-		err = os.Chmod(STATEOLD.ConfigFileName, 0o777)
-		if err != nil {
-			ERROR("Unable to change ownership of log file: ", err)
-			return
-		}
-
-		_, err = config.Write(cb)
-		if err != nil {
-			ERROR("Unable to write config bytes to new config file: ", err)
-			return
-		}
-
-		C = NC
-	}
-
-	applyCertificateDefaults(C)
-
-	STATEOLD.C = C
-	if len(C.AvailableBlockLists) == 0 && !CLIDisableBlockLists {
-		C.AvailableBlockLists = GetDefaultBlockLists()
-		STATEOLD.C.AvailableBlockLists = C.AvailableBlockLists
-		SaveConfig(C)
-	}
-
-	DEBUG("Configurations loaded")
+	CONFIG.Store(Conf)
+	writeConfigToDisk()
 }
 
-func applyCertificateDefaults(cfg *Config) {
+func applyCertificateDefaultsToConfig(cfg *ConfigV2) {
 	if cfg.APIKey == "" {
 		cfg.APIKey = "./api.key"
 	}
@@ -463,40 +399,40 @@ func applyCertificateDefaults(cfg *Config) {
 	return
 }
 
-func LoadDNSWhitelist() (err error) {
-	defer RecoverAndLogToFile()
-
-	if C.DomainWhitelist == "" {
-		return nil
-	}
-
-	WFile, err := os.OpenFile(C.DomainWhitelist, os.O_RDWR|os.O_CREATE, 0o777)
-	if err != nil {
-		return err
-	}
-	defer WFile.Close()
-
-	scanner := bufio.NewScanner(WFile)
-
-	WhitelistMap := make(map[string]bool)
-	for scanner.Scan() {
-		domain := scanner.Text()
-		if domain == "" {
-			continue
-		}
-		WhitelistMap[domain] = true
-	}
-
-	err = scanner.Err()
-	if err != nil {
-		ERROR("Unable to load domain whitelist: ", err)
-		return err
-	}
-
-	DNSWhitelist = WhitelistMap
-
-	return nil
-}
+//	func LoadDNSWhitelist() (err error) {
+//		defer RecoverAndLogToFile()
+//
+//		if C.DomainWhitelist == "" {
+//			return nil
+//		}
+//
+//		WFile, err := os.OpenFile(C.DomainWhitelist, os.O_RDWR|os.O_CREATE, 0o777)
+//		if err != nil {
+//			return err
+//		}
+//		defer WFile.Close()
+//
+//		scanner := bufio.NewScanner(WFile)
+//
+//		WhitelistMap := make(map[string]bool)
+//		for scanner.Scan() {
+//			domain := scanner.Text()
+//			if domain == "" {
+//				continue
+//			}
+//			WhitelistMap[domain] = true
+//		}
+//
+//		err = scanner.Err()
+//		if err != nil {
+//			ERROR("Unable to load domain whitelist: ", err)
+//			return err
+//		}
+//
+//		DNSWhitelist = WhitelistMap
+//
+//		return nil
+//	}
 
 func CleanupOnClose() {
 	defer RecoverAndLogToFile()

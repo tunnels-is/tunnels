@@ -15,28 +15,33 @@ import (
 )
 
 var (
-	PRODUCTION  = true
-	APP_VERSION = "1.0.4"
-	API_VERSION = 1
+	PRODUCTION = true
 
-	DefaultTunnelName    = "tunnels"
-	DefaultTunnelNameMin = "tunnels-min"
-	CertPool             *x509.CertPool
+	DefaultTunnelName = "tunnels"
+	CertPool          *x509.CertPool
 )
 
+type x struct{}
+
+func (x *x) Write(data []byte) (int, error) {
+	return 0, nil
+}
+
 type DNSStats struct {
-	Count     int
-	Tag       string
-	LastSeen  time.Time
-	FirstSeen time.Time
-	Answers   []string
+	Count        int
+	Tag          string
+	LastSeen     time.Time
+	FirstSeen    time.Time
+	LastResolved time.Time
+	LastBlocked  time.Time
+	Answers      []string
 }
 
 type ConnectionRequest struct {
 	DeviceKey string `json:"DeviceKey"`
 
-	DeviceToken string `json:"DeviceToken"`
-	UserID      string `json:"UserID"`
+	UserToken string `json:"DeviceToken"`
+	UserID    string `json:"UserID"`
 
 	Tag        string          `json:"Tag"`
 	ServerID   string          `json:"ServerID"`
@@ -51,8 +56,8 @@ type RemoteConnectionRequest struct {
 	DeviceKey string `json:"DeviceKey"`
 
 	// GUI
-	DeviceToken string `json:"DeviceToken"`
-	UserID      string `json:"UserID"`
+	UserToken string `json:"UserToken"`
+	UserID    string `json:"UserID"`
 
 	// General
 	EncType   crypt.EncType   `json:"EncType"`
@@ -66,7 +71,6 @@ type RemoteConnectionRequest struct {
 
 	RequestingPorts bool   `json:"RequestingPorts"`
 	DHCPToken       string `json:"DHCPToken"`
-	Hostname        string `json:"Hostname"`
 }
 
 type ErrorResponse struct {
@@ -115,48 +119,27 @@ var (
 )
 
 var (
-	AppStartTime = time.Now()
-	// C                   = new(Config)
-	STATEOLD            = STATE.Load()
+	AppStartTime        = time.Now()
 	DEFAULT_TUNNEL      *TunnelInterface
 	DEFAULT_DNS_SERVERS []string
 	DNSClient           = new(dns.Client)
 
-	// DEFAULT CONNECTION
-	DEFAULT_CONNECTION *TunnelMETA
-
-	// IS POPUI GUI
-	POPUI  bool
 	uiChan = make(chan struct{}, 1)
-
-	MINIMAL bool
-
-	// Base Path Overwrite
-	// BASE_PATH string
 
 	// HTTP
 	API_SERVER http.Server
 	API_PORT   string
-
-	// INTERFACE RELATED
-	DEFAULT_GATEWAY         net.IP
-	DEFAULT_INTERFACE       net.IP
-	DEFAULT_INTERFACE_ID    int
-	DEFAULT_INTERFACE_NAME  string
-	ROUTER_PROBE_TIMEOUT_MS = 60000
-	LAST_ROUTER_PROBE       = time.Now().AddDate(0, 0, -1)
 
 	CURRENT_UBBS           = 0
 	CURRENT_DBBS           = 0
 	EGRESS_PACKETS  uint64 = 0
 	INGRESS_PACKETS uint64 = 0
 
-	TAG_ERROR         = "ERROR"
-	TAG_GENERAL       = "GENERAL"
-	LogFile           *os.File
-	TraceFile         *os.File
-	UDPDNSServer      *dns.Server
-	BLOCK_DNS_QUERIES = false
+	TAG_ERROR    = "ERROR"
+	TAG_GENERAL  = "GENERAL"
+	LogFile      *os.File
+	TraceFile    *os.File
+	UDPDNSServer *dns.Server
 )
 
 type DNSReply struct {
@@ -263,10 +246,10 @@ type CONFIG_FORM struct {
 }
 
 var (
-	TunList [1000]*Tunnel
-	ConLock = sync.Mutex{}
-	IFList  [1000]*TunnelInterface
-	IFLock  = sync.Mutex{}
+	// TunList [1000]*Tunnel
+	// ConLock = sync.Mutex{}
+	IFList [1000]*TunnelInterface
+	IFLock = sync.Mutex{}
 )
 
 type ConnectionOverwrite struct {
@@ -311,18 +294,22 @@ type ActiveConnectionMeta struct {
 }
 
 type TunnelMETA struct {
-	Private          bool
-	PrivateIP        string
-	PrivatePort      string
-	PrivateCert      string
-	PrivateCertBytes []byte `json:"-"`
-	DNSDiscovery     string
+	// Manual server configuration
+	ServerIP   string
+	ServerPort string
+	ServerCert string
 
-	OrgID     string
-	DeviceKey string
+	// Alternitive authentication
+	deviceKey string
+
+	// Autmatic configurations (managed by tunnels/users)
+	Public   bool
+	ServerID string
+
+	// Automatic DNS discovery (user managed)
+	DNSDiscovery string
+
 	DHCPToken string
-	ServerID  string
-	Hostname  string
 
 	WindowsGUID string
 
@@ -338,16 +325,10 @@ type TunnelMETA struct {
 	EncryptionType crypt.EncType
 	CurveType      crypt.CurveType
 
-	// EXPERIMENTAL
-	CloseConnectionsOnConnect bool
-
-	// Is delivered from company but can be overwirtten by user
 	TxQueueLen int32
 	MTU        int32
 	IFName     string
 
-	// IS controller by ORG if user is part of one
-	// ID                  primitive.ObjectID `json:"_id,omitempty" bson:"_id,omitempty"`
 	Tag         string
 	IPv4Address string
 	IPv6Address string
@@ -357,32 +338,21 @@ type TunnelMETA struct {
 	AllowedHosts    []string
 	DisableFirewall bool
 
-	// Port blocking
-	// BlockedPorts       []int
-	// ParsedBlockedPorts [][]byte
-
 	// This overwrites or adds to settings
 	// that are applied to the Node
 	EnableDefaultRoute bool
 	DNSServers         []string
 	DNS                []*ServerDNS
 	Networks           []*ServerNetwork
+
+	// EXPERIMENTAL
+	CloseConnectionsOnConnect bool
 }
 
 type AllowedHost struct {
 	Host    string
 	Expires time.Time
 }
-
-// func (VC *VPNConnection) Initialize() {
-// 	if len(VC.Node.DNSServers) > 0 {
-// 		VC.DNS1IP = net.ParseIP(VC.Node.DNSServers[0]).To4()
-// 		VC.DNS1Bytes = [4]byte(VC.DNS1IP)
-// 	} else {
-// 		VC.DNS1IP = net.ParseIP(C.DNS1Default).To4()
-// 		VC.DNS1Bytes = [4]byte(VC.DNS1IP)
-// 	}
-// }
 
 type TunnelSTATS struct {
 	// Stats

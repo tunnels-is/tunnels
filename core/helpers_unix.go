@@ -37,9 +37,8 @@ func InitBaseFoldersAndPaths() {
 	defer RecoverAndLogToFile()
 	DEBUG("Creating base folders and paths")
 	s := STATE.Load()
-	cli := CLI.Load()
 
-	basePath := cli.BasePath
+	basePath := s.BasePath
 	basePath, _ = strings.CutSuffix(basePath, string(os.PathSeparator))
 
 	if basePath != "" {
@@ -57,6 +56,9 @@ func InitBaseFoldersAndPaths() {
 			basePath = filepath.Dir(ex) + string(os.PathSeparator)
 		}
 	}
+
+	s.BasePath = basePath
+	s.TunnelsPath = s.BasePath
 
 	CreateFolder(s.BasePath)
 	s.ConfigFileName = s.BasePath + string(os.PathSeparator) + "tunnels.json"

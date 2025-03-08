@@ -7,6 +7,26 @@ import (
 	"golang.org/x/net/context"
 )
 
+func tunnelMapRange(do func(tun *TUN) bool) {
+	TunnelMap.Range(func(key, value any) bool {
+		tun, ok := value.(*TUN)
+		if !ok {
+			return true
+		}
+		return do(tun)
+	})
+}
+
+func tunnelMetaMapRange(do func(tun *TunnelMETA) bool) {
+	TunnelMetaMap.Range(func(key, value any) bool {
+		tun, ok := value.(*TunnelMETA)
+		if !ok {
+			return true
+		}
+		return do(tun)
+	})
+}
+
 func doEvent(channel chan *event, method func()) {
 	defer RecoverAndLogToFile()
 	select {
