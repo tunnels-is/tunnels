@@ -42,6 +42,18 @@ func CleanDNSCache() {
 	})
 }
 
+// func updateDNSHandlerInterface(dnsInterface net.IP) {
+// 	if DNSClient != nil && DNSClient.Dialer != nil {
+// 		if dnsInterface == nil {
+// 			DNSClient.Dialer.LocalAddr = nil
+// 		} else {
+// 			DNSClient.Dialer.LocalAddr = &net.UDPAddr{
+// 				IP: dnsInterface,
+// 			}
+// 		}
+// 	}
+// }
+
 func InitDNSHandler() {
 	DEBUG("Starting DNS Handler")
 	DNSClient.Dialer = new(net.Dialer)
@@ -84,20 +96,14 @@ func StartUDPDNSHandler() {
 	}
 }
 
-func ResolveDomainLocal(V *TUN, m *dns.Msg, w dns.ResponseWriter) {
-	if GlobalBlockEnabled(m, w) {
+func ResolveDomainLocal(tun *TUN, m *dns.Msg, w dns.ResponseWriter) {
+	if len(tun.crReponse.DNSServers) == 0 {
 		return
 	}
 
-	dialer := new(net.Dialer)
-	dialer.LocalAddr = &net.UDPAddr{
-		IP: DEFAULT_INTERFACE.To4(),
+	if GlobalBlockEnabled(m, w) {
+		return
 	}
-	localClient := new(dns.Client)
-	localClient.Dialer = dialer
-	localClient.Dialer.Resolver = DNSClient.Dialer.Resolver
-	localClient.Dialer.Timeout = time.Duration(5 * time.Second)
-	localClient.Timeout = time.Second * 5
 
 	start := time.Now()
 	var r *dns.Msg
@@ -106,11 +112,12 @@ func ResolveDomainLocal(V *TUN, m *dns.Msg, w dns.ResponseWriter) {
 	conf := CONFIG.Load()
 
 	defer func() {
+		meta := tun.meta.Load()
 		if err != nil {
-			ERROR("DNS: ", m.Question[0].Name, " || ", fmt.Sprintf("(%d)ms ", time.Since(start).Milliseconds()), " || ", V.Meta.Tag, " || ", err)
+			ERROR("DNS: ", m.Question[0].Name, " || ", fmt.Sprintf("(%d)ms ", time.Since(start).Milliseconds()), " || ", meta.Tag, " || ", err)
 		} else {
 			if conf.LogAllDomains {
-				INFO("DNS: ", m.Question[0].Name, fmt.Sprintf("(%d)ms ", time.Since(start).Milliseconds()), " @ ", V.Meta.Tag, " @ ", server)
+				INFO("DNS: ", m.Question[0].Name, fmt.Sprintf("(%d)ms ", time.Since(start).Milliseconds()), " @ ", meta.Tag, " @ ", server)
 			}
 			if conf.DNSstats {
 				IncrementDNSStats(m.Question[0].Name, false, "", r.Answer)
@@ -118,15 +125,11 @@ func ResolveDomainLocal(V *TUN, m *dns.Msg, w dns.ResponseWriter) {
 		}
 	}()
 
-	if len(V.CRR.DNSServers) == 0 {
-		return
-	}
-
-	r, _, err = localClient.Exchange(m, V.CRR.DNSServers[0]+":53")
-	server = V.CRR.DNSServers[0]
-	if err != nil && len(V.CRR.DNSServers) > 1 {
-		r, _, err = localClient.Exchange(m, V.CRR.DNSServers[1]+":53")
-		server = V.CRR.DNSServers[1]
+	r, _, err = tun.localDNSClient.Exchange(m, tun.crReponse.DNSServers[0]+":53")
+	server = tun.crReponse.DNSServers[0]
+	if err != nil && len(tun.crReponse.DNSServers) > 1 {
+		r, _, err = tun.localDNSClient.Exchange(m, tun.crReponse.DNSServers[1]+":53")
+		server = tun.crReponse.DNSServers[1]
 	}
 
 	if err != nil {
@@ -345,7 +348,8 @@ func DNSQuery(w dns.ResponseWriter, m *dns.Msg) {
 
 		if conf.LogAllDomains {
 			if DNSTunnel != nil {
-				INFO("DNS @ server:", DNSTunnel.Meta.Tag, " >> ", m.Question[0].Name, " >> local record found")
+				meta := DNSTunnel.meta.Load()
+				INFO("DNS @ server:", meta.Tag, " >> ", m.Question[0].Name, " >> local record found")
 			} else {
 				INFO("DNS @ local:", m.Question[0].Name, " >> local record found")
 			}

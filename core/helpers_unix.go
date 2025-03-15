@@ -61,19 +61,17 @@ func InitBaseFoldersAndPaths() {
 	s.TunnelsPath = s.BasePath
 
 	CreateFolder(s.BasePath)
-	s.ConfigFileName = s.BasePath + string(os.PathSeparator) + "tunnels.json"
+	s.ConfigFileName = s.BasePath + "tunnels.json"
 
-	s.LogPath = s.BasePath + string(os.PathSeparator) + "logs" + string(os.PathSeparator)
+	s.LogPath = s.BasePath + "logs" + string(os.PathSeparator)
 	CreateFolder(s.LogPath)
+	s.LogFileName = s.LogPath + time.Now().Format("2006-01-02") + ".log"
 
-	s.BlockListPath = s.BasePath + string(os.PathSeparator) + "blocklists" + string(os.PathSeparator)
+	s.TracePath = s.LogPath
+	s.TraceFileName = s.TracePath + time.Now().Format("2006-01-02-15-04-05") + ".trace.log"
+
+	s.BlockListPath = s.BasePath + "blocklists" + string(os.PathSeparator)
 	CreateFolder(s.BlockListPath)
-
-	logFileName := s.LogPath + time.Now().Format("2006-01-02") + ".log"
-	s.LogFileName.Store(&logFileName)
-
-	traceFileName := s.LogPath + time.Now().Format("2006-01-02-15-04-05") + ".trace.log"
-	s.TraceFileName.Store(&traceFileName)
 
 	return
 }

@@ -73,8 +73,8 @@ const Settings = () => {
 	let basePath = state.State?.BasePath
 	let logPath = ""
 	let tracePath = ""
-	let logFileName = state.State?.LogFileName?.replace(state.State?.BasePath, "")
-	let traceFileName = state.State?.TraceFileName?.replace(state.State?.BasePath, "")
+	let logFileName = state.State?.LogFileName?.replace(state.State?.LogPath, "")
+	let traceFileName = state.State?.TraceFileName?.replace(state.State?.TracePath, "")
 	let configPath = state.State?.ConfigPath?.replace(state.State?.BasePath, "")
 	if (state.State?.LogPath !== basePath) {
 		logPath = state.State?.LogPath

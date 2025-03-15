@@ -14,16 +14,16 @@ func inc(ip net.IP) {
 	}
 }
 
-func (V *Tunnel) TransLateVPLIP(ip [4]byte) ([4]byte, bool) {
-	if xxx, ok := V.NAT_CACHE[ip]; ok {
+func (t *TUN) TransLateVPLIP(ip [4]byte) ([4]byte, bool) {
+	if xxx, ok := t.NATEgress[ip]; ok {
 		return xxx, true
 	}
 
-	if V.CRR.VPLNetwork == nil {
+	if t.crReponse.VPLNetwork == nil {
 		return ip, true
 	}
 
-	v := V.CRR.VPLNetwork
+	v := t.crReponse.VPLNetwork
 	var newIP [4]byte
 
 	for i := 0; i < 3; i++ {
@@ -31,23 +31,23 @@ func (V *Tunnel) TransLateVPLIP(ip [4]byte) ([4]byte, bool) {
 	}
 	newIP[3] = ip[3]
 
-	V.NAT_CACHE[ip] = newIP
-	V.REVERSE_NAT_CACHE[newIP] = ip
+	t.NATEgress[ip] = newIP
+	t.NATIngress[newIP] = ip
 
 	return newIP, true
 }
 
-func (V *Tunnel) TransLateIP(ip [4]byte) ([4]byte, bool) {
-	if xxx, ok := V.NAT_CACHE[ip]; ok {
+func (V *TUN) TransLateIP(ip [4]byte) ([4]byte, bool) {
+	if xxx, ok := V.NATEgress[ip]; ok {
 		return xxx, true
 	}
 
-	if len(V.CRR.Networks) == 0 {
+	if len(V.crReponse.Networks) == 0 {
 		return ip, true
 	}
 
 	var newIP [4]byte
-	for _, v := range V.CRR.Networks {
+	for _, v := range V.crReponse.Networks {
 		if v.Nat == "" {
 			continue
 		}
@@ -67,8 +67,8 @@ func (V *Tunnel) TransLateIP(ip [4]byte) ([4]byte, bool) {
 			newIP[3] = ip[3]
 		}
 
-		V.NAT_CACHE[ip] = newIP
-		V.REVERSE_NAT_CACHE[newIP] = ip
+		V.NATEgress[ip] = newIP
+		V.NATIngress[newIP] = ip
 		break
 	}
 
@@ -79,39 +79,40 @@ func (V *Tunnel) TransLateIP(ip [4]byte) ([4]byte, bool) {
 	return newIP, true
 }
 
-func (V *Tunnel) IsEgressVPLIP(ip [4]byte) (ok bool) {
-	_, ok = V.VPL_E_MAP[ip]
+func (V *TUN) IsEgressVPLIP(ip [4]byte) (ok bool) {
+	_, ok = V.VPLIngress[ip]
 	return
 }
 
-func (V *Tunnel) IsIngressVPLIP(ip [4]byte) (ok bool) {
-	_, ok = V.VPL_I_MAP[ip]
+func (V *TUN) IsIngressVPLIP(ip [4]byte) (ok bool) {
+	_, ok = V.VPLIngress[ip]
 	return
 }
 
-func (V *Tunnel) InitVPLMap() (err error) {
-	DEBUG("Initializing VPL/NAT maps for tunnel:", V.Meta.IFName)
-	if V.CRR.VPLNetwork == nil {
+func (t *TUN) InitVPLMap() (err error) {
+	meta := t.meta.Load()
+	DEBUG("Initializing VPL/NAT maps for tunnel:", meta.IFName)
+	if t.crReponse.VPLNetwork == nil {
 		return nil
 	}
 
-	if V.CRR.VPLNetwork.Nat != "" {
-		_, V.CRR.VPLNetwork.NatIPNet, err = net.ParseCIDR(V.CRR.VPLNetwork.Nat)
+	if t.crReponse.VPLNetwork.Nat != "" {
+		_, t.crReponse.VPLNetwork.NatIPNet, err = net.ParseCIDR(t.crReponse.VPLNetwork.Nat)
 		if err != nil {
 			return err
 		}
 	}
 
-	_, V.CRR.VPLNetwork.NetIPNet, err = net.ParseCIDR(V.CRR.VPLNetwork.Network)
+	_, t.crReponse.VPLNetwork.NetIPNet, err = net.ParseCIDR(t.crReponse.VPLNetwork.Network)
 	if err != nil {
 		return err
 	}
 
 	toMap := ""
-	if V.CRR.VPLNetwork.Nat != "" {
-		toMap = V.CRR.VPLNetwork.Nat
+	if t.crReponse.VPLNetwork.Nat != "" {
+		toMap = t.crReponse.VPLNetwork.Nat
 	} else {
-		toMap = V.CRR.VPLNetwork.Network
+		toMap = t.crReponse.VPLNetwork.Network
 	}
 
 	ip, network, err := net.ParseCIDR(toMap)
@@ -121,20 +122,21 @@ func (V *Tunnel) InitVPLMap() (err error) {
 
 	ip = ip.Mask(network.Mask)
 
-	V.VPL_E_MAP = make(map[[4]byte]struct{})
-	V.VPL_I_MAP = make(map[[4]byte]struct{})
+	t.VPLEgress = make(map[[4]byte]struct{})
+	t.VPLIngress = make(map[[4]byte]struct{})
 	for network.Contains(ip) {
-		V.VPL_E_MAP[[4]byte{ip[0], ip[1], ip[2], ip[3]}] = struct{}{}
-		V.VPL_I_MAP[[4]byte{ip[0], ip[1], ip[2], ip[3]}] = struct{}{}
+		t.VPLEgress[[4]byte{ip[0], ip[1], ip[2], ip[3]}] = struct{}{}
+		t.VPLIngress[[4]byte{ip[0], ip[1], ip[2], ip[3]}] = struct{}{}
 		inc(ip)
 	}
 
 	return nil
 }
 
-func (V *Tunnel) InitNatMaps() (err error) {
-	DEBUG("Initializing NAT maps for tunnel:", V.Meta.IFName)
-	for _, v := range V.CRR.Networks {
+func (t *TUN) InitNatMaps() (err error) {
+	meta := t.meta.Load()
+	DEBUG("Initializing NAT maps for tunnel:", meta.IFName)
+	for _, v := range t.crReponse.Networks {
 		if v.Nat == "" {
 			continue
 		}
@@ -148,50 +150,50 @@ func (V *Tunnel) InitNatMaps() (err error) {
 			return err
 		}
 	}
-	V.NAT_CACHE = make(map[[4]byte][4]byte)
-	V.REVERSE_NAT_CACHE = make(map[[4]byte][4]byte)
+	t.NATEgress = make(map[[4]byte][4]byte)
+	t.NATIngress = make(map[[4]byte][4]byte)
 	return nil
 }
 
-func (V *Tunnel) BuildNATMap() (err error) {
-	if V.CRR.Networks == nil {
-		DEBUG("no NAT map found")
-		return
-	}
-
-	V.NAT_CACHE = make(map[[4]byte][4]byte)
-	V.REVERSE_NAT_CACHE = make(map[[4]byte][4]byte)
-
-	for _, v := range V.CRR.Networks {
-		if v.Nat == "" {
-			continue
-		}
-		if v.Network == "" {
-			continue
-		}
-		ip2, ip2net, err := net.ParseCIDR(v.Nat)
-		if err != nil {
-			return err
-		}
-		v.NatIPNet = ip2net
-		ip, ipnet, err := net.ParseCIDR(v.Network)
-		if err != nil {
-			return err
-		}
-		v.NetIPNet = ipnet
-
-		ip = ip.Mask(ipnet.Mask)
-		ip2 = ip2.Mask(ip2net.Mask)
-
-		for ipnet.Contains(ip) && ip2net.Contains(ip2) {
-
-			V.NAT_CACHE[[4]byte{ip2[0], ip2[1], ip2[2], ip2[3]}] = [4]byte{ip[0], ip[1], ip[2], ip[3]}
-			V.REVERSE_NAT_CACHE[[4]byte{ip[0], ip[1], ip[2], ip[3]}] = [4]byte{ip2[0], ip2[1], ip2[2], ip2[3]}
-
-			inc(ip)
-			inc(ip2)
-		}
-
-	}
-	return
-}
+// func (V *Tunnel) BuildNATMap() (err error) {
+// 	if V.crReponse.Networks == nil {
+// 		DEBUG("no NAT map found")
+// 		return
+// 	}
+//
+// 	V.NAT_CACHE = make(map[[4]byte][4]byte)
+// 	V.REVERSE_NAT_CACHE = make(map[[4]byte][4]byte)
+//
+// 	for _, v := range V.CRR.Networks {
+// 		if v.Nat == "" {
+// 			continue
+// 		}
+// 		if v.Network == "" {
+// 			continue
+// 		}
+// 		ip2, ip2net, err := net.ParseCIDR(v.Nat)
+// 		if err != nil {
+// 			return err
+// 		}
+// 		v.NatIPNet = ip2net
+// 		ip, ipnet, err := net.ParseCIDR(v.Network)
+// 		if err != nil {
+// 			return err
+// 		}
+// 		v.NetIPNet = ipnet
+//
+// 		ip = ip.Mask(ipnet.Mask)
+// 		ip2 = ip2.Mask(ip2net.Mask)
+//
+// 		for ipnet.Contains(ip) && ip2net.Contains(ip2) {
+//
+// 			V.NAT_CACHE[[4]byte{ip2[0], ip2[1], ip2[2], ip2[3]}] = [4]byte{ip[0], ip[1], ip[2], ip[3]}
+// 			V.REVERSE_NAT_CACHE[[4]byte{ip[0], ip[1], ip[2], ip[3]}] = [4]byte{ip2[0], ip2[1], ip2[2], ip2[3]}
+//
+// 			inc(ip)
+// 			inc(ip2)
+// 		}
+//
+// 	}
+// 	return
+// }

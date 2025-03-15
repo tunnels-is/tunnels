@@ -14,15 +14,15 @@ type packetDebugOut struct {
 	TCPH    []byte
 }
 
-func (V *Tunnel) RegisterPing(packet []byte) {
-	V.TunnelSTATS.PingTime = time.Now()
+func (t *TUN) RegisterPing(packet []byte) {
+	t.registerPing(time.Now())
 
 	defer RecoverAndLogToFile()
-	V.TunnelSTATS.CPU = packet[0]
-	V.TunnelSTATS.MEM = packet[1]
-	V.TunnelSTATS.DISK = packet[2]
+	t.CPU = packet[0]
+	t.MEM = packet[1]
+	t.DISK = packet[2]
 	if len(packet) > 10 {
-		V.TunnelSTATS.ServerToClientMicro = time.Since(time.Unix(0, int64(binary.BigEndian.Uint64(packet[3:])))).Microseconds()
+		t.serverToClientMicro = time.Since(time.Unix(0, int64(binary.BigEndian.Uint64(packet[3:])))).Microseconds()
 	}
 }
 
@@ -43,11 +43,10 @@ func debugProcessPacket(packet []byte) (P *packetDebugOut) {
 	return
 }
 
-func (V *Tunnel) ProcessEgressPacket(p *[]byte) (sendRemote bool) {
+func (V *TUN) ProcessEgressPacket(p *[]byte) (sendRemote bool) {
 	packet := *p
 
-	V.EP_Version = packet[0] >> 4
-	if V.EP_Version != 4 {
+	if (packet[0] >> 4) != 4 {
 		return false
 	}
 
@@ -56,7 +55,6 @@ func (V *Tunnel) ProcessEgressPacket(p *[]byte) (sendRemote bool) {
 		return false
 	}
 
-	// V.EP_IPv4HeaderLength = (packet[0] << 4 >> 4) * 4
 	V.EP_IPv4HeaderLength = (packet[0] & 0x0F) * 4
 
 	V.EP_IPv4Header = packet[:V.EP_IPv4HeaderLength]
@@ -84,16 +82,16 @@ func (V *Tunnel) ProcessEgressPacket(p *[]byte) (sendRemote bool) {
 
 			V.EP_SYN = V.EP_TPHeader[13] & 0x2
 
-			V.EP_MP = V.CreateNEWPortMapping(V.TCP_EM, V.TCP_M, packet[12:20], V.EP_TPHeader[0:4])
-			if V.EP_MP == nil {
+			V.EgressMapping = V.CreateNEWPortMapping(V.TCPEgress, V.TCPPortMap, packet[12:20], V.EP_TPHeader[0:4])
+			if V.EgressMapping == nil {
 				debugMissingEgressMapping(packet)
 				return false
 			}
 
 		} else if V.EP_Protocol == 17 {
 
-			V.EP_MP = V.CreateNEWPortMapping(V.UDP_EM, V.UDP_M, packet[12:20], V.EP_TPHeader[0:4])
-			if V.EP_MP == nil {
+			V.EgressMapping = V.CreateNEWPortMapping(V.UDPEgress, V.UDPPortMap, packet[12:20], V.EP_TPHeader[0:4])
+			if V.EgressMapping == nil {
 				debugMissingEgressMapping(packet)
 				return false
 			}
@@ -101,32 +99,32 @@ func (V *Tunnel) ProcessEgressPacket(p *[]byte) (sendRemote bool) {
 		}
 
 		if V.EP_Protocol == 6 {
-			V.EP_MP.ERST = V.EP_TPHeader[13] & 0x4
-			if V.EP_MP.EFIN == 0 {
-				V.EP_MP.EFIN = V.EP_TPHeader[13] & 0x1
+			V.EgressMapping.ERST = V.EP_TPHeader[13] & 0x4
+			if V.EgressMapping.EFIN == 0 {
+				V.EgressMapping.EFIN = V.EP_TPHeader[13] & 0x1
 			}
-			if V.EP_MP.ERST == 4 {
+			if V.EgressMapping.ERST == 4 {
 				V.EP_TPHeader[13] = 0b00010100
 			}
 		}
 
 		V.EP_NAT_IP, V.EP_NAT_OK = V.TransLateIP(V.EP_DstIP)
 
-		V.EP_TPHeader[0] = V.EP_MP.VPNPort[0]
-		V.EP_TPHeader[1] = V.EP_MP.VPNPort[1]
+		V.EP_TPHeader[0] = V.EgressMapping.VPNPort[0]
+		V.EP_TPHeader[1] = V.EgressMapping.VPNPort[1]
 
-		V.EP_IPv4Header[12] = V.EP_VPNSrcIP[0]
-		V.EP_IPv4Header[13] = V.EP_VPNSrcIP[1]
-		V.EP_IPv4Header[14] = V.EP_VPNSrcIP[2]
-		V.EP_IPv4Header[15] = V.EP_VPNSrcIP[3]
+		V.EP_IPv4Header[12] = V.serverInterfaceIP4bytes[0]
+		V.EP_IPv4Header[13] = V.serverInterfaceIP4bytes[1]
+		V.EP_IPv4Header[14] = V.serverInterfaceIP4bytes[2]
+		V.EP_IPv4Header[15] = V.serverInterfaceIP4bytes[3]
 
 	} else {
 		V.EP_NAT_IP, V.EP_NAT_OK = V.TransLateVPLIP(V.EP_DstIP)
 
-		V.EP_IPv4Header[12] = V.VPL_IP[0]
-		V.EP_IPv4Header[13] = V.VPL_IP[1]
-		V.EP_IPv4Header[14] = V.VPL_IP[2]
-		V.EP_IPv4Header[15] = V.VPL_IP[3]
+		V.EP_IPv4Header[12] = V.serverVPLIP[0]
+		V.EP_IPv4Header[13] = V.serverVPLIP[1]
+		V.EP_IPv4Header[14] = V.serverVPLIP[2]
+		V.EP_IPv4Header[15] = V.serverVPLIP[3]
 	}
 
 	if V.EP_NAT_OK {
@@ -142,7 +140,7 @@ func (V *Tunnel) ProcessEgressPacket(p *[]byte) (sendRemote bool) {
 	return true
 }
 
-func (V *Tunnel) ProcessIngressPacket(packet []byte) bool {
+func (V *TUN) ProcessIngressPacket(packet []byte) bool {
 	V.IP_SrcIP[0] = packet[12]
 	V.IP_SrcIP[1] = packet[13]
 	V.IP_SrcIP[2] = packet[14]
@@ -158,7 +156,7 @@ func (V *Tunnel) ProcessIngressPacket(packet []byte) bool {
 	V.IP_DstPort[1] = V.IP_TPHeader[3]
 
 	if !V.IsIngressVPLIP(V.IP_SrcIP) {
-		V.IP_NAT_IP, V.IP_NAT_OK = V.REVERSE_NAT_CACHE[V.IP_SrcIP]
+		V.IP_NAT_IP, V.IP_NAT_OK = V.NATIngress[V.IP_SrcIP]
 		if V.IP_NAT_OK {
 			V.IP_IPv4Header[12] = V.IP_NAT_IP[0]
 			V.IP_IPv4Header[13] = V.IP_NAT_IP[1]
@@ -172,34 +170,34 @@ func (V *Tunnel) ProcessIngressPacket(packet []byte) bool {
 		}
 
 		if V.IP_Protocol == 6 {
-			V.IP_MP = V.getIngressPortMapping(V.TCP_M, packet[12:16], V.IP_DstPort)
-			if V.IP_MP == nil {
+			V.IngressMapping = V.getIngressPortMapping(V.TCPPortMap, packet[12:16], V.IP_DstPort)
+			if V.IngressMapping == nil {
 				return false
 			}
 
 		} else if V.IP_Protocol == 17 {
-			V.IP_MP = V.getIngressPortMapping(V.UDP_M, packet[12:16], V.IP_DstPort)
-			if V.IP_MP == nil {
+			V.IngressMapping = V.getIngressPortMapping(V.UDPPortMap, packet[12:16], V.IP_DstPort)
+			if V.IngressMapping == nil {
 				return false
 			}
 		}
 
 		if V.IP_Protocol == 6 {
-			if V.IP_MP.IRST == 0 {
-				V.IP_MP.IRST = V.IP_TPHeader[13] & 0x4
+			if V.IngressMapping.IRST == 0 {
+				V.IngressMapping.IRST = V.IP_TPHeader[13] & 0x4
 			}
-			if V.IP_MP.IFIN == 0 {
-				V.IP_MP.IFIN = V.IP_TPHeader[13] & 0x1
+			if V.IngressMapping.IFIN == 0 {
+				V.IngressMapping.IFIN = V.IP_TPHeader[13] & 0x1
 			}
 		}
 
-		V.IP_TPHeader[2] = V.IP_MP.LocalPort[0]
-		V.IP_TPHeader[3] = V.IP_MP.LocalPort[1]
+		V.IP_TPHeader[2] = V.IngressMapping.LocalPort[0]
+		V.IP_TPHeader[3] = V.IngressMapping.LocalPort[1]
 
-		V.IP_IPv4Header[16] = V.IP_MP.OriginalSourceIP[0]
-		V.IP_IPv4Header[17] = V.IP_MP.OriginalSourceIP[1]
-		V.IP_IPv4Header[18] = V.IP_MP.OriginalSourceIP[2]
-		V.IP_IPv4Header[19] = V.IP_MP.OriginalSourceIP[3]
+		V.IP_IPv4Header[16] = V.IngressMapping.OriginalSourceIP[0]
+		V.IP_IPv4Header[17] = V.IngressMapping.OriginalSourceIP[1]
+		V.IP_IPv4Header[18] = V.IngressMapping.OriginalSourceIP[2]
+		V.IP_IPv4Header[19] = V.IngressMapping.OriginalSourceIP[3]
 
 	} else {
 		// if DST == ME ON VPL .. then DST == 127.0.0.1
@@ -207,10 +205,10 @@ func (V *Tunnel) ProcessIngressPacket(packet []byte) bool {
 		// V.IP_IPv4Header[17] = 0
 		// V.IP_IPv4Header[18] = 0
 		// V.IP_IPv4Header[19] = 1
-		V.IP_IPv4Header[16] = V.LOCAL_IF_IP[0]
-		V.IP_IPv4Header[17] = V.LOCAL_IF_IP[1]
-		V.IP_IPv4Header[18] = V.LOCAL_IF_IP[2]
-		V.IP_IPv4Header[19] = V.LOCAL_IF_IP[3]
+		V.IP_IPv4Header[16] = V.localInterfaceIP4bytes[0]
+		V.IP_IPv4Header[17] = V.localInterfaceIP4bytes[1]
+		V.IP_IPv4Header[18] = V.localInterfaceIP4bytes[2]
+		V.IP_IPv4Header[19] = V.localInterfaceIP4bytes[3]
 	}
 
 	RecalculateIPv4HeaderChecksum(V.IP_IPv4Header)

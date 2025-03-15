@@ -45,7 +45,7 @@ func GET_FUNC(skip int) string {
 	return sn[len(sn)-1]
 }
 
-func DEEP(Line ...interface{}) {
+func DEEP(Line ...any) {
 	conf := CONFIG.Load()
 	if !conf.DeepDebugLoggin {
 		return
@@ -53,7 +53,7 @@ func DEEP(Line ...interface{}) {
 
 	x := ""
 	for _, v := range Line {
-		x += fmt.Sprintf(" %v", v)
+		x += fmt.Sprintf("%v", v)
 	}
 
 	select {
@@ -68,7 +68,7 @@ func DEEP(Line ...interface{}) {
 	}
 }
 
-func DEBUG(Line ...interface{}) {
+func DEBUG(Line ...any) {
 	conf := CONFIG.Load()
 	if !conf.DebugLogging {
 		return
@@ -76,7 +76,7 @@ func DEBUG(Line ...interface{}) {
 
 	x := ""
 	for _, v := range Line {
-		x += fmt.Sprintf(" %v", v)
+		x += fmt.Sprintf("%v", v)
 	}
 
 	select {
@@ -91,7 +91,7 @@ func DEBUG(Line ...interface{}) {
 	}
 }
 
-func ERROR(Line ...interface{}) {
+func ERROR(Line ...any) {
 	conf := CONFIG.Load()
 	if !conf.ErrorLogging {
 		return
@@ -99,7 +99,7 @@ func ERROR(Line ...interface{}) {
 
 	x := ""
 	for _, v := range Line {
-		x += fmt.Sprintf(" %v", v)
+		x += fmt.Sprintf("%v", v)
 	}
 	checkLogUniqueness(&x)
 
@@ -115,7 +115,7 @@ func ERROR(Line ...interface{}) {
 	}
 }
 
-func INFO(Line ...interface{}) {
+func INFO(Line ...any) {
 	conf := CONFIG.Load()
 	if !conf.InfoLogging {
 		return
@@ -123,7 +123,7 @@ func INFO(Line ...interface{}) {
 
 	x := ""
 	for _, v := range Line {
-		x += fmt.Sprintf(" %v", v)
+		x += fmt.Sprintf("%v", v)
 	}
 
 	select {
@@ -171,6 +171,6 @@ func StartLogQueueProcessor() {
 	}
 }
 
-func ErrorLog(err interface{}, msgs ...interface{}) {
+func ErrorLog(err any, msgs ...any) {
 	log.Println(TAG_ERROR+" || ", fmt.Sprint(msgs...), " >> system error: ", err)
 }
