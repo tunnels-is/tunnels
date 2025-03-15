@@ -94,13 +94,14 @@ func PingConnections() {
 
 		}
 
-		if time.Since(tun.pingTime).Seconds() > 30 || err != nil {
+		ping := tun.pingTime.Load()
+		if time.Since(*ping).Seconds() > 30 || err != nil {
 			if meta.AutoReconnect {
 				DEBUG("30+ Seconds since ping from ", meta.Tag, " attempting reconnection")
 				_, _ = PublicConnect(tun.cr)
 			} else {
 				DEBUG("30+ Seconds since ping from ", meta.Tag, " disconnecting")
-				_ = Disconnect(meta.WindowsGUID, true, false)
+				_ = Disconnect(tun.id, true)
 			}
 		}
 
@@ -145,12 +146,6 @@ func loadDefaultInterface() {
 
 	DEBUG("new defailt interface discovered", newInterface.To4())
 	s.DefaultInterface = newInterface
-
-	if DNSClient != nil && DNSClient.Dialer != nil {
-		DNSClient.Dialer.LocalAddr = &net.UDPAddr{
-			IP: s.DefaultInterface,
-		}
-	}
 
 	ifList, _ := net.Interfaces()
 

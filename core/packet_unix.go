@@ -25,9 +25,11 @@ func (T *TunnelInterface) ReadFromTunnelInterface() {
 		writtenBytes int
 		sendRemote   bool
 		tempBytes    = make([]byte, 500000)
-		Tun          *Tunnel
+		Tun          *TUN
 		out          = make([]byte, 500000)
 	)
+
+	// Tun = T
 
 	DEBUG("New tunnel interface reader:", T.Name)
 	for {
@@ -43,7 +45,6 @@ func (T *TunnelInterface) ReadFromTunnelInterface() {
 			continue
 		}
 
-		Tun = *T.tunnel.Load()
 		if Tun == nil {
 			time.Sleep(1 * time.Millisecond)
 			continue
@@ -56,31 +57,28 @@ func (T *TunnelInterface) ReadFromTunnelInterface() {
 			continue
 		}
 
-		out = Tun.EH.SEAL.Seal1(packet, Tun.Index)
+		out = Tun.encWrapper.SEAL.Seal1(packet, Tun.Index)
 
 		// TIP; SET DONT FRAGMENT
-		writtenBytes, err = Tun.Con.Write(out)
+		writtenBytes, err = Tun.connection.Write(out)
 		if err != nil {
 			ERROR("router write error: ", err)
 			continue
 		}
 
-		if Tun.EP_MP != nil {
-			Tun.EP_MP.egressBytes += writtenBytes
-		}
-		Tun.EgressBytes += writtenBytes
+		Tun.egressBytes.Add(int64(writtenBytes))
 	}
 }
 
-func (V *Tunnel) ReadFromServeTunnel() {
+func (tun *TUN) ReadFromServeTunnel() {
 	defer func() {
 		if r := recover(); r != nil {
 			ERROR(r, string(debug.Stack()))
 		}
-		DEBUG("Server listener exiting:", V.Meta.Tag)
-		if V.Connected {
-			V.UserRWLoopAbnormalExit = true
-			tunnelMonitor <- V
+		meta := tun.meta.Load()
+		DEBUG("Server listener exiting:", meta.Tag, tun.id)
+		if tun.GetState() == TUN_Connected {
+			tunnelMonitor <- tun
 		}
 	}()
 
@@ -92,18 +90,19 @@ func (V *Tunnel) ReadFromServeTunnel() {
 		buff     = make([]byte, 500000)
 		staging  = make([]byte, 500000)
 		err      error
+		osTunnel = tun.tunnel.Load()
 	)
 
 	DEBUG("Server Tunnel listener initialized")
 	for {
-		n, readErr = V.Con.Read(buff)
+		n, readErr = tun.connection.Read(buff)
 		if readErr != nil {
 			ERROR("error reading from server socket: ", readErr, n)
 			return
 		}
 
-		V.Nonce2Bytes = buff[2:10]
-		packet, err = V.EH.SEAL.Open2(
+		tun.Nonce2Bytes = buff[2:10]
+		packet, err = tun.encWrapper.SEAL.Open2(
 			buff[10:n],
 			buff[2:10],
 			staging[:0],
@@ -114,23 +113,19 @@ func (V *Tunnel) ReadFromServeTunnel() {
 			return
 		}
 
-		V.IngressBytes += n
+		tun.ingressBytes.Add(int64(n))
 
 		if len(packet) < 20 {
-			V.RegisterPing(CopySlice(packet))
+			tun.RegisterPing(CopySlice(packet))
 			continue
 		}
 
-		if !V.ProcessIngressPacket(packet) {
+		if !tun.ProcessIngressPacket(packet) {
 			debugMissingIngressMapping(packet)
 			continue
 		}
 
-		if V.IP_MP != nil {
-			V.IP_MP.ingressBytes += n
-		}
-
-		_, writeErr = V.Interface.RWC.Write(packet)
+		_, writeErr = osTunnel.RWC.Write(packet)
 		if writeErr != nil {
 			ERROR("tun/tap write Error: ", writeErr)
 			return

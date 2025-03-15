@@ -279,7 +279,7 @@ func (t *TunnelInterface) SetTXQueueLen() (err error) {
 	return
 }
 
-func (t *TunnelInterface) addRoutes(V *Tunnel, n *ServerNetwork) (err error) {
+func (t *TunnelInterface) addRoutes(n *ServerNetwork) (err error) {
 	if n.Nat != "" {
 		err = IP_AddRoute(n.Nat, "", t.IPv4Address, "0")
 		if err != nil {
@@ -364,7 +364,7 @@ func (t *TunnelInterface) RemoveRoutes(V *Tunnel, preserve bool) (err error) {
 	return
 }
 
-func (t *TunnelInterface) Connect(V *Tunnel) (err error) {
+func (t *TunnelInterface) Connect(V *TUN) (err error) {
 	// if !t.Persistent {
 	err = t.Addr()
 	if err != nil {

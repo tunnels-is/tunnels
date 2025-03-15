@@ -4,7 +4,6 @@ import axios from "axios"
 import dayjs from "dayjs";
 import { v4 as uuidv4 } from 'uuid';
 
-
 const state = (page) => {
 	const [value, reload] = useState({ x: 0 })
 	const update = () => {
@@ -42,6 +41,31 @@ export var STATE = {
 			STATE.updates[k]()
 		})
 	},
+	// NEW
+	// NEW
+	// NEW
+	// NEW
+	// NEW
+	// NEW
+	v2_ConfigSave: () => {
+
+	},
+	v2_TunnelSave: () => {
+
+	},
+	v2_TunnelCreate: () => {
+
+	},
+
+
+
+	// OLD
+	// OLD
+	// OLD
+	// OLD
+	// OLD
+	// OLD
+	// OLD
 	DNSListDateFormat: "ddd D. HH:mm:ss",
 	TablePageSize: Number(STORE.Cache.Get("pageSize")),
 	setPageSize: (id, count) => {
@@ -257,11 +281,11 @@ export var STATE = {
 		STATE.UserSaveModifiedSate()
 		STATE.rerender()
 	},
-	changeServerOnConnection: (tag, index) => {
-		let cons = [...STATE.Config?.Connections]
+	changeServerOnConnection2: (tag, index) => {
+		let cons = [...STATE.Tunnels]
 		let found = false
 
-		cons.forEach((c, i) => {
+		cons?.forEach((c, i) => {
 			if (c.Tag.toLowerCase() === tag.toLowerCase()) {
 				cons[i].ServerID = index
 				found = true
@@ -276,42 +300,38 @@ export var STATE = {
 	},
 	ConfigSave: async () => {
 
-		STATE.createObjectIfEmpty("modifiedConfig")
-		if (!STATE.modifiedConfig.Connections) {
-			STATE.modifiedConfig.Connections = []
-		}
-
-		STATE.Config.Connections.forEach(cc => {
-			let found = false
-			STATE.modifiedConfig.Connections.forEach(mc => {
-				if (mc.WindowsGUID == cc.WindowsGUID) {
-					found = true
-				}
-			})
-			if (!found) {
-				STATE.modifiedConfig.Connections.push(cc)
-			}
-		});
-		if (STATE.modifiedLists) {
-			STATE.modifiedLists.forEach(l => {
-				if (l.Enabled) {
-					STATE.Config?.AvailableBlockLists.forEach(al => {
-						if (al.Tag === l.Tag) {
-							al.Enabled = l.Enabled
-						}
-					})
-				}
-			})
-		}
+		// STATE.createObjectIfEmpty("modifiedConfig")
+		// if (!STATE.modifiedConfig.Connections) {
+		// 	STATE.modifiedConfig.Connections = []
+		// }
+		//
+		// STATE.Tunnels?.forEach(cc => {
+		// 	let found = false
+		// 	STATE.modifiedConfig.Connections.forEach(mc => {
+		// 		if (mc.WindowsGUID == cc.WindowsGUID) {
+		// 			found = true
+		// 		}
+		// 	})
+		// 	if (!found) {
+		// 		STATE.modifiedConfig.Connections.push(cc)
+		// 	}
+		// });
+		// if (STATE.modifiedLists) {
+		// 	STATE.modifiedLists.forEach(l => {
+		// 		if (l.Enabled) {
+		// 			STATE.Config?.AvailableBlockLists.forEach(al => {
+		// 				if (al.Tag === l.Tag) {
+		// 					al.Enabled = l.Enabled
+		// 				}
+		// 			})
+		// 		}
+		// 	})
+		// }
 
 		let newConfig = {
 			...STATE.Config,
 			...STATE.modifiedConfig
 		}
-		// console.log("SAVE CONFIG")
-		// console.dir(STATE.Config)
-		// console.dir(STATE.modifiedConfig)
-		// console.dir(newConfig)
 
 		let success = false
 		try {
@@ -329,10 +349,10 @@ export var STATE = {
 				STORE.Cache.SetObject("config", newConfig)
 				STORE.Cache.Set("darkMode", newConfig.DarkMode)
 				STATE.Config = newConfig
-				STATE.RemoveModifiedConfig()
-				STATE.RemoveModifiedLists()
-				STATE.successNotification("Config saved", undefined)
-				STATE.SetConfigModifiedState(false)
+				// STATE.RemoveModifiedConfig()
+				// STATE.RemoveModifiedLists()
+				// STATE.successNotification("Config saved", undefined)
+				// STATE.SetConfigModifiedState(false)
 			}
 		} catch (error) {
 			console.dir(error)
@@ -456,23 +476,13 @@ export var STATE = {
 	},
 	toggleKeyAndReloadDom: (type, key) => {
 		try {
-			let modObj = STATE["modified" + type]
-			if (modObj !== undefined) {
-				let modKey = modObj[key]
-				if (modKey !== undefined) {
-					// console.log("flip on modified")
-					STATE["modified" + type][key] = !STATE["modified" + type][key]
-				} else {
-					// console.log("flip on original")
-					STATE["modified" + type][key] = !STATE[type][key]
-				}
-			} else {
-				// console.log("create modified")
-				STATE["modified" + type] = {}
-				STATE["modified" + type][key] = !STATE[type][key]
-			}
-			STORE.Cache.SetObject("modified" + type, STATE["modified" + type])
-			// STATE[type + "Save"]()
+			let mod = STATE[type]
+			if (mod === undefined) {
+				STATE[type] = {}
+			} 
+
+			STATE[type][key] = !STATE[type][key]
+			STORE.Cache.SetObject(type, STATE[type])
 			STATE.rerender()
 			return
 		} catch (error) {
@@ -485,16 +495,12 @@ export var STATE = {
 	},
 	setKeyAndReloadDom: (type, key, value) => {
 		try {
-			let modObj = STATE["modified" + type]
-			if (modObj !== undefined) {
-				STATE["modified" + type][key] = value
-			} else {
-				// console.log("create modified")
-				STATE["modified" + type] = {}
-				STATE["modified" + type][key] = value
-			}
-			STORE.Cache.SetObject("modified" + type, STATE["modified" + type])
-			// STATE[type + "Save"]()
+			let mod = STATE[type]
+			if (mod === undefined) {
+				STATE[type] = {}
+			} 
+			STATE[type][key] = value
+			STORE.Cache.SetObject(type, STATE[type])
 			STATE.rerender()
 			return
 		} catch (error) {
@@ -502,31 +508,31 @@ export var STATE = {
 		}
 	},
 	ConfirmAndExecute: async (type, id, duration, title, subtitle, method) => {
-		if (type === "") {
-			type = "success"
-		}
-		await toast[type]((t) => (
-			<div className="content">
-				{title &&
-					<div className="title">
-						{title}
-					</div>
-				}
-				<div className="subtitle">
-					{subtitle}
-				</div>
-				<div className="buttons">
-					<div className="button no" onClick={() => toast.dismiss(t.id)}>NO</div>
-					<div className="button yes" onClick={async function() {
-						toast.dismiss(t.id)
-						await method()
-					}
-					}>YES</div>
-
-				</div>
-			</div >
-
-		), { id: id, duration: duration })
+		// if (type === "") {
+		// 	type = "success"
+		// }
+		// await toast[type]((t) => (
+		// 	<div className="content">
+		// 		{title &&
+		// 			<div className="title">
+		// 				{title}
+		// 			</div>
+		// 		}
+		// 		<div className="subtitle">
+		// 			{subtitle}
+		// 		</div>
+		// 		<div className="buttons">
+		// 			<div className="button no" onClick={() => toast.dismiss(t.id)}>NO</div>
+		// 			<div className="button yes" onClick={async function() {
+		// 				toast.dismiss(t.id)
+		// 				await method()
+		// 			}
+		// 			}>YES</div>
+		//
+		// 		</div>
+		// 	</div >
+		//
+		// ), { id: id, duration: duration })
 	},
 	FinalizeLogout: async () => {
 		let theme = STATE.darkMode
@@ -1433,15 +1439,22 @@ export var STATE = {
 			)
 
 			if (response.status === 200) {
-				STATE.State = response.data
-				STATE.Config = response.data.C
-				STATE.User = response.data.User
-				STATE.darkMode = response.data.DarkMode
+				if (response.data !== undefined) {
+				STATE.State = response.data?.State
+				STATE.Config = response.data?.Config
+				STATE.User = response.data?.User
+				STATE.Tunnels = response.data?.Tunnels
+				STATE.ActiveTunnels = response.data?.ActiveTunnels
+				STATE.darkMode = response.data?.State?.DarkMode
 
+				STORE.Cache.SetObject("active-tunnels", STATE.ActiveTunnels)
+				STORE.Cache.SetObject("tunnels", STATE.Tunnels)
 				STORE.Cache.SetObject("state", STATE.State)
-				STORE.Cache.SetObject("config", STATE.State.C)
+				STORE.Cache.SetObject("config", STATE.Config)
+				STORE.Cache.SetObject("user", STATE.User)
 				STORE.Cache.Set("darkMode", STATE.Config.DarkMode)
-				STORE.Cache.SetObject("user", STATE.State.User)
+				}
+
 				STATE.globalRerender()
 			}
 			STATE.StateFetchInProgress = false

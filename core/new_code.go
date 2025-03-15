@@ -38,17 +38,17 @@ func doEvent(channel chan *event, method func()) {
 	}
 }
 
-func doEventWithWait(channel chan *event, method func(), wait func(any), timeout time.Duration) {
-	defer RecoverAndLogToFile()
-	ev := new(event)
-	ev.method = method
-	select {
-	case channel <- ev:
-	default:
-		panic("priority channel full")
-	}
-	ev.Wait(wait, timeout)
-}
+// func doEventWithWait(channel chan *event, method func(), wait func(any), timeout time.Duration) {
+// 	defer RecoverAndLogToFile()
+// 	ev := new(event)
+// 	ev.method = method
+// 	select {
+// 	case channel <- ev:
+// 	default:
+// 		panic("priority channel full")
+// 	}
+// 	ev.Wait(wait, timeout)
+// }
 
 type event struct {
 	// method is executed inside priority channels
