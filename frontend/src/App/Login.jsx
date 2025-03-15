@@ -657,34 +657,32 @@ const Login = (props) => {
 
 		<div className="login-options">
 
-			<button className="button"
+			<button className={`${mode === 1 ? "active":""} button`}
+				onClick={() => setMode(1)}>Login
+			</button>
+
+			<button className={`${mode === 2 ? "active":""} button`}
 				onClick={() => {
 					RemoveToken()
 					setMode(2)
 				}}>Register
 			</button>
 
-			<button className="button"
-				onClick={() => setMode(6)}>Enable Account
-			</button>
 
-			<button className="button"
+			<button className={`${mode === 5 ? "active":""} button`}
 				onClick={() => {
 					GenerateToken()
 					setMode(5)
 				}}>Register Anonymously
 			</button>
 
-			<button className="button"
-				onClick={() => setMode(1)}>Login
-			</button>
 
 
-			<button className="button"
+			<button className={`${mode === 4 ? "active":""} button`}
 				onClick={() => setMode(4)}>Reset Password
 			</button>
 
-			<button className="button"
+			<button className={`${mode === 3 ? "active":""} button`}
 				onClick={() => setMode(3)}>2FA Recovery
 			</button>
 

@@ -98,6 +98,52 @@ export var STATE = {
 		STATE.ConfigSave()
 		STATE.renderPage("dns")
 	},
+	v2_TunnelSave: async (tunnel) => {
+		try {
+			STATE.toggleLoading({
+				tag: "tunnel_save",
+				show: true,
+				msg: "Saving tunnel..",
+			})
+
+			let resp = await STATE.API.method("setTunnel", tunnel)
+			if (resp === undefined) {
+				STATE.errorNotification("Unknown error, please try again in a moment")
+			} else if (resp.status === 200) {
+				STATE.successNotification("Tunnel saved", undefined)
+			}
+		} catch (error) {
+			console.dir(error)
+		}
+		STATE.toggleLoading(undefined)
+		STATE.globalRerender()
+
+	},
+
+	v2_ConfigSave: async (newConfig) => {
+		try {
+			STATE.toggleLoading({
+				tag: "config_save",
+				show: true,
+				msg: "Saving config..",
+			})
+
+			let resp = await STATE.API.method("setConfig", newConfig)
+			if (resp === undefined) {
+				STATE.errorNotification("Unknown error, please try again in a moment")
+			} else if (resp.status === 200) {
+				STORE.Cache.SetObject("config", newConfig)
+				STORE.Cache.Set("darkMode", newConfig.DarkMode)
+				STATE.Config = newConfig
+				STATE.successNotification("Config saved", undefined)
+				// STATE.SetConfigModifiedState(false)
+			}
+		} catch (error) {
+			console.dir(error)
+		}
+		STATE.toggleLoading(undefined)
+		STATE.globalRerender()
+},
 	createConnection: async (new_conn) => {
 		try {
 			let resp = await STATE.API.method("createConnection", new_conn)
