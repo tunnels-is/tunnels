@@ -625,16 +625,19 @@ button {
 
 .form {
   /* background-color: $c-shade2; */
-  width: 400px;
-  margin-left: calc(50% - 200px);
+  /* width: 400px; */
+  /* margin-left: calc(50% - 200px); */
   display: flex;
   flex-direction: column;
   gap: 20px;
-  padding-top: 30px;
-  padding-bottom: 30px;
+  max-width:420px;
+  /* padding-top: 30px; */
+  /* padding-bottom: 30px; */
   align-items: center;
 
   .warning {
+    float:left;
+    text-align:center;
     padding-inline: 20px;
     color: $c-orange;
   }
@@ -753,39 +756,49 @@ button {
 .login-options {
   display: flex;
   flex-direction: column;
-  text-align: center;
+  text-align: left;
   z-index: 3;
-
-  align-items: center;
-  width: 400px;
-  margin-left: calc(50% - 200px);
   height: fit-content;
-  padding: 20px;
   font-size: 18px;
+  margin-top:10px;
 
   button {
 
     margin-top: 5px !important;
     font-size: 1em !important;
     height: 20px !important;
-    color: var(--c-blue);
+    color: var(--c-shade3);
     font-weight: normal;
     border: none !important;
     background: none !important;
+    text-align:left;
   }
 
   button:hover {
-    color: $c-teal-hover;
+    color: var(--c-shade6);
   }
 }
 
 .login-wrapper {
-  margin-left: -30px;
-
+  /* margin-left: -30px; */
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   padding-bottom: 200px;
-  margin-top: 50px;
+  margin-top: 150px;
+  gap:80px;
+  justify-content:center;
+
+  .active {
+    color:var(--c-shade6);
+  }
+  .ok-button {
+    color:var(--c-white);
+    background:var(--c-dark-blue) !important;
+  }
+  .ok-button:hover {
+    background:var(--c-blue) !important;
+
+  }
 }
 
 .reset-wrapper {
@@ -1979,6 +1992,8 @@ button {
   padding-top: 50px;
   justify-items: center;
   align-items: center;
+  background-color:var(--c-shade1);
+  border-right:1px solid black;
 
   .spinner {
     display: inherit;
@@ -2084,7 +2099,7 @@ button {
   .form {
     margin-top: 20px;
     /* width: 400px; */
-    margin-left: calc(50% - 200px);
+    /* margin-left: calc(50% - 200px); */
     height: 100%;
 
     .response-error {

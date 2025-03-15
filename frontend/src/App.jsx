@@ -112,6 +112,7 @@ const LaunchApp = () => {
 							<Route path="login" element={<Login />} />
 							<Route path="settings" element={<Settings />} />
 							<Route path="help" element={<Welcome />} />
+							<Route path="settings" element={<Settings />} />
 							<Route path="dns" element={<DNS />} />
 							<Route path="*" element={<Login />} />
 						</>
@@ -121,7 +122,6 @@ const LaunchApp = () => {
 						<>
 							<Route path="/" element={<Welcome />} />
 							<Route path="account" element={<Account />} />
-							<Route path="settings" element={<Settings />} />
 
 							<Route path="twofactor" element={<Enable2FA />} />
 							<Route path="org" element={<Org />} />
