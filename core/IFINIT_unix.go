@@ -46,7 +46,7 @@ func (t *TunnelInterface) Close() error {
 }
 
 func CreateNewTunnelInterface(
-	VC *Tunnel,
+	meta *TunnelMETA,
 ) (IF *TunnelInterface, err error) {
 	defer RecoverAndLogToFile()
 
@@ -59,12 +59,12 @@ func CreateNewTunnelInterface(
 	}
 
 	IF = &TunnelInterface{
-		Name:          VC.Meta.IFName,
-		IPv4Address:   VC.Meta.IPv4Address,
-		NetMask:       VC.Meta.NetMask,
-		TxQueuelen:    VC.Meta.TxQueueLen,
-		MTU:           VC.Meta.MTU,
-		Persistent:    VC.Meta.Persistent,
+		Name:          meta.IFName,
+		IPv4Address:   meta.IPv4Address,
+		NetMask:       meta.NetMask,
+		TxQueuelen:    meta.TxQueueLen,
+		MTU:           meta.MTU,
+		Persistent:    meta.Persistent,
 		shouldRestart: true,
 		// IPv6Address: "fe80::1",
 	}
@@ -276,45 +276,45 @@ func (t *TunnelInterface) Delete() (err error) {
 	return
 }
 
-func (t *TunnelInterface) ApplyRoutes(V *Tunnel) (err error) {
-	if IsDefaultConnection(V.Meta.IFName) || V.Meta.EnableDefaultRoute {
-		err = IP_AddRoute("default", "", t.IPv4Address, "0")
-		if err != nil {
-			return
-		}
-	}
+// func (t *TunnelInterface) ApplyRoutes(V *Tunnel) (err error) {
+// 	if IsDefaultConnection(V.Meta.IFName) || V.Meta.EnableDefaultRoute {
+// 		err = IP_AddRoute("default", "", t.IPv4Address, "0")
+// 		if err != nil {
+// 			return
+// 		}
+// 	}
+//
+// 	for _, n := range V.CRR.Networks {
+// 		t.addRoutes(V, n)
+// 	}
+//
+// 	if V.CRR.VPLNetwork != nil {
+// 		t.addRoutes(V, V.CRR.VPLNetwork)
+// 	}
+//
+// 	return
+// }
 
-	for _, n := range V.CRR.Networks {
-		t.addRoutes(V, n)
-	}
+// func (t *TunnelInterface) RemoveRoutes(V *Tunnel, preserve bool) (err error) {
+// 	defer RecoverAndLogToFile()
+//
+// 	for _, n := range V.CRR.Networks {
+// 		t.deleteRoutes(V, n)
+// 	}
+//
+// 	if V.CRR.VPLNetwork != nil {
+// 		t.deleteRoutes(V, V.CRR.VPLNetwork)
+// 	}
+// 	if !preserve {
+// 		if IsDefaultConnection(V.Meta.IFName) || V.Meta.EnableDefaultRoute {
+// 			err = IP_DelRoute("default", t.IPv4Address, "0")
+// 		}
+// 	}
+//
+// 	return
+// }
 
-	if V.CRR.VPLNetwork != nil {
-		t.addRoutes(V, V.CRR.VPLNetwork)
-	}
-
-	return
-}
-
-func (t *TunnelInterface) RemoveRoutes(V *Tunnel, preserve bool) (err error) {
-	defer RecoverAndLogToFile()
-
-	for _, n := range V.CRR.Networks {
-		t.deleteRoutes(V, n)
-	}
-
-	if V.CRR.VPLNetwork != nil {
-		t.deleteRoutes(V, V.CRR.VPLNetwork)
-	}
-	if !preserve {
-		if IsDefaultConnection(V.Meta.IFName) || V.Meta.EnableDefaultRoute {
-			err = IP_DelRoute("default", t.IPv4Address, "0")
-		}
-	}
-
-	return
-}
-
-func (t *TunnelInterface) Connect(V *Tunnel) (err error) {
+func (t *TunnelInterface) Connect(tun *TUN) (err error) {
 	// if !t.Persistent {
 	err = t.Addr()
 	if err != nil {
@@ -333,25 +333,26 @@ func (t *TunnelInterface) Connect(V *Tunnel) (err error) {
 		return
 	}
 
-	if IsDefaultConnection(V.Meta.IFName) || V.Meta.EnableDefaultRoute {
+	meta := tun.meta.Load()
+	if IsDefaultConnection(meta.IFName) || meta.EnableDefaultRoute {
 		err = IP_AddRoute("default", "", t.IPv4Address, "0")
 		if err != nil {
 			return
 		}
 	}
 
-	for _, n := range V.CRR.Networks {
-		t.addRoutes(V, n)
+	for _, n := range tun.crReponse.Networks {
+		t.addRoutes(n)
 	}
 
-	if V.CRR.VPLNetwork != nil {
-		t.addRoutes(V, V.CRR.VPLNetwork)
+	if tun.crReponse.VPLNetwork != nil {
+		t.addRoutes(tun.crReponse.VPLNetwork)
 	}
 
 	return
 }
 
-func (t *TunnelInterface) addRoutes(_ *Tunnel, n *ServerNetwork) (err error) {
+func (t *TunnelInterface) addRoutes(n *ServerNetwork) (err error) {
 	if n.Nat != "" {
 		err = IP_AddRoute(n.Nat, "", t.IPv4Address, "0")
 		if err != nil {
@@ -372,7 +373,7 @@ func (t *TunnelInterface) addRoutes(_ *Tunnel, n *ServerNetwork) (err error) {
 	return nil
 }
 
-func (t *TunnelInterface) deleteRoutes(_ *Tunnel, n *ServerNetwork) (err error) {
+func (t *TunnelInterface) deleteRoutes(n *ServerNetwork) (err error) {
 	if n.Nat != "" {
 		err = IP_DelRoute(n.Nat, t.IPv4Address, "0")
 		if err != nil {
@@ -394,24 +395,25 @@ func (t *TunnelInterface) deleteRoutes(_ *Tunnel, n *ServerNetwork) (err error) 
 	return nil
 }
 
-func (t *TunnelInterface) Disconnect(V *Tunnel) (err error) {
+func (t *TunnelInterface) Disconnect(tun *TUN) (err error) {
 	defer RecoverAndLogToFile()
 
-	for _, n := range V.CRR.Networks {
-		t.deleteRoutes(V, n)
+	for _, n := range tun.crReponse.Networks {
+		t.deleteRoutes(n)
 	}
 
-	if V.CRR.VPLNetwork != nil {
-		t.deleteRoutes(V, V.CRR.VPLNetwork)
+	if tun.crReponse.VPLNetwork != nil {
+		t.deleteRoutes(tun.crReponse.VPLNetwork)
 	}
 
-	if V.Con != nil {
-		V.Con.Close()
+	if tun.connection != nil {
+		tun.connection.Close()
 	}
 
 	t.shouldRestart = false
 
-	if IsDefaultConnection(V.Meta.IFName) || V.Meta.EnableDefaultRoute {
+	meta := tun.meta.Load()
+	if IsDefaultConnection(meta.IFName) || meta.EnableDefaultRoute {
 		err = IP_DelRoute("default", t.IPv4Address, "0")
 	}
 
@@ -424,8 +426,6 @@ func (t *TunnelInterface) Disconnect(V *Tunnel) (err error) {
 	if err != nil {
 		ERROR("unable to delete the interface", err)
 	}
-
-	RemoveTunnelInterfaceFromList(t)
 
 	return
 }
@@ -448,38 +448,38 @@ func createDevNetTun() {
 	}
 }
 
-func StartDefaultInterface() (err error) {
-	CON := new(Tunnel)
-	CON.Meta = findDefaultTunnelMeta()
-
-	DEFAULT_TUNNEL, err = CreateNewTunnelInterface(CON)
-	if err != nil {
-		return
-	}
-
-	CON.Interface = DEFAULT_TUNNEL
-
-	err = DEFAULT_TUNNEL.Addr()
-	if err != nil {
-		return
-	}
-	err = DEFAULT_TUNNEL.SetMTU()
-	if err != nil {
-		return
-	}
-	err = DEFAULT_TUNNEL.SetTXQueueLen()
-	if err != nil {
-		return
-	}
-	err = DEFAULT_TUNNEL.Up()
-	if err != nil {
-		return
-	}
-
-	// GLOBAL_STATE.DefaultInterfaceOnline = true
-
-	return
-}
+// func StartDefaultInterface() (err error) {
+// 	CON := new(Tunnel)
+// 	CON.Meta = findDefaultTunnelMeta()
+//
+// 	DEFAULT_TUNNEL, err = CreateNewTunnelInterface(CON)
+// 	if err != nil {
+// 		return
+// 	}
+//
+// 	CON.Interface = DEFAULT_TUNNEL
+//
+// 	err = DEFAULT_TUNNEL.Addr()
+// 	if err != nil {
+// 		return
+// 	}
+// 	err = DEFAULT_TUNNEL.SetMTU()
+// 	if err != nil {
+// 		return
+// 	}
+// 	err = DEFAULT_TUNNEL.SetTXQueueLen()
+// 	if err != nil {
+// 		return
+// 	}
+// 	err = DEFAULT_TUNNEL.Up()
+// 	if err != nil {
+// 		return
+// 	}
+//
+// 	// GLOBAL_STATE.DefaultInterfaceOnline = true
+//
+// 	return
+// }
 
 func tunnelCtl(fd uintptr, request uintptr, argp uintptr) error {
 	_, _, errno := syscall.Syscall(syscall.SYS_IOCTL, fd, uintptr(request), argp)

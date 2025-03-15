@@ -16,7 +16,6 @@ import (
 	"os/signal"
 	"runtime"
 	"runtime/debug"
-	"slices"
 	"strings"
 	"syscall"
 	"time"
@@ -84,10 +83,6 @@ const (
 	DNSFeature string = "DNS"
 	APIFeature string = "API"
 )
-
-func isFeatureEnabled(feature string) bool {
-	return slices.Contains(enabledFeatures, feature)
-}
 
 func main() {
 	defer func() {
@@ -455,7 +450,7 @@ func GeneratePortAllocation() (err error) {
 
 	currentPort := uint16(Config.StartPort)
 
-	for uc := 0; uc < slots; uc++ {
+	for range slots {
 		PR := new(PortRange)
 		PR.StartPort = uint16(currentPort)
 		PR.EndPort = PR.StartPort + uint16(portPerUser)

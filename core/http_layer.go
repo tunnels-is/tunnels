@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"slices"
 	"time"
 
 	"github.com/tunnels-is/tunnels/certs"
@@ -56,8 +57,8 @@ func LaunchAPI() {
 
 	INFO("====== API SERVER =========")
 	INFO("ADDR: ", ln.Addr())
-	INFO("PORT: ", ip)
-	INFO("IP: ", port)
+	INFO("IP: ", ip)
+	INFO("PORT: ", port)
 	INFO("Key: ", conf.APIKey)
 	INFO("Cert: ", conf.APICert)
 	INFO("===========================")
@@ -140,9 +141,6 @@ func HTTPhandler(w http.ResponseWriter, r *http.Request) {
 	case "resetNetwork":
 		HTTP_ResetNetwork(w, r)
 		return
-	case "setConfig":
-		HTTP_SetConfig(w, r)
-		return
 	case "getQRCode":
 		HTTP_GetQRCode(w, r)
 		return
@@ -154,6 +152,18 @@ func HTTPhandler(w http.ResponseWriter, r *http.Request) {
 		return
 	case "getState":
 		HTTP_GetState(w, r)
+		return
+	case "setConfig":
+		HTTP_SetConfig(w, r)
+		return
+	// case "getConfig":
+	// 	HTTP_GetConfig(w, r)
+	// 	return
+	// case "getTunnels":
+	// 	HTTP_GetTunnels(w, r)
+	// 	return
+	case "setTunnel":
+		HTTP_SetTunnel(w, r)
 		return
 	default:
 	}
@@ -214,16 +224,35 @@ func JSON(w http.ResponseWriter, r *http.Request, code int, data interface{}) {
 	}
 }
 
-func HTTP_GetState(w http.ResponseWriter, r *http.Request) {
-	form := new(FORWARD_REQUEST)
-	err := Bind(form, r)
-	if err != nil {
-		JSON(w, r, 400, err)
-		return
-	}
+type StateResponse struct {
+	Config        *configV2
+	State         *stateV2
+	User          *User
+	Tunnels       []*TunnelMETA
+	ActiveTunnels []*TUN
+}
 
-	_ = GenerateState()
-	JSON(w, r, 200, STATEOLD)
+func HTTP_GetState(w http.ResponseWriter, r *http.Request) {
+	JSON(w, r, 200, GetFullState())
+}
+
+func GetFullState() (s *StateResponse) {
+	s = new(StateResponse)
+	state := STATE.Load()
+	s.User = state.user.Load()
+	s.Config = CONFIG.Load()
+	s.State = state
+
+	tunnelMetaMapRange(func(tun *TunnelMETA) bool {
+		s.Tunnels = append(s.Tunnels, tun)
+		return true
+	})
+
+	tunnelMapRange(func(tun *TUN) bool {
+		s.ActiveTunnels = append(s.ActiveTunnels, tun)
+		return true
+	})
+	return
 }
 
 func HTTP_Connect(w http.ResponseWriter, r *http.Request) {
@@ -234,7 +263,7 @@ func HTTP_Connect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	code, err := PublicConnect(*ns)
+	code, err := PublicConnect(ns)
 	if err != nil {
 		STRING(w, r, code, err.Error())
 		return
@@ -249,7 +278,7 @@ func HTTP_Disconnect(w http.ResponseWriter, r *http.Request) {
 		JSON(w, r, 400, err)
 		return
 	}
-	err = Disconnect(DF.GUID, true, false)
+	err = Disconnect(DF.ID, true)
 	if err != nil {
 		JSON(w, r, 400, err)
 		return
@@ -262,8 +291,69 @@ func HTTP_ResetNetwork(w http.ResponseWriter, r *http.Request) {
 	JSON(w, r, 200, nil)
 }
 
+func HTTP_GetConfig(w http.ResponseWriter, r *http.Request) {
+	JSON(w, r, 200, CONFIG.Load())
+}
+
+func HTTP_SetTunnel(w http.ResponseWriter, r *http.Request) {
+	newMeta := new(TunnelMETA)
+	err := Bind(newMeta, r)
+	if err != nil {
+		JSON(w, r, 400, err.Error())
+		return
+	}
+
+	errors := validateTunnelMeta(newMeta)
+	if len(errors) > 0 {
+		JSON(w, r, 400, errors)
+		return
+	}
+
+	oldTun, ok := TunnelMetaMap.Load(newMeta.Tag)
+	if ok {
+		oldt, ok := oldTun.(*TunnelMETA)
+		if ok {
+			if !slices.Equal(oldt.AllowedHosts, newMeta.AllowedHosts) {
+				tunnelMapRange(func(tun *TUN) bool {
+					meta := tun.meta.Load()
+					if meta.Tag == newMeta.Tag {
+						sendFirewallToServer(
+							tun.cr.ServerIP,
+							tun.dhcp.Token,
+							net.IP(tun.dhcp.IP[:]).String(),
+							newMeta.AllowedHosts,
+							newMeta.DisableFirewall,
+							newMeta.ServerCert,
+						)
+						return false
+					}
+					return true
+				})
+			}
+		}
+	}
+
+	TunnelMetaMap.Store(newMeta.Tag, newMeta)
+	err = writeTunnelsToDisk(newMeta.Tag)
+	if err != nil {
+		JSON(w, r, 400, err.Error())
+		return
+	}
+	JSON(w, r, 200, nil)
+}
+
+func HTTP_GetTunnels(w http.ResponseWriter, r *http.Request) {
+	out := make([]*TunnelMETA, 0)
+	tunnelMetaMapRange(func(tun *TunnelMETA) bool {
+		out = append(out, tun)
+		return true
+	})
+
+	JSON(w, r, 200, out)
+}
+
 func HTTP_SetConfig(w http.ResponseWriter, r *http.Request) {
-	config := new(Config)
+	config := new(configV2)
 	err := Bind(config, r)
 	if err != nil {
 		JSON(w, r, 400, err.Error())
@@ -293,12 +383,7 @@ func HTTP_GetQRCode(w http.ResponseWriter, r *http.Request) {
 }
 
 func HTTP_CreateConnection(w http.ResponseWriter, r *http.Request) {
-	config, err := createRandomTunnel()
-	if err != nil {
-		STRING(w, r, 400, err.Error())
-		return
-	}
-	JSON(w, r, 200, config)
+	JSON(w, r, 200, createRandomTunnel())
 }
 
 func HTTP_ForwardToController(w http.ResponseWriter, r *http.Request) {

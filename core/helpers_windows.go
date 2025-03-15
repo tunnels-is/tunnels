@@ -30,7 +30,7 @@ func stripSuffix(domain string) string {
 func ValidateAdapterID(meta *TunnelMETA) error {
 	_, err := windows.GUIDFromString(meta.WindowsGUID)
 	if err != nil {
-		return errors.New("invalid windows GUID on default connection, err: " + err.Error())
+		return errors.New("invalid windows GUID on connection, err: " + err.Error())
 	}
 	return nil
 }

@@ -2,141 +2,54 @@ package core
 
 import (
 	"errors"
-	"fmt"
 	"math/rand"
-	"net"
-	"strings"
 
 	"github.com/zveinn/crypt"
 )
 
-func FindOrCreateInterface(TUN *Tunnel) (err error, created bool) {
-	TUN.Interface = FindTunnelInterfaceByName(TUN.Meta.IFName)
-	if TUN.Interface == nil {
-		TUN.Interface, err = CreateNewTunnelInterface(TUN)
-		if err != nil {
-			ERROR("unable to create tunnel interface: ", err)
-			return errors.New("Unable to create tunnel interface"), false
-		}
-		created = true
-	} else {
-		DEBUG("Interface already exists: ", TUN.Meta.IFName)
-	}
-
-	metaIP := net.ParseIP(TUN.Meta.IPv4Address).To4()
-	if metaIP == nil {
-		return fmt.Errorf("invalid IP (%s) in tunnel (%s) options", TUN.Meta.IPv4Address, TUN.Meta.Tag), false
-	}
-	TUN.LOCAL_IF_IP[0] = metaIP[0]
-	TUN.LOCAL_IF_IP[1] = metaIP[1]
-	TUN.LOCAL_IF_IP[2] = metaIP[2]
-	TUN.LOCAL_IF_IP[3] = metaIP[3]
-
-	return
-}
-
-func FindTunnelInterfaceByName(name string) *TunnelInterface {
-	for i := range IFList {
-		if IFList[i] != nil {
-			if IFList[i].Name == name {
-				return IFList[i]
-			}
-		}
-	}
-
-	return nil
-}
-
-func RemoveTunnelInterfaceFromList(T *TunnelInterface) {
-	for i := range IFList {
-		if IFList[i] != nil {
-			if IFList[i].Name == T.Name {
-				IFList[i] = nil
-			}
-		}
-	}
-}
-
-func AddTunnelInterfaceToList(T *TunnelInterface) (assigned bool) {
-	IFLock.Lock()
-	defer IFLock.Unlock()
-
-	for i := range IFList {
-		if IFList[i] == nil {
-			DEBUG("New Tunnel Interface @ index (", i, ") Name (", T.Name, ")")
-			IFList[i] = T
-			return true
-		}
-	}
-
-	return false
-}
-
-func RemoveTunnelFromList(GUID string) {
-	for i := range TunList {
-		if TunList[i] == nil {
-			continue
-		}
-		if TunList[i].Meta.WindowsGUID == GUID {
-			DEBUG("RemovingConnection:", GUID)
-			TunList[i] = nil
-		}
-	}
-}
-
-func AddTunnelToList(T *Tunnel) (assigned bool) {
-	ConLock.Lock()
-	defer ConLock.Unlock()
-
-	for i := range TunList {
-		if TunList[i] != nil {
-			if TunList[i].Meta.WindowsGUID == T.Meta.WindowsGUID {
-				DEBUG("RemovingConnection:", T.Meta.WindowsGUID)
-				TunList[i] = nil
-			}
-		}
-	}
-
-	for i := range TunList {
-		if TunList[i] == nil {
-			DEBUG("New Connection @ index (", i, ") GUID (", T.Meta.WindowsGUID, ")")
-			TunList[i] = T
-			return true
-		}
-	}
-
-	return false
-}
-
-func Disconnect(GUID string, remove bool, switching bool) (err error) {
-	DEBUG("Disconnect:", GUID, "RemovingConnection:", remove, "Switching:", switching)
-	CON := findTunnelByGUID(GUID)
-	if CON == nil {
-		return
-	}
-
-	if !switching && !CON.Meta.Persistent {
-		IF := FindTunnelInterfaceByName(CON.Interface.Name)
-		if IF != nil {
-			DEBUG("RemovingInterface:", IF.Name)
-			IF.Disconnect(CON)
-		}
-	}
-
-	CON.Connected = false
-	CON.Con.Close()
-
-	if remove {
-		RemoveTunnelFromList(GUID)
+func CreateAndConnectToInterface(t *TUN) (inter *TunnelInterface, err error) {
+	meta := t.meta.Load()
+	inter, err = CreateNewTunnelInterface(meta)
+	if err != nil {
+		ERROR("unable to create tunnel interface: ", err)
+		return nil, errors.New("Unable to create tunnel interface")
 	}
 
 	return
 }
 
-func createRandomTunnel() {
-	M := new(TunnelMETA)
-	M = createTunnel()
-	TunnelMetaMap.Store(M.Tag, M)
+func Disconnect(tunID string, switching bool) (err error) {
+	DEBUG("disconnecting from", tunID, switching)
+	tunnelMapRange(func(tun *TUN) bool {
+		if tun.id == tunID {
+			tun.SetState(TUN_Disconnecting)
+			tunnel := tun.tunnel.Load()
+			tunnel.Disconnect(tun)
+			if tun.connection != nil {
+				tun.connection.Close()
+			}
+			if tun.encWrapper != nil {
+				if tun.encWrapper.HStream != nil {
+					tun.encWrapper.HStream.Close()
+				}
+				if tun.encWrapper.HConn != nil {
+					tun.encWrapper.HConn.Close()
+				}
+			}
+
+			tun.SetState(TUN_Disconnected)
+			DEBUG("disconnected from ", tun.tag, tun.id)
+			return false
+		}
+		return true
+	})
+
+	return
+}
+
+func createRandomTunnel() (m *TunnelMETA) {
+	m = createTunnel()
+	TunnelMetaMap.Store(m.Tag, m)
 	return
 }
 
@@ -179,42 +92,4 @@ func createDefaultTunnelMeta() (M *TunnelMETA) {
 	M.IFName = DefaultTunnelName
 	M.EnableDefaultRoute = true
 	return
-}
-
-func FindMETAForConnectRequest(CC *ConnectionRequest) *TunnelMETA {
-	for i, v := range STATEOLD.C.Connections {
-		if strings.EqualFold(v.Tag, CC.Tag) {
-			return STATEOLD.C.Connections[i]
-		}
-	}
-	return nil
-}
-
-func findTunnelByGUID(GUID string) (CON *Tunnel) {
-	for i := range TunList {
-		if TunList[i] == nil {
-			continue
-		}
-		if TunList[i].Meta.WindowsGUID == GUID {
-			DEBUG("FoundConnection:", GUID)
-			CON = TunList[i]
-			return
-		}
-	}
-	return
-}
-
-func findDefaultTunnelMeta() (M *TunnelMETA) {
-	for i := range STATEOLD.C.Connections {
-		if STATEOLD.C.Connections[i] == nil {
-			continue
-		}
-		c := STATEOLD.C.Connections[i]
-
-		if strings.ToLower(c.IFName) == DefaultTunnelName {
-			return STATEOLD.C.Connections[i]
-		}
-	}
-
-	return nil
 }

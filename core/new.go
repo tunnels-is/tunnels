@@ -8,20 +8,31 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/miekg/dns"
 	"github.com/tunnels-is/tunnels/certs"
 	"github.com/zveinn/crypt"
 )
 
 func init() {
 	STATE.Store(&stateV2{})
+	CONFIG.Store(&configV2{})
 }
 
+const (
+	apiVersion       = 1
+	version          = "2.0.0"
+	tunnelFileSuffix = ".tun.json"
+
+	DefaultAPIIP   = "127.0.0.1"
+	DefaultAPIPort = "7777"
+
+	DefaultDNSIP   = "127.0.0.1"
+	DefaultDNSPort = "53"
+)
+
 var (
-	apiVersion = 1
-	version    = "2.0.0"
-	STATE      atomic.Pointer[stateV2]
-	CONFIG     atomic.Pointer[ConfigV2]
+	STATE  atomic.Pointer[stateV2]
+	CONFIG atomic.Pointer[configV2]
 
 	// Tunnels, Servers, Meta
 	TunnelMetaMap sync.Map
@@ -34,10 +45,10 @@ var (
 
 	// Go Routine monitors
 	concurrencyMonitor = make(chan *goSignal, 1000)
-	interfaceMonitor   = make(chan *TunnelInterface, 200)
-	tunnelMonitor      = make(chan *Tunnel, 200)
+	tunnelMonitor      = make(chan *TUN, 1000)
+	interfaceMonitor   = make(chan *TunnelInterface, 1000)
 
-	// testing
+	// NOT SURE YET
 	highPriorityChannel   = make(chan *event, 100)
 	mediumPriorityChannel = make(chan *event, 100)
 	lowPriorityChannel    = make(chan *event, 100)
@@ -48,20 +59,14 @@ var (
 	CancelContext context.Context
 	CancelFunc    context.CancelFunc
 
-	// API
-	DefaultAPIIP   = "127.0.0.1"
-	DefaultAPIPort = "7777"
-
 	// DNS
-	DefaultDNSIP   = "127.0.0.1"
-	DefaultDNSPort = "53"
 	DNSGlobalBlock atomic.Bool
 	DNSBlockList   atomic.Pointer[sync.Map]
 	DNSCache       sync.Map
 	DNSStatsMap    sync.Map
 )
 
-type ConfigV2 struct {
+type configV2 struct {
 	Minimal bool
 	OpenUI  bool
 
@@ -110,6 +115,8 @@ type ConfigV2 struct {
 type stateV2 struct {
 	adminState bool
 
+	user atomic.Pointer[User]
+
 	// Networking parameters
 	DefaultGateway       net.IP
 	DefaultInterface     net.IP
@@ -121,10 +128,10 @@ type stateV2 struct {
 	LogPath        string
 	ConfigFileName string
 	BasePath       string
+	TracePath      string
 	TunnelsPath    string
-	TraceFileName  atomic.Pointer[string]
-	TracePath      atomic.Pointer[string]
-	LogFileName    atomic.Pointer[string]
+	TraceFileName  string
+	LogFileName    string
 }
 
 type TunnelState int
@@ -133,6 +140,7 @@ const (
 	TUN_NotReady TunnelState = iota
 	TUN_Ready
 	TUN_Error
+	TUN_Disconnecting
 	TUN_Disconnected
 	// >= TUN_Connected is reserved for connected or potentially connected states
 	TUN_Connected
@@ -148,13 +156,21 @@ func (t *TUN) GetState() TunnelState {
 	return *ts
 }
 
+func (t *TUN) SetState(state TunnelState) {
+	t.state.Store(&state)
+}
+
+func (t *TUN) registerPing(ping time.Time) {
+	t.pingTime.Store(&ping)
+}
+
 type TUN struct {
-	id    uuid.UUID
+	id    string
 	state atomic.Pointer[TunnelState]
 	tag   string
 
-	meta   atomic.Pointer[TunnelMETA]
-	server atomic.Pointer[any]
+	meta atomic.Pointer[TunnelMETA]
+	// server atomic.Pointer[any]
 	tunnel atomic.Pointer[TunnelInterface]
 
 	// encWrapper wraps connection with encryption
@@ -166,36 +182,60 @@ type TUN struct {
 	cr        *ConnectionRequest
 	crReponse *ConnectRequestResponse
 
-	// Stats
-	egressBytes   int
-	egressString  string
-	ingressBytes  int
-	ingressString string
+	// NEW MAPPING STUFF
+	pingTime                atomic.Pointer[time.Time]
+	localInterfaceNetIP     net.IP
+	localDNSClient          *dns.Client
+	localInterfaceIP4bytes  [4]byte
+	serverInterfaceNetIP    net.IP
+	serverInterfaceIP4bytes [4]byte
+	startPort               uint16
+	endPort                 uint16
+	TCPEgress               map[[10]byte]*Mapping
+	UDPEgress               map[[10]byte]*Mapping
 
-	// Configurations
-	startPort  uint16
-	endPort    uint16
-	dhcp       *DHCPRecord
-	vplNetwork *ServerNetwork
+	// Network Natting
+	NATEgress  map[[4]byte][4]byte `json:"-"`
+	NATIngress map[[4]byte][4]byte `json:"-"`
+
+	// Nonce ?
+	Nonce2Bytes []byte
+
+	// VPL
+	serverVPLIP [4]byte
+	dhcp        *DHCPRecord
+	VPLNetwork  *ServerNetwork
+	VPLEgress   map[[4]byte]struct{} `json:"-"`
+	VPLIngress  map[[4]byte]struct{} `json:"-"`
+
+	// TCP and UDP Natting
+	TCPPortMap []VPNPort
+	UDPPortMap []VPNPort
+
+	// TODO ....
+	Index []byte
+
+	// Stats
+	egressBytes   atomic.Int64
+	egressString  string
+	ingressBytes  atomic.Int64
+	ingressString string
 
 	// Tunnel States
 	nonce1 uint64
 	nonce2 uint64
 
 	// Server States
-	cPU                 byte
-	dISK                byte
-	mEM                 byte
-	derverToClientMicro int64
-	pingTime            time.Time
+	CPU                 byte
+	DISK                byte
+	MEM                 byte
+	serverToClientMicro int64
 
 	// Random mappint stuff
-	LOCAL_IF_IP [4]byte
-	Index       []byte
+	// LOCAL_IF_IP [4]byte
 
 	// EGRESS PACKET STUFF
 	EP_Protocol         byte
-	EP_VPNSrcIP         [4]byte
 	EP_DstIP            [4]byte
 	EP_IPv4HeaderLength byte
 	EP_IPv4Header       []byte
@@ -216,20 +256,19 @@ type TUN struct {
 	IP_NAT_OK           bool
 
 	// NEW PORT MAPPING
-	TCP_M  []VPNPort
-	UDP_M  []VPNPort
-	TCP_EM map[[10]byte]*Mapping
-	UDP_EM map[[10]byte]*Mapping
-	EP_MP  *Mapping
-	IP_MP  *Mapping
-	EP_SYN byte
+	EgressMapping  *Mapping
+	IngressMapping *Mapping
+	EP_SYN         byte
+}
 
-	// VPL
-	VPL_IP    [4]byte
-	VPL_E_MAP map[[4]byte]struct{} `json:"-"`
-	VPL_I_MAP map[[4]byte]struct{} `json:"-"`
+func (t *TUN) InitPortMap() {
+	t.TCPPortMap = make([]VPNPort, t.endPort-t.startPort)
+	t.UDPPortMap = make([]VPNPort, t.endPort-t.startPort)
 
-	//  NAT
-	NAT_CACHE         map[[4]byte][4]byte `json:"-"`
-	REVERSE_NAT_CACHE map[[4]byte][4]byte `json:"-"`
+	for i := range t.TCPPortMap {
+		t.TCPPortMap[i].M = make(map[[4]byte]*Mapping)
+	}
+	for i := range t.UDPPortMap {
+		t.UDPPortMap[i].M = make(map[[4]byte]*Mapping)
+	}
 }

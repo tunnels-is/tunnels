@@ -22,10 +22,9 @@ const ConnectionTable = () => {
 
 	useEffect(() => {
 		let x = async () => {
-			state.GetPrivateServers()
-			state.GetServers()
-			await state.GetBackendState()
+			await state.GetPrivateServers()
 			await state.GetServers()
+			state.GetBackendState()
 		}
 		x()
 	}, [])
@@ -111,7 +110,7 @@ const ConnectionTable = () => {
 
 	let rows = []
 
-	state?.Config?.Connections.forEach((c, i) => {
+	state?.Tunnels?.forEach((c, i) => {
 		let row = { items: [] }
 		row.items.push({
 			type: "text",
@@ -121,7 +120,7 @@ const ConnectionTable = () => {
 		})
 
 		let active = false
-		state.State?.ActiveConnections?.map((x) => {
+		state.ActiveTunnels?.map((x) => {
 			if (x.WindowsGUID === c.WindowsGUID) {
 				active = true
 				return
@@ -178,9 +177,9 @@ const ConnectionTable = () => {
 			value: <CustomSelect
 				parentkey={c.Tag}
 				className={"clickable"}
-				placeholder={"Assign"}
+				placeholder={"Click Here"}
 				setValue={(opt) => {
-					state.changeServerOnConnection(c.Tag, opt.key)
+					state.changeServerOnConnection2(c.Tag, opt.key)
 				}}
 				options={opts}
 			></CustomSelect>,
@@ -191,7 +190,7 @@ const ConnectionTable = () => {
 			type: "text",
 			align: "left",
 			className: "serverip",
-			value: server ? server.IP ? server.IP : c.PrivateIP : "",
+			value: server ? server.IP ? server.IP : c.PrivateIP : "unknown",
 			color: "blue",
 			click: () => {
 				setPServer(server)
@@ -318,7 +317,7 @@ const ConnectionTable = () => {
 
 	return (
 		<div className="connections" >
-			{(!state.Config?.Connections || state.Config?.Connections.length < 1) &&
+			{(!state.Tunnels || state.Tunnels?.length < 1) &&
 				<Loader
 					key={"loader"}
 					className="spinner"

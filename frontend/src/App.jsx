@@ -32,7 +32,7 @@ import STORE from "./store";
 import WS from "./ws";
 
 // Use this to automatically turn on debug 
-STORE.Cache.Set("debug", false)
+STORE.Cache.Set("debug", true)
 
 const appElement = document.getElementById('app')
 const root = createRoot(appElement);
@@ -82,7 +82,6 @@ const LaunchApp = () => {
 					},
 				}}
 			/>
-
 
 			<SideBar />
 

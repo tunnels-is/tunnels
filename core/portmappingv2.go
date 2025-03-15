@@ -36,7 +36,7 @@ func StartTraceProcessor() {
 
 	s := STATE.Load()
 	if TraceFile == nil {
-		TraceFile, err = CreateFile(*s.TraceFileName.Load())
+		TraceFile, err = CreateFile(s.TraceFileName)
 		if err != nil {
 			return
 		}
@@ -74,7 +74,7 @@ func StartTraceProcessor() {
 		if ISM {
 			_, _ = fmt.Fprintf(
 				TraceFile,
-				"M: s= %-15s:%-05d || d= %-15s:%-5d  || m= %-4d || p= %-2s || e=SFR %s.%s.%s || i=FR %s.%s || i/e= %d/%d  \n",
+				"M: s= %-15s:%-05d || d= %-15s:%-5d  || m= %-4d || p= %-2s || e=SFR %s.%s.%s || i=FR %s.%s \n",
 				net.IP(M.OriginalSourceIP[:]).String(),
 				binary.BigEndian.Uint16(M.LocalPort[:]),
 				net.IP(M.DestinationIP[:]).String(),
@@ -86,8 +86,8 @@ func StartTraceProcessor() {
 				strconv.Itoa(int(M.ERST)),
 				strconv.Itoa(int(M.IFIN)),
 				strconv.Itoa(int(M.IRST)),
-				M.ingressBytes,
-				M.egressBytes,
+				// M.ingressBytes,
+				// M.egressBytes,
 			)
 		}
 
@@ -113,23 +113,11 @@ type Mapping struct {
 	VPNPort          [2]byte
 	OriginalSourceIP [4]byte
 	DestinationIP    [4]byte
-	ingressBytes     int
-	egressBytes      int
+	// ingressBytes     int
+	// egressBytes      int
 }
 
-func (V *Tunnel) InitPortMap() {
-	V.TCP_M = make([]VPNPort, V.EndPort-V.StartPort)
-	V.UDP_M = make([]VPNPort, V.EndPort-V.StartPort)
-
-	for i := range V.TCP_M {
-		V.TCP_M[i].M = make(map[[4]byte]*Mapping)
-	}
-	for i := range V.UDP_M {
-		V.UDP_M[i].M = make(map[[4]byte]*Mapping)
-	}
-}
-
-func (V *Tunnel) CreateNEWPortMapping(Emap map[[10]byte]*Mapping, PortMap []VPNPort, ips, port []byte) *Mapping {
+func (V *TUN) CreateNEWPortMapping(Emap map[[10]byte]*Mapping, PortMap []VPNPort, ips, port []byte) *Mapping {
 	EID := [10]byte{
 		ips[0],
 		ips[1],
@@ -185,7 +173,7 @@ func (V *Tunnel) CreateNEWPortMapping(Emap map[[10]byte]*Mapping, PortMap []VPNP
 			Emap[EID].dstPort[1] = port[3]
 			binary.BigEndian.PutUint16(
 				Emap[EID].VPNPort[:],
-				i+V.StartPort,
+				i+V.startPort,
 			)
 			break
 		}
@@ -200,8 +188,8 @@ func (V *Tunnel) CreateNEWPortMapping(Emap map[[10]byte]*Mapping, PortMap []VPNP
 	return Emap[EID]
 }
 
-func (V *Tunnel) getIngressPortMapping(VPNPortMap []VPNPort, dstIP []byte, port [2]byte) *Mapping {
-	p := binary.BigEndian.Uint16(port[:]) - V.StartPort
+func (V *TUN) getIngressPortMapping(VPNPortMap []VPNPort, dstIP []byte, port [2]byte) *Mapping {
+	p := binary.BigEndian.Uint16(port[:]) - V.startPort
 	VPNPortMap[p].L.Lock()
 	mapping, ok := VPNPortMap[p].M[[4]byte(dstIP)]
 	VPNPortMap[p].L.Unlock()
@@ -259,33 +247,33 @@ func debugMappStream(M *Mapping) {
 }
 
 func (t *TUN) cleanPortMap() {
-	for i := range t.TCP_M {
-		t.TCP_M[i].L.Lock()
-		for k, v := range t.TCP_M[i].M {
+	for i := range t.TCPPortMap {
+		t.TCPPortMap[i].L.Lock()
+		for k, v := range t.TCPPortMap[i].M {
 			switch {
 			case v.EFIN > 0 && v.IFIN > 0:
 				if time.Since(v.LastActivity) > time.Second*10 {
 					debugMappStream(v)
-					delete(t.TCP_M[i].M, k)
+					delete(t.TCPPortMap[i].M, k)
 				}
 			case v.ERST > 0 || v.IRST > 0:
 				if time.Since(v.LastActivity) > time.Second*10 {
 					debugMappStream(v)
-					delete(t.TCP_M[i].M, k)
+					delete(t.TCPPortMap[i].M, k)
 				}
 			default:
 				if time.Since(v.LastActivity) > time.Second*360 {
 					debugMappStream(v)
-					delete(t.TCP_M[i].M, k)
+					delete(t.TCPPortMap[i].M, k)
 				}
 			}
 		}
-		t.TCP_M[i].L.Unlock()
+		t.TCPPortMap[i].L.Unlock()
 	}
 
-	for i := range t.UDP_M {
-		t.UDP_M[i].L.Lock()
-		for k, v := range t.UDP_M[i].M {
+	for i := range t.UDPPortMap {
+		t.UDPPortMap[i].L.Lock()
+		for k, v := range t.UDPPortMap[i].M {
 			dnsL := 0
 			if t.crReponse != nil {
 				dnsL = len(t.crReponse.DNSServers)
@@ -304,7 +292,7 @@ func (t *TUN) cleanPortMap() {
 				if isDNS {
 					if time.Since(v.LastActivity) > time.Second*15 {
 						debugMappStream(v)
-						delete(t.UDP_M[i].M, k)
+						delete(t.UDPPortMap[i].M, k)
 					}
 				}
 			}
@@ -312,11 +300,11 @@ func (t *TUN) cleanPortMap() {
 			if !isDNS {
 				if time.Since(v.LastActivity) > time.Second*150 {
 					debugMappStream(v)
-					delete(t.UDP_M[i].M, k)
+					delete(t.UDPPortMap[i].M, k)
 				}
 			}
 		}
-		t.UDP_M[i].L.Unlock()
+		t.UDPPortMap[i].L.Unlock()
 	}
 }
 

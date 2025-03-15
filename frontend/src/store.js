@@ -1,7 +1,6 @@
 import dayjs from "dayjs";
 const DATA = "data_";
 
-
 var STORE = {
 	debug: false,
 	// debug: Boolean(window.localStorage.getItem("debug")),

@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/x509"
 	"encoding/json"
+	"errors"
 	"io/fs"
 	"log"
 	"os"
@@ -21,17 +22,22 @@ import (
 func InitService() error {
 	defer RecoverAndLogToFile()
 
-	INFO("Starting Tunnels")
 	InitBaseFoldersAndPaths()
 	loadConfigFromDisk()
 	loadTunnelsFromDisk()
+	loadDefaultGateway()
+	loadDefaultInterface()
+	InitDNSHandler()
+	INFO("Starting Tunnels")
 
 	set := CONFIG.Load()
 	s := STATE.Load()
 
+	// updateDNSHandlerInterface(s.DefaultInterface)
+
 	if !set.ConsoleLogOnly {
 		var err error
-		LogFile, err = CreateFile(*s.LogFileName.Load())
+		LogFile, err = CreateFile(s.LogFileName)
 		if err != nil {
 			return err
 		}
@@ -46,8 +52,6 @@ func InitService() error {
 	// TODO ..
 	printInfo()
 	printInfo2()
-
-	InitDNSHandler()
 
 	INFO("Loading certificates")
 
@@ -138,10 +142,9 @@ func LaunchEverything() {
 		PingConnections()
 	})
 
-	// newConcurrentSignal("GatewayChecker", CancelContext, func() {
-	// loadDefaultGateway()
-	// loadDefaultInterface()
-	// })
+	newConcurrentSignal("BlockListUpdater", CancelContext, func() {
+		updateBlockLists()
+	})
 
 	newConcurrentSignal("LogMapCleaner", CancelContext, func() {
 		CleanUniqueLogMap()
@@ -219,6 +222,12 @@ func writeConfigToDisk() (err error) {
 	}
 	defer f.Close()
 
+	err = f.Truncate(0)
+	if err != nil {
+		ERROR("Unable to write config bytes to new config file: ", err)
+		return err
+	}
+
 	_, err = f.Write(cb)
 	if err != nil {
 		ERROR("Unable to write config bytes to new config file: ", err)
@@ -228,11 +237,11 @@ func writeConfigToDisk() (err error) {
 	return
 }
 
-func (m *TunnelMETA) LoadPrivateCerts() (p *x509.CertPool, err error) {
-	if len(m.PrivateCertBytes) > 0 {
-		return LoadPrivateCertFromBytes(m.PrivateCertBytes)
+func (m *TUN) LoadPrivateCerts(certpath string) (p *x509.CertPool, err error) {
+	if len(m.ServerCertBytes) > 0 {
+		return LoadPrivateCertFromBytes(m.ServerCertBytes)
 	}
-	return LoadPrivateCert(m.PrivateCert)
+	return LoadPrivateCert(certpath)
 }
 
 func LoadPrivateCertFromBytes(data []byte) (pool *x509.CertPool, err error) {
@@ -255,10 +264,10 @@ func ReadConfigFileFromDisk() (err error) {
 	state := STATE.Load()
 	config, err := os.ReadFile(state.ConfigFileName)
 	if err != nil {
-		return
+		return err
 	}
 
-	Conf := new(ConfigV2)
+	Conf := new(configV2)
 	err = json.Unmarshal(config, Conf)
 	if err != nil {
 		ERROR("Unable to turn config file into config object: ", err)
@@ -270,28 +279,43 @@ func ReadConfigFileFromDisk() (err error) {
 	return
 }
 
-func writeTunnelsToDisk() {
+func writeTunnelsToDisk(tag string) (outErr error) {
 	s := STATE.Load()
 	TunnelMetaMap.Range(func(key, value any) bool {
 		t, ok := value.(*TunnelMETA)
 		if !ok {
 			ERROR("Unable to save tunnel to disk: unable to cast any to meta")
+			outErr = errors.New("unable to save tunnel to disk")
+			return false
+		}
+		if tag != "" {
+			if t.Tag != tag {
+				return true
+			}
 		}
 		tb, err := json.Marshal(value)
 		if err != nil {
 			ERROR("Unable to transform tunnel to json:", err)
+			outErr = err
+			return false
 		}
-		tf, err := CreateFile(s.TunnelsPath + string(os.PathSeparator) + t.Tag + ".tunnel")
+		tf, err := CreateFile(s.TunnelsPath + string(os.PathSeparator) + t.Tag + tunnelFileSuffix)
 		if err != nil {
 			ERROR("Unable to save tunnel to disk:", err)
+			outErr = err
+			return false
 		}
 		_, err = tf.Write(tb)
 		if err != nil {
 			ERROR("Unable to write tunnel json to file:", err)
+			outErr = err
+			return false
 		}
 
 		return true
 	})
+
+	return
 }
 
 func loadTunnelsFromDisk() {
@@ -305,7 +329,7 @@ func loadTunnelsFromDisk() {
 			return nil
 		}
 
-		if !strings.HasSuffix(path, ".tunnel") {
+		if !strings.HasSuffix(path, tunnelFileSuffix) {
 			return nil
 		}
 
@@ -332,7 +356,7 @@ func loadTunnelsFromDisk() {
 	if !foundDefault {
 		newTun := createDefaultTunnelMeta()
 		TunnelMetaMap.Store(newTun.Tag, newTun)
-		writeTunnelsToDisk()
+		writeTunnelsToDisk(newTun.Tag)
 	}
 }
 
@@ -342,18 +366,12 @@ func loadConfigFromDisk() {
 
 	err := ReadConfigFileFromDisk()
 	if err == nil {
-		conf := CONFIG.Load()
-		applyCertificateDefaultsToConfig(conf)
-		if len(conf.AvailableBlockLists) == 0 && !conf.DisableBlockLists {
-			conf.AvailableBlockLists = GetDefaultBlockLists()
-			writeConfigToDisk()
-		}
 		return
 	}
 
 	DEBUG("Generating a new default config")
 
-	Conf := new(ConfigV2)
+	Conf := new(configV2)
 	Conf.DarkMode = true
 
 	Conf.DebugLogging = true
@@ -379,7 +397,7 @@ func loadConfigFromDisk() {
 	writeConfigToDisk()
 }
 
-func applyCertificateDefaultsToConfig(cfg *ConfigV2) {
+func applyCertificateDefaultsToConfig(cfg *configV2) {
 	if cfg.APIKey == "" {
 		cfg.APIKey = "./api.key"
 	}
@@ -436,18 +454,17 @@ func applyCertificateDefaultsToConfig(cfg *ConfigV2) {
 
 func CleanupOnClose() {
 	defer RecoverAndLogToFile()
-	// CleanupWithStateLock()
-	for _, v := range TunList {
-		if v == nil {
-			continue
-		}
-		if v.Interface != nil {
-			_ = v.Interface.Disconnect(v)
-		}
+	tunnelMapRange(func(tun *TUN) bool {
+		tunnel := tun.tunnel.Load()
+		tunnel.Disconnect(tun)
+		return true
+	})
+	if TraceFile != nil {
+		_ = TraceFile.Close()
 	}
-	// Keeping this here for now
-	// RestoreDNSOnClose()
-	_ = LogFile.Close()
+	if LogFile != nil {
+		_ = LogFile.Close()
+	}
 }
 
 func popUI() {

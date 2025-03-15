@@ -505,7 +505,7 @@ func (t *TunnelInterface) SetMTU() error {
 	return nil
 }
 
-func (t *TunnelInterface) addRoutes(V *Tunnel, n *ServerNetwork) (err error) {
+func (t *TunnelInterface) addRoutes(n *ServerNetwork) (err error) {
 	if n.Nat != "" {
 		err = IP_AddRoute(n.Nat, t.Name, t.IPv4Address, "0")
 		if err != nil {

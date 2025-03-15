@@ -21,7 +21,6 @@ func IsAlphanumeric(s string) bool {
 func CreateConfig(flag *bool) {
 	if *flag {
 		InitBaseFoldersAndPaths()
-		CreateBaseFolder()
 		loadConfigFromDisk()
 		os.Exit(1)
 	}

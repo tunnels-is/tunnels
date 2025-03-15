@@ -13,6 +13,20 @@ import (
 	"time"
 )
 
+func updateBlockLists() {
+	defer func() {
+		time.Sleep(1 * time.Hour)
+	}()
+	conf := CONFIG.Load()
+	if !conf.DisableBlockLists {
+		DEBUG("Updating DNS Blocklists...")
+		err := ReBuildBlockLists()
+		if err != nil {
+			ERROR("Error updating DNS block lists ", err)
+		}
+	}
+}
+
 func ReBuildBlockLists() (listError error) {
 	defer RecoverAndLogToFile()
 	defer runtime.GC()

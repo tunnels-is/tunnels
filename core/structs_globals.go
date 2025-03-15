@@ -225,7 +225,7 @@ type List struct {
 }
 
 type DisconnectForm struct {
-	GUID string `json:"GUID"`
+	ID string `json:"ID"`
 }
 
 type CONFIG_FORM struct {
@@ -246,10 +246,10 @@ type CONFIG_FORM struct {
 }
 
 var (
-	// TunList [1000]*Tunnel
-	// ConLock = sync.Mutex{}
-	IFList [1000]*TunnelInterface
-	IFLock = sync.Mutex{}
+// TunList [1000]*Tunnel
+// ConLock = sync.Mutex{}
+// IFList [1000]*TunnelInterface
+// IFLock = sync.Mutex{}
 )
 
 type ConnectionOverwrite struct {
