@@ -13,6 +13,12 @@ const Servers = () => {
 		maxDepth: 1000,
 		onlyKeys: false,
 		readOnly: true,
+		backButton: {
+			title: "Back",
+			func: () => {
+				setServer(undefined)
+			}
+		}
 	}
 
 	useEffect(() => {
@@ -109,7 +115,7 @@ const Servers = () => {
 				},
 				{
 					type: "text",
-					value: <div className={con ? "disconnect" : "connect"}>{con ? "Disconnect" : "Connect"}</div>,
+					value: con ? "Disconnect" : "Connect",
 					color: con ? "red" : "green",
 					click: conButton,
 				},
@@ -126,13 +132,13 @@ const Servers = () => {
 		{ value: "Tag" },
 		{ value: "Server" },
 		{ value: "IP" },
-		{ value: "Tunnel", align:"center" },
+		{ value: "Tunnel", align: "center" },
 		{ value: "" }
 	]
+
 	if (server !== undefined) {
 		return (
 			<div className="connections">
-				<div className="back" onClick={() => setServer(undefined)}>Back to Servers</div>
 				<ObjectEditor
 					opts={editorOpts}
 					object={server}

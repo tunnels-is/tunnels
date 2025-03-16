@@ -2,7 +2,6 @@ import React, { useEffect, useState } from "react";
 import GLOBAL_STATE from "../state";
 import FormKeyValue from "./component/formkeyvalue";
 import KeyValue from "./component/keyvalue";
-import Label from "./component/label";
 import CustomToggle from "./component/CustomToggle";
 import FormKeyInput from "./component/formkeyrawvalue";
 import STORE from "../store";
@@ -24,7 +23,6 @@ const Settings = () => {
 	let APIIP = state.getKey("Config", "APIIP")
 	let APIPort = state.getKey("Config", "APIPort")
 
-	let DialTimeout = state.getKey("Config", "RouterDialTimeoutSeconds")
 
 	let modified = STORE.Cache.GetBool("modified_Config")
 
@@ -51,10 +49,10 @@ const Settings = () => {
 		<div className="settings-wrapper">
 
 			{modified === true &&
-			<div className="save-banner">
+				<div className="save-banner">
 					<div className="button"
 						onClick={() => state.v2_ConfigSave()}
-						>
+					>
 						Save
 					</div>
 					<div className="notice">Your config has un-saved changes</div>
@@ -64,15 +62,6 @@ const Settings = () => {
 
 			<div className="general panel">
 				<div className="title">General Settings</div>
-
-				<CustomToggle
-					label={"Dark Mode"}
-					value={DarkMode}
-					toggle={() => {
-						state.toggleDarkMode()
-						state.globalRerender()
-					}}
-				/>
 
 
 				<CustomToggle
@@ -216,19 +205,19 @@ const Settings = () => {
 				</div>
 
 				<KeyValue
-					label="Default" 
+					label="Default"
 					defaultValue={"Unknown"}
 					value={state.Network?.DefaultInterfaceName} />
-				<KeyValue 
+				<KeyValue
 					label="IP"
 					defaultValue={"Unknown"}
 					value={state.Network?.DefaultInterface} />
-				<KeyValue 
-					label="ID" 
+				<KeyValue
+					label="ID"
 					defaultValue={"Unknown"}
 					value={state.Network?.DefaultInterfaceID} />
-				<KeyValue 
-					label="Gateway" 
+				<KeyValue
+					label="Gateway"
 					defaultValue={"Unknown"}
 					value={state.Network?.DefaultGateway} />
 

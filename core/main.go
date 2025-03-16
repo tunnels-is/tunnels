@@ -64,10 +64,7 @@ func InitService() error {
 
 	if !set.Minimal {
 		doEvent(highPriorityChannel, func() {
-			err := ReBuildBlockLists()
-			if err == nil {
-				writeConfigToDisk()
-			}
+			reloadBlockLists()
 		})
 	}
 
@@ -147,7 +144,7 @@ func LaunchEverything() {
 	})
 
 	newConcurrentSignal("BlockListUpdater", CancelContext, func() {
-		updateBlockLists()
+		reloadBlockLists()
 	})
 
 	newConcurrentSignal("LogMapCleaner", CancelContext, func() {
@@ -388,7 +385,6 @@ func loadConfigFromDisk() {
 	DEBUG("Generating a new default config")
 
 	Conf := new(configV2)
-	Conf.DarkMode = true
 
 	Conf.DebugLogging = true
 	Conf.InfoLogging = true
@@ -402,7 +398,7 @@ func loadConfigFromDisk() {
 	Conf.LogBlockedDomains = true
 	Conf.LogAllDomains = true
 	Conf.DNSstats = true
-	Conf.AvailableBlockLists = GetDefaultBlockLists()
+	Conf.DNSBlockLists = GetDefaultBlockLists()
 
 	Conf.APIIP = "127.0.0.1"
 	Conf.APIPort = "7777"

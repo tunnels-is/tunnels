@@ -54,16 +54,17 @@ $editor-shadow: 4px 4px 15px 3px rgba(0, 0, 0, 0.66);
   --c-shade6: #F5F5F5;
   --c-dark-blue: #164edb;
   --c-blue: #466ccc;
-  --c-green: #466ccc;
+  /* --c-green: #2cbd38; */
   --c-dark-green: #164edb;
   --c-orange: #eb8718;
   --c-red-hover: #ff3333;
-  --c-red: #ff0000;
-
+  /* --c-red: #ff0000; */
+  --c-red: #CC4646;
+  --c-green: #1c731c;
   --input-hover: #454545;
 
-  --label-border-radius: 3px;
-  --button-border-radius: 3px;
+  --label-border-radius: 2px;
+  --button-border-radius: 2px;
   --label-width: 140px;
 
   --button-color: var(--c-dark-blue);
@@ -162,17 +163,34 @@ body::-webkit-scrollbar {
   border-radius: var(--button-border-radius);
   align-content: center;
   text-align: center;
-  color: var(--c-white);
+  color: var(--c-shade5);
   padding: 5px 10px 5px 10px;
   /* width: fit-content; */
+  font-size: 28px;
   width: 100%;
   font-weight: 700;
   background: var(--button-color);
+  width: fit-content !important;
+  margin-top: 15px;
+  margin-bottom: 15px;
+
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .button:hover {
-  color: var(--c-white);
-  background: var(--button-hover-color);
+  box-shadow: 1px 1px 5px 0px #8a8a8a;
+}
+
+.red {
+  background: var(--c-red);
+}
+
+.green {
+  background: var(--c-green);
+}
+
+.orange {
+  background: var(--c-orange);
 }
 
 .card-button {
@@ -198,21 +216,6 @@ body::-webkit-scrollbar {
   background: var(--button-hover-color);
 }
 
-.red {
-  background: var(--c-red);
-}
-
-.red:hover {
-  background: var(--c-red-hover) !important;
-}
-
-.green {
-  background: var(--c-dark-green);
-}
-
-.green:hover {
-  background: var(--c-green);
-}
 
 .blue {
   color: var(--c-shade5) !important;
@@ -350,7 +353,7 @@ body::-webkit-scrollbar {
 }
 
 .formkeyvalue {
-  margin-top: 5px;
+  /* margin-top: 5px; */
   margin-bottom: 6px;
   display: flex;
   flex-direction: row;
@@ -363,7 +366,7 @@ body::-webkit-scrollbar {
     border-radius: var(--label-border-radius);
     font-size: 16px;
     color: var(--c-blue);
-    text-align: right;
+    text-align: left;
   }
 
   textarea {
@@ -416,7 +419,7 @@ body::-webkit-scrollbar {
     border-radius: var(--label-border-radius);
     font-size: 16px;
     color: var(--c-blue);
-    text-align: right;
+    text-align: left;
     min-width: 140px;
   }
 
@@ -432,7 +435,7 @@ body::-webkit-scrollbar {
 }
 
 .toast {
-  margin-bottom: 200px;
+  /* margin-bottom: 200px; */
   margin-left: 20px;
   border-radius: 10px;
   background-color: var(--c-shade2) !important;
@@ -896,16 +899,6 @@ body::-webkit-scrollbar {
   height: auto;
   max-width: 100%;
 
-  .router-table {
-    width: 1100px !important;
-
-  }
-
-  .new-table {
-    .connect {
-      color: var(--c-green);
-    }
-  }
 
 
 }
@@ -925,8 +918,7 @@ body::-webkit-scrollbar {
   }
 
   .router-table {
-    width: 900px !important;
-
+    width: 800px !important;
   }
 
   .create {
@@ -940,9 +932,6 @@ body::-webkit-scrollbar {
       flex: 0 1 50px !important;
     }
 
-    .connect {
-      color: var(--c-green);
-    }
   }
 
 }
@@ -1032,13 +1021,16 @@ body::-webkit-scrollbar {
     cursor: pointer;
   }
 
+  .clickable:hover {
+    color: var(--c-shade5) !important;
+  }
+
   .hide {
     display: none !important;
   }
 
   .disabled {
     color: var(--c-shade2);
-    /* pointer-events: none; */
   }
 
   .waiting {
@@ -1067,8 +1059,11 @@ body::-webkit-scrollbar {
       font-size: 20px;
       text-align: left;
       margin-left: 20px;
-      /* margin-right: 14px; */
       padding-top: 2px;
+    }
+
+    .text-button:hover {
+      color: var(--c-shade5)
     }
 
     .search-bar {
@@ -1197,7 +1192,7 @@ body::-webkit-scrollbar {
     /*   border-bottom: 1px solid var(--c-shade2); */
     /* } */
     .row:hover {
-      background: var(--c-shade2) !important;
+      background: var(--c-shade1) !important;
     }
 
     .row {
@@ -1296,6 +1291,10 @@ body::-webkit-scrollbar {
     .text-button {
       text-align: right;
       margin-right: 10px;
+    }
+
+    .text-button:hovert {
+      color: var(--c-shade5);
     }
 
     .search-bar {
@@ -1477,8 +1476,18 @@ body::-webkit-scrollbar {
     width: 100%;
   }
 
+  .default {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .default:hover {
+    color: var(--c-shade5);
+  }
+
   .opt-wrapper {
-    border: 2px solid var(--c-shade3);
+    border: 1px solid var(--c-blue);
     z-index: 9001;
     cursor: pointer;
     position: fixed;
@@ -1488,14 +1497,14 @@ body::-webkit-scrollbar {
     flex-direction: column;
     width: fit-content;
     padding: 10px;
-    border-radius: 4px;
-    background-color: var(--c-shade2);
+    /* border-radius: 4px; */
+    background-color: var(--c-shade1);
     box-shadow: $base-shadow;
 
     .opt {
-      padding: 2px 10px 2px 10px;
+      padding: 4px 12px 4px 12px;
       height: fit-content;
-      font-size: 20px;
+      font-size: 18px;
       width: 100%;
     }
 
@@ -1505,7 +1514,7 @@ body::-webkit-scrollbar {
     }
 
     .inactive:hover {
-      color: var(--c-green);
+      color: var(--c-blue);
     }
   }
 
@@ -1668,50 +1677,12 @@ body::-webkit-scrollbar {
   }
 }
 
-.object-editor-save {
-  position: relative;
-  height: 50px;
-  width: fit-content;
-  padding: 0px 20px 0px 20px;
-  z-index: 1000;
-  font-size: 30px;
-  align-content: center;
-  color: var(--c-white);
-  font-weight: bold;
-  background: var(--c-green);
-  cursor: pointer;
-  border-radius: 5px;
-  color: var(--c-shade6);
-  margin-bottom: 20px;
+.button-wrap {
+  display: flex;
+  width: 100%;
+  margin-right: 40px;
+  gap: 16px;
 }
-
-.object-editor-save:hover {
-  background: var(--c-dark-green);
-}
-
-.object-editor-back {
-  position: relative;
-  height: 50px;
-  width: fit-content;
-  padding: 0px 20px 0px 20px;
-  z-index: 1000;
-  font-size: 30px;
-  align-content: center;
-  color: var(--c-white);
-  font-weight: bold;
-  background: var(--c-dark-blue);
-  cursor: pointer;
-  border-radius: 5px;
-  color: var(--c-shade6);
-  margin-bottom: 20px;
-}
-
-
-.object-editor-back:hover {
-  background: var(--c-blue);
-}
-
-
 
 .object-editor {
   flex-wrap: wrap;
@@ -1729,6 +1700,7 @@ body::-webkit-scrollbar {
     flex-wrap: wrap;
 
   }
+
 
 
   .d1 {

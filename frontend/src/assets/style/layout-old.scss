@@ -602,26 +602,6 @@
 
 
 
-button {
-  height: fit-content; // height: 45px;
-  width: fit-content;
-  padding-top: 5px;
-  padding-right: 20px;
-  padding-left: 20px;
-  padding-bottom: 5px;
-  margin-top: 10px;
-
-  border-radius: 5px;
-  border: none;
-  outline: none;
-
-  font-size: 20px !important;
-  font-weight: bold;
-  color: var(--c-white);
-  background: none;
-
-  cursor: pointer;
-}
 
 .form {
   /* background-color: $c-shade2; */
@@ -1476,126 +1456,6 @@ button {
   flex-wrap: wrap;
   padding-left: 20px;
   padding-top: 20px;
-
-  .active-bg {
-    border: 2px solid $c-teal !important;
-    border-radius: 0px !important;
-  }
-
-  // .router-card:hover {
-  // 	background-color: #45ff8a0a !important;
-  // }
-
-  .router-card {
-    display: flex;
-    flex-direction: column;
-    /* background: #141414; */
-    background: var(--c-shade1) !important;
-    width: fit-content;
-    min-width: fit-content;
-    padding: 10px;
-    border-radius: $card-border-radius;
-    height: fit-content;
-
-    .tag {
-      font-size: 20px;
-      text-align: center;
-    }
-
-    .api-default {
-      font-weight: bold;
-      background: black;
-      padding: 5px;
-      padding-left: 10px;
-      padding-right: 10px;
-      cursor: pointer;
-      width: 100%;
-      text-align: center;
-      color: $c-lightblue;
-      -webkit-user-select: none;
-      -ms-user-select: none;
-      user-select: none;
-    }
-
-    .button-and-text-seperator {
-      height: 5px;
-    }
-
-    .extra-margin {
-      margin-top: 10px;
-    }
-
-    .small-item {
-      height: 20px;
-    }
-
-    .item {
-      justify-content: space-between;
-
-      .selected {
-
-        .default {
-          width: 100%;
-          font-size: 16px;
-          font-weight: bold;
-          /* color: $white !important; */
-        }
-      }
-
-
-      .con-select {
-
-        .default {
-          width: 100%;
-        }
-
-      }
-    }
-
-    .item {
-      display: flex;
-
-      .key {
-        color: $c-teal;
-        margin-right: 5px;
-
-        .country-flag {
-          height: 40px;
-          width: 50px;
-        }
-      }
-
-      .value {
-        /* color: $white; */
-        color: var(--c-shade6);
-        /* font-weight: 600; */
-        text-align: right;
-
-        .x2 {
-          margin-left: 5px;
-          margin-top: 2px;
-
-          .x21 {
-            font-size: 18px;
-            height: 20px;
-            line-height: 1;
-          }
-
-          .x22 {
-            font-size: 14px;
-          }
-        }
-
-      }
-
-      .orange {
-        color: $c-orange;
-      }
-
-    }
-
-
-  }
 
 }
 
@@ -2885,12 +2745,6 @@ button {
     min-width: 800px;
   }
 
-  .back {
-    font-size: 26px;
-    color: var(--c-blue);
-    cursor: pointer;
-  }
-
   .search-wrapper {
     margin-bottom: 20px;
   }
@@ -3576,9 +3430,12 @@ button {
     cursor: pointer;
   }
 
-  .logout:hover {
-    color: var(--c-red-hover);
+  .button {
+    margin: 0px;
+    margin-top: 15px;
+    margin-bottom: 0px;
   }
+
 
 
   .panel {
@@ -3619,53 +3476,6 @@ button {
       display: flex;
       flex-direction: row;
 
-      .dialtimeout {
-        width: 65px;
-      }
-
-      .card-button {
-        margin-top: 10px;
-      }
-
-      .toggle {
-        font-size: 20px;
-        color: var(--c-green) !important;
-        margin-right: 10px;
-        cursor: pointer;
-      }
-
-      .off {
-        color: var(--c-red) !important;
-      }
-
-      .prefix-button {
-        font-size: 16px;
-        margin-left: 10px;
-        cursor: pointer;
-      }
-
-      .fake-button {
-        font-size: 18px;
-        margin-left: 10px;
-      }
-
-      .logout-button {
-        margin-top: 20px;
-      }
-
-      .button {
-        width: 100% !important;
-        text-align: center;
-        margin-top: 5px;
-        line-height: 1;
-        cursor: pointer;
-        padding: 10px;
-        padding-left: 10px;
-        padding-right: 10px;
-        color: $c-teal;
-        font-size: 24px;
-        background-color: $body-dark-bg;
-      }
 
       .input {
         width: 100%;

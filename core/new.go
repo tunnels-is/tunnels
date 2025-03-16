@@ -89,7 +89,6 @@ type configV2 struct {
 	APICertType    certs.CertType
 
 	// Generic
-	DarkMode          bool
 	LogBlockedDomains bool
 	LogAllDomains     bool
 	DebugLogging      bool
@@ -101,15 +100,14 @@ type configV2 struct {
 	ConnectionTracer  bool
 
 	// DNS
-	DNS1Default         string
-	DNS2Default         string
-	DNSOverHTTPS        bool
-	DNSstats            bool
-	DNSServerIP         string
-	DNSServerPort       string
-	EnabledBlockLists   []string
-	AvailableBlockLists []*BlockList
-	DNSRecords          []*ServerDNS
+	DNS1Default   string
+	DNS2Default   string
+	DNSOverHTTPS  bool
+	DNSstats      bool
+	DNSServerIP   string
+	DNSServerPort string
+	DNSBlockLists []*BlockList
+	DNSRecords    []*ServerDNS
 }
 
 type stateV2 struct {

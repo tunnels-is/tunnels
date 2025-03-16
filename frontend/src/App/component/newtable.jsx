@@ -155,15 +155,15 @@ const NewTable = (props) => {
 
 			</div>
 			<div className={` top-bar`}>
-			{props.rows?.length > 20  && 
-				<div className="search-bar">
-					<input
-						onChange={(e) => setFilter(e.target.value)}
-						placeholder={props?.placeholder ? props.placeholder : "Search .."}
-						className="ab" />
-				</div>
+				{props.rows?.length > 20 &&
+					<div className="search-bar">
+						<input
+							onChange={(e) => setFilter(e.target.value)}
+							placeholder={props?.placeholder ? props.placeholder : "Search .."}
+							className="ab" />
+					</div>
 
-			}
+				}
 			</div>
 
 			{finalRows.length < 1 &&
@@ -257,7 +257,7 @@ const NewTable = (props) => {
 											className={`ab tooltip column ${classNames} ${i.click ? "clickable" : ""}`}>
 											{i.value}
 											{i.tooltip === true &&
-												<span class="tooltiptext">{i.value}</span>
+												<span class="tooltiptext">{i.value} </span>
 											}
 										</div>
 									)

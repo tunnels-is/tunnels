@@ -11,7 +11,8 @@ import dayjs from "dayjs";
 
 const ConnectionTable = () => {
 	const state = GLOBAL_STATE("connections")
-	const [con, setCon] = useState(undefined)
+	const [tunnel, setTunnel] = useState(undefined)
+	const [tunnelTag, setTunnelTag] = useState(undefined)
 	const [pserver, setPServer] = useState(undefined)
 
 	let user = STORE.GetUser()
@@ -31,22 +32,9 @@ const ConnectionTable = () => {
 
 
 	const addConnection = () => {
-		let new_conn = {
-			Tag: "newtag",
-			IFName: "newconn",
-			IFIP: "0.0.0.0",
-		}
-		state.createConnection(new_conn).then(function(conn) {
-			if (conn !== undefined) {
-				state.renderPage("connections")
-			}
-		})
+		state.createTunnel()
 	}
 
-	const saveConnection = (data) => {
-		state.v2_TunnelSave(data)
-		state.renderPage("connections")
-	}
 
 	const editorOpts = {
 		baseClass: "connection-object-editor",
@@ -55,10 +43,23 @@ const ConnectionTable = () => {
 		defaults: {
 			root_AllowedHosts: [],
 		},
-		backButton:{
-			title:"Back To Tunnels",
+		backButton: {
+			title: "Back To Tunnels",
 			func: () => {
-				setCon(undefined)
+				setTunnel(undefined)
+				setTunnelTag(undefined)
+			},
+		},
+		saveButton: (tun) => {
+			state.v2_TunnelSave(tun, tunnelTag)
+			state.renderPage("connections")
+		},
+		deleteButton: {
+			title: "Delete",
+			func: (tun) => {
+				state.v2_TunnelDelete(tun)
+				setTunnel(undefined)
+				setTunnelTag(undefined)
 			},
 		},
 		titles: {
@@ -90,8 +91,6 @@ const ConnectionTable = () => {
 				obj.push("9.9.9.9")
 			},
 		},
-		delButtons: [],
-		saveButton: saveConnection,
 	}
 
 	const serverOpts = {
@@ -99,6 +98,12 @@ const ConnectionTable = () => {
 		maxDepth: 1000,
 		onlyKeys: false,
 		readOnly: true,
+		backButton: {
+			title: "Back",
+			func: () => {
+				setPServer(undefined)
+			}
+		}
 	}
 
 	let rows = []
@@ -127,7 +132,8 @@ const ConnectionTable = () => {
 			value: c.IFName,
 			color: "blue",
 			click: () => {
-				setCon(c)
+				setTunnel(c)
+				setTunnelTag(c.Tag)
 				state.renderPage("connections")
 			}
 		})
@@ -163,8 +169,8 @@ const ConnectionTable = () => {
 				opts.push({ value: x.Tag, key: x._id, selected: false })
 			}
 		})
-		if(opts.length === 0){
-				opts.push({ value: "No Servers..", key: "", selected: false })
+		if (opts.length === 0) {
+			opts.push({ value: "No Servers..", key: "", selected: false })
 		}
 
 		row.items.push({
@@ -175,7 +181,7 @@ const ConnectionTable = () => {
 				className={"clickable"}
 				placeholder={"Click Here"}
 				setValue={(opt) => {
-					state.changeServerOnConnection2(c.Tag, opt.key)
+					state.changeServerOnTunnel(c, opt.key)
 				}}
 				options={opts}
 			></CustomSelect>,
@@ -189,7 +195,7 @@ const ConnectionTable = () => {
 			value: server ? server.IP ? server.IP : c.PrivateIP : "unknown",
 			color: "blue",
 			click: () => {
-				if (server){
+				if (server) {
 					setPServer(server)
 					state.renderPage("connections")
 				}
@@ -200,7 +206,7 @@ const ConnectionTable = () => {
 			type: "text",
 			align: "right",
 			className: "connect-button",
-			value: active ? "disconnect" : server ? "connect" : "",
+			value: active ? "Disconnect" : server ? "Connect" : "",
 			color: active ? "red" : "green",
 			click: () => {
 				if (active) {
@@ -282,12 +288,12 @@ const ConnectionTable = () => {
 		{ value: "", align: "right", className: "connect-header" },
 	]
 
-	if (con !== undefined) {
+	if (tunnel !== undefined) {
 		return (
 			<div className="connections">
 				<ObjectEditor
 					opts={editorOpts}
-					object={con}
+					object={tunnel}
 				/>
 			</div>
 		)
@@ -296,7 +302,6 @@ const ConnectionTable = () => {
 	if (pserver !== undefined) {
 		return (
 			<div className="connections">
-				<div className="back" onClick={() => setPServer(undefined)}>Back to tunnels</div>
 				<ObjectEditor
 					opts={serverOpts}
 					object={pserver}

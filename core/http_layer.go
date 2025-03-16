@@ -147,8 +147,11 @@ func HTTPhandler(w http.ResponseWriter, r *http.Request) {
 	case "forwardToController":
 		HTTP_ForwardToController(w, r)
 		return
-	case "createConnection":
-		HTTP_CreateConnection(w, r)
+	case "createTunnel":
+		HTTP_CreateTunnel(w, r)
+		return
+	case "deleteTunnel":
+		HTTP_DeleteTunnels(w, r)
 		return
 	case "getState":
 		HTTP_GetState(w, r)
@@ -156,12 +159,6 @@ func HTTPhandler(w http.ResponseWriter, r *http.Request) {
 	case "setConfig":
 		HTTP_SetConfig(w, r)
 		return
-	// case "getConfig":
-	// 	HTTP_GetConfig(w, r)
-	// 	return
-	// case "getTunnels":
-	// 	HTTP_GetTunnels(w, r)
-	// 	return
 	case "setTunnel":
 		HTTP_SetTunnel(w, r)
 		return
@@ -321,35 +318,47 @@ func HTTP_GetConfig(w http.ResponseWriter, r *http.Request) {
 	JSON(w, r, 200, CONFIG.Load())
 }
 
+type saveTunnelForm struct {
+	Meta   *TunnelMETA
+	OldTag string
+}
+
 func HTTP_SetTunnel(w http.ResponseWriter, r *http.Request) {
-	newMeta := new(TunnelMETA)
-	err := Bind(newMeta, r)
+	newForm := new(saveTunnelForm)
+	err := Bind(newForm, r)
 	if err != nil {
 		JSON(w, r, 400, err.Error())
 		return
 	}
 
-	errors := validateTunnelMeta(newMeta)
+	errors := validateTunnelMeta(newForm.Meta)
 	if len(errors) > 0 {
 		JSON(w, r, 400, errors)
 		return
 	}
 
-	oldTun, ok := TunnelMetaMap.Load(newMeta.Tag)
+	TunnelMetaMap.Store(newForm.Meta.Tag, newForm.Meta)
+	err = writeTunnelsToDisk(newForm.Meta.Tag)
+	if err != nil {
+		JSON(w, r, 400, err.Error())
+		return
+	}
+
+	oldTun, ok := TunnelMetaMap.Load(newForm.OldTag)
 	if ok {
 		oldt, ok := oldTun.(*TunnelMETA)
 		if ok {
-			if !slices.Equal(oldt.AllowedHosts, newMeta.AllowedHosts) {
+			if !slices.Equal(oldt.AllowedHosts, newForm.Meta.AllowedHosts) {
 				tunnelMapRange(func(tun *TUN) bool {
 					meta := tun.meta.Load()
-					if meta.Tag == newMeta.Tag {
+					if meta.Tag == newForm.OldTag {
 						sendFirewallToServer(
 							tun.cr.ServerIP,
 							tun.dhcp.Token,
 							net.IP(tun.dhcp.IP[:]).String(),
-							newMeta.AllowedHosts,
-							newMeta.DisableFirewall,
-							newMeta.ServerCert,
+							newForm.Meta.AllowedHosts,
+							newForm.Meta.DisableFirewall,
+							newForm.Meta.ServerCert,
 						)
 						return false
 					}
@@ -359,12 +368,16 @@ func HTTP_SetTunnel(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	TunnelMetaMap.Store(newMeta.Tag, newMeta)
-	err = writeTunnelsToDisk(newMeta.Tag)
-	if err != nil {
-		JSON(w, r, 400, err.Error())
-		return
+	if newForm.OldTag != newForm.Meta.Tag {
+		TunnelMetaMap.Delete(newForm.OldTag)
+		state := STATE.Load()
+		err = os.Remove(state.TunnelsPath + string(os.PathSeparator) + newForm.OldTag + tunnelFileSuffix)
+		if err != nil {
+			JSON(w, r, 400, err.Error())
+			return
+		}
 	}
+
 	JSON(w, r, 200, nil)
 }
 
@@ -408,8 +421,29 @@ func HTTP_GetQRCode(w http.ResponseWriter, r *http.Request) {
 	JSON(w, r, 200, QR)
 }
 
-func HTTP_CreateConnection(w http.ResponseWriter, r *http.Request) {
+func HTTP_CreateTunnel(w http.ResponseWriter, r *http.Request) {
 	JSON(w, r, 200, createRandomTunnel())
+}
+
+func HTTP_DeleteTunnels(w http.ResponseWriter, r *http.Request) {
+	form := new(TunnelMETA)
+	err := Bind(form, r)
+	if err != nil {
+		JSON(w, r, 400, err)
+	}
+
+	state := STATE.Load()
+	_ = os.Remove(state.TunnelsPath + string(os.PathSeparator) + form.Tag + tunnelFileSuffix)
+
+	tunnelMetaMapRange(func(tun *TunnelMETA) bool {
+		if tun.Tag == form.Tag {
+			TunnelMetaMap.Delete(form.Tag)
+			return false
+		}
+		return true
+	})
+
+	JSON(w, r, 200, nil)
 }
 
 func HTTP_ForwardToController(w http.ResponseWriter, r *http.Request) {
