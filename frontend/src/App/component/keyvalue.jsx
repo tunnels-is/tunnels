@@ -12,7 +12,12 @@ const KeyValue = (props) => {
 			</div>
 
 			<div className="value">
-				{props?.value}
+			{props.value &&
+				props?.value
+			}
+			{(props.defaultValue && !props.value) &&
+				props?.defaultValue
+			}
 			</div>
 		</div >
 	)

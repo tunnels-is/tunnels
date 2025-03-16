@@ -97,7 +97,7 @@ const NewTable = (props) => {
 	}
 
 	return (
-		<div className={`new-table ${props.background ? "table-bg" : ""}`}>
+		<div className={`new-table ${props.background ? "table-bg" : ""} ${props.className}`}>
 
 			<div className="top-bar">
 
@@ -155,6 +155,7 @@ const NewTable = (props) => {
 
 			</div>
 			<div className={` top-bar`}>
+			{props.rows?.length > 20  && 
 				<div className="search-bar">
 					<input
 						onChange={(e) => setFilter(e.target.value)}
@@ -162,6 +163,7 @@ const NewTable = (props) => {
 						className="ab" />
 				</div>
 
+			}
 			</div>
 
 			{finalRows.length < 1 &&
@@ -171,7 +173,7 @@ const NewTable = (props) => {
 
 			}
 
-			<div className={`${props.className} ab table`}>
+			<div className={`ab table`}>
 
 				<div className={`ab header ${finalRows.length < 1 ? "hide" : ""}`}>
 					{props?.header?.map((l, i) => {

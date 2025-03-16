@@ -1,5 +1,5 @@
 import { useNavigate, useLocation } from "react-router-dom";
-import React from "react";
+import React, {useEffect, useRef} from "react";
 
 import {
 	AccessibilityIcon,
@@ -25,7 +25,32 @@ import * as runtime from "../../wailsjs/runtime/runtime"
 const SideBar = () => {
 	const navigate = useNavigate();
 	const location = useLocation();
+	const sideb = useRef(null)
+
+	const captureM = (e) => {
+		// if (e.keyCode === 77){
+		// 	console.dir(e)
+		// 	let removed = false
+		// 	sideb?.current?.classList?.forEach(c => {
+		// 		if (c==="showsidebar"){
+		// 			sideb.current.classList.remove("showsidebar")
+		// 			removed = true
+		// 		}
+		// 	})
+		// 	if (!removed){
+		// 			sideb.current.classList.add("showsidebar")
+		//
+		// 	}
+		// }
+	}
+
 	const state = GLOBAL_STATE("sidebar")
+
+	useEffect(() => {
+		document.removeEventListener('keydown',captureM)
+		document.addEventListener('keydown', captureM);
+
+	},[])
 
 	const OpenWindowURL = (url) => {
 		window.open(url, "_blank")
@@ -52,22 +77,27 @@ const SideBar = () => {
 	const menu = {
 		groups: [
 			{
-				title: "Networking",
+				title: "Servers",
 				items: [
-					{ icon: LayersIcon, label: "DNS", route: "dns", user: false, },
-					{ icon: GlobeIcon, label: "Public", route: "servers", user: true, },
+					{ icon: MobileIcon, label: "Public", route: "public", user: true, },
 					{ icon: MobileIcon, label: "Private", route: "private", user: true, },
-					{ icon: Share1Icon, label: "Tunnels", route: "tunnels", user: true, },
-					// { icon: SymbolIcon, label: "Routing", route: "routing", user: true, },
 				]
 			},
 			{
-				title: "Account",
+				title: "DNS",
 				items: [
+					{ icon: LayersIcon, label: "Proxy", route: "dns", user: false, },
+					{ icon: LayersIcon, label: "Records", route: "dns-records", user: false, },
+				]
+			},
+			{
+				title: "Settings",
+				items: [
+					{ icon: Share1Icon, label: "Tunnels", route: "tunnels", user: true, },
+					{ icon: GearIcon, label: "Application", route: "settings", user: false, },
 					{ icon: LockOpen1Icon, label: "Login", route: "login", user: false, shouldRender: showLogin },
-					{ icon: PersonIcon, label: "Profile", route: "account", user: true, },
-					{ icon: GearIcon, label: "Setting", route: "settings", user: false, },
 					{ icon: HomeIcon, label: "Organization", route: "org", user: true, },
+					{ icon: PersonIcon, label: "Account", route: "account", user: true, },
 				]
 			},
 			{
@@ -118,7 +148,7 @@ const SideBar = () => {
 	}
 
 	return (
-		<div className="ab sidebar">
+		<div className="ab sidebar" ref={sideb} id="sidebar">
 
 			{menu.groups.map(g => {
 				return (

@@ -131,7 +131,10 @@ func loadDefaultInterface() {
 	s := STATE.Load()
 	oldInterface := make([]byte, 4)
 	var newInterface net.IP
-	copy(oldInterface, s.DefaultInterface.To4())
+	def := s.DefaultInterface.Load()
+	if def != nil {
+		copy(oldInterface, def.To4())
+	}
 
 	var err error
 	newInterface, err = gateway.DiscoverInterface()
@@ -145,7 +148,7 @@ func loadDefaultInterface() {
 	}
 
 	DEBUG("new defailt interface discovered", newInterface.To4())
-	s.DefaultInterface = newInterface
+	s.DefaultInterface.Store(&newInterface)
 
 	ifList, _ := net.Interfaces()
 
@@ -156,19 +159,20 @@ LOOP:
 			continue
 		}
 		for _, iv := range addrs {
-			if strings.Split(iv.String(), "/")[0] == s.DefaultInterface.To4().String() {
-				s.DefaultInterfaceID = v.Index
-				s.DefaultInterfaceName = v.Name
+			if strings.Split(iv.String(), "/")[0] == newInterface.To4().String() {
+				s.DefaultInterfaceID.Store(int32(v.Index))
+				name := v.Name
+				s.DefaultInterfaceName.Store(&name)
 				break LOOP
 			}
 		}
 	}
 
 	DEBUG(
-		"Default interface",
-		s.DefaultInterfaceName,
-		s.DefaultInterfaceID,
-		s.DefaultInterface,
+		"Default interface >>",
+		s.DefaultInterfaceName.Load(),
+		s.DefaultInterfaceID.Load(),
+		s.DefaultInterface.Load(),
 	)
 }
 
@@ -179,7 +183,10 @@ func loadDefaultGateway() {
 	var err error
 	oldGateway := make([]byte, 4)
 	var newGateway net.IP
-	copy(oldGateway, s.DefaultGateway.To4())
+	def := s.DefaultGateway.Load()
+	if def != nil {
+		copy(oldGateway, def.To4())
+	}
 
 	newGateway, err = gateway.DiscoverGateway()
 	if err != nil {
@@ -196,18 +203,18 @@ func loadDefaultGateway() {
 	}
 
 	DEBUG("new defailt gateway discovered", newGateway.To4())
-	s.DefaultGateway = newGateway
+	s.DefaultGateway.Store(&newGateway)
 
 	DEBUG(
 		"Default Gateway",
-		s.DefaultGateway,
+		s.DefaultGateway.Load(),
 	)
 }
 
 func GetDefaultGateway() {
 	s := STATE.Load()
 	defer func() {
-		if s.DefaultGateway != nil {
+		if s.DefaultGateway.Load() != nil {
 			time.Sleep(5 * time.Second)
 		} else {
 			time.Sleep(2 * time.Second)

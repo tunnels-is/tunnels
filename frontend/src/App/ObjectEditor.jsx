@@ -355,11 +355,13 @@ const ObjectEditor = (props) => {
 		}
 		let input = null
 		let label = null
+		let checked = undefined
 		if (x.type === "boolean") {
+		 checked = x.parent.origin[x.id]
 			input = React.createElement("input",
 				{
 					key: x.key + "_checkbox",
-					className: "checkbox",
+					className:  checked ? "checkbox checked":"checkbox" ,
 					checked: x.parent.origin[x.id],
 					type: transformType(x.type),
 					onClick: (e) => {
@@ -411,10 +413,21 @@ const ObjectEditor = (props) => {
 		} else {
 			label = React.createElement("div", {
 				key: x.key + "_label",
-				className: "label",
+				// className: "label",
+					className:  checked ? "label checked":"label" ,
 			}, x.title)
 		}
 
+
+		if (x.type === "boolean"){
+		return React.createElement("div", {
+			key: x.key + "_input_wrap",
+			className: x.id + " input_wrap " + (x.type !== "boolean" ? "bottom_border" : "") + " " + x.ns,
+		},
+			input,
+			label,
+		)
+		} 
 
 		return React.createElement("div", {
 			key: x.key + "_input_wrap",
@@ -471,7 +484,7 @@ const ObjectEditor = (props) => {
 				x.newButton(x.origin)
 				reload()
 			}
-		}, "Add") : null
+		}, "+") : null
 
 		delB = x.delButton !== undefined ? React.createElement("div", {
 			key: x.key + "_del_button",
@@ -480,16 +493,15 @@ const ObjectEditor = (props) => {
 				x.delButton(x.parent.origin)
 				reload()
 			}
-		}, x.type === "object" ? "delete" : "x") : null
+		}, x.type === "object" ? "X" : "X") : null
 
-		if (delB !== null || titleD !== null || newB !== null) {
+		if (titleD !== null || newB !== null) {
 			topB = React.createElement("div", {
 				key: x.key + "_top_bar",
 				className: "top_bar",
 			},
 				titleD,
 				newB,
-				delB,
 			)
 
 		}
@@ -500,6 +512,7 @@ const ObjectEditor = (props) => {
 				className: x.className + " " + x.extraClasses,
 			},
 			topB,
+				delB,
 			...sub,
 		)
 	}
@@ -511,9 +524,10 @@ const ObjectEditor = (props) => {
 				rootKeys.push(makeInput(k))
 			}
 		})
+		let rootBools = []
 		opts.meta.rootKeys.map((k, i) => {
 			if (k.type === "boolean") {
-				rootKeys.push(makeInput(k))
+				rootBools.push(makeInput(k))
 			}
 		})
 
@@ -527,38 +541,84 @@ const ObjectEditor = (props) => {
 			rootObjects.push(walkNested(k))
 		})
 
-		let rootKeyDom = React.createElement("div", {
-			key: "root_keys",
-			id: "root_keys",
-			className: "root_keys obj_grp",
-		},
-			...rootKeys,
-			...rootArrays,
-			...rootObjects
-		)
-
 		let nested = []
 		opts.meta.nested.map(n => {
 			nested.push(walkNested(n))
 		})
 
-		return React.createElement("div", {
+		let rootKeyDomBool = []
+		let rootKeyDom = []
+		
+
+		if (rootBools.length > 0){
+	 rootKeyDomBool = React.createElement("div", {
+			key: "root_keys bools",
+			id: "root_keys bools",
+			className: "root_keys bools obj_grp",
+		},
+			...rootBools,
+		)
+		}
+
+		if (rootKeys.length > 0){
+		 rootKeyDom = React.createElement("div", {
+			key: "root_keys",
+			id: "root_keys",
+			className: "root_keys keys obj_grp",
+		},
+			...rootKeys,
+		)
+
+		}
+
+	let	 rootKeyArray = React.createElement("div", {
+			key: "root_keys",
+			id: "root_keys",
+			className: "root_keys arrays",
+		},
+			...nested,
+			...rootObjects,
+			...rootArrays,
+		)
+
+
+
+		let editor1 =  React.createElement("div", {
+			key: "root" + opts.baseClass,
+			className: "object-wrapper " + opts.baseClass
+		},
+			rootKeyDom,
+			rootKeyDomBool,
+		)
+
+		let editor2 =  React.createElement("div", {
+			key: "root" + opts.baseClass,
+			className: "object-wrapper big-gap " + opts.baseClass
+		},
+			rootKeyArray,
+		)
+
+		return  React.createElement("div", {
 			key: "root" + opts.baseClass,
 			className: "object-editor " + opts.baseClass
 		},
-			rootKeyDom,
-			...nested,
+			editor1,
+			editor2
 		)
 
 	}
 
 
 	makeMeta(props.object, props.opts)
-	// console.log(props.opts.meta)
-	// console.log("config")
-	// console.dir(state.Config)
+
 	return (<>
-		<div className="object-editor-save" onClick={() => props.opts.saveButton()}>Save</div>
+		{props.opts.backButton &&
+		<div className="object-editor-back" onClick={() => props.opts.backButton.func()}>{props.opts.backButton.title}</div>
+		}
+		<div className="object-editor-save" onClick={() => props.opts.saveButton(props.object)}>Save</div>
+		{props.opts.title && 
+		<div className="title">{props.opts.title}</div>
+		}
 		{makeDom(props.opts)}
 	</>)
 }

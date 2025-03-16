@@ -9,14 +9,13 @@ import '@fontsource-variable/inter';
 
 import InspectBlocklist from "./App/InspectBlocklist";
 import InspectConnection from "./App/InspectConnection";
-import InspectJSON from "./App/component/InspectJSON";
 import ConnectionTable from "./App/ConnectionTable";
 import DNSAnswers from "./App/component/DNSAnswers";
 import PrivateServers from "./App/PrivateServers";
-import ObjectEditor from "./App/ObjectEditor";
 import ScreenLoader from "./App/ScreenLoader";
 import InspectGroup from "./App/InspectGroup";
 import Enable2FA from "./App/Enable2FA";
+import ServersFull from "./App/ServersFull";
 import Settings from "./App/Settings";
 import Account from "./App/Account";
 import Servers from "./App/Servers";
@@ -25,6 +24,7 @@ import SideBar from "./App/SideBar";
 import Login from "./App/Login";
 import Org from "./App/Org";
 import DNS from "./App/dns";
+import DNSRecords from "./App/DNSRecords";
 
 import GLOBAL_STATE from "./state";
 import { STATE } from "./state";
@@ -72,7 +72,7 @@ const LaunchApp = () => {
 			<Toaster
 				toastOptions={{
 					className: 'toast',
-					position: "top-right",
+					position: "bottom-left",
 					success: {
 						duration: 5000,
 					},
@@ -88,22 +88,6 @@ const LaunchApp = () => {
 			<ScreenLoader />
 			<div className="ab app-wrapper">
 
-				{configModified &&
-					<div className="save-bar">
-						<div className="text">Your config has unsaved changes</div>
-						<div className="button"
-							onClick={() => state.ConfigSave()}>
-							SAVE
-						</div>
-						<div className="cancel-button button"
-							onClick={() => state.RemoveModifiedConfig()}>
-							CANCEL
-						</div>
-					</div>
-				}
-
-				{state.editorData && <InspectJSON />}
-
 				<Routes>
 
 					{(state.User?.Email === "" || !state.User) &&
@@ -112,8 +96,8 @@ const LaunchApp = () => {
 							<Route path="login" element={<Login />} />
 							<Route path="settings" element={<Settings />} />
 							<Route path="help" element={<Welcome />} />
-							<Route path="settings" element={<Settings />} />
 							<Route path="dns" element={<DNS />} />
+							<Route path="dns-records" element={<DNSRecords />} />
 							<Route path="*" element={<Login />} />
 						</>
 					}
@@ -132,18 +116,20 @@ const LaunchApp = () => {
 							<Route path="tunnels" element={<ConnectionTable />} />
 							<Route path="inspect/connection/:id" element={<InspectConnection />} />
 							<Route path="routing" element={<ConnectionTable />} />
+							<Route path="settings" element={<Settings />} />
 
 							<Route path="dns" element={<DNS />} />
+							<Route path="dns-records" element={<DNSRecords />} />
 							<Route path="dns/answers/:domain" element={<DNSAnswers />} />
 
 							<Route path="servers" element={<Servers />} />
+							<Route path="all" element={<ServersFull />} />
 							<Route path="private" element={<PrivateServers />} />
 
 							<Route path="inspect/blocklist/" element={<InspectBlocklist />} />
 
 							<Route path="login" element={<Login />} />
 							<Route path="help" element={<Welcome />} />
-							<Route path="test" element={<ObjectEditor />} />
 
 							<Route path="*" element={<Servers />} />
 						</>

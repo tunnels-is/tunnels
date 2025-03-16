@@ -45,6 +45,7 @@ const Org = () => {
 			root_Information: "Additional Info",
 			root_MangerID: "Manager ID"
 		},
+		title:"You do not have an organization, create one to continue..",
 		hidden: {
 			root_Groups: true,
 		},

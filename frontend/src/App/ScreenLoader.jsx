@@ -35,8 +35,6 @@ const ScreenLoader = () => {
 		hideClasses += " hide"
 	}
 
-
-
 	return (
 		<div className={classes}  >
 			<div className="control-bar">

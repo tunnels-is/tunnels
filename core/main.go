@@ -133,9 +133,13 @@ func LaunchEverything() {
 		newConcurrentSignal("UDPDNSHandler", CancelContext, func() {
 			StartUDPDNSHandler()
 		})
-		newConcurrentSignal("OpenUI", CancelContext, func() {
-			popUI()
-		})
+
+		config := CONFIG.Load()
+		if config.OpenUI {
+			newConcurrentSignal("OpenUI", CancelContext, func() {
+				popUI()
+			})
+		}
 	}
 
 	newConcurrentSignal("Pinger", CancelContext, func() {
@@ -158,6 +162,10 @@ func LaunchEverything() {
 		StartTraceProcessor()
 	})
 
+	newConcurrentSignal("DefaultGateway", CancelContext, func() {
+		GetDefaultGateway()
+	})
+
 	newConcurrentSignal("CleanDNSCache", CancelContext, func() {
 		CleanDNSCache()
 	})
@@ -171,20 +179,20 @@ mainLoop:
 
 		select {
 		case high := <-highPriorityChannel:
-			high.method()
+			go high.method()
 			continue mainLoop
 		case med := <-mediumPriorityChannel:
-			med.method()
+			go med.method()
 			continue mainLoop
 		case low := <-lowPriorityChannel:
-			low.method()
+			go low.method()
 			continue mainLoop
 		default:
 		}
 
 		select {
 		case sig := <-quit:
-			DEBUG("", "exit signal caught: ", sig)
+			DEBUG("", "exit signal caught: ", sig.String())
 			CancelFunc()
 			CleanupOnClose()
 			os.Exit(1)
@@ -305,6 +313,14 @@ func writeTunnelsToDisk(tag string) (outErr error) {
 			outErr = err
 			return false
 		}
+
+		err = tf.Truncate(0)
+		if err != nil {
+			ERROR("Unable to truncate tunnel json to file:", err)
+			outErr = err
+			return false
+		}
+
 		_, err = tf.Write(tb)
 		if err != nil {
 			ERROR("Unable to write tunnel json to file:", err)
