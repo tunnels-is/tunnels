@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import GLOBAL_STATE from "../state";
 import dayjs from "dayjs";
 import KeyValue from "./component/keyvalue";
-import Label from "./component/label";
 import NewTable from "./component/newtable";
 
 const Account = () => {
@@ -74,7 +73,7 @@ const Account = () => {
 	let APIKey = state.getKey("User", "APIKey")
 
 	return (
-		 
+
 		<div className="account-page">
 			{state?.User &&
 				<div className="panel">
@@ -100,6 +99,29 @@ const Account = () => {
 
 					<KeyValue label={"License"} value={state.User.Key?.Key} />
 
+
+					<div className="button-and-text-seperator"></div>
+
+					<div className="item full-width-item">
+						<div className="button red"
+							onClick={() => state.LogoutAllTokens()} >
+							Log Out All Devices
+						</div>
+					</div>
+
+					<div className="item full-width-item">
+						{!state.modifiedUser &&
+							<div className="button" onClick={() => state.refreshApiKey()} >Re-Generate API Key</div>
+						}
+						{state.modifiedUser &&
+							<div className="button" onClick={() => state.UpdateUser()} >Save API Key</div>
+						}
+					</div>
+
+
+					<div className="item full-width-item">
+						<div className="button" onClick={() => NavigateTo2fa()} >Two-Factor Authentication</div>
+					</div>
 					<div className="button-and-text-seperator"></div>
 					<div className="item">
 						<input
@@ -111,30 +133,7 @@ const Account = () => {
 					</div>
 
 					<div className="item full-width-item" key={state?.LicenseKey}>
-						<div className="card-button" onClick={() => state.ActivateLicense()} >Activate Key</div>
-					</div>
-
-					<div className="button-and-text-seperator"></div>
-
-					<div className="item full-width-item">
-						<div className="card-button red"
-							onClick={() => state.LogoutAllTokens()} >
-							Log Out All Devices
-						</div>
-					</div>
-
-					<div className="item full-width-item">
-						{!state.modifiedUser &&
-							<div className="card-button" onClick={() => state.refreshApiKey()} >Re-Generate API Key</div>
-						}
-						{state.modifiedUser &&
-							<div className="card-button" onClick={() => state.UpdateUser()} >Save API Key</div>
-						}
-					</div>
-
-
-					<div className="item full-width-item">
-						<div className="card-button" onClick={() => NavigateTo2fa()} >Two-Factor Authentication</div>
+						<div className="button" onClick={() => state.ActivateLicense()} >Activate Key</div>
 					</div>
 
 

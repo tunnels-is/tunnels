@@ -1,5 +1,5 @@
 import { useNavigate, useLocation } from "react-router-dom";
-import React, {useEffect, useRef} from "react";
+import React, { useEffect, useRef } from "react";
 
 import {
 	AccessibilityIcon,
@@ -13,6 +13,7 @@ import {
 	PersonIcon,
 	Share1Icon,
 	GitHubLogoIcon,
+	DimensionsIcon,
 } from '@radix-ui/react-icons'
 
 import GLOBAL_STATE from "../state";
@@ -47,10 +48,10 @@ const SideBar = () => {
 	const state = GLOBAL_STATE("sidebar")
 
 	useEffect(() => {
-		document.removeEventListener('keydown',captureM)
+		document.removeEventListener('keydown', captureM)
 		document.addEventListener('keydown', captureM);
 
-	},[])
+	}, [])
 
 	const OpenWindowURL = (url) => {
 		window.open(url, "_blank")
@@ -79,14 +80,14 @@ const SideBar = () => {
 			{
 				title: "Servers",
 				items: [
-					{ icon: MobileIcon, label: "Public", route: "public", user: true, },
+					{ icon: GlobeIcon, label: "Public", route: "public", user: true, },
 					{ icon: MobileIcon, label: "Private", route: "private", user: true, },
 				]
 			},
 			{
 				title: "DNS",
 				items: [
-					{ icon: LayersIcon, label: "Proxy", route: "dns", user: false, },
+					{ icon: DimensionsIcon, label: "Proxy", route: "dns", user: false, },
 					{ icon: LayersIcon, label: "Records", route: "dns-records", user: false, },
 				]
 			},
