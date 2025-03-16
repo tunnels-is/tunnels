@@ -39,7 +39,7 @@ const DNS = () => {
 		state.GetBackendState()
 	}, [])
 
-	let blockLists = state.Config?.AvailableBlockLists
+	let blockLists = state.Config?.DNSBlockLists
 	state.modifiedLists?.forEach(l => {
 		blockLists?.forEach((ll, i) => {
 			if (ll.Tag === l.Tag) {
@@ -179,10 +179,10 @@ const DNS = () => {
 	return (
 		<div className="dns-page">
 			{modified === true &&
-			<div className="save-banner">
+				<div className="save-banner">
 					<div className="button"
 						onClick={() => state.v2_ConfigSave()}
-						>
+					>
 						Save
 					</div>
 					<div className="notice">Your config has un-saved changes</div>
@@ -192,7 +192,6 @@ const DNS = () => {
 
 			<div className="basic-info panel">
 				<div className="title">Settings</div>
-				<div className="warn-msg">Use {DNSServerIP} as your DNS server to enable these settings.</div>
 				<div className="warn-msg">Enabling blocklists will increase memory usage.</div>
 				<div className="button-and-text-seperator"></div>
 
@@ -290,7 +289,7 @@ const DNS = () => {
 				header={headers}
 				rows={rows}
 				button={{
-					text: "Add",
+					text: "New Blocklist",
 					click: function() {
 						navigate("/inspect/blocklist")
 					}

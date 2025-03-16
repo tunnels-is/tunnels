@@ -40,27 +40,6 @@ const root = createRoot(appElement);
 const LaunchApp = () => {
 	const state = GLOBAL_STATE("root")
 
-	let configModified = state.modifiedLists !== undefined
-	if (!configModified) {
-		configModified = state.modifiedConfig !== undefined
-	}
-	if (!configModified) {
-		configModified = state.IsConfigModified()
-	}
-
-
-	if (state.getDarkMode()) {
-		appElement.classList.remove("light")
-		appElement.classList.add("dark")
-		document.documentElement.classList.add("dark")
-		document.documentElement.classList.remove("light")
-	} else {
-		appElement.classList.remove("dark")
-		appElement.classList.add("light")
-		document.documentElement.classList.add("light")
-		document.documentElement.classList.remove("dark")
-	}
-
 	useEffect(() => {
 		state.GetBackendState()
 		WS.NewSocket(WS.GetURL("logs"), "logs", WS.ReceiveLogEvent)
@@ -72,7 +51,7 @@ const LaunchApp = () => {
 			<Toaster
 				toastOptions={{
 					className: 'toast',
-					position: "bottom-left",
+					position: "top-right",
 					success: {
 						duration: 5000,
 					},

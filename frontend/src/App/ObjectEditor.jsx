@@ -357,11 +357,11 @@ const ObjectEditor = (props) => {
 		let label = null
 		let checked = undefined
 		if (x.type === "boolean") {
-		 checked = x.parent.origin[x.id]
+			checked = x.parent.origin[x.id]
 			input = React.createElement("input",
 				{
 					key: x.key + "_checkbox",
-					className:  checked ? "checkbox checked":"checkbox" ,
+					className: checked ? "checkbox checked" : "checkbox",
 					checked: x.parent.origin[x.id],
 					type: transformType(x.type),
 					onClick: (e) => {
@@ -414,20 +414,20 @@ const ObjectEditor = (props) => {
 			label = React.createElement("div", {
 				key: x.key + "_label",
 				// className: "label",
-					className:  checked ? "label checked":"label" ,
+				className: checked ? "label checked" : "label",
 			}, x.title)
 		}
 
 
-		if (x.type === "boolean"){
-		return React.createElement("div", {
-			key: x.key + "_input_wrap",
-			className: x.id + " input_wrap " + (x.type !== "boolean" ? "bottom_border" : "") + " " + x.ns,
-		},
-			input,
-			label,
-		)
-		} 
+		if (x.type === "boolean") {
+			return React.createElement("div", {
+				key: x.key + "_input_wrap",
+				className: x.id + " input_wrap " + (x.type !== "boolean" ? "bottom_border" : "") + " " + x.ns,
+			},
+				input,
+				label,
+			)
+		}
 
 		return React.createElement("div", {
 			key: x.key + "_input_wrap",
@@ -512,7 +512,7 @@ const ObjectEditor = (props) => {
 				className: x.className + " " + x.extraClasses,
 			},
 			topB,
-				delB,
+			delB,
 			...sub,
 		)
 	}
@@ -548,30 +548,30 @@ const ObjectEditor = (props) => {
 
 		let rootKeyDomBool = []
 		let rootKeyDom = []
-		
 
-		if (rootBools.length > 0){
-	 rootKeyDomBool = React.createElement("div", {
-			key: "root_keys bools",
-			id: "root_keys bools",
-			className: "root_keys bools obj_grp",
-		},
-			...rootBools,
-		)
+
+		if (rootBools.length > 0) {
+			rootKeyDomBool = React.createElement("div", {
+				key: "root_keys bools",
+				id: "root_keys bools",
+				className: "root_keys bools obj_grp",
+			},
+				...rootBools,
+			)
 		}
 
-		if (rootKeys.length > 0){
-		 rootKeyDom = React.createElement("div", {
-			key: "root_keys",
-			id: "root_keys",
-			className: "root_keys keys obj_grp",
-		},
-			...rootKeys,
-		)
+		if (rootKeys.length > 0) {
+			rootKeyDom = React.createElement("div", {
+				key: "root_keys",
+				id: "root_keys",
+				className: "root_keys keys obj_grp",
+			},
+				...rootKeys,
+			)
 
 		}
 
-	let	 rootKeyArray = React.createElement("div", {
+		let rootKeyArray = React.createElement("div", {
 			key: "root_keys",
 			id: "root_keys",
 			className: "root_keys arrays",
@@ -583,7 +583,7 @@ const ObjectEditor = (props) => {
 
 
 
-		let editor1 =  React.createElement("div", {
+		let editor1 = React.createElement("div", {
 			key: "root" + opts.baseClass,
 			className: "object-wrapper " + opts.baseClass
 		},
@@ -591,14 +591,14 @@ const ObjectEditor = (props) => {
 			rootKeyDomBool,
 		)
 
-		let editor2 =  React.createElement("div", {
+		let editor2 = React.createElement("div", {
 			key: "root" + opts.baseClass,
 			className: "object-wrapper big-gap " + opts.baseClass
 		},
 			rootKeyArray,
 		)
 
-		return  React.createElement("div", {
+		return React.createElement("div", {
 			key: "root" + opts.baseClass,
 			className: "object-editor " + opts.baseClass
 		},
@@ -612,12 +612,19 @@ const ObjectEditor = (props) => {
 	makeMeta(props.object, props.opts)
 
 	return (<>
-		{props.opts.backButton &&
-		<div className="object-editor-back" onClick={() => props.opts.backButton.func()}>{props.opts.backButton.title}</div>
-		}
-		<div className="object-editor-save" onClick={() => props.opts.saveButton(props.object)}>Save</div>
-		{props.opts.title && 
-		<div className="title">{props.opts.title}</div>
+		<div className="button-wrap">
+			{props.opts.backButton &&
+				<div className="button" onClick={() => props.opts.backButton.func()}>{props.opts.backButton.title}</div>
+			}
+			{props.opts.saveButton &&
+				<div className="button green" onClick={() => props.opts.saveButton(props.object)}>Save</div>
+			}
+			{props.opts.deleteButton &&
+				<div className="button red end" onClick={() => props.opts.deleteButton.func(props.object)}>{props.opts.deleteButton.title}</div>
+			}
+		</div>
+		{props.opts.title &&
+			<div className="title">{props.opts.title}</div>
 		}
 		{makeDom(props.opts)}
 	</>)

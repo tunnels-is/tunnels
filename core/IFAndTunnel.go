@@ -55,7 +55,7 @@ func createRandomTunnel() (m *TunnelMETA) {
 
 func createTunnel() (T *TunnelMETA) {
 	T = new(TunnelMETA)
-	b := make([]rune, 16)
+	b := make([]rune, 8)
 	for i := range b {
 		b[i] = letterRunes[rand.Intn(len(letterRunes))]
 	}
