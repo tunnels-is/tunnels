@@ -225,11 +225,21 @@ func JSON(w http.ResponseWriter, r *http.Request, code int, data interface{}) {
 }
 
 type StateResponse struct {
+	Version       string
+	APIVersion    int
 	Config        *configV2
 	State         *stateV2
 	User          *User
 	Tunnels       []*TunnelMETA
 	ActiveTunnels []*TUN
+	Network       StateNetworkResponse
+}
+
+type StateNetworkResponse struct {
+	DefaultGateway       net.IP
+	DefaultInterface     net.IP
+	DefaultInterfaceID   int32
+	DefaultInterfaceName string
 }
 
 func HTTP_GetState(w http.ResponseWriter, r *http.Request) {
@@ -237,11 +247,27 @@ func HTTP_GetState(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetFullState() (s *StateResponse) {
-	s = new(StateResponse)
 	state := STATE.Load()
+	s = new(StateResponse)
+	s.Version = version
+	s.APIVersion = apiVersion
 	s.User = state.user.Load()
 	s.Config = CONFIG.Load()
 	s.State = state
+
+	s.Network.DefaultInterfaceID = state.DefaultInterfaceID.Load()
+	defInt := state.DefaultInterface.Load()
+	if defInt != nil {
+		s.Network.DefaultInterface = *defInt
+	}
+	defIntName := state.DefaultInterfaceName.Load()
+	if defIntName != nil {
+		s.Network.DefaultInterfaceName = *defIntName
+	}
+	defGate := state.DefaultGateway.Load()
+	if defGate != nil {
+		s.Network.DefaultGateway = *defGate
+	}
 
 	tunnelMetaMapRange(func(tun *TunnelMETA) bool {
 		s.Tunnels = append(s.Tunnels, tun)

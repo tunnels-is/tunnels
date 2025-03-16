@@ -14,25 +14,37 @@ const ConfigDNSRecordEditor = () => {
 		}
 		state.Config?.DNSRecords.push({
 			Domain: "domain.local",
-			IP: [],
-			TXT: [],
+			IP: [""],
+			TXT: [""],
 			CNAME: "",
 			Wildcard: true,
 		})
 		state.renderPage("DNSRecordForm")
 	}
 	const saveAll = () => {
+		state.Config.DNSRecords?.forEach((r,i) => {
+			r.IP?.forEach((ip,ii) => {
+				if (ip===""){
+			state.Config.DNSRecords[i].IP.splice(ii, 1)
+				}
+			})
+			r.TXT?.forEach((txt,ii) => {
+				if (txt===""){
+			state.Config.DNSRecords[i].TXT.splice(ii, 1)
+				}
+			})
+		})
 		state.ConfigSave()
 		state.renderPage("DNSRecordForm")
 	}
 	const deleteRecord = (index) => {
 		if (state.Config.DNSRecords.length === 1) {
 			state.Config.DNSRecords = []
-			state.SetConfigModifiedState(true)
+			state.v2_ConfigSave()
 			state.globalRerender()
 		} else {
 			state.Config.DNSRecords.splice(index, 1)
-			state.SetConfigModifiedState(true)
+			state.v2_ConfigSave()
 			state.globalRerender()
 		}
 
@@ -41,6 +53,7 @@ const ConfigDNSRecordEditor = () => {
 	const updateRecord = (index, subindex, key, value) => {
 		console.log("update:", index, subindex, key, value)
 		if (key === "IP") {
+
 			try {
 				state.Config.DNSRecords[index].IP[subindex] = value
 			} catch (error) {
@@ -78,7 +91,7 @@ const ConfigDNSRecordEditor = () => {
 			return (
 				<FormKeyValue label={key} key={key + subindex} value={
 					<textarea
-						cols={value.length / 2}
+						cols={value.length }
 						rows={rows}
 						className="value"
 						onChange={() => { console.log("on change!", value, index) }}
@@ -125,6 +138,7 @@ const ConfigDNSRecordEditor = () => {
 
 	return (
 		<div className="ab config-dns-editor">
+			<div className="plus-button" onClick={() => addRecord()}>Create a new DNS Record..</div>
 			{state.Config?.DNSRecords?.map((r, i) => {
 				if (!r) {
 					return (<></>)
@@ -133,16 +147,14 @@ const ConfigDNSRecordEditor = () => {
 					<>
 						<div className="dns-record panel">
 							{makeInput(i, 0, "Domain", r.Domain, "text")}
-							{r.IP?.map((ip, ii) => makeInput(i, ii, "IP", ip, "text"))}
-							{r.TXT?.map((txt, ii) => makeInput(i, ii, "TXT", txt, "textarea"))}
-
-
 							{makeInput(i, 0, "CNAME", r.CNAME, "text")}
+							{r.IP?.map((ip, ii) => makeInput(i, ii, "IP", ip, "text"))}
+							<div className="add" onClick={() => addIP(i)}>Add IP</div>
+
+							{r.TXT?.map((txt, ii) => makeInput(i, ii, "TXT", txt, "textarea"))}
+								<div className="add" onClick={() => addTXT(i)}>Add TXT</div>
 							{makeInput(i, 0, "Wildcard", r.Wildcard, "toggle")}
-							<div className="buttons buttons-first">
-								<div className="item card-button blue" onClick={() => addIP(i)}>New IP</div>
-								<div className="item card-button blue" onClick={() => addTXT(i)}>New TXT</div>
-							</div>
+
 							<div className="buttons">
 
 								<div className="item card-button green"
@@ -165,7 +177,6 @@ const ConfigDNSRecordEditor = () => {
 				)
 			})}
 
-			<div className="plus-button" onClick={() => addRecord()}>+</div>
 
 
 		</div >

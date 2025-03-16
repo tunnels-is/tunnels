@@ -55,10 +55,11 @@ func ReBuildBlockLists() (listError error) {
 			_, err := os.Stat(bl.DiskPath)
 			if err != nil {
 				DEBUG("Could not find DNS blocklist on disk, downloading: ", bl.DiskPath)
-				bl.LastRefresh = time.Now().AddDate(-2, 0, 0)
+				bl.LastRefresh = time.Now().AddDate(0, 0, 30)
 			}
 
-			if time.Since(bl.LastRefresh).Hours() > 12 {
+			fmt.Println("LR:", time.Since(bl.LastRefresh).Hours(), bl.LastRefresh)
+			if time.Since(bl.LastRefresh).Hours() > 24 {
 				listBytes, err = downloadList(bl.FullPath)
 				if err != nil {
 					listError = err
@@ -166,10 +167,12 @@ retry:
 	resp, err := http.Get(url)
 	if err != nil || resp.StatusCode != http.StatusOK {
 		if tries < 5 {
-			time.Sleep(1 * time.Second)
+			time.Sleep(5 * time.Second)
 			tries++
-			DEBUG("Unable to load list (retrying): ", url)
-			goto retry
+			if tries < 5 {
+				DEBUG("Unable to load list (retrying): ", url)
+				goto retry
+			}
 		}
 		if resp != nil {
 			return nil, fmt.Errorf("failed to download list: %d %s ", resp.StatusCode, err)

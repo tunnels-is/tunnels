@@ -127,6 +127,7 @@ func ResolveDomainLocal(tun *TUN, m *dns.Msg, w dns.ResponseWriter) {
 
 	r, _, err = tun.localDNSClient.Exchange(m, tun.crReponse.DNSServers[0]+":53")
 	server = tun.crReponse.DNSServers[0]
+
 	if err != nil && len(tun.crReponse.DNSServers) > 1 {
 		r, _, err = tun.localDNSClient.Exchange(m, tun.crReponse.DNSServers[1]+":53")
 		server = tun.crReponse.DNSServers[1]
@@ -157,7 +158,7 @@ func ResolveDomain(m *dns.Msg, w dns.ResponseWriter) {
 
 	defer func() {
 		if err != nil {
-			ERROR("DNS: ", m.Question[0].Name, " || ", fmt.Sprintf("(%d)ms ", time.Since(start).Milliseconds()), " || ", err)
+			ERROR("DNS: ", m.Question[0].Name+" >> ", fmt.Sprintf("(%d)ms >>  ", time.Since(start).Milliseconds()), err)
 		} else {
 			if conf.LogAllDomains {
 				INFO("DNS: ", m.Question[0].Name, fmt.Sprintf("(%d)ms ", time.Since(start).Milliseconds()), " @  ", server)

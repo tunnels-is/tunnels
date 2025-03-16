@@ -318,7 +318,6 @@ type TunnelMETA struct {
 	LocalhostNat    bool
 	AutoReconnect   bool
 	AutoConnect     bool
-	Persistent      bool
 	PreventIPv6     bool
 	RequestVPNPorts bool
 
@@ -344,9 +343,6 @@ type TunnelMETA struct {
 	DNSServers         []string
 	DNS                []*ServerDNS
 	Networks           []*ServerNetwork
-
-	// EXPERIMENTAL
-	CloseConnectionsOnConnect bool
 }
 
 type AllowedHost struct {

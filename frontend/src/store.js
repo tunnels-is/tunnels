@@ -170,6 +170,9 @@ var STORE = {
 			}
 			return false
 		},
+		SetRawData(key, value){
+			STORE.Cache.interface.setItem(DATA + key, value)
+		},
 		Set: function(key, value) {
 			STORE.Cache.interface.setItem(key, value)
 		},

@@ -118,10 +118,10 @@ type stateV2 struct {
 	user atomic.Pointer[User]
 
 	// Networking parameters
-	DefaultGateway       net.IP
-	DefaultInterface     net.IP
-	DefaultInterfaceID   int
-	DefaultInterfaceName string
+	DefaultGateway       atomic.Pointer[net.IP] `json:"-"`
+	DefaultInterface     atomic.Pointer[net.IP] `json:"-"`
+	DefaultInterfaceID   atomic.Int32           `json:"-"`
+	DefaultInterfaceName atomic.Pointer[string] `json:"-"`
 
 	// Disk Paths and filenames
 	BlockListPath  string

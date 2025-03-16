@@ -24,7 +24,6 @@ const Account = () => {
 		state.GetBackendState()
 	}, [])
 
-	let configChanged = state.modifiedConfig !== undefined
 
 	state.User?.Tokens?.sort(function(x, y) {
 		if (x.Created < y.Created) {
@@ -72,18 +71,11 @@ const Account = () => {
 		{ value: "" },
 	]
 
+	let APIKey = state.getKey("User", "APIKey")
 
 	return (
+		 
 		<div className="account-page">
-			{configChanged &&
-				<div className="save">
-					<div className="button"
-						onClick={() => state.ConfigSave()}>
-						SAVE
-					</div>
-					<div className="text">unsaved changes detected</div>
-				</div>
-			}
 			{state?.User &&
 				<div className="panel">
 
@@ -95,7 +87,7 @@ const Account = () => {
 						dayjs(state.User.Updated).format("DD-MM-YYYY HH:mm:ss")
 					} />
 					<KeyValue label={"ID"} value={state.User._id} />
-					<KeyValue label={"API Key"} value={state.getKey("User", "APIKey")} />
+					<KeyValue label={"API Key"} defaultValue={"not set.."} value={APIKey} />
 
 
 					{state.User.SubExpiration &&
@@ -103,7 +95,7 @@ const Account = () => {
 					}
 
 					{state.User.Trial &&
-						<KeyValue label={"Trial Status"} value={state.User.Trial ? "Trial Active" : "Trial Ended"} />
+						<KeyValue label={"Trial Status"} value={state.User.Trial ? "Active" : "Ended"} />
 					}
 
 					<KeyValue label={"License"} value={state.User.Key?.Key} />
@@ -153,7 +145,7 @@ const Account = () => {
 
 			<NewTable
 				tableID={"devices"}
-				title={"Logins"}
+				title={"Logged In Devices"}
 				className="logins-list-table"
 				background={true}
 				header={headers}

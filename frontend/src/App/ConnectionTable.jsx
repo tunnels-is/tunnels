@@ -43,21 +43,8 @@ const ConnectionTable = () => {
 		})
 	}
 
-	const saveConnection = () => {
-		let modCons = state.GetModifiedConnections()
-		let found = false
-		modCons.forEach((n, i) => {
-			if (n.WindowsGUID === con.WindowsGUID) {
-				modCons[i] = x
-				found = true
-			}
-		})
-		if (!found) {
-			modCons.push(con)
-		}
-
-		state.SaveConnectionsToModifiedConfig(modCons)
-		state.ConfigSave()
+	const saveConnection = (data) => {
+		state.v2_TunnelSave(data)
 		state.renderPage("connections")
 	}
 
@@ -67,6 +54,12 @@ const ConnectionTable = () => {
 		onlyKeys: false,
 		defaults: {
 			root_AllowedHosts: [],
+		},
+		backButton:{
+			title:"Back To Tunnels",
+			func: () => {
+				setCon(undefined)
+			},
 		},
 		titles: {
 			root_DNSServers: "DNS Servers",
@@ -170,6 +163,9 @@ const ConnectionTable = () => {
 				opts.push({ value: x.Tag, key: x._id, selected: false })
 			}
 		})
+		if(opts.length === 0){
+				opts.push({ value: "No Servers..", key: "", selected: false })
+		}
 
 		row.items.push({
 			type: "select",
@@ -193,8 +189,10 @@ const ConnectionTable = () => {
 			value: server ? server.IP ? server.IP : c.PrivateIP : "unknown",
 			color: "blue",
 			click: () => {
-				setPServer(server)
-				state.renderPage("connections")
+				if (server){
+					setPServer(server)
+					state.renderPage("connections")
+				}
 			}
 		})
 
@@ -238,7 +236,7 @@ const ConnectionTable = () => {
 	const generateStatsTable = () => {
 		let rows = []
 
-		state?.State?.ConnectionStats?.map(cs => {
+		state?.ActiveTunnels?.map(cs => {
 
 			let stocms = Math.floor(String(cs.ServerToClientMicro / 1000))
 			let nonce = cs.Nonce1
@@ -255,15 +253,8 @@ const ConnectionTable = () => {
 			row.items.push({ type: "text", align: "left", className: "Disk", value: String(cs.DISK) + " %", })
 			row.items.push({ type: "text", align: "left", className: "Ping", value: dayjs(cs.PingTime).format('HH:mm:ss') })
 			row.items.push({ type: "text", align: "left", className: "Disk", value: stocms + "ms" })
-
 			row.items.push({ type: "text", align: "left", className: "Disk", value: nonce })
-
 			rows.push(row)
-			// console.dir(cs)
-			// if (cs.StatsTag === c.Tag) {
-			// 	s = cs
-			// 	return
-			// }
 		})
 
 		return rows
@@ -294,7 +285,6 @@ const ConnectionTable = () => {
 	if (con !== undefined) {
 		return (
 			<div className="connections">
-				<div className="back" onClick={() => setCon(undefined)}>Back to tunnels</div>
 				<ObjectEditor
 					opts={editorOpts}
 					object={con}

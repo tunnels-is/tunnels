@@ -37,7 +37,7 @@ const Servers = () => {
 					})
 			}
 
-			state.State?.ActiveConnections?.forEach((x) => {
+			state.ActiveTunnels?.forEach((x) => {
 				if (x.ServerID === server._id) {
 					con = x
 					return
@@ -65,7 +65,7 @@ const Servers = () => {
 			}
 
 			let opts = []
-			state?.Config?.Connections?.map(c => {
+			state?.Tunnels?.map(c => {
 				if (c.ServerID === server._id) {
 					opts.push({ value: c.Tag, key: c.Tag, selected: true })
 				} else {
@@ -96,6 +96,7 @@ const Servers = () => {
 				{
 					type: "select",
 					opts: opts,
+					align: "center",
 					value: <CustomSelect
 						parentkey={server._id}
 						className={"clickable"}
@@ -125,7 +126,7 @@ const Servers = () => {
 		{ value: "Tag" },
 		{ value: "Server" },
 		{ value: "IP" },
-		{ value: "Tunnel" },
+		{ value: "Tunnel", align:"center" },
 		{ value: "" }
 	]
 	if (server !== undefined) {
