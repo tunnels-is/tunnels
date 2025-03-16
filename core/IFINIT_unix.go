@@ -27,7 +27,6 @@ type TunnelInterface struct {
 	NetMask     string
 	TxQueuelen  int32
 	MTU         int32
-	Persistent  bool
 	Gateway     string
 
 	Multiqueue bool
@@ -64,7 +63,6 @@ func CreateNewTunnelInterface(
 		NetMask:       meta.NetMask,
 		TxQueuelen:    meta.TxQueueLen,
 		MTU:           meta.MTU,
-		Persistent:    meta.Persistent,
 		shouldRestart: true,
 		// IPv6Address: "fe80::1",
 	}
@@ -128,11 +126,11 @@ func (t *TunnelInterface) Create() (err error) {
 		}
 	}
 
-	if t.Persistent {
-		if err = tunnelCtl(t.FD, syscall.TUNSETPERSIST, uintptr(1)); err != nil {
-			return err
-		}
-	}
+	// if t.Persistent {
+	// 	if err = tunnelCtl(t.FD, syscall.TUNSETPERSIST, uintptr(1)); err != nil {
+	// 		return err
+	// 	}
+	// }
 
 	t.RWC = os.NewFile(t.FD, "tun_"+t.Name)
 	return
@@ -608,7 +606,12 @@ func RestoreSaneDNSDefaults() {
 
 func IPv6Enabled() bool {
 	s := STATE.Load()
-	out, err := exec.Command("bash", "-c", "cat /proc/sys/net/ipv6/conf/"+s.DefaultInterfaceName+"/disable_ipv6").CombinedOutput()
+	defIntName := s.DefaultInterfaceName.Load()
+	if defIntName == nil {
+		return false
+	}
+
+	out, err := exec.Command("bash", "-c", "cat /proc/sys/net/ipv6/conf/"+*defIntName+"/disable_ipv6").CombinedOutput()
 	if err != nil {
 		ERROR("Error getting ipv6 settings for interface: ", s.DefaultInterfaceName, " || msg: ", err, " || output: ", string(out))
 		return true

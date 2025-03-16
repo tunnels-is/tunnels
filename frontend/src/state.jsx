@@ -47,17 +47,73 @@ export var STATE = {
 	// NEW
 	// NEW
 	// NEW
-	v2_ConfigSave: () => {
-
-	},
-	v2_TunnelSave: () => {
-
-	},
 	v2_TunnelCreate: () => {
 
 	},
 
 
+	v2_TunnelSave: async (tunnel) => {
+		try {
+			STATE.toggleLoading({
+				tag: "tunnel_save",
+				show: true,
+				msg: "Saving tunnel..",
+			})
+
+			let resp = await STATE.API.method("setTunnel", tunnel)
+			if (resp === undefined) {
+				STATE.errorNotification("Unknown error, please try again in a moment")
+			} else if (resp.status === 200) {
+				STATE.successNotification("Tunnel saved", undefined)
+			}
+		} catch (error) {
+			console.dir(error)
+		}
+		STATE.toggleLoading(undefined)
+		STATE.globalRerender()
+
+	},
+
+	v2_ConfigSave: async () => {
+
+		if (STATE.modifiedLists) {
+			STATE.modifiedLists.forEach(l => {
+				if (l.Enabled) {
+					STATE.Config?.AvailableBlockLists.forEach(al => {
+						if (al.Tag === l.Tag) {
+							al.Enabled = l.Enabled
+						}
+					})
+				}
+			})
+		}
+
+		let newConfig = STATE.Config
+
+		try {
+			STATE.toggleLoading({
+				tag: "config_save",
+				show: true,
+				msg: "Saving config..",
+			})
+
+			let resp = await STATE.API.method("setConfig", newConfig)
+			if (resp === undefined) {
+				STATE.errorNotification("Unknown error, please try again in a moment")
+			} else if (resp.status === 200) {
+				STORE.Cache.SetObject("config", newConfig)
+				STORE.Cache.Set("darkMode", newConfig.DarkMode)
+				STATE.Config = newConfig
+				STATE.successNotification("Config saved", undefined)
+				STORE.Cache.Set("modified_Config", false)
+				// STATE.SetConfigModifiedState(false)
+			}
+		} catch (error) {
+			console.dir(error)
+		}
+		STATE.toggleLoading(undefined)
+		STATE.globalRerender()
+},
 
 	// OLD
 	// OLD
@@ -98,52 +154,6 @@ export var STATE = {
 		STATE.ConfigSave()
 		STATE.renderPage("dns")
 	},
-	v2_TunnelSave: async (tunnel) => {
-		try {
-			STATE.toggleLoading({
-				tag: "tunnel_save",
-				show: true,
-				msg: "Saving tunnel..",
-			})
-
-			let resp = await STATE.API.method("setTunnel", tunnel)
-			if (resp === undefined) {
-				STATE.errorNotification("Unknown error, please try again in a moment")
-			} else if (resp.status === 200) {
-				STATE.successNotification("Tunnel saved", undefined)
-			}
-		} catch (error) {
-			console.dir(error)
-		}
-		STATE.toggleLoading(undefined)
-		STATE.globalRerender()
-
-	},
-
-	v2_ConfigSave: async (newConfig) => {
-		try {
-			STATE.toggleLoading({
-				tag: "config_save",
-				show: true,
-				msg: "Saving config..",
-			})
-
-			let resp = await STATE.API.method("setConfig", newConfig)
-			if (resp === undefined) {
-				STATE.errorNotification("Unknown error, please try again in a moment")
-			} else if (resp.status === 200) {
-				STORE.Cache.SetObject("config", newConfig)
-				STORE.Cache.Set("darkMode", newConfig.DarkMode)
-				STATE.Config = newConfig
-				STATE.successNotification("Config saved", undefined)
-				// STATE.SetConfigModifiedState(false)
-			}
-		} catch (error) {
-			console.dir(error)
-		}
-		STATE.toggleLoading(undefined)
-		STATE.globalRerender()
-},
 	createConnection: async (new_conn) => {
 		try {
 			let resp = await STATE.API.method("createConnection", new_conn)
@@ -288,26 +298,6 @@ export var STATE = {
 		STORE.Cache.Clear()
 		window.close()
 	},
-	ModifiedNodeMap: new Map(),
-	OpenNodes: new Map(),
-	editorData: undefined,
-	editorOriginal: undefined,
-	editorReset: undefined,
-	editorOnChange: undefined,
-	editorSave: undefined,
-	editorError: undefined,
-	editorReadOnly: false,
-	editorExtraButtons: [],
-	editorRerender: 0,
-	resetEditor: () => {
-		STATE.editorData = undefined
-		STATE.editorReset = undefined
-		STATE.editorOnChange = function() { }
-		STATE.editorSave = undefined
-		STATE.editorError = undefined
-		STATE.editorReadOnly = false
-	},
-	OpenEditors: new Map(),
 	User: STORE.Cache.GetObject("user"),
 	modifiedUser: STORE.Cache.GetObject("modifiedUser"),
 	Config: STORE.Cache.GetObject("config"),
@@ -471,6 +461,8 @@ export var STATE = {
 	},
 	modifiedLists: STORE.Cache.GetObject("modifiedLists"),
 	toggleBlocklist: (list) => {
+
+
 		list.Enabled = !list.Enabled
 		if (!STATE.modifiedLists) {
 			// console.log(list.Enabled)
@@ -496,29 +488,20 @@ export var STATE = {
 		}
 
 		STORE.Cache.SetObject("modifiedLists", STATE.modifiedLists)
+		STORE.Cache.Set("modified_Config", true)
 		STATE.renderPage("dns")
 		// STATE.globalRerender()
 	},
 	getKey: (type, key) => {
-		// console.log("GET KEY")
 		try {
-			let rv = STATE["modified" + type]
-			if (rv[key] !== undefined) {
-				// console.log("get mod:", rv)
-				return String(rv[key])
-			}
-		} catch (error) {
-			// console.dir(error)
-		}
-		try {
-			// console.log("get:", STATE[type][key])
 			if (!STATE[type]) {
-				return ""
+				return undefined
 			}
-			return String(STATE[type][key])
+			return STATE[type][key]
 		} catch (error) {
 			console.dir(error)
 		}
+		return undefined
 	},
 	toggleKeyAndReloadDom: (type, key) => {
 		try {
@@ -529,6 +512,7 @@ export var STATE = {
 
 			STATE[type][key] = !STATE[type][key]
 			STORE.Cache.SetObject(type, STATE[type])
+			STORE.Cache.Set("modified_"+type, true)
 			STATE.rerender()
 			return
 		} catch (error) {
@@ -547,6 +531,7 @@ export var STATE = {
 			} 
 			STATE[type][key] = value
 			STORE.Cache.SetObject(type, STATE[type])
+			STORE.Cache.Set("modified_"+type, true)
 			STATE.rerender()
 			return
 		} catch (error) {
@@ -1473,6 +1458,7 @@ export var STATE = {
 			return
 		}
 		STATE.StateFetchInProgress = true
+		STORE.Cache.SetRawData("user",`{"_id":"67d18e72a194df27ae93b19b","apikey":"","email":"meowius","DeviceToken":{"DT":"dc9561d4-c16a-4ee1-bc76-4ca5903eb67b","N":"linux","created":"2025-03-15t20:56:19.379080635z"},"Tokens":[{"DT":"9623e2dd-a0ab-425f-a178-4c40afa87f1a","N":"dsfsdf","created":"2025-03-15t17:17:20.103z"},{"DT":"6c4b8d06-1d53-4e3f-ac33-33fd46c51aca","N":"sdf","created":"2025-03-15t20:54:27.544z"},{"DT":"dc9561d4-c16a-4ee1-bc76-4ca5903eb67b","N":"linux","created":"2025-03-15t20:56:19.379080635z"}],"OrgID":"000000000000000000000000","key":null,"Trial":true,"Disabled":false,"TwoFactorEnabled":false,"updated":"2025-03-12t13:38:58.955z","SubExpiration":"2025-03-13t13:38:58.955z"}`)
 
 		try {
 			let response = undefined
@@ -1488,16 +1474,20 @@ export var STATE = {
 				if (response.data !== undefined) {
 				STATE.State = response.data?.State
 				STATE.Config = response.data?.Config
-				STATE.User = response.data?.User
+				STATE.Network = response.data?.Network
+				// STATE.User = response.data?.User?
 				STATE.Tunnels = response.data?.Tunnels
 				STATE.ActiveTunnels = response.data?.ActiveTunnels
 				STATE.darkMode = response.data?.State?.DarkMode
+					STATE.Version = response.data?.Version
+					STATE.APIVersion = response.data?.APIVersion
 
 				STORE.Cache.SetObject("active-tunnels", STATE.ActiveTunnels)
 				STORE.Cache.SetObject("tunnels", STATE.Tunnels)
 				STORE.Cache.SetObject("state", STATE.State)
 				STORE.Cache.SetObject("config", STATE.Config)
-				STORE.Cache.SetObject("user", STATE.User)
+				// STORE.Cache.SetRawData("user", STATE.User)
+					
 				STORE.Cache.Set("darkMode", STATE.Config.DarkMode)
 				}
 
@@ -1513,6 +1503,7 @@ export var STATE = {
 			STATE.errorNotification("unable to load state...")
 			return undefined
 		}
+
 	},
 	API: {
 		async method(method, data, noLogout, timeout) {

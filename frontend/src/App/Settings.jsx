@@ -26,90 +26,43 @@ const Settings = () => {
 
 	let DialTimeout = state.getKey("Config", "RouterDialTimeoutSeconds")
 
+	let modified = STORE.Cache.GetBool("modified_Config")
+
 	useEffect(() => {
 		state.GetBackendState()
 	}, [])
-
-	const popEditor = (data) => {
-		state.editorData = data
-		state.editorReadOnly = true
-		state.globalRerender()
-	}
-
-	const openConfigEditor = (config) => {
-		state.resetEditor()
-		state.editorData = config
-		state.editorReadOnly = false
-		state.editorDelete = undefined
-		state.editorSave = function() {
-			console.dir(state.modifiedConfig)
-			state.ConfigSave()
-			state.globalRerender()
-		}
-		state.editorOnChange = function(data) {
-			state.editorError = ""
-			let x = undefined
-			try {
-				x = JSON.parse(data)
-			} catch (error) {
-				console.log(error.message)
-				console.dir(error)
-				if (error.message) {
-					state.editorError = error.message
-				} else {
-					state.editorError = "Invalid JSON"
-				}
-				return
-			}
-
-			console.dir(x)
-			state.modifiedConfig = x
-			state.ConfigSaveModifiedSate()
-			state.globalRerender()
-		}
-		state.globalRerender()
-	}
 
 	let basePath = state.State?.BasePath
 	let logPath = ""
 	let tracePath = ""
 	let logFileName = state.State?.LogFileName?.replace(state.State?.LogPath, "")
 	let traceFileName = state.State?.TraceFileName?.replace(state.State?.TracePath, "")
-	let configPath = state.State?.ConfigPath?.replace(state.State?.BasePath, "")
+	let configPath = state.State?.ConfigFileName
 	if (state.State?.LogPath !== basePath) {
 		logPath = state.State?.LogPath
 	}
 	if (state.State?.TracePath !== basePath) {
 		tracePath = state.State?.TracePath
 	}
-	let version = state.getKey("State", "Version")
+	let version = state.Version ? state.Version : "unknown"
+	let apiversion = state.APIVersion ? state.APIVersion : "unknown"
 
 	return (
 		<div className="settings-wrapper">
-			<div className="state panel">
-				<div className="title"
-					onClick={() => popEditor(state?.State)}>
-					Application State
+
+			{modified === true &&
+			<div className="save-banner">
+					<div className="button"
+						onClick={() => state.v2_ConfigSave()}
+						>
+						Save
+					</div>
+					<div className="notice">Your config has un-saved changes</div>
 				</div>
+			}
 
-				<KeyValue label="Version" value={version} />
-				<KeyValue label="Log Path" value={logPath} />
-				<KeyValue label="Config File" value={configPath} />
-				<KeyValue label="Trace Path" value={tracePath} />
-				<KeyValue label="Trace File" value={traceFileName} />
-				<KeyValue label="Log File" value={logFileName} />
-				<KeyValue label="Base Path" value={state.State?.BasePath} />
 
-				<div className="label-wrapper">
-					<Label
-						className={state.State?.IsAdmin ? "ok" : "warn"}
-						value={state.State?.IsAdmin ? "Tunnels has the correct permissions" : "Tunnels is missing permissions"}
-					/>
-				</div>
-
-			</div>
-
-			< div className="general panel">
+			<div className="general panel">
 				<div className="title">General Settings</div>
 
 				<CustomToggle
@@ -169,32 +122,13 @@ const Settings = () => {
 
 
 
-				<div
-					className="red card-button"
-					onClick={() => state.resetApp()}
-				>
-					Reset Everything
-				</div>
 
 			</div>
 
 
 			<div className="advanced panel">
-				<div className="title" onClick={() => {
-					openConfigEditor(state.Config)
-				}}>Advanced Settings</div>
+				<div className="title">Advanced Settings</div>
 
-				<FormKeyValue label={"Timeouts"} value={
-					<input value={DialTimeout} onChange={(e) => {
-
-						state.setKeyAndReloadDom(
-							"Config",
-							"RouterDialTimeoutSeconds",
-							Number(e.target.value))
-
-						state.renderPage("settings")
-					}} type="number" />}
-				/>
 
 				<FormKeyValue label={"API IP"} value={
 					<input value={APIIP} onChange={(e) => {
@@ -220,6 +154,33 @@ const Settings = () => {
 					}} type="text" />}
 				/>
 
+				<FormKeyInput
+					label={"API Cert Domains"}
+					type="text"
+					value={APICertDomains}
+					onChange={(e) => {
+
+						state.setArrayAndReloadDom(
+							"Config",
+							"APICertDomains",
+							e.target.value)
+						state.renderPage("settings")
+					}}
+				/>
+
+				<FormKeyInput
+					label={"API Cert IPs"}
+					type="text"
+					value={APICertIPs}
+					onChange={(e) => {
+
+						state.setArrayAndReloadDom(
+							"Config",
+							"APICertIPs",
+							e.target.value)
+						state.renderPage("settings")
+					}}
+				/>
 
 				<FormKeyValue label={"API Cert"} value={
 					<input value={APICert} onChange={(e) => {
@@ -244,36 +205,52 @@ const Settings = () => {
 					}} type="text" />}
 				/>
 
-				<FormKeyInput
-					label={"API Cert IPs"}
-					type="text"
-					value={APICertIPs}
-					onChange={(e) => {
 
-						state.setArrayAndReloadDom(
-							"Config",
-							"APICertIPs",
-							e.target.value)
-						state.renderPage("settings")
-					}}
-				/>
-
-				<FormKeyInput
-					label={"API Cert Domains"}
-					type="text"
-					value={APICertDomains}
-					onChange={(e) => {
-
-						state.setArrayAndReloadDom(
-							"Config",
-							"APICertDomains",
-							e.target.value)
-						state.renderPage("settings")
-					}}
-				/>
 
 
 			</div>
+
+			<div className="net-state panel">
+				<div className="title">
+					Network State
+				</div>
+
+				<KeyValue
+					label="Default" 
+					defaultValue={"Unknown"}
+					value={state.Network?.DefaultInterfaceName} />
+				<KeyValue 
+					label="IP"
+					defaultValue={"Unknown"}
+					value={state.Network?.DefaultInterface} />
+				<KeyValue 
+					label="ID" 
+					defaultValue={"Unknown"}
+					value={state.Network?.DefaultInterfaceID} />
+				<KeyValue 
+					label="Gateway" 
+					defaultValue={"Unknown"}
+					value={state.Network?.DefaultGateway} />
+
+			</div>
+
+			<div className="state panel">
+				<div className="title">
+					Application State
+				</div>
+
+				<KeyValue label="API Version" value={apiversion} />
+				<KeyValue label="Version" value={version} />
+				<KeyValue label="Base Path" value={basePath} />
+				<KeyValue label="Config File" value={configPath} />
+				<KeyValue label="Log Path" value={logPath} />
+				<KeyValue label="Log File" value={logFileName} />
+				<KeyValue label="Trace Path" value={tracePath} />
+				<KeyValue label="Trace File" value={traceFileName} />
+				<KeyValue label="Admin" value={state.State?.IsAdmin} />
+
+			</div>
+
 
 
 		</div>

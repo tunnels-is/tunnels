@@ -63,18 +63,17 @@ func createTunnel() (T *TunnelMETA) {
 	T.Tag = ifAndTag
 	T.IFName = ifAndTag
 	T.EnableDefaultRoute = false
-	T.IPv4Address = ""
-	T.NetMask = ""
+	T.IPv4Address = "777.777.777.777"
+	T.NetMask = "255.255.255.255"
 
 	T.EncryptionType = crypt.CHACHA20
-	T.DNSBlocking = false
-	T.PreventIPv6 = false
-	T.TxQueueLen = 1000
-	T.MTU = 1420
+	T.DNSBlocking = true
+	T.PreventIPv6 = true
+	T.TxQueueLen = 2000
+	T.MTU = 1400
 	T.ServerID = ""
 	T.AutoReconnect = false
 	T.AutoConnect = false
-	T.CloseConnectionsOnConnect = false
 	T.Networks = make([]*ServerNetwork, 0)
 	T.DNSServers = make([]string, 0)
 	T.DNS = make([]*ServerDNS, 0)
@@ -86,10 +85,11 @@ func createDefaultTunnelMeta() (M *TunnelMETA) {
 	M = new(TunnelMETA)
 	M = createTunnel()
 	M.RequestVPNPorts = true
-	M.IPv4Address = ""
-	M.NetMask = ""
+	M.IPv4Address = "172.22.22.1"
+	M.NetMask = "255.255.255.255"
 	M.Tag = DefaultTunnelName
 	M.IFName = DefaultTunnelName
 	M.EnableDefaultRoute = true
+	M.Public = true
 	return
 }
