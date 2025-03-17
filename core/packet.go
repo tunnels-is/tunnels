@@ -217,22 +217,32 @@ func (V *TUN) ProcessIngressPacket(packet []byte) bool {
 	return true
 }
 
+// Optimized checksum calculation
 func RecalculateIPv4HeaderChecksum(bytes []byte) {
-	bytes[10] = 0
-	bytes[11] = 0
+	// Clear existing checksum
+	bytes[10], bytes[11] = 0, 0
 
 	var csum uint32
+	length := len(bytes)
 
-	for i := 0; i < len(bytes)-1; i += 2 {
+	// Process 2 bytes at a time
+	for i := 0; i < length-1; i += 2 {
 		csum += uint32(bytes[i])<<8 | uint32(bytes[i+1])
 	}
 
+	// Handle last byte if length is odd
+	if length%2 == 1 {
+		csum += uint32(bytes[length-1]) << 8
+	}
+
+	// Fold 32-bit sum to 16 bits
 	for csum > 0xFFFF {
 		csum = (csum >> 16) + (csum & 0xFFFF)
 	}
 
-	bytes[10] = byte(^csum >> 8)
-	bytes[11] = byte(^csum & 0xFF)
+	checksum := ^uint16(csum)
+	bytes[10] = byte(checksum >> 8)
+	bytes[11] = byte(checksum & 0xFF)
 }
 
 func RecalculateAndReplaceIPv4HeaderChecksum_old_donotremoveyet(bytes []byte) {
@@ -255,41 +265,42 @@ func RecalculateAndReplaceIPv4HeaderChecksum_old_donotremoveyet(bytes []byte) {
 }
 
 func RecalculateTransportChecksum(IPv4Header []byte, TPPacket []byte) {
-	// wipe the old checksum before calculating
-	if IPv4Header[9] == 6 {
-		TPPacket[16] = 0
-		TPPacket[17] = 0
-	} else if IPv4Header[9] == 17 {
-		TPPacket[6] = 0
-		TPPacket[7] = 0
+	isUDP := IPv4Header[9] == 17
+	checksumOffset := 16
+	if isUDP {
+		checksumOffset = 6
 	}
 
+	// Clear existing checksum
+	TPPacket[checksumOffset] = 0
+	TPPacket[checksumOffset+1] = 0
+
 	var csum uint32
-	csum += (uint32(IPv4Header[12]) + uint32(IPv4Header[14])) << 8
-	csum += uint32(IPv4Header[13]) + uint32(IPv4Header[15])
-	csum += (uint32(IPv4Header[16]) + uint32(IPv4Header[18])) << 8
-	csum += uint32(IPv4Header[17]) + uint32(IPv4Header[19])
-	csum += uint32(uint8(IPv4Header[9]))
+
+	// Add pseudo-header
+	csum += uint32(IPv4Header[12])<<8 | uint32(IPv4Header[13])
+	csum += uint32(IPv4Header[14])<<8 | uint32(IPv4Header[15])
+	csum += uint32(IPv4Header[16])<<8 | uint32(IPv4Header[17])
+	csum += uint32(IPv4Header[18])<<8 | uint32(IPv4Header[19])
+	csum += uint32(IPv4Header[9])
 	tcpLength := uint32(len(TPPacket))
+	csum += tcpLength
 
-	csum += tcpLength & 0xffff
-	csum += tcpLength >> 16
-
+	// Add packet data
 	length := len(TPPacket) - 1
 	for i := 0; i < length; i += 2 {
-		csum += uint32(TPPacket[i]) << 8
-		csum += uint32(TPPacket[i+1])
+		csum += uint32(TPPacket[i])<<8 | uint32(TPPacket[i+1])
 	}
 	if len(TPPacket)%2 == 1 {
 		csum += uint32(TPPacket[length]) << 8
 	}
-	for csum > 0xffff {
-		csum = (csum >> 16) + (csum & 0xffff)
+
+	// Fold to 16 bits
+	for csum > 0xFFFF {
+		csum = (csum >> 16) + (csum & 0xFFFF)
 	}
 
-	if IPv4Header[9] == 6 {
-		binary.BigEndian.PutUint16(TPPacket[16:18], ^uint16(csum))
-	} else if IPv4Header[9] == 17 {
-		binary.BigEndian.PutUint16(TPPacket[6:8], ^uint16(csum))
-	}
+	checksum := ^uint16(csum)
+	TPPacket[checksumOffset] = byte(checksum >> 8)
+	TPPacket[checksumOffset+1] = byte(checksum & 0xFF)
 }

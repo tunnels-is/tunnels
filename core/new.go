@@ -207,8 +207,8 @@ type TUN struct {
 	VPLIngress  map[[4]byte]struct{} `json:"-"`
 
 	// TCP and UDP Natting
-	TCPPortMap []VPNPort
-	UDPPortMap []VPNPort
+	TCPPortMapFixed [65536]*Mapping
+	UDPPortMapFixed [65536]*Mapping
 
 	// TODO ....
 	Index []byte
@@ -257,16 +257,36 @@ type TUN struct {
 	EgressMapping  *Mapping
 	IngressMapping *Mapping
 	EP_SYN         byte
+
+	// Pre-allocate commonly used buffers
+	packetBuffer [65536]byte
+
+	// Add cache fields
+	cachedChecksum uint16
+	cachedIPHeader [20]byte
+
+	// Add buffer cache
+	packetBufferCache []byte
+
+	// Keep existing map structures but add size hints
+	TCPPortMap []VPNPort
+	UDPPortMap []VPNPort
 }
 
 func (t *TUN) InitPortMap() {
-	t.TCPPortMap = make([]VPNPort, t.endPort-t.startPort)
-	t.UDPPortMap = make([]VPNPort, t.endPort-t.startPort)
+	portRange := int(t.endPort - t.startPort)
+	// Pre-allocate slices with capacity
+	t.TCPPortMap = make([]VPNPort, portRange)
+	t.UDPPortMap = make([]VPNPort, portRange)
 
+	// Initialize maps with size hints
 	for i := range t.TCPPortMap {
-		t.TCPPortMap[i].M = make(map[[4]byte]*Mapping)
+		t.TCPPortMap[i].M = make(map[[4]byte]*Mapping, 64) // Size hint for better performance
 	}
 	for i := range t.UDPPortMap {
-		t.UDPPortMap[i].M = make(map[[4]byte]*Mapping)
+		t.UDPPortMap[i].M = make(map[[4]byte]*Mapping, 64)
 	}
+
+	// Initialize packet buffer cache
+	t.packetBufferCache = make([]byte, 65536)
 }
