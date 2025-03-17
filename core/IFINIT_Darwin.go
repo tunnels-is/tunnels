@@ -51,7 +51,6 @@ func CreateNewTunnelInterface(
 		NetMask:     VC.Meta.NetMask,
 		TxQueuelen:  VC.Meta.TxQueueLen,
 		MTU:         VC.Meta.MTU,
-		Persistent:  VC.Meta.Persistent,
 		// IPv6Address: "fe80::1",
 	}
 
