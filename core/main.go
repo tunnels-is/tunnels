@@ -373,40 +373,41 @@ func loadTunnelsFromDisk() {
 	}
 }
 
-func loadConfigFromDisk() {
+// DefaultConfig returns a new configV2 with default values
+func DefaultConfig() *configV2 {
+	conf := &configV2{
+		DebugLogging:      true,
+		InfoLogging:       true,
+		ErrorLogging:      true,
+		ConnectionTracer:  false,
+		DNSServerIP:       "127.0.0.1",
+		DNSServerPort:     "53",
+		DNS1Default:       "1.1.1.1",
+		DNS2Default:       "8.8.8.8",
+		LogBlockedDomains: true,
+		LogAllDomains:     true,
+		DNSstats:          true,
+		DNSBlockLists:     GetDefaultBlockLists(),
+		APIIP:             "127.0.0.1",
+		APIPort:           "7777",
+	}
+	applyCertificateDefaultsToConfig(conf)
+	conf.APICertType = certs.ECDSA
+	return conf
+}
+
+func loadConfigFromDisk() error {
 	defer RecoverAndLogToFile()
 	DEBUG("Loading configurations from file")
 
-	err := ReadConfigFileFromDisk()
-	if err == nil {
-		return
+	if err := ReadConfigFileFromDisk(); err == nil {
+		return nil
 	}
 
 	DEBUG("Generating a new default config")
-
-	Conf := new(configV2)
-
-	Conf.DebugLogging = true
-	Conf.InfoLogging = true
-	Conf.ErrorLogging = true
-	Conf.ConnectionTracer = false
-
-	Conf.DNSServerIP = "127.0.0.1"
-	Conf.DNSServerPort = "53"
-	Conf.DNS1Default = "1.1.1.1"
-	Conf.DNS2Default = "8.8.8.8"
-	Conf.LogBlockedDomains = true
-	Conf.LogAllDomains = true
-	Conf.DNSstats = true
-	Conf.DNSBlockLists = GetDefaultBlockLists()
-
-	Conf.APIIP = "127.0.0.1"
-	Conf.APIPort = "7777"
-	applyCertificateDefaultsToConfig(Conf)
-	Conf.APICertType = certs.ECDSA
-
-	CONFIG.Store(Conf)
-	writeConfigToDisk()
+	conf := DefaultConfig()
+	CONFIG.Store(conf)
+	return writeConfigToDisk()
 }
 
 func applyCertificateDefaultsToConfig(cfg *configV2) {
