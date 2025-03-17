@@ -405,8 +405,7 @@ func loadConfigFromDisk() error {
 	}
 
 	DEBUG("Generating a new default config")
-	conf := DefaultConfig()
-	CONFIG.Store(conf)
+	CONFIG.Store(DefaultConfig())
 	return writeConfigToDisk()
 }
 
