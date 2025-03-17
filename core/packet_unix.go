@@ -4,8 +4,15 @@ package core
 
 import (
 	"runtime/debug"
+	"sync"
 	"time"
 )
+
+var packetBufferPool = sync.Pool{
+	New: func() interface{} {
+		return make([]byte, 65536) // Standard MTU size
+	},
+}
 
 func (T *TunnelInterface) ReadFromTunnelInterface() {
 	defer func() {
@@ -24,16 +31,19 @@ func (T *TunnelInterface) ReadFromTunnelInterface() {
 		packet       []byte
 		writtenBytes int
 		sendRemote   bool
-		tempBytes    = make([]byte, 500000)
-		Tun          *TUN
-		out          = make([]byte, 500000)
+		// Get buffers from pool
+		tempBytes = packetBufferPool.Get().([]byte)
+		out       = packetBufferPool.Get().([]byte)
+		Tun       *TUN
 	)
-
-	// Tun = T
+	// Return buffers to pool when done
+	defer func() {
+		packetBufferPool.Put(tempBytes)
+		packetBufferPool.Put(out)
+	}()
 
 	DEBUG("New tunnel interface reader:", T.Name)
 	for {
-
 		packetLength, err = T.RWC.Read(tempBytes[0:])
 		if err != nil {
 			ERROR("error in tun/tap reader loop:", err)
@@ -59,7 +69,6 @@ func (T *TunnelInterface) ReadFromTunnelInterface() {
 
 		out = Tun.encWrapper.SEAL.Seal1(packet, Tun.Index)
 
-		// TIP; SET DONT FRAGMENT
 		writtenBytes, err = Tun.connection.Write(out)
 		if err != nil {
 			ERROR("router write error: ", err)
