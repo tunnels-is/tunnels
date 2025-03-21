@@ -85,7 +85,14 @@ func getFileSystem() http.FileSystem {
 func makeTLSConfig() (tc *tls.Config) {
 	conf := CONFIG.Load()
 	tc = new(tls.Config)
-	tc.MinVersion = tls.VersionTLS13
+	tc.MinVersion = tls.VersionTLS12
+	tc.MaxVersion = tls.VersionTLS13
+	tc.CipherSuites = []uint16{
+		tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+		tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+		tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+		tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+	}
 	certsExist := true
 	_, err := os.Stat(conf.APICert)
 	if err != nil {
@@ -97,7 +104,6 @@ func makeTLSConfig() (tc *tls.Config) {
 	}
 
 	if !certsExist {
-
 		_, err := certs.MakeCert(
 			conf.APICertType,
 			conf.APICert,
@@ -156,6 +162,9 @@ func HTTPhandler(w http.ResponseWriter, r *http.Request) {
 	case "getState":
 		HTTP_GetState(w, r)
 		return
+	case "logout":
+		HTTP_Logout(w, r)
+		return
 	case "setConfig":
 		HTTP_SetConfig(w, r)
 		return
@@ -166,7 +175,6 @@ func HTTPhandler(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(200)
 	r.Body.Close()
-	return
 }
 
 var LogSocket *websocket.Conn
@@ -179,19 +187,17 @@ func handleWebSocket(ws *websocket.Conn) {
 		}
 	}()
 	LogSocket = ws
-	for {
-		select {
-		case event := <-APILogQueue:
-			err := websocket.Message.Send(ws, event)
-			if err != nil {
-				// Make an attempt to delive this log line to the new LogSocket.
-				// if delivery fails, the event will be found in the log file.
-				_ = websocket.Message.Send(LogSocket, event)
-				ERROR("Logging websocket error: ", err)
-				return
-			}
+	for event := range APILogQueue {
+		err := websocket.Message.Send(ws, event)
+		if err != nil {
+			// Make an attempt to delive this log line to the new LogSocket.
+			// if delivery fails, the event will be found in the log file.
+			_ = websocket.Message.Send(LogSocket, event)
+			ERROR("Logging websocket error: ", err)
+			return
 		}
 	}
+
 }
 
 func Bind[I any](form I, r *http.Request) (err error) {
@@ -202,10 +208,10 @@ func Bind[I any](form I, r *http.Request) (err error) {
 
 func STRING(w http.ResponseWriter, r *http.Request, code int, data string) {
 	w.WriteHeader(code)
-	w.Write([]byte(data))
+	_, _ = w.Write([]byte(data))
 }
 
-func JSON(w http.ResponseWriter, r *http.Request, code int, data interface{}) {
+func JSON(w http.ResponseWriter, r *http.Request, code int, data any) {
 	defer RecoverAndLogToFile()
 	defer func() {
 		if r.Body != nil {
@@ -241,6 +247,12 @@ type StateNetworkResponse struct {
 
 func HTTP_GetState(w http.ResponseWriter, r *http.Request) {
 	JSON(w, r, 200, GetFullState())
+}
+
+func HTTP_Logout(w http.ResponseWriter, r *http.Request) {
+	state := STATE.Load()
+	state.user.Store(nil)
+	JSON(w, r, 200, nil)
 }
 
 func GetFullState() (s *StateResponse) {
@@ -371,7 +383,7 @@ func HTTP_SetTunnel(w http.ResponseWriter, r *http.Request) {
 	if newForm.OldTag != newForm.Meta.Tag {
 		TunnelMetaMap.Delete(newForm.OldTag)
 		state := STATE.Load()
-		err = os.Remove(state.TunnelsPath + string(os.PathSeparator) + newForm.OldTag + tunnelFileSuffix)
+		err = os.Remove(state.TunnelsPath + newForm.OldTag + tunnelFileSuffix)
 		if err != nil {
 			JSON(w, r, 400, err.Error())
 			return

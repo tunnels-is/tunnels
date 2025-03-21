@@ -19,6 +19,7 @@
 		"@uiw/react-codemirror": "^4.22.2",
 		"axios": "^1.7.4",
 		"dayjs": "^1.11.10",
+		"frontend": "link:",
 		"react": "^18.2.0",
 		"react-dom": "^18.2.0",
 		"react-hot-toast": "^2.4.0",
