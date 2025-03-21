@@ -603,6 +603,7 @@
 
 
 
+
 .form {
   /* background-color: $c-shade2; */
   /* width: 400px; */
@@ -610,7 +611,8 @@
   display: flex;
   flex-direction: column;
   gap: 20px;
-  max-width: 420px;
+  /* max-width: 300px; */
+  width: 360px;
   /* padding-top: 30px; */
   /* padding-bottom: 30px; */
   align-items: center;
@@ -622,14 +624,27 @@
     color: $c-orange;
   }
 
+  .buttons {
+    align-items: center;
+    display: flex;
+    justify-content: center;
+    width: 100%;
+    flex-direction: column;
+
+    .code-button {
+      margin-bottom: 0px;
+      background: var(--c-green);
+    }
+
+  }
+
   .input {
-    // flex-grow: 1;
     display: flex;
     flex-direction: row;
     justify-content: center;
     align-items: center;
     // flex-flow: column wrap;
-    width: 300px;
+    width: 360px;
     flex-wrap: wrap;
 
     // height: 40px;
@@ -639,18 +654,17 @@
       text-align: left !important;
       // width: fit-content;
       min-width: 300px;
-      margin-left: 100px;
+      margin-left: 38px;
       margin-top: -5px;
       margin-bottom: -20px;
       padding: 0px;
     }
 
-    .token-input {
-      font-size: 13px !important;
-    }
 
     input {
-      min-width: 250px;
+      font-weight: bold;
+
+      min-width: 310px;
       flex-wrap: nowrap;
       margin-left: 5px;
       height: 22px;
@@ -675,72 +689,16 @@
     }
   }
 
-  .buttons {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    color: var(--c-white);
-
-    .reset-button {
-      /* background: $c-blue; */
-      background: var(--button-danger);
-    }
-
-    .reset-button:hover {
-      background: var(--button-hover-danger);
-    }
-
-    .ok-button {
-      background: var(--button-color);
-    }
-
-    .ok-button:hover {
-      background: var(--button-hover-color);
-    }
-
-    .neutral-button {
-      background: var(--button-color);
-    }
-
-    .neutral-button:hover {
-      background: var(--button-hover-color);
-    }
-  }
-
-  .get-code-button {
-    color: $c-lightblue;
-    cursor: pointer;
-  }
-
-  .get-code-button:hover {
-    color: $c-teal-hover;
-  }
-
-  .color-ok {
-    color: $c-teal;
-  }
-
-  .color-neutral {
-    color: $c-lightblue;
-  }
-
-  .color-cancel {
-    color: $c-orange;
-  }
-
-  .color-error {
-    color: $error-color;
-  }
 }
 
 .login-options {
+  padding-top: 10px;
   display: flex;
   flex-direction: column;
   text-align: left;
   z-index: 3;
   height: fit-content;
   font-size: 18px;
-  margin-top: 10px;
 
   button {
 
@@ -765,22 +723,36 @@
   flex-direction: row;
   padding-bottom: 200px;
   margin-top: 150px;
-  gap: 80px;
+  gap: 40px;
   justify-content: center;
+
+  .warning {
+    float: left;
+    color: red;
+    position: absolute;
+    top: 79px;
+    text-align: center;
+    font-size: 20px;
+    font-weight: bold;
+  }
 
   .active {
     color: var(--c-shade6);
   }
 
-  .ok-button {
-    color: var(--c-white);
-    background: var(--c-dark-blue) !important;
-  }
-
-  .ok-button:hover {
-    background: var(--c-blue) !important;
+  .btn {
+    color: var(--c-shade3);
+    cursor: pointer;
+    margin-bottom: 10px;
+    font-weight: bold;
 
   }
+
+  .btn:hover {
+    color: var(--c-shade5);
+  }
+
+
 }
 
 .reset-wrapper {

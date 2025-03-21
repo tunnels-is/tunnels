@@ -108,7 +108,7 @@ const Servers = () => {
 						className={"clickable"}
 						placeholder={"Assign"}
 						setValue={(opt) => {
-							state.changeServerOnConnection(opt.value, server._id)
+							state.changeServerOnTunnelUsingTag(opt.value, server._id)
 						}}
 						options={opts}
 					></CustomSelect>,

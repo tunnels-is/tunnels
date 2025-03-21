@@ -21,12 +21,6 @@ var (
 	CertPool          *x509.CertPool
 )
 
-type x struct{}
-
-func (x *x) Write(data []byte) (int, error) {
-	return 0, nil
-}
-
 type DNSStats struct {
 	Count        int
 	Tag          string
@@ -87,7 +81,7 @@ type ConnectRequestResponse struct {
 	AvailableMbps     int `json:"AvailableMbps"`
 	AvailableUserMbps int `json:"AvailableUserMbps"`
 
-	InternetAccess     bool `json:"InternetAccess,required"`
+	InternetAccess     bool `json:"InternetAccess"`
 	LocalNetworkAccess bool `json:"LocalNetworkAccess"`
 
 	DataPort    string `json:"DataPort"`
@@ -550,11 +544,13 @@ type DEBUG_OUT struct {
 }
 
 type FORWARD_REQUEST struct {
-	Path     string
-	Method   string
-	Timeout  int
-	Authed   bool
-	JSONData any
+	Path       string
+	Method     string
+	Timeout    int
+	Authed     bool
+	JSONData   any
+	SyncUser   bool
+	LogoutUser bool
 }
 
 type TWO_FACTOR_CONFIRM struct {
