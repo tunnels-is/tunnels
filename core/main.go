@@ -346,14 +346,18 @@ func loadTunnelsFromDisk() {
 			return nil
 		}
 
-		tb, err := os.ReadFile(path)
-		if err != nil {
+		tb, ferr := os.ReadFile(path)
+		if ferr != nil {
 			ERROR("Unable to read tunnel file:", err)
 			return err
 		}
 
 		tunnel := new(TunnelMETA)
-		err = json.Unmarshal(tb, tunnel)
+		merr := json.Unmarshal(tb, tunnel)
+		if merr != nil {
+			ERROR("Unable to marshal tunnel file:", err)
+			return err
+		}
 		TunnelMetaMap.Store(tunnel.Tag, tunnel)
 		DEBUG("Loaded tunnel:", tunnel.Tag)
 		if tunnel.Tag == DefaultTunnelName {
@@ -392,7 +396,6 @@ func DefaultConfig() *configV2 {
 		APIPort:           "7777",
 	}
 	applyCertificateDefaultsToConfig(conf)
-	conf.APICertType = certs.ECDSA
 	return conf
 }
 
@@ -419,14 +422,13 @@ func applyCertificateDefaultsToConfig(cfg *configV2) {
 
 	cfg.APICertType = certs.RSA
 
-	if cfg.APICertIPs == nil || len(cfg.APICertIPs) < 1 {
+	if len(cfg.APICertIPs) < 1 {
 		cfg.APICertIPs = []string{"127.0.0.1"}
 	}
 
-	if cfg.APICertDomains == nil || len(cfg.APICertDomains) < 1 {
+	if len(cfg.APICertDomains) < 1 {
 		cfg.APICertDomains = []string{"tunnels.app", "app.tunnels.is"}
 	}
-	return
 }
 
 //	func LoadDNSWhitelist() (err error) {
@@ -468,7 +470,10 @@ func CleanupOnClose() {
 	defer RecoverAndLogToFile()
 	tunnelMapRange(func(tun *TUN) bool {
 		tunnel := tun.tunnel.Load()
-		tunnel.Disconnect(tun)
+		err := tunnel.Disconnect(tun)
+		if err != nil {
+			ERROR("unable to disconnect tunnel", tun.tag, "error:", err)
+		}
 		return true
 	})
 	if TraceFile != nil {

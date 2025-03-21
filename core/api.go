@@ -257,7 +257,7 @@ func ForwardToController(FR *FORWARD_REQUEST) (any, int) {
 		}
 	}
 
-	if strings.Contains(FR.Path, "login") {
+	if FR.SyncUser {
 		if len(responseBytes) != 0 && code == 200 {
 			user := new(User)
 			err = json.Unmarshal(responseBytes, user)
@@ -270,6 +270,9 @@ func ForwardToController(FR *FORWARD_REQUEST) (any, int) {
 			}
 
 		}
+	} else if FR.LogoutUser {
+		state := STATE.Load()
+		state.user.Store(nil)
 	}
 
 	return respJSON, code
