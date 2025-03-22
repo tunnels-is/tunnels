@@ -29,7 +29,7 @@ func (T *TunnelInterface) ReadFromTunnelInterface() {
 		out          = make([]byte, 500000)
 	)
 
-	// Tun = T
+	Tun = *T.tunnel.Load()
 
 	DEBUG("New tunnel interface reader:", T.Name)
 	for {

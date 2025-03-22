@@ -3,10 +3,12 @@ package core
 import (
 	"crypto/tls"
 	"encoding/json"
+	"fmt"
 	"io/fs"
 	"net"
 	"net/http"
 	"os"
+	"runtime/debug"
 	"slices"
 	"time"
 
@@ -222,6 +224,7 @@ func JSON(w http.ResponseWriter, r *http.Request, code int, data any) {
 	encoder := json.NewEncoder(w)
 	err := encoder.Encode(data)
 	if err != nil {
+		_, _ = w.Write([]byte("encoding error"))
 		ERROR("Unable to write encoded json to response writer:", err)
 		return
 	}
@@ -256,6 +259,12 @@ func HTTP_Logout(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetFullState() (s *StateResponse) {
+	defer func() {
+		r := recover()
+		if r != nil {
+			fmt.Println(string(debug.Stack()))
+		}
+	}()
 	state := STATE.Load()
 	s = new(StateResponse)
 	s.Version = version
@@ -287,6 +296,8 @@ func GetFullState() (s *StateResponse) {
 		s.ActiveTunnels = append(s.ActiveTunnels, tun)
 		return true
 	})
+	fmt.Println("RETURNING STATE:")
+	fmt.Println(s)
 	return
 }
 
@@ -298,6 +309,7 @@ func HTTP_Connect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	fmt.Println(ns)
 	code, err := PublicConnect(ns)
 	if err != nil {
 		STRING(w, r, code, err.Error())

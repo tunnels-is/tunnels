@@ -533,31 +533,32 @@ export var STATE = {
     }
   },
   ConfirmAndExecute: async (type, id, duration, title, subtitle, method) => {
-    // if (type === "") {
-    // 	type = "success"
-    // }
-    // await toast[type]((t) => (
-    // 	<div className="content">
-    // 		{title &&
-    // 			<div className="title">
-    // 				{title}
-    // 			</div>
-    // 		}
-    // 		<div className="subtitle">
-    // 			{subtitle}
-    // 		</div>
-    // 		<div className="buttons">
-    // 			<div className="button no" onClick={() => toast.dismiss(t.id)}>NO</div>
-    // 			<div className="button yes" onClick={async function() {
-    // 				toast.dismiss(t.id)
-    // 				await method()
-    // 			}
-    // 			}>YES</div>
-    //
-    // 		</div>
-    // 	</div >
-    //
-    // ), { id: id, duration: duration })
+    if (type === "") {
+      type = "success";
+    }
+    await toast[type](
+      (t) => (
+        <div className="content">
+          {title && <div className="title">{title}</div>}
+          <div className="subtitle">{subtitle}</div>
+          <div className="buttons">
+            <div className="button no" onClick={() => toast.dismiss(t.id)}>
+              NO
+            </div>
+            <div
+              className="button yes"
+              onClick={async function () {
+                toast.dismiss(t.id);
+                await method();
+              }}
+            >
+              YES
+            </div>
+          </div>
+        </div>
+      ),
+      { id: id, duration: duration },
+    );
   },
   UpdateUser: async () => {
     try {
@@ -603,19 +604,57 @@ export var STATE = {
     STATE.toggleLoading(undefined);
   },
   connectToVPN: async (c, server) => {
-    if (server) {
-      STATE.Config?.Connections?.forEach((con) => {
+    if (!server && !c) {
+      STATE.errorNotification("no server or tunnel given when connecting");
+      return;
+    }
+
+    let user = STORE.GetUser();
+    if (!user.DeviceToken) {
+      STATE.errorNotification("You are not logged in");
+      STORE.Cache.Clear();
+      return;
+    }
+
+    let connectionRequest = {};
+    connectionRequest.UserID = user._id;
+    connectionRequest.DeviceToken = user.DeviceToken.DT;
+
+    if (!c) {
+      STATE.Tunnels?.forEach((con) => {
         if (con.Tag === "tunnels") {
+          connectionRequest.Tag = con.Tag;
+          connectionRequest.EncType = con.EncryptionType;
           c = con;
           return;
         }
       });
+    } else {
+      connectionRequest.Tag = c.Tag;
+      connectionRequest.EncType = c.EncryptionType;
+
+      if (c.ServerIP === "") {
+        STATE.Servers?.forEach((s) => {
+          if (s._id === c.ServerID) server = s;
+          connectionRequest.ServerIP = s.IP;
+          connectionRequest.ServerPort = s.Port;
+          connectionRequest.ServerID = s._id;
+        });
+      } else {
+        connectionRequest.ServerIP = c.ServerIP;
+        connectionRequest.ServerPort = c.ServerPort;
+        connectionRequest.ServerID = c.ServerID;
+      }
     }
 
-    if (!c) {
-      STATE.errorNotification("no connection selected");
-      return;
+    if (server) {
+      connectionRequest.ServerIP = server.IP;
+      connectionRequest.ServerPort = server.Port;
+      connectionRequest.ServerID = server._id;
     }
+
+    console.log("CONR");
+    console.dir(connectionRequest);
 
     try {
       STATE.toggleLoading({
@@ -626,43 +665,7 @@ export var STATE = {
         includeLogs: true,
       });
 
-      let user = STORE.GetUser();
-      if (!user.DeviceToken) {
-        STATE.errorNotification("You are not logged in");
-        STORE.Cache.Clear();
-        return;
-      }
-
       let method = "connect";
-      let connectionRequest = {};
-      connectionRequest.UserID = user._id;
-      connectionRequest.DeviceToken = user.DeviceToken.DT;
-      connectionRequest.Tag = c.Tag;
-      connectionRequest.ServerID = c.ServerID;
-      connectionRequest.EncType = c.EncryptionType;
-      if (server) {
-        connectionRequest.ServerID = server._id;
-        connectionRequest.ServerIP = server.IP;
-        connectionRequest.ServerPort = server.Port;
-      } else if (c) {
-        STATE.PrivateServers?.forEach((s) => {
-          if (s._id === c.ServerID) {
-            connectionRequest.ServerIP = s.IP;
-            connectionRequest.ServerPort = s.Port;
-          }
-        });
-        STATE.Servers?.forEach((s) => {
-          if (s._id === c.ServerID) {
-            connectionRequest.ServerIP = s.IP;
-            connectionRequest.ServerPort = s.Port;
-          }
-        });
-      } else {
-        STATE.errorNotification(
-          "No server or connection defined during connection, please check your settings",
-        );
-      }
-
       let resp = await STATE.API.method(method, connectionRequest);
       if (resp === undefined) {
         STATE.errorNotification("Unknown error, please try again in a moment");
@@ -672,7 +675,7 @@ export var STATE = {
             "Unauthorized, logging you out!",
             undefined,
           );
-          LogOut();
+          STATE.LogoutCurrentToken();
         } else if (resp.status === 200) {
           STATE.successNotification("connection ready");
         }
@@ -680,6 +683,7 @@ export var STATE = {
     } catch (error) {
       console.dir(error);
     }
+
     STATE.toggleLoading(undefined);
     STATE.GetBackendState();
   },
@@ -789,15 +793,15 @@ export var STATE = {
             toks.push(t);
           }
         });
+        u.Tokens = toks;
       }
 
-      u.Tokens = toks;
       STORE.Cache.SetObject("user", u);
       STATE.User = u;
-      STATE.rerender();
     } else {
       STATE.errorNotification("Unable to log out device", undefined);
     }
+    STATE.rerender();
   },
 
   ForwardToController: async (req, loader) => {
@@ -1445,16 +1449,17 @@ export var STATE = {
         {},
         { headers: { "Content-Type": "application/json" } },
       );
+      console.log("RESP");
+      console.dir(response);
 
       if (response.status === 200) {
-        if (response.data !== undefined) {
+        if (response.data) {
           STATE.State = response.data?.State;
           STATE.Config = response.data?.Config;
           STATE.Network = response.data?.Network;
           STATE.User = response.data?.User;
           STATE.Tunnels = response.data?.Tunnels;
           STATE.ActiveTunnels = response.data?.ActiveTunnels;
-          STATE.darkMode = response.data?.State?.DarkMode;
           STATE.Version = response.data?.Version;
           STATE.APIVersion = response.data?.APIVersion;
 
