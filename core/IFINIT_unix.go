@@ -18,7 +18,7 @@ import (
 )
 
 type TunnelInterface struct {
-	tunnel        atomic.Pointer[*Tunnel]
+	tunnel        atomic.Pointer[*TUN]
 	shouldRestart bool
 
 	Name        string

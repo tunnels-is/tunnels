@@ -164,12 +164,12 @@ func (t *TUN) registerPing(ping time.Time) {
 
 type TUN struct {
 	id    string
-	state atomic.Pointer[TunnelState]
+	state atomic.Pointer[TunnelState] `json:"-"`
 	tag   string
 
-	meta atomic.Pointer[TunnelMETA]
+	meta atomic.Pointer[TunnelMETA] `json:"-"`
 	// server atomic.Pointer[any]
-	tunnel atomic.Pointer[TunnelInterface]
+	tunnel atomic.Pointer[TunnelInterface] `json:"-"`
 
 	// encWrapper wraps connection with encryption
 	encWrapper      *crypt.SocketWrapper
@@ -189,8 +189,8 @@ type TUN struct {
 	serverInterfaceIP4bytes [4]byte
 	startPort               uint16
 	endPort                 uint16
-	TCPEgress               map[[10]byte]*Mapping
-	UDPEgress               map[[10]byte]*Mapping
+	TCPEgress               map[[10]byte]*Mapping `json:"-"`
+	UDPEgress               map[[10]byte]*Mapping `json:"-"`
 
 	// Network Natting
 	NATEgress  map[[4]byte][4]byte `json:"-"`
@@ -207,10 +207,9 @@ type TUN struct {
 	VPLIngress  map[[4]byte]struct{} `json:"-"`
 
 	// TCP and UDP Natting
-	TCPPortMap []VPNPort
-	UDPPortMap []VPNPort
+	TCPPortMap []VPNPort `json:"-"`
+	UDPPortMap []VPNPort `json:"-"`
 
-	// TODO ....
 	Index []byte
 
 	// Stats

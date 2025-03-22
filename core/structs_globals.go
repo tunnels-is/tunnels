@@ -34,8 +34,8 @@ type DNSStats struct {
 type ConnectionRequest struct {
 	DeviceKey string `json:"DeviceKey"`
 
-	UserToken string `json:"DeviceToken"`
-	UserID    string `json:"UserID"`
+	DeviceToken string `json:"DeviceToken"`
+	UserID      string `json:"UserID"`
 
 	Tag        string          `json:"Tag"`
 	ServerID   string          `json:"ServerID"`
@@ -50,8 +50,8 @@ type RemoteConnectionRequest struct {
 	DeviceKey string `json:"DeviceKey"`
 
 	// GUI
-	UserToken string `json:"UserToken"`
-	UserID    string `json:"UserID"`
+	DeviceToken string `json:"DeviceToken"`
+	UserID      string `json:"UserID"`
 
 	// General
 	EncType   crypt.EncType   `json:"EncType"`
