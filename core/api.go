@@ -632,15 +632,15 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		meta.Public = false
 	}
 
-	if ClientCR.ServerIP != "" {
+	if ClientCR.ServerIP == "" {
 		ERROR("No Server IPAddress found when connecting: ", ClientCR)
 		return 400, errors.New("no ip address found when connecting")
 	}
-	if ClientCR.ServerPort != "" {
+	if ClientCR.ServerPort == "" {
 		ERROR("No Server Port found when connecting: ", ClientCR)
 		return 400, errors.New("no server port found when connecting")
 	}
-	if ClientCR.ServerID != "" {
+	if ClientCR.ServerID == "" {
 		ERROR("No Server id found when connecting: ", ClientCR)
 		return 400, errors.New("no server id found when connecting")
 	}
@@ -654,7 +654,7 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	FinalCR.SeverID = ClientCR.ServerID
 	FinalCR.CurveType = ClientCR.CurveType
 	FinalCR.DeviceKey = ClientCR.DeviceKey
-	FinalCR.UserToken = ClientCR.UserToken
+	FinalCR.DeviceToken = ClientCR.DeviceToken
 	FinalCR.RequestingPorts = meta.RequestVPNPorts
 
 	DEBUG("ConnectRequestFromClient", ClientCR)
@@ -730,6 +730,7 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	FR.JSONData = FinalCR
 	FR.Timeout = 25000
 
+	fmt.Println("DT:", ClientCR.DeviceToken)
 	bytesFromController, code := ForwardConnectToController(FR)
 	DEBUG("CodeFromController:", code)
 	if code != 200 {
@@ -738,6 +739,7 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		ERROR("ErrFromController:", string(bytesFromController))
 		ER := new(ErrorResponse)
 		err := json.Unmarshal(bytesFromController, ER)
+		fmt.Println("format err:", err)
 		if err != nil {
 			return code, errors.New(ER.Error)
 		} else {
@@ -843,6 +845,7 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	}
 
 	tunnel.tunnel.Store(inter)
+	inter.tunnel.Store(&tunnel)
 	err = inter.Connect(tunnel)
 	if err != nil {
 		ERROR("unable to configure tunnel interface: ", err)
@@ -864,6 +867,7 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	}
 
 	go tunnel.ReadFromServeTunnel()
+	go inter.ReadFromTunnelInterface()
 
 	if tunnel.crReponse.DHCP != nil {
 		err = sendFirewallToServer(

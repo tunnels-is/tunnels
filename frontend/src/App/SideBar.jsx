@@ -166,13 +166,6 @@ const SideBar = () => {
 
   let user = state.User;
 
-  if (user) {
-    let subdate = dayjs(user.SubExpiration);
-    if (subdate.isAfter(dayjs())) {
-      hasSub = true;
-    }
-  }
-
   return (
     <div className="ab sidebar" ref={sideb} id="sidebar">
       {menu.groups.map((g) => {
