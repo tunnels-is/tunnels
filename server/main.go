@@ -149,7 +149,11 @@ func main() {
 	}
 
 	if VPLEnabled {
-		initializeVPL()
+		err = initializeVPL()
+		if err != nil {
+			ERR("unable to initialize VPL")
+			os.Exit(1)
+		}
 	}
 
 	if Config.UserMaxConnections < 1 {
@@ -271,7 +275,10 @@ func initializeVPN() {
 		panic(err)
 	}
 
-	GeneratePortAllocation()
+	err = GeneratePortAllocation()
+	if err != nil {
+		panic(err)
+	}
 	GenerateVPLCoreMappings()
 }
 
@@ -410,6 +417,9 @@ func makeConfigAndCertificates() {
 	}
 
 	serialN, err := certs.ExtractSerialNumberFromCRT(ep + "server.crt")
+	if err != nil {
+		panic(err)
+	}
 	INFO("CERT SERIAL NUMBER: ", serialN)
 	f, err := os.Create(ep + "serial")
 	if err != nil {

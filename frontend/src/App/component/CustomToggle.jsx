@@ -1,27 +1,19 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 
 const CustomToggle = (props) => {
-	if (props.value === undefined) {
-		return (<></>)
-	}
+  if (props.value === undefined) {
+    return <></>;
+  }
 
-	return (
-		<div className="ab custom-toggle">
-			<div className="label">
-				{props?.label}
-			</div>
+  return (
+    <div className="ab custom-toggle">
+      <div className="label">{props?.label}</div>
 
-			<div
-				onClick={() => props.toggle()}
-				className="slider">
-				<div
-					className={`nob ${String(props.value)}`}
-				></div>
-			</div>
+      <div onClick={() => props.toggle()} className="slider">
+        <div className={`nob ${String(props.value)}`}></div>
+      </div>
+    </div>
+  );
+};
 
-
-		</div >
-	)
-}
-
-export default CustomToggle
+export default CustomToggle;

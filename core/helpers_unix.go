@@ -25,8 +25,7 @@ func openURL(url string) error {
 }
 
 func OSSpecificInit() error {
-	AdjustRoutersForTunneling()
-	return nil
+	return AdjustRoutersForTunneling()
 }
 
 func ValidateAdapterID(meta *TunnelMETA) error {
@@ -72,24 +71,16 @@ func InitBaseFoldersAndPaths() {
 
 	s.BlockListPath = s.BasePath + "blocklists" + string(os.PathSeparator)
 	CreateFolder(s.BlockListPath)
-
-	return
 }
 
 func CreateFile(file string) (f *os.File, err error) {
 	f, err = os.OpenFile(file, os.O_APPEND|os.O_CREATE|os.O_RDWR, 0o777)
 	if err != nil {
-		ERROR("Unable to create file: ", err)
+		ERROR("Unable to open file: ", err)
 		return
 	}
 
-	// err = os.Chmod(file, 0o777)
-	// if err != nil {
-	// 	ERROR("Unable to change ownership of file: ", err)
-	// 	return
-	// }
-
-	DEBUG("New file created: ", f.Name())
+	DEBUG("New file opened: ", f.Name())
 	return
 }
 

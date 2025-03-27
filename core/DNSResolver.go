@@ -97,7 +97,7 @@ func StartUDPDNSHandler() {
 }
 
 func ResolveDomainLocal(tun *TUN, m *dns.Msg, w dns.ResponseWriter) {
-	if len(tun.crReponse.DNSServers) == 0 {
+	if len(tun.CRReponse.DNSServers) == 0 {
 		return
 	}
 
@@ -125,12 +125,12 @@ func ResolveDomainLocal(tun *TUN, m *dns.Msg, w dns.ResponseWriter) {
 		}
 	}()
 
-	r, _, err = tun.localDNSClient.Exchange(m, tun.crReponse.DNSServers[0]+":53")
-	server = tun.crReponse.DNSServers[0]
+	r, _, err = tun.localDNSClient.Exchange(m, tun.CRReponse.DNSServers[0]+":53")
+	server = tun.CRReponse.DNSServers[0]
 
-	if err != nil && len(tun.crReponse.DNSServers) > 1 {
-		r, _, err = tun.localDNSClient.Exchange(m, tun.crReponse.DNSServers[1]+":53")
-		server = tun.crReponse.DNSServers[1]
+	if err != nil && len(tun.CRReponse.DNSServers) > 1 {
+		r, _, err = tun.localDNSClient.Exchange(m, tun.CRReponse.DNSServers[1]+":53")
+		server = tun.CRReponse.DNSServers[1]
 	}
 
 	if err != nil {
@@ -294,11 +294,11 @@ func DNSQuery(w dns.ResponseWriter, m *dns.Msg) {
 			return true
 		}
 
-		if tun.crReponse == nil {
+		if tun.CRReponse == nil {
 			return true
 		}
 
-		ServerDNS = DNSAMapping(tun.crReponse.DNS, m.Question[0].Name)
+		ServerDNS = DNSAMapping(tun.CRReponse.DNS, m.Question[0].Name)
 		if ServerDNS != nil {
 			DNSTunnel = tun
 			return false
@@ -472,9 +472,10 @@ func isBlocked(m *dns.Msg) (ok bool, tag string) {
 		return true, ""
 	}
 
-	tagint, ok := bl.Load(name)
-	if ok {
-		tag = tagint.(string)
+	tagString, ok := bl.Load(name)
+	if ok && tagString != nil {
+		bl := tagString.(*BlockList)
+		tag = bl.Tag
 	}
 
 	return ok, tag

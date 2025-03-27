@@ -161,11 +161,17 @@ func HTTPhandler(w http.ResponseWriter, r *http.Request) {
 	case "deleteTunnel":
 		HTTP_DeleteTunnels(w, r)
 		return
+	case "setUser":
+		HTTP_SetUser(w, r)
+		return
+	case "getUser":
+		HTTP_GetUser(w, r)
+		return
+	case "delUser":
+		HTTP_DelUser(w, r)
+		return
 	case "getState":
 		HTTP_GetState(w, r)
-		return
-	case "logout":
-		HTTP_Logout(w, r)
 		return
 	case "setConfig":
 		HTTP_SetConfig(w, r)
@@ -175,6 +181,7 @@ func HTTPhandler(w http.ResponseWriter, r *http.Request) {
 		return
 	default:
 	}
+
 	w.WriteHeader(200)
 	r.Body.Close()
 }
@@ -182,12 +189,15 @@ func HTTPhandler(w http.ResponseWriter, r *http.Request) {
 var LogSocket *websocket.Conn
 
 func handleWebSocket(ws *websocket.Conn) {
-	defer RecoverAndLogToFile()
 	defer func() {
+		if r := recover(); r != nil {
+			ERROR("Possible UI reload: ", r, string(debug.Stack()))
+		}
 		if ws != nil {
 			ws.Close()
 		}
 	}()
+
 	LogSocket = ws
 	for event := range APILogQueue {
 		err := websocket.Message.Send(ws, event)
@@ -214,20 +224,27 @@ func STRING(w http.ResponseWriter, r *http.Request, code int, data string) {
 }
 
 func JSON(w http.ResponseWriter, r *http.Request, code int, data any) {
+	if data == nil {
+		w.WriteHeader(200)
+		return
+	}
 	defer RecoverAndLogToFile()
 	defer func() {
 		if r.Body != nil {
 			r.Body.Close()
 		}
 	}()
-	w.WriteHeader(code)
-	encoder := json.NewEncoder(w)
-	err := encoder.Encode(data)
+
+	outb, err := json.Marshal(data)
 	if err != nil {
-		_, _ = w.Write([]byte("encoding error"))
 		ERROR("Unable to write encoded json to response writer:", err)
+		w.WriteHeader(500)
+		_, _ = w.Write([]byte(err.Error()))
 		return
 	}
+
+	w.WriteHeader(code)
+	_, _ = w.Write(outb)
 }
 
 type StateResponse struct {
@@ -235,7 +252,6 @@ type StateResponse struct {
 	APIVersion    int
 	Config        *configV2
 	State         *stateV2
-	User          *User
 	Tunnels       []*TunnelMETA
 	ActiveTunnels []*TUN
 	Network       StateNetworkResponse
@@ -252,10 +268,32 @@ func HTTP_GetState(w http.ResponseWriter, r *http.Request) {
 	JSON(w, r, 200, GetFullState())
 }
 
-func HTTP_Logout(w http.ResponseWriter, r *http.Request) {
-	state := STATE.Load()
-	state.user.Store(nil)
+func HTTP_SetUser(w http.ResponseWriter, r *http.Request) {
+	u := new(User)
+	err := Bind(u, r)
+	if err != nil {
+		JSON(w, r, 400, err)
+		return
+	}
+	err = saveUser(u)
+	if err != nil {
+		JSON(w, r, 400, err)
+		return
+	}
 	JSON(w, r, 200, nil)
+}
+
+func HTTP_DelUser(w http.ResponseWriter, r *http.Request) {
+	JSON(w, r, 200, delUser())
+}
+
+func HTTP_GetUser(w http.ResponseWriter, r *http.Request) {
+	u, err := loadUser()
+	if err != nil {
+		JSON(w, r, 400, err)
+		return
+	}
+	JSON(w, r, 200, u)
 }
 
 func GetFullState() (s *StateResponse) {
@@ -269,7 +307,6 @@ func GetFullState() (s *StateResponse) {
 	s = new(StateResponse)
 	s.Version = version
 	s.APIVersion = apiVersion
-	s.User = state.user.Load()
 	s.Config = CONFIG.Load()
 	s.State = state
 
@@ -296,8 +333,6 @@ func GetFullState() (s *StateResponse) {
 		s.ActiveTunnels = append(s.ActiveTunnels, tun)
 		return true
 	})
-	fmt.Println("RETURNING STATE:")
-	fmt.Println(s)
 	return
 }
 
@@ -355,6 +390,21 @@ func HTTP_SetTunnel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	isConnected := false
+	tunnelMapRange(func(t *TUN) bool {
+		if t.CR != nil {
+			if t.CR.Tag == newForm.Meta.Tag {
+				isConnected = true
+				return false
+			}
+		}
+		return true
+	})
+	if isConnected {
+		JSON(w, r, 400, "tunnel is connected")
+		return
+	}
+
 	errors := validateTunnelMeta(newForm.Meta)
 	if len(errors) > 0 {
 		JSON(w, r, 400, errors)
@@ -377,7 +427,7 @@ func HTTP_SetTunnel(w http.ResponseWriter, r *http.Request) {
 					meta := tun.meta.Load()
 					if meta.Tag == newForm.OldTag {
 						sendFirewallToServer(
-							tun.cr.ServerIP,
+							tun.CR.ServerIP,
 							tun.dhcp.Token,
 							net.IP(tun.dhcp.IP[:]).String(),
 							newForm.Meta.AllowedHosts,
@@ -446,7 +496,12 @@ func HTTP_GetQRCode(w http.ResponseWriter, r *http.Request) {
 }
 
 func HTTP_CreateTunnel(w http.ResponseWriter, r *http.Request) {
-	JSON(w, r, 200, createRandomTunnel())
+	tun, err := createRandomTunnel()
+	if err != nil {
+		JSON(w, r, 400, err)
+		return
+	}
+	JSON(w, r, 200, tun)
 }
 
 func HTTP_DeleteTunnels(w http.ResponseWriter, r *http.Request) {

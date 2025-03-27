@@ -17,7 +17,7 @@ import (
 	"github.com/vishvananda/netlink"
 )
 
-type TunnelInterface struct {
+type TInterface struct {
 	tunnel        atomic.Pointer[*TUN]
 	shouldRestart bool
 
@@ -37,7 +37,7 @@ type TunnelInterface struct {
 	FD         uintptr
 }
 
-func (t *TunnelInterface) Close() error {
+func (t *TInterface) Close() error {
 	if t.RWC != nil {
 		return t.RWC.Close()
 	}
@@ -46,7 +46,7 @@ func (t *TunnelInterface) Close() error {
 
 func CreateNewTunnelInterface(
 	meta *TunnelMETA,
-) (IF *TunnelInterface, err error) {
+) (IF *TInterface, err error) {
 	defer RecoverAndLogToFile()
 
 	// Some kernels seem to not be compiled with
@@ -57,7 +57,7 @@ func CreateNewTunnelInterface(
 		createDevNetTun()
 	}
 
-	IF = &TunnelInterface{
+	IF = &TInterface{
 		Name:          meta.IFName,
 		IPv4Address:   meta.IPv4Address,
 		NetMask:       meta.NetMask,
@@ -85,7 +85,7 @@ type syscallCreateIF struct {
 	pad   [0x28 - 0x10 - 2]byte
 }
 
-func (t *TunnelInterface) Create() (err error) {
+func (t *TInterface) Create() (err error) {
 	if t.TunnelFile == "" {
 		t.TunnelFile = "/dev/net/tun"
 	}
@@ -146,7 +146,7 @@ type syscallAddAddrV4 struct {
 	syscall.RawSockaddrInet4
 }
 
-func (t *TunnelInterface) Addr() (err error) {
+func (t *TInterface) Addr() (err error) {
 	var ifr syscallAddAddrV4
 	ifr.Port = 0
 	ifr.Family = syscall.AF_INET
@@ -164,7 +164,7 @@ func (t *TunnelInterface) Addr() (err error) {
 	return
 }
 
-func (t *TunnelInterface) Up() (err error) {
+func (t *TInterface) Up() (err error) {
 	var ifr syscallSetFlags
 
 	copy(ifr.Name[:], []byte(t.Name))
@@ -180,7 +180,7 @@ func (t *TunnelInterface) Up() (err error) {
 	return
 }
 
-func (t *TunnelInterface) Down() (err error) {
+func (t *TInterface) Down() (err error) {
 	var ifr syscallSetFlags
 
 	copy(ifr.Name[:], []byte(t.Name))
@@ -201,7 +201,7 @@ type syscallChangeMTU struct {
 	MTU  int32
 }
 
-func (t *TunnelInterface) SetMTU() (err error) {
+func (t *TInterface) SetMTU() (err error) {
 	var ifr syscallChangeMTU
 	copy(ifr.Name[:], []byte(t.Name))
 	ifr.MTU = t.MTU
@@ -221,7 +221,7 @@ type syscallChangeTXQueueLen struct {
 	TxQueueLen int32
 }
 
-func (t *TunnelInterface) SetTXQueueLen() (err error) {
+func (t *TInterface) SetTXQueueLen() (err error) {
 	var ifr syscallChangeTXQueueLen
 	copy(ifr.Name[:], []byte(t.Name))
 	ifr.TxQueueLen = t.TxQueuelen
@@ -236,7 +236,7 @@ func (t *TunnelInterface) SetTXQueueLen() (err error) {
 	return
 }
 
-func (t *TunnelInterface) Netmask() (err error) {
+func (t *TInterface) Netmask() (err error) {
 	var ifr syscallAddAddrV4
 	ifr.Port = 0
 	ifr.Family = syscall.AF_INET
@@ -254,7 +254,7 @@ func (t *TunnelInterface) Netmask() (err error) {
 	return
 }
 
-func (t *TunnelInterface) Delete() (err error) {
+func (t *TInterface) Delete() (err error) {
 	var ifr syscallSetFlags
 	DOR := 1 << 17
 
@@ -312,7 +312,7 @@ func (t *TunnelInterface) Delete() (err error) {
 // 	return
 // }
 
-func (t *TunnelInterface) Connect(tun *TUN) (err error) {
+func (t *TInterface) Connect(tun *TUN) (err error) {
 	// if !t.Persistent {
 	err = t.Addr()
 	if err != nil {
@@ -339,18 +339,19 @@ func (t *TunnelInterface) Connect(tun *TUN) (err error) {
 		}
 	}
 
-	for _, n := range tun.crReponse.Networks {
-		t.addRoutes(n)
+	for _, n := range tun.CRReponse.Networks {
+		_ = t.addRoutes(n)
+
 	}
 
-	if tun.crReponse.VPLNetwork != nil {
-		t.addRoutes(tun.crReponse.VPLNetwork)
+	if tun.CRReponse.VPLNetwork != nil {
+		_ = t.addRoutes(tun.CRReponse.VPLNetwork)
 	}
 
 	return
 }
 
-func (t *TunnelInterface) addRoutes(n *ServerNetwork) (err error) {
+func (t *TInterface) addRoutes(n *ServerNetwork) (err error) {
 	if n.Nat != "" {
 		err = IP_AddRoute(n.Nat, "", t.IPv4Address, "0")
 		if err != nil {
@@ -371,7 +372,7 @@ func (t *TunnelInterface) addRoutes(n *ServerNetwork) (err error) {
 	return nil
 }
 
-func (t *TunnelInterface) deleteRoutes(n *ServerNetwork) (err error) {
+func (t *TInterface) deleteRoutes(n *ServerNetwork) (err error) {
 	if n.Nat != "" {
 		err = IP_DelRoute(n.Nat, t.IPv4Address, "0")
 		if err != nil {
@@ -393,15 +394,15 @@ func (t *TunnelInterface) deleteRoutes(n *ServerNetwork) (err error) {
 	return nil
 }
 
-func (t *TunnelInterface) Disconnect(tun *TUN) (err error) {
+func (t *TInterface) Disconnect(tun *TUN) (err error) {
 	defer RecoverAndLogToFile()
 
-	for _, n := range tun.crReponse.Networks {
-		t.deleteRoutes(n)
+	for _, n := range tun.CRReponse.Networks {
+		_ = t.deleteRoutes(n)
 	}
 
-	if tun.crReponse.VPLNetwork != nil {
-		t.deleteRoutes(tun.crReponse.VPLNetwork)
+	if tun.CRReponse.VPLNetwork != nil {
+		_ = t.deleteRoutes(tun.CRReponse.VPLNetwork)
 	}
 
 	if tun.connection != nil {
@@ -520,9 +521,12 @@ func IP_AddRoute(
 
 	r := new(netlink.Route)
 	if network == "default" {
-		_, r.Dst, err = net.ParseCIDR("0.0.0.0/0")
+		_, r.Dst, _ = net.ParseCIDR("0.0.0.0/0")
 	} else {
 		_, r.Dst, err = net.ParseCIDR(network)
+		if err != nil {
+			return err
+		}
 	}
 
 	r.Priority = mInt
@@ -579,9 +583,12 @@ func IP_DelRoute(network string, gateway string, metric string) (err error) {
 
 	r := new(netlink.Route)
 	if network == "default" {
-		_, r.Dst, err = net.ParseCIDR("0.0.0.0/0")
+		_, r.Dst, _ = net.ParseCIDR("0.0.0.0/0")
 	} else {
 		_, r.Dst, err = net.ParseCIDR(network)
+		if err != nil {
+			return err
+		}
 	}
 
 	r.Priority = mInt
@@ -613,7 +620,7 @@ func IPv6Enabled() bool {
 
 	out, err := exec.Command("bash", "-c", "cat /proc/sys/net/ipv6/conf/"+*defIntName+"/disable_ipv6").CombinedOutput()
 	if err != nil {
-		ERROR("Error getting ipv6 settings for interface: ", s.DefaultInterfaceName, " || msg: ", err, " || output: ", string(out))
+		ERROR("Error getting ipv6 settings for interface: ", s.DefaultInterfaceName.Load(), " || msg: ", err, " || output: ", string(out))
 		return true
 	}
 

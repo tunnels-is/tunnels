@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-func (T *TunnelInterface) ReadFromTunnelInterface() {
+func (T *TInterface) ReadFromTunnelInterface() {
 	defer func() {
 		if r := recover(); r != nil {
 			ERROR(r, string(debug.Stack()))
@@ -26,7 +26,7 @@ func (T *TunnelInterface) ReadFromTunnelInterface() {
 		sendRemote   bool
 		tempBytes    = make([]byte, 500000)
 		Tun          *TUN
-		out          = make([]byte, 500000)
+		out          []byte
 	)
 
 	Tun = *T.tunnel.Load()
