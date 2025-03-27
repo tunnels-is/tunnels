@@ -22,7 +22,7 @@ func (t *TUN) RegisterPing(packet []byte) {
 	t.MEM = packet[1]
 	t.DISK = packet[2]
 	if len(packet) > 10 {
-		t.serverToClientMicro = time.Since(time.Unix(0, int64(binary.BigEndian.Uint64(packet[3:])))).Microseconds()
+		t.ServerToClientMicro.Store(time.Since(time.Unix(0, int64(binary.BigEndian.Uint64(packet[3:])))).Microseconds())
 	}
 }
 

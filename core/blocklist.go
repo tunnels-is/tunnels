@@ -7,18 +7,18 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"runtime"
 	"strings"
 	"sync"
 	"time"
 )
 
-func reloadBlockLists() {
+func reloadBlockLists(sleep bool, saveConfig bool) {
 	defer func() {
-		time.Sleep(1 * time.Hour)
+		if sleep {
+			time.Sleep(1 * time.Hour)
+		}
 	}()
 	defer RecoverAndLogToFile()
-	defer runtime.GC()
 	config := CONFIG.Load()
 
 	if config.DisableBlockLists {
@@ -31,17 +31,19 @@ func reloadBlockLists() {
 
 	newMap := new(sync.Map)
 
-	DEBUG("Updating DNS Blocklists...")
 	wg := new(sync.WaitGroup)
 	for i := range config.DNSBlockLists {
 		wg.Add(1)
 		go processBlockList(i, wg, newMap)
 	}
 	wg.Wait()
+	DEBUG("finished updating blocklists")
 	DNSBlockList.Store(newMap)
-	err := writeConfigToDisk()
-	if err != nil {
-		ERROR("unable to write config to disk post blocklist update", err)
+	if saveConfig {
+		err := writeConfigToDisk()
+		if err != nil {
+			ERROR("unable to write config to disk post blocklist update", err)
+		}
 	}
 }
 
@@ -74,13 +76,34 @@ func processBlockList(index int, wg *sync.WaitGroup, nm *sync.Map) {
 				return
 			}
 			defer listFile.Close()
+			_ = listFile.Truncate(0)
+			_, err = listFile.Write(listBytes)
+			if err != nil {
+				ERROR("unable to write dns block list:", err)
+			}
 			bl.Disk = listFile.Name()
 		}
 	} else if bl.Disk != "" {
 		listBytes, err = os.ReadFile(bl.Disk)
 		if err != nil {
-			ERROR("Could not open", bl.URL, err)
-			return
+			listBytes, err = downloadList(bl.URL)
+			if err != nil {
+				ERROR("Could not download", bl.URL, err)
+				return
+			}
+
+			listFile, err = CreateFile(state.BlockListPath + bl.Tag + ".txt")
+			if err != nil {
+				ERROR("Could not save", bl.URL, err)
+				return
+			}
+			defer listFile.Close()
+			_ = listFile.Truncate(0)
+			_, err = listFile.Write(listBytes)
+			if err != nil {
+				ERROR("unable to write dns block list:", err)
+			}
+			bl.Disk = listFile.Name()
 		}
 	}
 

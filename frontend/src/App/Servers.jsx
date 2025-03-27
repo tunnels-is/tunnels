@@ -45,7 +45,7 @@ const Servers = () => {
       };
 
       state.ActiveTunnels?.forEach((x) => {
-        if (x.ServerID === server._id) {
+        if (x.CR?.ServerID === server._id) {
           con = x;
           return;
         }

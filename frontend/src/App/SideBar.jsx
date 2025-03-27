@@ -1,10 +1,9 @@
 import { useNavigate, useLocation } from "react-router-dom";
-import React, { useEffect, useRef } from "react";
+import React, { useRef } from "react";
 
 import {
   AccessibilityIcon,
   GearIcon,
-  GlobeIcon,
   HomeIcon,
   InfoCircledIcon,
   LayersIcon,
@@ -13,11 +12,11 @@ import {
   PersonIcon,
   Share1Icon,
   GitHubLogoIcon,
-  DimensionsIcon,
+  LockClosedIcon,
+  ContainerIcon,
 } from "@radix-ui/react-icons";
 
 import GLOBAL_STATE from "../state";
-import dayjs from "dayjs";
 
 const IconWidth = 23;
 const IconHeight = 23;
@@ -27,30 +26,7 @@ const SideBar = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const sideb = useRef(null);
-
-  const captureM = (e) => {
-    // if (e.keyCode === 77){
-    // 	console.dir(e)
-    // 	let removed = false
-    // 	sideb?.current?.classList?.forEach(c => {
-    // 		if (c==="showsidebar"){
-    // 			sideb.current.classList.remove("showsidebar")
-    // 			removed = true
-    // 		}
-    // 	})
-    // 	if (!removed){
-    // 			sideb.current.classList.add("showsidebar")
-    //
-    // 	}
-    // }
-  };
-
   const state = GLOBAL_STATE("sidebar");
-
-  useEffect(() => {
-    document.removeEventListener("keydown", captureM);
-    document.addEventListener("keydown", captureM);
-  }, []);
 
   const OpenWindowURL = (url) => {
     window.open(url, "_blank");
@@ -98,14 +74,19 @@ const SideBar = () => {
         title: "Servers",
         user: true,
         items: [
-          { icon: GlobeIcon, label: "Public", route: "public", user: true },
-          { icon: MobileIcon, label: "Private", route: "private", user: true },
+          { icon: MobileIcon, label: "Public", route: "public", user: true },
+          {
+            icon: LockClosedIcon,
+            label: "Private",
+            route: "private",
+            user: true,
+          },
         ],
       },
       {
         title: "DNS",
         items: [
-          { icon: DimensionsIcon, label: "Proxy", route: "dns", user: false },
+          { icon: ContainerIcon, label: "Server", route: "dns", user: false },
           {
             icon: LayersIcon,
             label: "Records",
@@ -165,7 +146,6 @@ const SideBar = () => {
   };
 
   let user = state.User;
-
   return (
     <div className="ab sidebar" ref={sideb} id="sidebar">
       {menu.groups.map((g) => {

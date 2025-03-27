@@ -48,6 +48,71 @@ export var STATE = {
   // NEW
   // NEW
   // NEW
+  GetUser: async () => {
+    try {
+      let user = STORE.Cache.GetObject("user");
+      if (!user) {
+        user = await STATE.LoadUser();
+        console.log("POST FETCH");
+        console.dir(user);
+        if (user) {
+          STORE.Cache.SetObject("user", user);
+        }
+      }
+      if (user) {
+        STATE.User = user;
+      }
+      return user;
+    } catch (err) {
+      console.dir(err);
+    }
+  },
+  v2_SetUser: async (u, saveToDisk) => {
+    try {
+      console.log("SETTING USER");
+      console.dir(u);
+      STATE.User = u;
+      STORE.Cache.SetObject("user", u);
+      if (saveToDisk) {
+        STATE.SaveUser(u);
+      }
+      return u;
+    } catch (err) {
+      console.dir(err);
+      STORE.Cache.interface = window.sessionStorage;
+    }
+  },
+  DelUser: async () => {
+    try {
+      console.log("DELETING USER FROM DISK");
+      await STATE.API.method("delUser", null, true, 10000, false);
+    } catch (error) {
+      STATE.toggleError("unable to delete encrypted user from disk");
+    }
+  },
+  SaveUser: async (user) => {
+    try {
+      await STATE.API.method("setUser", user, true, 10000, false);
+    } catch (error) {
+      STATE.toggleError("unable to save encrypted user to disk");
+    }
+  },
+  LoadUser: async () => {
+    try {
+      let resp = await STATE.API.method("getUser", null, true, 10000, true);
+      console.log("LOAD USER");
+      console.dir(resp);
+      if (resp?.status === 200 && resp.data) {
+        return resp.data;
+      } else {
+        return undefined;
+      }
+    } catch (error) {
+      STATE.toggleError("unable to get encrypted user from disk");
+      return undefined;
+    }
+  },
+  v2_Cleanup: () => {},
   v2_TunnelDelete: async (tun) => {
     try {
       STATE.toggleLoading({
@@ -111,16 +176,14 @@ export var STATE = {
         msg: "Saving config..",
       });
 
-      let resp = await STATE.API.method("setConfig", newConfig);
+      let resp = await STATE.API.method("setConfig", newConfig, 120000, false);
       if (resp === undefined) {
         STATE.errorNotification("Unknown error, please try again in a moment");
       } else if (resp.status === 200) {
         STORE.Cache.SetObject("config", newConfig);
-        STORE.Cache.Set("darkMode", newConfig.DarkMode);
         STATE.Config = newConfig;
         STATE.successNotification("Config saved", undefined);
         STORE.Cache.Set("modified_Config", false);
-        // STATE.SetConfigModifiedState(false)
       }
     } catch (error) {
       console.dir(error);
@@ -182,6 +245,7 @@ export var STATE = {
       }
     } catch (error) {
       console.dir(error);
+      STATE.toggleError("unable to create tunnel");
     }
   },
   debug: STORE.Cache.GetBool("debug"),
@@ -267,35 +331,6 @@ export var STATE = {
   },
   successNotification: (e) => {
     toast.success(e);
-  },
-  // UTILITY
-  resetApp: async () => {
-    try {
-      await STATE.ConfirmAndExecute(
-        "",
-        "resetAll",
-        15000,
-        "This will disconnect Tunnels and reset everything",
-        "Are you sure ?",
-        async function () {
-          STATE.toggleLoading({
-            logTag: "reset",
-            tag: "reset",
-            show: true,
-            msg: "Reseting Tunnels...",
-            includeLogs: false,
-          });
-          await STATE.API.method("resetNetwork", {});
-          STATE.toggleLoading(undefined);
-        },
-      );
-    } catch (error) {
-      console.dir(error);
-    }
-
-    STATE.toggleLoading(undefined);
-    STORE.Cache.Clear();
-    window.close();
   },
   User: STORE.Cache.GetObject("user"),
   modifiedUser: STORE.Cache.GetObject("modifiedUser"),
@@ -395,10 +430,6 @@ export var STATE = {
         STORE.Cache.SetObject("config", newConfig);
         STORE.Cache.Set("darkMode", newConfig.DarkMode);
         STATE.Config = newConfig;
-        // STATE.RemoveModifiedConfig()
-        // STATE.RemoveModifiedLists()
-        // STATE.successNotification("Config saved", undefined)
-        // STATE.SetConfigModifiedState(false)
       }
     } catch (error) {
       console.dir(error);
@@ -407,19 +438,12 @@ export var STATE = {
     STATE.globalRerender();
     return success;
   },
-  RemoveModifiedLists: () => {
-    STATE.modifiedLists = undefined;
-    STATE.SaveModifiedLists();
-  },
   RemoveModifiedConfig: () => {
     STATE.modifiedConfig = undefined;
     STATE.modifiedLists = undefined;
     STATE.ConfigSaveModifiedSate();
     STATE.SetConfigModifiedState(false);
     STATE.globalRerender();
-  },
-  SaveModifiedLists: () => {
-    STORE.Cache.SetObject("modifiedLists", STATE.modifiedLists);
   },
   ConfigSaveModifiedSate: () => {
     STORE.Cache.SetObject("modifiedConfig", STATE.modifiedConfig);
@@ -609,7 +633,7 @@ export var STATE = {
       return;
     }
 
-    let user = STORE.GetUser();
+    let user = await STATE.GetUser();
     if (!user.DeviceToken) {
       STATE.errorNotification("You are not logged in");
       STORE.Cache.Clear();
@@ -703,7 +727,6 @@ export var STATE = {
           Body: "You have been disconnected from " + c.Tag,
           TimeoutType: "default",
         });
-        STORE.CleanupOnDisconnect();
       }
     } catch (error) {
       console.dir(error);
@@ -713,6 +736,7 @@ export var STATE = {
     STATE.GetBackendState();
   },
   FinalizeLogout: async () => {
+    STATE.DelUser();
     STORE.Cache.Clear();
     STATE.GetBackendState();
     window.location.replace("/#/login");
@@ -1144,18 +1168,17 @@ export var STATE = {
       },
     );
   },
-  Login: async (inputs) => {
+  Login: async (inputs, remember) => {
     STATE.toggleLoading({
       tag: "login",
       show: true,
       msg: "logging you in...",
     });
 
-    let token = STORE.Cache.Get(inputs["email"] + "_" + "TOKEN");
-
-    if (token !== null) {
-      inputs.DeviceToken = token;
-    }
+    // let token = STORE.Cache.Get(inputs["email"] + "_" + "TOKEN");
+    // if (token !== null) {
+    //   inputs.DeviceToken = token;
+    // }
 
     let FR = {
       Path: "v3/user/login",
@@ -1166,18 +1189,13 @@ export var STATE = {
       SyncUser: true,
     };
 
-    STORE.Cache.Set("default-device-name", inputs["devicename"]);
+    STORE.Local.setItem("default-device-name", inputs["devicename"]);
     STORE.Cache.Set("default-email", inputs["email"]);
 
     let x = await STATE.API.method("forwardToController", FR, true);
 
-    console.log("DONE LOGIN");
-    console.dir(x);
     if (x?.status === 200) {
-      STORE.Cache.Set(inputs["email"] + "_" + "TOKEN", x.data.DeviceToken.DT);
-
-      STATE.User = x.data;
-      STORE.Cache.SetObject("user", x.data);
+      STATE.v2_SetUser(x.data, remember);
       STATE.toggleLoading(undefined);
       window.location.replace("/");
     }
@@ -1457,7 +1475,7 @@ export var STATE = {
           STATE.State = response.data?.State;
           STATE.Config = response.data?.Config;
           STATE.Network = response.data?.Network;
-          STATE.User = response.data?.User;
+          // STATE.User = response.data?.User;
           STATE.Tunnels = response.data?.Tunnels;
           STATE.ActiveTunnels = response.data?.ActiveTunnels;
           STATE.Version = response.data?.Version;
@@ -1467,9 +1485,9 @@ export var STATE = {
           STORE.Cache.SetObject("tunnels", STATE.Tunnels);
           STORE.Cache.SetObject("state", STATE.State);
           STORE.Cache.SetObject("config", STATE.Config);
-          STORE.Cache.SetObject("user", STATE.User);
 
-          STORE.Cache.Set("darkMode", STATE.Config.DarkMode);
+          // STORE.Cache.SetObject("user", STATE.User);
+          // STORE.Cache.Set("darkMode", STATE.Config.DarkMode);
         }
 
         STATE.globalRerender();
@@ -1485,7 +1503,7 @@ export var STATE = {
     }
   },
   API: {
-    async method(method, data, noLogout, timeout) {
+    async method(method, data, noLogout, timeout, ignoreError) {
       try {
         let response = undefined;
         let host = STATE.GetURL();
@@ -1509,6 +1527,8 @@ export var STATE = {
           timeout: to,
           headers: { "Content-Type": "application/json" },
         });
+        console.log("CON RESPONSE");
+        console.dir(response);
 
         if (response.data?.Message) {
           STATE.successNotification(response?.data?.Message);
@@ -1519,25 +1539,41 @@ export var STATE = {
         return response;
       } catch (error) {
         console.dir(error);
-
-        if (!noLogout || noLogout === false) {
-          if (error?.response?.status === 401) {
-            STATE.LogoutCurrentToken();
-            return;
-          }
+        if (error?.message === "Network Error") {
+          STATE.successNotification("Tunnel connected, network changed");
+          return undefined;
         }
 
-        if (error?.response?.data?.Message) {
-          STATE.errorNotification(error?.response?.data?.Message);
-        } else if (error?.response?.data?.Error) {
-          STATE.errorNotification(error?.response?.data?.Error);
-        } else if (error?.response?.data?.error) {
-          STATE.errorNotification(error?.response?.data.error);
-        } else {
-          if (typeof error?.response?.data === "string") {
-            STATE.errorNotification(error?.response?.data);
+        if (!ignoreError) {
+          if (!noLogout || noLogout === false) {
+            if (error?.response?.status === 401) {
+              STATE.LogoutCurrentToken();
+              return;
+            }
+          }
+
+          if (error?.response?.data?.Message) {
+            STATE.errorNotification(error?.response?.data?.Message);
+          } else if (error?.response?.data?.Error) {
+            STATE.errorNotification(error?.response?.data?.Error);
+          } else if (error?.response?.data?.error) {
+            STATE.errorNotification(error?.response?.data.error);
           } else {
-            STATE.errorNotification("Unknown error");
+            console.log(typeof error.response.data);
+            console.dir(error.response.data);
+            if (typeof error?.response?.data === "string") {
+              STATE.errorNotification(error?.response?.data);
+            } else {
+              try {
+                let out = "";
+                error?.response?.data?.forEach((err) => {
+                  out = out + err + ".\n";
+                });
+                STATE.errorNotification(out);
+              } catch (error) {
+                STATE.errorNotification("Unknown error");
+              }
+            }
           }
         }
 

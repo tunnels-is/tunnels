@@ -132,7 +132,7 @@ func sendFirewallToServer(serverIP string, DHCPToken string, DHCPIP string, allo
 	return nil
 }
 
-func SendRequestToController(method string, route string, data interface{}, timeoutMS int) ([]byte, int, error) {
+func SendRequestToController(method string, route string, data any, timeoutMS int) ([]byte, int, error) {
 	defer RecoverAndLogToFile()
 
 	var body []byte
@@ -257,34 +257,16 @@ func ForwardToController(FR *FORWARD_REQUEST) (any, int) {
 		}
 	}
 
-	if FR.SyncUser {
-		if len(responseBytes) != 0 && code == 200 {
-			user := new(User)
-			err = json.Unmarshal(responseBytes, user)
-			if err != nil {
-				ERROR("login detected but not registered in background service: ", err)
-			} else {
-				state := STATE.Load()
-				state.user.Store(user)
-				DEBUG("login registered in background service")
-			}
-
-		}
-	} else if FR.LogoutUser {
-		state := STATE.Load()
-		state.user.Store(nil)
-	}
-
 	return respJSON, code
 }
 
 var AZ_CHAR_CHECK = regexp.MustCompile(`^[a-zA-Z0-9]*$`)
 
-func validateTunnelMeta(tun *TunnelMETA) (err []error) {
+func validateTunnelMeta(tun *TunnelMETA) (err []string) {
 	ifnamemap := make(map[string]struct{})
 	ifFail := AZ_CHAR_CHECK.MatchString(tun.IFName)
 	if !ifFail {
-		err = append(err, errors.New("tunnel names can only contain a-z A-Z 0-9, invalid name: "+tun.IFName))
+		err = append(err, "tunnel names can only contain a-z A-Z 0-9, invalid name: "+tun.IFName)
 	}
 
 	tunnelMetaMapRange(func(t *TunnelMETA) bool {
@@ -298,18 +280,18 @@ func validateTunnelMeta(tun *TunnelMETA) (err []error) {
 	_, ok := ifnamemap[strings.ToLower(tun.IFName)]
 	if ok {
 		err = append(err,
-			errors.New("you cannot have two tunnels with the same interface name: "+tun.IFName),
+			"you cannot have two tunnels with the same interface name: "+tun.IFName,
 		)
 	}
 
 	if len(tun.IFName) < 3 {
-		err = append(err, fmt.Errorf("tunnel name should not be less then 3 characters (%s)", tun.IFName))
+		err = append(err, fmt.Sprintf("tunnel name should not be less then 3 characters (%s)", tun.IFName))
 	}
 
 	// this is windows only
 	errx := ValidateAdapterID(tun)
 	if errx != nil {
-		err = append(err, errx)
+		err = append(err, errx.Error())
 	}
 
 	return
@@ -338,6 +320,7 @@ func SetConfig(config *configV2) (err error) {
 		_ = API_SERVER.Shutdown(context.Background())
 	}
 
+	reloadBlockLists(false, false)
 	CONFIG.Store(config)
 	err = writeConfigToDisk()
 
@@ -346,9 +329,9 @@ func SetConfig(config *configV2) (err error) {
 	return nil
 }
 
-func BandwidthBytesToString(b uint64) string {
+func BandwidthBytesToString(b int64) string {
 	if b <= 999 {
-		intS := strconv.FormatUint(b, 10)
+		intS := strconv.FormatInt(b, 10)
 		return intS + " B"
 	} else if b <= 999_999 {
 		intF := float64(b)
@@ -437,7 +420,7 @@ func InitializeTunnelFromCRR(TUN *TUN) (err error) {
 
 	// This index is used to identify packet streams between server and user.
 	TUN.Index = make([]byte, 2)
-	binary.BigEndian.PutUint16(TUN.Index, uint16(TUN.crReponse.Index))
+	binary.BigEndian.PutUint16(TUN.Index, uint16(TUN.CRReponse.Index))
 
 	TUN.localInterfaceNetIP = net.ParseIP(meta.IPv4Address).To4()
 	if TUN.localInterfaceNetIP == nil {
@@ -457,9 +440,9 @@ func InitializeTunnelFromCRR(TUN *TUN) (err error) {
 	TUN.localDNSClient.Dialer.Timeout = time.Duration(5 * time.Second)
 	TUN.localDNSClient.Timeout = time.Second * 5
 
-	TUN.serverInterfaceNetIP = net.ParseIP(TUN.crReponse.InterfaceIP).To4()
+	TUN.serverInterfaceNetIP = net.ParseIP(TUN.CRReponse.InterfaceIP).To4()
 	if TUN.serverInterfaceNetIP == nil {
-		return fmt.Errorf("Interface ip (%s) was malformed", TUN.crReponse.InterfaceIP)
+		return fmt.Errorf("Interface ip (%s) was malformed", TUN.CRReponse.InterfaceIP)
 	}
 
 	TUN.serverInterfaceIP4bytes[0] = TUN.serverInterfaceNetIP[0]
@@ -467,45 +450,45 @@ func InitializeTunnelFromCRR(TUN *TUN) (err error) {
 	TUN.serverInterfaceIP4bytes[2] = TUN.serverInterfaceNetIP[2]
 	TUN.serverInterfaceIP4bytes[3] = TUN.serverInterfaceNetIP[3]
 
-	if TUN.crReponse.DHCP != nil {
-		TUN.serverVPLIP[0] = TUN.crReponse.DHCP.IP[0]
-		TUN.serverVPLIP[1] = TUN.crReponse.DHCP.IP[1]
-		TUN.serverVPLIP[2] = TUN.crReponse.DHCP.IP[2]
-		TUN.serverVPLIP[3] = TUN.crReponse.DHCP.IP[3]
+	if TUN.CRReponse.DHCP != nil {
+		TUN.serverVPLIP[0] = TUN.CRReponse.DHCP.IP[0]
+		TUN.serverVPLIP[1] = TUN.CRReponse.DHCP.IP[1]
+		TUN.serverVPLIP[2] = TUN.CRReponse.DHCP.IP[2]
+		TUN.serverVPLIP[3] = TUN.CRReponse.DHCP.IP[3]
 
-		TUN.dhcp = TUN.crReponse.DHCP
-		meta.DHCPToken = TUN.crReponse.DHCP.Token
-		writeTunnelsToDisk(meta.Tag)
+		TUN.dhcp = TUN.CRReponse.DHCP
+		meta.DHCPToken = TUN.CRReponse.DHCP.Token
+		_ = writeTunnelsToDisk(meta.Tag)
 	}
 
-	if TUN.crReponse.VPLNetwork != nil {
-		TUN.VPLNetwork = TUN.crReponse.VPLNetwork
+	if TUN.CRReponse.VPLNetwork != nil {
+		TUN.VPLNetwork = TUN.CRReponse.VPLNetwork
 	}
 
 	if meta.LocalhostNat {
 		NN := new(ServerNetwork)
 		NN.Network = "127.0.0.1/32"
 		NN.Nat = TUN.serverInterfaceNetIP.String() + "/32"
-		TUN.crReponse.Networks = append(TUN.crReponse.Networks, NN)
+		TUN.CRReponse.Networks = append(TUN.CRReponse.Networks, NN)
 	}
 
 	if len(meta.Networks) > 0 {
-		TUN.crReponse.Networks = meta.Networks
+		TUN.CRReponse.Networks = meta.Networks
 	}
 	if len(meta.DNS) > 0 {
-		TUN.crReponse.DNS = meta.DNS
+		TUN.CRReponse.DNS = meta.DNS
 	}
 	if len(meta.DNSServers) > 0 {
-		TUN.crReponse.DNSServers = meta.DNSServers
+		TUN.CRReponse.DNSServers = meta.DNSServers
 	}
 
 	conf := CONFIG.Load()
-	if len(TUN.crReponse.DNSServers) < 1 {
-		TUN.crReponse.DNSServers = []string{conf.DNS1Default, conf.DNS2Default}
+	if len(TUN.CRReponse.DNSServers) < 1 {
+		TUN.CRReponse.DNSServers = []string{conf.DNS1Default, conf.DNS2Default}
 	}
 
-	TUN.startPort = TUN.crReponse.StartPort
-	TUN.endPort = TUN.crReponse.EndPort
+	TUN.startPort = TUN.CRReponse.StartPort
+	TUN.endPort = TUN.CRReponse.EndPort
 	TUN.TCPEgress = make(map[[10]byte]*Mapping)
 	TUN.UDPEgress = make(map[[10]byte]*Mapping)
 	TUN.InitPortMap()
@@ -522,17 +505,17 @@ func InitializeTunnelFromCRR(TUN *TUN) (err error) {
 	DEBUG(fmt.Sprintf(
 		"Connection info: Addr(%s) StartPort(%d) EndPort(%d) srcIP(%s) ",
 		meta.IPv4Address,
-		TUN.crReponse.StartPort,
-		TUN.crReponse.EndPort,
-		TUN.crReponse.InterfaceIP,
+		TUN.CRReponse.StartPort,
+		TUN.CRReponse.EndPort,
+		TUN.CRReponse.InterfaceIP,
 	))
 
-	if TUN.crReponse.VPLNetwork != nil && TUN.crReponse.DHCP != nil {
+	if TUN.CRReponse.VPLNetwork != nil && TUN.CRReponse.DHCP != nil {
 		DEBUG(fmt.Sprintf(
 			"DHCP/VPL info: Addr(%s) Network:(%s) Token(%s) ",
-			TUN.crReponse.DHCP.IP,
-			TUN.crReponse.VPLNetwork.Network,
-			TUN.crReponse.DHCP.Token,
+			TUN.CRReponse.DHCP.IP,
+			TUN.CRReponse.VPLNetwork.Network,
+			TUN.CRReponse.DHCP.Token,
 		))
 	}
 
@@ -573,20 +556,24 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	loadDefaultInterface()
 
 	var meta *TunnelMETA
+	if ClientCR.Tag == "" {
+		ERROR("No tunnel tag given when connecting")
+		return 400, errors.New("no tunnel tag given when connecting")
+	}
+
 	tunnelMetaMapRange(func(tun *TunnelMETA) bool {
-		if ClientCR.Tag == "" {
-			if tun.Tag == DefaultTunnelName {
-				meta = tun
-				return false
-			}
-		} else if ClientCR.Tag != "" {
-			if tun.Tag == ClientCR.Tag {
-				meta = tun
-				return false
-			}
+		if tun.Tag == DefaultTunnelName && ClientCR.Tag == DefaultTunnelName {
+			meta = tun
+			tun.ServerID = ClientCR.ServerID
+			_ = writeTunnelsToDisk(DefaultTunnelName)
+			return false
+		} else if tun.Tag == ClientCR.Tag {
+			meta = tun
+			return false
 		}
 		return true
 	})
+
 	if meta == nil {
 		ERROR("vpn connection metadata not found for tag: ", ClientCR.Tag)
 		return 400, errors.New("error fetching connection meta")
@@ -598,7 +585,11 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 
 	isConnected := false
 	tunnelMapRange(func(tun *TUN) bool {
-		if tun.tag == meta.Tag {
+		m := tun.meta.Load()
+		if m == nil {
+			return true
+		}
+		if m.Tag == meta.Tag {
 			if tun.GetState() >= TUN_Connected {
 				isConnected = true
 			}
@@ -614,7 +605,7 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 
 	tunnel := new(TUN)
 	tunnel.meta.Store(meta)
-	tunnel.cr = ClientCR
+	tunnel.CR = ClientCR
 
 	if meta.DNSDiscovery != "" {
 		DEBUG("looking for connection info @ ", meta.DNSDiscovery)
@@ -809,7 +800,7 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	closeAll()
 
 	DEBUG("ConnectionRequestResponse:", CRR)
-	tunnel.crReponse = CRR
+	tunnel.CRReponse = CRR
 
 	err = InitializeTunnelFromCRR(tunnel)
 	if err != nil {
@@ -821,14 +812,18 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	// ensure gateway is not incorrect
 	gateway := state.DefaultGateway.Load()
 	if gateway != nil {
-		if isGatewayATunnel(*gateway) {
+		if isInterfaceATunnel(*gateway) {
 			return 502, errors.New("default gateway is a tunnel, please retry in a moment")
 		}
 	} else {
 		return 502, errors.New("no default gateway, check your connection settings")
 	}
 
-	IP_AddRoute(ClientCR.ServerIP+"/32", "", gateway.To4().String(), "0")
+	err = IP_AddRoute(ClientCR.ServerIP+"/32", "", gateway.To4().String(), "0")
+	if err != nil {
+		return 502, errors.New("unable to initialize routes")
+	}
+
 	tunnel.connection, err = net.Dial(
 		"udp4",
 		net.JoinHostPort(ClientCR.ServerIP, CRR.DataPort),
@@ -846,6 +841,7 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 
 	tunnel.tunnel.Store(inter)
 	inter.tunnel.Store(&tunnel)
+
 	err = inter.Connect(tunnel)
 	if err != nil {
 		ERROR("unable to configure tunnel interface: ", err)
@@ -869,9 +865,9 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	go tunnel.ReadFromServeTunnel()
 	go inter.ReadFromTunnelInterface()
 
-	if tunnel.crReponse.DHCP != nil {
+	if tunnel.CRReponse.DHCP != nil {
 		err = sendFirewallToServer(
-			tunnel.cr.ServerIP,
+			tunnel.CR.ServerIP,
 			tunnel.dhcp.Token,
 			net.IP(tunnel.dhcp.IP[:]).String(),
 			meta.AllowedHosts,

@@ -122,7 +122,6 @@ outerloop:
 		fmt.Fprintf(w, "Encoding error: %s", err)
 	}
 	r.Body.Close()
-	return
 }
 
 type FirewallRequest struct {
@@ -156,17 +155,15 @@ func HTTP_Firewall(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		w.WriteHeader(400)
-		w.Write(outb)
+		_, _ = w.Write(outb)
 		return
 	}
 
 	w.WriteHeader(200)
 	r.Body.Close()
-	return
 }
 
 func HTTP_HealthCheck(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(200)
 	r.Body.Close()
-	return
 }

@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"encoding/json"
 	"net"
 	"os"
 	"sync"
@@ -46,7 +47,7 @@ var (
 	// Go Routine monitors
 	concurrencyMonitor = make(chan *goSignal, 1000)
 	tunnelMonitor      = make(chan *TUN, 1000)
-	interfaceMonitor   = make(chan *TunnelInterface, 1000)
+	interfaceMonitor   = make(chan *TInterface, 1000)
 
 	// NOT SURE YET
 	highPriorityChannel   = make(chan *event, 100)
@@ -113,7 +114,7 @@ type configV2 struct {
 type stateV2 struct {
 	adminState bool
 
-	user atomic.Pointer[User]
+	// user atomic.Pointer[User]
 
 	// Networking parameters
 	DefaultGateway       atomic.Pointer[net.IP] `json:"-"`
@@ -162,14 +163,56 @@ func (t *TUN) registerPing(ping time.Time) {
 	t.pingTime.Store(&ping)
 }
 
+// Implement MarshalJSON method
+func (t *TUN) MarshalJSON() ([]byte, error) {
+	// Create a type alias to avoid recursion
+
+	var pingTime time.Time
+	if t.pingTime.Load() != nil {
+		pingTime = *t.pingTime.Load()
+	}
+	eb := BandwidthBytesToString(t.egressBytes.Load())
+	ib := BandwidthBytesToString(t.ingressBytes.Load())
+
+	// Define the structure we want in JSON
+	return json.Marshal(struct {
+		CR         *ConnectionRequest
+		CRResponse *ConnectRequestResponse
+		Ping       time.Time
+		StartPort  int
+		EndPort    int
+		DHCP       *DHCPRecord
+		VPLNetwork *ServerNetwork
+		CPU        byte
+		DISK       byte
+		MEM        byte
+		Egress     string
+		Ingress    string
+		MS         int64
+	}{
+		t.CR,
+		t.CRReponse,
+		pingTime,
+		int(t.startPort),
+		int(t.endPort),
+		t.dhcp,
+		t.VPLNetwork,
+		t.CPU,
+		t.DISK,
+		t.MEM,
+		eb,
+		ib,
+		t.ServerToClientMicro.Load(),
+	})
+}
+
 type TUN struct {
 	id    string
 	state atomic.Pointer[TunnelState] `json:"-"`
-	tag   string
 
 	meta atomic.Pointer[TunnelMETA] `json:"-"`
 	// server atomic.Pointer[any]
-	tunnel atomic.Pointer[TunnelInterface] `json:"-"`
+	tunnel atomic.Pointer[TInterface] `json:"-"`
 
 	// encWrapper wraps connection with encryption
 	encWrapper      *crypt.SocketWrapper
@@ -177,8 +220,8 @@ type TUN struct {
 	ServerCertBytes []byte `json:"-"`
 
 	// Connection Requests + Response
-	cr        *ConnectionRequest
-	crReponse *ConnectRequestResponse
+	CR        *ConnectionRequest
+	CRReponse *ConnectRequestResponse
 
 	// NEW MAPPING STUFF
 	pingTime                atomic.Pointer[time.Time]
@@ -218,15 +261,11 @@ type TUN struct {
 	ingressBytes  atomic.Int64
 	ingressString string
 
-	// Tunnel States
-	nonce1 uint64
-	nonce2 uint64
-
 	// Server States
 	CPU                 byte
 	DISK                byte
 	MEM                 byte
-	serverToClientMicro int64
+	ServerToClientMicro atomic.Int64
 
 	// Random mappint stuff
 	// LOCAL_IF_IP [4]byte
