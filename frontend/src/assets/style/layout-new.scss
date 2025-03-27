@@ -1137,6 +1137,8 @@ body::-webkit-scrollbar {
         padding-right: 10px;
         overflow-x: hidden;
         font-weight: bold;
+        padding-right: 10px !important;
+        padding-left: 10px !important;
       }
 
       .column:last-of-type {
@@ -1173,13 +1175,10 @@ body::-webkit-scrollbar {
 
       .column {
         color: var(--c-shade5);
-        padding-left: 10px;
-        /* padding-right: 10px; */
-        /* flex-basis: 100%; */
+        padding-right: 10px !important;
+        padding-left: 10px !important;
         flex: 1;
         height: 100%;
-        /* max-width: 50px; */
-        /* word-wrap: break-word; */
         overflow-x: hidden;
         white-space: nowrap;
         text-overflow: ellipsis;
@@ -1382,7 +1381,6 @@ body::-webkit-scrollbar {
     flex-direction: row;
     gap: 10px;
 
-    .column {}
 
     .dimmed {
       color: var(--c-shade3);
@@ -1576,10 +1574,6 @@ body::-webkit-scrollbar {
   color: var(--c-white) !important;
 }
 
-.ab {
-  /* animation: border-in-out 2s ease-in-out; */
-}
-
 @keyframes border-in-out {
   from {
     border: 1px solid black;
@@ -1662,7 +1656,6 @@ body::-webkit-scrollbar {
     gap: 20px !important;
 
     .d0 {
-      .top_bar {}
 
       .input_wrap {
         padding-left: 10px;

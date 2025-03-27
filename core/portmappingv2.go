@@ -275,17 +275,17 @@ func (t *TUN) cleanPortMap() {
 		t.UDPPortMap[i].L.Lock()
 		for k, v := range t.UDPPortMap[i].M {
 			dnsL := 0
-			if t.crReponse != nil {
-				dnsL = len(t.crReponse.DNSServers)
+			if t.CRReponse != nil {
+				dnsL = len(t.CRReponse.DNSServers)
 			}
 
 			isDNS := false
 			if dnsL > 0 {
-				if bytes.Equal(v.DestinationIP[:], net.ParseIP(t.crReponse.DNSServers[0]).To4()) {
+				if bytes.Equal(v.DestinationIP[:], net.ParseIP(t.CRReponse.DNSServers[0]).To4()) {
 					isDNS = true
 				}
 				if dnsL > 1 && !isDNS {
-					if bytes.Equal(v.DestinationIP[:], net.ParseIP(t.crReponse.DNSServers[1]).To4()) {
+					if bytes.Equal(v.DestinationIP[:], net.ParseIP(t.CRReponse.DNSServers[1]).To4()) {
 						isDNS = true
 					}
 				}

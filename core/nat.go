@@ -19,14 +19,14 @@ func (t *TUN) TransLateVPLIP(ip [4]byte) ([4]byte, bool) {
 		return xxx, true
 	}
 
-	if t.crReponse.VPLNetwork == nil {
+	if t.CRReponse.VPLNetwork == nil {
 		return ip, true
 	}
 
-	v := t.crReponse.VPLNetwork
+	v := t.CRReponse.VPLNetwork
 	var newIP [4]byte
 
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		newIP[i] = v.NetIPNet.IP[i]&v.NetIPNet.Mask[i] | ip[i]&^v.NetIPNet.Mask[i]
 	}
 	newIP[3] = ip[3]
@@ -42,12 +42,12 @@ func (V *TUN) TransLateIP(ip [4]byte) ([4]byte, bool) {
 		return xxx, true
 	}
 
-	if len(V.crReponse.Networks) == 0 {
+	if len(V.CRReponse.Networks) == 0 {
 		return ip, true
 	}
 
 	var newIP [4]byte
-	for _, v := range V.crReponse.Networks {
+	for _, v := range V.CRReponse.Networks {
 		if v.Nat == "" {
 			continue
 		}
@@ -57,11 +57,11 @@ func (V *TUN) TransLateIP(ip [4]byte) ([4]byte, bool) {
 		}
 
 		if strings.HasSuffix(v.Network, "/32") {
-			for i := 0; i < 4; i++ {
+			for i := range 4 {
 				newIP[i] = v.NetIPNet.IP[i]&v.NetIPNet.Mask[i] | ip[i]&^v.NetIPNet.Mask[i]
 			}
 		} else {
-			for i := 0; i < 3; i++ {
+			for i := range 3 {
 				newIP[i] = v.NetIPNet.IP[i]&v.NetIPNet.Mask[i] | ip[i]&^v.NetIPNet.Mask[i]
 			}
 			newIP[3] = ip[3]
@@ -92,27 +92,27 @@ func (V *TUN) IsIngressVPLIP(ip [4]byte) (ok bool) {
 func (t *TUN) InitVPLMap() (err error) {
 	meta := t.meta.Load()
 	DEBUG("Initializing VPL/NAT maps for tunnel:", meta.IFName)
-	if t.crReponse.VPLNetwork == nil {
+	if t.CRReponse.VPLNetwork == nil {
 		return nil
 	}
 
-	if t.crReponse.VPLNetwork.Nat != "" {
-		_, t.crReponse.VPLNetwork.NatIPNet, err = net.ParseCIDR(t.crReponse.VPLNetwork.Nat)
+	if t.CRReponse.VPLNetwork.Nat != "" {
+		_, t.CRReponse.VPLNetwork.NatIPNet, err = net.ParseCIDR(t.CRReponse.VPLNetwork.Nat)
 		if err != nil {
 			return err
 		}
 	}
 
-	_, t.crReponse.VPLNetwork.NetIPNet, err = net.ParseCIDR(t.crReponse.VPLNetwork.Network)
+	_, t.CRReponse.VPLNetwork.NetIPNet, err = net.ParseCIDR(t.CRReponse.VPLNetwork.Network)
 	if err != nil {
 		return err
 	}
 
 	toMap := ""
-	if t.crReponse.VPLNetwork.Nat != "" {
-		toMap = t.crReponse.VPLNetwork.Nat
+	if t.CRReponse.VPLNetwork.Nat != "" {
+		toMap = t.CRReponse.VPLNetwork.Nat
 	} else {
-		toMap = t.crReponse.VPLNetwork.Network
+		toMap = t.CRReponse.VPLNetwork.Network
 	}
 
 	ip, network, err := net.ParseCIDR(toMap)
@@ -136,7 +136,7 @@ func (t *TUN) InitVPLMap() (err error) {
 func (t *TUN) InitNatMaps() (err error) {
 	meta := t.meta.Load()
 	DEBUG("Initializing NAT maps for tunnel:", meta.IFName)
-	for _, v := range t.crReponse.Networks {
+	for _, v := range t.CRReponse.Networks {
 		if v.Nat == "" {
 			continue
 		}

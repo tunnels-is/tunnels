@@ -98,7 +98,7 @@ func PingConnections() {
 		if time.Since(*ping).Seconds() > 30 || err != nil {
 			if meta.AutoReconnect {
 				DEBUG("30+ Seconds since ping from ", meta.Tag, " attempting reconnection")
-				_, _ = PublicConnect(tun.cr)
+				_, _ = PublicConnect(tun.CR)
 			} else {
 				DEBUG("30+ Seconds since ping from ", meta.Tag, " disconnecting")
 				_ = Disconnect(tun.id, true)
@@ -109,14 +109,14 @@ func PingConnections() {
 	})
 }
 
-func isGatewayATunnel(gateway net.IP) (isTunnel bool) {
+func isInterfaceATunnel(interf net.IP) (isTunnel bool) {
 	tunnelMapRange(func(tun *TUN) bool {
 		tunnel := tun.tunnel.Load()
 		if tunnel == nil {
 			return true
 		}
 
-		if tunnel.IPv4Address == gateway.To4().String() {
+		if tunnel.IPv4Address == interf.To4().String() {
 			isTunnel = true
 			return false
 		}
@@ -144,6 +144,10 @@ func loadDefaultInterface() {
 	}
 
 	if bytes.Equal(oldInterface, newInterface.To4()) {
+		return
+	}
+
+	if isInterfaceATunnel(newInterface.To4()) {
 		return
 	}
 
@@ -194,14 +198,13 @@ func loadDefaultGateway() {
 		return
 	}
 
-	if isGatewayATunnel(newGateway.To4()) {
-		return
-	}
-
 	if bytes.Equal(oldGateway, newGateway.To4()) {
 		return
 	}
 
+	if isInterfaceATunnel(newGateway.To4()) {
+		return
+	}
 	DEBUG("new defailt gateway discovered", newGateway.To4())
 	s.DefaultGateway.Store(&newGateway)
 

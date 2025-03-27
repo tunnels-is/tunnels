@@ -23,7 +23,7 @@ func InitService() error {
 	defer RecoverAndLogToFile()
 
 	InitBaseFoldersAndPaths()
-	loadConfigFromDisk()
+	_ = loadConfigFromDisk()
 	loadTunnelsFromDisk()
 	loadDefaultGateway()
 	loadDefaultInterface()
@@ -32,8 +32,6 @@ func InitService() error {
 
 	set := CONFIG.Load()
 	s := STATE.Load()
-
-	// updateDNSHandlerInterface(s.DefaultInterface)
 
 	if !set.ConsoleLogOnly {
 		var err error
@@ -64,7 +62,7 @@ func InitService() error {
 
 	if !set.Minimal {
 		doEvent(highPriorityChannel, func() {
-			reloadBlockLists()
+			reloadBlockLists(false, true)
 		})
 	}
 
@@ -144,7 +142,7 @@ func LaunchEverything() {
 	})
 
 	newConcurrentSignal("BlockListUpdater", CancelContext, func() {
-		reloadBlockLists()
+		reloadBlockLists(true, true)
 	})
 
 	newConcurrentSignal("LogMapCleaner", CancelContext, func() {
@@ -373,7 +371,7 @@ func loadTunnelsFromDisk() {
 	if !foundDefault {
 		newTun := createDefaultTunnelMeta()
 		TunnelMetaMap.Store(newTun.Tag, newTun)
-		writeTunnelsToDisk(newTun.Tag)
+		_ = writeTunnelsToDisk(newTun.Tag)
 	}
 }
 
@@ -472,7 +470,7 @@ func CleanupOnClose() {
 		tunnel := tun.tunnel.Load()
 		err := tunnel.Disconnect(tun)
 		if err != nil {
-			ERROR("unable to disconnect tunnel", tun.tag, "error:", err)
+			ERROR("unable to disconnect tunnel", tun.id, tunnel.IPv4Address, "error:", err)
 		}
 		return true
 	})
@@ -494,12 +492,14 @@ func popUI() {
 
 	switch runtime.GOOS {
 	case "windows":
-		openURL(url)
+		_ = openURL(url)
+
 	case "darwin":
-		openURL(url)
+		_ = openURL(url)
+
 	default:
 		if !isWSL() {
-			openURL(url)
+			_ = openURL(url)
 		}
 
 	}

@@ -1,5 +1,5 @@
-import { useNavigate } from "react-router-dom";
 import React, { useEffect, useState } from "react";
+import CustomToggle from "./component/CustomToggle.jsx";
 
 import { v4 as uuidv4 } from "uuid";
 import {
@@ -7,18 +7,17 @@ import {
   EnvelopeClosedIcon,
   FrameIcon,
   LockClosedIcon,
-  Share1Icon,
 } from "@radix-ui/react-icons";
 
 import GLOBAL_STATE from "../state";
 import STORE from "../store";
 
-const useForm = (props) => {
+const useForm = () => {
   const [inputs, setInputs] = useState({});
   const [tokenLogin, setTokenLogin] = useState(false);
   const [errors, setErrors] = useState({});
-  const navigate = useNavigate();
   const [mode, setMode] = useState(1);
+  const [remember, setRememeber] = useState(false);
   const state = GLOBAL_STATE("login");
 
   const RemoveToken = () => {
@@ -104,6 +103,7 @@ const useForm = (props) => {
     let errors = {};
     let hasErrors = false;
 
+    console.dir(inputs);
     if (!inputs["email"] || inputs["email"] === "") {
       errors["email"] = "Email / Token missing";
       hasErrors = true;
@@ -145,7 +145,7 @@ const useForm = (props) => {
       return;
     }
 
-    await state.Login(inputs);
+    await state.Login(inputs, remember);
     setErrors({});
   };
   const EnableSubmit = async () => {
@@ -295,18 +295,14 @@ const useForm = (props) => {
     }));
   };
 
-  const ManualInputChange = (key, value) => {
-    setInputs((inputs) => ({ ...inputs, [key]: value }));
-  };
-
   return {
+    remember,
+    setRememeber,
     inputs,
     setInputs,
     HandleInputChange,
-    ManualInputChange,
     HandleSubmit,
     errors,
-    navigate,
     setMode,
     mode,
     RegisterSubmit,
@@ -315,20 +311,20 @@ const useForm = (props) => {
     ResetSubmit,
     GetCode,
     RemoveToken,
-    state,
     EnableSubmit,
   };
 };
 
 const Login = (props) => {
   const {
+    //
+    remember,
+    setRememeber,
     inputs,
     setInputs,
     HandleInputChange,
-    ManualInputChange,
     HandleSubmit,
     errors,
-    navigate,
     setMode,
     mode,
     RegisterSubmit,
@@ -337,14 +333,13 @@ const Login = (props) => {
     ResetSubmit,
     GetCode,
     RemoveToken,
-    state,
     EnableSubmit,
   } = useForm(props);
 
   const GetDefaults = () => {
     let i = { ...inputs };
 
-    let defaultDeviceName = STORE.Cache.Get("default-device-name");
+    let defaultDeviceName = STORE.Local.getItem("default-device-name");
     if (defaultDeviceName) {
       i["devicename"] = defaultDeviceName;
     }
@@ -611,6 +606,13 @@ const Login = (props) => {
             Login
           </button>
         </div>
+        <CustomToggle
+          value={remember}
+          label={"Remember Login"}
+          toggle={() => {
+            setRememeber(!remember);
+          }}
+        />
       </div>
     );
   };

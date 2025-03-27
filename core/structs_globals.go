@@ -114,7 +114,7 @@ var (
 
 var (
 	AppStartTime        = time.Now()
-	DEFAULT_TUNNEL      *TunnelInterface
+	DEFAULT_TUNNEL      *TInterface
 	DEFAULT_DNS_SERVERS []string
 	DNSClient           = new(dns.Client)
 
@@ -388,7 +388,7 @@ type Tunnel struct {
 	// TUN/TAP
 	Index        []byte
 	Nonce2Bytes  []byte
-	Interface    *TunnelInterface
+	Interface    *TInterface
 	AddressNetIP net.IP
 	Routes       []string
 
@@ -544,13 +544,10 @@ type DEBUG_OUT struct {
 }
 
 type FORWARD_REQUEST struct {
-	Path       string
-	Method     string
-	Timeout    int
-	Authed     bool
-	JSONData   any
-	SyncUser   bool
-	LogoutUser bool
+	Path     string
+	Method   string
+	Timeout  int
+	JSONData any
 }
 
 type TWO_FACTOR_CONFIRM struct {

@@ -7,7 +7,7 @@ import (
 	"github.com/zveinn/crypt"
 )
 
-func CreateAndConnectToInterface(t *TUN) (inter *TunnelInterface, err error) {
+func CreateAndConnectToInterface(t *TUN) (inter *TInterface, err error) {
 	meta := t.meta.Load()
 	inter, err = CreateNewTunnelInterface(meta)
 	if err != nil {
@@ -24,7 +24,7 @@ func Disconnect(tunID string, switching bool) (err error) {
 		if tun.id == tunID {
 			tun.SetState(TUN_Disconnecting)
 			tunnel := tun.tunnel.Load()
-			tunnel.Disconnect(tun)
+			_ = tunnel.Disconnect(tun)
 			if tun.connection != nil {
 				tun.connection.Close()
 			}
@@ -38,7 +38,12 @@ func Disconnect(tunID string, switching bool) (err error) {
 			}
 
 			tun.SetState(TUN_Disconnected)
-			DEBUG("disconnected from ", tun.tag, tun.id)
+			m := tun.meta.Load()
+			if m != nil {
+				DEBUG("disconnected from ", m.Tag, tun.id)
+			} else {
+				DEBUG("disconnected from ", "(tag unknown)", tun.id)
+			}
 			return false
 		}
 		return true
@@ -47,9 +52,10 @@ func Disconnect(tunID string, switching bool) (err error) {
 	return
 }
 
-func createRandomTunnel() (m *TunnelMETA) {
+func createRandomTunnel() (m *TunnelMETA, err error) {
 	m = createTunnel()
 	TunnelMetaMap.Store(m.Tag, m)
+	err = writeTunnelsToDisk(m.Tag)
 	return
 }
 
@@ -82,7 +88,6 @@ func createTunnel() (T *TunnelMETA) {
 }
 
 func createDefaultTunnelMeta() (M *TunnelMETA) {
-	M = new(TunnelMETA)
 	M = createTunnel()
 	M.RequestVPNPorts = true
 	M.IPv4Address = "172.22.22.1"

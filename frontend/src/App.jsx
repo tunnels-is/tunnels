@@ -2,10 +2,10 @@ import { HashRouter, Route, Routes } from "react-router-dom";
 import { createRoot } from "react-dom/client";
 import React, { useEffect } from "react";
 
-import { Toaster } from 'react-hot-toast';
+import { Toaster } from "react-hot-toast";
 
 import "./assets/style/app.scss";
-import '@fontsource-variable/inter';
+import "@fontsource-variable/inter";
 
 import InspectBlocklist from "./App/InspectBlocklist";
 import InspectConnection from "./App/InspectConnection";
@@ -31,157 +31,157 @@ import { STATE } from "./state";
 import STORE from "./store";
 import WS from "./ws";
 
-// Use this to automatically turn on debug 
-STORE.Cache.Set("debug", true)
+// Use this to automatically turn on debug
+STORE.Cache.Set("debug", true);
 
-const appElement = document.getElementById('app')
+const appElement = document.getElementById("app");
 const root = createRoot(appElement);
 
 const LaunchApp = () => {
-	const state = GLOBAL_STATE("root")
+  const state = GLOBAL_STATE("root");
 
-	useEffect(() => {
-		state.GetBackendState()
-		WS.NewSocket(WS.GetURL("logs"), "logs", WS.ReceiveLogEvent)
-	}, [])
+  useEffect(() => {
+    state.GetUser();
+    state.GetBackendState();
+    WS.NewSocket(WS.GetURL("logs"), "logs", WS.ReceiveLogEvent);
+  }, []);
 
-	return (
-		< HashRouter >
+  return (
+    <HashRouter>
+      <Toaster
+        toastOptions={{
+          className: "toast",
+          position: "top-right",
+          success: {
+            duration: 5000,
+          },
+          icon: null,
+          error: {
+            duration: 5000,
+          },
+        }}
+      />
 
-			<Toaster
-				toastOptions={{
-					className: 'toast',
-					position: "top-right",
-					success: {
-						duration: 5000,
-					},
-					icon: null,
-					error: {
-						duration: 5000,
-					},
-				}}
-			/>
+      <SideBar />
 
-			<SideBar />
+      <ScreenLoader />
+      <div className="ab app-wrapper">
+        <Routes>
+          {(state.User?.Email === "" || !state.User) && (
+            <>
+              <Route path="/" element={<Login />} />
+              <Route path="login" element={<Login />} />
+              <Route path="settings" element={<Settings />} />
+              <Route path="help" element={<Welcome />} />
+              <Route path="dns" element={<DNS />} />
+              <Route path="dns-records" element={<DNSRecords />} />
+              <Route path="*" element={<Login />} />
+            </>
+          )}
 
-			<ScreenLoader />
-			<div className="ab app-wrapper">
+          {state.User && (
+            <>
+              <Route path="/" element={<Welcome />} />
+              <Route path="account" element={<Account />} />
 
-				<Routes>
+              <Route path="twofactor" element={<Enable2FA />} />
+              <Route path="org" element={<Org />} />
 
-					{(state.User?.Email === "" || !state.User) &&
-						<>
-							<Route path="/" element={<Login />} />
-							<Route path="login" element={<Login />} />
-							<Route path="settings" element={<Settings />} />
-							<Route path="help" element={<Welcome />} />
-							<Route path="dns" element={<DNS />} />
-							<Route path="dns-records" element={<DNSRecords />} />
-							<Route path="*" element={<Login />} />
-						</>
-					}
+              <Route path="inspect/group/:id" element={<InspectGroup />} />
+              <Route path="inspect/group" element={<InspectGroup />} />
 
-					{state.User &&
-						<>
-							<Route path="/" element={<Welcome />} />
-							<Route path="account" element={<Account />} />
+              <Route path="tunnels" element={<ConnectionTable />} />
+              <Route
+                path="inspect/connection/:id"
+                element={<InspectConnection />}
+              />
+              <Route path="routing" element={<ConnectionTable />} />
+              <Route path="settings" element={<Settings />} />
 
-							<Route path="twofactor" element={<Enable2FA />} />
-							<Route path="org" element={<Org />} />
+              <Route path="dns" element={<DNS />} />
+              <Route path="dns-records" element={<DNSRecords />} />
+              <Route path="dns/answers/:domain" element={<DNSAnswers />} />
 
-							<Route path="inspect/group/:id" element={<InspectGroup />} />
-							<Route path="inspect/group" element={<InspectGroup />} />
+              <Route path="servers" element={<Servers />} />
+              <Route path="all" element={<ServersFull />} />
+              <Route path="private" element={<PrivateServers />} />
 
-							<Route path="tunnels" element={<ConnectionTable />} />
-							<Route path="inspect/connection/:id" element={<InspectConnection />} />
-							<Route path="routing" element={<ConnectionTable />} />
-							<Route path="settings" element={<Settings />} />
+              <Route path="inspect/blocklist/" element={<InspectBlocklist />} />
 
-							<Route path="dns" element={<DNS />} />
-							<Route path="dns-records" element={<DNSRecords />} />
-							<Route path="dns/answers/:domain" element={<DNSAnswers />} />
+              <Route path="login" element={<Login />} />
+              <Route path="help" element={<Welcome />} />
 
-							<Route path="servers" element={<Servers />} />
-							<Route path="all" element={<ServersFull />} />
-							<Route path="private" element={<PrivateServers />} />
-
-							<Route path="inspect/blocklist/" element={<InspectBlocklist />} />
-
-							<Route path="login" element={<Login />} />
-							<Route path="help" element={<Welcome />} />
-
-							<Route path="*" element={<Servers />} />
-						</>
-					}
-				</Routes>
-			</div>
-		</HashRouter >
-	)
-}
-
+              <Route path="*" element={<Servers />} />
+            </>
+          )}
+        </Routes>
+      </div>
+    </HashRouter>
+  );
+};
 
 class ErrorBoundary extends React.Component {
-	constructor(props) {
-		super(props);
-		this.state = {
-			hasError: false,
-			title: "Something unexpected happened, please press Reload. If that doesn't work try pressing 'Close And Reset'. If nothing works, please contact customer support"
-		};
-	}
+  constructor(props) {
+    super(props);
+    this.state = {
+      hasError: false,
+      title:
+        "Something unexpected happened, please press Reload. If that doesn't work try pressing 'Close And Reset'. If nothing works, please contact customer support",
+    };
+  }
 
-	static getDerivedStateFromError() {
-		return { hasError: true };
-	}
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
 
-	componentDidCatch() {
-		this.state.hasError = true
-	}
+  componentDidCatch() {
+    this.state.hasError = true;
+  }
 
-	reloadAll() {
-		STORE.Cache.Clear()
-		window.location.reload()
-	}
+  reloadAll() {
+    STORE.Cache.Clear();
+    window.location.reload();
+  }
 
-	async quit() {
-		this.setState({ ...this.state, title: "closing app, please wait.." })
-		window.location.reload()
-		STORE.Cache.Clear()
-	}
+  async quit() {
+    STORE.Cache.Clear();
+    window.location.reload();
+  }
 
-	async ProductionCheck() {
+  async ProductionCheck() {
+    if (!STATE.debug) {
+      window.console.apply = function () {};
+      window.console.dir = function () {};
+      window.console.log = function () {};
+      window.console.info = function () {};
+      window.console.warn = function () {};
+      window.console.error = function () {};
+      window.console.debug = function () {};
+    }
+  }
 
-		if (!STATE.debug) {
-			window.console.apply = function() { }
-			window.console.dir = function() { }
-			window.console.log = function() { }
-			window.console.info = function() { }
-			window.console.warn = function() { }
-			window.console.error = function() { }
-			window.console.debug = function() { }
-		}
+  render() {
+    this.ProductionCheck();
 
-	}
+    if (this.state.hasError) {
+      return (
+        <>
+          <h1 className="exception-title">{this.state.title}</h1>
+          <button className="exception-button" onClick={() => this.reloadAll()}>
+            Reload
+          </button>
+        </>
+      );
+    }
 
-	render() {
-		this.ProductionCheck()
-
-		if (this.state.hasError) {
-			return (<>
-				<h1 className="exception-title">
-					{this.state.title}
-				</h1>
-				<button className="exception-button" onClick={() => this.reloadAll()}>Reload</button>
-				<button className="exception2-button" onClick={() => this.quit()}>Close And Reset</button>
-			</>)
-		}
-
-		return this.props.children;
-	}
+    return this.props.children;
+  }
 }
 
-
-root.render(<React.StrictMode>
-	<ErrorBoundary>
-		<LaunchApp />
-	</ErrorBoundary>
-</React.StrictMode>)
+root.render(
+  <React.StrictMode>
+    <ErrorBoundary>
+      <LaunchApp />
+    </ErrorBoundary>
+  </React.StrictMode>,
+);
