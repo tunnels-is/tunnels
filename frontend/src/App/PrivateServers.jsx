@@ -151,6 +151,7 @@ const PrivateServers = () => {
 					value: <div className={con ? "disconnect" : "connect"}>{con ? "Disconnect" : "Connect"}</div>,
 					color: con ? "red" : "green",
 					click: conButton,
+					width:"50px",
 				},
 			]
 			rows.push(row)
