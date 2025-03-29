@@ -89,12 +89,12 @@ func makeTLSConfig() (tc *tls.Config) {
 	tc = new(tls.Config)
 	tc.MinVersion = tls.VersionTLS12
 	tc.MaxVersion = tls.VersionTLS13
-	tc.CipherSuites = []uint16{
-		tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
-		tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
-		tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
-		tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
-	}
+	// tc.CipherSuites = []uint16{
+	// 	tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+	// 	tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+	// 	tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+	// 	tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+	// }
 	certsExist := true
 	_, err := os.Stat(conf.APICert)
 	if err != nil {
@@ -205,7 +205,6 @@ func handleWebSocket(ws *websocket.Conn) {
 			// Make an attempt to delive this log line to the new LogSocket.
 			// if delivery fails, the event will be found in the log file.
 			_ = websocket.Message.Send(LogSocket, event)
-			ERROR("Logging websocket error: ", err)
 			return
 		}
 	}
