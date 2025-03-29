@@ -89,11 +89,12 @@ const Org = () => {
 				{
 					type: "text", value: g.Tag, color: "blue", click: function(e) {
 						navigate("/inspect/group/" + g._id)
-					}
+					},
+					width:"100",
 				},
-				{ type: "text", value: g._id },
-				{ type: "text", align: "right", value: g.Users ? Object.keys(g.Users).length : 0 },
-				{ type: "text", value: g.Servers ? Object.keys(g.Servers).length : 0 },
+				{ type: "text", value: g._id, width:"200" },
+				{ type: "text", align: "right", value: g.Users ? Object.keys(g.Users).length : 0, width:"50" },
+				{ type: "text", value: g.Servers ? Object.keys(g.Servers).length : 0, width:"50" },
 			]
 			rows.push(row)
 		})
@@ -104,10 +105,10 @@ const Org = () => {
 
 	let rows = generateGroupTable(state?.Org)
 	const headers = [
-		{ value: "Tag" },
-		{ value: "ID" },
-		{ value: "Users", align: "right" },
-		{ value: "Servers" }
+		{ value: "Tag",width:"100",},
+		{ value: "ID",width:"200" },
+		{ value: "Users", align: "right", width:"50"  },
+		{ value: "Servers", width:"50"  }
 	]
 
 	if (editOrg) {

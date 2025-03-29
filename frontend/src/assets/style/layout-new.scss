@@ -772,6 +772,10 @@ body::-webkit-scrollbar {
     }
   }
 
+  .group-table {
+    max-width:700px;
+  }
+
   .back {
     font-size: 26px;
     color: var(--c-blue);
@@ -924,8 +928,11 @@ body::-webkit-scrollbar {
   }
 
   .dns-record {
-    padding: 20px 20px 10px 0px;
     background: var(--c-shade1);
+
+    .label {
+      text-align:right;
+    }
 
     .custom-toggle {
       margin-top: 20px;
@@ -948,7 +955,6 @@ body::-webkit-scrollbar {
 
     .buttons {
       /* margin-top: 20px; */
-      margin-left: 10px;
       gap: 10px;
       width: 100%;
       display: flex;
