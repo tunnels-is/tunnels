@@ -6,10 +6,12 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"errors"
+	"log"
 	"math"
 	"net"
 	"runtime/debug"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -213,8 +215,8 @@ func CreateClientCoreMapping(CRR *ConnectRequestResponse, CR *ConnectRequest, EH
 			ClientCoreMappings[i].DeviceToken = CR.DeviceToken
 			ClientCoreMappings[i].EH = EH
 			ClientCoreMappings[i].Created = time.Now()
-			ClientCoreMappings[i].ToUser = make(chan []byte, 300000)
-			ClientCoreMappings[i].FromUser = make(chan Packet, 300000)
+			ClientCoreMappings[i].ToUser = make(chan []byte, 500000)
+			ClientCoreMappings[i].FromUser = make(chan Packet, 500000)
 			ClientCoreMappings[i].LastPingFromClient = time.Now()
 			ClientCoreMappings[i].Uindex = make([]byte, 2)
 			binary.BigEndian.PutUint16(ClientCoreMappings[i].Uindex, uint16(index))
@@ -252,66 +254,101 @@ func CreateClientCoreMapping(CRR *ConnectRequestResponse, CR *ConnectRequest, EH
 	return
 }
 
-func ExternalTCPListener(SIGNAL *SIGNAL) {
+func ExternalSocketListener(SIGNAL *SIGNAL) {
 	defer RecoverAndReturnID(SIGNAL, 1)
-	defer func() {
-		r := recover()
-		if r != nil {
-			ERR(r, string(debug.Stack()))
-		}
-	}()
 
+	var ETH_P_ALL uint16 = 0x0003 // Listen for all Ethernet protocols
 	var err error
-	rawTCPSockFD, err = syscall.Socket(
-		syscall.AF_INET,
-		syscall.SOCK_RAW,
-		syscall.IPPROTO_TCP,
-	)
+	rawSock, err = syscall.Socket(syscall.AF_PACKET, syscall.SOCK_RAW, int(htons(ETH_P_ALL)))
+	defer syscall.Close(rawSock)
 	if err != nil {
-		syscall.Close(rawTCPSockFD)
 		ERR("Unable to make raw socket err:", err)
 		return
 	}
 
-	ipx := InterfaceIP.To4()
-	addr := &syscall.SockaddrInet4{
-		Addr: [4]byte{
-			ipx[0],
-			ipx[1],
-			ipx[2],
-			ipx[3],
-		},
+	var iface *net.Interface
+	ifList, _ := net.Interfaces()
+	for _, v := range ifList {
+		addrs, e := v.Addrs()
+		if e != nil {
+			continue
+		}
+		for _, iv := range addrs {
+			if strings.Split(iv.String(), "/")[0] == InterfaceIP.To4().String() {
+				iface = &v
+			}
+		}
 	}
-
-	err = syscall.Bind(rawTCPSockFD, addr)
-	if err != nil {
-		syscall.Close(rawTCPSockFD)
-		ERR("Unable to bind net listener socket err:", err)
+	if iface == nil {
+		ERR("unable to find interface for ip:", InterfaceIP.To16())
 		return
 	}
 
+	// Construct a sockaddr_ll structure for binding to the interface
+	var addr syscall.SockaddrLinklayer
+	addr.Protocol = htons(ETH_P_ALL)
+	addr.Ifindex = iface.Index
+	rawSockAddr = syscall.SockaddrLinklayer{
+		Protocol: htons(0x0800), // Protocol in network byte order
+		Ifindex:  iface.Index,
+		Hatype:   0, // ARP Hardware Type (Ethernet is 1, 0 should be ok)
+		Pkttype:  0, // Packet Type (PACKET_OUTGOING)
+		Halen:    0,
+	}
+
+	err = syscall.Bind(rawSock, &addr)
+	if err != nil {
+		ERR("unable to bind raw socket listener to interface:", iface, err)
+		return
+	}
+
+	portInt, err := strconv.Atoi(Config.DataPort)
+	if err != nil {
+		panic(err)
+	}
+	datadstport := uint16(portInt)
+
 	var DSTP uint16
-	var IHL byte
+	var IHL int
 	var PM *PortRange
 	var n int
-	var version byte
-	buffer := make([]byte, math.MaxUint16)
+
+	buffer := make([]byte, 1500) // Adjust buffer size as needed
+	var out []byte
 
 	for {
-		n, _, err = syscall.Recvfrom(rawTCPSockFD, buffer, 0)
+		n, _, err = syscall.Recvfrom(rawSock, buffer, 0)
 		if err != nil {
-			ERR("Error reading from raw TCP sock:", err)
-			return
-		}
-
-		version = buffer[0] >> 4
-		if version != 4 {
+			log.Printf("Error receiving packet: %v", err)
+			time.Sleep(1 * time.Millisecond)
 			continue
 		}
 
-		// TODO .. use mask
-		IHL = ((buffer[0] << 4) >> 4) * 4
-		DSTP = binary.BigEndian.Uint16(buffer[IHL+2 : IHL+4])
+		// too small to be ipv4
+		if n < 60 {
+			continue
+		}
+		out = buffer[14:n]
+
+		// IP v4 protocol
+		if (out[0] >> 4) != 4 {
+			continue
+		}
+
+		IHL = (int(out[0]&0x0F) << 2)
+		SRCP := binary.BigEndian.Uint16(out[IHL : IHL+2])
+		DSTP = binary.BigEndian.Uint16(out[IHL+2 : IHL+4])
+		if SRCP == 22 || DSTP == 22 {
+			continue
+		}
+		if DSTP == datadstport {
+			continue
+		} else if DSTP < uint16(Config.StartPort) || DSTP > uint16(Config.EndPort) {
+			// fmt.Println("ignore:", DSTP)
+			continue
+		}
+		// fmt.Println("IH:", IHL, DSTP, out[9])
+
 		PM = PortToCoreMapping[DSTP]
 		if PM == nil || PM.Client == nil {
 			continue
@@ -321,92 +358,82 @@ func ExternalTCPListener(SIGNAL *SIGNAL) {
 			WARN("TCP: no mapping addr: ", DSTP)
 			continue
 		}
+		// fmt.Println(PM.Client.ID)
 
 		select {
-		case PM.Client.ToUser <- CopySlice(buffer[:n]):
+		case PM.Client.ToUser <- CopySlice(out):
 		default:
 			WARN("TCP: packet channel full: ", DSTP)
 		}
 	}
+
 }
 
-func ExternalUDPListener(SIGNAL *SIGNAL) {
-	defer RecoverAndReturnID(SIGNAL, 1)
-	defer func() {
-		r := recover()
-		if r != nil {
-			ERR(r, string(debug.Stack()))
-		}
-		ERR("UPD LISTENER EXITING")
-	}()
+func htons(i uint16) uint16 {
+	b := make([]byte, 2)
+	b[0] = byte(i & 0xFF)
+	b[1] = byte(i >> 8)
+	return uint16(b[0])<<8 | uint16(b[1])
+}
 
-	var err error
-	rawUDPSockFD, err = syscall.Socket(
-		syscall.AF_INET,
-		syscall.SOCK_RAW,
-		syscall.IPPROTO_UDP,
-	)
-	if err != nil {
-		syscall.Close(rawUDPSockFD)
-		ERR("Unable to make raw socket err:", err)
+func createRawTCPSocket() (
+	buffer []byte,
+	socket *tunnels.RawSocket,
+	err error,
+) {
+	interfaceString := findInterfaceName()
+	if interfaceString == "" {
+		err = errors.New("no interface found")
 		return
 	}
 
-	ipx := InterfaceIP.To4()
-	addr := &syscall.SockaddrInet4{
-		Addr: [4]byte{
-			ipx[0],
-			ipx[1],
-			ipx[2],
-			ipx[3],
-		},
+	buffer = make([]byte, math.MaxUint16)
+	socket = &tunnels.RawSocket{
+		InterfaceName: interfaceString,
+		SocketBuffer:  buffer,
+		Domain:        syscall.AF_INET,
+		Type:          syscall.SOCK_RAW,
+		Proto:         syscall.IPPROTO_TCP,
 	}
 
-	err = syscall.Bind(rawUDPSockFD, addr)
+	err = socket.Create()
 	if err != nil {
-		syscall.Close(rawUDPSockFD)
-		ERR("Unable to bind net listener socket err:", err)
 		return
 	}
 
-	var DSTP uint16
-	var IHL byte
-	var PM *PortRange
-	var n int
-	var version byte
-	buffer := make([]byte, math.MaxUint16)
+	TCPRWC = socket.RWC
 
-	for {
-		n, _, err = syscall.Recvfrom(rawUDPSockFD, buffer, 0)
-		if err != nil {
-			ERR("Error reading from raw UDP sock:", err)
-			return
-		}
+	return
+}
 
-		version = buffer[0] >> 4
-		if version != 4 {
-			continue
-		}
-
-		// TODO .. use mask
-		IHL = ((buffer[0] << 4) >> 4) * 4
-		DSTP = binary.BigEndian.Uint16(buffer[IHL+2 : IHL+4])
-		PM = PortToCoreMapping[DSTP]
-		if PM == nil || PM.Client == nil {
-			continue
-		}
-
-		if PM.Client.Addr == nil {
-			WARN("UDP: no mapping addr: ", DSTP)
-			continue
-		}
-
-		select {
-		case PM.Client.ToUser <- CopySlice(buffer[:n]):
-		default:
-			WARN("UDP: packet channel full: ", DSTP)
-		}
+func createRawUDPSocket() (
+	buffer []byte,
+	socket *tunnels.RawSocket,
+	err error,
+) {
+	interfaceString := findInterfaceName()
+	if interfaceString == "" {
+		err = errors.New("no interface found")
+		return
 	}
+
+	buffer = make([]byte, math.MaxUint16)
+	socket = &tunnels.RawSocket{
+		InterfaceName: interfaceString,
+		SocketBuffer:  buffer,
+		Domain:        syscall.AF_INET,
+		Type:          syscall.SOCK_RAW,
+		Proto:         syscall.IPPROTO_UDP,
+	}
+
+	err = socket.Create()
+	if err != nil {
+		return
+	}
+
+	UDPRWC = socket.RWC
+
+	return
 }
 
 func DataSocketListener(SIGNAL *SIGNAL) {
@@ -487,9 +514,7 @@ func fromUserChannel(index int) {
 	}
 
 	var payload Packet
-	var PACKET []byte
 	var NIP net.IP
-	var err error
 	var ok bool
 	staging := make([]byte, 100000)
 	// clientCache := make(map[[4]byte]*UserCoreMapping)
@@ -511,7 +536,7 @@ func fromUserChannel(index int) {
 			panic("PAYLOAD BIGGER THEN STAGING .. THIS SHOULD NEVR HAPPEN")
 		}
 
-		PACKET, err = CM.EH.SEAL.Open1(
+		PACKET, err := CM.EH.SEAL.Open1(
 			payload.data[10:],
 			payload.data[2:10],
 			staging[:0],
@@ -649,7 +674,6 @@ func toUserChannel(index int) {
 	var PACKET []byte
 	var err error
 	var ok bool
-	var out []byte
 	var S4 [4]byte
 	var S4Port [2]byte
 	var FIN byte
@@ -709,43 +733,16 @@ func toUserChannel(index int) {
 			}
 		}
 
-		out = CM.EH.SEAL.Seal2(PACKET, CM.Uindex)
-		err = syscall.Sendto(dataSocketFD, out, 0, CM.Addr)
+		err = syscall.Sendto(dataSocketFD,
+			CM.EH.SEAL.Seal2(PACKET, CM.Uindex),
+			0,
+			CM.Addr,
+		)
 		if err != nil {
 			WARN("dataSocketFD sendTo err:", err)
 			return
 		}
 	}
-}
-
-func createRawTCPSocket() (
-	buffer []byte,
-	socket *tunnels.RawSocket,
-	err error,
-) {
-	interfaceString := findInterfaceName()
-	if interfaceString == "" {
-		err = errors.New("no interface found")
-		return
-	}
-
-	buffer = make([]byte, math.MaxUint16)
-	socket = &tunnels.RawSocket{
-		InterfaceName: interfaceString,
-		SocketBuffer:  buffer,
-		Domain:        syscall.AF_INET,
-		Type:          syscall.SOCK_RAW,
-		Proto:         syscall.IPPROTO_TCP,
-	}
-
-	err = socket.Create()
-	if err != nil {
-		return
-	}
-
-	TCPRWC = socket.RWC
-
-	return
 }
 
 func findInterfaceName() (name string) {
@@ -759,35 +756,5 @@ func findInterfaceName() (name string) {
 			}
 		}
 	}
-	return
-}
-
-func createRawUDPSocket() (
-	buffer []byte,
-	socket *tunnels.RawSocket,
-	err error,
-) {
-	interfaceString := findInterfaceName()
-	if interfaceString == "" {
-		err = errors.New("no interface found")
-		return
-	}
-
-	buffer = make([]byte, math.MaxUint16)
-	socket = &tunnels.RawSocket{
-		InterfaceName: interfaceString,
-		SocketBuffer:  buffer,
-		Domain:        syscall.AF_INET,
-		Type:          syscall.SOCK_RAW,
-		Proto:         syscall.IPPROTO_UDP,
-	}
-
-	err = socket.Create()
-	if err != nil {
-		return
-	}
-
-	UDPRWC = socket.RWC
-
 	return
 }

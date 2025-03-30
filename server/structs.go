@@ -32,11 +32,11 @@ var (
 	quicConfig         *quic.Config
 
 	dataSocketFD int
-	rawUDPSockFD int
-	rawTCPSockFD int
+	rawSock      int
+	rawSockAddr  syscall.SockaddrLinklayer
 	InterfaceIP  net.IP
-	TCPRWC       io.ReadWriteCloser
 	UDPRWC       io.ReadWriteCloser
+	TCPRWC       io.ReadWriteCloser
 
 	toUserChannelMonitor   = make(chan int, 100000)
 	fromUserChannelMonitor = make(chan int, 100000)

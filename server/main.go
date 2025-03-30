@@ -63,7 +63,6 @@ func loadPublicSigningCert() (err error) {
 }
 
 var (
-	id              string
 	interfaceIP     string
 	config          bool
 	features        string
@@ -93,7 +92,6 @@ func main() {
 	}()
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
-	flag.StringVar(&id, "id", "", "Tunnels ID used when generating the config. NOTE: not including and id will skip config generation but the certificate will still be generated.")
 	flag.StringVar(&interfaceIP, "interfaceIP", "", "InterfaceIP used when generating config and certificates")
 	flag.BoolVar(&config, "config", false, "Generate a config and make certificates ( Remember to copy the serial number ! )")
 	flag.StringVar(&features, "features", "", "Select enabled features. Available: VPN,VPL,API")
@@ -207,19 +205,15 @@ func main() {
 			case 2:
 				go ControlSocketListener(SIGNAL)
 			case 3:
-				go DataSocketListener(SIGNAL)
+				go ExternalSocketListener(SIGNAL)
 			case 4:
 				go startAPI(SIGNAL)
 			case 5:
 				go ReloadConfig(SIGNAL)
 
 			// VPN
-			case 10:
-				go ExternalUDPListener(SIGNAL)
-			case 11:
-				go ExternalTCPListener(SIGNAL)
 			case 12:
-
+				go DataSocketListener(SIGNAL)
 			// VPL
 			case 20:
 			case 21:
@@ -343,63 +337,60 @@ func makeConfigAndCertificates() {
 		interfaceIP = IFIP.String()
 	}
 
-	if id != "" {
-		sc := new(Server)
-		sc.ControlIP = interfaceIP
-		sc.InterfaceIP = interfaceIP
-		sc.APIPort = "444"
-		sc.ControlPort = "444"
-		sc.DataPort = "443"
-		sc.StartPort = 2000
-		sc.EndPort = 65500
-		sc.UserMaxConnections = 4
-		sc.AvailableMbps = 1000
-		sc.AvailableUserMbps = 10
-		sc.InternetAccess = true
-		sc.LocalNetworkAccess = true
-		sc.DNSAllowCustomOnly = false
-		sc.DNS = make([]*ServerDNS, 0)
-		sc.Networks = make([]*ServerNetwork, 0)
-		sc.DNSServers = []string{"1.1.1.1", "8.8.8.8"}
-		sc.ControlCert = ep + "server.crt"
-		sc.ControlKey = ep + "server.key"
+	sc := new(Server)
+	sc.ControlIP = interfaceIP
+	sc.InterfaceIP = interfaceIP
+	sc.APIPort = "444"
+	sc.ControlPort = "444"
+	sc.DataPort = "443"
+	sc.StartPort = 2000
+	sc.EndPort = 65500
+	sc.UserMaxConnections = 4
+	sc.AvailableMbps = 1000
+	sc.AvailableUserMbps = 10
+	sc.InternetAccess = true
+	sc.LocalNetworkAccess = true
+	sc.DNSAllowCustomOnly = false
+	sc.DNS = make([]*ServerDNS, 0)
+	sc.Networks = make([]*ServerNetwork, 0)
+	sc.DNSServers = []string{"1.1.1.1", "8.8.8.8"}
+	sc.ControlCert = ep + "server.crt"
+	sc.ControlKey = ep + "server.key"
 
-		N := new(ServerNetwork)
-		N.Tag = "default"
-		N.Network = interfaceIP + "/24"
-		N.Nat = "10.10.10.1/24"
-		sc.Networks = append(sc.Networks, N)
+	N := new(ServerNetwork)
+	N.Tag = "default"
+	N.Network = interfaceIP + "/24"
+	N.Nat = "10.10.10.1/24"
+	sc.Networks = append(sc.Networks, N)
 
-		sc.VPL = new(VPLSettings)
-		sc.VPL.Network = new(ServerNetwork)
-		sc.VPL.Network.Tag = "VPL"
-		sc.VPL.Network.Network = "10.0.0.0/16"
-		sc.VPL.Network.Nat = ""
-		sc.VPL.Network.Routes = []*Route{
-			{
-				Address: "10.0.0.0/16",
-				Metric:  "0",
-			},
-		}
+	sc.VPL = new(VPLSettings)
+	sc.VPL.Network = new(ServerNetwork)
+	sc.VPL.Network.Tag = "VPL"
+	sc.VPL.Network.Network = "10.0.0.0/16"
+	sc.VPL.Network.Nat = ""
+	sc.VPL.Network.Routes = []*Route{
+		{
+			Address: "10.0.0.0/16",
+			Metric:  "0",
+		},
+	}
 
-		sc.VPL.MaxDevices = math.MaxUint16
-		sc.VPL.AllowAll = true
+	sc.VPL.MaxDevices = math.MaxUint16
+	sc.VPL.AllowAll = true
 
-		f, err := os.Create(ep + "server.json")
-		if err != nil {
-			panic(err)
-		}
-		defer f.Close()
-		encoder := json.NewEncoder(f)
-		encoder.SetIndent("", "    ")
+	f, err := os.Create(ep + "server.json")
+	if err != nil {
+		panic(err)
+	}
+	defer f.Close()
+	encoder := json.NewEncoder(f)
+	encoder.SetIndent("", "    ")
 
-		// Encode the config to the file
-		if err := encoder.Encode(sc); err != nil {
-			ERR("Error encoding JSON:", err)
-		} else {
-			INFO("Config file has been written successfully.")
-		}
-
+	// Encode the config to the file
+	if err := encoder.Encode(sc); err != nil {
+		ERR("Error encoding JSON:", err)
+	} else {
+		INFO("Config file has been written successfully.")
 	}
 
 	_, err = certs.MakeCert(
@@ -421,7 +412,7 @@ func makeConfigAndCertificates() {
 		panic(err)
 	}
 	INFO("CERT SERIAL NUMBER: ", serialN)
-	f, err := os.Create(ep + "serial")
+	f, err = os.Create(ep + "serial")
 	if err != nil {
 		panic("unable to create folder for serial number")
 	}
