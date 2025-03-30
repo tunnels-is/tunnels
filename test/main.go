@@ -1,10 +1,12 @@
 package main
 
 import (
+	"encoding/binary"
 	"fmt"
 	"log"
 	"net"
 	"os"
+	"reflect"
 	"syscall"
 )
 
@@ -22,6 +24,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Error creating socket: %v", err)
 	}
+
 	ifaceName := "enx9cbf0d00a640" // Replace with your desired interface name
 	iface, err := net.InterfaceByName(ifaceName)
 	if err != nil {
@@ -51,59 +54,66 @@ func main() {
 		}
 
 		// Process the received packet
+		err = syscall.Sendto(fd, buffer[:n], 0, addr)
+		if err != nil {
+			fmt.Println(err)
+		}
+
 		processPacket(buffer[:n], addr)
+
 	}
 }
 
 func processPacket(packet []byte, addr syscall.Sockaddr) {
+	if binary.BigEndian.Uint16(packet[36:38]) == 22 {
+		return
+	}
+	if binary.BigEndian.Uint16(packet[34:36]) == 22 {
+		return
+	}
+	fmt.Println(packet)
+	fmt.Println(reflect.TypeOf(addr))
+
+	ll, ok := addr.(*syscall.SockaddrLinklayer)
+	if ok {
+		fmt.Printf("%+v\n", ll)
+	}
 	// This function will process each raw packet.
 	// You need to parse the Ethernet header, IP header, and UDP header to extract
 	// the desired information.
-
-	// Convert Sockaddr to SockaddrLinklayer
-	linkLayerAddr, ok := addr.(*syscall.SockaddrLinklayer)
-	if !ok {
-		log.Println("Unexpected address type:", addr)
-		return
-	}
-	if len(packet) > 1500 {
-		fmt.Println(len(packet))
-	}
-
-	// Extract information from Ethernet header
-	ethHeader := EthernetHeader(packet)
-	ethType := ethHeader.EtherType()
-
-	// Check for IPv4 (0x0800) or IPv6 (0x86DD)
-	if ethType == 0x0800 { // IPv4
-		ipHeader := IPv4Header(packet[14:]) // Ethernet header is 14 bytes
-		protocol := ipHeader.Protocol()
-		if protocol == 17 { // UDP
-			udpHeader := UDPHeader(packet[14+ipHeader.IHL()*4:]) // IP header length is variable (IHL*4)
-			// Print or process the UDP packet here
-			fmt.Printf("Received UDP Packet on interface index %d, protocol: %d, source port: %d, dest port: %d, from %s to %s, packet length: %d\n",
-				linkLayerAddr.Ifindex,
-				protocol,
-				udpHeader.SourcePort(),
-				udpHeader.DestinationPort(),
-				ipHeader.SourceAddress(),
-				ipHeader.DestinationAddress(),
-				len(packet),
-			)
-			// Access UDP data:
-			udpData := packet[14+ipHeader.IHL()*4+8:] // 8 bytes for UDP header
-			_ = udpData                               // Use udpData for further processing
-
-		}
-	} else if ethType == 0x86DD { // IPv6
-		// IPv6 implementation would be similar
-		fmt.Println("Received IPv6 packet (implementation omitted)")
+	// // Print potentially interesting byte segments with labels.  Adjust these
+	// based on what you expect to see in your network traffic.  These are *examples*.
+	if len(packet) > 14 {
 	} else {
-		fmt.Printf("Received non-IP packet of type 0x%X\n", ethType)
+		fmt.Println("Packet too short to extract MAC addresses/EtherType")
 	}
 
-	// Example of printing the whole packet
-	//fmt.Printf("Received packet from interface index %d, length: %d, data: %X\n", linkLayerAddr.Ifindex, len(packet), packet)
+	if len(packet) > 20 && packet[12] == 0x08 && packet[13] == 0x00 { //Check if it's IP
+		fmt.Printf("DM:%X SM:%X ",
+			packet[0:6],
+			packet[6:12],
+		)
+		fmt.Printf("SIP: %d.%d.%d.%d ", packet[26], packet[27], packet[28], packet[29])
+		fmt.Printf("DIP: %d.%d.%d.%d ", packet[30], packet[31], packet[32], packet[33])
+	} else {
+		fmt.Println("Not an IP packet, skipping IP header extraction.")
+	}
+
+	if len(packet) > 34 && packet[12] == 0x08 && packet[13] == 0x00 { //more checks
+		protocolByte := packet[23]
+		if protocolByte == 0x06 && len(packet) > 54 { //TCP
+			fmt.Printf("TSP: %d ", binary.BigEndian.Uint16(packet[34:36]))
+			fmt.Printf("TDP: %d ", binary.BigEndian.Uint16(packet[36:38]))
+		} else if protocolByte == 0x11 && len(packet) > 42 { //UDP
+			fmt.Printf("USP: %d ", binary.BigEndian.Uint16(packet[34:36]))
+			fmt.Printf("UDP %d ", binary.BigEndian.Uint16(packet[36:38]))
+		} else {
+			fmt.Printf("Other TCP or UDP Protocol: %X\n", protocolByte)
+		}
+	} else {
+		fmt.Println("Not an IP packet, skipping IP header extraction.")
+	}
+	fmt.Println()
 
 }
 

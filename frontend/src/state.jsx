@@ -659,11 +659,25 @@ export var STATE = {
 
       if (c.ServerIP === "") {
         STATE.Servers?.forEach((s) => {
-          if (s._id === c.ServerID) server = s;
+          if (s._id === c.ServerID){
+          server = s;
           connectionRequest.ServerIP = s.IP;
           connectionRequest.ServerPort = s.Port;
-          connectionRequest.ServerID = s._id;
+          connectionRequest.ServerID = s._id;            
+          }
         });
+        if(!server){
+        STATE.PrivateServers?.forEach((s) => {
+          console.log(s._id, c.ServerID)
+          if (s._id === c.ServerID){
+          server = s;
+          connectionRequest.ServerIP = s.IP;
+          connectionRequest.ServerPort = s.Port;
+          connectionRequest.ServerID = s._id;            
+          }
+        });
+          
+        }
       } else {
         connectionRequest.ServerIP = c.ServerIP;
         connectionRequest.ServerPort = c.ServerPort;
