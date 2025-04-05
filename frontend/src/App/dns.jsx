@@ -37,6 +37,7 @@ const DNS = () => {
 
 	useEffect(() => {
 		state.GetBackendState()
+		state.GetDNSStats()
 	}, [])
 
 	let blockLists = state.Config?.DNSBlockLists
@@ -85,16 +86,22 @@ const DNS = () => {
 	}
 
 	const generateBlocksTable = () => {
-		let dnsBlocks = state.State?.DNSBlocks
+		
+		let dnsBlocks = state.DNSStats ? state.DNSStats : [];
 		let rows = []
-
 		if (!dnsBlocks || dnsBlocks.length === 0) {
 			return rows
 		}
 
 		let stats = []
 
+
 		Object.entries(dnsBlocks).forEach(([key, value]) => {
+			let lb = dayjs(value.LastBlocked)
+			let ls = dayjs(value.LastSeen)
+			if (ls.diff(lb, "s") > 0){
+					return true
+			}
 			stats.push({ ...value, tag: key })
 		});
 
@@ -115,16 +122,19 @@ const DNS = () => {
 	}
 
 	const generateResolvesTable = () => {
-		let dnsResolves = state.State?.DNSResolves
+		let dnsResolves = state.DNSStats ? state.DNSStats : [];
 		let rows = []
-
 		if (!dnsResolves || dnsResolves.length === 0) {
 			return rows
 		}
 
 		let stats = []
 		Object.entries(dnsResolves).forEach(([key, value]) => {
-			stats.push({ ...value, tag: key })
+			let lb = dayjs(value.LastBlocked)
+			let ls = dayjs(value.LastSeen)
+			if (ls.diff(lb, "s") > 0){
+				stats.push({ ...value, tag: key })
+			}
 		});
 
 		stats = stats.sort(DNSSort)

@@ -851,8 +851,8 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	// Create cross-pointers
 	tunnel.SetState(TUN_Connected)
 	tunnel.registerPing(time.Now())
-	tunnel.id = uuid.NewString()
-	TunnelMap.Store(tunnel.id, tunnel)
+	tunnel.ID = uuid.NewString()
+	TunnelMap.Store(tunnel.ID, tunnel)
 
 	// _ = GenerateState()
 

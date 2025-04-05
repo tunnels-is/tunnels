@@ -1,4 +1,4 @@
-import { useState } from "react";
+  import { useState } from "react";
 import STORE from "./store";
 import toast from "react-hot-toast";
 import axios from "axios";
@@ -29,14 +29,14 @@ export var STATE = {
   renderPage: (page) => {
     if (STATE.updates[page]) {
       if (STATE.debug) {
-        console.log("RERENDER");
+        console.log("RERENDER:", page);
       }
       STATE.updates[page]();
     }
   },
   rerender: () => {
     if (STATE.debug) {
-      console.log("RERENDER");
+      console.log("GLOBAL RERENDER");
     }
     Object.keys(STATE.updates).forEach((k) => {
       STATE.updates[k]();
@@ -199,7 +199,6 @@ export var STATE = {
   // OLD
   // OLD
   // OLD
-  DNSListDateFormat: "ddd D. HH:mm:ss",
   TablePageSize: Number(STORE.Cache.Get("pageSize")),
   setPageSize: (id, count) => {
     let pg = STORE.Cache.GetObject("table_" + id);
@@ -659,11 +658,28 @@ export var STATE = {
 
       if (c.ServerIP === "") {
         STATE.Servers?.forEach((s) => {
-          if (s._id === c.ServerID) server = s;
+          if (s._id === c.ServerID){
+            
+          server = s;
           connectionRequest.ServerIP = s.IP;
           connectionRequest.ServerPort = s.Port;
           connectionRequest.ServerID = s._id;
+          }
+          
         });
+        if (!server){
+        STATE.PrivateServers?.forEach((s) => {
+          if (s._id === c.ServerID){
+            
+          server = s;
+          connectionRequest.ServerIP = s.IP;
+          connectionRequest.ServerPort = s.Port;
+          connectionRequest.ServerID = s._id;
+          }
+          
+        });
+          
+        }
       } else {
         connectionRequest.ServerIP = c.ServerIP;
         connectionRequest.ServerPort = c.ServerPort;
@@ -712,12 +728,20 @@ export var STATE = {
     STATE.GetBackendState();
   },
   disconnectFromVPN: async (c) => {
+      STATE.toggleLoading({
+        logTag: "disconnecting",
+        tag: "DISCONNECT",
+        show: true,
+        msg: "Disconnecting ...",
+        includeLogs: true,
+      });
+
     try {
       let x = await STATE.API.method(
         "disconnect",
-        { GUID: c.WindowsGUID },
+        { ID: c.ID},
         false,
-        5000,
+        20000,
       );
       if (x === undefined) {
         STATE.errorNotification("Unknown error, please try again in a moment");
@@ -994,11 +1018,19 @@ export var STATE = {
     }
 
     if (resp?.status === 200) {
+      if (resp.data?.length > 0){
       STORE.Cache.SetObject("private-servers", resp.data);
       STATE.PrivateServers = resp.data;
+              } else {
+      STATE.errorNotification("Unable to find servers");
+      STORE.Cache.SetObject("private-servers",[]);
+      STATE.PrivateServers = [];
+              }
       STATE.renderPage("pservers");
     } else {
       STATE.errorNotification("Unable to find servers");
+      STORE.Cache.SetObject("private-servers",[]);
+      STATE.PrivateServers = [];
     }
 
     STATE.GetPrivateServersInProgress = false;
@@ -1439,7 +1471,21 @@ export var STATE = {
     STATE.toggleLoading(undefined);
     return resp.data;
   },
-  State: STORE.Cache.GetObject("state"),
+  DNSStats: STORE.Cache.GetObject("dns-stats"),
+  DNSListDateFormat: "ddd D. HH:mm:ss",
+  GetDNSStats: async () => {
+    try {
+    let  resp = await STATE.API.method("getDNSStats", null);
+      if (resp?.status === 200) {
+        STATE.DNSStats = resp.data
+        STORE.Cache.SetObject("dns-stats", resp.data);
+      }
+    } catch(error){
+      console.dir(error)
+    }
+    
+  },
+ State: STORE.Cache.GetObject("state"),
   StateFetchInProgress: false,
   GetURL: () => {
     let host = window.location.origin;
@@ -1467,8 +1513,7 @@ export var STATE = {
         {},
         { headers: { "Content-Type": "application/json" } },
       );
-      console.log("RESP");
-      console.dir(response);
+;
 
       if (response.status === 200) {
         if (response.data) {
@@ -1527,8 +1572,6 @@ export var STATE = {
           timeout: to,
           headers: { "Content-Type": "application/json" },
         });
-        console.log("CON RESPONSE");
-        console.dir(response);
 
         if (response.data?.Message) {
           STATE.successNotification(response?.data?.Message);

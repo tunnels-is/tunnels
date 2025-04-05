@@ -8,7 +8,7 @@ const DNSAnswers = (props) => {
 	const { domain } = useParams()
 
 	const OpenWindowURL = (baseurl, value) => {
-		// let final = "https://who.is/whois/" + value
+		// let final = "https://whois.com/whois/" + value
 		let final = baseurl + value
 		window.open(final, "_blank")
 		try {
@@ -25,15 +25,14 @@ const DNSAnswers = (props) => {
 
 	let answers = new Map();
 
-	state.State?.DNSResolves[domain].Answers?.map(a => {
-		// console.dir(a)
+	state?.DNSStats[domain].Answers?.map(a => {
 		let as = a.split("\t")
 		let children = []
 		as.forEach((a, index) => {
 			let isLast = false
 			let isFirst = false
 			let classes = "column"
-			let baseURL = "https://who.is/whois/"
+			let baseURL = "https://whois.com/whois/"
 			if (index === as.length - 1) {
 				isLast = true
 				classes += " bold"
@@ -69,13 +68,8 @@ const DNSAnswers = (props) => {
 			answers.set(key, e)
 		}
 		return
-
-
-
 	})
 
-
-	console.dir(answers.size)
 	return (
 		<div className={`ab DNSAnswers ${props.className ? props.className : ""}`}>
 			{answers.size < 1 &&

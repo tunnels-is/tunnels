@@ -232,8 +232,19 @@ body::-webkit-scrollbar {
   background: $menu-background;
 }
 
+
+.sidebar-title {
+margin-bottom: 10px;
+    margin-top: 10px;
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--c-shade4);
+}
+
 .title {
-  font-size: 24px;
+  background:var(--c-shade1);
+  padding:10px;
+  font-size: 26px;
   font-weight: 800;
   color: var(--c-shade4);
   margin-bottom: 20px;
@@ -357,6 +368,7 @@ body::-webkit-scrollbar {
   flex-direction: row;
 
   .label {
+  padding-left: 10px;
     font-weight: bold;
     /* background: var(--c-shade4); */
     width: var(--label-width);
@@ -401,7 +413,7 @@ body::-webkit-scrollbar {
   }
 }
 
-#fullpath {
+.fullpath {
   width: 250%;
 }
 
@@ -412,6 +424,7 @@ body::-webkit-scrollbar {
   flex-direction: row;
 
   .label {
+  padding-left:10px;
     font-weight: bold;
     width: var(--label-width);
     border-radius: var(--label-border-radius);
@@ -450,21 +463,26 @@ body::-webkit-scrollbar {
     text-align: center;
 
     .title {
-      font-size: 30px;
+      font-size: 24px;
       padding: 5px;
       text-wrap: stable;
     }
 
     .subtitle {
-      font-size: 26px;
+      font-size: 22px;
       padding: 5px;
-      margin-bottom: 20px;
+      margin-bottom: 10px;
     }
 
     .buttons {
       display: flex;
       gap: 5%;
       justify-content: center;
+      .button {
+        height:30px;
+        font-size:20px;
+        padding:3px 10px 10px 10px;
+      }
 
       .no {
         width: 45% !important;
@@ -773,7 +791,7 @@ body::-webkit-scrollbar {
   }
 
   .group-table {
-    max-width:700px;
+    max-width:700px !important;
   }
 
   .back {
@@ -791,6 +809,10 @@ body::-webkit-scrollbar {
 
   .card-button {
     width: 200px !important;
+  }
+
+  .group-table {
+    max-width:900px !important;
   }
 
   .formkeyvalue,
@@ -874,11 +896,24 @@ body::-webkit-scrollbar {
   }
 }
 
+
+.public-server-wrapper{
+.new-table {
+  max-width:800px !important;
+}
+  
+}
+
 .private-server-wrapper {
   min-height: 100%;
   height: auto;
   max-width: 100%;
+
+  .router-table {
+  max-width: 700px;
+  }
 }
+
 
 .router-wrapper {
   min-height: 100%;
@@ -891,10 +926,6 @@ body::-webkit-scrollbar {
     .root_keys {
       min-width: 400px;
     }
-  }
-
-  .router-table {
-    width: 800px !important;
   }
 
   .create {
@@ -985,6 +1016,8 @@ body::-webkit-scrollbar {
   display: flex;
   flex-direction: column;
 
+
+
   .clickable {
     font-weight: 600 !important;
     cursor: pointer;
@@ -1009,30 +1042,12 @@ body::-webkit-scrollbar {
     margin-left: 20px;
   }
 
-  .top-bar {
+  .search-top-bar{
     position: relative;
     display: flex;
     /* padding-bottom: 10px; */
     margin-bottom: 10px;
     /* padding-left: 10px; */
-
-    .title {
-      margin: 0px;
-      /* padding-top: 15px; */
-      margin-right: auto;
-    }
-
-    .text-button {
-      font-size: 20px;
-      text-align: left;
-      margin-left: 20px;
-      padding-top: 2px;
-    }
-
-    .text-button:hover {
-      color: var(--c-shade5);
-    }
-
     .search-bar {
       display: flex;
       width: 100%;
@@ -1057,6 +1072,37 @@ body::-webkit-scrollbar {
         color: var(--c-shade4);
       }
     }
+    
+  }
+
+  .top-bar {
+    background: var(--c-shade1);
+    padding: 10px;
+    position: relative;
+    display: flex;
+    /* padding-bottom: 10px; */
+    margin-bottom: 10px;
+    /* padding-left: 10px; */
+
+.table-title {
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--c-shade4);
+      margin: 0px;
+      margin-right: auto;
+}
+
+    .text-button {
+      font-size: 20px;
+      text-align: left;
+      margin-left: 20px;
+      padding-top: 2px;
+    }
+
+    .text-button:hover {
+      color: var(--c-shade5);
+    }
+
 
     .pagination-bar {
       margin-left: auto;
@@ -1378,10 +1424,9 @@ body::-webkit-scrollbar {
   flex-direction: column;
 
   .answer {
-    width: 100%;
+    width: fit-content;
     padding-top: 3px;
     padding-bottom: 3px;
-    border-bottom: 1px solid gray;
     color: var(--c-shade6) !important;
     display: flex;
     flex-direction: row;
@@ -1638,6 +1683,8 @@ body::-webkit-scrollbar {
   width: 100%;
   margin-bottom: 300px;
 
+  
+
   .object-wrapper {
     display: flex;
     flex-direction: row;
@@ -1646,6 +1693,9 @@ body::-webkit-scrollbar {
 
   .d1 {
     align-content: baseline;
+    .editor-title {
+      padding:10px;
+    }
   }
 
   .root_keys {
@@ -1662,6 +1712,9 @@ body::-webkit-scrollbar {
     gap: 20px !important;
 
     .d0 {
+    .editor-title {
+      padding:10px;
+    }
 
       .input_wrap {
         padding-left: 10px;
@@ -1680,7 +1733,11 @@ body::-webkit-scrollbar {
     flex-basis: 100%;
     width: 100% !important;
 
-    .title {
+    .editor-title {
+    background:var(--c-shade1);
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--c-shade4);
       margin-right: 20px;
       margin-bottom: 0px;
       margin-top: 10px;
@@ -1705,11 +1762,11 @@ body::-webkit-scrollbar {
   }
 
   .new_button {
-    margin-top: 10px;
+    margin-top: 18px;
     color: var(--c-blue);
     cursor: pointer;
     font-weight: bold;
-    font-size: 25px;
+    font-size: 28px;
   }
 
   .del_button,
@@ -1721,10 +1778,10 @@ body::-webkit-scrollbar {
 
   .del_button {
     /* margin-left: 0px !important; */
-    margin-top: -30px;
-    margin-right: -28px;
-    font-size: 26px;
-    margin-bottom: -10px;
+    /* margin-top: -30px; */
+    /* margin-right: -28px; */
+    font-size: 20px;
+    margin-bottom: -5px;
   }
 
   .obj_grp {
@@ -1760,7 +1817,7 @@ body::-webkit-scrollbar {
   }
 
   .obj_grp {
-    padding: 20px;
+    padding: 10px;
     flex-wrap: wrap;
     /* border: 1px solid orange; */
     display: flex;
@@ -1770,11 +1827,6 @@ body::-webkit-scrollbar {
     height: fit-content;
 
     /* max-width: 1000px; */
-    .del_button {
-      color: var(--c-red);
-      cursor: pointer;
-      margin-left: auto;
-    }
   }
 
   .input_wrap {

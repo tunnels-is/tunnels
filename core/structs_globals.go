@@ -6,7 +6,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"sync"
 	"time"
 
 	"github.com/miekg/dns"
@@ -376,111 +375,6 @@ type FirewallRequest struct {
 	IP              string
 	Hosts           []string
 	DisableFirewall bool
-}
-
-type Tunnel struct {
-	Meta *TunnelMETA
-	TunnelSTATS
-	CRR      *ConnectRequestResponse
-	ClientCR ConnectionRequest
-	Con      net.Conn
-
-	// TUN/TAP
-	Index        []byte
-	Nonce2Bytes  []byte
-	Interface    *TInterface
-	AddressNetIP net.IP
-	Routes       []string
-
-	// ??????
-	// CRR       *ConnectRequestResponse
-	StartPort uint16
-	EndPort   uint16
-	EH        *crypt.SocketWrapper
-
-	// STATES
-	Connected              bool
-	UserRWLoopAbnormalExit bool
-	Connecting             bool
-	Exiting                bool
-
-	// VPN NODE
-	LOCAL_IF_IP [4]byte
-
-	PingBuffer [8]byte
-
-	// DNS1Bytes     [4]byte `json:"-"`
-	// DNS1IP        net.IP  `json:"-"`
-	PrevDNS       net.IP
-	DNSBytes      [4]byte
-	DNSIP         net.IP
-	DNSEgressLock sync.Mutex
-
-	// NEW PORT MAPPING
-	TCP_M  []VPNPort
-	UDP_M  []VPNPort
-	TCP_EM map[[10]byte]*Mapping
-	UDP_EM map[[10]byte]*Mapping
-	EP_MP  *Mapping
-	IP_MP  *Mapping
-	EP_SYN byte
-
-	// VPL
-	VPL_IP    [4]byte
-	VPL_E_MAP map[[4]byte]struct{} `json:"-"`
-	VPL_I_MAP map[[4]byte]struct{} `json:"-"`
-
-	//  NAT
-	NAT_CACHE         map[[4]byte][4]byte `json:"-"`
-	REVERSE_NAT_CACHE map[[4]byte][4]byte `json:"-"`
-
-	// BufferError bool
-
-	//  PACKET MANIPULATION
-	EP_Version  byte
-	EP_Protocol byte
-
-	EP_DstIP [4]byte
-
-	EP_IPv4HeaderLength byte
-	EP_IPv4Header       []byte
-	EP_TPHeader         []byte
-
-	EP_SrcPort [2]byte
-	EP_DstPort [2]byte
-
-	EP_NAT_IP [4]byte
-	EP_NAT_OK bool
-
-	EP_DNS_Response         []byte
-	EP_DNS_Local            bool
-	EP_DNS_Drop             bool
-	EP_DNS_Forward          bool
-	EP_DNS_Port_Placeholder [2]byte
-	EP_DNS_Packet           []byte
-
-	// This IP gets over-written on connect
-	EP_VPNSrcIP [4]byte
-
-	// EP_NEW_RST  byte
-	PREV_DNS_IP [4]byte
-	IS_UNIX     bool
-
-	IP_Version  byte
-	IP_Protocol byte
-
-	IP_DstIP [4]byte
-	IP_SrcIP [4]byte
-
-	IP_IPv4HeaderLength byte
-	IP_IPv4Header       []byte
-	IP_TPHeader         []byte
-
-	IP_SrcPort [2]byte
-	IP_DstPort [2]byte
-
-	IP_NAT_IP [4]byte
-	IP_NAT_OK bool
 }
 
 type Config struct {

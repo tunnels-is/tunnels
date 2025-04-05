@@ -157,7 +157,7 @@ const SideBar = () => {
         }
         return (
           <div className="ab group" key={g.title}>
-            <div className="ab title">{g.title}</div>
+            <div className="ab sidebar-title">{g.title}</div>
 
             {g.items.map((i) => {
               if (i.user && (!user || user.Email === "")) {

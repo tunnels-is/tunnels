@@ -17,7 +17,7 @@ const CustomSelect = (props) => {
 			}
 		})
 		if (count > 1) {
-			return String(count) + " Assignments"
+			return String(count) + " Assigned"
 		} else {
 			return def
 		}
