@@ -302,7 +302,7 @@ func writeTunnelsToDisk(tag string) (outErr error) {
 			outErr = err
 			return false
 		}
-		tf, err := CreateFile(s.TunnelsPath + string(os.PathSeparator) + t.Tag + tunnelFileSuffix)
+		tf, err := CreateFile(s.TunnelsPath + t.Tag + tunnelFileSuffix)
 		if err != nil {
 			ERROR("Unable to save tunnel to disk:", err)
 			outErr = err
@@ -470,7 +470,7 @@ func CleanupOnClose() {
 		tunnel := tun.tunnel.Load()
 		err := tunnel.Disconnect(tun)
 		if err != nil {
-			ERROR("unable to disconnect tunnel", tun.id, tunnel.IPv4Address, "error:", err)
+			ERROR("unable to disconnect tunnel", tun.ID, tunnel.IPv4Address, "error:", err)
 		}
 		return true
 	})

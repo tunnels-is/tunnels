@@ -80,7 +80,7 @@ func CreateFile(file string) (f *os.File, err error) {
 		return
 	}
 
-	DEBUG("New file opened: ", f.Name())
+	DEBUG("File opened: ", f.Name())
 	return
 }
 
@@ -92,6 +92,7 @@ func CreateFolder(path string) {
 			ERROR("Unable to create base folder: ", err)
 			return
 		}
+		DEBUG("New directory:", path)
 	}
 }
 

@@ -171,6 +171,9 @@ var STORE = {
         if (object === "undefined") {
           return undefined;
         }
+        if (!object || object === '""'){
+          return undefined
+        }
         jsonData = JSON.parse(object);
         if (STORE.debug) {
           console.log(

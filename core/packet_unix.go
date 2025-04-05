@@ -76,7 +76,7 @@ func (tun *TUN) ReadFromServeTunnel() {
 			ERROR(r, string(debug.Stack()))
 		}
 		meta := tun.meta.Load()
-		DEBUG("Server listener exiting:", meta.Tag, tun.id)
+		DEBUG("Server listener exiting:", meta.Tag, tun.ID)
 		if tun.GetState() == TUN_Connected {
 			tunnelMonitor <- tun
 		}

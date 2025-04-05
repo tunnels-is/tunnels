@@ -21,13 +21,10 @@ func CreateAndConnectToInterface(t *TUN) (inter *TInterface, err error) {
 func Disconnect(tunID string, switching bool) (err error) {
 	DEBUG("disconnecting from", tunID, switching)
 	tunnelMapRange(func(tun *TUN) bool {
-		if tun.id == tunID {
+		if tun.ID == tunID {
 			tun.SetState(TUN_Disconnecting)
 			tunnel := tun.tunnel.Load()
 			_ = tunnel.Disconnect(tun)
-			if tun.connection != nil {
-				tun.connection.Close()
-			}
 			if tun.encWrapper != nil {
 				if tun.encWrapper.HStream != nil {
 					tun.encWrapper.HStream.Close()
@@ -37,12 +34,12 @@ func Disconnect(tunID string, switching bool) (err error) {
 				}
 			}
 
-			tun.SetState(TUN_Disconnected)
+			TunnelMap.Delete(tun.ID)
 			m := tun.meta.Load()
 			if m != nil {
-				DEBUG("disconnected from ", m.Tag, tun.id)
+				DEBUG("disconnected from ", m.Tag, tun.ID)
 			} else {
-				DEBUG("disconnected from ", "(tag unknown)", tun.id)
+				DEBUG("disconnected from ", "(tag unknown)", tun.ID)
 			}
 			return false
 		}

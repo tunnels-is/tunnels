@@ -140,7 +140,7 @@ const ServersFull = () => {
 			row.items = [
 				{
 					type: "text",
-					value: server.Tag,
+					value: server.Tag+"sfdfd",
 					color: "blue",
 					click: function() {
 						setPServer(server)

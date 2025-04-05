@@ -84,7 +84,7 @@ const Servers = () => {
       row.items = [
         {
           type: "img",
-          align: "right",
+          align: "left",
           className: "flag",
           value:
             "https://raw.githubusercontent.com/tunnels-is/media/master/nl-website/v2/flags/" +
@@ -150,7 +150,7 @@ const Servers = () => {
   }
 
   return (
-    <div className="ab router-wrapper">
+    <div className="ab router-wrapper public-server-wrapper">
       <NewTable
         title={"Public VPN Servers"}
         tableID={"public-servers"}

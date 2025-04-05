@@ -88,7 +88,7 @@ func PingConnections() {
 			if len(out) > 0 {
 				_, err = tun.connection.Write(out)
 				if err != nil {
-					ERROR("unable to ping tunnel: ", tun.id, meta.Tag)
+					ERROR("unable to ping tunnel: ", tun.ID, meta.Tag)
 				}
 			}
 
@@ -100,8 +100,8 @@ func PingConnections() {
 				DEBUG("30+ Seconds since ping from ", meta.Tag, " attempting reconnection")
 				_, _ = PublicConnect(tun.CR)
 			} else {
-				DEBUG("30+ Seconds since ping from ", meta.Tag, " disconnecting")
-				_ = Disconnect(tun.id, true)
+				DEBUG("30+ Seconds since ping from ", meta.Tag)
+				// _ = Disconnect(tun.ID, true)
 			}
 		}
 

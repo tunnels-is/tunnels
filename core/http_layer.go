@@ -179,6 +179,9 @@ func HTTPhandler(w http.ResponseWriter, r *http.Request) {
 	case "setTunnel":
 		HTTP_SetTunnel(w, r)
 		return
+	case "getDNSStats":
+		HTTP_GetDNSStats(w, r)
+		return
 	default:
 	}
 
@@ -261,6 +264,19 @@ type StateNetworkResponse struct {
 	DefaultInterface     net.IP
 	DefaultInterfaceID   int32
 	DefaultInterfaceName string
+}
+
+func HTTP_GetDNSStats(w http.ResponseWriter, r *http.Request) {
+	stats := make(map[string]any)
+	DNSStatsMap.Range(func(key, value any) bool {
+		ks, ok := key.(string)
+		if !ok {
+			return true
+		}
+		stats[ks] = value
+		return true
+	})
+	JSON(w, r, 200, stats)
 }
 
 func HTTP_GetState(w http.ResponseWriter, r *http.Request) {
@@ -511,7 +527,7 @@ func HTTP_DeleteTunnels(w http.ResponseWriter, r *http.Request) {
 	}
 
 	state := STATE.Load()
-	_ = os.Remove(state.TunnelsPath + string(os.PathSeparator) + form.Tag + tunnelFileSuffix)
+	_ = os.Remove(state.TunnelsPath + form.Tag + tunnelFileSuffix)
 
 	tunnelMetaMapRange(func(tun *TunnelMETA) bool {
 		if tun.Tag == form.Tag {

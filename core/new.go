@@ -176,6 +176,7 @@ func (t *TUN) MarshalJSON() ([]byte, error) {
 
 	// Define the structure we want in JSON
 	return json.Marshal(struct {
+		ID         string
 		CR         *ConnectionRequest
 		CRResponse *ConnectRequestResponse
 		Ping       time.Time
@@ -190,6 +191,7 @@ func (t *TUN) MarshalJSON() ([]byte, error) {
 		Ingress    string
 		MS         int64
 	}{
+		t.ID,
 		t.CR,
 		t.CRReponse,
 		pingTime,
@@ -207,7 +209,7 @@ func (t *TUN) MarshalJSON() ([]byte, error) {
 }
 
 type TUN struct {
-	id    string
+	ID    string
 	state atomic.Pointer[TunnelState] `json:"-"`
 
 	meta atomic.Pointer[TunnelMETA] `json:"-"`
