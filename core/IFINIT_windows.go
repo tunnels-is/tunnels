@@ -15,8 +15,8 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-type TunnelInterface struct {
-	tunnel        atomic.Pointer[*Tunnel]
+type TInterface struct {
+	tunnel        atomic.Pointer[*TUN]
 	shouldRestart bool
 	shouldExit    bool
 	exitChannel   chan byte
@@ -47,42 +47,41 @@ type TunnelInterface struct {
 	IFIndex       int
 }
 
-func (t *TunnelInterface) VerifyOrLoadPointer(method string) {
+func (t *TInterface) VerifyOrLoadPointer(method string) {
 	// if atomic.LoadPointer(unsafe.Pointer(&t.WDLL.module)) == nil {
 	// WINTUN IS GONE
 	// }
 }
 
 func CreateNewTunnelInterface(
-	VC *Tunnel,
-) (IF *TunnelInterface, err error) {
+	meta *TunnelMETA,
+) (IF *TInterface, err error) {
 	defer RecoverAndLogToFile()
 
 	var GUID windows.GUID
-	if VC.Meta.WindowsGUID != "" {
-		GUID, err = windows.GUIDFromString(VC.Meta.WindowsGUID)
+	if meta.WindowsGUID != "" {
+		GUID, err = windows.GUIDFromString(meta.WindowsGUID)
 		if err != nil {
-			ERROR("Unable to create Windows UID from string: ", VC.Meta.WindowsGUID)
+			ERROR("Unable to create Windows UID from string: ", meta.WindowsGUID)
 			return
 		}
 	} else {
 		GUID = *new(windows.GUID)
 	}
 
-	IF = &TunnelInterface{
-		Name:        VC.Meta.IFName,
-		IPv4Address: VC.Meta.IPv4Address,
-		NetMask:     VC.Meta.NetMask,
-		TxQueuelen:  VC.Meta.TxQueueLen,
-		MTU:         VC.Meta.MTU,
-		Persistent:  VC.Meta.Persistent,
+	IF = &TInterface{
+		Name:        meta.IFName,
+		IPv4Address: meta.IPv4Address,
+		NetMask:     meta.NetMask,
+		TxQueuelen:  meta.TxQueueLen,
+		MTU:         meta.MTU,
 
 		// hardcoded for now
 		IPv6Address:   "fe80::1",
 		GatewayMetric: "2000",
 		// Gateway:       DEFAULT_GATEWAY.To4().String(),
 		// Gateway: "127.0.0.1",
-		Gateway: VC.Meta.IPv4Address,
+		Gateway: meta.IPv4Address,
 		GUID:    GUID,
 		RingCap: 0x4000000,
 		// RingCap: 0x8000000,
@@ -90,12 +89,11 @@ func CreateNewTunnelInterface(
 	DEBUG(fmt.Sprintf("New tunnel interface/adapter: %v", IF))
 
 	IF.WDLL = new(DLL)
-	IF.WDLL.Init("./wintun.dll")
-
+	_ = IF.WDLL.Init("./wintun.dll")
 	return IF, err
 }
 
-func (t *TunnelInterface) CreateOrOpen() (err error) {
+func (t *TInterface) CreateOrOpen() (err error) {
 	t.NamePtr, err = windows.UTF16PtrFromString(t.Name)
 	if err != nil {
 		DEBUG(fmt.Sprintf("Adapter creation error (%s) err: %s", t.Name, err))
@@ -153,7 +151,7 @@ func (t *TunnelInterface) CreateOrOpen() (err error) {
 	return
 }
 
-func (t *TunnelInterface) Up() (err error) {
+func (t *TInterface) Up() (err error) {
 	var msg error
 	add, err := t.WDLL.GetAddr(3)
 	if err != nil {
@@ -174,7 +172,7 @@ func (t *TunnelInterface) Up() (err error) {
 	return
 }
 
-func (t *TunnelInterface) Down() (err error) {
+func (t *TInterface) Down() (err error) {
 	// cmd := exec.Command(
 	// 	"netsh",
 	// 	"interface",
@@ -221,7 +219,7 @@ func (t *TunnelInterface) Down() (err error) {
 	return nil
 }
 
-func (t *TunnelInterface) Addr() (err error) {
+func (t *TInterface) Addr() (err error) {
 	cmd := exec.Command(
 		"netsh",
 		"interface",
@@ -262,11 +260,11 @@ func (t *TunnelInterface) Addr() (err error) {
 	return nil
 }
 
-func (t *TunnelInterface) Close() (err error) {
+func (t *TInterface) Close() (err error) {
 	return t.Delete()
 }
 
-func (t *TunnelInterface) Delete() (err error) {
+func (t *TInterface) Delete() (err error) {
 	add, err := t.WDLL.GetAddr(1)
 	if err != nil {
 		return
@@ -475,7 +473,7 @@ func DNS_Set(IFNameOrIndex, DNSIP, Index string) (err error) {
 	return nil
 }
 
-func (t *TunnelInterface) SetMTU() error {
+func (t *TInterface) SetMTU() error {
 	cmd := exec.Command(
 		"netsh",
 		"interface",
@@ -505,7 +503,7 @@ func (t *TunnelInterface) SetMTU() error {
 	return nil
 }
 
-func (t *TunnelInterface) addRoutes(n *ServerNetwork) (err error) {
+func (t *TInterface) addRoutes(n *ServerNetwork) (err error) {
 	if n.Nat != "" {
 		err = IP_AddRoute(n.Nat, t.Name, t.IPv4Address, "0")
 		if err != nil {
@@ -527,7 +525,7 @@ func (t *TunnelInterface) addRoutes(n *ServerNetwork) (err error) {
 	return nil
 }
 
-func (t *TunnelInterface) deleteRoutes(V *Tunnel, n *ServerNetwork) (err error) {
+func (t *TInterface) deleteRoutes(n *ServerNetwork) (err error) {
 	err = IP_DelRoute(n.Nat, t.IPv4Address, "0")
 	if err != nil {
 		return err
@@ -546,8 +544,10 @@ func (t *TunnelInterface) deleteRoutes(V *Tunnel, n *ServerNetwork) (err error) 
 	return nil
 }
 
-func (t *TunnelInterface) ApplyRoutes(V *Tunnel) (err error) {
-	if IsDefaultConnection(V.Meta.IFName) || V.Meta.EnableDefaultRoute {
+func (t *TInterface) ApplyRoutes(V *TUN) (err error) {
+
+	meta := V.meta.Load()
+	if IsDefaultConnection(meta.IFName) || meta.EnableDefaultRoute {
 		t.GatewayMetric = "1"
 		err = IP_RouteMetric("0.0.0.0/0", t.Name, "1")
 		if err != nil {
@@ -555,26 +555,26 @@ func (t *TunnelInterface) ApplyRoutes(V *Tunnel) (err error) {
 		}
 	}
 
-	for _, n := range V.CRR.Networks {
-		t.addRoutes(V, n)
+	for _, n := range V.CRResponse.Networks {
+		t.addRoutes(n)
 	}
 
-	if V.CRR.VPLNetwork != nil {
-		t.addRoutes(V, V.CRR.VPLNetwork)
+	if V.CRResponse.VPLNetwork != nil {
+		t.addRoutes(V.CRResponse.VPLNetwork)
 	}
 
 	return
 }
 
-func (t *TunnelInterface) RemoveRoutes(V *Tunnel, preserve bool) (err error) {
+func (t *TInterface) RemoveRoutes(V *Tunnel, preserve bool) (err error) {
 	defer RecoverAndLogToFile()
 
-	for _, n := range V.CRR.Networks {
-		t.deleteRoutes(V, n)
+	for _, n := range V.CRRespose.Networks {
+		t.deleteRoutes(n)
 	}
 
-	if V.CRR.VPLNetwork != nil {
-		t.deleteRoutes(V, V.CRR.VPLNetwork)
+	if V.CRRespose.VPLNetwork != nil {
+		t.deleteRoutes(V.CRRespose.VPLNetwork)
 	}
 	if !preserve {
 		if IsDefaultConnection(V.Meta.IFName) || V.Meta.EnableDefaultRoute {
@@ -589,7 +589,7 @@ func (t *TunnelInterface) RemoveRoutes(V *Tunnel, preserve bool) (err error) {
 	return
 }
 
-func (t *TunnelInterface) Connect(V *Tunnel) (err error) {
+func (t *TInterface) Connect(tun *TUN) (err error) {
 	err = t.CreateOrOpen()
 	if err != nil {
 		return
@@ -611,8 +611,9 @@ func (t *TunnelInterface) Connect(V *Tunnel) (err error) {
 	// 	return
 	// }
 	t.exitChannel = make(chan byte, 10)
+	meta := tun.meta.Load()
 
-	if IsDefaultConnection(V.Meta.IFName) || V.Meta.EnableDefaultRoute {
+	if IsDefaultConnection(meta.IFName) || meta.EnableDefaultRoute {
 		// Gateway metric is what determines default
 		// routing on windows. The interface will always
 		// have a default router on creation.
@@ -626,18 +627,18 @@ func (t *TunnelInterface) Connect(V *Tunnel) (err error) {
 	// _ = DNS_Del(strconv.Itoa(DEFAULT_INTERFACE_ID))
 	// err = DNS_Set(strconv.Itoa(DEFAULT_INTERFACE_ID), "127.0.0.1", "1")
 
-	if V.CRR.VPLNetwork != nil {
-		t.addRoutes(V, V.CRR.VPLNetwork)
+	if tun.CRResponse.VPLNetwork != nil {
+		t.addRoutes(tun.CRResponse.VPLNetwork)
 	}
 
-	for _, n := range V.CRR.Networks {
-		t.addRoutes(V, n)
+	for _, n := range tun.CRResponse.Networks {
+		t.addRoutes(n)
 	}
 
 	return
 }
 
-func (t *TunnelInterface) CloseReadAndWriteLoop() {
+func (t *TInterface) CloseReadAndWriteLoop() {
 	exitTimeout := time.NewTicker(10 * time.Second)
 	exitCount := 0
 exitLoop:
@@ -656,68 +657,35 @@ exitLoop:
 	return
 }
 
-func (t *TunnelInterface) Disconnect(V *Tunnel) (err error) {
+func (t *TInterface) Disconnect(tun *TUN) (err error) {
 	defer RecoverAndLogToFile()
 
 	t.shouldRestart = false
 	t.shouldExit = true
 
-	for _, n := range V.CRR.Networks {
-		t.deleteRoutes(V, n)
+	for _, n := range tun.CRResponse.Networks {
+		t.deleteRoutes(n)
 	}
 
-	if V.CRR.VPLNetwork != nil {
-		t.deleteRoutes(V, V.CRR.VPLNetwork)
+	if tun.CRResponse.VPLNetwork != nil {
+		t.deleteRoutes(tun.CRResponse.VPLNetwork)
 	}
 
-	if V.Con != nil {
-		V.Con.Close()
+	if tun.connection != nil {
+		tun.connection.Close()
 	}
 
 	t.CloseReadAndWriteLoop()
+
+	err = t.Close()
+	if err != nil {
+		ERROR("unable to close the interface", err)
+	}
 
 	err = t.Delete()
 	if err != nil {
 		ERROR("unable to delete the interface", err)
 	}
-
-	RemoveTunnelInterfaceFromList(t)
-	return
-}
-
-func StartDefaultInterface() (err error) {
-	defer func() {
-		RecoverAndLogToFile()
-	}()
-
-	CON := new(Tunnel)
-	CON.Meta = findDefaultTunnelMeta()
-
-	DEFAULT_TUNNEL, err = CreateNewTunnelInterface(CON)
-	if err != nil {
-		return
-	}
-
-	err = DEFAULT_TUNNEL.CreateOrOpen()
-	if err != nil {
-		return
-	}
-
-	if err = DEFAULT_TUNNEL.Up(); err != nil {
-		return
-	}
-
-	if err = DEFAULT_TUNNEL.Addr(); err != nil {
-		return
-	}
-
-	_ = DNS_Del(CON.Meta.IFName)
-	err = DNS_Set(CON.Meta.IFName, CON.Meta.IPv4Address, "1")
-	if err != nil {
-		return
-	}
-
-	GLOBAL_STATE.DefaultInterfaceOnline = true
 
 	return
 }
@@ -750,7 +718,7 @@ func logMessage(_ int, timestamp uint64, msg *uint16) int {
 	return 0
 }
 
-func (t *TunnelInterface) ReceivePacket() (packet []byte, size uint16, err error) {
+func (t *TInterface) ReceivePacket() (packet []byte, size uint16, err error) {
 	add, err := t.WDLL.GetAddr(5)
 	if err != nil {
 		return
@@ -772,7 +740,7 @@ func (t *TunnelInterface) ReceivePacket() (packet []byte, size uint16, err error
 	return
 }
 
-func (t *TunnelInterface) ReleaseReceivePacket(packet []byte) (err error) {
+func (t *TInterface) ReleaseReceivePacket(packet []byte) (err error) {
 	if packet == nil {
 		return
 	}
@@ -794,7 +762,7 @@ func (t *TunnelInterface) ReleaseReceivePacket(packet []byte) (err error) {
 	return
 }
 
-func (t *TunnelInterface) AllocateSendPacket(packetSize int) (packet []byte, err error) {
+func (t *TInterface) AllocateSendPacket(packetSize int) (packet []byte, err error) {
 	add, err := t.WDLL.GetAddr(6)
 	if err != nil {
 		return
@@ -814,7 +782,7 @@ func (t *TunnelInterface) AllocateSendPacket(packetSize int) (packet []byte, err
 	return
 }
 
-func (t *TunnelInterface) SendPacket(packet []byte) (err error) {
+func (t *TInterface) SendPacket(packet []byte) (err error) {
 	add, err := t.WDLL.GetAddr(8)
 	if err != nil {
 		return
