@@ -590,13 +590,13 @@ func fromUserChannel(index int) {
 		}
 
 		if PACKET[9] == 17 {
-			_, err = UDPRWC.Write(PACKET)
+			_, err = UDPRWC.Write(CopySlice(PACKET))
 			if err != nil {
 				WARN("UDPRWC err:", err)
 				continue
 			}
 		} else {
-			_, err = TCPRWC.Write(PACKET)
+			_, err = TCPRWC.Write(CopySlice(PACKET))
 			if err != nil {
 				WARN("TCPRWC err:", err)
 				continue
@@ -649,7 +649,6 @@ func toUserChannel(index int) {
 	var PACKET []byte
 	var err error
 	var ok bool
-	var out []byte
 	var S4 [4]byte
 	var S4Port [2]byte
 	var FIN byte
@@ -709,8 +708,9 @@ func toUserChannel(index int) {
 			}
 		}
 
-		out = CM.EH.SEAL.Seal2(PACKET, CM.Uindex)
-		err = syscall.Sendto(dataSocketFD, out, 0, CM.Addr)
+		err = syscall.Sendto(dataSocketFD,
+			CM.EH.SEAL.Seal2(PACKET, CM.Uindex),
+			0, CM.Addr)
 		if err != nil {
 			WARN("dataSocketFD sendTo err:", err)
 			return

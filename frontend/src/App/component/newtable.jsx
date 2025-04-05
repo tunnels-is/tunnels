@@ -102,7 +102,7 @@ const NewTable = (props) => {
 			<div className="top-bar">
 
 				{props?.title &&
-					<div className="title">{props.title}</div>
+					<div className="table-title">{props.title}</div>
 				}
 
 				{props?.button &&
@@ -154,7 +154,7 @@ const NewTable = (props) => {
 				}
 
 			</div>
-			<div className={` top-bar`}>
+			<div className={`search-top-bar`}>
 				{props.rows?.length > 20 &&
 					<div className="search-bar">
 						<input

@@ -475,17 +475,17 @@ const ObjectEditor = (props) => {
     let delB = null;
     let topB = null;
 
-    titleD =
-      x.title !== undefined
-        ? React.createElement(
+    if (x.title !== "" && x.title !== undefined){
+      
+    titleD = React.createElement(
             "div",
             {
               key: x.key + "_title",
-              className: "title",
+              className: "editor-title",
             },
             x.title,
           )
-        : null;
+    }
 
     if (titleD === null && x.type === "array") {
       titleD =
@@ -494,7 +494,7 @@ const ObjectEditor = (props) => {
               "div",
               {
                 key: x.key + "_title",
-                className: "title",
+                className: "editor-title",
               },
               x.id,
             )
@@ -529,7 +529,7 @@ const ObjectEditor = (props) => {
                 reload();
               },
             },
-            x.type === "object" ? "X" : "X",
+            x.type === "object" ? "delete" : "delete",
           )
         : null;
 
@@ -551,8 +551,8 @@ const ObjectEditor = (props) => {
         key: x.key,
         className: x.className + " " + x.extraClasses,
       },
-      topB,
       delB,
+      topB,
       ...sub,
     );
   };
@@ -682,7 +682,7 @@ const ObjectEditor = (props) => {
           </div>
         )}
       </div>
-      {props.opts.title && <div className="title">{props.opts.title}</div>}
+      {props.opts.title && <div className="editor-title">{props.opts.title}</div>}
       {makeDom(props.opts)}
     </>
   );

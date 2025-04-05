@@ -421,11 +421,7 @@ func (t *TInterface) Disconnect(tun *TUN) (err error) {
 		ERROR("unable to close the interface", err)
 	}
 
-	err = t.Delete()
-	if err != nil {
-		ERROR("unable to delete the interface", err)
-	}
-
+	_ = t.Delete()
 	return
 }
 

@@ -60,14 +60,16 @@ const PrivateServers = () => {
 
 	const generateServerTable = () => {
 		let rows = []
-		state.PrivateServers?.forEach(server => {
+		state?.PrivateServers?.forEach(server => {
 
 			let servertun = undefined
+			let assignedTunnels = 0
 			let opts = []
-			state?.Config?.Connections?.map(c => {
+			state?.Tunnels?.map(c => {
 				if (c.ServerID === server._id) {
 					servertun = c
 					opts.push({ value: c.Tag, key: c.Tag, selected: true })
+					assignedTunnels++
 				} else {
 					opts.push({ value: c.Tag, key: c.Tag, selected: false })
 				}
@@ -82,22 +84,12 @@ const PrivateServers = () => {
 					"",
 					"Connect to " + server.Tag,
 					() => {
-						console.log("SERVER")
-						console.dir(server)
-						if (server.IP !== "") {
-							console.log("22222")
-							console.dir(server)
-							state.connectToVPN(undefined, server)
-						} else if (servertun !== undefined) {
-							console.log("1111")
-							console.dir(servertun)
-							state.connectToVPN(servertun, undefined)
-						}
+						state.connectToVPN(servertun, undefined)
 					})
 			}
 
-			state.State?.ActiveConnections?.forEach((x) => {
-				if (x.ServerID === server._id) {
+			state?.ActiveTunnels?.forEach((x) => {
+				if (x.CR?.ServerID === server._id) {
 					con = x
 					return
 				}
@@ -115,24 +107,26 @@ const PrivateServers = () => {
 							state.disconnectFromVPN(con)
 						})
 				}
-
 			}
 
-
+			if (assignedTunnels > 1){
+				conButton = function() {
+					state.toggleError("too many tunnels assigned to server")
+				}
+			}
 
 			let row = {}
 			row.items = [
 				{
 					type: "text",
 					value: server.Tag,
-					color: "blue",
+					 minWidth: "180px",
+					 color: "blue",
 					click: function() {
 						setPServer(server)
 						state.renderPage("pservers")
 					}
 				},
-				{ type: "text", value: server.IP },
-				{ type: "text", minWidth: "380px", value: server.Serial },
 				{
 					type: "select",
 					opts: opts,
@@ -141,11 +135,13 @@ const PrivateServers = () => {
 						className={"clickable"}
 						placeholder={"Assign"}
 						setValue={(opt) => {
-							state.changeServerOnConnection(opt.value, server._id)
+							state.changeServerOnTunnelUsingTag(opt.value, server._id)
 						}}
 						options={opts}
 					></CustomSelect>,
 				},
+				{ type: "text", value: server.IP, minWidth:"180px" },
+				{ type: "text", value: server.Port },
 				{
 					type: "text",
 					value: <div className={con ? "disconnect" : "connect"}>{con ? "Disconnect" : "Connect"}</div>,
@@ -163,10 +159,10 @@ const PrivateServers = () => {
 
 	let rows = generateServerTable()
 	const headers = [
-		{ value: "Tag" },
-		{ value: "IP", },
-		{ value: "Cert Serial", minWidth: "380px" },
+		{ value: "Tag", minWidth:"180px" },
 		{ value: "Tunnel" },
+		{ value: "IP", minWidth:"180px" },
+		{ value: "Port"},
 		{ value: "" }
 	]
 
