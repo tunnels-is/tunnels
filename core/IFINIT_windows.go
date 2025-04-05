@@ -566,18 +566,19 @@ func (t *TInterface) ApplyRoutes(V *TUN) (err error) {
 	return
 }
 
-func (t *TInterface) RemoveRoutes(V *Tunnel, preserve bool) (err error) {
+func (t *TInterface) RemoveRoutes(V *TUN, preserve bool) (err error) {
 	defer RecoverAndLogToFile()
 
-	for _, n := range V.CRRespose.Networks {
+	meta := V.meta.Load()
+	for _, n := range V.CRResponse.Networks {
 		t.deleteRoutes(n)
 	}
 
-	if V.CRRespose.VPLNetwork != nil {
-		t.deleteRoutes(V.CRRespose.VPLNetwork)
+	if V.CRResponse.VPLNetwork != nil {
+		t.deleteRoutes(V.CRResponse.VPLNetwork)
 	}
 	if !preserve {
-		if IsDefaultConnection(V.Meta.IFName) || V.Meta.EnableDefaultRoute {
+		if IsDefaultConnection(meta.IFName) || meta.EnableDefaultRoute {
 			t.GatewayMetric = "2000"
 			err = IP_RouteMetric("0.0.0.0/0", t.Name, "2000")
 			if err != nil {
@@ -644,17 +645,16 @@ func (t *TInterface) CloseReadAndWriteLoop() {
 exitLoop:
 	for {
 		select {
-		case _ = <-t.exitChannel:
+		case <-t.exitChannel:
 			exitCount++
 			if exitCount >= 2 {
 				break exitLoop
 			}
-		case _ = <-exitTimeout.C:
+		case <-exitTimeout.C:
 			ERROR("timed out waiting for reader and writer to exit")
 			return
 		}
 	}
-	return
 }
 
 func (t *TInterface) Disconnect(tun *TUN) (err error) {

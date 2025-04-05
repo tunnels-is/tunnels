@@ -19,11 +19,11 @@ func (t *TUN) TransLateVPLIP(ip [4]byte) ([4]byte, bool) {
 		return xxx, true
 	}
 
-	if t.CRReponse.VPLNetwork == nil {
+	if t.CRResponse.VPLNetwork == nil {
 		return ip, true
 	}
 
-	v := t.CRReponse.VPLNetwork
+	v := t.CRResponse.VPLNetwork
 	var newIP [4]byte
 
 	for i := range 3 {
@@ -42,12 +42,12 @@ func (V *TUN) TransLateIP(ip [4]byte) ([4]byte, bool) {
 		return xxx, true
 	}
 
-	if len(V.CRReponse.Networks) == 0 {
+	if len(V.CRResponse.Networks) == 0 {
 		return ip, true
 	}
 
 	var newIP [4]byte
-	for _, v := range V.CRReponse.Networks {
+	for _, v := range V.CRResponse.Networks {
 		if v.Nat == "" {
 			continue
 		}
@@ -92,27 +92,27 @@ func (V *TUN) IsIngressVPLIP(ip [4]byte) (ok bool) {
 func (t *TUN) InitVPLMap() (err error) {
 	meta := t.meta.Load()
 	DEBUG("Initializing VPL/NAT maps for tunnel:", meta.IFName)
-	if t.CRReponse.VPLNetwork == nil {
+	if t.CRResponse.VPLNetwork == nil {
 		return nil
 	}
 
-	if t.CRReponse.VPLNetwork.Nat != "" {
-		_, t.CRReponse.VPLNetwork.NatIPNet, err = net.ParseCIDR(t.CRReponse.VPLNetwork.Nat)
+	if t.CRResponse.VPLNetwork.Nat != "" {
+		_, t.CRResponse.VPLNetwork.NatIPNet, err = net.ParseCIDR(t.CRResponse.VPLNetwork.Nat)
 		if err != nil {
 			return err
 		}
 	}
 
-	_, t.CRReponse.VPLNetwork.NetIPNet, err = net.ParseCIDR(t.CRReponse.VPLNetwork.Network)
+	_, t.CRResponse.VPLNetwork.NetIPNet, err = net.ParseCIDR(t.CRResponse.VPLNetwork.Network)
 	if err != nil {
 		return err
 	}
 
 	toMap := ""
-	if t.CRReponse.VPLNetwork.Nat != "" {
-		toMap = t.CRReponse.VPLNetwork.Nat
+	if t.CRResponse.VPLNetwork.Nat != "" {
+		toMap = t.CRResponse.VPLNetwork.Nat
 	} else {
-		toMap = t.CRReponse.VPLNetwork.Network
+		toMap = t.CRResponse.VPLNetwork.Network
 	}
 
 	ip, network, err := net.ParseCIDR(toMap)
@@ -136,7 +136,7 @@ func (t *TUN) InitVPLMap() (err error) {
 func (t *TUN) InitNatMaps() (err error) {
 	meta := t.meta.Load()
 	DEBUG("Initializing NAT maps for tunnel:", meta.IFName)
-	for _, v := range t.CRReponse.Networks {
+	for _, v := range t.CRResponse.Networks {
 		if v.Nat == "" {
 			continue
 		}
