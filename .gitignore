@@ -9,6 +9,9 @@ build/*
 builds/*
 
 cmd/main/files
+cmd/main/logs
+cmd/main/blocklists
+cmd/main/*.jsom
 cmd/main/*.exe
 cmd/main/main
 cmd/main/api.key
