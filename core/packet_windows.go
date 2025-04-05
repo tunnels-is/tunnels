@@ -3,13 +3,14 @@
 package core
 
 import (
+	"fmt"
 	"runtime/debug"
 	"time"
 
 	"golang.org/x/sys/windows"
 )
 
-func (T *TunnelInterface) ReadFromTunnelInterface() {
+func (T *TInterface) ReadFromTunnelInterface() {
 	defer func() {
 		if r := recover(); r != nil {
 			ERROR(r, string(debug.Stack()))
@@ -33,9 +34,10 @@ func (T *TunnelInterface) ReadFromTunnelInterface() {
 
 		err          error
 		writtenBytes int
-		Tun          *Tunnel
-		out          = make([]byte, 70000)
+		Tun          *TUN
 	)
+
+	Tun = *T.tunnel.Load()
 
 	for {
 		if T.shouldExit {
@@ -77,75 +79,72 @@ func (T *TunnelInterface) ReadFromTunnelInterface() {
 			continue
 		}
 
-		Tun = *T.tunnel.Load()
-		if !Tun.Connected {
-			time.Sleep(1 * time.Millisecond)
+		if Tun.GetState() == TUN_Disconnected {
+			fmt.Println("not connected..")
+			time.Sleep(5 * time.Millisecond)
 			continue
 		}
 
 		shouldSend := Tun.ProcessEgressPacket(&packet)
 		if !shouldSend {
+			fmt.Println("not sending:", len(packet))
 			continue
 		}
 
-		out = Tun.EH.SEAL.Seal1(packet, Tun.Index)
-
-		// TIP; SET DONT FRAGMENT
-		writtenBytes, err = Tun.Con.Write(out)
+		writtenBytes, err = Tun.connection.Write(Tun.encWrapper.SEAL.Seal1(packet, Tun.Index))
 		if err != nil {
+			fmt.Println("FAIL:", err)
 			ERROR("router write error: ", err)
 			continue
 		}
-		if Tun.EP_MP != nil {
-			Tun.EP_MP.egressBytes += writtenBytes
-		}
-		Tun.EgressBytes += writtenBytes
+		Tun.egressBytes.Add(int64(writtenBytes))
 
 	}
 }
 
-func (V *Tunnel) ReadFromServeTunnel() {
+func (V *TUN) ReadFromServeTunnel() {
 	defer func() {
 		if r := recover(); r != nil {
 			ERROR(r, string(debug.Stack()))
 		}
-		DEBUG("Server listener exiting:", V.Meta.Tag)
-		if V.Connected && V.Interface.shouldRestart {
-			V.UserRWLoopAbnormalExit = true
+		meta := V.meta.Load()
+		inf := V.tunnel.Load()
+		DEBUG("Server listener exiting:", meta.Tag)
+		if (V.GetState() == TUN_Connected) && inf.shouldRestart {
 			tunnelMonitor <- V
 		}
 		select {
-		case V.Interface.exitChannel <- 1:
+		case inf.exitChannel <- 1:
 		default:
 		}
 	}()
 
 	var (
-		ingressAllocationBuffer []byte
-		writeError              error
-		readErr                 error
+		writeError error
+		readErr    error
 
 		n       int
 		packet  []byte
-		buff    = make([]byte, 70000)
-		staging = make([]byte, 70000)
+		buff    = make([]byte, 500000)
+		staging = make([]byte, 500000)
+		inf     = V.tunnel.Load()
 		err     error
 	)
 
 	for {
 
-		if V.Interface.shouldExit {
+		if inf.shouldExit {
 			return
 		}
 
-		n, readErr = V.Con.Read(buff)
+		n, readErr = V.connection.Read(buff)
 		if readErr != nil {
 			ERROR("error reading from server socket: ", readErr, n)
 			return
 		}
 
 		V.Nonce2Bytes = buff[2:10]
-		packet, err = V.EH.SEAL.Open2(
+		packet, err = V.encWrapper.SEAL.Open2(
 			buff[10:n],
 			buff[2:10],
 			staging[:0],
@@ -155,31 +154,29 @@ func (V *Tunnel) ReadFromServeTunnel() {
 			ERROR("Packet authentication error: ", err)
 			return
 		}
-
-		V.IngressBytes += n
+		V.ingressBytes.Add(int64(n))
 
 		if len(packet) < 20 {
+			fmt.Println("PING!")
 			go V.RegisterPing(CopySlice(packet))
 			continue
 		}
 
 		if !V.ProcessIngressPacket(packet) {
+			fmt.Println("invalid ingres.....")
 			debugMissingIngressMapping(packet)
 			continue
 		}
 
-		ingressAllocationBuffer, writeError = V.Interface.AllocateSendPacket(len(packet))
-		if writeError != nil {
-			ERROR("ingress packet allocation error: ", writeError)
+		outb, allocErr := inf.AllocateSendPacket(len(packet))
+		if allocErr != nil {
+			fmt.Println("ingress err:", allocErr)
+			ERROR("ingress packet allocation error: ", allocErr)
 			return
 		}
 
-		if V.IP_MP != nil {
-			V.IP_MP.ingressBytes += n
-		}
-
-		copy(ingressAllocationBuffer, packet)
-		writeError = V.Interface.SendPacket(ingressAllocationBuffer)
+		copy(outb, packet)
+		writeError = inf.SendPacket(outb)
 		if writeError != nil {
 			ERROR("adapter write error: ", writeError)
 			return

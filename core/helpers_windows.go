@@ -6,7 +6,6 @@ import (
 	"errors"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -69,37 +68,39 @@ func OSSpecificInit() error {
 }
 
 func RestoreSaneDNSDefaults() {
-	INFO("restoring dns: ", DEFAULT_DNS_SERVERS)
-	_ = DNS_Del(strconv.Itoa(DEFAULT_INTERFACE_ID))
-	if DEFAULT_INTERFACE_ID != 0 {
-		_ = DNS_Set(strconv.Itoa(DEFAULT_INTERFACE_ID), "1.1.1.1", "1")
-		_ = DNS_Set(strconv.Itoa(DEFAULT_INTERFACE_ID), "1.0.0.1", "2")
+	state := STATE.Load()
+	ifid := int(state.DefaultInterfaceID.Load())
+	INFO("restoring dns: 1.1.1.1, 1.0.0.1")
+	_ = DNS_Del(strconv.Itoa(ifid))
+	if ifid != 0 {
+		_ = DNS_Set(strconv.Itoa(ifid), "1.1.1.1", "1")
+		_ = DNS_Set(strconv.Itoa(ifid), "1.0.0.1", "2")
 	} else {
 		ERROR("unable to restore dns, could not find default interface")
 	}
 }
 
-func RestoreDNSOnClose() {
-	INFO("restoring dns: ", DEFAULT_DNS_SERVERS)
-	_ = DNS_Del(strconv.Itoa(DEFAULT_INTERFACE_ID))
-	if len(DEFAULT_DNS_SERVERS) == 1 {
-		_ = DNS_Set(strconv.Itoa(DEFAULT_INTERFACE_ID), DEFAULT_DNS_SERVERS[0], "1")
-	} else if len(DEFAULT_DNS_SERVERS) > 1 {
-		_ = DNS_Set(strconv.Itoa(DEFAULT_INTERFACE_ID), DEFAULT_DNS_SERVERS[0], "1")
-		_ = DNS_Set(strconv.Itoa(DEFAULT_INTERFACE_ID), DEFAULT_DNS_SERVERS[1], "2")
-	}
-}
+// func RestoreDNSOnClose() {
+// 	INFO("restoring dns: ", DEFAULT_DNS_SERVERS)
+// 	_ = DNS_Del(strconv.Itoa(DEFAULT_INTERFACE_ID))
+// 	if len(DEFAULT_DNS_SERVERS) == 1 {
+// 		_ = DNS_Set(strconv.Itoa(DEFAULT_INTERFACE_ID), DEFAULT_DNS_SERVERS[0], "1")
+// 	} else if len(DEFAULT_DNS_SERVERS) > 1 {
+// 		_ = DNS_Set(strconv.Itoa(DEFAULT_INTERFACE_ID), DEFAULT_DNS_SERVERS[0], "1")
+// 		_ = DNS_Set(strconv.Itoa(DEFAULT_INTERFACE_ID), DEFAULT_DNS_SERVERS[1], "2")
+// 	}
+// }
 
-func RestoreDNSOnDisconnect() {
-	INFO("restoring dns: ", DEFAULT_DNS_SERVERS)
-	_ = DNS_Del(strconv.Itoa(DEFAULT_INTERFACE_ID))
-	if len(DEFAULT_DNS_SERVERS) == 1 {
-		_ = DNS_Set(strconv.Itoa(DEFAULT_INTERFACE_ID), DEFAULT_DNS_SERVERS[0], "1")
-	} else if len(DEFAULT_DNS_SERVERS) > 1 {
-		_ = DNS_Set(strconv.Itoa(DEFAULT_INTERFACE_ID), DEFAULT_DNS_SERVERS[0], "1")
-		_ = DNS_Set(strconv.Itoa(DEFAULT_INTERFACE_ID), DEFAULT_DNS_SERVERS[1], "2")
-	}
-}
+// func RestoreDNSOnDisconnect() {
+// 	INFO("restoring dns: ", DEFAULT_DNS_SERVERS)
+// 	_ = DNS_Del(strconv.Itoa(DEFAULT_INTERFACE_ID))
+// 	if len(DEFAULT_DNS_SERVERS) == 1 {
+// 		_ = DNS_Set(strconv.Itoa(DEFAULT_INTERFACE_ID), DEFAULT_DNS_SERVERS[0], "1")
+// 	} else if len(DEFAULT_DNS_SERVERS) > 1 {
+// 		_ = DNS_Set(strconv.Itoa(DEFAULT_INTERFACE_ID), DEFAULT_DNS_SERVERS[0], "1")
+// 		_ = DNS_Set(strconv.Itoa(DEFAULT_INTERFACE_ID), DEFAULT_DNS_SERVERS[1], "2")
+// 	}
+// }
 
 func GetDNSServers(intf string) (err error) {
 	var out []byte
@@ -123,65 +124,42 @@ func GetDNSServers(intf string) (err error) {
 	return
 }
 
-func GenerateBaseFolderPath() string {
-	defer RecoverAndLogToFile()
-	if BASE_PATH != "" {
-		return BASE_PATH + string(os.PathSeparator)
-	}
-
-	base := "."
-
-	ex, err := os.Executable()
-	if err != nil {
-		ERROR("Unable to find working directory: ", err.Error())
-	} else {
-		base = filepath.Dir(ex)
-	}
-
-	return base + string(os.PathSeparator) + "files" + string(os.PathSeparator)
-}
-
-func CreateBaseFolder() {
-	defer RecoverAndLogToFile()
-
-	DEBUG("Verifying configurations and logging folder")
-
-	_, err := os.Stat(GLOBAL_STATE.BasePath)
-	if err != nil {
-		err = os.Mkdir(GLOBAL_STATE.BasePath, 0o777)
-		if err != nil {
-			ERROR("Unable to create base folder: ", err)
-			return
-		}
-	}
-
-	GLOBAL_STATE.BaseFolderInitialized = true
-}
-
 // https://coolaj86.com/articles/golang-and-windows-and-admins-oh-my/
 func AdminCheck() {
 	defer RecoverAndLogToFile()
 
 	fd, err := os.Open("\\\\.\\PHYSICALDRIVE0")
 	if err != nil {
-		GLOBAL_STATE.IsAdmin = false
+		s := STATE.Load()
+		s.adminState = false
 		ERROR("Tunnels is not running as administrator, please restart as administartor")
 		return
 	}
 
 	DEBUG("Tunnels is running as admin")
-	GLOBAL_STATE.IsAdmin = true
+
+	s := STATE.Load()
+	s.adminState = true
 	_ = fd.Close()
 }
 
 func IPv6Enabled() bool {
 	defer RecoverAndLogToFile()
+	state := STATE.Load()
+	ifname := state.DefaultInterfaceName.Load()
+	if ifname == nil {
+		ERROR("No default interface name found!")
+		return true
+	}
 
-	cmd := exec.Command("netsh", "interface", "ipv6", "show", "interface", DEFAULT_INTERFACE_NAME)
+	cmd := exec.Command("netsh", "interface", "ipv6", "show", "interface", *ifname)
 	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		ERROR("Unable to detect IPv6 setting // msg: ", err, " // output: ", string(out))
+		if strings.Contains(string(out), "Element not found") {
+			return false
+		}
+		ERROR("Unable to detect IPv6 setting // msg: ", err, " // output: ", string(out), "// IF:", *ifname)
 		return true
 	}
 
