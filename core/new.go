@@ -193,7 +193,7 @@ func (t *TUN) MarshalJSON() ([]byte, error) {
 	}{
 		t.ID,
 		t.CR,
-		t.CRReponse,
+		t.CRResponse,
 		pingTime,
 		int(t.startPort),
 		int(t.endPort),
@@ -222,8 +222,8 @@ type TUN struct {
 	ServerCertBytes []byte `json:"-"`
 
 	// Connection Requests + Response
-	CR        *ConnectionRequest
-	CRReponse *ConnectRequestResponse
+	CR         *ConnectionRequest
+	CRResponse *ConnectRequestResponse
 
 	// NEW MAPPING STUFF
 	pingTime                atomic.Pointer[time.Time]
