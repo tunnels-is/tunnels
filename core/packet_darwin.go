@@ -3,7 +3,6 @@
 package core
 
 import (
-	"fmt"
 	"runtime/debug"
 	"time"
 )
@@ -30,8 +29,6 @@ func (T *TInterface) ReadFromTunnelInterface() {
 		out          []byte
 	)
 
-	Tun = *T.tunnel.Load()
-
 	DEBUG("New tunnel interface reader:", T.Name)
 	for {
 		packetLength, err = T.RWC.Read(tempBytes[0:])
@@ -53,11 +50,8 @@ func (T *TInterface) ReadFromTunnelInterface() {
 
 		packet = tempBytes[4:packetLength]
 
-		fmt.Println("Packet length:", packetLength)
-		fmt.Println("Packet data:", packet)
 		sendRemote = Tun.ProcessEgressPacket(&packet)
 		if !sendRemote {
-			fmt.Println("Packet not sent to remote")
 			continue
 		}
 
@@ -118,18 +112,14 @@ func (tun *TUN) ReadFromServeTunnel() {
 			return
 		}
 
-		fmt.Println("read bytes:", packet)
 		tun.ingressBytes.Add(int64(n))
 
 		if len(packet) < 20 {
-			fmt.Println("packet too small. ping ??")
 			tun.RegisterPing(CopySlice(packet))
 			continue
 		}
 
 		if !tun.ProcessIngressPacket(packet) {
-			fmt.Println("missing mapping for packet")
-			fmt.Println("packet: ", packet)
 			debugMissingIngressMapping(packet)
 			continue
 		}

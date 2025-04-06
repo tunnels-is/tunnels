@@ -469,7 +469,7 @@ func isBlocked(m *dns.Msg) (ok bool, tag string) {
 	name := strings.TrimSuffix(m.Question[0].Name, ".")
 	bl := DNSBlockList.Load()
 	if bl == nil {
-		return true, ""
+		return false, ""
 	}
 
 	tagString, ok := bl.Load(name)
