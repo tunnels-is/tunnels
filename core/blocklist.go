@@ -70,13 +70,13 @@ func processBlockList(index int, wg *sync.WaitGroup, nm *sync.Map) {
 				return
 			}
 
+			_ = RemoveFile(state.BlockListPath + bl.Tag + ".txt")
 			listFile, err = CreateFile(state.BlockListPath + bl.Tag + ".txt")
 			if err != nil {
 				ERROR("Could not save", bl.URL, err)
 				return
 			}
 			defer listFile.Close()
-			_ = listFile.Truncate(0)
 			_, err = listFile.Write(listBytes)
 			if err != nil {
 				ERROR("unable to write dns block list:", err)
@@ -92,13 +92,13 @@ func processBlockList(index int, wg *sync.WaitGroup, nm *sync.Map) {
 				return
 			}
 
+			_ = RemoveFile(state.BlockListPath + bl.Tag + ".txt")
 			listFile, err = CreateFile(state.BlockListPath + bl.Tag + ".txt")
 			if err != nil {
 				ERROR("Could not save", bl.URL, err)
 				return
 			}
 			defer listFile.Close()
-			_ = listFile.Truncate(0)
 			_, err = listFile.Write(listBytes)
 			if err != nil {
 				ERROR("unable to write dns block list:", err)

@@ -70,6 +70,48 @@ func InitBaseFoldersAndPaths() {
 	CreateFolder(s.BlockListPath)
 }
 
+func RenameFile(oldName, newName string) (err error) {
+	_, err = os.Stat(oldName)
+	if err != nil {
+		if os.IsNotExist(err) {
+			DEBUG("File does not exist: ", oldName)
+			return nil
+		}
+		ERROR("Unable to check file: ", err)
+		return
+	}
+
+	err = os.Rename(oldName, newName)
+	if err != nil {
+		ERROR("Unable to rename file: ", err)
+		return
+	}
+
+	DEBUG("File renamed: ", oldName, " -> ", newName)
+	return nil
+}
+
+func RemoveFile(file string) (err error) {
+	_, err = os.Stat(file)
+	if err != nil {
+		if os.IsNotExist(err) {
+			DEBUG("File does not exist: ", file)
+			return nil
+		}
+		ERROR("Unable to check file: ", err)
+		return
+	}
+
+	err = os.Remove(file)
+	if err != nil {
+		ERROR("Unable to remove file: ", err)
+		return
+	}
+
+	DEBUG("File removed: ", file)
+	return nil
+}
+
 func CreateFile(file string) (f *os.File, err error) {
 	f, err = os.OpenFile(file, os.O_APPEND|os.O_CREATE|os.O_RDWR, 0o777)
 	if err != nil {

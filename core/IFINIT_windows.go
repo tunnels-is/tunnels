@@ -636,6 +636,8 @@ func (t *TInterface) Connect(tun *TUN) (err error) {
 		t.addRoutes(n)
 	}
 
+	closeAllOpenTCPconnections()
+
 	return
 }
 
@@ -707,10 +709,6 @@ const (
 	AdapterNameMax                      = 128
 	LOAD_LIBRARY_SEARCH_APPLICATION_DIR = 0x00000200
 	LOAD_LIBRARY_SEARCH_SYSTEM32        = 0x00000800
-
-	// experimental
-	MIB_TCP_TABLE_OWNER_PID_ALL = 5
-	MIB_TCP_STATE_DELETE_TCB    = 12
 )
 
 func logMessage(_ int, timestamp uint64, msg *uint16) int {
