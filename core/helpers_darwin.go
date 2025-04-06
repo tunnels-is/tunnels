@@ -26,43 +26,6 @@ func ValidateAdapterID(meta *TunnelMETA) error {
 	return nil
 }
 
-func GenerateBaseFolderPath() string {
-	defer RecoverAndLogToFile()
-	if BASE_PATH != "" {
-		return BASE_PATH + string(os.PathSeparator)
-	}
-
-	// if !NATIVE {
-	// 	base := "."
-	// 	ex, err := os.Executable()
-	// 	if err != nil {
-	// 		ERROR("Unable to find working directory: ", err.Error())
-	// 	} else {
-	// 		base = filepath.Dir(ex)
-	// 	}
-	//
-	// 	return base + string(os.PathSeparator) + "files" + string(os.PathSeparator)
-	// }
-
-	return GetPWD() + string(os.PathSeparator) + "tunnels" + string(os.PathSeparator)
-}
-
-func CreateBaseFolder() {
-	// GLOBAL_STATE.BasePath = GenerateBaseFolderPath()
-	// GLOBAL_STATE.BackupPath = GLOBAL_STATE.BasePath
-
-	_, err := os.Stat(GLOBAL_STATE.BasePath)
-	if err != nil {
-		err = os.Mkdir(GLOBAL_STATE.BasePath, 0o777)
-		if err != nil {
-			ERROR("Unable to create base folder: ", err)
-			return
-		}
-	}
-
-	GLOBAL_STATE.BaseFolderInitialized = true
-}
-
 func GetHOME() string {
 	HOMEPATH := os.Getenv("HOME")
 	if HOMEPATH == "" {
@@ -79,8 +42,23 @@ func GetPWD() string {
 	return HOMEPATH
 }
 
-func AdminCheck() error {
+func AdminCheck() {
 	DEBUG("Admin check")
-	GLOBAL_STATE.IsAdmin = true
-	return nil
+	s := STATE.Load()
+
+	// Check if running as root by checking effective user ID
+	if os.Geteuid() == 0 {
+		s.adminState = true
+		return
+	}
+
+	// If not root, check sudo access by attempting a test command without prompting for password
+	cmd := exec.Command("sudo", "-n", "true")
+	if err := cmd.Run(); err == nil {
+		s.adminState = true
+		return
+	}
+
+	// Neither root nor sudo
+	s.adminState = false
 }
