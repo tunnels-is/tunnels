@@ -819,7 +819,11 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		return 502, errors.New("no default gateway, check your connection settings")
 	}
 
-	err = IP_AddRoute(ClientCR.ServerIP+"/32", "", gateway.To4().String(), "0")
+	ifName := state.DefaultInterfaceName.Load()
+	if ifName == nil {
+		return 502, errors.New("no default interface, please check try again")
+	}
+	err = IP_AddRoute(ClientCR.ServerIP+"/32", *ifName, gateway.To4().String(), "0")
 	if err != nil {
 		return 502, errors.New("unable to initialize routes")
 	}
