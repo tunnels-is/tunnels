@@ -218,18 +218,17 @@ func writeConfigToDisk() (err error) {
 		return err
 	}
 
+	err = RenameFile(s.ConfigFileName, s.ConfigFileName+".bak")
+	if err != nil {
+		ERROR("Unable to rename config file: ", err)
+	}
+
 	f, err := CreateFile(s.ConfigFileName)
 	if err != nil {
 		ERROR("Unable to create new config", err)
 		return err
 	}
 	defer f.Close()
-
-	err = f.Truncate(0)
-	if err != nil {
-		ERROR("Unable to write config bytes to new config file: ", err)
-		return err
-	}
 
 	_, err = f.Write(cb)
 	if err != nil {
@@ -302,16 +301,15 @@ func writeTunnelsToDisk(tag string) (outErr error) {
 			outErr = err
 			return false
 		}
+
+		err = RenameFile(s.TunnelsPath+t.Tag+tunnelFileSuffix, s.TunnelsPath+t.Tag+tunnelFileSuffix+".bak")
+		if err != nil {
+			ERROR("Unable to rename tunnel file:", err)
+		}
+
 		tf, err := CreateFile(s.TunnelsPath + t.Tag + tunnelFileSuffix)
 		if err != nil {
 			ERROR("Unable to save tunnel to disk:", err)
-			outErr = err
-			return false
-		}
-
-		err = tf.Truncate(0)
-		if err != nil {
-			ERROR("Unable to truncate tunnel json to file:", err)
 			outErr = err
 			return false
 		}

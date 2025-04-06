@@ -30,6 +30,7 @@ func saveUser(u *User) (err error) {
 	}
 
 	s := STATE.Load()
+	_ = RemoveFile(s.BasePath + "enc")
 	f, err := CreateFile(s.BasePath + "enc")
 	if err != nil {
 		return err
