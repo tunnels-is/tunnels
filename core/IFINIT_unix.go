@@ -61,6 +61,7 @@ func CreateNewTunnelInterface(
 		Name:          meta.IFName,
 		IPv4Address:   meta.IPv4Address,
 		NetMask:       meta.NetMask,
+		Gateway:       meta.IPv4Address,
 		TxQueuelen:    meta.TxQueueLen,
 		MTU:           meta.MTU,
 		shouldRestart: true,
@@ -339,13 +340,13 @@ func (t *TInterface) Connect(tun *TUN) (err error) {
 		}
 	}
 
-	for _, n := range tun.CRReponse.Networks {
+	for _, n := range tun.CRResponse.Networks {
 		_ = t.addRoutes(n)
 
 	}
 
-	if tun.CRReponse.VPLNetwork != nil {
-		_ = t.addRoutes(tun.CRReponse.VPLNetwork)
+	if tun.CRResponse.VPLNetwork != nil {
+		_ = t.addRoutes(tun.CRResponse.VPLNetwork)
 	}
 
 	return
@@ -396,20 +397,18 @@ func (t *TInterface) deleteRoutes(n *ServerNetwork) (err error) {
 
 func (t *TInterface) Disconnect(tun *TUN) (err error) {
 	defer RecoverAndLogToFile()
-
-	for _, n := range tun.CRReponse.Networks {
-		_ = t.deleteRoutes(n)
-	}
-
-	if tun.CRReponse.VPLNetwork != nil {
-		_ = t.deleteRoutes(tun.CRReponse.VPLNetwork)
-	}
-
+	t.shouldRestart = false
 	if tun.connection != nil {
 		tun.connection.Close()
 	}
 
-	t.shouldRestart = false
+	for _, n := range tun.CRResponse.Networks {
+		_ = t.deleteRoutes(n)
+	}
+
+	if tun.CRResponse.VPLNetwork != nil {
+		_ = t.deleteRoutes(tun.CRResponse.VPLNetwork)
+	}
 
 	meta := tun.meta.Load()
 	if IsDefaultConnection(meta.IFName) || meta.EnableDefaultRoute {
