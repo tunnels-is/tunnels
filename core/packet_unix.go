@@ -45,6 +45,7 @@ func (T *TInterface) ReadFromTunnelInterface() {
 			continue
 		}
 
+		Tun = *T.tunnel.Load()
 		if Tun == nil {
 			time.Sleep(1 * time.Millisecond)
 			continue
@@ -95,6 +96,7 @@ func (tun *TUN) ReadFromServeTunnel() {
 
 	DEBUG("Server Tunnel listener initialized")
 	for {
+		osTunnel = tun.tunnel.Load()
 		n, readErr = tun.connection.Read(buff)
 		if readErr != nil {
 			ERROR("error reading from server socket: ", readErr, n)

@@ -79,6 +79,12 @@ func (T *TInterface) ReadFromTunnelInterface() {
 			continue
 		}
 
+		Tun = *T.tunnel.Load()
+		if Tun == nil {
+			time.Sleep(1 * time.Millisecond)
+			continue
+		}
+
 		if Tun.GetState() == TUN_Disconnected {
 			fmt.Println("not connected..")
 			time.Sleep(5 * time.Millisecond)

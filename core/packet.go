@@ -2,6 +2,7 @@ package core
 
 import (
 	"encoding/binary"
+	"fmt"
 	"time"
 )
 
@@ -47,11 +48,13 @@ func (V *TUN) ProcessEgressPacket(p *[]byte) (sendRemote bool) {
 	packet := *p
 
 	if (packet[0] >> 4) != 4 {
+		fmt.Println("not an IPv4 packet")
 		return false
 	}
 
 	V.EP_Protocol = packet[9]
 	if V.EP_Protocol != 6 && V.EP_Protocol != 17 {
+		fmt.Println("not an IPv4 packet")
 		return false
 	}
 
@@ -85,6 +88,8 @@ func (V *TUN) ProcessEgressPacket(p *[]byte) (sendRemote bool) {
 			V.EgressMapping = V.CreateNEWPortMapping(V.TCPEgress, V.TCPPortMap, packet[12:20], V.EP_TPHeader[0:4])
 			if V.EgressMapping == nil {
 				debugMissingEgressMapping(packet)
+				fmt.Println("Egress mapping is nil TCP")
+
 				return false
 			}
 
@@ -92,6 +97,7 @@ func (V *TUN) ProcessEgressPacket(p *[]byte) (sendRemote bool) {
 
 			V.EgressMapping = V.CreateNEWPortMapping(V.UDPEgress, V.UDPPortMap, packet[12:20], V.EP_TPHeader[0:4])
 			if V.EgressMapping == nil {
+				fmt.Println("Egress mapping is nil UDP")
 				debugMissingEgressMapping(packet)
 				return false
 			}
