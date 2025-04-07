@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import CustomToggle from "./component/CustomToggle.jsx";
-
 import { v4 as uuidv4 } from "uuid";
 import {
   DesktopIcon,
@@ -8,10 +7,12 @@ import {
   FrameIcon,
   LockClosedIcon,
 } from "@radix-ui/react-icons";
-
 import GLOBAL_STATE from "../state";
 import STORE from "../store";
-import { Button } from "@/components/ui/button.jsx";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const useForm = () => {
   const [inputs, setInputs] = useState({});
@@ -359,24 +360,21 @@ const Login = (props) => {
 
   const EmailOnlyInput = () => {
     return (
-      <div className="input">
-        <EnvelopeClosedIcon
-          className="white-color"
-          width={40}
-          height={30}
-          center
-        ></EnvelopeClosedIcon>
-        <input
-          className="email-input"
-          autocomplete="off"
-          type="email"
-          placeholder={"Email"}
-          value={inputs["email"]}
-          name="email"
-          onChange={HandleInputChange}
-        />
+      <div className="space-y-2">
+        <div className="relative">
+          <EnvelopeClosedIcon className="absolute left-3 top-2.5 h-5 w-5 text-muted-foreground" />
+          <Input
+            id="email"
+            className="pl-10"
+            type="email"
+            placeholder="Email"
+            value={inputs["email"]}
+            name="email"
+            onChange={HandleInputChange}
+          />
+        </div>
         {errors["email"] !== "" && (
-          <div className="error">{errors["email"]}</div>
+          <p className="text-sm text-destructive">{errors["email"]}</p>
         )}
       </div>
     );
@@ -384,24 +382,21 @@ const Login = (props) => {
 
   const EmailInput = () => {
     return (
-      <div className="input">
-        <EnvelopeClosedIcon
-          className="white-color"
-          width={40}
-          height={30}
-          center
-        ></EnvelopeClosedIcon>
-        <input
-          className="email-input"
-          autocomplete="off"
-          type="email"
-          placeholder={"Email / Token"}
-          value={inputs["email"]}
-          name="email"
-          onChange={HandleInputChange}
-        />
+      <div className="space-y-2">
+        <div className="relative">
+          <EnvelopeClosedIcon className="absolute left-3 top-2.5 h-5 w-5 text-[#4B7BF5]" />
+          <Input
+            id="email"
+            className="pl-10 bg-[#0B0E14] border-[#1a1f2d] text-white focus:ring-[#4B7BF5] focus:border-[#4B7BF5] h-11"
+            type="email"
+            placeholder="Email / Token"
+            value={inputs["email"]}
+            name="email"
+            onChange={HandleInputChange}
+          />
+        </div>
         {errors["email"] !== "" && (
-          <div className="error">{errors["email"]}</div>
+          <p className="text-sm text-red-500">{errors["email"]}</p>
         )}
       </div>
     );
@@ -409,46 +404,42 @@ const Login = (props) => {
 
   const DeviceInput = () => {
     return (
-      <div className="input">
-        <DesktopIcon
-          className="white-color"
-          width={40}
-          height={30}
-          center
-        ></DesktopIcon>
-        <input
-          className="device-input"
-          type="text"
-          placeholder={"Device Name"}
-          value={inputs["devicename"]}
-          name="devicename"
-          onChange={HandleInputChange}
-        />
+      <div className="space-y-2">
+        <div className="relative">
+          <DesktopIcon className="absolute left-3 top-2.5 h-5 w-5 text-[#4B7BF5]" />
+          <Input
+            id="devicename"
+            className="pl-10 bg-[#0B0E14] border-[#1a1f2d] text-white focus:ring-[#4B7BF5] focus:border-[#4B7BF5] h-11"
+            type="text"
+            placeholder="Device Name"
+            value={inputs["devicename"]}
+            name="devicename"
+            onChange={HandleInputChange}
+          />
+        </div>
         {errors["devicename"] && (
-          <div className="error">{errors["devicename"]}</div>
+          <p className="text-sm text-red-500">{errors["devicename"]}</p>
         )}
       </div>
     );
   };
   const NewPasswordInput = () => {
     return (
-      <div className="input">
-        <LockClosedIcon
-          className="white-color"
-          width={40}
-          height={30}
-          center
-        ></LockClosedIcon>
-        <input
-          className=" pass-input"
-          type="password"
-          placeholder={"New Password"}
-          value={inputs["password"]}
-          name="password"
-          onChange={HandleInputChange}
-        />
+      <div className="space-y-2">
+        <div className="relative">
+          <LockClosedIcon className="absolute left-3 top-2.5 h-5 w-5 text-muted-foreground" />
+          <Input
+            id="password"
+            className="pl-10"
+            type="password"
+            placeholder="New Password"
+            value={inputs["password"]}
+            name="password"
+            onChange={HandleInputChange}
+          />
+        </div>
         {errors["password"] && (
-          <div className="error">{errors["password"]}</div>
+          <p className="text-sm text-destructive">{errors["password"]}</p>
         )}
       </div>
     );
@@ -456,23 +447,21 @@ const Login = (props) => {
 
   const PasswordInput = () => {
     return (
-      <div className="input">
-        <LockClosedIcon
-          className="white-color"
-          width={40}
-          height={30}
-          center
-        ></LockClosedIcon>
-        <input
-          className=" pass-input"
-          type="password"
-          placeholder={"Password"}
-          value={inputs["password"]}
-          name="password"
-          onChange={HandleInputChange}
-        />
+      <div className="space-y-2">
+        <div className="relative">
+          <LockClosedIcon className="absolute left-3 top-2.5 h-5 w-5 text-[#4B7BF5]" />
+          <Input
+            id="password"
+            className="pl-10 bg-[#0B0E14] border-[#1a1f2d] text-white focus:ring-[#4B7BF5] focus:border-[#4B7BF5] h-11"
+            type="password"
+            placeholder="Password"
+            value={inputs["password"]}
+            name="password"
+            onChange={HandleInputChange}
+          />
+        </div>
         {errors["password"] && (
-          <div className="error">{errors["password"]}</div>
+          <p className="text-sm text-red-500">{errors["password"]}</p>
         )}
       </div>
     );
@@ -480,45 +469,43 @@ const Login = (props) => {
 
   const TwoFactorInput = () => {
     return (
-      <div className="input">
-        <LockClosedIcon
-          className="white-color"
-          width={40}
-          height={30}
-          center
-        ></LockClosedIcon>
-        <input
-          className=" code-input"
-          type="text"
-          placeholder={"Authenticator Code (optional)"}
-          value={inputs["digits"]}
-          name="digits"
-          onChange={HandleInputChange}
-        />
-        {errors["digits"] && <div className="error">{errors["digits"]}</div>}
+      <div className="space-y-2">
+        <div className="relative">
+          <LockClosedIcon className="absolute left-3 top-2.5 h-5 w-5 text-[#4B7BF5]" />
+          <Input
+            id="digits"
+            className="pl-10 bg-[#0B0E14] border-[#1a1f2d] text-white focus:ring-[#4B7BF5] focus:border-[#4B7BF5] h-11"
+            type="text"
+            placeholder="Authenticator Code (optional)"
+            value={inputs["digits"]}
+            name="digits"
+            onChange={HandleInputChange}
+          />
+        </div>
+        {errors["digits"] && (
+          <p className="text-sm text-red-500">{errors["digits"]}</p>
+        )}
       </div>
     );
   };
 
   const ConfirmPasswordInput = () => {
     return (
-      <div className="input">
-        <LockClosedIcon
-          className="white-color"
-          width={40}
-          height={30}
-          center
-        ></LockClosedIcon>
-        <input
-          className="code-input"
-          type="password"
-          placeholder={"Confirm Password"}
-          value={inputs["password2"]}
-          name="password2"
-          onChange={HandleInputChange}
-        />
+      <div className="space-y-2">
+        <div className="relative">
+          <LockClosedIcon className="absolute left-3 top-2.5 h-5 w-5 text-muted-foreground" />
+          <Input
+            id="password2"
+            className="pl-10"
+            type="password"
+            placeholder="Confirm Password"
+            value={inputs["password2"]}
+            name="password2"
+            onChange={HandleInputChange}
+          />
+        </div>
         {errors["password2"] && (
-          <div className="error">{errors["password2"]}</div>
+          <p className="text-sm text-destructive">{errors["password2"]}</p>
         )}
       </div>
     );
@@ -526,69 +513,71 @@ const Login = (props) => {
 
   const TokenInput = () => {
     return (
-      <div className="input">
-        <FrameIcon
-          className="white-color"
-          width={40}
-          height={30}
-          center
-        ></FrameIcon>
-        <input
-          className="token-input"
-          autocomplete="off"
-          placeholder={"Token / Token"}
-          type="text"
-          value={inputs["email"]}
-          name="email"
-          onChange={HandleInputChange}
-        />
-        {errors["email"] && <div className="error">{errors["email"]}</div>}
+      <div className="space-y-2">
+        <div className="relative">
+          <FrameIcon className="absolute left-3 top-2.5 h-5 w-5 text-[#4B7BF5]" />
+          <Input
+            id="token"
+            className="pl-10 bg-[#0B0E14] border-[#1a1f2d] text-white focus:ring-[#4B7BF5] focus:border-[#4B7BF5] h-11"
+            type="text"
+            placeholder="Token"
+            value={inputs["email"]}
+            name="email"
+            onChange={HandleInputChange}
+          />
+        </div>
+        {inputs["email"] && (
+          <Alert variant="destructive" className="mt-2">
+            <AlertDescription className="font-semibold">
+              SAVE THIS TOKEN!
+            </AlertDescription>
+          </Alert>
+        )}
+        {errors["email"] && (
+          <p className="text-sm text-red-500">{errors["email"]}</p>
+        )}
       </div>
     );
   };
 
   const CodeInput = () => {
     return (
-      <div className="input">
-        <FrameIcon
-          className="white-color"
-          width={40}
-          height={30}
-          center
-        ></FrameIcon>
-        <input
-          className="code-input"
-          autocomplete="off"
-          type="text"
-          placeholder={"Code"}
-          // value={inputs["email"]}
-          name="code"
-          onChange={HandleInputChange}
-        />
-        {errors["code"] && <div className="error">{errors["code"]}</div>}
+      <div className="space-y-2">
+        <div className="relative">
+          <FrameIcon className="absolute left-3 top-2.5 h-5 w-5 text-[#4B7BF5]" />
+          <Input
+            id="code"
+            className="pl-10 bg-[#0B0E14] border-[#1a1f2d] text-white focus:ring-[#4B7BF5] focus:border-[#4B7BF5] h-11"
+            type="text"
+            placeholder="Code"
+            name="code"
+            onChange={HandleInputChange}
+          />
+        </div>
+        {errors["code"] && (
+          <p className="text-sm text-red-500">{errors["code"]}</p>
+        )}
       </div>
     );
   };
 
   const RecoveryInput = () => {
     return (
-      <div className="input">
-        <FrameIcon
-          className="white-color"
-          width={40}
-          height={30}
-          center
-        ></FrameIcon>
-        <input
-          className=" recovery-input"
-          type="text"
-          placeholder={"Two Factor Recovery Code"}
-          value={inputs["recovery"]}
-          name="recovery"
-          onChange={HandleInputChange}
-        />
+      <div className="space-y-2">
+        <div className="relative">
+          <FrameIcon className="absolute left-3 top-2.5 h-5 w-5 text-[#4B7BF5]" />
+          <Input
+            id="recovery"
+            className="pl-10 bg-[#0B0E14] border-[#1a1f2d] text-white focus:ring-[#4B7BF5] focus:border-[#4B7BF5] h-11"
+            type="text"
+            placeholder="Two Factor Recovery Code"
+            value={inputs["recovery"]}
+            name="recovery"
+            onChange={HandleInputChange}
+          />
+        </div>
         {errors["recovery"] && (
-          <div className="error">{errors["recovery"]}</div>
+          <p className="text-sm text-red-500">{errors["recovery"]}</p>
         )}
       </div>
     );
@@ -596,171 +585,204 @@ const Login = (props) => {
 
   const LoginForm = () => {
     return (
-      <div className="form">
-        {EmailInput()}
-        {DeviceInput()}
-        {PasswordInput()}
-        {TwoFactorInput()}
-
-        <div className="buttons">
-          <button className={`button`} onClick={HandleSubmit}>
+      <Card className="w-full max-w-md mx-auto bg-[#0B0E14] border border-[#1a1f2d] shadow-2xl">
+        <CardContent className="space-y-6 p-6">
+          <div className="text-center mb-2">
+            <h1 className="text-lg font-medium text-white/80">Welcome back</h1>
+          </div>
+          {EmailInput()}
+          {DeviceInput()}
+          {PasswordInput()}
+          {TwoFactorInput()}
+          <div className="flex items-center space-x-2">
+            <CustomToggle
+              value={remember}
+              label={<span className="text-[#4B7BF5]">Remember Login</span>}
+              toggle={() => {
+                setRememeber(!remember);
+              }}
+            />
+          </div>
+          <Button className="w-full h-11 bg-[#4B7BF5] hover:bg-[#4B7BF5]/90 text-white" onClick={HandleSubmit}>
             Login
-          </button>
-        </div>
-        <CustomToggle
-          value={remember}
-          label={"Remember Login"}
-          toggle={() => {
-            setRememeber(!remember);
-          }}
-        />
-      </div>
+          </Button>
+        </CardContent>
+      </Card>
     );
   };
   const RegisterAnonForm = () => {
     return (
-      <>
-        <div className="warning">
-          Save your login token in a secure place. <br />
-          <br />
-          If you loose the token your account is lost forever.
-        </div>
-        <div className="form">
+      <Card className="w-full max-w-md mx-auto bg-[#0B0E14] border border-[#1a1f2d] shadow-2xl">
+        <CardContent className="space-y-6 p-6">
+          <div className="text-center mb-2">
+            <h1 className="text-lg font-medium text-white/80">Anonymous Registration</h1>
+          </div>
+          <Alert className="border-2 border-red-500 bg-red-500/10">
+            <AlertDescription className="font-medium text-red-500">
+              Save your login token in a secure place, it is the only form of authentication you have for your account. If you lose the token your account is lost forever.
+            </AlertDescription>
+          </Alert>
           {TokenInput()}
           {PasswordInput()}
           {ConfirmPasswordInput()}
-
-          <div className="buttons">
-            <button className={`button`} onClick={RegisterSubmit}>
-              Register
-            </button>
-          </div>
-        </div>
-      </>
+          <Button className="w-full h-11 bg-[#4B7BF5] hover:bg-[#4B7BF5]/90 text-white" onClick={RegisterSubmit}>
+            Register
+          </Button>
+        </CardContent>
+      </Card>
     );
   };
 
   const RegisterForm = () => {
     return (
-      <div className="form">
-        {tokenLogin && TokenInput()}
-
-        {!tokenLogin && EmailInput()}
-
-        {PasswordInput()}
-        {ConfirmPasswordInput()}
-
-        <div className="buttons">
-          <button className={`button`} onClick={RegisterSubmit}>
+      <Card className="w-full max-w-md mx-auto bg-[#0B0E14] border border-[#1a1f2d] shadow-2xl">
+        <CardContent className="space-y-6 p-6">
+          <div className="text-center mb-2">
+            <h1 className="text-lg font-medium text-white/80">Create your account</h1>
+          </div>
+          {tokenLogin && TokenInput()}
+          {!tokenLogin && EmailInput()}
+          {PasswordInput()}
+          {ConfirmPasswordInput()}
+          <Button className="w-full h-11 bg-[#4B7BF5] hover:bg-[#4B7BF5]/90 text-white" onClick={RegisterSubmit}>
             Register
-          </button>
-        </div>
-      </div>
+          </Button>
+        </CardContent>
+      </Card>
     );
   };
 
   const ResetPasswordForm = () => {
     return (
-      <div className="form">
-        {EmailOnlyInput()}
-        {NewPasswordInput()}
-        {ConfirmPasswordInput()}
-        {CodeInput()}
-
-        <div className="buttons">
-          <button className={`button code-button`} onClick={() => GetCode()}>
-            Get Reset Code
-          </button>
-          <button className={`button`} onClick={() => ResetSubmit()}>
-            Reset Password
-          </button>
-        </div>
-      </div>
+      <Card className="w-full max-w-md mx-auto bg-[#0B0E14] border border-[#1a1f2d] shadow-2xl">
+        <CardContent className="space-y-6 p-6">
+          <div className="text-center mb-2">
+            <h1 className="text-lg font-medium text-white/80">Reset your password</h1>
+          </div>
+          {EmailInput()}
+          {PasswordInput()}
+          {ConfirmPasswordInput()}
+          {CodeInput()}
+          <div className="flex space-x-2">
+            <Button variant="outline" className="flex-1 h-11 bg-[#0B0E14] border-[#1a1f2d] text-white hover:bg-[#1a1f2d] hover:text-white" onClick={() => GetCode()}>
+              Get Reset Code
+            </Button>
+            <Button className="flex-1 h-11 bg-[#4B7BF5] hover:bg-[#4B7BF5]/90 text-white" onClick={() => ResetSubmit()}>
+              Reset Password
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     );
   };
 
   const RecoverTwoFactorForm = () => {
     return (
-      <div className="form">
-        {EmailInput()}
-        {PasswordInput()}
-        {RecoveryInput()}
-
-        <div className="buttons">
-          <button className={`button`} onClick={HandleSubmit}>
+      <Card className="w-full max-w-md mx-auto bg-[#0B0E14] border border-[#1a1f2d] shadow-2xl">
+        <CardContent className="space-y-6 p-6">
+          <div className="text-center mb-2">
+            <h1 className="text-lg font-medium text-white/80">Two-Factor Recovery</h1>
+          </div>
+          {EmailInput()}
+          {PasswordInput()}
+          {RecoveryInput()}
+          <Button className="w-full h-11 bg-[#4B7BF5] hover:bg-[#4B7BF5]/90 text-white" onClick={HandleSubmit}>
             Login
-          </button>
-        </div>
-      </div>
+          </Button>
+        </CardContent>
+      </Card>
     );
   };
 
   const EnableAccountForm = () => {
     return (
-      <div className="form">
-        {EmailInput()}
-        {CodeInput()}
-
-        <div className="buttons">
-          <button className={`button`} onClick={EnableSubmit}>
+      <Card className="w-full max-w-md mx-auto bg-[#0B0E14] border border-[#1a1f2d] shadow-2xl">
+        <CardContent className="space-y-6 p-6">
+          <div className="text-center mb-2">
+            <h1 className="text-lg font-medium text-white/80">Enable your account</h1>
+          </div>
+          {EmailInput()}
+          {CodeInput()}
+          <Button className="w-full h-11 bg-[#4B7BF5] hover:bg-[#4B7BF5]/90 text-white" onClick={EnableSubmit}>
             Enable Account
-          </button>
-        </div>
-      </div>
+          </Button>
+        </CardContent>
+      </Card>
     );
   };
 
   return (
-    <div className="login-wrapper">
-      {mode === 1 && LoginForm()}
-      {mode === 2 && RegisterForm()}
-      {mode === 4 && ResetPasswordForm()}
-      {mode === 3 && RecoverTwoFactorForm()}
-      {mode === 5 && RegisterAnonForm()}
-      {mode === 6 && EnableAccountForm()}
+    <div className="w-full flex flex-col items-center justify-center p-4 bg-black">
+      <div className="w-full max-w-md space-y-6">
+        {mode === 1 && LoginForm()}
+        {mode === 2 && RegisterForm()}
+        {mode === 4 && ResetPasswordForm()}
+        {mode === 3 && RecoverTwoFactorForm()}
+        {mode === 5 && RegisterAnonForm()}
+        {mode === 6 && EnableAccountForm()}
 
-      <div className="">
-        <div
-          className={`${mode === 1 ? "active" : ""} `}
-          onClick={() => setMode(1)}
-        >
-         
-        </div>
-        <Button >
+        <div className="flex flex-wrap items-center justify-center gap-3 mt-4">
+          <Button
+            variant="ghost"
+            onClick={() => setMode(1)}
+            className={`h-9 px-4 ${
+              mode === 1 
+                ? 'text-[#4B7BF5] hover:text-[#4B7BF5] hover:bg-[#4B7BF5]/10' 
+                : 'text-white/50 hover:text-white hover:bg-white/5'
+            }`}
+          >
             Login
           </Button>
-        <div
-          className={`${mode === 2 ? "active" : ""} btn`}
-          onClick={() => {
-            RemoveToken();
-            setMode(2);
-          }}
-        >
-          Register
-        </div>
-
-        <div
-          className={`${mode === 5 ? "active" : ""} btn`}
-          onClick={() => {
-            GenerateToken();
-            setMode(5);
-          }}
-        >
-          Register Anonymously
-        </div>
-
-        <div
-          className={`${mode === 4 ? "active" : ""} btn`}
-          onClick={() => setMode(4)}
-        >
-          Reset Password
-        </div>
-
-        <div
-          className={`${mode === 3 ? "active" : ""} btn`}
-          onClick={() => setMode(3)}
-        >
-          2FA Recovery
+          <Button
+            variant="ghost"
+            onClick={() => {
+              RemoveToken();
+              setMode(2);
+            }}
+            className={`h-9 px-4 ${
+              mode === 2 
+                ? 'text-[#4B7BF5] hover:text-[#4B7BF5] hover:bg-[#4B7BF5]/10' 
+                : 'text-white/50 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            Register
+          </Button>
+          <Button
+            variant="ghost"
+            onClick={() => {
+              GenerateToken();
+              setMode(5);
+            }}
+            className={`h-9 px-4 ${
+              mode === 5 
+                ? 'text-[#4B7BF5] hover:text-[#4B7BF5] hover:bg-[#4B7BF5]/10' 
+                : 'text-white/50 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            Register Anonymously
+          </Button>
+          <Button
+            variant="ghost"
+            onClick={() => setMode(4)}
+            className={`h-9 px-4 ${
+              mode === 4 
+                ? 'text-[#4B7BF5] hover:text-[#4B7BF5] hover:bg-[#4B7BF5]/10' 
+                : 'text-white/50 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            Reset Password
+          </Button>
+          <Button
+            variant="ghost"
+            onClick={() => setMode(3)}
+            className={`h-9 px-4 ${
+              mode === 3 
+                ? 'text-[#4B7BF5] hover:text-[#4B7BF5] hover:bg-[#4B7BF5]/10' 
+                : 'text-white/50 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            2FA Recovery
+          </Button>
         </div>
       </div>
     </div>
