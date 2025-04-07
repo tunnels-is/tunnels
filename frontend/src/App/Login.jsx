@@ -11,6 +11,7 @@ import {
 
 import GLOBAL_STATE from "../state";
 import STORE from "../store";
+import { Button } from "@/components/ui/button.jsx";
 
 const useForm = () => {
   const [inputs, setInputs] = useState({});
@@ -718,14 +719,16 @@ const Login = (props) => {
       {mode === 5 && RegisterAnonForm()}
       {mode === 6 && EnableAccountForm()}
 
-      <div className="login-options">
+      <div className="">
         <div
-          className={`${mode === 1 ? "active" : ""} btn`}
+          className={`${mode === 1 ? "active" : ""} `}
           onClick={() => setMode(1)}
         >
-          Login
+         
         </div>
-
+        <Button >
+            Login
+          </Button>
         <div
           className={`${mode === 2 ? "active" : ""} btn`}
           onClick={() => {
