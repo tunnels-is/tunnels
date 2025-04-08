@@ -353,13 +353,9 @@ func (t *TInterface) Disconnect(V *TUN) (err error) {
 	meta := V.meta.Load()
 	if IsDefaultConnection(meta.IFName) || meta.EnableDefaultRoute {
 		_ = IP_DelDefaultRoute()
-		// Retrieve the default gateway from STATE and force macOS to recreate its default route
 		gateway := STATE.Load().DefaultGateway.Load()
 		if gateway != nil {
-			_, err = exec.Command("route", "-n", "change", "default", gateway.To4().String()).CombinedOutput()
-			if err != nil {
-				ERROR("unable to recreate default route:", err)
-			}
+			_ = IP_AddDefaultRoute(gateway.To4().String())
 		} else {
 			ERROR("default gateway not found in STATE")
 		}
