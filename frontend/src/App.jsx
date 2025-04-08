@@ -62,59 +62,66 @@ const LaunchApp = () => {
         }}
       />
 
-      <SideBar />
+      <div className="min-h-screen bg-black w-full">
+        <SideBar />
+        
+        {/* Main Content Area */}
+        <main className="pl-64">
+          <div className="min-h-screen">
+            <ScreenLoader />
+            <div className="p-6 w-full">
+              <Routes>
+                {(state.User?.Email === "" || !state.User) && (
+                  <>
+                    <Route path="/" element={<Login />} />
+                    <Route path="login" element={<Login />} />
+                    <Route path="settings" element={<Settings />} />
+                    <Route path="help" element={<Welcome />} />
+                    <Route path="dns" element={<DNS />} />
+                    <Route path="dns-records" element={<DNSRecords />} />
+                    <Route path="*" element={<Login />} />
+                  </>
+                )}
 
-      <ScreenLoader />
-      <div className="ab app-wrapper">
-        <Routes>
-          {(state.User?.Email === "" || !state.User) && (
-            <>
-              <Route path="/" element={<Login />} />
-              <Route path="login" element={<Login />} />
-              <Route path="settings" element={<Settings />} />
-              <Route path="help" element={<Welcome />} />
-              <Route path="dns" element={<DNS />} />
-              <Route path="dns-records" element={<DNSRecords />} />
-              <Route path="*" element={<Login />} />
-            </>
-          )}
+                {state.User && (
+                  <>
+                    <Route path="/" element={<Welcome />} />
+                    <Route path="account" element={<Account />} />
 
-          {state.User && (
-            <>
-              <Route path="/" element={<Welcome />} />
-              <Route path="account" element={<Account />} />
+                    <Route path="twofactor" element={<Enable2FA />} />
+                    <Route path="org" element={<Org />} />
 
-              <Route path="twofactor" element={<Enable2FA />} />
-              <Route path="org" element={<Org />} />
+                    <Route path="inspect/group/:id" element={<InspectGroup />} />
+                    <Route path="inspect/group" element={<InspectGroup />} />
 
-              <Route path="inspect/group/:id" element={<InspectGroup />} />
-              <Route path="inspect/group" element={<InspectGroup />} />
+                    <Route path="tunnels" element={<ConnectionTable />} />
+                    <Route
+                      path="inspect/connection/:id"
+                      element={<InspectConnection />}
+                    />
+                    <Route path="routing" element={<ConnectionTable />} />
+                    <Route path="settings" element={<Settings />} />
 
-              <Route path="tunnels" element={<ConnectionTable />} />
-              <Route
-                path="inspect/connection/:id"
-                element={<InspectConnection />}
-              />
-              <Route path="routing" element={<ConnectionTable />} />
-              <Route path="settings" element={<Settings />} />
+                    <Route path="dns" element={<DNS />} />
+                    <Route path="dns-records" element={<DNSRecords />} />
+                    <Route path="dns/answers/:domain" element={<DNSAnswers />} />
 
-              <Route path="dns" element={<DNS />} />
-              <Route path="dns-records" element={<DNSRecords />} />
-              <Route path="dns/answers/:domain" element={<DNSAnswers />} />
+                    <Route path="servers" element={<Servers />} />
+                    <Route path="all" element={<ServersFull />} />
+                    <Route path="private" element={<PrivateServers />} />
 
-              <Route path="servers" element={<Servers />} />
-              <Route path="all" element={<ServersFull />} />
-              <Route path="private" element={<PrivateServers />} />
+                    <Route path="inspect/blocklist/" element={<InspectBlocklist />} />
 
-              <Route path="inspect/blocklist/" element={<InspectBlocklist />} />
+                    <Route path="login" element={<Login />} />
+                    <Route path="help" element={<Welcome />} />
 
-              <Route path="login" element={<Login />} />
-              <Route path="help" element={<Welcome />} />
-
-              <Route path="*" element={<Servers />} />
-            </>
-          )}
-        </Routes>
+                    <Route path="*" element={<Servers />} />
+                  </>
+                )}
+              </Routes>
+            </div>
+          </div>
+        </main>
       </div>
     </HashRouter>
   );
