@@ -127,7 +127,7 @@ const NewTable = (props) => {
 	// Render a card-style row
 	const renderPublicVpnServers = (row, index) => {
 		const imageItem = row.items.find(item => item.type === "img");
-		const statusItem = row.items.find(item => ["Connect", "Assign", "tunnels", "Active", "Inactive", "Error", "Warning", "Success"].includes(item.value));
+		const statusItem = row.items.find(item => ["Connect", "Disconnect"].includes(item.value));
 		const assignItem = row.items.find(item => item.type === "select");
 
 		const tag = row.items[1]
@@ -193,18 +193,18 @@ const NewTable = (props) => {
 				)}
 
 					<div className="flex items-center gap-3 ml-4">
-					{statusItem && statusItem.value === "Connect" || statusItem.value === "Disconnect" ? (
+					{statusItem && statusItem?.value === "Connect" || statusItem?.value === "Disconnect" ? (
 						<Badge 
 							onClick={() => statusItem.click && statusItem.click()}
 							className={`
 								font-medium text-xs py-1 px-2.5 rounded-md border cursor-pointer
-								${statusItem.value === "Connect"
+								${statusItem?.value === "Connect"
 									? "bg-green-500/10 text-green-400 border-green-500/20 hover:bg-green-500/20" 
 									: "bg-red-500/10 text-red-400 border-red-500/20 hover:bg-red-500/20"
 								}
 							`}
 						>
-							{statusItem.value}
+							{statusItem?.value}
 						</Badge>
 					) : null}
 				</div>

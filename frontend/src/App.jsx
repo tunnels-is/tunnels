@@ -62,12 +62,12 @@ const LaunchApp = () => {
         }}
       />
 
-      <div className="min-h-screen bg-black w-full">
+      <div className=" bg-black w-full">
         <SideBar />
         
         {/* Main Content Area */}
         <main className="pl-64">
-          <div className="min-h-screen">
+          <div className="">
             <ScreenLoader />
             <div className="p-6 w-full">
               <Routes>
