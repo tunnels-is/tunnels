@@ -156,6 +156,7 @@ const Servers = () => {
         tableID={"public-servers"}
         className="router-table"
         placeholder={"Search .."}
+        design="public-vpn-servers"
         background={true}
         header={headers}
         rows={rows}
