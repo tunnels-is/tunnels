@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Search, ArrowRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Search, ArrowRight, Filter } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 const NewTable = (props) => {
@@ -213,12 +213,85 @@ const NewTable = (props) => {
 		);
 	};
 
+	// Render a card-style row for private VPN servers
+	const renderPrivateVpnServers = (row, index) => {
+		const statusItem = row.items.find(item => item.s_type === "connect-disconnect");
+		const assignItem = row.items.find(item => item.type === "select");
+
+		const tag = row.items[0];
+		const ip = row.items[2];
+		const port = row.items[3];
+		
+		return (
+			<div 
+				key={`private-card-${index}`}
+				className="flex items-center p-4 bg-[#0a0a0a] border border-[#222] rounded-lg hover:border-[#333] transition-all shadow-md hover:shadow-lg"
+			>
+				<div className="flex-1 min-w-0">
+					{tag?.value ? (
+						<h3 
+							onClick={() => tag.click && tag.click()}
+							className="text-white text-base font-medium cursor-pointer hover:text-blue-400 transition-colors"
+						>
+							{tag.value}
+						</h3>
+					) : (
+						<h3 className="text-gray-500 text-base font-medium">
+							No tag available
+						</h3>
+					)}
+					
+					<div className="flex flex-wrap gap-2 items-center mt-1 text-xs">
+						{ip?.value ? (
+							<div className="px-2 py-0.5 bg-emerald-500/10 text-emerald-400 rounded font-mono">
+								{ip.value}
+							</div>
+						) : (
+							<div className="px-2 py-0.5 bg-gray-500/10 text-gray-400 rounded font-mono">
+								IP not found
+							</div>
+						)}
+						
+						{port?.value ? (
+							<div className="px-2 py-0.5 bg-purple-500/10 text-purple-400 rounded">
+								Port: {port.value}
+							</div>
+						) : (
+							<div className="px-2 py-0.5 bg-gray-500/10 text-gray-400 rounded">
+								Port not specified
+							</div>
+						)}
+					</div>
+				</div>
+				
+				<div className="flex items-center gap-3">
+					{assignItem && assignItem.value}
+					
+					{statusItem && (
+						<Badge 
+							onClick={() => statusItem.click && statusItem.click()}
+							className={`
+								font-medium text-xs py-1 px-2.5 rounded-md border cursor-pointer
+								${statusItem.s_state === "connect"
+									? "bg-green-500/10 text-green-400 border-green-500/20 hover:bg-green-500/20" 
+									: "bg-red-500/10 text-red-400 border-red-500/20 hover:bg-red-500/20"
+								}
+							`}
+						>
+							{statusItem.value}
+						</Badge>
+					)}
+				</div>
+			</div>
+		);
+	};
+
 	return (
-		<div className={`${!props.design && "max-w-[900px]"} space-y-3 transition-all duration-300 ${props.background ? "bg-[#000000] p-4 rounded-md shadow-lg" : ""} ${props.className}`}>
+		<div className={`${!props.design && "max-w-[900px]"} space-y-3 transition-all duration-300 ${props.background ? "bg-[#000000] p-6 rounded-md shadow-lg border border-[#222]" : ""} ${props.className}`}>
 			<div className="flex items-center justify-between gap-2">
 				{props?.title && (
 					<div className="flex items-center">
-						<h2 className="text-lg font-semibold tracking-tight text-white">{props.title}</h2>
+						<h2 className="text-lg font-semibold tracking-tight text-white relative pl-2 before:content-[''] before:absolute before:left-0 before:top-0 before:bottom-0 before:w-1 before:bg-blue-500 before:rounded-full">{props.title}</h2>
 					</div>
 				)}
 
@@ -227,7 +300,7 @@ const NewTable = (props) => {
 						<Button 
 							variant="outline" 
 							size="sm"
-							className="h-8 px-3 text-xs font-medium text-white border-[#222] bg-[#111] hover:bg-[#222] hover:text-white"
+							className="h-8 px-3 text-xs font-medium text-white border-[#222] bg-[#111] hover:bg-[#222] hover:text-white shadow-sm"
 							onClick={(e) => props.button.click(e)}
 						>
 							{props.button.text}
@@ -238,42 +311,43 @@ const NewTable = (props) => {
 						<Button 
 							variant="outline" 
 							size="sm"
-							className="h-8 px-3 text-xs font-medium text-white border-[#222] bg-[#111] hover:bg-[#222] hover:text-white"
+							className="h-8 px-3 text-xs font-medium text-white border-[#222] bg-[#111] hover:bg-[#222] hover:text-white shadow-sm"
 							onClick={(e) => props.button2.click(e)}
 						>
 							{props.button2.text}
 						</Button>
 					)}
 					
-					{props.rows?.length > 20 && (
+					{props.rows?.length >= 1 && (
 						<div className="relative ml-2">
 							<Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-white/50" />
 							<Input
 								value={filter}
 								onChange={(e) => setFilter(e.target.value)}
 								placeholder={props?.placeholder ? props.placeholder : "Search..."}
-								className="h-8 w-[180px] pl-8 text-xs bg-[#111] border-[#222] focus-visible:ring-[#333] text-white"
+								className="h-8 w-[200px] pl-8 text-xs bg-[#111] border-[#222] focus-visible:ring-[#333] text-white shadow-sm"
 							/>
 						</div>
 					)}
 				</div>
 			</div>
 
-{/* public vpn servers design */}
-				{props.design === "public-vpn-servers" && (
-					<div className="space-y-1">
+			{/* public vpn servers design */}
+			{props.design === "public-vpn-servers" && (
+				<div className="space-y-1">
 					{finalRows.length > 0 ? (
 						<div className="mt-3">
-							<div className="grid lg:grid-cols-2 gap-4">
+							<div className="grid lg:grid-cols-2 2xl:grid-cols-3 gap-4">
 								{indexes.map(ind => renderPublicVpnServers(finalRows[ind], ind))}
 							</div>
 						</div>
 					) : (
-						<div className="flex justify-center py-10 text-white/60 bg-[#0a0a0a] border border-[#222] rounded-lg">
+						<div className="flex justify-center py-12 text-white/60 bg-[#0a0a0a] border border-[#222] rounded-lg">
 							<div className="flex flex-col items-center">
-								<Search className="h-8 w-8 mb-2 opacity-30" />
+								<div className="w-10 h-10 mb-3 rounded-full bg-[#111] flex items-center justify-center">
+									<Filter className="w-5 h-5 text-white/40" />
+								</div>
 								<p className="text-sm font-medium">No results found</p>
-								<p className="text-xs text-white/40 mt-1">Try adjusting your search</p>
 								{filter && (
 									<Button
 										variant="ghost"
@@ -288,9 +362,41 @@ const NewTable = (props) => {
 						</div>
 					)}
 				</div>
-				)}
+			)}
 
-{/* regular table */}
+			{/* private vpn servers design */}
+			{props.design === "private-vpn-servers" && (
+				<div className="space-y-1">
+					{finalRows.length > 0 ? (
+						<div className="mt-3">
+							<div className="grid lg:grid-cols-2 2xl:grid-cols-3 gap-4">
+								{indexes.map(ind => renderPrivateVpnServers(finalRows[ind], ind))}
+							</div>
+						</div>
+					) : (
+						<div className="flex justify-center py-12 text-white/60 bg-[#0a0a0a] border border-[#222] rounded-lg">
+							<div className="flex flex-col items-center">
+								<div className="w-10 h-10 mb-3 rounded-full bg-[#111] flex items-center justify-center">
+									<Filter className="w-5 h-5 text-white/40" />
+								</div>
+								<p className="text-sm font-medium">No results found</p>
+								{filter && (
+									<Button
+										variant="ghost"
+										size="sm"
+										onClick={() => setFilter("")}
+										className="mt-3 h-7 px-2 text-xs font-medium text-blue-400 hover:bg-blue-500/10"
+									>
+										Clear Search
+									</Button>
+								)}
+							</div>
+						</div>
+					)}
+				</div>
+			)}
+
+			{/* regular table */}
 			{!props.design && 	
 				<div className="rounded-md border border-[#222] overflow-hidden bg-[#000000] shadow-lg transition-all duration-300">
 					{finalRows.length > 0 && (
@@ -310,7 +416,7 @@ const NewTable = (props) => {
 												<TableHead 
 													key={l.value + i}
 													style={style}
-													className={`py-2.5 px-3 text-xs font-semibold text-white/90 transition-colors ${l.className || ""}`}
+													className={`py-3 px-4 text-xs font-semibold text-white/90 transition-colors uppercase tracking-wider ${l.className || ""}`}
 												>
 													{l.value}
 												</TableHead>
@@ -412,7 +518,7 @@ const NewTable = (props) => {
 															key={i.value + String(index)}
 															style={style}
 															onClick={(e) => handleClick(e)}
-															className={`py-2.5 px-3 text-sm ${classNames} ${isClickable} ${i.click ? "hover:bg-[#111] transition-colors" : ""}`}
+															className={`py-3 px-4 text-sm ${classNames} ${isClickable} ${i.click ? "hover:bg-[#111] transition-colors" : ""}`}
 														>
 															{cellContent}
 														</TableCell>
@@ -427,11 +533,12 @@ const NewTable = (props) => {
 					)}
 
 					{finalRows.length < 1 && (
-						<div className="flex justify-center py-10 text-white/60">
+						<div className="flex justify-center py-12 text-white/60">
 							<div className="flex flex-col items-center">
-								<Search className="h-8 w-8 mb-2 opacity-30" />
+								<div className="w-10 h-10 mb-3 rounded-full bg-[#111] flex items-center justify-center">
+									<Filter className="w-5 h-5 text-white/40" />
+								</div>
 								<p className="text-sm font-medium">No results found</p>
-								<p className="text-xs text-white/40 mt-1">Try adjusting your search</p>
 								{filter && (
 									<Button
 										variant="ghost"
@@ -445,16 +552,17 @@ const NewTable = (props) => {
 							</div>
 						</div>
 					)}
-				</div>}
+				</div>
+			}
 
 			{(pg.TotalPages > 1 || pg.TableSize === finalRows.length) && (
-				<div className="flex items-center justify-between gap-2 mt-2 px-1">
-					<div className="flex items-center text-xs text-white/50">
+				<div className="flex items-center justify-between gap-2 mt-4 px-1">
+					<div className="flex items-center text-xs text-white/50 bg-[#0a0a0a] px-3 py-1.5 rounded-md border border-[#222]">
 						<span>{calculateItemsShowing()}</span>
 					</div>
 
-					<div className="flex items-center gap-2">
-						<div className="flex items-center">
+					<div className="flex items-center gap-3">
+						<div className="flex items-center overflow-hidden rounded-md border border-[#222] shadow-sm">
 							<Button 
 								variant="outline" 
 								size="icon"
@@ -481,7 +589,7 @@ const NewTable = (props) => {
 								value={String(originalSize)} 
 								onValueChange={(value) => state.setPageSize(props.tableID, value)}
 							>
-								<SelectTrigger className="h-8 w-[72px] text-xs border-[#222] bg-[#111] focus:ring-0">
+								<SelectTrigger className="h-8 w-[80px] text-xs border-[#222] bg-[#111] focus:ring-0 shadow-sm">
 									<span className="text-white/50 text-xs mr-1">Items:</span>
 									<SelectValue placeholder={originalSize} className="text-white/90 text-xs" />
 								</SelectTrigger>
@@ -498,7 +606,7 @@ const NewTable = (props) => {
 								value={String(pg.CurrentPage)} 
 								onValueChange={(value) => setPageWrap(parseInt(value), finalRows.length)}
 							>
-								<SelectTrigger className="h-8 w-[72px] text-xs border-[#222] bg-[#111] focus:ring-0">
+								<SelectTrigger className="h-8 w-[80px] text-xs border-[#222] bg-[#111] focus:ring-0 shadow-sm">
 									<span className="text-white/50 text-xs mr-1">Page:</span>
 									<SelectValue placeholder={pg.CurrentPage + 1} className="text-white/90 text-xs" />
 								</SelectTrigger>

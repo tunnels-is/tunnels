@@ -4,11 +4,24 @@ import CustomSelect from "./component/CustomSelect";
 import { useNavigate } from "react-router-dom";
 import NewTable from "./component/newtable";
 import ObjectEditor from "./ObjectEditor";
+import { Save } from "lucide-react";
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogHeader,
+	DialogTitle,
+	DialogFooter,
+	DialogClose
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
 const PrivateServers = () => {
 	const state = GLOBAL_STATE("pservers")
 	const [pserver, setPServer] = useState(undefined)
 	const [nserver, setNServer] = useState(undefined)
+	const [editModalOpen, setEditModalOpen] = useState(false)
+	const [createModalOpen, setCreateModalOpen] = useState(false)
 
 	useEffect(() => {
 		state.GetPrivateServers()
@@ -18,6 +31,7 @@ const PrivateServers = () => {
 		let resp = await state.API_UpdateServer(pserver)
 		if (resp?.status === 200) {
 			state.renderPage("pservers")
+			setEditModalOpen(false)
 		}
 	}
 	const serverUpdateOpts = {
@@ -43,10 +57,11 @@ const PrivateServers = () => {
 		let resp = await state.API_CreateServer(nserver)
 		if (resp?.status === 200) {
 			state.renderPage("pservers")
+			setCreateModalOpen(false)
 		}
 	}
 	const serverCreateOpts = {
-		baseClass: "private-server-object-editor",
+		baseClass: "",
 		maxDepth: 1000,
 		onlyKeys: false,
 		disabled: {
@@ -124,7 +139,7 @@ const PrivateServers = () => {
 					 color: "blue",
 					click: function() {
 						setPServer(server)
-						state.renderPage("pservers")
+						setEditModalOpen(true)
 					}
 				},
 				{
@@ -148,6 +163,8 @@ const PrivateServers = () => {
 					color: con ? "red" : "green",
 					click: conButton,
 					width:"50px",
+					s_type: "connect-disconnect",
+					s_state: con ? "disconnect" : "connect",
 				},
 			]
 			rows.push(row)
@@ -166,42 +183,17 @@ const PrivateServers = () => {
 		{ value: "" }
 	]
 
-	if (nserver !== undefined) {
-		return (
-			<div className="connections">
-				<div className="back" onClick={() => setNServer(undefined)}>Back to server</div>
-				<ObjectEditor
-					opts={serverCreateOpts}
-					object={nserver}
-				/>
-			</div>
-		)
-	}
-
-	if (pserver !== undefined) {
-		return (
-			<div className="connections">
-				<div className="back" onClick={() => setPServer(undefined)}>Back to server</div>
-				<ObjectEditor
-					opts={serverUpdateOpts}
-					object={pserver}
-				/>
-			</div>
-		)
-	}
-
-
 	return (
-		<div className="ab private-server-wrapper">
-
+		<div className="ab private-server-wrapper w-full">
 			<NewTable
 				title={"Private VPN Servers"}
 				tableID={"private-servers"}
-				className="router-table"
+				className="w-full"
 				placeholder={"Search .."}
 				header={headers}
 				background={true}
 				rows={rows}
+				design="private-vpn-servers"
 				button={{
 					text: "New Server",
 					click: function() {
@@ -216,13 +208,96 @@ const PrivateServers = () => {
 							Tag: "",
 							Serial: "",
 						})
+						setCreateModalOpen(true)
 					}
 				}}
-
 			/>
-		</div >
-	);
 
+			{/* Edit Server Dialog */}
+			<Dialog open={editModalOpen} onOpenChange={setEditModalOpen}>
+				<DialogContent className="sm:max-w-[800px] bg-[#0a0a0a] border-[#222] text-white">
+					<DialogHeader>
+						<DialogTitle className="text-lg font-bold text-white">Edit Server</DialogTitle>
+						<DialogDescription className="text-white/60">
+							Make changes to your server configuration here.
+						</DialogDescription>
+					</DialogHeader>
+					
+					{pserver && (
+						<div className="py-4 max-h-[70vh] overflow-y-auto overflow-x-hidden pr-2">
+							<ObjectEditor
+								hideSaveButton={true}
+								opts={serverUpdateOpts}
+								object={pserver}
+							/>
+						</div>
+					)}
+					
+					<DialogFooter className="flex items-center justify-end gap-2 pt-4 border-t border-[#222]">
+					{serverUpdateOpts.saveButton && pserver  && (
+							<Button
+								variant="outline"
+								onClick={() => serverUpdateOpts.saveButton(pserver)}
+								className="h-9 border-emerald-800/40 bg-[#0c1e0c] text-emerald-400 hover:bg-emerald-900/30 hover:text-emerald-300 shadow-sm font-medium"
+							>
+								<Save className="h-4 w-4 mr-1" />
+								Save
+							</Button>
+						)}
+						<Button 
+							variant="outline" 
+							onClick={() => setEditModalOpen(false)}
+							className="h-9 px-4 text-sm font-medium text-white/80 border-[#222] bg-[#111] hover:bg-[#222] hover:text-white"
+						>
+							Cancel
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
+
+			{/* Create Server Dialog */}
+			<Dialog open={createModalOpen} onOpenChange={setCreateModalOpen}>
+				<DialogContent className="sm:max-w-[800px] bg-[#0a0a0a] border-[#222] text-white">
+					<DialogHeader>
+						<DialogTitle className="text-lg font-bold text-white">New Server</DialogTitle>
+						<DialogDescription className="text-white/60">
+							Configure your new server settings below.
+						</DialogDescription>
+					</DialogHeader>
+					
+					{nserver && (
+						<div className="py-4 max-h-[70vh] overflow-y-auto overflow-x-hidden pr-2">
+							<ObjectEditor
+								hideSaveButton={true}
+								opts={serverCreateOpts}
+								object={nserver}
+							/>
+						</div>
+					)}
+					
+					<DialogFooter className="flex items-center justify-end gap-2 pt-4 border-t border-[#222]">
+					{serverCreateOpts.saveButton && nserver  && (
+							<Button
+								variant="outline"
+								onClick={() => serverCreateOpts.saveButton(nserver)}
+								className="h-9 border-emerald-800/40 bg-[#0c1e0c] text-emerald-400 hover:bg-emerald-900/30 hover:text-emerald-300 shadow-sm font-medium"
+							>
+								<Save className="h-4 w-4 mr-1" />
+								Save
+							</Button>
+						)}
+						<Button 
+							variant="outline" 
+							onClick={() => setCreateModalOpen(false)}
+							className="h-9 px-4 text-sm font-medium text-white/80 border-[#222] bg-[#111] hover:bg-[#222] hover:text-white"
+						>
+							Cancel
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
+		</div>
+	);
 }
 
 export default PrivateServers;
