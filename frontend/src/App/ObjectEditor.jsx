@@ -610,7 +610,7 @@ const ObjectEditor = (props) => {
         {
           key: "root_keys_obj_grp",
           id: "root_keys",
-          className: "root_keys keys obj_grp",
+          className: "root_keys keys obj_grp grid sm:grid-cols-2 gap-3",
         },
         ...rootKeys,
       );
@@ -621,7 +621,7 @@ const ObjectEditor = (props) => {
       {
         key: "root_keys_arrays",
         id: "root_keys",
-        className: "root_keys arrays",
+        className: "root_keys arrays grid sm:grid-cols-2 gap-3",
       },
       ...nested,
       ...rootObjects,

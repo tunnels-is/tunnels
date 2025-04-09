@@ -3,18 +3,7 @@ import GLOBAL_STATE from "../state";
 import CustomSelect from "./component/CustomSelect";
 import { useNavigate } from "react-router-dom";
 import NewTable from "./component/newtable";
-import ObjectEditor from "./ObjectEditor";
-import { Save } from "lucide-react";
-import {
-	Dialog,
-	DialogContent,
-	DialogDescription,
-	DialogHeader,
-	DialogTitle,
-	DialogFooter,
-	DialogClose
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+import ObjectEditorDialog from "./component/ObjectEditorDialog";
 
 const PrivateServers = () => {
 	const state = GLOBAL_STATE("pservers")
@@ -213,89 +202,25 @@ const PrivateServers = () => {
 				}}
 			/>
 
-			{/* Edit Server Dialog */}
-			<Dialog open={editModalOpen} onOpenChange={setEditModalOpen}>
-				<DialogContent className="sm:max-w-[800px] bg-[#0a0a0a] border-[#222] text-white">
-					<DialogHeader>
-						<DialogTitle className="text-lg font-bold text-white">Edit Server</DialogTitle>
-						<DialogDescription className="text-white/60">
-							Make changes to your server configuration here.
-						</DialogDescription>
-					</DialogHeader>
-					
-					{pserver && (
-						<div className="py-4 max-h-[70vh] overflow-y-auto overflow-x-hidden pr-2">
-							<ObjectEditor
-								hideSaveButton={true}
-								opts={serverUpdateOpts}
-								object={pserver}
-							/>
-						</div>
-					)}
-					
-					<DialogFooter className="flex items-center justify-end gap-2 pt-4 border-t border-[#222]">
-					{serverUpdateOpts.saveButton && pserver  && (
-							<Button
-								variant="outline"
-								onClick={() => serverUpdateOpts.saveButton(pserver)}
-								className="h-9 border-emerald-800/40 bg-[#0c1e0c] text-emerald-400 hover:bg-emerald-900/30 hover:text-emerald-300 shadow-sm font-medium"
-							>
-								<Save className="h-4 w-4 mr-1" />
-								Save
-							</Button>
-						)}
-						<Button 
-							variant="outline" 
-							onClick={() => setEditModalOpen(false)}
-							className="h-9 px-4 text-sm font-medium text-white/80 border-[#222] bg-[#111] hover:bg-[#222] hover:text-white"
-						>
-							Cancel
-						</Button>
-					</DialogFooter>
-				</DialogContent>
-			</Dialog>
+			<ObjectEditorDialog
+				open={editModalOpen}
+				onOpenChange={setEditModalOpen}
+				object={pserver}
+				editorOpts={serverUpdateOpts}
+				title="Edit Server"
+				description="Make changes to your server configuration"
+				readOnly={false}
+			/>
 
-			{/* Create Server Dialog */}
-			<Dialog open={createModalOpen} onOpenChange={setCreateModalOpen}>
-				<DialogContent className="sm:max-w-[800px] bg-[#0a0a0a] border-[#222] text-white">
-					<DialogHeader>
-						<DialogTitle className="text-lg font-bold text-white">New Server</DialogTitle>
-						<DialogDescription className="text-white/60">
-							Configure your new server settings below.
-						</DialogDescription>
-					</DialogHeader>
-					
-					{nserver && (
-						<div className="py-4 max-h-[70vh] overflow-y-auto overflow-x-hidden pr-2">
-							<ObjectEditor
-								hideSaveButton={true}
-								opts={serverCreateOpts}
-								object={nserver}
-							/>
-						</div>
-					)}
-					
-					<DialogFooter className="flex items-center justify-end gap-2 pt-4 border-t border-[#222]">
-					{serverCreateOpts.saveButton && nserver  && (
-							<Button
-								variant="outline"
-								onClick={() => serverCreateOpts.saveButton(nserver)}
-								className="h-9 border-emerald-800/40 bg-[#0c1e0c] text-emerald-400 hover:bg-emerald-900/30 hover:text-emerald-300 shadow-sm font-medium"
-							>
-								<Save className="h-4 w-4 mr-1" />
-								Save
-							</Button>
-						)}
-						<Button 
-							variant="outline" 
-							onClick={() => setCreateModalOpen(false)}
-							className="h-9 px-4 text-sm font-medium text-white/80 border-[#222] bg-[#111] hover:bg-[#222] hover:text-white"
-						>
-							Cancel
-						</Button>
-					</DialogFooter>
-				</DialogContent>
-			</Dialog>
+			<ObjectEditorDialog
+				open={createModalOpen}
+				onOpenChange={setCreateModalOpen}
+				object={nserver}
+				editorOpts={serverCreateOpts}
+				title="New Server"
+				description="Configure your new server settings"
+				readOnly={false}
+			/>
 		</div>
 	);
 }
