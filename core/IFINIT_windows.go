@@ -261,40 +261,29 @@ func (t *TInterface) Addr() (err error) {
 }
 
 func (t *TInterface) Close() (err error) {
-	return t.Delete()
-}
 
-func (t *TInterface) Delete() (err error) {
-	add, err := t.WDLL.GetAddr(1)
+	add, err := t.WDLL.GetAddr(4)
 	if err != nil {
 		return
 	}
-	r1, _, msg := syscall.SyscallN(
-		// WCloseAdapter.Addr(),
-		// t.WDLL.PTR_CloseAdapter,
-		add.UPTR,
-		t.Handle)
+	r1, _, msg := syscall.SyscallN(add.UPTR, t.SessionHandle)
 	if r1 == 0 {
 		err = msg
-		ERROR(fmt.Sprintf("Interface/Adapter (%s) state (delete) error(%s)", t.Name, err))
+		ERROR(fmt.Sprintf("Interface/Adapter (%s) state (close/endsession) error(%s)", t.Name, err))
 	} else {
-		DEBUG(fmt.Sprintf("Interface/Adapter (%s) state (delete)", t.Name))
+		DEBUG(fmt.Sprintf("Interface/Adapter (%s) state (close/endsession)", t.Name))
 	}
 
-	add, err = t.WDLL.GetAddr(4)
+	add, err = t.WDLL.GetAddr(1)
 	if err != nil {
 		return
 	}
-	r1, _, msg = syscall.SyscallN(
-		// WEndSession.Addr(),
-		// t.WDLL.PTR_EndSession,
-		add.UPTR,
-		t.SessionHandle)
+	r1, _, msg = syscall.SyscallN(add.UPTR, t.Handle)
 	if r1 == 0 {
 		err = msg
-		ERROR(fmt.Sprintf("Interface/Adapter (%s) state (close) error(%s)", t.Name, err))
+		ERROR(fmt.Sprintf("Interface/Adapter (%s) state (close/remove) error(%s)", t.Name, err))
 	} else {
-		DEBUG(fmt.Sprintf("Interface/Adapter (%s) state (close)", t.Name))
+		DEBUG(fmt.Sprintf("Interface/Adapter (%s) state (close/remove)", t.Name))
 	}
 
 	return
@@ -680,11 +669,6 @@ func (t *TInterface) Disconnect(tun *TUN) (err error) {
 	t.CloseReadAndWriteLoop()
 
 	err = t.Close()
-	if err != nil {
-		ERROR("unable to close the interface", err)
-	}
-
-	err = t.Delete()
 	if err != nil {
 		ERROR("unable to delete the interface", err)
 	}
