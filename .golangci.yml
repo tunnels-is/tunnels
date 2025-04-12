@@ -1,0 +1,90 @@
+# .golangci.yml
+# Specify configuration format version 2
+version: 2
+
+run:
+  # Timeout for analysis, e.g. 3m, 5m. Default is 1m.
+  timeout: 5m
+
+  # Go version to analyze against. Match your go.mod file.
+  go: '1.21' # Adjust to your project's Go version
+
+  # Directories to skip. vendor is essential.
+  skip-dirs:
+    - vendor
+
+  # File path patterns to skip.
+  skip-files:
+    - ".*_test\\.go$"
+
+# Configuration for the output format and verbosity.
+output:
+  format: colored-line-number
+  print-issued-lines: true
+  print-linter-name: true
+  sort-results: true
+
+# Linters configuration section (Primary v2 configuration).
+linters:
+  # Enable specific linters.
+  enable:
+    # --- Essential Checks ---
+    - errcheck          # Check for unchecked errors (critical).
+    - govet             # Standard Go vet checks (shadowing, unreachable, etc.).
+    - ineffassign       # Detects when assignments are useless.
+    - staticcheck       # Comprehensive static analysis (many checks).
+    - unused            # Detects unused constants, variables, functions, etc. (part of staticcheck).
+
+    # --- Commonly Useful Checks ---
+    - bodyclose         # Checks for unclosed HTTP response bodies. Relevant for APIs.
+    # - containedctx    # Checks context uses; enable if context hygiene is important.
+    - dupl              # Finds duplicate code blocks (threshold configurable).
+    - durationcheck     # Checks for wrong comparisons or multiplications with time.Duration.
+    # - goconst           # Finds repeated strings that could be constants (can be noisy).
+    - gocritic          # Provides various opinionated checks (style, performance).
+    - gocyclo           # Checks cyclomatic complexity (threshold configurable).
+    # - gofmt           # <--- REMOVED THIS LINE
+    # - gomoddirectives   # Checks go.mod directives like replace, retract.
+    - misspell          # Checks for common misspellings in comments and code.
+    - nakedret          # Checks for naked returns (can be controversial).
+    - nolintlint        # Checks nolint directives for validity and format.
+    # - revive            # Alternative to golint, highly configurable linter.
+    - wastedassign      # Finds assignments where the variable is immediately reassigned.
+    - whitespace        # Checks for unnecessary trailing whitespace.
+
+  # Disable specific linters if they were implicitly enabled by a preset.
+  # disable:
+  #  - some-linter
+
+  # Optionally, run linters fast without extensive build caching.
+  # fast: false
+
+# Linters specific settings.
+linters-settings:
+  errcheck:
+    check-blank: true
+    check-type-assertions: true
+  govet:
+    check-shadowing: true
+  gocyclo:
+    min-complexity: 15
+  dupl:
+    threshold: 120
+  goimports:
+    # local-prefixes: your-module-prefix
+  misspell:
+    locale: US
+  nolintlint:
+    require-explanation: true
+    require-specific: true
+
+# Issue filtering and exclusion rules.
+issues:
+  max-same-issues: 50
+  max-issues-per-linter: 0
+  exclude-use-default: false
+  exclude-rules:
+    # Add project-specific exclusions here if necessary.
+    # - path: _test\.go
+    #   linters:
+    #     - gocyclo

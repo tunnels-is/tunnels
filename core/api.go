@@ -14,6 +14,7 @@ import (
 	"math/rand"
 	"net"
 	"net/http"
+	"os"
 	"regexp"
 	"runtime"
 	"slices"
@@ -28,6 +29,7 @@ import (
 	"github.com/xlzd/gotp"
 	"github.com/zveinn/crypt"
 	"golang.org/x/net/quic"
+	"golang.org/x/sys/unix"
 )
 
 // func OpenProxyTunnelToRouter() (TcpConn net.Conn, err error) {
@@ -828,14 +830,27 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		return 502, errors.New("unable to initialize routes")
 	}
 
-	tunnel.connection, err = net.Dial(
+	raddr, err := net.ResolveUDPAddr("udp4", ClientCR.ServerIP+":"+CRR.DataPort)
+	if err != nil {
+		fmt.Printf("Error resolving address: %v\n", err)
+		os.Exit(1)
+	}
+
+	UDPConn, err := net.DialUDP(
 		"udp4",
-		net.JoinHostPort(ClientCR.ServerIP, CRR.DataPort),
+		nil,
+		raddr,
+		// net.JoinHostPort(ClientCR.ServerIP, CRR.DataPort),
 	)
 	if err != nil {
 		DEBUG("Unable to open data tunnel: ", err)
 		return 502, errors.New("unable to open data tunnel")
 	}
+	err = setDontFragment(UDPConn)
+	if err != nil {
+		DEBUG("unable to disable IP fragmentation", err)
+	}
+	tunnel.connection = net.Conn(UDPConn)
 
 	inter, err := CreateAndConnectToInterface(tunnel)
 	if err != nil {
@@ -886,6 +901,37 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	}
 
 	return 200, nil
+}
+
+func setDontFragment(conn *net.UDPConn) error {
+	// Get the underlying file descriptor
+	rawConn, err := conn.SyscallConn()
+	if err != nil {
+		return fmt.Errorf("failed to get raw connection: %w", err)
+	}
+
+	var sockOptErr error
+	err = rawConn.Control(func(fd uintptr) {
+		// --------- Platform Specific ---------
+		switch runtime.GOOS {
+		case "linux":
+			// IP_PMTUDISC_DO = 2: Always set DF flag. Never fragment locally.
+			sockOptErr = unix.SetsockoptInt(int(fd), unix.IPPROTO_IP, unix.IP_MTU_DISCOVER, unix.IP_PMTUDISC_DO)
+		default:
+			sockOptErr = fmt.Errorf("setting DF bit not supported on GOOS=%s", runtime.GOOS)
+		}
+		// --------- End Platform Specific ---------
+	})
+
+	if err != nil {
+		return fmt.Errorf("rawconn control error: %w", err)
+	}
+
+	if sockOptErr != nil {
+		return fmt.Errorf("setsockopt error: %w", sockOptErr)
+	}
+
+	return nil
 }
 
 func GetQRCode(LF *TWO_FACTOR_CONFIRM) (QR *QR_CODE, err error) {
