@@ -173,10 +173,7 @@ func listItemsRaw(db *badger.DB, prefix []byte) ([][]byte, error) {
 		}
 		return nil
 	})
-	if err != nil {
-		return nil, err
-	}
-	return items, nil
+	return items, err
 }
 
 // --- User Specific ---

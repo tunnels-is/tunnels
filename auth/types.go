@@ -13,31 +13,6 @@ type User struct {
 	OTPEnabled   bool   `json:"otpEnabled"`
 }
 
-// Add a response struct that hides sensitive User fields
-type UserApiResponse struct {
-	UUID       string `json:"uuid"`
-	Username   string `json:"username"`
-	IsAdmin    bool   `json:"isAdmin"`
-	IsManager  bool   `json:"isManager"`
-	OTPEnabled bool   `json:"otpEnabled"`
-	// Notice: PasswordHash, GoogleID, OTPSecret are OMITTED
-}
-
-// Helper function to convert User to safe API response
-func SanitizeUserForApi(user *User) UserApiResponse {
-	if user == nil {
-		// Handle nil input if necessary, though unlikely in normal flow
-		return UserApiResponse{}
-	}
-	return UserApiResponse{
-		UUID:       user.UUID,
-		Username:   user.Username,
-		IsAdmin:    user.IsAdmin,
-		IsManager:  user.IsManager,
-		OTPEnabled: user.OTPEnabled,
-	}
-}
-
 type Group struct {
 	UUID        string   `json:"uuid"`
 	Name        string   `json:"name"`
@@ -73,7 +48,7 @@ type UpdateUserRequest struct {
 	IsManager *bool   `json:"isManager,omitempty"` // Admin or Manager only
 }
 
-type LoginRequest struct { // <-- ADDED: For username/password login
+type LoginRequest struct {
 	Username   string `json:"username"`
 	Password   string `json:"password"`
 	DeviceName string `json:"deviceName,omitempty"` // Optional device name
