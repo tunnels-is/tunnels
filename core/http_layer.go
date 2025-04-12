@@ -88,13 +88,13 @@ func makeTLSConfig() (tc *tls.Config) {
 	conf := CONFIG.Load()
 	tc = new(tls.Config)
 	tc.MinVersion = tls.VersionTLS12
-	tc.MaxVersion = tls.VersionTLS13
-	tc.CipherSuites = []uint16{
-		tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
-		tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
-		tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
-		tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
-	}
+	// tc.MaxVersion = tls.VersionTLS13
+	// tc.CipherSuites = []uint16{
+	// 	tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+	// 	tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+	// 	tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+	// 	tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+	// }
 	certsExist := true
 	_, err := os.Stat(conf.APICert)
 	if err != nil {
