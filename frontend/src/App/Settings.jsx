@@ -162,7 +162,7 @@ const Settings = () => {
                 }}
                 description="Logs basic information about application operations"
               />
-              <Separator />
+              
               
               <SettingToggle
                 label="Error Logging"
@@ -174,7 +174,7 @@ const Settings = () => {
                 }}
                 description="Logs errors and exceptions"
               />
-              <Separator />
+              
               
               <SettingToggle
                 label="Debug Logging"
@@ -186,7 +186,7 @@ const Settings = () => {
                 }}
                 description="Detailed logs for troubleshooting"
               />
-              <Separator />
+              
               
               <SettingToggle
                 label="Debug Mode"
@@ -198,7 +198,7 @@ const Settings = () => {
                 }}
                 description="Enables advanced debugging features"
               />
-              <Separator />
+              
               
               <SettingToggle
                 label="Connection Tracing"
@@ -231,7 +231,7 @@ const Settings = () => {
                 }}
                 placeholder="Enter API IP address"
               />
-              <Separator />
+              
               
               <SettingInput
                 label="API Port"
@@ -243,7 +243,7 @@ const Settings = () => {
                 }}
                 placeholder="Enter API port"
               />
-              <Separator />
+              
               
               <SettingInput
                 label="API Cert Domains"
@@ -259,7 +259,7 @@ const Settings = () => {
                 }}
                 placeholder="Enter domain names"
               />
-              <Separator />
+              
               
               <SettingInput
                 label="API Cert IPs"
@@ -271,7 +271,7 @@ const Settings = () => {
                 }}
                 placeholder="Enter IP addresses"
               />
-              <Separator />
+              
               
               <SettingInput
                 label="API Cert"
@@ -283,7 +283,7 @@ const Settings = () => {
                 }}
                 placeholder="Enter certificate path"
               />
-              <Separator />
+              
               
               <SettingInput
                 label="API Key"
@@ -312,21 +312,21 @@ const Settings = () => {
                 value={state.Network?.DefaultInterfaceName} 
                 icon={<Network className="h-4 w-4 text-blue-400" />}
               />
-              <Separator />
+              
               
               <InfoItem 
                 label="IP Address" 
                 value={state.Network?.DefaultInterface} 
                 icon={<Globe className="h-4 w-4 text-teal-400" />}
               />
-              <Separator />
+              
               
               <InfoItem 
                 label="Interface ID" 
                 value={state.Network?.DefaultInterfaceID} 
                 icon={<Info className="h-4 w-4 text-indigo-400" />}
               />
-              <Separator />
+              
               
               <InfoItem 
                 label="Gateway" 
@@ -358,7 +358,7 @@ const Settings = () => {
                   icon={<Info className="h-4 w-4 text-green-400" />}
                 />
               </div>
-              <Separator className="my-3" />
+             
               
               <div className="space-y-1">
                 <InfoItem 
@@ -366,42 +366,42 @@ const Settings = () => {
                   value={basePath} 
                   icon={<Server className="h-4 w-4 text-neutral-400" />}
                 />
-                <Separator />
+                
                 
                 <InfoItem 
                   label="Config File" 
                   value={configPath} 
                   icon={<Server className="h-4 w-4 text-amber-400" />}
                 />
-                <Separator />
+                
                 
                 <InfoItem 
                   label="Log Path" 
                   value={logPath || "Default"} 
                   icon={<Server className="h-4 w-4 text-red-400" />}
                 />
-                <Separator />
+                
                 
                 <InfoItem 
                   label="Log File" 
                   value={logFileName} 
                   icon={<Info className="h-4 w-4 text-red-400" />}
                 />
-                <Separator />
+                
                 
                 <InfoItem 
                   label="Trace Path" 
                   value={tracePath || "Default"} 
                   icon={<Activity className="h-4 w-4 text-purple-400" />}
                 />
-                <Separator />
+                
                 
                 <InfoItem 
                   label="Trace File" 
                   value={traceFileName} 
                   icon={<Activity className="h-4 w-4 text-purple-400" />}
                 />
-                <Separator />
+                
                 
                 <InfoItem 
                   label="Admin" 
