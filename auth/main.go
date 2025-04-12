@@ -81,6 +81,8 @@ func main() {
 
 	// Authentication Routes
 	authGroup := app.Group("/auth")
+	authGroup.Post("/login", handleLogin)
+	authGroup.Post("/logout", handleLogout)
 	if googleOAuthEnabled() {
 		authGroup.Get("/google/login", handleGoogleLogin)       // Redirects to Google
 		authGroup.Get("/google/callback", handleGoogleCallback) // Handles callback from Google

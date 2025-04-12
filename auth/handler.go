@@ -11,6 +11,71 @@ import (
 	"github.com/google/uuid"
 )
 
+func errBadRequest(c *fiber.Ctx, err error) error { /* ... */
+	return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": true, "message": err.Error()})
+}
+func errUnauthorized(c *fiber.Ctx, msg string) error { /* ... */
+	return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": true, "message": msg})
+}
+
+// --- Login/Logout Handlers ---
+func handleLogin(c *fiber.Ctx) error {
+	var req LoginRequest
+	if err := c.BodyParser(&req); err != nil {
+		return errBadRequest(c, err)
+	}
+	if req.Username == "" || req.Password == "" {
+		return errBadRequest(c, errors.New("usr/pwd needed"))
+	}
+
+	userUUID, err := getUserUUIDByUsername(req.Username)
+	if err != nil {
+		return errUnauthorized(c, "invalid credentials")
+	} // Hide user existence
+	user, err := getUser(userUUID)
+	if err != nil {
+		return errUnauthorized(c, "invalid credentials")
+	} // Internal inconsistency?
+
+	if user.PasswordHash == "" || !checkPasswordHash(req.Password, user.PasswordHash) {
+		return errUnauthorized(c, "invalid credentials")
+	}
+
+	if user.OTPEnabled { // Check OTP
+		return c.Status(fiber.StatusAccepted).JSON(PendingOTPInfo{UserUUID: user.UUID, OTPRequired: true})
+	}
+
+	// Issue Token
+	deviceName := req.DeviceName
+	if deviceName == "" {
+		deviceName = "Unknown"
+	}
+	authToken, err := generateAndSaveToken(user.UUID, deviceName)
+	if err != nil {
+		logger.Error("Failed to generate token", slog.Any("error", "failed to generate token"), slog.String("username", req.Username))
+		return fiber.NewError(http.StatusInternalServerError, "failed generating token")
+	}
+
+	logger.Info("Password login success", slog.String("user", user.UUID))
+	return c.JSON(fiber.Map{
+		"message": "Login successful",
+		"token":   authToken.TokenUUID,
+		"user":    mapUserForResponse(user), // Use helper map function
+	})
+}
+
+func handleLogout(c *fiber.Ctx) error {
+	_, token, err := authenticateRequest(c)
+	if err != nil {
+		return errUnauthorized(c, "invalid credentials")
+	}
+	if err := deleteToken(token.TokenUUID); err != nil {
+		logger.Warn("Failed token delete logout", slog.Any("err", err))
+	}
+	logger.Info("User logged out", slog.String("user", token.UserUUID))
+	return c.SendStatus(fiber.StatusNoContent)
+}
+
 // --- User Handlers ---
 
 func handleCreateUser(c *fiber.Ctx) error {
@@ -61,9 +126,18 @@ func handleCreateUser(c *fiber.Ctx) error {
 		OTPEnabled: false,
 	}
 
+	if req.Password != "" {
+		hashedPassword, hashErr := hashPassword(req.Password)
+		if hashErr != nil {
+			logger.Error("Failed to create password", slog.Any("error", "unable to hash password"), slog.String("username", req.Username))
+			return fiber.NewError(http.StatusInternalServerError, "Error creating password")
+		}
+		newUser.PasswordHash = hashedPassword
+	}
+
 	// Only Admins can set IsAdmin or IsManager flags on creation
 	if requestUser.IsAdmin {
-		newUser.IsAdmin = req.IsAdmin                    // Admin can create other admins
+		// newUser.IsAdmin = req.IsAdmin                    // Admin can create other admins
 		newUser.IsManager = req.IsManager || req.IsAdmin // Admin can create managers, and Admin implies Manager
 	} else if requestUser.IsManager {
 		// Managers cannot create Admins or other Managers
@@ -87,7 +161,7 @@ func handleCreateUser(c *fiber.Ctx) error {
 
 	logger.Info("User created", slog.String("newUserUUID", newUser.UUID), slog.String("username", newUser.Username), slog.String("createdBy", requestUser.UUID))
 	// Return the created user object (excluding sensitive fields ideally)
-	return c.Status(fiber.StatusCreated).JSON(newUser)
+	return c.Status(fiber.StatusCreated).JSON(mapUserForResponse(newUser))
 }
 
 func handleGetUser(c *fiber.Ctx) error {
@@ -124,18 +198,7 @@ func handleGetUser(c *fiber.Ctx) error {
 		return fiber.NewError(http.StatusInternalServerError, "Error retrieving user")
 	}
 
-	// --- HIDE SENSITIVE FIELDS ---
-	user.OTPSecret = "" // Always hide the OTP secret
-	// Optionally hide GoogleID depending on who is asking
-	// Example: Only show GoogleID to admins or the user themselves
-	// if !isAdmin(requestUser) && requestUser.UUID != responseUser.UUID {
-	//     responseUser.GoogleID = ""
-	// }
-	// --- END HIDE SENSITIVE FIELDS ---
-
-	// Exclude sensitive fields from the response if needed
-	// user.OTPSecret = "" // Example
-	return c.JSON(user)
+	return c.JSON(mapUserForResponse(user))
 }
 
 func handleUpdateUser(c *fiber.Ctx) error {
@@ -268,7 +331,7 @@ func handleUpdateUser(c *fiber.Ctx) error {
 	}
 
 	logger.Info("User updated", slog.String("targetUserUUID", targetUser.UUID), slog.String("updatedBy", requestUser.UUID))
-	return c.JSON(targetUser) // Return updated user (sensitive fields?)
+	return c.JSON(mapUserForResponse(targetUser))
 }
 
 func handleDeleteUser(c *fiber.Ctx) error {
@@ -385,10 +448,12 @@ func handleListUsers(c *fiber.Ctx) error {
 		return fiber.NewError(http.StatusInternalServerError, "Error retrieving user list")
 	}
 
-	// Filter sensitive data?
-	// for i := range users { users[i].OTPSecret = "" }
-
-	return c.JSON(users)
+	responseList := make([]map[string]any, len(users))
+	for i, u := range users {
+		// MUST manually clear sensitive fields from 'u' before adding to response
+		responseList[i] = mapUserForResponse(&u) // Use helper map function
+	}
+	return c.JSON(responseList)
 }
 
 // --- Group Handlers ---
