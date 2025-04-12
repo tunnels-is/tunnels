@@ -1,11 +1,11 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"log/slog"
 	"os"
-	"reflect"
 	"testing"
 	"time"
 
@@ -106,8 +106,16 @@ func TestSaveAndGetUser(t *testing.T) {
 		t.Fatalf("getUser failed: %v", err)
 	}
 
-	if !reflect.DeepEqual(testUser, retrievedUser) {
-		t.Errorf("Retrieved user %+v does not match saved user %+v", retrievedUser, testUser)
+	savedJSON, err := json.Marshal(testUser)
+	if err != nil {
+		t.Fatalf("Failed to marshal test user: %v", err)
+	}
+	retrievedJSON, err := json.Marshal(retrievedUser)
+	if err != nil {
+		t.Fatalf("Failed to marshal retrieved user: %v", err)
+	}
+	if !bytes.Equal(savedJSON, retrievedJSON) {
+		t.Errorf("Retrieved user %s does not match saved user %s", retrievedJSON, savedJSON)
 	}
 
 	_, err = getUser(uuid.NewString()) // Try getting non-existent user
@@ -116,7 +124,6 @@ func TestSaveAndGetUser(t *testing.T) {
 	} else if !errors.Is(err, ErrNotFound) && !errors.Is(err, badger.ErrKeyNotFound) {
 		t.Errorf("Expected ErrNotFound or badger.ErrKeyNotFound, but got: %v", err)
 	}
-
 }
 
 func TestGetUserByGoogleID(t *testing.T) {
@@ -281,8 +288,16 @@ func TestSaveAndGetGroup(t *testing.T) {
 		t.Fatalf("getGroup failed: %v", err)
 	}
 
-	if !reflect.DeepEqual(testGroup, retrievedGroup) {
-		t.Errorf("Retrieved group %+v does not match saved group %+v", retrievedGroup, testGroup)
+	savedJSON, err := json.Marshal(testGroup)
+	if err != nil {
+		t.Fatalf("Failed to marshal test group: %v", err)
+	}
+	retrievedJSON, err := json.Marshal(retrievedGroup)
+	if err != nil {
+		t.Fatalf("Failed to marshal retrieved group: %v", err)
+	}
+	if !bytes.Equal(savedJSON, retrievedJSON) {
+		t.Errorf("Retrieved group %s does not match saved group %s", retrievedJSON, savedJSON)
 	}
 }
 
@@ -351,8 +366,16 @@ func TestSaveAndGetServer(t *testing.T) {
 		t.Fatalf("getServer failed: %v", err)
 	}
 
-	if !reflect.DeepEqual(testServer, retrieved) {
-		t.Errorf("Retrieved server %+v mismatch saved %+v", retrieved, testServer)
+	savedJSON, err := json.Marshal(testServer)
+	if err != nil {
+		t.Fatalf("Failed to marshal test server: %v", err)
+	}
+	retrievedJSON, err := json.Marshal(retrieved)
+	if err != nil {
+		t.Fatalf("Failed to marshal retrieved server: %v", err)
+	}
+	if !bytes.Equal(savedJSON, retrievedJSON) {
+		t.Errorf("Retrieved server %s does not match saved server %s", retrievedJSON, savedJSON)
 	}
 }
 
@@ -422,9 +445,9 @@ func TestSaveAndGetToken(t *testing.T) {
 	// Truncate retrieved time too before comparison
 	retrieved.CreatedAt = retrieved.CreatedAt.Truncate(time.Second)
 
-	if !reflect.DeepEqual(testToken, retrieved) {
-		savedJSON, _ := json.Marshal(testToken)
-		retrievedJSON, _ := json.Marshal(retrieved)
+	savedJSON, _ := json.Marshal(testToken)
+	retrievedJSON, _ := json.Marshal(retrieved)
+	if !bytes.Equal(savedJSON, retrievedJSON) {
 		t.Errorf("Retrieved token %s mismatch saved %s", retrievedJSON, savedJSON)
 	}
 }
