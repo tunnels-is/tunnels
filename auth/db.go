@@ -13,7 +13,7 @@ var userDB *badger.DB
 var groupDB *badger.DB
 var serverDB *badger.DB
 var tokenDB *badger.DB
-var indexDB *badger.DB // For username -> user UUID mapping
+var indexDB *badger.DB
 
 const (
 	userPrefix   = "u:"
@@ -26,7 +26,7 @@ const (
 func initDBs(logger *slog.Logger) error {
 	var err error
 
-	openOpts := badger.DefaultOptions("").WithLogger(nil) // Badger logs are verbose, manage logging externally
+	openOpts := badger.DefaultOptions("").WithLogger(nil)
 
 	userDB, err = badger.Open(openOpts.WithDir("users.db").WithValueDir("users.db"))
 	if err != nil {
@@ -75,8 +75,6 @@ func closeDBs(logger *slog.Logger) {
 	logger.Info("Databases closed")
 }
 
-// --- Generic Helpers ---
-
 func createItem(db *badger.DB, key []byte, value any) error {
 	valBytes, err := json.Marshal(value)
 	if err != nil {
@@ -84,14 +82,6 @@ func createItem(db *badger.DB, key []byte, value any) error {
 	}
 
 	err = db.Update(func(txn *badger.Txn) error {
-		// Optionally check if key already exists if true 'create' is needed
-		// _, err := txn.Get(key)
-		// if err == nil {
-		// 	return errors.New("item already exists") // Or badger.ErrKeyExists?
-		// }
-		// if err != badger.ErrKeyNotFound {
-		//  return err // Handle other potential errors
-		// }
 		return txn.Set(key, valBytes)
 	})
 	return err
@@ -102,7 +92,7 @@ func getItem(db *badger.DB, key []byte, target any) error {
 	err := db.View(func(txn *badger.Txn) error {
 		item, err := txn.Get(key)
 		if err != nil {
-			return err // Handles ErrKeyNotFound implicitly
+			return err
 		}
 
 		valCopy, err = item.ValueCopy(nil)
@@ -113,7 +103,7 @@ func getItem(db *badger.DB, key []byte, target any) error {
 	})
 
 	if err != nil {
-		return err // e.g., badger.ErrKeyNotFound
+		return err
 	}
 
 	if err := json.Unmarshal(valCopy, target); err != nil {
@@ -129,10 +119,9 @@ func updateItem(db *badger.DB, key []byte, value any) error {
 	}
 
 	err = db.Update(func(txn *badger.Txn) error {
-		// Check if key exists to ensure it's an update
 		_, err := txn.Get(key)
 		if err != nil {
-			return err // Return ErrKeyNotFound if it doesn't exist
+			return err
 		}
 		return txn.Set(key, valBytes)
 	})
@@ -141,20 +130,10 @@ func updateItem(db *badger.DB, key []byte, value any) error {
 
 func deleteItem(db *badger.DB, key []byte) error {
 	err := db.Update(func(txn *badger.Txn) error {
-		// Optionally check existence first
-		// _, err := txn.Get(key)
-		// if err != nil {
-		// 	 return err // Propagate ErrKeyNotFound or other errors
-		// }
 		return txn.Delete(key)
 	})
-	// Badger's Delete doesn't error if the key doesn't exist, adjust if strict check needed
 	return err
 }
-
-// List items might be better implemented specifically per type
-// due to unmarshaling requirements. Returning [][]byte avoids generics
-// but pushes unmarshaling to the caller.
 
 func listItemsRaw(db *badger.DB, prefix []byte) ([][]byte, error) {
 	var items [][]byte
@@ -166,7 +145,6 @@ func listItemsRaw(db *badger.DB, prefix []byte) ([][]byte, error) {
 			item := it.Item()
 			valCopy, err := item.ValueCopy(nil)
 			if err != nil {
-				// Decide whether to skip or fail all
 				return fmt.Errorf("failed to copy value during list for prefix %s: %w", string(prefix), err)
 			}
 			items = append(items, valCopy)
@@ -176,10 +154,8 @@ func listItemsRaw(db *badger.DB, prefix []byte) ([][]byte, error) {
 	return items, err
 }
 
-// --- User Specific ---
-
 func saveUser(user *User) error {
-	return createItem(userDB, []byte(userPrefix+user.UUID), user) // Use create as it works for update too
+	return createItem(userDB, []byte(userPrefix+user.UUID), user)
 }
 
 func getUser(uuid string) (*User, error) {
@@ -209,16 +185,15 @@ func getUserByGoogleID(googleID string) (*User, error) {
 				return json.Unmarshal(val, &user)
 			})
 			if err != nil {
-				// Log this error but continue scanning
 				logger.Warn("Failed to unmarshal user during Google ID scan", slog.String("key", string(item.Key())), slog.Any("error", err))
 				continue
 			}
 			if user.GoogleID == googleID {
 				foundUser = &user
-				return nil // Found, stop iteration
+				return nil
 			}
 		}
-		return nil // Finished iteration without finding
+		return nil
 	})
 
 	if err != nil {
@@ -244,7 +219,6 @@ func listUsers() ([]User, error) {
 	for _, raw := range rawUsers {
 		var user User
 		if err := json.Unmarshal(raw, &user); err != nil {
-			// Log and potentially skip?
 			logger.Warn("Failed to unmarshal user during list", slog.Any("error", err))
 			continue
 		}
@@ -253,22 +227,10 @@ func listUsers() ([]User, error) {
 	return users, nil
 }
 
-// --- Username Index ---
-
 func setUsernameIndex(username, userUUID string) error {
 	key := []byte(indexPrefix + username)
 	value := []byte(userUUID)
 	err := indexDB.Update(func(txn *badger.Txn) error {
-		// Optionally: Check if username is already taken by a *different* user UUID
-		// item, err := txn.Get(key)
-		// if err == nil {
-		//     existingUUID, _ := item.ValueCopy(nil)
-		//     if string(existingUUID) != userUUID {
-		//         return errors.New("username already taken")
-		//     }
-		// } else if err != badger.ErrKeyNotFound {
-		//     return err
-		// }
 		return txn.Set(key, value)
 	})
 	return err
@@ -280,7 +242,7 @@ func getUserUUIDByUsername(username string) (string, error) {
 	err := indexDB.View(func(txn *badger.Txn) error {
 		item, err := txn.Get(key)
 		if err != nil {
-			return err // Handles ErrKeyNotFound
+			return err
 		}
 		uuidBytes, err := item.ValueCopy(nil)
 		if err != nil {
@@ -302,8 +264,6 @@ func deleteUsernameIndex(username string) error {
 	key := []byte(indexPrefix + username)
 	return deleteItem(indexDB, key)
 }
-
-// --- Group Specific ---
 
 func saveGroup(group *Group) error {
 	return createItem(groupDB, []byte(groupPrefix+group.UUID), group)
@@ -342,8 +302,6 @@ func listGroups() ([]Group, error) {
 	return groups, nil
 }
 
-// --- Server Specific ---
-
 func saveServer(server *Server) error {
 	return createItem(serverDB, []byte(serverPrefix+server.UUID), server)
 }
@@ -381,16 +339,12 @@ func listServers() ([]Server, error) {
 	return servers, nil
 }
 
-// --- Token Specific ---
-
 func saveToken(token *AuthToken) error {
 	return createItem(tokenDB, []byte(tokenPrefix+token.TokenUUID), token)
 }
 
 func getToken(tokenUUID string) (*AuthToken, error) {
 	var token AuthToken
-	// Add TTL check conceptually here if needed, though Badger doesn't directly expire based on struct field
-	// Tokens should probably have an expiry set on the key using badger's SetEntry or checked manually
 	err := getItem(tokenDB, []byte(tokenPrefix+tokenUUID), &token)
 	if err != nil {
 		if errors.Is(err, badger.ErrKeyNotFound) {
@@ -398,12 +352,6 @@ func getToken(tokenUUID string) (*AuthToken, error) {
 		}
 		return nil, err
 	}
-
-	// Optional: Manual expiry check
-	// if time.Since(token.CreatedAt) > tokenLifetime {
-	//     deleteToken(tokenUUID) // Clean up expired token
-	//     return nil, fmt.Errorf("token %s expired: %w", tokenUUID, ErrUnauthorized)
-	// }
 
 	return &token, nil
 }
@@ -436,19 +384,17 @@ func deleteAllUserTokens(userUUID string) error {
 	})
 	if err != nil {
 		logger.Error("Error scanning tokens for deletion", slog.String("userUUID", userUUID), slog.Any("error", err))
-		return err // Error during the scan itself
+		return err
 	}
 
-	// Perform deletions in batches
 	if len(tokensToDelete) > 0 {
 		err = tokenDB.Update(func(txn *badger.Txn) error {
 			for _, tokenUUID := range tokensToDelete {
 				if err := txn.Delete([]byte(tokenPrefix + tokenUUID)); err != nil {
-					// Log but attempt to continue deleting others
 					logger.Error("Error deleting specific token during batch cleanup", slog.String("tokenUUID", tokenUUID), slog.Any("error", err))
 				}
 			}
-			return nil // Batch transaction succeeds even if some deletes failed internally (logged above)
+			return nil
 		})
 		if err != nil {
 			logger.Error("Error during batch token deletion transaction", slog.String("userUUID", userUUID), slog.Any("error", err))
