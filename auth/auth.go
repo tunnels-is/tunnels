@@ -17,6 +17,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/pquerna/otp"
 	"github.com/pquerna/otp/totp"
+	"golang.org/x/crypto/bcrypt"
 	"golang.org/x/oauth2"
 	googleOAuth "golang.org/x/oauth2/google"
 )
@@ -43,6 +44,39 @@ var googleClientSecret = os.Getenv("GOOGLE_CLIENT_SECRET")
 
 // IMPORTANT: Update this to your actual callback URL registered with Google
 var googleRedirectURL = "http://localhost:3000/auth/google/callback"
+
+// Helper to create response map from User, clearing sensitive fields
+func mapUserForResponse(user *User) map[string]interface{} {
+	if user == nil {
+		return nil // Or empty map? {}
+	}
+	// Create map manually, excluding sensitive fields
+	return map[string]interface{}{
+		"uuid":       user.UUID,
+		"username":   user.Username,
+		"isAdmin":    user.IsAdmin,
+		"isManager":  user.IsManager,
+		"otpEnabled": user.OTPEnabled,
+		// passwordHash, googleId, otpSecret ARE NOT included
+	}
+}
+
+func hashPassword(password string) (string, error) { /* ... */
+	if password == "" {
+		return "", fmt.Errorf("pwd empty")
+	}
+	bytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return "", err
+	}
+	return string(bytes), nil
+}
+func checkPasswordHash(password, hash string) bool { /* ... */
+	if password == "" || hash == "" {
+		return false
+	}
+	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) == nil
+}
 
 func googleOAuthEnabled() bool {
 	if googleClientID == "" || googleClientSecret == "" {
@@ -382,7 +416,7 @@ func handleGoogleCallback(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
 		"message": "Login successful",
 		"token":   authToken.TokenUUID,
-		"user":    user, // Omit sensitive fields here too
+		"user":    mapUserForResponse(user), // Omit sensitive fields here too
 	})
 }
 
@@ -658,6 +692,6 @@ func handle2FAVerify(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
 		"message": "Login successful",
 		"token":   authToken.TokenUUID,
-		"user":    user, // Omit sensitive fields
+		"user":    mapUserForResponse(user), // Omit sensitive fields
 	})
 }
