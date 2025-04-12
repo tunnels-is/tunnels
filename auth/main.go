@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"hash/crc32"
 	"log/slog"
 	"os"
 
@@ -13,6 +14,12 @@ import (
 )
 
 var logger *slog.Logger
+var numShards = 5
+
+func getShardIndex(key string) int {
+	checksum := crc32.ChecksumIEEE([]byte(key))
+	return int(checksum % uint32(numShards))
+}
 
 func main() {
 	logHandler := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}) // Use LevelInfo in prod
