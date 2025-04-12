@@ -30,31 +30,26 @@ func initDBs(logger *slog.Logger) error {
 
 	userDB, err = badger.Open(openOpts.WithDir("users.db").WithValueDir("users.db"))
 	if err != nil {
-		logger.Error("Failed to open user DB", slog.Any("error", err))
 		return fmt.Errorf("failed to open user DB: %w", err)
 	}
 
 	groupDB, err = badger.Open(openOpts.WithDir("groups.db").WithValueDir("groups.db"))
 	if err != nil {
-		logger.Error("Failed to open group DB", slog.Any("error", err))
 		return fmt.Errorf("failed to open group DB: %w", err)
 	}
 
 	serverDB, err = badger.Open(openOpts.WithDir("servers.db").WithValueDir("servers.db"))
 	if err != nil {
-		logger.Error("Failed to open server DB", slog.Any("error", err))
 		return fmt.Errorf("failed to open server DB: %w", err)
 	}
 
 	tokenDB, err = badger.Open(openOpts.WithDir("tokens.db").WithValueDir("tokens.db"))
 	if err != nil {
-		logger.Error("Failed to open token DB", slog.Any("error", err))
 		return fmt.Errorf("failed to open token DB: %w", err)
 	}
 
 	indexDB, err = badger.Open(openOpts.WithDir("index.db").WithValueDir("index.db"))
 	if err != nil {
-		logger.Error("Failed to open index DB", slog.Any("error", err))
 		return fmt.Errorf("failed to open index DB: %w", err)
 	}
 
@@ -197,7 +192,6 @@ func getUserByGoogleID(googleID string) (*User, error) {
 	})
 
 	if err != nil {
-		logger.Error("Error during user scan by Google ID", slog.Any("error", err))
 		return nil, err
 	}
 	if foundUser == nil {
@@ -383,7 +377,6 @@ func deleteAllUserTokens(userUUID string) error {
 		return nil
 	})
 	if err != nil {
-		logger.Error("Error scanning tokens for deletion", slog.String("userUUID", userUUID), slog.Any("error", err))
 		return err
 	}
 
@@ -397,7 +390,6 @@ func deleteAllUserTokens(userUUID string) error {
 			return nil
 		})
 		if err != nil {
-			logger.Error("Error during batch token deletion transaction", slog.String("userUUID", userUUID), slog.Any("error", err))
 			return err
 		}
 	}
