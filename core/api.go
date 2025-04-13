@@ -32,31 +32,6 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-// func OpenProxyTunnelToRouter() (TcpConn net.Conn, err error) {
-// 	dialer := net.Dialer{Timeout: time.Duration(5 * time.Second)}
-// 	routerIndexForConnection := 0
-// 	retryRouterCount := 0
-//
-// retryRouter:
-// 	IP := GLOBAL_STATE.RouterList[routerIndexForConnection].IP
-// 	TcpConn, err = dialer.Dial("tcp", IP+":443")
-// 	if err != nil {
-// 		CreateErrorLog("", "Could not dial router: ", IP, err)
-// 		if retryRouterCount > 2 {
-// 			CreateErrorLog("", "Could not dial router (final retry) backing off: ", IP, err)
-// 			return
-// 		}
-// 		retryRouterCount++
-// 		routerIndexForConnection++
-// 		if routerIndexForConnection == len(GLOBAL_STATE.RouterList) {
-// 			routerIndexForConnection = 0
-// 		}
-// 		goto retryRouter
-// 	}
-//
-// 	return
-// }
-
 func ResetEverything() {
 	defer RecoverAndLogToFile()
 	tunnelMapRange(func(tun *TUN) bool {
