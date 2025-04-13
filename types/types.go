@@ -1,0 +1,197 @@
+package types
+
+import (
+	"fmt"
+	"sync"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/zveinn/crypt"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+)
+
+type Feature string
+
+const (
+	VPN  Feature = "VPN"
+	LAN  Feature = "LAN"
+	AUTH Feature = "AUTH"
+	DNS  Feature = "DNS"
+)
+
+type ServerConfig struct {
+	Features []Feature `json:"Features"`
+
+	VPNIP   string `json:"VPNIP"`
+	VPNPort string `json:"VPNPort"`
+	CertPem string `json:"CertPem"`
+	KeyPem  string `json:"KeyPem"`
+
+	APIIP   string `json:"APIIP"`
+	APIPort string `json:"APIPort"`
+
+	AdminApiKey string   `json:"AdminAPIKey"`
+	Admins      []string `json:"Admins"`
+	NetAdmins   []string `json:"NetAdmins"`
+
+	Hostname           string
+	Lan                *Network   `json:"Lan"`
+	DisableLanFirewall bool       `json:"DisableLanFirwall"`
+	SubNets            []*Network `json:"SubNets"`
+	Routes             []*Route   `json:"Routes"`
+
+	StartPort          int  `json:"StartPort"`
+	EndPort            int  `json:"EndPort"`
+	UserMaxConnections int  `json:"UserMaxConnections"`
+	InternetAccess     bool `json:"InternetAccess"`
+	LocalNetworkAccess bool `json:"LocalNetworkAccess"`
+	BandwidthMbps      int  `json:"BandwidthMbps"`
+	UserBandwidthMbps  int  `json:"BandwidthUserMbps"`
+
+	DNSAllowCustomOnly bool         `json:"DNSAllowCustomOnly"`
+	DNS                []*DNSRecord `json:"DNS"`
+	DNSServers         []string     `json:"DNSServers"`
+}
+
+type Route struct {
+	Address string
+	Metric  string
+	Gateway string
+}
+
+type Network struct {
+	Tag     string `json:"Tag" bson:"Tag"`
+	Network string `json:"Network" bson:"Network"`
+	Nat     string `json:"Nat" bson:"Nat"`
+}
+
+type DNSRecord struct {
+	Domain   string   `json:"Domain" bson:"Domain"`
+	Wildcard bool     `json:"Wildcard" bson:"Wildcard"`
+	IP       []string `json:"IP" bson:"IP"`
+	TXT      []string `json:"TXT" bson:"TXT"`
+}
+
+type DeviceListResponse struct {
+	Devices      []*ListDevice
+	DHCPAssigned int
+	DHCPFree     int
+}
+
+type ListDevice struct {
+	DHCP         DHCPRecord
+	AllowedIPs   []string
+	CPU          byte
+	RAM          byte
+	Disk         byte
+	IngressQueue int
+	EgressQueue  int
+	Created      time.Time
+	StartPort    uint16
+	EndPort      uint16
+}
+
+type ConnectRequestResponse struct {
+	Index             int `json:"Index"`
+	AvailableMbps     int `json:"AvailableMbps"`
+	AvailableUserMbps int `json:"AvailableUserMbps"`
+
+	InternetAccess     bool `json:"InternetAccess,required"`
+	LocalNetworkAccess bool `json:"LocalNetworkAccess"`
+
+	InterfaceIP string `json:"InterfaceIP"`
+	DataPort    string `json:"DataPort"`
+	StartPort   uint16 `json:"StartPort"`
+	EndPort     uint16 `json:"EndPort"`
+
+	DNS                []*DNSRecord `json:"DNS"`
+	Networks           []*Network   `json:"Networks"`
+	Routes             []*Route     `json:"Routes"`
+	DNSServers         []string     `json:"DNSServers"`
+	DNSAllowCustomOnly bool         `json:"DNSAllowCustomOnly"`
+
+	DHCP       *DHCPRecord `json:"DHCP"`
+	VPLNetwork *Network    `json:"VPLNetwork"`
+}
+
+func CreateCRRFromServer(S *ServerConfig) (CRR *ConnectRequestResponse) {
+	return &ConnectRequestResponse{
+		Index:              0,
+		StartPort:          0,
+		EndPort:            0,
+		InterfaceIP:        S.VPNIP,
+		DataPort:           S.VPNPort,
+		AvailableMbps:      S.BandwidthMbps,
+		AvailableUserMbps:  S.UserBandwidthMbps,
+		InternetAccess:     S.InternetAccess,
+		LocalNetworkAccess: S.LocalNetworkAccess,
+		DNS:                S.DNS,
+		Networks:           S.SubNets,
+		DNSServers:         S.DNSServers,
+		DNSAllowCustomOnly: S.DNSAllowCustomOnly,
+	}
+}
+
+type ConnectRequest struct {
+	DeviceToken string             `json:"DeviceToken"`
+	APIToken    string             `json:"APIToken"`
+	EncType     crypt.EncType      `json:"EncType"`
+	CurveType   crypt.CurveType    `json:"CurveType"`
+	UserID      primitive.ObjectID `json:"UserID"`
+	SeverID     primitive.ObjectID `json:"ServerID"`
+	Serial      string             `json:"Serial"`
+
+	Version int       `json:"Version"`
+	Created time.Time `json:"Created"`
+
+	// DHCP
+	Hostname        string `json:"Hostname"`
+	RequestingPorts bool   `json:"RequestingPorts"`
+	DHCPToken       string `json:"DHCPToken"`
+}
+
+type DHCPRecord struct {
+	m        sync.Mutex `json:"-"`
+	IP       [4]byte
+	Hostname string
+	Token    string
+	Activity time.Time `json:"-"`
+}
+type FirewallRequest struct {
+	DHCPToken       string
+	IP              string
+	Hosts           []string
+	DisableFirewall bool
+}
+
+func (d *DHCPRecord) AssignHostname(host string, defaultHostname string) {
+	if host == "" {
+		host = fmt.Sprintf("%d-%d-%d-%d",
+			d.IP[0],
+			d.IP[1],
+			d.IP[2],
+			d.IP[3],
+		)
+	}
+
+	if defaultHostname != "" {
+		d.Hostname = host + "." + defaultHostname
+	} else {
+		d.Hostname = host
+	}
+}
+
+func (d *DHCPRecord) Assign() (ok bool) {
+	if d.Token != "" {
+		return
+	}
+	d.m.Lock()
+	defer d.m.Unlock()
+	if d.Token == "" {
+		d.Token = uuid.NewString()
+		d.Activity = time.Now()
+		ok = true
+		return
+	}
+	return
+}
