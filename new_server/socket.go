@@ -25,7 +25,7 @@ func ControlSocketListener() {
 	Config := Config.Load()
 	l, err := quic.Listen(
 		"udp4",
-		net.JoinHostPort(Config.VPNIP, Config.VPNPort),
+		net.JoinHostPort(Config.APIIP, Config.APIPort),
 		QUICConfig.Load(),
 	)
 	if err != nil {
@@ -44,7 +44,11 @@ func ControlSocketListener() {
 }
 
 func validateSignatureAndExtractConnectRequest(buff []byte) (scr crypt.SignedConnectRequest, cr *types.ConnectRequest, err error) {
-	scr, err = crypt.ValidateSignature(buff, PubKey.Load())
+	err = json.Unmarshal(buff, &scr)
+	if err != nil {
+		return
+	}
+	err = verifySignature(scr.Payload, scr.Signature)
 	if err != nil {
 		WARN("Invalid payload signature:", err)
 		return
@@ -168,11 +172,11 @@ func acceptUserUDPTLSSocket(conn *quic.Conn) {
 	}
 	s.Flush()
 
-	go signal.NewSignal(fmt.Sprintf("TO:%d", index), *CTX.Load(), *Cancel.Load(), goroutineLogger, func() {
+	go signal.NewSignal(fmt.Sprintf("TO:%d", index), *CTX.Load(), *Cancel.Load(), time.Second, goroutineLogger, func() {
 		toUserChannel(index)
 	})
 
-	go signal.NewSignal(fmt.Sprintf("TO:%d", index), *CTX.Load(), *Cancel.Load(), goroutineLogger, func() {
+	go signal.NewSignal(fmt.Sprintf("TO:%d", index), *CTX.Load(), *Cancel.Load(), time.Second, goroutineLogger, func() {
 		fromUserChannel(index)
 	})
 }
