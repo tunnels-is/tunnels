@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"crypto/rsa"
 	"crypto/tls"
 	"encoding/json"
 	"errors"
@@ -28,7 +27,6 @@ import (
 
 	"github.com/jackpal/gateway"
 	"github.com/tunnels-is/tunnels/certs"
-	"github.com/tunnels-is/tunnels/iptables"
 	"github.com/tunnels-is/tunnels/setcap"
 	"github.com/tunnels-is/tunnels/signal"
 	"github.com/tunnels-is/tunnels/types"
@@ -99,8 +97,8 @@ var Cancel atomic.Pointer[context.CancelFunc]
 var Config atomic.Pointer[types.ServerConfig]
 var APITLSConfig atomic.Pointer[tls.Config]
 var QUICConfig atomic.Pointer[quic.Config]
-var PrivKey atomic.Pointer[rsa.PrivateKey]
-var PubKey atomic.Pointer[rsa.PublicKey]
+var PrivKey atomic.Pointer[any]
+var PubKey atomic.Pointer[any]
 var KeyPair atomic.Pointer[tls.Certificate]
 
 var (
@@ -169,19 +167,20 @@ func main() {
 			initializeVPN()
 		}
 
-		go signal.NewSignal("PING", ctx, cancel, goroutineLogger, ControlSocketListener)
-		go signal.NewSignal("PING", ctx, cancel, goroutineLogger, DataSocketListener)
-		go signal.NewSignal("TCP", ctx, cancel, goroutineLogger, ExternalTCPListener)
-		go signal.NewSignal("UDP", ctx, cancel, goroutineLogger, ExternalUDPListener)
-		go signal.NewSignal("PING", ctx, cancel, goroutineLogger, pingActiveUsers)
+		go signal.NewSignal("CONTROL", ctx, cancel, 1*time.Second, goroutineLogger, ControlSocketListener)
+		go signal.NewSignal("DATA", ctx, cancel, 1*time.Second, goroutineLogger, DataSocketListener)
+		go signal.NewSignal("TCP", ctx, cancel, 1*time.Second, goroutineLogger, ExternalTCPListener)
+		go signal.NewSignal("UDP", ctx, cancel, 1*time.Second, goroutineLogger, ExternalUDPListener)
+		go signal.NewSignal("PING", ctx, cancel, 10*time.Second, goroutineLogger, pingActiveUsers)
 	}
 
-	go signal.NewSignal("API", ctx, cancel, goroutineLogger, StartAPI)
+	go signal.NewSignal("API", ctx, cancel, 1*time.Second, goroutineLogger, StartAPI)
 
-	go signal.NewSignal("CONFIG", ctx, cancel, goroutineLogger, func() {
+	go signal.NewSignal("CONFIG", ctx, cancel, 10*time.Second, goroutineLogger, func() {
 		_ = LoadServerConfig("./config.json")
 	})
 
+	logger.Info("Tunnels ready")
 	quit := make(chan os.Signal, 1)
 	sig.Notify(quit, os.Interrupt, syscall.SIGTERM)
 	<-quit
@@ -245,9 +244,15 @@ func LoadServerConfig(path string) (err error) {
 func loadCertificatesAndTLSSettings() (err error) {
 	Config := Config.Load()
 	priv, privB, err := loadPrivateKey(Config.KeyPem)
+	if err != nil {
+		panic(err)
+	}
 	pub, pubB, err := loadPublicKey(Config.CertPem)
-	PrivKey.Store(priv)
-	PubKey.Store(pub)
+	if err != nil {
+		panic(err)
+	}
+	PrivKey.Store(&priv)
+	PubKey.Store(&pub)
 	tlscert, err := tls.X509KeyPair(pubB, privB)
 	if err != nil {
 		log.Fatalf("Failed to load key pair for TLS: %v", err)
@@ -284,15 +289,15 @@ func initializeVPN() {
 	}
 	Config := Config.Load()
 
-	var existed bool
-	err, existed = iptables.SetIPTablesRSTDropFilter(Config.VPNIP)
-	if err != nil {
-		ERR("Error applying iptables rule: ", err)
-		os.Exit(1)
-	}
-	if !existed {
-		INFO("> added iptables rule")
-	}
+	// var existed bool
+	// err, existed = iptables.SetIPTablesRSTDropFilter(Config.VPNIP)
+	// if err != nil {
+	// 	ERR("Error applying iptables rule: ", err)
+	// 	os.Exit(1)
+	// }
+	// if !existed {
+	// 	INFO("> added iptables rule")
+	// }
 
 	InterfaceIP = net.ParseIP(Config.VPNIP)
 	if InterfaceIP == nil {
@@ -328,6 +333,7 @@ func initializeLAN() (err error) {
 	}
 	return
 }
+
 func GenerateVPLCoreMappings() {
 	VPLIPToCore[10] = make([][][]*UserCoreMapping, 11)
 	VPLIPToCore[10][0] = make([][]*UserCoreMapping, 256)
@@ -436,7 +442,7 @@ func makeConfigAndCerts() {
 		DNS:                []*types.DNSRecord{},
 		DNSServers:         []string{},
 	}
-	f, err := os.Create(ep + "server.json")
+	f, err := os.Create(ep + "config.json")
 	if err != nil {
 		panic(err)
 	}
