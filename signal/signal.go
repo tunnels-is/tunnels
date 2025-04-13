@@ -4,21 +4,27 @@ import (
 	"context"
 	"fmt"
 	"runtime/debug"
+	"sync"
 	"sync/atomic"
 	"time"
 )
 
-var Signals = make([]*Signal, 0)
+// var Signals = make([]*Signal, 0)
+var Signals sync.Map
 
-func NewSignal(tag string, ctx context.Context, cancel context.CancelFunc, logFunc func(string), method func()) {
-	Signals = append(Signals, &Signal{
+func NewSignal(tag string, ctx context.Context, cancel context.CancelFunc, sleep time.Duration, logFunc func(string), method func()) {
+	newSignal := &Signal{
 		Ctx:        ctx,
 		Cancel:     cancel,
 		Method:     method,
 		Log:        logFunc,
 		Tag:        tag,
+		Sleep:      sleep,
 		ShouldStop: atomic.Bool{},
-	})
+	}
+	Signals.Store(tag, newSignal)
+
+	go newSignal.Start()
 }
 
 type Signal struct {
@@ -27,6 +33,7 @@ type Signal struct {
 	Method     func()
 	Log        func(string)
 	Tag        string
+	Sleep      time.Duration
 	ShouldStop atomic.Bool
 }
 
@@ -40,14 +47,18 @@ func (s *Signal) Stop() {
 func (s *Signal) Start() {
 	defer func() {
 		r := recover()
-		if s.Log != nil {
-			s.Log(fmt.Sprintf("err: %s \n %s", r, string(debug.Stack())))
+		if r != nil {
+			if s.Log != nil {
+				s.Log(fmt.Sprintf("err: %s \n %s", r, string(debug.Stack())))
+			}
 		}
+		s.Log("goroutine exit: " + s.Tag)
 	}()
 
-	for !s.ShouldStop.Load() && s.Ctx.Err() != nil {
+	fmt.Println(s.ShouldStop.Load(), s.Ctx.Err())
+	for !s.ShouldStop.Load() && s.Ctx.Err() == nil {
 		s.Method()
-		time.Sleep(1 * time.Second)
-		s.Log("goroutine restart:" + s.Tag)
+		time.Sleep(s.Sleep)
+		s.Log("goroutine restart: " + s.Tag)
 	}
 }

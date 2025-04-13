@@ -155,7 +155,6 @@ type Certs struct {
 	CertPem     []byte
 	KeyPem      []byte
 	KeyPKCS8    []byte
-	KeyPKCS1    []byte
 	X509KeyPair tls.Certificate
 	CertBytes   []byte
 }
@@ -234,9 +233,8 @@ func MakeCertV2(ct CertType, certPath string, keyPath string, ips []string, doma
 	}
 
 	typeString := ""
-	rsaPriv, ok := CR.Priv.(*rsa.PrivateKey)
+	_, ok := CR.Priv.(*rsa.PrivateKey)
 	if ok {
-		CR.KeyPKCS1 = x509.MarshalPKCS1PrivateKey(rsaPriv)
 		typeString = "RSA PRIVATE KEY"
 	}
 	_, ok = CR.Priv.(*ecdsa.PrivateKey)
@@ -268,14 +266,11 @@ func MakeCertV2(ct CertType, certPath string, keyPath string, ips []string, doma
 		}
 		defer kpem.Close()
 
-		_, err = kpem.Write(CR.KeyPem)
-		if err != nil {
-			return nil, err
+		if err := pem.Encode(cpem, &pem.Block{Type: "CERTIFICATE", Bytes: CR.CertBytes}); err != nil {
+			return nil, fmt.Errorf("failed to write certificate data to %s: %w", certPath, err)
 		}
-
-		_, err = cpem.Write(CR.CertPem)
-		if err != nil {
-			return nil, err
+		if err := pem.Encode(kpem, &pem.Block{Type: "PRIVATE KEY", Bytes: CR.KeyPKCS8}); err != nil {
+			return nil, fmt.Errorf("failed to write certificate data to %s: %w", certPath, err)
 		}
 	}
 	return
