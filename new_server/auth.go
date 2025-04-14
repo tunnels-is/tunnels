@@ -43,10 +43,6 @@ func hashPassword(password string) (string, error) {
 	return string(bytes), nil
 }
 
-func checkPasswordHash(password, hash string) bool {
-	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) == nil
-}
-
 func googleOAuthEnabled() bool {
 	if googleClientID == "" || googleClientSecret == "" {
 		logger.Warn("Failed to setup Google OAuth", slog.Any("warn", "No credentials provided"))
@@ -109,17 +105,17 @@ func parseAuthState(stateParam string) (*GoogleCallbackState, error) {
 }
 
 func authenticateRequest(c *fiber.Ctx) (*User, *AuthToken, error) {
-	tokenUUID := c.Get(AuthHeader)
+	tokenUUID := c.Get(authHeader)
 	if tokenUUID == "" {
 		logger.Warn("Authentication failed: Missing auth header", slog.String("path", c.Path()))
-		return nil, nil, ErrUnauthorized
+		return nil, nil, errUnauthorized
 	}
 
 	token, err := getToken(tokenUUID)
 	if err != nil {
-		if errors.Is(err, ErrNotFound) {
+		if errors.Is(err, errNotFound) {
 			logger.Warn("Authentication failed: Token not found", slog.String("tokenUUID", tokenUUID), slog.String("path", c.Path()))
-			return nil, nil, ErrUnauthorized
+			return nil, nil, errUnauthorized
 		}
 		logger.Error("Authentication error: Failed to retrieve token", slog.Any("error", err), slog.String("tokenUUID", tokenUUID))
 		return nil, nil, fmt.Errorf("failed to retrieve token: %w", err)
@@ -127,9 +123,9 @@ func authenticateRequest(c *fiber.Ctx) (*User, *AuthToken, error) {
 
 	user, err := getUser(token.UserUUID)
 	if err != nil {
-		if errors.Is(err, ErrNotFound) {
+		if errors.Is(err, errNotFound) {
 			logger.Warn("Authentication failed: User for token not found", slog.String("userUUID", token.UserUUID), slog.String("tokenUUID", tokenUUID), slog.String("path", c.Path()))
-			return nil, nil, ErrUnauthorized
+			return nil, nil, errUnauthorized
 		}
 		logger.Error("Authentication error: Failed to retrieve user for token", slog.Any("error", err), slog.String("userUUID", token.UserUUID))
 		return nil, nil, fmt.Errorf("failed to retrieve user: %w", err)
@@ -153,7 +149,7 @@ func canManageUser(requestUser *User, targetUserUUID string) (bool, error) {
 	if requestUser.IsManager {
 		targetUser, err := getUser(targetUserUUID)
 		if err != nil {
-			if errors.Is(err, ErrNotFound) {
+			if errors.Is(err, errNotFound) {
 				return false, fmt.Errorf("target user %s not found", targetUserUUID)
 			}
 			return false, fmt.Errorf("failed to get target user %s: %w", targetUserUUID, err)
@@ -234,7 +230,7 @@ func handleGoogleCallback(c *fiber.Ctx) error {
 		return errResponse(c, http.StatusInternalServerError, "Received invalid token")
 	}
 
-	response, err := http.Get(GoogleUserInfoURL + token.AccessToken)
+	response, err := http.Get(googleUserInfoURL + token.AccessToken)
 	if err != nil {
 		return errResponse(c, http.StatusInternalServerError, "Could not get user info")
 	}
@@ -257,7 +253,7 @@ func handleGoogleCallback(c *fiber.Ctx) error {
 
 	user, err := getUserByGoogleID(googleUser.ID)
 	if err != nil {
-		if errors.Is(err, ErrNotFound) {
+		if errors.Is(err, errNotFound) {
 			return errResponse(c, http.StatusForbidden, "User not registered or linked. Please contact an administrator.")
 		} else {
 			return errResponse(c, http.StatusInternalServerError, "Database error during login")
@@ -307,7 +303,7 @@ func handleGoogleCallback(c *fiber.Ctx) error {
 func handleTokenValidate(c *fiber.Ctx) error {
 	user, token, err := authenticateRequest(c)
 	if err != nil {
-		if errors.Is(err, ErrUnauthorized) {
+		if errors.Is(err, errUnauthorized) {
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Invalid or missing token"})
 		}
 		return errResponse(c, http.StatusInternalServerError, "Error validating token", slog.Any("error", err))
@@ -327,7 +323,7 @@ func handleTokenValidate(c *fiber.Ctx) error {
 func handleTokenDelete(c *fiber.Ctx) error {
 	requestUser, _, err := authenticateRequest(c)
 	if err != nil {
-		if errors.Is(err, ErrUnauthorized) {
+		if errors.Is(err, errUnauthorized) {
 			return errResponse(c, http.StatusUnauthorized, "Authentication required")
 		}
 		return errResponse(c, http.StatusInternalServerError, "Error authenticating request")
@@ -340,7 +336,7 @@ func handleTokenDelete(c *fiber.Ctx) error {
 
 	tokenToDelete, err := getToken(targetTokenUUID)
 	if err != nil {
-		if errors.Is(err, ErrNotFound) {
+		if errors.Is(err, errNotFound) {
 			return errResponse(c, http.StatusNotFound, "Target token not found")
 		}
 		return errResponse(c, http.StatusInternalServerError, "Error checking token ownership", slog.Any("error", err), slog.String("targetTokenUUID", targetTokenUUID))
@@ -362,7 +358,7 @@ func handleTokenDelete(c *fiber.Ctx) error {
 func handleTokenDeleteAll(c *fiber.Ctx) error {
 	requestUser, _, err := authenticateRequest(c)
 	if err != nil {
-		if errors.Is(err, ErrUnauthorized) {
+		if errors.Is(err, errUnauthorized) {
 			return errResponse(c, http.StatusUnauthorized, "Authentication required")
 		}
 		return errResponse(c, http.StatusInternalServerError, "Error authenticating request")
@@ -382,7 +378,7 @@ func handleTokenDeleteAll(c *fiber.Ctx) error {
 	if !isTargetingSelf && requestUser.IsAdmin {
 		_, err := getUser(targetUserUUID)
 		if err != nil {
-			if errors.Is(err, ErrNotFound) {
+			if errors.Is(err, errNotFound) {
 				return errResponse(c, http.StatusNotFound, "Target user not found")
 			}
 			return errResponse(c, http.StatusInternalServerError, "Failed to verify target user",
@@ -403,7 +399,7 @@ func handleTokenDeleteAll(c *fiber.Ctx) error {
 func handle2FASetup(c *fiber.Ctx) error {
 	user, _, err := authenticateRequest(c)
 	if err != nil {
-		if errors.Is(err, ErrUnauthorized) {
+		if errors.Is(err, errUnauthorized) {
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Authentication required"})
 		}
 		return errResponse(c, http.StatusInternalServerError, "Error authenticating request")
@@ -426,7 +422,7 @@ func handle2FASetup(c *fiber.Ctx) error {
 		return errResponse(c, http.StatusInternalServerError, "Could not generate OTP key", slog.Any("error", err), slog.String("userUUID", user.UUID))
 	}
 
-	user.OTPSecret, err = Encrypt(key.Secret(), []byte(TwoFactorKey))
+	user.OTPSecret, err = Encrypt(key.Secret(), []byte(twoFactorKey))
 	if err != nil {
 		return errResponse(c, 500, "unable to encrypt two factor secret", slog.Any("err", err))
 	}
@@ -453,7 +449,7 @@ func handle2FAConfirm(c *fiber.Ctx) error {
 
 	user, err := getUser(req.UserID)
 	if err != nil {
-		if errors.Is(err, ErrNotFound) {
+		if errors.Is(err, errNotFound) {
 			return errResponse(c, http.StatusNotFound, "User not found")
 		}
 		return errResponse(c, http.StatusInternalServerError, "Internal server error", slog.Any("err", err))
@@ -473,7 +469,7 @@ func handle2FAConfirm(c *fiber.Ctx) error {
 		return errResponse(c, http.StatusBadRequest, "Malformed pending auth request")
 	}
 
-	secret, err := Decrypt(user.OTPSecret, []byte(TwoFactorKey))
+	secret, err := Decrypt(user.OTPSecret, []byte(twoFactorKey))
 	if err != nil {
 		return errResponse(c, http.StatusBadRequest, "Error decrypting two factor authenticaton secret", slog.Any("err", err))
 	}
@@ -498,7 +494,7 @@ func handle2FAConfirm(c *fiber.Ctx) error {
 func handle2FAEnable(c *fiber.Ctx) error {
 	user, _, err := authenticateRequest(c)
 	if err != nil {
-		if errors.Is(err, ErrUnauthorized) {
+		if errors.Is(err, errUnauthorized) {
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Authentication required"})
 		}
 		return errResponse(c, http.StatusInternalServerError, "Error authenticating request")
@@ -526,7 +522,7 @@ func handle2FAEnable(c *fiber.Ctx) error {
 		return errResponse(c, http.StatusInternalServerError, "Two Factor Authentication secret not found")
 	}
 
-	secret, err := Decrypt(user.OTPSecret, []byte(TwoFactorKey))
+	secret, err := Decrypt(user.OTPSecret, []byte(twoFactorKey))
 	if err != nil {
 		return errResponse(c, http.StatusBadRequest, "Error decrypting two factor authenticaton secret", slog.Any("err", err))
 	}

@@ -182,12 +182,12 @@ func acceptUserUDPTLSSocket(conn *quic.Conn) {
 }
 
 func countConnections(id string) (count int, userCount int) {
-	for i := range ClientCoreMappings {
-		if ClientCoreMappings[i] == nil {
+	for i := range clientCoreMappings {
+		if clientCoreMappings[i] == nil {
 			continue
 		}
 
-		if ClientCoreMappings[i].ID == id {
+		if clientCoreMappings[i].ID == id {
 			userCount++
 		}
 
@@ -205,29 +205,29 @@ func CreateClientCoreMapping(CRR *types.ConnectRequestResponse, CR *types.Connec
 	}()
 
 	wasAllocated := false
-	for i := range ClientCoreMappings {
-		if ClientCoreMappings[i] == nil {
+	for i := range clientCoreMappings {
+		if clientCoreMappings[i] == nil {
 			index = i
 
-			COREm.Lock()
-			if ClientCoreMappings[i] == nil {
-				ClientCoreMappings[i] = new(UserCoreMapping)
+			coreMutex.Lock()
+			if clientCoreMappings[i] == nil {
+				clientCoreMappings[i] = new(UserCoreMapping)
 				wasAllocated = true
 			}
-			COREm.Unlock()
+			coreMutex.Unlock()
 			if !wasAllocated {
 				continue
 			}
 
-			ClientCoreMappings[i].ID = CR.UserID.Hex()
-			ClientCoreMappings[i].DeviceToken = CR.DeviceToken
-			ClientCoreMappings[i].EH = EH
-			ClientCoreMappings[i].Created = time.Now()
-			ClientCoreMappings[i].ToUser = make(chan []byte, 300000)
-			ClientCoreMappings[i].FromUser = make(chan Packet, 300000)
-			ClientCoreMappings[i].LastPingFromClient = time.Now()
-			ClientCoreMappings[i].Uindex = make([]byte, 2)
-			binary.BigEndian.PutUint16(ClientCoreMappings[i].Uindex, uint16(index))
+			clientCoreMappings[i].ID = CR.UserID.Hex()
+			clientCoreMappings[i].DeviceToken = CR.DeviceToken
+			clientCoreMappings[i].EH = EH
+			clientCoreMappings[i].Created = time.Now()
+			clientCoreMappings[i].ToUser = make(chan []byte, 300000)
+			clientCoreMappings[i].FromUser = make(chan Packet, 300000)
+			clientCoreMappings[i].LastPingFromClient = time.Now()
+			clientCoreMappings[i].Uindex = make([]byte, 2)
+			binary.BigEndian.PutUint16(clientCoreMappings[i].Uindex, uint16(index))
 
 			break
 		}
@@ -316,7 +316,7 @@ func ExternalTCPListener() {
 		// TODO .. use mask
 		IHL = ((buffer[0] << 4) >> 4) * 4
 		DSTP = binary.BigEndian.Uint16(buffer[IHL+2 : IHL+4])
-		PM = PortToCoreMapping[DSTP]
+		PM = portToCoreMapping[DSTP]
 		if PM == nil || PM.Client == nil {
 			continue
 		}
@@ -386,7 +386,7 @@ func ExternalUDPListener() {
 		// TODO .. use mask
 		IHL = ((buffer[0] << 4) >> 4) * 4
 		DSTP = binary.BigEndian.Uint16(buffer[IHL+2 : IHL+4])
-		PM = PortToCoreMapping[DSTP]
+		PM = portToCoreMapping[DSTP]
 		if PM == nil || PM.Client == nil {
 			continue
 		}
@@ -446,8 +446,8 @@ func DataSocketListener() {
 			return
 		}
 		id = binary.BigEndian.Uint16(buff[0:2])
-		if ClientCoreMappings[id] != nil {
-			ClientCoreMappings[id].FromUser <- Packet{
+		if clientCoreMappings[id] != nil {
+			clientCoreMappings[id].FromUser <- Packet{
 				addr: addr,
 				data: CopySlice(buff[:n]),
 			}
@@ -469,7 +469,7 @@ func fromUserChannel(index int) {
 		}
 	}()
 
-	CM := ClientCoreMappings[index]
+	CM := clientCoreMappings[index]
 	if CM == nil {
 		shouldRestart = false
 		return
@@ -630,7 +630,7 @@ func toUserChannel(index int) {
 		}
 	}()
 
-	CM := ClientCoreMappings[index]
+	CM := clientCoreMappings[index]
 	if CM == nil {
 		shouldRestart = false
 		return
@@ -674,7 +674,7 @@ func toUserChannel(index int) {
 				}
 			}
 
-			if !LanFirewallDisabled && !CM.DisableFirewall && !skipFirewall {
+			if !lanFirewallDisabled && !CM.DisableFirewall && !skipFirewall {
 
 				l := (PACKET[0] & 0x0F) * 4
 				S4Port[0] = PACKET[l]

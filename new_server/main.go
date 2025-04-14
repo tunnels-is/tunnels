@@ -35,27 +35,45 @@ import (
 )
 
 var (
-	TwoFactorKey       = os.Getenv("TWO_FACTOR_KEY")
+	twoFactorKey       = os.Getenv("TWO_FACTOR_KEY")
 	googleClientID     = os.Getenv("GOOGLE_CLIENT_ID")
 	googleClientSecret = os.Getenv("GOOGLE_CLIENT_SECRET")
+	emailKey           = os.Getenv("SENDMAIL_KEY")
 	googleRedirectURL  = "http://localhost:3000/auth/google/callback"
 	oauthStateString   = "random-pseudo-state"
 )
 
 const (
-	AuthHeader        = "X-Auth-Token"
-	GoogleUserInfoURL = "https://www.googleapis.com/oauth2/v2/userinfo?access_token="
+	authHeader        = "X-Auth-Token"
+	googleUserInfoURL = "https://www.googleapis.com/oauth2/v2/userinfo?access_token="
 )
 
 var (
-	ErrUnauthorized = errors.New("unauthorized")
-	ErrForbidden    = errors.New("forbidden")
-	ErrNotFound     = errors.New("not found")
-	ErrOTPRequired  = errors.New("otp required")
-	ErrInvalidOTP   = errors.New("invalid otp code")
+	errUnauthorized = errors.New("unauthorized")
+	errForbidden    = errors.New("forbidden")
+	errNotFound     = errors.New("not found")
+	errOTPRequired  = errors.New("otp required")
+	errInvalidOTP   = errors.New("invalid otp code")
 )
 
 var (
+	CTX          atomic.Pointer[context.Context]
+	Cancel       atomic.Pointer[context.CancelFunc]
+	Config       atomic.Pointer[types.ServerConfig]
+	APITLSConfig atomic.Pointer[tls.Config]
+	QUICConfig   atomic.Pointer[quic.Config]
+	PrivKey      atomic.Pointer[any]
+	PubKey       atomic.Pointer[any]
+	KeyPair      atomic.Pointer[tls.Certificate]
+)
+
+var (
+	LANEnabled        bool
+	VPNEnabled        bool
+	AUTHEnabled       bool
+	DNSEnabled        bool
+	logger            *slog.Logger
+	numShards         = 5
 	twoFactorAppName  = "tunnels"
 	pendingTwoFactor  = sync.Map{}
 	googleOauthConfig *oauth2.Config
@@ -64,10 +82,6 @@ var (
 
 	publicPath  string
 	privatePath string
-	// publicSigningCert  *x509.Certificate
-	// publicSigningKey   *rsa.PublicKey
-	// controlCertificate tls.Certificate
-	// quicConfig *quic.Config
 
 	dataSocketFD int
 	rawUDPSockFD int
@@ -79,19 +93,19 @@ var (
 	toUserChannelMonitor   = make(chan int, 200000)
 	fromUserChannelMonitor = make(chan int, 200000)
 
-	PortMappingResponseDurations = time.Duration(30 * time.Second)
+	portMappingResponseDurations = time.Duration(30 * time.Second)
 
-	ClientCoreMappings [math.MaxUint16 + 1]*UserCoreMapping
-	PortToCoreMapping  [math.MaxUint16 + 1]*PortRange
-	COREm              = sync.Mutex{}
+	clientCoreMappings [math.MaxUint16 + 1]*UserCoreMapping
+	portToCoreMapping  [math.MaxUint16 + 1]*PortRange
+	coreMutex          = sync.Mutex{}
 
 	VPLNetwork  *net.IPNet
 	DHCPMapping [math.MaxUint16 + 1]*types.DHCPRecord
 
 	VPLIPToCore         = make([][][][]*UserCoreMapping, 255)
-	LanFirewallDisabled bool
+	lanFirewallDisabled bool
+	disableLogs         bool
 )
-var disableLogs bool
 
 func LOG(x ...any) {
 	if !disableLogs {
@@ -116,24 +130,6 @@ func ERR(x ...any) {
 		log.Println(x...)
 	}
 }
-
-var CTX atomic.Pointer[context.Context]
-var Cancel atomic.Pointer[context.CancelFunc]
-var Config atomic.Pointer[types.ServerConfig]
-var APITLSConfig atomic.Pointer[tls.Config]
-var QUICConfig atomic.Pointer[quic.Config]
-var PrivKey atomic.Pointer[any]
-var PubKey atomic.Pointer[any]
-var KeyPair atomic.Pointer[tls.Certificate]
-
-var (
-	LANEnabled  bool
-	VPNEnabled  bool
-	AUTHEnabled bool
-	DNSEnabled  bool
-)
-var logger *slog.Logger
-var numShards = 5
 
 func main() {
 
@@ -359,7 +355,7 @@ func initializeLAN() (err error) {
 	Config := Config.Load()
 
 	if Config.Lan != nil {
-		LanFirewallDisabled = Config.DisableLanFirewall
+		lanFirewallDisabled = Config.DisableLanFirewall
 	}
 	return
 }
@@ -403,16 +399,16 @@ func GeneratePortAllocation() (err error) {
 				return errors.New("end port is too big")
 			}
 
-			if PortToCoreMapping[i] != nil {
-				if PortToCoreMapping[i].StartPort < PR.StartPort {
+			if portToCoreMapping[i] != nil {
+				if portToCoreMapping[i].StartPort < PR.StartPort {
 					return errors.New("start port is too small")
 				}
-				if PortToCoreMapping[i].StartPort < PR.EndPort {
+				if portToCoreMapping[i].StartPort < PR.EndPort {
 					return errors.New("end port is too big")
 				}
 			}
 
-			PortToCoreMapping[i] = PR
+			portToCoreMapping[i] = PR
 		}
 
 		currentPort = PR.EndPort + 1

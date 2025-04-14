@@ -11,6 +11,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 	"github.com/tunnels-is/tunnels/types"
+	"golang.org/x/crypto/bcrypt"
 )
 
 func cleanTwoFactorPendingMap() {
@@ -48,7 +49,8 @@ func handleLogin(c *fiber.Ctx) error {
 		return errResponse(c, fiber.StatusUnauthorized, "Invalid user or password")
 	}
 
-	if user.PasswordHash == "" || !checkPasswordHash(req.Password, user.PasswordHash) {
+	err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password))
+	if err != nil {
 		return errResponse(c, fiber.StatusUnauthorized, "Invalid user or password")
 	}
 
@@ -146,7 +148,7 @@ func handleCreateUser(c *fiber.Ctx) error {
 func handleGetUser(c *fiber.Ctx) error {
 	requestUser, _, err := authenticateRequest(c)
 	if err != nil {
-		if errors.Is(err, ErrUnauthorized) {
+		if errors.Is(err, errUnauthorized) {
 			return errResponse(c, fiber.StatusUnauthorized, "Authentication required")
 		}
 		return errResponse(c, http.StatusInternalServerError, "Error authenticating request", slog.Any("error", err))
@@ -167,7 +169,7 @@ func handleGetUser(c *fiber.Ctx) error {
 
 	user, err := getUser(targetUserUUID)
 	if err != nil {
-		if errors.Is(err, ErrNotFound) {
+		if errors.Is(err, errNotFound) {
 			return errResponse(c, fiber.StatusNotFound, "User not found", slog.String("targetUserUUID", targetUserUUID))
 		}
 		return errResponse(c, http.StatusInternalServerError, "Error retrieving user", slog.Any("error", err), slog.String("targetUserUUID", targetUserUUID))
@@ -179,7 +181,7 @@ func handleGetUser(c *fiber.Ctx) error {
 func handleUpdateUser(c *fiber.Ctx) error {
 	requestUser, _, err := authenticateRequest(c)
 	if err != nil {
-		if errors.Is(err, ErrUnauthorized) {
+		if errors.Is(err, errUnauthorized) {
 			return errResponse(c, fiber.StatusUnauthorized, "Authentication required")
 		}
 		return errResponse(c, http.StatusInternalServerError, "Error authenticating request", slog.Any("error", err))
@@ -217,7 +219,7 @@ func handleUpdateUser(c *fiber.Ctx) error {
 
 	targetUser, err := getUser(targetUserUUID)
 	if err != nil {
-		if errors.Is(err, ErrNotFound) {
+		if errors.Is(err, errNotFound) {
 			return errResponse(c, fiber.StatusNotFound, "User not found", slog.String("targetUserUUID", targetUserUUID))
 		}
 		return errResponse(c, http.StatusInternalServerError, "Error retrieving user", slog.Any("error", err), slog.String("targetUserUUID", targetUserUUID))
@@ -238,7 +240,7 @@ func handleUpdateUser(c *fiber.Ctx) error {
 func handleListUsers(c *fiber.Ctx) error {
 	requestUser, _, err := authenticateRequest(c)
 	if err != nil {
-		if errors.Is(err, ErrUnauthorized) {
+		if errors.Is(err, errUnauthorized) {
 			return errResponse(c, fiber.StatusUnauthorized, "Authentication required")
 		}
 		return errResponse(c, http.StatusInternalServerError, "Error authenticating request", slog.Any("error", err))
@@ -264,7 +266,7 @@ func handleListUsers(c *fiber.Ctx) error {
 func handleCreateGroup(c *fiber.Ctx) error {
 	requestUser, _, err := authenticateRequest(c)
 	if err != nil {
-		if errors.Is(err, ErrUnauthorized) {
+		if errors.Is(err, errUnauthorized) {
 			return errResponse(c, fiber.StatusUnauthorized, "Authentication required")
 		}
 		return errResponse(c, http.StatusInternalServerError, "Error authenticating request", slog.Any("error", err))
@@ -302,7 +304,7 @@ func handleCreateGroup(c *fiber.Ctx) error {
 func handleGetGroup(c *fiber.Ctx) error {
 	requestUser, _, err := authenticateRequest(c)
 	if err != nil {
-		if errors.Is(err, ErrUnauthorized) {
+		if errors.Is(err, errUnauthorized) {
 			return errResponse(c, fiber.StatusUnauthorized, "Authentication required")
 		}
 		return errResponse(c, http.StatusInternalServerError, "Error authenticating request", slog.Any("error", err))
@@ -319,7 +321,7 @@ func handleGetGroup(c *fiber.Ctx) error {
 
 	group, err := getGroup(targetGroupUUID)
 	if err != nil {
-		if errors.Is(err, ErrNotFound) {
+		if errors.Is(err, errNotFound) {
 			return errResponse(c, fiber.StatusNotFound, "Group not found", slog.String("targetGroupUUID", targetGroupUUID))
 		}
 		return errResponse(c, http.StatusInternalServerError, "Error retrieving group", slog.Any("error", err), slog.String("targetGroupUUID", targetGroupUUID))
@@ -331,7 +333,7 @@ func handleGetGroup(c *fiber.Ctx) error {
 func handleUpdateGroup(c *fiber.Ctx) error {
 	requestUser, _, err := authenticateRequest(c)
 	if err != nil {
-		if errors.Is(err, ErrUnauthorized) {
+		if errors.Is(err, errUnauthorized) {
 			return errResponse(c, fiber.StatusUnauthorized, "Authentication required")
 		}
 		return errResponse(c, http.StatusInternalServerError, "Error authenticating request", slog.Any("error", err))
@@ -359,7 +361,7 @@ func handleUpdateGroup(c *fiber.Ctx) error {
 
 	group, err := getGroup(targetGroupUUID)
 	if err != nil {
-		if errors.Is(err, ErrNotFound) {
+		if errors.Is(err, errNotFound) {
 			return errResponse(c, fiber.StatusNotFound, "Group not found", slog.String("targetGroupUUID", targetGroupUUID))
 		}
 		return errResponse(c, http.StatusInternalServerError, "Error retrieving group", slog.Any("error", err), slog.String("targetGroupUUID", targetGroupUUID))
@@ -378,7 +380,7 @@ func handleDeleteGroup(c *fiber.Ctx) error {
 
 	requestUser, _, err := authenticateRequest(c)
 	if err != nil {
-		if errors.Is(err, ErrUnauthorized) {
+		if errors.Is(err, errUnauthorized) {
 			return errResponse(c, fiber.StatusUnauthorized, "Authentication required")
 		}
 		return errResponse(c, http.StatusInternalServerError, "Error authenticating request", slog.Any("error", err))
@@ -395,7 +397,7 @@ func handleDeleteGroup(c *fiber.Ctx) error {
 
 	_, err = getGroup(targetGroupUUID)
 	if err != nil {
-		if errors.Is(err, ErrNotFound) {
+		if errors.Is(err, errNotFound) {
 			return errResponse(c, fiber.StatusNotFound, "Group not found", slog.String("targetGroupUUID", targetGroupUUID))
 		}
 		return errResponse(c, http.StatusInternalServerError, "Error checking group existence", slog.Any("error", err), slog.String("targetGroupUUID", targetGroupUUID))
@@ -412,7 +414,7 @@ func handleDeleteGroup(c *fiber.Ctx) error {
 func handleListGroups(c *fiber.Ctx) error {
 	requestUser, _, err := authenticateRequest(c)
 	if err != nil {
-		if errors.Is(err, ErrUnauthorized) {
+		if errors.Is(err, errUnauthorized) {
 			return errResponse(c, fiber.StatusUnauthorized, "Authentication required")
 		}
 		return errResponse(c, http.StatusInternalServerError, "Error authenticating request", slog.Any("error", err))
@@ -433,7 +435,7 @@ func handleListGroups(c *fiber.Ctx) error {
 func handleAddUserToGroup(c *fiber.Ctx) error {
 	requestUser, _, err := authenticateRequest(c)
 	if err != nil {
-		if errors.Is(err, ErrUnauthorized) {
+		if errors.Is(err, errUnauthorized) {
 			return errResponse(c, fiber.StatusUnauthorized, "Authentication required", slog.Any("error", err))
 		}
 		return errResponse(c, http.StatusInternalServerError, "Error authenticating request", slog.Any("error", err))
@@ -458,7 +460,7 @@ func handleAddUserToGroup(c *fiber.Ctx) error {
 
 	group, err := getGroup(groupUUID)
 	if err != nil {
-		if errors.Is(err, ErrNotFound) {
+		if errors.Is(err, errNotFound) {
 			return errResponse(c, fiber.StatusNotFound, "Group not found", slog.String("groupUUID", groupUUID))
 		}
 		return errResponse(c, http.StatusInternalServerError, "Error retrieving group",
@@ -467,7 +469,7 @@ func handleAddUserToGroup(c *fiber.Ctx) error {
 
 	_, err = getUser(userUUID)
 	if err != nil {
-		if errors.Is(err, ErrNotFound) {
+		if errors.Is(err, errNotFound) {
 			return errResponse(c, fiber.StatusNotFound, "User not found", slog.String("userUUID", userUUID))
 		}
 		return errResponse(c, http.StatusInternalServerError, "Error retrieving user",
@@ -488,7 +490,7 @@ func handleAddUserToGroup(c *fiber.Ctx) error {
 func handleRemoveUserFromGroup(c *fiber.Ctx) error {
 	requestUser, _, err := authenticateRequest(c)
 	if err != nil {
-		if errors.Is(err, ErrUnauthorized) {
+		if errors.Is(err, errUnauthorized) {
 			return errResponse(c, fiber.StatusUnauthorized, "Authentication required", slog.Any("error", err))
 		}
 		return errResponse(c, http.StatusInternalServerError, "Error authenticating request", slog.Any("error", err))
@@ -513,7 +515,7 @@ func handleRemoveUserFromGroup(c *fiber.Ctx) error {
 
 	group, err := getGroup(groupUUID)
 	if err != nil {
-		if errors.Is(err, ErrNotFound) {
+		if errors.Is(err, errNotFound) {
 			return errResponse(c, fiber.StatusNotFound, "Group not found", slog.String("groupUUID", groupUUID))
 		}
 		return errResponse(c, http.StatusInternalServerError, "Error retrieving group",
@@ -537,7 +539,7 @@ func handleRemoveUserFromGroup(c *fiber.Ctx) error {
 func handleAddServerToGroup(c *fiber.Ctx) error {
 	requestUser, _, err := authenticateRequest(c)
 	if err != nil {
-		if errors.Is(err, ErrUnauthorized) {
+		if errors.Is(err, errUnauthorized) {
 			return errResponse(c, fiber.StatusUnauthorized, "Authentication required", slog.Any("error", err))
 		}
 		return errResponse(c, http.StatusInternalServerError, "Error authenticating request", slog.Any("error", err))
@@ -563,7 +565,7 @@ func handleAddServerToGroup(c *fiber.Ctx) error {
 
 	group, err := getGroup(groupUUID)
 	if err != nil {
-		if errors.Is(err, ErrNotFound) {
+		if errors.Is(err, errNotFound) {
 			return errResponse(c, fiber.StatusNotFound, "Group not found", slog.String("groupUUID", groupUUID))
 		}
 		return errResponse(c, http.StatusInternalServerError, "Error retrieving group",
@@ -572,7 +574,7 @@ func handleAddServerToGroup(c *fiber.Ctx) error {
 
 	_, err = getServer(serverUUID)
 	if err != nil {
-		if errors.Is(err, ErrNotFound) {
+		if errors.Is(err, errNotFound) {
 			return errResponse(c, fiber.StatusNotFound, "Server not found", slog.String("serverUUID", serverUUID))
 		}
 		return errResponse(c, http.StatusInternalServerError, "Error retrieving server",
@@ -594,7 +596,7 @@ func handleRemoveServerFromGroup(c *fiber.Ctx) error {
 
 	requestUser, _, err := authenticateRequest(c)
 	if err != nil {
-		if errors.Is(err, ErrUnauthorized) {
+		if errors.Is(err, errUnauthorized) {
 			return errResponse(c, fiber.StatusUnauthorized, "Authentication required", slog.Any("error", err))
 		}
 		return errResponse(c, http.StatusInternalServerError, "Error authenticating request", slog.Any("error", err))
@@ -619,7 +621,7 @@ func handleRemoveServerFromGroup(c *fiber.Ctx) error {
 
 	group, err := getGroup(groupUUID)
 	if err != nil {
-		if errors.Is(err, ErrNotFound) {
+		if errors.Is(err, errNotFound) {
 			return errResponse(c, fiber.StatusNotFound, "Group not found", slog.String("groupUUID", groupUUID))
 		}
 		return errResponse(c, http.StatusInternalServerError, "Error retrieving group",
@@ -643,7 +645,7 @@ func handleRemoveServerFromGroup(c *fiber.Ctx) error {
 func handleCreateServer(c *fiber.Ctx) error {
 	requestUser, _, err := authenticateRequest(c)
 	if err != nil {
-		if errors.Is(err, ErrUnauthorized) {
+		if errors.Is(err, errUnauthorized) {
 			return errResponse(c, fiber.StatusUnauthorized, "Authentication required", slog.Any("error", err))
 		}
 		return errResponse(c, http.StatusInternalServerError, "Error authenticating request", slog.Any("error", err))
@@ -674,7 +676,7 @@ func handleCreateServer(c *fiber.Ctx) error {
 func handleGetServer(c *fiber.Ctx) error {
 	requestUser, _, err := authenticateRequest(c)
 	if err != nil {
-		if errors.Is(err, ErrUnauthorized) {
+		if errors.Is(err, errUnauthorized) {
 			return errResponse(c, fiber.StatusUnauthorized, "Authentication required", slog.Any("error", err))
 		}
 		return errResponse(c, http.StatusInternalServerError, "Error authenticating request", slog.Any("error", err))
@@ -691,7 +693,7 @@ func handleGetServer(c *fiber.Ctx) error {
 
 	server, err := getServer(targetServerUUID)
 	if err != nil {
-		if errors.Is(err, ErrNotFound) {
+		if errors.Is(err, errNotFound) {
 			return errResponse(c, fiber.StatusNotFound, "Server not found", slog.String("targetServerUUID", targetServerUUID))
 		}
 		return errResponse(c, http.StatusInternalServerError, "Error retrieving server", slog.Any("error", err), slog.String("targetServerUUID", targetServerUUID))
@@ -703,7 +705,7 @@ func handleGetServer(c *fiber.Ctx) error {
 func handleUpdateServer(c *fiber.Ctx) error {
 	requestUser, _, err := authenticateRequest(c)
 	if err != nil {
-		if errors.Is(err, ErrUnauthorized) {
+		if errors.Is(err, errUnauthorized) {
 			return errResponse(c, fiber.StatusUnauthorized, "Authentication required", slog.Any("error", err))
 		}
 		return errResponse(c, http.StatusInternalServerError, "Error authenticating request", slog.Any("error", err))
@@ -731,7 +733,7 @@ func handleUpdateServer(c *fiber.Ctx) error {
 
 	server, err := getServer(targetServerUUID)
 	if err != nil {
-		if errors.Is(err, ErrNotFound) {
+		if errors.Is(err, errNotFound) {
 			return errResponse(c, fiber.StatusNotFound, "Server not found", slog.String("targetServerUUID", targetServerUUID))
 		}
 		return errResponse(c, http.StatusInternalServerError, "Error retrieving server", slog.Any("error", err), slog.String("targetServerUUID", targetServerUUID))
@@ -747,7 +749,7 @@ func handleUpdateServer(c *fiber.Ctx) error {
 func handleDeleteServer(c *fiber.Ctx) error {
 	requestUser, _, err := authenticateRequest(c)
 	if err != nil {
-		if errors.Is(err, ErrUnauthorized) {
+		if errors.Is(err, errUnauthorized) {
 			return errResponse(c, fiber.StatusUnauthorized, "Authentication required", slog.Any("error", err))
 		}
 		return errResponse(c, http.StatusInternalServerError, "Error authenticating request", slog.Any("error", err))
@@ -764,7 +766,7 @@ func handleDeleteServer(c *fiber.Ctx) error {
 
 	_, err = getServer(targetServerUUID)
 	if err != nil {
-		if errors.Is(err, ErrNotFound) {
+		if errors.Is(err, errNotFound) {
 			return errResponse(c, fiber.StatusNotFound, "Server not found", slog.String("targetServerUUID", targetServerUUID))
 		}
 		return errResponse(c, http.StatusInternalServerError, "Error retrieving server", slog.Any("error", err), slog.String("targetServerUUID", targetServerUUID))
@@ -805,7 +807,7 @@ func handleDeleteServer(c *fiber.Ctx) error {
 func handleListServers(c *fiber.Ctx) error {
 	requestUser, _, err := authenticateRequest(c)
 	if err != nil {
-		if errors.Is(err, ErrUnauthorized) {
+		if errors.Is(err, errUnauthorized) {
 			return errResponse(c, fiber.StatusUnauthorized, "Authentication required", slog.Any("error", err))
 		}
 		return errResponse(c, http.StatusInternalServerError, "Error authenticating request", slog.Any("error", err))
