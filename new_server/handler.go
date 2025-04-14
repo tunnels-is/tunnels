@@ -791,31 +791,21 @@ func handleCreateServer(c *fiber.Ctx) error {
 		return errResponse(c, fiber.StatusForbidden, "Admin privileges required", slog.String("requestUser", requestUser.UUID))
 	}
 
-	var req CreateServerRequest
+	var req Server
 	if err := c.BodyParser(&req); err != nil {
 		return errResponse(c, fiber.StatusBadRequest, fmt.Sprintf("Invalid request body: %v", err), slog.Any("error", err))
 	}
-	if req.Name == "" || req.Hostname == "" {
-		return errResponse(c, fiber.StatusBadRequest, "Server name and hostname cannot be empty",
-			slog.String("name", req.Name), slog.String("hostname", req.Hostname))
-	}
 
-	newServerUUID, _ := uuid.NewRandom()
-	newServer := &Server{
-		UUID:      newServerUUID.String(),
-		Name:      req.Name,
-		Hostname:  req.Hostname,
-		IPAddress: req.IPAddress,
-	}
+	req.UUID = uuid.NewString()
 
-	if err := saveServer(newServer); err != nil {
+	if err := saveServer(&req); err != nil {
 		logger.Error("Failed to save new server", slog.Any("error", err), slog.String("serverName", req.Name))
 		return errResponse(c, http.StatusInternalServerError, "Could not save server",
-			slog.Any("error", err), slog.String("serverName", req.Name))
+			slog.Any("error", err), slog.String("serverName", req.Tag))
 	}
 
-	logger.Info("Server created", slog.String("newServerUUID", newServer.UUID), slog.String("serverName", newServer.Name), slog.String("createdBy", requestUser.UUID))
-	return c.Status(fiber.StatusCreated).JSON(newServer)
+	logger.Info("Server created", slog.String("newServerUUID", req.UUID), slog.String("serverName", newServer.Name), slog.String("createdBy", requestUser.UUID))
+	return c.SendStatus(fiber.StatusCreated)
 }
 
 func handleGetServer(c *fiber.Ctx) error {
@@ -868,7 +858,7 @@ func handleUpdateServer(c *fiber.Ctx) error {
 		return errResponse(c, fiber.StatusBadRequest, "Missing server UUID in path")
 	}
 
-	var req UpdateServerRequest
+	var req Server
 	if err := c.BodyParser(&req); err != nil {
 		return errResponse(c, fiber.StatusBadRequest, fmt.Sprintf("Invalid request body: %v", err), slog.Any("error", err))
 	}
@@ -880,30 +870,6 @@ func handleUpdateServer(c *fiber.Ctx) error {
 		}
 		logger.Error("Failed to get server for update", slog.Any("error", err), slog.String("targetServerUUID", targetServerUUID))
 		return errResponse(c, http.StatusInternalServerError, "Error retrieving server", slog.Any("error", err), slog.String("targetServerUUID", targetServerUUID))
-	}
-
-	changed := false
-	if req.Name != nil && *req.Name != server.Name {
-		if *req.Name == "" {
-			return errResponse(c, fiber.StatusBadRequest, "Server name cannot be empty")
-		}
-		server.Name = *req.Name
-		changed = true
-	}
-	if req.Hostname != nil && *req.Hostname != server.Hostname {
-		if *req.Hostname == "" {
-			return errResponse(c, fiber.StatusBadRequest, "Server hostname cannot be empty")
-		}
-		server.Hostname = *req.Hostname
-		changed = true
-	}
-	if req.IPAddress != nil && *req.IPAddress != server.IPAddress {
-		server.IPAddress = *req.IPAddress
-		changed = true
-	}
-
-	if !changed {
-		return errResponse(c, fiber.StatusBadRequest, "No changes provided")
 	}
 
 	if err := saveServer(server); err != nil {
