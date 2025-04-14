@@ -12,6 +12,8 @@ import (
 )
 
 func handleLogin(c *fiber.Ctx) error {
+	defer recoverAndLog()
+
 	var req LoginRequest
 	if err := c.BodyParser(&req); err != nil {
 		return errResponse(c, fiber.StatusBadRequest, "Invalid request body")
@@ -68,35 +70,30 @@ func handleLogout(c *fiber.Ctx) error {
 }
 
 func handleCreateUser(c *fiber.Ctx) error {
-	requestUser, _, err := authenticateRequest(c)
-	if err != nil {
-		if errors.Is(err, ErrUnauthorized) {
-			return errResponse(c, fiber.StatusUnauthorized, "Authentication required")
-		}
-		return errResponse(c, http.StatusInternalServerError, "Error authenticating request", slog.Any("error", err))
-	}
-
-	if !isManager(requestUser) {
-		logger.Warn("Forbidden attempt to create user", slog.String("requestUser", requestUser.UUID))
-		return errResponse(c, fiber.StatusForbidden, "Admin or Manager privileges required", slog.String("requestUser", requestUser.UUID))
-	}
-
 	var req CreateUserRequest
 	if err := c.BodyParser(&req); err != nil {
 		return errResponse(c, fiber.StatusBadRequest, fmt.Sprintf("Invalid request body: %v", err), slog.Any("error", err))
 	}
+	userMutex.Lock()
+	defer func() {
+		userMutex.Unlock()
+	}()
+	defer recoverAndLog()
 
 	if req.Username == "" {
 		return errResponse(c, fiber.StatusBadRequest, "Username cannot be empty")
 	}
 
-	_, err = getUserUUIDByUsername(req.Username)
-	if err == nil {
-		return errResponse(c, fiber.StatusConflict, "Username already taken", slog.String("username", req.Username))
+	if req.Password != req.SecondPassword {
+		return errResponse(c, fiber.StatusBadRequest, "Password do not match")
 	}
-	if !errors.Is(err, ErrNotFound) {
-		logger.Error("Failed to check username existence", slog.Any("error", err), slog.String("username", req.Username))
-		return errResponse(c, http.StatusInternalServerError, "Error checking username", slog.Any("error", err), slog.String("username", req.Username))
+	if req.Password != "" {
+		return errResponse(c, fiber.StatusBadRequest, "Password cannot be empty")
+	}
+
+	hashedPassword, hashErr := hashPassword(req.Password)
+	if hashErr != nil {
+		return errResponse(c, http.StatusInternalServerError, "unable to hash password")
 	}
 
 	newUserUUID, _ := uuid.NewRandom()
@@ -108,34 +105,17 @@ func handleCreateUser(c *fiber.Ctx) error {
 		OTPSecret:  "",
 		OTPEnabled: false,
 	}
+	newUser.PasswordHash = hashedPassword
 
-	if req.Password != "" {
-		hashedPassword, hashErr := hashPassword(req.Password)
-		if hashErr != nil {
-			logger.Error("Failed to create password", slog.Any("error", "unable to hash password"), slog.String("username", req.Username))
-			return fiber.NewError(http.StatusInternalServerError, "Error creating password")
-		}
-		newUser.PasswordHash = hashedPassword
-	}
-
-	if requestUser.IsAdmin {
-		newUser.IsManager = req.IsManager || req.IsAdmin
-	} else if requestUser.IsManager {
-		if req.IsAdmin || req.IsManager {
-			logger.Warn("Manager attempted to create user with elevated roles", slog.String("requestUser", requestUser.UUID), slog.String("targetUsername", req.Username))
-			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Managers can only create regular users"})
-		}
+	if err := setUsernameIndex(newUser.Username, newUser.UUID); err != nil {
+		return errResponse(c, http.StatusBadRequest, "username already taken")
 	}
 
 	if err := saveUser(newUser); err != nil {
-		logger.Error("Failed to save new user", slog.Any("error", err), slog.String("username", req.Username))
-		return fiber.NewError(http.StatusInternalServerError, "Could not save user")
-	}
-	if err := setUsernameIndex(newUser.Username, newUser.UUID); err != nil {
-		logger.Error("Failed to set username index for new user", slog.Any("error", err), slog.String("username", newUser.Username), slog.String("uuid", newUser.UUID))
+		return errResponse(c, http.StatusInternalServerError, "unable to save user")
 	}
 
-	logger.Info("User created", slog.String("newUserUUID", newUser.UUID), slog.String("username", newUser.Username), slog.String("createdBy", requestUser.UUID))
+	logger.Info("User created", slog.String("newUserUUID", newUser.UUID), slog.String("username", newUser.Username))
 	return c.Status(fiber.StatusCreated).JSON(mapUserForResponse(newUser))
 }
 
@@ -155,11 +135,9 @@ func handleGetUser(c *fiber.Ctx) error {
 
 	allowed, authErr := canManageUser(requestUser, targetUserUUID)
 	if authErr != nil {
-		logger.Error("Error checking user access permission", slog.Any("error", authErr), slog.String("requestUser", requestUser.UUID), slog.String("targetUser", targetUserUUID))
 		return errResponse(c, http.StatusInternalServerError, "Error checking permissions", slog.Any("error", authErr), slog.String("requestUser", requestUser.UUID), slog.String("targetUser", targetUserUUID))
 	}
 	if !allowed {
-		logger.Warn("Forbidden attempt to get user", slog.String("requestUser", requestUser.UUID), slog.String("targetUser", targetUserUUID))
 		return errResponse(c, fiber.StatusForbidden, "Access denied", slog.String("requestUser", requestUser.UUID), slog.String("targetUser", targetUserUUID))
 	}
 
@@ -168,7 +146,6 @@ func handleGetUser(c *fiber.Ctx) error {
 		if errors.Is(err, ErrNotFound) {
 			return errResponse(c, fiber.StatusNotFound, "User not found", slog.String("targetUserUUID", targetUserUUID))
 		}
-		logger.Error("Failed to get user", slog.Any("error", err), slog.String("targetUserUUID", targetUserUUID))
 		return errResponse(c, http.StatusInternalServerError, "Error retrieving user", slog.Any("error", err), slog.String("targetUserUUID", targetUserUUID))
 	}
 
@@ -194,171 +171,44 @@ func handleUpdateUser(c *fiber.Ctx) error {
 		return errResponse(c, fiber.StatusBadRequest, fmt.Sprintf("Invalid request body: %v", err), slog.Any("error", err))
 	}
 
+	userMutex.Lock()
+	defer func() {
+		userMutex.Unlock()
+	}()
+	defer recoverAndLog()
+
+	allowed, authErr := canManageUser(requestUser, targetUserUUID)
+	if authErr != nil {
+		return errResponse(c, http.StatusInternalServerError, "Error checking permissions", slog.Any("error", authErr), slog.String("requestUser", requestUser.UUID), slog.String("targetUser", targetUserUUID))
+	}
+	if !allowed {
+		return errResponse(c, fiber.StatusForbidden, "Access denied", slog.String("requestUser", requestUser.UUID), slog.String("targetUser", targetUserUUID))
+	}
+
+	userMutex.Lock()
+	defer func() {
+		userMutex.Unlock()
+	}()
+	defer recoverAndLog()
+
 	targetUser, err := getUser(targetUserUUID)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			return errResponse(c, fiber.StatusNotFound, "User not found", slog.String("targetUserUUID", targetUserUUID))
 		}
-		logger.Error("Failed to get user for update", slog.Any("error", err), slog.String("targetUserUUID", targetUserUUID))
 		return errResponse(c, http.StatusInternalServerError, "Error retrieving user", slog.Any("error", err), slog.String("targetUserUUID", targetUserUUID))
 	}
 
-	originalUsername := targetUser.Username
-	needsIndexUpdate := false
-
-	if req.Username != nil && *req.Username != targetUser.Username {
-		canModify, authErr := canManageUser(requestUser, targetUserUUID)
-		if authErr != nil {
-			logger.Error("Error checking user access permission for username update", slog.Any("error", authErr), slog.String("requestUser", requestUser.UUID), slog.String("targetUser", targetUserUUID))
-			return errResponse(c, http.StatusInternalServerError, "Error checking permissions", slog.Any("error", authErr), slog.String("requestUser", requestUser.UUID), slog.String("targetUser", targetUserUUID))
-		}
-		if !canModify {
-			logger.Warn("Forbidden attempt to update username", slog.String("requestUser", requestUser.UUID), slog.String("targetUser", targetUserUUID))
-			return errResponse(c, fiber.StatusForbidden, "Permission denied to update username", slog.String("requestUser", requestUser.UUID), slog.String("targetUser", targetUserUUID))
-		}
-
-		existingUUID, err := getUserUUIDByUsername(*req.Username)
-		if err == nil && existingUUID != targetUserUUID {
-			return errResponse(c, fiber.StatusConflict, "New username is already taken", slog.String("username", *req.Username), slog.String("existingUUID", existingUUID))
-		}
-		if err != nil && !errors.Is(err, ErrNotFound) {
-			logger.Error("Failed to check new username existence", slog.Any("error", err), slog.String("username", *req.Username))
-			return errResponse(c, http.StatusInternalServerError, "Error checking username availability", slog.Any("error", err), slog.String("username", *req.Username))
-		}
-
-		targetUser.Username = *req.Username
-		needsIndexUpdate = true
-	}
-
-	if req.IsAdmin != nil || req.IsManager != nil {
-		if !isManager(requestUser) {
-			logger.Warn("Non-manager attempting role modification", slog.String("requestUser", requestUser.UUID), slog.String("targetUser", targetUserUUID))
-			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Admin or Manager privileges required to modify roles"})
-		}
-
-		if req.IsAdmin != nil && *req.IsAdmin != targetUser.IsAdmin && !requestUser.IsAdmin {
-			logger.Warn("Manager attempting admin role modification", slog.String("requestUser", requestUser.UUID), slog.String("targetUser", targetUserUUID))
-			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Only Admins can modify the Admin role"})
-		}
-		if req.IsAdmin != nil && requestUser.IsAdmin {
-			if targetUser.IsAdmin && !(*req.IsAdmin) && targetUserUUID == requestUser.UUID {
-				logger.Warn("Admin removing their own admin status", slog.String("userUUID", requestUser.UUID))
-			}
-			targetUser.IsAdmin = *req.IsAdmin
-			if targetUser.IsAdmin {
-				targetUser.IsManager = true
-			}
-		}
-
-		if req.IsManager != nil && *req.IsManager != targetUser.IsManager {
-			if requestUser.IsManager && !requestUser.IsAdmin {
-				if targetUser.IsAdmin {
-					return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Cannot modify Manager role for an Admin"})
-				}
-			}
-			targetUser.IsManager = *req.IsManager
-			if req.IsAdmin != nil && !(*req.IsAdmin) && targetUser.IsAdmin {
-				if req.IsManager == nil || !(*req.IsManager) {
-					targetUser.IsManager = false
-				}
-			}
-		}
-		if targetUser.IsAdmin {
-			targetUser.IsManager = true
-		}
-	}
+	targetUser.Disaled = req.Disaled
+	targetUser.APIKey = req.APIKey
 
 	if err := saveUser(targetUser); err != nil {
 		logger.Error("Failed to save updated user", slog.Any("error", err), slog.String("targetUserUUID", targetUserUUID))
 		return fiber.NewError(http.StatusInternalServerError, "Could not save user")
 	}
 
-	if needsIndexUpdate {
-		if err := deleteUsernameIndex(originalUsername); err != nil {
-			logger.Error("Failed to delete old username index entry", slog.Any("error", err), slog.String("username", originalUsername), slog.String("uuid", targetUserUUID))
-		}
-		if err := setUsernameIndex(targetUser.Username, targetUser.UUID); err != nil {
-			logger.Error("Failed to set new username index entry", slog.Any("error", err), slog.String("username", targetUser.Username), slog.String("uuid", targetUserUUID))
-		}
-	}
-
 	logger.Info("User updated", slog.String("targetUserUUID", targetUser.UUID), slog.String("updatedBy", requestUser.UUID))
 	return c.JSON(mapUserForResponse(targetUser))
-}
-
-func handleDeleteUser(c *fiber.Ctx) error {
-	requestUser, _, err := authenticateRequest(c)
-	if err != nil {
-		if errors.Is(err, ErrUnauthorized) {
-			return errResponse(c, fiber.StatusUnauthorized, "Authentication required")
-		}
-		return errResponse(c, http.StatusInternalServerError, "Error authenticating request", slog.Any("error", err))
-	}
-
-	targetUserUUID := c.Params("uuid")
-	if targetUserUUID == "" {
-		return errResponse(c, fiber.StatusBadRequest, "Missing user UUID in path")
-	}
-
-	targetUser, err := getUser(targetUserUUID)
-	if err != nil {
-		if errors.Is(err, ErrNotFound) {
-			return errResponse(c, fiber.StatusNotFound, "User not found", slog.String("targetUserUUID", targetUserUUID))
-		}
-		logger.Error("Failed to get user for delete check", slog.Any("error", err), slog.String("targetUserUUID", targetUserUUID))
-		return errResponse(c, http.StatusInternalServerError, "Error retrieving user", slog.Any("error", err), slog.String("targetUserUUID", targetUserUUID))
-	}
-
-	if !isAdmin(requestUser) {
-		logger.Warn("Forbidden attempt to delete user", slog.String("requestUser", requestUser.UUID), slog.String("targetUser", targetUserUUID))
-		return errResponse(c, fiber.StatusForbidden, "Admin privileges required to delete users", slog.String("requestUser", requestUser.UUID), slog.String("targetUser", targetUserUUID))
-	}
-	if requestUser.UUID == targetUserUUID {
-		logger.Warn("Admin attempted self-deletion", slog.String("adminUUID", requestUser.UUID))
-		return errResponse(c, fiber.StatusForbidden, "Cannot delete your own account", slog.String("adminUUID", requestUser.UUID))
-	}
-
-	if targetUser.Username != "" {
-		if err := deleteUsernameIndex(targetUser.Username); err != nil {
-			logger.Error("Failed to delete username index before user deletion", slog.Any("error", err), slog.String("username", targetUser.Username), slog.String("uuid", targetUserUUID))
-		}
-	}
-
-	allGroups, err := listGroups()
-	if err != nil {
-		logger.Error("Failed to list groups for user cleanup", slog.Any("error", err), slog.String("targetUserUUID", targetUserUUID))
-	} else {
-		for _, group := range allGroups {
-			needsUpdate := false
-			originalLen := len(group.UserUUIDs)
-			group.UserUUIDs = slices.DeleteFunc(group.UserUUIDs, func(uuid string) bool {
-				return uuid == targetUserUUID
-			})
-			if len(group.UserUUIDs) < originalLen {
-				needsUpdate = true
-			}
-
-			if needsUpdate {
-				if err := saveGroup(&group); err != nil {
-					logger.Error("Failed to update group after removing user", slog.Any("error", err), slog.String("groupUUID", group.UUID), slog.String("userUUID", targetUserUUID))
-				} else {
-					logger.Debug("Removed user from group", slog.String("groupUUID", group.UUID), slog.String("userUUID", targetUserUUID))
-				}
-			}
-		}
-	}
-
-	if err := deleteAllUserTokens(targetUserUUID); err != nil {
-		logger.Error("Failed to delete auth tokens before user deletion", slog.Any("error", err), slog.String("userUUID", targetUserUUID))
-	}
-
-	if err := deleteUser(targetUserUUID); err != nil {
-		logger.Error("Failed to delete user", slog.Any("error", err), slog.String("targetUserUUID", targetUserUUID))
-		return fiber.NewError(http.StatusInternalServerError, "Failed to delete user")
-	}
-
-	logger.Info("User deleted", slog.String("targetUserUUID", targetUserUUID), slog.String("deletedBy", requestUser.UUID))
-	return c.SendStatus(fiber.StatusNoContent)
 }
 
 func handleListUsers(c *fiber.Ctx) error {
@@ -371,7 +221,6 @@ func handleListUsers(c *fiber.Ctx) error {
 	}
 
 	if !isManager(requestUser) {
-		logger.Warn("Forbidden attempt to list users", slog.String("requestUser", requestUser.UUID))
 		return errResponse(c, fiber.StatusForbidden, "Admin or Manager privileges required", slog.String("requestUser", requestUser.UUID))
 	}
 
@@ -398,7 +247,6 @@ func handleCreateGroup(c *fiber.Ctx) error {
 	}
 
 	if !canManageGroup(requestUser) {
-		logger.Warn("Forbidden attempt to create group", slog.String("requestUser", requestUser.UUID))
 		return errResponse(c, fiber.StatusForbidden, "Admin or Manager privileges required", slog.String("requestUser", requestUser.UUID))
 	}
 
@@ -406,6 +254,7 @@ func handleCreateGroup(c *fiber.Ctx) error {
 	if err := c.BodyParser(&req); err != nil {
 		return errResponse(c, fiber.StatusBadRequest, fmt.Sprintf("Invalid request body: %v", err), slog.Any("error", err))
 	}
+
 	if req.Name == "" {
 		return errResponse(c, fiber.StatusBadRequest, "Group name cannot be empty")
 	}
@@ -419,7 +268,6 @@ func handleCreateGroup(c *fiber.Ctx) error {
 	}
 
 	if err := saveGroup(newGroup); err != nil {
-		logger.Error("Failed to save new group", slog.Any("error", err), slog.String("groupName", req.Name))
 		return errResponse(c, http.StatusInternalServerError, "Could not save group", slog.Any("error", err), slog.String("groupName", req.Name))
 	}
 
@@ -437,7 +285,6 @@ func handleGetGroup(c *fiber.Ctx) error {
 	}
 
 	if !canManageGroup(requestUser) {
-		logger.Warn("Forbidden attempt to get group details", slog.String("requestUser", requestUser.UUID))
 		return errResponse(c, fiber.StatusForbidden, "Admin or Manager privileges required", slog.String("requestUser", requestUser.UUID))
 	}
 
@@ -451,7 +298,6 @@ func handleGetGroup(c *fiber.Ctx) error {
 		if errors.Is(err, ErrNotFound) {
 			return errResponse(c, fiber.StatusNotFound, "Group not found", slog.String("targetGroupUUID", targetGroupUUID))
 		}
-		logger.Error("Failed to get group", slog.Any("error", err), slog.String("targetGroupUUID", targetGroupUUID))
 		return errResponse(c, http.StatusInternalServerError, "Error retrieving group", slog.Any("error", err), slog.String("targetGroupUUID", targetGroupUUID))
 	}
 
@@ -468,7 +314,6 @@ func handleUpdateGroup(c *fiber.Ctx) error {
 	}
 
 	if !canManageGroup(requestUser) {
-		logger.Warn("Forbidden attempt to update group", slog.String("requestUser", requestUser.UUID))
 		return errResponse(c, fiber.StatusForbidden, "Admin or Manager privileges required", slog.String("requestUser", requestUser.UUID))
 	}
 
@@ -482,26 +327,22 @@ func handleUpdateGroup(c *fiber.Ctx) error {
 		return errResponse(c, fiber.StatusBadRequest, fmt.Sprintf("Invalid request body: %v", err), slog.Any("error", err))
 	}
 
+	groupMutex.Lock()
+	defer func() {
+		groupMutex.Unlock()
+	}()
+	defer recoverAndLog()
+
 	group, err := getGroup(targetGroupUUID)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			return errResponse(c, fiber.StatusNotFound, "Group not found", slog.String("targetGroupUUID", targetGroupUUID))
 		}
-		logger.Error("Failed to get group for update", slog.Any("error", err), slog.String("targetGroupUUID", targetGroupUUID))
 		return errResponse(c, http.StatusInternalServerError, "Error retrieving group", slog.Any("error", err), slog.String("targetGroupUUID", targetGroupUUID))
 	}
-
-	if req.Name != nil && *req.Name != group.Name {
-		if *req.Name == "" {
-			return errResponse(c, fiber.StatusBadRequest, "Group name cannot be empty")
-		}
-		group.Name = *req.Name
-	} else {
-		return errResponse(c, fiber.StatusBadRequest, "No changes provided")
-	}
+	group.Name = req.Name
 
 	if err := saveGroup(group); err != nil {
-		logger.Error("Failed to save updated group", slog.Any("error", err), slog.String("groupUUID", group.UUID))
 		return errResponse(c, http.StatusInternalServerError, "Could not save group", slog.Any("error", err), slog.String("groupUUID", group.UUID))
 	}
 
@@ -510,6 +351,7 @@ func handleUpdateGroup(c *fiber.Ctx) error {
 }
 
 func handleDeleteGroup(c *fiber.Ctx) error {
+
 	requestUser, _, err := authenticateRequest(c)
 	if err != nil {
 		if errors.Is(err, ErrUnauthorized) {
@@ -519,7 +361,6 @@ func handleDeleteGroup(c *fiber.Ctx) error {
 	}
 
 	if !canManageGroup(requestUser) {
-		logger.Warn("Forbidden attempt to delete group", slog.String("requestUser", requestUser.UUID))
 		return errResponse(c, fiber.StatusForbidden, "Admin or Manager privileges required", slog.String("requestUser", requestUser.UUID))
 	}
 
@@ -533,12 +374,10 @@ func handleDeleteGroup(c *fiber.Ctx) error {
 		if errors.Is(err, ErrNotFound) {
 			return errResponse(c, fiber.StatusNotFound, "Group not found", slog.String("targetGroupUUID", targetGroupUUID))
 		}
-		logger.Error("Failed to get group for delete check", slog.Any("error", err), slog.String("targetGroupUUID", targetGroupUUID))
 		return errResponse(c, http.StatusInternalServerError, "Error checking group existence", slog.Any("error", err), slog.String("targetGroupUUID", targetGroupUUID))
 	}
 
 	if err := deleteGroup(targetGroupUUID); err != nil {
-		logger.Error("Failed to delete group", slog.Any("error", err), slog.String("targetGroupUUID", targetGroupUUID))
 		return errResponse(c, http.StatusInternalServerError, "Failed to delete group", slog.Any("error", err), slog.String("targetGroupUUID", targetGroupUUID))
 	}
 
@@ -556,13 +395,11 @@ func handleListGroups(c *fiber.Ctx) error {
 	}
 
 	if !canManageGroup(requestUser) {
-		logger.Warn("Forbidden attempt to list groups", slog.String("requestUser", requestUser.UUID))
 		return errResponse(c, fiber.StatusForbidden, "Admin or Manager privileges required", slog.String("requestUser", requestUser.UUID))
 	}
 
 	groups, err := listGroups()
 	if err != nil {
-		logger.Error("Failed to list groups", slog.Any("error", err))
 		return errResponse(c, http.StatusInternalServerError, "Error retrieving group list", slog.Any("error", err))
 	}
 
@@ -579,7 +416,6 @@ func handleAddUserToGroup(c *fiber.Ctx) error {
 	}
 
 	if !canManageGroup(requestUser) {
-		logger.Warn("Forbidden attempt to add user to group", slog.String("requestUser", requestUser.UUID))
 		return errResponse(c, fiber.StatusForbidden, "Admin or Manager privileges required", slog.String("requestUser", requestUser.UUID))
 	}
 
@@ -590,12 +426,17 @@ func handleAddUserToGroup(c *fiber.Ctx) error {
 			slog.String("groupUUID", groupUUID), slog.String("userUUID", userUUID))
 	}
 
+	groupMutex.Lock()
+	defer func() {
+		groupMutex.Unlock()
+	}()
+	defer recoverAndLog()
+
 	group, err := getGroup(groupUUID)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			return errResponse(c, fiber.StatusNotFound, "Group not found", slog.String("groupUUID", groupUUID))
 		}
-		logger.Error("Failed to get group for adding user", slog.Any("error", err), slog.String("groupUUID", groupUUID))
 		return errResponse(c, http.StatusInternalServerError, "Error retrieving group",
 			slog.Any("error", err), slog.String("groupUUID", groupUUID))
 	}
@@ -605,7 +446,6 @@ func handleAddUserToGroup(c *fiber.Ctx) error {
 		if errors.Is(err, ErrNotFound) {
 			return errResponse(c, fiber.StatusNotFound, "User not found", slog.String("userUUID", userUUID))
 		}
-		logger.Error("Failed to get user for adding to group", slog.Any("error", err), slog.String("userUUID", userUUID))
 		return errResponse(c, http.StatusInternalServerError, "Error retrieving user",
 			slog.Any("error", err), slog.String("userUUID", userUUID))
 	}
@@ -613,16 +453,12 @@ func handleAddUserToGroup(c *fiber.Ctx) error {
 	if !slices.Contains(group.UserUUIDs, userUUID) {
 		group.UserUUIDs = append(group.UserUUIDs, userUUID)
 		if err := saveGroup(group); err != nil {
-			logger.Error("Failed to save group after adding user", slog.Any("error", err), slog.String("groupUUID", groupUUID), slog.String("userUUID", userUUID))
 			return errResponse(c, http.StatusInternalServerError, "Could not update group membership",
 				slog.Any("error", err), slog.String("groupUUID", groupUUID), slog.String("userUUID", userUUID))
 		}
-		logger.Info("User added to group", slog.String("userUUID", userUUID), slog.String("groupUUID", groupUUID), slog.String("addedBy", requestUser.UUID))
-	} else {
-		return c.Status(fiber.StatusOK).JSON(fiber.Map{"message": "User already in group"})
 	}
 
-	return c.Status(fiber.StatusOK).JSON(group)
+	return c.SendStatus(fiber.StatusOK)
 }
 
 func handleRemoveUserFromGroup(c *fiber.Ctx) error {
@@ -635,7 +471,6 @@ func handleRemoveUserFromGroup(c *fiber.Ctx) error {
 	}
 
 	if !canManageGroup(requestUser) {
-		logger.Warn("Forbidden attempt to remove user from group", slog.String("requestUser", requestUser.UUID))
 		return errResponse(c, fiber.StatusForbidden, "Admin or Manager privileges required", slog.String("requestUser", requestUser.UUID))
 	}
 
@@ -646,12 +481,17 @@ func handleRemoveUserFromGroup(c *fiber.Ctx) error {
 			slog.String("groupUUID", groupUUID), slog.String("userUUID", userUUID))
 	}
 
+	groupMutex.Lock()
+	defer func() {
+		groupMutex.Unlock()
+	}()
+	defer recoverAndLog()
+
 	group, err := getGroup(groupUUID)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			return errResponse(c, fiber.StatusNotFound, "Group not found", slog.String("groupUUID", groupUUID))
 		}
-		logger.Error("Failed to get group for removing user", slog.Any("error", err), slog.String("groupUUID", groupUUID))
 		return errResponse(c, http.StatusInternalServerError, "Error retrieving group",
 			slog.Any("error", err), slog.String("groupUUID", groupUUID))
 	}
@@ -663,14 +503,11 @@ func handleRemoveUserFromGroup(c *fiber.Ctx) error {
 
 	if len(group.UserUUIDs) < originalLen {
 		if err := saveGroup(group); err != nil {
-			logger.Error("Failed to save group after removing user", slog.Any("error", err), slog.String("groupUUID", groupUUID), slog.String("userUUID", userUUID))
 			return errResponse(c, http.StatusInternalServerError, "Could not update group membership", slog.Any("error", err))
 		}
-		logger.Info("User removed from group", slog.String("userUUID", userUUID), slog.String("groupUUID", groupUUID), slog.String("removedBy", requestUser.UUID))
-		return c.Status(fiber.StatusOK).JSON(group)
-	} else {
-		return c.SendStatus(fiber.StatusNoContent)
 	}
+
+	return c.SendStatus(fiber.StatusOK)
 }
 
 func handleAddServerToGroup(c *fiber.Ctx) error {
@@ -694,12 +531,17 @@ func handleAddServerToGroup(c *fiber.Ctx) error {
 			slog.String("groupUUID", groupUUID), slog.String("serverUUID", serverUUID))
 	}
 
+	groupMutex.Lock()
+	defer func() {
+		groupMutex.Unlock()
+	}()
+	defer recoverAndLog()
+
 	group, err := getGroup(groupUUID)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			return errResponse(c, fiber.StatusNotFound, "Group not found", slog.String("groupUUID", groupUUID))
 		}
-		logger.Error("Failed to get group for adding server", slog.Any("error", err), slog.String("groupUUID", groupUUID))
 		return errResponse(c, http.StatusInternalServerError, "Error retrieving group",
 			slog.Any("error", err), slog.String("groupUUID", groupUUID))
 	}
@@ -709,7 +551,6 @@ func handleAddServerToGroup(c *fiber.Ctx) error {
 		if errors.Is(err, ErrNotFound) {
 			return errResponse(c, fiber.StatusNotFound, "Server not found", slog.String("serverUUID", serverUUID))
 		}
-		logger.Error("Failed to get server for adding to group", slog.Any("error", err), slog.String("serverUUID", serverUUID))
 		return errResponse(c, http.StatusInternalServerError, "Error retrieving server",
 			slog.Any("error", err), slog.String("serverUUID", serverUUID))
 	}
@@ -717,19 +558,21 @@ func handleAddServerToGroup(c *fiber.Ctx) error {
 	if !slices.Contains(group.ServerUUIDs, serverUUID) {
 		group.ServerUUIDs = append(group.ServerUUIDs, serverUUID)
 		if err := saveGroup(group); err != nil {
-			logger.Error("Failed to save group after adding server", slog.Any("error", err), slog.String("groupUUID", groupUUID), slog.String("serverUUID", serverUUID))
 			return errResponse(c, http.StatusInternalServerError, "Could not update group membership",
 				slog.Any("error", err), slog.String("groupUUID", groupUUID), slog.String("serverUUID", serverUUID))
 		}
-		logger.Info("Server added to group", slog.String("serverUUID", serverUUID), slog.String("groupUUID", groupUUID), slog.String("addedBy", requestUser.UUID))
-	} else {
-		return c.Status(fiber.StatusOK).JSON(fiber.Map{"message": "Server already in group"})
 	}
 
-	return c.Status(fiber.StatusOK).JSON(group)
+	return c.SendStatus(fiber.StatusOK)
 }
 
 func handleRemoveServerFromGroup(c *fiber.Ctx) error {
+	groupMutex.Lock()
+	defer func() {
+		groupMutex.Unlock()
+	}()
+	defer recoverAndLog()
+
 	requestUser, _, err := authenticateRequest(c)
 	if err != nil {
 		if errors.Is(err, ErrUnauthorized) {
@@ -799,12 +642,12 @@ func handleCreateServer(c *fiber.Ctx) error {
 	req.UUID = uuid.NewString()
 
 	if err := saveServer(&req); err != nil {
-		logger.Error("Failed to save new server", slog.Any("error", err), slog.String("serverName", req.Name))
+		logger.Error("Failed to save new server", slog.Any("error", err), slog.String("serverName", req.Tag))
 		return errResponse(c, http.StatusInternalServerError, "Could not save server",
 			slog.Any("error", err), slog.String("serverName", req.Tag))
 	}
 
-	logger.Info("Server created", slog.String("newServerUUID", req.UUID), slog.String("serverName", newServer.Name), slog.String("createdBy", requestUser.UUID))
+	logger.Info("Server created", slog.String("newServerUUID", req.UUID), slog.String("serverName", req.Tag), slog.String("createdBy", requestUser.UUID))
 	return c.SendStatus(fiber.StatusCreated)
 }
 
@@ -840,6 +683,12 @@ func handleGetServer(c *fiber.Ctx) error {
 }
 
 func handleUpdateServer(c *fiber.Ctx) error {
+	serverMutex.Lock()
+	defer func() {
+		serverMutex.Unlock()
+	}()
+	defer recoverAndLog()
+
 	requestUser, _, err := authenticateRequest(c)
 	if err != nil {
 		if errors.Is(err, ErrUnauthorized) {

@@ -8,11 +8,10 @@ import (
 	"log"
 	"log/slog"
 	"net"
-	"os"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
-	gflog "github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/tunnels-is/tunnels/types"
 )
@@ -20,29 +19,12 @@ import (
 func StartAPI() {
 
 	app := fiber.New(fiber.Config{
-		ErrorHandler: func(c *fiber.Ctx, err error) error {
-			code := fiber.StatusInternalServerError
-			message := "Internal Server Error"
-
-			var e *fiber.Error
-			if errors.As(err, &e) {
-				code = e.Code
-				message = e.Message
-			} else {
-				logger.Error("Unhandled error in handler", slog.Any("error", err), slog.String("path", c.Path()))
-			}
-
-			if code >= 500 {
-				// Already logged above if it wasn't a fiber.Error
-			} else {
-				logger.Warn("Client error occurred", slog.Int("status", code), slog.String("message", message), slog.String("path", c.Path()))
-			}
-
-			c.Status(code)
-			return c.JSON(fiber.Map{
-				"message": message,
-			})
-		},
+		ErrorHandler:          APIErrorHandler,
+		IdleTimeout:           time.Second * 60,
+		WriteTimeout:          time.Second * 60,
+		ReadTimeout:           time.Second * 60,
+		DisableStartupMessage: true,
+		DisableKeepalive:      true,
 	})
 
 	app.Use(cors.New(cors.Config{
@@ -51,12 +33,8 @@ func StartAPI() {
 		AllowMethods: "GET, POST, PUT, DELETE, OPTIONS",
 	}))
 
+	app.Use(TimingMiddleware())
 	app.Use(recover.New())
-
-	app.Use(gflog.New(gflog.Config{
-		TimeFormat: "2006-01-02 15:04:05",
-		Output:     os.Stdout,
-	}))
 
 	app.Get("/health", func(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusOK).JSON(fiber.Map{"status": "ok"})
@@ -87,7 +65,7 @@ func StartAPI() {
 		userGroup.Get("/", handleListUsers)
 		userGroup.Get("/:uuid", handleGetUser)
 		userGroup.Put("/:uuid", handleUpdateUser)
-		userGroup.Delete("/:uuid", handleDeleteUser)
+		// userGroup.Delete("/:uuid", handleDeleteUser)
 
 		groupGroup := app.Group("/groups")
 		groupGroup.Post("/", handleCreateGroup)
@@ -137,6 +115,38 @@ func StartAPI() {
 	logger.Info("Starting server...", slog.String("addr", addr))
 	if err := app.Listener(tlsListener); err != nil {
 		log.Fatalf("Error starting server: %v", err)
+	}
+}
+
+func APIErrorHandler(c *fiber.Ctx, err error) error {
+	code := fiber.StatusInternalServerError
+	message := "Internal Server Error"
+
+	var e *fiber.Error
+	if errors.As(err, &e) {
+		code = e.Code
+		message = e.Message
+	} else {
+		logger.Error("middlware caught error", slog.Any("error", err), slog.String("path", c.Path()), slog.Any("stacktrace", getStacktraceLines(3)))
+	}
+
+	c.Status(code)
+	return c.JSON(fiber.Map{
+		"message": message,
+	})
+}
+
+func TimingMiddleware() fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		start := time.Now()
+		err := c.Next()
+		slog.Info("API",
+			slog.Any("method", c.Method()),
+			slog.Any("path", c.Path()),
+			slog.Any("code", c.Response().StatusCode()),
+			slog.Any("ms", time.Since(start).Milliseconds()),
+		)
+		return err
 	}
 }
 

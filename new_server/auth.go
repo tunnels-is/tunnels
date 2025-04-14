@@ -42,15 +42,15 @@ var googleClientSecret = os.Getenv("GOOGLE_CLIENT_SECRET")
 var googleRedirectURL = "http://localhost:3000/auth/google/callback"
 
 func mapUserForResponse(user *User) map[string]interface{} {
-	if user == nil {
-		return nil
-	}
 	return map[string]interface{}{
-		"uuid":       user.UUID,
-		"username":   user.Username,
-		"isAdmin":    user.IsAdmin,
-		"isManager":  user.IsManager,
-		"otpEnabled": user.OTPEnabled,
+		"UUID":       user.UUID,
+		"Username":   user.Username,
+		"IsAdmin":    user.IsAdmin,
+		"IsManager":  user.IsManager,
+		"OTPEnabled": user.OTPEnabled,
+		"Trial":      user.Trial,
+		"SubExpires": user.SubExpires,
+		"Disabled":   user.Disaled,
 	}
 }
 
@@ -154,7 +154,6 @@ func authenticateRequest(c *fiber.Ctx) (*User, *AuthToken, error) {
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			logger.Warn("Authentication failed: User for token not found", slog.String("userUUID", token.UserUUID), slog.String("tokenUUID", tokenUUID), slog.String("path", c.Path()))
-			_ = deleteToken(tokenUUID)
 			return nil, nil, ErrUnauthorized
 		}
 		logger.Error("Authentication error: Failed to retrieve user for token", slog.Any("error", err), slog.String("userUUID", token.UserUUID))
@@ -165,17 +164,14 @@ func authenticateRequest(c *fiber.Ctx) (*User, *AuthToken, error) {
 }
 
 func isAdmin(user *User) bool {
-	return user != nil && user.IsAdmin
+	return user.IsAdmin
 }
 
 func isManager(user *User) bool {
-	return user != nil && (user.IsManager || user.IsAdmin)
+	return (user.IsManager || user.IsAdmin)
 }
 
 func canManageUser(requestUser *User, targetUserUUID string) (bool, error) {
-	if requestUser == nil {
-		return false, ErrUnauthorized
-	}
 	if requestUser.IsAdmin {
 		return true, nil
 	}
