@@ -51,9 +51,9 @@ func StartAPI() {
 		authGroup.Post("/logout", handleLogout)
 
 		tokenGroup := authGroup.Group("/token")
-		tokenGroup.Get("/validate", handleTokenValidate)
+		// tokenGroup.Get("/validate", handleTokenValidate)
 		tokenGroup.Delete("/:token_uuid", handleTokenDelete)
-		tokenGroup.Delete("/user/:user_uuid?", handleTokenDeleteAll)
+		tokenGroup.Delete("/user/:user_uuid", handleTokenDeleteAll)
 
 		twoFAGroup := authGroup.Group("/2fa")
 		twoFAGroup.Post("/setup", handle2FASetup)

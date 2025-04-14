@@ -31,11 +31,36 @@ import (
 	"github.com/tunnels-is/tunnels/signal"
 	"github.com/tunnels-is/tunnels/types"
 	"golang.org/x/net/quic"
+	"golang.org/x/oauth2"
 )
 
 var (
-	serverConfigPath = "./server.json"
-	slots            int
+	TwoFactorKey       = os.Getenv("TWO_FACTOR_KEY")
+	googleClientID     = os.Getenv("GOOGLE_CLIENT_ID")
+	googleClientSecret = os.Getenv("GOOGLE_CLIENT_SECRET")
+	googleRedirectURL  = "http://localhost:3000/auth/google/callback"
+	oauthStateString   = "random-pseudo-state"
+)
+
+const (
+	AuthHeader        = "X-Auth-Token"
+	GoogleUserInfoURL = "https://www.googleapis.com/oauth2/v2/userinfo?access_token="
+)
+
+var (
+	ErrUnauthorized = errors.New("unauthorized")
+	ErrForbidden    = errors.New("forbidden")
+	ErrNotFound     = errors.New("not found")
+	ErrOTPRequired  = errors.New("otp required")
+	ErrInvalidOTP   = errors.New("invalid otp code")
+)
+
+var (
+	twoFactorAppName  = "tunnels"
+	pendingTwoFactor  = sync.Map{}
+	googleOauthConfig *oauth2.Config
+	serverConfigPath  = "./server.json"
+	slots             int
 
 	publicPath  string
 	privatePath string
@@ -199,6 +224,10 @@ func validateConfig(Config *types.ServerConfig) (err error) {
 
 	if len(Config.Features) == 0 {
 		return fmt.Errorf("no features enbaled")
+	}
+
+	if Config.TwoFactorKey == "" {
+		return fmt.Errorf("Two factor authentication encryption key no set")
 	}
 
 	return nil
