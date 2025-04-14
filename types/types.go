@@ -53,6 +53,13 @@ type ServerConfig struct {
 	DNSServers         []string     `json:"DNSServers"`
 }
 
+type TwoFAPending struct {
+	AuthID  string
+	UserID  string
+	Expires time.Time
+	Code    string
+}
+
 type Route struct {
 	Address string
 	Metric  string
