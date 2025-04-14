@@ -144,7 +144,6 @@ type ConnectRequest struct {
 	Version int       `json:"Version"`
 	Created time.Time `json:"Created"`
 
-	// DHCP
 	Hostname        string `json:"Hostname"`
 	RequestingPorts bool   `json:"RequestingPorts"`
 	DHCPToken       string `json:"DHCPToken"`

@@ -12,12 +12,10 @@ import (
 
 const (
 	ping byte = 0
-	// ok   byte = 1
-	// fail byte = 2
 )
 
 type ErrorResponse struct {
-	Error string `json:"Error"`
+	Error string
 }
 type PortRange struct {
 	StartPort uint16
@@ -39,14 +37,12 @@ type UserCoreMapping struct {
 
 	Addr syscall.Sockaddr
 
-	// VPL
 	APIToken        string
 	Allowedm        sync.Mutex
 	AllowedHosts    []*AllowedHost
 	DHCP            *types.DHCPRecord
 	DisableFirewall bool
 
-	// IOT Client Only
 	CPU  byte
 	RAM  byte
 	Disk byte
@@ -150,91 +146,80 @@ func (u *UserCoreMapping) DelHost(host [4]byte, t string) {
 }
 
 type User struct {
-	UUID         string `json:"uuid"`
-	Username     string `json:"username"`
-	PasswordHash string `json:"passwordHash"`
-	GoogleID     string `json:"googleId,omitempty"` // Changed: Allow marshalling, keep omitempty
-	IsAdmin      bool   `json:"isAdmin"`
-	IsManager    bool   `json:"isManager"`
-	OTPSecret    string `json:"otpSecret,omitempty"` // Changed: Allow marshalling, keep omitempty
-	OTPEnabled   bool   `json:"otpEnabled"`
+	UUID         string
+	Username     string
+	PasswordHash string
+	GoogleID     string
+	IsAdmin      bool
+	IsManager    bool
+	OTPSecret    string
+	OTPEnabled   bool
 }
 
 type Group struct {
-	UUID        string   `json:"uuid"`
-	Name        string   `json:"name"`
-	UserUUIDs   []string `json:"userUuids"`
-	ServerUUIDs []string `json:"serverUuids"`
+	UUID        string
+	Name        string
+	UserUUIDs   []string
+	ServerUUIDs []string
 }
 
 type Server struct {
-	UUID      string `json:"uuid"`
-	Name      string `json:"name"`
-	Hostname  string `json:"hostname"`
-	IPAddress string `json:"ipAddress"`
+	UUID        string
+	Tag         string
+	IPAddress   string
+	PubKey      []byte
+	DataPort    uint16
+	ControlPort uint16
 }
 
 type AuthToken struct {
-	UserUUID   string    `json:"userUuid"`
-	TokenUUID  string    `json:"tokenUuid"` // This is the actual token the client sends
-	CreatedAt  time.Time `json:"createdAt"`
-	DeviceName string    `json:"deviceName"` // e.g., "Chrome on Desktop", "User's iPhone"
+	UserUUID   string
+	TokenUUID  string
+	CreatedAt  time.Time
+	DeviceName string
 }
 
-// Request bodies
 type CreateUserRequest struct {
-	Username  string `json:"username"`
-	Password  string `json:"password,omitempty"`
-	IsAdmin   bool   `json:"isAdmin"`   // Should only be settable by existing admin
-	IsManager bool   `json:"isManager"` // Should only be settable by existing admin/manager
+	Username  string
+	Password  string
+	IsAdmin   bool
+	IsManager bool
 }
 
 type UpdateUserRequest struct {
-	Username  *string `json:"username,omitempty"`
-	IsAdmin   *bool   `json:"isAdmin,omitempty"`   // Admin only
-	IsManager *bool   `json:"isManager,omitempty"` // Admin or Manager only
+	Username  *string
+	IsAdmin   *bool
+	IsManager *bool
 }
 
 type LoginRequest struct {
-	Username   string `json:"username"`
-	Password   string `json:"password"`
-	DeviceName string `json:"deviceName,omitempty"` // Optional device name
+	Username   string
+	Password   string
+	DeviceName string
 }
 
 type CreateGroupRequest struct {
-	Name string `json:"name"`
+	Name string
 }
 
 type UpdateGroupRequest struct {
-	Name *string `json:"name,omitempty"`
-}
-
-type CreateServerRequest struct {
-	Name      string `json:"name"`
-	Hostname  string `json:"hostname"`
-	IPAddress string `json:"ipAddress"`
-}
-
-type UpdateServerRequest struct {
-	Name      *string `json:"name,omitempty"`
-	Hostname  *string `json:"hostname,omitempty"`
-	IPAddress *string `json:"ipAddress,omitempty"`
+	Name *string
 }
 
 type GoogleCallbackState struct {
-	DeviceName string `json:"deviceName"`
-	Redirect   string `json:"redirect"` // Optional redirect after successful auth
+	DeviceName string
+	Redirect   string
 }
 
 type OTPSetupResponse struct {
-	ProvisioningUrl string `json:"provisioningUrl"` // URL for manual entry
+	ProvisioningUrl string
 }
 
 type OTPVerifyRequest struct {
-	OTPCode string `json:"otpCode"`
+	OTPCode string
 }
 
 type PendingOTPInfo struct {
-	UserUUID    string `json:"userUuid"`
-	OTPRequired bool   `json:"otpRequired"`
+	UserUUID    string
+	OTPRequired bool
 }
