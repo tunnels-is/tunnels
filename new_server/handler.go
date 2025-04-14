@@ -6,10 +6,26 @@ import (
 	"log/slog"
 	"net/http"
 	"slices"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 )
+
+func cleanTwoFactorPendingMap() {
+	pendingTwoFactor.Range(func(key, value any) bool {
+		//
+		val, ok := value.(*TwoFAPending)
+		if !ok {
+			logger.Error("unable to cast pending auth to type", slog.Any("value", value))
+		}
+		if time.Since(val.Expires).Seconds() > 1 {
+			logger.Info("two factor expired", slog.Any("key", key.(string)))
+			pendingTwoFactor.Delete(key)
+		}
+		return true
+	})
+}
 
 func handleLogin(c *fiber.Ctx) error {
 	defer recoverAndLog()
@@ -24,19 +40,27 @@ func handleLogin(c *fiber.Ctx) error {
 
 	userUUID, err := getUserUUIDByUsername(req.Username)
 	if err != nil {
-		return errResponse(c, fiber.StatusUnauthorized, "Authentication required")
+		return errResponse(c, fiber.StatusUnauthorized, "Invalid user or password")
 	}
 	user, err := getUser(userUUID)
 	if err != nil {
-		return errResponse(c, fiber.StatusUnauthorized, "Authentication required")
+		return errResponse(c, fiber.StatusUnauthorized, "Invalid user or password")
 	}
 
 	if user.PasswordHash == "" || !checkPasswordHash(req.Password, user.PasswordHash) {
-		return errResponse(c, fiber.StatusUnauthorized, "Authentication required")
+		return errResponse(c, fiber.StatusUnauthorized, "Invalid user or password")
 	}
 
 	if user.OTPEnabled {
-		return c.Status(fiber.StatusAccepted).JSON(PendingOTPInfo{UserUUID: user.UUID, OTPRequired: true})
+		authID := uuid.NewString()
+		pendingAuth := &TwoFAPending{
+			Expires: time.Now().Add(5 * time.Minute),
+			AuthID:  authID,
+			UserID:  user.UUID,
+		}
+		pendingTwoFactor.Store(authID, pendingAuth)
+
+		return c.Status(fiber.StatusAccepted).JSON(pendingAuth)
 	}
 
 	deviceName := req.DeviceName
@@ -51,9 +75,8 @@ func handleLogin(c *fiber.Ctx) error {
 
 	logger.Info("Password login success", slog.String("user", user.UUID))
 	return c.JSON(fiber.Map{
-		"message": "Login successful",
-		"token":   authToken.TokenUUID,
-		"user":    mapUserForResponse(user),
+		"token": authToken.TokenUUID,
+		"user":  mapUserForResponse(user),
 	})
 }
 
@@ -567,11 +590,6 @@ func handleAddServerToGroup(c *fiber.Ctx) error {
 }
 
 func handleRemoveServerFromGroup(c *fiber.Ctx) error {
-	groupMutex.Lock()
-	defer func() {
-		groupMutex.Unlock()
-	}()
-	defer recoverAndLog()
 
 	requestUser, _, err := authenticateRequest(c)
 	if err != nil {
@@ -582,7 +600,6 @@ func handleRemoveServerFromGroup(c *fiber.Ctx) error {
 	}
 
 	if !isAdmin(requestUser) {
-		logger.Warn("Forbidden attempt to remove server from group by non-admin", slog.String("requestUser", requestUser.UUID))
 		return errResponse(c, fiber.StatusForbidden, "Admin privileges required", slog.String("requestUser", requestUser.UUID))
 	}
 
@@ -593,12 +610,17 @@ func handleRemoveServerFromGroup(c *fiber.Ctx) error {
 			slog.String("groupUUID", groupUUID), slog.String("serverUUID", serverUUID))
 	}
 
+	groupMutex.Lock()
+	defer func() {
+		groupMutex.Unlock()
+	}()
+	defer recoverAndLog()
+
 	group, err := getGroup(groupUUID)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			return errResponse(c, fiber.StatusNotFound, "Group not found", slog.String("groupUUID", groupUUID))
 		}
-		logger.Error("Failed to get group for removing server", slog.Any("error", err), slog.String("groupUUID", groupUUID))
 		return errResponse(c, http.StatusInternalServerError, "Error retrieving group",
 			slog.Any("error", err), slog.String("groupUUID", groupUUID))
 	}
@@ -610,14 +632,11 @@ func handleRemoveServerFromGroup(c *fiber.Ctx) error {
 
 	if len(group.ServerUUIDs) < originalLen {
 		if err := saveGroup(group); err != nil {
-			logger.Error("Failed to save group after removing server", slog.Any("error", err), slog.String("groupUUID", groupUUID), slog.String("serverUUID", serverUUID))
 			return errResponse(c, http.StatusInternalServerError, "Could not update group membership", slog.Any("error", err))
 		}
-		logger.Info("Server removed from group", slog.String("serverUUID", serverUUID), slog.String("groupUUID", groupUUID), slog.String("removedBy", requestUser.UUID))
-		return c.Status(fiber.StatusOK).JSON(group)
-	} else {
-		return c.SendStatus(fiber.StatusNoContent)
 	}
+
+	return c.SendStatus(fiber.StatusOK)
 }
 
 func handleCreateServer(c *fiber.Ctx) error {
@@ -661,7 +680,6 @@ func handleGetServer(c *fiber.Ctx) error {
 	}
 
 	if !canManageServer(requestUser) {
-		logger.Warn("Forbidden attempt to get server details by non-admin", slog.String("requestUser", requestUser.UUID))
 		return errResponse(c, fiber.StatusForbidden, "Admin privileges required", slog.String("requestUser", requestUser.UUID))
 	}
 
@@ -675,7 +693,6 @@ func handleGetServer(c *fiber.Ctx) error {
 		if errors.Is(err, ErrNotFound) {
 			return errResponse(c, fiber.StatusNotFound, "Server not found", slog.String("targetServerUUID", targetServerUUID))
 		}
-		logger.Error("Failed to get server", slog.Any("error", err), slog.String("targetServerUUID", targetServerUUID))
 		return errResponse(c, http.StatusInternalServerError, "Error retrieving server", slog.Any("error", err), slog.String("targetServerUUID", targetServerUUID))
 	}
 
@@ -683,12 +700,6 @@ func handleGetServer(c *fiber.Ctx) error {
 }
 
 func handleUpdateServer(c *fiber.Ctx) error {
-	serverMutex.Lock()
-	defer func() {
-		serverMutex.Unlock()
-	}()
-	defer recoverAndLog()
-
 	requestUser, _, err := authenticateRequest(c)
 	if err != nil {
 		if errors.Is(err, ErrUnauthorized) {
@@ -698,7 +709,6 @@ func handleUpdateServer(c *fiber.Ctx) error {
 	}
 
 	if !canManageServer(requestUser) {
-		logger.Warn("Forbidden attempt to update server by non-admin", slog.String("requestUser", requestUser.UUID))
 		return errResponse(c, fiber.StatusForbidden, "Admin privileges required", slog.String("requestUser", requestUser.UUID))
 	}
 
@@ -706,6 +716,12 @@ func handleUpdateServer(c *fiber.Ctx) error {
 	if targetServerUUID == "" {
 		return errResponse(c, fiber.StatusBadRequest, "Missing server UUID in path")
 	}
+
+	serverMutex.Lock()
+	defer func() {
+		serverMutex.Unlock()
+	}()
+	defer recoverAndLog()
 
 	var req Server
 	if err := c.BodyParser(&req); err != nil {
@@ -717,16 +733,13 @@ func handleUpdateServer(c *fiber.Ctx) error {
 		if errors.Is(err, ErrNotFound) {
 			return errResponse(c, fiber.StatusNotFound, "Server not found", slog.String("targetServerUUID", targetServerUUID))
 		}
-		logger.Error("Failed to get server for update", slog.Any("error", err), slog.String("targetServerUUID", targetServerUUID))
 		return errResponse(c, http.StatusInternalServerError, "Error retrieving server", slog.Any("error", err), slog.String("targetServerUUID", targetServerUUID))
 	}
 
 	if err := saveServer(server); err != nil {
-		logger.Error("Failed to save updated server", slog.Any("error", err), slog.String("serverUUID", server.UUID))
 		return errResponse(c, http.StatusInternalServerError, "Could not save server", slog.Any("error", err), slog.String("serverUUID", server.UUID))
 	}
 
-	logger.Info("Server updated", slog.String("serverUUID", server.UUID), slog.String("updatedBy", requestUser.UUID))
 	return c.JSON(server)
 }
 
@@ -740,7 +753,6 @@ func handleDeleteServer(c *fiber.Ctx) error {
 	}
 
 	if !canManageServer(requestUser) {
-		logger.Warn("Forbidden attempt to delete server by non-admin", slog.String("requestUser", requestUser.UUID))
 		return errResponse(c, fiber.StatusForbidden, "Admin privileges required", slog.String("requestUser", requestUser.UUID))
 	}
 
@@ -754,8 +766,11 @@ func handleDeleteServer(c *fiber.Ctx) error {
 		if errors.Is(err, ErrNotFound) {
 			return errResponse(c, fiber.StatusNotFound, "Server not found", slog.String("targetServerUUID", targetServerUUID))
 		}
-		logger.Error("Failed to get server for delete check", slog.Any("error", err), slog.String("targetServerUUID", targetServerUUID))
 		return errResponse(c, http.StatusInternalServerError, "Error retrieving server", slog.Any("error", err), slog.String("targetServerUUID", targetServerUUID))
+	}
+
+	if err := deleteServer(targetServerUUID); err != nil {
+		return errResponse(c, http.StatusInternalServerError, "Failed to delete server", slog.Any("error", err), slog.String("targetServerUUID", targetServerUUID))
 	}
 
 	allGroups, err := listGroups()
@@ -782,11 +797,6 @@ func handleDeleteServer(c *fiber.Ctx) error {
 		}
 	}
 
-	if err := deleteServer(targetServerUUID); err != nil {
-		logger.Error("Failed to delete server", slog.Any("error", err), slog.String("targetServerUUID", targetServerUUID))
-		return errResponse(c, http.StatusInternalServerError, "Failed to delete server", slog.Any("error", err), slog.String("targetServerUUID", targetServerUUID))
-	}
-
 	logger.Info("Server deleted", slog.String("serverUUID", targetServerUUID), slog.String("deletedBy", requestUser.UUID))
 	return c.SendStatus(fiber.StatusNoContent)
 }
@@ -801,13 +811,11 @@ func handleListServers(c *fiber.Ctx) error {
 	}
 
 	if !canManageServer(requestUser) {
-		logger.Warn("Forbidden attempt to list servers by non-admin", slog.String("requestUser", requestUser.UUID))
 		return errResponse(c, fiber.StatusForbidden, "Admin privileges required", slog.String("requestUser", requestUser.UUID))
 	}
 
 	servers, err := listServers()
 	if err != nil {
-		logger.Error("Failed to list servers", slog.Any("error", err))
 		return errResponse(c, http.StatusInternalServerError, "Error retrieving server list", slog.Any("error", err))
 	}
 

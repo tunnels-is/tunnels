@@ -148,6 +148,7 @@ func main() {
 
 	if AUTHEnabled {
 		initAuth()
+		go signal.NewSignal("2FCLEANER", ctx, cancel, 5*time.Minute, goroutineLogger, cleanTwoFactorPendingMap)
 	}
 
 	if DNSEnabled {
