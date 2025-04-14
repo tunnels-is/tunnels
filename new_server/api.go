@@ -57,8 +57,8 @@ func StartAPI() {
 
 		twoFAGroup := authGroup.Group("/2fa")
 		twoFAGroup.Post("/setup", handle2FASetup)
-		twoFAGroup.Post("/verify", handle2FAVerify)
-		twoFAGroup.Post("/verify/:user_uuid", handle2FAVerify)
+		twoFAGroup.Post("/enable/:user_uuid", handle2FAEnable)
+		twoFAGroup.Post("/confirm", handle2FAConfirm)
 
 		userGroup := app.Group("/users")
 		userGroup.Post("/", handleCreateUser)

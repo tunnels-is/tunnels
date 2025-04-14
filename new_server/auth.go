@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -41,8 +42,17 @@ var googleClientSecret = os.Getenv("GOOGLE_CLIENT_SECRET")
 
 var googleRedirectURL = "http://localhost:3000/auth/google/callback"
 
-func mapUserForResponse(user *User) map[string]interface{} {
-	return map[string]interface{}{
+var pendingTwoFactor = sync.Map{}
+
+type TwoFAPending struct {
+	AuthID  string
+	UserID  string
+	Expires time.Time
+	Code    string
+}
+
+func mapUserForResponse(user *User) map[string]any {
+	return map[string]any{
 		"UUID":       user.UUID,
 		"Username":   user.Username,
 		"IsAdmin":    user.IsAdmin,
@@ -55,9 +65,6 @@ func mapUserForResponse(user *User) map[string]interface{} {
 }
 
 func hashPassword(password string) (string, error) {
-	if password == "" {
-		return "", fmt.Errorf("pwd empty")
-	}
 	bytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return "", err
@@ -66,9 +73,6 @@ func hashPassword(password string) (string, error) {
 }
 
 func checkPasswordHash(password, hash string) bool {
-	if password == "" || hash == "" {
-		return false
-	}
 	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)) == nil
 }
 
@@ -228,8 +232,8 @@ func generateAndSaveToken(userUUID string, deviceName string) (*AuthToken, error
 }
 
 func handleGoogleLogin(c *fiber.Ctx) error {
-	deviceName := c.Query("deviceName", "Unknown Browser")
-	redirectAfter := c.Query("redirect", "/")
+	deviceName := c.Query("deviceName", "Google login")
+	redirectAfter := c.Query("redirect", "/auth/google/callback")
 	state, err := generateAuthState(deviceName, redirectAfter)
 	if err != nil {
 		logger.Error("Failed to generate OAuth state", slog.Any("error", err))
@@ -478,8 +482,52 @@ func handle2FASetup(c *fiber.Ctx) error {
 
 	return c.Status(fiber.StatusOK).JSON(response)
 }
+func handle2FAConfirm(c *fiber.Ctx) error {
+	var req TwoFAPending
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": fmt.Sprintf("Invalid request body: %v", err)})
+	}
 
-func handle2FAVerify(c *fiber.Ctx) error {
+	user, err := getUser(req.UserID)
+	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			return errResponse(c, fiber.StatusNotFound, "User not found")
+		}
+		return errResponse(c, fiber.StatusNotFound, "Internal server error", slog.Any("err", err))
+	}
+
+	val, ok := pendingTwoFactor.Load(req.AuthID)
+	if !ok {
+		return errResponse(c, fiber.StatusUnauthorized, "Pending auth request not found")
+	}
+
+	pendingAuth, ok := val.(*TwoFAPending)
+	if !ok {
+		return errResponse(c, fiber.StatusInternalServerError, "Malformed pending auth request")
+	}
+
+	if time.Since(pendingAuth.Expires).Seconds() > 1 {
+		return errResponse(c, fiber.StatusBadRequest, "Malformed pending auth request")
+	}
+
+	valid, err := totp.ValidateCustom(req.Code, user.OTPSecret, time.Now().UTC(), totp.ValidateOpts{
+		Period:    30,
+		Skew:      1,
+		Digits:    otp.DigitsSix,
+		Algorithm: otp.AlgorithmSHA1,
+	})
+	if err != nil {
+		return errResponse(c, fiber.StatusNotFound, "Unable to validate two factor authentication", slog.Any("err", err))
+	}
+
+	if !valid {
+		return errResponse(c, fiber.StatusNotFound, "Unable to validate two factor authentication")
+	}
+
+	return c.JSON(mapUserForResponse(user))
+}
+
+func handle2FAEnable(c *fiber.Ctx) error {
 	requestUser, _, authErr := authenticateRequest(c)
 
 	var req OTPVerifyRequest
@@ -535,7 +583,6 @@ func handle2FAVerify(c *fiber.Ctx) error {
 		if errors.Is(err, ErrNotFound) {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "User not found"})
 		}
-		logger.Error("Failed to get user for OTP login verification", slog.Any("error", err), slog.String("userUUID", userUUID))
 		return fiber.NewError(http.StatusInternalServerError, "Error retrieving user")
 	}
 

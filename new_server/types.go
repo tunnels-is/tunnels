@@ -228,8 +228,3 @@ type OTPSetupResponse struct {
 type OTPVerifyRequest struct {
 	OTPCode string
 }
-
-type PendingOTPInfo struct {
-	UserUUID    string
-	OTPRequired bool
-}
