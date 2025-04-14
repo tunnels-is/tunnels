@@ -468,3 +468,34 @@ func makeConfigAndCerts() {
 	}
 
 }
+
+func recoverAndLog() {
+	r := recover()
+	if r != nil {
+		logger.Error("PANIC", slog.Any("stacktrace", getStacktraceLines(3)))
+	}
+}
+
+func getStacktraceLines(skipFrames int) []string {
+	buf := make([]byte, 4086)
+
+	n := runtime.Stack(buf, false)
+	stack := string(buf[:n])
+
+	lines := strings.Split(stack, "\n")
+
+	startIndex := 1 + (skipFrames * 2)
+	if startIndex >= len(lines) {
+		startIndex = 1
+	}
+
+	cleanedLines := make([]string, 0, len(lines)-startIndex)
+	for _, line := range lines[startIndex:] {
+		trimmed := strings.TrimSpace(line)
+		if trimmed != "" {
+			cleanedLines = append(cleanedLines, trimmed)
+		}
+	}
+
+	return cleanedLines
+}

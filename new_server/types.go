@@ -145,6 +145,8 @@ func (u *UserCoreMapping) DelHost(host [4]byte, t string) {
 	}
 }
 
+var userMutex = sync.Mutex{}
+
 type User struct {
 	UUID         string
 	Username     string
@@ -154,7 +156,13 @@ type User struct {
 	IsManager    bool
 	OTPSecret    string
 	OTPEnabled   bool
+	Trial        bool
+	SubExpires   time.Time
+	Disaled      bool
+	APIKey       string
 }
+
+var groupMutex = sync.Mutex{}
 
 type Group struct {
 	UUID        string
@@ -162,6 +170,8 @@ type Group struct {
 	UserUUIDs   []string
 	ServerUUIDs []string
 }
+
+var serverMutex = sync.Mutex{}
 
 type Server struct {
 	UUID        string
@@ -180,16 +190,16 @@ type AuthToken struct {
 }
 
 type CreateUserRequest struct {
-	Username  string
-	Password  string
-	IsAdmin   bool
-	IsManager bool
+	Username       string
+	Password       string
+	SecondPassword string
+	IsAdmin        bool
+	IsManager      bool
 }
 
 type UpdateUserRequest struct {
-	Username  *string
-	IsAdmin   *bool
-	IsManager *bool
+	Disaled bool
+	APIKey  string
 }
 
 type LoginRequest struct {
@@ -203,7 +213,7 @@ type CreateGroupRequest struct {
 }
 
 type UpdateGroupRequest struct {
-	Name *string
+	Name string
 }
 
 type GoogleCallbackState struct {
