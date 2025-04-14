@@ -9,47 +9,18 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
-	"os"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 	"github.com/pquerna/otp"
 	"github.com/pquerna/otp/totp"
+	"github.com/tunnels-is/tunnels/types"
 	"golang.org/x/crypto/bcrypt"
 	"golang.org/x/oauth2"
 	googleOAuth "golang.org/x/oauth2/google"
 )
-
-var (
-	googleOauthConfig *oauth2.Config
-	oauthStateString  = "random-pseudo-state"
-
-	ErrUnauthorized = errors.New("unauthorized")
-	ErrForbidden    = errors.New("forbidden")
-	ErrNotFound     = errors.New("not found")
-	ErrOTPRequired  = errors.New("otp required")
-	ErrInvalidOTP   = errors.New("invalid otp code")
-)
-
-const AuthHeader = "X-Auth-Token"
-const GoogleUserInfoURL = "https://www.googleapis.com/oauth2/v2/userinfo?access_token="
-
-var googleClientID = os.Getenv("GOOGLE_CLIENT_ID")
-var googleClientSecret = os.Getenv("GOOGLE_CLIENT_SECRET")
-
-var googleRedirectURL = "http://localhost:3000/auth/google/callback"
-
-var pendingTwoFactor = sync.Map{}
-
-type TwoFAPending struct {
-	AuthID  string
-	UserID  string
-	Expires time.Time
-	Code    string
-}
 
 func mapUserForResponse(user *User) map[string]any {
 	return map[string]any{
@@ -437,8 +408,11 @@ func handle2FASetup(c *fiber.Ctx) error {
 		}
 		return errResponse(c, http.StatusInternalServerError, "Error authenticating request")
 	}
+	if user.OTPEnabled {
+		return errResponse(c, http.StatusBadRequest, "Two Factor Authentication already enabled")
+	}
 
-	issuer := "YourAppName"
+	issuer := twoFactorAppName
 	accountName := user.Username
 
 	key, err := totp.Generate(totp.GenerateOpts{
@@ -452,7 +426,10 @@ func handle2FASetup(c *fiber.Ctx) error {
 		return errResponse(c, http.StatusInternalServerError, "Could not generate OTP key", slog.Any("error", err), slog.String("userUUID", user.UUID))
 	}
 
-	user.OTPSecret = key.Secret()
+	user.OTPSecret, err = Encrypt(key.Secret(), []byte(TwoFactorKey))
+	if err != nil {
+		return errResponse(c, 500, "unable to encrypt two factor secret", slog.Any("err", err))
+	}
 	user.OTPEnabled = false
 
 	if err := saveUser(user); err != nil {
@@ -469,7 +446,7 @@ func handle2FASetup(c *fiber.Ctx) error {
 }
 
 func handle2FAConfirm(c *fiber.Ctx) error {
-	var req TwoFAPending
+	var req types.TwoFAPending
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(http.StatusBadRequest).JSON(fiber.Map{"error": fmt.Sprintf("Invalid request body: %v", err)})
 	}
@@ -487,7 +464,7 @@ func handle2FAConfirm(c *fiber.Ctx) error {
 		return errResponse(c, http.StatusUnauthorized, "Pending auth request not found")
 	}
 
-	pendingAuth, ok := val.(*TwoFAPending)
+	pendingAuth, ok := val.(*types.TwoFAPending)
 	if !ok {
 		return errResponse(c, http.StatusInternalServerError, "Malformed pending auth request")
 	}
@@ -496,7 +473,12 @@ func handle2FAConfirm(c *fiber.Ctx) error {
 		return errResponse(c, http.StatusBadRequest, "Malformed pending auth request")
 	}
 
-	valid, err := totp.ValidateCustom(req.Code, user.OTPSecret, time.Now().UTC(), totp.ValidateOpts{
+	secret, err := Decrypt(user.OTPSecret, []byte(TwoFactorKey))
+	if err != nil {
+		return errResponse(c, http.StatusBadRequest, "Error decrypting two factor authenticaton secret", slog.Any("err", err))
+	}
+
+	valid, err := totp.ValidateCustom(req.Code, secret, time.Now().UTC(), totp.ValidateOpts{
 		Period:    30,
 		Skew:      1,
 		Digits:    otp.DigitsSix,
@@ -514,7 +496,13 @@ func handle2FAConfirm(c *fiber.Ctx) error {
 }
 
 func handle2FAEnable(c *fiber.Ctx) error {
-	requestUser, _, authErr := authenticateRequest(c)
+	user, _, err := authenticateRequest(c)
+	if err != nil {
+		if errors.Is(err, ErrUnauthorized) {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Authentication required"})
+		}
+		return errResponse(c, http.StatusInternalServerError, "Error authenticating request")
+	}
 
 	var req OTPVerifyRequest
 	if err := c.BodyParser(&req); err != nil {
@@ -525,56 +513,17 @@ func handle2FAEnable(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Missing otpCode field"})
 	}
 
-	if authErr == nil && requestUser != nil {
-		if requestUser.OTPEnabled {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "OTP is already enabled for this user"})
-		}
-		if requestUser.OTPSecret == "" {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "OTP secret not set up for this user"})
-		}
-
-		valid, err := totp.ValidateCustom(req.OTPCode, requestUser.OTPSecret, time.Now().UTC(), totp.ValidateOpts{
-			Period:    30,
-			Skew:      1,
-			Digits:    otp.DigitsSix,
-			Algorithm: otp.AlgorithmSHA1,
-		})
-		if err != nil {
-			return errResponse(c, http.StatusInternalServerError, "Error validating OTP code", slog.Any("error", err), slog.String("userUUID", requestUser.UUID))
-		}
-
-		if !valid {
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Invalid OTP code"})
-		}
-
-		requestUser.OTPEnabled = true
-		if err := saveUser(requestUser); err != nil {
-			return errResponse(c, http.StatusInternalServerError, "Failed to update user OTP status", slog.Any("error", err), slog.String("userUUID", requestUser.UUID))
-		}
-
-		logger.Info("OTP successfully verified and enabled for user", slog.String("userUUID", requestUser.UUID))
-		return c.Status(fiber.StatusOK).JSON(fiber.Map{"message": "OTP enabled successfully"})
-	}
-
 	userUUID := c.Params("user_uuid")
 	if userUUID == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "User UUID required in path for OTP login verification"})
 	}
 
-	user, err := getUser(userUUID)
-	if err != nil {
-		if errors.Is(err, ErrNotFound) {
-			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "User not found"})
-		}
-		return errResponse(c, http.StatusInternalServerError, "Error retrieving user", slog.Any("error", err))
+	if user.OTPEnabled {
+		return errResponse(c, http.StatusBadRequest, "Two Factor Authentication already enabled")
 	}
 
-	if !user.OTPEnabled {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "OTP is not enabled for this user"})
-	}
 	if user.OTPSecret == "" {
-		logger.Error("Data inconsistency: OTP enabled but no secret found", slog.String("userUUID", user.UUID))
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "User OTP configuration error"})
+		return errResponse(c, http.StatusInternalServerError, "Two Factor Authentication secret not found")
 	}
 
 	valid, err := totp.ValidateCustom(req.OTPCode, user.OTPSecret, time.Now().UTC(), totp.ValidateOpts{
@@ -585,14 +534,14 @@ func handle2FAEnable(c *fiber.Ctx) error {
 	})
 
 	if err != nil {
-		return errResponse(c, http.StatusInternalServerError, "Error validating OTP code", slog.Any("error", err), slog.String("userUUID", user.UUID))
+		return errResponse(c, http.StatusInternalServerError, "Error validating Two Factor Authentication", slog.Any("error", err), slog.String("userUUID", user.UUID))
 	}
 
 	if !valid {
-		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Invalid OTP code"})
+		return errResponse(c, http.StatusInternalServerError, "Invalid code", slog.String("userUUID", user.UUID))
 	}
 
-	deviceName := "Verified via OTP"
+	deviceName := "Verified via 2FA"
 
 	authToken, err := generateAndSaveToken(user.UUID, deviceName)
 	if err != nil {
@@ -601,8 +550,7 @@ func handle2FAEnable(c *fiber.Ctx) error {
 
 	logger.Info("Successful OTP verification during login", slog.String("userUUID", user.UUID), slog.String("tokenUUID", authToken.TokenUUID))
 	return c.JSON(fiber.Map{
-		"message": "Login successful",
-		"token":   authToken.TokenUUID,
-		"user":    mapUserForResponse(user),
+		"token": authToken.TokenUUID,
+		"user":  mapUserForResponse(user),
 	})
 }
