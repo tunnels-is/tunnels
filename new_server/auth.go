@@ -236,8 +236,7 @@ func handleGoogleLogin(c *fiber.Ctx) error {
 	redirectAfter := c.Query("redirect", "/auth/google/callback")
 	state, err := generateAuthState(deviceName, redirectAfter)
 	if err != nil {
-		logger.Error("Failed to generate OAuth state", slog.Any("error", err))
-		return fiber.NewError(http.StatusInternalServerError, "Could not initiate login flow")
+		return errResponse(c, http.StatusInternalServerError, "Could not initiate login flow")
 	}
 	url := googleOauthConfig.AuthCodeURL(state, oauth2.AccessTypeOffline)
 	return c.Redirect(url, http.StatusTemporaryRedirect)
@@ -247,38 +246,32 @@ func handleGoogleCallback(c *fiber.Ctx) error {
 	stateParam := c.Query("state")
 	stateData, err := parseAuthState(stateParam)
 	if err != nil {
-		logger.Warn("Invalid OAuth state received", slog.String("state", stateParam), slog.Any("error", err))
-		return fiber.NewError(http.StatusBadRequest, "Invalid state parameter")
+		return errResponse(c, http.StatusBadRequest, "Invalid state parameter")
 	}
 
 	code := c.Query("code")
 	if code == "" {
-		logger.Warn("OAuth callback missing code", slog.String("state", stateParam))
-		return fiber.NewError(http.StatusBadRequest, "Authorization code not found")
+		return errResponse(c, http.StatusBadRequest, "Authorization code not found")
 	}
 
 	token, err := googleOauthConfig.Exchange(context.Background(), code)
 	if err != nil {
-		logger.Error("Failed to exchange Google token", slog.Any("error", err))
-		return fiber.NewError(http.StatusInternalServerError, "Could not exchange token")
+		return errResponse(c, http.StatusInternalServerError, "Could not exchange token")
 	}
 
 	if !token.Valid() {
-		logger.Error("Received invalid token from Google", slog.Any("token", token))
-		return fiber.NewError(http.StatusInternalServerError, "Received invalid token")
+		return errResponse(c, http.StatusInternalServerError, "Received invalid token")
 	}
 
 	response, err := http.Get(GoogleUserInfoURL + token.AccessToken)
 	if err != nil {
-		logger.Error("Failed to get user info from Google", slog.Any("error", err))
-		return fiber.NewError(http.StatusInternalServerError, "Could not get user info")
+		return errResponse(c, http.StatusInternalServerError, "Could not get user info")
 	}
 	defer response.Body.Close()
 
 	contents, err := io.ReadAll(response.Body)
 	if err != nil {
-		logger.Error("Failed to read user info response", slog.Any("error", err))
-		return fiber.NewError(http.StatusInternalServerError, "Could not read user info")
+		return errResponse(c, http.StatusInternalServerError, "Could not read user info")
 	}
 
 	var googleUser struct {
@@ -288,18 +281,15 @@ func handleGoogleCallback(c *fiber.Ctx) error {
 		Picture string `json:"picture"`
 	}
 	if err := json.Unmarshal(contents, &googleUser); err != nil {
-		logger.Error("Failed to parse Google user info", slog.Any("error", err), slog.String("response", string(contents)))
-		return fiber.NewError(http.StatusInternalServerError, "Could not parse user info")
+		return errResponse(c, http.StatusInternalServerError, "Could not parse user info", slog.String("response", string(contents)))
 	}
 
 	user, err := getUserByGoogleID(googleUser.ID)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
-			logger.Warn("Google OAuth attempt for unknown user", slog.String("googleId", googleUser.ID), slog.String("email", googleUser.Email))
-			return fiber.NewError(http.StatusForbidden, "User not registered or linked. Please contact an administrator.")
+			return errResponse(c, http.StatusForbidden, "User not registered or linked. Please contact an administrator.")
 		} else {
-			logger.Error("Failed to lookup user by Google ID", slog.Any("error", err), slog.String("googleId", googleUser.ID))
-			return fiber.NewError(http.StatusInternalServerError, "Database error during login")
+			return errResponse(c, http.StatusInternalServerError, "Database error during login")
 		}
 	} else {
 		if user.GoogleID == "" {
@@ -323,8 +313,7 @@ func handleGoogleCallback(c *fiber.Ctx) error {
 
 	authToken, err := generateAndSaveToken(user.UUID, stateData.DeviceName)
 	if err != nil {
-		logger.Error("Failed to generate internal auth token after Google OAuth", slog.Any("error", err), slog.String("userUUID", user.UUID))
-		return fiber.NewError(http.StatusInternalServerError, "Could not complete login")
+		return errResponse(c, http.StatusInternalServerError, "Could not complete login")
 	}
 
 	logger.Info("Successful Google OAuth login", slog.String("userUUID", user.UUID), slog.String("tokenUUID", authToken.TokenUUID))
@@ -350,7 +339,7 @@ func handleTokenValidate(c *fiber.Ctx) error {
 		if errors.Is(err, ErrUnauthorized) {
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Invalid or missing token"})
 		}
-		return fiber.NewError(http.StatusInternalServerError, "Error validating token")
+		return errResponse(c, http.StatusInternalServerError, "Error validating token", slog.Any("error", err))
 	}
 
 	return c.Status(fiber.StatusOK).JSON(fiber.Map{
@@ -370,7 +359,7 @@ func handleTokenDelete(c *fiber.Ctx) error {
 		if errors.Is(err, ErrUnauthorized) {
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Authentication required"})
 		}
-		return fiber.NewError(http.StatusInternalServerError, "Error authenticating request")
+		return errResponse(c, http.StatusInternalServerError, "Error authenticating request")
 	}
 
 	targetTokenUUID := c.Params("token_uuid")
@@ -384,7 +373,7 @@ func handleTokenDelete(c *fiber.Ctx) error {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Target token not found"})
 		}
 		logger.Error("Failed to get token for deletion check", slog.Any("error", err), slog.String("targetTokenUUID", targetTokenUUID))
-		return fiber.NewError(http.StatusInternalServerError, "Error checking token ownership")
+		return errResponse(c, http.StatusInternalServerError, "Error checking token ownership")
 	}
 
 	if tokenToDelete.UserUUID != requestUser.UUID && !requestUser.IsAdmin {
@@ -408,7 +397,7 @@ func handleTokenDeleteAll(c *fiber.Ctx) error {
 		if errors.Is(err, ErrUnauthorized) {
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Authentication required"})
 		}
-		return fiber.NewError(http.StatusInternalServerError, "Error authenticating request")
+		return errResponse(c, http.StatusInternalServerError, "Error authenticating request")
 	}
 
 	targetUserUUID := c.Params("user_uuid")
@@ -428,14 +417,14 @@ func handleTokenDeleteAll(c *fiber.Ctx) error {
 				return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Target user not found"})
 			}
 			logger.Error("Failed to get target user before token deletion", slog.Any("error", err), slog.String("targetUserUUID", targetUserUUID))
-			return fiber.NewError(http.StatusInternalServerError, "Failed to verify target user")
+			return errResponse(c, http.StatusInternalServerError, "Failed to verify target user")
 		}
 	}
 
 	err = deleteAllUserTokens(targetUserUUID)
 	if err != nil {
 		logger.Error("Failed to delete all tokens for user", slog.Any("error", err), slog.String("targetUserUUID", targetUserUUID))
-		return fiber.NewError(http.StatusInternalServerError, "Failed to delete user tokens")
+		return errResponse(c, http.StatusInternalServerError, "Failed to delete user tokens")
 	}
 
 	logger.Info("Deleted all tokens for user", slog.String("targetUserUUID", targetUserUUID), slog.String("deletedBy", requestUser.UUID))
@@ -448,7 +437,7 @@ func handle2FASetup(c *fiber.Ctx) error {
 		if errors.Is(err, ErrUnauthorized) {
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Authentication required"})
 		}
-		return fiber.NewError(http.StatusInternalServerError, "Error authenticating request")
+		return errResponse(c, http.StatusInternalServerError, "Error authenticating request")
 	}
 
 	issuer := "YourAppName"
@@ -462,16 +451,14 @@ func handle2FASetup(c *fiber.Ctx) error {
 		Digits:      otp.DigitsSix,
 	})
 	if err != nil {
-		logger.Error("Failed to generate TOTP key", slog.Any("error", err), slog.String("userUUID", user.UUID))
-		return fiber.NewError(http.StatusInternalServerError, "Could not generate OTP key")
+		return errResponse(c, http.StatusInternalServerError, "Could not generate OTP key", slog.Any("error", err), slog.String("userUUID", user.UUID))
 	}
 
 	user.OTPSecret = key.Secret()
 	user.OTPEnabled = false
 
 	if err := saveUser(user); err != nil {
-		logger.Error("Failed to save user with new OTP secret", slog.Any("error", err), slog.String("userUUID", user.UUID))
-		return fiber.NewError(http.StatusInternalServerError, "Could not save OTP configuration")
+		return errResponse(c, http.StatusInternalServerError, "Could not save OTP configuration", slog.Any("error", err), slog.String("userUUID", user.UUID))
 	}
 
 	logger.Info("Generated OTP setup details for user", slog.String("userUUID", user.UUID), slog.String("accountName", accountName))
@@ -482,32 +469,33 @@ func handle2FASetup(c *fiber.Ctx) error {
 
 	return c.Status(fiber.StatusOK).JSON(response)
 }
+
 func handle2FAConfirm(c *fiber.Ctx) error {
 	var req TwoFAPending
 	if err := c.BodyParser(&req); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": fmt.Sprintf("Invalid request body: %v", err)})
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{"error": fmt.Sprintf("Invalid request body: %v", err)})
 	}
 
 	user, err := getUser(req.UserID)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
-			return errResponse(c, fiber.StatusNotFound, "User not found")
+			return errResponse(c, http.StatusNotFound, "User not found")
 		}
-		return errResponse(c, fiber.StatusNotFound, "Internal server error", slog.Any("err", err))
+		return errResponse(c, http.StatusInternalServerError, "Internal server error", slog.Any("err", err))
 	}
 
 	val, ok := pendingTwoFactor.Load(req.AuthID)
 	if !ok {
-		return errResponse(c, fiber.StatusUnauthorized, "Pending auth request not found")
+		return errResponse(c, http.StatusUnauthorized, "Pending auth request not found")
 	}
 
 	pendingAuth, ok := val.(*TwoFAPending)
 	if !ok {
-		return errResponse(c, fiber.StatusInternalServerError, "Malformed pending auth request")
+		return errResponse(c, http.StatusInternalServerError, "Malformed pending auth request")
 	}
 
 	if time.Since(pendingAuth.Expires).Seconds() > 1 {
-		return errResponse(c, fiber.StatusBadRequest, "Malformed pending auth request")
+		return errResponse(c, http.StatusBadRequest, "Malformed pending auth request")
 	}
 
 	valid, err := totp.ValidateCustom(req.Code, user.OTPSecret, time.Now().UTC(), totp.ValidateOpts{
@@ -517,11 +505,11 @@ func handle2FAConfirm(c *fiber.Ctx) error {
 		Algorithm: otp.AlgorithmSHA1,
 	})
 	if err != nil {
-		return errResponse(c, fiber.StatusNotFound, "Unable to validate two factor authentication", slog.Any("err", err))
+		return errResponse(c, http.StatusInternalServerError, "Unable to validate two factor authentication", slog.Any("err", err))
 	}
 
 	if !valid {
-		return errResponse(c, fiber.StatusNotFound, "Unable to validate two factor authentication")
+		return errResponse(c, http.StatusUnauthorized, "Unable to validate two factor authentication")
 	}
 
 	return c.JSON(mapUserForResponse(user))
@@ -554,19 +542,16 @@ func handle2FAEnable(c *fiber.Ctx) error {
 			Algorithm: otp.AlgorithmSHA1,
 		})
 		if err != nil {
-			logger.Error("Error during OTP validation (setup)", slog.Any("error", err), slog.String("userUUID", requestUser.UUID))
-			return fiber.NewError(http.StatusInternalServerError, "Error validating OTP code")
+			return errResponse(c, http.StatusInternalServerError, "Error validating OTP code", slog.Any("error", err), slog.String("userUUID", requestUser.UUID))
 		}
 
 		if !valid {
-			logger.Warn("Invalid OTP code during setup verification", slog.String("userUUID", requestUser.UUID))
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Invalid OTP code"})
 		}
 
 		requestUser.OTPEnabled = true
 		if err := saveUser(requestUser); err != nil {
-			logger.Error("Failed to enable OTP flag for user", slog.Any("error", err), slog.String("userUUID", requestUser.UUID))
-			return fiber.NewError(http.StatusInternalServerError, "Failed to update user OTP status")
+			return errResponse(c, http.StatusInternalServerError, "Failed to update user OTP status", slog.Any("error", err), slog.String("userUUID", requestUser.UUID))
 		}
 
 		logger.Info("OTP successfully verified and enabled for user", slog.String("userUUID", requestUser.UUID))
@@ -583,7 +568,7 @@ func handle2FAEnable(c *fiber.Ctx) error {
 		if errors.Is(err, ErrNotFound) {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "User not found"})
 		}
-		return fiber.NewError(http.StatusInternalServerError, "Error retrieving user")
+		return errResponse(c, http.StatusInternalServerError, "Error retrieving user", slog.Any("error", err))
 	}
 
 	if !user.OTPEnabled {
@@ -602,12 +587,10 @@ func handle2FAEnable(c *fiber.Ctx) error {
 	})
 
 	if err != nil {
-		logger.Error("Error during OTP validation (login)", slog.Any("error", err), slog.String("userUUID", user.UUID))
-		return fiber.NewError(http.StatusInternalServerError, "Error validating OTP code")
+		return errResponse(c, http.StatusInternalServerError, "Error validating OTP code", slog.Any("error", err), slog.String("userUUID", user.UUID))
 	}
 
 	if !valid {
-		logger.Warn("Invalid OTP code during login verification", slog.String("userUUID", user.UUID))
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Invalid OTP code"})
 	}
 
@@ -615,8 +598,7 @@ func handle2FAEnable(c *fiber.Ctx) error {
 
 	authToken, err := generateAndSaveToken(user.UUID, deviceName)
 	if err != nil {
-		logger.Error("Failed to generate internal auth token after OTP verification", slog.Any("error", err), slog.String("userUUID", user.UUID))
-		return fiber.NewError(http.StatusInternalServerError, "Could not complete login")
+		return errResponse(c, http.StatusInternalServerError, "Could not complete login", slog.Any("error", err), slog.String("userUUID", user.UUID))
 	}
 
 	logger.Info("Successful OTP verification during login", slog.String("userUUID", user.UUID), slog.String("tokenUUID", authToken.TokenUUID))
