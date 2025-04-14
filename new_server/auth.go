@@ -357,37 +357,34 @@ func handleTokenDelete(c *fiber.Ctx) error {
 	requestUser, _, err := authenticateRequest(c)
 	if err != nil {
 		if errors.Is(err, ErrUnauthorized) {
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Authentication required"})
+			return errResponse(c, http.StatusUnauthorized, "Authentication required")
 		}
 		return errResponse(c, http.StatusInternalServerError, "Error authenticating request")
 	}
 
 	targetTokenUUID := c.Params("token_uuid")
 	if targetTokenUUID == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Missing token UUID in path"})
+		return errResponse(c, http.StatusBadRequest, "Missing token UUID in path")
 	}
 
 	tokenToDelete, err := getToken(targetTokenUUID)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
-			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Target token not found"})
+			return errResponse(c, http.StatusNotFound, "Target token not found")
 		}
-		logger.Error("Failed to get token for deletion check", slog.Any("error", err), slog.String("targetTokenUUID", targetTokenUUID))
-		return errResponse(c, http.StatusInternalServerError, "Error checking token ownership")
+		return errResponse(c, http.StatusInternalServerError, "Error checking token ownership", slog.Any("error", err), slog.String("targetTokenUUID", targetTokenUUID))
 	}
 
 	if tokenToDelete.UserUUID != requestUser.UUID && !requestUser.IsAdmin {
-		logger.Warn("Forbidden attempt to delete token", slog.String("requestUser", requestUser.UUID), slog.String("targetUser", tokenToDelete.UserUUID), slog.String("targetToken", targetTokenUUID))
-		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "You can only delete your own tokens"})
+		return errResponse(c, http.StatusForbidden, "You can only delete your own tokens", slog.String("requestUser", requestUser.UUID), slog.String("targetUser", tokenToDelete.UserUUID), slog.String("targetToken", targetTokenUUID))
 	}
 
 	err = deleteToken(targetTokenUUID)
 	if err != nil {
-		logger.Error("Failed to delete token", slog.Any("error", err), slog.String("tokenUUID", targetTokenUUID))
-	} else {
-		logger.Info("Token deleted", slog.String("tokenUUID", targetTokenUUID), slog.String("deletedBy", requestUser.UUID))
+		return errResponse(c, http.StatusInternalServerError, "Failed to delete token", slog.Any("error", err), slog.String("tokenUUID", targetTokenUUID))
 	}
 
+	logger.Info("Token deleted", slog.String("tokenUUID", targetTokenUUID), slog.String("deletedBy", requestUser.UUID))
 	return c.SendStatus(fiber.StatusNoContent)
 }
 
@@ -395,7 +392,7 @@ func handleTokenDeleteAll(c *fiber.Ctx) error {
 	requestUser, _, err := authenticateRequest(c)
 	if err != nil {
 		if errors.Is(err, ErrUnauthorized) {
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{"error": "Authentication required"})
+			return errResponse(c, http.StatusUnauthorized, "Authentication required")
 		}
 		return errResponse(c, http.StatusInternalServerError, "Error authenticating request")
 	}
@@ -407,24 +404,25 @@ func handleTokenDeleteAll(c *fiber.Ctx) error {
 		targetUserUUID = requestUser.UUID
 		isTargetingSelf = true
 	} else if !requestUser.IsAdmin {
-		logger.Warn("Forbidden attempt to delete all tokens for another user", slog.String("requestUser", requestUser.UUID), slog.String("targetUser", targetUserUUID))
-		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "Admin privileges required to delete another user's tokens"})
+		return errResponse(c, http.StatusForbidden, "Admin privileges required to delete another user's tokens",
+			slog.String("requestUser", requestUser.UUID), slog.String("targetUser", targetUserUUID))
 	}
+
 	if !isTargetingSelf && requestUser.IsAdmin {
 		_, err := getUser(targetUserUUID)
 		if err != nil {
 			if errors.Is(err, ErrNotFound) {
-				return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "Target user not found"})
+				return errResponse(c, http.StatusNotFound, "Target user not found")
 			}
-			logger.Error("Failed to get target user before token deletion", slog.Any("error", err), slog.String("targetUserUUID", targetUserUUID))
-			return errResponse(c, http.StatusInternalServerError, "Failed to verify target user")
+			return errResponse(c, http.StatusInternalServerError, "Failed to verify target user",
+				slog.Any("error", err), slog.String("targetUserUUID", targetUserUUID))
 		}
 	}
 
 	err = deleteAllUserTokens(targetUserUUID)
 	if err != nil {
-		logger.Error("Failed to delete all tokens for user", slog.Any("error", err), slog.String("targetUserUUID", targetUserUUID))
-		return errResponse(c, http.StatusInternalServerError, "Failed to delete user tokens")
+		return errResponse(c, http.StatusInternalServerError, "Failed to delete user tokens",
+			slog.Any("error", err), slog.String("targetUserUUID", targetUserUUID))
 	}
 
 	logger.Info("Deleted all tokens for user", slog.String("targetUserUUID", targetUserUUID), slog.String("deletedBy", requestUser.UUID))
