@@ -186,7 +186,7 @@ func getUser(uuid string) (*User, error) {
 	err := getItem(stores[dbID], []byte(key), &user)
 	if err != nil {
 		if errors.Is(err, badger.ErrKeyNotFound) {
-			return nil, fmt.Errorf("user %s not found: %w", uuid, ErrNotFound)
+			return nil, fmt.Errorf("user %s not found: %w", uuid, errNotFound)
 		}
 		return nil, err
 	}
@@ -227,7 +227,7 @@ func getUserByGoogleID(googleID string) (*User, error) {
 		return nil, err
 	}
 	if foundUser == nil {
-		return nil, ErrNotFound
+		return nil, errNotFound
 	}
 	return foundUser, nil
 }
@@ -299,7 +299,7 @@ func getUserUUIDByUsername(username string) (string, error) {
 	})
 	if err != nil {
 		if errors.Is(err, badger.ErrKeyNotFound) {
-			return "", fmt.Errorf("username %s not found: %w", username, ErrNotFound)
+			return "", fmt.Errorf("username %s not found: %w", username, errNotFound)
 		}
 		return "", err
 	}
@@ -327,7 +327,7 @@ func getGroup(uuid string) (*Group, error) {
 	err := getItem(stores[dbID], []byte(key), &group)
 	if err != nil {
 		if errors.Is(err, badger.ErrKeyNotFound) {
-			return nil, fmt.Errorf("group %s not found: %w", uuid, ErrNotFound)
+			return nil, fmt.Errorf("group %s not found: %w", uuid, errNotFound)
 		}
 		return nil, err
 	}
@@ -374,7 +374,7 @@ func getServer(uuid string) (*Server, error) {
 	err := getItem(stores[dbID], []byte(key), &server)
 	if err != nil {
 		if errors.Is(err, badger.ErrKeyNotFound) {
-			return nil, fmt.Errorf("server %s not found: %w", uuid, ErrNotFound)
+			return nil, fmt.Errorf("server %s not found: %w", uuid, errNotFound)
 		}
 		return nil, err
 	}
@@ -424,7 +424,7 @@ func getToken(tokenUUID string) (*AuthToken, error) {
 	err := getItem(stores[dbID], []byte(key), &token)
 	if err != nil {
 		if errors.Is(err, badger.ErrKeyNotFound) {
-			return nil, fmt.Errorf("token %s not found: %w", tokenUUID, ErrNotFound)
+			return nil, fmt.Errorf("token %s not found: %w", tokenUUID, errNotFound)
 		}
 		return nil, err
 	}

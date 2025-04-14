@@ -29,7 +29,7 @@ func StartAPI() {
 
 	app.Use(cors.New(cors.Config{
 		AllowOrigins: "*",
-		AllowHeaders: fmt.Sprintf("Origin, Content-Type, Accept, %s", AuthHeader),
+		AllowHeaders: fmt.Sprintf("Origin, Content-Type, Accept, %s", authHeader),
 		AllowMethods: "GET, POST, PUT, DELETE, OPTIONS",
 	}))
 
@@ -172,14 +172,14 @@ func HTTP_ListDevices(c *fiber.Ctx) error {
 	response := new(types.DeviceListResponse)
 	response.Devices = make([]*types.ListDevice, 0)
 outerloop:
-	for i := range ClientCoreMappings {
-		if ClientCoreMappings[i] == nil {
+	for i := range clientCoreMappings {
+		if clientCoreMappings[i] == nil {
 			continue
 		}
 
-		if ClientCoreMappings[i].DHCP != nil {
+		if clientCoreMappings[i].DHCP != nil {
 			for _, v := range response.Devices {
-				if v.DHCP.Token == ClientCoreMappings[i].DHCP.Token {
+				if v.DHCP.Token == clientCoreMappings[i].DHCP.Token {
 					continue outerloop
 				}
 			}
@@ -187,7 +187,7 @@ outerloop:
 
 		d := new(types.ListDevice)
 		d.AllowedIPs = make([]string, 0)
-		for _, v := range ClientCoreMappings[i].AllowedHosts {
+		for _, v := range clientCoreMappings[i].AllowedHosts {
 			if v.Type == "auto" {
 				continue
 			}
@@ -200,20 +200,20 @@ outerloop:
 				))
 		}
 
-		d.RAM = ClientCoreMappings[i].RAM
-		d.CPU = ClientCoreMappings[i].CPU
-		d.Disk = ClientCoreMappings[i].Disk
-		if ClientCoreMappings[i].DHCP != nil {
+		d.RAM = clientCoreMappings[i].RAM
+		d.CPU = clientCoreMappings[i].CPU
+		d.Disk = clientCoreMappings[i].Disk
+		if clientCoreMappings[i].DHCP != nil {
 			response.DHCPAssigned++
-			d.DHCP = *ClientCoreMappings[i].DHCP
+			d.DHCP = *clientCoreMappings[i].DHCP
 		}
 
-		d.IngressQueue = len(ClientCoreMappings[i].ToUser)
-		d.EgressQueue = len(ClientCoreMappings[i].FromUser)
-		d.Created = ClientCoreMappings[i].Created
-		if ClientCoreMappings[i].PortRange != nil {
-			d.StartPort = ClientCoreMappings[i].PortRange.StartPort
-			d.EndPort = ClientCoreMappings[i].PortRange.EndPort
+		d.IngressQueue = len(clientCoreMappings[i].ToUser)
+		d.EgressQueue = len(clientCoreMappings[i].FromUser)
+		d.Created = clientCoreMappings[i].Created
+		if clientCoreMappings[i].PortRange != nil {
+			d.StartPort = clientCoreMappings[i].PortRange.StartPort
+			d.EndPort = clientCoreMappings[i].PortRange.EndPort
 		}
 		response.Devices = append(response.Devices, d)
 	}

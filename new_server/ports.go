@@ -10,21 +10,21 @@ func allocatePorts(CRR *types.ConnectRequestResponse, index int) (err error) {
 	Config := Config.Load()
 	var startPort uint16 = 0
 	var endPort uint16 = 0
-	for i := range PortToCoreMapping {
+	for i := range portToCoreMapping {
 		if i < int(Config.StartPort) {
 			continue
 		}
 
-		if PortToCoreMapping[i] == nil {
+		if portToCoreMapping[i] == nil {
 			// WARN("PORT TO CLIENT MAPPING IS NIL: ", i)
 			continue
 		}
 
-		if PortToCoreMapping[i].Client == nil {
-			PortToCoreMapping[i].Client = ClientCoreMappings[index]
-			ClientCoreMappings[index].PortRange = PortToCoreMapping[i]
-			startPort = PortToCoreMapping[i].StartPort
-			endPort = PortToCoreMapping[i].EndPort
+		if portToCoreMapping[i].Client == nil {
+			portToCoreMapping[i].Client = clientCoreMappings[index]
+			clientCoreMappings[index].PortRange = portToCoreMapping[i]
+			startPort = portToCoreMapping[i].StartPort
+			endPort = portToCoreMapping[i].EndPort
 			break
 		}
 	}
