@@ -10,12 +10,13 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
+	"github.com/tunnels-is/tunnels/types"
 )
 
 func cleanTwoFactorPendingMap() {
 	pendingTwoFactor.Range(func(key, value any) bool {
 		//
-		val, ok := value.(*TwoFAPending)
+		val, ok := value.(*types.TwoFAPending)
 		if !ok {
 			logger.Error("unable to cast pending auth to type", slog.Any("value", value))
 		}
@@ -53,7 +54,7 @@ func handleLogin(c *fiber.Ctx) error {
 
 	if user.OTPEnabled {
 		authID := uuid.NewString()
-		pendingAuth := &TwoFAPending{
+		pendingAuth := &types.TwoFAPending{
 			Expires: time.Now().Add(5 * time.Minute),
 			AuthID:  authID,
 			UserID:  user.UUID,
