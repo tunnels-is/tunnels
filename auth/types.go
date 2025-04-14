@@ -6,10 +6,10 @@ type User struct {
 	UUID         string `json:"uuid"`
 	Username     string `json:"username"`
 	PasswordHash string `json:"passwordHash"`
-	GoogleID     string `json:"googleId,omitempty"` // Changed: Allow marshalling, keep omitempty
+	GoogleID     string `json:"googleId"`
 	IsAdmin      bool   `json:"isAdmin"`
 	IsManager    bool   `json:"isManager"`
-	OTPSecret    string `json:"otpSecret,omitempty"` // Changed: Allow marshalling, keep omitempty
+	OTPSecret    string `json:"otpSecret"`
 	OTPEnabled   bool   `json:"otpEnabled"`
 }
 
@@ -29,29 +29,29 @@ type Server struct {
 
 type AuthToken struct {
 	UserUUID   string    `json:"userUuid"`
-	TokenUUID  string    `json:"tokenUuid"` // This is the actual token the client sends
+	TokenUUID  string    `json:"tokenUuid"`
 	CreatedAt  time.Time `json:"createdAt"`
-	DeviceName string    `json:"deviceName"` // e.g., "Chrome on Desktop", "User's iPhone"
+	DeviceName string    `json:"deviceName"`
 }
 
 // Request bodies
 type CreateUserRequest struct {
 	Username  string `json:"username"`
-	Password  string `json:"password,omitempty"`
-	IsAdmin   bool   `json:"isAdmin"`   // Should only be settable by existing admin
-	IsManager bool   `json:"isManager"` // Should only be settable by existing admin/manager
+	Password  string `json:"password"`
+	IsAdmin   bool   `json:"isAdmin"`
+	IsManager bool   `json:"isManager"`
 }
 
 type UpdateUserRequest struct {
-	Username  *string `json:"username,omitempty"`
-	IsAdmin   *bool   `json:"isAdmin,omitempty"`   // Admin only
-	IsManager *bool   `json:"isManager,omitempty"` // Admin or Manager only
+	Username  *string `json:"username"`
+	IsAdmin   *bool   `json:"isAdmin"`
+	IsManager *bool   `json:"isManager"`
 }
 
 type LoginRequest struct {
 	Username   string `json:"username"`
 	Password   string `json:"password"`
-	DeviceName string `json:"deviceName,omitempty"` // Optional device name
+	DeviceName string `json:"deviceName"`
 }
 
 type CreateGroupRequest struct {
