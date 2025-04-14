@@ -273,14 +273,14 @@ func handleGoogleCallback(c *fiber.Ctx) error {
 		}
 	}
 
-	if user.OTPEnabled {
-		logger.Info("OTP is enabled for user, requiring verification", slog.String("userUUID", user.UUID))
-		pendingInfo := PendingOTPInfo{
-			UserUUID:    user.UUID,
-			OTPRequired: true,
-		}
-		return c.Status(fiber.StatusAccepted).JSON(pendingInfo)
-	}
+	// if user.OTPEnabled {
+	// 	logger.Info("OTP is enabled for user, requiring verification", slog.String("userUUID", user.UUID))
+	// 	pendingInfo := PendingOTPInfo{
+	// 		UserUUID:    user.UUID,
+	// 		OTPRequired: true,
+	// 	}
+	// 	return c.Status(fiber.StatusAccepted).JSON(pendingInfo)
+	// }
 
 	authToken, err := generateAndSaveToken(user.UUID, stateData.DeviceName)
 	if err != nil {
