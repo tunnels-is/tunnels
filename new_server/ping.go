@@ -38,37 +38,37 @@ func PopulatePingBufferWithStats() {
 
 func NukeClient(index int) {
 	LOG("Removing index:", index)
-	cm := ClientCoreMappings[index]
+	cm := clientCoreMappings[index]
 	if cm == nil {
 		ERR("Nuke client on nill index", index)
 		return
 	}
 
 	if cm.PortRange != nil {
-		for i, v := range PortToCoreMapping {
+		for i, v := range portToCoreMapping {
 			if v == nil {
 				continue
 			}
 
 			if v.StartPort == cm.PortRange.StartPort {
-				PortToCoreMapping[i].Client = nil
+				portToCoreMapping[i].Client = nil
 			}
 		}
 	}
 
-	if ClientCoreMappings[index].DHCP != nil {
-		ip := ClientCoreMappings[index].DHCP.IP
+	if clientCoreMappings[index].DHCP != nil {
+		ip := clientCoreMappings[index].DHCP.IP
 		VPLIPToCore[ip[0]][ip[1]][ip[2]][ip[3]] = nil
 	}
-	close(ClientCoreMappings[index].ToUser)
-	close(ClientCoreMappings[index].FromUser)
-	ClientCoreMappings[index] = nil
+	close(clientCoreMappings[index].ToUser)
+	close(clientCoreMappings[index].FromUser)
+	clientCoreMappings[index] = nil
 }
 
 func pingActiveUsers() {
 	PopulatePingBufferWithStats()
 
-	for index, u := range ClientCoreMappings {
+	for index, u := range clientCoreMappings {
 		if u == nil {
 			continue
 		}

@@ -78,15 +78,15 @@ func getIP4FromHostOrDHCP(host string) (ip4 [4]byte, ok bool) {
 }
 
 func getHostnameFromDHCP(hostname string) (ip4b [4]byte, ok bool) {
-	for i := range ClientCoreMappings {
-		if ClientCoreMappings[i] == nil {
+	for i := range clientCoreMappings {
+		if clientCoreMappings[i] == nil {
 			continue
 		}
-		if ClientCoreMappings[i].DHCP == nil {
+		if clientCoreMappings[i].DHCP == nil {
 			continue
 		}
-		if ClientCoreMappings[i].DHCP.Hostname == hostname {
-			return ClientCoreMappings[i].DHCP.IP, true
+		if clientCoreMappings[i].DHCP.Hostname == hostname {
+			return clientCoreMappings[i].DHCP.IP, true
 		}
 	}
 	return [4]byte{}, false
@@ -97,16 +97,16 @@ func validateDHCPTokenAndIP(fr *types.FirewallRequest) (mapping *UserCoreMapping
 	ip = ip.To4()
 	ip4b := [4]byte{ip[0], ip[1], ip[2], ip[3]}
 
-	for i := range ClientCoreMappings {
-		if ClientCoreMappings[i] == nil {
+	for i := range clientCoreMappings {
+		if clientCoreMappings[i] == nil {
 			continue
 		}
-		if ClientCoreMappings[i].DHCP == nil {
+		if clientCoreMappings[i].DHCP == nil {
 			continue
 		}
-		if ClientCoreMappings[i].DHCP.Token == fr.DHCPToken {
-			if ClientCoreMappings[i].DHCP.IP == ip4b {
-				return ClientCoreMappings[i]
+		if clientCoreMappings[i].DHCP.Token == fr.DHCPToken {
+			if clientCoreMappings[i].DHCP.IP == ip4b {
+				return clientCoreMappings[i]
 			}
 		}
 	}
