@@ -526,7 +526,12 @@ func handle2FAEnable(c *fiber.Ctx) error {
 		return errResponse(c, http.StatusInternalServerError, "Two Factor Authentication secret not found")
 	}
 
-	valid, err := totp.ValidateCustom(req.OTPCode, user.OTPSecret, time.Now().UTC(), totp.ValidateOpts{
+	secret, err := Decrypt(user.OTPSecret, []byte(TwoFactorKey))
+	if err != nil {
+		return errResponse(c, http.StatusBadRequest, "Error decrypting two factor authenticaton secret", slog.Any("err", err))
+	}
+
+	valid, err := totp.ValidateCustom(req.OTPCode, secret, time.Now().UTC(), totp.ValidateOpts{
 		Period:    30,
 		Skew:      1,
 		Digits:    otp.DigitsSix,
