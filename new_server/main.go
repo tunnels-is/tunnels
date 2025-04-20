@@ -7,7 +7,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"hash/crc32"
 	"io"
 	"log"
 	"log/slog"
@@ -25,7 +24,9 @@ import (
 
 	"slices"
 
+	"github.com/NdoleStudio/lemonsqueezy-go"
 	"github.com/jackpal/gateway"
+	"github.com/joho/godotenv"
 	"github.com/tunnels-is/tunnels/certs"
 	"github.com/tunnels-is/tunnels/setcap"
 	"github.com/tunnels-is/tunnels/signal"
@@ -35,17 +36,17 @@ import (
 )
 
 var (
-	twoFactorKey       = os.Getenv("TWO_FACTOR_KEY")
-	googleClientID     = os.Getenv("GOOGLE_CLIENT_ID")
-	googleClientSecret = os.Getenv("GOOGLE_CLIENT_SECRET")
-	emailKey           = os.Getenv("SENDMAIL_KEY")
-	googleRedirectURL  = "http://localhost:3000/auth/google/callback"
-	oauthStateString   = "random-pseudo-state"
+// twoFactorKey       = os.Getenv("TWO_FACTOR_KEY")
+// googleClientID     = os.Getenv("GOOGLE_CLIENT_ID")
+// googleClientSecret = os.Getenv("GOOGLE_CLIENT_SECRET")
+// emailKey           = os.Getenv("SENDMAIL_KEY")
+// googleRedirectURL  = "http://localhost:3000/auth/google/callback"
+// oauthStateString   = "random-pseudo-state"
 )
 
 const (
-	authHeader        = "X-Auth-Token"
-	googleUserInfoURL = "https://www.googleapis.com/oauth2/v2/userinfo?access_token="
+// authHeader        = "X-Auth-Token"
+// googleUserInfoURL = "https://www.googleapis.com/oauth2/v2/userinfo?access_token="
 )
 
 var (
@@ -65,6 +66,7 @@ var (
 	PrivKey      atomic.Pointer[any]
 	PubKey       atomic.Pointer[any]
 	KeyPair      atomic.Pointer[tls.Certificate]
+	lc           atomic.Pointer[lemonsqueezy.Client]
 )
 
 var (
@@ -131,11 +133,16 @@ func ERR(x ...any) {
 	}
 }
 
-func main() {
+func ADMIN(x ...any) {
+	if !disableLogs {
+		log.Println(x...)
+	}
+}
 
-	config := flag.Bool("config", false, "This command creates a new server config and certificates")
+func main() {
+	configFlag := flag.Bool("config", false, "This command creates a new server config and certificates")
 	flag.Parse()
-	if config != nil && *config {
+	if configFlag != nil && *configFlag {
 		fmt.Println("new config")
 		makeConfigAndCerts()
 		os.Exit(1)
@@ -143,7 +150,7 @@ func main() {
 
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
-	logHandler := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}) // Use LevelInfo in prod
+	logHandler := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug})
 	logger = slog.New(logHandler)
 	slog.SetDefault(logger)
 
@@ -152,11 +159,19 @@ func main() {
 		panic(err)
 	}
 
-	Config := Config.Load()
-	AUTHEnabled = slices.Contains(Config.Features, types.AUTH)
-	LANEnabled = slices.Contains(Config.Features, types.LAN)
-	DNSEnabled = slices.Contains(Config.Features, types.DNS)
-	VPNEnabled = slices.Contains(Config.Features, types.VPN)
+	config := Config.Load()
+	err = godotenv.Load(".env")
+	if err != nil {
+		if config.SecretStore == types.EnvStore {
+			logger.Error("no .env file found")
+			os.Exit(1)
+		}
+	}
+
+	AUTHEnabled = slices.Contains(config.Features, types.AUTH)
+	LANEnabled = slices.Contains(config.Features, types.LAN)
+	DNSEnabled = slices.Contains(config.Features, types.DNS)
+	VPNEnabled = slices.Contains(config.Features, types.VPN)
 
 	err = loadCertificatesAndTLSSettings()
 	if err != nil {
@@ -168,8 +183,21 @@ func main() {
 	Cancel.Store(&cancel)
 
 	if AUTHEnabled {
-		initAuth()
-		go signal.NewSignal("2FCLEANER", ctx, cancel, 5*time.Minute, goroutineLogger, cleanTwoFactorPendingMap)
+		err = ConnectToDB(loadSecret("DBurl"))
+		if err != nil {
+			os.Exit(1)
+		}
+
+		// Tunnels public network specific
+		if loadSecret("PayKey") != "" {
+			lemonClient := lemonsqueezy.New(lemonsqueezy.WithAPIKey(loadSecret("PayKey")))
+			if lemonClient == nil {
+				logger.Error("Unable to initialize lemon queezy client", slog.Any("err", err))
+				os.Exit(1)
+			}
+			lc.Store(lemonClient)
+			go signal.NewSignal("SUBSCANNER", ctx, cancel, 12*time.Hour, goroutineLogger, scanSubs)
+		}
 	}
 
 	if DNSEnabled {
@@ -196,7 +224,7 @@ func main() {
 		go signal.NewSignal("PING", ctx, cancel, 10*time.Second, goroutineLogger, pingActiveUsers)
 	}
 
-	go signal.NewSignal("API", ctx, cancel, 1*time.Second, goroutineLogger, StartAPI)
+	go signal.NewSignal("API", ctx, cancel, 1*time.Second, goroutineLogger, launchAPIServer)
 
 	go signal.NewSignal("CONFIG", ctx, cancel, 10*time.Second, goroutineLogger, func() {
 		_ = LoadServerConfig("./config.json")
@@ -206,7 +234,7 @@ func main() {
 	quit := make(chan os.Signal, 1)
 	sig.Notify(quit, os.Interrupt, syscall.SIGTERM)
 	<-quit
-	// TODO: log
+	logger.Info("Tunnels server exiting")
 }
 
 func goroutineLogger(msg string) {
@@ -222,30 +250,11 @@ func validateConfig(Config *types.ServerConfig) (err error) {
 		return fmt.Errorf("no features enbaled")
 	}
 
-	if Config.TwoFactorKey == "" {
-		return fmt.Errorf("Two factor authentication encryption key no set")
+	if Config.SecretStore == "" {
+		Config.SecretStore = types.EnvStore
 	}
 
 	return nil
-}
-func getShardIndex(key string) int {
-	checksum := crc32.ChecksumIEEE([]byte(key))
-	return int(checksum % uint32(numShards))
-}
-
-func initAuth() {
-	logger.Info("Initializing databases...")
-	if err := initDBs(logger); err != nil {
-		logger.Error("Fatal: Failed to initialize databases", slog.Any("error", err))
-		os.Exit(1)
-	}
-	defer closeDBs(logger)
-	logger.Info("Setting up Google OAuth...")
-	if err := setupGoogleOAuth(); err != nil {
-		logger.Error("Fatal: Failed to setup Google OAuth", slog.Any("error", err))
-		os.Exit(1)
-	}
-
 }
 
 func LoadServerConfig(path string) (err error) {
@@ -268,12 +277,11 @@ func LoadServerConfig(path string) (err error) {
 }
 
 func loadCertificatesAndTLSSettings() (err error) {
-	Config := Config.Load()
-	priv, privB, err := loadPrivateKey(Config.KeyPem)
+	priv, privB, err := loadPrivateKey(loadSecret("KeyPem"))
 	if err != nil {
 		panic(err)
 	}
-	pub, pubB, err := loadPublicKey(Config.CertPem)
+	pub, pubB, err := loadPublicKey(loadSecret("CertPem"))
 	if err != nil {
 		panic(err)
 	}
@@ -493,13 +501,6 @@ func makeConfigAndCerts() {
 		panic(err)
 	}
 
-}
-
-func recoverAndLog() {
-	r := recover()
-	if r != nil {
-		logger.Error("PANIC", slog.Any("stacktrace", getStacktraceLines(3)))
-	}
 }
 
 func getStacktraceLines(skipFrames int) []string {

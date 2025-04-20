@@ -24,15 +24,12 @@ type ServerConfig struct {
 
 	VPNIP   string `json:"VPNIP"`
 	VPNPort string `json:"VPNPort"`
-	CertPem string `json:"CertPem"`
-	KeyPem  string `json:"KeyPem"`
 
 	APIIP   string `json:"APIIP"`
 	APIPort string `json:"APIPort"`
 
-	AdminApiKey string   `json:"AdminAPIKey"`
-	Admins      []string `json:"Admins"`
-	NetAdmins   []string `json:"NetAdmins"`
+	Admins    []string `json:"Admins"`
+	NetAdmins []string `json:"NetAdmins"`
 
 	Hostname           string
 	Lan                *Network   `json:"Lan"`
@@ -51,7 +48,23 @@ type ServerConfig struct {
 	DNSAllowCustomOnly bool         `json:"DNSAllowCustomOnly"`
 	DNS                []*DNSRecord `json:"DNS"`
 	DNSServers         []string     `json:"DNSServers"`
+
+	SecretStore SecretStore `json:"SecretStore"`
+	// If SecretStore set to "config"
+	AdminApiKey     string
+	DBurl           string
+	TwoFactorEncKey string
+	EmailKey        string
+	CertPem         string
+	KeyPem          string
 }
+
+type SecretStore string
+
+const (
+	EnvStore    SecretStore = "env"
+	ConfigStore SecretStore = "config"
+)
 
 type TwoFAPending struct {
 	AuthID  string
@@ -98,6 +111,11 @@ type ListDevice struct {
 	EndPort      uint16
 }
 
+type SignedConnectRequest struct {
+	Signature []byte
+	Payload   []byte
+}
+
 type ConnectRequestResponse struct {
 	Index             int `json:"Index"`
 	AvailableMbps     int `json:"AvailableMbps"`
@@ -140,20 +158,21 @@ func CreateCRRFromServer(S *ServerConfig) (CRR *ConnectRequestResponse) {
 }
 
 type ConnectRequest struct {
-	DeviceToken string             `json:"DeviceToken"`
-	APIToken    string             `json:"APIToken"`
-	EncType     crypt.EncType      `json:"EncType"`
-	CurveType   crypt.CurveType    `json:"CurveType"`
-	UserID      primitive.ObjectID `json:"UserID"`
-	SeverID     primitive.ObjectID `json:"ServerID"`
-	Serial      string             `json:"Serial"`
+	EncType   crypt.EncType      `json:"EncType"`
+	CurveType crypt.CurveType    `json:"CurveType"`
+	SeverID   primitive.ObjectID `json:"ServerID"`
+	Serial    string             `json:"Serial"`
 
 	Version int       `json:"Version"`
 	Created time.Time `json:"Created"`
 
-	Hostname        string `json:"Hostname"`
 	RequestingPorts bool   `json:"RequestingPorts"`
 	DHCPToken       string `json:"DHCPToken"`
+
+	Hostname  string             `json:"Hostname"`
+	UserID    primitive.ObjectID `json:"UserID"`
+	UserEmail string             `json:"UserEmail"`
+	UserToken string             `json:"UserToken"`
 }
 
 type DHCPRecord struct {

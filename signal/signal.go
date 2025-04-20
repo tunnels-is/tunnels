@@ -55,7 +55,6 @@ func (s *Signal) Start() {
 		s.Log("goroutine exit: " + s.Tag)
 	}()
 
-	fmt.Println(s.ShouldStop.Load(), s.Ctx.Err())
 	for !s.ShouldStop.Load() && s.Ctx.Err() == nil {
 		s.Method()
 		time.Sleep(s.Sleep)
