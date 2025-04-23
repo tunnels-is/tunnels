@@ -24,7 +24,7 @@ func (T *TInterface) ReadFromTunnelInterface() {
 		packet       []byte
 		writtenBytes int
 		sendRemote   bool
-		tempBytes    = make([]byte, 500000)
+		tempBytes    = make([]byte, 66000)
 		Tun          *TUN
 		out          []byte
 	)
@@ -60,7 +60,6 @@ func (T *TInterface) ReadFromTunnelInterface() {
 
 		out = Tun.encWrapper.SEAL.Seal1(packet, Tun.Index)
 
-		// TIP; SET DONT FRAGMENT
 		writtenBytes, err = Tun.connection.Write(out)
 		if err != nil {
 			ERROR("router write error: ", err)
@@ -88,8 +87,8 @@ func (tun *TUN) ReadFromServeTunnel() {
 		readErr  error
 		n        int
 		packet   []byte
-		buff     = make([]byte, 500000)
-		staging  = make([]byte, 500000)
+		buff     = make([]byte, 66000)
+		staging  = make([]byte, 66000)
 		err      error
 		osTunnel = tun.tunnel.Load()
 	)

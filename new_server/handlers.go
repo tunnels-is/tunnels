@@ -1,22 +1,109 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
+	"math/rand"
 	"net/http"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/tunnels-is/monorepo/email"
+	"github.com/tunnels-is/tunnels/crypt"
+	"github.com/tunnels-is/tunnels/signal"
 	"github.com/tunnels-is/tunnels/types"
 	"github.com/xlzd/gotp"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"golang.org/x/crypto/bcrypt"
 )
 
-func APICreateUser(w http.ResponseWriter, r *http.Request) {
+func API_AcceptUserConnections(w http.ResponseWriter, r *http.Request) {
+
+	SCR := new(types.SignedConnectRequest)
+	err := decodeBody(r, SCR)
+	if err != nil {
+		senderr(w, 400, err.Error())
+		return
+	}
+	err = verifySignature(SCR.Payload, SCR.Signature)
+	if err != nil {
+		senderr(w, 401, "Invalid signature", slog.Any("err", err))
+		return
+	}
+
+	CR := new(types.ServerConnectRequest)
+	err = json.Unmarshal(SCR.Payload, CR)
+	if err != nil {
+		senderr(w, 400, "unable to decode Payload")
+		return
+	}
+
+	if time.Since(CR.Created).Seconds() > 20 {
+		senderr(w, 401, "request not valid")
+		return
+	}
+	if CR.UserID.IsZero() || CR.UserEmail == "" {
+		senderr(w, 401, "invalid user identifier")
+		return
+	}
+	totalC, totalUserC := countConnections(CR.UserID.Hex())
+	if CR.RequestingPorts {
+		if totalC >= slots {
+			senderr(w, 400, "server is full")
+			return
+		}
+	}
+
+	Config := Config.Load()
+	if totalUserC > Config.UserMaxConnections {
+		senderr(w, 400, "user has too many active connections")
+		return
+	}
+
+	var EH *crypt.SocketWrapper
+	EH, err = crypt.NewEncryptionHandler(CR.EncType, CR.CurveType)
+	if err != nil {
+		ERR("unable to create encryption handler", err)
+		return
+	}
+
+	EH.SEAL.NewPublicKeyFromBytes(SCR.UserHandshake)
+	EH.SEAL.CreateAEAD()
+
+	CRR := types.CreateCRRFromServer(Config)
+	index, err := CreateClientCoreMapping(CRR, CR, EH)
+	if err != nil {
+		ERR("Port allocation failed", err)
+		return
+	}
+
+	CRR.ServerHandshake = EH.GetPublicKey()
+	CRRB, err := json.Marshal(CRR)
+	if err != nil {
+		ERR("Unable to marshal CCR", err)
+		return
+	}
+
+	_, err = w.Write(CRRB)
+	if err != nil {
+		ERR("Unable to marshal CCR", err)
+		return
+	}
+
+	go signal.NewSignal(fmt.Sprintf("TO:%d", index), *CTX.Load(), *Cancel.Load(), time.Second, goroutineLogger, func() {
+		toUserChannel(index)
+	})
+
+	go signal.NewSignal(fmt.Sprintf("FROM:%d", index), *CTX.Load(), *Cancel.Load(), time.Second, goroutineLogger, func() {
+		fromUserChannel(index)
+	})
+}
+
+func API_UserCreate(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 	RF := new(REGISTER_FORM)
 	err := decodeBody(r, RF)
@@ -70,16 +157,16 @@ func APICreateUser(w http.ResponseWriter, r *http.Request) {
 	newUser.Trial = true
 	newUser.SubExpiration = time.Now().AddDate(0, 0, 1)
 
-	splitEmail := strings.Split(RF.Email, "@")
-	if len(splitEmail) > 1 {
-		newUser.ConfirmCode = uuid.NewString()
-		err = email.SEND_CONFIRMATION(loadSecret("EmailKey"), newUser.Email, newUser.ConfirmCode)
-		if err != nil {
-			INFO("unable to send confirm email on signup", err, nil)
-			senderr(w, 500, "Email system error, please contact support")
-			return
-		}
-	}
+	// splitEmail := strings.Split(RF.Email, "@")
+	// if len(splitEmail) > 1 {
+	// 	newUser.ConfirmCode = uuid.NewString()
+	// 	err = SEND_CONFIRMATION(loadSecret("EmailKey"), newUser.Email, newUser.ConfirmCode)
+	// 	if err != nil {
+	// 		INFO("unable to send confirm email on signup", err, nil)
+	// 		senderr(w, 500, "Email system error, please contact support")
+	// 		return
+	// 	}
+	// }
 
 	err = DB_CreateUser(newUser)
 	if err != nil {
@@ -90,7 +177,7 @@ func APICreateUser(w http.ResponseWriter, r *http.Request) {
 	sendObject(w, newUser)
 }
 
-func APIUpdateUser(w http.ResponseWriter, r *http.Request) {
+func API_UserUpdate(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 
 	UF := new(USER_UPDATE_FORM)
@@ -115,7 +202,7 @@ func APIUpdateUser(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(200)
 }
 
-func APILoginUser(w http.ResponseWriter, r *http.Request) {
+func API_UserLogin(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 
 	LF := new(LOGIN_FORM)
@@ -172,7 +259,7 @@ func APILoginUser(w http.ResponseWriter, r *http.Request) {
 	sendObject(w, user)
 }
 
-func APILogoutUser(w http.ResponseWriter, r *http.Request) {
+func API_UserLogout(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 	LF := new(LOGOUT_FORM)
 	err := decodeBody(r, LF)
@@ -214,7 +301,7 @@ func APILogoutUser(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(200)
 }
 
-func APITwoFactorConfirm(w http.ResponseWriter, r *http.Request) {
+func API_UserTwoFactorConfirm(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 
 	var user *User
@@ -309,7 +396,7 @@ func APITwoFactorConfirm(w http.ResponseWriter, r *http.Request) {
 	sendObject(w, out)
 }
 
-func APICreateGroup(w http.ResponseWriter, r *http.Request) {
+func API_GroupCreate(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 	F := new(FORM_CREATE_GROUP)
 	err := decodeBody(r, F)
@@ -342,7 +429,7 @@ func APICreateGroup(w http.ResponseWriter, r *http.Request) {
 
 	sendObject(w, F.Group)
 }
-func APIAddToGroup(w http.ResponseWriter, r *http.Request) {
+func API_GroupAdd(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 	F := new(FORM_GROUP_ADD)
 	err := decodeBody(r, F)
@@ -374,7 +461,7 @@ func APIAddToGroup(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(200)
 }
 
-func APIUpdateGroup(w http.ResponseWriter, r *http.Request) {
+func API_GroupUpdate(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 	F := new(FORM_UPDATE_GROUP)
 	err := decodeBody(r, F)
@@ -406,7 +493,7 @@ func APIUpdateGroup(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(200)
 }
 
-func APIGetGroup(w http.ResponseWriter, r *http.Request) {
+func API_GroupGet(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 	F := new(FORM_GET_GROUP)
 	err := decodeBody(r, F)
@@ -442,7 +529,7 @@ func APIGetGroup(w http.ResponseWriter, r *http.Request) {
 	sendObject(w, group)
 }
 
-func APIGetServers(w http.ResponseWriter, r *http.Request) {
+func API_ServerGet(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 	F := new(FORM_GET_SERVERS)
 	err := decodeBody(r, F)
@@ -475,7 +562,7 @@ func APIGetServers(w http.ResponseWriter, r *http.Request) {
 	sendObject(w, servers)
 }
 
-func APIUpdateServer(w http.ResponseWriter, r *http.Request) {
+func API_ServerUpdate(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 
 	F := new(FORM_UPDATE_SERVER)
@@ -507,7 +594,7 @@ func APIUpdateServer(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(200)
 }
 
-func APICreateServer(w http.ResponseWriter, r *http.Request) {
+func API_ServerCreate(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 	F := new(FORM_CREATE_SERVER)
 	err := decodeBody(r, F)
@@ -539,10 +626,10 @@ func APICreateServer(w http.ResponseWriter, r *http.Request) {
 	sendObject(w, F.Server)
 }
 
-func APIConnectVPN(w http.ResponseWriter, r *http.Request) {
+func API_SessionCreate(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 
-	CR := new(types.ConnectRequest)
+	CR := new(types.ServerConnectRequest)
 	err := decodeBody(r, CR)
 	if err != nil {
 		senderr(w, 400, "Invalid request body", slog.Any("error", err))
@@ -591,10 +678,234 @@ func APIConnectVPN(w http.ResponseWriter, r *http.Request) {
 	SCR := new(types.SignedConnectRequest)
 	SCR.Payload, err = json.Marshal(CR)
 	SCR.Signature, err = signData(SCR.Payload)
+	SCR.ServerPubKey = server.PubKey
 	if err != nil {
 		senderr(w, 500, "Unable to sign payload")
 		return
 	}
 
 	sendObject(w, SCR)
+}
+
+func API_UserRequestPasswordCode(w http.ResponseWriter, r *http.Request) {
+	defer BasicRecover()
+
+	var user *User
+	RF := new(PASSWORD_RESET_FORM)
+	err := decodeBody(r, RF)
+	if err != nil {
+		senderr(w, 400, "Invalid request body", slog.Any("error", err))
+		return
+	}
+
+	user, err = DB_findUserByEmail(RF.Email)
+	if err != nil {
+		senderr(w, 500, "Unknown error, please try again in a moment")
+	}
+	if user == nil {
+		senderr(w, 401, "Invalid session token, please log in again")
+	}
+
+	if !user.LastResetRequest.IsZero() && time.Since(user.LastResetRequest).Seconds() < 30 {
+		senderr(w, 401, "You need to wait at least 30 seconds between password reset attempts")
+	}
+
+	user.ResetCode = uuid.NewString()
+	user.LastResetRequest = time.Now()
+
+	err = DB_userUpdateResetCode(user)
+	if err != nil {
+		senderr(w, 500, "Database error, please try again in a moment")
+	}
+
+	err = SEND_PASSWORD_RESET(loadSecret("EmailKey"), user.Email, user.ResetCode)
+	if err != nil {
+		ADMIN(3, "UNABLE TO SEND PASSWORD RESET CODE TO USER: ", user.ID)
+		senderr(w, 500, "Email system  error, please try again in a moment")
+	}
+
+	w.WriteHeader(200)
+}
+
+func API_UserResetPassword(w http.ResponseWriter, r *http.Request) {
+	defer BasicRecover()
+
+	var user *User
+	RF := new(PASSWORD_RESET_FORM)
+	err := decodeBody(r, RF)
+	if err != nil {
+		senderr(w, 400, "Invalid request body", slog.Any("error", err))
+		return
+	}
+
+	if RF.Password == "" || RF.Password2 == "" {
+		senderr(w, 400, "password is empty")
+		return
+	}
+
+	if RF.Password != RF.Password2 {
+		senderr(w, 400, "passwords do not match")
+		return
+	}
+
+	if len(RF.Password) < 10 {
+		senderr(w, 400, "password smaller then 10 characters")
+		return
+	}
+
+	user, err = DB_findUserByEmail(RF.Email)
+	if user == nil {
+		senderr(w, 401, "Invalid user, please try again")
+		return
+	}
+
+	if err != nil {
+		senderr(w, 500, "Unknown error, please try again in a moment")
+		return
+	}
+
+	if RF.ResetCode != user.ResetCode || user.ResetCode == "" {
+		senderr(w, 401, "Invalid reset code")
+		return
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(RF.Password), 13)
+	if err != nil {
+		senderr(w, 500, "Unable to generate a secure password, please contact customer support")
+		return
+	}
+	user.Password = string(hash)
+
+	err = DB_userResetPassword(user)
+	if err != nil {
+		senderr(w, 401, "Database error, please try again in a moment")
+		return
+	}
+
+	w.WriteHeader(200)
+}
+
+func API_UserToggleSubStatus(w http.ResponseWriter, r *http.Request) {
+	defer BasicRecover()
+	UF := new(USER_UPDATE_SUB_FORM)
+	err := decodeBody(r, UF)
+	if err != nil {
+		senderr(w, 400, "Invalid request body", slog.Any("error", err))
+		return
+	}
+
+	user, err := authenticateUserFromEmailOrIDAndToken(UF.Email, primitive.NilObjectID, UF.DeviceToken)
+	if err != nil || user == nil {
+		senderr(w, 401, err.Error())
+		return
+	}
+
+	err = DB_toggleUserSubscriptionStatus(UF)
+	if err != nil {
+		senderr(w, 500, "unexpected error, please try again later")
+		return
+	}
+
+	w.WriteHeader(200)
+}
+func API_ActivateLicenseKey(w http.ResponseWriter, r *http.Request) {
+	defer BasicRecover()
+
+	AF := new(KEY_ACTIVATE_FORM)
+	err := decodeBody(r, AF)
+	if err != nil {
+		senderr(w, 400, err.Error())
+		return
+	}
+
+	user, err := authenticateUserFromEmailOrIDAndToken("", AF.UserID, AF.DeviceToken)
+	if err != nil {
+		senderr(w, 401, err.Error())
+		return
+	}
+
+	INFO(3, "KEY attempt:", AF.Key)
+
+	lemonClient := lc.Load()
+	key, resp, err := lemonClient.Licenses.Validate(context.Background(), AF.Key, "")
+	if err != nil {
+		if resp != nil && resp.Body != nil {
+			// return c.String(resp.HTTPResponse.StatusCode, string(*resp.Body))
+			senderr(w, 500, "unexpected error, please try again")
+			return
+		}
+		senderr(w, 500, "unexpected error, please try again")
+		return
+	}
+
+	if key.LicenseKey.ActivationUsage > 0 {
+		senderr(w, 400, "key is already in use, please contact customer support")
+		return
+	}
+
+	if strings.Contains(strings.ToLower(key.LicenseAttributes.Meta.ProductName), "anonymous") {
+		if user.SubExpiration.IsZero() {
+			user.SubExpiration = time.Now()
+		}
+		if time.Until(user.SubExpiration).Seconds() > 1 {
+			user.SubExpiration = time.Now()
+		}
+		user.SubExpiration = user.SubExpiration.AddDate(0, 1, 0).Add(time.Duration(rand.Intn(60)+60) * time.Minute)
+		INFO(3, "KEY +1:", key.LicenseKey.Key, " - check activation in lemon")
+
+		user.Key = &LicenseKey{
+			Created: key.LicenseKey.CreatedAt,
+			Months:  1,
+			Key:     "unknown",
+		}
+	} else {
+		ns := strings.Split(key.LicenseAttributes.Meta.ProductName, " ")
+		months, err := strconv.Atoi(ns[0])
+		if err != nil {
+			ADMIN(3, "unable to parse license key name:", err)
+			senderr(w, 500, "Something went wrong, please contact customer support")
+		}
+		if user.SubExpiration.IsZero() {
+			user.SubExpiration = time.Now()
+		}
+		user.SubExpiration = time.Now().AddDate(0, months, 0).Add(time.Duration(rand.Intn(600)+60) * time.Minute)
+		INFO(3, "KEY +", months, ":", key.LicenseKey.Key, " - check activate in lemon")
+
+		user.Key = &LicenseKey{
+			Created: key.LicenseKey.CreatedAt,
+			Months:  months,
+			Key:     key.LicenseKey.Key,
+		}
+	}
+
+	user.Trial = false
+	user.Disabled = false
+	err = DB_UserActivateKey(user.SubExpiration, user.Key, user.ID)
+	if err != nil {
+		senderr(w, 500, "unexpected error, please contact support")
+		return
+	}
+
+	activeKey, resp, err := lemonClient.Licenses.Activate(context.Background(), AF.Key, "tunnels")
+	if err != nil {
+		if resp != nil && resp.Body != nil {
+			// return c.String(resp.HTTPResponse.StatusCode, string(*resp.Body))
+			senderr(w, 500, "unexpected error, please try again")
+			return
+		}
+		senderr(w, 500, "unexpected error, please try again")
+		return
+	}
+
+	if activeKey.Error != "" {
+		senderr(w, 400, activeKey.Error)
+		return
+	}
+
+	if key != nil {
+		INFO(3, "KEY: Activated:", key.LicenseKey.Key)
+	}
+
+	w.WriteHeader(200)
+	return
 }

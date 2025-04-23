@@ -217,7 +217,6 @@ func main() {
 			initializeVPN()
 		}
 
-		go signal.NewSignal("CONTROL", ctx, cancel, 1*time.Second, goroutineLogger, ControlSocketListener)
 		go signal.NewSignal("DATA", ctx, cancel, 1*time.Second, goroutineLogger, DataSocketListener)
 		go signal.NewSignal("TCP", ctx, cancel, 1*time.Second, goroutineLogger, ExternalTCPListener)
 		go signal.NewSignal("UDP", ctx, cancel, 1*time.Second, goroutineLogger, ExternalUDPListener)
@@ -473,7 +472,7 @@ func makeConfigAndCerts() {
 		BandwidthMbps:      1000,
 		UserBandwidthMbps:  10,
 		DNSAllowCustomOnly: false,
-		DNS:                []*types.DNSRecord{},
+		DNSRecords:         []*types.DNSRecord{},
 		DNSServers:         []string{},
 	}
 	f, err := os.Create(ep + "config.json")

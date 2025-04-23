@@ -6,7 +6,7 @@ import (
 	"github.com/tunnels-is/tunnels/types"
 )
 
-func allocatePorts(CRR *types.ConnectRequestResponse, index int) (err error) {
+func allocatePorts(CRR *types.ServerConnectResponse, index int) (err error) {
 	Config := Config.Load()
 	var startPort uint16 = 0
 	var endPort uint16 = 0
