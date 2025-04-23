@@ -290,6 +290,7 @@ func (t *TInterface) Connect(tun *TUN) (err error) {
 	if err != nil {
 		return
 	}
+
 	meta := tun.meta.Load()
 	if IsDefaultConnection(meta.IFName) || meta.EnableDefaultRoute {
 		err = IP_AddRoute("default", "", t.IPv4Address, "0")
