@@ -636,7 +636,7 @@ func API_SessionCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := authenticateUserFromEmailOrIDAndToken(CR.UserEmail, CR.UserID, CR.UserToken)
+	user, err := authenticateUserFromEmailOrIDAndToken(CR.UserEmail, CR.UserID, CR.DeviceToken)
 	if err != nil {
 		senderr(w, 401, err.Error())
 		return
