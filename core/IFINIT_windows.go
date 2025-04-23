@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os/exec"
 	"strconv"
-	"strings"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -376,21 +375,9 @@ func IP_AddRoute(
 }
 
 func IP_DelRoute(network string, _ string, _ string) (err error) {
-	// if IsActiveRouterIP(network) {
-	// 	return
-	// }
+	cmd := exec.Command("route", "DELETE", network)
 
-	cmd := exec.Command(
-		"route",
-		"DELETE",
-		network,
-	)
-
-	DEBUG(
-		"route",
-		"DELETE",
-		network,
-	)
+	DEBUG("route", "DELETE", network)
 
 	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
 	ob, cerr := cmd.Output()
@@ -492,93 +479,6 @@ func (t *TInterface) SetMTU() error {
 	return nil
 }
 
-func (t *TInterface) addRoutes(n *ServerNetwork) (err error) {
-	if n.Nat != "" {
-		err = IP_AddRoute(n.Nat, t.Name, t.IPv4Address, "0")
-		if err != nil {
-			return err
-		}
-	}
-
-	for _, v := range n.Routes {
-		// default routes are not allowed on windows
-		if strings.ToLower(v.Address) == "default" || strings.HasPrefix(v.Address, "0.0.0.0") {
-			continue
-		}
-
-		err = IP_AddRoute(v.Address, t.Name, t.IPv4Address, v.Metric)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (t *TInterface) deleteRoutes(n *ServerNetwork) (err error) {
-	err = IP_DelRoute(n.Nat, t.IPv4Address, "0")
-	if err != nil {
-		return err
-	}
-
-	for _, v := range n.Routes {
-		if strings.ToLower(v.Address) == "default" || strings.Contains(v.Address, "0.0.0.0") {
-			continue
-		}
-
-		err = IP_DelRoute(v.Address, t.IPv4Address, v.Metric)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (t *TInterface) ApplyRoutes(V *TUN) (err error) {
-
-	meta := V.meta.Load()
-	if IsDefaultConnection(meta.IFName) || meta.EnableDefaultRoute {
-		t.GatewayMetric = "1"
-		err = IP_RouteMetric("0.0.0.0/0", t.Name, "1")
-		if err != nil {
-			return
-		}
-	}
-
-	for _, n := range V.CRResponse.Networks {
-		t.addRoutes(n)
-	}
-
-	if V.CRResponse.VPLNetwork != nil {
-		t.addRoutes(V.CRResponse.VPLNetwork)
-	}
-
-	return
-}
-
-func (t *TInterface) RemoveRoutes(V *TUN, preserve bool) (err error) {
-	defer RecoverAndLogToFile()
-
-	meta := V.meta.Load()
-	for _, n := range V.CRResponse.Networks {
-		t.deleteRoutes(n)
-	}
-
-	if V.CRResponse.VPLNetwork != nil {
-		t.deleteRoutes(V.CRResponse.VPLNetwork)
-	}
-	if !preserve {
-		if IsDefaultConnection(meta.IFName) || meta.EnableDefaultRoute {
-			t.GatewayMetric = "2000"
-			err = IP_RouteMetric("0.0.0.0/0", t.Name, "2000")
-			if err != nil {
-				return
-			}
-		}
-	}
-
-	return
-}
-
 func (t *TInterface) Connect(tun *TUN) (err error) {
 	err = t.CreateOrOpen()
 	if err != nil {
@@ -596,17 +496,21 @@ func (t *TInterface) Connect(tun *TUN) (err error) {
 	if err != nil {
 		return
 	}
+
 	// err = t.SetTXQueueLen()
 	// if err != nil {
 	// 	return
 	// }
+
+	closeAllOpenTCPconnections()
+
 	t.exitChannel = make(chan byte, 10)
 	meta := tun.meta.Load()
 
 	if IsDefaultConnection(meta.IFName) || meta.EnableDefaultRoute {
 		// Gateway metric is what determines default
 		// routing on windows. The interface will always
-		// have a default router on creation.
+		// have a default route on creation.
 		t.GatewayMetric = "1"
 		err = IP_RouteMetric("0.0.0.0/0", t.Name, "1")
 		if err != nil {
@@ -614,15 +518,31 @@ func (t *TInterface) Connect(tun *TUN) (err error) {
 		}
 	}
 
+	// experimental
 	// _ = DNS_Del(strconv.Itoa(DEFAULT_INTERFACE_ID))
 	// err = DNS_Set(strconv.Itoa(DEFAULT_INTERFACE_ID), "127.0.0.1", "1")
 
-	if tun.CRResponse.VPLNetwork != nil {
-		t.addRoutes(tun.CRResponse.VPLNetwork)
+	if tun.ServerReponse.LAN != nil && tun.ServerReponse.LAN.Nat != "" {
+		err = IP_AddRoute(tun.ServerReponse.LAN.Nat, "", t.IPv4Address, "0")
+		if err != nil {
+			return err
+		}
 	}
 
-	for _, n := range tun.CRResponse.Networks {
-		t.addRoutes(n)
+	for _, n := range tun.ServerReponse.Networks {
+		if n.Nat != "" {
+			err = IP_AddRoute(n.Nat, "", t.IPv4Address, "0")
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	for _, v := range tun.ServerReponse.Routes {
+		err = IP_AddRoute(v.Address, "", t.IPv4Address, v.Metric)
+		if err != nil {
+			return err
+		}
 	}
 
 	closeAllOpenTCPconnections()
@@ -654,23 +574,43 @@ func (t *TInterface) Disconnect(tun *TUN) (err error) {
 	t.shouldRestart = false
 	t.shouldExit = true
 
-	for _, n := range tun.CRResponse.Networks {
-		t.deleteRoutes(n)
-	}
-
-	if tun.CRResponse.VPLNetwork != nil {
-		t.deleteRoutes(tun.CRResponse.VPLNetwork)
-	}
-
 	if tun.connection != nil {
 		tun.connection.Close()
 	}
 
-	t.CloseReadAndWriteLoop()
-
 	err = t.Close()
 	if err != nil {
 		ERROR("unable to delete the interface", err)
+	}
+
+	t.CloseReadAndWriteLoop()
+
+	// TODO .. might not be needed ?????
+	meta := tun.meta.Load()
+	if IsDefaultConnection(meta.IFName) || meta.EnableDefaultRoute {
+		err = IP_DelRoute("default", t.IPv4Address, "0")
+	}
+
+	if tun.ServerReponse.LAN != nil && tun.ServerReponse.LAN.Nat != "" {
+		err = IP_DelRoute(tun.ServerReponse.LAN.Nat, t.IPv4Address, "0")
+		if err != nil {
+			return err
+		}
+	}
+
+	for _, n := range tun.ServerReponse.Networks {
+		if n.Nat != "" {
+			err = IP_DelRoute(n.Nat, t.IPv4Address, "0")
+			if err != nil {
+				return err
+			}
+		}
+	}
+	for _, r := range tun.ServerReponse.Routes {
+		err = IP_DelRoute(r.Address, t.IPv4Address, r.Metric)
+		if err != nil {
+			return err
+		}
 	}
 
 	return
