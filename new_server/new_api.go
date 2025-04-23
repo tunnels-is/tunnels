@@ -23,35 +23,37 @@ func launchAPIServer() {
 	mux.HandleFunc("/", healthCheckHandler)
 
 	if LANEnabled {
-		mux.HandleFunc("/firewall", HTTP_Firewall)
-		mux.HandleFunc("/devices", HTTP_ListDevices)
+		mux.HandleFunc("/firewall", API_Firewall)
+		mux.HandleFunc("/devices", API_ListDevices)
+	}
+
+	if VPNEnabled {
+		mux.HandleFunc("/connect", API_AcceptUserConnections)
 	}
 
 	if AUTHEnabled {
-		mux.HandleFunc("/user/create", APICreateUser)
-		mux.HandleFunc("/user/update", APIUpdateUser)
-		// mux.HandleFunc("/user/update")
-		// mux.HandleFunc("/user/enable", nil)
-		mux.HandleFunc("/user/login", APILoginUser)
-		mux.HandleFunc("/user/logout", APILogoutUser)
-		mux.HandleFunc("/user/2fa/confirm", APITwoFactorConfirm)
-		mux.HandleFunc("/user/reset/password", nil)
-		mux.HandleFunc("/user/reset/code", nil)
+		mux.HandleFunc("/user/create", API_UserCreate)
+		mux.HandleFunc("/user/update", API_UserUpdate)
+		mux.HandleFunc("/user/login", API_UserLogin)
+		mux.HandleFunc("/user/logout", API_UserLogout)
+		mux.HandleFunc("/user/2fa/confirm", API_UserTwoFactorConfirm)
+		mux.HandleFunc("/user/reset/code", API_UserRequestPasswordCode)
+		mux.HandleFunc("/user/reset/password", API_UserResetPassword)
 
-		mux.HandleFunc("/groupd/create", APICreateGroup)
-		mux.HandleFunc("/groupd/update", APIUpdateGroup)
-		mux.HandleFunc("/groupd/add", APIAddToGroup)
-		mux.HandleFunc("/group", APIGetGroup)
+		mux.HandleFunc("/groupd/create", API_GroupCreate)
+		mux.HandleFunc("/groupd/update", API_GroupUpdate)
+		mux.HandleFunc("/groupd/add", API_GroupAdd)
+		mux.HandleFunc("/group", API_GroupGet)
 
-		mux.HandleFunc("/servers/create", nil)
-		mux.HandleFunc("/servers/update", APIUpdateServer)
-		mux.HandleFunc("/servers", APIGetServers)
+		mux.HandleFunc("/servers/create", API_ServerCreate)
+		mux.HandleFunc("/servers/update", API_ServerUpdate)
+		mux.HandleFunc("/servers", API_ServerGet)
 
-		mux.HandleFunc("/session/public", nil)
+		mux.HandleFunc("/session", API_SessionCreate)
 
 		// Tunnels public network specific
-		mux.HandleFunc("/key/activate", nil)
-		mux.HandleFunc("/user/toggle/substatus", nil)
+		mux.HandleFunc("/key/activate", API_ActivateLicenseKey)
+		mux.HandleFunc("/user/toggle/substatus", API_UserToggleSubStatus)
 	}
 
 	tlsConfig := &tls.Config{
@@ -144,7 +146,7 @@ func bodyCloseMiddleware(next http.Handler) http.Handler {
 
 func senderr(w http.ResponseWriter, code int, msg string, slogArgs ...any) {
 	logger.Error(msg, slogArgs...)
-	responsePayload := map[string]string{"Message": msg}
+	responsePayload := map[string]string{"Error": msg}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(code)
 	err := json.NewEncoder(w).Encode(responsePayload)

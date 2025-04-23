@@ -9,7 +9,7 @@ import (
 	"github.com/tunnels-is/tunnels/types"
 )
 
-func HTTP_Firewall(w http.ResponseWriter, r *http.Request) {
+func API_Firewall(w http.ResponseWriter, r *http.Request) {
 	fr := new(types.FirewallRequest)
 	dec := json.NewDecoder(r.Body)
 	dec.DisallowUnknownFields()
@@ -30,7 +30,7 @@ func HTTP_Firewall(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(200)
 	return
 }
-func HTTP_ListDevices(w http.ResponseWriter, r *http.Request) {
+func API_ListDevices(w http.ResponseWriter, r *http.Request) {
 	if !HTTP_validateKey(r) {
 		senderr(w, 401, "Unauthorized")
 		return

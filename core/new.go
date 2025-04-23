@@ -11,7 +11,8 @@ import (
 
 	"github.com/miekg/dns"
 	"github.com/tunnels-is/tunnels/certs"
-	"github.com/zveinn/crypt"
+	"github.com/tunnels-is/tunnels/crypt"
+	"github.com/tunnels-is/tunnels/types"
 )
 
 func init() {
@@ -108,7 +109,7 @@ type configV2 struct {
 	DNSServerIP   string
 	DNSServerPort string
 	DNSBlockLists []*BlockList
-	DNSRecords    []*ServerDNS
+	DNSRecords    []*types.DNSRecord
 }
 
 type stateV2 struct {
@@ -178,12 +179,12 @@ func (t *TUN) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
 		ID         string
 		CR         *ConnectionRequest
-		CRResponse *ConnectRequestResponse
+		CRResponse *types.ServerConnectResponse
 		Ping       time.Time
 		StartPort  int
 		EndPort    int
-		DHCP       *DHCPRecord
-		VPLNetwork *ServerNetwork
+		DHCP       *types.DHCPRecord
+		LAN        *types.Network
 		CPU        byte
 		DISK       byte
 		MEM        byte
@@ -193,7 +194,7 @@ func (t *TUN) MarshalJSON() ([]byte, error) {
 	}{
 		t.ID,
 		t.CR,
-		t.CRResponse,
+		t.ServerReponse,
 		pingTime,
 		int(t.startPort),
 		int(t.endPort),
@@ -222,8 +223,8 @@ type TUN struct {
 	ServerCertBytes []byte `json:"-"`
 
 	// Connection Requests + Response
-	CR         *ConnectionRequest
-	CRResponse *ConnectRequestResponse
+	CR            *ConnectionRequest
+	ServerReponse *types.ServerConnectResponse
 
 	// NEW MAPPING STUFF
 	pingTime                atomic.Pointer[time.Time]
@@ -246,8 +247,8 @@ type TUN struct {
 
 	// VPL
 	serverVPLIP [4]byte
-	dhcp        *DHCPRecord
-	VPLNetwork  *ServerNetwork
+	dhcp        *types.DHCPRecord
+	VPLNetwork  *types.Network
 	VPLEgress   map[[4]byte]struct{} `json:"-"`
 	VPLIngress  map[[4]byte]struct{} `json:"-"`
 

@@ -1,23 +1,22 @@
 package core
 
 import (
-	"crypto/x509"
 	"embed"
-	"net"
 	"net/http"
 	"os"
 	"time"
 
 	"github.com/miekg/dns"
 	"github.com/tunnels-is/tunnels/certs"
-	"github.com/zveinn/crypt"
+	"github.com/tunnels-is/tunnels/crypt"
+	"github.com/tunnels-is/tunnels/types"
 )
 
 var (
 	PRODUCTION = true
 
 	DefaultTunnelName = "tunnels"
-	CertPool          *x509.CertPool
+	// CertPool          *x509.CertPool
 )
 
 type DNSStats struct {
@@ -44,28 +43,6 @@ type ConnectionRequest struct {
 	CurveType  crypt.CurveType `json:"CurveType"`
 }
 
-type RemoteConnectionRequest struct {
-	// CLI/MIN
-	DeviceKey string `json:"DeviceKey"`
-
-	// GUI
-	DeviceToken string `json:"DeviceToken"`
-	UserID      string `json:"UserID"`
-
-	// General
-	EncType   crypt.EncType   `json:"EncType"`
-	CurveType crypt.CurveType `json:"CurveType"`
-	SeverID   string          `json:"ServerID"`
-	Serial    string          `json:"Serial"`
-
-	// These are added by the golang client
-	Version int       `json:"Version"`
-	Created time.Time `json:"Created"`
-
-	RequestingPorts bool   `json:"RequestingPorts"`
-	DHCPToken       string `json:"DHCPToken"`
-}
-
 type ErrorResponse struct {
 	Error string `json:"Error"`
 }
@@ -75,36 +52,11 @@ type SignedConnectRequest struct {
 	Payload   []byte
 }
 
-type ConnectRequestResponse struct {
-	Index             int `json:"Index"`
-	AvailableMbps     int `json:"AvailableMbps"`
-	AvailableUserMbps int `json:"AvailableUserMbps"`
-
-	InternetAccess     bool `json:"InternetAccess"`
-	LocalNetworkAccess bool `json:"LocalNetworkAccess"`
-
-	DataPort    string `json:"DataPort"`
-	InterfaceIP string `json:"InterfaceIP"`
-
-	// Normal VPN
-	StartPort uint16 `json:"StartPort"`
-	EndPort   uint16 `json:"EndPort"`
-
-	DNS                []*ServerDNS     `json:"DNS"`
-	Networks           []*ServerNetwork `json:"Networks"`
-	DNSServers         []string         `json:"DNSServers"`
-	DNSAllowCustomOnly bool             `json:"DNSAllowCustomOnly"`
-
-	// VPL Mapping
-	DHCP       *DHCPRecord    `json:"DHCP"`
-	VPLNetwork *ServerNetwork `json:"VPLNetwork"`
-}
-
-type DHCPRecord struct {
-	IP       [4]byte
-	Token    string
-	Hostname string
-}
+// type DHCPRecord struct {
+// 	IP       [4]byte
+// 	Token    string
+// 	Hostname string
+// }
 
 var (
 	DIST_EMBED embed.FS
@@ -256,23 +208,23 @@ type Route struct {
 	Metric  string
 }
 
-type ServerDNS struct {
-	Domain   string   `json:"Domain"`
-	Wildcard bool     `json:"Wildcard" bson:"Wildcard"`
-	IP       []string `json:"IP" bson:"IP"`
-	TXT      []string `json:"TXT" bson:"TXT"`
-	CNAME    string   `json:"CNAME" bson:"CNAME"`
-}
-type ServerNetwork struct {
-	Tag     string   `json:"Tag" bson:"Tag"`
-	Network string   `json:"Network" bson:"Network"`
-	Nat     string   `json:"Nat" bson:"Nat"`
-	Routes  []*Route `json:"Routes" bson:"Routes"`
+// type ServerDNS struct {
+// 	Domain   string   `json:"Domain"`
+// 	Wildcard bool     `json:"Wildcard" bson:"Wildcard"`
+// 	IP       []string `json:"IP" bson:"IP"`
+// 	TXT      []string `json:"TXT" bson:"TXT"`
+// 	CNAME    string   `json:"CNAME" bson:"CNAME"`
+// }
+// type ServerNetwork struct {
+// 	Tag     string   `json:"Tag" bson:"Tag"`
+// 	Network string   `json:"Network" bson:"Network"`
+// 	Nat     string   `json:"Nat" bson:"Nat"`
+// 	Routes  []*Route `json:"Routes" bson:"Routes"`
 
-	// Post Init
-	NatIPNet *net.IPNet `json:"-"`
-	NetIPNet *net.IPNet `json:"-"`
-}
+// 	// Post Init
+// 	NatIPNet *net.IPNet `json:"-"`
+// 	NetIPNet *net.IPNet `json:"-"`
+// }
 
 type ActiveConnectionMeta struct {
 	Country        string
@@ -334,8 +286,9 @@ type TunnelMETA struct {
 	// that are applied to the Node
 	EnableDefaultRoute bool
 	DNSServers         []string
-	DNS                []*ServerDNS
-	Networks           []*ServerNetwork
+	DNSRecords         []*types.DNSRecord
+	Networks           []*types.Network
+	Routes             []*types.Route
 }
 
 type AllowedHost struct {
@@ -366,8 +319,8 @@ type TunnelSTATS struct {
 	ServerToClientMicro int64
 	PingTime            time.Time
 
-	DHCP       *DHCPRecord
-	VPLNetwork *ServerNetwork
+	DHCP *types.DNSRecord
+	LAN  *types.Network
 }
 
 type FirewallRequest struct {
@@ -416,7 +369,7 @@ type Config struct {
 	EnabledBlockLists   []string
 	AvailableBlockLists []*BlockList
 
-	DNSRecords []*ServerDNS
+	DNSRecords []*types.DNSRecord
 }
 
 type LOADING_LOGS_RESPONSE struct {

@@ -5,6 +5,7 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/fs"
 	"log"
 	"os"
@@ -47,18 +48,10 @@ func InitService() error {
 	INFO("Checking permissins")
 	AdminCheck()
 
-	// TODO ..
 	printInfo()
 	printInfo2()
 
 	INFO("Loading certificates")
-
-	var err error
-	CertPool, err = certs.LoadTunnelsCACertPool()
-	if err != nil {
-		DEBUG("Could not load root CA:", err)
-		return err
-	}
 
 	if !set.Minimal {
 		doEvent(highPriorityChannel, func() {
@@ -259,6 +252,15 @@ func LoadPrivateCert(path string) (pool *x509.CertPool, err error) {
 		return nil, err
 	}
 	certPool.AppendCertsFromPEM(certData)
+	return certPool, nil
+}
+
+func (m *TUN) LoadCertPEMBytes(cert []byte) (pool *x509.CertPool, err error) {
+	certPool := x509.NewCertPool()
+	ok := certPool.AppendCertsFromPEM(cert)
+	if !ok {
+		return certPool, fmt.Errorf("unable to append cert")
+	}
 	return certPool, nil
 }
 

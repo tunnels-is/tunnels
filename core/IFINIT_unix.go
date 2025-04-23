@@ -65,7 +65,6 @@ func CreateNewTunnelInterface(
 		TxQueuelen:    meta.TxQueueLen,
 		MTU:           meta.MTU,
 		shouldRestart: true,
-		// IPv6Address: "fe80::1",
 	}
 
 	err = IF.Create()
@@ -93,7 +92,6 @@ func (t *TInterface) Create() (err error) {
 
 	INFO("about to open device: ", t.TunnelFile)
 	fd, err := syscall.Open(t.TunnelFile, os.O_RDWR|syscall.O_NONBLOCK, 0)
-	// fd, err := syscall.Open(t.TunnelFile, os.O_RDWR, 0)
 	if err != nil {
 		ERROR("erro opening device: ", t.TunnelFile, " || err: ", err)
 		return err
@@ -275,46 +273,7 @@ func (t *TInterface) Delete() (err error) {
 	return
 }
 
-// func (t *TunnelInterface) ApplyRoutes(V *Tunnel) (err error) {
-// 	if IsDefaultConnection(V.Meta.IFName) || V.Meta.EnableDefaultRoute {
-// 		err = IP_AddRoute("default", "", t.IPv4Address, "0")
-// 		if err != nil {
-// 			return
-// 		}
-// 	}
-//
-// 	for _, n := range V.CRR.Networks {
-// 		t.addRoutes(V, n)
-// 	}
-//
-// 	if V.CRR.VPLNetwork != nil {
-// 		t.addRoutes(V, V.CRR.VPLNetwork)
-// 	}
-//
-// 	return
-// }
-
-// func (t *TunnelInterface) RemoveRoutes(V *Tunnel, preserve bool) (err error) {
-// 	defer RecoverAndLogToFile()
-//
-// 	for _, n := range V.CRR.Networks {
-// 		t.deleteRoutes(V, n)
-// 	}
-//
-// 	if V.CRR.VPLNetwork != nil {
-// 		t.deleteRoutes(V, V.CRR.VPLNetwork)
-// 	}
-// 	if !preserve {
-// 		if IsDefaultConnection(V.Meta.IFName) || V.Meta.EnableDefaultRoute {
-// 			err = IP_DelRoute("default", t.IPv4Address, "0")
-// 		}
-// 	}
-//
-// 	return
-// }
-
 func (t *TInterface) Connect(tun *TUN) (err error) {
-	// if !t.Persistent {
 	err = t.Addr()
 	if err != nil {
 		return
@@ -331,68 +290,38 @@ func (t *TInterface) Connect(tun *TUN) (err error) {
 	if err != nil {
 		return
 	}
-
 	meta := tun.meta.Load()
 	if IsDefaultConnection(meta.IFName) || meta.EnableDefaultRoute {
 		err = IP_AddRoute("default", "", t.IPv4Address, "0")
 		if err != nil {
-			return
+			return err
 		}
 	}
 
-	for _, n := range tun.CRResponse.Networks {
-		_ = t.addRoutes(n)
-
+	if tun.ServerReponse.LAN != nil && tun.ServerReponse.LAN.Nat != "" {
+		err = IP_AddRoute(tun.ServerReponse.LAN.Nat, "", t.IPv4Address, "0")
+		if err != nil {
+			return err
+		}
 	}
 
-	if tun.CRResponse.VPLNetwork != nil {
-		_ = t.addRoutes(tun.CRResponse.VPLNetwork)
+	for _, n := range tun.ServerReponse.Networks {
+		if n.Nat != "" {
+			err = IP_AddRoute(n.Nat, "", t.IPv4Address, "0")
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	for _, v := range tun.ServerReponse.Routes {
+		err = IP_AddRoute(v.Address, "", t.IPv4Address, v.Metric)
+		if err != nil {
+			return err
+		}
 	}
 
 	return
-}
-
-func (t *TInterface) addRoutes(n *ServerNetwork) (err error) {
-	if n.Nat != "" {
-		err = IP_AddRoute(n.Nat, "", t.IPv4Address, "0")
-		if err != nil {
-			return
-		}
-	}
-
-	for _, v := range n.Routes {
-		if strings.ToLower(v.Address) == "default" || strings.HasPrefix(v.Address, "0.0.0.0") {
-			continue
-		}
-
-		err = IP_AddRoute(v.Address, "", t.IPv4Address, v.Metric)
-		if err != nil {
-			return
-		}
-	}
-	return nil
-}
-
-func (t *TInterface) deleteRoutes(n *ServerNetwork) (err error) {
-	if n.Nat != "" {
-		err = IP_DelRoute(n.Nat, t.IPv4Address, "0")
-		if err != nil {
-			return
-		}
-	}
-
-	for _, v := range n.Routes {
-		if strings.ToLower(v.Address) == "default" || strings.Contains(v.Address, "0.0.0.0") {
-			continue
-		}
-
-		err = IP_DelRoute(v.Address, t.IPv4Address, v.Metric)
-		if err != nil {
-			return
-		}
-	}
-
-	return nil
 }
 
 func (t *TInterface) Disconnect(tun *TUN) (err error) {
@@ -402,25 +331,41 @@ func (t *TInterface) Disconnect(tun *TUN) (err error) {
 		tun.connection.Close()
 	}
 
-	for _, n := range tun.CRResponse.Networks {
-		_ = t.deleteRoutes(n)
-	}
-
-	if tun.CRResponse.VPLNetwork != nil {
-		_ = t.deleteRoutes(tun.CRResponse.VPLNetwork)
-	}
-
-	meta := tun.meta.Load()
-	if IsDefaultConnection(meta.IFName) || meta.EnableDefaultRoute {
-		err = IP_DelRoute("default", t.IPv4Address, "0")
-	}
-
 	err = t.Close()
 	if err != nil {
 		ERROR("unable to close the interface", err)
 	}
 
 	_ = t.Delete()
+
+	// TODO .. might not be needed ?????
+	// meta := tun.meta.Load()
+	// if IsDefaultConnection(meta.IFName) || meta.EnableDefaultRoute {
+	// 	err = IP_DelRoute("default", t.IPv4Address, "0")
+	// }
+
+	// if tun.ServerReponse.LAN != nil && tun.ServerReponse.LAN.Nat != "" {
+	// 	err = IP_DelRoute(tun.ServerReponse.LAN.Nat, t.IPv4Address, "0")
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// }
+
+	// for _, n := range tun.ServerReponse.Networks {
+	// 	if n.Nat != "" {
+	// 		err = IP_DelRoute(n.Nat, t.IPv4Address, "0")
+	// 		if err != nil {
+	// 			return err
+	// 		}
+	// 	}
+	// }
+	// for _, r := range tun.ServerReponse.Routes {
+	// 	err = IP_DelRoute(r.Address, t.IPv4Address, r.Metric)
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// }
+
 	return
 }
 
@@ -441,39 +386,6 @@ func createDevNetTun() {
 		return
 	}
 }
-
-// func StartDefaultInterface() (err error) {
-// 	CON := new(Tunnel)
-// 	CON.Meta = findDefaultTunnelMeta()
-//
-// 	DEFAULT_TUNNEL, err = CreateNewTunnelInterface(CON)
-// 	if err != nil {
-// 		return
-// 	}
-//
-// 	CON.Interface = DEFAULT_TUNNEL
-//
-// 	err = DEFAULT_TUNNEL.Addr()
-// 	if err != nil {
-// 		return
-// 	}
-// 	err = DEFAULT_TUNNEL.SetMTU()
-// 	if err != nil {
-// 		return
-// 	}
-// 	err = DEFAULT_TUNNEL.SetTXQueueLen()
-// 	if err != nil {
-// 		return
-// 	}
-// 	err = DEFAULT_TUNNEL.Up()
-// 	if err != nil {
-// 		return
-// 	}
-//
-// 	// GLOBAL_STATE.DefaultInterfaceOnline = true
-//
-// 	return
-// }
 
 func tunnelCtl(fd uintptr, request uintptr, argp uintptr) error {
 	_, _, errno := syscall.Syscall(syscall.SYS_IOCTL, fd, uintptr(request), argp)
@@ -527,7 +439,7 @@ func IP_AddRoute(
 	r.Priority = mInt
 	r.Gw = net.ParseIP(gateway).To4()
 
-	DEBUG("NEW ROUTE: ", r)
+	DEBUG("ADD ROUTE: ", r)
 	err = netlink.RouteAdd(r)
 	if err != nil {
 		if strings.Contains(err.Error(), "exists") {
@@ -550,9 +462,6 @@ func IP_AddRoute(
 }
 
 func IP_DelRouteNoGW(network string, metric int) (err error) {
-	// if IsActiveRouterIP(network) {
-	// 	return
-	// }
 	r := new(netlink.Route)
 	r.Dst = new(net.IPNet)
 	r.Dst.IP = net.ParseIP(network).To4()
@@ -567,10 +476,6 @@ func IP_DelRouteNoGW(network string, metric int) (err error) {
 }
 
 func IP_DelRoute(network string, gateway string, metric string) (err error) {
-	// if IsActiveRouterIP(network) {
-	// 	return
-	// }
-
 	mInt, err := strconv.Atoi(metric)
 	if err != nil {
 		return err
@@ -643,24 +548,4 @@ func AdjustRoutersForTunneling() (err error) {
 	}
 
 	return
-}
-
-func PrintInterfaces() (error, []byte) {
-	out, err := exec.Command("bash", "-c", "ip a").Output()
-	if err != nil {
-		return err, nil
-	}
-	return nil, out
-}
-
-func PrintRoutes() (error, []byte) {
-	out, err := exec.Command("bash", "-c", "ip route").Output()
-	if err != nil {
-		return err, nil
-	}
-	return nil, out
-}
-
-func PrintDNS() (error, []byte) {
-	return nil, []byte(".. DNS already printed via resolv.conf and NetworkManager settings")
 }

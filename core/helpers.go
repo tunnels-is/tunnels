@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/tunnels-is/tunnels/types"
 )
 
 func CreateConnectionUUID() string {
@@ -212,7 +213,7 @@ func GetDomainAndSubDomain(domain string) (d, s string) {
 // 	return false
 // }
 
-func DNSAMapping(DNS []*ServerDNS, fullDomain string) *ServerDNS {
+func DNSAMapping(DNS []*types.DNSRecord, fullDomain string) *types.DNSRecord {
 	domain, subdomain := GetDomainAndSubDomain(fullDomain)
 	if domain == "" {
 		return nil

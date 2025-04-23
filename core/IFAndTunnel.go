@@ -4,7 +4,8 @@ import (
 	"errors"
 	"math/rand"
 
-	"github.com/zveinn/crypt"
+	"github.com/tunnels-is/tunnels/crypt"
+	"github.com/tunnels-is/tunnels/types"
 )
 
 func CreateAndConnectToInterface(t *TUN) (inter *TInterface, err error) {
@@ -77,9 +78,9 @@ func createTunnel() (T *TunnelMETA) {
 	T.ServerID = ""
 	T.AutoReconnect = false
 	T.AutoConnect = false
-	T.Networks = make([]*ServerNetwork, 0)
+	T.Networks = make([]*types.Network, 0)
 	T.DNSServers = make([]string, 0)
-	T.DNS = make([]*ServerDNS, 0)
+	T.DNSRecords = make([]*types.DNSRecord, 0)
 	T.WindowsGUID = CreateConnectionUUID()
 	return
 }

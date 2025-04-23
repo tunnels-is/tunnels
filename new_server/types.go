@@ -158,8 +158,9 @@ type USER_ENABLE_QUERY struct {
 }
 
 type KEY_ACTIVATE_FORM struct {
-	Email string
-	Key   string
+	UserID      primitive.ObjectID `json:"UID"`
+	DeviceToken string             `json:"DeviceToken"`
+	Key         string
 }
 
 type REGISTER_FORM struct {
@@ -234,9 +235,10 @@ type TWO_FACTOR_DB_PACKAGE struct {
 }
 
 type PASSWORD_RESET_FORM struct {
-	Email       string
-	NewPassword string
-	ResetCode   string
+	Email     string
+	Password  string
+	Password2 string
+	ResetCode string
 }
 
 type FORM_GET_SERVERS struct {
