@@ -178,10 +178,10 @@ type ServerConnectRequest struct {
 	RequestingPorts bool   `json:"RequestingPorts"`
 	DHCPToken       string `json:"DHCPToken"`
 
-	Hostname  string             `json:"Hostname"`
-	UserID    primitive.ObjectID `json:"UserID"`
-	UserEmail string             `json:"UserEmail"`
-	UserToken string             `json:"UserToken"`
+	Hostname    string             `json:"Hostname"`
+	UserID      primitive.ObjectID `json:"UserID"`
+	UserEmail   string             `json:"UserEmail"`
+	DeviceToken string             `json:"DeviceToken"`
 }
 
 type ControllerConnectRequest struct {

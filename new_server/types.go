@@ -6,8 +6,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/tunnels-is/tunnels/crypt"
 	"github.com/tunnels-is/tunnels/types"
-	"github.com/zveinn/crypt"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
