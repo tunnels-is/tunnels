@@ -1,11 +1,8 @@
 package main
 
 import (
-	"context"
 	"encoding/binary"
-	"encoding/json"
 	"errors"
-	"fmt"
 	"math"
 	"net"
 	"runtime/debug"
@@ -14,172 +11,10 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/tunnels-is/tunnels/signal"
+	"github.com/tunnels-is/tunnels/crypt"
 	"github.com/tunnels-is/tunnels/types"
-	"github.com/zveinn/crypt"
-	"golang.org/x/net/quic"
 	"golang.org/x/sys/unix"
 )
-
-func ControlSocketListener() {
-	Config := Config.Load()
-	l, err := quic.Listen(
-		"udp4",
-		net.JoinHostPort(Config.APIIP, Config.APIPort),
-		QUICConfig.Load(),
-	)
-	if err != nil {
-		panic(err)
-	}
-	for {
-		con, err := l.Accept(context.Background())
-		if err != nil {
-			ERR("ACCEPT ERROR:", err)
-			time.Sleep(3 * time.Millisecond)
-			continue
-		}
-
-		go acceptUserUDPTLSSocket(con)
-	}
-}
-
-func validateSignatureAndExtractConnectRequest(buff []byte) (scr crypt.SignedConnectRequest, cr *types.ConnectRequest, err error) {
-	err = json.Unmarshal(buff, &scr)
-	if err != nil {
-		return
-	}
-	err = verifySignature(scr.Payload, scr.Signature)
-	if err != nil {
-		WARN("Invalid payload signature:", err)
-		return
-	}
-
-	cr = new(types.ConnectRequest)
-	err = json.Unmarshal(scr.Payload, &cr)
-	if err != nil {
-		WARN("Invalid connect request(unmarshal):", err)
-		err = errors.New("Invalid payload from user")
-		return
-	}
-
-	if time.Since(cr.Created).Seconds() > 20 {
-		ERR("Expired connection request", err)
-		err = errors.New("invalid cr timer")
-		return
-	}
-
-	return
-}
-
-func acceptUserUDPTLSSocket(conn *quic.Conn) {
-	var s *quic.Stream
-	defer func() {
-		r := recover()
-		if r != nil {
-			ERR(r, string(debug.Stack()))
-		}
-		if s != nil {
-			s.Close()
-		}
-		if conn != nil {
-			conn.Close()
-		}
-	}()
-
-	Config := Config.Load()
-	buff := make([]byte, 10000)
-	var err error
-	var n int
-
-	s, err = conn.AcceptStream(context.Background())
-	if err != nil {
-		ERR("Unable to accept stream:", err)
-		return
-	}
-
-	n, err = s.Read(buff)
-	if err != nil {
-		ERR("Unable to read from client:", err)
-		return
-	}
-
-	_, CR, err := validateSignatureAndExtractConnectRequest(buff[:n])
-	if err != nil {
-		ERR("Payload validation error: ", err)
-		return
-	}
-
-	if !CR.UserID.IsZero() {
-		totalC, totalUserC := countConnections(CR.UserID.Hex())
-
-		if CR.RequestingPorts {
-			if totalC >= slots {
-				WARN("Server is full", totalUserC, totalC, slots)
-				return
-			}
-		}
-
-		if totalUserC > Config.UserMaxConnections {
-			WARN("User has more then 4 connections", totalUserC)
-			return
-		}
-	} else {
-		// this might not be needed.
-		// if Config.VPL != nil {
-		// 	if totalUserC > Config.VPL.MaxDevices {
-		// 		WARN("Max devices reached", totalUserC)
-		// 		return
-		// 	}
-		// }
-	}
-
-	var EH *crypt.SocketWrapper
-	EH, err = crypt.NewEncryptionHandler(CR.EncType, CR.CurveType)
-	if err != nil {
-		ERR("unable to create encryption handler", err)
-		return
-	}
-
-	EH.SetHandshakeStream(s)
-
-	err = EH.InitHandshake()
-	if err != nil {
-		ERR("Handshakte initialization failed", err)
-		return
-	}
-
-	CRR := types.CreateCRRFromServer(Config)
-	index, err := CreateClientCoreMapping(CRR, CR, EH)
-	if err != nil {
-		ERR("Port allocation failed", err)
-		return
-	}
-
-	CRRB, err := json.Marshal(CRR)
-	if err != nil {
-		ERR("Unable to marshal CCR", err)
-		return
-	}
-
-	n, err = s.Write(CRRB)
-	if err != nil {
-		ERR("Unable to write CRRB", err)
-		return
-	}
-	if n != len(CRRB) {
-		ERR("Did not write full CRRB", err)
-		return
-	}
-	s.Flush()
-
-	go signal.NewSignal(fmt.Sprintf("TO:%d", index), *CTX.Load(), *Cancel.Load(), time.Second, goroutineLogger, func() {
-		toUserChannel(index)
-	})
-
-	go signal.NewSignal(fmt.Sprintf("TO:%d", index), *CTX.Load(), *Cancel.Load(), time.Second, goroutineLogger, func() {
-		fromUserChannel(index)
-	})
-}
 
 func countConnections(id string) (count int, userCount int) {
 	for i := range clientCoreMappings {
@@ -196,7 +31,7 @@ func countConnections(id string) (count int, userCount int) {
 	return
 }
 
-func CreateClientCoreMapping(CRR *types.ConnectRequestResponse, CR *types.ConnectRequest, EH *crypt.SocketWrapper) (index int, err error) {
+func CreateClientCoreMapping(CRR *types.ServerConnectResponse, CR *types.ServerConnectRequest, EH *crypt.SocketWrapper) (index int, err error) {
 	defer func() {
 		r := recover()
 		if r != nil {
@@ -258,7 +93,7 @@ func CreateClientCoreMapping(CRR *types.ConnectRequestResponse, CR *types.Connec
 	}
 
 	Config := Config.Load()
-	CRR.VPLNetwork = Config.Lan
+	CRR.LAN = Config.Lan
 
 	return
 }

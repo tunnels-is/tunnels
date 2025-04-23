@@ -2,11 +2,12 @@ package types
 
 import (
 	"fmt"
+	"net"
 	"sync"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/zveinn/crypt"
+	"github.com/tunnels-is/tunnels/crypt"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -46,7 +47,7 @@ type ServerConfig struct {
 	UserBandwidthMbps  int  `json:"BandwidthUserMbps"`
 
 	DNSAllowCustomOnly bool         `json:"DNSAllowCustomOnly"`
-	DNS                []*DNSRecord `json:"DNS"`
+	DNSRecords         []*DNSRecord `json:"DNSRecords"`
 	DNSServers         []string     `json:"DNSServers"`
 
 	SecretStore SecretStore `json:"SecretStore"`
@@ -83,6 +84,9 @@ type Network struct {
 	Tag     string `json:"Tag" bson:"Tag"`
 	Network string `json:"Network" bson:"Network"`
 	Nat     string `json:"Nat" bson:"Nat"`
+
+	NetIPNet *net.IPNet `json:"-"`
+	NatIPNet *net.IPNet `json:"-"`
 }
 
 type DNSRecord struct {
@@ -112,11 +116,14 @@ type ListDevice struct {
 }
 
 type SignedConnectRequest struct {
-	Signature []byte
-	Payload   []byte
+	Signature     []byte
+	Payload       []byte
+	ServerPubKey  []byte
+	UserHandshake []byte
 }
 
-type ConnectRequestResponse struct {
+type ServerConnectResponse struct {
+	ServerHandshake   []byte
 	Index             int `json:"Index"`
 	AvailableMbps     int `json:"AvailableMbps"`
 	AvailableUserMbps int `json:"AvailableUserMbps"`
@@ -129,18 +136,18 @@ type ConnectRequestResponse struct {
 	StartPort   uint16 `json:"StartPort"`
 	EndPort     uint16 `json:"EndPort"`
 
-	DNS                []*DNSRecord `json:"DNS"`
+	DNSRecords         []*DNSRecord `json:"DNSRecords"`
 	Networks           []*Network   `json:"Networks"`
 	Routes             []*Route     `json:"Routes"`
 	DNSServers         []string     `json:"DNSServers"`
 	DNSAllowCustomOnly bool         `json:"DNSAllowCustomOnly"`
 
-	DHCP       *DHCPRecord `json:"DHCP"`
-	VPLNetwork *Network    `json:"VPLNetwork"`
+	DHCP *DHCPRecord `json:"DHCP"`
+	LAN  *Network    `json:"LANNetwork"`
 }
 
-func CreateCRRFromServer(S *ServerConfig) (CRR *ConnectRequestResponse) {
-	return &ConnectRequestResponse{
+func CreateCRRFromServer(S *ServerConfig) (CRR *ServerConnectResponse) {
+	return &ServerConnectResponse{
 		Index:              0,
 		StartPort:          0,
 		EndPort:            0,
@@ -150,14 +157,16 @@ func CreateCRRFromServer(S *ServerConfig) (CRR *ConnectRequestResponse) {
 		AvailableUserMbps:  S.UserBandwidthMbps,
 		InternetAccess:     S.InternetAccess,
 		LocalNetworkAccess: S.LocalNetworkAccess,
-		DNS:                S.DNS,
+		DNSRecords:         S.DNSRecords,
 		Networks:           S.SubNets,
+		Routes:             S.Routes,
 		DNSServers:         S.DNSServers,
 		DNSAllowCustomOnly: S.DNSAllowCustomOnly,
+		LAN:                S.Lan,
 	}
 }
 
-type ConnectRequest struct {
+type ServerConnectRequest struct {
 	EncType   crypt.EncType      `json:"EncType"`
 	CurveType crypt.CurveType    `json:"CurveType"`
 	SeverID   primitive.ObjectID `json:"ServerID"`
@@ -173,6 +182,27 @@ type ConnectRequest struct {
 	UserID    primitive.ObjectID `json:"UserID"`
 	UserEmail string             `json:"UserEmail"`
 	UserToken string             `json:"UserToken"`
+}
+
+type ControllerConnectRequest struct {
+	// CLI/MIN
+	DeviceKey string `json:"DeviceKey"`
+
+	// GUI
+	DeviceToken string `json:"DeviceToken"`
+	UserID      string `json:"UserID"`
+
+	// General
+	EncType   crypt.EncType   `json:"EncType"`
+	CurveType crypt.CurveType `json:"CurveType"`
+	SeverID   string          `json:"ServerID"`
+
+	// These are added by the golang client
+	Version int       `json:"Version"`
+	Created time.Time `json:"Created"`
+
+	RequestingPorts bool   `json:"RequestingPorts"`
+	DHCPToken       string `json:"DHCPToken"`
 }
 
 type DHCPRecord struct {

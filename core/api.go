@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
-	"crypto/x509"
 	"encoding/binary"
 	"encoding/json"
 	"errors"
@@ -14,7 +13,6 @@ import (
 	"math/rand"
 	"net"
 	"net/http"
-	"os"
 	"regexp"
 	"runtime"
 	"slices"
@@ -26,9 +24,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/miekg/dns"
 	"github.com/tunnels-is/tunnels/certs"
+	"github.com/tunnels-is/tunnels/crypt"
+	"github.com/tunnels-is/tunnels/types"
 	"github.com/xlzd/gotp"
-	"github.com/zveinn/crypt"
-	"golang.org/x/net/quic"
 	"golang.org/x/sys/unix"
 )
 
@@ -68,7 +66,7 @@ func sendFirewallToServer(serverIP string, DHCPToken string, DHCPIP string, allo
 	}
 
 	tc := &tls.Config{
-		RootCAs:            CertPool,
+		// RootCAs:            CertPool,
 		MinVersion:         tls.VersionTLS13,
 		CurvePreferences:   []tls.CurveID{tls.X25519MLKEM768},
 		InsecureSkipVerify: false,
@@ -109,7 +107,7 @@ func sendFirewallToServer(serverIP string, DHCPToken string, DHCPIP string, allo
 	return nil
 }
 
-func SendRequestToController(method string, route string, data any, timeoutMS int) ([]byte, int, error) {
+func SendRequestToURL(tc *tls.Config, method string, url string, data any, timeoutMS int, skipVerify bool) ([]byte, int, error) {
 	defer RecoverAndLogToFile()
 
 	var body []byte
@@ -117,35 +115,37 @@ func SendRequestToController(method string, route string, data any, timeoutMS in
 	if data != nil {
 		body, err = json.Marshal(data)
 		if err != nil {
-			return nil, 0, err
+			return nil, 400, err
 		}
 	}
 
 	var req *http.Request
 	if method == "POST" {
-		req, err = http.NewRequest(method, "https://api.tunnels.is/"+route, bytes.NewBuffer(body))
+		req, err = http.NewRequest(method, url, bytes.NewBuffer(body))
 	} else if method == "GET" {
-		req, err = http.NewRequest(method, "https://api.tunnels.is/"+route, nil)
+		req, err = http.NewRequest(method, url, nil)
 	} else {
-		return nil, 0, errors.New("method not supported:" + method)
+		return nil, 400, errors.New("method not supported:" + method)
 	}
 
 	if err != nil {
-		return nil, 0, err
+		return nil, 400, err
 	}
 
 	req.Header.Add("Content-Type", "application/json")
 
-	client := http.Client{
-		Timeout: time.Duration(timeoutMS) * time.Millisecond,
-		Transport: &http.Transport{
+	client := http.Client{Timeout: time.Duration(timeoutMS) * time.Millisecond}
+	if tc != nil {
+		client.Transport = &http.Transport{
+			TLSClientConfig: tc,
+		}
+	} else {
+		client.Transport = &http.Transport{
 			TLSClientConfig: &tls.Config{
-				CurvePreferences:   []tls.CurveID{tls.CurveP521},
-				RootCAs:            CertPool,
-				MinVersion:         tls.VersionTLS13,
-				InsecureSkipVerify: false,
+				MinVersion:         tls.VersionTLS12,
+				InsecureSkipVerify: skipVerify,
 			},
-		},
+		}
 	}
 
 	resp, err := client.Do(req)
@@ -153,7 +153,7 @@ func SendRequestToController(method string, route string, data any, timeoutMS in
 		if resp != nil {
 			return nil, resp.StatusCode, err
 		} else {
-			return nil, 0, err
+			return nil, 400, err
 		}
 	}
 
@@ -162,53 +162,25 @@ func SendRequestToController(method string, route string, data any, timeoutMS in
 		defer resp.Body.Close()
 	}
 
-	var x []byte
-	x, err = io.ReadAll(resp.Body)
+	var respBodyBytes []byte
+	respBodyBytes, err = io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, resp.StatusCode, err
 	}
 
-	return x, resp.StatusCode, nil
-}
-
-func ForwardConnectToController(FR *FORWARD_REQUEST) ([]byte, int) {
-	defer RecoverAndLogToFile()
-
-	// The domain being used here is an old domain that needs to be replaced.
-	// This method uses a custom dialer which does not DNS resolve.
-	responseBytes, code, err := SendRequestToController(
-		FR.Method,
-		FR.Path,
-		FR.JSONData,
-		FR.Timeout,
-	)
-	if err != nil {
-		ERROR("Could not forward request (err): ", err)
-		if code == 0 {
-			return responseBytes, 420
-		} else {
-			return responseBytes, code
-		}
-	}
-
-	if code == 0 {
-		ERROR("Could not forward request (code 0): ", err)
-		return responseBytes, 420
-	}
-
-	return responseBytes, code
+	return respBodyBytes, resp.StatusCode, nil
 }
 
 func ForwardToController(FR *FORWARD_REQUEST) (any, int) {
 	defer RecoverAndLogToFile()
 
-	// The domain being used here is an old domain that needs to be replaced.
-	// This method uses a custom dialer which does not DNS resolve.
-	responseBytes, code, err := SendRequestToController(
+	responseBytes, code, err := SendRequestToURL(
+		nil,
 		FR.Method,
 		FR.Path,
 		FR.JSONData,
 		FR.Timeout,
+		false,
 	)
 
 	er := new(ErrorResponse)
@@ -397,7 +369,7 @@ func InitializeTunnelFromCRR(TUN *TUN) (err error) {
 
 	// This index is used to identify packet streams between server and user.
 	TUN.Index = make([]byte, 2)
-	binary.BigEndian.PutUint16(TUN.Index, uint16(TUN.CRResponse.Index))
+	binary.BigEndian.PutUint16(TUN.Index, uint16(TUN.ServerReponse.Index))
 
 	TUN.localInterfaceNetIP = net.ParseIP(meta.IPv4Address).To4()
 	if TUN.localInterfaceNetIP == nil {
@@ -417,9 +389,9 @@ func InitializeTunnelFromCRR(TUN *TUN) (err error) {
 	TUN.localDNSClient.Dialer.Timeout = time.Duration(5 * time.Second)
 	TUN.localDNSClient.Timeout = time.Second * 5
 
-	TUN.serverInterfaceNetIP = net.ParseIP(TUN.CRResponse.InterfaceIP).To4()
+	TUN.serverInterfaceNetIP = net.ParseIP(TUN.ServerReponse.InterfaceIP).To4()
 	if TUN.serverInterfaceNetIP == nil {
-		return fmt.Errorf("Interface ip (%s) was malformed", TUN.CRResponse.InterfaceIP)
+		return fmt.Errorf("Interface ip (%s) was malformed", TUN.ServerReponse.InterfaceIP)
 	}
 
 	TUN.serverInterfaceIP4bytes[0] = TUN.serverInterfaceNetIP[0]
@@ -427,45 +399,48 @@ func InitializeTunnelFromCRR(TUN *TUN) (err error) {
 	TUN.serverInterfaceIP4bytes[2] = TUN.serverInterfaceNetIP[2]
 	TUN.serverInterfaceIP4bytes[3] = TUN.serverInterfaceNetIP[3]
 
-	if TUN.CRResponse.DHCP != nil {
-		TUN.serverVPLIP[0] = TUN.CRResponse.DHCP.IP[0]
-		TUN.serverVPLIP[1] = TUN.CRResponse.DHCP.IP[1]
-		TUN.serverVPLIP[2] = TUN.CRResponse.DHCP.IP[2]
-		TUN.serverVPLIP[3] = TUN.CRResponse.DHCP.IP[3]
+	if TUN.ServerReponse.DHCP != nil {
+		TUN.serverVPLIP[0] = TUN.ServerReponse.DHCP.IP[0]
+		TUN.serverVPLIP[1] = TUN.ServerReponse.DHCP.IP[1]
+		TUN.serverVPLIP[2] = TUN.ServerReponse.DHCP.IP[2]
+		TUN.serverVPLIP[3] = TUN.ServerReponse.DHCP.IP[3]
 
-		TUN.dhcp = TUN.CRResponse.DHCP
-		meta.DHCPToken = TUN.CRResponse.DHCP.Token
+		TUN.dhcp = TUN.ServerReponse.DHCP
+		meta.DHCPToken = TUN.ServerReponse.DHCP.Token
 		_ = writeTunnelsToDisk(meta.Tag)
 	}
 
-	if TUN.CRResponse.VPLNetwork != nil {
-		TUN.VPLNetwork = TUN.CRResponse.VPLNetwork
+	if TUN.ServerReponse.LAN != nil {
+		TUN.VPLNetwork = TUN.ServerReponse.LAN
 	}
 
 	if meta.LocalhostNat {
-		NN := new(ServerNetwork)
+		NN := new(types.Network)
 		NN.Network = "127.0.0.1/32"
 		NN.Nat = TUN.serverInterfaceNetIP.String() + "/32"
-		TUN.CRResponse.Networks = append(TUN.CRResponse.Networks, NN)
+		TUN.ServerReponse.Networks = append(TUN.ServerReponse.Networks, NN)
 	}
 
 	if len(meta.Networks) > 0 {
-		TUN.CRResponse.Networks = meta.Networks
+		TUN.ServerReponse.Networks = meta.Networks
 	}
-	if len(meta.DNS) > 0 {
-		TUN.CRResponse.DNS = meta.DNS
+	if len(meta.Routes) > 0 {
+		TUN.ServerReponse.Routes = meta.Routes
+	}
+	if len(meta.DNSRecords) > 0 {
+		TUN.ServerReponse.DNSRecords = meta.DNSRecords
 	}
 	if len(meta.DNSServers) > 0 {
-		TUN.CRResponse.DNSServers = meta.DNSServers
+		TUN.ServerReponse.DNSServers = meta.DNSServers
 	}
 
 	conf := CONFIG.Load()
-	if len(TUN.CRResponse.DNSServers) < 1 {
-		TUN.CRResponse.DNSServers = []string{conf.DNS1Default, conf.DNS2Default}
+	if len(TUN.ServerReponse.DNSServers) < 1 {
+		TUN.ServerReponse.DNSServers = []string{conf.DNS1Default, conf.DNS2Default}
 	}
 
-	TUN.startPort = TUN.CRResponse.StartPort
-	TUN.endPort = TUN.CRResponse.EndPort
+	TUN.startPort = TUN.ServerReponse.StartPort
+	TUN.endPort = TUN.ServerReponse.EndPort
 	TUN.TCPEgress = make(map[[10]byte]*Mapping)
 	TUN.UDPEgress = make(map[[10]byte]*Mapping)
 	TUN.InitPortMap()
@@ -482,17 +457,17 @@ func InitializeTunnelFromCRR(TUN *TUN) (err error) {
 	DEBUG(fmt.Sprintf(
 		"Connection info: Addr(%s) StartPort(%d) EndPort(%d) srcIP(%s) ",
 		meta.IPv4Address,
-		TUN.CRResponse.StartPort,
-		TUN.CRResponse.EndPort,
-		TUN.CRResponse.InterfaceIP,
+		TUN.ServerReponse.StartPort,
+		TUN.ServerReponse.EndPort,
+		TUN.ServerReponse.InterfaceIP,
 	))
 
-	if TUN.CRResponse.VPLNetwork != nil && TUN.CRResponse.DHCP != nil {
+	if TUN.ServerReponse.LAN != nil && TUN.ServerReponse.DHCP != nil {
 		DEBUG(fmt.Sprintf(
 			"DHCP/VPL info: Addr(%s) Network:(%s) Token(%s) ",
-			TUN.CRResponse.DHCP.IP,
-			TUN.CRResponse.VPLNetwork.Network,
-			TUN.CRResponse.DHCP.Token,
+			TUN.ServerReponse.DHCP.IP,
+			TUN.ServerReponse.LAN.Network,
+			TUN.ServerReponse.DHCP.Token,
 		))
 	}
 
@@ -613,7 +588,7 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		return 400, errors.New("no server id found when connecting")
 	}
 
-	FinalCR := new(RemoteConnectionRequest)
+	FinalCR := new(types.ControllerConnectRequest)
 	FinalCR.Created = time.Now()
 	FinalCR.Version = apiVersion
 	FinalCR.UserID = ClientCR.UserID
@@ -624,167 +599,91 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	FinalCR.DeviceKey = ClientCR.DeviceKey
 	FinalCR.DeviceToken = ClientCR.DeviceToken
 	FinalCR.RequestingPorts = meta.RequestVPNPorts
-
 	DEBUG("ConnectRequestFromClient", ClientCR)
 
-	tc := &tls.Config{
-		RootCAs:            CertPool,
-		MinVersion:         tls.VersionTLS13,
-		CurvePreferences:   []tls.CurveID{tls.X25519MLKEM768},
-		InsecureSkipVerify: false,
-		VerifyPeerCertificate: func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
-			return nil
-		},
-		VerifyConnection: func(cs tls.ConnectionState) error {
-			if len(cs.PeerCertificates) > 0 {
-				FinalCR.Serial = fmt.Sprintf("%x", cs.PeerCertificates[0].SerialNumber)
-			}
-			return nil
-		},
-	}
-
-	if !meta.Public {
-		tc.RootCAs, errm = tunnel.LoadPrivateCerts(meta.ServerCert)
-		if errm != nil {
-			ERROR("Unable to load private cert: ", errm)
-			return 502, errors.New("Unable to load private cert: " + meta.ServerCert)
-		}
-	}
-
-	qc := &quic.Config{
-		TLSConfig:                tc,
-		HandshakeTimeout:         time.Duration(15 * time.Second),
-		RequireAddressValidation: false,
-		KeepAlivePeriod:          0,
-		MaxUniRemoteStreams:      10,
-		MaxBidiRemoteStreams:     10,
-		MaxStreamReadBufferSize:  70000,
-		MaxStreamWriteBufferSize: 70000,
-		MaxConnReadBufferSize:    70000,
-		MaxIdleTimeout:           60 * time.Second,
-	}
-
-	x, err := quic.Listen("udp4", "", qc)
-	if err != nil {
-		ERROR("Unable to open UDP listener:", err)
-		return 502, errors.New("Unable to create udp listener")
-	}
-
-	DEBUG("ConnectingTo:", net.JoinHostPort(ClientCR.ServerIP, ClientCR.ServerPort))
-	con, err := x.Dial(
-		context.Background(),
-		"udp4",
-		net.JoinHostPort(ClientCR.ServerIP, ClientCR.ServerPort),
-		qc,
+	// TODO.. think about private certs ? or just make auto let's encrypt service ?
+	bytesFromController, code, err := SendRequestToURL(
+		nil,
+		"POST",
+		"https://api.tunnels.is/session",
+		FinalCR,
+		10000,
+		false,
 	)
-	if err != nil {
-		x.Close(context.Background())
-		DEBUG("ConnectionError:", err)
-		return 502, errors.New("unable to connect to server")
-	}
-
-	FR := new(FORWARD_REQUEST)
-	FR.Method = "POST"
-	if !meta.Public {
-		FR.Path = "v3/session/private"
-	} else {
-		FR.Path = "v3/session/public"
-	}
-
-	if ClientCR.DeviceKey != "" {
-		FR.Path += "/min"
-	}
-
-	FR.JSONData = FinalCR
-	FR.Timeout = 25000
-
-	fmt.Println("DT:", ClientCR.DeviceToken)
-	bytesFromController, code := ForwardConnectToController(FR)
-	DEBUG("CodeFromController:", code)
 	if code != 200 {
-		x.Close(context.Background())
-		con.Abort(errors.New(""))
 		ERROR("ErrFromController:", string(bytesFromController))
 		ER := new(ErrorResponse)
 		err := json.Unmarshal(bytesFromController, ER)
-		fmt.Println("format err:", err)
-		if err != nil {
+		if err == nil {
 			return code, errors.New(ER.Error)
 		} else {
-			return code, errors.New("Unknown error from controller")
+			return code, errors.New("Error code from controller")
 		}
 	}
-
-	DEBUG("SignedPayload:", string(bytesFromController))
-
-	s, err := con.NewStream(context.Background())
 	if err != nil {
-		x.Close(context.Background())
-		con.Abort(errors.New(""))
-		DEBUG("StreamError:", err)
-		return 502, errors.New("unable to make stream")
+		return 500, errors.New("Unknown when contacting controller")
 	}
+	DEBUG("SignedPayload:", code, string(bytesFromController))
 
-	closeAll := func() {
-		s.Close()
-		con.Close()
-		x.Close(context.Background())
-	}
-
-	_, err = s.Write(bytesFromController)
+	SignedResponse := new(types.SignedConnectRequest)
+	err = json.Unmarshal(bytesFromController, SignedResponse)
 	if err != nil {
-		closeAll()
-		DEBUG("WriteError:", err)
-		return 502, errors.New("unable to write connection request data to server")
+		ERROR("invalid signed response from controller", err)
+		return 502, errors.New("invalid response from controller")
 	}
-	s.Flush()
 
 	tunnel.encWrapper, err = crypt.NewEncryptionHandler(ClientCR.EncType, ClientCR.CurveType)
 	if err != nil {
-		closeAll()
 		ERROR("unable to create encryption handler: ", err)
 		return 502, errors.New("Unable to secure connection")
 	}
+	SignedResponse.UserHandshake = tunnel.encWrapper.GetPublicKey()
 
-	tunnel.encWrapper.SetHandshakeStream(s)
-
-	err = tunnel.encWrapper.ReceiveHandshake()
-	if err != nil {
-		con.Abort(errors.New(""))
-		ERROR("Handshakte initialization failed", err)
-		return 502, errors.New("Unable to finalize handshake")
+	tc := &tls.Config{
+		MinVersion:         tls.VersionTLS13,
+		CurvePreferences:   []tls.CurveID{tls.X25519MLKEM768},
+		InsecureSkipVerify: false,
 	}
-
-	CRR := new(ConnectRequestResponse)
-	resp := make([]byte, 100000)
-	n, err := s.Read(resp)
-	DEBUG("(RAW)ConnectionRequestResponse:", string(resp[:n]))
-	if err != nil {
-		if err != io.EOF {
-			closeAll()
-			ERROR("Unable to receive connection response", err)
-			return 500, errors.New("Did not receive connection response from server")
+	tc.RootCAs, errm = tunnel.LoadCertPEMBytes(SignedResponse.ServerPubKey)
+	if errm != nil {
+		ERROR("Unable to load cert pem from controller: ", errm)
+		return 502, errors.New("Unable to load cert pem from controller")
+	}
+	bytesFromServer, code, err := SendRequestToURL(
+		tc,
+		"POST",
+		"https://server.tunnels.is/connect",
+		SignedResponse,
+		10000,
+		false,
+	)
+	if code != 200 {
+		ERROR("ErrFromServer:", string(bytesFromServer))
+		ER := new(ErrorResponse)
+		err := json.Unmarshal(bytesFromServer, ER)
+		if err == nil {
+			return code, errors.New(ER.Error)
+		} else {
+			return code, errors.New("Error code from controller")
 		}
 	}
-
-	err = json.Unmarshal(resp[:n], &CRR)
 	if err != nil {
-		closeAll()
-		ERROR("Unable to parse connection response", err)
-		return 502, errors.New("Unable to open data from server.. disconnecting..")
+		return 500, errors.New("Unknown when contacting controller")
 	}
 
-	closeAll()
+	ServerReponse := new(types.ServerConnectResponse)
+	err = json.Unmarshal(bytesFromServer, ServerReponse)
+	if err != nil {
+		return 500, errors.New("Unable to decode reponse from server")
+	}
 
-	DEBUG("ConnectionRequestResponse:", CRR)
-	tunnel.CRResponse = CRR
+	DEBUG("ConnectionRequestResponse:", ServerReponse)
+	tunnel.ServerReponse = ServerReponse
 
 	err = InitializeTunnelFromCRR(tunnel)
 	if err != nil {
 		return 502, err
 	}
-
-	DEBUG("Opening data tunnel:", net.JoinHostPort(ClientCR.ServerIP, CRR.DataPort))
 
 	// ensure gateway is not incorrect
 	gateway := state.DefaultGateway.Load()
@@ -800,31 +699,25 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	if ifName == nil {
 		return 502, errors.New("no default interface, please check try again")
 	}
-	err = IP_AddRoute(ClientCR.ServerIP+"/32", *ifName, gateway.To4().String(), "0")
+	err = IP_AddRoute(ServerReponse.InterfaceIP+"/32", *ifName, gateway.To4().String(), "0")
 	if err != nil {
 		return 502, errors.New("unable to initialize routes")
 	}
 
-	raddr, err := net.ResolveUDPAddr("udp4", ClientCR.ServerIP+":"+CRR.DataPort)
+	raddr, err := net.ResolveUDPAddr("udp4", ServerReponse.InterfaceIP+":"+ServerReponse.DataPort)
 	if err != nil {
-		fmt.Printf("Error resolving address: %v\n", err)
-		os.Exit(1)
+		return 502, errors.New("unable to resolve data port upd route")
 	}
 
-	UDPConn, err := net.DialUDP(
-		"udp4",
-		nil,
-		raddr,
-		// net.JoinHostPort(ClientCR.ServerIP, CRR.DataPort),
-	)
+	UDPConn, err := net.DialUDP("udp4", nil, raddr)
 	if err != nil {
 		DEBUG("Unable to open data tunnel: ", err)
 		return 502, errors.New("unable to open data tunnel")
 	}
-	err = setDontFragment(UDPConn)
-	if err != nil {
-		DEBUG("unable to disable IP fragmentation", err)
-	}
+	// err = setDontFragment(UDPConn)
+	// if err != nil {
+	// 	DEBUG("unable to disable IP fragmentation", err)
+	// }
 	tunnel.connection = net.Conn(UDPConn)
 
 	inter, err := CreateAndConnectToInterface(tunnel)
@@ -835,31 +728,28 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 
 	tunnel.tunnel.Store(inter)
 	inter.tunnel.Store(&tunnel)
-
 	err = inter.Connect(tunnel)
 	if err != nil {
 		ERROR("unable to configure tunnel interface: ", err)
 		return 502, errors.New("Unable to connect to tunnel interface")
 	}
 
-	// Create cross-pointers
 	tunnel.SetState(TUN_Connected)
 	tunnel.registerPing(time.Now())
 	tunnel.ID = uuid.NewString()
 	TunnelMap.Store(tunnel.ID, tunnel)
 
-	// _ = GenerateState()
-
-	out := tunnel.encWrapper.SEAL.Seal1(PingPongStatsBuffer, tunnel.Index)
-	_, err = tunnel.connection.Write(out)
+	_, err = tunnel.connection.Write(
+		tunnel.encWrapper.SEAL.Seal1(PingPongStatsBuffer, tunnel.Index),
+	)
 	if err != nil {
-		return 502, errors.New("unable to send initial ping to server")
+		return 502, errors.New("unable to send ping to server")
 	}
 
 	go tunnel.ReadFromServeTunnel()
 	go inter.ReadFromTunnelInterface()
 
-	if tunnel.CRResponse.DHCP != nil {
+	if tunnel.ServerReponse.DHCP != nil {
 		err = sendFirewallToServer(
 			tunnel.CR.ServerIP,
 			tunnel.dhcp.Token,
