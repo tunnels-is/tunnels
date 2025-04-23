@@ -181,13 +181,8 @@ func (t *TInterface) Down() (err error) {
 	return
 }
 
-func (t *TInterface) Addr() (err error) {
-	return nil
-}
-
 func (t *TInterface) SetMTU() (err error) {
 	DEBUG("ifconfig", t.SystemName, "mtu", strconv.FormatInt(int64(t.MTU), 10))
-
 	out, err := exec.Command("ifconfig", t.SystemName, "mtu", strconv.FormatInt(int64(t.MTU), 10)).CombinedOutput()
 	if err != nil {
 		ERROR("Unable to change mtu out: ", string(out), " err: ", err)
@@ -200,19 +195,17 @@ func (t *TInterface) Netmask() (err error) {
 	return nil
 }
 
-func (t *TInterface) Delete() (err error) {
-	return nil
-}
-
 func (t *TInterface) SetTXQueueLen() (err error) {
+	DEBUG("ifconfig", t.SystemName, "txqueuelen", strconv.FormatInt(int64(t.MTU), 10))
+	out, err := exec.Command("ifconfig", t.SystemName, "txqueuelen", strconv.FormatInt(int64(t.TxQueuelen), 10)).CombinedOutput()
+	if err != nil {
+		ERROR("Unable to change mtu out: ", string(out), " err: ", err)
+		return err
+	}
 	return nil
 }
 
 func (t *TInterface) Connect(tun *TUN) (err error) {
-	err = t.Addr()
-	if err != nil {
-		return
-	}
 	err = t.Up()
 	if err != nil {
 		return
@@ -271,11 +264,6 @@ func (t *TInterface) Disconnect(V *TUN) (err error) {
 	err = t.Close()
 	if err != nil {
 		ERROR("unable to close the interface", err)
-	}
-
-	err = t.Delete()
-	if err != nil {
-		ERROR("unable to delete the interface", err)
 	}
 
 	// TODO .. might not be needed ?????
