@@ -82,6 +82,11 @@ func API_AcceptUserConnections(w http.ResponseWriter, r *http.Request) {
 	}
 
 	CRR.ServerHandshake = EH.GetPublicKey()
+	CRR.ServerHandshakeSignature, err = signData(CRR.ServerHandshake)
+	if err != nil {
+		ERR("Unable to sign server handshake", err)
+		return
+	}
 	CRRB, err := json.Marshal(CRR)
 	if err != nil {
 		ERR("Unable to marshal CCR", err)
