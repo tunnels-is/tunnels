@@ -29,7 +29,7 @@ func API_AcceptUserConnections(w http.ResponseWriter, r *http.Request) {
 		senderr(w, 400, err.Error())
 		return
 	}
-	err = verifySignature(SCR.Payload, SCR.Signature)
+	err = crypt.VerifySignature(SCR.Payload, SCR.Signature, PubKey.Load())
 	if err != nil {
 		senderr(w, 401, "Invalid signature", slog.Any("err", err))
 		return
@@ -82,7 +82,7 @@ func API_AcceptUserConnections(w http.ResponseWriter, r *http.Request) {
 	}
 
 	CRR.ServerHandshake = EH.GetPublicKey()
-	CRR.ServerHandshakeSignature, err = signData(CRR.ServerHandshake)
+	CRR.ServerHandshakeSignature, err = crypt.SignData(CRR.ServerHandshake, PrivKey.Load())
 	if err != nil {
 		ERR("Unable to sign server handshake", err)
 		return
@@ -285,7 +285,7 @@ func API_UserLogout(w http.ResponseWriter, r *http.Request) {
 	if LF.All {
 		user.Tokens = make([]*DeviceToken, 0)
 	} else {
-		slices.DeleteFunc(user.Tokens, func(dt *DeviceToken) bool {
+		user.Tokens = slices.DeleteFunc(user.Tokens, func(dt *DeviceToken) bool {
 			if dt.DT == LF.DeviceToken {
 				return true
 			}
@@ -339,8 +339,8 @@ func API_UserTwoFactorConfirm(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		rcs := strings.Split(string(rc), " ")
-		for _, v := range rcs {
+		rcs := strings.SplitSeq(string(rc), " ")
+		for v := range rcs {
 			if v == recoveryUpper {
 				recoveryFound = true
 			}
@@ -682,7 +682,7 @@ func API_SessionCreate(w http.ResponseWriter, r *http.Request) {
 
 	SCR := new(types.SignedConnectRequest)
 	SCR.Payload, err = json.Marshal(CR)
-	SCR.Signature, err = signData(SCR.Payload)
+	SCR.Signature, err = crypt.SignData(SCR.Payload, PrivKey.Load())
 	SCR.ServerPubKey = server.PubKey
 	if err != nil {
 		senderr(w, 500, "Unable to sign payload")
