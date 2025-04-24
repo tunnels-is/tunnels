@@ -1,4 +1,4 @@
-package main
+package crypt
 
 import (
 	"crypto"
@@ -24,7 +24,7 @@ func anyToPublicKeys(key any) (RSA *rsa.PublicKey, EC *ecdsa.PublicKey) {
 	return
 }
 
-func loadPrivateKey(filePath string) (any, []byte, error) {
+func LoadPrivateKey(filePath string) (any, []byte, error) {
 	keyBytes, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to read private key file: %w", err)
@@ -49,7 +49,7 @@ func loadPrivateKey(filePath string) (any, []byte, error) {
 	return keyInterface, keyBytes, nil
 }
 
-func loadPublicKeyBytes(keyBytes []byte) (any, []byte, error) {
+func LoadPublicKeyBytes(keyBytes []byte) (any, []byte, error) {
 	block, _ := pem.Decode(keyBytes)
 	if block == nil {
 		return nil, nil, errors.New("failed to decode PEM block containing public key")
@@ -63,7 +63,7 @@ func loadPublicKeyBytes(keyBytes []byte) (any, []byte, error) {
 	return cert.PublicKey, keyBytes, nil
 }
 
-func loadPublicKey(filePath string) (any, []byte, error) {
+func LoadPublicKey(filePath string) (any, []byte, error) {
 	keyBytes, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to read public key file: %w", err)
@@ -82,11 +82,10 @@ func loadPublicKey(filePath string) (any, []byte, error) {
 	return cert.PublicKey, keyBytes, nil
 }
 
-func signData(data []byte) ([]byte, error) {
-	privateKey := PrivKey.Load()
+func SignData(data []byte, key any) ([]byte, error) {
 	hashed := sha256.Sum256(data)
 
-	rsaKey, ecKey := anyToPrivateKeys(privateKey)
+	rsaKey, ecKey := anyToPrivateKeys(key)
 	if rsaKey != nil {
 		opts := &rsa.PSSOptions{SaltLength: rsa.PSSSaltLengthAuto, Hash: crypto.SHA256}
 		signature, err := rsa.SignPSS(rand.Reader, rsaKey, crypto.SHA256, hashed[:], opts)
@@ -105,11 +104,10 @@ func signData(data []byte) ([]byte, error) {
 	return nil, fmt.Errorf("no valid private key found")
 }
 
-func verifySignature(data []byte, signature []byte) error {
-	publicKey := PubKey.Load()
+func VerifySignature(data []byte, signature []byte, key any) error {
 	hashed := sha256.Sum256(data)
 
-	rsaKey, ecKey := anyToPublicKeys(publicKey)
+	rsaKey, ecKey := anyToPublicKeys(key)
 	if rsaKey != nil {
 		opts := &rsa.PSSOptions{SaltLength: rsa.PSSSaltLengthAuto, Hash: crypto.SHA256}
 		err := rsa.VerifyPSS(rsaKey, crypto.SHA256, hashed[:], signature, opts)

@@ -8,16 +8,13 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
-	"crypto/x509"
 	"encoding/binary"
 	"encoding/json"
-	"encoding/pem"
 	"errors"
 	"io"
 	"log"
 	"math"
 	"net"
-	"os"
 	"runtime/debug"
 	"sync/atomic"
 	"time"
@@ -397,7 +394,7 @@ type SignedConnectRequest struct {
 	Payload   []byte
 }
 
-func SignPayload(obj interface{}, privateKey *rsa.PrivateKey) (w *SignedConnectRequest, err error) {
+func SignPayload(obj any, privateKey *rsa.PrivateKey) (w *SignedConnectRequest, err error) {
 	var encB []byte
 	encB, err = json.Marshal(obj)
 	if err != nil {
@@ -433,25 +430,25 @@ func ValidateSignature(wrapper []byte, publicKey *rsa.PublicKey) (w SignedConnec
 	return
 }
 
-func LoadPrivateKey(path string) (privateKey *rsa.PrivateKey, err error) {
-	privateKeyPEM, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
+// func LoadPrivateKey(path string) (privateKey *rsa.PrivateKey, err error) {
+// 	privateKeyPEM, err := os.ReadFile(path)
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-	privateKeyBlock, _ := pem.Decode(privateKeyPEM)
+// 	privateKeyBlock, _ := pem.Decode(privateKeyPEM)
 
-	var anyKey any
-	anyKey, err = x509.ParsePKCS8PrivateKey(privateKeyBlock.Bytes)
-	if err != nil {
-		return nil, err
-	}
+// 	var anyKey any
+// 	anyKey, err = x509.ParsePKCS8PrivateKey(privateKeyBlock.Bytes)
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-	var ok bool
-	privateKey, ok = anyKey.(*rsa.PrivateKey)
-	if !ok {
-		return nil, errors.New("private signing key was not rsa.PrivateKey")
-	}
+// 	var ok bool
+// 	privateKey, ok = anyKey.(*rsa.PrivateKey)
+// 	if !ok {
+// 		return nil, errors.New("private signing key was not rsa.PrivateKey")
+// 	}
 
-	return
-}
+// 	return
+// }

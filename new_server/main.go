@@ -28,6 +28,7 @@ import (
 	"github.com/jackpal/gateway"
 	"github.com/joho/godotenv"
 	"github.com/tunnels-is/tunnels/certs"
+	"github.com/tunnels-is/tunnels/crypt"
 	"github.com/tunnels-is/tunnels/setcap"
 	"github.com/tunnels-is/tunnels/signal"
 	"github.com/tunnels-is/tunnels/types"
@@ -276,11 +277,11 @@ func LoadServerConfig(path string) (err error) {
 }
 
 func loadCertificatesAndTLSSettings() (err error) {
-	priv, privB, err := loadPrivateKey(loadSecret("KeyPem"))
+	priv, privB, err := crypt.LoadPrivateKey(loadSecret("KeyPem"))
 	if err != nil {
 		panic(err)
 	}
-	pub, pubB, err := loadPublicKey(loadSecret("CertPem"))
+	pub, pubB, err := crypt.LoadPublicKey(loadSecret("CertPem"))
 	if err != nil {
 		panic(err)
 	}
@@ -500,28 +501,4 @@ func makeConfigAndCerts() {
 		panic(err)
 	}
 
-}
-
-func getStacktraceLines(skipFrames int) []string {
-	buf := make([]byte, 4086)
-
-	n := runtime.Stack(buf, false)
-	stack := string(buf[:n])
-
-	lines := strings.Split(stack, "\n")
-
-	startIndex := 1 + (skipFrames * 2)
-	if startIndex >= len(lines) {
-		startIndex = 1
-	}
-
-	cleanedLines := make([]string, 0, len(lines)-startIndex)
-	for _, line := range lines[startIndex:] {
-		trimmed := strings.TrimSpace(line)
-		if trimmed != "" {
-			cleanedLines = append(cleanedLines, trimmed)
-		}
-	}
-
-	return cleanedLines
 }
