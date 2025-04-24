@@ -123,10 +123,11 @@ type SignedConnectRequest struct {
 }
 
 type ServerConnectResponse struct {
-	ServerHandshake   []byte
-	Index             int `json:"Index"`
-	AvailableMbps     int `json:"AvailableMbps"`
-	AvailableUserMbps int `json:"AvailableUserMbps"`
+	ServerHandshake          []byte
+	ServerHandshakeSignature []byte
+	Index                    int `json:"Index"`
+	AvailableMbps            int `json:"AvailableMbps"`
+	AvailableUserMbps        int `json:"AvailableUserMbps"`
 
 	InternetAccess     bool `json:"InternetAccess,required"`
 	LocalNetworkAccess bool `json:"LocalNetworkAccess"`
