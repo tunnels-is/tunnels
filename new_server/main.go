@@ -32,8 +32,6 @@ import (
 	"github.com/tunnels-is/tunnels/setcap"
 	"github.com/tunnels-is/tunnels/signal"
 	"github.com/tunnels-is/tunnels/types"
-	"golang.org/x/net/quic"
-	"golang.org/x/oauth2"
 )
 
 var (
@@ -51,19 +49,10 @@ const (
 )
 
 var (
-	errUnauthorized = errors.New("unauthorized")
-	errForbidden    = errors.New("forbidden")
-	errNotFound     = errors.New("not found")
-	errOTPRequired  = errors.New("otp required")
-	errInvalidOTP   = errors.New("invalid otp code")
-)
-
-var (
 	CTX          atomic.Pointer[context.Context]
 	Cancel       atomic.Pointer[context.CancelFunc]
 	Config       atomic.Pointer[types.ServerConfig]
 	APITLSConfig atomic.Pointer[tls.Config]
-	QUICConfig   atomic.Pointer[quic.Config]
 	PrivKey      atomic.Pointer[any]
 	PubKey       atomic.Pointer[any]
 	KeyPair      atomic.Pointer[tls.Certificate]
@@ -71,20 +60,13 @@ var (
 )
 
 var (
-	LANEnabled        bool
-	VPNEnabled        bool
-	AUTHEnabled       bool
-	DNSEnabled        bool
-	logger            *slog.Logger
-	numShards         = 5
-	twoFactorAppName  = "tunnels"
-	pendingTwoFactor  = sync.Map{}
-	googleOauthConfig *oauth2.Config
-	serverConfigPath  = "./server.json"
-	slots             int
+	LANEnabled  bool
+	VPNEnabled  bool
+	AUTHEnabled bool
+	DNSEnabled  bool
+	logger      *slog.Logger
 
-	publicPath  string
-	privatePath string
+	slots int
 
 	dataSocketFD int
 	rawUDPSockFD int
@@ -95,8 +77,6 @@ var (
 
 	toUserChannelMonitor   = make(chan int, 200000)
 	fromUserChannelMonitor = make(chan int, 200000)
-
-	portMappingResponseDurations = time.Duration(30 * time.Second)
 
 	clientCoreMappings [math.MaxUint16 + 1]*UserCoreMapping
 	portToCoreMapping  [math.MaxUint16 + 1]*PortRange
@@ -226,7 +206,7 @@ func main() {
 
 	go signal.NewSignal("API", ctx, cancel, 1*time.Second, goroutineLogger, launchAPIServer)
 
-	go signal.NewSignal("CONFIG", ctx, cancel, 10*time.Second, goroutineLogger, func() {
+	go signal.NewSignal("CONFIG", ctx, cancel, 30*time.Second, goroutineLogger, func() {
 		_ = LoadServerConfig("./config.json")
 	})
 
@@ -238,7 +218,7 @@ func main() {
 }
 
 func goroutineLogger(msg string) {
-	fmt.Println(msg)
+	logger.Debug(msg)
 }
 
 func validateConfig(Config *types.ServerConfig) (err error) {
@@ -279,17 +259,17 @@ func LoadServerConfig(path string) (err error) {
 func loadCertificatesAndTLSSettings() (err error) {
 	priv, privB, err := crypt.LoadPrivateKey(loadSecret("KeyPem"))
 	if err != nil {
-		panic(err)
+		return err
 	}
 	pub, pubB, err := crypt.LoadPublicKey(loadSecret("CertPem"))
 	if err != nil {
-		panic(err)
+		return err
 	}
 	PrivKey.Store(&priv)
 	PubKey.Store(&pub)
 	tlscert, err := tls.X509KeyPair(pubB, privB)
 	if err != nil {
-		log.Fatalf("Failed to load key pair for TLS: %v", err)
+		return err
 	}
 	KeyPair.Store(&tlscert)
 
@@ -300,21 +280,9 @@ func loadCertificatesAndTLSSettings() (err error) {
 		Certificates:     []tls.Certificate{*KeyPair.Load()},
 	})
 
-	QUICConfig.Store(&quic.Config{
-		TLSConfig:                APITLSConfig.Load(),
-		RequireAddressValidation: false,
-		HandshakeTimeout:         time.Duration(10 * time.Second),
-		KeepAlivePeriod:          0,
-		MaxUniRemoteStreams:      500,
-		MaxBidiRemoteStreams:     500,
-		MaxStreamReadBufferSize:  70000,
-		MaxStreamWriteBufferSize: 70000,
-		MaxConnReadBufferSize:    70000,
-		MaxIdleTimeout:           60 * time.Second,
-	})
-
 	return nil
 }
+
 func initializeVPN() {
 	err := setcap.CheckCapabilities()
 	if err != nil {
@@ -480,7 +448,9 @@ func makeConfigAndCerts() {
 	if err != nil {
 		panic(err)
 	}
-	defer f.Close()
+	defer func() {
+		_ = f.Close()
+	}()
 	encoder := json.NewEncoder(f)
 	encoder.SetIndent("", "    ")
 	if err := encoder.Encode(Config); err != nil {

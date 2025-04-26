@@ -58,19 +58,12 @@ func sendObject(w http.ResponseWriter, obj any) {
 		senderr(w, 500, "unable to encode response object")
 		return
 	}
-	return
 }
 
 func handleUserDeviceToken(user *User, LF *LOGIN_FORM) (userTokenUpdate *UPDATE_USER_TOKENS) {
-	defer func() {
-		r := recover()
-		if r != nil {
-			log.Println(r, string(debug.Stack()))
-		}
-	}()
+	defer BasicRecover()
 
 	tokenExists := false
-
 	if LF.DeviceToken != "" {
 		for i, v := range user.Tokens {
 			if v.DT == LF.DeviceToken {
@@ -112,16 +105,16 @@ func validateUserTwoFactor(user *User, LF *LOGIN_FORM) (err error) {
 	if user.TwoFactorEnabled {
 
 		if LF.Recovery != "" {
-			var recoveryFound bool = false
+			recoveryFound := false
 			recoveryUpper := strings.ToUpper(LF.Recovery)
 			rc, err := Decrypt(user.RecoveryCodes, []byte(loadSecret("TwoFactorKey")))
 			if err != nil {
 				ADMIN(err)
-				return errors.New("Encryption error")
+				return errors.New("encryption error")
 			}
 
-			rcs := strings.Split(string(rc), " ")
-			for _, v := range rcs {
+			rcs := strings.SplitSeq(string(rc), " ")
+			for v := range rcs {
 				if v == recoveryUpper {
 					recoveryEnabled = true
 					recoveryFound = true
@@ -129,7 +122,7 @@ func validateUserTwoFactor(user *User, LF *LOGIN_FORM) (err error) {
 			}
 
 			if !recoveryFound {
-				return errors.New("Invalid Recovery code")
+				return errors.New("invalid Recovery code")
 			}
 		}
 
@@ -137,7 +130,7 @@ func validateUserTwoFactor(user *User, LF *LOGIN_FORM) (err error) {
 			code, err := Decrypt(user.TwoFactorCode, []byte(loadSecret("TwoFactorKey")))
 			if err != nil {
 				ADMIN(err)
-				return errors.New("Encryption error")
+				return errors.New("encryption error")
 			}
 
 			otp := gotp.NewDefaultTOTP(string(code)).Now()
@@ -157,15 +150,12 @@ func authenticateUserFromEmailOrIDAndToken(email string, id primitive.ObjectID, 
 	} else {
 		return nil, errors.New("user not found")
 	}
-
-	if user == nil {
-		return nil, errors.New("user not found")
-	}
-
 	if err != nil {
 		return nil, errors.New("Database error, please try again in a moment")
 	}
-
+	if user == nil {
+		return nil, errors.New("user not found")
+	}
 	if user.Disabled {
 		return nil, errors.New("This account has been disabled, please contact customer support")
 	}
@@ -183,9 +173,9 @@ func authenticateUserFromEmailOrIDAndToken(email string, id primitive.ObjectID, 
 		}
 	}
 
-	if !allowed {
-		return nil, errors.New("unauthorized")
+	if allowed {
+		return
 	}
 
-	return
+	return nil, errors.New("unauthorized")
 }
