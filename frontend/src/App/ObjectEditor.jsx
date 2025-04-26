@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react";
 import React from "react";
 import GLOBAL_STATE from "../state";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Plus, X, Save, ArrowLeft, Trash2 } from "lucide-react";
 
 const ObjectEditor = (props) => {
   const state = GLOBAL_STATE("oe");
@@ -16,9 +20,9 @@ const ObjectEditor = (props) => {
     "div",
     {
       key: "no-items",
-      className: "no-items",
+      className: "no-items text-gray-400 p-4 text-center text-sm",
     },
-    "no items",
+    "No items available",
   );
 
   const transformType = (t) => {
@@ -354,14 +358,12 @@ const ObjectEditor = (props) => {
     let checked = undefined;
     if (x.type === "boolean") {
       checked = x.parent.origin[x.id];
-      input = React.createElement("input", {
+      input = React.createElement(Checkbox, {
         key: x.key + "_checkbox",
-        className: checked ? "checkbox checked" : "checkbox",
+        className: checked ? "accent-emerald-500 cursor-pointer" : "accent-emerald-500 cursor-pointer",
         checked: x.parent.origin[x.id],
-        type: transformType(x.type),
-        onClick: (e) => {
-          x.parent.origin[x.id] = e.target.checked ? true : false;
-          // console.log("check:", x.parent.origin[x.id])
+        onCheckedChange: (checked) => {
+          x.parent.origin[x.id] = checked;
           state.renderPage("oe");
         },
       });
@@ -372,18 +374,13 @@ const ObjectEditor = (props) => {
       } else if (props.opts.readOnly === true) {
         disabled = true;
       }
-      input = React.createElement("input", {
+      input = React.createElement(Input, {
         key: x.key + "_input",
-        className: "input",
+        className: "h-9 px-3 py-1.5 bg-[#0f0f0f] border-[#333] rounded-md text-white/90 text-sm focus:ring-blue-500 focus:border-blue-500 w-full",
         value: x.parent.origin[x.id],
         type: transformType(x.type),
-        // disabled: props.opts.disabled ? props.opts.disabled["root_" + x.id] : false,
         disabled: disabled,
         onChange: (e) => {
-          // console.log("change")
-          // console.dir(x.id)
-          // console.dir(x.parent.origin)
-          // console.dir(x.parent.origin[x.id])
           if (x.type === "number") {
             x.parent.origin[x.id] = Number(e.target.value);
           } else {
@@ -396,24 +393,25 @@ const ObjectEditor = (props) => {
 
     if (x.parent.type === "array") {
       label = React.createElement(
-        "div",
+        Button,
         {
           key: x.key + "_rem_button",
-          className: "rem_button",
+          variant: "outline",
+          size: "icon",
+          className: "h-6 w-6 rounded-full bg-red-500/10 text-red-400 hover:bg-red-500/20 border-transparent p-0",
           onClick: () => {
             x.parent.origin.splice(x.id, 1);
             state.renderPage("oe");
           },
         },
-        "X",
+        React.createElement(X, { className: "h-3 w-3" })
       );
     } else {
       label = React.createElement(
         "div",
         {
           key: x.key + "_label",
-          // className: "label",
-          className: checked ? "label checked" : "label",
+          className: checked ? "label checked text-sm font-medium text-emerald-400" : "label text-sm font-medium text-white/80",
         },
         x.title,
       );
@@ -426,8 +424,8 @@ const ObjectEditor = (props) => {
           key: x.key + "_input_wrap",
           className:
             x.id +
-            " input_wrap " +
-            (x.type !== "boolean" ? "bottom_border" : "") +
+            " input_wrap flex items-center gap-2 p-2 " +
+            (x.type !== "boolean" ? "bottom_border border-b border-[#222] mb-2" : "") +
             " " +
             x.ns,
         },
@@ -442,8 +440,8 @@ const ObjectEditor = (props) => {
         key: x.key + "_input_wrap",
         className:
           x.id +
-          " input_wrap " +
-          (x.type !== "boolean" ? "bottom_border" : "") +
+          " input_wrap flex flex-col gap-1.5 mb-3 " +
+          (x.type !== "boolean" ? "" : "") +
           " " +
           x.ns,
       },
@@ -494,7 +492,7 @@ const ObjectEditor = (props) => {
               "div",
               {
                 key: x.key + "_title",
-                className: "editor-title",
+                className: "editor-title text-base font-medium text-white/90 mb-2",
               },
               x.id,
             )
@@ -504,32 +502,37 @@ const ObjectEditor = (props) => {
     newB =
       x.newButton !== undefined
         ? React.createElement(
-            "div",
+            Button,
             {
               key: x.key + "_new_button",
-              className: "new_button",
+              variant: "outline",
+              size: "icon",
+              className: "h-6 w-6 p-0 rounded-full bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border-transparent",
               onClick: () => {
                 x.newButton(x.origin);
                 reload();
               },
             },
-            "+",
+            React.createElement(Plus, { className: "h-3 w-3" })
           )
         : null;
 
     delB =
       x.delButton !== undefined
         ? React.createElement(
-            "div",
+            Button,
             {
               key: x.key + "_del_button",
-              className: "del_button",
+              variant: "outline",
+              size: "sm",
+              className: "h-7 px-2 py-1 text-xs bg-red-500/10 text-red-400 hover:bg-red-500/20 border-transparent",
               onClick: () => {
                 x.delButton(x.parent.origin);
                 reload();
               },
             },
-            x.type === "object" ? "delete" : "delete",
+            React.createElement(Trash2, { className: "h-3 w-3 mr-1" }),
+            x.type === "object" ? "Delete" : "Delete"
           )
         : null;
 
@@ -538,7 +541,7 @@ const ObjectEditor = (props) => {
         "div",
         {
           key: x.key + "_top_bar",
-          className: "top_bar",
+          className: "top_bar flex items-center justify-between mb-2 mt-1",
         },
         titleD,
         newB,
@@ -549,7 +552,7 @@ const ObjectEditor = (props) => {
       "div",
       {
         key: x.key,
-        className: x.className + " " + x.extraClasses,
+        className: x.className + " " + x.extraClasses + " p-3 bg-[#0d0d0d] rounded-md mb-3 border border-[#222] shadow-sm",
       },
       delB,
       topB,
@@ -607,7 +610,7 @@ const ObjectEditor = (props) => {
         {
           key: "root_keys_obj_grp",
           id: "root_keys",
-          className: "root_keys keys obj_grp",
+          className: "root_keys keys obj_grp grid sm:grid-cols-2 gap-3",
         },
         ...rootKeys,
       );
@@ -618,7 +621,7 @@ const ObjectEditor = (props) => {
       {
         key: "root_keys_arrays",
         id: "root_keys",
-        className: "root_keys arrays",
+        className: "root_keys arrays grid sm:grid-cols-2 gap-3",
       },
       ...nested,
       ...rootObjects,
@@ -648,7 +651,7 @@ const ObjectEditor = (props) => {
       "div",
       {
         key: "root" + opts.baseClass + "3",
-        className: "object-editor " + opts.baseClass,
+        className: opts.baseClass,
       },
       editor1,
       editor2,
@@ -659,31 +662,42 @@ const ObjectEditor = (props) => {
 
   return (
     <>
-      <div className="button-wrap">
+      <div className="button-wrap flex gap-3 mb-3">
         {props.opts.backButton && (
-          <div className="button" onClick={() => props.opts.backButton.func()}>
-            {props.opts.backButton.title}
-          </div>
-        )}
-        {props.opts.saveButton && (
-          <div
-            className="button green"
-            onClick={() => props.opts.saveButton(props.object)}
+          <Button 
+            variant="outline" 
+            onClick={() => props.opts.backButton.func()}
+            className="h-9 border-[#333] bg-[#111] hover:bg-[#222] hover:text-white/90 text-white/80 shadow-sm"
           >
+            <ArrowLeft className="h-4 w-4 mr-1" />
+            {props.opts.backButton.title}
+          </Button>
+        )}
+        {props.opts.saveButton && !props.hideSaveButton && (
+          <Button
+            variant="outline"
+            onClick={() => props.opts.saveButton(props.object)}
+            className="h-9 border-emerald-800/40 bg-[#0c1e0c] text-emerald-400 hover:bg-emerald-900/30 hover:text-emerald-300 shadow-sm font-medium"
+          >
+            <Save className="h-4 w-4 mr-1" />
             Save
-          </div>
+          </Button>
         )}
         {props.opts.deleteButton && (
-          <div
-            className="button red end"
+          <Button
+            variant="outline"
             onClick={() => props.opts.deleteButton.func(props.object)}
+            className="h-9 border-red-800/40 bg-[#1e0c0c] text-red-400 hover:bg-red-900/30 hover:text-red-300 shadow-sm font-medium ml-auto"
           >
+            <Trash2 className="h-4 w-4 mr-1" />
             {props.opts.deleteButton.title}
-          </div>
+          </Button>
         )}
       </div>
-      {props.opts.title && <div className="editor-title">{props.opts.title}</div>}
-      {makeDom(props.opts)}
+      {props.opts.title && <div className="editor-title text-xl font-semibold mb-4 text-white/90 border-b border-[#222] pb-2">{props.opts.title}</div>}
+      <div className="rounded-lg bg-[#0a0a0a] p-0shadow-md h-fit">
+        {makeDom(props.opts)}
+      </div>
     </>
   );
 };
