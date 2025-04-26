@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/miekg/dns"
+	"github.com/tunnels-is/tunnels/types"
 	"golang.org/x/net/idna"
 )
 
@@ -97,7 +98,7 @@ func StartUDPDNSHandler() {
 }
 
 func ResolveDomainLocal(tun *TUN, m *dns.Msg, w dns.ResponseWriter) {
-	if len(tun.CRResponse.DNSServers) == 0 {
+	if len(tun.ServerReponse.DNSServers) == 0 {
 		return
 	}
 
@@ -125,12 +126,12 @@ func ResolveDomainLocal(tun *TUN, m *dns.Msg, w dns.ResponseWriter) {
 		}
 	}()
 
-	r, _, err = tun.localDNSClient.Exchange(m, tun.CRResponse.DNSServers[0]+":53")
-	server = tun.CRResponse.DNSServers[0]
+	r, _, err = tun.localDNSClient.Exchange(m, tun.ServerReponse.DNSServers[0]+":53")
+	server = tun.ServerReponse.DNSServers[0]
 
-	if err != nil && len(tun.CRResponse.DNSServers) > 1 {
-		r, _, err = tun.localDNSClient.Exchange(m, tun.CRResponse.DNSServers[1]+":53")
-		server = tun.CRResponse.DNSServers[1]
+	if err != nil && len(tun.ServerReponse.DNSServers) > 1 {
+		r, _, err = tun.localDNSClient.Exchange(m, tun.ServerReponse.DNSServers[1]+":53")
+		server = tun.ServerReponse.DNSServers[1]
 	}
 
 	if err != nil {
@@ -188,7 +189,7 @@ func ResolveDomain(m *dns.Msg, w dns.ResponseWriter) {
 	}
 }
 
-func ProcessDNSMsg(m *dns.Msg, DNS *ServerDNS) (rm *dns.Msg) {
+func ProcessDNSMsg(m *dns.Msg, DNS *types.DNSRecord) (rm *dns.Msg) {
 	rm = new(dns.Msg)
 	rm.SetReply(m)
 	rm.Authoritative = true
@@ -196,17 +197,7 @@ func ProcessDNSMsg(m *dns.Msg, DNS *ServerDNS) (rm *dns.Msg) {
 
 	for i := range rm.Question {
 		if rm.Question[i].Qtype == dns.TypeA {
-			if DNS.CNAME != "" {
-				rm.Answer = append(rm.Answer, &dns.CNAME{
-					Hdr: dns.RR_Header{
-						Class:  dns.ClassNONE,
-						Rrtype: dns.TypeCNAME,
-						Name:   rm.Question[i].Name,
-						Ttl:    5,
-					},
-					Target: DNS.CNAME + ".",
-				})
-			} else if len(DNS.IP) > 0 {
+			if len(DNS.IP) > 0 {
 				for ii := range DNS.IP {
 					rm.Answer = append(rm.Answer, &dns.A{
 						Hdr: dns.RR_Header{
@@ -232,18 +223,6 @@ func ProcessDNSMsg(m *dns.Msg, DNS *ServerDNS) (rm *dns.Msg) {
 						Txt: []string{DNS.TXT[ii]},
 					})
 				}
-			}
-		} else if rm.Question[i].Qtype == dns.TypeCNAME {
-			if DNS.CNAME != "" {
-				rm.Answer = append(rm.Answer, &dns.CNAME{
-					Hdr: dns.RR_Header{
-						Class:  dns.ClassNONE,
-						Rrtype: dns.TypeCNAME,
-						Name:   rm.Question[i].Name,
-						Ttl:    30,
-					},
-					Target: DNS.CNAME + ".",
-				})
 			}
 		}
 	}
@@ -279,7 +258,7 @@ func DNSQuery(w dns.ResponseWriter, m *dns.Msg) {
 	blocked, tag := isBlocked(m)
 
 	var DNSTunnel *TUN
-	var ServerDNS *ServerDNS
+	var ServerDNS *types.DNSRecord
 	tunnelMapRange(func(tun *TUN) bool {
 		if tun.GetState() != TUN_Connected {
 			return true
@@ -294,11 +273,11 @@ func DNSQuery(w dns.ResponseWriter, m *dns.Msg) {
 			return true
 		}
 
-		if tun.CRResponse == nil {
+		if tun.ServerReponse == nil {
 			return true
 		}
 
-		ServerDNS = DNSAMapping(tun.CRResponse.DNS, m.Question[0].Name)
+		ServerDNS = DNSAMapping(tun.ServerReponse.DNSRecords, m.Question[0].Name)
 		if ServerDNS != nil {
 			DNSTunnel = tun
 			return false
@@ -332,8 +311,6 @@ func DNSQuery(w dns.ResponseWriter, m *dns.Msg) {
 	if ServerDNS != nil {
 		hasInfo := false
 		if len(ServerDNS.IP) > 0 {
-			hasInfo = true
-		} else if ServerDNS.CNAME != "" {
 			hasInfo = true
 		} else if len(ServerDNS.TXT) > 0 {
 			hasInfo = true
@@ -469,7 +446,7 @@ func isBlocked(m *dns.Msg) (ok bool, tag string) {
 	name := strings.TrimSuffix(m.Question[0].Name, ".")
 	bl := DNSBlockList.Load()
 	if bl == nil {
-		return true, ""
+		return false, ""
 	}
 
 	tagString, ok := bl.Load(name)

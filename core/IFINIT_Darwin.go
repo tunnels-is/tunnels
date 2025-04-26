@@ -16,8 +16,8 @@ import (
 	"unsafe"
 )
 
-type TunnelInterface struct {
-	tunnel        atomic.Pointer[*Tunnel]
+type TInterface struct {
+	tunnel        atomic.Pointer[*TUN]
 	shouldRestart bool
 
 	Name        string
@@ -40,18 +40,18 @@ type TunnelInterface struct {
 }
 
 func CreateNewTunnelInterface(
-	VC *Tunnel,
-) (IF *TunnelInterface, err error) {
+	meta *TunnelMETA,
+) (IF *TInterface, err error) {
 	defer RecoverAndLogToFile()
 
-	IF = &TunnelInterface{
-		Name:        VC.Meta.IFName,
-		IPv4Address: VC.Meta.IPv4Address,
-		Gateway:     VC.Meta.IPv4Address,
-		NetMask:     VC.Meta.NetMask,
-		TxQueuelen:  VC.Meta.TxQueueLen,
-		MTU:         VC.Meta.MTU,
-		// IPv6Address: "fe80::1",
+	IF = &TInterface{
+		Name:          meta.IFName,
+		IPv4Address:   meta.IPv4Address,
+		Gateway:       meta.IPv4Address,
+		NetMask:       meta.NetMask,
+		TxQueuelen:    meta.TxQueueLen,
+		MTU:           meta.MTU,
+		shouldRestart: true,
 	}
 
 	err = IF.Create()
@@ -62,38 +62,7 @@ func CreateNewTunnelInterface(
 	return
 }
 
-func StartDefaultInterface() (err error) {
-	CON := new(Tunnel)
-	CON.Meta = findDefaultTunnelMeta()
-
-	DEFAULT_TUNNEL, err = CreateNewTunnelInterface(CON)
-	if err != nil {
-		return
-	}
-
-	CON.Interface = DEFAULT_TUNNEL
-
-	err = DEFAULT_TUNNEL.Up()
-	if err != nil {
-		return
-	}
-
-	err = DEFAULT_TUNNEL.SetMTU()
-	if err != nil {
-		return
-	}
-
-	// err = DEFAULT_TUNNEL.SetTXQueueLen()
-	// if err != nil {
-	// 	return
-	// }
-
-	GLOBAL_STATE.DefaultInterfaceOnline = true
-
-	return
-}
-
-func (t *TunnelInterface) Close() error {
+func (t *TInterface) Close() error {
 	if t.RWC != nil {
 		return t.RWC.Close()
 	}
@@ -101,42 +70,11 @@ func (t *TunnelInterface) Close() error {
 }
 
 const (
-	appleUTUNCtl = "com.apple.net.utun_control"
-	/*
-	 * From ioctl.h:
-	 * #define	IOCPARM_MASK	0x1fff		// parameter length, at most 13 bits
-	 * ...
-	 * #define	IOC_OUT		0x40000000	// copy out parameters
-	 * #define	IOC_IN		0x80000000	// copy in parameters
-	 * #define	IOC_INOUT	(IOC_IN|IOC_OUT)
-	 * ...
-	 * #define _IOC(inout,group,num,len) \
-	 * 	(inout | ((len & IOCPARM_MASK) << 16) | ((group) << 8) | (num))
-	 * ...
-	 * #define	_IOWR(g,n,t)	_IOC(IOC_INOUT,	(g), (n), sizeof(t))
-	 *
-	 * From kern_control.h:
-	 * #define CTLIOCGINFO     _IOWR('N', 3, struct ctl_info)	// get id from name
-	 *
-	 */
+	appleUTUNCtl     = "com.apple.net.utun_control"
 	appleCTLIOCGINFO = (0x40000000 | 0x80000000) | ((100 & 0x1fff) << 16) | uint32(byte('N'))<<8 | 3
-	/*
-	 * #define _IOW(g,n,t) _IOC(IOC_IN, (g), (n), sizeof(t))
-	 * #define TUNSIFMODE _IOW('t', 94, int)
-	 */
-	appleTUNSIFMODE = (0x80000000) | ((4 & 0x1fff) << 16) | uint32(byte('t'))<<8 | 94
+	appleTUNSIFMODE  = (0x80000000) | ((4 & 0x1fff) << 16) | uint32(byte('t'))<<8 | 94
 )
 
-/*
- * struct sockaddr_ctl {
- *     u_char sc_len; // depends on size of bundle ID string
- *     u_char sc_family; // AF_SYSTEM
- *     u_int16_t ss_sysaddr; // AF_SYS_KERNCONTROL
- *     u_int32_t sc_id; // Controller unique identifier
- *     u_int32_t sc_unit; // Developer private unit number
- *     u_int32_t sc_reserved[5];
- * };
- */
 type sockaddrCtl struct {
 	scLen      uint8
 	scFamily   uint8
@@ -148,7 +86,7 @@ type sockaddrCtl struct {
 
 var sockaddrCtlSize uintptr = 32
 
-func (t *TunnelInterface) Create() (err error) {
+func (t *TInterface) Create() (err error) {
 	ifIndex := -1
 
 	var fd int
@@ -219,7 +157,7 @@ func (t *TunnelInterface) Create() (err error) {
 	return nil
 }
 
-func (t *TunnelInterface) Up() (err error) {
+func (t *TInterface) Up() (err error) {
 	DEBUG("ifconfig", t.SystemName, t.IPv4Address, t.Gateway, "up")
 
 	out, err := exec.Command("ifconfig", t.SystemName, t.IPv4Address, t.Gateway, "up").CombinedOutput()
@@ -231,7 +169,7 @@ func (t *TunnelInterface) Up() (err error) {
 	return
 }
 
-func (t *TunnelInterface) Down() (err error) {
+func (t *TInterface) Down() (err error) {
 	DEBUG("ifconfig", t.SystemName, "down")
 
 	out, err := exec.Command("ifconfig", t.SystemName, "down").CombinedOutput()
@@ -243,14 +181,8 @@ func (t *TunnelInterface) Down() (err error) {
 	return
 }
 
-func (t *TunnelInterface) Addr() (err error) {
-	// not needed on macos
-	return nil
-}
-
-func (t *TunnelInterface) SetMTU() (err error) {
+func (t *TInterface) SetMTU() (err error) {
 	DEBUG("ifconfig", t.SystemName, "mtu", strconv.FormatInt(int64(t.MTU), 10))
-
 	out, err := exec.Command("ifconfig", t.SystemName, "mtu", strconv.FormatInt(int64(t.MTU), 10)).CombinedOutput()
 	if err != nil {
 		ERROR("Unable to change mtu out: ", string(out), " err: ", err)
@@ -259,116 +191,21 @@ func (t *TunnelInterface) SetMTU() (err error) {
 	return
 }
 
-func (t *TunnelInterface) Netmask() (err error) {
+func (t *TInterface) Netmask() (err error) {
 	return nil
 }
 
-func (t *TunnelInterface) Delete() (err error) {
-	return nil
-}
-
-func (t *TunnelInterface) SetTXQueueLen() (err error) {
-	// DEBUG("ifconfig", t.SystemName, "txqueuelen", strconv.FormatInt(int64(t.TxQueuelen), 10))
-	//
-	// out, err := exec.Command("ifconfig", t.SystemName, "txqueuelen", strconv.FormatInt(int64(t.TxQueuelen), 10)).CombinedOutput()
-	// if err != nil {
-	// 	ERROR("Unable to change txqueuelen out: ", string(out), " err: ", err)
-	// 	return err
-	// }
-	return
-}
-
-func (t *TunnelInterface) addRoutes(n *ServerNetwork) (err error) {
-	if n.Nat != "" {
-		err = IP_AddRoute(n.Nat, "", t.IPv4Address, "0")
-		if err != nil {
-			return
-		}
-	}
-
-	for _, v := range n.Routes {
-		if strings.ToLower(v.Address) == "default" || strings.HasPrefix(v.Address, "0.0.0.0") {
-			continue
-		}
-
-		err = IP_AddRoute(v.Address, "", t.IPv4Address, v.Metric)
-		if err != nil {
-			return
-		}
-	}
-	return nil
-}
-
-func (t *TunnelInterface) deleteRoutes(V *Tunnel, n *ServerNetwork) (err error) {
-	if n.Nat != "" {
-		err = IP_DelRoute(n.Nat, t.IPv4Address, "0")
-		if err != nil {
-			return
-		}
-	}
-	for _, v := range n.Routes {
-		if strings.ToLower(v.Address) == "default" || strings.Contains(v.Address, "0.0.0.0") {
-			continue
-		}
-		err = IP_DelRoute(v.Address, t.IPv4Address, v.Metric)
-		if err != nil {
-			return
-		}
-	}
-	return nil
-}
-
-func (t *TunnelInterface) ApplyRoutes(V *Tunnel) (err error) {
-	if IsDefaultConnection(V.Meta.IFName) || V.Meta.EnableDefaultRoute {
-		// _ = IP_DelDefaultRoute()
-		err = IP_AddDefaultRoute(t.IPv4Address)
-		if err != nil {
-			return
-		}
-	}
-
-	for _, n := range V.CRR.Networks {
-		t.addRoutes(V, n)
-	}
-
-	if V.CRR.VPLNetwork != nil {
-		t.addRoutes(V, V.CRR.VPLNetwork)
-	}
-
-	return
-}
-
-func (t *TunnelInterface) RemoveRoutes(V *Tunnel, preserve bool) (err error) {
-	defer RecoverAndLogToFile()
-
-	for _, n := range V.CRR.Networks {
-		t.deleteRoutes(V, n)
-	}
-
-	if V.CRR.VPLNetwork != nil {
-		t.deleteRoutes(V, V.CRR.VPLNetwork)
-	}
-
-	if !preserve {
-		if IsDefaultConnection(V.Meta.IFName) || V.Meta.EnableDefaultRoute {
-			_ = IP_DelDefaultRoute()
-			err = IP_AddDefaultRoute(DEFAULT_GATEWAY.To4().String())
-			if err != nil {
-				ERROR("unable to restore default route", err)
-			}
-
-		}
-	}
-
-	return
-}
-
-func (t *TunnelInterface) Connect(V *TUN) (err error) {
-	// if !t.Persistent {
-	err = t.Addr()
+func (t *TInterface) SetTXQueueLen() (err error) {
+	DEBUG("ifconfig", t.SystemName, "txqueuelen", strconv.FormatInt(int64(t.MTU), 10))
+	out, err := exec.Command("ifconfig", t.SystemName, "txqueuelen", strconv.FormatInt(int64(t.TxQueuelen), 10)).CombinedOutput()
 	if err != nil {
-		return
+		ERROR("Unable to change mtu out: ", string(out), " err: ", err)
+		return err
 	}
+	return nil
+}
+
+func (t *TInterface) Connect(tun *TUN) (err error) {
 	err = t.Up()
 	if err != nil {
 		return
@@ -377,13 +214,13 @@ func (t *TunnelInterface) Connect(V *TUN) (err error) {
 	if err != nil {
 		return
 	}
-	// err = t.SetTXQueueLen()
-	// if err != nil {
-	// 	return
-	// }
-	// }
+	err = t.SetTXQueueLen()
+	if err != nil {
+		return
+	}
 
-	if IsDefaultConnection(V.Meta.IFName) || V.Meta.EnableDefaultRoute {
+	meta := tun.meta.Load()
+	if IsDefaultConnection(meta.IFName) || meta.EnableDefaultRoute {
 		_ = IP_DelDefaultRoute()
 		err = IP_AddDefaultRoute(t.IPv4Address)
 		if err != nil {
@@ -391,39 +228,37 @@ func (t *TunnelInterface) Connect(V *TUN) (err error) {
 		}
 	}
 
-	if V.CRR.VPLNetwork != nil {
-		t.addRoutes(V, V.CRR.VPLNetwork)
+	if tun.ServerReponse.LAN != nil && tun.ServerReponse.LAN.Nat != "" {
+		err = IP_AddRoute(tun.ServerReponse.LAN.Nat, "", t.IPv4Address, "0")
+		if err != nil {
+			return err
+		}
 	}
 
-	for _, n := range V.CRR.Networks {
-		t.addRoutes(V, n)
+	for _, n := range tun.ServerReponse.Networks {
+		if n.Nat != "" {
+			err = IP_AddRoute(n.Nat, "", t.IPv4Address, "0")
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	for _, v := range tun.ServerReponse.Routes {
+		err = IP_AddRoute(v.Address, "", t.IPv4Address, v.Metric)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
 }
 
-func (t *TunnelInterface) Disconnect(V *Tunnel) (err error) {
+func (t *TInterface) Disconnect(V *TUN) (err error) {
 	defer RecoverAndLogToFile()
-
 	t.shouldRestart = false
-	if V.Con != nil {
-		V.Con.Close()
-	}
-
-	for _, n := range V.CRR.Networks {
-		t.deleteRoutes(V, n)
-	}
-
-	if V.CRR.VPLNetwork != nil {
-		t.deleteRoutes(V, V.CRR.VPLNetwork)
-	}
-
-	if IsDefaultConnection(V.Meta.IFName) || V.Meta.EnableDefaultRoute {
-		_ = IP_DelDefaultRoute()
-		err = IP_AddDefaultRoute(DEFAULT_GATEWAY.To4().String())
-		if err != nil {
-			ERROR("unable to restore default route", err)
-		}
+	if V.connection != nil {
+		V.connection.Close()
 	}
 
 	err = t.Close()
@@ -431,12 +266,33 @@ func (t *TunnelInterface) Disconnect(V *Tunnel) (err error) {
 		ERROR("unable to close the interface", err)
 	}
 
-	err = t.Delete()
-	if err != nil {
-		ERROR("unable to delete the interface", err)
-	}
+	// TODO .. might not be needed ?????
+	// meta := tun.meta.Load()
+	// if IsDefaultConnection(meta.IFName) || meta.EnableDefaultRoute {
+	// 	err = IP_DelRoute("default", t.IPv4Address, "0")
+	// }
 
-	RemoveTunnelInterfaceFromList(t)
+	// if tun.ServerReponse.LAN != nil && tun.ServerReponse.LAN.Nat != "" {
+	// 	err = IP_DelRoute(tun.ServerReponse.LAN.Nat, t.IPv4Address, "0")
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// }
+
+	// for _, n := range tun.ServerReponse.Networks {
+	// 	if n.Nat != "" {
+	// 		err = IP_DelRoute(n.Nat, t.IPv4Address, "0")
+	// 		if err != nil {
+	// 			return err
+	// 		}
+	// 	}
+	// }
+	// for _, r := range tun.ServerReponse.Routes {
+	// 	err = IP_DelRoute(r.Address, t.IPv4Address, r.Metric)
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// }
 
 	return nil
 }
@@ -469,7 +325,7 @@ func IP_AddRoute(
 	gateway string,
 	metric string,
 ) (err error) {
-	_ = IP_DelRoute(network, "", "")
+	_ = IP_DelRoute(network, "", metric)
 
 	DEBUG("route", "-n", "add", "-net", network, gateway)
 
@@ -483,10 +339,6 @@ func IP_AddRoute(
 }
 
 func IP_DelRoute(network string, gateway string, metric string) (err error) {
-	// if IsActiveRouterIP(network) {
-	// 	return
-	// }
-
 	DEBUG("route", "-n", "delete", "-net", network)
 
 	out, err := exec.Command("route", "-n", "delete", "-net", network).CombinedOutput()
@@ -499,26 +351,26 @@ func IP_DelRoute(network string, gateway string, metric string) (err error) {
 }
 
 func RestoreDNSOnClose() {
-	// not implemented for unix
+	// not implemented for Darwin
 }
 
 func RestoreSaneDNSDefaults() {
-	// not implemented for unix
+	// not implemented for Darwin
 }
 
 func GetDNSServers(id string) error {
-	// not implemented for unix
 	DEFAULT_DNS_SERVERS = nil
 	return nil
 }
 
 func IPv6Enabled() bool {
-	if DEFAULT_INTERFACE_NAME == "" {
+	ifName := STATE.Load().DefaultInterfaceName.Load()
+	if ifName == nil {
 		DEBUG("no default interface name found, assuming ipv6 is enabled")
 		return true
 	}
 
-	iface, err := net.InterfaceByName(DEFAULT_INTERFACE_NAME)
+	iface, err := net.InterfaceByName(*ifName)
 	if err != nil {
 		ERROR("Error retrieving interface: ", err)
 		return false
@@ -531,7 +383,6 @@ func IPv6Enabled() bool {
 	}
 
 	for _, addr := range addrs {
-		// Check for IPv6 address
 		if strings.Contains(addr.String(), ":") {
 			DEBUG("ipv6 is enabled on the default interface")
 			return true
@@ -540,4 +391,34 @@ func IPv6Enabled() bool {
 
 	DEBUG("ipv6 is not enabled on the default interface")
 	return false
+}
+
+func AdjustRoutersForTunneling() (err error) {
+	// Implementation specific to Darwin
+	// Since Darwin uses a different routing mechanism, this is a no-op
+	return nil
+}
+
+func PrintInterfaces() (error, []byte) {
+	out, err := exec.Command("ifconfig").Output()
+	if err != nil {
+		return err, nil
+	}
+	return nil, out
+}
+
+func PrintRoutes() (error, []byte) {
+	out, err := exec.Command("netstat", "-nr").Output()
+	if err != nil {
+		return err, nil
+	}
+	return nil, out
+}
+
+func PrintDNS() (error, []byte) {
+	out, err := exec.Command("scutil", "--dns").Output()
+	if err != nil {
+		return err, nil
+	}
+	return nil, out
 }

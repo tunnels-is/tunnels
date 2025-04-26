@@ -123,6 +123,7 @@ func MakeCert(ct CertType, certPath string, keyPath string, ips []string, domain
 		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
 		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 		BasicConstraintsValid: true,
+		IsCA:                  true,
 		IPAddresses:           parsedIPs,
 		DNSNames:              domains,
 	}
@@ -146,6 +147,133 @@ func MakeCert(ct CertType, certPath string, keyPath string, ips []string, domain
 	}
 
 	return tls.X509KeyPair(cb.Bytes(), kb.Bytes())
+}
+
+type Certs struct {
+	Priv        any
+	Pub         any
+	CertPem     []byte
+	KeyPem      []byte
+	KeyPKCS8    []byte
+	X509KeyPair tls.Certificate
+	CertBytes   []byte
+}
+
+func MakeCertV2(ct CertType, certPath string, keyPath string, ips []string, domains []string, org string, expirationDate time.Time, saveToDisk bool) (CR *Certs, err error) {
+	defer func() {
+		r := recover()
+		if r != nil {
+			log.Println(r, string(debug.Stack()))
+		}
+	}()
+
+	CR = new(Certs)
+
+	if ct == RSA {
+		var pk *rsa.PrivateKey
+		pk, err = rsa.GenerateKey(rand.Reader, 4096)
+		if err != nil {
+			return
+		}
+		CR.Priv = pk
+		CR.Pub = &pk.PublicKey
+	} else if ct == ECDSA {
+		var pk *ecdsa.PrivateKey
+		pk, err = ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
+		if err != nil {
+			return
+		}
+		CR.Priv = pk
+		CR.Pub = &pk.PublicKey
+	}
+
+	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
+	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
+	if err != nil {
+		log.Fatalf("Failed to generate serial number: %v", err)
+		return
+	}
+
+	parsedIPs := make([]net.IP, 0)
+	for _, v := range ips {
+		parsedIPs = append(parsedIPs, net.ParseIP(v).To4())
+	}
+
+	if org == "" {
+		org = "Tunnels Server"
+	}
+	if expirationDate.IsZero() {
+		expirationDate = time.Now().Add(10 * 365 * 24 * time.Hour)
+	}
+
+	template := x509.Certificate{
+		SerialNumber: serialNumber,
+		Subject: pkix.Name{
+			Organization:       []string{org},
+			OrganizationalUnit: []string{"networking"},
+		},
+		NotBefore:             time.Now(),
+		NotAfter:              expirationDate,
+		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		BasicConstraintsValid: true,
+		IsCA:                  true,
+		IPAddresses:           parsedIPs,
+		DNSNames:              domains,
+	}
+
+	CR.CertBytes, err = x509.CreateCertificate(rand.Reader, &template, &template, CR.Pub, CR.Priv)
+	if err != nil {
+		return
+	}
+
+	CR.CertPem = pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: CR.CertBytes})
+	if CR.CertPem == nil {
+		return nil, fmt.Errorf("unable to encode certificate pem")
+	}
+
+	typeString := ""
+	_, ok := CR.Priv.(*rsa.PrivateKey)
+	if ok {
+		typeString = "RSA PRIVATE KEY"
+	}
+	_, ok = CR.Priv.(*ecdsa.PrivateKey)
+	if ok {
+		typeString = "EC PRIVATE KEY"
+	}
+
+	CR.KeyPKCS8, err = x509.MarshalPKCS8PrivateKey(CR.Priv)
+	if err != nil {
+		return
+	}
+
+	CR.KeyPem = pem.EncodeToMemory(&pem.Block{Type: typeString, Bytes: CR.KeyPKCS8})
+	if CR.KeyPem == nil {
+		return nil, fmt.Errorf("unable to encode PKCS8")
+	}
+
+	CR.X509KeyPair, err = tls.X509KeyPair(CR.CertPem, CR.KeyPem)
+	if saveToDisk {
+		cpem, err := os.Create(certPath)
+		if err != nil {
+			return nil, err
+		}
+		defer cpem.Close()
+
+		kpem, err := os.Create(keyPath)
+		if err != nil {
+			return nil, err
+		}
+		defer kpem.Close()
+
+		if err := pem.Encode(cpem, &pem.Block{Type: "CERTIFICATE", Bytes: CR.CertBytes}); err != nil {
+			return nil, fmt.Errorf("failed to write certificate data to %s: %w", certPath, err)
+		}
+		if err := pem.Encode(kpem, &pem.Block{Type: "PRIVATE KEY", Bytes: CR.KeyPKCS8}); err != nil {
+			return nil, fmt.Errorf("failed to write certificate data to %s: %w", certPath, err)
+		}
+	}
+	return
 }
 
 func ExtractSerialNumberHex(cert tls.Certificate) string {

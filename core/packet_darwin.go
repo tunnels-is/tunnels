@@ -7,15 +7,7 @@ import (
 	"time"
 )
 
-func stripSuffix(domain string) string {
-	// if strings.Contains(domain, ".lan") {
-	// 	domain = strings.TrimSuffix(domain, ".lan.")
-	// 	domain += "."
-	// }
-	return domain
-}
-
-func (T *TunnelInterface) ReadFromTunnelInterface() {
+func (T *TInterface) ReadFromTunnelInterface() {
 	defer func() {
 		if r := recover(); r != nil {
 			ERROR(r, string(debug.Stack()))
@@ -32,21 +24,21 @@ func (T *TunnelInterface) ReadFromTunnelInterface() {
 		packet       []byte
 		writtenBytes int
 		sendRemote   bool
-		tempBytes    = make([]byte, 70000)
-		Tun          *Tunnel
-		out          = make([]byte, 70000)
+		tempBytes    = make([]byte, 500000)
+		Tun          *TUN
+		out          []byte
 	)
 
+	DEBUG("New tunnel interface reader:", T.Name)
 	for {
-
 		packetLength, err = T.RWC.Read(tempBytes[0:])
 		if err != nil {
-			ERROR("error in interface reader loop:", err)
+			ERROR("error in tun/tap reader loop:", err)
 			return
 		}
 
 		if packetLength == 0 {
-			DEBUG("tun/tap read size was 0")
+			DEEP("tun/tap read size was 0")
 			continue
 		}
 
@@ -63,48 +55,53 @@ func (T *TunnelInterface) ReadFromTunnelInterface() {
 			continue
 		}
 
-		out = Tun.EH.SEAL.Seal1(packet, Tun.Index)
+		out = Tun.encWrapper.SEAL.Seal1(packet, Tun.Index)
 
-		writtenBytes, err = Tun.Con.Write(out)
+		writtenBytes, err = Tun.connection.Write(out)
 		if err != nil {
-			ERROR("socket write errir: ", err)
-			return
+			ERROR("router write error: ", err)
+			continue
 		}
-		if Tun.EP_MP != nil {
-			Tun.EP_MP.egressBytes += writtenBytes
-		}
-		Tun.EgressBytes += writtenBytes
+
+		Tun.egressBytes.Add(int64(writtenBytes))
 	}
 }
 
-func (V *Tunnel) ReadFromServeTunnel() {
+func (tun *TUN) ReadFromServeTunnel() {
 	defer func() {
-		RecoverAndLogToFile()
-		DEBUG("tun tap listener exiting:", V.Meta.Tag)
+		if r := recover(); r != nil {
+			ERROR(r, string(debug.Stack()))
+		}
+		meta := tun.meta.Load()
+		DEBUG("Server listener exiting:", meta.Tag, tun.ID)
+		if tun.GetState() == TUN_Connected {
+			tunnelMonitor <- tun
+		}
 	}()
 
 	var (
-		writeErr      error
-		readErr       error
-		receivedBytes int
-		packet        []byte
-		prePend       = []byte{0, 0, 0, 2}
-
-		buff    = make([]byte, 70000)
-		staging = make([]byte, 70000)
-		err     error
-		n       int
+		writeErr error
+		readErr  error
+		n        int
+		packet   []byte
+		buff     = make([]byte, 500000)
+		staging  = make([]byte, 500000)
+		err      error
+		osTunnel = tun.tunnel.Load()
+		prePend  = []byte{0, 0, 0, 2}
 	)
 
+	DEBUG("Server Tunnel listener initialized")
 	for {
-		n, readErr = V.Con.Read(buff)
+		osTunnel = tun.tunnel.Load()
+		n, readErr = tun.connection.Read(buff)
 		if readErr != nil {
-			ERROR("error reading from node socket", readErr, receivedBytes)
+			ERROR("error reading from server socket: ", readErr, n)
 			return
 		}
 
-		V.Nonce2Bytes = buff[2:10]
-		packet, err = V.EH.SEAL.Open2(
+		tun.Nonce2Bytes = buff[2:10]
+		packet, err = tun.encWrapper.SEAL.Open2(
 			buff[10:n],
 			buff[2:10],
 			staging[:0],
@@ -115,27 +112,24 @@ func (V *Tunnel) ReadFromServeTunnel() {
 			return
 		}
 
-		V.IngressBytes += n
+		tun.ingressBytes.Add(int64(n))
 
 		if len(packet) < 20 {
-			V.RegisterPing(CopySlice(packet))
+			tun.RegisterPing(CopySlice(packet))
 			continue
 		}
 
-		if !V.ProcessIngressPacket(packet) {
+		if !tun.ProcessIngressPacket(packet) {
 			debugMissingIngressMapping(packet)
 			continue
 		}
-		if V.IP_MP != nil {
-			V.IP_MP.ingressBytes += n
-		}
 
 		prePend = append(prePend[:4], packet...)
-		_, writeErr = V.Interface.RWC.Write(prePend[:len(packet)+4])
+		_, writeErr = osTunnel.RWC.Write(prePend[:len(packet)+4])
+		//_, writeErr = osTunnel.RWC.Write(packet)
 		if writeErr != nil {
 			ERROR("tun/tap write Error: ", writeErr)
 			return
 		}
-
 	}
 }
