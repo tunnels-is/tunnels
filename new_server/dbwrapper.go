@@ -147,7 +147,6 @@ func DB_findUserByID(UID primitive.ObjectID) (USER *User, err error) {
 
 func DB_CreateUser(U *User) (err error) {
 	defer BasicRecover()
-
 	_, err = DB.Database(USERS_DATABASE).
 		Collection(USERS_COLLECTION).
 		InsertOne(
@@ -164,7 +163,6 @@ func DB_CreateUser(U *User) (err error) {
 
 func DB_findUserByEmail(Email string) (USER *User, err error) {
 	USER = new(User)
-
 	err = DB.Database(USERS_DATABASE).
 		Collection(USERS_COLLECTION).
 		FindOne(
@@ -260,6 +258,7 @@ func DB_updateUser(UF *USER_UPDATE_FORM) (err error) {
 					Key: "$set",
 					Value: bson.D{
 						{Key: "APIKey", Value: UF.APIKey},
+						{Key: "AdditionalInformation", Value: UF.AdditionalInformation},
 					},
 				},
 			},
