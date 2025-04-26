@@ -2,6 +2,7 @@ package main
 
 import (
 	"io"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -223,9 +224,10 @@ type TWO_FACTOR_CONFIRM struct {
 }
 
 type USER_UPDATE_FORM struct {
-	UserID      primitive.ObjectID
-	DeviceToken string
-	APIKey      string
+	UserID                primitive.ObjectID
+	DeviceToken           string
+	APIKey                string
+	AdditionalInformation string
 }
 
 type TWO_FACTOR_DB_PACKAGE struct {
@@ -314,6 +316,15 @@ type User struct {
 }
 
 func (u *User) RemoveSensitiveInformation() {
+	if u.Key != nil {
+		ks := strings.Split(u.Key.Key, "-")
+		if len(ks) < 1 {
+			u.Key.Key = "redacted"
+		} else {
+			u.Key.Key = ks[len(ks)-1]
+		}
+	}
+
 	u.Password = ""
 	u.Password2 = ""
 	u.ResetCode = ""

@@ -71,8 +71,16 @@ func API_AcceptUserConnections(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	EH.SEAL.NewPublicKeyFromBytes(SCR.UserHandshake)
-	EH.SEAL.CreateAEAD()
+	_, err = EH.SEAL.NewPublicKeyFromBytes(SCR.UserHandshake)
+	if err != nil {
+		ERR("Port allocation failed", err)
+		return
+	}
+	err = EH.SEAL.CreateAEAD()
+	if err != nil {
+		ERR("Port allocation failed", err)
+		return
+	}
 
 	CRR := types.CreateCRRFromServer(Config)
 	index, err := CreateClientCoreMapping(CRR, CR, EH)
@@ -122,7 +130,7 @@ func API_UserCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if len(RF.Password) > 72 {
+	if len(RF.Password) > 200 {
 		senderr(w, 400, "Password is too long, maximum 255 characters")
 		return
 	}
@@ -158,18 +166,19 @@ func API_UserCreate(w http.ResponseWriter, r *http.Request) {
 	newUser.AdditionalInformation = RF.AdditionalInformation
 	newUser.Email = RF.Email
 	newUser.Updated = time.Now()
-
 	newUser.Trial = true
 	newUser.SubExpiration = time.Now().AddDate(0, 0, 1)
 
-	// splitEmail := strings.Split(RF.Email, "@")
-	// if len(splitEmail) > 1 {
-	// 	newUser.ConfirmCode = uuid.NewString()
-	// 	err = SEND_CONFIRMATION(loadSecret("EmailKey"), newUser.Email, newUser.ConfirmCode)
-	// 	if err != nil {
-	// 		INFO("unable to send confirm email on signup", err, nil)
-	// 		senderr(w, 500, "Email system error, please contact support")
-	// 		return
+	// if loadSecret("EmailKey") != "" {
+	// 	splitEmail := strings.Split(RF.Email, "@")
+	// 	if len(splitEmail) > 1 {
+	// 		newUser.ConfirmCode = uuid.NewString()
+	// 		err = SEND_CONFIRMATION(loadSecret("EmailKey"), newUser.Email, newUser.ConfirmCode)
+	// 		if err != nil {
+	// 			INFO("unable to send confirm email on signup", err, nil)
+	// 			senderr(w, 500, "Email system error, please contact support")
+	// 			return
+	// 		}
 	// 	}
 	// }
 
@@ -222,12 +231,7 @@ func API_UserLogin(w http.ResponseWriter, r *http.Request) {
 		senderr(w, 500, "Unknown error, please try again in a moment")
 		return
 	}
-
 	if user == nil {
-		senderr(w, 401, "Invalid login credentials")
-		return
-	}
-	if user.Email == "" {
 		senderr(w, 401, "Invalid login credentials")
 		return
 	}
@@ -249,15 +253,6 @@ func API_UserLogin(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		senderr(w, 500, "Database error, please try again in a moment")
 		return
-	}
-
-	if user.Key != nil {
-		ks := strings.Split(user.Key.Key, "-")
-		if len(ks) < 1 {
-			user.Key.Key = "redacted"
-		} else {
-			user.Key.Key = ks[len(ks)-1]
-		}
 	}
 
 	user.RemoveSensitiveInformation()
@@ -286,10 +281,7 @@ func API_UserLogout(w http.ResponseWriter, r *http.Request) {
 		user.Tokens = make([]*DeviceToken, 0)
 	} else {
 		user.Tokens = slices.DeleteFunc(user.Tokens, func(dt *DeviceToken) bool {
-			if dt.DT == LF.DeviceToken {
-				return true
-			}
-			return false
+			return dt.DT == LF.DeviceToken
 		})
 	}
 
@@ -329,7 +321,7 @@ func API_UserTwoFactorConfirm(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if LF.Recovery != "" {
-		var recoveryFound bool = false
+		recoveryFound := false
 		recoveryUpper := strings.ToUpper(LF.Recovery)
 		rc, err := Decrypt(user.RecoveryCodes, []byte(loadSecret("TwoFactory")))
 		// rc, err := encrypter.Decrypt(user.RecoveryCodes, []byte(ENV.F2KEY))
@@ -434,6 +426,7 @@ func API_GroupCreate(w http.ResponseWriter, r *http.Request) {
 
 	sendObject(w, F.Group)
 }
+
 func API_GroupAdd(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 	F := new(FORM_GROUP_ADD)
@@ -682,6 +675,10 @@ func API_SessionCreate(w http.ResponseWriter, r *http.Request) {
 
 	SCR := new(types.SignedConnectRequest)
 	SCR.Payload, err = json.Marshal(CR)
+	if err != nil {
+		senderr(w, 500, "Unable to decode payload")
+		return
+	}
 	SCR.Signature, err = crypt.SignData(SCR.Payload, PrivKey.Load())
 	SCR.ServerPubKey = server.PubKey
 	if err != nil {
@@ -706,13 +703,16 @@ func API_UserRequestPasswordCode(w http.ResponseWriter, r *http.Request) {
 	user, err = DB_findUserByEmail(RF.Email)
 	if err != nil {
 		senderr(w, 500, "Unknown error, please try again in a moment")
+		return
 	}
 	if user == nil {
 		senderr(w, 401, "Invalid session token, please log in again")
+		return
 	}
 
 	if !user.LastResetRequest.IsZero() && time.Since(user.LastResetRequest).Seconds() < 30 {
 		senderr(w, 401, "You need to wait at least 30 seconds between password reset attempts")
+		return
 	}
 
 	user.ResetCode = uuid.NewString()
@@ -721,12 +721,13 @@ func API_UserRequestPasswordCode(w http.ResponseWriter, r *http.Request) {
 	err = DB_userUpdateResetCode(user)
 	if err != nil {
 		senderr(w, 500, "Database error, please try again in a moment")
+		return
 	}
 
 	err = SEND_PASSWORD_RESET(loadSecret("EmailKey"), user.Email, user.ResetCode)
 	if err != nil {
-		ADMIN(3, "UNABLE TO SEND PASSWORD RESET CODE TO USER: ", user.ID)
 		senderr(w, 500, "Email system  error, please try again in a moment")
+		return
 	}
 
 	w.WriteHeader(200)
@@ -835,7 +836,6 @@ func API_ActivateLicenseKey(w http.ResponseWriter, r *http.Request) {
 	key, resp, err := lemonClient.Licenses.Validate(context.Background(), AF.Key, "")
 	if err != nil {
 		if resp != nil && resp.Body != nil {
-			// return c.String(resp.HTTPResponse.StatusCode, string(*resp.Body))
 			senderr(w, 500, "unexpected error, please try again")
 			return
 		}
@@ -848,7 +848,7 @@ func API_ActivateLicenseKey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if strings.Contains(strings.ToLower(key.LicenseAttributes.Meta.ProductName), "anonymous") {
+	if strings.Contains(strings.ToLower(key.Meta.ProductName), "anonymous") {
 		if user.SubExpiration.IsZero() {
 			user.SubExpiration = time.Now()
 		}
@@ -864,7 +864,7 @@ func API_ActivateLicenseKey(w http.ResponseWriter, r *http.Request) {
 			Key:     "unknown",
 		}
 	} else {
-		ns := strings.Split(key.LicenseAttributes.Meta.ProductName, " ")
+		ns := strings.Split(key.Meta.ProductName, " ")
 		months, err := strconv.Atoi(ns[0])
 		if err != nil {
 			ADMIN(3, "unable to parse license key name:", err)
@@ -894,7 +894,6 @@ func API_ActivateLicenseKey(w http.ResponseWriter, r *http.Request) {
 	activeKey, resp, err := lemonClient.Licenses.Activate(context.Background(), AF.Key, "tunnels")
 	if err != nil {
 		if resp != nil && resp.Body != nil {
-			// return c.String(resp.HTTPResponse.StatusCode, string(*resp.Body))
 			senderr(w, 500, "unexpected error, please try again")
 			return
 		}
@@ -912,5 +911,4 @@ func API_ActivateLicenseKey(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(200)
-	return
 }
