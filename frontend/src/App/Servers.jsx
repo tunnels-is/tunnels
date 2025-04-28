@@ -2,23 +2,18 @@ import React, { useEffect, useState } from "react";
 import GLOBAL_STATE from "../state";
 import CustomSelect from "./component/CustomSelect";
 import NewTable from "./component/newtable";
-import ObjectEditor from "./ObjectEditor";
+import ObjectEditorDialog from "./component/ObjectEditorDialog";
 
 const Servers = () => {
   const state = GLOBAL_STATE("servers");
   const [server, setServer] = useState(undefined);
+  const [viewModalOpen, setViewModalOpen] = useState(false);
 
   const editorOpts = {
     baseClass: "server-object-editor",
     maxDepth: 1000,
     onlyKeys: false,
     readOnly: true,
-    backButton: {
-      title: "Back",
-      func: () => {
-        setServer(undefined);
-      },
-    },
   };
 
   useEffect(() => {
@@ -97,7 +92,7 @@ const Servers = () => {
           color: "blue",
           click: function () {
             setServer(server);
-            state.renderPage("servers");
+            setViewModalOpen(true);
           },
         },
         { type: "text", value: server.Server ? server.Server : "Unknown" },
@@ -141,14 +136,6 @@ const Servers = () => {
     { value: "" },
   ];
 
-  if (server !== undefined) {
-    return (
-      <div className="connections">
-        <ObjectEditor opts={editorOpts} object={server} />
-      </div>
-    );
-  }
-
   return (
     <div className="ab router-wrapper public-server-wrapper">
       <NewTable
@@ -156,9 +143,20 @@ const Servers = () => {
         tableID={"public-servers"}
         className="router-table"
         placeholder={"Search .."}
+        design="public-vpn-servers"
         background={true}
         header={headers}
         rows={rows}
+      />
+
+      <ObjectEditorDialog
+        open={viewModalOpen}
+        onOpenChange={setViewModalOpen}
+        object={server}
+        editorOpts={editorOpts}
+        title="Server Details"
+        description="Viewing details"
+        readOnly={true}
       />
     </div>
   );

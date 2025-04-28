@@ -3,12 +3,14 @@ import GLOBAL_STATE from "../state";
 import CustomSelect from "./component/CustomSelect";
 import { useNavigate } from "react-router-dom";
 import NewTable from "./component/newtable";
-import ObjectEditor from "./ObjectEditor";
+import ObjectEditorDialog from "./component/ObjectEditorDialog";
 
 const PrivateServers = () => {
 	const state = GLOBAL_STATE("pservers")
 	const [pserver, setPServer] = useState(undefined)
 	const [nserver, setNServer] = useState(undefined)
+	const [editModalOpen, setEditModalOpen] = useState(false)
+	const [createModalOpen, setCreateModalOpen] = useState(false)
 
 	useEffect(() => {
 		state.GetPrivateServers()
@@ -18,6 +20,7 @@ const PrivateServers = () => {
 		let resp = await state.API_UpdateServer(pserver)
 		if (resp?.status === 200) {
 			state.renderPage("pservers")
+			setEditModalOpen(false)
 		}
 	}
 	const serverUpdateOpts = {
@@ -43,10 +46,11 @@ const PrivateServers = () => {
 		let resp = await state.API_CreateServer(nserver)
 		if (resp?.status === 200) {
 			state.renderPage("pservers")
+			setCreateModalOpen(false)
 		}
 	}
 	const serverCreateOpts = {
-		baseClass: "private-server-object-editor",
+		baseClass: "",
 		maxDepth: 1000,
 		onlyKeys: false,
 		disabled: {
@@ -124,7 +128,7 @@ const PrivateServers = () => {
 					 color: "blue",
 					click: function() {
 						setPServer(server)
-						state.renderPage("pservers")
+						setEditModalOpen(true)
 					}
 				},
 				{
@@ -148,6 +152,8 @@ const PrivateServers = () => {
 					color: con ? "red" : "green",
 					click: conButton,
 					width:"50px",
+					s_type: "connect-disconnect",
+					s_state: con ? "disconnect" : "connect",
 				},
 			]
 			rows.push(row)
@@ -166,42 +172,17 @@ const PrivateServers = () => {
 		{ value: "" }
 	]
 
-	if (nserver !== undefined) {
-		return (
-			<div className="connections">
-				<div className="back" onClick={() => setNServer(undefined)}>Back to server</div>
-				<ObjectEditor
-					opts={serverCreateOpts}
-					object={nserver}
-				/>
-			</div>
-		)
-	}
-
-	if (pserver !== undefined) {
-		return (
-			<div className="connections">
-				<div className="back" onClick={() => setPServer(undefined)}>Back to server</div>
-				<ObjectEditor
-					opts={serverUpdateOpts}
-					object={pserver}
-				/>
-			</div>
-		)
-	}
-
-
 	return (
-		<div className="ab private-server-wrapper">
-
+		<div className="ab private-server-wrapper w-full">
 			<NewTable
 				title={"Private VPN Servers"}
 				tableID={"private-servers"}
-				className="router-table"
+				className="w-full"
 				placeholder={"Search .."}
 				header={headers}
 				background={true}
 				rows={rows}
+				design="private-vpn-servers"
 				button={{
 					text: "New Server",
 					click: function() {
@@ -216,13 +197,32 @@ const PrivateServers = () => {
 							Tag: "",
 							Serial: "",
 						})
+						setCreateModalOpen(true)
 					}
 				}}
-
 			/>
-		</div >
-	);
 
+			<ObjectEditorDialog
+				open={editModalOpen}
+				onOpenChange={setEditModalOpen}
+				object={pserver}
+				editorOpts={serverUpdateOpts}
+				title="Edit Server"
+				description="Make changes to your server configuration"
+				readOnly={false}
+			/>
+
+			<ObjectEditorDialog
+				open={createModalOpen}
+				onOpenChange={setCreateModalOpen}
+				object={nserver}
+				editorOpts={serverCreateOpts}
+				title="New Server"
+				description="Configure your new server settings"
+				readOnly={false}
+			/>
+		</div>
+	);
 }
 
 export default PrivateServers;

@@ -3,63 +3,12 @@ import GLOBAL_STATE from "../state";
 import KeyValue from "./component/keyvalue";
 import { useNavigate } from "react-router-dom";
 import NewTable from "./component/newtable";
-import ObjectEditor from "./ObjectEditor";
-
+import OrganizationForm from "./forms/OrganizationForm";
 
 const Org = () => {
 	const state = GLOBAL_STATE("org")
 	const navigate = useNavigate()
 	const [editOrg, setEditOrg] = useState(undefined)
-
-	const updateOpts = {
-		baseClass: "org-object-editor",
-		maxDepth: 1000,
-		onlyKeys: false,
-		disabled: {
-			root__id: true,
-
-		},
-		titles: {
-			root_Information: "Additional Info",
-			root_MangerID: "Manager ID"
-		},
-		hidden: {
-			root_Groups: true,
-		},
-		newButtons: {
-			root_Domains: (obj) => {
-				obj.push("new-domain.local")
-			},
-		},
-		saveButton: async () => {
-			console.log('Update ORG')
-			console.dir(editOrg)
-			await state.API_UpdateOrg(editOrg)
-		}
-	}
-	const createOpts = {
-		baseClass: "org-object-editor",
-		maxDepth: 1000,
-		onlyKeys: false,
-		titles: {
-			root_Information: "Additional Info",
-			root_MangerID: "Manager ID"
-		},
-		title:"You do not have an organization, create one to continue..",
-		hidden: {
-			root_Groups: true,
-		},
-		newButtons: {
-			root_Domains: (obj) => {
-				obj.push("new-domain.local")
-			},
-		},
-		saveButton: async () => {
-			console.log('SAVE ORG')
-			console.dir(dummyOrg)
-			await state.API_CreateOrg(dummyOrg)
-		}
-	}
 
 	const dummyOrg = {
 		Name: "",
@@ -79,6 +28,23 @@ const Org = () => {
 
 		x()
 	}, [])
+
+	const handleUpdateSubmit = async (formData) => {
+		console.log('Update ORG')
+		console.dir(formData)
+		await state.API_UpdateOrg(formData)
+		setEditOrg(undefined)
+	}
+
+	const handleCreateSubmit = async (formData) => {
+		console.log('SAVE ORG')
+		console.dir(formData)
+		await state.API_CreateOrg(formData)
+	}
+
+	const handleCancelEdit = () => {
+		setEditOrg(undefined)
+	}
 
 	const generateGroupTable = (org) => {
 		let rows = []
@@ -102,7 +68,6 @@ const Org = () => {
 		return rows
 	}
 
-
 	let rows = generateGroupTable(state?.Org)
 	const headers = [
 		{ value: "Tag",width:"100",},
@@ -112,15 +77,15 @@ const Org = () => {
 	]
 
 	if (editOrg) {
-
 		return (
 			<div className="ab org-wrapper">
 				<div className="back" onClick={() => setEditOrg(undefined)}>Back to Organization</div>
-				<ObjectEditor
-					opts={updateOpts}
-					object={editOrg}
+				<OrganizationForm
+					organizationData={editOrg}
+					onSubmit={handleUpdateSubmit}
+					onCancel={handleCancelEdit}
+					formTitle="Edit Organization"
 				/>
-
 			</div>
 		)
 	}
@@ -129,9 +94,11 @@ const Org = () => {
 		<div className="ab org-wrapper">
 			{!state.Org &&
 				<>
-					<ObjectEditor
-						opts={createOpts}
-						object={dummyOrg}
+					<OrganizationForm
+						organizationData={dummyOrg}
+						onSubmit={handleCreateSubmit}
+						formTitle="You do not have an organization, create one to continue.."
+						isCreate={true}
 					/>
 				</>
 			}
@@ -168,7 +135,6 @@ const Org = () => {
 					/>
 				</>
 			}
-
 		</div>
 	)
 }

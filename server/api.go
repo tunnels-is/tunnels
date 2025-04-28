@@ -41,10 +41,12 @@ func startAPI(SIGNAL *SIGNAL) {
 		return
 	}
 
-	err = apiServer.ServeTLS(ln, Config.ControlCert, Config.ControlKey)
-	if err != nil {
-		ERR("HTTP/s API error:", err)
-	}
+	apiServer.Serve(ln)
+
+	// err = apiServer.ServeTLS(ln, Config.ControlCert, Config.ControlKey)
+	// if err != nil {
+	// 	ERR("HTTP/s API error:", err)
+	// }
 }
 
 func HTTP_validateKey(w http.ResponseWriter, r *http.Request) (ok bool) {

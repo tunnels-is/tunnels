@@ -1,8 +1,14 @@
-import React, { useEffect, useRef } from "react";
-
+import React from "react";
 import GLOBAL_STATE from "../../state";
-import FormKeyValue from "./formkeyvalue";
-import CustomToggle from "./CustomToggle";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { PlusCircle, Trash2, Save, Plus } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 const ConfigDNSRecordEditor = () => {
 	const state = GLOBAL_STATE("DNSRecordForm")
@@ -85,102 +91,152 @@ const ConfigDNSRecordEditor = () => {
 		state.renderPage("DNSRecordForm")
 	}
 
-	const makeInput = (index, subindex, key, value, type) => {
-		if (type === "textarea") {
-			let rows = (value.length / 40) + 2
-			return (
-				<FormKeyValue label={key} key={key + subindex} value={
-					<textarea
-						cols={value.length }
-						rows={rows}
-						className="value"
-						onChange={() => { console.log("on change!", value, index) }}
-						type={type}
-						value={value}
-						onInput={(e) => {
-							updateRecord(index, subindex, key, e.target.value)
-						}}
-					/>
-				}
-				/>
-			)
+	
 
-		} else if (type === "toggle") {
-			return (
-				<CustomToggle
-					label={key}
-					value={value}
-					toggle={() => {
-						updateRecord(index, subindex, key, Boolean(!value))
-					}}
-				/>
-			)
-
-		}
-
-		return (
-			<FormKeyValue label={key} key={key + subindex} value={
-				<input
-					size={value.length}
-					className="value"
-					onChange={() => { console.log("on change!", value, index) }}
-					type={type}
-					value={value}
-					onInput={(e) => {
-						updateRecord(index, subindex, key, e.target.value)
-					}}
-				/>
-
-			}
-			/>
-		)
-	}
+	const FormField = ({ label, children }) => (
+		<div className="grid gap-2 mb-4">
+			<Label className="text-sm font-medium">{label}</Label>
+			{children}
+		</div>
+	);
 
 	return (
-		<div className="ab config-dns-editor">
-			<div className="plus-button" onClick={() => addRecord()}>Create a new DNS Record..</div>
-			{state.Config?.DNSRecords?.map((r, i) => {
-				if (!r) {
-					return (<></>)
-				}
-				return (
-					<>
-						<div className="dns-record panel">
-							{makeInput(i, 0, "Domain", r.Domain, "text")}
-							{makeInput(i, 0, "CNAME", r.CNAME, "text")}
-							{r.IP?.map((ip, ii) => makeInput(i, ii, "IP", ip, "text"))}
-							<div className="add" onClick={() => addIP(i)}>Add IP</div>
+		<div className="w-full max-w-4xl mx-auto p-4 space-y-6">
+			<div className="flex items-center justify-between mb-6">
+				<h2 className="text-2xl font-bold tracking-tight text-white">DNS Records</h2>
+				<Button 
+					onClick={addRecord} 
+					variant="outline" 
+					className="flex items-center gap-2 text-white"
+				>
+					<PlusCircle className="h-4 w-4" />
+					<span>Add DNS Record</span>
+				</Button>
+			</div>
 
-							{r.TXT?.map((txt, ii) => makeInput(i, ii, "TXT", txt, "textarea"))}
-								<div className="add" onClick={() => addTXT(i)}>Add TXT</div>
-							{makeInput(i, 0, "Wildcard", r.Wildcard, "toggle")}
+			<ScrollArea className="h-[calc(100vh-12rem)]">
+				<div className="space-y-6">
+					{state.Config?.DNSRecords?.map((r, i) => {
+						if (!r) return null;
+						
+						return (
+							<Card key={i} className="shadow-md transition-all hover:shadow-lg">
+								<CardHeader className="bg-muted/40 pb-2">
+									<CardTitle className="text-lg flex items-center gap-2">
+										DNS Record {i + 1}
+										{r.Wildcard && <Badge variant="outline" className="ml-2">Wildcard</Badge>}
+									</CardTitle>
+								</CardHeader>
+								
+								<CardContent className="pt-6 space-y-4">
+									<FormField label="Domain">
+										<Input
+											value={r.Domain}
+											onChange={(e) => updateRecord(i, 0, "Domain", e.target.value)}
+											placeholder="e.g. example.com"
+											className="w-full"
+										/>
+									</FormField>
+									
+									<FormField label="CNAME">
+										<Input
+											value={r.CNAME}
+											onChange={(e) => updateRecord(i, 0, "CNAME", e.target.value)}
+											placeholder="e.g. subdomain.example.com"
+											className="w-full"
+										/>
+									</FormField>
 
-							<div className="buttons">
+									<div className="space-y-3">
+										<div className="flex items-center justify-between">
+											<Label className="text-sm font-medium">IP Addresses</Label>
+											<Button
+												size="sm"
+												variant="outline"
+												onClick={() => addIP(i)}
+												className="h-8 text-xs"
+											>
+												<Plus className="h-3 w-3 mr-1" /> Add IP
+											</Button>
+										</div>
+										
+										{r.IP?.map((ip, ii) => (
+											<Input
+												key={`ip-${i}-${ii}`}
+												value={ip}
+												onChange={(e) => updateRecord(i, ii, "IP", e.target.value)}
+												placeholder="e.g. 192.168.1.1"
+												className="w-full"
+											/>
+										))}
+									</div>
 
-								<div className="item card-button green"
-									onClick={() => {
-										saveAll()
-									}}>
-									Save
-								</div>
+									<div className="space-y-3">
+										<div className="flex items-center justify-between">
+											<Label className="text-sm font-medium">TXT Records</Label>
+											<Button
+												size="sm"
+												variant="outline"
+												onClick={() => addTXT(i)}
+												className="h-8 text-xs"
+											>
+												<Plus className="h-3 w-3 mr-1" /> Add TXT
+											</Button>
+										</div>
+										
+										{r.TXT?.map((txt, ii) => (
+											<Textarea
+												key={`txt-${i}-${ii}`}
+												value={txt}
+												onChange={(e) => updateRecord(i, ii, "TXT", e.target.value)}
+												placeholder="Enter text record"
+												className="w-full min-h-[80px]"
+											/>
+										))}
+									</div>
 
-								<div className="item card-button red"
-									onClick={() => {
-										deleteRecord(i)
-									}}>
-									Remove
-								</div>
+									<div className="flex items-center space-x-2">
+										<Switch
+											id={`wildcard-${i}`}
+											checked={r.Wildcard}
+											onCheckedChange={(checked) => updateRecord(i, 0, "Wildcard", checked)}
+										/>
+										<Label htmlFor={`wildcard-${i}`}>Wildcard Domain</Label>
+									</div>
+								</CardContent>
+								
+								<CardFooter className="flex justify-between bg-muted/20 pt-2">
+									<Button 
+										variant="outline" 
+										className="flex items-center gap-2"
+										onClick={saveAll}
+									>
+										<Save className="h-4 w-4" />
+										<span>Save</span>
+									</Button>
+									
+									<Button 
+										variant="destructive" 
+										className="flex items-center gap-2"
+										onClick={() => deleteRecord(i)}
+									>
+										<Trash2 className="h-4 w-4" />
+										<span>Remove</span>
+									</Button>
+								</CardFooter>
+							</Card>
+						);
+					})}
 
-							</div>
+					{(!state.Config?.DNSRecords || state.Config.DNSRecords.length === 0) && (
+						<div className="text-center p-12 border border-dashed rounded-lg bg-muted/30">
+							<p className="text-muted-foreground">No DNS records found. Add your first record to get started.</p>
 						</div>
-					</>
-				)
-			})}
+					)}
+				</div>
+			</ScrollArea>
+		</div>
+	);
+};
 
-
-
-		</div >
-	)
-}
-
-export default ConfigDNSRecordEditor
+export default ConfigDNSRecordEditor;
