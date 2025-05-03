@@ -146,7 +146,7 @@ const SideBar = () => {
 
   return (
     <div
-      className="fixed top-0 left-0 w-64 h-screen bg-[#0B0E14] border-r border-[#1a1f2d] flex flex-col py-6 z-[2000]"
+      className="fixed top-0 left-0 w-44 h-screen bg-[#0B0E14] border-r border-[#1a1f2d] flex flex-col py-6 z-[2000]"
       ref={sideb}
       id="sidebar"
     >
@@ -191,7 +191,7 @@ const SideBar = () => {
                         }
                       }}
                       className={cn(
-                        "flex items-center w-full gap-3 px-5 py-2 rounded-md text-sm font-medium transition-colors",
+                        "flex items-center w-full gap-3 px-5 py-1 rounded-md text-sm font-medium transition-colors",
                         isActive
                           ? "bg-[#4B7BF5]/10 text-[#4B7BF5]"
                           : "text-white/70 hover:text-white hover:bg-white/5"

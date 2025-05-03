@@ -66,7 +66,7 @@ const LaunchApp = () => {
         <SideBar />
 
         {/* Main Content Area */}
-        <main className="pl-64 pb-[300px]">
+        <main className="pl-44 pb-[300px]">
           <div className="">
             <ScreenLoader />
             <div className="p-6 w-full">

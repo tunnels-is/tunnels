@@ -146,14 +146,13 @@ const Settings = () => {
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-xl flex items-center gap-2">
-              <Settings2 className="h-5 w-5" />
               General Settings
             </CardTitle>
           </CardHeader>
           <CardContent>
             <SettingToggle
               label="Basic Logging"
-              icon={<Info className="h-4 w-4 text-blue-500" />}
+              icon={<Info className="h-4 w-4 mt-1 text-blue-500" />}
               value={InfoLogging}
               onToggle={() => {
                 state.toggleKeyAndReloadDom("Config", "InfoLogging");
@@ -165,7 +164,7 @@ const Settings = () => {
 
             <SettingToggle
               label="Error Logging"
-              icon={<AlertTriangle className="h-4 w-4 text-red-500" />}
+              icon={<AlertTriangle className="h-4 w-4 mt-1 text-red-500" />}
               value={ErrorLogging}
               onToggle={() => {
                 state.toggleKeyAndReloadDom("Config", "ErrorLogging");
@@ -177,7 +176,7 @@ const Settings = () => {
 
             <SettingToggle
               label="Debug Logging"
-              icon={<Bug className="h-4 w-4 text-amber-500" />}
+              icon={<Bug className="h-4 w-4 mt-1 text-amber-500" />}
               value={DebugLogging}
               onToggle={() => {
                 state.toggleKeyAndReloadDom("Config", "DebugLogging");
@@ -189,7 +188,7 @@ const Settings = () => {
 
             <SettingToggle
               label="Debug Mode"
-              icon={<Bug className="h-4 w-4 text-purple-500" />}
+              icon={<Bug className="h-4 w-4 mt-1 text-purple-500" />}
               value={state?.debug}
               onToggle={() => {
                 state.toggleDebug();
@@ -201,7 +200,7 @@ const Settings = () => {
 
             <SettingToggle
               label="Connection Tracing"
-              icon={<Activity className="h-4 w-4 text-green-500" />}
+              icon={<Activity className="h-4 w-4 mt-1 text-green-500" />}
               value={ConnectionTracer}
               onToggle={() => {
                 state.toggleKeyAndReloadDom("Config", "ConnectionTracer");
@@ -215,7 +214,6 @@ const Settings = () => {
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-xl flex items-center gap-2">
-              <Server className="h-5 w-5" />
               API Configuration
             </CardTitle>
           </CardHeader>
@@ -300,7 +298,6 @@ const Settings = () => {
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-xl flex items-center gap-2">
-              <Network className="h-5 w-5" />
               Network Information
             </CardTitle>
             <CardDescription>Default network interface details</CardDescription>
@@ -338,7 +335,6 @@ const Settings = () => {
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-xl flex items-center gap-2">
-              <Info className="h-5 w-5" />
               System Information
             </CardTitle>
             <CardDescription>Application status and file paths</CardDescription>
