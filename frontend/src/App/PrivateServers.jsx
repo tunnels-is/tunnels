@@ -29,7 +29,6 @@ const PrivateServers = () => {
 		onlyKeys: false,
 		disabled: {
 			root_Admin: true,
-			root_OrgID: true,
 			root__id: true,
 		},
 		saveButton: UpdateServer,
@@ -40,7 +39,6 @@ const PrivateServers = () => {
 		if (!user) {
 			return
 		}
-		nserver.OrgID = user.OrgID
 		nserver.Admin = user._id
 
 		let resp = await state.API_CreateServer(nserver)
@@ -55,7 +53,6 @@ const PrivateServers = () => {
 		onlyKeys: false,
 		disabled: {
 			root_Admin: true,
-			root_OrgID: true,
 			root__id: true,
 		},
 		saveButton: CreateServer,
@@ -113,7 +110,7 @@ const PrivateServers = () => {
 				}
 			}
 
-			if (assignedTunnels > 1){
+			if (assignedTunnels > 1) {
 				conButton = function() {
 					state.toggleError("too many tunnels assigned to server")
 				}
@@ -124,8 +121,8 @@ const PrivateServers = () => {
 				{
 					type: "text",
 					value: server.Tag,
-					 minWidth: "180px",
-					 color: "blue",
+					minWidth: "180px",
+					color: "blue",
 					click: function() {
 						setPServer(server)
 						setEditModalOpen(true)
@@ -144,14 +141,16 @@ const PrivateServers = () => {
 						options={opts}
 					></CustomSelect>,
 				},
-				{ type: "text", value: server.IP, minWidth:"180px" },
+				{ type: "text", value: server.IP, minWidth: "180px" },
+				{ type: "text", value: server.Country },
 				{ type: "text", value: server.Port },
+				{ type: "text", value: server.DataPort },
 				{
 					type: "text",
 					value: <div className={con ? "disconnect" : "connect"}>{con ? "Disconnect" : "Connect"}</div>,
 					color: con ? "red" : "green",
 					click: conButton,
-					width:"50px",
+					width: "50px",
 					s_type: "connect-disconnect",
 					s_state: con ? "disconnect" : "connect",
 				},
@@ -165,17 +164,16 @@ const PrivateServers = () => {
 
 	let rows = generateServerTable()
 	const headers = [
-		{ value: "Tag", minWidth:"180px" },
-		{ value: "Tunnel" },
-		{ value: "IP", minWidth:"180px" },
-		{ value: "Port"},
-		{ value: "" }
+		// { value: "Tag", minWidth: "180px" },
+		// { value: "Tunnel" },
+		// { value: "IP", minWidth: "180px" },
+		// { value: "Port" },
+		// { value: "" }
 	]
 
 	return (
 		<div className="ab private-server-wrapper w-full">
 			<NewTable
-				title={"Private VPN Servers"}
 				tableID={"private-servers"}
 				className="w-full"
 				placeholder={"Search .."}
@@ -192,10 +190,13 @@ const PrivateServers = () => {
 						}
 
 						setNServer({
-							OrgID: user.OrgID,
 							Admin: user._id,
 							Tag: "",
-							Serial: "",
+							Country: "",
+							IP: "",
+							Port: "",
+							DataPort: "",
+							PubKey: "",
 						})
 						setCreateModalOpen(true)
 					}

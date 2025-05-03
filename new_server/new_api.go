@@ -23,37 +23,37 @@ func launchAPIServer() {
 	mux.HandleFunc("/", healthCheckHandler)
 
 	if LANEnabled {
-		mux.HandleFunc("/firewall", API_Firewall)
-		mux.HandleFunc("/devices", API_ListDevices)
+		mux.HandleFunc("/v3/firewall", API_Firewall)
+		mux.HandleFunc("/v3/devices", API_ListDevices)
 	}
 
 	if VPNEnabled {
-		mux.HandleFunc("/connect", API_AcceptUserConnections)
+		mux.HandleFunc("/v3/connect", API_AcceptUserConnections)
 	}
 
 	if AUTHEnabled {
-		mux.HandleFunc("/user/create", API_UserCreate)
-		mux.HandleFunc("/user/update", API_UserUpdate)
-		mux.HandleFunc("/user/login", API_UserLogin)
-		mux.HandleFunc("/user/logout", API_UserLogout)
-		mux.HandleFunc("/user/2fa/confirm", API_UserTwoFactorConfirm)
-		mux.HandleFunc("/user/reset/code", API_UserRequestPasswordCode)
-		mux.HandleFunc("/user/reset/password", API_UserResetPassword)
+		mux.HandleFunc("/v3/user/create", API_UserCreate)
+		mux.HandleFunc("/v3/user/update", API_UserUpdate)
+		mux.HandleFunc("/v3/user/login", API_UserLogin)
+		mux.HandleFunc("/v3/user/logout", API_UserLogout)
+		mux.HandleFunc("/v3/user/2fa/confirm", API_UserTwoFactorConfirm)
+		mux.HandleFunc("/v3/user/reset/code", API_UserRequestPasswordCode)
+		mux.HandleFunc("/v3/user/reset/password", API_UserResetPassword)
 
-		mux.HandleFunc("/groupd/create", API_GroupCreate)
-		mux.HandleFunc("/groupd/update", API_GroupUpdate)
-		mux.HandleFunc("/groupd/add", API_GroupAdd)
-		mux.HandleFunc("/group", API_GroupGet)
+		mux.HandleFunc("/v3/groupd/create", API_GroupCreate)
+		mux.HandleFunc("/v3/groupd/update", API_GroupUpdate)
+		mux.HandleFunc("/v3/groupd/add", API_GroupAdd)
+		mux.HandleFunc("/v3/group", API_GroupGet)
 
-		mux.HandleFunc("/servers/create", API_ServerCreate)
-		mux.HandleFunc("/servers/update", API_ServerUpdate)
-		mux.HandleFunc("/servers", API_ServerGet)
+		mux.HandleFunc("/v3/servers/create", API_ServerCreate)
+		mux.HandleFunc("/v3/servers/update", API_ServerUpdate)
+		mux.HandleFunc("/v3/servers", API_ServerGet)
 
-		mux.HandleFunc("/session", API_SessionCreate)
+		mux.HandleFunc("/v3/session", API_SessionCreate)
 
 		// Tunnels public network specific
-		mux.HandleFunc("/key/activate", API_ActivateLicenseKey)
-		mux.HandleFunc("/user/toggle/substatus", API_UserToggleSubStatus)
+		mux.HandleFunc("/v3/key/activate", API_ActivateLicenseKey)
+		mux.HandleFunc("/v3/user/toggle/substatus", API_UserToggleSubStatus)
 	}
 
 	tlsConfig := &tls.Config{

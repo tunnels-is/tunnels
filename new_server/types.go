@@ -341,14 +341,14 @@ type DeviceToken struct {
 }
 
 type Server struct {
-	ID       primitive.ObjectID   `json:"_id,omitempty" bson:"_id"`
-	Tag      string               `json:"Tag,required" bson:"Tag"`
-	Country  string               `json:"Country,required" bson:"Country"`
-	IP       string               `json:"IP,required" bson:"IP"`
-	Port     string               `json:"Port,required" bson:"Port"`
-	DataPort string               `json:"DataPort,required" bson:"DataPort"`
-	PubKey   []byte               `json:"PubKey" bson:"PubKey"`
-	Groups   []primitive.ObjectID `json:"Groups" bson:"Groups"`
+	ID       primitive.ObjectID   `json:"_id" bson:"_id"`
+	Tag      string               `json:"Tag" bson:"Tag"`
+	Country  string               `json:"Country" bson:"Country"`
+	IP       string               `json:"IP" bson:"IP"`
+	Port     string               `json:"Port" bson:"Port"`
+	DataPort string               `json:"DataPort" bson:"DataPort"`
+	PubKey   string               `json:"PubKey,omitempty" bson:"PubKey"`
+	Groups   []primitive.ObjectID `json:"Groups,omitempty" bson:"Groups"`
 }
 
 type Group struct {

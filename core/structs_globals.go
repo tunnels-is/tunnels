@@ -391,6 +391,8 @@ type DEBUG_OUT struct {
 }
 
 type FORWARD_REQUEST struct {
+	URL      string
+	Secure   bool
 	Path     string
 	Method   string
 	Timeout  int
@@ -430,6 +432,7 @@ type User struct {
 	Updated               time.Time       `json:"Updated"`
 	SubExpiration         time.Time       `json:"SubExpiration"`
 	AdditionalInformation string          `json:"AdditionalInformation,omitempty"`
+	AuthServer            string
 }
 
 type LicenseKey struct {

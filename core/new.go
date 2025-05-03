@@ -72,7 +72,7 @@ type configV2 struct {
 	Minimal bool
 	OpenUI  bool
 
-	LoginServers       []string
+	AuthServers        []string
 	DeviceKey          string
 	DNS                string
 	Host               string

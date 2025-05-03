@@ -64,9 +64,9 @@ const LaunchApp = () => {
 
       <div className=" bg-black w-full">
         <SideBar />
-        
+
         {/* Main Content Area */}
-        <main className="pl-64">
+        <main className="pl-64 pb-[300px]">
           <div className="">
             <ScreenLoader />
             <div className="p-6 w-full">
@@ -106,8 +106,8 @@ const LaunchApp = () => {
                     <Route path="dns-records" element={<DNSRecords />} />
                     <Route path="dns/answers/:domain" element={<DNSAnswers />} />
 
-                    <Route path="servers" element={<Servers />} />
-                    <Route path="all" element={<ServersFull />} />
+                    <Route path="servers" element={<PrivateServers />} />
+                    <Route path="all" element={<PrivateServers />} />
                     <Route path="private" element={<PrivateServers />} />
 
                     <Route path="inspect/blocklist/" element={<InspectBlocklist />} />
@@ -157,13 +157,13 @@ class ErrorBoundary extends React.Component {
 
   async ProductionCheck() {
     if (!STATE.debug) {
-      window.console.apply = function () {};
-      window.console.dir = function () {};
-      window.console.log = function () {};
-      window.console.info = function () {};
-      window.console.warn = function () {};
-      window.console.error = function () {};
-      window.console.debug = function () {};
+      window.console.apply = function() { };
+      window.console.dir = function() { };
+      window.console.log = function() { };
+      window.console.info = function() { };
+      window.console.warn = function() { };
+      window.console.error = function() { };
+      window.console.debug = function() { };
     }
   }
 
