@@ -862,6 +862,7 @@ export var STATE = {
     }
     req.Secure = req.Secure === undefined ? true : req.Secure
     STATE.toggleLoading(loader);
+    console.log("FW:", req.Secure)
     let x = await STATE.API.method("forwardToController", req);
     STATE.toggleLoading(undefined);
     return x;
@@ -1238,6 +1239,7 @@ export var STATE = {
         Method: "POST",
         JSONData: inputs,
         Timeout: 20000,
+        Secure: false
       },
       {
         tag: "register",
