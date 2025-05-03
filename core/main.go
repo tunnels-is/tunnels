@@ -392,7 +392,7 @@ func DefaultConfig() *configV2 {
 		DNSBlockLists:     GetDefaultBlockLists(),
 		APIIP:             "0.0.0.0",
 		APIPort:           "7777",
-		LoginServers:      []string{"https://api.tunnels.is"},
+		AuthServers:       []string{"https://api.tunnels.is"},
 	}
 	applyCertificateDefaultsToConfig(conf)
 	return conf
@@ -422,7 +422,7 @@ func applyCertificateDefaultsToConfig(cfg *configV2) {
 	cfg.APICertType = certs.RSA
 
 	if len(cfg.APICertIPs) < 1 {
-		cfg.APICertIPs = []string{"127.0.0.1"}
+		cfg.APICertIPs = []string{"127.0.0.1", "0.0.0.0"}
 	}
 
 	if len(cfg.APICertDomains) < 1 {

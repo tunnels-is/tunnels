@@ -50,7 +50,7 @@ const NewTable = (props) => {
 		props?.rows?.forEach(r => {
 			let show = false;
 			const lowercaseFilter = filter.toLowerCase();
-			
+
 			r.items.forEach(item => {
 				if (String(item.value).toLowerCase().includes(lowercaseFilter)) {
 					show = true;
@@ -118,162 +118,71 @@ const NewTable = (props) => {
 	// Calculate showing items text
 	const calculateItemsShowing = () => {
 		if (finalRows.length === 0) return "0 items";
-		
+
 		const start = pg.CurrentPage * pg.TableSize + 1;
 		const end = Math.min((pg.CurrentPage + 1) * pg.TableSize, finalRows.length);
 		return `${start}-${end} of ${finalRows.length}`;
 	};
 
-	// Render a card-style row
-	const renderPublicVpnServers = (row, index) => {
-		const imageItem = row.items.find(item => item.type === "img");
-		const statusItem = row.items.find(item => ["Connect", "Disconnect"].includes(item.value));
-		const assignItem = row.items.find(item => item.type === "select");
 
-		const tag = row.items[1]
-		const server = row.items[2]
-		const ip = row.items[3]
-		
-
-		return (
-			<div 
-				key={`card-${index}`}
-				className="flex items-center p-4 bg-[#0a0a0a] border border-[#222] rounded-lg hover:border-[#333] transition-all shadow-md hover:shadow-lg"
-			>
-				{imageItem && (
-					<div className="mr-4">
-						<div className="relative">
-							<img 
-								src={imageItem.value} 
-								alt="thumbnail" 
-								className="h-12 w-12 object-cover rounded-lg border border-[#333] shadow-sm" 
-							/>
-						</div>
-					</div>
-				)}
-				
-				<div className="flex-1 min-w-0">
-					{server && (
-						<h3 className="text-white text-base font-medium truncate">{server.value}</h3>
-					)}
-					
-					<div className="flex flex-wrap gap-2 items-center mt-1 text-xs text-gray-400 gap-x-4">
-						{tag && (
-							<div 	
-							onClick={() => {
-								const clickableItem = row.items.find(item => item.click);
-								if (clickableItem) {
-									clickableItem.click();
-								}
-							}} 
-							className="truncate px-2 py-0.5 bg-blue-500/10 text-blue-400 rounded cursor-pointer hover:bg-blue-500/20 transition-colors">
-								{tag.value}
-							</div>
-						)}
-						
-						{server && (
-							<div className="truncate px-2 py-0.5 bg-purple-500/10 text-purple-400 rounded flex items-center gap-1">
-								<div className="w-1.5 h-1.5 rounded-full bg-purple-400"></div>
-								{server.value}
-							</div>
-						)}
-						
-						{ip && (
-							<div className="truncate px-2 py-0.5 bg-emerald-500/10 text-emerald-400 rounded font-mono text-[10px]">
-								{ip.value}
-							</div>
-						)}
-						
-					</div>
-				</div>
-				{assignItem && (
-					<div className="flex items-center gap-3 ml-4">
-						{assignItem.value}
-					</div>
-				)}
-
-					<div className="flex items-center gap-3 ml-4">
-					{statusItem && statusItem?.value === "Connect" || statusItem?.value === "Disconnect" ? (
-						<Badge 
-							onClick={() => statusItem.click && statusItem.click()}
-							className={`
-								font-medium text-xs py-1 px-2.5 rounded-md border cursor-pointer
-								${statusItem?.value === "Connect"
-									? "bg-green-500/10 text-green-400 border-green-500/20 hover:bg-green-500/20" 
-									: "bg-red-500/10 text-red-400 border-red-500/20 hover:bg-red-500/20"
-								}
-							`}
-						>
-							{statusItem?.value}
-						</Badge>
-					) : null}
-				</div>
-
-			</div>
-		);
-	};
 
 	// Render a card-style row for private VPN servers
-	const renderPrivateVpnServers = (row, index) => {
+	const renderServers = (row, index) => {
 		const statusItem = row.items.find(item => item.s_type === "connect-disconnect");
 		const assignItem = row.items.find(item => item.type === "select");
 
 		const tag = row.items[0];
 		const ip = row.items[2];
-		const port = row.items[3];
-		
+		const country = row.items[3];
+		const port = row.items[4];
+		const dataport = row.items[5];
+
 		return (
-			<div 
+			<div
 				key={`private-card-${index}`}
 				className="flex items-center p-4 bg-[#0a0a0a] border border-[#222] rounded-lg hover:border-[#333] transition-all shadow-md hover:shadow-lg"
 			>
 				<div className="flex-1 min-w-0">
-					{tag?.value ? (
-						<h3 
+					{tag?.value &&
+						<h3
 							onClick={() => tag.click && tag.click()}
 							className="text-white text-base font-medium cursor-pointer hover:text-blue-400 transition-colors"
 						>
 							{tag.value}
 						</h3>
-					) : (
-						<h3 className="text-gray-500 text-base font-medium">
-							No tag available
-						</h3>
-					)}
-					
+					}
+
+
 					<div className="flex flex-wrap gap-2 items-center mt-1 text-xs">
-						{ip?.value ? (
+
+						{ip?.value &&
 							<div className="px-2 py-0.5 bg-emerald-500/10 text-emerald-400 rounded font-mono">
 								{ip.value}
 							</div>
-						) : (
-							<div className="px-2 py-0.5 bg-gray-500/10 text-gray-400 rounded font-mono">
-								IP not found
-							</div>
-						)}
-						
-						{port?.value ? (
+						}
+						{port?.value &&
 							<div className="px-2 py-0.5 bg-purple-500/10 text-purple-400 rounded">
 								Port: {port.value}
 							</div>
-						) : (
-							<div className="px-2 py-0.5 bg-gray-500/10 text-gray-400 rounded">
-								Port not specified
+						}
+						{dataport?.value &&
+							<div className="px-2 py-0.5 bg-purple-500/10 text-purple-400 rounded">
+								DataPort: {dataport.value}
 							</div>
-						)}
+						}
 					</div>
 				</div>
-				
+
 				<div className="flex items-center gap-3">
 					{assignItem && assignItem.value}
-					
+
 					{statusItem && (
-						<Badge 
+						<Badge
 							onClick={() => statusItem.click && statusItem.click()}
 							className={`
 								font-medium text-xs py-1 px-2.5 rounded-md border cursor-pointer
 								${statusItem.s_state === "connect"
-									? "bg-green-500/10 text-green-400 border-green-500/20 hover:bg-green-500/20" 
+									? "bg-green-500/10 text-green-400 border-green-500/20 hover:bg-green-500/20"
 									: "bg-red-500/10 text-red-400 border-red-500/20 hover:bg-red-500/20"
 								}
 							`}
@@ -287,7 +196,7 @@ const NewTable = (props) => {
 	};
 
 	return (
-		<div className={`${!props.design && "max-w-[900px]"} space-y-3 transition-all duration-300 ${props.background ? "bg-[#000000] p-6 rounded-md shadow-lg border border-[#222]" : ""} ${props.className}`}>
+		<div className={`${!props.design && "max-w-[900px]"} space-y-3 transition-all duration-300 ${props.background ? "bg-[#000000] p-6 rounded-md shadow-lg " : ""} ${props.className}`}>
 			<div className="flex items-center justify-between gap-2">
 				{props?.title && (
 					<div className="flex items-center">
@@ -297,8 +206,8 @@ const NewTable = (props) => {
 
 				<div className="flex items-center gap-2">
 					{props?.button && (
-						<Button 
-							variant="outline" 
+						<Button
+							variant="outline"
 							size="sm"
 							className="h-8 px-3 text-xs font-medium text-white border-[#222] bg-[#111] hover:bg-[#222] hover:text-white shadow-sm"
 							onClick={(e) => props.button.click(e)}
@@ -306,10 +215,10 @@ const NewTable = (props) => {
 							{props.button.text}
 						</Button>
 					)}
-					
+
 					{props?.button2 && (
-						<Button 
-							variant="outline" 
+						<Button
+							variant="outline"
 							size="sm"
 							className="h-8 px-3 text-xs font-medium text-white border-[#222] bg-[#111] hover:bg-[#222] hover:text-white shadow-sm"
 							onClick={(e) => props.button2.click(e)}
@@ -317,7 +226,7 @@ const NewTable = (props) => {
 							{props.button2.text}
 						</Button>
 					)}
-					
+
 					{props.rows?.length >= 1 && (
 						<div className="relative ml-2">
 							<Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-white/50" />
@@ -332,49 +241,17 @@ const NewTable = (props) => {
 				</div>
 			</div>
 
-			{/* public vpn servers design */}
-			{props.design === "public-vpn-servers" && (
-				<div className="space-y-1">
-					{finalRows.length > 0 ? (
-						<div className="mt-3">
-							<div className="grid lg:grid-cols-2 2xl:grid-cols-3 gap-4">
-								{indexes.map(ind => renderPublicVpnServers(finalRows[ind], ind))}
-							</div>
-						</div>
-					) : (
-						<div className="flex justify-center py-12 text-white/60 bg-[#0a0a0a] border border-[#222] rounded-lg">
-							<div className="flex flex-col items-center">
-								<div className="w-10 h-10 mb-3 rounded-full bg-[#111] flex items-center justify-center">
-									<Filter className="w-5 h-5 text-white/40" />
-								</div>
-								<p className="text-sm font-medium">No results found</p>
-								{filter && (
-									<Button
-										variant="ghost"
-										size="sm"
-										onClick={() => setFilter("")}
-										className="mt-3 h-7 px-2 text-xs font-medium text-blue-400 hover:bg-blue-500/10"
-									>
-										Clear Search
-									</Button>
-								)}
-							</div>
-						</div>
-					)}
-				</div>
-			)}
-
 			{/* private vpn servers design */}
 			{props.design === "private-vpn-servers" && (
 				<div className="space-y-1">
 					{finalRows.length > 0 ? (
 						<div className="mt-3">
 							<div className="grid lg:grid-cols-2 2xl:grid-cols-3 gap-4">
-								{indexes.map(ind => renderPrivateVpnServers(finalRows[ind], ind))}
+								{indexes.map(ind => renderServers(finalRows[ind], ind))}
 							</div>
 						</div>
 					) : (
-						<div className="flex justify-center py-12 text-white/60 bg-[#0a0a0a] border border-[#222] rounded-lg">
+						<div className="flex justify-center py-12 text-white/60 bg-[#0a0a0a]  rounded-lg">
 							<div className="flex flex-col items-center">
 								<div className="w-10 h-10 mb-3 rounded-full bg-[#111] flex items-center justify-center">
 									<Filter className="w-5 h-5 text-white/40" />
@@ -397,8 +274,8 @@ const NewTable = (props) => {
 			)}
 
 			{/* regular table */}
-			{!props.design && 	
-				<div className="rounded-md border border-[#222] overflow-hidden bg-[#000000] shadow-lg transition-all duration-300">
+			{!props.design &&
+				<div className="rounded-md  overflow-hidden bg-[#000000] shadow-lg transition-all duration-300">
 					{finalRows.length > 0 && (
 						<div className="overflow-x-auto">
 							<Table>
@@ -411,9 +288,9 @@ const NewTable = (props) => {
 												...(l.minWidth && { minWidth: l.minWidth }),
 												...(l.width && { width: `${l.width}%` })
 											};
-											
+
 											return (
-												<TableHead 
+												<TableHead
 													key={l.value + i}
 													style={style}
 													className={`py-3 px-4 text-xs font-semibold text-white/90 transition-colors uppercase tracking-wider ${l.className || ""}`}
@@ -427,10 +304,10 @@ const NewTable = (props) => {
 								<TableBody>
 									{indexes.map(ind => {
 										let r = finalRows[ind];
-										
+
 										return (
-											<TableRow 
-												key={"row" + ind} 
+											<TableRow
+												key={"row" + ind}
 												className="border-b border-[#222] hover:bg-[#0a0a0a] transition-colors"
 											>
 												{r.items.map((i, index) => {
@@ -440,17 +317,17 @@ const NewTable = (props) => {
 														...(i.minWidth && { minWidth: i.minWidth }),
 														...(i.width && { width: `${i.width}%` })
 													};
-													
-													const handleClick = i.click || (() => {});
+
+													const handleClick = i.click || (() => { });
 													const classNames = i.className || "";
 													const isClickable = i.click ? "cursor-pointer" : "";
-													
+
 													let cellContent;
 													if (i.type === "text") {
 														// Enhanced status styling with badges for status-like values
 														if (["Connect", "Assign", "tunnels", "Active", "Inactive", "Error", "Warning", "Success"].includes(i.value)) {
 															let badgeColor = "";
-															
+
 															if (i.value === "Connect" || i.value === "Success" || i.value === "Active") {
 																badgeColor = "bg-green-500/10 text-green-400 border-green-500/20";
 															} else if (i.value === "Assign" || i.value === "tunnels") {
@@ -460,7 +337,7 @@ const NewTable = (props) => {
 															} else if (i.value === "Warning" || i.value === "Inactive") {
 																badgeColor = "bg-amber-500/10 text-amber-400 border-amber-500/20";
 															}
-															
+
 															cellContent = (
 																<Badge className={`${badgeColor} font-medium text-xs py-0.5 px-2 border`}>
 																	{i.value}
@@ -484,17 +361,17 @@ const NewTable = (props) => {
 													} else if (i.type === "img") {
 														cellContent = (
 															<div className="relative group">
-																<img 
-																	src={i.value} 
-																	alt="thumbnail" 
-																	className="h-8 w-8 object-cover rounded-md border border-[#333]" 
+																<img
+																	src={i.value}
+																	alt="thumbnail"
+																	className="h-8 w-8 object-cover rounded-md border border-[#333]"
 																/>
 																{i.tooltip && (
 																	<div className="absolute left-full top-0 ml-2 z-50 hidden group-hover:block">
-																		<img 
-																			src={i.value} 
-																			alt="preview" 
-																			className="max-w-[200px] max-h-[150px] object-contain rounded border border-[#333] shadow-lg" 
+																		<img
+																			src={i.value}
+																			alt="preview"
+																			className="max-w-[200px] max-h-[150px] object-contain rounded border border-[#333] shadow-lg"
 																		/>
 																	</div>
 																)}
@@ -512,9 +389,9 @@ const NewTable = (props) => {
 															</Button>
 														);
 													}
-													
+
 													return (
-														<TableCell 
+														<TableCell
 															key={i.value + String(index)}
 															style={style}
 															onClick={(e) => handleClick(e)}
@@ -563,8 +440,8 @@ const NewTable = (props) => {
 
 					<div className="flex items-center gap-3">
 						<div className="flex items-center overflow-hidden rounded-md border border-[#222] shadow-sm">
-							<Button 
-								variant="outline" 
+							<Button
+								variant="outline"
 								size="icon"
 								onClick={() => setPageWrap(pg.PrevPage, finalRows.length)}
 								disabled={!showPP}
@@ -572,9 +449,9 @@ const NewTable = (props) => {
 							>
 								<ChevronLeft className="h-4 w-4 text-white/70" />
 							</Button>
-							
-							<Button 
-								variant="outline" 
+
+							<Button
+								variant="outline"
 								size="icon"
 								onClick={() => setPageWrap(pg.NextPage, finalRows.length)}
 								disabled={!showNP}
@@ -585,8 +462,8 @@ const NewTable = (props) => {
 						</div>
 
 						<div className="flex items-center gap-2">
-							<Select 
-								value={String(originalSize)} 
+							<Select
+								value={String(originalSize)}
 								onValueChange={(value) => state.setPageSize(props.tableID, value)}
 							>
 								<SelectTrigger className="h-8 w-[80px] text-xs border-[#222] bg-[#111] focus:ring-0 shadow-sm">
@@ -602,8 +479,8 @@ const NewTable = (props) => {
 								</SelectContent>
 							</Select>
 
-							<Select 
-								value={String(pg.CurrentPage)} 
+							<Select
+								value={String(pg.CurrentPage)}
 								onValueChange={(value) => setPageWrap(parseInt(value), finalRows.length)}
 							>
 								<SelectTrigger className="h-8 w-[80px] text-xs border-[#222] bg-[#111] focus:ring-0 shadow-sm">

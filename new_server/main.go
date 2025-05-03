@@ -25,6 +25,7 @@ import (
 	"slices"
 
 	"github.com/NdoleStudio/lemonsqueezy-go"
+	"github.com/google/uuid"
 	"github.com/jackpal/gateway"
 	"github.com/joho/godotenv"
 	"github.com/tunnels-is/tunnels/certs"
@@ -414,16 +415,13 @@ func makeConfigAndCerts() {
 			types.AUTH,
 			types.DNS,
 		},
-		VPNIP:       interfaceIP,
-		VPNPort:     "444",
-		CertPem:     "./cert.pem",
-		KeyPem:      "./key.pem",
-		APIIP:       interfaceIP,
-		APIPort:     "443",
-		AdminApiKey: "",
-		Admins:      []string{},
-		NetAdmins:   []string{},
-		Hostname:    "tunnels.local",
+		VPNIP:     interfaceIP,
+		VPNPort:   "444",
+		APIIP:     interfaceIP,
+		APIPort:   "443",
+		Admins:    []string{},
+		NetAdmins: []string{},
+		Hostname:  "tunnels.local",
 		Lan: &types.Network{
 			Tag:     "lan",
 			Network: "10.0.0.0/16",
@@ -443,6 +441,14 @@ func makeConfigAndCerts() {
 		DNSAllowCustomOnly: false,
 		DNSRecords:         []*types.DNSRecord{},
 		DNSServers:         []string{},
+		SecretStore:        "config",
+		// secrets
+		DBurl:           "mongodb://127.0.0.1:27017",
+		AdminApiKey:     uuid.NewString(),
+		TwoFactorEncKey: strings.ReplaceAll(uuid.NewString(), "-", ""),
+		EmailKey:        "",
+		CertPem:         "./cert.pem",
+		KeyPem:          "./key.pem",
 	}
 	f, err := os.Create(ep + "config.json")
 	if err != nil {
