@@ -1164,7 +1164,7 @@ export var STATE = {
     STORE.Cache.SetObject("user", { ...STATE.User });
     STATE.rerender();
   },
-  GetResetCode: async (inputs, url) => {
+  GetResetCode: async (inputs, url, secure) => {
     return STATE.ForwardToController(
       {
         URL: url,
@@ -1172,6 +1172,7 @@ export var STATE = {
         Method: "POST",
         JSONData: inputs,
         Timeout: 20000,
+        Secure: secure,
       },
       {
         tag: "reset-code",
@@ -1199,7 +1200,7 @@ export var STATE = {
       },
     );
   },
-  API_EnableAccount: async (inputs, url) => {
+  API_EnableAccount: async (inputs, url, secure) => {
     return STATE.ForwardToController(
       {
         URL: url,
@@ -1207,6 +1208,7 @@ export var STATE = {
         Method: "POST",
         JSONData: inputs,
         Timeout: 20000,
+        Secure: secure
       },
       {
         tag: "enable-account",
@@ -1215,7 +1217,7 @@ export var STATE = {
       },
     );
   },
-  ResetPassword: async (inputs, url) => {
+  ResetPassword: async (inputs, url, secure) => {
     return STATE.ForwardToController(
       {
         URL: url,
@@ -1223,6 +1225,7 @@ export var STATE = {
         Method: "POST",
         JSONData: inputs,
         Timeout: 20000,
+        Secure: secure
       },
       {
         tag: "reset-password",
@@ -1231,7 +1234,7 @@ export var STATE = {
       },
     );
   },
-  Register: async (inputs, url) => {
+  Register: async (inputs, url, secure) => {
     return STATE.ForwardToController(
       {
         URL: url,
@@ -1239,7 +1242,7 @@ export var STATE = {
         Method: "POST",
         JSONData: inputs,
         Timeout: 20000,
-        Secure: false
+        Secure: secure
       },
       {
         tag: "register",
@@ -1248,7 +1251,7 @@ export var STATE = {
       },
     );
   },
-  Login: async (inputs, remember, url) => {
+  Login: async (inputs, remember, url, secure) => {
     STORE.Local.setItem("default-device-name", inputs["devicename"]);
     STORE.Cache.Set("default-email", inputs["email"]);
 
@@ -1259,7 +1262,7 @@ export var STATE = {
         Method: "POST",
         JSONData: inputs,
         Timeout: 20000,
-        Secure: false,
+        Secure: secure,
       },
       {
         tag: "login",

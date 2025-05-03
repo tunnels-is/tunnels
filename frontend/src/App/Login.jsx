@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from "react";
-import CustomToggle from "./component/CustomToggle.jsx";
 import { v4 as uuidv4 } from "uuid";
 import {
   DesktopIcon,
@@ -11,9 +10,11 @@ import GLOBAL_STATE from "../state";
 import STORE from "../store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.jsx";
+import { Switch } from "@/components/ui/switch.jsx";
+import { Label } from "@/components/ui/label.jsx";
 
 const useForm = () => {
   const [inputs, setInputs] = useState({});
@@ -24,6 +25,7 @@ const useForm = () => {
   const state = GLOBAL_STATE("login");
   console.dir(state.Config)
   const [authServer, setAuthServer] = useState(state.Config?.AuthServers[0])
+  const [secure, setSecure] = useState(true)
 
   const RemoveToken = () => {
     setTokenLogin(false);
@@ -93,7 +95,7 @@ const useForm = () => {
       return;
     }
 
-    let x = await state.Register(inputs, authServer);
+    let x = await state.Register(inputs, authServer, secure);
     if (x.status === 200) {
       STORE.Cache.Set("default-email", inputs["email"]);
       inputs["password"] = "";
@@ -149,7 +151,7 @@ const useForm = () => {
       return;
     }
 
-    await state.Login(inputs, remember, authServer);
+    await state.Login(inputs, remember, authServer, secure);
     setErrors({});
   };
   const EnableSubmit = async () => {
@@ -183,7 +185,7 @@ const useForm = () => {
       ConfirmCode: inputs["code"],
     };
 
-    let x = await state.API_EnableAccount(request, authServer);
+    let x = await state.API_EnableAccount(request, authServer, secure);
     if (x.status === 200) {
       inputs["code"] = "";
       setInputs({ ...inputs });
@@ -250,7 +252,7 @@ const useForm = () => {
       ResetCode: inputs["code"],
     };
 
-    let x = await state.ResetPassword(request, authServer);
+    let x = await state.ResetPassword(request, authServer, secure);
     if (x.status === 200) {
       inputs["password"] = "";
       inputs["password2"] = "";
@@ -285,7 +287,7 @@ const useForm = () => {
     let request = {
       Email: inputs["email"],
     };
-    let status = await state.GetResetCode(request, authServer);
+    let status = await state.GetResetCode(request, authServer, secure);
     if (status === true) {
       // do we want to do anything more on success ??
     }
@@ -319,6 +321,8 @@ const useForm = () => {
     EnableSubmit,
     authServer,
     setAuthServer,
+    secure,
+    setSecure,
   };
 };
 
@@ -343,6 +347,8 @@ const Login = (props) => {
     EnableSubmit,
     authServer,
     setAuthServer,
+    secure,
+    setSecure,
   } = useForm(props);
 
   const GetDefaults = () => {
@@ -595,21 +601,30 @@ const Login = (props) => {
       return (<></>)
     }
     return (
-      <Select
-        defaultValue={authServer}
-        onValueChange={setAuthServer}
-      >
-        <SelectTrigger className="w-[180px]">
-          <SelectValue placeholder="Theme" />
-        </SelectTrigger>
-        <SelectContent>
-          {state.Config?.AuthServers.map(c => {
-            return (
-              <SelectItem value={c}>{c}</SelectItem>
-            )
-          })}
-        </SelectContent>
-      </Select >
+      <div className="flex  items-start">
+        <Select
+          defaultValue={authServer}
+          onValueChange={setAuthServer}
+        >
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Theme" />
+          </SelectTrigger>
+          <SelectContent>
+            {state.Config?.AuthServers.map(c => {
+              return (
+                <SelectItem value={c}>{c}</SelectItem>
+              )
+            })}
+          </SelectContent>
+        </Select >
+        <div className="flex items-center space-x-2 mt-[8px] ml-[10px]">
+          <Switch
+            checked={secure}
+            onCheckedChange={() => setSecure(!secure)}
+          />
+          <Label htmlFor="airplane-mode">Secure</Label>
+        </div>
+      </div >
     )
   }
 
@@ -625,18 +640,16 @@ const Login = (props) => {
           {PasswordInput()}
           {TwoFactorInput()}
           {selectForm()}
-          <div className="flex items-center space-x-2">
-            <CustomToggle
-              value={remember}
-              label={<span className="text-[#4B7BF5]">Remember Login</span>}
-              toggle={() => {
-                setRememeber(!remember);
-              }}
-            />
-          </div>
           <Button className="w-full h-11 bg-[#4B7BF5] hover:bg-[#4B7BF5]/90 text-white" onClick={HandleSubmit}>
             Login
           </Button>
+          <div className="flex items-center space-x-2">
+            <Switch
+              checked={remember}
+              onCheckedChange={() => setRememeber(!remember)}
+            />
+            <Label htmlFor="airplane-mode">Remember Login</Label>
+          </div>
         </CardContent>
       </Card>
     );
