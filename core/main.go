@@ -392,7 +392,7 @@ func DefaultConfig() *configV2 {
 		DNSBlockLists:     GetDefaultBlockLists(),
 		APIIP:             "0.0.0.0",
 		APIPort:           "7777",
-		AuthServers:       []string{"https://api.tunnels.is"},
+		AuthServers:       []string{"https://api.tunnels.is", "https://127.0.0.1"},
 	}
 	applyCertificateDefaultsToConfig(conf)
 	return conf
