@@ -1,9 +1,10 @@
-  import { useState } from "react";
+import { useState } from "react";
 import STORE from "./store";
 import toast from "react-hot-toast";
 import axios from "axios";
 import dayjs from "dayjs";
 import { v4 as uuidv4 } from "uuid";
+import https from 'https';
 
 const state = (page) => {
   const [value, reload] = useState({ x: 0 });
@@ -67,10 +68,10 @@ export var STATE = {
       console.dir(err);
     }
   },
-  v2_SetUser: async (u, saveToDisk) => {
+  v2_SetUser: async (u, saveToDisk, server, secure) => {
     try {
-      console.log("SETTING USER");
-      console.dir(u);
+      u.AuthServer = server
+      u.Secure = secure
       STATE.User = u;
       STORE.Cache.SetObject("user", u);
       if (saveToDisk) {
@@ -112,7 +113,7 @@ export var STATE = {
       return undefined;
     }
   },
-  v2_Cleanup: () => {},
+  v2_Cleanup: () => { },
   v2_TunnelDelete: async (tun) => {
     try {
       STATE.toggleLoading({
@@ -570,7 +571,7 @@ export var STATE = {
             </div>
             <div
               className="button yes"
-              onClick={async function () {
+              onClick={async function() {
                 toast.dismiss(t.id);
                 await method();
               }}
@@ -658,27 +659,27 @@ export var STATE = {
 
       if (c.ServerIP === "") {
         STATE.Servers?.forEach((s) => {
-          if (s._id === c.ServerID){
-            
-          server = s;
-          connectionRequest.ServerIP = s.IP;
-          connectionRequest.ServerPort = s.Port;
-          connectionRequest.ServerID = s._id;
+          if (s._id === c.ServerID) {
+
+            server = s;
+            connectionRequest.ServerIP = s.IP;
+            connectionRequest.ServerPort = s.Port;
+            connectionRequest.ServerID = s._id;
           }
-          
+
         });
-        if (!server){
-        STATE.PrivateServers?.forEach((s) => {
-          if (s._id === c.ServerID){
-            
-          server = s;
-          connectionRequest.ServerIP = s.IP;
-          connectionRequest.ServerPort = s.Port;
-          connectionRequest.ServerID = s._id;
-          }
-          
-        });
-          
+        if (!server) {
+          STATE.PrivateServers?.forEach((s) => {
+            if (s._id === c.ServerID) {
+
+              server = s;
+              connectionRequest.ServerIP = s.IP;
+              connectionRequest.ServerPort = s.Port;
+              connectionRequest.ServerID = s._id;
+            }
+
+          });
+
         }
       } else {
         connectionRequest.ServerIP = c.ServerIP;
@@ -728,18 +729,18 @@ export var STATE = {
     STATE.GetBackendState();
   },
   disconnectFromVPN: async (c) => {
-      STATE.toggleLoading({
-        logTag: "disconnecting",
-        tag: "DISCONNECT",
-        show: true,
-        msg: "Disconnecting ...",
-        includeLogs: true,
-      });
+    STATE.toggleLoading({
+      logTag: "disconnecting",
+      tag: "DISCONNECT",
+      show: true,
+      msg: "Disconnecting ...",
+      includeLogs: true,
+    });
 
     try {
       let x = await STATE.API.method(
         "disconnect",
-        { ID: c.ID},
+        { ID: c.ID },
         false,
         20000,
       );
@@ -853,11 +854,44 @@ export var STATE = {
   },
 
   ForwardToController: async (req, loader) => {
+    if (!req.URL || req.URL === "") {
+      req.URL = state.User?.AuthServer
+    }
+    if (!req.URL || req.URL === "") {
+      STATE.toggleError("no server selected")
+    }
+    req.Secure = req.Secure === undefined ? true : req.Secure
     STATE.toggleLoading(loader);
     let x = await STATE.API.method("forwardToController", req);
     STATE.toggleLoading(undefined);
     return x;
   },
+  // ForwardToController: async (req, loader) => {
+  //   if (!req.URL) {
+  //     req.URL = state.User?.AuthServer
+  //   }
+  //   if (!req.URL) {
+  //     STATE.toggleError("no server selected")
+  //     return
+  //   }
+  //   if (req.URL) {
+  //     if (!req.URL.endsWith("/")) {
+  //       req.URL += "/"
+  //     }
+  //   }
+
+  //   let url = req.URL + req.Path
+  //   let data = req.JSONData ? req.JSONData : null
+  //   let noLogout = req.NoLogout ? req.NoLogout : true
+  //   let timeout = req.Timeout ? req.Timeout : 20000
+  //   let ignoreError = req.InoreError ? req.IgnoreError : false
+
+
+  //   STATE.toggleLoading(loader);
+  //   let x = await STATE.API.methodv2(url, data, noLogout, timeout, ignoreError);
+  //   STATE.toggleLoading(undefined);
+  //   return x;
+  // },
 
   LicenseKey: "",
   UpdateLicenseInput: (value) => {
@@ -871,7 +905,7 @@ export var STATE = {
     STORE.Cache.SetObject("private-servers", STATE.PrivateServers);
   },
   ModifiedServers: [],
-  UpdateModifiedServer: function (server, key, value) {
+  UpdateModifiedServer: function(server, key, value) {
     let found = false;
     STATE.ModifiedServers.forEach((s, i) => {
       if (s._id === server._id) {
@@ -901,6 +935,8 @@ export var STATE = {
     let resp = undefined;
     try {
       let FR = {
+        URL: STATE.User.AuthServer,
+        Secure: STATE.User.Secure,
         Path: "v3/servers/update",
         Method: "POST",
         Timeout: 10000,
@@ -943,6 +979,8 @@ export var STATE = {
     let resp = undefined;
     try {
       let FR = {
+        URL: STATE.User.AuthServer,
+        Secure: STATE.User.Secure,
         Path: "v3/servers/create",
         Method: "POST",
         Timeout: 10000,
@@ -959,7 +997,7 @@ export var STATE = {
         msg: "Creating your server ...",
       });
 
-      resp = await STATE.API.method("forwardToController", FR);
+      resp = await STATE.API.method("forwardToController", FR, true, 10000, false);
       if (resp?.status === 200) {
         if (!STATE.PrivateServers) {
           STATE.PrivateServers = [];
@@ -993,12 +1031,14 @@ export var STATE = {
       } else {
         STATE.GetPrivateServersInProgress = false;
         STATE.errorNotification("Next refresh in " + (30 - diff) + " seconds");
-        return;
+        // return;
       }
 
       resp = await STATE.ForwardToController(
         {
-          Path: "v3/servers/private",
+          URL: STATE.User.AuthServer,
+          Secure: STATE.User.Secure,
+          Path: "v3/servers",
           Method: "POST",
           JSONData: {
             DeviceToken: STATE.User.DeviceToken.DT,
@@ -1018,18 +1058,18 @@ export var STATE = {
     }
 
     if (resp?.status === 200) {
-      if (resp.data?.length > 0){
-      STORE.Cache.SetObject("private-servers", resp.data);
-      STATE.PrivateServers = resp.data;
-              } else {
-      STATE.errorNotification("Unable to find servers");
-      STORE.Cache.SetObject("private-servers",[]);
-      STATE.PrivateServers = [];
-              }
+      if (resp.data?.length > 0) {
+        STORE.Cache.SetObject("private-servers", resp.data);
+        STATE.PrivateServers = resp.data;
+      } else {
+        STATE.errorNotification("Unable to find servers");
+        STORE.Cache.SetObject("private-servers", []);
+        STATE.PrivateServers = [];
+      }
       STATE.renderPage("pservers");
     } else {
       STATE.errorNotification("Unable to find servers");
-      STORE.Cache.SetObject("private-servers",[]);
+      STORE.Cache.SetObject("private-servers", []);
       STATE.PrivateServers = [];
     }
 
@@ -1100,6 +1140,7 @@ export var STATE = {
 
     STATE.ForwardToController(
       {
+        URL: STATE.User.AuthServer,
         Path: "v3/key/activate",
         Method: "POST",
         JSONData: {
@@ -1122,9 +1163,10 @@ export var STATE = {
     STORE.Cache.SetObject("user", { ...STATE.User });
     STATE.rerender();
   },
-  GetResetCode: async (inputs) => {
+  GetResetCode: async (inputs, url) => {
     return STATE.ForwardToController(
       {
+        URL: url,
         Path: "v3/user/reset/code",
         Method: "POST",
         JSONData: inputs,
@@ -1140,9 +1182,10 @@ export var STATE = {
   GetQRCode: async (inputs) => {
     return STATE.API.method("getQRCode", inputs);
   },
-  ConfirmTwoFactorCode: async (inputs) => {
+  ConfirmTwoFactorCode: async (inputs, url) => {
     return STATE.ForwardToController(
       {
+        URL: url,
         Path: "v3/user/2fa/confirm",
         Method: "POST",
         JSONData: inputs,
@@ -1155,9 +1198,10 @@ export var STATE = {
       },
     );
   },
-  API_EnableAccount: async (inputs) => {
+  API_EnableAccount: async (inputs, url) => {
     return STATE.ForwardToController(
       {
+        URL: url,
         Path: "v3/user/enable",
         Method: "POST",
         JSONData: inputs,
@@ -1170,9 +1214,10 @@ export var STATE = {
       },
     );
   },
-  ResetPassword: async (inputs) => {
+  ResetPassword: async (inputs, url) => {
     return STATE.ForwardToController(
       {
+        URL: url,
         Path: "v3/user/reset/password",
         Method: "POST",
         JSONData: inputs,
@@ -1185,9 +1230,10 @@ export var STATE = {
       },
     );
   },
-  Register: async (inputs) => {
+  Register: async (inputs, url) => {
     return STATE.ForwardToController(
       {
+        URL: url,
         Path: "v3/user/create",
         Method: "POST",
         JSONData: inputs,
@@ -1200,39 +1246,30 @@ export var STATE = {
       },
     );
   },
-  Login: async (inputs, remember) => {
-    STATE.toggleLoading({
-      tag: "login",
-      show: true,
-      msg: "logging you in...",
-    });
-
-    // let token = STORE.Cache.Get(inputs["email"] + "_" + "TOKEN");
-    // if (token !== null) {
-    //   inputs.DeviceToken = token;
-    // }
-
-    let FR = {
-      Path: "v3/user/login",
-      Method: "POST",
-      Timeout: 20000,
-      JSONData: inputs,
-      LogoutUser: false,
-      SyncUser: true,
-    };
-
+  Login: async (inputs, remember, url) => {
     STORE.Local.setItem("default-device-name", inputs["devicename"]);
     STORE.Cache.Set("default-email", inputs["email"]);
 
-    let x = await STATE.API.method("forwardToController", FR, true);
-
+    let x = await STATE.ForwardToController(
+      {
+        URL: url,
+        Path: "v3/user/login",
+        Method: "POST",
+        JSONData: inputs,
+        Timeout: 20000,
+        Secure: false,
+      },
+      {
+        tag: "login",
+        show: true,
+        msg: "logging you in..",
+      },
+    );
     if (x?.status === 200) {
-      STATE.v2_SetUser(x.data, remember);
-      STATE.toggleLoading(undefined);
+      STATE.v2_SetUser(x.data, remember, url, false);
       window.location.replace("/");
     }
 
-    STATE.toggleLoading(undefined);
   },
   Org: STORE.Cache.GetObject("org"),
   updateOrg: (org) => {
@@ -1475,23 +1512,23 @@ export var STATE = {
   DNSListDateFormat: "ddd D. HH:mm:ss",
   GetDNSStats: async () => {
     try {
-    let  resp = await STATE.API.method("getDNSStats", null);
+      let resp = await STATE.API.method("getDNSStats", null);
       if (resp?.status === 200) {
         STATE.DNSStats = resp.data
         STORE.Cache.SetObject("dns-stats", resp.data);
       }
-    } catch(error){
+    } catch (error) {
       console.dir(error)
     }
-    
+
   },
- State: STORE.Cache.GetObject("state"),
+  State: STORE.Cache.GetObject("state"),
   StateFetchInProgress: false,
   GetURL: () => {
     let host = window.location.origin;
     // let port = STORE.Cache.Get("api_port")
     // let ip = STORE.Cache.Get("api_ip")
-    host = host.replace("http://", "http://");
+    host = host.replace("http://", "https://");
     host = host.replace("5173", "7777");
     return host;
   },
@@ -1513,7 +1550,6 @@ export var STATE = {
         {},
         { headers: { "Content-Type": "application/json" } },
       );
-;
 
       if (response.status === 200) {
         if (response.data) {

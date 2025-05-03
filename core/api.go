@@ -143,7 +143,7 @@ func SendRequestToURL(tc *tls.Config, method string, url string, data any, timeo
 		client.Transport = &http.Transport{
 			TLSClientConfig: &tls.Config{
 				MinVersion:         tls.VersionTLS12,
-				InsecureSkipVerify: skipVerify,
+				InsecureSkipVerify: !skipVerify,
 			},
 		}
 	}
@@ -174,13 +174,22 @@ func SendRequestToURL(tc *tls.Config, method string, url string, data any, timeo
 func ForwardToController(FR *FORWARD_REQUEST) (any, int) {
 	defer RecoverAndLogToFile()
 
+	if !strings.HasSuffix(FR.URL, "/") {
+		FR.URL += "/"
+	}
+
+	// make sure api.tunnels.is is always secure
+	if strings.Contains(FR.URL, "api.tunnels.is") {
+		FR.Secure = true
+	}
+
 	responseBytes, code, err := SendRequestToURL(
 		nil,
 		FR.Method,
-		FR.Path,
+		FR.URL+FR.Path,
 		FR.JSONData,
 		FR.Timeout,
-		false,
+		FR.Secure,
 	)
 
 	er := new(ErrorResponse)

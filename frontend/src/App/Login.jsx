@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.jsx";
 
 const useForm = () => {
   const [inputs, setInputs] = useState({});
@@ -21,6 +22,8 @@ const useForm = () => {
   const [mode, setMode] = useState(1);
   const [remember, setRememeber] = useState(false);
   const state = GLOBAL_STATE("login");
+  console.dir(state.Config)
+  const [authServer, setAuthServer] = useState(state.Config?.AuthServers[0])
 
   const RemoveToken = () => {
     setTokenLogin(false);
@@ -90,7 +93,7 @@ const useForm = () => {
       return;
     }
 
-    let x = await state.Register(inputs);
+    let x = await state.Register(inputs, authServer);
     if (x.status === 200) {
       STORE.Cache.Set("default-email", inputs["email"]);
       inputs["password"] = "";
@@ -105,7 +108,6 @@ const useForm = () => {
     let errors = {};
     let hasErrors = false;
 
-    console.dir(inputs);
     if (!inputs["email"] || inputs["email"] === "") {
       errors["email"] = "Email / Token missing";
       hasErrors = true;
@@ -147,7 +149,7 @@ const useForm = () => {
       return;
     }
 
-    await state.Login(inputs, remember);
+    await state.Login(inputs, remember, authServer);
     setErrors({});
   };
   const EnableSubmit = async () => {
@@ -181,7 +183,7 @@ const useForm = () => {
       ConfirmCode: inputs["code"],
     };
 
-    let x = await state.API_EnableAccount(request);
+    let x = await state.API_EnableAccount(request, authServer);
     if (x.status === 200) {
       inputs["code"] = "";
       setInputs({ ...inputs });
@@ -248,7 +250,7 @@ const useForm = () => {
       ResetCode: inputs["code"],
     };
 
-    let x = await state.ResetPassword(request);
+    let x = await state.ResetPassword(request, authServer);
     if (x.status === 200) {
       inputs["password"] = "";
       inputs["password2"] = "";
@@ -283,7 +285,7 @@ const useForm = () => {
     let request = {
       Email: inputs["email"],
     };
-    let status = await state.GetResetCode(request);
+    let status = await state.GetResetCode(request, authServer);
     if (status === true) {
       // do we want to do anything more on success ??
     }
@@ -298,6 +300,7 @@ const useForm = () => {
   };
 
   return {
+    state,
     remember,
     setRememeber,
     inputs,
@@ -314,12 +317,14 @@ const useForm = () => {
     GetCode,
     RemoveToken,
     EnableSubmit,
+    authServer,
+    setAuthServer,
   };
 };
 
 const Login = (props) => {
   const {
-    //
+    state,
     remember,
     setRememeber,
     inputs,
@@ -336,6 +341,8 @@ const Login = (props) => {
     GetCode,
     RemoveToken,
     EnableSubmit,
+    authServer,
+    setAuthServer,
   } = useForm(props);
 
   const GetDefaults = () => {
@@ -583,6 +590,29 @@ const Login = (props) => {
     );
   };
 
+  const selectForm = () => {
+    if (state === undefined) {
+      return (<></>)
+    }
+    return (
+      <Select
+        defaultValue={authServer}
+        onValueChange={setAuthServer}
+      >
+        <SelectTrigger className="w-[180px]">
+          <SelectValue placeholder="Theme" />
+        </SelectTrigger>
+        <SelectContent>
+          {state.Config?.AuthServers.map(c => {
+            return (
+              <SelectItem value={c}>{c}</SelectItem>
+            )
+          })}
+        </SelectContent>
+      </Select >
+    )
+  }
+
   const LoginForm = () => {
     return (
       <Card className="w-full max-w-md mx-auto bg-[#0B0E14] border border-[#1a1f2d] shadow-2xl">
@@ -594,6 +624,7 @@ const Login = (props) => {
           {DeviceInput()}
           {PasswordInput()}
           {TwoFactorInput()}
+          {selectForm()}
           <div className="flex items-center space-x-2">
             <CustomToggle
               value={remember}
@@ -625,6 +656,7 @@ const Login = (props) => {
           {TokenInput()}
           {PasswordInput()}
           {ConfirmPasswordInput()}
+          {selectForm()}
           <Button className="w-full h-11 bg-[#4B7BF5] hover:bg-[#4B7BF5]/90 text-white" onClick={RegisterSubmit}>
             Register
           </Button>
@@ -644,6 +676,7 @@ const Login = (props) => {
           {!tokenLogin && EmailInput()}
           {PasswordInput()}
           {ConfirmPasswordInput()}
+          {selectForm()}
           <Button className="w-full h-11 bg-[#4B7BF5] hover:bg-[#4B7BF5]/90 text-white" onClick={RegisterSubmit}>
             Register
           </Button>
@@ -651,6 +684,10 @@ const Login = (props) => {
       </Card>
     );
   };
+
+  "use client"
+
+
 
   const ResetPasswordForm = () => {
     return (
@@ -663,6 +700,7 @@ const Login = (props) => {
           {PasswordInput()}
           {ConfirmPasswordInput()}
           {CodeInput()}
+          {selectForm()}
           <div className="flex space-x-2">
             <Button variant="outline" className="flex-1 h-11 bg-[#0B0E14] border-[#1a1f2d] text-white hover:bg-[#1a1f2d] hover:text-white" onClick={() => GetCode()}>
               Get Reset Code
@@ -686,6 +724,7 @@ const Login = (props) => {
           {EmailInput()}
           {PasswordInput()}
           {RecoveryInput()}
+          {selectForm()}
           <Button className="w-full h-11 bg-[#4B7BF5] hover:bg-[#4B7BF5]/90 text-white" onClick={HandleSubmit}>
             Login
           </Button>
@@ -703,6 +742,7 @@ const Login = (props) => {
           </div>
           {EmailInput()}
           {CodeInput()}
+          {selectForm()}
           <Button className="w-full h-11 bg-[#4B7BF5] hover:bg-[#4B7BF5]/90 text-white" onClick={EnableSubmit}>
             Enable Account
           </Button>
@@ -721,15 +761,14 @@ const Login = (props) => {
         {mode === 5 && RegisterAnonForm()}
         {mode === 6 && EnableAccountForm()}
 
-        <div className="flex flex-wrap items-center justify-center gap-3 mt-4">
+        < div className="flex flex-wrap items-center justify-center gap-3 mt-4">
           <Button
             variant="ghost"
             onClick={() => setMode(1)}
-            className={`h-9 px-4 ${
-              mode === 1 
-                ? 'text-[#4B7BF5] hover:text-[#4B7BF5] hover:bg-[#4B7BF5]/10' 
-                : 'text-white/50 hover:text-white hover:bg-white/5'
-            }`}
+            className={`h-9 px-4 ${mode === 1
+              ? 'text-[#4B7BF5] hover:text-[#4B7BF5] hover:bg-[#4B7BF5]/10'
+              : 'text-white/50 hover:text-white hover:bg-white/5'
+              }`}
           >
             Login
           </Button>
@@ -739,11 +778,10 @@ const Login = (props) => {
               RemoveToken();
               setMode(2);
             }}
-            className={`h-9 px-4 ${
-              mode === 2 
-                ? 'text-[#4B7BF5] hover:text-[#4B7BF5] hover:bg-[#4B7BF5]/10' 
-                : 'text-white/50 hover:text-white hover:bg-white/5'
-            }`}
+            className={`h-9 px-4 ${mode === 2
+              ? 'text-[#4B7BF5] hover:text-[#4B7BF5] hover:bg-[#4B7BF5]/10'
+              : 'text-white/50 hover:text-white hover:bg-white/5'
+              }`}
           >
             Register
           </Button>
@@ -753,39 +791,36 @@ const Login = (props) => {
               GenerateToken();
               setMode(5);
             }}
-            className={`h-9 px-4 ${
-              mode === 5 
-                ? 'text-[#4B7BF5] hover:text-[#4B7BF5] hover:bg-[#4B7BF5]/10' 
-                : 'text-white/50 hover:text-white hover:bg-white/5'
-            }`}
+            className={`h-9 px-4 ${mode === 5
+              ? 'text-[#4B7BF5] hover:text-[#4B7BF5] hover:bg-[#4B7BF5]/10'
+              : 'text-white/50 hover:text-white hover:bg-white/5'
+              }`}
           >
             Register Anonymously
           </Button>
           <Button
             variant="ghost"
             onClick={() => setMode(4)}
-            className={`h-9 px-4 ${
-              mode === 4 
-                ? 'text-[#4B7BF5] hover:text-[#4B7BF5] hover:bg-[#4B7BF5]/10' 
-                : 'text-white/50 hover:text-white hover:bg-white/5'
-            }`}
+            className={`h-9 px-4 ${mode === 4
+              ? 'text-[#4B7BF5] hover:text-[#4B7BF5] hover:bg-[#4B7BF5]/10'
+              : 'text-white/50 hover:text-white hover:bg-white/5'
+              }`}
           >
             Reset Password
           </Button>
           <Button
             variant="ghost"
             onClick={() => setMode(3)}
-            className={`h-9 px-4 ${
-              mode === 3 
-                ? 'text-[#4B7BF5] hover:text-[#4B7BF5] hover:bg-[#4B7BF5]/10' 
-                : 'text-white/50 hover:text-white hover:bg-white/5'
-            }`}
+            className={`h-9 px-4 ${mode === 3
+              ? 'text-[#4B7BF5] hover:text-[#4B7BF5] hover:bg-[#4B7BF5]/10'
+              : 'text-white/50 hover:text-white hover:bg-white/5'
+              }`}
           >
             2FA Recovery
           </Button>
         </div>
       </div>
-    </div>
+    </div >
   );
 };
 

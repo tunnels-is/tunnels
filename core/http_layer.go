@@ -70,11 +70,9 @@ func LaunchAPI() {
 	default:
 	}
 
-	API_SERVER.Serve(ln)
-
-	// if err := API_SERVER.ServeTLS(ln, conf.APICert, conf.APIKey); err != http.ErrServerClosed {
-	// 	ERROR("api start error: ", err)
-	// }
+	if err := API_SERVER.ServeTLS(ln, conf.APICert, conf.APIKey); err != http.ErrServerClosed {
+		ERROR("api start error: ", err)
+	}
 }
 
 func getFileSystem() http.FileSystem {
@@ -89,7 +87,8 @@ func getFileSystem() http.FileSystem {
 func makeTLSConfig() (tc *tls.Config) {
 	conf := CONFIG.Load()
 	tc = new(tls.Config)
-	tc.MinVersion = tls.VersionTLS12
+	tc.InsecureSkipVerify = true
+	// tc.MinVersion = tls.VersionTLS12
 	// tc.MaxVersion = tls.VersionTLS13
 	// tc.CipherSuites = []uint16{
 	// 	tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,

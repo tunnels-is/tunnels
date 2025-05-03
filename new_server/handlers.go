@@ -550,12 +550,14 @@ func API_ServerGet(w http.ResponseWriter, r *http.Request) {
 	}
 	servers = append(servers, pservers...)
 
-	puservers, err := DB_FindServersByGroups(user.Groups, 100, int64(F.StartIndex))
-	if err != nil {
-		senderr(w, 500, "Unknown error, please try again in a moment")
-		return
+	if len(user.Groups) > 0 {
+		puservers, err := DB_FindServersByGroups(user.Groups, 100, int64(F.StartIndex))
+		if err != nil {
+			senderr(w, 500, "Unknown error, please try again in a moment")
+			return
+		}
+		servers = append(servers, puservers...)
 	}
-	servers = append(servers, puservers...)
 
 	sendObject(w, servers)
 }
@@ -680,7 +682,7 @@ func API_SessionCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	SCR.Signature, err = crypt.SignData(SCR.Payload, PrivKey.Load())
-	SCR.ServerPubKey = server.PubKey
+	SCR.ServerPubKey = []byte(server.PubKey)
 	if err != nil {
 		senderr(w, 500, "Unable to sign payload")
 		return

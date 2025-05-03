@@ -55,8 +55,10 @@ func loadUser() (u *User, err error) {
 	s := STATE.Load()
 	ub, err := os.ReadFile(s.BasePath + "enc")
 	if err != nil {
-		fmt.Println("ERRRRR:", err)
 		return nil, err
+	}
+	if len(ub) == 0 {
+		return nil, fmt.Errorf("no user found")
 	}
 
 	data := ub[aes.BlockSize:]
@@ -64,13 +66,11 @@ func loadUser() (u *User, err error) {
 
 	encrypted, err := Decrypt(data, iv, []byte("01234567890123456789012345678900"))
 	if err != nil {
-		fmt.Println("ERRRRR:", err)
 		return nil, err
 	}
 
 	err = json.Unmarshal(encrypted, u)
 	if err != nil {
-		fmt.Println("ERRRRR:", err)
 		return nil, err
 	}
 	return
