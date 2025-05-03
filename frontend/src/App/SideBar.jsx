@@ -30,23 +30,26 @@ const SideBar = () => {
 
   const OpenWindowURL = (url) => {
     window.open(url, "_blank");
-    try {
-      state.ConfirmAndExecute(
-        "",
-        "clipboardCopy",
-        10000,
-        url,
-        "Copy link to clipboard ?",
-        () => {
-          if (navigator?.clipboard) {
-            navigator.clipboard.writeText(value);
-          }
-          runtime.ClipboardSetText(url);
-        },
-      );
-    } catch (e) {
-      console.log(e);
+    if (navigator?.clipboard) {
+      navigator.clipboard.writeText(value);
     }
+    // try {
+    //   state.ConfirmAndExecute(
+    //     "",
+    //     "clipboardCopy",
+    //     10000,
+    //     url,
+    //     "Copy link to clipboard ?",
+    //     () => {
+    //       if (navigator?.clipboard) {
+    //         navigator.clipboard.writeText(value);
+    //       }
+    //       runtime.ClipboardSetText(url);
+    //     },
+    //   );
+    // } catch (e) {
+    //   console.log(e);
+    // }
   };
 
   const showLogin = () => {
