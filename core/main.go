@@ -390,7 +390,7 @@ func DefaultConfig() *configV2 {
 		LogAllDomains:     true,
 		DNSstats:          true,
 		DNSBlockLists:     GetDefaultBlockLists(),
-		APIIP:             "127.0.0.1",
+		APIIP:             "0.0.0.0",
 		APIPort:           "7777",
 		LoginServers:      []string{"https://api.tunnels.is"},
 	}
