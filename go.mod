@@ -12,10 +12,10 @@ require (
 	github.com/zveinn/crypt v0.0.4
 	github.com/zveinn/tunnels v0.0.4
 	go.mongodb.org/mongo-driver v1.17.1
-	golang.org/x/crypto v0.35.0
-	golang.org/x/net v0.30.0
-	golang.org/x/sys v0.30.0
-	golang.org/x/term v0.29.0
+	golang.org/x/crypto v0.36.0
+	golang.org/x/net v0.38.0
+	golang.org/x/sys v0.31.0
+	golang.org/x/term v0.30.0
 	kernel.org/pub/linux/libs/security/libcap/cap v1.2.70
 )
 
@@ -32,8 +32,8 @@ require (
 	github.com/vishvananda/netns v0.0.4 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	golang.org/x/mod v0.19.0 // indirect
-	golang.org/x/sync v0.11.0 // indirect
-	golang.org/x/text v0.22.0 // indirect
+	golang.org/x/sync v0.12.0 // indirect
+	golang.org/x/text v0.23.0 // indirect
 	golang.org/x/tools v0.23.0 // indirect
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
