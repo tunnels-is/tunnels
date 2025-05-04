@@ -5,13 +5,14 @@ import KeyValue from "./component/keyvalue";
 import CustomToggle from "./component/CustomToggle";
 import FormKeyInput from "./component/formkeyrawvalue";
 import STORE from "../store";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
-  CardDescription
+  CardDescription,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -31,7 +32,7 @@ import {
   Globe,
   Key,
   Settings2,
-  Network
+  Network,
 } from "lucide-react";
 
 const Settings = () => {
@@ -81,17 +82,23 @@ const Settings = () => {
         {icon}
         <div className="space-y-0.5">
           <Label className="text-sm font-medium">{label}</Label>
-          {description && <p className="text-xs text-muted-foreground">{description}</p>}
+          {description && (
+            <p className="text-xs text-muted-foreground">{description}</p>
+          )}
         </div>
       </div>
-      <Switch
-        checked={value}
-        onCheckedChange={onToggle}
-      />
+      <Switch checked={value} onCheckedChange={onToggle} />
     </div>
   );
 
-  const SettingInput = ({ label, icon, value, onChange, type = "text", placeholder = "" }) => (
+  const SettingInput = ({
+    label,
+    icon,
+    value,
+    onChange,
+    type = "text",
+    placeholder = "",
+  }) => (
     <div className="space-y-2 py-3">
       <div className="flex items-center gap-2">
         {icon}
@@ -120,9 +127,8 @@ const Settings = () => {
   );
 
   return (
-    <div className="container mx-auto p-6 max-w-5xl space-y-6">
+    <div className="container max-w-5xl ">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold tracking-tight text-white">Settings</h1>
         {modified === true && (
           <Button
             className="flex items-center gap-2"
@@ -142,271 +148,246 @@ const Settings = () => {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-xl flex items-center gap-2">
-              General Settings
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <SettingToggle
-              label="Basic Logging"
-              icon={<Info className="h-4 w-4 mt-1 text-blue-500" />}
-              value={InfoLogging}
-              onToggle={() => {
-                state.toggleKeyAndReloadDom("Config", "InfoLogging");
-                state.renderPage("settings");
-              }}
-              description="Logs basic information about application operations"
-            />
+      <Tabs defaultValue="general" className="w-[400px]">
+        <TabsList>
+          <TabsTrigger value="general">General Settings</TabsTrigger>
+          <TabsTrigger value="apiconfig">API Config</TabsTrigger>
+          <TabsTrigger value="net">Network Information</TabsTrigger>
+          <TabsTrigger value="sys">System Information</TabsTrigger>
+        </TabsList>
+        <TabsContent value="general">
+          <Card className="mt-5 bg-black border-none">
+            <CardContent>
+              <SettingToggle
+                label="Basic Logging"
+                icon={<Info className="h-4 w-4 mt-1 text-blue-500" />}
+                value={InfoLogging}
+                onToggle={() => {
+                  state.toggleKeyAndReloadDom("Config", "InfoLogging");
+                  state.renderPage("settings");
+                }}
+                description="Logs basic information about application operations"
+              />
 
+              <SettingToggle
+                label="Error Logging"
+                icon={<AlertTriangle className="h-4 w-4 mt-1 text-red-500" />}
+                value={ErrorLogging}
+                onToggle={() => {
+                  state.toggleKeyAndReloadDom("Config", "ErrorLogging");
+                  state.renderPage("settings");
+                }}
+                description="Logs errors and exceptions"
+              />
 
-            <SettingToggle
-              label="Error Logging"
-              icon={<AlertTriangle className="h-4 w-4 mt-1 text-red-500" />}
-              value={ErrorLogging}
-              onToggle={() => {
-                state.toggleKeyAndReloadDom("Config", "ErrorLogging");
-                state.renderPage("settings");
-              }}
-              description="Logs errors and exceptions"
-            />
+              <SettingToggle
+                label="Debug Logging"
+                icon={<Bug className="h-4 w-4 mt-1 text-amber-500" />}
+                value={DebugLogging}
+                onToggle={() => {
+                  state.toggleKeyAndReloadDom("Config", "DebugLogging");
+                  state.renderPage("settings");
+                }}
+                description="Detailed logs for troubleshooting"
+              />
 
+              <SettingToggle
+                label="Debug Mode"
+                icon={<Bug className="h-4 w-4 mt-1 text-purple-500" />}
+                value={state?.debug}
+                onToggle={() => {
+                  state.toggleDebug();
+                  state.renderPage("settings");
+                }}
+                description="Enables advanced debugging features"
+              />
 
-            <SettingToggle
-              label="Debug Logging"
-              icon={<Bug className="h-4 w-4 mt-1 text-amber-500" />}
-              value={DebugLogging}
-              onToggle={() => {
-                state.toggleKeyAndReloadDom("Config", "DebugLogging");
-                state.renderPage("settings");
-              }}
-              description="Detailed logs for troubleshooting"
-            />
+              <SettingToggle
+                label="Connection Tracing"
+                icon={<Activity className="h-4 w-4 mt-1 text-green-500" />}
+                value={ConnectionTracer}
+                onToggle={() => {
+                  state.toggleKeyAndReloadDom("Config", "ConnectionTracer");
+                  state.renderPage("settings");
+                }}
+                description="Tracks all connection activities"
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+        <TabsContent value="apiconfig">
+          <Card className="mt-5 bg-black border-none">
+            <CardContent className="space-y-0">
+              <SettingInput
+                label="API IP"
+                icon={<Globe className="h-4 w-4 text-blue-500" />}
+                value={APIIP}
+                onChange={(e) => {
+                  state.setKeyAndReloadDom("Config", "APIIP", e.target.value);
+                  state.renderPage("settings");
+                }}
+                placeholder="Enter API IP address"
+              />
 
+              <SettingInput
+                label="API Port"
+                icon={<Server className="h-4 w-4 text-indigo-500" />}
+                value={APIPort}
+                onChange={(e) => {
+                  state.setKeyAndReloadDom("Config", "APIPort", e.target.value);
+                  state.renderPage("settings");
+                }}
+                placeholder="Enter API port"
+              />
 
-            <SettingToggle
-              label="Debug Mode"
-              icon={<Bug className="h-4 w-4 mt-1 text-purple-500" />}
-              value={state?.debug}
-              onToggle={() => {
-                state.toggleDebug();
-                state.renderPage("settings");
-              }}
-              description="Enables advanced debugging features"
-            />
+              <SettingInput
+                label="API Cert Domains"
+                icon={<Globe className="h-4 w-4 text-green-500" />}
+                value={APICertDomains}
+                onChange={(e) => {
+                  state.setArrayAndReloadDom(
+                    "Config",
+                    "APICertDomains",
+                    e.target.value,
+                  );
+                  state.renderPage("settings");
+                }}
+                placeholder="Enter domain names"
+              />
 
+              <SettingInput
+                label="API Cert IPs"
+                icon={<Network className="h-4 w-4 text-cyan-500" />}
+                value={APICertIPs}
+                onChange={(e) => {
+                  state.setArrayAndReloadDom(
+                    "Config",
+                    "APICertIPs",
+                    e.target.value,
+                  );
+                  state.renderPage("settings");
+                }}
+                placeholder="Enter IP addresses"
+              />
 
-            <SettingToggle
-              label="Connection Tracing"
-              icon={<Activity className="h-4 w-4 mt-1 text-green-500" />}
-              value={ConnectionTracer}
-              onToggle={() => {
-                state.toggleKeyAndReloadDom("Config", "ConnectionTracer");
-                state.renderPage("settings");
-              }}
-              description="Tracks all connection activities"
-            />
-          </CardContent>
-        </Card>
+              <SettingInput
+                label="API Cert"
+                icon={<Key className="h-4 w-4 text-amber-500" />}
+                value={APICert}
+                onChange={(e) => {
+                  state.setKeyAndReloadDom("Config", "APICert", e.target.value);
+                  state.renderPage("settings");
+                }}
+                placeholder="Enter certificate path"
+              />
 
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-xl flex items-center gap-2">
-              API Configuration
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-0">
-            <SettingInput
-              label="API IP"
-              icon={<Globe className="h-4 w-4 text-blue-500" />}
-              value={APIIP}
-              onChange={(e) => {
-                state.setKeyAndReloadDom("Config", "APIIP", e.target.value);
-                state.renderPage("settings");
-              }}
-              placeholder="Enter API IP address"
-            />
-
-
-            <SettingInput
-              label="API Port"
-              icon={<Server className="h-4 w-4 text-indigo-500" />}
-              value={APIPort}
-              onChange={(e) => {
-                state.setKeyAndReloadDom("Config", "APIPort", e.target.value);
-                state.renderPage("settings");
-              }}
-              placeholder="Enter API port"
-            />
-
-
-            <SettingInput
-              label="API Cert Domains"
-              icon={<Globe className="h-4 w-4 text-green-500" />}
-              value={APICertDomains}
-              onChange={(e) => {
-                state.setArrayAndReloadDom(
-                  "Config",
-                  "APICertDomains",
-                  e.target.value,
-                );
-                state.renderPage("settings");
-              }}
-              placeholder="Enter domain names"
-            />
-
-
-            <SettingInput
-              label="API Cert IPs"
-              icon={<Network className="h-4 w-4 text-cyan-500" />}
-              value={APICertIPs}
-              onChange={(e) => {
-                state.setArrayAndReloadDom("Config", "APICertIPs", e.target.value);
-                state.renderPage("settings");
-              }}
-              placeholder="Enter IP addresses"
-            />
-
-
-            <SettingInput
-              label="API Cert"
-              icon={<Key className="h-4 w-4 text-amber-500" />}
-              value={APICert}
-              onChange={(e) => {
-                state.setKeyAndReloadDom("Config", "APICert", e.target.value);
-                state.renderPage("settings");
-              }}
-              placeholder="Enter certificate path"
-            />
-
-
-            <SettingInput
-              label="API Key"
-              icon={<Key className="h-4 w-4 text-rose-500" />}
-              value={APIKey}
-              onChange={(e) => {
-                state.setKeyAndReloadDom("Config", "APIKey", e.target.value);
-                state.renderPage("settings");
-              }}
-              placeholder="Enter API key"
-            />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-xl flex items-center gap-2">
-              Network Information
-            </CardTitle>
-            <CardDescription>Default network interface details</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <InfoItem
-              label="Interface"
-              value={state.Network?.DefaultInterfaceName}
-              icon={<Network className="h-4 w-4 text-blue-400" />}
-            />
-
-
-            <InfoItem
-              label="IP Address"
-              value={state.Network?.DefaultInterface}
-              icon={<Globe className="h-4 w-4 text-teal-400" />}
-            />
-
-
-            <InfoItem
-              label="Interface ID"
-              value={state.Network?.DefaultInterfaceID}
-              icon={<Info className="h-4 w-4 text-indigo-400" />}
-            />
-
-
-            <InfoItem
-              label="Gateway"
-              value={state.Network?.DefaultGateway}
-              icon={<Server className="h-4 w-4 text-violet-400" />}
-            />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-xl flex items-center gap-2">
-              System Information
-            </CardTitle>
-            <CardDescription>Application status and file paths</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 gap-4">
+              <SettingInput
+                label="API Key"
+                icon={<Key className="h-4 w-4 text-rose-500" />}
+                value={APIKey}
+                onChange={(e) => {
+                  state.setKeyAndReloadDom("Config", "APIKey", e.target.value);
+                  state.renderPage("settings");
+                }}
+                placeholder="Enter API key"
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+        <TabsContent value="net">
+          {" "}
+          <Card className="mt-5 bg-black border-none">
+            <CardContent>
               <InfoItem
-                label="API Version"
-                value={apiversion}
-                icon={<Info className="h-4 w-4 text-blue-400" />}
+                label="Interface"
+                value={state.Network?.DefaultInterfaceName}
+                icon={<Network className="h-4 w-4 text-blue-400" />}
               />
 
               <InfoItem
-                label="App Version"
-                value={version}
-                icon={<Info className="h-4 w-4 text-green-400" />}
+                label="IP Address"
+                value={state.Network?.DefaultInterface}
+                icon={<Globe className="h-4 w-4 text-teal-400" />}
               />
-            </div>
-
-
-            <div className="space-y-1">
-              <InfoItem
-                label="Base Path"
-                value={basePath}
-                icon={<Server className="h-4 w-4 text-neutral-400" />}
-              />
-
 
               <InfoItem
-                label="Config File"
-                value={configPath}
-                icon={<Server className="h-4 w-4 text-amber-400" />}
+                label="Interface ID"
+                value={state.Network?.DefaultInterfaceID}
+                icon={<Info className="h-4 w-4 text-indigo-400" />}
               />
-
 
               <InfoItem
-                label="Log Path"
-                value={logPath || "Default"}
-                icon={<Server className="h-4 w-4 text-red-400" />}
+                label="Gateway"
+                value={state.Network?.DefaultGateway}
+                icon={<Server className="h-4 w-4 text-violet-400" />}
               />
+            </CardContent>
+          </Card>
+        </TabsContent>
+        <TabsContent value="sys">
+          <Card className="mt-5 bg-black border-none">
+            <CardContent>
+              <div className="grid grid-cols-2 gap-4">
+                <InfoItem
+                  label="API Version"
+                  value={apiversion}
+                  icon={<Info className="h-4 w-4 text-blue-400" />}
+                />
 
+                <InfoItem
+                  label="App Version"
+                  value={version}
+                  icon={<Info className="h-4 w-4 text-green-400" />}
+                />
+              </div>
 
-              <InfoItem
-                label="Log File"
-                value={logFileName}
-                icon={<Info className="h-4 w-4 text-red-400" />}
-              />
+              <div className="space-y-1">
+                <InfoItem
+                  label="Base Path"
+                  value={basePath}
+                  icon={<Server className="h-4 w-4 text-neutral-400" />}
+                />
 
+                <InfoItem
+                  label="Config File"
+                  value={configPath}
+                  icon={<Server className="h-4 w-4 text-amber-400" />}
+                />
 
-              <InfoItem
-                label="Trace Path"
-                value={tracePath || "Default"}
-                icon={<Activity className="h-4 w-4 text-purple-400" />}
-              />
+                <InfoItem
+                  label="Log Path"
+                  value={logPath || "Default"}
+                  icon={<Server className="h-4 w-4 text-red-400" />}
+                />
 
+                <InfoItem
+                  label="Log File"
+                  value={logFileName}
+                  icon={<Info className="h-4 w-4 text-red-400" />}
+                />
 
-              <InfoItem
-                label="Trace File"
-                value={traceFileName}
-                icon={<Activity className="h-4 w-4 text-purple-400" />}
-              />
+                <InfoItem
+                  label="Trace Path"
+                  value={tracePath || "Default"}
+                  icon={<Activity className="h-4 w-4 text-purple-400" />}
+                />
 
+                <InfoItem
+                  label="Trace File"
+                  value={traceFileName}
+                  icon={<Activity className="h-4 w-4 text-purple-400" />}
+                />
 
-              <InfoItem
-                label="Admin"
-                value={state.State?.IsAdmin ? "Yes" : "No"}
-                icon={<Key className="h-4 w-4 text-yellow-400" />}
-              />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+                <InfoItem
+                  label="Admin"
+                  value={state.State?.IsAdmin ? "Yes" : "No"}
+                  icon={<Key className="h-4 w-4 text-yellow-400" />}
+                />
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
