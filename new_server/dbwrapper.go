@@ -481,6 +481,58 @@ func DB_FindServersByGroups(groups []primitive.ObjectID, limit, offset int64) (D
 	return
 }
 
+func DB_FindEntitiesByGroupID(id primitive.ObjectID, objType string, limit, offset int64) (IL []any, err error) {
+	defer BasicRecover()
+
+	opt := options.Find()
+	opt.SetLimit(limit)
+	opt.SetSkip(offset)
+
+	database := ""
+	collection := ""
+	switch objType {
+	case "user":
+		database = USERS_DATABASE
+		collection = USERS_COLLECTION
+	case "server":
+		database = SERVER_DATABASE
+		collection = SERVER_COLLECTION
+	case "device":
+		database = DEVICE_DATABASE
+		collection = DEVICE_COLLECTION
+	default:
+		return nil, fmt.Errorf("unknown type")
+	}
+
+	filter := bson.D{
+		{Key: "Groups", Value: id},
+	}
+
+	cursor, err := DB.Database(database).
+		Collection(collection).
+		Find(
+			context.Background(),
+			filter,
+			opt,
+		)
+	if err != nil {
+		ADMIN(3, "Unable to find online devices: ", err)
+		return nil, err
+	}
+
+	IL = make([]any, 0)
+	for cursor.Next(context.TODO()) {
+		D := new(Server)
+		err = cursor.Decode(D)
+		if err != nil {
+			ADMIN(3, "Unable to decode device to struct: ", err)
+			continue
+		}
+		IL = append(IL, D)
+	}
+
+	return
+}
 func DB_UpdateGroup(G *Group) (err error) {
 	defer BasicRecover()
 
@@ -782,12 +834,33 @@ func DB_findGroupByID(id primitive.ObjectID) (G *Group, err error) {
 	return
 }
 
-func DB_findGroupsByOrgID(id primitive.ObjectID) (DL []*Group, err error) {
+func DB_DeleteGroupByID(id primitive.ObjectID) (err error) {
+	defer BasicRecover()
+
+	opt := options.Delete()
+
+	filter := bson.M{"_id": id}
+	_, err = DB.Database(GROUP_DATABASE).
+		Collection(GROUP_COLLECTION).
+		DeleteOne(
+			context.Background(),
+			filter,
+			opt,
+		)
+	if err != nil {
+		ADMIN(3, "Unable to delete group by id: ", id, err)
+		return err
+	}
+
+	return
+}
+
+func DB_findGroups() (gl []*Group, err error) {
 	defer BasicRecover()
 
 	opt := options.Find()
 
-	filter := bson.M{"OrgID": id}
+	filter := bson.M{}
 	cursor, err := DB.Database(GROUP_DATABASE).
 		Collection(GROUP_COLLECTION).Find(
 		context.Background(),
@@ -799,7 +872,7 @@ func DB_findGroupsByOrgID(id primitive.ObjectID) (DL []*Group, err error) {
 		return nil, err
 	}
 
-	DL = make([]*Group, 0)
+	gl = make([]*Group, 0)
 	for cursor.Next(context.TODO()) {
 		D := new(Group)
 		err = cursor.Decode(D)
@@ -807,7 +880,7 @@ func DB_findGroupsByOrgID(id primitive.ObjectID) (DL []*Group, err error) {
 			ADMIN(3, "Unable to decode group to struct: ", err)
 			continue
 		}
-		DL = append(DL, D)
+		gl = append(gl, D)
 	}
 
 	return
