@@ -64,6 +64,41 @@ func ConnectToDB(connectionString string) (err error) {
 	return
 }
 
+func DB_GetDevices(limit, offset int64) (DL []*Device, err error) {
+	defer BasicRecover()
+
+	opt := options.Find()
+	opt.SetLimit(limit)
+	opt.SetSkip(offset)
+
+	filter := bson.M{}
+
+	cursor, err := DB.Database(DEVICE_DATABASE).
+		Collection(DEVICE_COLLECTION).
+		Find(
+			context.Background(),
+			filter,
+			opt,
+		)
+	if err != nil {
+		ADMIN(3, "Unable to find device: ", err)
+		return nil, err
+	}
+
+	DL = make([]*Device, 0)
+	for cursor.Next(context.TODO()) {
+		D := new(Device)
+		err = cursor.Decode(D)
+		if err != nil {
+			ADMIN(3, "Unable to decode user to struct: ", err)
+			continue
+		}
+		DL = append(DL, D)
+	}
+
+	return
+}
+
 func DB_getUsers(limit, offset int64) (UL []*User, err error) {
 	defer BasicRecover()
 
@@ -522,13 +557,32 @@ func DB_FindEntitiesByGroupID(id primitive.ObjectID, objType string, limit, offs
 
 	IL = make([]any, 0)
 	for cursor.Next(context.TODO()) {
-		D := new(Server)
-		err = cursor.Decode(D)
-		if err != nil {
-			ADMIN(3, "Unable to decode device to struct: ", err)
-			continue
+		switch objType {
+		case "server":
+			E := new(Server)
+			err = cursor.Decode(E)
+			if err != nil {
+				ADMIN(3, "Unable to decode device to struct: ", err)
+				continue
+			}
+			IL = append(IL, E)
+		case "user":
+			E := new(User)
+			err = cursor.Decode(E)
+			if err != nil {
+				ADMIN(3, "Unable to decode device to struct: ", err)
+				continue
+			}
+			IL = append(IL, E)
+		case "device":
+			E := new(Device)
+			err = cursor.Decode(E)
+			if err != nil {
+				ADMIN(3, "Unable to decode device to struct: ", err)
+				continue
+			}
+			IL = append(IL, E)
 		}
-		IL = append(IL, D)
 	}
 
 	return
@@ -787,7 +841,60 @@ func DB_AddToGroup(groupID primitive.ObjectID, typeID primitive.ObjectID, objTyp
 	return
 }
 
-func DB_findDeviceByID(id primitive.ObjectID) (dev *Device, err error) {
+func DB_RemoveFromGroup(groupID primitive.ObjectID, typeID primitive.ObjectID, objType string) (err error) {
+	defer BasicRecover()
+
+	filter := bson.M{
+		"_id": typeID,
+	}
+
+	database := ""
+	collection := ""
+	switch objType {
+	case "user":
+		database = USERS_DATABASE
+		collection = USERS_COLLECTION
+	case "server":
+		database = SERVER_DATABASE
+		collection = SERVER_COLLECTION
+	case "device":
+		database = DEVICE_DATABASE
+		collection = DEVICE_COLLECTION
+	default:
+		return fmt.Errorf("unknown type")
+	}
+
+	res, err := DB.Database(database).
+		Collection(collection).
+		UpdateOne(
+			context.Background(),
+			filter,
+			bson.D{
+				{
+					Key: "$pull",
+					Value: bson.D{
+						{Key: "Groups", Value: groupID},
+					},
+				},
+			},
+			options.Update(),
+		)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return nil
+		}
+		ADMIN(3, "Unable to update object", objType, typeID.Hex(), err)
+		return err
+	}
+	if res.MatchedCount == 0 {
+		ADMIN(3, "Unable to update (no match count)", objType, typeID.Hex(), err)
+		return errors.New("unable to modify document")
+	}
+
+	return
+}
+
+func DB_FindDeviceByID(id primitive.ObjectID) (dev *Device, err error) {
 	defer BasicRecover()
 
 	opt := options.FindOne()

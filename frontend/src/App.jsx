@@ -31,6 +31,8 @@ import { STATE } from "./state";
 import STORE from "./store";
 import WS from "./ws";
 import Groups from "./App/Groups";
+import Users from "./App/Users";
+import Devices from "./App/Devices";
 
 // Use this to automatically turn on debug
 STORE.Cache.Set("debug", true);
@@ -91,9 +93,10 @@ const LaunchApp = () => {
 
                     <Route path="twofactor" element={<Enable2FA />} />
                     <Route path="groups" element={<Groups />} />
+                    <Route path="users" element={<Users />} />
+                    <Route path="devices" element={<Devices />} />
 
                     <Route path="inspect/group/:id" element={<InspectGroup />} />
-                    <Route path="inspect/group" element={<InspectGroup />} />
 
                     <Route path="tunnels" element={<ConnectionTable />} />
                     <Route

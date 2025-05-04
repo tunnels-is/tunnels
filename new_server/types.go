@@ -203,6 +203,20 @@ type FORM_LIST_GROUP struct {
 	UID         primitive.ObjectID `json:"UID"`
 }
 
+type FORM_LIST_USERS struct {
+	DeviceToken string             `json:"DeviceToken"`
+	UID         primitive.ObjectID `json:"UID"`
+	Limit       int                `json:"Limit"`
+	Offset      int                `json:"Offset"`
+}
+
+type FORM_LIST_DEVICE struct {
+	DeviceToken string             `json:"DeviceToken"`
+	UID         primitive.ObjectID `json:"UID"`
+	Limit       int                `json:"Limit"`
+	Offset      int                `json:"Offset"`
+}
+
 type FORM_CREATE_GROUP struct {
 	DeviceToken string             `json:"DeviceToken"`
 	UID         primitive.ObjectID `json:"UID"`
@@ -234,6 +248,14 @@ type FORM_GROUP_ADD struct {
 	Type        string             `json:"Type"`
 	TypeID      primitive.ObjectID `json:"TypeID"`
 	TypeTag     string             `json:"TypeTag"`
+}
+
+type FORM_GROUP_REMOVE struct {
+	DeviceToken string             `json:"DeviceToken"`
+	UserID      primitive.ObjectID `json:"UserID"`
+	GroupID     primitive.ObjectID `json:"GroupID"`
+	Type        string             `json:"Type"`
+	TypeID      primitive.ObjectID `json:"TypeID"`
 }
 
 type TWO_FACTOR_CONFIRM struct {
@@ -334,6 +356,25 @@ type User struct {
 	Trial         bool        `json:"Trial" bson:"Trial"`
 	Key           *LicenseKey `json:"Key" bson:"Key"`
 	SubExpiration time.Time   `json:"SubExpiration" bson:"SubExpiration"`
+}
+
+func (u *User) ToMinifiedUser() MinifiedUser {
+	return MinifiedUser{
+		ID:        u.ID.Hex(),
+		Email:     u.Email,
+		Disabled:  u.Disabled,
+		IsAdmin:   u.IsAdmin,
+		IsManager: u.IsManager,
+	}
+
+}
+
+type MinifiedUser struct {
+	ID        string `json:"_id,omitempty"`
+	Email     string `json:"Email"`
+	Disabled  bool   `json:"Disabled"`
+	IsAdmin   bool   `json:"IsAdmin" bson:"IsAdmin"`
+	IsManager bool   `json:"IsManager" bson:"IsManager"`
 }
 
 func (u *User) RemoveSensitiveInformation() {
