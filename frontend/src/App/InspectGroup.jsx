@@ -41,6 +41,25 @@ const InspectGroup = () => {
 		</div>
 	);
 
+	const addToGroup = async () => {
+		let e = await state.API_AddToGroup(id, addForm.id, addForm.type, addForm.idtype)
+		if (e) {
+			if (addForm.type === "user") {
+				console.log("PU")
+				console.dir(e)
+				users.push(e)
+				setUsers([...users])
+			} else if (addForm.type === "server") {
+				servers.push(e)
+				setServers([...servers])
+			} else if (addForm.type === "device") {
+				devices.push(e)
+				setDevices([...devices])
+			}
+			setDialog(false)
+		}
+	}
+
 	const getEntities = async (type) => {
 		let e = await state.API_GetGroupEntities(id, type, 1000, 0)
 		if (type === "user") {
@@ -52,11 +71,34 @@ const InspectGroup = () => {
 		}
 	}
 
+	const removeEntity = async (gid, typeid, type) => {
+		let e = await state.API_RemoveFromGroup(gid, typeid, type)
+		if (e === true) {
+			if (type === "user") {
+				let u = users.filter((u) => u._id !== typeid)
+				setUsers([...u])
+			} else if (type === "server") {
+				let s = servers.filter((s) => s._id !== typeid)
+				setServers([...s])
+			} else if (type === "device") {
+				let d = devices.filter((s) => s._id !== typeid)
+				setServers([...d])
+			}
+		}
+	}
+
+	const tagChange = async (tab) => {
+		setDialog(false)
+		console.log("TAB:", tab)
+		await getEntities(tab)
+	}
+
 	const getGroup = async () => {
 		setGroup(await state.API_GetGroup(id))
 	}
 	useEffect(() => {
 		getGroup()
+		getEntities("user")
 	}, [])
 
 	if (!group) {
@@ -101,7 +143,7 @@ const InspectGroup = () => {
 					type: "text",
 					color: "red",
 					click: () => {
-						serversRemove(s._id)
+						removeEntity(id, s._id, "server")
 					},
 					value: "Delete"
 				},
@@ -135,7 +177,7 @@ const InspectGroup = () => {
 					type: "text",
 					color: "red",
 					click: () => {
-						usersRemove(u._id)
+						removeEntity(id, u._id, "user")
 					},
 					value: "Delete"
 				},
@@ -170,7 +212,7 @@ const InspectGroup = () => {
 					type: "text",
 					color: "red",
 					click: () => {
-						devicesRemove(s._id)
+						removeEntity(id, s._id, "device")
 					},
 					value: "Delete"
 				},
@@ -204,8 +246,7 @@ const InspectGroup = () => {
 		{ value: "Added", minWidth: "200px" },
 		{ value: "" }
 	]
-
-	const addUserDialog = () => {
+	const addDialog = (type) => {
 		return (
 			<Dialog
 				open={dialog}
@@ -213,31 +254,62 @@ const InspectGroup = () => {
 			>
 				<DialogContent className="bg-black border border-gray-800 text-white max-w-2xl rounded-lg p-6">
 
-					<FormField label="Add user by Email or ID">
-						<Input
-							value={addForm.id}
-							onChange={(e) =>
-								setAddForm({ index: i, id: e.target.value, type: "user", idtype: "" })
-							}
-							placeholder="User ID"
-							className="w-full bg-gray-950 border-gray-700 text-white"
-						/>
-					</FormField>
-					<FormField>
-						<Input
-							value={addForm.id}
-							onChange={(e) =>
-								setAddForm({ index: i, id: e.target.value, type: "user", idtype: "email" })
-							}
-							placeholder="User Email"
-							className="w-full bg-gray-950 border-gray-700 text-white"
-						/>
-					</FormField>
+					{type === "device" &&
+						<FormField label="Device ID">
+							<Input
+								value={addForm.id}
+								onChange={(e) =>
+									setAddForm({ id: e.target.value, type: "device", idtype: "" })
+								}
+								placeholder="Device ID"
+								className="w-full bg-gray-950 border-gray-700 text-white"
+							/>
+						</FormField>
+					}
+
+					{type === "server" &&
+						<FormField label="Server ID">
+							<Input
+								value={addForm.id}
+								onChange={(e) =>
+									setAddForm({ id: e.target.value, type: "server", idtype: "" })
+								}
+								placeholder="Server ID"
+								className="w-full bg-gray-950 border-gray-700 text-white"
+							/>
+						</FormField>
+					}
+
+					{type === "user" &&
+						<>
+							<FormField label="Add user by Email or ID">
+								<Input
+									value={addForm.id}
+									onChange={(e) =>
+										setAddForm({ id: e.target.value, type: "user", idtype: "" })
+									}
+									placeholder="User ID"
+									className="w-full bg-gray-950 border-gray-700 text-white"
+								/>
+							</FormField>
+							<FormField>
+								<Input
+									value={addForm.id}
+									onChange={(e) =>
+										setAddForm({ id: e.target.value, type: "user", idtype: "email" })
+									}
+									placeholder="User Email"
+									className="w-full bg-gray-950 border-gray-700 text-white"
+								/>
+							</FormField>
+						</>
+					}
+
 					<div className="flex justify-between mt-1">
 						<Button
 							variant="outline"
 							className="flex items-center gap-2 bg-gray-950 border-gray-700 hover:bg-gray-700"
-							onClick={() => addUser()}
+							onClick={() => addToGroup()}
 						>
 							<Save className="h-4 w-4" />
 							Save
@@ -249,36 +321,32 @@ const InspectGroup = () => {
 		)
 	}
 
+
 	return (
 		<div className="ab group-wrapper">
-			<Tabs defaultValue="general" className="w-[400px]" onValueChange={() => setDialog(false)}>
+			<Tabs defaultValue="user" className="w-full" onValueChange={(v) => tagChange(v)}>
 				<TabsList>
-					<TabsTrigger value="servers">Server</TabsTrigger>
-					<TabsTrigger value="devices">Devices</TabsTrigger>
-					<TabsTrigger value="users">Users</TabsTrigger>
+					<TabsTrigger value="server">Server</TabsTrigger>
+					<TabsTrigger value="device">Devices</TabsTrigger>
+					<TabsTrigger value="user">Users</TabsTrigger>
 				</TabsList>
-				<TabsContent value="servers">
+				<TabsContent className="w-full" value="server">
+					{addDialog("server")}
 					<NewTable
 						background={true}
-						title={"Servers"}
+						title={""}
 						className="group-table"
 						header={nodesHeaders}
 						rows={nodesRows}
 						placeholder={"Search.."}
 						button={{
-							text: "Add",
+							text: "Add Server",
 							click: () => setDialog(true)
-						}}
-						button2={{
-							color: "green",
-							text: "Save",
-							click: function() {
-								Save()
-							}
 						}}
 					/>
 				</TabsContent>
-				<TabsContent value="devices">
+				<TabsContent value="device">
+					{addDialog("device")}
 					<NewTable
 						background={true}
 						title={"Devices"}
@@ -287,37 +355,23 @@ const InspectGroup = () => {
 						rows={deviceRows}
 						placeholder={"Search.."}
 						button={{
-							text: "Add",
+							text: "Add Device",
 							click: () => setDialog(true)
-						}}
-						button2={{
-							color: "green",
-							text: "Save",
-							click: function() {
-								Save()
-							}
 						}}
 					/>
 				</TabsContent>
-				<TabsContent value="users">
-					{addUserDialog()}
+				<TabsContent value="user">
+					{addDialog("user")}
 					<NewTable
 						background={true}
-						title={"Users"}
+						title={""}
 						className="group-table"
 						header={usersHeaders}
 						rows={usersRows}
 						placeholder={"Search.."}
 						button={{
-							text: "Add",
+							text: "Add User",
 							click: () => setDialog(true)
-						}}
-						button2={{
-							color: "green",
-							text: "Save",
-							click: function() {
-								Save()
-							}
 						}}
 					/>
 				</TabsContent>
