@@ -183,6 +183,26 @@ type FORM_GET_GROUP struct {
 	GID         primitive.ObjectID `json:"GID"`
 }
 
+type FORM_GET_GROUP_ENTITIES struct {
+	DeviceToken string             `json:"DeviceToken"`
+	UID         primitive.ObjectID `json:"UID"`
+	GID         primitive.ObjectID `json:"GID"`
+	Type        string             `json:"Type"`
+	Limit       int                `json:"Limit"`
+	Offset      int                `json:"Offset"`
+}
+
+type FORM_DELETE_GROUP struct {
+	DeviceToken string             `json:"DeviceToken"`
+	UID         primitive.ObjectID `json:"UID"`
+	GID         primitive.ObjectID `json:"GID"`
+}
+
+type FORM_LIST_GROUP struct {
+	DeviceToken string             `json:"DeviceToken"`
+	UID         primitive.ObjectID `json:"UID"`
+}
+
 type FORM_CREATE_GROUP struct {
 	DeviceToken string             `json:"DeviceToken"`
 	UID         primitive.ObjectID `json:"UID"`
@@ -213,6 +233,7 @@ type FORM_GROUP_ADD struct {
 	GroupID     primitive.ObjectID `json:"GroupID"`
 	Type        string             `json:"Type"`
 	TypeID      primitive.ObjectID `json:"TypeID"`
+	TypeTag     string             `json:"TypeTag"`
 }
 
 type TWO_FACTOR_CONFIRM struct {
@@ -354,7 +375,7 @@ type Server struct {
 type Group struct {
 	ID          primitive.ObjectID `json:"_id" bson:"_id"`
 	Tag         string             `json:"Tag" bson:"Tag"`
-	Description string             `json:"Description" bson:"Desciption"`
+	Description string             `json:"Description" bson:"Description"`
 }
 
 type Device struct {
