@@ -1,26 +1,18 @@
-import React, { useEffect } from "react";
+import React from "react";
 
-const KeyValue = (props) => {
-	if (!props?.value && !props.defaultValue) {
-		return (<></>)
-	}
+const KeyValue = ({ label, value, defaultValue, className = "" }) => {
+  if (!value && !defaultValue) return null;
 
-	return (
-		<div className={`ab keyvalue ${props.className ? props.className : ""}`}>
-			<div className="label">
-				{props?.label}
-			</div>
+  return (
+    <div
+      className={`flex items-start justify-between gap-4 py-2 border-b border-muted ${className}`}
+    >
+      <div className="text-sm font-medium text-muted-foreground">{label}</div>
+      <div className="text-sm text-right break-all text-foreground">
+        {value || defaultValue}
+      </div>
+    </div>
+  );
+};
 
-			<div className="value">
-			{props.value &&
-				props?.value
-			}
-			{(props.defaultValue && !props.value) &&
-				props?.defaultValue
-			}
-			</div>
-		</div >
-	)
-}
-
-export default KeyValue
+export default KeyValue;
