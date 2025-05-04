@@ -168,6 +168,8 @@ func API_UserCreate(w http.ResponseWriter, r *http.Request) {
 	newUser.Updated = time.Now()
 	newUser.Trial = true
 	newUser.SubExpiration = time.Now().AddDate(0, 0, 1)
+	newUser.Groups = make([]primitive.ObjectID, 0)
+	newUser.Tokens = make([]*DeviceToken, 0)
 
 	// if loadSecret("EmailKey") != "" {
 	// 	splitEmail := strings.Split(RF.Email, "@")
@@ -402,6 +404,11 @@ func API_GroupCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if F.Group == nil || F.Group.Tag == "" {
+		senderr(w, 400, "Invalid group format")
+		return
+	}
+
 	user, err := authenticateUserFromEmailOrIDAndToken("", F.UID, F.DeviceToken)
 	if err != nil {
 		senderr(w, 500, err.Error())
@@ -435,6 +442,7 @@ func API_GroupAdd(w http.ResponseWriter, r *http.Request) {
 		senderr(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
+	fmt.Println(F)
 
 	user, err := authenticateUserFromEmailOrIDAndToken("", F.UserID, F.DeviceToken)
 	if err != nil {
@@ -449,9 +457,21 @@ func API_GroupAdd(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	if F.Type == "user" && F.TypeTag == "email" {
+		u, err := DB_findUserByEmail(F.TypeTag)
+		if err != nil {
+			senderr(w, 500, err.Error())
+			return
+		}
+		if u == nil {
+			senderr(w, 204, "user not found")
+			return
+		}
+		F.TypeID = u.ID
+	}
+
 	err = DB_AddToGroup(F.GroupID, F.TypeID, F.Type)
 	if err != nil {
-		ERR(3, err)
 		senderr(w, 500, "Unknown error, please try again in a moment")
 		return
 	}
@@ -491,6 +511,39 @@ func API_GroupUpdate(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(200)
 }
 
+func API_GroupDelete(w http.ResponseWriter, r *http.Request) {
+	defer BasicRecover()
+	F := new(FORM_DELETE_GROUP)
+	err := decodeBody(r, F)
+	if err != nil {
+		senderr(w, 400, "Invalid request body", slog.Any("error", err))
+		return
+	}
+
+	user, err := authenticateUserFromEmailOrIDAndToken("", F.UID, F.DeviceToken)
+	if err != nil {
+		senderr(w, 500, err.Error())
+		return
+	}
+
+	if !user.IsAdmin {
+		if !user.IsManager {
+			senderr(w, 401, "You are not allowed to view groups")
+			return
+		}
+	}
+
+	err = DB_DeleteGroupByID(F.GID)
+	if err != nil {
+		senderr(w, 500, "Unknown error, please try again in a moment")
+		return
+	}
+
+	// TODO .. remove group from all users and servers
+
+	w.WriteHeader(200)
+}
+
 func API_GroupGet(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 	F := new(FORM_GET_GROUP)
@@ -514,6 +567,99 @@ func API_GroupGet(w http.ResponseWriter, r *http.Request) {
 	}
 
 	group, err := DB_findGroupByID(F.GID)
+	if err != nil {
+		senderr(w, 500, "Unknown error, please try again in a moment")
+		return
+	}
+
+	if group == nil {
+		w.WriteHeader(204)
+		return
+	}
+
+	sendObject(w, group)
+}
+
+func API_GroupGetEntities(w http.ResponseWriter, r *http.Request) {
+	defer BasicRecover()
+	F := new(FORM_GET_GROUP_ENTITIES)
+	err := decodeBody(r, F)
+	if err != nil {
+		senderr(w, 400, "Invalid request body", slog.Any("error", err))
+		return
+	}
+
+	user, err := authenticateUserFromEmailOrIDAndToken("", F.UID, F.DeviceToken)
+	if err != nil {
+		senderr(w, 500, err.Error())
+		return
+	}
+
+	if !user.IsAdmin {
+		if !user.IsManager {
+			senderr(w, 401, "You are not allowed to view groups")
+			return
+		}
+	}
+
+	entities, err := DB_FindEntitiesByGroupID(F.GID, F.Type, int64(F.Limit), int64(F.Offset))
+	if err != nil {
+		senderr(w, 500, "Unknown error, please try again in a moment")
+		return
+	}
+
+	if F.Type == "user" {
+		type u struct {
+			ID        string `json:"_id,omitempty"`
+			Email     string `json:"Email"`
+			Disabled  bool   `json:"Disabled"`
+			IsAdmin   bool   `json:"IsAdmin" bson:"IsAdmin"`
+			IsManager bool   `json:"IsManager" bson:"IsManager"`
+		}
+		ul := make([]*u, 0)
+		for _, v := range entities {
+			us, ok := v.(*User)
+			if !ok {
+				ADMIN("unable to transform user!")
+			}
+			ul = append(ul, &u{
+				ID:        us.ID.String(),
+				Email:     us.Email,
+				Disabled:  us.Disabled,
+				IsAdmin:   us.IsAdmin,
+				IsManager: us.IsManager,
+			})
+		}
+		sendObject(w, ul)
+		return
+	}
+
+	sendObject(w, entities)
+}
+
+func API_GroupList(w http.ResponseWriter, r *http.Request) {
+	defer BasicRecover()
+	F := new(FORM_LIST_GROUP)
+	err := decodeBody(r, F)
+	if err != nil {
+		senderr(w, 400, "Invalid request body", slog.Any("error", err))
+		return
+	}
+
+	user, err := authenticateUserFromEmailOrIDAndToken("", F.UID, F.DeviceToken)
+	if err != nil {
+		senderr(w, 500, err.Error())
+		return
+	}
+
+	if !user.IsAdmin {
+		if !user.IsManager {
+			senderr(w, 401, "You are not allowed to view groups")
+			return
+		}
+	}
+
+	group, err := DB_findGroups()
 	if err != nil {
 		senderr(w, 500, "Unknown error, please try again in a moment")
 		return

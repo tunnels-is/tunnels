@@ -78,7 +78,7 @@ const SideBar = () => {
         user: true,
         items: [
           { icon: LockClosedIcon, label: "Server", route: "servers", user: true, },
-          { icon: HomeIcon, label: "Groups", route: "org", user: true },
+          { icon: HomeIcon, label: "Groups", route: "groups", user: true },
         ],
       },
       {

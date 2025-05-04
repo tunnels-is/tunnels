@@ -30,6 +30,7 @@ import GLOBAL_STATE from "./state";
 import { STATE } from "./state";
 import STORE from "./store";
 import WS from "./ws";
+import Groups from "./App/Groups";
 
 // Use this to automatically turn on debug
 STORE.Cache.Set("debug", true);
@@ -89,7 +90,7 @@ const LaunchApp = () => {
                     <Route path="account" element={<Account />} />
 
                     <Route path="twofactor" element={<Enable2FA />} />
-                    <Route path="org" element={<Org />} />
+                    <Route path="groups" element={<Groups />} />
 
                     <Route path="inspect/group/:id" element={<InspectGroup />} />
                     <Route path="inspect/group" element={<InspectGroup />} />

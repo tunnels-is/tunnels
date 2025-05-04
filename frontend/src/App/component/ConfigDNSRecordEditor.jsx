@@ -6,34 +6,21 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   Edit,
   FileText,
-  Globe,
   Network,
   Plus,
   Save,
   Server,
-  Star,
   Trash2,
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardFooter,
-} from "@/components/ui/card";
 import { PlusCircle } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Check } from "lucide-react";
 
 const ConfigDNSRecordEditor = () => {
@@ -318,12 +305,12 @@ const ConfigDNSRecordEditor = () => {
 
         {(!state.Config?.DNSRecords ||
           state.Config.DNSRecords.length === 0) && (
-          <div className="text-center p-12 border border-dashed rounded-lg bg-muted/30">
-            <p className="text-muted-foreground">
-              No DNS records found. Add your first record to get started.
-            </p>
-          </div>
-        )}
+            <div className="text-center p-12 border border-dashed rounded-lg bg-muted/30">
+              <p className="text-muted-foreground">
+                No DNS records found. Add your first record to get started.
+              </p>
+            </div>
+          )}
       </div>
     </div>
   );
