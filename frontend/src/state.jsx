@@ -1370,29 +1370,12 @@ export var STATE = {
     STATE.toggleLoading(undefined);
     STATE.CreateOrgInProgress = false;
   },
-  GetOrgInProgress: false,
-  API_GetOrg: async () => {
-    if (!STATE.User) {
-      return;
-    }
-
-    if (STATE.GetOrgInProgress) {
-      return;
-    }
-    STATE.GetOrgInProgress = true;
-
+  API_ListGroups: async () => {
     try {
-      let timeout = STORE.Cache.GetObject("org_ct");
-      let now = dayjs().unix();
-      let diff = now - timeout;
-      if (now - timeout > 30 || !timeout) {
-      } else {
-        STATE.errorNotification("Next refresh in " + (30 - diff) + " seconds");
-        return;
-      }
-
       let FR = {
-        Path: "v3/org",
+        URL: STATE.User.AuthServer,
+        Secure: STATE.User.Secure,
+        Path: "v3/group/list",
         Method: "POST",
         Timeout: 10000,
       };
@@ -1406,47 +1389,65 @@ export var STATE = {
       }
 
       STATE.toggleLoading({
-        tag: "ORG_FETCH",
+        tag: "GROUP_LIST",
         show: true,
-        msg: "Fetching Your Organization Information ...",
+        msg: "fetching groups..",
       });
 
       let resp = await STATE.API.method("forwardToController", FR);
-      if (resp?.status === 200) {
-        STATE.updateOrg(resp.data);
-        STATE.Groups = resp.data.Groups;
+      if (resp && resp.status === 200) {
+        STATE.toggleLoading(undefined);
+        return resp.data
       }
     } catch (error) {
       console.dir(error);
     }
 
-    STATE.GetOrgInProgress = false;
     STATE.toggleLoading(undefined);
+    return [];
   },
-  UpdateGroup: (group) => {
-    if (STATE.Org) {
-      if (!STATE.Org.Groups) {
-        STATE.Org.Groups = [group];
-        STATE.updateOrg(STATE.Org);
-        return;
+  API_DeleteGroup: async (gid) => {
+    try {
+      let FR = {
+        URL: STATE.User.AuthServer,
+        Secure: STATE.User.Secure,
+        Path: "v3/group/delete",
+        Method: "POST",
+        Timeout: 10000,
+      };
+      if (STATE.User) {
+        FR.JSONData = {
+          UID: STATE.User._id,
+          DeviceToken: STATE.User.DeviceToken.DT,
+          GID: gid,
+        };
+      } else {
+        return false;
       }
-      let found = false;
-      STATE.Org.Groups?.forEach((g, i) => {
-        if (g._id === group._id) {
-          found = true;
-          STATE.Org.Groups[i] = group;
-          STATE.updateOrg(STATE.Org);
-        }
+
+      STATE.toggleLoading({
+        tag: "GROUP_DELETE",
+        show: true,
+        msg: "deleting ...",
       });
-      if (found === false) {
-        STATE.Org.Groups.push(group);
-        STATE.updateOrg(STATE.Org);
+
+      let resp = await STATE.API.method("forwardToController", FR);
+      if (resp && resp.status === 200) {
+        STATE.toggleLoading(undefined);
+        return true
       }
+    } catch (error) {
+      console.dir(error);
     }
+
+    STATE.toggleLoading(undefined);
+    return false
   },
   API_UpdateGroup: async (group) => {
     try {
       let FR = {
+        URL: STATE.User.AuthServer,
+        Secure: STATE.User.Secure,
         Path: "v3/group/update",
         Method: "POST",
         Timeout: 10000,
@@ -1469,7 +1470,8 @@ export var STATE = {
 
       let resp = await STATE.API.method("forwardToController", FR);
       if (resp && resp.status === 200) {
-        STATE.UpdateGroup(group);
+        STATE.toggleLoading(undefined);
+        return resp.data
       }
     } catch (error) {
       console.dir(error);
@@ -1478,10 +1480,134 @@ export var STATE = {
     STATE.toggleLoading(undefined);
     return;
   },
+  API_AddToGroup: async (gid, typeid, type, idtype) => {
+    try {
+      let FR = {
+        URL: STATE.User.AuthServer,
+        Secure: STATE.User.Secure,
+        Path: "v3/group/add",
+        Method: "POST",
+        Timeout: 10000,
+      };
+      if (STATE.User) {
+        FR.JSONData = {
+          UserID: STATE.User._id,
+          DeviceToken: STATE.User.DeviceToken.DT,
+          GroupID: gid,
+          Type: type,
+          TypeID: typeid,
+        };
+      } else {
+        return undefined;
+      }
+      if (idtype !== "" && idtype) {
+        FR.JSONData.TypeTag = typeid
+        delete FR.JSONData.TypeID
+      }
+
+      STATE.toggleLoading({
+        tag: "GROUP_ADD",
+        show: true,
+        msg: "adding " + type + " to group..",
+      });
+
+      let resp = await STATE.API.method("forwardToController", FR);
+      if (resp && resp.status === 200) {
+        STATE.toggleLoading(undefined);
+        return;
+      }
+    } catch (error) {
+      console.dir(error);
+    }
+
+    STATE.toggleLoading(undefined);
+    return;
+  },
+  API_GetGroupEntities: async (gid, type, limit, offset) => {
+    let resp = undefined;
+    try {
+      let FR = {
+        URL: STATE.User.AuthServer,
+        Secure: STATE.User.Secure,
+        Path: "v3/group/entities",
+        Method: "POST",
+        Timeout: 10000,
+      };
+      if (STATE.User) {
+        FR.JSONData = {
+          UID: STATE.User._id,
+          DeviceToken: STATE.User.DeviceToken.DT,
+          Type: type,
+          GID: gid,
+          Limit: limit,
+          Offset: offset,
+        };
+      } else {
+        return undefined;
+      }
+
+      STATE.toggleLoading({
+        tag: "GROUP_GET_ENTITIES",
+        show: true,
+        msg: "fetching group info ...",
+      });
+
+      resp = await STATE.API.method("forwardToController", FR);
+      if (resp?.status === 200) {
+        STATE.toggleLoading(undefined);
+        return resp.data
+      }
+    } catch (error) {
+      console.dir(error);
+    }
+
+    STATE.toggleLoading(undefined);
+    return undefined;
+  },
+  API_GetGroup: async (id) => {
+    let resp = undefined;
+    try {
+      let FR = {
+        URL: STATE.User.AuthServer,
+        Secure: STATE.User.Secure,
+        Path: "v3/group",
+        Method: "POST",
+        Timeout: 10000,
+      };
+      if (STATE.User) {
+        FR.JSONData = {
+          UID: STATE.User._id,
+          DeviceToken: STATE.User.DeviceToken.DT,
+          GID: id,
+        };
+      } else {
+        return undefined;
+      }
+
+      STATE.toggleLoading({
+        tag: "GROUP_Get",
+        show: true,
+        msg: "fetching group ...",
+      });
+
+      resp = await STATE.API.method("forwardToController", FR);
+      if (resp?.status === 200) {
+        STATE.toggleLoading(undefined);
+        return resp.data
+      }
+    } catch (error) {
+      console.dir(error);
+    }
+
+    STATE.toggleLoading(undefined);
+    return undefined;
+  },
   API_CreateGroup: async (group) => {
     let resp = undefined;
     try {
       let FR = {
+        URL: STATE.User.AuthServer,
+        Secure: STATE.User.Secure,
         Path: "v3/group/create",
         Method: "POST",
         Timeout: 10000,
@@ -1504,14 +1630,15 @@ export var STATE = {
 
       resp = await STATE.API.method("forwardToController", FR);
       if (resp?.status === 200) {
-        STATE.UpdateGroup(resp.data);
+        STATE.toggleLoading(undefined);
+        return resp.data
       }
     } catch (error) {
       console.dir(error);
     }
 
     STATE.toggleLoading(undefined);
-    return resp.data;
+    return undefined;
   },
   DNSStats: STORE.Cache.GetObject("dns-stats"),
   DNSListDateFormat: "ddd D. HH:mm:ss",

@@ -40,10 +40,13 @@ func launchAPIServer() {
 		mux.HandleFunc("/v3/user/reset/code", API_UserRequestPasswordCode)
 		mux.HandleFunc("/v3/user/reset/password", API_UserResetPassword)
 
-		mux.HandleFunc("/v3/groupd/create", API_GroupCreate)
-		mux.HandleFunc("/v3/groupd/update", API_GroupUpdate)
-		mux.HandleFunc("/v3/groupd/add", API_GroupAdd)
+		mux.HandleFunc("/v3/group/create", API_GroupCreate)
+		mux.HandleFunc("/v3/group/delete", API_GroupDelete)
+		mux.HandleFunc("/v3/group/update", API_GroupUpdate)
+		mux.HandleFunc("/v3/group/add", API_GroupAdd)
+		mux.HandleFunc("/v3/group/list", API_GroupList)
 		mux.HandleFunc("/v3/group", API_GroupGet)
+		mux.HandleFunc("/v3/group/entities", API_GroupGetEntities)
 
 		mux.HandleFunc("/v3/servers/create", API_ServerCreate)
 		mux.HandleFunc("/v3/servers/update", API_ServerUpdate)
