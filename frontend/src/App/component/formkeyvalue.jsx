@@ -1,21 +1,19 @@
+import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
 import React, { useEffect } from "react";
 
 const FormKeyValue = (props) => {
-	if (!props?.value) {
-		return (<></>)
-	}
+  if (!props?.value) {
+    return <></>;
+  }
 
-	return (
-		<div className="ab formkeyvalue">
-			<div className="label">
-				{props?.label}
-			</div>
+  return (
+    <div className="max-w-[400px] py-2">
+      <Label className="text-white">{props?.label}</Label>
 
-			<div className="value">
-				{props?.value}
-			</div>
-		</div >
-	)
-}
+      <div className="text-white">{props?.value}</div>
+    </div>
+  );
+};
 
-export default FormKeyValue
+export default FormKeyValue;

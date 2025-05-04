@@ -1,49 +1,83 @@
 import React from "react";
-import STORE from "../store"
-import * as runtime from "../../wailsjs/runtime/runtime"
+import STORE from "../store";
+import * as runtime from "../../wailsjs/runtime/runtime";
 import GLOBAL_STATE from "../state";
 
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
+import { ExternalLink } from "lucide-react";
+
 const Welcome = () => {
-	const state = GLOBAL_STATE()
+  const state = GLOBAL_STATE();
 
-	const Copy = (value) => {
-		window.open(value, "_blank")
-		// try {
-		//   state.ConfirmAndExecute("", "clipboardCopy", 10000, value, "Copy link to clipboard ?", () => {
-		//     if (navigator?.clipboard) {
-		//       navigator.clipboard.writeText(value);
-		//     }
-		//     runtime.ClipboardSetText(value)
-		//   })
-		// } catch (e) {
-		//   alert(e)
-		//   console.log(e)
-		// }
-	}
+  const Copy = (value) => {
+    window.open(value, "_blank");
+    // try {
+    //   state.ConfirmAndExecute("", "clipboardCopy", 10000, value, "Copy link to clipboard ?", () => {
+    //     if (navigator?.clipboard) {
+    //       navigator.clipboard.writeText(value);
+    //     }
+    //     runtime.ClipboardSetText(value)
+    //   })
+    // } catch (e) {
+    //   alert(e)
+    //   console.log(e)
+    // }
+  };
 
-	return (
-		<div className="support-wrapper">
+  return (
+    <div className="p-6 space-y-6">
+      <h2 className="text-2xl font-bold text-white">Support Platforms</h2>
+      <Separator />
 
-			<div className="support-table">
-				{STORE.SupportPlatforms.map(s => {
-					return (
-						<div className="row" key={s.name}>
-							<div className="name"
-								onClick={() => Copy(s.link)}
-							>{s.name}</div>
-							{s.type === "email" &&
-								<div className="link"><a href={`mailto: ${s.link}`} >{s.link}</a></div>
-							}
-							{s.type === "link" &&
-								<div className="link"><a href={s.link} target="_blank" >{s.link}</a></div>
-							}
-						</div>
-					)
-				})}
+      <div className="grid gap-4">
+        {STORE.SupportPlatforms.map((s) => (
+          <Card key={s.name} className="hover:shadow-md transition">
+            <CardContent className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4">
+              <div className="space-y-1">
+                <div
+                  onClick={() => Copy(s.link)}
+                  className="text-lg font-medium cursor-pointer hover:underline flex items-center gap-2"
+                >
+                  {s.name} <ExternalLink size={16} />
+                </div>
 
-			</div>
-		</div >
-	)
-}
+                {s.type === "email" && (
+                  <div className="text-sm text-muted-foreground">
+                    <a href={`mailto:${s.link}`} className="underline">
+                      {s.link}
+                    </a>
+                  </div>
+                )}
+                {s.type === "link" && (
+                  <div className="text-sm text-muted-foreground">
+                    <a
+                      href={s.link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline"
+                    >
+                      {s.link}
+                    </a>
+                  </div>
+                )}
+              </div>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleCopy(s.link)}
+                className="w-full sm:w-auto"
+              >
+                Open
+              </Button>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+};
 
 export default Welcome;
