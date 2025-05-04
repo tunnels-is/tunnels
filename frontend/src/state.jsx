@@ -1514,14 +1514,53 @@ export var STATE = {
       let resp = await STATE.API.method("forwardToController", FR);
       if (resp && resp.status === 200) {
         STATE.toggleLoading(undefined);
-        return;
+        return resp.data
       }
     } catch (error) {
       console.dir(error);
     }
 
     STATE.toggleLoading(undefined);
-    return;
+    return undefined
+  },
+  API_RemoveFromGroup: async (gid, typeid, type) => {
+    try {
+      let FR = {
+        URL: STATE.User.AuthServer,
+        Secure: STATE.User.Secure,
+        Path: "v3/group/remove",
+        Method: "POST",
+        Timeout: 10000,
+      };
+      if (STATE.User) {
+        FR.JSONData = {
+          UserID: STATE.User._id,
+          DeviceToken: STATE.User.DeviceToken.DT,
+          GroupID: gid,
+          Type: type,
+          TypeID: typeid,
+        };
+      } else {
+        return false;
+      }
+
+      STATE.toggleLoading({
+        tag: "GROUP_REMOVE",
+        show: true,
+        msg: "removing " + type + " to group..",
+      });
+
+      let resp = await STATE.API.method("forwardToController", FR);
+      if (resp && resp.status === 200) {
+        STATE.toggleLoading(undefined);
+        return true
+      }
+    } catch (error) {
+      console.dir(error);
+    }
+
+    STATE.toggleLoading(undefined);
+    return false
   },
   API_GetGroupEntities: async (gid, type, limit, offset) => {
     let resp = undefined;
@@ -1553,6 +1592,82 @@ export var STATE = {
       });
 
       resp = await STATE.API.method("forwardToController", FR);
+      if (resp?.status === 200) {
+        STATE.toggleLoading(undefined);
+        return resp.data
+      }
+    } catch (error) {
+      console.dir(error);
+    }
+
+    STATE.toggleLoading(undefined);
+    return undefined;
+  },
+  API_GetUsers: async (offset, limit) => {
+    try {
+      let FR = {
+        URL: STATE.User.AuthServer,
+        Secure: STATE.User.Secure,
+        Path: "v3/user/list",
+        Method: "POST",
+        Timeout: 10000,
+      };
+      if (STATE.User) {
+        FR.JSONData = {
+          UID: STATE.User._id,
+          DeviceToken: STATE.User.DeviceToken.DT,
+          Offset: offset,
+          Limit: limit,
+        };
+      } else {
+        return undefined;
+      }
+
+      STATE.toggleLoading({
+        tag: "USERS_LIST",
+        show: true,
+        msg: "fetching users..",
+      });
+
+      let resp = await STATE.API.method("forwardToController", FR);
+      if (resp?.status === 200) {
+        STATE.toggleLoading(undefined);
+        return resp.data
+      }
+    } catch (error) {
+      console.dir(error);
+    }
+
+    STATE.toggleLoading(undefined);
+    return undefined;
+  },
+  API_GetDevices: async (offset, limit) => {
+    try {
+      let FR = {
+        URL: STATE.User.AuthServer,
+        Secure: STATE.User.Secure,
+        Path: "v3/device/list",
+        Method: "POST",
+        Timeout: 10000,
+      };
+      if (STATE.User) {
+        FR.JSONData = {
+          UID: STATE.User._id,
+          DeviceToken: STATE.User.DeviceToken.DT,
+          Offset: offset,
+          Limit: limit,
+        };
+      } else {
+        return undefined;
+      }
+
+      STATE.toggleLoading({
+        tag: "DEVICE_LIST",
+        show: true,
+        msg: "fetching devices..",
+      });
+
+      let resp = await STATE.API.method("forwardToController", FR);
       if (resp?.status === 200) {
         STATE.toggleLoading(undefined);
         return resp.data

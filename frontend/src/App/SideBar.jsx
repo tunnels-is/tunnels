@@ -58,6 +58,12 @@ const SideBar = () => {
     }
     return false;
   };
+  const showManagement = () => {
+    if (state.User?.IsAdmin || state.User?.IsManager) {
+      return true;
+    }
+    return false;
+  }
 
   const menu = {
     groups: [
@@ -74,11 +80,13 @@ const SideBar = () => {
         ],
       },
       {
-        title: "Servers",
+        title: "Tunnels",
         user: true,
         items: [
-          { icon: LockClosedIcon, label: "Server", route: "servers", user: true, },
-          { icon: HomeIcon, label: "Groups", route: "groups", user: true },
+          { icon: LockClosedIcon, label: "Servers", route: "servers", user: true, },
+          { icon: HomeIcon, label: "Users", route: "users", user: true, shouldRender: showManagement },
+          { icon: HomeIcon, label: "Devices", route: "devices", user: true, shouldRender: showManagement },
+          { icon: HomeIcon, label: "Groups", route: "groups", user: true, shouldRender: showManagement },
         ],
       },
       {

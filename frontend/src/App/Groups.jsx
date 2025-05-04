@@ -31,7 +31,6 @@ import { useNavigate } from "react-router-dom";
 const Groups = () => {
   const state = GLOBAL_STATE("dns");
   const [groups, setGroups] = useState([])
-  const [addForm, setAddForm] = useState({})
   const navigate = useNavigate()
 
 
@@ -73,10 +72,6 @@ const Groups = () => {
     state.renderPage("dns");
   }
 
-  const addUser = () => {
-    state.API_AddToGroup(groups[addForm.index]._id, addForm.id, addForm.type, addForm.idtype)
-  }
-
   const deleteGroup = async (i) => {
     let ok = await state.API_DeleteGroup(groups[i]._id)
     if (ok === true) {
@@ -91,8 +86,6 @@ const Groups = () => {
       {children}
     </div>
   );
-  console.log("G")
-  console.dir(groups)
 
   return (
     <div className="groups-page">
@@ -130,52 +123,7 @@ const Groups = () => {
                   </div>
                 </div>
 
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      className="ml-auto bg-gray-800 hover:bg-gray-700"
-                    >
-                      <Edit className="h-4 w-4 mr-1" /> Add User
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="bg-black border border-gray-800 text-white max-w-2xl rounded-lg p-6">
 
-                    <FormField label="Add user by Email or ID">
-                      <Input
-                        value={addForm.id}
-                        onChange={(e) =>
-                          setAddForm({ index: i, id: e.target.value, type: "user", idtype: "" })
-                        }
-                        placeholder="User ID"
-                        className="w-full bg-gray-950 border-gray-700 text-white"
-                      />
-                    </FormField>
-                    <FormField>
-                      <Input
-                        value={addForm.id}
-                        onChange={(e) =>
-                          setAddForm({ index: i, id: e.target.value, type: "user", idtype: "email" })
-                        }
-                        placeholder="User Email"
-                        className="w-full bg-gray-950 border-gray-700 text-white"
-                      />
-                    </FormField>
-                    <div className="flex justify-between mt-1">
-                      <Button
-                        variant="outline"
-                        className="flex items-center gap-2 bg-gray-950 border-gray-700 hover:bg-gray-700"
-                        onClick={() => addUser()}
-                      >
-                        <Save className="h-4 w-4" />
-                        Save
-                      </Button>
-                    </div>
-
-
-                  </DialogContent>
-                </Dialog>
 
 
                 <Dialog>
@@ -256,7 +204,7 @@ const Groups = () => {
               </div>
             )}
         </div>
-      </div>
+      </div >
     </div >
   )
 
