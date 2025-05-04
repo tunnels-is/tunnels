@@ -4,6 +4,7 @@ import GLOBAL_STATE from "../state";
 import dayjs from "dayjs";
 import KeyValue from "./component/keyvalue";
 import NewTable from "./component/newtable";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const Account = () => {
   const navigate = useNavigate();
@@ -70,96 +71,116 @@ const Account = () => {
   let APIKey = state.getKey("User", "APIKey");
 
   return (
-    <div className="account-page">
-      {state?.User && (
-        <div className="panel">
-          <div className="title">Account</div>
+    <div className="account-page p-6 max-w-xl">
+      <Tabs defaultValue="account">
+        <TabsList className=" justify-start gap-2 mb-4">
+          <TabsTrigger value="account">Account</TabsTrigger>
+          <TabsTrigger value="loggedin">Logged In Devices</TabsTrigger>
+        </TabsList>
 
-          <KeyValue label={"User"} value={state.User?.Email} />
-          <KeyValue
-            label={"Last Update"}
-            value={dayjs(state.User.Updated).format("DD-MM-YYYY HH:mm:ss")}
-          />
-          <KeyValue label={"ID"} value={state.User._id} />
-          <KeyValue
-            label={"API Key"}
-            defaultValue={"not set.."}
-            value={APIKey}
-          />
+        <TabsContent value="account">
+          {state?.User && (
+            <div className="space-y-6 rounded-xl border p-6 shadow-sm bg-black">
+              <div className="space-y-4">
+                <KeyValue label="User" value={state.User?.Email} />
+                <KeyValue
+                  label="Last Update"
+                  value={dayjs(state.User.Updated).format(
+                    "DD-MM-YYYY HH:mm:ss",
+                  )}
+                />
+                <KeyValue label="ID" value={state.User._id} />
+                <KeyValue
+                  label="API Key"
+                  defaultValue="not set.."
+                  value={APIKey}
+                />
 
-          {state.User.SubExpiration && (
-            <KeyValue
-              label={"Subscription Expires"}
-              value={dayjs(state.User.SubExpiration).format(
-                "DD-MM-YYYY HH:mm:ss",
-              )}
-            />
-          )}
+                {state.User.SubExpiration && (
+                  <KeyValue
+                    label="Subscription Expires"
+                    value={dayjs(state.User.SubExpiration).format(
+                      "DD-MM-YYYY HH:mm:ss",
+                    )}
+                  />
+                )}
 
-          {state.User.Trial && (
-            <KeyValue
-              label={"Trial Status"}
-              value={state.User.Trial ? "Active" : "Ended"}
-            />
-          )}
+                {state.User.Trial && (
+                  <KeyValue
+                    label="Trial Status"
+                    value={state.User.Trial ? "Active" : "Ended"}
+                  />
+                )}
 
-          <KeyValue label={"License"} value={state.User.Key?.Key} />
-
-          <div className="button-and-text-seperator"></div>
-
-          <div className="item full-width-item">
-            <div className="button red" onClick={() => state.LogoutAllTokens()}>
-              Log Out All Devices
-            </div>
-          </div>
-
-          <div className="item full-width-item">
-            {!state.modifiedUser && (
-              <div className="button" onClick={() => state.refreshApiKey()}>
-                Re-Generate API Key
+                <KeyValue label="License" value={state.User.Key?.Key} />
               </div>
-            )}
-            {state.modifiedUser && (
-              <div className="button" onClick={() => state.UpdateUser()}>
-                Save API Key
+
+              <div className="flex flex-col gap-3">
+                <button
+                  className="w-full bg-destructive text-white py-2 rounded-md text-sm font-medium hover:bg-red-600 transition"
+                  onClick={() => state.LogoutAllTokens()}
+                >
+                  Log Out All Devices
+                </button>
+
+                {!state.modifiedUser ? (
+                  <button
+                    className="w-full bg-primary text-black py-2 rounded-md text-sm font-medium hover:bg-primary/90 transition"
+                    onClick={() => state.refreshApiKey()}
+                  >
+                    Re-Generate API Key
+                  </button>
+                ) : (
+                  <button
+                    className="w-full bg-primary text-white py-2 rounded-md text-sm font-medium hover:bg-primary/90 transition"
+                    onClick={() => state.UpdateUser()}
+                  >
+                    Save API Key
+                  </button>
+                )}
+
+                <button
+                  className="w-full bg-secondary text-black dark:text-white py-2 rounded-md text-sm font-medium hover:bg-secondary/80 transition"
+                  onClick={() => NavigateTo2fa()}
+                >
+                  Two-Factor Authentication
+                </button>
               </div>
-            )}
-          </div>
 
-          <div className="item full-width-item">
-            <div className="button" onClick={() => NavigateTo2fa()}>
-              Two-Factor Authentication
+              <div className="space-y-3">
+                <input
+                  onChange={(e) => {
+                    state.UpdateLicenseInput(e.target.value);
+                  }}
+                  name="license"
+                  className="w-full px-4 py-2 rounded-md border text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                  placeholder="Insert License Key"
+                  value={state.LicenseKey}
+                />
+
+                <button
+                  key={state?.LicenseKey}
+                  className="w-full bg-primary text-black py-2 rounded-md text-sm font-medium hover:bg-primary/90 transition"
+                  onClick={() => state.ActivateLicense()}
+                >
+                  Activate Key
+                </button>
+              </div>
             </div>
-          </div>
-          <div className="button-and-text-seperator"></div>
-          <div className="item">
-            <input
-              onChange={(e) => {
-                state.UpdateLicenseInput(e.target.value);
-              }}
-              name="license"
-              className="input license"
-              placeholder="Insert License Key"
-              value={state.LicenseKey}
-            />
-          </div>
+          )}
+        </TabsContent>
 
-          <div className="item full-width-item" key={state?.LicenseKey}>
-            <div className="button" onClick={() => state.ActivateLicense()}>
-              Activate Key
-            </div>
-          </div>
-        </div>
-      )}
-
-      <NewTable
-        tableID={"devices"}
-        title={"Logged In Devices"}
-        className="logins-list-table"
-        background={true}
-        header={headers}
-        rows={rows}
-      />
+        <TabsContent value="loggedin" className="border rounded">
+          <NewTable
+            tableID="devices"
+            title="Logged In Devices"
+            className="logins-list-table"
+            background={true}
+            header={headers}
+            rows={rows}
+          />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
