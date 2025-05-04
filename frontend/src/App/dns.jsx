@@ -234,6 +234,16 @@ const DNS = () => {
 
   return (
     <div className="">
+      {modified === true && (
+        <div className="mb-7 flex gap-[4px] items-center">
+          <Button variant="secondary" onClick={() => state.v2_ConfigSave()}>
+            Save
+          </Button>
+          <div className="text-yellow-400 text-xl">
+            Your config has un-saved changes
+          </div>
+        </div>
+      )}
       <Tabs defaultValue="settings">
         <TabsList className="">
           <TabsTrigger value="settings">Settings</TabsTrigger>
@@ -242,12 +252,10 @@ const DNS = () => {
           <TabsTrigger value="resolveddomains">Resovled Domains</TabsTrigger>
         </TabsList>
         <TabsContent value="settings">
-          <div className="basic-info panel">
-            <div className="title">Settings</div>
-            <div className="warn-msg">
+          <div className="">
+            <div className="text-yellow-300">
               Enabling blocklists will increase memory usage.
             </div>
-            <div className="button-and-text-seperator"></div>
 
             <FormKeyValue
               label="Server IP"
@@ -412,14 +420,6 @@ const DNS = () => {
           )}
         </TabsContent>
       </Tabs>
-      {modified === true && (
-        <div className="save-banner">
-          <div className="button" onClick={() => state.v2_ConfigSave()}>
-            Save
-          </div>
-          <div className="notice">Your config has un-saved changes</div>
-        </div>
-      )}
     </div>
   );
 };
