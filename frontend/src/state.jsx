@@ -72,7 +72,7 @@ export var STATE = {
 
       let FR = {
         URL: url ? url : STATE.User.AuthServer,
-        Secure: secure ? secure : STATE.User.Secure,
+        Secure: secure !== undefined ? secure : STATE.User.Secure,
         Path: route,
         Method: method,
         JSONData: data,
@@ -678,7 +678,7 @@ export var STATE = {
         ...STATE.modifiedUser,
       };
 
-      let x = await state.DoStuff(null, null, "POST", "/v3/user/update",
+      let x = await STATE.DoStuff(null, null, "POST", "/v3/user/update",
         { APIKey: STATE.modifiedUser.APIKey },
         false, true)
       if (x && x.status === 200) {
@@ -857,8 +857,8 @@ export var STATE = {
       logoutUser = true;
     }
 
-    let resp = await state.DoStuff(null, null, "POST", "/v3/user/logout",
-      { DeviceToken: token.DT, Email: user.Email, All: all },
+    let resp = await STATE.DoStuff(null, null, "POST", "/v3/user/logout",
+      { DeviceToken: token.DT, UserID: user._id, All: all },
       false, false)
     if (resp && resp.status === 200) {
 
@@ -963,7 +963,7 @@ export var STATE = {
       return;
     }
 
-    let ok = await state.DoStuff(null, null, "POST", "/v3/key/activate",
+    let ok = await STATE.DoStuff(null, null, "POST", "/v3/key/activate",
       { Key: STATE.LicenseKey },
       false, true)
     if (ok) {

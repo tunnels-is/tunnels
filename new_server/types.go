@@ -159,7 +159,7 @@ type USER_ENABLE_QUERY struct {
 }
 
 type KEY_ACTIVATE_FORM struct {
-	UserID      primitive.ObjectID `json:"UID"`
+	UID         primitive.ObjectID `json:"UID"`
 	DeviceToken string             `json:"DeviceToken"`
 	Key         string
 }
@@ -236,13 +236,13 @@ type FORM_CREATE_SERVER struct {
 
 type FORM_UPDATE_GROUP struct {
 	DeviceToken string             `json:"DeviceToken"`
-	UserID      primitive.ObjectID `json:"UID"`
+	UID         primitive.ObjectID `json:"UID"`
 	Group       *Group             `json:"Group"`
 }
 
 type FORM_GROUP_ADD struct {
 	DeviceToken string             `json:"DeviceToken"`
-	UserID      primitive.ObjectID `json:"UserID"`
+	UID         primitive.ObjectID `json:"UID"`
 	GroupID     primitive.ObjectID `json:"GroupID"`
 	Type        string             `json:"Type"`
 	TypeID      primitive.ObjectID `json:"TypeID"`
@@ -251,7 +251,7 @@ type FORM_GROUP_ADD struct {
 
 type FORM_GROUP_REMOVE struct {
 	DeviceToken string             `json:"DeviceToken"`
-	UserID      primitive.ObjectID `json:"UserID"`
+	UID         primitive.ObjectID `json:"UID"`
 	GroupID     primitive.ObjectID `json:"GroupID"`
 	Type        string             `json:"Type"`
 	TypeID      primitive.ObjectID `json:"TypeID"`
@@ -266,7 +266,7 @@ type TWO_FACTOR_CONFIRM struct {
 }
 
 type USER_UPDATE_FORM struct {
-	UserID                primitive.ObjectID
+	UID                   primitive.ObjectID
 	DeviceToken           string
 	APIKey                string
 	AdditionalInformation string
@@ -308,8 +308,9 @@ type LOGIN_FORM struct {
 }
 
 type LOGOUT_FORM struct {
-	UserID      primitive.ObjectID
+	UID         primitive.ObjectID
 	DeviceToken string
+	LogoutToken string
 	All         bool
 }
 
