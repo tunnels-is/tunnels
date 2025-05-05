@@ -74,7 +74,10 @@ const InspectGroup = () => {
 	}
 
 	const removeEntity = async (gid, typeid, type) => {
-		let e = await state.API_RemoveFromGroup(gid, typeid, type)
+		// let e = await state.API_RemoveFromGroup(gid, typeid, type)
+		let e = await state.DoStuff(null, null, "POST", "/v3/group/add",
+			{ GroupID: gid, TypeID: typeid, Type: type },
+			false, true)
 		if (e === true) {
 			if (type === "user") {
 				let u = users.filter((u) => u._id !== typeid)
