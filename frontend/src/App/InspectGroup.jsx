@@ -1,34 +1,27 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import FormKeyValue from "./component/formkeyvalue";
 import GLOBAL_STATE from "../state"
-import KeyValue from "./component/keyvalue";
 import dayjs from "dayjs";
 import NewTable from "./component/newtable";
-import ObjectEditor from "./ObjectEditor";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
 	Dialog,
 	DialogContent,
-	DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-	Edit,
 	Save,
 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 
 const InspectGroup = () => {
 	const { id } = useParams()
-	const [groupID, setGroupID] = useState(id)
 	const [users, setUsers] = useState([])
 	const [servers, setServers] = useState([])
 	const [devices, setDevices] = useState([])
 	const [dialog, setDialog] = useState(false)
 	const [addForm, setAddForm] = useState({})
-	const [tag, setTag] = useState([])
 	const [group, setGroup] = useState()
 	const state = GLOBAL_STATE("groups")
 	const navigate = useNavigate()
@@ -74,7 +67,6 @@ const InspectGroup = () => {
 	}
 
 	const removeEntity = async (gid, typeid, type) => {
-		// let e = await state.API_RemoveFromGroup(gid, typeid, type)
 		let e = await state.DoStuff(null, null, "POST", "/v3/group/add",
 			{ GroupID: gid, TypeID: typeid, Type: type },
 			false, true)
@@ -112,7 +104,7 @@ const InspectGroup = () => {
 	if (!group) {
 		return (
 			<div className="ab group-wrapper">
-				<div className="title">Group Not Found: {groupID}</div>
+				<div className="title">Group Not Found: {id}</div>
 			</div>
 		)
 	}

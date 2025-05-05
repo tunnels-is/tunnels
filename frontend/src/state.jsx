@@ -45,6 +45,7 @@ export var STATE = {
   },
 
   // NEW API
+  // TODO: .. add atomic
   DoStuff: async (url, secure, method, route, data, skipAuth, boolResponse) => {
     try {
       STATE.toggleLoading({
