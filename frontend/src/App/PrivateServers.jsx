@@ -68,7 +68,7 @@ const PrivateServers = () => {
 		}
 		nserver.Admin = user._id
 
-		let resp = await state.DoStuff(null, null, "POST", "/v3/server/create", nserver, false, false)
+		let resp = await state.DoStuff(null, null, "POST", "/v3/server/create", { Server: nserver }, false, false)
 		if (resp?.status === 200) {
 			if (!state.PrivateServers) {
 				state.PrivateServers = [];
