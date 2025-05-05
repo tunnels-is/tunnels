@@ -35,7 +35,7 @@ const Groups = () => {
 
 
   let getGroups = async () => {
-    let resp = await state.DoStuff(null, null, "POST", "/v3/group/list", {}, false, false)
+    let resp = await state.callController(null, null, "POST", "/v3/group/list", {}, false, false)
     if (resp.status === 200) {
       setGroups(resp.data)
     } else {
@@ -57,9 +57,9 @@ const Groups = () => {
   const saveGroup = async (i) => {
     let resp = undefined
     if (groups[i]._id !== undefined) {
-      resp = await state.DoStuff(null, null, "POST", "/v3/group/update", { Group: groups[i], }, false, false)
+      resp = await state.callController(null, null, "POST", "/v3/group/update", { Group: groups[i], }, false, false)
     } else {
-      resp = await state.DoStuff(null, null, "POST", "/v3/group/create", { Group: groups[i], }, false, false)
+      resp = await state.callController(null, null, "POST", "/v3/group/create", { Group: groups[i], }, false, false)
     }
 
     if (resp.status === 200) {
@@ -76,7 +76,7 @@ const Groups = () => {
   }
 
   const deleteGroup = async (i) => {
-    let resp = await state.DoStuff(null, null, "POST", "/v3/group/delete", { GID: groups[i]._id, }, false, false)
+    let resp = await state.callController(null, null, "POST", "/v3/group/delete", { GID: groups[i]._id, }, false, false)
     if (resp.status === 200) {
       delete groups[i]
     }

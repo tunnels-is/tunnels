@@ -14,7 +14,7 @@ const PrivateServers = () => {
 	const [createModalOpen, setCreateModalOpen] = useState(false)
 
 	const getServers = async () => {
-		let resp = await state.DoStuff(null, null, "POST", "/v3/servers", { StartIndex: 0 }, false, false)
+		let resp = await state.callController(null, null, "POST", "/v3/servers", { StartIndex: 0 }, false, false)
 		if (resp?.status === 200) {
 			if (resp.data?.length > 0) {
 				STORE.Cache.SetObject("private-servers", resp.data);
@@ -37,7 +37,7 @@ const PrivateServers = () => {
 	}, [])
 
 	const UpdateServer = async () => {
-		let resp = await state.DoStuff(null, null, "POST", "/v3/server/update", { Server: pserver }, false, false)
+		let resp = await state.callController(null, null, "POST", "/v3/server/update", { Server: pserver }, false, false)
 		if (resp?.status === 200) {
 			state.PrivateServers.forEach((s, i) => {
 				if (s._id === pserver._id) {
@@ -68,7 +68,7 @@ const PrivateServers = () => {
 		}
 		nserver.Admin = user._id
 
-		let resp = await state.DoStuff(null, null, "POST", "/v3/server/create", { Server: nserver }, false, false)
+		let resp = await state.callController(null, null, "POST", "/v3/server/create", { Server: nserver }, false, false)
 		if (resp?.status === 200) {
 			if (!state.PrivateServers) {
 				state.PrivateServers = [];

@@ -8,7 +8,7 @@ const Devices = () => {
 	const state = GLOBAL_STATE("groups")
 
 	const getDevices = async () => {
-		let resp = await state.DoStuff(null, null, "POST", "/v3/device/list", { Offset: 0, Limit: 1000 }, false, false)
+		let resp = await state.callController(null, null, "POST", "/v3/device/list", { Offset: 0, Limit: 1000 }, false, false)
 		if (resp.status === 200) {
 			setDevices(resp.data)
 		}

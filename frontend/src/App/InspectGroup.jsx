@@ -35,7 +35,7 @@ const InspectGroup = () => {
 	);
 
 	const addToGroup = async () => {
-		let e = await state.DoStuff(null, null, "POST", "/v3/group/add",
+		let e = await state.callController(null, null, "POST", "/v3/group/add",
 			{ GroupID: id, TypeID: addForm.id, Type: addForm.type, TypeID: addForm.idtyp },
 			false, true)
 		if (e) {
@@ -54,7 +54,7 @@ const InspectGroup = () => {
 	}
 
 	const getEntities = async (type) => {
-		let resp = await state.DoStuff(null, null, "POST", "/v3/group/entities",
+		let resp = await state.callController(null, null, "POST", "/v3/group/entities",
 			{ GID: id, Type: type, Limit: 1000, Offset: 0 },
 			false, false)
 		if (type === "user") {
@@ -67,7 +67,7 @@ const InspectGroup = () => {
 	}
 
 	const removeEntity = async (gid, typeid, type) => {
-		let e = await state.DoStuff(null, null, "POST", "/v3/group/add",
+		let e = await state.callController(null, null, "POST", "/v3/group/add",
 			{ GroupID: gid, TypeID: typeid, Type: type },
 			false, true)
 		if (e === true) {
@@ -91,7 +91,7 @@ const InspectGroup = () => {
 	}
 
 	const getGroup = async () => {
-		let resp = await state.DoStuff(null, null, "POST", "/v3/group", { GID: id, }, false, false)
+		let resp = await state.callController(null, null, "POST", "/v3/group", { GID: id, }, false, false)
 		if (resp.status === 200) {
 			setGroup(resp.data)
 		}

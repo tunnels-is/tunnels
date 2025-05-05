@@ -8,7 +8,7 @@ const Users = () => {
 	const state = GLOBAL_STATE("groups")
 
 	const getUsers = async () => {
-		let resp = await state.DoStuff(null, null, "POST", "/v3/user/list", { Offset: 0, Limit: 1000 }, false, false)
+		let resp = await state.callController(null, null, "POST", "/v3/user/list", { Offset: 0, Limit: 1000 }, false, false)
 		if (resp.status === 200) {
 			setUsers(resp.data)
 		}
