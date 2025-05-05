@@ -673,32 +673,14 @@ export var STATE = {
   },
   UpdateUser: async () => {
     try {
-      STATE.toggleLoading({
-        logTag: "",
-        tag: "USER-UPDATE",
-        show: true,
-        msg: "Updating User Settings",
-        includeLogs: false,
-      });
-
-      let FORM = {
-        Email: STATE.User.Email,
-        DeviceToken: STATE.User.DeviceToken.DT,
-        APIKey: STATE.modifiedUser.APIKey,
-      };
       let newUser = {
         ...STATE.User,
         ...STATE.modifiedUser,
       };
 
-      let FR = {
-        Path: "v3/user/update",
-        Method: "POST",
-        JSONData: FORM,
-        Timeout: 10000,
-      };
-
-      let x = await STATE.API.method("forwardToController", FR);
+      let x = await state.DoStuff(null, null, "POST", "/v3/user/update",
+        { APIKey: STATE.modifiedUser.APIKey },
+        false, true)
       if (x && x.status === 200) {
         STORE.Cache.SetObject("user", newUser);
         STORE.Cache.DelObject("modifiedUser");
@@ -855,85 +837,48 @@ export var STATE = {
     window.location.reload();
   },
   LogoutAllTokens: async () => {
-    let user = STORE.Cache.GetObject("user");
-    if (!user) {
-      return;
-    }
-
-    let LF = {
-      DeviceToken: user.DeviceToken.DT,
-      Email: user.Email,
-    };
-
-    let FR = {
-      Path: "v3/user/logout/all",
-      Method: "POST",
-      JSONData: LF,
-      Timeout: 20000,
-      LogoutUser: true,
-      SyncUser: false,
-    };
-
-    let x = await STATE.API.method("forwardToController", FR);
-    if (x && x.status === 200) {
-      STATE.successNotification("device logged out", undefined);
-      STATE.FinalizeLogout();
-    } else {
-      STATE.errorNotification("Unable to log out device", undefined);
+    if (STATE.User) {
+      STATE.LogoutToken(STATE.User.DeviceToken?.DT, true);
     }
   },
   LogoutCurrentToken: async () => {
-    if (STATE.User !== undefined) {
-      STATE.LogoutToken(STATE.User.DeviceToken?.DT);
+    if (STATE.User) {
+      STATE.LogoutToken(STATE.User.DeviceToken?.DT, false);
     }
   },
-  LogoutToken: async (token) => {
+  LogoutToken: async (token, all) => {
     let user = STORE.Cache.GetObject("user");
     if (!user) {
       return;
     }
 
-    let LF = {
-      DeviceToken: token.DT,
-      Email: user.Email,
-    };
-
-    let u = STORE.Cache.GetObject("user");
     let logoutUser = false;
-    let syncUser = true;
-    if (u?.DeviceToken.DT === token.DT) {
+    if (user.DeviceToken?.DT === token.DT) {
       logoutUser = true;
-      syncUser = false;
     }
 
-    let FR = {
-      Path: "v3/user/logout",
-      Method: "POST",
-      JSONData: LF,
-      Timeout: 20000,
-      SyncUser: syncUser,
-      LogoutUser: logoutUser,
-    };
+    let resp = await state.DoStuff(null, null, "POST", "/v3/user/logout",
+      { DeviceToken: token.DT, Email: user.Email, All: all },
+      false, false)
+    if (resp && resp.status === 200) {
 
-    let x = await STATE.API.method("forwardToController", FR);
-
-    if (x && x.status === 200) {
       STATE.successNotification("device logged out", undefined);
 
-      if (logoutUser === true) {
+      if (logoutUser === true || all === true) {
         STATE.FinalizeLogout();
+        return
       } else {
         let toks = [];
-        u?.Tokens?.map((t) => {
+        user.Tokens?.map((t) => {
           if (t.DT !== token.DT) {
             toks.push(t);
           }
         });
-        u.Tokens = toks;
+        user.Tokens = toks;
       }
 
-      STORE.Cache.SetObject("user", u);
-      STATE.User = u;
+      STORE.Cache.SetObject("user", user);
+      STATE.User = user;
     } else {
       STATE.errorNotification("Unable to log out device", undefined);
     }
@@ -1018,27 +963,14 @@ export var STATE = {
       return;
     }
 
-    STATE.ForwardToController(
-      {
-        URL: STATE.User.AuthServer,
-        Path: "v3/key/activate",
-        Method: "POST",
-        JSONData: {
-          Key: STATE.LicenseKey,
-          Email: STATE.User.Email,
-        },
-        Timeout: 20000,
-      },
-      {
-        tag: "key-activation",
-        show: true,
-        msg: "activating your license key...",
-      },
-    );
-
-    STATE.User.Key = {
-      Key: "[shown on next login]",
-    };
+    let ok = await state.DoStuff(null, null, "POST", "/v3/key/activate",
+      { Key: STATE.LicenseKey },
+      false, true)
+    if (ok) {
+      STATE.User.Key = {
+        Key: "[shown on next login]",
+      };
+    }
 
     STORE.Cache.SetObject("user", { ...STATE.User });
     STATE.rerender();

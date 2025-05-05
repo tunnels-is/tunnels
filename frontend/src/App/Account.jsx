@@ -23,7 +23,7 @@ const Account = () => {
     state.GetBackendState();
   }, []);
 
-  state.User?.Tokens?.sort(function (x, y) {
+  state.User?.Tokens?.sort(function(x, y) {
     if (x.Created < y.Created) {
       return 1;
     }
@@ -51,7 +51,7 @@ const Account = () => {
         {
           type: "text",
           click: () => {
-            state.LogoutToken(token);
+            state.LogoutToken(token, false);
           },
           value: (
             <div className={`logout clickable`} value={"Logout"}>
