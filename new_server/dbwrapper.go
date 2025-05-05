@@ -642,6 +642,11 @@ func DB_UpdateServer(S *Server) (RS *Server, err error) {
 					Key: "$set",
 					Value: bson.D{
 						{Key: "Tag", Value: S.Tag},
+						{Key: "Country", Value: S.Country},
+						{Key: "IP", Value: S.IP},
+						{Key: "Port", Value: S.Port},
+						{Key: "DataPort", Value: S.DataPort},
+						{Key: "PubKey", Value: S.PubKey},
 					},
 				},
 			},

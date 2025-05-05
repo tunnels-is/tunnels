@@ -800,7 +800,7 @@ func API_GroupList(w http.ResponseWriter, r *http.Request) {
 	sendObject(w, group)
 }
 
-func API_ServerGet(w http.ResponseWriter, r *http.Request) {
+func API_ServersForUser(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 	F := new(FORM_GET_SERVERS)
 	err := decodeBody(r, F)

@@ -34,16 +34,14 @@ const PrivateServers = () => {
 
 	useEffect(() => {
 		getServers()
-		// state.GetPrivateServers()
 	}, [])
 
 	const UpdateServer = async () => {
-		let resp = await state.DoStuff(null, null, "POST", "/v3/server/update", pserver, false, false)
-		// let resp = await state.API_UpdateServer(pserver)
+		let resp = await state.DoStuff(null, null, "POST", "/v3/server/update", { Server: pserver }, false, false)
 		if (resp?.status === 200) {
 			state.PrivateServers.forEach((s, i) => {
 				if (s._id === pserver._id) {
-					state.PrivateServers[i] = resp.data;
+					state.PrivateServers[i] = pserver;
 				}
 			});
 			state.updatePrivateServers();
