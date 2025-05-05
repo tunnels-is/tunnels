@@ -46,7 +46,7 @@ export var STATE = {
 
   // NEW API
   // TODO: .. add atomic
-  DoStuff: async (url, secure, method, route, data, skipAuth, boolResponse) => {
+  callController: async (url, secure, method, route, data, skipAuth, boolResponse) => {
     try {
       STATE.toggleLoading({
         logTag: "",
@@ -678,7 +678,7 @@ export var STATE = {
         ...STATE.modifiedUser,
       };
 
-      let x = await STATE.DoStuff(null, null, "POST", "/v3/user/update",
+      let x = await STATE.callController(null, null, "POST", "/v3/user/update",
         { APIKey: STATE.modifiedUser.APIKey },
         false, true)
       if (x && x.status === 200) {
@@ -857,7 +857,7 @@ export var STATE = {
       logoutUser = true;
     }
 
-    let resp = await STATE.DoStuff(null, null, "POST", "/v3/user/logout",
+    let resp = await STATE.callController(null, null, "POST", "/v3/user/logout",
       { DeviceToken: token.DT, UserID: user._id, All: all },
       false, false)
     if (resp && resp.status === 200) {
@@ -963,7 +963,7 @@ export var STATE = {
       return;
     }
 
-    let ok = await STATE.DoStuff(null, null, "POST", "/v3/key/activate",
+    let ok = await STATE.callController(null, null, "POST", "/v3/key/activate",
       { Key: STATE.LicenseKey },
       false, true)
     if (ok) {
