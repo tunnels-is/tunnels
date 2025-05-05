@@ -180,7 +180,7 @@ type ServerConnectRequest struct {
 	DHCPToken       string `json:"DHCPToken"`
 
 	Hostname    string             `json:"Hostname"`
-	UserID      primitive.ObjectID `json:"UserID"`
+	UID         primitive.ObjectID `json:"UID"`
 	UserEmail   string             `json:"UserEmail"`
 	DeviceToken string             `json:"DeviceToken"`
 }

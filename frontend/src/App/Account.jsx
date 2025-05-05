@@ -132,7 +132,7 @@ const Account = () => {
                   </button>
                 ) : (
                   <button
-                    className="w-full bg-primary text-white py-2 rounded-md text-sm font-medium hover:bg-primary/90 transition"
+                    className="w-full bg-primary text-black py-2 rounded-md text-sm font-medium hover:bg-primary/90 transition"
                     onClick={() => state.UpdateUser()}
                   >
                     Save API Key

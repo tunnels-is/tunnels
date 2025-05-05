@@ -280,7 +280,7 @@ func DB_updateUser(UF *USER_UPDATE_FORM) (err error) {
 	defer BasicRecover()
 
 	filter := bson.M{
-		"_id": UF.UserID,
+		"_id": UF.UID,
 	}
 
 	res, err := DB.Database(USERS_DATABASE).
