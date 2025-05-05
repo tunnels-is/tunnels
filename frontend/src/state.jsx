@@ -43,6 +43,90 @@ export var STATE = {
       STATE.updates[k]();
     });
   },
+
+  // NEW API
+  DoStuff: async (url, secure, method, route, data, skipAuth, boolResponse) => {
+    try {
+      STATE.toggleLoading({
+        logTag: "",
+        tag: uuidv4(),
+        show: true,
+        msg: "loading..",
+        includeLogs: false,
+      });
+
+      if (!skipAuth || skipAuth === false) {
+        data.UID = STATE.User?._id ? STATE.User?._id : ""
+        data.Email = STATE.User?.Email ? STATE.User?.Email : ""
+        data.DeviceToken = STATE.User?.DeviceToken?.DT ? STATE.User?.DeviceToken?.DT : ""
+        if (!data.DeviceToken || data.DeviceToken === "") {
+          STATE.errorNotification("No auth token found, please log in again");
+          return { data: { Error: "Auth token not found, please log in again" }, status: 401 }
+        }
+        if (!data.Email || data.Email === "") {
+          STATE.errorNotification("No user email/username found, please log in again");
+          return { data: { Error: "No user email/username found, please log in again" }, status: 401 }
+        }
+      }
+
+      let FR = {
+        URL: url ? url : STATE.User.AuthServer,
+        Secure: secure ? secure : STATE.User.Secure,
+        Path: route,
+        Method: method,
+        JSONData: data,
+        Timeout: 20000,
+      };
+
+      let body = undefined;
+      if (FR) {
+        try {
+          body = JSON.stringify(FR);
+        } catch (error) {
+          console.dir(error);
+          return;
+        }
+      }
+
+      let resp = await axios.post(STATE.GetURL() + "/v1/method/forwardToController", body, {
+        timeout: 10000,
+        headers: { "Content-Type": "application/json" },
+      });
+
+      // let resp = await STATE.API.method("forwardToController", FR);
+      STATE.toggleLoading(undefined);
+      if (resp && resp.status === 200) {
+        if (boolResponse === true) {
+          return true
+        }
+      }
+      return { data: resp.data, status: resp.status }
+
+    } catch (error) {
+      console.dir(error)
+      STATE.toggleLoading(undefined);
+
+      if (error?.message === "Network Error") {
+        STATE.successNotification("Tunnel connected, network changed");
+        return undefined;
+      }
+
+      if (error?.response?.data?.Error) {
+        STATE.errorNotification(error?.response?.data?.Error);
+      }
+
+      if (boolResponse === true) {
+        return false
+      } else {
+        return { data: error.respones?.data, status: error.response?.status }
+      }
+
+    }
+
+  },
+
+
+
   // NEW
   // NEW
   // NEW
@@ -77,7 +161,7 @@ export var STATE = {
       if (saveToDisk) {
         STATE.SaveUser(u);
       }
-      return u;
+      window.location.reload("/")
     } catch (err) {
       console.dir(err);
       STORE.Cache.interface = window.sessionStorage;
@@ -921,214 +1005,6 @@ export var STATE = {
     }
     STATE.renderPage("inspect-server");
   },
-  API_UpdateServer: async (server) => {
-    // let server = undefined
-    // STATE.ModifiedServers?.forEach(s => {
-    // 	if (s._id === id) {
-    // 		server = s
-    // 	}
-    // })
-
-    if (!server) {
-      return;
-    }
-
-    let resp = undefined;
-    try {
-      let FR = {
-        URL: STATE.User.AuthServer,
-        Secure: STATE.User.Secure,
-        Path: "v3/servers/update",
-        Method: "POST",
-        Timeout: 10000,
-      };
-      FR.JSONData = {
-        UID: STATE.User._id,
-        DeviceToken: STATE.User.DeviceToken.DT,
-        Server: server,
-      };
-
-      STATE.toggleLoading({
-        tag: "SERVER_UPDATE",
-        show: true,
-        msg: "Updating your server ...",
-      });
-
-      resp = await STATE.API.method("forwardToController", FR);
-      if (resp?.status === 200) {
-        // STATE.ModifiedServers?.forEach((s, i) => {
-        // 	if (s._id === id) {
-        // 		STATE.ModifiedServers.splice(i, 1)
-        // 	}
-        // })
-
-        STATE.PrivateServers.forEach((s, i) => {
-          if (s._id === server._id) {
-            STATE.PrivateServers[i] = server;
-          }
-        });
-        STATE.updatePrivateServers();
-      }
-    } catch (error) {
-      console.dir(error);
-    }
-
-    STATE.toggleLoading(undefined);
-    return resp;
-  },
-  API_CreateServer: async (server) => {
-    let resp = undefined;
-    try {
-      let FR = {
-        URL: STATE.User.AuthServer,
-        Secure: STATE.User.Secure,
-        Path: "v3/servers/create",
-        Method: "POST",
-        Timeout: 10000,
-      };
-      FR.JSONData = {
-        UID: STATE.User._id,
-        DeviceToken: STATE.User.DeviceToken.DT,
-        Server: server,
-      };
-
-      STATE.toggleLoading({
-        tag: "SERVER_CREATE",
-        show: true,
-        msg: "Creating your server ...",
-      });
-
-      resp = await STATE.API.method("forwardToController", FR, true, 10000, false);
-      if (resp?.status === 200) {
-        if (!STATE.PrivateServers) {
-          STATE.PrivateServers = [];
-        }
-        STATE.PrivateServers.push(resp.data);
-        STATE.updatePrivateServers();
-      }
-    } catch (error) {
-      console.dir(error);
-    }
-
-    STATE.toggleLoading(undefined);
-    return resp;
-  },
-  GetPrivateServers: async () => {
-    if (!STATE.User) {
-      return;
-    }
-
-    if (STATE.GetPrivateServersInProgress) {
-      return;
-    }
-    STATE.GetPrivateServersInProgress = true;
-
-    let resp = undefined;
-    try {
-      let timeout = STORE.Cache.GetObject("private-servers_ct");
-      let now = dayjs().unix();
-      let diff = now - timeout;
-      if (now - timeout > 30 || !timeout) {
-      } else {
-        STATE.GetPrivateServersInProgress = false;
-        STATE.errorNotification("Next refresh in " + (30 - diff) + " seconds");
-        // return;
-      }
-
-      resp = await STATE.ForwardToController(
-        {
-          URL: STATE.User.AuthServer,
-          Secure: STATE.User.Secure,
-          Path: "v3/servers",
-          Method: "POST",
-          JSONData: {
-            DeviceToken: STATE.User.DeviceToken.DT,
-            UID: STATE.User._id,
-            StartIndex: 0,
-          },
-          Timeout: 10000,
-        },
-        {
-          show: true,
-          tag: "server-search",
-          msg: "Searching for servers ..",
-        },
-      );
-    } catch (error) {
-      console.dir(error);
-    }
-
-    if (resp?.status === 200) {
-      if (resp.data?.length > 0) {
-        STORE.Cache.SetObject("private-servers", resp.data);
-        STATE.PrivateServers = resp.data;
-      } else {
-        STATE.errorNotification("Unable to find servers");
-        STORE.Cache.SetObject("private-servers", []);
-        STATE.PrivateServers = [];
-      }
-      STATE.renderPage("pservers");
-    } else {
-      STATE.errorNotification("Unable to find servers");
-      STORE.Cache.SetObject("private-servers", []);
-      STATE.PrivateServers = [];
-    }
-
-    STATE.GetPrivateServersInProgress = false;
-  },
-  GetServers: async () => {
-    if (!STATE.User) {
-      return;
-    }
-
-    if (STATE.GetPrivateServersInProgress) {
-      return;
-    }
-    STATE.GetPrivateServersInProgress = true;
-
-    let resp = undefined;
-    try {
-      let timeout = STORE.Cache.GetObject("servers_ct");
-      let now = dayjs().unix();
-      let diff = now - timeout;
-      if (now - timeout > 30 || !timeout) {
-      } else {
-        STATE.GetPrivateServersInProgress = false;
-        STATE.errorNotification("Next refresh in " + (30 - diff) + " seconds");
-        return;
-      }
-
-      resp = await STATE.ForwardToController(
-        {
-          Path: "v3/servers",
-          Method: "POST",
-          JSONData: {
-            DeviceToken: STATE.User.DeviceToken.DT,
-            UID: STATE.User._id,
-            StartIndex: 0,
-          },
-          Timeout: 10000,
-        },
-        {
-          show: true,
-          tag: "server-search",
-          msg: "Searching for servers ..",
-        },
-      );
-    } catch (error) {
-      console.dir(error);
-    }
-
-    if (resp?.status === 200) {
-      STORE.Cache.SetObject("servers", resp.data);
-      STATE.Servers = resp.data;
-      STATE.renderPage("servers");
-    } else {
-      STATE.errorNotification("Unable to find servers");
-    }
-
-    STATE.GetPrivateServersInProgress = false;
-  },
   ActivateLicense: async () => {
     if (!STATE.User) {
       return;
@@ -1164,23 +1040,6 @@ export var STATE = {
     STORE.Cache.SetObject("user", { ...STATE.User });
     STATE.rerender();
   },
-  GetResetCode: async (inputs, url, secure) => {
-    return STATE.ForwardToController(
-      {
-        URL: url,
-        Path: "v3/user/reset/code",
-        Method: "POST",
-        JSONData: inputs,
-        Timeout: 20000,
-        Secure: secure,
-      },
-      {
-        tag: "reset-code",
-        show: true,
-        msg: "sending you a reset code ...",
-      },
-    );
-  },
   GetQRCode: async (inputs) => {
     return STATE.API.method("getQRCode", inputs);
   },
@@ -1200,82 +1059,7 @@ export var STATE = {
       },
     );
   },
-  API_EnableAccount: async (inputs, url, secure) => {
-    return STATE.ForwardToController(
-      {
-        URL: url,
-        Path: "v3/user/enable",
-        Method: "POST",
-        JSONData: inputs,
-        Timeout: 20000,
-        Secure: secure
-      },
-      {
-        tag: "enable-account",
-        show: true,
-        msg: "enabling your account ..",
-      },
-    );
-  },
-  ResetPassword: async (inputs, url, secure) => {
-    return STATE.ForwardToController(
-      {
-        URL: url,
-        Path: "v3/user/reset/password",
-        Method: "POST",
-        JSONData: inputs,
-        Timeout: 20000,
-        Secure: secure
-      },
-      {
-        tag: "reset-password",
-        show: true,
-        msg: "resetting your password ..",
-      },
-    );
-  },
-  Register: async (inputs, url, secure) => {
-    return STATE.ForwardToController(
-      {
-        URL: url,
-        Path: "v3/user/create",
-        Method: "POST",
-        JSONData: inputs,
-        Timeout: 20000,
-        Secure: secure
-      },
-      {
-        tag: "register",
-        show: true,
-        msg: "creating your account ..",
-      },
-    );
-  },
-  Login: async (inputs, remember, url, secure) => {
-    STORE.Local.setItem("default-device-name", inputs["devicename"]);
-    STORE.Cache.Set("default-email", inputs["email"]);
 
-    let x = await STATE.ForwardToController(
-      {
-        URL: url,
-        Path: "v3/user/login",
-        Method: "POST",
-        JSONData: inputs,
-        Timeout: 20000,
-        Secure: secure,
-      },
-      {
-        tag: "login",
-        show: true,
-        msg: "logging you in..",
-      },
-    );
-    if (x?.status === 200) {
-      STATE.v2_SetUser(x.data, remember, url, false);
-      window.location.replace("/");
-    }
-
-  },
   Org: STORE.Cache.GetObject("org"),
   updateOrg: (org) => {
     if (org) {
@@ -1328,48 +1112,6 @@ export var STATE = {
     STATE.UpdateOrgInProgress = false;
   },
   CreateOrgInProgress: false,
-  API_CreateOrg: async (org) => {
-    if (STATE.CreateOrgInProgress) {
-      return;
-    }
-    STATE.CreateOrgInProgress = true;
-
-    let resp = undefined;
-    try {
-      let FR = {
-        Path: "v3/org/create",
-        Method: "POST",
-        Timeout: 10000,
-      };
-
-      if (STATE.User) {
-        FR.JSONData = {
-          UID: STATE.User._id,
-          DeviceToken: STATE.User.DeviceToken.DT,
-          Org: org,
-        };
-      } else {
-        STATE.CreateOrgInProgress = false;
-        return undefined;
-      }
-
-      STATE.toggleLoading({
-        tag: "ORG_CREATE",
-        show: true,
-        msg: "creating organization ...",
-      });
-
-      resp = await STATE.API.method("forwardToController", FR);
-      if (resp?.status === 200) {
-        STATE.updateOrg(resp.data);
-      }
-    } catch (error) {
-      console.dir(error);
-    }
-
-    STATE.toggleLoading(undefined);
-    STATE.CreateOrgInProgress = false;
-  },
   API_ListGroups: async () => {
     try {
       let FR = {

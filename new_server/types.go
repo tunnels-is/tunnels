@@ -168,7 +168,6 @@ type REGISTER_FORM struct {
 	Email                 string
 	Password              string
 	Password2             string
-	Code                  string
 	AdditionalInformation string
 }
 

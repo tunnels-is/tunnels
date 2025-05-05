@@ -15,6 +15,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.jsx";
 import { Switch } from "@/components/ui/switch.jsx";
 import { Label } from "@/components/ui/label.jsx";
+import { useNavigate } from "react-router-dom";
 
 const useForm = () => {
   const [inputs, setInputs] = useState({});
@@ -23,9 +24,9 @@ const useForm = () => {
   const [mode, setMode] = useState(1);
   const [remember, setRememeber] = useState(false);
   const state = GLOBAL_STATE("login");
-  console.dir(state.Config)
   const [authServer, setAuthServer] = useState(state.Config?.AuthServers[0])
   const [secure, setSecure] = useState(true)
+  const navigate = useNavigate()
 
   const RemoveToken = () => {
     setTokenLogin(false);
@@ -95,13 +96,10 @@ const useForm = () => {
       return;
     }
 
-    let x = await state.Register(inputs, authServer, secure);
+    let x = await state.DoStuff(authServer, secure, "POST", "/v3/user/create", inputs, true, false)
     if (x.status === 200) {
-      STORE.Cache.Set("default-email", inputs["email"]);
-      inputs["password"] = "";
-      inputs["password2"] = "";
-      setInputs({ ...inputs });
-      setMode(1);
+      state.v2_SetUser(x.data, false, authServer, secure);
+      navigate("/servers")
     }
     setErrors({});
   };
@@ -151,7 +149,14 @@ const useForm = () => {
       return;
     }
 
-    await state.Login(inputs, remember, authServer, secure);
+    let x = await state.DoStuff(authServer, secure, "POST", "/v3/user/login", inputs, true, false)
+    if (x && x.status === 200) {
+      STORE.Local.setItem("default-device-name", inputs["devicename"]);
+      STORE.Cache.Set("default-email", inputs["email"]);
+      state.v2_SetUser(x.data, false, authServer, secure);
+      navigate("/servers")
+    }
+    // await state.Login(inputs, remember, authServer, secure);
     setErrors({});
   };
   const EnableSubmit = async () => {
@@ -185,7 +190,7 @@ const useForm = () => {
       ConfirmCode: inputs["code"],
     };
 
-    let x = await state.API_EnableAccount(request, authServer, secure);
+    let x = await state.DoStuff(authServer, secure, "POST", "/v3/user/enable", request, true, false)
     if (x.status === 200) {
       inputs["code"] = "";
       setInputs({ ...inputs });
@@ -252,7 +257,8 @@ const useForm = () => {
       ResetCode: inputs["code"],
     };
 
-    let x = await state.ResetPassword(request, authServer, secure);
+    let x = await state.DoStuff(authServer, secure, "POST", "/v3/user/reset/password", request, true, false)
+    // let x = await state.ResetPassword(request, authServer, secure);
     if (x.status === 200) {
       inputs["password"] = "";
       inputs["password2"] = "";
@@ -287,9 +293,10 @@ const useForm = () => {
     let request = {
       Email: inputs["email"],
     };
-    let status = await state.GetResetCode(request, authServer, secure);
-    if (status === true) {
-      // do we want to do anything more on success ??
+
+    let x = await state.DoStuff(authServer, secure, "POST", "/v3/user/reset/code", request, true, false)
+    if (x.status === 200) {
+      state.successNotification("reset code sent")
     }
     setErrors({});
   };
