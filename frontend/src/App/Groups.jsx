@@ -35,30 +35,35 @@ const Groups = () => {
 
 
   let getGroups = async () => {
-    let gs = await state.API_ListGroups()
-    setGroups(gs)
+    let resp = await state.DoStuff(null, null, "POST", "/v3/group/list", {}, false, false)
+    if (resp.status === 200) {
+      setGroups(resp.data)
+    } else {
+      state.toggleError("unable to list groups")
+    }
   }
+
   useEffect(() => {
-    state.GetBackendState();
+    // state.GetBackendState();
     getGroups()
   }, []);
 
 
   const onFieldChange = (i, field, value) => {
     groups[i][field] = value
-    // setGroups([...groups])
     state.renderPage("dns");
   }
 
   const saveGroup = async (i) => {
+    let resp = undefined
     if (groups[i]._id !== undefined) {
-      state.API_UpdateGroup(groups[i])
-      return
+      resp = await state.DoStuff(null, null, "POST", "/v3/group/update", { Group: groups[i], }, false, false)
+    } else {
+      resp = await state.DoStuff(null, null, "POST", "/v3/group/create", { Group: groups[i], }, false, false)
     }
 
-    let g = await state.API_CreateGroup(groups[i])
-    if (g !== undefined) {
-      groups[i] = g
+    if (resp.status === 200) {
+      groups[i] = resp.data
     } else {
       state.toggleError("unable to create group")
     }
@@ -67,14 +72,12 @@ const Groups = () => {
 
   const newGroup = () => {
     groups.push({ Tag: "my-new-group", Description: "This is a new group" })
-    // setGroups([...groups])
-    console.dir(groups)
     state.renderPage("dns");
   }
 
   const deleteGroup = async (i) => {
-    let ok = await state.API_DeleteGroup(groups[i]._id)
-    if (ok === true) {
+    let resp = await state.DoStuff(null, null, "POST", "/v3/group/delete", { GID: groups[i]._id, }, false, false)
+    if (resp.status === 200) {
       delete groups[i]
     }
     setGroups([...groups])
