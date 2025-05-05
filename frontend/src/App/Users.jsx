@@ -14,11 +14,6 @@ const Users = () => {
 		}
 	}
 
-
-	// const getUsers = async () => {
-	// 	let us = await state.API_GetUsers(0, 1000)
-	// }
-
 	useEffect(() => {
 		getUsers()
 	}, [])
