@@ -53,9 +53,9 @@ func launchAPIServer() {
 		mux.HandleFunc("/v3/group", API_GroupGet)
 		mux.HandleFunc("/v3/group/entities", API_GroupGetEntities)
 
-		mux.HandleFunc("/v3/servers/create", API_ServerCreate)
-		mux.HandleFunc("/v3/servers/update", API_ServerUpdate)
-		mux.HandleFunc("/v3/servers", API_ServerGet)
+		mux.HandleFunc("/v3/server/create", API_ServerCreate)
+		mux.HandleFunc("/v3/server/update", API_ServerUpdate)
+		mux.HandleFunc("/v3/servers", API_ServersForUser)
 
 		mux.HandleFunc("/v3/session", API_SessionCreate)
 
