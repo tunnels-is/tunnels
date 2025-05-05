@@ -8,11 +8,16 @@ const Users = () => {
 	const state = GLOBAL_STATE("groups")
 
 	const getUsers = async () => {
-		let us = await state.API_GetUsers(0, 1000)
-		if (us) {
-			setUsers(us)
+		let resp = await state.DoStuff(null, null, "POST", "/v3/user/list", { Offset: 0, Limit: 1000 }, false, false)
+		if (resp.status === 200) {
+			setUsers(resp.data)
 		}
 	}
+
+
+	// const getUsers = async () => {
+	// 	let us = await state.API_GetUsers(0, 1000)
+	// }
 
 	useEffect(() => {
 		getUsers()
