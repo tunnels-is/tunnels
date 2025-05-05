@@ -174,10 +174,6 @@ func SendRequestToURL(tc *tls.Config, method string, url string, data any, timeo
 func ForwardToController(FR *FORWARD_REQUEST) (any, int) {
 	defer RecoverAndLogToFile()
 
-	if !strings.HasSuffix(FR.URL, "/") {
-		FR.URL += "/"
-	}
-
 	// make sure api.tunnels.is is always secure
 	if strings.Contains(FR.URL, "api.tunnels.is") {
 		FR.Secure = true
