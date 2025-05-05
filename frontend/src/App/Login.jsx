@@ -96,7 +96,7 @@ const useForm = () => {
       return;
     }
 
-    let x = await state.DoStuff(authServer, secure, "POST", "/v3/user/create", inputs, true, false)
+    let x = await state.callController(authServer, secure, "POST", "/v3/user/create", inputs, true, false)
     if (x.status === 200) {
       state.v2_SetUser(x.data, false, authServer, secure);
       navigate("/servers")
@@ -149,7 +149,7 @@ const useForm = () => {
       return;
     }
 
-    let x = await state.DoStuff(authServer, secure, "POST", "/v3/user/login", inputs, true, false)
+    let x = await state.callController(authServer, secure, "POST", "/v3/user/login", inputs, true, false)
     if (x && x.status === 200) {
       STORE.Local.setItem("default-device-name", inputs["devicename"]);
       STORE.Cache.Set("default-email", inputs["email"]);
@@ -190,7 +190,7 @@ const useForm = () => {
       ConfirmCode: inputs["code"],
     };
 
-    let x = await state.DoStuff(authServer, secure, "POST", "/v3/user/enable", request, true, false)
+    let x = await state.callController(authServer, secure, "POST", "/v3/user/enable", request, true, false)
     if (x.status === 200) {
       inputs["code"] = "";
       setInputs({ ...inputs });
@@ -257,7 +257,7 @@ const useForm = () => {
       ResetCode: inputs["code"],
     };
 
-    let x = await state.DoStuff(authServer, secure, "POST", "/v3/user/reset/password", request, true, false)
+    let x = await state.callController(authServer, secure, "POST", "/v3/user/reset/password", request, true, false)
     // let x = await state.ResetPassword(request, authServer, secure);
     if (x.status === 200) {
       inputs["password"] = "";
@@ -294,7 +294,7 @@ const useForm = () => {
       Email: inputs["email"],
     };
 
-    let x = await state.DoStuff(authServer, secure, "POST", "/v3/user/reset/code", request, true, false)
+    let x = await state.callController(authServer, secure, "POST", "/v3/user/reset/code", request, true, false)
     if (x.status === 200) {
       state.successNotification("reset code sent")
     }
