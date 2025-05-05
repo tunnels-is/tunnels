@@ -4,6 +4,7 @@ import CustomSelect from "./component/CustomSelect";
 import { useNavigate } from "react-router-dom";
 import NewTable from "./component/newtable";
 import ObjectEditorDialog from "./component/ObjectEditorDialog";
+import STORE from "@/store";
 
 const PrivateServers = () => {
 	const state = GLOBAL_STATE("pservers")
@@ -12,13 +13,40 @@ const PrivateServers = () => {
 	const [editModalOpen, setEditModalOpen] = useState(false)
 	const [createModalOpen, setCreateModalOpen] = useState(false)
 
+	const getServers = async () => {
+		let resp = await state.DoStuff(null, null, "POST", "/v3/servers", { StartIndex: 0 }, false, false)
+		if (resp?.status === 200) {
+			if (resp.data?.length > 0) {
+				STORE.Cache.SetObject("private-servers", resp.data);
+				state.PrivateServers = resp.data;
+			} else {
+				state.errorNotification("Unable to find servers");
+				STORE.Cache.SetObject("private-servers", []);
+				state.PrivateServers = [];
+			}
+			state.renderPage("pservers");
+		} else {
+			state.errorNotification("Unable to find servers");
+			STORE.Cache.SetObject("private-servers", []);
+			state.PrivateServers = [];
+		}
+	}
+
 	useEffect(() => {
-		state.GetPrivateServers()
+		getServers()
+		// state.GetPrivateServers()
 	}, [])
 
 	const UpdateServer = async () => {
-		let resp = await state.API_UpdateServer(pserver)
+		let resp = await state.DoStuff(null, null, "POST", "/v3/server/update", pserver, false, false)
+		// let resp = await state.API_UpdateServer(pserver)
 		if (resp?.status === 200) {
+			state.PrivateServers.forEach((s, i) => {
+				if (s._id === pserver._id) {
+					state.PrivateServers[i] = resp.data;
+				}
+			});
+			state.updatePrivateServers();
 			state.renderPage("pservers")
 			setEditModalOpen(false)
 		}
@@ -37,12 +65,18 @@ const PrivateServers = () => {
 	const CreateServer = async () => {
 		let user = state.User
 		if (!user) {
+			state.errorNotification("Can not find user, please log in again")
 			return
 		}
 		nserver.Admin = user._id
 
-		let resp = await state.API_CreateServer(nserver)
+		let resp = await state.DoStuff(null, null, "POST", "/v3/server/create", nserver, false, false)
 		if (resp?.status === 200) {
+			if (!state.PrivateServers) {
+				state.PrivateServers = [];
+			}
+			state.PrivateServers.push(resp.data);
+			state.updatePrivateServers();
 			state.renderPage("pservers")
 			setCreateModalOpen(false)
 		}

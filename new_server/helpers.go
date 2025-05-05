@@ -40,10 +40,12 @@ func GENERATE_CODE() string {
 	return strings.ToUpper(string(b))
 }
 
-func decodeBody(r *http.Request, target any) error {
+func decodeBody(r *http.Request, target any) (err error) {
+	// ra, err := io.ReadAll(r.Body)
+	// fmt.Println(string(ra))
 	dec := json.NewDecoder(r.Body)
 	// dec.DisallowUnknownFields()
-	err := dec.Decode(target)
+	err = dec.Decode(target)
 	if err != nil {
 		return fmt.Errorf("Invalid request body: %s", err)
 	}
@@ -52,8 +54,15 @@ func decodeBody(r *http.Request, target any) error {
 
 func sendObject(w http.ResponseWriter, obj any) {
 	w.WriteHeader(200)
+	var err error
 	enc := json.NewEncoder(w)
-	err := enc.Encode(obj)
+	u, ok := obj.(*User)
+	if ok {
+		u.RemoveSensitiveInformation()
+		err = enc.Encode(u)
+	} else {
+		err = enc.Encode(obj)
+	}
 	if err != nil {
 		senderr(w, 500, "unable to encode response object")
 		return

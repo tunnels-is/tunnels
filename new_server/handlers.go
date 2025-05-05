@@ -185,6 +185,13 @@ func API_UserCreate(w http.ResponseWriter, r *http.Request) {
 	// 	}
 	// }
 
+	T := new(DeviceToken)
+	T.N = "registration"
+	T.DT = uuid.NewString()
+	T.Created = time.Now()
+
+	newUser.DeviceToken = T
+	newUser.Tokens = append(newUser.Tokens, T)
 	err = DB_CreateUser(newUser)
 	if err != nil {
 		senderr(w, 500, "Unexpected error, please try again in a moment")
@@ -804,7 +811,7 @@ func API_ServerGet(w http.ResponseWriter, r *http.Request) {
 
 	user, err := authenticateUserFromEmailOrIDAndToken("", F.UID, F.DeviceToken)
 	if err != nil {
-		senderr(w, 500, "Unknown error, please try again in a moment")
+		senderr(w, 500, err.Error())
 		return
 	}
 
