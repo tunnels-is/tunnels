@@ -93,6 +93,8 @@ export var STATE = {
         headers: { "Content-Type": "application/json" },
       });
 
+      console.log("RESPONSE: ", FR.URL, FR.Path)
+      console.dir(resp)
       // let resp = await STATE.API.method("forwardToController", FR);
       STATE.toggleLoading(undefined);
       if (resp && resp.status === 200) {
