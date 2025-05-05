@@ -8,9 +8,9 @@ const Devices = () => {
 	const state = GLOBAL_STATE("groups")
 
 	const getDevices = async () => {
-		let dev = await state.API_GetDevices(0, 1000)
-		if (dev) {
-			setDevices(dev)
+		let resp = await state.DoStuff(null, null, "POST", "/v3/device/list", { Offset: 0, Limit: 1000 }, false, false)
+		if (resp.status === 200) {
+			setDevices(resp.data)
 		}
 	}
 

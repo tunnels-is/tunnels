@@ -42,11 +42,11 @@ const InspectGroup = () => {
 	);
 
 	const addToGroup = async () => {
-		let e = await state.API_AddToGroup(id, addForm.id, addForm.type, addForm.idtype)
+		let e = await state.DoStuff(null, null, "POST", "/v3/group/add",
+			{ GroupID: id, TypeID: addForm.id, Type: addForm.type, TypeID: addForm.idtyp },
+			false, true)
 		if (e) {
 			if (addForm.type === "user") {
-				console.log("PU")
-				console.dir(e)
 				users.push(e)
 				setUsers([...users])
 			} else if (addForm.type === "server") {
@@ -61,13 +61,15 @@ const InspectGroup = () => {
 	}
 
 	const getEntities = async (type) => {
-		let e = await state.API_GetGroupEntities(id, type, 1000, 0)
+		let resp = await state.DoStuff(null, null, "POST", "/v3/group/entities",
+			{ GID: id, Type: type, Limit: 1000, Offset: 0 },
+			false, false)
 		if (type === "user") {
-			setUsers(e)
+			setUsers(resp.data)
 		} else if (type === "server") {
-			setServers(e)
+			setServers(resp.data)
 		} else if (type === "device") {
-			setDevices(e)
+			setDevices(resp.data)
 		}
 	}
 
@@ -94,7 +96,10 @@ const InspectGroup = () => {
 	}
 
 	const getGroup = async () => {
-		setGroup(await state.API_GetGroup(id))
+		let resp = await state.DoStuff(null, null, "POST", "/v3/group", { GID: id, }, false, false)
+		if (resp.status === 200) {
+			setGroup(resp.data)
+		}
 	}
 	useEffect(() => {
 		getGroup()
@@ -112,7 +117,7 @@ const InspectGroup = () => {
 
 	const generateServerTable = (servers) => {
 		let rows = []
-		servers.forEach((s, i) => {
+		servers?.forEach((s, i) => {
 			let tag = ""
 			state?.PrivateServers?.forEach(sn => {
 				if (sn._id === s._id) {
@@ -156,7 +161,7 @@ const InspectGroup = () => {
 
 	const generateUsersTable = (users) => {
 		let rows = []
-		users.forEach((u, i) => {
+		users?.forEach((u, i) => {
 			let row = {}
 			row.items = [
 				{
@@ -190,7 +195,7 @@ const InspectGroup = () => {
 
 	const generateDevicesTables = (devices) => {
 		let rows = []
-		devices.forEach((s, i) => {
+		devices?.forEach((s, i) => {
 			let row = {}
 			row.items = [
 				{
