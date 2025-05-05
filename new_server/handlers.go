@@ -47,11 +47,11 @@ func API_AcceptUserConnections(w http.ResponseWriter, r *http.Request) {
 		senderr(w, 401, "request not valid")
 		return
 	}
-	if CR.UserID.IsZero() || CR.UserEmail == "" {
+	if CR.UID.IsZero() || CR.UserEmail == "" {
 		senderr(w, 401, "invalid user identifier")
 		return
 	}
-	totalC, totalUserC := countConnections(CR.UserID.Hex())
+	totalC, totalUserC := countConnections(CR.UID.Hex())
 	if CR.RequestingPorts {
 		if totalC >= slots {
 			senderr(w, 400, "server is full")
@@ -211,7 +211,7 @@ func API_UserUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err = authenticateUserFromEmailOrIDAndToken("", UF.UserID, UF.DeviceToken)
+	_, err = authenticateUserFromEmailOrIDAndToken("", UF.UID, UF.DeviceToken)
 	if err != nil {
 		senderr(w, 401, err.Error())
 		return
@@ -277,9 +277,9 @@ func API_UserLogout(w http.ResponseWriter, r *http.Request) {
 		senderr(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
-	user, err := authenticateUserFromEmailOrIDAndToken("", LF.UserID, LF.DeviceToken)
+	user, err := authenticateUserFromEmailOrIDAndToken("", LF.UID, LF.DeviceToken)
 	if err != nil {
-		senderr(w, 500, "Unknown error, please try again in a moment")
+		senderr(w, 500, err.Error())
 		return
 	}
 	if user == nil {
@@ -291,7 +291,7 @@ func API_UserLogout(w http.ResponseWriter, r *http.Request) {
 		user.Tokens = make([]*DeviceToken, 0)
 	} else {
 		user.Tokens = slices.DeleteFunc(user.Tokens, func(dt *DeviceToken) bool {
-			return dt.DT == LF.DeviceToken
+			return dt.DT == LF.LogoutToken
 		})
 	}
 
@@ -523,7 +523,7 @@ func API_GroupAdd(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := authenticateUserFromEmailOrIDAndToken("", F.UserID, F.DeviceToken)
+	user, err := authenticateUserFromEmailOrIDAndToken("", F.UID, F.DeviceToken)
 	if err != nil {
 		senderr(w, 500, err.Error())
 		return
@@ -598,7 +598,7 @@ func API_GroupRemove(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := authenticateUserFromEmailOrIDAndToken("", F.UserID, F.DeviceToken)
+	user, err := authenticateUserFromEmailOrIDAndToken("", F.UID, F.DeviceToken)
 	if err != nil {
 		senderr(w, 500, err.Error())
 		return
@@ -628,7 +628,7 @@ func API_GroupUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := authenticateUserFromEmailOrIDAndToken("", F.UserID, F.DeviceToken)
+	user, err := authenticateUserFromEmailOrIDAndToken("", F.UID, F.DeviceToken)
 	if err != nil {
 		senderr(w, 500, err.Error())
 		return
@@ -910,7 +910,7 @@ func API_SessionCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := authenticateUserFromEmailOrIDAndToken(CR.UserEmail, CR.UserID, CR.DeviceToken)
+	user, err := authenticateUserFromEmailOrIDAndToken(CR.UserEmail, CR.UID, CR.DeviceToken)
 	if err != nil {
 		senderr(w, 401, err.Error())
 		return
@@ -1100,7 +1100,7 @@ func API_ActivateLicenseKey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := authenticateUserFromEmailOrIDAndToken("", AF.UserID, AF.DeviceToken)
+	user, err := authenticateUserFromEmailOrIDAndToken("", AF.UID, AF.DeviceToken)
 	if err != nil {
 		senderr(w, 401, err.Error())
 		return

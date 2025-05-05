@@ -54,7 +54,7 @@ func CreateClientCoreMapping(CRR *types.ServerConnectResponse, CR *types.ServerC
 				continue
 			}
 
-			clientCoreMappings[i].ID = CR.UserID.Hex()
+			clientCoreMappings[i].ID = CR.UID.Hex()
 			clientCoreMappings[i].DeviceToken = CR.DeviceToken
 			clientCoreMappings[i].EH = EH
 			clientCoreMappings[i].Created = time.Now()
