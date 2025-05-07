@@ -118,7 +118,7 @@ const SideBar = () => {
       {
         title: "Support",
         items: [
-          { icon: InfoCircledIcon, label: "Chat", route: "help", user: false },
+          { icon: InfoCircledIcon, label: "Support", route: "help", user: false },
           {
             icon: AccessibilityIcon,
             label: "Guides",

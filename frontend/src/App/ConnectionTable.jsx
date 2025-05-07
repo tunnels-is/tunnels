@@ -20,7 +20,6 @@ const ConnectionTable = () => {
       if (!user) {
         return <Navigate to={"/login"} />;
       }
-      await state.GetPrivateServers();
       await state.GetServers();
       state.GetBackendState();
     };
@@ -347,7 +346,6 @@ const ConnectionTable = () => {
 
       {rows.length > 0 && (
         <NewTable
-          title={"Tunnels"}
           tableID={"tunnels"}
           className="tunnels-table"
           placeholder={"Search .."}
@@ -356,7 +354,7 @@ const ConnectionTable = () => {
           rows={rows}
           button={{
             text: "New Tunnel",
-            click: function () {
+            click: function() {
               state.createTunnel();
             },
           }}
@@ -365,7 +363,6 @@ const ConnectionTable = () => {
 
       {statsRows.length > 0 && (
         <NewTable
-          title={"Connection Stats"}
           tableID={"connection-stats"}
           className="connection-stats"
           placeholder={"Search .."}

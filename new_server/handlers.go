@@ -435,8 +435,74 @@ func API_UserList(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(204)
 		return
 	}
+	for i := range users {
+		users[i].RemoveSensitiveInformation()
+	}
 
 	sendObject(w, users)
+}
+
+func API_DeviceUpdate(w http.ResponseWriter, r *http.Request) {
+	defer BasicRecover()
+	F := new(FORM_UPDATE_DEVICE)
+	err := decodeBody(r, F)
+	if err != nil {
+		senderr(w, 400, "Invalid request body", slog.Any("error", err))
+		return
+	}
+
+	user, err := authenticateUserFromEmailOrIDAndToken("", F.UID, F.DeviceToken)
+	if err != nil {
+		senderr(w, 500, err.Error())
+		return
+	}
+
+	if !user.IsAdmin {
+		if !user.IsManager {
+			senderr(w, 401, "You are not allowed to update devices")
+			return
+		}
+	}
+
+	err = DB_UpdateDevice(F.Device)
+	if err != nil {
+		ERR(3, err)
+		senderr(w, 500, "Unknown error, please try again in a moment")
+		return
+	}
+
+	w.WriteHeader(200)
+}
+
+func API_DeviceDelete(w http.ResponseWriter, r *http.Request) {
+	defer BasicRecover()
+	F := new(FORM_DELETE_DEVICE)
+	err := decodeBody(r, F)
+	if err != nil {
+		senderr(w, 400, "Invalid request body", slog.Any("error", err))
+		return
+	}
+
+	user, err := authenticateUserFromEmailOrIDAndToken("", F.UID, F.DeviceToken)
+	if err != nil {
+		senderr(w, 500, err.Error())
+		return
+	}
+
+	if !user.IsAdmin {
+		if !user.IsManager {
+			senderr(w, 401, "You are not allowed to delete device")
+			return
+		}
+	}
+
+	err = DB_DeleteDeviceByID(F.DID)
+	if err != nil {
+		senderr(w, 500, "Unknown error, please try again in a moment")
+		return
+	}
+
+	w.WriteHeader(200)
 }
 
 func API_DeviceList(w http.ResponseWriter, r *http.Request) {
@@ -473,6 +539,49 @@ func API_DeviceList(w http.ResponseWriter, r *http.Request) {
 	}
 
 	sendObject(w, users)
+}
+
+func API_DeviceCreate(w http.ResponseWriter, r *http.Request) {
+	defer BasicRecover()
+	F := new(FORM_CREATE_DEVICE)
+	err := decodeBody(r, F)
+	if err != nil {
+		senderr(w, 400, "Invalid request body", slog.Any("error", err))
+		return
+	}
+
+	if F.Device == nil || F.Device.Tag == "" {
+		senderr(w, 400, "Invalid device format")
+		return
+	}
+
+	user, err := authenticateUserFromEmailOrIDAndToken("", F.UID, F.DeviceToken)
+	if err != nil {
+		senderr(w, 500, err.Error())
+		return
+	}
+
+	if !user.IsAdmin {
+		if !user.IsManager {
+			senderr(w, 401, "You are not allowed to create devices")
+			return
+		}
+	}
+
+	F.Device.ID = primitive.NewObjectID()
+	F.Device.CreatedAt = time.Now()
+	if F.Device.Groups == nil {
+		F.Device.Groups = make([]primitive.ObjectID, 0)
+	}
+
+	err = DB_CreateDevice(F.Device)
+	if err != nil {
+		ERR(3, err)
+		senderr(w, 500, "Unable to create group, please try again later")
+		return
+	}
+
+	sendObject(w, F.Device)
 }
 
 func API_GroupCreate(w http.ResponseWriter, r *http.Request) {

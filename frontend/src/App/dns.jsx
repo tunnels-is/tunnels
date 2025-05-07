@@ -378,14 +378,13 @@ const DNS = () => {
         <TabsContent value="blocklist">
           <NewTable
             tableID="dns-lists"
-            title={"Block Lists"}
             className="domain-list-table"
             background={true}
             header={headers}
             rows={rows}
             button={{
               text: "New Blocklist",
-              click: function () {
+              click: function() {
                 navigate("/inspect/blocklist");
               },
             }}
@@ -396,7 +395,6 @@ const DNS = () => {
             <>
               <NewTable
                 tableID="dns-blocked"
-                title={"Blocked Domains"}
                 className="dns-stats"
                 background={true}
                 header={headersDNSstats}
@@ -410,7 +408,6 @@ const DNS = () => {
             <>
               <NewTable
                 tableID="dns-resolved"
-                title={"Resolved Domains"}
                 className="dns-stats"
                 background={true}
                 header={headerDNSresolves}

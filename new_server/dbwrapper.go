@@ -64,6 +64,64 @@ func ConnectToDB(connectionString string) (err error) {
 	return
 }
 
+func DB_DeleteDeviceByID(id primitive.ObjectID) (err error) {
+	defer BasicRecover()
+
+	opt := options.Delete()
+
+	filter := bson.M{"_id": id}
+	_, err = DB.Database(DEVICE_DATABASE).
+		Collection(DEVICE_COLLECTION).
+		DeleteOne(
+			context.Background(),
+			filter,
+			opt,
+		)
+	if err != nil {
+		ADMIN(3, "Unable to delete device by id: ", id, err)
+		return err
+	}
+
+	return
+}
+
+func DB_UpdateDevice(D *Device) (err error) {
+	defer BasicRecover()
+
+	filter := bson.M{
+		"_id": D.ID,
+	}
+
+	res, err := DB.Database(DEVICE_DATABASE).
+		Collection(DEVICE_COLLECTION).
+		UpdateOne(
+			context.Background(),
+			filter,
+			bson.D{
+				{
+					Key: "$set",
+					Value: bson.D{
+						{Key: "Tag", Value: D.Tag},
+					},
+				},
+			},
+			options.Update(),
+		)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return nil
+		}
+		ADMIN(3, "Unable to update device", D.ID.Hex(), err)
+		return err
+	}
+	if res.MatchedCount == 0 {
+		ADMIN(3, "Unable to update device(no match count)", D.ID.Hex(), err)
+		return errors.New("unable to modify document")
+	}
+
+	return
+}
+
 func DB_GetDevices(limit, offset int64) (DL []*Device, err error) {
 	defer BasicRecover()
 
@@ -655,6 +713,24 @@ func DB_UpdateServer(S *Server) (RS *Server, err error) {
 	if err != nil {
 		ADMIN(3, "Unable to update server: ", S.ID.Hex())
 		return nil, err
+	}
+
+	return
+}
+
+func DB_CreateDevice(D *Device) (err error) {
+	defer BasicRecover()
+
+	_, err = DB.Database(DEVICE_DATABASE).
+		Collection(DEVICE_COLLECTION).
+		InsertOne(
+			context.Background(),
+			D,
+			options.InsertOne(),
+		)
+	if err != nil {
+		ADMIN(3, "Unable to create device: ", err)
+		return err
 	}
 
 	return

@@ -44,9 +44,33 @@ export var STATE = {
     });
   },
 
+  GetServers: async () => {
+    let resp = await STATE.callController(null, null, "POST", "/v3/servers", { StartIndex: 0 }, false, false)
+    if (resp?.status === 200) {
+      if (resp.data?.length > 0) {
+        STORE.Cache.SetObject("private-servers", resp.data);
+        state.PrivateServers = resp.data;
+      } else {
+        state.errorNotification("Unable to find servers");
+        STORE.Cache.SetObject("private-servers", []);
+        state.PrivateServers = [];
+      }
+      state.renderPage("pservers");
+    } else {
+      state.errorNotification("Unable to find servers");
+      STORE.Cache.SetObject("private-servers", []);
+      state.PrivateServers = [];
+    }
+  },
   // NEW API
-  // TODO: .. add atomic
+  calls: new Map(),
   callController: async (url, secure, method, route, data, skipAuth, boolResponse) => {
+    if (STATE.calls.get(route) === true) {
+      console.log("call already in progress, backing off")
+      return { status: 0, }
+    }
+    STATE.calls.set(route, true)
+
     try {
       STATE.toggleLoading({
         logTag: "",
@@ -96,7 +120,8 @@ export var STATE = {
 
       console.log("RESPONSE: ", FR.URL, FR.Path)
       console.dir(resp)
-      // let resp = await STATE.API.method("forwardToController", FR);
+      // STATE.callInProgress = false
+      STATE.calls.set(route, false)
       STATE.toggleLoading(undefined);
       if (resp && resp.status === 200) {
         if (boolResponse === true) {
@@ -106,6 +131,8 @@ export var STATE = {
       return { data: resp.data, status: resp.status }
 
     } catch (error) {
+      // STATE.callInProgress = false
+      STATE.calls.set(route, false)
       console.dir(error)
       STATE.toggleLoading(undefined);
 
@@ -429,11 +456,12 @@ export var STATE = {
   UserSaveModifiedSate: () => {
     STORE.Cache.SetObject("modifiedUser", STATE.modifiedUser);
   },
-  refreshApiKey: () => {
+  refreshApiKey: async () => {
     STATE.createObjectIfEmpty("modifiedUser");
     STATE.modifiedUser.APIKey = uuidv4();
     STATE.UserSaveModifiedSate();
-    STATE.rerender();
+    await STATE.UpdateUser()
+    STATE.renderPage("account");
   },
   changeServerOnTunnelUsingTag: (tunTag, index) => {
     console.dir(tunTag);
@@ -679,14 +707,14 @@ export var STATE = {
       };
 
       let x = await STATE.callController(null, null, "POST", "/v3/user/update",
-        { APIKey: STATE.modifiedUser.APIKey },
+        { APIKey: newUser.APIKey },
         false, true)
-      if (x && x.status === 200) {
+      if (x === true) {
         STORE.Cache.SetObject("user", newUser);
         STORE.Cache.DelObject("modifiedUser");
         STORE.User = newUser;
         STORE.modifiedUser = undefined;
-        STATE.showSuccessToast("User updated", undefined);
+        STATE.successNotification("User updated")
       } else {
         STATE.toggleError(x);
       }
