@@ -4,11 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
-import {
-  Dialog,
-  DialogContent,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 
 import {
   Edit,
@@ -23,7 +19,7 @@ import {
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-
+import { Label } from "@/components/ui/label";
 
 const ConfigDNSRecordEditor = () => {
   const state = GLOBAL_STATE("DNSRecordForm");
@@ -141,12 +137,12 @@ const ConfigDNSRecordEditor = () => {
         ))}
         {(!state.Config?.DNSRecords ||
           state.Config.DNSRecords.length === 0) && (
-            <div className="text-center p-12 border border-dashed rounded-lg bg-muted/30">
-              <p className="text-muted-foreground">
-                No DNS records found. Add your first record to get started.
-              </p>
-            </div>
-          )}
+          <div className="text-center p-12 border border-dashed rounded-lg bg-muted/30">
+            <p className="text-muted-foreground">
+              No DNS records found. Add your first record to get started.
+            </p>
+          </div>
+        )}
       </div>
 
       {selectedIndex !== null && (

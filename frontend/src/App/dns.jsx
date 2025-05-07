@@ -17,7 +17,7 @@ import FormKeyValue from "./component/formkeyvalue";
 import { useNavigate } from "react-router-dom";
 import NewTable from "./component/newtable";
 import dayjs from "dayjs";
-
+import { Check, ExternalLink, Tag, Trash2, X } from "lucide-react";
 import GLOBAL_STATE from "../state";
 import STORE from "../store";
 import { Switch } from "@/components/ui/switch";
@@ -232,6 +232,76 @@ const DNS = () => {
     { value: "Resolved" },
   ];
 
+  const customRowBlockList = (row) => {
+    const [status, tag, count, remove] = row.items;
+    const isEnabled = status.value.props.className.includes("enabled");
+
+    return (
+      <div className="group mb-3 p-2 rounded-2xl bg-black border border-slate-800 shadow-sm hover:shadow-md transition-all duration-300 flex justify-between items-center gap-4 relative overflow-hidden">
+        <div className="flex items-center gap-6 z-10">
+          <div
+            className={`relative flex items-center gap-1.5 text-xs font-medium px-3.5 py-2 rounded-full w-fit cursor-pointer transition-all duration-300 ${
+              isEnabled
+                ? "bg-emerald-800 text-emerald-300 hover:bg-emerald-700"
+                : "bg-amber-800 text-amber-300 hover:bg-amber-700"
+            }`}
+            onClick={status.value.props.onClick}
+          >
+            <span
+              className={`flex items-center justify-center w-4 h-4 rounded-full ${
+                isEnabled ? "bg-emerald-600" : "bg-amber-600"
+              }`}
+            >
+              {isEnabled ? (
+                <Check className="w-2.5 h-2.5 text-white" />
+              ) : (
+                <X className="w-2.5 h-2.5 text-white" />
+              )}
+            </span>
+            <span className="font-semibold">{status.value.props.children}</span>
+          </div>
+
+          <div className="flex items-center gap-2.5">
+            <div className="flex items-center justify-center w-7 h-7 rounded-full bg-slate-800">
+              <Tag className="w-3.5 h-3.5 text-slate-300" />
+            </div>
+            <div className="text-sm font-semibold text-slate-200 truncate max-w-[180px]">
+              {tag.value}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <div className="flex items-center justify-center w-7 h-7 rounded-full bg-slate-800">
+              <ExternalLink className="w-3.5 h-3.5 text-slate-300" />
+            </div>
+            <div className="flex items-center gap-1 text-sm text-slate-400">
+              <span className="font-semibold text-slate-300">
+                {count.value}
+              </span>
+              <span>domains</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center z-10">
+          <button
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg transition-all duration-300 ${
+              remove.value.props.className.includes("disabled")
+                ? "bg-slate-800 text-slate-600 cursor-not-allowed"
+                : "bg-red-800 text-red-300 hover:bg-red-700 group-hover:shadow-sm"
+            }`}
+            onClick={remove.value.props.onClick}
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            <span className="text-sm font-medium">
+              {remove.value.props.children}
+            </span>
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="">
       {modified === true && (
@@ -378,16 +448,17 @@ const DNS = () => {
         <TabsContent value="blocklist">
           <NewTable
             tableID="dns-lists"
-            className="domain-list-table"
+            className="!p-0 mt-5"
             background={true}
             header={headers}
             rows={rows}
             button={{
               text: "New Blocklist",
-              click: function() {
+              click: function () {
                 navigate("/inspect/blocklist");
               },
             }}
+            customRow={(row) => customRowBlockList(row)}
           />
         </TabsContent>
         <TabsContent value="blockdomains">
