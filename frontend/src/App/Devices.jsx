@@ -5,6 +5,7 @@ import NewTable from "./component/newtable";
 import { v4 as uuidv4 } from "uuid";
 import ObjectEditorDialog from "./component/ObjectEditorDialog";
 import { Edit } from "lucide-react";
+import NewObjectEditorDialog from "./NewObjectEdiorDialog";
 
 const Devices = () => {
 	const [devices, setDevices] = useState([])
@@ -29,15 +30,20 @@ const Devices = () => {
 	}
 
 	const saveDevice = async () => {
+		let resp = undefined
 		if (device._id !== undefined) {
-			return
+			resp = await state.callController(null, null, "POST", "/v3/device/update", { Device: device }, false, false)
+			if (resp.status === 200) {
+				state.renderPage("groups")
+			}
+		} else {
+			resp = await state.callController(null, null, "POST", "/v3/device/create", { Device: device }, false, false)
+			if (resp.status === 200) {
+				setDevice(resp.data)
+				state.renderPage("groups")
+			}
 		}
 
-		let resp = await state.callController(null, null, "POST", "/v3/device/create", { Device: device }, false, false)
-		if (resp.status === 200) {
-			setDevice(resp.data)
-			state.renderPage("groups")
-		}
 	}
 
 	const deviceCreateOpts = {
@@ -131,15 +137,23 @@ const Devices = () => {
 				}}
 			/>
 
-			<ObjectEditorDialog
+			<NewObjectEditorDialog
 				open={editModalOpen}
 				onOpenChange={setEditModalOpen}
 				object={device}
-				editorOpts={deviceCreateOpts}
 				title="Device"
 				description=""
 				readOnly={false}
+				saveButton={() => {
+					console.log("save")
+					saveDevice()
+				}}
+				onChange={(key, value, type) => {
+					device[key] = value
+					console.log(key, value, type)
+				}}
 			/>
+
 		</div >
 	)
 }
