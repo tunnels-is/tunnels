@@ -22,7 +22,6 @@ import Servers from "./App/Servers";
 import Welcome from "./App/Welcome";
 import SideBar from "./App/SideBar";
 import Login from "./App/Login";
-import Org from "./App/Org";
 import DNS from "./App/dns";
 import DNSRecords from "./App/DNSRecords";
 
@@ -33,6 +32,7 @@ import WS from "./ws";
 import Groups from "./App/Groups";
 import Users from "./App/Users";
 import Devices from "./App/Devices";
+import NewObjectEditor from "./App/NewObjectEdior";
 
 // Use this to automatically turn on debug
 STORE.Cache.Set("debug", true);
@@ -118,6 +118,8 @@ const LaunchApp = () => {
 
                     <Route path="login" element={<Login />} />
                     <Route path="help" element={<Welcome />} />
+
+                    <Route path="test" element={<NewObjectEditor />} />
 
                     <Route path="*" element={<Servers />} />
                   </>

@@ -44,22 +44,25 @@ export var STATE = {
     });
   },
 
+  // new form
+  obj: { id: "lksdfsld", intstuff: 1, Tag: "lksdfls", bll: true, x: {}, x2: [] },
+
   GetServers: async () => {
     let resp = await STATE.callController(null, null, "POST", "/v3/servers", { StartIndex: 0 }, false, false)
     if (resp?.status === 200) {
       if (resp.data?.length > 0) {
         STORE.Cache.SetObject("private-servers", resp.data);
-        state.PrivateServers = resp.data;
+        STATE.PrivateServers = resp.data;
       } else {
-        state.errorNotification("Unable to find servers");
+        STATE.errorNotification("Unable to find servers");
         STORE.Cache.SetObject("private-servers", []);
-        state.PrivateServers = [];
+        STATE.PrivateServers = [];
       }
-      state.renderPage("pservers");
-    } else {
-      state.errorNotification("Unable to find servers");
+      STATE.renderPage("pservers");
+    } else if (resp?.status !== 0) {
+      STATE.errorNotification("Unable to find servers");
       STORE.Cache.SetObject("private-servers", []);
-      state.PrivateServers = [];
+      STATE.PrivateServers = [];
     }
   },
   // NEW API
