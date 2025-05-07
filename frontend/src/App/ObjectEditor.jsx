@@ -473,67 +473,67 @@ const ObjectEditor = (props) => {
     let delB = null;
     let topB = null;
 
-    if (x.title !== "" && x.title !== undefined){
-      
-    titleD = React.createElement(
-            "div",
-            {
-              key: x.key + "_title",
-              className: "editor-title",
-            },
-            x.title,
-          )
+    if (x.title !== "" && x.title !== undefined) {
+
+      titleD = React.createElement(
+        "div",
+        {
+          key: x.key + "_title",
+          className: "editor-title",
+        },
+        x.title,
+      )
     }
 
     if (titleD === null && x.type === "array") {
       titleD =
         x.id !== ""
           ? React.createElement(
-              "div",
-              {
-                key: x.key + "_title",
-                className: "editor-title text-base font-medium text-white/90 mb-2",
-              },
-              x.id,
-            )
+            "div",
+            {
+              key: x.key + "_title",
+              className: "editor-title text-base font-medium text-white/90 mb-2",
+            },
+            x.id,
+          )
           : null;
     }
 
     newB =
       x.newButton !== undefined
         ? React.createElement(
-            Button,
-            {
-              key: x.key + "_new_button",
-              variant: "outline",
-              size: "icon",
-              className: "h-6 w-6 p-0 rounded-full bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border-transparent",
-              onClick: () => {
-                x.newButton(x.origin);
-                reload();
-              },
+          Button,
+          {
+            key: x.key + "_new_button",
+            variant: "outline",
+            size: "icon",
+            className: "h-6 w-6 p-0 rounded-full bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border-transparent",
+            onClick: () => {
+              x.newButton(x.origin);
+              reload();
             },
-            React.createElement(Plus, { className: "h-3 w-3" })
-          )
+          },
+          React.createElement(Plus, { className: "h-3 w-3" })
+        )
         : null;
 
     delB =
       x.delButton !== undefined
         ? React.createElement(
-            Button,
-            {
-              key: x.key + "_del_button",
-              variant: "outline",
-              size: "sm",
-              className: "h-7 px-2 py-1 text-xs bg-red-500/10 text-red-400 hover:bg-red-500/20 border-transparent",
-              onClick: () => {
-                x.delButton(x.parent.origin);
-                reload();
-              },
+          Button,
+          {
+            key: x.key + "_del_button",
+            variant: "outline",
+            size: "sm",
+            className: "h-7 px-2 py-1 text-xs bg-red-500/10 text-red-400 hover:bg-red-500/20 border-transparent",
+            onClick: () => {
+              x.delButton(x.parent.origin);
+              reload();
             },
-            React.createElement(Trash2, { className: "h-3 w-3 mr-1" }),
-            x.type === "object" ? "Delete" : "Delete"
-          )
+          },
+          React.createElement(Trash2, { className: "h-3 w-3 mr-1" }),
+          x.type === "object" ? "Delete" : "Delete"
+        )
         : null;
 
     if (titleD !== null || newB !== null) {
@@ -664,8 +664,8 @@ const ObjectEditor = (props) => {
     <>
       <div className="button-wrap flex gap-3 mb-3">
         {props.opts.backButton && (
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             onClick={() => props.opts.backButton.func()}
             className="h-9 border-[#333] bg-[#111] hover:bg-[#222] hover:text-white/90 text-white/80 shadow-sm"
           >

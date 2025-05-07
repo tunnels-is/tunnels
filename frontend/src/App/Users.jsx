@@ -18,7 +18,6 @@ const Users = () => {
 		getUsers()
 	}, [])
 
-
 	const generateUsersTable = (users) => {
 		let rows = []
 		users.forEach((u, i) => {
@@ -71,10 +70,7 @@ const Users = () => {
 				header={usersHeaders}
 				rows={usersRows}
 				placeholder={"Search.."}
-				button={{
-					text: "Add User",
-					click: () => setDialog(true)
-				}}
+
 			/>
 		</div >
 	)

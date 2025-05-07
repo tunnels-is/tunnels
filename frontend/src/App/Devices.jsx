@@ -2,16 +2,58 @@ import React, { useEffect, useState } from "react";
 import GLOBAL_STATE from "../state"
 import dayjs from "dayjs";
 import NewTable from "./component/newtable";
+import { v4 as uuidv4 } from "uuid";
+import ObjectEditorDialog from "./component/ObjectEditorDialog";
+import { Edit } from "lucide-react";
 
 const Devices = () => {
 	const [devices, setDevices] = useState([])
+	const [device, setDevice] = useState(undefined)
 	const state = GLOBAL_STATE("groups")
+	const [editModalOpen, setEditModalOpen] = useState(false)
 
 	const getDevices = async () => {
 		let resp = await state.callController(null, null, "POST", "/v3/device/list", { Offset: 0, Limit: 1000 }, false, false)
 		if (resp.status === 200) {
 			setDevices(resp.data)
+			state.renderPage("groups")
 		}
+	}
+	const deleteDevice = async (id) => {
+		let ok = await state.callController(null, null, "POST", "/v3/device/delete", { DID: id }, false, true)
+		if (ok === true) {
+			let d = devices.filter((d) => d._id !== id)
+			setDevices([...d])
+			state.renderPage("groups")
+		}
+	}
+
+	const saveDevice = async () => {
+		if (device._id !== undefined) {
+			return
+		}
+
+		let resp = await state.callController(null, null, "POST", "/v3/device/create", { Device: device }, false, false)
+		if (resp.status === 200) {
+			setDevice(resp.data)
+			state.renderPage("groups")
+		}
+	}
+
+	const deviceCreateOpts = {
+		baseClass: "",
+		maxDepth: 1000,
+		onlyKeys: false,
+		disabled: {
+			root__id: true,
+			root_CreatedAt: true,
+		},
+		saveButton: saveDevice,
+	}
+
+	const newDevice = () => {
+		setDevice({ Tag: "", Groups: [] })
+		setEditModalOpen(true)
 	}
 
 	useEffect(() => {
@@ -21,28 +63,37 @@ const Devices = () => {
 
 	const generateDeviceTable = (devices) => {
 		let rows = []
-		devices.forEach((u, i) => {
+		devices.forEach((d, i) => {
 			let row = {}
 			row.items = [
 				{
 					type: "text",
 					color: "blue",
-					value: u.Email,
+					value: d.Tag,
 				},
 				{
 					type: "text",
 					minWidth: "250px",
-					value: u._id,
+					value: d._id,
 				},
 				{
 					type: "text",
-					value: dayjs(u.Added).format("DD-MM-YYYY HH:mm:ss"),
+					value: dayjs(d.Added).format("DD-MM-YYYY HH:mm:ss"),
+				},
+				{
+					type: "text",
+					value: <Edit className="h-4 w-4 mr-1" />,
+					click: () => {
+						setDevice(d)
+						setEditModalOpen(true)
+
+					}
 				},
 				{
 					type: "text",
 					color: "red",
 					click: () => {
-						// removeEntity(id, u._id, "user")
+						deleteDevice(d._id)
 					},
 					value: "Delete"
 				},
@@ -56,14 +107,15 @@ const Devices = () => {
 
 	let deviceRow = generateDeviceTable(devices)
 	const devicesHeaders = [
-		{ value: "Email" },
+		{ value: "Tag" },
 		{ value: "ID", minWidth: "250px" },
 		{ value: "Added" },
+		{ value: "" },
 		{ value: "" }
 	]
 
 	return (
-		<div className="ab device-wrapper">
+		<div className="">
 			<NewTable
 				background={true}
 				title={""}
@@ -73,8 +125,20 @@ const Devices = () => {
 				placeholder={"Search.."}
 				button={{
 					text: "Add Device",
-					// click: () => setDialog(true)
+					click: () => {
+						newDevice()
+					}
 				}}
+			/>
+
+			<ObjectEditorDialog
+				open={editModalOpen}
+				onOpenChange={setEditModalOpen}
+				object={device}
+				editorOpts={deviceCreateOpts}
+				title="Device"
+				description=""
+				readOnly={false}
 			/>
 		</div >
 	)
