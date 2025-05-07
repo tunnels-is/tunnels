@@ -13,27 +13,9 @@ const PrivateServers = () => {
 	const [editModalOpen, setEditModalOpen] = useState(false)
 	const [createModalOpen, setCreateModalOpen] = useState(false)
 
-	const getServers = async () => {
-		let resp = await state.callController(null, null, "POST", "/v3/servers", { StartIndex: 0 }, false, false)
-		if (resp?.status === 200) {
-			if (resp.data?.length > 0) {
-				STORE.Cache.SetObject("private-servers", resp.data);
-				state.PrivateServers = resp.data;
-			} else {
-				state.errorNotification("Unable to find servers");
-				STORE.Cache.SetObject("private-servers", []);
-				state.PrivateServers = [];
-			}
-			state.renderPage("pservers");
-		} else {
-			state.errorNotification("Unable to find servers");
-			STORE.Cache.SetObject("private-servers", []);
-			state.PrivateServers = [];
-		}
-	}
 
 	useEffect(() => {
-		getServers()
+		state.GetServers()
 	}, [])
 
 	const UpdateServer = async () => {
@@ -86,8 +68,15 @@ const PrivateServers = () => {
 		disabled: {
 			root_Admin: true,
 			root__id: true,
+			d0_Groups: true,
+
+		},
+		hidden: {
+			Groups: true,
+
 		},
 		saveButton: CreateServer,
+
 	}
 
 

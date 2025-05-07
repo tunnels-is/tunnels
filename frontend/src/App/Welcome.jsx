@@ -28,9 +28,6 @@ const Welcome = () => {
 
   return (
     <div className="p-6 space-y-6">
-      <h2 className="text-2xl font-bold text-white">Support Platforms</h2>
-      <Separator />
-
       <div className="grid gap-4">
         {STORE.SupportPlatforms.map((s) => (
           <Card key={s.name} className="hover:shadow-md transition">

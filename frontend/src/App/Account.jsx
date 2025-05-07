@@ -75,10 +75,11 @@ const Account = () => {
       <Tabs defaultValue="account">
         <TabsList className=" justify-start gap-2 mb-4">
           <TabsTrigger value="account">Account</TabsTrigger>
-          <TabsTrigger value="loggedin">Logged In Devices</TabsTrigger>
+          <TabsTrigger value="loggedin">Devices</TabsTrigger>
+          <TabsTrigger value="license">License Key</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="account">
+        <TabsContent key={state?.User?._id} value="account">
           {state?.User && (
             <div className="space-y-6 rounded-xl border p-6 shadow-sm bg-black">
               <div className="space-y-4">
@@ -112,7 +113,6 @@ const Account = () => {
                   />
                 )}
 
-                <KeyValue label="License" value={state.User.Key?.Key} />
               </div>
 
               <div className="flex flex-col gap-3">
@@ -123,21 +123,13 @@ const Account = () => {
                   Log Out All Devices
                 </button>
 
-                {!state.modifiedUser ? (
-                  <button
-                    className="w-full bg-primary text-black py-2 rounded-md text-sm font-medium hover:bg-primary/90 transition"
-                    onClick={() => state.refreshApiKey()}
-                  >
-                    Re-Generate API Key
-                  </button>
-                ) : (
-                  <button
-                    className="w-full bg-primary text-black py-2 rounded-md text-sm font-medium hover:bg-primary/90 transition"
-                    onClick={() => state.UpdateUser()}
-                  >
-                    Save API Key
-                  </button>
-                )}
+
+                <button
+                  className="w-full bg-primary text-black py-2 rounded-md text-sm font-medium hover:bg-primary/90 transition"
+                  onClick={() => state.refreshApiKey()}
+                >
+                  Re-Generate API Key
+                </button>
 
                 <button
                   className="w-full bg-secondary text-black dark:text-white py-2 rounded-md text-sm font-medium hover:bg-secondary/80 transition"
@@ -147,25 +139,6 @@ const Account = () => {
                 </button>
               </div>
 
-              <div className="space-y-3">
-                <input
-                  onChange={(e) => {
-                    state.UpdateLicenseInput(e.target.value);
-                  }}
-                  name="license"
-                  className="w-full px-4 py-2 rounded-md border text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                  placeholder="Insert License Key"
-                  value={state.LicenseKey}
-                />
-
-                <button
-                  key={state?.LicenseKey}
-                  className="w-full bg-primary text-black py-2 rounded-md text-sm font-medium hover:bg-primary/90 transition"
-                  onClick={() => state.ActivateLicense()}
-                >
-                  Activate Key
-                </button>
-              </div>
             </div>
           )}
         </TabsContent>
@@ -173,12 +146,34 @@ const Account = () => {
         <TabsContent value="loggedin" className="border rounded">
           <NewTable
             tableID="devices"
-            title="Logged In Devices"
             className="logins-list-table"
             background={true}
             header={headers}
             rows={rows}
           />
+        </TabsContent>
+        <TabsContent value="license" className="border rounded">
+          <KeyValue label="License" value={state.User.Key?.Key} />
+
+          <div className="space-y-3">
+            <input
+              onChange={(e) => {
+                state.UpdateLicenseInput(e.target.value);
+              }}
+              name="license"
+              className="w-full px-4 py-2 rounded-md border text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+              placeholder="Insert License Key"
+              value={state.LicenseKey}
+            />
+
+            <button
+              key={state?.LicenseKey}
+              className="w-full bg-primary text-black py-2 rounded-md text-sm font-medium hover:bg-primary/90 transition"
+              onClick={() => state.ActivateLicense()}
+            >
+              Activate Key
+            </button>
+          </div>
         </TabsContent>
       </Tabs>
     </div>

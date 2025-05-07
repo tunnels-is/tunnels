@@ -197,6 +197,12 @@ type FORM_DELETE_GROUP struct {
 	GID         primitive.ObjectID `json:"GID"`
 }
 
+type FORM_DELETE_DEVICE struct {
+	DeviceToken string             `json:"DeviceToken"`
+	UID         primitive.ObjectID `json:"UID"`
+	DID         primitive.ObjectID `json:"DID"`
+}
+
 type FORM_LIST_GROUP struct {
 	DeviceToken string             `json:"DeviceToken"`
 	UID         primitive.ObjectID `json:"UID"`
@@ -222,6 +228,12 @@ type FORM_CREATE_GROUP struct {
 	Group       *Group             `json:"Group"`
 }
 
+type FORM_CREATE_DEVICE struct {
+	DeviceToken string             `json:"DeviceToken"`
+	UID         primitive.ObjectID `json:"UID"`
+	Device      *Device            `json:"Device"`
+}
+
 type FORM_UPDATE_SERVER struct {
 	DeviceToken string             `json:"DeviceToken"`
 	UID         primitive.ObjectID `json:"UID"`
@@ -238,6 +250,12 @@ type FORM_UPDATE_GROUP struct {
 	DeviceToken string             `json:"DeviceToken"`
 	UID         primitive.ObjectID `json:"UID"`
 	Group       *Group             `json:"Group"`
+}
+
+type FORM_UPDATE_DEVICE struct {
+	DeviceToken string             `json:"DeviceToken"`
+	UID         primitive.ObjectID `json:"UID"`
+	Device      *Device            `json:"Device"`
 }
 
 type FORM_GROUP_ADD struct {
@@ -421,7 +439,7 @@ type Group struct {
 
 type Device struct {
 	ID        primitive.ObjectID   `json:"_id" bson:"_id"`
-	CreatedAt time.Time            `json:"Added" bson:"Added"`
+	CreatedAt time.Time            `json:"CreatedAt" bson:"CreatedAt"`
 	Tag       string               `json:"Tag" bson:"Tag"`
 	Groups    []primitive.ObjectID `json:"Groups" bson:"Groups"`
 }

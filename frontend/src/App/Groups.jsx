@@ -38,8 +38,6 @@ const Groups = () => {
     let resp = await state.callController(null, null, "POST", "/v3/group/list", {}, false, false)
     if (resp.status === 200) {
       setGroups(resp.data)
-    } else {
-      state.toggleError("unable to list groups")
     }
   }
 
