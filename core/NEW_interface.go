@@ -22,15 +22,15 @@ func AutoConnect() {
 		if !meta.AutoConnect {
 			return true
 		}
-		code, err := PublicConnect(&ConnectionRequest{
-			Tag:        meta.Tag,
-			DeviceKey:  meta.deviceKey,
-			ServerIP:   meta.ServerIP,
-			ServerPort: meta.ServerPort,
-		})
-		if err != nil {
-			ERROR("Unable to connect, return code: ", code, " // error: ", err)
-		}
+		// code, err := PublicConnect(&ConnectionRequest{
+		// 	Tag:        meta.Tag,
+		// 	DeviceKey:  meta.deviceKey,
+		// 	ServerIP:   meta.ServerIP,
+		// 	ServerPort: meta.ServerPort,
+		// })
+		// if err != nil {
+		// 	ERROR("Unable to connect, return code: ", code, " // error: ", err)
+		// }
 		return true
 	})
 }

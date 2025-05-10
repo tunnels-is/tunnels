@@ -384,7 +384,6 @@ func (u *User) ToMinifiedUser() MinifiedUser {
 		IsAdmin:   u.IsAdmin,
 		IsManager: u.IsManager,
 	}
-
 }
 
 type MinifiedUser struct {

@@ -240,15 +240,14 @@ type ActiveConnectionMeta struct {
 
 type TunnelMETA struct {
 	// Manual server configuration
-	ServerIP   string
-	ServerPort string
-	ServerCert string
+	// ServerIP   string
+	// ServerPort string
+	// ServerCert string
 
 	// Alternitive authentication
 	deviceKey string
 
-	// Autmatic configurations (managed by tunnels/users)
-	Public   bool
+	// Public   bool
 	ServerID string
 
 	// Automatic DNS discovery (user managed)

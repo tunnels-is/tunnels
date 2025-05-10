@@ -93,6 +93,5 @@ func createDefaultTunnelMeta() (M *TunnelMETA) {
 	M.Tag = DefaultTunnelName
 	M.IFName = DefaultTunnelName
 	M.EnableDefaultRoute = true
-	M.Public = true
 	return
 }

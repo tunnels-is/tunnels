@@ -27,14 +27,14 @@ const GenericTable = (props) => {
   }
 
   let t = props.table
-  let hdc = "w-[100px] text-sky-300 "
-  let ddc = "w-[100px] text-sky-100 "
+  let hdc = "w-[150px] text-sky-300 "
+  let ddc = "w-[150px] text-sky-100 "
 
   const renderHeaders = () => {
     let rows = []
     t.headers?.map(h => {
       let hc = hdc
-      if (t.headerClass[h]) {
+      if (t.headerClass && t.headerClass[h]) {
         hc += t.headerClass[h]()
       }
       let out = h
@@ -82,8 +82,8 @@ const GenericTable = (props) => {
         }
 
         let dc = ddc
-        if (t.columnClass[key]) {
-          dc += + t.columnClass[key](t.data[i])
+        if (t.columnClass && t.columnClass[key]) {
+          dc += t.columnClass[key](t.data[i])
         }
 
         if (t.data[i][key]?.includes && filter !== "") {
@@ -156,24 +156,28 @@ const GenericTable = (props) => {
           placeholder={"Search.."}
           onChange={(e) => { setFilter(e.target.value) }} />
 
-        <Button onClick={async () => {
-          let off = offset - t.opts.RowPerPage
-          if (off < 0) {
-            off = 0
-          }
+        {t.more &&
+          <>
+            <Button onClick={async () => {
+              let off = offset - t.opts.RowPerPage
+              if (off < 0) {
+                off = 0
+              }
 
-          setOffset(offset - t.opts.RowPerPage)
-          await newPage(offset - t.opts.RowPerPage, t.opts.RowPerPage)
-        }}>Prev</Button>
+              setOffset(offset - t.opts.RowPerPage)
+              await newPage(offset - t.opts.RowPerPage, t.opts.RowPerPage)
+            }}>Prev</Button>
 
-        <Button onClick={async () => {
-          let off = offset + t.opts.RowPerPage
-          if (off < 0) {
-            off = 0
-          }
-          setOffset(offset + t.opts.RowPerPage)
-          await newPage(offset + t.opts.RowPerPage, t.opts.RowPerPage)
-        }}>Next</Button>
+            <Button onClick={async () => {
+              let off = offset + t.opts.RowPerPage
+              if (off < 0) {
+                off = 0
+              }
+              setOffset(offset + t.opts.RowPerPage)
+              await newPage(offset + t.opts.RowPerPage, t.opts.RowPerPage)
+            }}>Next</Button>
+          </>
+        }
 
       </div>
 
