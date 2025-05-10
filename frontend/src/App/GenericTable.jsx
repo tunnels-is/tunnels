@@ -37,7 +37,11 @@ const GenericTable = (props) => {
       if (t.headerClass[h]) {
         hc += t.headerClass[h]()
       }
-      rows.push(<TableHead className={hc}>{h}</TableHead>)
+      let out = h
+      if (t.headerFormat && t.headerFormat[h]) {
+        out = t.headerFormat[h]()
+      }
+      rows.push(<TableHead className={hc}>{out}</TableHead>)
     })
 
     return (
@@ -79,7 +83,7 @@ const GenericTable = (props) => {
 
         let dc = ddc
         if (t.columnClass[key]) {
-          dc += + t.columnClass[key]()
+          dc += + t.columnClass[key](t.data[i])
         }
 
         if (t.data[i][key]?.includes && filter !== "") {
@@ -90,17 +94,24 @@ const GenericTable = (props) => {
           hasFilter = true
         }
 
-        let cd = t.columFormat[key] ? t.columFormat[key](t.data[i]) : t.data[i][key]
+        let cd = t.data[i][key]
+        if (t.columnFormat && t.columnFormat[key]) {
+          cd = t.columnFormat[key](t.data[i])
+        }
         return <TableCell className={dc} onClick={() => click(t.data[i])} > {cd}</TableCell>
       })
 
-      Object.keys(t.customColumns).forEach(key => {
-        cells.push(t.customColumns[key](t.data[i]))
-      })
+      if (t.customColumns) {
+        Object.keys(t.customColumns).forEach(key => {
+          cells.push(t.customColumns[key](t.data[i]))
+        })
+      }
 
-      Object.keys(t.customBtn).forEach(key => {
-        cells.push(t.customBtn[key](t.data[i]))
-      })
+      if (t.customBtn) {
+        Object.keys(t.customBtn).forEach(key => {
+          cells.push(t.customBtn[key](t.data[i]))
+        })
+      }
 
       if (t.Btn?.Edit) {
         cells.push(
