@@ -83,23 +83,17 @@ const SideBar = () => {
         title: "Tunnels",
         user: true,
         items: [
-          { icon: LockClosedIcon, label: "Servers", route: "servers", user: true, },
-          { icon: HomeIcon, label: "Users", route: "users", user: true, shouldRender: showManagement },
-          { icon: HomeIcon, label: "Devices", route: "devices", user: true, shouldRender: showManagement },
-          { icon: HomeIcon, label: "Groups", route: "groups", user: true, shouldRender: showManagement },
+          { icon: LockClosedIcon, label: "VPN", route: "servers", user: true, },
+          { icon: ContainerIcon, label: "DNS", route: "dns", user: false },
+          { icon: LayersIcon, label: "??", route: "dns-records", user: false, },
         ],
       },
       {
-        title: "DNS",
+        title: "Admin",
         items: [
-          { icon: ContainerIcon, label: "Server", route: "dns", user: false },
-          {
-            icon: LayersIcon,
-            label: "Records",
-            route: "dns-records",
-            user: false,
-          },
-        ],
+          { icon: HomeIcon, label: "Users", route: "users", user: true, shouldRender: showManagement },
+          { icon: HomeIcon, label: "Devices", route: "devices", user: true, shouldRender: showManagement },
+          { icon: HomeIcon, label: "Groups", route: "groups", user: true, shouldRender: showManagement },],
       },
       {
         title: "Settings",

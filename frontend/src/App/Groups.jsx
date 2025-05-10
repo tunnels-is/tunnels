@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 
+import dayjs from "dayjs";
 import GLOBAL_STATE from "../state";
 import ConfigDNSRecordEditor from "./component/ConfigDNSRecordEditor";
 import STORE from "../store";
@@ -26,15 +27,19 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Check } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import GenericTable from "./GenericTable";
+import NewObjectEditorDialog from "./NewObjectEdiorDialog";
 
 
 const Groups = () => {
   const state = GLOBAL_STATE("dns");
   const [groups, setGroups] = useState([])
+  const [editModalOpen, setEditModalOpen] = useState(false)
+  const [group, setGroup] = useState(undefined)
   const navigate = useNavigate()
 
 
-  let getGroups = async () => {
+  let getGroups = async (offset, limit) => {
     let resp = await state.callController(null, null, "POST", "/v3/group/list", {}, false, false)
     if (resp.status === 200) {
       setGroups(resp.data)
@@ -42,26 +47,25 @@ const Groups = () => {
   }
 
   useEffect(() => {
-    // state.GetBackendState();
-    getGroups()
+    getGroups(0, 50)
   }, []);
 
 
-  const onFieldChange = (i, field, value) => {
-    groups[i][field] = value
-    state.renderPage("dns");
-  }
-
-  const saveGroup = async (i) => {
+  const saveGroup = async () => {
     let resp = undefined
-    if (groups[i]._id !== undefined) {
-      resp = await state.callController(null, null, "POST", "/v3/group/update", { Group: groups[i], }, false, false)
+    if (group._id !== undefined) {
+      resp = await state.callController(null, null, "POST", "/v3/group/update", { Group: group }, false, false)
     } else {
-      resp = await state.callController(null, null, "POST", "/v3/group/create", { Group: groups[i], }, false, false)
+      resp = await state.callController(null, null, "POST", "/v3/group/create", { Group: group }, false, false)
     }
 
     if (resp.status === 200) {
-      groups[i] = resp.data
+      groups.forEach((g, i) => {
+        if (g._id === group._id) {
+          groups[i] = g
+        }
+      })
+      setGroups([...groups])
     } else {
       state.toggleError("unable to create group")
     }
@@ -73,139 +77,70 @@ const Groups = () => {
     state.renderPage("dns");
   }
 
-  const deleteGroup = async (i) => {
-    let resp = await state.callController(null, null, "POST", "/v3/group/delete", { GID: groups[i]._id, }, false, false)
+  const deleteGroup = async (id) => {
+    let resp = await state.callController(null, null, "POST", "/v3/group/delete", { GID: id, }, false, false)
     if (resp.status === 200) {
-      delete groups[i]
+      let g = groups.filter(g => g._id !== id)
+      setGroups([...g])
     }
-    setGroups([...groups])
   }
 
-  const FormField = ({ label, children }) => (
-    <div className="grid gap-2 mb-4">
-      <Label className="text-sm font-medium">{label}</Label>
-      {children}
-    </div>
-  );
+  let table = {
+    data: groups,
+    rowClick: (obj) => {
+      navigate("/inspect/group/" + obj._id)
+    },
+    columns: {
+      Tag: true,
+      _id: true,
+      CreatedAt: true,
+    },
+    columFormat: {
+      CreatedAt: (obj) => {
+        return dayjs(obj.CreatedAt).format("HH:mm:ss DD-MM-YYYY")
+      }
+    },
+    Btn: {
+      Edit: (obj) => {
+        setGroup(obj)
+        setEditModalOpen(true)
+      },
+      Delete: (obj) => {
+        deleteGroup(obj._id)
+      },
+      New: () => {
+        console.log("new!")
+        newGroup()
+      },
+    },
+    columnClass: {},
+    headers: ["Tag", "ID", "CreatedAt"],
+    headerClass: {},
+    opts: {
+      RowPerPage: 50,
+    },
+    more: getGroups,
+  }
 
   return (
     <div className="groups-page">
+      <GenericTable table={table} />
 
-      <div className="w-full max-w-4xl mx-auto p-4 space-y-6">
-        <div className="flex items-center justify-between mb-6">
-          <Button
-            onClick={() => newGroup()}
-            variant="outline"
-            className="flex items-center gap-2 text-white"
-          >
-            <PlusCircle className="h-4 w-4" />
-            <span>New Group</span>
-          </Button>
-        </div>
-
-        <div className=" space-y-6">
-          {groups && groups?.map((g, i) => {
-            if (!g) return null;
-
-            return (
-              <div
-                key={`group-${i}`}
-                onClick={() => navigate("/inspect/group/" + g._id)}
-
-                className="w-full flex flex-wrap items-center gap-3 bg-black p-4 rounded-lg border border-gray-800 mb-4 text-white"
-              >
-                <div className="flex items-center gap-[10px]">
-                  <Server className="h-4 w-4 text-emerald-500" />
-                  <div>
-                    <span className="font-bold block text-sm">{g.Tag}</span>
-                    <span className="text-gray-400 block text-sm">
-                      {g.Description}
-                    </span>
-                  </div>
-                </div>
-
-
-
-
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      className="ml-auto bg-gray-800 hover:bg-gray-700"
-                    >
-                      <Edit className="h-4 w-4 mr-1" /> Edit
-                    </Button>
-                  </DialogTrigger>
-
-                  <DialogContent className="bg-black border border-gray-800 text-white max-w-2xl rounded-lg p-6">
-                    <div className="bg-gray-800/50 -m-6 mb-6 p-4 border-b border-gray-800">
-                      <h3 className="text-lg font-medium flex items-center gap-2">
-                        {g.Tag}
-                      </h3>
-                      <Label className="text-sm font-medium">{g._id}</Label>
-                    </div>
-
-                    <div className="space-y-6">
-                      <FormField label="Tag">
-                        <Input
-                          value={g.Tag}
-                          onChange={(e) =>
-                            onFieldChange(i, "Tag", e.target.value)
-                          }
-                          placeholder="e.g. example.com"
-                          className="w-full bg-gray-950 border-gray-700 text-white"
-                        />
-                      </FormField>
-
-                      <FormField label="Description">
-                        <Input
-                          value={g.Description}
-                          onChange={(e) =>
-                            onFieldChange(i, "Description", e.target.value)
-                          }
-                          placeholder="e.g. subdomain.example.com"
-                          className="w-full bg-gray-950 border-gray-700 text-white"
-                        />
-                      </FormField>
-
-                    </div>
-
-                    <div className="flex justify-between mt-6 pt-4 border-t border-gray-800">
-                      <Button
-                        variant="outline"
-                        className="flex items-center gap-2 bg-gray-950 border-gray-700 hover:bg-gray-700"
-                        onClick={() => saveGroup(i)}
-                      >
-                        <Save className="h-4 w-4" />
-                        Save
-                      </Button>
-
-                      <Button
-                        variant="destructive"
-                        className="flex items-center gap-2 bg-red-900 hover:bg-red-800"
-                        onClick={() => deleteGroup(i)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                        Remove
-                      </Button>
-                    </div>
-                  </DialogContent>
-                </Dialog>
-              </div>
-            );
-          })}
-
-          {(!groups ||
-            groups.length === 0) && (
-              <div className="text-center p-12 border border-dashed rounded-lg bg-muted/30">
-                <p className="text-muted-foreground">
-                  No groups found. Add your first group to get started.
-                </p>
-              </div>
-            )}
-        </div>
-      </div >
+      <NewObjectEditorDialog
+        open={editModalOpen}
+        onOpenChange={setEditModalOpen}
+        object={group}
+        title="Group"
+        description=""
+        readOnly={false}
+        saveButton={() => {
+          saveGroup()
+        }}
+        onChange={(key, value, type) => {
+          group[key] = value
+          console.log(key, value, type)
+        }}
+      />
     </div >
   )
 
