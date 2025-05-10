@@ -1,20 +1,17 @@
 import React, { useEffect, useState } from "react";
 import GLOBAL_STATE from "../state"
 import dayjs from "dayjs";
-import NewTable from "./component/newtable";
-import { v4 as uuidv4 } from "uuid";
-import ObjectEditorDialog from "./component/ObjectEditorDialog";
-import { Edit } from "lucide-react";
 import NewObjectEditorDialog from "./NewObjectEdiorDialog";
+import GenericTable from "./GenericTable";
 
 const Devices = () => {
 	const [devices, setDevices] = useState([])
-	const [device, setDevice] = useState(undefined)
 	const state = GLOBAL_STATE("groups")
+	const [device, setDevice] = useState(undefined)
 	const [editModalOpen, setEditModalOpen] = useState(false)
 
-	const getDevices = async () => {
-		let resp = await state.callController(null, null, "POST", "/v3/device/list", { Offset: 0, Limit: 1000 }, false, false)
+	const getDevices = async (offset, limit) => {
+		let resp = await state.callController(null, null, "POST", "/v3/device/list", { Offset: offset, Limit: limit }, false, false)
 		if (resp.status === 200) {
 			setDevices(resp.data)
 			state.renderPage("groups")
@@ -46,96 +43,55 @@ const Devices = () => {
 
 	}
 
-	const deviceCreateOpts = {
-		baseClass: "",
-		maxDepth: 1000,
-		onlyKeys: false,
-		disabled: {
-			root__id: true,
-			root_CreatedAt: true,
-		},
-		saveButton: saveDevice,
-	}
-
 	const newDevice = () => {
 		setDevice({ Tag: "", Groups: [] })
 		setEditModalOpen(true)
 	}
 
 	useEffect(() => {
-		getDevices()
+		getDevices(0, 100)
 	}, [])
 
-
-	const generateDeviceTable = (devices) => {
-		let rows = []
-		devices.forEach((d, i) => {
-			let row = {}
-			row.items = [
-				{
-					type: "text",
-					color: "blue",
-					value: d.Tag,
-				},
-				{
-					type: "text",
-					minWidth: "250px",
-					value: d._id,
-				},
-				{
-					type: "text",
-					value: dayjs(d.Added).format("DD-MM-YYYY HH:mm:ss"),
-				},
-				{
-					type: "text",
-					value: <Edit className="h-4 w-4 mr-1" />,
-					click: () => {
-						setDevice(d)
-						setEditModalOpen(true)
-
-					}
-				},
-				{
-					type: "text",
-					color: "red",
-					click: () => {
-						deleteDevice(d._id)
-					},
-					value: "Delete"
-				},
-			]
-			rows.push(row)
-		});
-
-		return rows
+	let table = {
+		data: devices,
+		rowClick: (obj) => {
+			console.log("row click!")
+			console.dir(obj)
+		},
+		columns: {
+			Tag: true,
+			_id: true,
+			CreatedAt: true,
+		},
+		columFormat: {
+			CreatedAt: (obj) => {
+				return dayjs(obj.CreatedAt).format("HH:mm:ss DD-MM-YYYY")
+			}
+		},
+		Btn: {
+			Edit: (obj) => {
+				setDevice(obj)
+				setEditModalOpen(true)
+			},
+			Delete: (obj) => {
+				deleteDevice(obj._id)
+			},
+			New: () => {
+				newDevice()
+			},
+		},
+		columnClass: {},
+		headers: ["Tag", "ID", "CreatedAt"],
+		headerClass: {},
+		opts: {
+			RowPerPage: 50,
+		},
+		more: getDevices,
 	}
-
-
-	let deviceRow = generateDeviceTable(devices)
-	const devicesHeaders = [
-		{ value: "Tag" },
-		{ value: "ID", minWidth: "250px" },
-		{ value: "Added" },
-		{ value: "" },
-		{ value: "" }
-	]
 
 	return (
 		<div className="">
-			<NewTable
-				background={true}
-				title={""}
-				className="device-table"
-				header={devicesHeaders}
-				rows={deviceRow}
-				placeholder={"Search.."}
-				button={{
-					text: "Add Device",
-					click: () => {
-						newDevice()
-					}
-				}}
-			/>
+			<GenericTable table={table} />
 
 			<NewObjectEditorDialog
 				open={editModalOpen}

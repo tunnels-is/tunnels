@@ -240,17 +240,15 @@ const DNS = () => {
       <div className="group mb-3 p-2 rounded-2xl bg-black border border-slate-800 shadow-sm hover:shadow-md transition-all duration-300 flex justify-between items-center gap-4 relative overflow-hidden">
         <div className="flex items-center gap-6 z-10">
           <div
-            className={`relative flex items-center gap-1.5 text-xs font-medium px-3.5 py-2 rounded-full w-fit cursor-pointer transition-all duration-300 ${
-              isEnabled
+            className={`relative flex items-center gap-1.5 text-xs font-medium px-3.5 py-2 rounded-full w-fit cursor-pointer transition-all duration-300 ${isEnabled
                 ? "bg-emerald-800 text-emerald-300 hover:bg-emerald-700"
                 : "bg-amber-800 text-amber-300 hover:bg-amber-700"
-            }`}
+              }`}
             onClick={status.value.props.onClick}
           >
             <span
-              className={`flex items-center justify-center w-4 h-4 rounded-full ${
-                isEnabled ? "bg-emerald-600" : "bg-amber-600"
-              }`}
+              className={`flex items-center justify-center w-4 h-4 rounded-full ${isEnabled ? "bg-emerald-600" : "bg-amber-600"
+                }`}
             >
               {isEnabled ? (
                 <Check className="w-2.5 h-2.5 text-white" />
@@ -285,11 +283,10 @@ const DNS = () => {
 
         <div className="flex items-center z-10">
           <button
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg transition-all duration-300 ${
-              remove.value.props.className.includes("disabled")
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg transition-all duration-300 ${remove.value.props.className.includes("disabled")
                 ? "bg-slate-800 text-slate-600 cursor-not-allowed"
                 : "bg-red-800 text-red-300 hover:bg-red-700 group-hover:shadow-sm"
-            }`}
+              }`}
             onClick={remove.value.props.onClick}
           >
             <Trash2 className="w-3.5 h-3.5" />
@@ -454,11 +451,10 @@ const DNS = () => {
             rows={rows}
             button={{
               text: "New Blocklist",
-              click: function () {
+              click: function() {
                 navigate("/inspect/blocklist");
               },
             }}
-            customRow={(row) => customRowBlockList(row)}
           />
         </TabsContent>
         <TabsContent value="blockdomains">
