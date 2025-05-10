@@ -14,6 +14,7 @@ import {
 	Save,
 } from "lucide-react";
 import { Label } from "@/components/ui/label";
+import GenericTable from "./GenericTable";
 
 const InspectGroup = () => {
 	const { id } = useParams()
@@ -35,18 +36,23 @@ const InspectGroup = () => {
 	);
 
 	const addToGroup = async () => {
+		console.log("ID:", addForm.id)
 		let e = await state.callController(null, null, "POST", "/v3/group/add",
-			{ GroupID: id, TypeID: addForm.id, Type: addForm.type, TypeID: addForm.idtyp },
-			false, true)
+			{
+				GroupID: id,
+				TypeID: addForm.id,
+				Type: addForm.type,
+			},
+			false, false)
 		if (e) {
 			if (addForm.type === "user") {
-				users.push(e)
+				users.push(e.data)
 				setUsers([...users])
 			} else if (addForm.type === "server") {
-				servers.push(e)
+				servers.push(e.data)
 				setServers([...servers])
 			} else if (addForm.type === "device") {
-				devices.push(e)
+				devices.push(e.data)
 				setDevices([...devices])
 			}
 			setDialog(false)
@@ -67,7 +73,7 @@ const InspectGroup = () => {
 	}
 
 	const removeEntity = async (gid, typeid, type) => {
-		let e = await state.callController(null, null, "POST", "/v3/group/add",
+		let e = await state.callController(null, null, "POST", "/v3/group/remove",
 			{ GroupID: gid, TypeID: typeid, Type: type },
 			false, true)
 		if (e === true) {
@@ -110,142 +116,113 @@ const InspectGroup = () => {
 	}
 
 
-	const generateServerTable = (servers) => {
-		let rows = []
-		servers?.forEach((s, i) => {
-			let tag = ""
-			state?.PrivateServers?.forEach(sn => {
-				if (sn._id === s._id) {
-					tag = sn.Tag
-					return
-				}
-			})
-			let row = {}
-			row.items = [
-				{
-					type: "text",
-					color: "blue",
-					click: () => {
-						navigate("/inspect/server/" + s._id)
-					},
-					value: tag,
-				},
-				{
-					minWidth: "250px",
-					type: "text",
-					value: s._id
-				},
-				{
-					type: "text",
-					value: dayjs(s.Added).format("DD-MM-YYYY HH:mm:ss"),
-				},
-				{
-					type: "text",
-					color: "red",
-					click: () => {
-						removeEntity(id, s._id, "server")
-					},
-					value: "Delete"
-				},
-			]
-			rows.push(row)
-		});
+	const generateServerTable = () => {
 
-		return rows
+		return {
+			data: servers,
+			rowClick: (obj) => {
+				console.log("row click!")
+				console.dir(obj)
+			},
+			columns: {
+				Tag: (obj) => {
+					// TODO
+					// navigate("/inspect/server/" + obj._id)
+				},
+				_id: true,
+			},
+			columFormat: {
+				Tag: (obj) => {
+					state?.PrivateServers?.forEach(sn => {
+						if (sn._id === obj._id) {
+							return sn.Tag
+						}
+					})
+					return "??"
+				},
+			},
+			Btn: {
+				Delete: (obj) => {
+					removeEntity(id, obj._id, "server")
+				},
+				New: () => {
+					setDialog(true)
+				},
+			},
+			columnClass: {},
+			headers: ["Tag", "ID"],
+			headerClass: {},
+			opts: {
+				RowPerPage: 50,
+			},
+		}
+
 	}
 
-	const generateUsersTable = (users) => {
-		let rows = []
-		users?.forEach((u, i) => {
-			let row = {}
-			row.items = [
-				{
-					type: "text",
-					color: "blue",
-					value: u.Email,
-				},
-				{
-					type: "text",
-					minWidth: "250px",
-					value: u._id,
-				},
-				{
-					type: "text",
-					value: dayjs(u.Added).format("DD-MM-YYYY HH:mm:ss"),
-				},
-				{
-					type: "text",
-					color: "red",
-					click: () => {
-						removeEntity(id, u._id, "user")
-					},
-					value: "Delete"
-				},
-			]
-			rows.push(row)
-		});
 
-		return rows
+	const generateDevicesTables = () => {
+		return {
+			data: devices,
+			rowClick: (obj) => {
+				console.log("row click!")
+				console.dir(obj)
+			},
+			columns: {
+				Tag: (obj) => {
+					// TODO
+					// navigate("/inspect/server/" + obj._id)
+				},
+				_id: true,
+			},
+			columFormat: {},
+			Btn: {
+				Delete: (obj) => {
+					removeEntity(id, obj._id, "device")
+				},
+				New: () => {
+					setDialog(true)
+				},
+			},
+			columnClass: {},
+			headers: ["Tag", "ID"],
+			headerClass: {},
+			opts: {
+				RowPerPage: 50,
+			},
+		}
+
 	}
 
-	const generateDevicesTables = (devices) => {
-		let rows = []
-		devices?.forEach((s, i) => {
-			let row = {}
-			row.items = [
-				{
-					type: "text",
-					color: "blue",
-					value: s.Tag,
-				},
-				{
-					type: "text",
-					minWidth: "310px",
-					value: s._id,
-				},
-				{
-					minWidth: "200px",
-					type: "text",
-					value: dayjs(s.Added).format("DD-MM-YYYY HH:mm:ss"),
-				},
-				{
-					type: "text",
-					color: "red",
-					click: () => {
-						removeEntity(id, s._id, "device")
-					},
-					value: "Delete"
-				},
-			]
-			rows.push(row)
-		});
 
-		return rows
+	let utable = {
+		data: users,
+		rowClick: (obj) => {
+			console.log("row click!")
+			console.dir(obj)
+		},
+		columns: {
+			Email: true,
+			_id: true,
+		},
+		columFormat: {
+		},
+		Btn: {
+			Delete: (obj) => {
+				removeEntity(id, obj._id, "user")
+			},
+			New: () => {
+				setDialog(true)
+			},
+		},
+		columnClass: {},
+		headers: ["Username", "ID"],
+		headerClass: {},
+		opts: {
+			RowPerPage: 50,
+		},
 	}
 
-	let usersRows = generateUsersTable(users)
-	const usersHeaders = [
-		{ value: "Email" },
-		{ value: "ID", minWidth: "250px" },
-		{ value: "Added" },
-		{ value: "" }
-	]
 
-	let nodesRows = generateServerTable(servers)
-	const nodesHeaders = [
-		{ value: "Tag" },
-		{ value: "ID", minWidth: "250px" },
-		{ value: "Added" },
-		{ value: "" }
-	]
-
-	let deviceRows = generateDevicesTables(devices)
-	const deviceHeader = [
-		{ value: "Tag" },
-		{ value: "ID", minWidth: "310px" },
-		{ value: "Added", minWidth: "200px" },
-		{ value: "" }
-	]
 	const addDialog = (type) => {
 		return (
 			<Dialog
@@ -332,48 +309,15 @@ const InspectGroup = () => {
 				</TabsList>
 				<TabsContent className="w-full" value="server">
 					{addDialog("server")}
-					<NewTable
-						background={true}
-						title={""}
-						className="group-table"
-						header={nodesHeaders}
-						rows={nodesRows}
-						placeholder={"Search.."}
-						button={{
-							text: "Add Server",
-							click: () => setDialog(true)
-						}}
-					/>
+					<GenericTable table={generateServerTable()} />
 				</TabsContent>
 				<TabsContent value="device">
 					{addDialog("device")}
-					<NewTable
-						background={true}
-						title={"Devices"}
-						className="group-table"
-						header={deviceHeader}
-						rows={deviceRows}
-						placeholder={"Search.."}
-						button={{
-							text: "Add Device",
-							click: () => setDialog(true)
-						}}
-					/>
+					<GenericTable table={generateDevicesTables()} />
 				</TabsContent>
 				<TabsContent value="user">
 					{addDialog("user")}
-					<NewTable
-						background={true}
-						title={""}
-						className="group-table"
-						header={usersHeaders}
-						rows={usersRows}
-						placeholder={"Search.."}
-						button={{
-							text: "Add User",
-							click: () => setDialog(true)
-						}}
-					/>
+					<GenericTable table={utable} />
 				</TabsContent>
 			</Tabs>
 
