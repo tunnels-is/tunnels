@@ -15,7 +15,6 @@ import PrivateServers from "./App/PrivateServers";
 import ScreenLoader from "./App/ScreenLoader";
 import InspectGroup from "./App/InspectGroup";
 import Enable2FA from "./App/Enable2FA";
-import ServersFull from "./App/ServersFull";
 import Settings from "./App/Settings";
 import Account from "./App/Account";
 import Servers from "./App/Servers";
@@ -32,6 +31,7 @@ import Groups from "./App/Groups";
 import Users from "./App/Users";
 import Devices from "./App/Devices";
 import NewObjectEditor from "./App/NewObjectEdior";
+import Tunnels from "./App/Tunnels";
 
 // Use this to automatically turn on debug
 STORE.Cache.Set("debug", true);
@@ -80,7 +80,6 @@ const LaunchApp = () => {
                     <Route path="settings" element={<Settings />} />
                     <Route path="help" element={<Welcome />} />
                     <Route path="dns" element={<DNS />} />
-                    <Route path="dns-records" element={<DNSRecords />} />
                     <Route path="*" element={<Login />} />
                   </>
                 )}
@@ -97,7 +96,7 @@ const LaunchApp = () => {
 
                     <Route path="inspect/group/:id" element={<InspectGroup />} />
 
-                    <Route path="tunnels" element={<ConnectionTable />} />
+                    <Route path="tunnels" element={<Tunnels />} />
                     <Route
                       path="inspect/connection/:id"
                       element={<InspectConnection />}

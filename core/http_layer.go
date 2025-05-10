@@ -448,7 +448,8 @@ func HTTP_SetTunnel(w http.ResponseWriter, r *http.Request) {
 							net.IP(tun.dhcp.IP[:]).String(),
 							newForm.Meta.AllowedHosts,
 							newForm.Meta.DisableFirewall,
-							newForm.Meta.ServerCert,
+							"TODO",
+							// newForm.Meta.ServerCert,
 						)
 						return false
 					}
