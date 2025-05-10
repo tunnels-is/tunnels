@@ -92,9 +92,6 @@ const ConfigDNSRecordEditor = () => {
   return (
     <div className="w-full max-w-4xl mx-auto p-4 space-y-6">
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold tracking-tight text-white">
-          DNS Records
-        </h2>
         <Button
           onClick={addRecord}
           variant="outline"
@@ -137,12 +134,12 @@ const ConfigDNSRecordEditor = () => {
         ))}
         {(!state.Config?.DNSRecords ||
           state.Config.DNSRecords.length === 0) && (
-          <div className="text-center p-12 border border-dashed rounded-lg bg-muted/30">
-            <p className="text-muted-foreground">
-              No DNS records found. Add your first record to get started.
-            </p>
-          </div>
-        )}
+            <div className="text-center p-12 border border-dashed rounded-lg bg-muted/30">
+              <p className="text-muted-foreground">
+                No DNS records found. Add your first record to get started.
+              </p>
+            </div>
+          )}
       </div>
 
       {selectedIndex !== null && (

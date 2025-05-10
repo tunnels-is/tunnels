@@ -23,7 +23,6 @@ import Welcome from "./App/Welcome";
 import SideBar from "./App/SideBar";
 import Login from "./App/Login";
 import DNS from "./App/dns";
-import DNSRecords from "./App/DNSRecords";
 
 import GLOBAL_STATE from "./state";
 import { STATE } from "./state";
@@ -107,7 +106,6 @@ const LaunchApp = () => {
                     <Route path="settings" element={<Settings />} />
 
                     <Route path="dns" element={<DNS />} />
-                    <Route path="dns-records" element={<DNSRecords />} />
                     <Route path="dns/answers/:domain" element={<DNSAnswers />} />
 
                     <Route path="servers" element={<PrivateServers />} />
