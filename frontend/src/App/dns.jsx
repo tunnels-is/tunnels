@@ -23,6 +23,7 @@ import STORE from "../store";
 import { Switch } from "@/components/ui/switch";
 import GenericTable from "./GenericTable";
 import { TableCell } from "@/components/ui/table";
+import ConfigDNSRecordEditor from "./component/ConfigDNSRecordEditor";
 
 const DNSSort = (a, b) => {
   if (dayjs(a.LastSeen).unix() < dayjs(b.LastSeen).unix()) {
@@ -225,6 +226,7 @@ const DNS = () => {
       <Tabs defaultValue="settings">
         <TabsList className="">
           <TabsTrigger value="settings">Settings</TabsTrigger>
+          <TabsTrigger value="records">Records</TabsTrigger>
           <TabsTrigger value="blocklist">Block List</TabsTrigger>
           <TabsTrigger value="blockdomains">Blocked Domains</TabsTrigger>
           <TabsTrigger value="resolveddomains">Resovled Domains</TabsTrigger>
@@ -361,6 +363,9 @@ const DNS = () => {
         </TabsContent>
         <TabsContent value="resolveddomains">
           <GenericTable table={generateResolvesTable()} />
+        </TabsContent>
+        <TabsContent value="records">
+          <ConfigDNSRecordEditor />
         </TabsContent>
       </Tabs>
     </div>

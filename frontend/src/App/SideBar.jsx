@@ -85,7 +85,6 @@ const SideBar = () => {
         items: [
           { icon: LockClosedIcon, label: "VPN", route: "servers", user: true, },
           { icon: ContainerIcon, label: "DNS", route: "dns", user: false },
-          { icon: LayersIcon, label: "??", route: "dns-records", user: false, },
         ],
       },
       {
