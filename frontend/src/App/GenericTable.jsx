@@ -15,6 +15,7 @@ import { DeleteIcon } from "lucide-react"
 import { useState } from "react"
 import { GridLoader } from "react-spinners"
 
+const buttonClass = "font-bold text-white hover:text-black"
 
 const GenericTable = (props) => {
   const [offset, setOffset] = useState(0)
@@ -27,8 +28,8 @@ const GenericTable = (props) => {
   }
 
   let t = props.table
-  let hdc = "w-[150px] text-sky-300 "
-  let ddc = "w-[150px] text-sky-100 "
+  let hdc = "w-[150px] text-blue-400 font-bold "
+  let ddc = "w-[150px] text-blue-100 font-medium "
 
   const renderHeaders = () => {
     let rows = []
@@ -149,7 +150,7 @@ const GenericTable = (props) => {
     <div className="flex flex-col">
       <div className="flex gap-2 mb-5">
         {t.Btn?.New &&
-          <Button onClick={() => t.Btn.New()} > Create</Button>
+          <Button className={"bg-emerald-500 " + buttonClass} onClick={() => t.Btn.New()} > Create</Button>
         }
         <Input
           className="text-white"
@@ -158,7 +159,7 @@ const GenericTable = (props) => {
 
         {t.more &&
           <>
-            <Button onClick={async () => {
+            <Button className={"bg-blue-500 " + buttonClass} onClick={async () => {
               let off = offset - t.opts.RowPerPage
               if (off < 0) {
                 off = 0
@@ -168,7 +169,7 @@ const GenericTable = (props) => {
               await newPage(offset - t.opts.RowPerPage, t.opts.RowPerPage)
             }}>Prev</Button>
 
-            <Button onClick={async () => {
+            <Button className={"bg-blue-500 " + buttonClass} onClick={async () => {
               let off = offset + t.opts.RowPerPage
               if (off < 0) {
                 off = 0
