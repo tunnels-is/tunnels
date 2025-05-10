@@ -5,6 +5,8 @@ import dayjs from "dayjs";
 import KeyValue from "./component/keyvalue";
 import NewTable from "./component/newtable";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import GenericTable from "./GenericTable";
+import { Button } from "@/components/ui/button";
 
 const Account = () => {
   const navigate = useNavigate();
@@ -33,47 +35,61 @@ const Account = () => {
     return 0;
   });
 
-  const generateListTable = (tokens) => {
-    let rows = [];
-    tokens?.forEach((token) => {
-      let current = false;
-      if (token.DT === state?.User?.DeviceToken.DT) {
-        current = true;
-      }
 
-      let row = {};
-      row.items = [
-        { type: "text", value: current ? token.N + " (this device)" : token.N },
-        {
-          type: "text",
-          value: dayjs(token.Created).format("DD-MM-YYYY HH:mm:ss"),
-        },
-        {
-          type: "text",
-          click: () => {
-            state.LogoutToken(token, false);
-          },
-          value: (
-            <div className={`logout clickable`} value={"Logout"}>
-              Logout
-            </div>
-          ),
-        },
-      ];
-      rows.push(row);
-    });
-    return rows;
-  };
-
-  let rows = generateListTable(state.User?.Tokens);
-  const headers = [{ value: "Device" }, { value: "Login Date" }, { value: "" }];
 
   let APIKey = state.getKey("User", "APIKey");
 
+  let table = {
+    data: state.User?.Tokens,
+    columns: {
+      N: true,
+      Created: true,
+    },
+    columnFormat: {
+      Created: (obj) => {
+        return dayjs(obj.Created).format("HH:mm:ss DD-MM-YYYY")
+      },
+      N: (obj) => {
+        console.dir(obj)
+        if (obj.DT === state?.User?.DeviceToken.DT) {
+          return obj.N + " (current)"
+        }
+        return obj.N
+      }
+    },
+    columnClass: {
+      Created: (obj) => {
+        console.log("CCCC")
+        return "w-[400px]"
+      }
+    },
+    customBtn: {
+      Logout: (obj) => {
+        return (< Button onClick={() => {
+          state.LogoutToken(obj, false);
+        }}>
+          Logout
+        </Button >)
+      }
+    },
+    Btn: {},
+    headers: ["N", "Created"],
+    headerFormat: {
+      N: () => {
+        return "Device"
+      }
+    },
+    headerClass: {},
+    opts: {
+      RowPerPage: 50,
+    },
+  }
+
+
   return (
-    <div className="account-page p-6 max-w-xl">
+    <div className="account-page p-6">
       <Tabs defaultValue="account">
-        <TabsList className=" justify-start gap-2 mb-4">
+        <TabsList className="justify-start gap-2 mb-4">
           <TabsTrigger value="account">Account</TabsTrigger>
           <TabsTrigger value="loggedin">Devices</TabsTrigger>
           <TabsTrigger value="license">License Key</TabsTrigger>
@@ -143,14 +159,8 @@ const Account = () => {
           )}
         </TabsContent>
 
-        <TabsContent value="loggedin" className="border rounded">
-          <NewTable
-            tableID="devices"
-            className="logins-list-table"
-            background={true}
-            header={headers}
-            rows={rows}
-          />
+        <TabsContent value="loggedin" className=" w-[500px]">
+          <GenericTable table={table} />
         </TabsContent>
         <TabsContent value="license" className="border rounded">
           <KeyValue label="License" value={state.User.Key?.Key} />

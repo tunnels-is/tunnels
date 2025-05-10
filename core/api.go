@@ -577,7 +577,6 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		ClientCR.ServerIP = dnsInfo.IP
 		ClientCR.ServerID = dnsInfo.ServerID
 		tunnel.ServerCertBytes = dnsInfo.Cert
-		meta.Public = false
 	}
 
 	if ClientCR.ServerIP == "" {
@@ -762,7 +761,8 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 			net.IP(tunnel.dhcp.IP[:]).String(),
 			meta.AllowedHosts,
 			meta.DisableFirewall,
-			meta.ServerCert,
+			"TODO",
+			// meta.ServerCert,
 		)
 		if err != nil {
 			ERROR("unable to update firewall: ", err)

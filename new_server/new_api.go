@@ -7,6 +7,7 @@ import (
 	"log"
 	"log/slog"
 	"net/http"
+	"runtime/debug"
 	"time"
 )
 
@@ -157,6 +158,7 @@ func bodyCloseMiddleware(next http.Handler) http.Handler {
 }
 
 func senderr(w http.ResponseWriter, code int, msg string, slogArgs ...any) {
+	fmt.Println(string(debug.Stack()))
 	logger.Error(msg, slogArgs...)
 	responsePayload := map[string]string{"Error": msg}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
