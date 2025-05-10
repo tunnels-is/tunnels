@@ -21,6 +21,8 @@ import { Check, ExternalLink, Tag, Trash2, X } from "lucide-react";
 import GLOBAL_STATE from "../state";
 import STORE from "../store";
 import { Switch } from "@/components/ui/switch";
+import GenericTable from "./GenericTable";
+import { TableCell } from "@/components/ui/table";
 
 const DNSSort = (a, b) => {
   if (dayjs(a.LastSeen).unix() < dayjs(b.LastSeen).unix()) {
@@ -64,62 +66,6 @@ const DNS = () => {
     blockLists = [];
   }
 
-  const default_lists = [
-    "Ads",
-    "AdultContent",
-    "CryptoCurrency",
-    "Drugs",
-    "FakeNews",
-    "Fraud",
-    "Gambling",
-    "Malware",
-    "SocialMedia",
-    "Surveillance",
-  ];
-
-  const isDefault = (tag) => {
-    return default_lists.includes(tag);
-  };
-
-  const generateListTable = (blockLists) => {
-    let rows = [];
-    blockLists.forEach((i) => {
-      let row = {};
-      row.items = [
-        {
-          type: "text",
-          value: (
-            <div
-              className={`${i.Enabled ? "enabled" : "disabled"} clickable`}
-              onClick={() => {
-                state.toggleBlocklist(i);
-              }}
-            >
-              {" "}
-              {i.Enabled ? "Blocked" : "Allowed"}
-            </div>
-          ),
-        },
-        { type: "text", value: i.Tag },
-        { type: "text", value: i.Count },
-        {
-          type: "text",
-          value: (
-            <div
-              className={`${isDefault(i.Tag) ? "disabled" : "red"} clickable`}
-              onClick={() => {
-                state.deleteBlocklist(i);
-              }}
-            >
-              Remove
-            </div>
-          ),
-        },
-      ];
-      rows.push(row);
-    });
-    return rows;
-  };
 
   const generateBlocksTable = () => {
     let dnsBlocks = state.DNSStats ? state.DNSStats : [];
@@ -140,25 +86,37 @@ const DNS = () => {
     });
 
     stats = stats.sort(DNSSort);
-
-    stats.forEach((value) => {
-      let row = {};
-      row.items = [
-        { type: "text", value: value.tag, tooltip: true },
-        { type: "text", value: value.Tag },
-        {
-          type: "text",
-          value: dayjs(value.FirstSeen).format(state.DNSListDateFormat),
+    return {
+      data: stats,
+      columns: {
+        tag: true,
+        Tag: true,
+        Count: true,
+        FirstSeen: true,
+        LastSeen: true,
+      },
+      headerFormat: {
+        "tag": () => {
+          return "Domain"
         },
-        {
-          type: "text",
-          value: dayjs(value.LastSeen).format(state.DNSListDateFormat),
+        "Tag": () => {
+          return "List"
+        }
+      },
+      columnFormat: {
+        FirstSeen: (obj) => {
+          return dayjs(obj.FirstSeen).format(state.DNSListDateFormat)
         },
-        { type: "text", value: value.Count },
-      ];
-      rows.push(row);
-    });
-    return rows;
+        LastSeen: (obj) => {
+          return dayjs(obj.LastSeen).format(state.DNSListDateFormat)
+        }
+      },
+      customColumns: {},
+      columnClass: {},
+      Btn: {},
+      headers: ["tag", "Tag", "Count", "FirstSeen", "LastSeen"],
+      headerClass: {},
+    }
   };
 
   const generateResolvesTable = () => {
@@ -178,126 +136,79 @@ const DNS = () => {
     });
 
     stats = stats.sort(DNSSort);
+    return {
+      data: stats,
+      columns: {
+        tag: () => {
+          navigate("/dns/answers/" + value.tag);
+        },
+        Count: true,
+        FirstSeen: true,
+        LastSeen: true,
+      },
+      headerFormat: {
+        "tag": () => {
+          return "Domain"
+        },
+      },
+      columnFormat: {
+        FirstSeen: (obj) => {
+          return dayjs(obj.FirstSeen).format(state.DNSListDateFormat)
+        },
+        LastSeen: (obj) => {
+          return dayjs(obj.LastSeen).format(state.DNSListDateFormat)
+        }
+      },
+      customColumns: {},
+      columnClass: {},
+      Btn: {},
+      headers: ["tag", "Count", "FirstSeen", "LastSeen"],
+      headerClass: {},
+    }
 
-    stats.forEach((value) => {
-      let row = {};
-      row.items = [
-        {
-          tooltip: true,
-          type: "text",
-          value: value.tag,
-          color: "blue",
-          width: 30,
-          click: () => {
-            navigate("/dns/answers/" + value.tag);
-          },
-        },
-        {
-          type: "text",
-          value: dayjs(value.FirstSeen).format(state.DNSListDateFormat),
-        },
-        {
-          type: "text",
-          value: dayjs(value.LastSeen).format(state.DNSListDateFormat),
-        },
-        { type: "text", value: value.Count },
-      ];
-      rows.push(row);
-    });
-    return rows;
   };
 
-  let rows = generateListTable(blockLists);
-  const headers = [
-    { value: "Enabled" },
-    { value: "Tag" },
-    { value: "Domains" },
-    { value: "" },
-  ];
 
-  let rowsDNSstats = generateBlocksTable();
-  const headersDNSstats = [
-    { value: "Domain" },
-    { value: "List" },
-    { value: "First Seen" },
-    { value: "Last Seen" },
-    { value: "Blocked" },
-  ];
+  const EnableColumn = (obj) => {
+    if (obj.Enabled) {
+      return <TableCell onClick={() => state.toggleBlocklist(obj)} className={"w-[10px] text-sky-100"}  >
+        <Button>Disable</Button>
+      </TableCell>
+    }
+    return <TableCell onClick={() => state.toggleBlocklist(obj)} className={"w-[10px] text-sky-100"}  >
+      <Button>Enable</Button>
+    </TableCell>
+  }
 
-  let rowsDNSresolves = generateResolvesTable();
-  const headerDNSresolves = [
-    { value: "Domain", width: 30 },
-    { value: "First Seen" },
-    { value: "Last Seen" },
-    { value: "Resolved" },
-  ];
-
-  const customRowBlockList = (row) => {
-    const [status, tag, count, remove] = row.items;
-    const isEnabled = status.value.props.className.includes("enabled");
-
-    return (
-      <div className="group mb-3 p-2 rounded-2xl bg-black border border-slate-800 shadow-sm hover:shadow-md transition-all duration-300 flex justify-between items-center gap-4 relative overflow-hidden">
-        <div className="flex items-center gap-6 z-10">
-          <div
-            className={`relative flex items-center gap-1.5 text-xs font-medium px-3.5 py-2 rounded-full w-fit cursor-pointer transition-all duration-300 ${isEnabled
-                ? "bg-emerald-800 text-emerald-300 hover:bg-emerald-700"
-                : "bg-amber-800 text-amber-300 hover:bg-amber-700"
-              }`}
-            onClick={status.value.props.onClick}
-          >
-            <span
-              className={`flex items-center justify-center w-4 h-4 rounded-full ${isEnabled ? "bg-emerald-600" : "bg-amber-600"
-                }`}
-            >
-              {isEnabled ? (
-                <Check className="w-2.5 h-2.5 text-white" />
-              ) : (
-                <X className="w-2.5 h-2.5 text-white" />
-              )}
-            </span>
-            <span className="font-semibold">{status.value.props.children}</span>
-          </div>
-
-          <div className="flex items-center gap-2.5">
-            <div className="flex items-center justify-center w-7 h-7 rounded-full bg-slate-800">
-              <Tag className="w-3.5 h-3.5 text-slate-300" />
-            </div>
-            <div className="text-sm font-semibold text-slate-200 truncate max-w-[180px]">
-              {tag.value}
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <div className="flex items-center justify-center w-7 h-7 rounded-full bg-slate-800">
-              <ExternalLink className="w-3.5 h-3.5 text-slate-300" />
-            </div>
-            <div className="flex items-center gap-1 text-sm text-slate-400">
-              <span className="font-semibold text-slate-300">
-                {count.value}
-              </span>
-              <span>domains</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center z-10">
-          <button
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg transition-all duration-300 ${remove.value.props.className.includes("disabled")
-                ? "bg-slate-800 text-slate-600 cursor-not-allowed"
-                : "bg-red-800 text-red-300 hover:bg-red-700 group-hover:shadow-sm"
-              }`}
-            onClick={remove.value.props.onClick}
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-            <span className="text-sm font-medium">
-              {remove.value.props.children}
-            </span>
-          </button>
-        </div>
-      </div>
-    );
-  };
+  let bltable = {
+    data: blockLists,
+    columns: {
+      Tag: true,
+      Count: true,
+    },
+    customColumns: {
+      Enabled: EnableColumn,
+    },
+    columnClass: {
+      Enabled: (obj) => {
+        if (obj.Enabled === true) {
+          return "text-green-400"
+        }
+        return "text-red-400"
+      },
+    },
+    Btn: {
+      Delete: (obj) => {
+        state.deleteBlocklist(obj);
+      },
+      New: () => { },
+    },
+    headers: ["Enabled", "Tag", "Count"],
+    headerClass: {},
+    opts: {
+      RowPerPage: 50,
+    },
+  }
 
   return (
     <div className="">
@@ -443,45 +354,13 @@ const DNS = () => {
           </div>
         </TabsContent>
         <TabsContent value="blocklist">
-          <NewTable
-            tableID="dns-lists"
-            className="!p-0 mt-5"
-            background={true}
-            header={headers}
-            rows={rows}
-            button={{
-              text: "New Blocklist",
-              click: function() {
-                navigate("/inspect/blocklist");
-              },
-            }}
-          />
+          <GenericTable table={bltable} />
         </TabsContent>
         <TabsContent value="blockdomains">
-          {dnsStats && (
-            <>
-              <NewTable
-                tableID="dns-blocked"
-                className="dns-stats"
-                background={true}
-                header={headersDNSstats}
-                rows={rowsDNSstats}
-              />
-            </>
-          )}
+          <GenericTable table={generateBlocksTable()} />
         </TabsContent>
         <TabsContent value="resolveddomains">
-          {dnsStats && (
-            <>
-              <NewTable
-                tableID="dns-resolved"
-                className="dns-stats"
-                background={true}
-                header={headerDNSresolves}
-                rows={rowsDNSresolves}
-              />
-            </>
-          )}
+          <GenericTable table={generateResolvesTable()} />
         </TabsContent>
       </Tabs>
     </div>
