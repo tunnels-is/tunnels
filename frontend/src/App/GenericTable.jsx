@@ -158,26 +158,28 @@ const GenericTable = (props) => {
         <TableCell className="text-right w-[10px]">
           <div className="flex justify-end items-center gap-[5px]">
             {customButton}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  className="h-8 w-8 p-0 text-white hover:bg-zinc-800"
+            {actionItems && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    className="h-8 w-8 p-0 text-white hover:bg-zinc-800"
+                  >
+                    <span className="sr-only">Open menu</span>
+                    <MoreHorizontal className="w-4 h-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  align="end"
+                  className="w-48 bg-zinc-900 text-white border border-zinc-700"
                 >
-                  <span className="sr-only">Open menu</span>
-                  <MoreHorizontal className="w-4 h-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                align="end"
-                className="w-48 bg-zinc-900 text-white border border-zinc-700"
-              >
-                <DropdownMenuLabel className="text-zinc-400">
-                  Actions
-                </DropdownMenuLabel>
-                {actionItems}
-              </DropdownMenuContent>
-            </DropdownMenu>
+                  <DropdownMenuLabel className="text-zinc-400">
+                    Actions
+                  </DropdownMenuLabel>
+                  {actionItems}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </div>
         </TableCell>,
       );
@@ -191,7 +193,7 @@ const GenericTable = (props) => {
   };
 
   return (
-    <div className="flex flex-col gap-6 p-6 bg-muted/10 rounded-2xl shadow-md">
+    <div className="flex flex-col gap-6 p-6 bg-[#0B0E14] rounded-2xl shadow-md">
       <div className="flex flex-col md:flex-row justify-between items-center gap-4">
         <div className="flex gap-3 items-center w-full md:w-auto">
           {t.Btn?.New && (
@@ -245,7 +247,7 @@ const GenericTable = (props) => {
       </div>
 
       {!loading && (
-        <div className="overflow-hidden rounded-xl border border-border shadow-sm bg-background">
+        <div className="overflow-hidden rounded-xl border border-border shadow-sm px-3">
           <Table className="w-full text-sm text-foreground">
             {renderHeaders()}
             {renderRows()}
