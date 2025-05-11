@@ -100,6 +100,7 @@ const useForm = () => {
     if (x.status === 200) {
       state.v2_SetUser(x.data, false, authServer, secure);
       navigate("/servers")
+      return
     }
     setErrors({});
   };
@@ -154,7 +155,12 @@ const useForm = () => {
       STORE.Local.setItem("default-device-name", inputs["devicename"]);
       STORE.Cache.Set("default-email", inputs["email"]);
       state.v2_SetUser(x.data, false, authServer, secure);
-      navigate("/servers")
+      if (mode === 3) {
+        navigate("/twofactor/recover")
+      } else {
+        navigate("/servers")
+      }
+      return
     }
     // await state.Login(inputs, remember, authServer, secure);
     setErrors({});
@@ -253,8 +259,9 @@ const useForm = () => {
 
     let request = {
       Email: inputs["email"],
-      NewPassword: inputs["password"],
+      Password: inputs["password"],
       ResetCode: inputs["code"],
+      UseTwoFactor: inputs["usetwofactor"] ? inputs["usetwofactor"] : false
     };
 
     let x = await state.callController(authServer, secure, "POST", "/v3/user/reset/password", request, true, false)
@@ -720,6 +727,15 @@ const Login = (props) => {
           {PasswordInput()}
           {ConfirmPasswordInput()}
           {CodeInput()}
+          <div className="flex items-center space-x-2 mt-[8px] ml-[10px]">
+            <Switch
+              checked={inputs["usetwofactor"]}
+              onCheckedChange={(e) => {
+                inputs["usetwofactor"] = e
+              }}
+            />
+            <Label htmlFor="airplane-mode">Use Two-Factor Authentication</Label>
+          </div>
           {selectForm()}
           <div className="flex space-x-2">
             <Button variant="outline" className="flex-1 h-11 bg-[#0B0E14] border-[#1a1f2d] text-white hover:bg-[#1a1f2d] hover:text-white" onClick={() => GetCode()}>

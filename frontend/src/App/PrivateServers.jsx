@@ -5,6 +5,8 @@ import { TableCell } from "@/components/ui/table";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import NewObjectEditorDialog from "./NewObjectEdiorDialog";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { AccessibilityIcon } from "lucide-react";
 
 const PrivateServers = () => {
 	const state = GLOBAL_STATE("pservers")
@@ -103,9 +105,14 @@ const PrivateServers = () => {
 			}
 		}
 
-		return <TableCell onClick={() => conButton()} className={"w-[10px] text-sky-100"}  >
-			<Button>{label}</Button>
-		</TableCell>
+		// return <Button onClick={() => conButton()}>{label}</Button>
+		return <DropdownMenuItem
+			key="connect"
+			onClick={() => conButton()}
+			className="cursor-pointer text-emerald-400 focus:text-emerald-700"
+		>
+			<AccessibilityIcon className="w-4 h-4 mr-2" /> Connect
+		</DropdownMenuItem >
 	}
 
 	const TunnelsColumn = (obj) => {
@@ -131,13 +138,13 @@ const PrivateServers = () => {
 			value = servertun?.Tag
 		}
 
-		return <TableCell className={"w-[10px] text-sky-100"}  >
+		return <TableCell className={"w-[100px] text-sky-100"}  >
 			<Select value={value}
 				onValueChange={(e) => {
 					state.changeServerOnTunnelUsingTag(e, obj._id)
 				}}
 			>
-				<SelectTrigger className="w-[150px]">
+				<SelectTrigger className="w-full">
 					<SelectValue placeholder={assigned} />
 				</SelectTrigger>
 				<SelectContent>
@@ -202,7 +209,7 @@ const PrivateServers = () => {
 	}
 
 	return (
-		<div className="ab private-server-wrapper w-full">
+		<div className="ab private-server-wrapper w-full" >
 			<GenericTable table={table} />
 
 			<NewObjectEditorDialog
@@ -221,7 +228,7 @@ const PrivateServers = () => {
 				}}
 			/>
 
-		</div>
+		</div >
 	);
 }
 
