@@ -37,9 +37,9 @@ func launchAPIServer() {
 		mux.HandleFunc("/v3/user/update", API_UserUpdate)
 		mux.HandleFunc("/v3/user/login", API_UserLogin)
 		mux.HandleFunc("/v3/user/logout", API_UserLogout)
-		mux.HandleFunc("/v3/user/2fa/confirm", API_UserTwoFactorConfirm)
 		mux.HandleFunc("/v3/user/reset/code", API_UserRequestPasswordCode)
 		mux.HandleFunc("/v3/user/reset/password", API_UserResetPassword)
+		mux.HandleFunc("/v3/user/2fa/confirm", API_UserTwoFactorConfirm)
 
 		// ADMIN
 		mux.HandleFunc("/v3/user/list", API_UserList)

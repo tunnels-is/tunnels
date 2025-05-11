@@ -275,12 +275,18 @@ type FORM_GROUP_REMOVE struct {
 	TypeID      primitive.ObjectID `json:"TypeID"`
 }
 
-type TWO_FACTOR_CONFIRM struct {
-	Email    string
-	Code     string
-	Digits   string
-	Password string
-	Recovery string
+type TWO_FACTOR_CREATE struct {
+	DeviceToken string             `json:"DeviceToken"`
+	UID         primitive.ObjectID `json:"UID"`
+}
+
+type TWO_FACTOR_FORM struct {
+	DeviceToken string             `json:"DeviceToken"`
+	UID         primitive.ObjectID `json:"UID"`
+	Code        string
+	Digits      string
+	Password    string
+	Recovery    string
 }
 
 type USER_UPDATE_FORM struct {
@@ -297,10 +303,10 @@ type TWO_FACTOR_DB_PACKAGE struct {
 }
 
 type PASSWORD_RESET_FORM struct {
-	Email     string
-	Password  string
-	Password2 string
-	ResetCode string
+	Email        string
+	Password     string
+	ResetCode    string
+	UseTwoFactor bool
 }
 
 type FORM_GET_SERVERS struct {
