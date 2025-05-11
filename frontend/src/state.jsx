@@ -192,12 +192,11 @@ export var STATE = {
       STATE.User = u;
       STORE.Cache.SetObject("user", u);
       if (saveToDisk) {
-        STATE.SaveUser(u);
+        await STATE.SaveUser(u);
       }
-      window.location.reload("/")
     } catch (err) {
       console.dir(err);
-      STORE.Cache.interface = window.sessionStorage;
+      // STORE.Cache.interface = window.sessionStorage;
     }
   },
   DelUser: async () => {
@@ -1010,6 +1009,12 @@ export var STATE = {
     return STATE.API.method("getQRCode", inputs);
   },
   ConfirmTwoFactorCode: async (inputs, url) => {
+
+
+    return await STATE.callController(null, null, "POST", "/v3/user/2fa/confirm",
+      inputs,
+      false, false)
+
     return STATE.ForwardToController(
       {
         URL: url,

@@ -12,10 +12,6 @@ const Account = () => {
   const navigate = useNavigate();
   const state = GLOBAL_STATE("account");
 
-  const NavigateTo2fa = () => {
-    navigate("/twofactor");
-  };
-
   if (state.User?.Email === "" || !state.User) {
     navigate("/login");
     return;
@@ -149,10 +145,11 @@ const Account = () => {
 
                 <button
                   className="w-full bg-secondary text-black dark:text-white py-2 rounded-md text-sm font-medium hover:bg-secondary/80 transition"
-                  onClick={() => NavigateTo2fa()}
+                  onClick={() => navigate("/twofactor/create")}
                 >
                   Two-Factor Authentication
                 </button>
+
               </div>
 
             </div>

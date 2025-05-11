@@ -406,7 +406,6 @@ type TWO_FACTOR_CONFIRM struct {
 
 type QR_CODE struct {
 	Value string
-	// Recovery string
 }
 
 // Device token struct need for the login respons from user scruct
