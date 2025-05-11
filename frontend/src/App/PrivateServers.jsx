@@ -188,7 +188,7 @@ const PrivateServers = () => {
 				// TODO
 			},
 			New: () => {
-				setServer({ Tag: "", Country: "", IP: "", Port: 0, DataPort: 0, PubKey: "" })
+				setServer({ Tag: "", Country: "", IP: "", Port: "", DataPort: "", PubKey: "" })
 				setEditModalOpen(true)
 			},
 		},

@@ -614,7 +614,7 @@ const Login = (props) => {
           onValueChange={setAuthServer}
         >
           <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Theme" />
+            <SelectValue placeholder="Select Auth Server" />
           </SelectTrigger>
           <SelectContent>
             {state.Config?.AuthServers.map(c => {
