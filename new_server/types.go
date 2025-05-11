@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/tunnels-is/tunnels/crypt"
+	"github.com/tunnels-is/tunnels/signal"
 	"github.com/tunnels-is/tunnels/types"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -34,8 +35,10 @@ type UserCoreMapping struct {
 	Uindex             []byte
 	Created            time.Time
 
-	ToUser   chan []byte
-	FromUser chan Packet
+	ToUser     chan []byte
+	ToSignal   *signal.Signal
+	FromUser   chan Packet
+	FromSignal *signal.Signal
 
 	Addr syscall.Sockaddr
 
@@ -48,6 +51,8 @@ type UserCoreMapping struct {
 	CPU  byte
 	RAM  byte
 	Disk byte
+
+	Delete sync.Once
 }
 
 type Packet struct {

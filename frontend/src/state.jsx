@@ -727,6 +727,9 @@ export var STATE = {
     STATE.toggleLoading(undefined);
   },
   connectToVPN: async (c, server) => {
+    console.log("CONNECTING")
+    console.dir(c)
+    console.dir(server)
     if (!server && !c) {
       STATE.errorNotification("no server or tunnel given when connecting");
       return;
@@ -755,43 +758,40 @@ export var STATE = {
     } else {
       connectionRequest.Tag = c.Tag;
       connectionRequest.EncType = c.EncryptionType;
+    }
 
-      if (c.ServerIP === "") {
-        STATE.Servers?.forEach((s) => {
-          if (s._id === c.ServerID) {
-
-            server = s;
-            connectionRequest.ServerIP = s.IP;
-            connectionRequest.ServerPort = s.Port;
-            connectionRequest.ServerID = s._id;
-          }
-
-        });
-        if (!server) {
-          STATE.PrivateServers?.forEach((s) => {
-            if (s._id === c.ServerID) {
-
-              server = s;
-              connectionRequest.ServerIP = s.IP;
-              connectionRequest.ServerPort = s.Port;
-              connectionRequest.ServerID = s._id;
-            }
-
-          });
-
-        }
-      } else {
-        connectionRequest.ServerIP = c.ServerIP;
-        connectionRequest.ServerPort = c.ServerPort;
-        connectionRequest.ServerID = c.ServerID;
+    STATE.Servers?.forEach((s) => {
+      if (s._id === c.ServerID) {
+        server = s;
+        connectionRequest.ServerIP = s.IP;
+        connectionRequest.ServerPort = s.Port;
+        connectionRequest.ServerID = s._id;
       }
+    });
+
+    if (!server) {
+      STATE.PrivateServers?.forEach((s) => {
+        if (s._id === c.ServerID) {
+          server = s;
+          connectionRequest.ServerIP = s.IP;
+          connectionRequest.ServerPort = s.Port;
+          connectionRequest.ServerID = s._id;
+        }
+      });
     }
 
     if (server) {
       connectionRequest.ServerIP = server.IP;
       connectionRequest.ServerPort = server.Port;
       connectionRequest.ServerID = server._id;
+      connectionRequest.ServerPubKey = server.PubKey;
+    } else {
+      STATE.errorNotification("unable to find server with the given ID")
+      return
     }
+
+    connectionRequest.URL = STATE.User.AuthServer
+    connectionRequest.Secure = STATE.User.Secure
 
     console.log("CONR");
     console.dir(connectionRequest);

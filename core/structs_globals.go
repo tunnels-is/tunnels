@@ -30,6 +30,10 @@ type DNSStats struct {
 }
 
 type ConnectionRequest struct {
+	URL          string
+	Secure       bool
+	ServerPubKey string
+
 	DeviceKey string `json:"DeviceKey"`
 
 	DeviceToken string `json:"DeviceToken"`
