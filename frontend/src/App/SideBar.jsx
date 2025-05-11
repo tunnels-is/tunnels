@@ -58,8 +58,8 @@ const SideBar = () => {
     }
     return false;
   };
-  const showManagement = () => {
-    if (state.User?.IsAdmin || state.User?.IsManager) {
+  const isManager = () => {
+    if (state.User?.IsAdmin === true || state.User?.IsManager === true) {
       return true;
     }
     return false;
@@ -89,10 +89,11 @@ const SideBar = () => {
       },
       {
         title: "Admin",
+        isManager: true,
         items: [
-          { icon: HomeIcon, label: "Users", route: "users", user: true, shouldRender: showManagement },
-          { icon: HomeIcon, label: "Devices", route: "devices", user: true, shouldRender: showManagement },
-          { icon: HomeIcon, label: "Groups", route: "groups", user: true, shouldRender: showManagement },],
+          { icon: HomeIcon, label: "Users", route: "users", user: true, shouldRender: isManager },
+          { icon: HomeIcon, label: "Devices", route: "devices", user: true, shouldRender: isManager },
+          { icon: HomeIcon, label: "Groups", route: "groups", user: true, shouldRender: isManager },],
       },
       {
         title: "Settings",
@@ -159,6 +160,9 @@ const SideBar = () => {
           }
           if (g.shouldRender && !g.shouldRender()) {
             return false;
+          }
+          if (g.isManager && !isManager()) {
+            return (<></>)
           }
           return (
             <div className="px-3" key={g.title}>
