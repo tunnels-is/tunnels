@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import GLOBAL_STATE from "../state";
 import GenericTable from "./GenericTable";
@@ -11,8 +10,8 @@ import NewObjectEditorDialog from "./NewObjectEdiorDialog";
 const Tunnels = () => {
   const state = GLOBAL_STATE("tunnels");
   const [tunnel, setTunnel] = useState(undefined);
-  const [tunnels, setTunnels] = useState([])
-  const [modalOpen, setModalOpen] = useState(false)
+  const [tunnels, setTunnels] = useState([]);
+  const [modalOpen, setModalOpen] = useState(false);
 
   useEffect(() => {
     let x = async () => {
@@ -35,12 +34,11 @@ const Tunnels = () => {
       }
     });
 
-
-    let connect = undefined
-    let label = ""
+    let connect = undefined;
+    let label = "";
 
     if (active) {
-      label = "disconnect"
+      label = "disconnect";
       connect = () => {
         state.ConfirmAndExecute(
           "success",
@@ -52,9 +50,9 @@ const Tunnels = () => {
             state.disconnectFromVPN(obj);
           },
         );
-      }
+      };
     } else {
-      label = "connect"
+      label = "connect";
       connect = () => {
         state.ConfirmAndExecute(
           "success",
@@ -66,23 +64,25 @@ const Tunnels = () => {
             state.connectToVPN(obj);
           },
         );
-      }
+      };
     }
 
-    return <TableCell onClick={connect} className={"w-[10px] text-sky-100"}  >
-      <Button>{label}</Button>
-    </TableCell>
-  }
+    return (
+      <Button className={"w-[80px] bg-blue-800 text-white hover:bg-blue-900"}>
+        {label}
+      </Button>
+    );
+  };
 
   const newServer = async () => {
-    await state.createTunnel()
-  }
+    await state.createTunnel();
+  };
 
   let table = {
     data: state?.Tunnels,
     rowClick: (obj) => {
-      console.log("row click!")
-      console.dir(obj)
+      console.log("row click!");
+      console.dir(obj);
     },
     columns: {
       Tag: true,
@@ -90,55 +90,53 @@ const Tunnels = () => {
       ServerID: true,
     },
     customBtn: {
-      Connect: ConnectButton
+      Connect: ConnectButton,
     },
     Btn: {
       Edit: (obj) => {
-        setTunnel(obj)
-        setModalOpen(true)
+        setTunnel(obj);
+        setModalOpen(true);
       },
       Delete: (obj) => {
         state.v2_TunnelDelete(obj);
         setTunnel(undefined);
       },
       New: () => {
-        newServer()
+        newServer();
       },
     },
     headers: ["Tag", "IFName", "ServerID"],
     headerFormat: {
       IFName: () => {
-        return "Interface"
-      }
+        return "Interface";
+      },
     },
     opts: {
       RowPerPage: 50,
     },
-    more: () => {
+    more: () => {},
+  };
 
-    },
-  }
+  return (
+    <div className="tunnels">
+      <GenericTable table={table} />
+      <NewObjectEditorDialog
+        open={modalOpen}
+        onOpenChange={setModalOpen}
+        object={tunnel}
+        title="Tunnel"
+        description=""
+        readOnly={false}
+        saveButton={() => {
+          console.log("save");
+        }}
+        onChange={(key, value, type) => {
+          device[key] = value;
+          console.log(key, value, type);
+        }}
+      />
+    </div>
+  );
+};
 
-  return (<div className="tunnels">
-    <GenericTable table={table} />
-    <NewObjectEditorDialog
-      open={modalOpen}
-      onOpenChange={setModalOpen}
-      object={tunnel}
-      title="Tunnel"
-      description=""
-      readOnly={false}
-      saveButton={() => {
-        console.log("save")
-
-      }}
-      onChange={(key, value, type) => {
-        device[key] = value
-        console.log(key, value, type)
-      }}
-    />
-  </div>)
-
-}
-
-export default Tunnels
+export default Tunnels;
