@@ -30,6 +30,7 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/tunnels-is/tunnels/certs"
 	"github.com/tunnels-is/tunnels/crypt"
+	"github.com/tunnels-is/tunnels/iptables"
 	"github.com/tunnels-is/tunnels/setcap"
 	"github.com/tunnels-is/tunnels/signal"
 	"github.com/tunnels-is/tunnels/types"
@@ -54,8 +55,8 @@ var (
 	Cancel       atomic.Pointer[context.CancelFunc]
 	Config       atomic.Pointer[types.ServerConfig]
 	APITLSConfig atomic.Pointer[tls.Config]
-	PrivKey      atomic.Pointer[any]
-	PubKey       atomic.Pointer[any]
+	PrivKey      any
+	PubKey       any
 	KeyPair      atomic.Pointer[tls.Certificate]
 	lc           atomic.Pointer[lemonsqueezy.Client]
 )
@@ -76,8 +77,8 @@ var (
 	TCPRWC       io.ReadWriteCloser
 	UDPRWC       io.ReadWriteCloser
 
-	toUserChannelMonitor   = make(chan int, 200000)
-	fromUserChannelMonitor = make(chan int, 200000)
+	// toUserChannelMonitor   = make(chan int, 200000)
+	// fromUserChannelMonitor = make(chan int, 200000)
 
 	clientCoreMappings [math.MaxUint16 + 1]*UserCoreMapping
 	portToCoreMapping  [math.MaxUint16 + 1]*PortRange
@@ -90,6 +91,10 @@ var (
 	lanFirewallDisabled bool
 	disableLogs         bool
 )
+
+func GetVPLCM(ip [4]byte) {
+
+}
 
 func LOG(x ...any) {
 	if !disableLogs {
@@ -266,8 +271,8 @@ func loadCertificatesAndTLSSettings() (err error) {
 	if err != nil {
 		return err
 	}
-	PrivKey.Store(&priv)
-	PubKey.Store(&pub)
+	PrivKey = priv
+	PubKey = pub
 	tlscert, err := tls.X509KeyPair(pubB, privB)
 	if err != nil {
 		return err
@@ -292,15 +297,15 @@ func initializeVPN() {
 	}
 	Config := Config.Load()
 
-	// var existed bool
-	// err, existed = iptables.SetIPTablesRSTDropFilter(Config.VPNIP)
-	// if err != nil {
-	// 	ERR("Error applying iptables rule: ", err)
-	// 	os.Exit(1)
-	// }
-	// if !existed {
-	// 	INFO("> added iptables rule")
-	// }
+	var existed bool
+	err, existed = iptables.SetIPTablesRSTDropFilter(Config.VPNIP)
+	if err != nil {
+		ERR("Error applying iptables rule: ", err)
+		os.Exit(1)
+	}
+	if !existed {
+		INFO("> added iptables rule")
+	}
 
 	InterfaceIP = net.ParseIP(Config.VPNIP)
 	if InterfaceIP == nil {
@@ -434,7 +439,7 @@ func makeConfigAndCerts() {
 		StartPort:          2000,
 		EndPort:            65530,
 		UserMaxConnections: 10,
-		InternetAccess:     false,
+		InternetAccess:     true,
 		LocalNetworkAccess: false,
 		BandwidthMbps:      1000,
 		UserBandwidthMbps:  10,

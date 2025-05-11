@@ -27,6 +27,7 @@ import (
 	"github.com/tunnels-is/tunnels/crypt"
 	"github.com/tunnels-is/tunnels/types"
 	"github.com/xlzd/gotp"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"golang.org/x/sys/unix"
 )
 
@@ -490,6 +491,7 @@ func PreConnectCheck() (int, error) {
 var IsConnecting = atomic.Bool{}
 
 func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
+	fmt.Println(ClientCR)
 	if !IsConnecting.CompareAndSwap(false, true) {
 		INFO("Already connecting to another connection, please wait a moment")
 		return 400, errors.New("Already connecting to another connection, please wait a moment")
@@ -592,13 +594,24 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		return 400, errors.New("no server id found when connecting")
 	}
 
+	UID, err := primitive.ObjectIDFromHex(ClientCR.UserID)
+	if err != nil {
+		ERROR("Invalid user ID")
+		return 400, errors.New("Invalid user ID")
+	}
+	SID, err := primitive.ObjectIDFromHex(ClientCR.ServerID)
+	if err != nil {
+		ERROR("Invalid user ID")
+		return 400, errors.New("Invalid user ID")
+	}
+
 	FinalCR := new(types.ControllerConnectRequest)
 	FinalCR.Created = time.Now()
 	FinalCR.Version = apiVersion
-	FinalCR.UserID = ClientCR.UserID
+	FinalCR.UserID = UID
 	FinalCR.EncType = ClientCR.EncType
 	FinalCR.DHCPToken = meta.DHCPToken
-	FinalCR.SeverID = ClientCR.ServerID
+	FinalCR.ServerID = SID
 	FinalCR.CurveType = ClientCR.CurveType
 	FinalCR.DeviceKey = ClientCR.DeviceKey
 	FinalCR.DeviceToken = ClientCR.DeviceToken
@@ -609,13 +622,13 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	bytesFromController, code, err := SendRequestToURL(
 		nil,
 		"POST",
-		"https://api.tunnels.is/session",
+		ClientCR.URL+"/v3/session",
 		FinalCR,
 		10000,
-		false,
+		ClientCR.Secure,
 	)
 	if code != 200 {
-		ERROR("ErrFromController:", string(bytesFromController))
+		ERROR("ErrFromController:", err, string(bytesFromController))
 		ER := new(ErrorResponse)
 		err := json.Unmarshal(bytesFromController, ER)
 		if err == nil {
@@ -648,7 +661,7 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		CurvePreferences:   []tls.CurveID{tls.X25519MLKEM768},
 		InsecureSkipVerify: false,
 	}
-	tc.RootCAs, errm = tunnel.LoadCertPEMBytes(SignedResponse.ServerPubKey)
+	tc.RootCAs, errm = tunnel.LoadCertPEMBytes([]byte(ClientCR.ServerPubKey))
 	if errm != nil {
 		ERROR("Unable to load cert pem from controller: ", errm)
 		return 502, errors.New("Unable to load cert pem from controller")
@@ -656,10 +669,11 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	bytesFromServer, code, err := SendRequestToURL(
 		tc,
 		"POST",
-		"https://server.tunnels.is/connect",
+		"https://"+ClientCR.ServerIP+":"+ClientCR.ServerPort+"/v3/connect",
+		// "https://server.tunnels.is/connect",
 		SignedResponse,
 		10000,
-		false,
+		ClientCR.Secure,
 	)
 	if code != 200 {
 		ERROR("ErrFromServer:", string(bytesFromServer))
@@ -679,6 +693,25 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	err = json.Unmarshal(bytesFromServer, ServerReponse)
 	if err != nil {
 		return 500, errors.New("Unable to decode reponse from server")
+	}
+
+	pubKey, _, err := crypt.LoadPublicKeyBytes([]byte(ClientCR.ServerPubKey))
+	if err != nil {
+		return 500, errors.New("Unable to load server public key")
+	}
+
+	err = crypt.VerifySignature(ServerReponse.ServerHandshake, ServerReponse.ServerHandshakeSignature, pubKey)
+	if err != nil {
+		return 500, errors.New("Unable to verify server signature")
+	}
+
+	tunnel.encWrapper.SEAL.PublicKey, err = tunnel.encWrapper.SEAL.NewPublicKeyFromBytes(ServerReponse.ServerHandshake)
+	if err != nil {
+		return 500, errors.New("Unable to create public key from server handshake response")
+	}
+	err = tunnel.encWrapper.SEAL.CreateAEAD()
+	if err != nil {
+		return 500, errors.New("Unable to create encryption wrapper seal")
 	}
 
 	DEBUG("ConnectionRequestResponse:", ServerReponse)

@@ -118,7 +118,6 @@ type ListDevice struct {
 type SignedConnectRequest struct {
 	Signature     []byte
 	Payload       []byte
-	ServerPubKey  []byte
 	UserHandshake []byte
 }
 
@@ -167,41 +166,21 @@ func CreateCRRFromServer(S *ServerConfig) (CRR *ServerConnectResponse) {
 	}
 }
 
-type ServerConnectRequest struct {
-	EncType   crypt.EncType      `json:"EncType"`
-	CurveType crypt.CurveType    `json:"CurveType"`
-	SeverID   primitive.ObjectID `json:"ServerID"`
-	Serial    string             `json:"Serial"`
-
-	Version int       `json:"Version"`
-	Created time.Time `json:"Created"`
-
-	RequestingPorts bool   `json:"RequestingPorts"`
-	DHCPToken       string `json:"DHCPToken"`
-
-	Hostname    string             `json:"Hostname"`
-	UID         primitive.ObjectID `json:"UID"`
-	UserEmail   string             `json:"UserEmail"`
-	DeviceToken string             `json:"DeviceToken"`
-}
-
 type ControllerConnectRequest struct {
-	// CLI/MIN
-	DeviceKey string `json:"DeviceKey"`
-
-	// GUI
-	DeviceToken string `json:"DeviceToken"`
-	UserID      string `json:"UserID"`
+	DeviceKey   string             `json:"DeviceKey"`
+	DeviceToken string             `json:"DeviceToken"`
+	UserID      primitive.ObjectID `json:"UserID"`
 
 	// General
-	EncType   crypt.EncType   `json:"EncType"`
-	CurveType crypt.CurveType `json:"CurveType"`
-	SeverID   string          `json:"ServerID"`
+	EncType   crypt.EncType      `json:"EncType"`
+	CurveType crypt.CurveType    `json:"CurveType"`
+	ServerID  primitive.ObjectID `json:"ServerID"`
 
 	// These are added by the golang client
 	Version int       `json:"Version"`
 	Created time.Time `json:"Created"`
 
+	Hostname        string `json:"Hostname"`
 	RequestingPorts bool   `json:"RequestingPorts"`
 	DHCPToken       string `json:"DHCPToken"`
 }

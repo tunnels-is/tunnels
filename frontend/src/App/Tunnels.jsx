@@ -6,6 +6,8 @@ import { TableCell } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { v4 as uuidv4 } from "uuid";
 import NewObjectEditorDialog from "./NewObjectEdiorDialog";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { AccessibilityIcon } from "lucide-react";
 
 const Tunnels = () => {
   const state = GLOBAL_STATE("tunnels");
@@ -67,11 +69,13 @@ const Tunnels = () => {
       };
     }
 
-    return (
-      <Button className={"w-[80px] bg-blue-800 text-white hover:bg-blue-900"}>
-        {label}
-      </Button>
-    );
+    return <DropdownMenuItem
+      key="connect"
+      onClick={() => connect()}
+      className="cursor-pointer text-emerald-400 focus:text-emerald-700"
+    >
+      <AccessibilityIcon className="w-4 h-4 mr-2" /> {label}
+    </DropdownMenuItem >
   };
 
   const newServer = async () => {
@@ -114,7 +118,7 @@ const Tunnels = () => {
     opts: {
       RowPerPage: 50,
     },
-    more: () => {},
+    more: () => { },
   };
 
   return (

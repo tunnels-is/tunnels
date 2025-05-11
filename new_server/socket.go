@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"math"
 	"net"
 	"runtime/debug"
@@ -31,7 +32,7 @@ func countConnections(id string) (count int, userCount int) {
 	return
 }
 
-func CreateClientCoreMapping(CRR *types.ServerConnectResponse, CR *types.ServerConnectRequest, EH *crypt.SocketWrapper) (index int, err error) {
+func CreateClientCoreMapping(CRR *types.ServerConnectResponse, CR *types.ControllerConnectRequest, EH *crypt.SocketWrapper) (index int, err error) {
 	defer func() {
 		r := recover()
 		if r != nil {
@@ -54,7 +55,7 @@ func CreateClientCoreMapping(CRR *types.ServerConnectResponse, CR *types.ServerC
 				continue
 			}
 
-			clientCoreMappings[i].ID = CR.UID.Hex()
+			clientCoreMappings[i].ID = CR.UserID.Hex()
 			clientCoreMappings[i].DeviceToken = CR.DeviceToken
 			clientCoreMappings[i].EH = EH
 			clientCoreMappings[i].Created = time.Now()
@@ -291,24 +292,23 @@ func DataSocketListener() {
 }
 
 func fromUserChannel(index int) {
+	CM := clientCoreMappings[index]
+	if CM == nil {
+		return
+	}
+
 	shouldRestart := true
 	defer func() {
 		if r := recover(); r != nil {
 			ERR(3, r, string(debug.Stack()))
 		}
 
-		if shouldRestart {
-			fromUserChannelMonitor <- index
-		} else {
-			NukeClient(index)
+		if !shouldRestart {
+			CM.Delete.Do(func() {
+				NukeClient(index)
+			})
 		}
 	}()
-
-	CM := clientCoreMappings[index]
-	if CM == nil {
-		shouldRestart = false
-		return
-	}
 
 	var payload Packet
 	var PACKET []byte
@@ -346,6 +346,8 @@ func fromUserChannel(index int) {
 			ERR("Authentication error:", err)
 			continue
 		}
+		fmt.Println("FROM USER!")
+		fmt.Println(PACKET)
 
 		CM.Addr = payload.addr
 		if len(PACKET) < 20 {
@@ -367,7 +369,7 @@ func fromUserChannel(index int) {
 		}
 
 		NIP = PACKET[16:20]
-		if LANEnabled {
+		if LANEnabled && (NIP[0] == 10 && NIP[1] == 0) {
 			D4[0] = NIP[0]
 			D4[1] = NIP[1]
 			D4[2] = NIP[2]
@@ -452,24 +454,23 @@ func IS_LOCAL(ip net.IP) bool {
 }
 
 func toUserChannel(index int) {
+	CM := clientCoreMappings[index]
+	if CM == nil {
+		return
+	}
 	shouldRestart := true
+
 	defer func() {
 		if r := recover(); r != nil {
 			ERR(3, r, string(debug.Stack()))
 		}
 
-		if shouldRestart {
-			toUserChannelMonitor <- index
-		} else {
-			NukeClient(index)
+		if !shouldRestart {
+			CM.Delete.Do(func() {
+				NukeClient(index)
+			})
 		}
 	}()
-
-	CM := clientCoreMappings[index]
-	if CM == nil {
-		shouldRestart = false
-		return
-	}
 
 	var PACKET []byte
 	var err error
@@ -488,12 +489,14 @@ func toUserChannel(index int) {
 			shouldRestart = false
 			return
 		}
+		fmt.Println("TO USER!")
+		fmt.Println(PACKET)
 
 		if PACKET[9] != 6 && PACKET[9] != 17 {
 			continue
 		}
 
-		if LANEnabled {
+		if LANEnabled && (PACKET[12] == 10 && PACKET[13] == 0) {
 			S4[0] = PACKET[12]
 			S4[1] = PACKET[13]
 			S4[2] = PACKET[14]
