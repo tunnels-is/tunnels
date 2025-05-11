@@ -1,15 +1,11 @@
 import React from "react";
 import STORE from "../store";
-import * as runtime from "../../wailsjs/runtime/runtime";
-import GLOBAL_STATE from "../state";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import { ExternalLink } from "lucide-react";
 
 const Welcome = () => {
-  const state = GLOBAL_STATE();
 
   const Copy = (value) => {
     window.open(value, "_blank");

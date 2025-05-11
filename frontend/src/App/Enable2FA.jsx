@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-
 import QRCode from "react-qr-code";
-
-
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import STORE from "../store";
 import GLOBAL_STATE from "../state";
-import { FrameIcon, LockClosedIcon } from "@radix-ui/react-icons";
+import { EnvelopeClosedIcon, FrameIcon, LockClosedIcon } from "@radix-ui/react-icons";
+import { Input } from "@/components/ui/input";
 
 const useForm = (props) => {
 	const [inputs, setInputs] = useState({});
@@ -46,9 +46,7 @@ const useForm = (props) => {
 
 		let user = STORE.Cache.GetObject("user")
 		if (!user) {
-			navigate("/loging")
-		} else {
-			inputs.Email = user.Email
+			navigate("/login")
 		}
 
 		let c = code.Value
@@ -118,79 +116,99 @@ const Enable2FA = (props) => {
 
 
 	return (
-		<div className="two-factor-wrapper">
+		<div className="w-full flex flex-col items-center justify-center p-4 bg-black">
+			<div className="w-full max-w-md space-y-6">
 
-			{(code.Value && !code.Recovery) &&
-				<div className="qr-wrapper">
-					<div className="qr-code">
-						<QRCode
-							className="qr"
-							style={{ height: "auto", maxWidth: "220px", width: "220px" }}
-							value={code.Value}
-							viewBox={`0 0 256 256`}
-						></QRCode>
-					</div>
-					<div className="text">
-						Scan the code with a Two-Factor Authentication APP.<br />
-						For Example: google authenticator or Aegis app
-					</div>
-				</div>
+				<Card className="w-full max-w-md mx-auto bg-[#0B0E14] border border-[#1a1f2d] shadow-2xl">
+					<CardContent className="space-y-6 p-6">
+						<div className="text-center flex-col mb-2">
 
-			}
+							{(code.Value && !code.Recovery) &&
+								<>
+									<div className="qr-code p-4 bg-white w-[260px] m-auto mt-8">
+										<QRCode
+											className="qr"
+											style={{ height: "auto", maxWidth: "220px", width: "220px" }}
+											value={code.Value}
+											viewBox={`0 0 256 256`}
+										></QRCode>
+									</div>
 
-			{code.Recovery &&
-				<div className="recovery-codes">
-					<div className="title">
-						Please copy and store these recovery codes in a safe place, we recommend you write them down on paper. If you ever loose your authenticator app access you can use these codes to recover your account at a later date
-					</div>
-					<div className="codes">
-						{code.Recovery}
-					</div>
-					<div className="notice title">DO NOT STORE THESE CODES WITH YOUR PASSWORD</div>
-				</div>
-			}
+									<div className="space-y-2 mt-10">
+										<div className="relative">
+											<LockClosedIcon className="absolute left-3 top-2.5 h-5 w-5 text-[#4B7BF5]" />
+											<Input
+												id="password"
+												className="pl-10 bg-[#0B0E14] border-[#1a1f2d] text-white focus:ring-[#4B7BF5] focus:border-[#4B7BF5] h-11"
+												type="password"
+												placeholder="Password"
+												value={inputs["password"]}
+												name="password"
+												onChange={HandleInputChange}
+											/>
+										</div>
+										{errors["password"] !== "" && (
+											<p className="text-sm text-red-500">{errors["password"]}</p>
+										)}
+									</div>
 
-			<div className="form" >
+									<div className="space-y-2">
+										<div className="relative">
+											<LockClosedIcon className="absolute left-3 top-2.5 h-5 w-5 text-[#4B7BF5]" />
+											<Input
+												id="digits"
+												className="pl-10 bg-[#0B0E14] border-[#1a1f2d] text-white focus:ring-[#4B7BF5] focus:border-[#4B7BF5] h-11"
+												type="string"
+												placeholder="Two Factor Code"
+												value={inputs["digits"]}
+												name="digits"
+												onChange={HandleInputChange}
+											/>
+										</div>
+										{errors["digits"] !== "" && (
+											<p className="text-sm text-red-500">{errors["digits"]}</p>
+										)}
+									</div>
 
-				<div className="input">
-					<FrameIcon className="color-ok" width={40} height={30} center ></FrameIcon>
-					<input className="code"
-						placeholder={"Authenticator Code"} type="text"
-						value={inputs["digits"]}
-						name="digits"
-						onChange={HandleInputChange} />
-					{errors["digits"] && <div className="error">{errors["digits"]}</div>}
-				</div>
+									<Button className="mt-2 w-full h-11 bg-[#4B7BF5] hover:bg-[#4B7BF5]/90 text-white" onClick={HandleSubmit}>
+										Confirm
+									</Button>
+									<h1 className="mt-4 text-white">Insert Two-Factor Recovery code below to over-write existing Two-Factor Authentication</h1>
+									<div className="space-y-2 mt-4">
+										<div className="relative">
+											<LockClosedIcon className="absolute left-3 top-2.5 h-5 w-5 text-[#4B7BF5]" />
+											<Input
+												id="recovery"
+												className="pl-10 bg-[#0B0E14] border-[#1a1f2d] text-white focus:ring-[#4B7BF5] focus:border-[#4B7BF5] h-11"
+												type="string"
+												placeholder="Recovery Code"
+												value={inputs["recovery"]}
+												name="recovery"
+												onChange={HandleInputChange}
+											/>
+										</div>
+									</div>
+								</>
+							}
 
-				<div className="input">
-					<LockClosedIcon className="color-ok" width={40} height={30} center ></LockClosedIcon>
-					<input className="pass"
-						placeholder={"Password"} type="password"
-						value={inputs["password"]}
-						name="password"
-						onChange={HandleInputChange} />
-					{errors["password"] !== "" && <div className="error">{errors["password"]}</div>}
-				</div>
-
-				<div className="input">
-					<FrameIcon className="color-ok" width={40} height={30} center ></FrameIcon>
-					<input className="recovery"
-						placeholder="Recovery Code (optional)"
-						type="text"
-						value={inputs["recovery"]}
-						name="recovery"
-						onChange={HandleInputChange} />
-				</div>
+							{code.Recovery &&
+								<div className="flex flex-col w-full mt-5">
+									<h1 className="text-white font-bold">
+										RECOVERY CODES
+									</h1>
+									<div className="text-red-300 mt-3">DO NOT STORE THESE CODES WITH YOUR PASSWORD</div>
+									<div className="mt-4">
+										{code.Recovery}
+									</div>
+								</div>
+							}
 
 
-				<div className="buttons">
-					<button className={`ok-button`}
-						onClick={() => HandleSubmit()}
-					>Confirm</button>
-				</div>
+						</div>
 
+					</CardContent>
+				</Card>
 			</div>
-
 		</div >
 	)
 }

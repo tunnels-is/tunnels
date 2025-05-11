@@ -74,46 +74,48 @@ const LaunchApp = () => {
             <div className="p-6 w-full">
               <Routes>
 
+                <Route path="account" element={<Account />} />
+
+                <Route path="twofactor/create" element={<Enable2FA />} />
+
+                <Route path="groups" element={<Groups />} />
+                <Route path="users" element={<Users />} />
+                <Route path="devices" element={<Devices />} />
+
+                <Route path="inspect/group/:id" element={<InspectGroup />} />
+
+                <Route path="tunnels" element={<Tunnels />} />
+                <Route
+                  path="inspect/connection/:id"
+                  element={<InspectConnection />}
+                />
+                <Route path="routing" element={<ConnectionTable />} />
+                <Route path="settings" element={<Settings />} />
+
+                <Route path="dns" element={<DNS />} />
+                <Route path="dns/answers/:domain" element={<DNSAnswers />} />
+
+                <Route path="servers" element={<PrivateServers />} />
+                <Route path="all" element={<PrivateServers />} />
+                <Route path="private" element={<PrivateServers />} />
+
+                <Route path="inspect/blocklist/" element={<InspectBlocklist />} />
+
+                <Route path="login" element={<Login />} />
+                <Route path="help" element={<Welcome />} />
+
+                <Route path="test" element={<NewObjectEditor />} />
+
                 {state.User && (
                   <>
                     <Route path="/" element={<Welcome />} />
-                    <Route path="account" element={<Account />} />
-
-                    <Route path="twofactor" element={<Enable2FA />} />
-                    <Route path="groups" element={<Groups />} />
-                    <Route path="users" element={<Users />} />
-                    <Route path="devices" element={<Devices />} />
-
-                    <Route path="inspect/group/:id" element={<InspectGroup />} />
-
-                    <Route path="tunnels" element={<Tunnels />} />
-                    <Route
-                      path="inspect/connection/:id"
-                      element={<InspectConnection />}
-                    />
-                    <Route path="routing" element={<ConnectionTable />} />
-                    <Route path="settings" element={<Settings />} />
-
-                    <Route path="dns" element={<DNS />} />
-                    <Route path="dns/answers/:domain" element={<DNSAnswers />} />
-
-                    <Route path="servers" element={<PrivateServers />} />
-                    <Route path="all" element={<PrivateServers />} />
-                    <Route path="private" element={<PrivateServers />} />
-
-                    <Route path="inspect/blocklist/" element={<InspectBlocklist />} />
-
-                    <Route path="login" element={<Login />} />
-                    <Route path="help" element={<Welcome />} />
-
-                    <Route path="test" element={<NewObjectEditor />} />
-
                     <Route path="*" element={<Servers />} />
                   </>
                 )}
 
-                {(state.User?.Email === "" || !state.User) && (
+                {!state.User && (
                   <>
+                    <Route path="/" element={<Login />} />
                     <Route path="*" element={<Login />} />
                   </>
                 )}

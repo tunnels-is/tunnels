@@ -38,8 +38,8 @@ const GenericTable = (props) => {
   }
 
   let t = props.table;
-  let hdc = "w-[150px] text-blue-400 font-bold ";
-  let ddc = "w-[150px] text-blue-100 font-medium ";
+  let hdc = "w-[60px] text-blue-400 font-bold ";
+  let ddc = "w-[60px] text-blue-100 font-medium ";
 
   const renderHeaders = () => {
     let rows = [];
@@ -85,7 +85,7 @@ const GenericTable = (props) => {
           return;
         }
 
-        let click = t.rowClick ? t.rowClick : () => {};
+        let click = t.rowClick ? t.rowClick : () => { };
         if (t.columns[key] !== true) {
           click = t.columns[key];
         }
@@ -109,7 +109,6 @@ const GenericTable = (props) => {
         }
         return (
           <TableCell className={dc} onClick={() => click(t.data[i])}>
-            {" "}
             {cd}
           </TableCell>
         );
@@ -123,7 +122,9 @@ const GenericTable = (props) => {
 
       const actionItems = [];
 
+      let hasButtons = false
       if (t.Btn?.Edit) {
+        hasButtons = true
         actionItems.push(
           <DropdownMenuItem
             key="edit"
@@ -136,6 +137,7 @@ const GenericTable = (props) => {
       }
 
       if (t.Btn?.Delete) {
+        hasButtons = true
         actionItems.push(
           <DropdownMenuItem
             key="delete"
@@ -150,39 +152,38 @@ const GenericTable = (props) => {
       if (t.customBtn) {
         Object.keys(t.customBtn).forEach((key) => {
           const customBtnEl = t.customBtn[key](t.data[i]);
-          customButton.push(<>{customBtnEl}</>);
+          customButton.push(customBtnEl);
         });
       }
 
-      cells.push(
-        <TableCell className="text-right w-[10px]">
-          <div className="flex justify-end items-center gap-[5px]">
-            {customButton}
-            {actionItems && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    className="h-8 w-8 p-0 text-white hover:bg-zinc-800"
+      if (hasButtons === true) {
+        cells.push(
+          <TableCell className="text-right w-[20px]">
+            <div className="flex justify-end gap-[5px]">
+              {hasButtons && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      className="h-8 w-8 p-0 text-white hover:bg-zinc-800"
+                    >
+                      <span className="sr-only">Open menu</span>
+                      <MoreHorizontal className="w-4 h-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    align="end"
+                    className="w-48 bg-zinc-900 text-white border border-zinc-700"
                   >
-                    <span className="sr-only">Open menu</span>
-                    <MoreHorizontal className="w-4 h-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent
-                  align="end"
-                  className="w-48 bg-zinc-900 text-white border border-zinc-700"
-                >
-                  <DropdownMenuLabel className="text-zinc-400">
-                    Actions
-                  </DropdownMenuLabel>
-                  {actionItems}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
-          </div>
-        </TableCell>,
-      );
+                    {customButton}
+                    {actionItems}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+            </div>
+          </TableCell>,
+        );
+      }
 
       if (hasFilter === true) {
         rows.push(<TableRow key={i}>{cells}</TableRow>);
@@ -193,7 +194,7 @@ const GenericTable = (props) => {
   };
 
   return (
-    <div className="flex flex-col gap-6 p-6 bg-[#0B0E14] rounded-2xl shadow-md">
+    <div className="flex flex-col gap-6">
       <div className="flex flex-col md:flex-row justify-between items-center gap-4">
         <div className="flex gap-3 items-center w-full md:w-auto">
           {t.Btn?.New && (
@@ -247,8 +248,8 @@ const GenericTable = (props) => {
       </div>
 
       {!loading && (
-        <div className="overflow-hidden rounded-xl border border-border shadow-sm px-3">
-          <Table className="w-full text-sm text-foreground">
+        <div className="shadow-sm px-3">
+          <Table className="w-full overflow-visible text-sm text-foreground">
             {renderHeaders()}
             {renderRows()}
           </Table>
