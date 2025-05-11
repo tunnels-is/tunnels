@@ -30,13 +30,15 @@ func API_AcceptUserConnections(w http.ResponseWriter, r *http.Request) {
 		senderr(w, 400, err.Error())
 		return
 	}
-	err = crypt.VerifySignature(SCR.Payload, SCR.Signature, PubKey.Load())
+	fmt.Println(SCR)
+
+	err = crypt.VerifySignature(SCR.Payload, SCR.Signature, PubKey)
 	if err != nil {
 		senderr(w, 401, "Invalid signature", slog.Any("err", err))
 		return
 	}
 
-	CR := new(types.ServerConnectRequest)
+	CR := new(types.ControllerConnectRequest)
 	err = json.Unmarshal(SCR.Payload, CR)
 	if err != nil {
 		senderr(w, 400, "unable to decode Payload")
@@ -47,11 +49,11 @@ func API_AcceptUserConnections(w http.ResponseWriter, r *http.Request) {
 		senderr(w, 401, "request not valid")
 		return
 	}
-	if CR.UID.IsZero() || CR.UserEmail == "" {
+	if CR.UserID.IsZero() {
 		senderr(w, 401, "invalid user identifier")
 		return
 	}
-	totalC, totalUserC := countConnections(CR.UID.Hex())
+	totalC, totalUserC := countConnections(CR.UserID.Hex())
 	if CR.RequestingPorts {
 		if totalC >= slots {
 			senderr(w, 400, "server is full")
@@ -72,7 +74,8 @@ func API_AcceptUserConnections(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err = EH.SEAL.NewPublicKeyFromBytes(SCR.UserHandshake)
+	fmt.Println("MAKE SEAL", SCR.UserHandshake)
+	EH.SEAL.PublicKey, err = EH.SEAL.NewPublicKeyFromBytes(SCR.UserHandshake)
 	if err != nil {
 		ERR("Port allocation failed", err)
 		return
@@ -91,7 +94,7 @@ func API_AcceptUserConnections(w http.ResponseWriter, r *http.Request) {
 	}
 
 	CRR.ServerHandshake = EH.GetPublicKey()
-	CRR.ServerHandshakeSignature, err = crypt.SignData(CRR.ServerHandshake, PrivKey.Load())
+	CRR.ServerHandshakeSignature, err = crypt.SignData(CRR.ServerHandshake, PrivKey)
 	if err != nil {
 		ERR("Unable to sign server handshake", err)
 		return
@@ -108,11 +111,11 @@ func API_AcceptUserConnections(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	go signal.NewSignal(fmt.Sprintf("TO:%d", index), *CTX.Load(), *Cancel.Load(), time.Second, goroutineLogger, func() {
+	clientCoreMappings[index].ToSignal = signal.NewSignal(fmt.Sprintf("TO:%d", index), *CTX.Load(), *Cancel.Load(), time.Second, goroutineLogger, func() {
 		toUserChannel(index)
 	})
 
-	go signal.NewSignal(fmt.Sprintf("FROM:%d", index), *CTX.Load(), *Cancel.Load(), time.Second, goroutineLogger, func() {
+	clientCoreMappings[index].FromSignal = signal.NewSignal(fmt.Sprintf("FROM:%d", index), *CTX.Load(), *Cancel.Load(), time.Second, goroutineLogger, func() {
 		fromUserChannel(index)
 	})
 }
@@ -1011,14 +1014,16 @@ func API_ServerCreate(w http.ResponseWriter, r *http.Request) {
 func API_SessionCreate(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 
-	CR := new(types.ServerConnectRequest)
+	CR := new(types.ControllerConnectRequest)
 	err := decodeBody(r, CR)
 	if err != nil {
 		senderr(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
+	fmt.Println("ENTER INTO ME!")
+	fmt.Println(CR)
 
-	user, err := authenticateUserFromEmailOrIDAndToken(CR.UserEmail, CR.UID, CR.DeviceToken)
+	user, err := authenticateUserFromEmailOrIDAndToken("", CR.UserID, CR.DeviceToken)
 	if err != nil {
 		senderr(w, 401, err.Error())
 		return
@@ -1029,7 +1034,7 @@ func API_SessionCreate(w http.ResponseWriter, r *http.Request) {
 	// 	return WriteErrorResponse(c, code, err.Error())
 	// }
 
-	server, err := DB_FindServerByID(CR.SeverID)
+	server, err := DB_FindServerByID(CR.ServerID)
 	if err != nil {
 		senderr(w, 500, "Unknown error, please try again in a moment")
 		return
@@ -1063,10 +1068,9 @@ func API_SessionCreate(w http.ResponseWriter, r *http.Request) {
 		senderr(w, 500, "Unable to decode payload")
 		return
 	}
-	SCR.Signature, err = crypt.SignData(SCR.Payload, PrivKey.Load())
-	SCR.ServerPubKey = []byte(server.PubKey)
+	SCR.Signature, err = crypt.SignData(SCR.Payload, PrivKey)
 	if err != nil {
-		senderr(w, 500, "Unable to sign payload")
+		senderr(w, 500, "Unable to sign payload", slog.Any("err", err))
 		return
 	}
 

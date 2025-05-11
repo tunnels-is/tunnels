@@ -29,7 +29,7 @@ func generateDHCPMap() (err error) {
 	return
 }
 
-func assignDHCP(CR *types.ServerConnectRequest, CRR *types.ServerConnectResponse, index int) (err error) {
+func assignDHCP(CR *types.ControllerConnectRequest, CRR *types.ServerConnectResponse, index int) (err error) {
 	Config := Config.Load()
 	var assigned bool
 	if CR.DHCPToken != "" {

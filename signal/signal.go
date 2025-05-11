@@ -12,7 +12,7 @@ import (
 // var Signals = make([]*Signal, 0)
 var Signals sync.Map
 
-func NewSignal(tag string, ctx context.Context, cancel context.CancelFunc, sleep time.Duration, logFunc func(string), method func()) {
+func NewSignal(tag string, ctx context.Context, cancel context.CancelFunc, sleep time.Duration, logFunc func(string), method func()) *Signal {
 	newSignal := &Signal{
 		Ctx:        ctx,
 		Cancel:     cancel,
@@ -25,6 +25,7 @@ func NewSignal(tag string, ctx context.Context, cancel context.CancelFunc, sleep
 	Signals.Store(tag, newSignal)
 
 	go newSignal.Start()
+	return newSignal
 }
 
 type Signal struct {

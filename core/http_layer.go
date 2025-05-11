@@ -360,7 +360,6 @@ func HTTP_Connect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Println(ns)
 	code, err := PublicConnect(ns)
 	if err != nil {
 		STRING(w, r, code, err.Error())

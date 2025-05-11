@@ -60,8 +60,11 @@ func NukeClient(index int) {
 		ip := clientCoreMappings[index].DHCP.IP
 		VPLIPToCore[ip[0]][ip[1]][ip[2]][ip[3]] = nil
 	}
+
 	close(clientCoreMappings[index].ToUser)
 	close(clientCoreMappings[index].FromUser)
+	clientCoreMappings[index].FromSignal.ShouldStop.Store(true)
+	clientCoreMappings[index].ToSignal.ShouldStop.Store(true)
 	clientCoreMappings[index] = nil
 }
 
