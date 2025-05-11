@@ -73,16 +73,6 @@ const LaunchApp = () => {
             <ScreenLoader />
             <div className="p-6 w-full">
               <Routes>
-                {(state.User?.Email === "" || !state.User) && (
-                  <>
-                    <Route path="/" element={<Login />} />
-                    <Route path="login" element={<Login />} />
-                    <Route path="settings" element={<Settings />} />
-                    <Route path="help" element={<Welcome />} />
-                    <Route path="dns" element={<DNS />} />
-                    <Route path="*" element={<Login />} />
-                  </>
-                )}
 
                 {state.User && (
                   <>
@@ -121,6 +111,13 @@ const LaunchApp = () => {
                     <Route path="*" element={<Servers />} />
                   </>
                 )}
+
+                {(state.User?.Email === "" || !state.User) && (
+                  <>
+                    <Route path="*" element={<Login />} />
+                  </>
+                )}
+
               </Routes>
             </div>
           </div>
