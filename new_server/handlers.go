@@ -277,6 +277,7 @@ func API_UserLogout(w http.ResponseWriter, r *http.Request) {
 		senderr(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
+
 	user, err := authenticateUserFromEmailOrIDAndToken("", LF.UID, LF.DeviceToken)
 	if err != nil {
 		senderr(w, 500, err.Error())
@@ -311,29 +312,27 @@ func API_UserLogout(w http.ResponseWriter, r *http.Request) {
 func API_UserTwoFactorConfirm(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 
-	var user *User
-	LF := new(TWO_FACTOR_CONFIRM)
+	LF := new(TWO_FACTOR_FORM)
 	err := decodeBody(r, LF)
 	if err != nil {
 		senderr(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
 
-	user, err = DB_findUserByEmail(LF.Email)
-	if user == nil {
-		senderr(w, 401, "Invalid session token, please log in again")
+	user, err := authenticateUserFromEmailOrIDAndToken("", LF.UID, LF.DeviceToken)
+	if err != nil {
+		senderr(w, 500, err.Error())
 		return
 	}
-
-	if err != nil {
-		senderr(w, 500, "Unknown error, please try again in a moment")
+	if user == nil {
+		senderr(w, 400, "User not found")
 		return
 	}
 
 	if LF.Recovery != "" {
 		recoveryFound := false
 		recoveryUpper := strings.ToUpper(LF.Recovery)
-		rc, err := Decrypt(user.RecoveryCodes, []byte(loadSecret("TwoFactory")))
+		rc, err := Decrypt(user.RecoveryCodes, []byte(loadSecret("TwoFactorKey")))
 		// rc, err := encrypter.Decrypt(user.RecoveryCodes, []byte(ENV.F2KEY))
 		if err != nil {
 			ADMIN(err)
@@ -1129,16 +1128,6 @@ func API_UserResetPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if RF.Password == "" || RF.Password2 == "" {
-		senderr(w, 400, "password is empty")
-		return
-	}
-
-	if RF.Password != RF.Password2 {
-		senderr(w, 400, "passwords do not match")
-		return
-	}
-
 	if len(RF.Password) < 10 {
 		senderr(w, 400, "password smaller then 10 characters")
 		return
@@ -1149,15 +1138,27 @@ func API_UserResetPassword(w http.ResponseWriter, r *http.Request) {
 		senderr(w, 401, "Invalid user, please try again")
 		return
 	}
-
 	if err != nil {
 		senderr(w, 500, "Unknown error, please try again in a moment")
 		return
 	}
+	if RF.UseTwoFactor {
+		code, err := Decrypt(user.TwoFactorCode, []byte(loadSecret("TwoFactorKey")))
+		if err != nil {
+			ADMIN(err)
+			return
+		}
 
-	if RF.ResetCode != user.ResetCode || user.ResetCode == "" {
-		senderr(w, 401, "Invalid reset code")
-		return
+		otp := gotp.NewDefaultTOTP(string(code)).Now()
+		if otp != RF.ResetCode {
+			return
+		}
+	} else {
+		if RF.ResetCode != user.ResetCode || user.ResetCode == "" {
+			senderr(w, 401, "Invalid reset code")
+			return
+		}
+
 	}
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(RF.Password), 13)
