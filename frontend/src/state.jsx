@@ -4,7 +4,7 @@ import toast from "react-hot-toast";
 import axios from "axios";
 import dayjs from "dayjs";
 import { v4 as uuidv4 } from "uuid";
-import https from 'https';
+import https from "https";
 
 const state = (page) => {
   const [value, reload] = useState({ x: 0 });
@@ -48,9 +48,12 @@ export var STATE = {
     borderColor: " border border-[#1a1f2d]  cursor-pointer",
     menuBG: " bg-[#0B0E14]",
     mainBG: " bg-black",
-    neutralBtn: "  text-[#2056e1] border-[#2056e1] hover:bg-[#2056e1] hover:text-white cursor-pointer",
-    successBtn: " text-[#3a994c] border-[#3a994c] hover:bg-[#3a994c] hover:text-white cursor-pointer",
-    warningBtn: " text-orange-500 border-orange-500 hover:bg-orange-500 hover:text-white cursor-pointer",
+    neutralBtn:
+      "  text-[#2056e1] border-[#2056e1] hover:bg-[#2056e1] hover:text-white cursor-pointer",
+    successBtn:
+      " text-[#3a994c] border-[#3a994c] hover:bg-[#3a994c] hover:text-white cursor-pointer",
+    warningBtn:
+      " text-orange-500 border-orange-500 hover:bg-orange-500 hover:text-white cursor-pointer",
     errorBtn: " text-red-700 border-red-700 cursor-pointer hover:bg-red-500",
     activeSelect: " bg-[#2056e1] text-white cursor-pointer",
     neutralSelect: "  text-white focus:text-[#3168f3] cursor-pointer",
@@ -58,10 +61,25 @@ export var STATE = {
   },
 
   // new form
-  obj: { id: "lksdfsld", intstuff: 1, Tag: "lksdfls", bll: true, x: {}, x2: [] },
+  obj: {
+    id: "lksdfsld",
+    intstuff: 1,
+    Tag: "lksdfls",
+    bll: true,
+    x: {},
+    x2: [],
+  },
 
   GetServers: async () => {
-    let resp = await STATE.callController(null, null, "POST", "/v3/servers", { StartIndex: 0 }, false, false)
+    let resp = await STATE.callController(
+      null,
+      null,
+      "POST",
+      "/v3/servers",
+      { StartIndex: 0 },
+      false,
+      false,
+    );
     if (resp?.status === 200) {
       if (resp.data?.length > 0) {
         STORE.Cache.SetObject("private-servers", resp.data);
@@ -80,18 +98,26 @@ export var STATE = {
   },
   // NEW API
   calls: new Map(),
-  callController: async (url, secure, method, route, data, skipAuth, boolResponse) => {
+  callController: async (
+    url,
+    secure,
+    method,
+    route,
+    data,
+    skipAuth,
+    boolResponse,
+  ) => {
     if (STATE.calls.get(route) === true) {
-      console.log("call already in progress, backing off")
-      return { status: 0, }
+      console.log("call already in progress, backing off");
+      return { status: 0 };
     }
-    STATE.calls.set(route, true)
+    STATE.calls.set(route, true);
 
-    let URL = url ? url : STATE.User?.AuthServer
+    let URL = url ? url : STATE.User?.AuthServer;
     if (!URL || URL === "") {
-      console.log("no user auth server found")
-      STATE.calls.set(route, false)
-      return { status: 0, }
+      console.log("no user auth server found");
+      STATE.calls.set(route, false);
+      return { status: 0 };
     }
     try {
       STATE.toggleLoading({
@@ -103,18 +129,30 @@ export var STATE = {
       });
 
       if (!skipAuth || skipAuth === false) {
-        data.UID = STATE.User?._id ? STATE.User?._id : ""
-        data.Email = STATE.User?.Email ? STATE.User?.Email : ""
-        data.DeviceToken = STATE.User?.DeviceToken?.DT ? STATE.User?.DeviceToken?.DT : ""
+        data.UID = STATE.User?._id ? STATE.User?._id : "";
+        data.Email = STATE.User?.Email ? STATE.User?.Email : "";
+        data.DeviceToken = STATE.User?.DeviceToken?.DT
+          ? STATE.User?.DeviceToken?.DT
+          : "";
         if (!data.DeviceToken || data.DeviceToken === "") {
           STATE.errorNotification("No auth token found, please log in again");
-          STATE.calls.set(route, false)
-          return { data: { Error: "Auth token not found, please log in again" }, status: 401 }
+          STATE.calls.set(route, false);
+          return {
+            data: { Error: "Auth token not found, please log in again" },
+            status: 401,
+          };
         }
         if (!data.Email || data.Email === "") {
-          STATE.errorNotification("No user email/username found, please log in again");
-          STATE.calls.set(route, false)
-          return { data: { Error: "No user email/username found, please log in again" }, status: 401 }
+          STATE.errorNotification(
+            "No user email/username found, please log in again",
+          );
+          STATE.calls.set(route, false);
+          return {
+            data: {
+              Error: "No user email/username found, please log in again",
+            },
+            status: 401,
+          };
         }
       }
 
@@ -133,33 +171,36 @@ export var STATE = {
         try {
           body = JSON.stringify(FR);
         } catch (error) {
-          STATE.calls.set(route, false)
+          STATE.calls.set(route, false);
           console.dir(error);
           return;
         }
       }
 
-      let resp = await axios.post(STATE.GetURL() + "/v1/method/forwardToController", body, {
-        timeout: 10000,
-        headers: { "Content-Type": "application/json" },
-      });
+      let resp = await axios.post(
+        STATE.GetURL() + "/v1/method/forwardToController",
+        body,
+        {
+          timeout: 10000,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
 
-      console.log("RESPONSE: ", FR.URL, FR.Path)
-      console.dir(resp)
+      console.log("RESPONSE: ", FR.URL, FR.Path);
+      console.dir(resp);
       // STATE.callInProgress = false
-      STATE.calls.set(route, false)
+      STATE.calls.set(route, false);
       STATE.toggleLoading(undefined);
       if (resp && resp.status === 200) {
         if (boolResponse === true) {
-          return true
+          return true;
         }
       }
-      return { data: resp.data, status: resp.status }
-
+      return { data: resp.data, status: resp.status };
     } catch (error) {
       // STATE.callInProgress = false
-      STATE.calls.set(route, false)
-      console.dir(error)
+      STATE.calls.set(route, false);
+      console.dir(error);
       STATE.toggleLoading(undefined);
 
       if (error?.message === "Network Error") {
@@ -172,16 +213,12 @@ export var STATE = {
       }
 
       if (boolResponse === true) {
-        return false
+        return false;
       } else {
-        return { data: error.respones?.data, status: error.response?.status }
+        return { data: error.respones?.data, status: error.response?.status };
       }
-
     }
-
   },
-
-
 
   // NEW
   // NEW
@@ -210,8 +247,8 @@ export var STATE = {
   },
   v2_SetUser: async (u, saveToDisk, server, secure) => {
     try {
-      u.AuthServer = server
-      u.Secure = secure
+      u.AuthServer = server;
+      u.Secure = secure;
       STATE.User = u;
       STORE.Cache.SetObject("user", u);
       if (saveToDisk) {
@@ -252,7 +289,7 @@ export var STATE = {
       return undefined;
     }
   },
-  v2_Cleanup: () => { },
+  v2_Cleanup: () => {},
   v2_TunnelDelete: async (tun) => {
     try {
       STATE.toggleLoading({
@@ -292,7 +329,7 @@ export var STATE = {
         Meta: tunnel,
         OldTag: oldTunnelTag,
       };
-      console.dir(out)
+      console.dir(out);
 
       let resp = await STATE.API.method("setTunnel", out);
       if (resp === undefined) {
@@ -486,7 +523,7 @@ export var STATE = {
     STATE.createObjectIfEmpty("modifiedUser");
     STATE.modifiedUser.APIKey = uuidv4();
     STATE.UserSaveModifiedSate();
-    await STATE.UpdateUser()
+    await STATE.UpdateUser();
     STATE.renderPage("account");
   },
   changeServerOnTunnelUsingTag: (tunTag, index) => {
@@ -703,22 +740,27 @@ export var STATE = {
     }
     await toast[type](
       (t) => (
-        <div className="content">
-          {title && <div className="title">{title}</div>}
-          <div className="subtitle">{subtitle}</div>
-          <div className="buttons">
-            <div className="button no" onClick={() => toast.dismiss(t.id)}>
+        <div className="text-center">
+          {title && (
+            <div className="text-2xl font-bold text-gray-800 mb-3">{title}</div>
+          )}
+          <div className="text-base text-gray-600 mb-6">{subtitle}</div>
+          <div className="flex justify-center gap-4">
+            <button
+              onClick={() => toast.dismiss(t.id)}
+              className="px-5 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 transition duration-150"
+            >
               NO
-            </div>
-            <div
-              className="button yes"
-              onClick={async function() {
+            </button>
+            <button
+              onClick={async () => {
                 toast.dismiss(t.id);
                 await method();
               }}
+              className="px-5 py-2 rounded-lg bg-[#2056e1] text-white hover:bg-blue-700 transition duration-150"
             >
               YES
-            </div>
+            </button>
           </div>
         </div>
       ),
@@ -732,15 +774,21 @@ export var STATE = {
         ...STATE.modifiedUser,
       };
 
-      let x = await STATE.callController(null, null, "POST", "/v3/user/update",
+      let x = await STATE.callController(
+        null,
+        null,
+        "POST",
+        "/v3/user/update",
         { APIKey: newUser.APIKey },
-        false, true)
+        false,
+        true,
+      );
       if (x === true) {
         STORE.Cache.SetObject("user", newUser);
         STORE.Cache.DelObject("modifiedUser");
         STORE.User = newUser;
         STORE.modifiedUser = undefined;
-        STATE.successNotification("User updated")
+        STATE.successNotification("User updated");
       } else {
         STATE.toggleError(x);
       }
@@ -751,9 +799,9 @@ export var STATE = {
     STATE.toggleLoading(undefined);
   },
   connectToVPN: async (c, server) => {
-    console.log("CONNECTING")
-    console.dir(c)
-    console.dir(server)
+    console.log("CONNECTING");
+    console.dir(c);
+    console.dir(server);
     if (!server && !c) {
       STATE.errorNotification("no server or tunnel given when connecting");
       return;
@@ -810,12 +858,12 @@ export var STATE = {
       connectionRequest.ServerID = server._id;
       connectionRequest.ServerPubKey = server.PubKey;
     } else {
-      STATE.errorNotification("unable to find server with the given ID")
-      return
+      STATE.errorNotification("unable to find server with the given ID");
+      return;
     }
 
-    connectionRequest.URL = STATE.User.AuthServer
-    connectionRequest.Secure = STATE.User.Secure
+    connectionRequest.URL = STATE.User.AuthServer;
+    connectionRequest.Secure = STATE.User.Secure;
 
     console.log("CONR");
     console.dir(connectionRequest);
@@ -861,12 +909,7 @@ export var STATE = {
     });
 
     try {
-      let x = await STATE.API.method(
-        "disconnect",
-        { ID: c.ID },
-        false,
-        20000,
-      );
+      let x = await STATE.API.method("disconnect", { ID: c.ID }, false, 20000);
       if (x === undefined) {
         STATE.errorNotification("Unknown error, please try again in a moment");
       } else {
@@ -911,16 +954,21 @@ export var STATE = {
       logoutUser = true;
     }
 
-    let resp = await STATE.callController(null, null, "POST", "/v3/user/logout",
+    let resp = await STATE.callController(
+      null,
+      null,
+      "POST",
+      "/v3/user/logout",
       { DeviceToken: token.DT, UserID: user._id, All: all },
-      false, false)
+      false,
+      false,
+    );
     if (resp && resp.status === 200) {
-
       STATE.successNotification("device logged out", undefined);
 
       if (logoutUser === true || all === true) {
         STATE.FinalizeLogout();
-        return
+        return;
       } else {
         let toks = [];
         user.Tokens?.map((t) => {
@@ -941,14 +989,14 @@ export var STATE = {
 
   ForwardToController: async (req, loader) => {
     if (!req.URL || req.URL === "") {
-      req.URL = state.User?.AuthServer
+      req.URL = state.User?.AuthServer;
     }
     if (!req.URL || req.URL === "") {
-      STATE.toggleError("no server selected")
+      STATE.toggleError("no server selected");
     }
-    req.Secure = req.Secure === undefined ? true : req.Secure
+    req.Secure = req.Secure === undefined ? true : req.Secure;
     STATE.toggleLoading(loader);
-    console.log("FW:", req.Secure)
+    console.log("FW:", req.Secure);
     let x = await STATE.API.method("forwardToController", req);
     STATE.toggleLoading(undefined);
     return x;
@@ -973,7 +1021,6 @@ export var STATE = {
   //   let timeout = req.Timeout ? req.Timeout : 20000
   //   let ignoreError = req.InoreError ? req.IgnoreError : false
 
-
   //   STATE.toggleLoading(loader);
   //   let x = await STATE.API.methodv2(url, data, noLogout, timeout, ignoreError);
   //   STATE.toggleLoading(undefined);
@@ -992,7 +1039,7 @@ export var STATE = {
     STORE.Cache.SetObject("private-servers", STATE.PrivateServers);
   },
   ModifiedServers: [],
-  UpdateModifiedServer: function(server, key, value) {
+  UpdateModifiedServer: function (server, key, value) {
     let found = false;
     STATE.ModifiedServers.forEach((s, i) => {
       if (s._id === server._id) {
@@ -1017,9 +1064,15 @@ export var STATE = {
       return;
     }
 
-    let ok = await STATE.callController(null, null, "POST", "/v3/key/activate",
+    let ok = await STATE.callController(
+      null,
+      null,
+      "POST",
+      "/v3/key/activate",
       { Key: STATE.LicenseKey },
-      false, true)
+      false,
+      true,
+    );
     if (ok) {
       STATE.User.Key = {
         Key: "[shown on next login]",
@@ -1033,11 +1086,15 @@ export var STATE = {
     return STATE.API.method("getQRCode", inputs);
   },
   ConfirmTwoFactorCode: async (inputs, url) => {
-
-
-    return await STATE.callController(null, null, "POST", "/v3/user/2fa/confirm",
+    return await STATE.callController(
+      null,
+      null,
+      "POST",
+      "/v3/user/2fa/confirm",
       inputs,
-      false, false)
+      false,
+      false,
+    );
 
     return STATE.ForwardToController(
       {
@@ -1136,7 +1193,7 @@ export var STATE = {
       let resp = await STATE.API.method("forwardToController", FR);
       if (resp?.status === 200) {
         STATE.toggleLoading(undefined);
-        return resp.data
+        return resp.data;
       }
     } catch (error) {
       console.dir(error);
@@ -1174,7 +1231,7 @@ export var STATE = {
       let resp = await STATE.API.method("forwardToController", FR);
       if (resp?.status === 200) {
         STATE.toggleLoading(undefined);
-        return resp.data
+        return resp.data;
       }
     } catch (error) {
       console.dir(error);
@@ -1189,13 +1246,12 @@ export var STATE = {
     try {
       let resp = await STATE.API.method("getDNSStats", null);
       if (resp?.status === 200) {
-        STATE.DNSStats = resp.data
+        STATE.DNSStats = resp.data;
         STORE.Cache.SetObject("dns-stats", resp.data);
       }
     } catch (error) {
-      console.dir(error)
+      console.dir(error);
     }
-
   },
   State: STORE.Cache.GetObject("state"),
   StateFetchInProgress: false,
@@ -1203,7 +1259,7 @@ export var STATE = {
     let host = window.location.origin;
     // let port = STORE.Cache.Get("api_port")
     // let ip = STORE.Cache.Get("api_ip")
-    host = host.replace("http://", "https://");
+    host = host.replace("http://", "http://");
     host = host.replace("5173", "7777");
     return host;
   },
