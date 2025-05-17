@@ -33,7 +33,6 @@ import Devices from "./App/Devices";
 import NewObjectEditor from "./App/NewObjectEdior";
 import Tunnels from "./App/Tunnels";
 import Logs from "./App/Logs";
-import { Alert } from "./components/ui/alert";
 
 // Use this to automatically turn on debug
 STORE.Cache.Set("debug", true);
@@ -166,13 +165,13 @@ class ErrorBoundary extends React.Component {
 
   async ProductionCheck() {
     if (!STATE.debug) {
-      window.console.apply = function () {};
-      window.console.dir = function () {};
-      window.console.log = function () {};
-      window.console.info = function () {};
-      window.console.warn = function () {};
-      window.console.error = function () {};
-      window.console.debug = function () {};
+      window.console.apply = function() { };
+      window.console.dir = function() { };
+      window.console.log = function() { };
+      window.console.info = function() { };
+      window.console.warn = function() { };
+      window.console.error = function() { };
+      window.console.debug = function() { };
     }
   }
 
