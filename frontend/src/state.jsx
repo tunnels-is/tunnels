@@ -691,22 +691,25 @@ export var STATE = {
     }
     await toast[type](
       (t) => (
-        <div className="content">
-          {title && <div className="title">{title}</div>}
-          <div className="subtitle">{subtitle}</div>
-          <div className="buttons">
-            <div className="button no" onClick={() => toast.dismiss(t.id)}>
+        <div className="text-center">
+          {title && <div className="text-2xl font-bold mb-3">{title}</div>}
+          <div className="text-base mb-6">{subtitle}</div>
+          <div className="flex justify-center gap-4">
+            <button
+              onClick={() => toast.dismiss(t.id)}
+              className="px-5 py-2 border border-gray-300 hover:bg-gray-900 transition duration-150"
+            >
               NO
-            </div>
-            <div
-              className="button yes"
-              onClick={async function() {
+            </button>
+            <button
+              onClick={async () => {
                 toast.dismiss(t.id);
                 await method();
               }}
+              className="px-5 py-2 bg-[#2056e1] text-white hover:bg-blue-700 transition duration-150"
             >
               YES
-            </div>
+            </button>
           </div>
         </div>
       ),

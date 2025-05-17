@@ -54,7 +54,7 @@ const LaunchApp = () => {
       {createPortal(
         <Toaster
           toastOptions={{
-            className: "toast",
+            className: "toast bg-black !text-white border border-[#2056e1] rounded-none",
             position: "top-right",
             success: {
               duration: 5000,
