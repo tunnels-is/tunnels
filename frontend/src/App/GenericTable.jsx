@@ -60,7 +60,7 @@ const GenericTable = (props) => {
     let hasButtons = false
     if (t.Btn?.Edit) { hasButtons = true }
     if (t.Btn?.Delete) { hasButtons = true }
-    if (t.customBtn?.length > 0) {
+    if (t.customBtn) {
       hasButtons = true
     }
     if (hasButtons) {
@@ -154,7 +154,7 @@ const GenericTable = (props) => {
           <DropdownMenuItem
             key="delete"
             onClick={() => t.Btn.Delete(t.data[i])}
-            className="cursor-pointer text-red-600 focus:text-red-700"
+            className="cursor-pointer text-red-500"
           >
             <Trash2 className="w-4 h-4 mr-2" /> Delete
           </DropdownMenuItem>,
@@ -162,6 +162,7 @@ const GenericTable = (props) => {
       }
       const customButton = [];
       if (t.customBtn) {
+        hasButtons = true
         Object.keys(t.customBtn).forEach((key) => {
           const customBtnEl = t.customBtn[key](t.data[i]);
           customButton.push(customBtnEl);
@@ -177,7 +178,7 @@ const GenericTable = (props) => {
                   <DropdownMenuTrigger asChild>
                     <Button
                       variant="ghost"
-                      className="h-8 w-8 p-0 text-white hover:bg-zinc-800"
+                      className="h-8 w-8 p-0 text-white"
                     >
                       <span className="sr-only">Open menu</span>
                       <MoreHorizontal className="w-4 h-4" />
@@ -185,7 +186,7 @@ const GenericTable = (props) => {
                   </DropdownMenuTrigger>
                   <DropdownMenuContent
                     align="end"
-                    className="w-48 bg-zinc-900 text-white border border-zinc-700"
+                    className={"w-48 text-white " + state.Theme?.borderColor}
                   >
                     {customButton}
                     {actionItems}
@@ -193,7 +194,7 @@ const GenericTable = (props) => {
                 </DropdownMenu>
               )}
             </div>
-          </TableCell>,
+          </TableCell >,
         );
       }
 
