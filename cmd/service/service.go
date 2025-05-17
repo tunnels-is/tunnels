@@ -23,7 +23,7 @@ func Start() {
 		time.Sleep(5 * time.Second)
 		panic(err)
 	}
-	core.LaunchEverything()
+	core.LaunchTunnels()
 }
 
 func StartWithExternalMonitor(ctx context.Context, id int, monitor chan int) {
@@ -45,5 +45,5 @@ func StartWithExternalMonitor(ctx context.Context, id int, monitor chan int) {
 		fmt.Println("Error initializing tunnels service:", err)
 		return
 	}
-	core.LaunchEverything()
+	core.LaunchTunnels()
 }

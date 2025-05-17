@@ -32,6 +32,7 @@ import Users from "./App/Users";
 import Devices from "./App/Devices";
 import NewObjectEditor from "./App/NewObjectEdior";
 import Tunnels from "./App/Tunnels";
+import Logs from "./App/Logs";
 
 // Use this to automatically turn on debug
 STORE.Cache.Set("debug", true);
@@ -65,12 +66,13 @@ const LaunchApp = () => {
       />
 
       <div className=" bg-black w-full">
+        <div className="wtf">lksjdflksjdklfjklsdj</div>
+        <ScreenLoader />
         <SideBar />
 
         {/* Main Content Area */}
         <main className="pl-44 pb-[300px]">
           <div className="">
-            <ScreenLoader />
             <div className="p-6 w-full">
               <Routes>
 
@@ -85,6 +87,7 @@ const LaunchApp = () => {
                 <Route path="inspect/group/:id" element={<InspectGroup />} />
 
                 <Route path="tunnels" element={<Tunnels />} />
+                <Route path="logs" element={<Logs />} />
                 <Route
                   path="inspect/connection/:id"
                   element={<InspectConnection />}

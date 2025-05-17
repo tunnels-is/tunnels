@@ -223,15 +223,17 @@ const DNS = () => {
           </div>
         </div>
       )}
-      <Tabs defaultValue="settings">
-        <TabsList className="">
-          <TabsTrigger value="settings">Settings</TabsTrigger>
-          <TabsTrigger value="records">Records</TabsTrigger>
-          <TabsTrigger value="blocklist">Block List</TabsTrigger>
-          <TabsTrigger value="blockdomains">Blocked Domains</TabsTrigger>
-          <TabsTrigger value="resolveddomains">Resovled Domains</TabsTrigger>
+      <Tabs defaultValue="settings" >
+        <TabsList
+          className={state.Theme?.borderColor}
+        >
+          <TabsTrigger className={state.Theme?.tabs} value="settings">Settings</TabsTrigger>
+          <TabsTrigger className={state.Theme?.tabs} value="records">Records</TabsTrigger>
+          <TabsTrigger className={state.Theme?.tabs} value="blocklist">Block List</TabsTrigger>
+          <TabsTrigger className={state.Theme?.tabs} value="blockdomains">Blocked Domains</TabsTrigger>
+          <TabsTrigger className={state.Theme?.tabs} value="resolveddomains">Resovled Domains</TabsTrigger>
         </TabsList>
-        <TabsContent value="settings">
+        <TabsContent value="settings" className="pl-2">
           <div className="">
             <div className="text-yellow-300">
               Enabling blocklists will increase memory usage.
@@ -354,6 +356,7 @@ const DNS = () => {
               </div>
             </div>
           </div>
+
         </TabsContent>
         <TabsContent value="blocklist">
           <GenericTable table={bltable} />

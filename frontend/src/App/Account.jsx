@@ -7,6 +7,9 @@ import NewTable from "./component/newtable";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import GenericTable from "./GenericTable";
 import { Button } from "@/components/ui/button";
+import InfoItem from "./component/InfoItem";
+import { Network } from "lucide-react";
+import { Input } from "@/components/ui/input";
 
 const Account = () => {
   const navigate = useNavigate();
@@ -54,6 +57,9 @@ const Account = () => {
       }
     },
     columnClass: {
+      N: (obj) => {
+        return "w-[200px]"
+      },
       Created: (obj) => {
         console.log("CCCC")
         return "w-[400px]"
@@ -83,107 +89,122 @@ const Account = () => {
 
 
   return (
-    <div className="account-page p-6">
-      <Tabs defaultValue="account">
-        <TabsList className="justify-start gap-2 mb-4">
-          <TabsTrigger value="account">Account</TabsTrigger>
-          <TabsTrigger value="loggedin">Devices</TabsTrigger>
-          <TabsTrigger value="license">License Key</TabsTrigger>
-        </TabsList>
+    <Tabs defaultValue="account">
+      <TabsList
+        className={state.Theme?.borderColor}
+      >
+        <TabsTrigger className={state.Theme?.tabs} value="account">Account</TabsTrigger>
+        <TabsTrigger className={state.Theme?.tabs} value="loggedin">Devices</TabsTrigger>
+        <TabsTrigger className={state.Theme?.tabs} value="license">License Key</TabsTrigger>
+      </TabsList>
 
-        <TabsContent key={state?.User?._id} value="account">
-          {state?.User && (
-            <div className="space-y-6 rounded-xl border p-6 shadow-sm bg-black">
-              <div className="space-y-4">
-                <KeyValue label="User" value={state.User?.Email} />
-                <KeyValue
-                  label="Last Update"
-                  value={dayjs(state.User.Updated).format(
+      <TabsContent key={state?.User?._id} value="account" className="size-fit pl-2 w-[400px]">
+        {state?.User && (
+          <div className="">
+            <div className="space-y-1 text-white">
+              <InfoItem
+                label="User"
+                value={state.User?.Email}
+                icon={<Network className="h-4 w-4 text-blue-400" />}
+              />
+              <InfoItem
+                label="ID"
+                value={state.User?._id}
+                icon={<Network className="h-4 w-4 text-blue-400" />}
+              />
+              <InfoItem
+                label="Update"
+                value={dayjs(state.User?.Updated).format(
+                  "DD-MM-YYYY HH:mm:ss",
+                )}
+                icon={<Network className="h-4 w-4 text-blue-400" />}
+              />
+
+
+              {state.User?.SubExpiration && (
+                <InfoItem
+                  label="Subscription Expires"
+                  value={dayjs(state.User?.SubExpiration).format(
                     "DD-MM-YYYY HH:mm:ss",
                   )}
+                  icon={< Network className="h-4 w-4 text-blue-400" />}
                 />
-                <KeyValue label="ID" value={state.User._id} />
-                <KeyValue
-                  label="API Key"
-                  defaultValue="not set.."
-                  value={APIKey}
+              )}
+              <InfoItem
+                label="API Key"
+                value={APIKey}
+                icon={<Network className="h-4 w-4 text-blue-400" />}
+              />
+
+              {state.User?.Trial && (
+                <InfoItem
+                  label="Trial Status"
+                  value={state.User?.Trial ? "Active" : "Ended"}
+                  icon={<Network className="h-4 w-4 text-blue-400" />}
                 />
-
-                {state.User.SubExpiration && (
-                  <KeyValue
-                    label="Subscription Expires"
-                    value={dayjs(state.User.SubExpiration).format(
-                      "DD-MM-YYYY HH:mm:ss",
-                    )}
-                  />
-                )}
-
-                {state.User.Trial && (
-                  <KeyValue
-                    label="Trial Status"
-                    value={state.User.Trial ? "Active" : "Ended"}
-                  />
-                )}
-
-              </div>
-
-              <div className="flex flex-col gap-3">
-                <button
-                  className="w-full bg-destructive text-white py-2 rounded-md text-sm font-medium hover:bg-red-600 transition"
-                  onClick={() => state.LogoutAllTokens()}
-                >
-                  Log Out All Devices
-                </button>
-
-
-                <button
-                  className="w-full bg-primary text-black py-2 rounded-md text-sm font-medium hover:bg-primary/90 transition"
-                  onClick={() => state.refreshApiKey()}
-                >
-                  Re-Generate API Key
-                </button>
-
-                <button
-                  className="w-full bg-secondary text-black dark:text-white py-2 rounded-md text-sm font-medium hover:bg-secondary/80 transition"
-                  onClick={() => navigate("/twofactor/create")}
-                >
-                  Two-Factor Authentication
-                </button>
-
-              </div>
+              )}
 
             </div>
-          )}
-        </TabsContent>
 
-        <TabsContent value="loggedin" className=" w-[500px]">
-          <GenericTable table={table} />
-        </TabsContent>
-        <TabsContent value="license" className="border rounded">
-          <KeyValue label="License" value={state.User.Key?.Key} />
+            <div className="flex flex-col gap-3 mt-6">
+              <Button
+                variant="outline"
+                className={state.Theme?.neutralBtn}
+                onClick={() => state.refreshApiKey()}
+              >
+                Re-Generate API Key
+              </Button>
 
-          <div className="space-y-3">
-            <input
-              onChange={(e) => {
-                state.UpdateLicenseInput(e.target.value);
-              }}
-              name="license"
-              className="w-full px-4 py-2 rounded-md border text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-              placeholder="Insert License Key"
-              value={state.LicenseKey}
-            />
+              <Button
+                variant="outline"
+                className={state.Theme?.neutralBtn}
+                onClick={() => navigate("/twofactor/create")}
+              >
+                Two-Factor Authentication
+              </Button>
 
-            <button
-              key={state?.LicenseKey}
-              className="w-full bg-primary text-black py-2 rounded-md text-sm font-medium hover:bg-primary/90 transition"
-              onClick={() => state.ActivateLicense()}
-            >
-              Activate Key
-            </button>
+              <Button
+                variant="outline"
+                className={state.Theme?.errorBtn}
+                onClick={() => state.LogoutAllTokens()}
+              >
+                Log Out All Devices
+              </Button>
+
+            </div>
+
           </div>
-        </TabsContent>
-      </Tabs>
-    </div>
+        )}
+      </TabsContent>
+
+      <TabsContent value="loggedin" className="size-fit">
+        <GenericTable table={table} />
+      </TabsContent>
+      <TabsContent value="license" className="w-[500px]">
+        <KeyValue label="License" value={state.User.Key?.Key} />
+
+        <div className="space-y-3">
+          <Input
+
+            onChange={(e) => {
+              state.UpdateLicenseInput(e.target.value);
+            }}
+            name="license"
+            placeholder="Insert License Key"
+            value={state.LicenseKey}
+          />
+
+          <Button
+            variant="outline"
+            className={state.Theme?.neutralBtn}
+            key={state?.LicenseKey}
+            onClick={() => state.ActivateLicense()}
+          >
+            Activate Key
+          </Button>
+        </div>
+      </TabsContent>
+    </Tabs>
   );
 };
 

@@ -44,6 +44,19 @@ export var STATE = {
     });
   },
 
+  Theme: {
+    borderColor: " border border-[#1a1f2d]  cursor-pointer",
+    menuBG: " bg-[#0B0E14]",
+    mainBG: " bg-black",
+    neutralBtn: "  text-[#2056e1] border-[#2056e1] hover:bg-[#2056e1] hover:text-white cursor-pointer",
+    successBtn: " text-[#3a994c] border-[#3a994c] hover:bg-[#3a994c] hover:text-white cursor-pointer",
+    warningBtn: " text-orange-500 border-orange-500 hover:bg-orange-500 hover:text-white cursor-pointer",
+    errorBtn: " text-red-700 border-red-700 cursor-pointer hover:bg-red-500",
+    activeSelect: " bg-[#2056e1] text-white cursor-pointer",
+    neutralSelect: "  text-white focus:text-[#3168f3] cursor-pointer",
+    tabs: "data-[state=active]:text-[#3168f3]",
+  },
+
   // new form
   obj: { id: "lksdfsld", intstuff: 1, Tag: "lksdfls", bll: true, x: {}, x2: [] },
 
@@ -74,12 +87,18 @@ export var STATE = {
     }
     STATE.calls.set(route, true)
 
+    let URL = url ? url : STATE.User?.AuthServer
+    if (!URL || URL === "") {
+      console.log("no user auth server found")
+      STATE.calls.set(route, false)
+      return { status: 0, }
+    }
     try {
       STATE.toggleLoading({
         logTag: "",
         tag: uuidv4(),
         show: true,
-        msg: "loading..",
+        msg: URL + route,
         includeLogs: false,
       });
 
@@ -89,16 +108,19 @@ export var STATE = {
         data.DeviceToken = STATE.User?.DeviceToken?.DT ? STATE.User?.DeviceToken?.DT : ""
         if (!data.DeviceToken || data.DeviceToken === "") {
           STATE.errorNotification("No auth token found, please log in again");
+          STATE.calls.set(route, false)
           return { data: { Error: "Auth token not found, please log in again" }, status: 401 }
         }
         if (!data.Email || data.Email === "") {
           STATE.errorNotification("No user email/username found, please log in again");
+          STATE.calls.set(route, false)
           return { data: { Error: "No user email/username found, please log in again" }, status: 401 }
         }
       }
 
       let FR = {
-        URL: url ? url : STATE.User.AuthServer,
+        URL: URL,
+        // URL: url ? url : STATE.User.AuthServer,
         Secure: secure !== undefined ? secure : STATE.User.Secure,
         Path: route,
         Method: method,
@@ -111,6 +133,7 @@ export var STATE = {
         try {
           body = JSON.stringify(FR);
         } catch (error) {
+          STATE.calls.set(route, false)
           console.dir(error);
           return;
         }
@@ -269,6 +292,7 @@ export var STATE = {
         Meta: tunnel,
         OldTag: oldTunnelTag,
       };
+      console.dir(out)
 
       let resp = await STATE.API.method("setTunnel", out);
       if (resp === undefined) {

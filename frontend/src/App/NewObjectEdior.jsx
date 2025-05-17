@@ -3,9 +3,12 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { useState } from "react"
+import GLOBAL_STATE from "../state";
+import { Textarea } from "@/components/ui/textarea"
 
 const NewObjectEditor = (props) => {
   const [trigger, setTrigger] = useState({ id: 1 });
+  const state = GLOBAL_STATE("object-editor");
   const reload = () => {
     let xx = { ...trigger };
     xx.id += 1;
@@ -20,11 +23,27 @@ const NewObjectEditor = (props) => {
           return
         }
 
+        if (k === "PubKey") {
+          return (
+            <div key={k} className="mt-4 mt-2">
+              <Label className="text-white" type="bool" >{k}</Label>
+
+              <Textarea
+                className={"w-full" + state.Theme?.borderColor}
+                onChange={(e) => {
+                  props.onChange(k, String(e.target.value), type)
+                }}
+              >
+              </Textarea>
+            </div>
+          )
+        }
+
         if (type === "boolean") {
           return (
-            <div key={k} className="mt-4">
-              <Label className="text-stone-400" type="bool" >{k}</Label>
-              <Switch className="ml-2 text-stone-100 hover:border-blue-300"
+            <div key={k} className="mt-4 mt-2">
+              <Label className="text-white" type="bool" >{k}</Label>
+              <Switch className="ml-2 "
                 value={props.obj[k]}
                 onCheckedChange={(e) => {
                   props.onChange(k, Boolean(e), type)
@@ -37,9 +56,9 @@ const NewObjectEditor = (props) => {
 
         if (type === "string" || type === "number") {
           return (
-            <div key={k} className="">
-              <Label className="text-stone-400" >{k}</Label>
-              <Input className="w-[400px] text-stone-100 hover:border-blue-300" onChange={(e) => {
+            <div key={k} className=" mt-2">
+              <Label className="text-white" >{k}</Label>
+              <Input className={"w-[400px]" + state.Theme?.borderColor} onChange={(e) => {
                 if (type === "number") {
                   props.onChange(k, Number(e.target.value), type)
                 } else {

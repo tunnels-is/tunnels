@@ -420,7 +420,7 @@ func HTTP_SetTunnel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	errors := validateTunnelMeta(newForm.Meta)
+	errors := validateTunnelMeta(newForm.Meta, newForm.OldTag)
 	if len(errors) > 0 {
 		JSON(w, r, 400, errors)
 		return
