@@ -10,17 +10,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Card,
   CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
+
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   AlertCircle,
   Save,
@@ -31,7 +26,6 @@ import {
   Server,
   Globe,
   Key,
-  Settings2,
   Network,
 } from "lucide-react";
 
@@ -42,9 +36,6 @@ const Settings = () => {
   let ErrorLogging = state.getKey("Config", "ErrorLogging");
   let ConnectionTracer = state.getKey("Config", "ConnectionTracer");
   let InfoLogging = state.getKey("Config", "InfoLogging");
-
-  let DarkMode = state.getKey("Config", "DarkMode");
-
   let APICertDomains = state.getKey("Config", "APICertDomains");
   let APICertIPs = state.getKey("Config", "APICertIPs");
   let APICert = state.getKey("Config", "APICert");
@@ -130,23 +121,20 @@ const Settings = () => {
     <div className="container max-w-5xl ">
       <div className="flex items-center justify-between">
         {modified === true && (
-          <Button
-            className="flex items-center gap-2"
-            onClick={() => state.v2_ConfigSave()}
-            variant="default"
-          >
-            <Save className="h-4 w-4" />
-            Save Changes
-          </Button>
+          <div className="mb-7 flex gap-[4px] items-center">
+            <Button
+              className={state.Theme?.successBtn}
+              variant="outline"
+              onClick={() => state.v2_ConfigSave()}>
+              Save
+            </Button>
+            <div className="ml-3 text-yellow-400 text-xl">
+              Your config has un-saved changes
+            </div>
+          </div>
         )}
       </div>
 
-      {modified === true && (
-        <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4 flex items-center gap-3 mb-6">
-          <AlertCircle className="h-5 w-5 text-yellow-500" />
-          <p className="text-sm">Your configuration has unsaved changes</p>
-        </div>
-      )}
 
       <Tabs defaultValue="general" className="size-fit">
         <TabsList
