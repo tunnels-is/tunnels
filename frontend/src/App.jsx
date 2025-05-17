@@ -1,7 +1,7 @@
 import { HashRouter, Route, Routes } from "react-router-dom";
 import { createRoot } from "react-dom/client";
 import React, { useEffect } from "react";
-
+import { createPortal } from "react-dom";
 import { Toaster } from "react-hot-toast";
 
 import "./assets/style/app.scss";
@@ -52,20 +52,23 @@ const LaunchApp = () => {
 
   return (
     <HashRouter>
-      <Toaster
-        toastOptions={{
-          className: "toast",
-          position: "top-right",
-          success: {
-            duration: 5000,
-          },
-          icon: null,
-          error: {
-            duration: 5000,
-          },
-        }}
-      />
+      {createPortal(
+        <Toaster
+          toastOptions={{
+            className: "toast",
+            position: "top-right",
+            success: {
+              duration: 5000,
+            },
 
+            icon: null,
+            error: {
+              duration: 5000,
+            },
+          }}
+        />,
+        document.body,
+      )}
       <div className=" bg-black w-full">
         <ScreenLoader />
         <SideBar />
@@ -75,7 +78,6 @@ const LaunchApp = () => {
           <div className="">
             <div className="p-6 w-full">
               <Routes>
-
                 <Route path="account" element={<Account />} />
 
                 <Route path="twofactor/create" element={<Enable2FA />} />
@@ -102,7 +104,10 @@ const LaunchApp = () => {
                 <Route path="all" element={<PrivateServers />} />
                 <Route path="private" element={<PrivateServers />} />
 
-                <Route path="inspect/blocklist/" element={<InspectBlocklist />} />
+                <Route
+                  path="inspect/blocklist/"
+                  element={<InspectBlocklist />}
+                />
 
                 <Route path="login" element={<Login />} />
                 <Route path="help" element={<Welcome />} />
@@ -122,7 +127,6 @@ const LaunchApp = () => {
                     <Route path="*" element={<Login />} />
                   </>
                 )}
-
               </Routes>
             </div>
           </div>
@@ -162,13 +166,13 @@ class ErrorBoundary extends React.Component {
 
   async ProductionCheck() {
     if (!STATE.debug) {
-      window.console.apply = function() { };
-      window.console.dir = function() { };
-      window.console.log = function() { };
-      window.console.info = function() { };
-      window.console.warn = function() { };
-      window.console.error = function() { };
-      window.console.debug = function() { };
+      window.console.apply = function () {};
+      window.console.dir = function () {};
+      window.console.log = function () {};
+      window.console.info = function () {};
+      window.console.warn = function () {};
+      window.console.error = function () {};
+      window.console.debug = function () {};
     }
   }
 
