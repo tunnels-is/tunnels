@@ -69,7 +69,6 @@ const LaunchApp = () => {
         document.body,
       )}
       <div className=" bg-black w-full">
-        <div className="wtf">lksjdflksjdklfjklsdj</div>
         <ScreenLoader />
         <SideBar />
 

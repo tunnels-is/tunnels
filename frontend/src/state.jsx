@@ -318,7 +318,9 @@ export var STATE = {
   },
 
   v2_TunnelSave: async (tunnel, oldTunnelTag) => {
+    let ok = false
     try {
+
       STATE.toggleLoading({
         tag: "tunnel_save",
         show: true,
@@ -329,19 +331,22 @@ export var STATE = {
         Meta: tunnel,
         OldTag: oldTunnelTag,
       };
-      console.dir(out);
 
       let resp = await STATE.API.method("setTunnel", out);
       if (resp === undefined) {
         STATE.errorNotification("Unknown error, please try again in a moment");
+        ok = false
       } else if (resp.status === 200) {
         STATE.successNotification("Tunnel saved", undefined);
+        ok = true
       }
     } catch (error) {
+      ok = false
       console.dir(error);
     }
     STATE.toggleLoading(undefined);
     STATE.globalRerender();
+    return ok
   },
 
   v2_ConfigSave: async () => {
@@ -449,6 +454,7 @@ export var STATE = {
   },
   // SYSTEM SPECIFIC
   loading: undefined,
+  loadTimeout: undefined,
   toggleLoading: (object) => {
     if (object === undefined) {
       STATE.loading = undefined;
@@ -470,11 +476,11 @@ export var STATE = {
       STATE.loading = object;
       STATE.renderPage("loader");
 
-      const to = setTimeout(
+      STATE.loadTimeout = setTimeout(
         () => {
           STATE.loading = undefined;
           STATE.renderPage("loader");
-          clearTimeout(to);
+          clearTimeout(STATE.loadTimeout);
         },
         object.timeout ? object.timeout : 10000,
       );
@@ -484,7 +490,7 @@ export var STATE = {
       STATE.loading = undefined;
       return () => {
         STATE.renderPage("loader");
-        clearTimeout(to);
+        clearTimeout(STATE.loadTimeout);
       };
     }
   },
@@ -498,13 +504,7 @@ export var STATE = {
     STORE.Cache.Set("error-timeout", dayjs().unix());
   },
   errorNotification: (e) => {
-    let lastFetch = STORE.Cache.Get("error-timeout");
-    let now = dayjs().unix();
-    if (now - lastFetch < 3) {
-      return;
-    }
-    toast.error(e);
-    STORE.Cache.Set("error-timeout", dayjs().unix());
+    STATE.toggleError(e)
   },
   successNotification: (e) => {
     toast.success(e);
@@ -1259,7 +1259,7 @@ export var STATE = {
     let host = window.location.origin;
     // let port = STORE.Cache.Get("api_port")
     // let ip = STORE.Cache.Get("api_ip")
-    host = host.replace("http://", "http://");
+    host = host.replace("http://", "https://");
     host = host.replace("5173", "7777");
     return host;
   },
