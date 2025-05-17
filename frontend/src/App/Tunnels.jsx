@@ -135,6 +135,9 @@ const Tunnels = () => {
         readOnly={false}
         saveButton={async () => {
           await state.v2_TunnelSave(tunnel, tunTag)
+          // if (ok === true) {
+          //   setModalOpen(false)
+          // }
         }}
         onChange={(key, value, type) => {
           tunnel[key] = value;

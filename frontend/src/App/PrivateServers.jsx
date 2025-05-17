@@ -222,6 +222,7 @@ const PrivateServers = () => {
 				readOnly={false}
 				saveButton={() => {
 					saveServer()
+					setEditModalOpen(false)
 				}}
 				onChange={(key, value, type) => {
 					server[key] = value
