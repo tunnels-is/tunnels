@@ -54,17 +54,18 @@ const LaunchApp = () => {
       {createPortal(
         <Toaster
           toastOptions={{
-            className: "toast bg-black !text-white border border-[#2056e1] rounded-none",
+            className: "toast !text-white border p-6 border-white rounded" + state.Theme?.menuBG,
             position: "top-right",
             success: {
-              duration: 5000,
+              duration: 2000,
             },
 
             icon: null,
             error: {
-              duration: 5000,
+              duration: 2000,
             },
-          }}
+          }
+          }
         />,
         document.body,
       )}
