@@ -215,10 +215,13 @@ const DNS = () => {
     <div className="">
       {modified === true && (
         <div className="mb-7 flex gap-[4px] items-center">
-          <Button variant="secondary" onClick={() => state.v2_ConfigSave()}>
+          <Button
+            variant="outline"
+            className={state.Theme?.successBtn}
+            onClick={() => state.v2_ConfigSave()}>
             Save
           </Button>
-          <div className="text-yellow-400 text-xl">
+          <div className="ml-3 text-yellow-400 text-xl">
             Your config has un-saved changes
           </div>
         </div>
