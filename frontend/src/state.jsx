@@ -281,7 +281,9 @@ export var STATE = {
   },
 
   v2_TunnelSave: async (tunnel, oldTunnelTag) => {
+    let ok = false
     try {
+
       STATE.toggleLoading({
         tag: "tunnel_save",
         show: true,
@@ -292,19 +294,22 @@ export var STATE = {
         Meta: tunnel,
         OldTag: oldTunnelTag,
       };
-      console.dir(out)
 
       let resp = await STATE.API.method("setTunnel", out);
       if (resp === undefined) {
         STATE.errorNotification("Unknown error, please try again in a moment");
+        ok = false
       } else if (resp.status === 200) {
         STATE.successNotification("Tunnel saved", undefined);
+        ok = true
       }
     } catch (error) {
+      ok = false
       console.dir(error);
     }
     STATE.toggleLoading(undefined);
     STATE.globalRerender();
+    return ok
   },
 
   v2_ConfigSave: async () => {
@@ -457,8 +462,7 @@ export var STATE = {
     if (now - lastFetch < 3) {
       return;
     }
-    alert(e)
-    // toast.error(e);
+    toast.error(e);
     STORE.Cache.Set("error-timeout", dayjs().unix());
   },
   errorNotification: (e) => {
@@ -467,7 +471,7 @@ export var STATE = {
     if (now - lastFetch < 3) {
       return;
     }
-    alert(e)
+    toast.error(e)
     STORE.Cache.Set("error-timeout", dayjs().unix());
   },
   successNotification: (e) => {
