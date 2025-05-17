@@ -417,6 +417,7 @@ export var STATE = {
   },
   // SYSTEM SPECIFIC
   loading: undefined,
+  loadTimeout: undefined,
   toggleLoading: (object) => {
     if (object === undefined) {
       STATE.loading = undefined;
@@ -438,11 +439,11 @@ export var STATE = {
       STATE.loading = object;
       STATE.renderPage("loader");
 
-      const to = setTimeout(
+      STATE.loadTimeout = setTimeout(
         () => {
           STATE.loading = undefined;
           STATE.renderPage("loader");
-          clearTimeout(to);
+          clearTimeout(STATE.loadTimeout);
         },
         object.timeout ? object.timeout : 10000,
       );
@@ -452,7 +453,7 @@ export var STATE = {
       STATE.loading = undefined;
       return () => {
         STATE.renderPage("loader");
-        clearTimeout(to);
+        clearTimeout(STATE.loadTimeout);
       };
     }
   },
