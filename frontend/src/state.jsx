@@ -466,16 +466,9 @@ export var STATE = {
     STORE.Cache.Set("error-timeout", dayjs().unix());
   },
   errorNotification: (e) => {
-    let lastFetch = STORE.Cache.Get("error-timeout");
-    let now = dayjs().unix();
-    if (now - lastFetch < 3) {
-      return;
-    }
-    toast.error(e)
-    STORE.Cache.Set("error-timeout", dayjs().unix());
+    STATE.toggleError(e)
   },
   successNotification: (e) => {
-
     toast.success(e);
   },
   User: STORE.Cache.GetObject("user"),
