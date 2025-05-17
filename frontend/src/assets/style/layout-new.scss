@@ -447,8 +447,8 @@ margin-bottom: 10px;
 
 
 
-.toast {
- 
+:global(.toast) {
+
   /* margin-bottom: 200px; */
   margin-left: 20px;
   border-radius: 10px;
@@ -859,7 +859,7 @@ margin-bottom: 10px;
 .new-table {
   max-width:800px !important;
 }
-  
+
 }
 
 .private-server-wrapper {
@@ -1030,7 +1030,7 @@ margin-bottom: 10px;
         color: var(--c-shade4);
       }
     }
-    
+
   }
 
   .top-bar {
@@ -1641,7 +1641,7 @@ margin-bottom: 10px;
   width: 100%;
   margin-bottom: 300px;
 
-  
+
 
   .object-wrapper {
     display: flex;
