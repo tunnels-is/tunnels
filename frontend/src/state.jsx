@@ -748,7 +748,7 @@ export var STATE = {
           <div className="flex justify-center gap-4">
             <button
               onClick={() => toast.dismiss(t.id)}
-              className="px-5 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 transition duration-150"
+              className="px-5 py-2 border border-gray-300 text-gray-700 hover:bg-gray-100 transition duration-150"
             >
               NO
             </button>
@@ -757,7 +757,7 @@ export var STATE = {
                 toast.dismiss(t.id);
                 await method();
               }}
-              className="px-5 py-2 rounded-lg bg-[#2056e1] text-white hover:bg-blue-700 transition duration-150"
+              className="px-5 py-2 bg-[#2056e1] text-white hover:bg-blue-700 transition duration-150"
             >
               YES
             </button>
@@ -1259,7 +1259,7 @@ export var STATE = {
     let host = window.location.origin;
     // let port = STORE.Cache.Get("api_port")
     // let ip = STORE.Cache.Get("api_ip")
-    host = host.replace("http://", "http://");
+    host = host.replace("http://", "https://");
     host = host.replace("5173", "7777");
     return host;
   },
