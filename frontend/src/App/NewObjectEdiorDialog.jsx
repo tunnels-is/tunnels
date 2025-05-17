@@ -33,7 +33,7 @@ const NewObjectEditorDialog = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className={"sm:max-w-[800px] text-white" + state.Theme?.menuBG + state.Theme?.borderColor} >
         <DialogHeader>
-          <DialogTitle className="text-lg font-bold text-white">{title + ": " + dynamicDescription}</DialogTitle>
+          <DialogTitle className="text-lg font-bold text-white">{dynamicDescription}</DialogTitle>
         </DialogHeader>
 
         {object && (
