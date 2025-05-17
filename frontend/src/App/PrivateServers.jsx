@@ -108,7 +108,7 @@ const PrivateServers = () => {
 		return <DropdownMenuItem
 			key="connect"
 			onClick={() => conButton()}
-			className="cursor-pointer text-emerald-400 focus:text-emerald-700"
+			className="cursor-pointer text-[#3a994c]"
 		>
 			<AccessibilityIcon className="w-4 h-4 mr-2" /> Connect
 		</DropdownMenuItem >
