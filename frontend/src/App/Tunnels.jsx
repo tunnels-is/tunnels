@@ -41,7 +41,7 @@ const Tunnels = () => {
     let label = "";
 
     if (active) {
-      label = "disconnect";
+      label = "Disconnect";
       connect = () => {
         state.ConfirmAndExecute(
           "success",
@@ -55,7 +55,7 @@ const Tunnels = () => {
         );
       };
     } else {
-      label = "connect";
+      label = "Connect";
       connect = () => {
         state.ConfirmAndExecute(
           "success",
@@ -73,7 +73,7 @@ const Tunnels = () => {
     return <DropdownMenuItem
       key="connect"
       onClick={() => connect()}
-      className="cursor-pointer text-emerald-400 focus:text-emerald-700"
+      className="cursor-pointer text-emerald-500"
     >
       <AccessibilityIcon className="w-4 h-4 mr-2" /> {label}
     </DropdownMenuItem >

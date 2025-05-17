@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/button";
 import InfoItem from "./component/InfoItem";
 import { Network } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { ExitIcon } from "@radix-ui/react-icons";
 
 const Account = () => {
   const navigate = useNavigate();
@@ -37,6 +39,20 @@ const Account = () => {
 
 
   let APIKey = state.getKey("User", "APIKey");
+
+  const LogoutButton = (obj) => {
+    return <DropdownMenuItem
+      key="connect"
+      onClick={() => {
+        state.LogoutToken(obj, false);
+      }
+      }
+      className="cursor-pointer text-red-700 focus:text-red-500"
+    >
+      <ExitIcon className="w-4 h-4 mr-2" /> Logout
+    </DropdownMenuItem >
+
+  }
 
   let table = {
     data: state.User?.Tokens,
@@ -66,13 +82,7 @@ const Account = () => {
       }
     },
     customBtn: {
-      Logout: (obj) => {
-        return (< Button onClick={() => {
-          state.LogoutToken(obj, false);
-        }}>
-          Logout
-        </Button >)
-      }
+      Logout: LogoutButton,
     },
     Btn: {},
     headers: ["N", "Created"],

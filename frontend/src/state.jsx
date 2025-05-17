@@ -48,8 +48,8 @@ export var STATE = {
     borderColor: " border border-[#1a1f2d]  cursor-pointer",
     menuBG: " bg-[#0B0E14]",
     mainBG: " bg-black",
-    neutralBtn: "  text-[#2056e1] border-[#2056e1] hover:bg-[#2056e1] hover:text-white cursor-pointer",
-    successBtn: " text-[#3a994c] border-[#3a994c] hover:bg-[#3a994c] hover:text-white cursor-pointer",
+    neutralBtn: " text-[#2056e1] border-[#2056e1] hover:bg-[#2056e1] hover:text-white cursor-pointer",
+    successBtn: " text-emerald-500 border-emerald-500 hover:bg-emerald-500 hover:text-white cursor-pointer",
     warningBtn: " text-orange-500 border-orange-500 hover:bg-orange-500 hover:text-white cursor-pointer",
     errorBtn: " text-red-700 border-red-700 cursor-pointer hover:bg-red-500",
     activeSelect: " bg-[#2056e1] text-white cursor-pointer",
@@ -422,18 +422,6 @@ export var STATE = {
     if (object === undefined) {
       STATE.loading = undefined;
       STATE.renderPage("loader");
-      // return
-
-      // Without timeout the "Saving Config..." msg
-      // blinks on/off too fast imo it's better if it's about 1sec
-      //
-      // const to = setTimeout(() => {
-      // 	STATE.loading = undefined
-      // }, 1000)
-      // return () => {
-      // 	STATE.renderPage("loader")
-      // 	clearTimeout(to)
-      // }
     }
     if (object?.show) {
       STATE.loading = object;
