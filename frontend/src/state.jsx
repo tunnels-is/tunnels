@@ -318,9 +318,8 @@ export var STATE = {
   },
 
   v2_TunnelSave: async (tunnel, oldTunnelTag) => {
-    let ok = false
+    let ok = false;
     try {
-
       STATE.toggleLoading({
         tag: "tunnel_save",
         show: true,
@@ -335,18 +334,18 @@ export var STATE = {
       let resp = await STATE.API.method("setTunnel", out);
       if (resp === undefined) {
         STATE.errorNotification("Unknown error, please try again in a moment");
-        ok = false
+        ok = false;
       } else if (resp.status === 200) {
         STATE.successNotification("Tunnel saved", undefined);
-        ok = true
+        ok = true;
       }
     } catch (error) {
-      ok = false
+      ok = false;
       console.dir(error);
     }
     STATE.toggleLoading(undefined);
     STATE.globalRerender();
-    return ok
+    return ok;
   },
 
   v2_ConfigSave: async () => {
@@ -504,7 +503,7 @@ export var STATE = {
     STORE.Cache.Set("error-timeout", dayjs().unix());
   },
   errorNotification: (e) => {
-    STATE.toggleError(e)
+    STATE.toggleError(e);
   },
   successNotification: (e) => {
     toast.success(e);
@@ -741,14 +740,12 @@ export var STATE = {
     await toast[type](
       (t) => (
         <div className="text-center">
-          {title && (
-            <div className="text-2xl font-bold text-gray-800 mb-3">{title}</div>
-          )}
-          <div className="text-base text-gray-600 mb-6">{subtitle}</div>
+          {title && <div className="text-2xl font-bold mb-3">{title}</div>}
+          <div className="text-base mb-6">{subtitle}</div>
           <div className="flex justify-center gap-4">
             <button
               onClick={() => toast.dismiss(t.id)}
-              className="px-5 py-2 border border-gray-300 text-gray-700 hover:bg-gray-100 transition duration-150"
+              className="px-5 py-2 border border-gray-300 hover:bg-gray-900 transition duration-150"
             >
               NO
             </button>
