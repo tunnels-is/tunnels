@@ -5,6 +5,7 @@ import axios from "axios";
 import dayjs from "dayjs";
 import { v4 as uuidv4 } from "uuid";
 import https from 'https';
+import { Button } from "./components/ui/button";
 
 const state = (page) => {
   const [value, reload] = useState({ x: 0 });
@@ -691,27 +692,29 @@ export var STATE = {
     }
     await toast[type](
       (t) => (
-        <div className="text-center">
+        <div className={"text-center"} >
           {title && <div className="text-2xl font-bold mb-3">{title}</div>}
-          <div className="text-base mb-6">{subtitle}</div>
+          < div className="text-base mb-6" > {subtitle}</div>
           <div className="flex justify-center gap-4">
-            <button
+            <Button
+              variant="outline"
+              className={STATE.Theme?.errorBtn}
               onClick={() => toast.dismiss(t.id)}
-              className="px-5 py-2 border border-gray-300 hover:bg-gray-900 transition duration-150"
             >
               NO
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="outline"
+              className={STATE.Theme?.successBtn}
               onClick={async () => {
                 toast.dismiss(t.id);
                 await method();
               }}
-              className="px-5 py-2 bg-[#2056e1] text-white hover:bg-blue-700 transition duration-150"
             >
               YES
-            </button>
+            </Button>
           </div>
-        </div>
+        </div >
       ),
       { id: id, duration: duration },
     );
