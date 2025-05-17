@@ -33,6 +33,7 @@ import Devices from "./App/Devices";
 import NewObjectEditor from "./App/NewObjectEdior";
 import Tunnels from "./App/Tunnels";
 import Logs from "./App/Logs";
+import { Alert } from "./components/ui/alert";
 
 // Use this to automatically turn on debug
 STORE.Cache.Set("debug", true);
@@ -66,7 +67,6 @@ const LaunchApp = () => {
       />
 
       <div className=" bg-black w-full">
-        <div className="wtf">lksjdflksjdklfjklsdj</div>
         <ScreenLoader />
         <SideBar />
 
