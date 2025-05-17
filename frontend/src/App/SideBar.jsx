@@ -16,11 +16,10 @@ import {
 } from "@radix-ui/react-icons";
 import { cn } from "@/lib/utils";
 import GLOBAL_STATE from "../state";
-import * as runtime from "../../wailsjs/runtime/runtime";
+import { Logs } from "lucide-react";
 
 const IconWidth = 20;
 const IconHeight = 20;
-const SIDEBAR_WIDTH = "16rem"; // 256px - same as w-64
 
 const SideBar = () => {
   const navigate = useNavigate();
@@ -107,6 +106,7 @@ const SideBar = () => {
           },
 
           { icon: PersonIcon, label: "Account", route: "account", user: true },
+          { icon: Logs, label: "Logs", route: "logs", user: true },
         ],
       },
       {
@@ -148,94 +148,98 @@ const SideBar = () => {
 
   return (
     <div
-      className="fixed top-0 left-0 w-44 h-screen bg-[#0B0E14] border-r border-[#1a1f2d] flex flex-col py-6 z-[2000]"
+      className={"fixed top-0 left-0 w-44 h-screen bg-[#0B0E14] border-r flex flex-col py-6 z-[2000]" + state.Theme?.borderColor}
       ref={sideb}
       id="sidebar"
     >
       {/* Logo or Brand */}
-      <div className="flex-1 overflow-y-auto space-y-6">
-        {menu.groups.map((g) => {
-          if (g.user === true && (!user || user.Email === "")) {
-            return false;
-          }
-          if (g.shouldRender && !g.shouldRender()) {
-            return false;
-          }
-          if (g.isManager && !isManager()) {
-            return (<></>)
-          }
-          return (
-            <div className="px-3" key={g.title}>
-              {g.title && (
-                <div className="px-3 mb-2">
-                  <h2 className="text-xs font-semibold text-white/40 uppercase tracking-wider">
-                    {g.title}
-                  </h2>
-                </div>
-              )}
+      < div className="flex-1 overflow-y-auto space-y-6" >
+        {
+          menu.groups.map((g) => {
+            if (g.user === true && (!user || user.Email === "")) {
+              return false;
+            }
+            if (g.shouldRender && !g.shouldRender()) {
+              return false;
+            }
+            if (g.isManager && !isManager()) {
+              return (<></>)
+            }
+            return (
+              <div className="px-3" key={g.title}>
+                {g.title && (
+                  <div className="px-3 mb-2">
+                    <h2 className="text-xs font-semibold text-white/40 uppercase tracking-wider">
+                      {g.title}
+                    </h2>
+                  </div>
+                )}
 
-              <div className="space-y-1">
-                {g.items.map((i) => {
-                  if (i.user && (!user || user.Email === "")) {
-                    return null;
-                  }
-                  if (i.shouldRender && !i.shouldRender()) {
-                    return false;
-                  }
+                <div className="space-y-1">
+                  {g.items.map((i) => {
+                    if (i.user && (!user || user.Email === "")) {
+                      return null;
+                    }
+                    if (i.shouldRender && !i.shouldRender()) {
+                      return false;
+                    }
 
-                  const isActive = sp[1] === i.route;
+                    const isActive = sp[1] === i.route;
 
-                  return (
-                    <button
-                      key={i.label}
-                      onClick={() => {
-                        if (i.click) {
-                          i.click();
-                        } else {
-                          navHandler("/" + i.route);
-                        }
-                      }}
-                      className={cn(
-                        "flex items-center w-full gap-3 px-5 py-1 rounded-md text-sm font-medium transition-colors",
-                        isActive
-                          ? "bg-[#4B7BF5]/10 text-[#4B7BF5]"
-                          : "text-white/70 hover:text-white hover:bg-white/5"
-                      )}
-                    >
-                      <i.icon
+                    return (
+                      <button
+                        key={i.label}
+                        onClick={() => {
+                          if (i.click) {
+                            i.click();
+                          } else {
+                            navHandler("/" + i.route);
+                          }
+                        }}
                         className={cn(
-                          "flex-shrink-0",
-                          isActive ? "text-[#4B7BF5]" : "text-white/70"
+                          "flex items-center w-full gap-3 px-5 py-1 rounded-md text-sm font-medium transition-colors",
+                          isActive
+                            ? "bg-[#4B7BF5]/10 text-[#4B7BF5]"
+                            : "text-white/70 hover:text-white hover:bg-white/5"
                         )}
-                        width={IconWidth}
-                        height={IconHeight}
-                      />
-                      <span>{i.label}</span>
-                    </button>
-                  );
-                })}
+                      >
+                        <i.icon
+                          className={cn(
+                            "flex-shrink-0",
+                            isActive ? "text-[#4B7BF5]" : "text-white/70"
+                          )}
+                          width={IconWidth}
+                          height={IconHeight}
+                        />
+                        <span>{i.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })
+        }
+      </div >
 
       {/* User Section at Bottom */}
-      {user && user.Email && (
-        <div className="px-3 pt-6 border-t border-[#1a1f2d]">
-          <div className="flex items-center gap-3 px-3 py-3 rounded-md bg-[#1a1f2d]/50">
-            <div className="w-8 h-8 rounded-full bg-[#4B7BF5]/20 flex items-center justify-center">
-              <PersonIcon className="w-4 h-4 text-[#4B7BF5]" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-white truncate">
-                {user.Email}
-              </p>
+      {
+        user && user.Email && (
+          <div className="px-3 pt-6 border-t border-[#1a1f2d]">
+            <div className="flex items-center gap-3 px-3 py-3 rounded-md bg-[#1a1f2d]/50">
+              <div className="w-8 h-8 rounded-full bg-[#4B7BF5]/20 flex items-center justify-center">
+                <PersonIcon className="w-4 h-4 text-[#4B7BF5]" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-white truncate">
+                  {user.Email}
+                </p>
+              </div>
             </div>
           </div>
-        </div>
-      )}
-    </div>
+        )
+      }
+    </div >
   );
 };
 

@@ -14,6 +14,7 @@ const Tunnels = () => {
   const [tunnel, setTunnel] = useState(undefined);
   const [tunnels, setTunnels] = useState([]);
   const [modalOpen, setModalOpen] = useState(false);
+  const [tunTag, setTunTag] = useState("")
 
   useEffect(() => {
     let x = async () => {
@@ -100,6 +101,7 @@ const Tunnels = () => {
       Edit: (obj) => {
         setTunnel(obj);
         setModalOpen(true);
+        setTunTag(obj.Tag)
       },
       Delete: (obj) => {
         state.v2_TunnelDelete(obj);
@@ -131,12 +133,12 @@ const Tunnels = () => {
         title="Tunnel"
         description=""
         readOnly={false}
-        saveButton={() => {
-          console.log("save");
+        saveButton={async () => {
+          await state.v2_TunnelSave(tunnel, tunTag)
         }}
         onChange={(key, value, type) => {
-          device[key] = value;
-          console.log(key, value, type);
+          tunnel[key] = value;
+          // console.log(key, value, type);
         }}
       />
     </div>

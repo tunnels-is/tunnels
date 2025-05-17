@@ -445,7 +445,18 @@ margin-bottom: 10px;
   }
 }
 
+.wtf {
+  z-index:2000;
+  height:100px;
+  width:100px;
+  color:white;
+  top:10px;
+  left:10px;
+  position:fixed;
+}
+
 .toast {
+ 
   /* margin-bottom: 200px; */
   margin-left: 20px;
   border-radius: 10px;
@@ -456,7 +467,7 @@ margin-bottom: 10px;
   border-radius: var(--button-border-radius);
   padding: 10px !important;
   color: var(--c-shade6) !important;
-  z-index: 9999;
+  z-index: 1999;
 
   .content {
     min-width: 220px !important;
@@ -617,78 +628,35 @@ margin-bottom: 10px;
   height: 0% !important;
 }
 
-.bottom-loader {
-  z-index: 2000;
-  position: fixed;
-  bottom: 0px;
-  left: 0px;
-  width: 100%;
-  height: 200px;
-  background-color: var(--c-shade1);
-  border-top: 1px solid var(--c-shade2);
-
-  .control-bar {
-    display: flex;
-    gap: 10px;
-    justify-items: right;
-    text-transform: uppercase;
-    font-size: 14px;
-    font-weight: bold;
-
-    position: absolute;
-    right: 10px;
-    top: -24px;
-    /* background: var(--c-shade2); */
-    /* border: 1px solid var(--c-shade3); */
-    /* padding: 7px 30px 5px 30px; */
-    /* border-radius: var(--button-border-radius); */
-    height: fit-content;
-
-    .item:hover {
-      color: var(--c-shade5);
-    }
-
-    .item {
-      cursor: pointer;
-    }
-
-    .fullscreen {
-      color: var(--c-blue);
-    }
-
-    .clear {
-      color: var(--c-red);
-    }
-
-    .hide {
-      color: var(--c-orange);
-    }
-
-    .show {
-      color: var(--c-green);
-    }
+.new-loader {
+  position:fixed;
+  bottom:00px;
+  left:00px;
+  width:100%;
+  height:50px;
+  z-index:2000;
+  background:none;
+  .l-title {
+    font-size:30px;
+    text-align:left;
+    margin-left:190px;
+    background:none;
+    color:white;
   }
-
-  .title {
-    position: absolute;
-    left: 30px;
-    top: -70px;
-    background: var(--c-shade2);
-    /* border: 1px solid var(--c-shade3); */
-    padding: 10px 30px 10px 30px;
-    border-radius: var(--button-border-radius);
-    height: fit-content;
-    /* box-shadow: $base-shadow; */
-  }
-
   .bar-loader {
-    width: 100%;
-  }
+    color:green;
+    background:green;
+   }
+}
+
+
+.bottom-loader {
+
 
   .logs-window {
     // margin-left: 20px;
     position: relative;
-    width: calc(100% - 00px);
+    width: 100%;
     // width: 100%;
     height: 100%;
     /* font-family: system-ui; */
@@ -696,7 +664,6 @@ margin-bottom: 10px;
     font-size: 0.9em;
     overflow-y: scroll;
     overflow-x: hidden;
-    padding: 5px;
     border-radius: 0px;
     z-index: 41;
 

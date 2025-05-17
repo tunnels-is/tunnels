@@ -217,7 +217,7 @@ func ForwardToController(FR *FORWARD_REQUEST) (any, int) {
 
 var AZ_CHAR_CHECK = regexp.MustCompile(`^[a-zA-Z0-9]*$`)
 
-func validateTunnelMeta(tun *TunnelMETA) (err []string) {
+func validateTunnelMeta(tun *TunnelMETA, oldTag string) (err []string) {
 	ifnamemap := make(map[string]struct{})
 	ifFail := AZ_CHAR_CHECK.MatchString(tun.IFName)
 	if !ifFail {
@@ -234,9 +234,11 @@ func validateTunnelMeta(tun *TunnelMETA) (err []string) {
 
 	_, ok := ifnamemap[strings.ToLower(tun.IFName)]
 	if ok {
-		err = append(err,
-			"you cannot have two tunnels with the same interface name: "+tun.IFName,
-		)
+		if strings.ToLower(tun.IFName) != oldTag {
+			err = append(err,
+				"you cannot have two tunnels with the same interface name: "+tun.IFName,
+			)
+		}
 	}
 
 	if len(tun.IFName) < 3 {

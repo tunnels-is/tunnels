@@ -99,7 +99,7 @@ const Settings = () => {
     type = "text",
     placeholder = "",
   }) => (
-    <div className="space-y-2 py-3">
+    <div className="space-y-1 py-2">
       <div className="flex items-center gap-2">
         {icon}
         <Label className="text-sm font-medium">{label}</Label>
@@ -120,7 +120,7 @@ const Settings = () => {
         {icon}
         <Label className="text-sm font-medium">{label}</Label>
       </div>
-      <code className="text-xs block font-mono bg-muted/60 px-2 py-1.5 rounded w-full overflow-auto whitespace-normal break-all">
+      <code className="text-md block font-mono bg-muted/60 px-2 py-1.5 h-9  w-full overflow-hidden  break-all text-ellipsis text-nowrap">
         {value !== undefined && value !== null ? String(value) : "Unknown"}
       </code>
     </div>
@@ -148,15 +148,17 @@ const Settings = () => {
         </div>
       )}
 
-      <Tabs defaultValue="general" className="w-[400px]">
-        <TabsList>
-          <TabsTrigger value="general">General Settings</TabsTrigger>
-          <TabsTrigger value="apiconfig">API Config</TabsTrigger>
-          <TabsTrigger value="net">Network Information</TabsTrigger>
-          <TabsTrigger value="sys">System Information</TabsTrigger>
+      <Tabs defaultValue="general" className="size-fit">
+        <TabsList
+          className={state.Theme?.borderColor}
+        >
+          <TabsTrigger className={state.Theme?.tabs} value="general">General Settings</TabsTrigger>
+          <TabsTrigger className={state.Theme?.tabs} value="apiconfig">API Config</TabsTrigger>
+          <TabsTrigger className={state.Theme?.tabs} value="net">Network Information</TabsTrigger>
+          <TabsTrigger className={state.Theme?.tabs} value="sys">System Information</TabsTrigger>
         </TabsList>
-        <TabsContent value="general">
-          <Card className="mt-5 bg-black border-none">
+        <TabsContent value="general" className="pl-2">
+          <Card className="bg-black border-none">
             <CardContent>
               <SettingToggle
                 label="Basic Logging"
@@ -215,8 +217,8 @@ const Settings = () => {
             </CardContent>
           </Card>
         </TabsContent>
-        <TabsContent value="apiconfig">
-          <Card className="mt-5 bg-black border-none">
+        <TabsContent value="apiconfig" className="pl-2">
+          <Card className="bg-black border-none">
             <CardContent className="space-y-0">
               <SettingInput
                 label="API IP"
@@ -294,9 +296,8 @@ const Settings = () => {
             </CardContent>
           </Card>
         </TabsContent>
-        <TabsContent value="net">
-          {" "}
-          <Card className="mt-5 bg-black border-none">
+        <TabsContent value="net" className="pl-2">
+          <Card className="bg-black border-none">
             <CardContent>
               <InfoItem
                 label="Interface"
@@ -324,8 +325,8 @@ const Settings = () => {
             </CardContent>
           </Card>
         </TabsContent>
-        <TabsContent value="sys">
-          <Card className="mt-5 bg-black border-none">
+        <TabsContent value="sys" className="pl-2">
+          <Card className="bg-black border-none">
             <CardContent>
               <div className="grid grid-cols-2 gap-4">
                 <InfoItem

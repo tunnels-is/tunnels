@@ -435,6 +435,8 @@ type User struct {
 	SubExpiration         time.Time       `json:"SubExpiration"`
 	AdditionalInformation string          `json:"AdditionalInformation,omitempty"`
 	AuthServer            string
+	IsAdmin               bool `json:"IsAdmin"`
+	IsManager             bool `json:"IsManager"`
 }
 
 type LicenseKey struct {
