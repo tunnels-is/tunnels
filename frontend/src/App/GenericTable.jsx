@@ -24,22 +24,24 @@ import {
 import { MoreHorizontal, Edit, Trash2 } from "lucide-react";
 import { GridLoader } from "react-spinners";
 import { ArrowLeft, ArrowRight, Plus, BadgePlus } from "lucide-react";
+import { PlusIcon } from "lucide-react";
 
-const buttonClass = "font-bold text-white hover:text-black";
+import GLOBAL_STATE from "../state";
 
 const GenericTable = (props) => {
   const [offset, setOffset] = useState(0);
   const [limit, setLimit] = useState(100);
   const [filter, setFilter] = useState("");
   const [loading, setLoading] = useState(false);
+  const state = GLOBAL_STATE("btn+?");
 
   if (!props.table) {
     return <></>;
   }
 
   let t = props.table;
-  let hdc = "w-[60px] text-blue-400 font-bold ";
-  let ddc = "w-[60px] text-blue-100 font-medium ";
+  let hdc = "w-[60px] text-white font-bold ";
+  let ddc = "w-[60px] text-white-100 font-medium ";
 
   const renderHeaders = () => {
     let rows = [];
@@ -55,8 +57,18 @@ const GenericTable = (props) => {
       rows.push(<TableHead className={hc}>{out}</TableHead>);
     });
 
+    let hasButtons = false
+    if (t.Btn?.Edit) { hasButtons = true }
+    if (t.Btn?.Delete) { hasButtons = true }
+    if (t.customBtn?.length > 0) {
+      hasButtons = true
+    }
+    if (hasButtons) {
+      rows.push(<TableHead className={"btnx"}></TableHead>);
+    }
+
     return (
-      <TableHeader>
+      <TableHeader className="bg-[#0B0E14] border border-[#1a1f2d] rounded-full">
         <TableRow>{rows}</TableRow>
       </TableHeader>
     );
@@ -194,31 +206,19 @@ const GenericTable = (props) => {
   };
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-        <div className="flex gap-3 items-center w-full md:w-auto">
-          {t.Btn?.New && (
-            <Button
-              variant="default"
-              className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
-              onClick={() => t.Btn.New()}
-            >
-              <BadgePlus className="w-4 h-4" />
-              Create
-            </Button>
-          )}
-          <Input
-            className="w-full md:w-64 placeholder:text-muted-foreground"
-            placeholder="Search..."
-            onChange={(e) => setFilter(e.target.value)}
-          />
-        </div>
+    <div className="flex flex-col gap-5">
+      <div className="flex flex-col md:flex-row justify-start items-center  ">
 
         {t.more && (
           <div className="flex gap-2">
+            <Input
+              className="w-full md:w-64 placeholder:text-muted-foreground text-white"
+              placeholder="Search..."
+              onChange={(e) => setFilter(e.target.value)}
+            />
             <Button
               variant="outline"
-              className="flex items-center gap-1 text-white"
+              className={"flex items-center gap-1" + state.Theme?.neutralBtn}
               onClick={async () => {
                 let off = offset - t.opts.RowPerPage;
                 if (off < 0) off = 0;
@@ -227,12 +227,11 @@ const GenericTable = (props) => {
               }}
             >
               <ArrowLeft className="w-4 h-4" />
-              Prev
             </Button>
 
             <Button
               variant="outline"
-              className="flex items-center gap-1 text-white"
+              className={"flex items-center gap-1" + state.Theme?.neutralBtn}
               onClick={async () => {
                 let off = offset + t.opts.RowPerPage;
                 if (off < 0) off = 0;
@@ -240,22 +239,34 @@ const GenericTable = (props) => {
                 await newPage(off, t.opts.RowPerPage);
               }}
             >
-              Next
               <ArrowRight className="w-4 h-4" />
+            </Button>
+          </div>
+        )}
+        {t.Btn?.New && (
+          <div className="flex justify-end w-full">
+            <Button
+              variant="outline"
+              className={"flex items-center gap-1" + state.Theme?.successBtn}
+              onClick={() => t.Btn.New()}
+            >
+              Create
             </Button>
           </div>
         )}
       </div>
 
-      {!loading && (
-        <div className="shadow-sm px-3">
-          <Table className="w-full overflow-visible text-sm text-foreground">
-            {renderHeaders()}
-            {renderRows()}
-          </Table>
-        </div>
-      )}
-    </div>
+      {
+        !loading && (
+          <div className="shadow-sm">
+            <Table className="w-full overflow-visible text-sm text-foreground">
+              {renderHeaders()}
+              {renderRows()}
+            </Table>
+          </div>
+        )
+      }
+    </div >
   );
 };
 

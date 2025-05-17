@@ -2,8 +2,7 @@ import React, { useEffect, useState } from "react";
 import GLOBAL_STATE from "../state";
 import GenericTable from "./GenericTable";
 import { TableCell } from "@/components/ui/table";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import NewObjectEditorDialog from "./NewObjectEdiorDialog";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { AccessibilityIcon } from "lucide-react";
@@ -138,7 +137,7 @@ const PrivateServers = () => {
 			value = servertun?.Tag
 		}
 
-		return <TableCell className={"w-[100px] text-sky-100"}  >
+		return <TableCell className={"w-[100px] text-white"}  >
 			<Select value={value}
 				onValueChange={(e) => {
 					state.changeServerOnTunnelUsingTag(e, obj._id)
@@ -147,16 +146,18 @@ const PrivateServers = () => {
 				<SelectTrigger className="w-full">
 					<SelectValue placeholder={assigned} />
 				</SelectTrigger>
-				<SelectContent>
+				<SelectContent
+					className={"bg-transparent" + state.Theme.borderColor + state.Theme?.mainBG}
+				>
 					<SelectGroup>
 						{opts?.map(t => {
 							if (t.selected === true) {
 								return (
-									<SelectItem className="bg-sky-300" value={t.value}>{t.key}</SelectItem>
+									<SelectItem className={state.Theme?.activeSelect} value={t.value}>{t.key}</SelectItem>
 								)
 							} else {
 								return (
-									<SelectItem value={t.value}>{t.key}</SelectItem>
+									<SelectItem className={state.Theme?.neutralSelect} value={t.value}>{t.key}</SelectItem>
 								)
 							}
 						})}

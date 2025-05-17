@@ -11,6 +11,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Save } from "lucide-react";
 import NewObjectEditor from "./NewObjectEdior";
+import GLOBAL_STATE from "../state";
 
 
 const NewObjectEditorDialog = ({
@@ -23,22 +24,20 @@ const NewObjectEditorDialog = ({
   description = "View or edit object details",
   readOnly = false
 }) => {
+  const state = GLOBAL_STATE("editor-dialog");
   const dynamicDescription = object?.Tag
-    ? `${description} for ${object.Tag}`
+    ? `${description} ${object.Tag}`
     : description;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[800px] bg-[#0a0a0a] border-[#222] text-white">
+      <DialogContent className={"sm:max-w-[800px] text-white" + state.Theme?.menuBG + state.Theme?.borderColor} >
         <DialogHeader>
-          <DialogTitle className="text-lg font-bold text-white">{title}</DialogTitle>
-          <DialogDescription className="text-white/60">
-            {dynamicDescription}
-          </DialogDescription>
+          <DialogTitle className="text-lg font-bold text-white">{title + ": " + dynamicDescription}</DialogTitle>
         </DialogHeader>
 
         {object && (
-          <div className="py-4 max-h-[70vh] overflow-y-auto overflow-x-hidden pr-2">
+          <div className=" max-h-[70vh] overflow-y-auto overflow-x-hidden pr-2">
             <NewObjectEditor
               obj={object}
               onChange={onChange}
@@ -46,12 +45,12 @@ const NewObjectEditorDialog = ({
           </div>
         )}
 
-        <DialogFooter className="flex items-center justify-end gap-2 pt-4 border-t border-[#222]">
+        <DialogFooter className="flex gap-2 mt-2 ">
           {!readOnly && saveButton && object && (
             <Button
               variant="outline"
+              className={state.Theme?.successBtn}
               onClick={() => saveButton(object)}
-              className="h-9 border-emerald-800/40 bg-[#0c1e0c] text-emerald-400 hover:bg-emerald-900/30 hover:text-emerald-300 shadow-sm font-medium"
             >
               <Save className="h-4 w-4 mr-1" />
               Save
@@ -59,14 +58,14 @@ const NewObjectEditorDialog = ({
           )}
           <Button
             variant="outline"
+            className={state.Theme?.warningBtn}
             onClick={() => onOpenChange(false)}
-            className="h-9 px-4 text-sm font-medium text-white/80 border-[#222] bg-[#111] hover:bg-[#222] hover:text-white"
           >
             {readOnly ? "Close" : "Cancel"}
           </Button>
         </DialogFooter>
       </DialogContent>
-    </Dialog>
+    </Dialog >
   );
 };
 

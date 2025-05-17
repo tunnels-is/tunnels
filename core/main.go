@@ -94,7 +94,7 @@ func printInfo2() {
 	log.Println("=======================================================================")
 }
 
-func LaunchEverything() {
+func LaunchTunnels() {
 	defer RecoverAndLogToFile()
 	conf := CONFIG.Load()
 

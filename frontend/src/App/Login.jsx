@@ -98,7 +98,7 @@ const useForm = () => {
 
     let x = await state.callController(authServer, secure, "POST", "/v3/user/create", inputs, true, false)
     if (x.status === 200) {
-      state.v2_SetUser(x.data, false, authServer, secure);
+      state.v2_SetUser(x.data, remember, authServer, secure);
       navigate("/servers")
       return
     }
@@ -154,7 +154,7 @@ const useForm = () => {
     if (x && x.status === 200) {
       STORE.Local.setItem("default-device-name", inputs["devicename"]);
       STORE.Cache.Set("default-email", inputs["email"]);
-      state.v2_SetUser(x.data, false, authServer, secure);
+      state.v2_SetUser(x.data, remember, authServer, secure);
       if (mode === 3) {
         navigate("/twofactor/recover")
       } else {
