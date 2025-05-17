@@ -445,15 +445,7 @@ margin-bottom: 10px;
   }
 }
 
-.wtf {
-  z-index:2000;
-  height:100px;
-  width:100px;
-  color:white;
-  top:10px;
-  left:10px;
-  position:fixed;
-}
+
 
 .toast {
  
@@ -560,7 +552,7 @@ margin-bottom: 10px;
 
 .sidebar {
   position: fixed;
-  z-index: 2000;
+  z-index: 1800;
   left: 0px;
   top: 0px;
   display: flex;
