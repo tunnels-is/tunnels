@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"os"
 	"runtime/debug"
-	"slices"
 	"time"
 
 	"github.com/tunnels-is/tunnels/certs"
@@ -433,30 +432,55 @@ func HTTP_SetTunnel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	oldTun, ok := TunnelMetaMap.Load(newForm.OldTag)
-	if ok {
-		oldt, ok := oldTun.(*TunnelMETA)
-		if ok {
-			if !slices.Equal(oldt.AllowedHosts, newForm.Meta.AllowedHosts) {
-				tunnelMapRange(func(tun *TUN) bool {
-					meta := tun.meta.Load()
-					if meta.Tag == newForm.OldTag {
-						sendFirewallToServer(
-							tun.CR.ServerIP,
-							tun.dhcp.Token,
-							net.IP(tun.dhcp.IP[:]).String(),
-							newForm.Meta.AllowedHosts,
-							newForm.Meta.DisableFirewall,
-							"TODO",
-							// newForm.Meta.ServerCert,
-						)
-						return false
-					}
-					return true
-				})
-			}
-		}
-	}
+	// oldTun, ok := TunnelMetaMap.Load(newForm.OldTag)
+	// if ok {
+	// 	oldt, ok := oldTun.(*TunnelMETA)
+	// 	if ok {
+	// 		if !slices.Equal(oldt.AllowedHosts, newForm.Meta.AllowedHosts) {
+	// 			tunnelMapRange(func(tun *TUN) bool {
+	// 				meta := tun.meta.Load()
+	// 				if meta.Tag == newForm.OldTag {
+
+	// 					tc := &tls.Config{
+	// 						MinVersion:         tls.VersionTLS13,
+	// 						CurvePreferences:   []tls.CurveID{tls.X25519MLKEM768},
+	// 						InsecureSkipVerify: false,
+	// 					}
+	// 					var errm error
+	// 					tc.RootCAs, errm = tun.LoadCertPEMBytes([]byte(tun.CR.ServerPubKey))
+	// 					if errm != nil {
+	// 						ERROR("Unable to load cert pem from controller: ", errm)
+	// 					}
+
+	// 					FR := &FirewallRequest{
+	// 						DHCPToken:       tun.dhcp.Token,
+	// 						IP:              net.IP(tun.dhcp.IP[:]).String(),
+	// 						Hosts:           meta.AllowedHosts,
+	// 						DisableFirewall: meta.DisableFirewall,
+	// 					}
+
+	// 					_, code, err := SendRequestToURL(
+	// 						tc,
+	// 						"POST",
+	// 						"https://"+tun.CR.ServerIP+":"+tun.CR.ServerPort+"/v3/firewall",
+	// 						FR,
+	// 						10000,
+	// 						tun.CR.Secure,
+	// 					)
+	// 					if err != nil {
+	// 						ERROR("unable to update firewall: ", err)
+	// 					} else if code != 200 {
+	// 						ERROR("unable to update firewall: ", code)
+	// 					} else {
+	// 						DEBUG("firewall update on server")
+	// 					}
+	// 					return false
+	// 				}
+	// 				return true
+	// 			})
+	// 		}
+	// 	}
+	// }
 
 	if newForm.OldTag != newForm.Meta.Tag {
 		TunnelMetaMap.Delete(newForm.OldTag)

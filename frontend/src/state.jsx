@@ -56,6 +56,12 @@ export var STATE = {
     activeSelect: " bg-[#2056e1] text-white cursor-pointer",
     neutralSelect: "  text-white focus:text-[#3168f3] cursor-pointer",
     tabs: "data-[state=active]:text-[#3168f3]",
+    greenIcon: " text-emerald-500 border-emerald-500 hover:text-white cursor-pointer",
+    redIcon: " text-red-700 border-red-700 hover:text-white cursor-pointer",
+    badgeNeutral: " bg-[#2a1db5] hove:bg-white hover:text-black text-white ",
+    badgeSuccess: " bg-emerald-500 hove:bg-white hover:text-black text-white ",
+    badgeWarning: " bg-orange-500 hove:bg-white hover:text-black text-white ",
+    badgeError: " bg-red-500 hove:bg-white hover:text-black text-white ",
   },
 
   // new form
@@ -314,7 +320,9 @@ export var STATE = {
   },
 
   v2_ConfigSave: async () => {
+
     let newConfig = STATE.Config;
+    let ok = false
 
     try {
       STATE.toggleLoading({
@@ -327,6 +335,7 @@ export var STATE = {
       if (resp === undefined) {
         STATE.errorNotification("Unknown error, please try again in a moment");
       } else if (resp.status === 200) {
+        ok = true
         STORE.Cache.SetObject("config", newConfig);
         STATE.Config = newConfig;
         STATE.successNotification("Config saved", undefined);
@@ -337,6 +346,7 @@ export var STATE = {
     }
     STATE.toggleLoading(undefined);
     STATE.globalRerender();
+    return ok
   },
 
   // OLD
@@ -538,6 +548,10 @@ export var STATE = {
     // 		}
     // 	})
     // }
+    STATE.modifiedConfig?.DNSRecords?.forEach((r, i) => {
+      r.IP = r.IP?.filter((ip) => ip !== "");
+      r.TXT = r.TXT?.filter((txt) => txt !== "");
+    });
 
     let newConfig = {
       ...STATE.Config,

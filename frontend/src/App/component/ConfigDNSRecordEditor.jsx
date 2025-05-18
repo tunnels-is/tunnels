@@ -39,14 +39,6 @@ const ConfigDNSRecordEditor = () => {
     state.renderPage("DNSRecordForm");
   };
 
-  const saveAll = () => {
-    state.Config.DNSRecords?.forEach((r, i) => {
-      r.IP = r.IP?.filter((ip) => ip !== "");
-      r.TXT = r.TXT?.filter((txt) => txt !== "");
-    });
-    state.ConfigSave();
-    state.renderPage("DNSRecordForm");
-  };
 
   const deleteRecord = (index) => {
     if (state.Config.DNSRecords.length === 1) {

@@ -34,6 +34,8 @@ import (
 	"github.com/tunnels-is/tunnels/setcap"
 	"github.com/tunnels-is/tunnels/signal"
 	"github.com/tunnels-is/tunnels/types"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"golang.org/x/crypto/bcrypt"
 )
 
 var (
@@ -76,9 +78,6 @@ var (
 	InterfaceIP  net.IP
 	TCPRWC       io.ReadWriteCloser
 	UDPRWC       io.ReadWriteCloser
-
-	// toUserChannelMonitor   = make(chan int, 200000)
-	// fromUserChannelMonitor = make(chan int, 200000)
 
 	clientCoreMappings [math.MaxUint16 + 1]*UserCoreMapping
 	portToCoreMapping  [math.MaxUint16 + 1]*PortRange
@@ -128,18 +127,17 @@ func ADMIN(x ...any) {
 
 func main() {
 	configFlag := flag.Bool("config", false, "This command creates a new server config and certificates")
-	flag.Parse()
-	if configFlag != nil && *configFlag {
-		fmt.Println("new config")
-		makeConfigAndCerts()
-		os.Exit(1)
-	}
-
-	runtime.GOMAXPROCS(runtime.NumCPU())
-
 	logHandler := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug})
 	logger = slog.New(logHandler)
 	slog.SetDefault(logger)
+
+	flag.Parse()
+	if *configFlag {
+		logger.Info("generating config")
+		makeConfigAndCerts()
+	}
+
+	runtime.GOMAXPROCS(runtime.NumCPU())
 
 	err := LoadServerConfig("./config.json")
 	if err != nil {
@@ -184,6 +182,14 @@ func main() {
 			}
 			lc.Store(lemonClient)
 			go signal.NewSignal("SUBSCANNER", ctx, cancel, 12*time.Hour, goroutineLogger, scanSubs)
+		}
+
+		if *configFlag {
+			err = initializeNewServer()
+			if err != nil {
+				logger.Error("unable to create admin user", slog.Any("err", err))
+				os.Exit(1)
+			}
 		}
 	}
 
@@ -481,5 +487,58 @@ func makeConfigAndCerts() {
 	if err != nil {
 		panic(err)
 	}
+
+}
+
+func initializeNewServer() error {
+
+	user, err := DB_findUserByEmail("admin")
+	if err != nil {
+		return err
+	}
+	if user != nil {
+		return nil
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte("admin"), 13)
+	if err != nil {
+		return err
+	}
+
+	newUser := new(User)
+	newUser.ID = primitive.NewObjectID()
+	newUser.Password = string(hash)
+	newUser.IsAdmin = true
+	newUser.IsManager = true
+	newUser.AdditionalInformation = ""
+	newUser.Email = "admin"
+	newUser.ResetCode = "admin"
+	newUser.Updated = time.Now()
+	newUser.Trial = false
+	newUser.APIKey = uuid.NewString()
+	newUser.Updated = time.Now()
+	newUser.SubExpiration = time.Now().AddDate(100, 0, 0)
+	newUser.Groups = make([]primitive.ObjectID, 0)
+	newUser.Tokens = make([]*DeviceToken, 0)
+	err = DB_CreateUser(newUser)
+	if err != nil {
+		return err
+	}
+
+	c := Config.Load()
+	keyBytes, err := os.ReadFile(c.CertPem)
+	if err != nil {
+		return err
+	}
+	return DB_CreateServer(&Server{
+		ID:       primitive.NewObjectID(),
+		Tag:      "tunnels",
+		Country:  "X",
+		IP:       c.VPNIP,
+		Port:     c.APIPort,
+		DataPort: c.VPNPort,
+		PubKey:   string(keyBytes),
+		Groups:   []primitive.ObjectID{},
+	})
 
 }

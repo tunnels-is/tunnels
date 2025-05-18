@@ -6,11 +6,13 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 import NewObjectEditorDialog from "./NewObjectEdiorDialog";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { AccessibilityIcon } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 const PrivateServers = () => {
 	const state = GLOBAL_STATE("pservers")
 	const [server, setServer] = useState(undefined)
 	const [editModalOpen, setEditModalOpen] = useState(false)
+	const navigate = useNavigate()
 
 	useEffect(() => {
 		state.GetServers()
@@ -174,7 +176,9 @@ const PrivateServers = () => {
 			console.dir(obj)
 		},
 		columns: {
-			Tag: true,
+			Tag: (obj) => {
+				navigate("/server/" + obj._id)
+			},
 			Country: true,
 			IP: true,
 			Port: true,

@@ -31,9 +31,25 @@ func API_Firewall(w http.ResponseWriter, r *http.Request) {
 	return
 }
 func API_ListDevices(w http.ResponseWriter, r *http.Request) {
-	if !HTTP_validateKey(r) {
-		senderr(w, 401, "Unauthorized")
-		return
+	defer BasicRecover()
+	hasAPIKey := false
+	if HTTP_validateKey(r) {
+		hasAPIKey = true
+	}
+
+	if !hasAPIKey {
+		F := new(FORM_LIST_DEVICE)
+		err := decodeBody(r, F)
+		if err != nil {
+			senderr(w, 400, "Invalid request body", slog.Any("error", err))
+			return
+		}
+
+		_, err = authenticateUserFromEmailOrIDAndToken("", F.UID, F.DeviceToken)
+		if err != nil {
+			senderr(w, 500, err.Error())
+			return
+		}
 	}
 
 	response := new(types.DeviceListResponse)
