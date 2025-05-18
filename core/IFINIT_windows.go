@@ -523,7 +523,7 @@ func (t *TInterface) Connect(tun *TUN) (err error) {
 	// err = DNS_Set(strconv.Itoa(DEFAULT_INTERFACE_ID), "127.0.0.1", "1")
 
 	if tun.ServerReponse.LAN != nil && tun.ServerReponse.LAN.Nat != "" {
-		err = IP_AddRoute(tun.ServerReponse.LAN.Nat, "", t.IPv4Address, "0")
+		err = IP_AddRoute(tun.ServerReponse.LAN.Nat, meta.IFName, t.IPv4Address, "0")
 		if err != nil {
 			return err
 		}
@@ -531,7 +531,7 @@ func (t *TInterface) Connect(tun *TUN) (err error) {
 
 	for _, n := range tun.ServerReponse.Networks {
 		if n.Nat != "" {
-			err = IP_AddRoute(n.Nat, "", t.IPv4Address, "0")
+			err = IP_AddRoute(n.Nat, meta.IFName, t.IPv4Address, "0")
 			if err != nil {
 				return err
 			}
@@ -539,7 +539,7 @@ func (t *TInterface) Connect(tun *TUN) (err error) {
 	}
 
 	for _, v := range tun.ServerReponse.Routes {
-		err = IP_AddRoute(v.Address, "", t.IPv4Address, v.Metric)
+		err = IP_AddRoute(v.Address, meta.IFName, t.IPv4Address, v.Metric)
 		if err != nil {
 			return err
 		}

@@ -72,6 +72,7 @@ func portString(port uint32) string {
 }
 
 func closeAllOpenTCPconnections() (err error) {
+	return nil
 	log.Println("Attempting to close all IPv4 TCP connections. Requires Administrator privileges.")
 
 	var pdwSize uint32
