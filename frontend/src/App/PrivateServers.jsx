@@ -78,14 +78,18 @@ const PrivateServers = () => {
 				})
 		}
 
-		state?.ActiveTunnels?.forEach((x) => {
+		state?.ActiveTunnels?.forEach((x, i) => {
 			if (x.CR?.ServerID === server._id) {
-				con = x
+				con = state?.ActiveTunnels[i]
 				return
 			}
 		})
+		console.log("CON")
+		console.dir(con)
+		let classColor = "text-[#3a994c]"
 
 		if (con) {
+			classColor = "text-[#ef4444]"
 			label = "Disconnect"
 			conButton = function() {
 				state.ConfirmAndExecute(
@@ -106,13 +110,13 @@ const PrivateServers = () => {
 			}
 		}
 
-		// return <Button onClick={() => conButton()}>{label}</Button>
+
 		return <DropdownMenuItem
 			key="connect"
 			onClick={() => conButton()}
-			className="cursor-pointer text-[#3a994c]"
+			className={"cursor-pointer " + classColor}
 		>
-			<AccessibilityIcon className="w-4 h-4 mr-2" /> Connect
+			<AccessibilityIcon className="w-4 h-4 mr-2" /> {label}
 		</DropdownMenuItem >
 	}
 

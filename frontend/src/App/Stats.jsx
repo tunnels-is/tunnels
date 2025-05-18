@@ -32,12 +32,21 @@ const Stats = () => {
     })
     return (
       <Card className="p-5">
-        <CardHeader>
-          <CardTitle>tunnels</CardTitle>
-          <CardDescription>Connected: 12-23-1232</CardDescription>
-        </CardHeader>
+
         <CardContent>
-          <CardTitle className="text-center mb-2">Server</CardTitle>
+          <CardTitle className="text-center mb-2">Tunnel</CardTitle>
+          {renderKeyValue("Tag", tunnel?.Tag)}
+          {renderKeyValue("Interface", tunnel?.IFName)}
+          {renderKeyValue("IP", tunnel?.IPv4Address)}
+          {renderKeyValue("MTU", tunnel?.MTU)}
+          {renderKeyValue("DNS Blocking", tunnel?.DNSBlocking ? "enabled" : "disabled")}
+          {renderKeyValue("DNS Servers", tunnel?.DNSServers?.join(" "))}
+          {renderKeyValue("Encryption", state.GetEncType(tunnel?.EncryptionType))}
+          {renderKeyValue("Curve", state.GetCurveType(tunnel?.CurveType))}
+          {renderKeyValue("Auto Connect", tunnel?.AutoConnect ? "enabled" : "disabled")}
+          {renderKeyValue("Auto Re-Connect", tunnel?.AutoReconnect ? "enabled" : "disabled")}
+
+          <CardTitle className="text-center mb-2 mt-5">Server</CardTitle>
           {renderKeyValue("CPU", String(ac.CPU) + "%")}
           {renderKeyValue("DISK", String(ac.DISK) + "%")}
           {renderKeyValue("MEMORY", String(ac.MEM) + "%")}
@@ -47,7 +56,6 @@ const Stats = () => {
           {renderKeyValue("Upload", ac.Egress)}
 
           <CardTitle className="text-center mb-2 mt-5">Local Network</CardTitle>
-          {renderKeyValue("Tag", ac.LAN?.Tag)}
           {renderKeyValue("Hostname", ac.DHCP?.Hostname)}
           {renderKeyValue("IP", ac.DHCP?.IP?.join("."))}
           {renderKeyValue("Network", ac.LAN?.Network)}
@@ -84,17 +92,15 @@ const Stats = () => {
 
 
         </CardContent>
-        <CardFooter className="mt-6">
-          <Button
-            variant="outline"
-            className={"w-full" + state.Theme?.errorBtn}
-            onClick={() => {
-              state.disconnectFromVPN(tunnel)
-            }}
-          >
-            Disconnect
-          </Button>
-        </CardFooter>
+        <Button
+          variant="outline"
+          className={"mt-5 w-full" + state.Theme?.errorBtn}
+          onClick={() => {
+            state.disconnectFromVPN(ac)
+          }}
+        >
+          Disconnect
+        </Button>
       </Card >
     )
   }

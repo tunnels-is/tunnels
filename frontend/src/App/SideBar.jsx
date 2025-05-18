@@ -13,6 +13,8 @@ import {
   GitHubLogoIcon,
   LockClosedIcon,
   ContainerIcon,
+  MixerHorizontalIcon,
+  DesktopIcon,
 } from "@radix-ui/react-icons";
 import { cn } from "@/lib/utils";
 import GLOBAL_STATE from "../state";
@@ -84,15 +86,15 @@ const SideBar = () => {
         items: [
           { icon: LockClosedIcon, label: "VPN", route: "servers", user: true, },
           { icon: ContainerIcon, label: "DNS", route: "dns", user: false },
-          { icon: ContainerIcon, label: "Stats", route: "stats", user: false },
+          { icon: MixerHorizontalIcon, label: "Connections", route: "connections", user: false },
         ],
       },
       {
         title: "Admin",
         isManager: true,
         items: [
-          { icon: HomeIcon, label: "Users", route: "users", user: true, shouldRender: isManager },
-          { icon: HomeIcon, label: "Devices", route: "devices", user: true, shouldRender: isManager },
+          { icon: PersonIcon, label: "Users", route: "users", user: true, shouldRender: isManager },
+          { icon: DesktopIcon, label: "Devices", route: "devices", user: true, shouldRender: isManager },
           { icon: HomeIcon, label: "Groups", route: "groups", user: true, shouldRender: isManager },
         ],
       },
