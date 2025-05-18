@@ -220,6 +220,11 @@ type FORM_LIST_USERS struct {
 	Offset      int                `json:"Offset"`
 }
 
+type FORM_CONNECTED_DEVICES struct {
+	DeviceToken string             `json:"DeviceToken"`
+	UID         primitive.ObjectID `json:"UID"`
+}
+
 type FORM_LIST_DEVICE struct {
 	DeviceToken string             `json:"DeviceToken"`
 	UID         primitive.ObjectID `json:"UID"`

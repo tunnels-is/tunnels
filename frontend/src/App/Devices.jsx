@@ -6,15 +6,25 @@ import GenericTable from "./GenericTable";
 
 const Devices = () => {
 	const [devices, setDevices] = useState([])
-	const state = GLOBAL_STATE("groups")
+	const state = GLOBAL_STATE("devices")
 	const [device, setDevice] = useState(undefined)
+	const [connectedDevices, setConnectedDevices] = useState([])
 	const [editModalOpen, setEditModalOpen] = useState(false)
 
 	const getDevices = async (offset, limit) => {
 		let resp = await state.callController(null, null, "POST", "/v3/device/list", { Offset: offset, Limit: limit }, false, false)
 		if (resp.status === 200) {
 			setDevices(resp.data)
-			state.renderPage("groups")
+			state.renderPage("devices")
+		}
+	}
+	const getConnectedDevices = async () => {
+		let resp = await state.callController(null, null, "POST", "/v3/devices", {}, false, false)
+		if (resp.status === 200) {
+			setConnectedDevices(resp.data)
+			console.log("LKSDJFLKSJDLKDLKFJSDF")
+			console.dir(resp.data)
+			state.renderPage("devices")
 		}
 	}
 	const deleteDevice = async (id) => {
@@ -22,25 +32,28 @@ const Devices = () => {
 		if (ok === true) {
 			let d = devices.filter((d) => d._id !== id)
 			setDevices([...d])
-			state.renderPage("groups")
+			state.renderPage("devices")
 		}
 	}
 
 	const saveDevice = async () => {
 		let resp = undefined
+		let ok = false
 		if (device._id !== undefined) {
 			resp = await state.callController(null, null, "POST", "/v3/device/update", { Device: device }, false, false)
 			if (resp.status === 200) {
-				state.renderPage("groups")
+				ok = true
 			}
 		} else {
 			resp = await state.callController(null, null, "POST", "/v3/device/create", { Device: device }, false, false)
 			if (resp.status === 200) {
-				setDevice(resp.data)
-				state.renderPage("groups")
+				ok = true
+				devices.push(resp.data)
+				setDevices([...devices])
 			}
 		}
 
+		return ok
 	}
 
 	const newDevice = () => {
@@ -50,6 +63,7 @@ const Devices = () => {
 
 	useEffect(() => {
 		getDevices(0, 100)
+		getConnectedDevices()
 	}, [])
 
 	let table = {
@@ -63,7 +77,7 @@ const Devices = () => {
 			_id: true,
 			CreatedAt: true,
 		},
-		columFormat: {
+		columnFormat: {
 			CreatedAt: (obj) => {
 				return dayjs(obj.CreatedAt).format("HH:mm:ss DD-MM-YYYY")
 			}
@@ -100,13 +114,16 @@ const Devices = () => {
 				title="Device"
 				description=""
 				readOnly={false}
-				saveButton={() => {
+				saveButton={async () => {
 					console.log("save")
-					saveDevice()
+					let ok = await saveDevice()
+					if (ok === true) {
+						setEditModalOpen(false)
+						state.renderPage("devices")
+					}
 				}}
 				onChange={(key, value, type) => {
 					device[key] = value
-					console.log(key, value, type)
 				}}
 			/>
 

@@ -82,6 +82,7 @@ func createTunnel() (T *TunnelMETA) {
 	T.DNSServers = make([]string, 0)
 	T.DNSRecords = make([]*types.DNSRecord, 0)
 	T.WindowsGUID = CreateConnectionUUID()
+	T.Routes = make([]*types.Route, 0)
 	return
 }
 
