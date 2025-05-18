@@ -624,7 +624,7 @@ const Login = (props) => {
             <SelectValue placeholder="Select Auth Server" />
           </SelectTrigger>
           <SelectContent>
-            {state.Config?.AuthServers.map(c => {
+            {state.Config?.AuthServers?.map(c => {
               return (
                 <SelectItem value={c}>{c}</SelectItem>
               )
