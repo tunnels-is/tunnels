@@ -24,7 +24,7 @@ const useForm = () => {
   const [mode, setMode] = useState(1);
   const [remember, setRememeber] = useState(false);
   const state = GLOBAL_STATE("login");
-  const [authServer, setAuthServer] = useState(state.Config?.AuthServers[0])
+  const [authServer, setAuthServer] = useState(state.Config?.AuthServers?.length > 0 ? state.Config?.AuthServers[0] : "https://api.tunnels.is")
   const [secure, setSecure] = useState(true)
   const navigate = useNavigate()
 
