@@ -65,7 +65,32 @@ export var STATE = {
   },
 
   // new form
-  obj: { id: "lksdfsld", intstuff: 1, Tag: "lksdfls", bll: true, x: {}, x2: [] },
+  GetCurveType: (int) => {
+    console.log("CT:", int)
+    switch (String(int)) {
+      case "0":
+        return "P521"
+      case "1":
+        return "X25519"
+      default:
+        return "unknown"
+    }
+  },
+  GetEncType: (int) => {
+    console.log("CT:", int)
+    switch (String(int)) {
+      case "0":
+        return "None"
+      case "1":
+        return "AES128"
+      case "2":
+        return "AES256"
+      case "3":
+        return "CHACHA20"
+      default:
+        return "unknown"
+    }
+  },
 
   GetServers: async () => {
     let resp = await STATE.callController(null, null, "POST", "/v3/servers", { StartIndex: 0 }, false, false)
