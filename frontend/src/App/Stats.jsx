@@ -34,7 +34,7 @@ const Stats = () => {
       <Card className="p-5">
 
         <CardContent>
-          <CardTitle className="text-center mb-2">Tunnel</CardTitle>
+          <CardTitle className="text-center mb-2">Tunnel Interface</CardTitle>
           {renderKeyValue("Tag", tunnel?.Tag)}
           {renderKeyValue("Interface", tunnel?.IFName)}
           {renderKeyValue("IP", tunnel?.IPv4Address)}
@@ -45,15 +45,15 @@ const Stats = () => {
           {renderKeyValue("Curve", state.GetCurveType(tunnel?.CurveType))}
           {renderKeyValue("Auto Connect", tunnel?.AutoConnect ? "enabled" : "disabled")}
           {renderKeyValue("Auto Re-Connect", tunnel?.AutoReconnect ? "enabled" : "disabled")}
+          {renderKeyValue("Download", ac.Ingress)}
+          {renderKeyValue("Upload", ac.Egress)}
 
-          <CardTitle className="text-center mb-2 mt-5">Server</CardTitle>
+          <CardTitle className="text-center mb-2 mt-5">VPN Server</CardTitle>
           {renderKeyValue("CPU", String(ac.CPU) + "%")}
           {renderKeyValue("DISK", String(ac.DISK) + "%")}
           {renderKeyValue("MEMORY", String(ac.MEM) + "%")}
           {renderKeyValue("Ping", String(Math.floor(ac.MS / 1000)) + "ms")}
           {renderKeyValue("Ping Time", dayjs(ac.Ping).format("HH:mm:ss DD-MM-YYYY"))}
-          {renderKeyValue("Download", ac.Ingress)}
-          {renderKeyValue("Upload", ac.Egress)}
 
           <CardTitle className="text-center mb-2 mt-5">Local Network</CardTitle>
           {renderKeyValue("Hostname", ac.DHCP?.Hostname)}
@@ -89,6 +89,18 @@ const Stats = () => {
               <div className="">{r.Metric}</div>
             </div>
           })}
+
+          {ac.CRResponse?.DNSRecords?.length > 0 &&
+            <>
+              <CardTitle className="text-center mb-2 mt-5">Domains</CardTitle>
+              {ac.CRResponse?.DNSRecords?.map(r => {
+                return <div className="flex flex-row gap-1">
+                  <div className="">{r.Wildcard ? "*." : ""}{r.Domain}</div>
+                </div>
+              })}
+            </>
+          }
+
 
 
         </CardContent>
