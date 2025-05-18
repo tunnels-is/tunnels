@@ -33,6 +33,8 @@ import Devices from "./App/Devices";
 import NewObjectEditor from "./App/NewObjectEdior";
 import Tunnels from "./App/Tunnels";
 import Logs from "./App/Logs";
+import Stats from "./App/Stats";
+import ServerDevices from "./App/ServerDevices";
 
 // Use this to automatically turn on debug
 STORE.Cache.Set("debug", true);
@@ -85,10 +87,12 @@ const LaunchApp = () => {
                 <Route path="groups" element={<Groups />} />
                 <Route path="users" element={<Users />} />
                 <Route path="devices" element={<Devices />} />
+                <Route path="server/:id" element={<ServerDevices />} />
 
                 <Route path="inspect/group/:id" element={<InspectGroup />} />
 
                 <Route path="tunnels" element={<Tunnels />} />
+                <Route path="Stats" element={<Stats />} />
                 <Route path="logs" element={<Logs />} />
                 <Route
                   path="inspect/connection/:id"

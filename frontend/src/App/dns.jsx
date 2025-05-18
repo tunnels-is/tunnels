@@ -1,14 +1,6 @@
 import React, { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -23,7 +15,9 @@ import STORE from "../store";
 import { Switch } from "@/components/ui/switch";
 import GenericTable from "./GenericTable";
 import { TableCell } from "@/components/ui/table";
-import ConfigDNSRecordEditor from "./component/ConfigDNSRecordEditor";
+import { useState } from "react";
+import NewObjectEditorDialog from "./NewObjectEdiorDialog";
+import { Badge } from "@/components/ui/badge";
 
 const DNSSort = (a, b) => {
   if (dayjs(a.LastSeen).unix() < dayjs(b.LastSeen).unix()) {
@@ -37,6 +31,11 @@ const DNSSort = (a, b) => {
 const DNS = () => {
   const state = GLOBAL_STATE("dns");
   const navigate = useNavigate();
+  const [record, setRecord] = useState(undefined)
+  const [recordModal, setRecordModal] = useState(false)
+  const [isRecordEdit, setIsRecordEdit] = useState(false)
+
+
   let LogBlockedDomains = state.getKey("Config", "LogBlockedDomains");
   let LogAllDomains = state.getKey("Config", "LogAllDomains");
   let dnsStats = state.getKey("Config", "DNSstats");
@@ -67,6 +66,89 @@ const DNS = () => {
     blockLists = [];
   }
 
+  const addRecord = () => {
+    if (!state.Config.DNSRecords) {
+      state.Config.DNSRecords = [];
+    }
+    state.Config.DNSRecords.push({
+      Domain: "domain.local",
+      IP: [""],
+      TXT: [""],
+      Wildcard: true,
+    });
+  };
+
+  const generateDNSRecordsTable = () => {
+
+    return {
+      data: state.Config?.DNSRecords,
+      columns: {
+        Domain: true,
+      },
+      headerFormat: {
+        TXT: () => {
+          return "Text"
+        }
+      },
+      columnFormat: {
+        // IP: (obj) => {
+        //   return obj.IP.join(" | ")
+        // },
+        // TXT: (obj) => {
+        //   return obj.TXT.join(" | ")
+        // },
+      },
+      customColumns: {
+        IP: (obj) => {
+          return <TableCell className={""}>
+            <div className="flex flex-col">
+              {obj.IP?.map(ip => {
+                return <Badge className={"mt-1 size-fit" + state.Theme?.badgeNeutral} > {ip}</Badge>
+              })}
+            </div>
+          </TableCell >
+        },
+        TXT: (obj) => {
+          return <TableCell className={""}>
+            <div className="flex flex-col">
+              {obj.TXT?.map((txt) => {
+                return <Badge className={"mt-1 size-fit" + state.Theme?.badgeNeutral} > {txt}</Badge>
+              })}
+            </div>
+          </TableCell >
+        },
+        WildCard: (obj) => {
+          return <TableCell className={""}>
+            {(obj.Wildcard === true) &&
+              <Badge className={"mt-1 size-fit" + state.Theme?.badgeSuccess} > yes</Badge>
+            }
+            {(obj.Wildcard === false) &&
+              <Badge className={"mt-1 size-fit" + state.Theme?.badgeWarning} > no</Badge>
+            }
+          </TableCell >
+        }
+      },
+      columnClass: {},
+      Btn: {
+        Edit: (obj) => {
+          setIsRecordEdit(true)
+          setRecord(obj)
+          setRecordModal(true)
+        },
+        Delete: (obj) => {
+          state.Config.DNSRecords = state.Config.DNSRecords.filter((r) => r.Domain !== obj.Domain)
+          state.v2_ConfigSave();
+        },
+        New: () => {
+          setRecord({ Domain: "yourdomain.com", IP: ["127.0.0.1"], TXT: ["yourdomain.com text record"], Wildcard: true })
+          setRecordModal(true)
+        }
+      },
+      headers: ["Domain", "IP", "Text", "Wildcard"],
+      headerClass: {},
+    }
+
+  }
 
   const generateBlocksTable = () => {
     let dnsBlocks = state.DNSStats ? state.DNSStats : [];
@@ -169,16 +251,11 @@ const DNS = () => {
 
   };
 
-
   const EnableColumn = (obj) => {
-    if (obj.Enabled) {
-      return <TableCell onClick={() => state.toggleBlocklist(obj)} className={"w-[10px] text-sky-100"}  >
-        <Button>Disable</Button>
-      </TableCell>
-    }
-    return <TableCell onClick={() => state.toggleBlocklist(obj)} className={"w-[10px] text-sky-100"}  >
-      <Button>Enable</Button>
-    </TableCell>
+    return <TableCell className={"w-[10px] text-sky-100"}  >
+      <Switch checked={obj.Enabled} onCheckedChange={() => state.toggleBlocklist(obj)} />
+    </TableCell >
+
   }
 
   let bltable = {
@@ -204,7 +281,7 @@ const DNS = () => {
       },
       New: () => { },
     },
-    headers: ["Enabled", "Tag", "Count"],
+    headers: ["Tag", "Domain Count", "Enabled"],
     headerClass: {},
     opts: {
       RowPerPage: 50,
@@ -371,7 +448,31 @@ const DNS = () => {
           <GenericTable table={generateResolvesTable()} />
         </TabsContent>
         <TabsContent value="records">
-          <ConfigDNSRecordEditor />
+          <GenericTable table={generateDNSRecordsTable()} />
+          <NewObjectEditorDialog
+            open={recordModal}
+            onOpenChange={setRecordModal}
+            object={record}
+            title="DNS Record"
+            description=""
+            readOnly={false}
+            saveButton={async (obj) => {
+              if (!isRecordEdit) {
+                state.Config.DNSRecords.push(obj)
+              }
+              let ok = await state.v2_ConfigSave();
+              if (ok === true) {
+                setRecordModal(false)
+                setIsRecordEdit(false)
+              }
+            }}
+            onChange={(key, value, type) => {
+              record[key] = value;
+            }}
+            onArrayChange={(key, value, index) => {
+              record[key][index] = value;
+            }}
+          />
         </TabsContent>
       </Tabs>
     </div>

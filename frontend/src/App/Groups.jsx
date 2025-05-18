@@ -32,7 +32,7 @@ import NewObjectEditorDialog from "./NewObjectEdiorDialog";
 
 
 const Groups = () => {
-  const state = GLOBAL_STATE("dns");
+  const state = GLOBAL_STATE("groups");
   const [groups, setGroups] = useState([])
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [group, setGroup] = useState(undefined)
@@ -53,6 +53,7 @@ const Groups = () => {
 
   const saveGroup = async () => {
     let resp = undefined
+    let ok = false
     if (group._id !== undefined) {
       resp = await state.callController(null, null, "POST", "/v3/group/update", { Group: group }, false, false)
     } else {
@@ -60,21 +61,22 @@ const Groups = () => {
     }
 
     if (resp.status === 200) {
-      groups.forEach((g, i) => {
-        if (g._id === group._id) {
-          groups[i] = g
-        }
-      })
-      setGroups([...groups])
+      ok = true
+      if (group._id === undefined) {
+        groups.push(resp.data)
+        setGroups([...groups])
+      }
     } else {
       state.toggleError("unable to create group")
     }
-    state.renderPage("dns");
+    state.renderPage("groups");
+    return ok
   }
 
   const newGroup = () => {
-    groups.push({ Tag: "my-new-group", Description: "This is a new group" })
-    state.renderPage("dns");
+    setGroup({ Tag: "my-new-group", Description: "This is a new group" })
+    setEditModalOpen(true)
+    state.renderPage("groups");
   }
 
   const deleteGroup = async (id) => {
@@ -133,12 +135,14 @@ const Groups = () => {
         title="Group"
         description=""
         readOnly={false}
-        saveButton={() => {
-          saveGroup()
+        saveButton={async () => {
+          let ok = await saveGroup()
+          if (ok === true) {
+            setEditModalOpen(false)
+          }
         }}
         onChange={(key, value, type) => {
           group[key] = value
-          console.log(key, value, type)
         }}
       />
     </div >

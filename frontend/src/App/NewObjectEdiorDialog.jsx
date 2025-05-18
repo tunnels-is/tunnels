@@ -19,21 +19,22 @@ const NewObjectEditorDialog = ({
   onOpenChange,
   object,
   onChange,
+  onArrayChange,
   saveButton,
-  title = "Edit Object",
-  description = "View or edit object details",
   readOnly = false
 }) => {
   const state = GLOBAL_STATE("editor-dialog");
-  const dynamicDescription = object?.Tag
-    ? `${description} ${object.Tag}`
-    : description;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className={"sm:max-w-[800px] text-white" + state.Theme?.menuBG + state.Theme?.borderColor} >
         <DialogHeader>
-          <DialogTitle className="text-lg font-bold text-white">{dynamicDescription}</DialogTitle>
+          {object?.Tag &&
+            <DialogTitle className="text-lg font-bold text-white">{object?.Tag}</DialogTitle>
+          }
+          {object?._id &&
+            <DialogTitle className="text-lg font-bold text-white">id: {object?._id}</DialogTitle>
+          }
         </DialogHeader>
 
         {object && (
@@ -41,6 +42,7 @@ const NewObjectEditorDialog = ({
             <NewObjectEditor
               obj={object}
               onChange={onChange}
+              onArrayChange={onArrayChange}
             />
           </div>
         )}

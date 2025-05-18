@@ -27,6 +27,7 @@ import { ArrowLeft, ArrowRight, Plus, BadgePlus } from "lucide-react";
 import { PlusIcon } from "lucide-react";
 
 import GLOBAL_STATE from "../state";
+import { Badge } from "@/components/ui/badge";
 
 const GenericTable = (props) => {
   const [offset, setOffset] = useState(0);
@@ -118,6 +119,14 @@ const GenericTable = (props) => {
         let cd = t.data[i][key];
         if (t.columnFormat && t.columnFormat[key]) {
           cd = t.columnFormat[key](t.data[i]);
+        }
+        if (key === "Tag") {
+          return (
+            <TableCell className={dc} onClick={() => click(t.data[i])}>
+              <Badge className={"cursor-pointer" + state.Theme?.badgeNeutral}> {cd}</Badge>
+            </TableCell>
+          );
+
         }
         return (
           <TableCell className={dc} onClick={() => click(t.data[i])}>

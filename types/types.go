@@ -128,7 +128,7 @@ type ServerConnectResponse struct {
 	AvailableMbps            int `json:"AvailableMbps"`
 	AvailableUserMbps        int `json:"AvailableUserMbps"`
 
-	InternetAccess     bool `json:"InternetAccess,required"`
+	InternetAccess     bool `json:"InternetAccess"`
 	LocalNetworkAccess bool `json:"LocalNetworkAccess"`
 
 	InterfaceIP string `json:"InterfaceIP"`

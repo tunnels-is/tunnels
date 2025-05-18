@@ -143,7 +143,8 @@ func SendRequestToURL(tc *tls.Config, method string, url string, data any, timeo
 	} else {
 		client.Transport = &http.Transport{
 			TLSClientConfig: &tls.Config{
-				MinVersion:         tls.VersionTLS12,
+				MinVersion:         tls.VersionTLS13,
+				CurvePreferences:   []tls.CurveID{tls.X25519MLKEM768},
 				InsecureSkipVerify: !skipVerify,
 			},
 		}
@@ -672,7 +673,6 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		tc,
 		"POST",
 		"https://"+ClientCR.ServerIP+":"+ClientCR.ServerPort+"/v3/connect",
-		// "https://server.tunnels.is/connect",
 		SignedResponse,
 		10000,
 		ClientCR.Secure,
@@ -715,6 +715,10 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	if err != nil {
 		return 500, errors.New("Unable to create encryption wrapper seal")
 	}
+
+	// clear out handshake data
+	ServerReponse.ServerHandshake = nil
+	ServerReponse.ServerHandshakeSignature = nil
 
 	DEBUG("ConnectionRequestResponse:", ServerReponse)
 	tunnel.ServerReponse = ServerReponse
@@ -790,19 +794,26 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	go inter.ReadFromTunnelInterface()
 
 	if tunnel.ServerReponse.DHCP != nil {
-		err = sendFirewallToServer(
-			tunnel.CR.ServerIP,
-			tunnel.dhcp.Token,
-			net.IP(tunnel.dhcp.IP[:]).String(),
-			meta.AllowedHosts,
-			meta.DisableFirewall,
-			"TODO",
-			// meta.ServerCert,
+		FR := &FirewallRequest{
+			DHCPToken:       tunnel.dhcp.Token,
+			IP:              net.IP(tunnel.dhcp.IP[:]).String(),
+			Hosts:           meta.AllowedHosts,
+			DisableFirewall: meta.DisableFirewall,
+		}
+		_, code, err := SendRequestToURL(
+			tc,
+			"POST",
+			"https://"+ClientCR.ServerIP+":"+ClientCR.ServerPort+"/v3/firewall",
+			FR,
+			10000,
+			ClientCR.Secure,
 		)
 		if err != nil {
 			ERROR("unable to update firewall: ", err)
+		} else if code != 200 {
+			ERROR("unable to update firewall: ", code)
 		} else {
-			DEBUG("firewall update on server")
+			DEBUG("firewall updated")
 		}
 	}
 

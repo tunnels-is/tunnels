@@ -80,10 +80,11 @@ const SideBar = () => {
       },
       {
         title: "Tunnels",
-        user: true,
+        user: false,
         items: [
           { icon: LockClosedIcon, label: "VPN", route: "servers", user: true, },
           { icon: ContainerIcon, label: "DNS", route: "dns", user: false },
+          { icon: ContainerIcon, label: "Stats", route: "stats", user: false },
         ],
       },
       {
@@ -92,7 +93,8 @@ const SideBar = () => {
         items: [
           { icon: HomeIcon, label: "Users", route: "users", user: true, shouldRender: isManager },
           { icon: HomeIcon, label: "Devices", route: "devices", user: true, shouldRender: isManager },
-          { icon: HomeIcon, label: "Groups", route: "groups", user: true, shouldRender: isManager },],
+          { icon: HomeIcon, label: "Groups", route: "groups", user: true, shouldRender: isManager },
+        ],
       },
       {
         title: "Settings",
