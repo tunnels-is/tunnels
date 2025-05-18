@@ -92,7 +92,7 @@ const LaunchApp = () => {
                 <Route path="inspect/group/:id" element={<InspectGroup />} />
 
                 <Route path="tunnels" element={<Tunnels />} />
-                <Route path="Stats" element={<Stats />} />
+                <Route path="connections" element={<Stats />} />
                 <Route path="logs" element={<Logs />} />
                 <Route
                   path="inspect/connection/:id"
