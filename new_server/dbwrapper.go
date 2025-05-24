@@ -31,7 +31,7 @@ const (
 )
 
 var DB *mongo.Client
-var bboltEnabled bool // Global switch for bbolt
+var bboltEnabled bool = true // Global switch for bbolt
 
 func ConnectToDB(connectionString string) (err error) {
 	defer BasicRecover()

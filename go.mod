@@ -13,11 +13,10 @@ require (
 	github.com/songgao/water v0.0.0-20200317203138-2b4b6d7c09d8
 	github.com/vishvananda/netlink v1.3.0
 	github.com/xlzd/gotp v0.1.0
-	github.com/zveinn/crypt v0.0.4
+	go.etcd.io/bbolt v1.4.0
 	go.mongodb.org/mongo-driver v1.17.1
 	golang.org/x/crypto v0.36.0
 	golang.org/x/net v0.38.0
-	golang.org/x/oauth2 v0.29.0
 	golang.org/x/sys v0.31.0
 	golang.org/x/term v0.30.0
 	kernel.org/pub/linux/libs/security/libcap/cap v1.2.70
