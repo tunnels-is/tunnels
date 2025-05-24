@@ -109,7 +109,7 @@ func PingConnections() {
 				_, _ = PublicConnect(tun.CR)
 			} else {
 				DEBUG("30+ Seconds since ping from ", meta.Tag)
-				// _ = Disconnect(tun.ID, true)
+				_ = Disconnect(tun.ID, false)
 			}
 		}
 

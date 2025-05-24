@@ -216,8 +216,8 @@ const GenericTable = (props) => {
   };
 
   return (
-    <div className="flex flex-col gap-5">
-      <div className="flex flex-col md:flex-row justify-start items-center  ">
+    <div className={"flex flex-col gap-5 " + (props.className ? props.className : "")} >
+      <div className="flex flex-col md:flex-row justify-start items-center ">
 
         {t.more && (
           <div className="flex gap-2">
