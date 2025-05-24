@@ -508,6 +508,9 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	tunnel := new(TUN)
 	tunnel.meta.Store(meta)
 	tunnel.CR = ClientCR
+	if !strings.HasPrefix(ClientCR.URL, "https://") {
+		ClientCR.URL = "https://" + ClientCR.URL
+	}
 
 	if ClientCR.ServerIP == "" {
 		server, err := getServerByID(
@@ -563,10 +566,6 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	FinalCR.DHCPToken = meta.DHCPToken
 	FinalCR.RequestingPorts = meta.RequestVPNPorts
 	DEBUG("ConnectRequestFromClient", ClientCR)
-
-	if !strings.HasPrefix("https://", ClientCR.URL) {
-		ClientCR.URL = "https://" + ClientCR.URL
-	}
 
 	bytesFromController, code, err := SendRequestToURL(
 		nil,

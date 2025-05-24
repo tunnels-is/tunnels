@@ -7,6 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"slices"
+
 	"github.com/tunnels-is/tunnels/types"
 	gobolt "go.etcd.io/bbolt"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -69,7 +71,7 @@ func BBolt_UpdateDevice(D *types.Device) error {
 
 // Get devices with limit/offset (inefficient scan)
 func BBolt_GetDevices(limit, offset int64) ([]*types.Device, error) {
-	var DL []*types.Device
+	DL := make([]*types.Device, 0)
 	err := BBoltDB.View(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(DEVICES_BUCKET))
 		c := b.Cursor()
@@ -97,7 +99,7 @@ func BBolt_GetDevices(limit, offset int64) ([]*types.Device, error) {
 
 // Get users with limit/offset
 func BBolt_getUsers(limit, offset int64) ([]*User, error) {
-	var UL []*User
+	UL := make([]*User, 0)
 	err := BBoltDB.View(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(USERS_BUCKET))
 		c := b.Cursor()
@@ -339,7 +341,7 @@ func BBolt_userUpdateResetCode(user *User) error {
 
 // Find servers without groups
 func BBolt_FindServersWithoutGroups(limit, offset int64) ([]*types.Server, error) {
-	var DL []*types.Server
+	DL := make([]*types.Server, 0)
 	err := BBoltDB.View(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(SERVERS_BUCKET))
 		c := b.Cursor()
@@ -366,7 +368,7 @@ func BBolt_FindServersWithoutGroups(limit, offset int64) ([]*types.Server, error
 
 // Find servers by group IDs
 func BBolt_FindServersByGroups(groups []string, limit, offset int64) ([]*types.Server, error) {
-	var DL []*types.Server
+	DL := make([]*types.Server, 0)
 	groupSet := make(map[string]struct{})
 	for _, g := range groups {
 		groupSet[g] = struct{}{}
@@ -400,7 +402,7 @@ func BBolt_FindServersByGroups(groups []string, limit, offset int64) ([]*types.S
 
 // Find entities by group ID and type
 func BBolt_FindEntitiesByGroupID(id string, objType string, limit, offset int64) ([]any, error) {
-	var IL []any
+	IL := make([]any, 0)
 	bucket := ""
 	switch objType {
 	case "user":
@@ -422,11 +424,8 @@ func BBolt_FindEntitiesByGroupID(id string, objType string, limit, offset int64)
 			case "server":
 				E := new(types.Server)
 				if err := bboltUnmarshal(v, E); err == nil {
-					for _, gid := range objectIDSliceToString(E.Groups) {
-						if gid == id {
-							match = true
-							break
-						}
+					if slices.Contains(objectIDSliceToString(E.Groups), id) {
+						match = true
 					}
 					if match {
 						if skipped < offset {
@@ -442,11 +441,8 @@ func BBolt_FindEntitiesByGroupID(id string, objType string, limit, offset int64)
 			case "user":
 				E := new(User)
 				if err := bboltUnmarshal(v, E); err == nil {
-					for _, gid := range objectIDSliceToString(E.Groups) {
-						if gid == id {
-							match = true
-							break
-						}
+					if slices.Contains(objectIDSliceToString(E.Groups), id) {
+						match = true
 					}
 					if match {
 						if skipped < offset {
@@ -462,11 +458,8 @@ func BBolt_FindEntitiesByGroupID(id string, objType string, limit, offset int64)
 			case "device":
 				E := new(types.Device)
 				if err := bboltUnmarshal(v, E); err == nil {
-					for _, gid := range objectIDSliceToString(E.Groups) {
-						if gid == id {
-							match = true
-							break
-						}
+					if slices.Contains(objectIDSliceToString(E.Groups), id) {
+						match = true
 					}
 					if match {
 						if skipped < offset {
@@ -791,7 +784,7 @@ func BBolt_RemoveFromGroup(groupID, typeID, objType string) error {
 
 // Find all groups
 func BBolt_findGroups() ([]*Group, error) {
-	var gl []*Group
+	gl := make([]*Group, 0)
 	err := BBoltDB.View(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(GROUPS_BUCKET))
 		c := b.Cursor()
@@ -808,12 +801,7 @@ func BBolt_findGroups() ([]*Group, error) {
 
 // Helper functions
 func contains(slice []string, s string) bool {
-	for _, v := range slice {
-		if v == s {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(slice, s)
 }
 
 func removeString(slice []string, s string) []string {

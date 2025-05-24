@@ -22,8 +22,6 @@ const Devices = () => {
 		let resp = await state.callController(null, null, "POST", "/v3/devices", {}, false, false)
 		if (resp.status === 200) {
 			setConnectedDevices(resp.data)
-			console.log("LKSDJFLKSJDLKDLKFJSDF")
-			console.dir(resp.data)
 			state.renderPage("devices")
 		}
 	}
