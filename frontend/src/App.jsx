@@ -56,7 +56,7 @@ const LaunchApp = () => {
       {createPortal(
         <Toaster
           toastOptions={{
-            className: "toast !text-white border p-6 border-white rounded" + state.Theme?.menuBG,
+            className: "toast border-[2px] p-6 " + state.Theme?.toast,
             position: "top-right",
             success: {
               duration: 2000,
@@ -89,7 +89,7 @@ const LaunchApp = () => {
                 <Route path="devices" element={<Devices />} />
                 <Route path="server/:id" element={<ServerDevices />} />
 
-                <Route path="inspect/group/:id" element={<InspectGroup />} />
+                <Route path="groups/:id" element={<InspectGroup />} />
 
                 <Route path="tunnels" element={<Tunnels />} />
                 <Route path="connections" element={<Stats />} />

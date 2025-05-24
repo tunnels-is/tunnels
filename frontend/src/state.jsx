@@ -62,6 +62,7 @@ export var STATE = {
     badgeSuccess: " bg-emerald-500 hove:bg-white hover:text-black text-white ",
     badgeWarning: " bg-orange-500 hove:bg-white hover:text-black text-white ",
     badgeError: " bg-red-500 hove:bg-white hover:text-black text-white ",
+    toast: " !text-white bg-[#0B0E14] border-[#1a1f2d]"
   },
 
   // new form

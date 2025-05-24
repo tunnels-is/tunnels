@@ -456,5 +456,6 @@ type Device struct {
 	ID        primitive.ObjectID   `json:"_id" bson:"_id"`
 	CreatedAt time.Time            `json:"CreatedAt" bson:"CreatedAt"`
 	Tag       string               `json:"Tag" bson:"Tag"`
+	Hostname  string               `json:"Hostname" bson:"Hostname"`
 	Groups    []primitive.ObjectID `json:"Groups" bson:"Groups"`
 }
