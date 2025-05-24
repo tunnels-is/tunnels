@@ -31,7 +31,7 @@ const Users = () => {
 		columns: {
 			Email: true,
 			_id: (obj) => {
-				alert(obj._id)
+				// alert(obj._id)
 			},
 			Updated: true,
 

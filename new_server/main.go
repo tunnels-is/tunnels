@@ -168,9 +168,18 @@ func main() {
 	Cancel.Store(&cancel)
 
 	if AUTHEnabled {
-		err = ConnectToDB(loadSecret("DBurl"))
-		if err != nil {
-			os.Exit(1)
+		if bboltEnabled {
+			err = ConnectToBBoltDB("tunnels.db")
+			if err != nil {
+				fmt.Println(err)
+				os.Exit(1)
+			}
+
+		} else {
+			err = ConnectToDB(loadSecret("DBurl"))
+			if err != nil {
+				os.Exit(1)
+			}
 		}
 
 		// Tunnels public network specific
