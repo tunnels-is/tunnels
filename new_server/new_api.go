@@ -41,6 +41,8 @@ func launchAPIServer() {
 		mux.HandleFunc("/v3/user/reset/password", API_UserResetPassword)
 		mux.HandleFunc("/v3/user/2fa/confirm", API_UserTwoFactorConfirm)
 
+		// Device Initialization
+
 		// ADMIN
 		mux.HandleFunc("/v3/user/list", API_UserList)
 
@@ -48,6 +50,7 @@ func launchAPIServer() {
 		mux.HandleFunc("/v3/device/create", API_DeviceCreate) // supports APIKey
 		mux.HandleFunc("/v3/device/delete", API_DeviceDelete)
 		mux.HandleFunc("/v3/device/update", API_DeviceUpdate)
+		mux.HandleFunc("/v3/device", API_DeviceGet)
 
 		mux.HandleFunc("/v3/group/create", API_GroupCreate)
 		mux.HandleFunc("/v3/group/delete", API_GroupDelete)
@@ -58,6 +61,7 @@ func launchAPIServer() {
 		mux.HandleFunc("/v3/group", API_GroupGet)
 		mux.HandleFunc("/v3/group/entities", API_GroupGetEntities)
 
+		mux.HandleFunc("/v3/server", API_ServerGet)
 		mux.HandleFunc("/v3/server/create", API_ServerCreate)
 		mux.HandleFunc("/v3/server/update", API_ServerUpdate)
 		mux.HandleFunc("/v3/servers", API_ServersForUser)

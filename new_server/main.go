@@ -530,7 +530,7 @@ func initializeNewServer() error {
 	if err != nil {
 		return err
 	}
-	return DB_CreateServer(&Server{
+	return DB_CreateServer(&types.Server{
 		ID:       primitive.NewObjectID(),
 		Tag:      "tunnels",
 		Country:  "X",

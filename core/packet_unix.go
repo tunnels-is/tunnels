@@ -3,7 +3,6 @@
 package core
 
 import (
-	"fmt"
 	"runtime/debug"
 	"time"
 )
@@ -45,8 +44,6 @@ func (T *TInterface) ReadFromTunnelInterface() {
 			DEEP("tun/tap read size was 0")
 			continue
 		}
-		fmt.Println("from user")
-		fmt.Println(packetLength)
 
 		Tun = *T.tunnel.Load()
 		if Tun == nil {
@@ -116,8 +113,6 @@ func (tun *TUN) ReadFromServeTunnel() {
 			ERROR("Packet authentication error: ", err)
 			return
 		}
-		fmt.Println("from user")
-		fmt.Println(packet)
 
 		tun.ingressBytes.Add(int64(n))
 

@@ -39,12 +39,12 @@ type ConnectionRequest struct {
 	DeviceToken string `json:"DeviceToken"`
 	UserID      string `json:"UserID"`
 
-	Tag        string          `json:"Tag"`
-	ServerID   string          `json:"ServerID"`
-	ServerIP   string          `json:"ServerIP"`
-	ServerPort string          `json:"ServerPort"`
-	EncType    crypt.EncType   `json:"EncType"`
-	CurveType  crypt.CurveType `json:"CurveType"`
+	Tag      string `json:"Tag"`
+	ServerID string `json:"ServerID"`
+
+	// Set using API call in PublicConnect
+	ServerIP   string `json:"ServerIP"`
+	ServerPort string `json:"ServerPort"`
 }
 
 type ErrorResponse struct {
@@ -249,13 +249,13 @@ type TunnelMETA struct {
 	// ServerCert string
 
 	// Alternitive authentication
-	deviceKey string
+	// deviceKey string
 
-	// Public   bool
 	ServerID string
+	UserID   string
 
 	// Automatic DNS discovery (user managed)
-	DNSDiscovery string
+	// DNSDiscovery string
 
 	DHCPToken string
 

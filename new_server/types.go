@@ -241,19 +241,19 @@ type FORM_CREATE_GROUP struct {
 type FORM_CREATE_DEVICE struct {
 	DeviceToken string             `json:"DeviceToken"`
 	UID         primitive.ObjectID `json:"UID"`
-	Device      *Device            `json:"Device"`
+	Device      *types.Device      `json:"Device"`
 }
 
 type FORM_UPDATE_SERVER struct {
 	DeviceToken string             `json:"DeviceToken"`
 	UID         primitive.ObjectID `json:"UID"`
-	Server      *Server            `json:"Server"`
+	Server      *types.Server      `json:"Server"`
 }
 
 type FORM_CREATE_SERVER struct {
 	DeviceToken string             `json:"DeviceToken"`
 	UID         primitive.ObjectID `json:"UID"`
-	Server      *Server            `json:"Server"`
+	Server      *types.Server      `json:"Server"`
 }
 
 type FORM_UPDATE_GROUP struct {
@@ -265,7 +265,7 @@ type FORM_UPDATE_GROUP struct {
 type FORM_UPDATE_DEVICE struct {
 	DeviceToken string             `json:"DeviceToken"`
 	UID         primitive.ObjectID `json:"UID"`
-	Device      *Device            `json:"Device"`
+	Device      *types.Device      `json:"Device"`
 }
 
 type FORM_GROUP_ADD struct {
@@ -435,27 +435,8 @@ type DeviceToken struct {
 	Created time.Time `bson:"C"`
 }
 
-type Server struct {
-	ID       primitive.ObjectID   `json:"_id" bson:"_id"`
-	Tag      string               `json:"Tag" bson:"Tag"`
-	Country  string               `json:"Country" bson:"Country"`
-	IP       string               `json:"IP" bson:"IP"`
-	Port     string               `json:"Port" bson:"Port"`
-	DataPort string               `json:"DataPort" bson:"DataPort"`
-	PubKey   string               `json:"PubKey,omitempty" bson:"PubKey"`
-	Groups   []primitive.ObjectID `json:"Groups,omitempty" bson:"Groups"`
-}
-
 type Group struct {
 	ID          primitive.ObjectID `json:"_id" bson:"_id"`
 	Tag         string             `json:"Tag" bson:"Tag"`
 	Description string             `json:"Description" bson:"Description"`
-}
-
-type Device struct {
-	ID        primitive.ObjectID   `json:"_id" bson:"_id"`
-	CreatedAt time.Time            `json:"CreatedAt" bson:"CreatedAt"`
-	Tag       string               `json:"Tag" bson:"Tag"`
-	Hostname  string               `json:"Hostname" bson:"Hostname"`
-	Groups    []primitive.ObjectID `json:"Groups" bson:"Groups"`
 }
