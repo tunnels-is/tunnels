@@ -31,6 +31,7 @@ const (
 )
 
 var DB *mongo.Client
+var bboltEnabled bool // Global switch for bbolt
 
 func ConnectToDB(connectionString string) (err error) {
 	defer BasicRecover()
@@ -66,6 +67,9 @@ func ConnectToDB(connectionString string) (err error) {
 }
 
 func DB_DeleteDeviceByID(id primitive.ObjectID) (err error) {
+	if bboltEnabled {
+		return BBolt_DeleteDeviceByID(objectIDToString(id))
+	}
 	defer BasicRecover()
 
 	opt := options.Delete()
@@ -87,6 +91,9 @@ func DB_DeleteDeviceByID(id primitive.ObjectID) (err error) {
 }
 
 func DB_UpdateDevice(D *types.Device) (err error) {
+	if bboltEnabled {
+		return BBolt_UpdateDevice(D)
+	}
 	defer BasicRecover()
 
 	filter := bson.M{
@@ -124,6 +131,9 @@ func DB_UpdateDevice(D *types.Device) (err error) {
 }
 
 func DB_GetDevices(limit, offset int64) (DL []*types.Device, err error) {
+	if bboltEnabled {
+		return BBolt_GetDevices(limit, offset)
+	}
 	defer BasicRecover()
 
 	opt := options.Find()
@@ -159,6 +169,9 @@ func DB_GetDevices(limit, offset int64) (DL []*types.Device, err error) {
 }
 
 func DB_getUsers(limit, offset int64) (UL []*User, err error) {
+	if bboltEnabled {
+		return BBolt_getUsers(limit, offset)
+	}
 	defer BasicRecover()
 
 	opt := options.Find()
@@ -194,6 +207,9 @@ func DB_getUsers(limit, offset int64) (UL []*User, err error) {
 }
 
 func DB_findUserByAPIKey(Key string) (USER *User, err error) {
+	if bboltEnabled {
+		return BBolt_findUserByAPIKey(Key)
+	}
 	defer BasicRecover()
 
 	USER = new(User)
@@ -217,6 +233,9 @@ func DB_findUserByAPIKey(Key string) (USER *User, err error) {
 }
 
 func DB_findUserByID(UID primitive.ObjectID) (USER *User, err error) {
+	if bboltEnabled {
+		return BBolt_findUserByID(objectIDToString(UID))
+	}
 	defer BasicRecover()
 
 	USER = new(User)
@@ -240,6 +259,9 @@ func DB_findUserByID(UID primitive.ObjectID) (USER *User, err error) {
 }
 
 func DB_CreateUser(U *User) (err error) {
+	if bboltEnabled {
+		return BBolt_CreateUser(U)
+	}
 	defer BasicRecover()
 	_, err = DB.Database(USERS_DATABASE).
 		Collection(USERS_COLLECTION).
@@ -256,6 +278,9 @@ func DB_CreateUser(U *User) (err error) {
 }
 
 func DB_findUserByEmail(Email string) (USER *User, err error) {
+	if bboltEnabled {
+		return BBolt_findUserByEmail(Email)
+	}
 	USER = new(User)
 	err = DB.Database(USERS_DATABASE).
 		Collection(USERS_COLLECTION).
@@ -276,6 +301,9 @@ func DB_findUserByEmail(Email string) (USER *User, err error) {
 }
 
 func DB_updateUserDeviceTokens(TU *UPDATE_USER_TOKENS) (err error) {
+	if bboltEnabled {
+		return BBolt_updateUserDeviceTokens(TU)
+	}
 	defer BasicRecover()
 
 	_, err = DB.Database(USERS_DATABASE).
@@ -301,6 +329,9 @@ func DB_updateUserDeviceTokens(TU *UPDATE_USER_TOKENS) (err error) {
 }
 
 func DB_updateUserSubTime(u *User) (err error) {
+	if bboltEnabled {
+		return BBolt_updateUserSubTime(u)
+	}
 	defer BasicRecover()
 
 	filter := bson.M{
@@ -336,6 +367,9 @@ func DB_updateUserSubTime(u *User) (err error) {
 }
 
 func DB_updateUser(UF *USER_UPDATE_FORM) (err error) {
+	if bboltEnabled {
+		return BBolt_updateUser(UF)
+	}
 	defer BasicRecover()
 
 	filter := bson.M{
@@ -372,6 +406,9 @@ func DB_updateUser(UF *USER_UPDATE_FORM) (err error) {
 }
 
 func DB_toggleUserSubscriptionStatus(UF *USER_UPDATE_SUB_FORM) (err error) {
+	if bboltEnabled {
+		return BBolt_toggleUserSubscriptionStatus(UF)
+	}
 	defer BasicRecover()
 
 	filter := bson.M{
@@ -407,6 +444,9 @@ func DB_toggleUserSubscriptionStatus(UF *USER_UPDATE_SUB_FORM) (err error) {
 }
 
 func DB_userUpdateTwoFactorCodes(TFP *TWO_FACTOR_DB_PACKAGE) (err error) {
+	if bboltEnabled {
+		return BBolt_userUpdateTwoFactorCodes(TFP)
+	}
 	defer BasicRecover()
 
 	_, err = DB.Database(USERS_DATABASE).
@@ -433,6 +473,9 @@ func DB_userUpdateTwoFactorCodes(TFP *TWO_FACTOR_DB_PACKAGE) (err error) {
 }
 
 func DB_userResetPassword(user *User) error {
+	if bboltEnabled {
+		return BBolt_userResetPassword(user)
+	}
 	defer BasicRecover()
 
 	res, err := DB.Database(USERS_DATABASE).
@@ -465,6 +508,9 @@ func DB_userResetPassword(user *User) error {
 }
 
 func DB_userUpdateResetCode(user *User) error {
+	if bboltEnabled {
+		return BBolt_userUpdateResetCode(user)
+	}
 	defer BasicRecover()
 
 	res, err := DB.Database(USERS_DATABASE).
@@ -496,6 +542,9 @@ func DB_userUpdateResetCode(user *User) error {
 }
 
 func DB_FindServersWithoutGroups(limit, offset int64) (DL []*types.Server, err error) {
+	if bboltEnabled {
+		return BBolt_FindServersWithoutGroups(limit, offset)
+	}
 	defer BasicRecover()
 
 	opt := options.Find()
@@ -537,6 +586,9 @@ func DB_FindServersWithoutGroups(limit, offset int64) (DL []*types.Server, err e
 }
 
 func DB_FindServersByGroups(groups []primitive.ObjectID, limit, offset int64) (DL []*types.Server, err error) {
+	if bboltEnabled {
+		return BBolt_FindServersByGroups(objectIDSliceToString(groups), limit, offset)
+	}
 	defer BasicRecover()
 
 	opt := options.Find()
@@ -576,6 +628,9 @@ func DB_FindServersByGroups(groups []primitive.ObjectID, limit, offset int64) (D
 }
 
 func DB_FindEntitiesByGroupID(id primitive.ObjectID, objType string, limit, offset int64) (IL []any, err error) {
+	if bboltEnabled {
+		return BBolt_FindEntitiesByGroupID(objectIDToString(id), objType, limit, offset)
+	}
 	defer BasicRecover()
 
 	opt := options.Find()
@@ -647,6 +702,9 @@ func DB_FindEntitiesByGroupID(id primitive.ObjectID, objType string, limit, offs
 	return
 }
 func DB_UpdateGroup(G *Group) (err error) {
+	if bboltEnabled {
+		return BBolt_UpdateGroup(G)
+	}
 	defer BasicRecover()
 
 	filter := bson.M{
@@ -685,6 +743,9 @@ func DB_UpdateGroup(G *Group) (err error) {
 }
 
 func DB_UpdateServer(S *types.Server) (RS *types.Server, err error) {
+	if bboltEnabled {
+		return BBolt_UpdateServer(S)
+	}
 	defer BasicRecover()
 
 	filter := bson.M{
@@ -720,6 +781,9 @@ func DB_UpdateServer(S *types.Server) (RS *types.Server, err error) {
 }
 
 func DB_CreateDevice(D *types.Device) (err error) {
+	if bboltEnabled {
+		return BBolt_CreateDevice(D)
+	}
 	defer BasicRecover()
 
 	_, err = DB.Database(DEVICE_DATABASE).
@@ -738,6 +802,9 @@ func DB_CreateDevice(D *types.Device) (err error) {
 }
 
 func DB_CreateGroup(G *Group) (err error) {
+	if bboltEnabled {
+		return BBolt_CreateGroup(G)
+	}
 	defer BasicRecover()
 
 	_, err = DB.Database(GROUP_DATABASE).
@@ -756,6 +823,9 @@ func DB_CreateGroup(G *Group) (err error) {
 }
 
 func DB_CreateServer(S *types.Server) (err error) {
+	if bboltEnabled {
+		return BBolt_CreateServer(S)
+	}
 	defer BasicRecover()
 
 	_, err = DB.Database(SERVER_DATABASE).
@@ -774,6 +844,9 @@ func DB_CreateServer(S *types.Server) (err error) {
 }
 
 func DB_FindServerByID(ID primitive.ObjectID) (S *types.Server, err error) {
+	if bboltEnabled {
+		return BBolt_FindServerByID(objectIDToString(ID))
+	}
 	defer BasicRecover()
 
 	filter := bson.M{
@@ -797,6 +870,9 @@ func DB_FindServerByID(ID primitive.ObjectID) (S *types.Server, err error) {
 }
 
 func DB_WipeUserConfirmCode(UF *USER_ENABLE_QUERY) (err error) {
+	if bboltEnabled {
+		return BBolt_WipeUserConfirmCode(UF)
+	}
 	defer BasicRecover()
 
 	filter := bson.M{
@@ -833,6 +909,9 @@ func DB_WipeUserConfirmCode(UF *USER_ENABLE_QUERY) (err error) {
 }
 
 func DB_UserActivateKey(SubExpiration time.Time, Key *LicenseKey, userID primitive.ObjectID) (err error) {
+	if bboltEnabled {
+		return BBolt_UserActivateKey(SubExpiration, Key, objectIDToString(userID))
+	}
 	defer BasicRecover()
 
 	filter := bson.M{
@@ -871,6 +950,9 @@ func DB_UserActivateKey(SubExpiration time.Time, Key *LicenseKey, userID primiti
 }
 
 func DB_AddToGroup(groupID primitive.ObjectID, typeID primitive.ObjectID, objType string) (err error) {
+	if bboltEnabled {
+		return BBolt_AddToGroup(objectIDToString(groupID), objectIDToString(typeID), objType)
+	}
 	defer BasicRecover()
 
 	filter := bson.M{
@@ -924,6 +1006,9 @@ func DB_AddToGroup(groupID primitive.ObjectID, typeID primitive.ObjectID, objTyp
 }
 
 func DB_RemoveFromGroup(groupID primitive.ObjectID, typeID primitive.ObjectID, objType string) (err error) {
+	if bboltEnabled {
+		return BBolt_RemoveFromGroup(objectIDToString(groupID), objectIDToString(typeID), objType)
+	}
 	defer BasicRecover()
 
 	filter := bson.M{
@@ -977,6 +1062,9 @@ func DB_RemoveFromGroup(groupID primitive.ObjectID, typeID primitive.ObjectID, o
 }
 
 func DB_FindDeviceByID(id primitive.ObjectID) (dev *types.Device, err error) {
+	if bboltEnabled {
+		return BBolt_FindDeviceByID(objectIDToString(id))
+	}
 	defer BasicRecover()
 
 	opt := options.FindOne()
@@ -1002,6 +1090,9 @@ func DB_FindDeviceByID(id primitive.ObjectID) (dev *types.Device, err error) {
 }
 
 func DB_findGroupByID(id primitive.ObjectID) (G *Group, err error) {
+	if bboltEnabled {
+		return BBolt_findGroupByID(objectIDToString(id))
+	}
 	defer BasicRecover()
 
 	opt := options.FindOne()
@@ -1024,6 +1115,9 @@ func DB_findGroupByID(id primitive.ObjectID) (G *Group, err error) {
 }
 
 func DB_DeleteGroupByID(id primitive.ObjectID) (err error) {
+	if bboltEnabled {
+		return BBolt_DeleteGroupByID(objectIDToString(id))
+	}
 	defer BasicRecover()
 
 	opt := options.Delete()
@@ -1045,6 +1139,9 @@ func DB_DeleteGroupByID(id primitive.ObjectID) (err error) {
 }
 
 func DB_findGroups() (gl []*Group, err error) {
+	if bboltEnabled {
+		return BBolt_findGroups()
+	}
 	defer BasicRecover()
 
 	opt := options.Find()
