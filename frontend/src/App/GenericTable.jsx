@@ -11,7 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { DeleteIcon } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 // import { GridLoader } from "react-spinners";
 import {
   DropdownMenu,
@@ -34,7 +34,17 @@ const GenericTable = (props) => {
   const [limit, setLimit] = useState(100);
   const [filter, setFilter] = useState("");
   const [loading, setLoading] = useState(false);
+  const [isTablet, setIsTablet] = useState(false);
   const state = GLOBAL_STATE("btn+?");
+
+  useEffect(() => {
+    const checkTablet = () => {
+      setIsTablet(window.innerWidth <= 1024 && window.innerWidth >= 640);
+    };
+    checkTablet();
+    window.addEventListener("resize", checkTablet);
+    return () => window.removeEventListener("resize", checkTablet);
+  }, []);
 
   if (!props.table) {
     return <></>;
@@ -215,6 +225,108 @@ const GenericTable = (props) => {
     return <TableBody>{rows}</TableBody>;
   };
 
+  const renderCardList = () => {
+    return (
+      <div className="flex flex-col gap-4">
+        {t.data?.map((row, i) => {
+          let hasFilter = false;
+          let cardContent = Object.keys(t.columns).map((key) => {
+            if (t.columns[key] === undefined) return null;
+            let click = t.rowClick ? t.rowClick : () => {};
+            if (t.columns[key] !== true) click = t.columns[key];
+            let dc = ddc;
+            if (t.columnClass && t.columnClass[key]) {
+              dc += t.columnClass[key](row);
+            }
+            let cd = row[key];
+            if (t.columnFormat && t.columnFormat[key]) {
+              cd = t.columnFormat[key](row);
+            }
+            if (row[key]?.includes && filter !== "") {
+              if (row[key].includes(filter)) {
+                hasFilter = true;
+              }
+            } else {
+              hasFilter = true;
+            }
+            if (key === "Tag" || key === "Email") {
+              return (
+                <div className={"flex items-center gap-2 " + dc} key={key} onClick={() => click(row)}>
+                  <span className="font-semibold">{key}:</span>
+                  <Badge className={"cursor-pointer" + state.Theme?.badgeNeutral}>{cd}</Badge>
+                </div>
+              );
+            }
+            return (
+              <div className={"flex items-center gap-2 " + dc} key={key} onClick={() => click(row)}>
+                <span className="font-semibold">{key}:</span>
+                <span>{cd}</span>
+              </div>
+            );
+          });
+
+          if (t.customColumns) {
+            Object.keys(t.customColumns).forEach((key) => {
+              cardContent.push(t.customColumns[key](row));
+            });
+          }
+
+          const actionItems = [];
+          let hasButtons = false;
+          if (t.Btn?.Edit) {
+            hasButtons = true;
+            actionItems.push(
+              <DropdownMenuItem key="edit" onClick={() => t.Btn.Edit(row)} className="cursor-pointer">
+                <Edit className="w-4 h-4 mr-2" /> Edit
+              </DropdownMenuItem>
+            );
+          }
+          if (t.Btn?.Delete) {
+            hasButtons = true;
+            actionItems.push(
+              <DropdownMenuItem key="delete" onClick={() => t.Btn.Delete(row)} className="cursor-pointer text-red-500">
+                <Trash2 className="w-4 h-4 mr-2" /> Delete
+              </DropdownMenuItem>
+            );
+          }
+          const customButton = [];
+          if (t.customBtn) {
+            hasButtons = true;
+            Object.keys(t.customBtn).forEach((key) => {
+              const customBtnEl = t.customBtn[key](row);
+              customButton.push(customBtnEl);
+            });
+          }
+
+          if (hasFilter === true) {
+            return (
+              <div key={i} className="rounded-lg border border-[#1a1f2d] bg-[#0B0E14] p-4 shadow-sm flex flex-col gap-2">
+                {cardContent}
+                {hasButtons && (
+                  <div className="flex justify-end gap-2 mt-2">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" className="h-8 w-8 p-0 text-white">
+                          <span className="sr-only">Open menu</span>
+                          <MoreHorizontal className="w-4 h-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className={"w-48 text-white " + state.Theme?.borderColor}>
+                        {customButton}
+                        {actionItems}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                )}
+              </div>
+            );
+          }
+          return null;
+        })}
+      </div>
+    );
+  };
+
   return (
     <div className={"flex flex-col gap-5 " + (props.className ? props.className : "")} >
       <div className="flex flex-col md:flex-row justify-start items-center ">
@@ -269,10 +381,14 @@ const GenericTable = (props) => {
       {
         !loading && (
           <div className="shadow-sm">
-            <Table className="w-full overflow-visible text-sm text-foreground">
-              {renderHeaders()}
-              {renderRows()}
-            </Table>
+            {isTablet ? (
+              renderCardList()
+            ) : (
+              <Table className="w-full overflow-visible text-sm text-foreground">
+                {renderHeaders()}
+                {renderRows()}
+              </Table>
+            )}
           </div>
         )
       }
