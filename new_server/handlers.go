@@ -612,6 +612,7 @@ func API_GroupCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	F.Group.ID = primitive.NewObjectID()
+	F.Group.CreatedAt = time.Now()
 
 	err = DB_CreateGroup(F.Group)
 	if err != nil {
@@ -917,18 +918,18 @@ func API_GroupList(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	group, err := DB_findGroups()
+	groups, err := DB_findGroups()
 	if err != nil {
 		senderr(w, 500, "Unknown error, please try again in a moment")
 		return
 	}
 
-	if group == nil {
+	if groups == nil {
 		w.WriteHeader(204)
 		return
 	}
 
-	sendObject(w, group)
+	sendObject(w, groups)
 }
 
 func API_ServersForUser(w http.ResponseWriter, r *http.Request) {

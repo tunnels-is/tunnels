@@ -34,9 +34,8 @@ const Users = () => {
 				// alert(obj._id)
 			},
 			Updated: true,
-
 		},
-		columFormat: {
+		columnFormat: {
 			Updated: (obj) => {
 				return dayjs(obj.Updated).format("HH:mm:ss DD-MM-YYYY")
 			}
