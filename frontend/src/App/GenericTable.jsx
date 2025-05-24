@@ -227,7 +227,7 @@ const GenericTable = (props) => {
 
   const renderCardList = () => {
     return (
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-6">
         {t.data?.map((row, i) => {
           let hasFilter = false;
           let cardContent = Object.keys(t.columns).map((key) => {
@@ -251,16 +251,16 @@ const GenericTable = (props) => {
             }
             if (key === "Tag" || key === "Email") {
               return (
-                <div className={"flex items-center gap-2 " + dc} key={key} onClick={() => click(row)}>
-                  <span className="font-semibold">{key}:</span>
-                  <Badge className={"cursor-pointer" + state.Theme?.badgeNeutral}>{cd}</Badge>
+                <div className="flex items-center gap-2 py-1" key={key}>
+                  <span className="text-xs font-semibold text-[#bfc7d5] min-w-[80px]">{key}</span>
+                  <Badge className={"cursor-pointer text-xs px-2 py-1 " + state.Theme?.badgeNeutral} onClick={() => click(row)}>{cd}</Badge>
                 </div>
               );
             }
             return (
-              <div className={"flex items-center gap-2 " + dc} key={key} onClick={() => click(row)}>
-                <span className="font-semibold">{key}:</span>
-                <span>{cd}</span>
+              <div className="flex items-center gap-2 py-1" key={key}>
+                <span className="text-xs font-semibold text-[#bfc7d5] min-w-[80px]">{key}</span>
+                <span className="text-sm text-white break-all" onClick={() => click(row)}>{cd}</span>
               </div>
             );
           });
@@ -300,10 +300,25 @@ const GenericTable = (props) => {
 
           if (hasFilter === true) {
             return (
-              <div key={i} className="rounded-lg border border-[#1a1f2d] bg-[#0B0E14] p-4 shadow-sm flex flex-col gap-2">
-                {cardContent}
+              <div
+                key={i}
+                className="border border-[#1a1f2d] bg-[#0B0E14] rounded-xl shadow-lg p-6 flex flex-col gap-2 transition-shadow hover:shadow-xl"
+              >
+                {/* Card header row for column names, styled like table header */}
+                <div className="flex flex-wrap gap-x-6 gap-y-2 mb-2 border-b border-[#23283a] pb-2">
+                  {Object.keys(t.columns).map((key) =>
+                    t.columns[key] !== undefined ? (
+                      <span key={key} className="text-xs font-bold uppercase tracking-wide text-[#bfc7d5] min-w-[80px]">
+                        {key}
+                      </span>
+                    ) : null
+                  )}
+                </div>
+                {/* Card content */}
+                <div className="flex flex-col gap-1">{cardContent}</div>
+                {/* Card actions */}
                 {hasButtons && (
-                  <div className="flex justify-end gap-2 mt-2">
+                  <div className="flex justify-end gap-2 mt-4">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" className="h-8 w-8 p-0 text-white">
