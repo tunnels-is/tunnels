@@ -458,7 +458,10 @@ const DNS = () => {
             readOnly={false}
             saveButton={async (obj) => {
               if (!isRecordEdit) {
-                state.Config.DNSRecords.push(obj)
+                if (!state.Config?.DNSRecord) {
+                  state.Config.DNSRecords = []
+                }
+                state.Config?.DNSRecords.push(obj)
               }
               let ok = await state.v2_ConfigSave();
               if (ok === true) {
