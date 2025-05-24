@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import GenericTable from "./GenericTable";
+import NewObjectEditorDialog from "./NewObjectEdiorDialog";
 
 const InspectGroup = () => {
 	const { id } = useParams()
@@ -24,16 +25,8 @@ const InspectGroup = () => {
 	const [dialog, setDialog] = useState(false)
 	const [addForm, setAddForm] = useState({})
 	const [group, setGroup] = useState()
+	const [tag, setTag] = useState("users")
 	const state = GLOBAL_STATE("groups")
-	const navigate = useNavigate()
-
-
-	const FormField = ({ label, children }) => (
-		<div className="grid gap-2 mb-4">
-			<Label className="text-sm font-medium">{label}</Label>
-			{children}
-		</div>
-	);
 
 	const addToGroup = async () => {
 		console.log("ID:", addForm.id)
@@ -42,9 +35,10 @@ const InspectGroup = () => {
 				GroupID: id,
 				TypeID: addForm.id,
 				Type: addForm.type,
+				TypeTag: addForm.idtype,
 			},
 			false, false)
-		if (e) {
+		if (e.status === 200) {
 			if (addForm.type === "user") {
 				users.push(e.data)
 				setUsers([...users])
@@ -90,10 +84,11 @@ const InspectGroup = () => {
 		}
 	}
 
-	const tagChange = async (tab) => {
+	const tagChange = async (tag) => {
 		setDialog(false)
-		console.log("TAB:", tab)
-		await getEntities(tab)
+		setTag(tag)
+		console.log("TAB:", tag)
+		await getEntities(tag)
 	}
 
 	const getGroup = async () => {
@@ -107,13 +102,6 @@ const InspectGroup = () => {
 		getEntities("user")
 	}, [])
 
-	if (!group) {
-		return (
-			<div className="ab group-wrapper">
-				<div className="title">Group Not Found: {id}</div>
-			</div>
-		)
-	}
 
 
 	const generateServerTable = () => {
@@ -146,6 +134,7 @@ const InspectGroup = () => {
 					removeEntity(id, obj._id, "server")
 				},
 				New: () => {
+					setAddForm({ id: "", type: "server", idtype: "" })
 					setDialog(true)
 				},
 			},
@@ -180,6 +169,7 @@ const InspectGroup = () => {
 					removeEntity(id, obj._id, "device")
 				},
 				New: () => {
+					setAddForm({ id: "", type: "device", idtype: "" })
 					setDialog(true)
 				},
 			},
@@ -211,6 +201,7 @@ const InspectGroup = () => {
 				removeEntity(id, obj._id, "user")
 			},
 			New: () => {
+				setAddForm({ id: "", type: "user", idtype: "" })
 				setDialog(true)
 			},
 		},
@@ -222,102 +213,55 @@ const InspectGroup = () => {
 		},
 	}
 
-
-	const addDialog = (type) => {
+	if (!group) {
 		return (
-			<Dialog
-				open={dialog}
-				onOpenChange={() => setDialog(false)}
-			>
-				<DialogContent className="bg-black border border-gray-800 text-white max-w-2xl rounded-lg p-6">
-
-					{type === "device" &&
-						<FormField label="Device ID">
-							<Input
-								value={addForm.id}
-								onChange={(e) =>
-									setAddForm({ id: e.target.value, type: "device", idtype: "" })
-								}
-								placeholder="Device ID"
-								className="w-full bg-gray-950 border-gray-700 text-white"
-							/>
-						</FormField>
-					}
-
-					{type === "server" &&
-						<FormField label="Server ID">
-							<Input
-								value={addForm.id}
-								onChange={(e) =>
-									setAddForm({ id: e.target.value, type: "server", idtype: "" })
-								}
-								placeholder="Server ID"
-								className="w-full bg-gray-950 border-gray-700 text-white"
-							/>
-						</FormField>
-					}
-
-					{type === "user" &&
-						<>
-							<FormField label="Add user by Email or ID">
-								<Input
-									value={addForm.id}
-									onChange={(e) =>
-										setAddForm({ id: e.target.value, type: "user", idtype: "" })
-									}
-									placeholder="User ID"
-									className="w-full bg-gray-950 border-gray-700 text-white"
-								/>
-							</FormField>
-							<FormField>
-								<Input
-									value={addForm.id}
-									onChange={(e) =>
-										setAddForm({ id: e.target.value, type: "user", idtype: "email" })
-									}
-									placeholder="User Email"
-									className="w-full bg-gray-950 border-gray-700 text-white"
-								/>
-							</FormField>
-						</>
-					}
-
-					<div className="flex justify-between mt-1">
-						<Button
-							variant="outline"
-							className="flex items-center gap-2 bg-gray-950 border-gray-700 hover:bg-gray-700"
-							onClick={() => addToGroup()}
-						>
-							<Save className="h-4 w-4" />
-							Save
-						</Button>
-					</div>
-
-				</DialogContent>
-			</Dialog>
+			<div className="ab group-wrapper">			</div>
 		)
 	}
 
-
 	return (
 		<div className="ab group-wrapper">
+			<NewObjectEditorDialog
+				open={dialog}
+				onOpenChange={setDialog}
+				object={addForm}
+				opts={{
+					fields: {
+						idtype: "hidden",
+						type: "hidden"
+					},
+					nameMap: {
+						id: tag + " ID"
+					}
+				}}
+				title={tag}
+				readOnly={false}
+				saveButton={() => {
+					addToGroup()
+				}}
+				onChange={(key, value, type) => {
+					addForm[key] = value
+					console.log(key, value, type)
+				}}
+			/>
+
 			<Tabs defaultValue="user" className="w-full" onValueChange={(v) => tagChange(v)}>
-				<TabsList>
-					<TabsTrigger value="server">Server</TabsTrigger>
-					<TabsTrigger value="device">Devices</TabsTrigger>
-					<TabsTrigger value="user">Users</TabsTrigger>
+				<TabsList
+					className={state.Theme?.borderColor}
+				>
+					<TabsTrigger className={state.Theme?.tabs} value="server">Server</TabsTrigger>
+					<TabsTrigger className={state.Theme?.tabs} value="device">Devices</TabsTrigger>
+					<TabsTrigger className={state.Theme?.tabs} value="user">Users</TabsTrigger>
 				</TabsList>
 				<TabsContent className="w-full" value="server">
-					{addDialog("server")}
-					<GenericTable table={generateServerTable()} />
+					<GenericTable table={generateServerTable()} newButtonLabel={"Add"} />
 				</TabsContent>
 				<TabsContent value="device">
-					{addDialog("device")}
-					<GenericTable table={generateDevicesTables()} />
+					<GenericTable table={generateDevicesTables()} newButtonLabel={"Add"} />
 				</TabsContent>
 				<TabsContent value="user">
-					{addDialog("user")}
-					<GenericTable table={utable} />
+
+					<GenericTable table={utable} newButtonLabel={"Add"} />
 				</TabsContent>
 			</Tabs>
 

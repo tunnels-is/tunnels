@@ -529,22 +529,22 @@ func API_DeviceList(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	users, err := DB_GetDevices(int64(F.Limit), int64(F.Offset))
+	devices, err := DB_GetDevices(int64(F.Limit), int64(F.Offset))
 	if err != nil {
 		senderr(w, 500, "Unknown error, please try again in a moment")
 		return
 	}
 
-	if users == nil {
-		w.WriteHeader(204)
-		return
-	}
-
-	sendObject(w, users)
+	sendObject(w, devices)
 }
 
 func API_DeviceCreate(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
+	hasAPIKey := false
+	if HTTP_validateKey(r) {
+		hasAPIKey = true
+	}
+
 	F := new(FORM_CREATE_DEVICE)
 	err := decodeBody(r, F)
 	if err != nil {
@@ -552,22 +552,24 @@ func API_DeviceCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if F.Device == nil || F.Device.Tag == "" {
-		senderr(w, 400, "Invalid device format")
-		return
-	}
-
-	user, err := authenticateUserFromEmailOrIDAndToken("", F.UID, F.DeviceToken)
-	if err != nil {
-		senderr(w, 500, err.Error())
-		return
-	}
-
-	if !user.IsAdmin {
-		if !user.IsManager {
-			senderr(w, 401, "You are not allowed to create devices")
+	if !hasAPIKey {
+		user, err := authenticateUserFromEmailOrIDAndToken("", F.UID, F.DeviceToken)
+		if err != nil {
+			senderr(w, 500, err.Error())
 			return
 		}
+		if !user.IsAdmin {
+			if !user.IsManager {
+				senderr(w, 401, "You are not allowed to create devices")
+				return
+			}
+		}
+
+	}
+
+	if F.Device == nil || F.Device.Hostname == "" {
+		senderr(w, 400, "Invalid device format")
+		return
 	}
 
 	F.Device.ID = primitive.NewObjectID()

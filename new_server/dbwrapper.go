@@ -101,7 +101,7 @@ func DB_UpdateDevice(D *Device) (err error) {
 				{
 					Key: "$set",
 					Value: bson.D{
-						{Key: "Tag", Value: D.Tag},
+						{Key: "Tag", Value: D.Hostname},
 					},
 				},
 			},
