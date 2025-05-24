@@ -304,16 +304,6 @@ const GenericTable = (props) => {
                 key={i}
                 className="border border-[#1a1f2d] bg-[#0B0E14] rounded-xl shadow-lg p-6 flex flex-col gap-2 transition-shadow hover:shadow-xl"
               >
-                {/* Card header row for column names, styled like table header */}
-                <div className="flex flex-wrap gap-x-6 gap-y-2 mb-2 border-b border-[#23283a] pb-2">
-                  {Object.keys(t.columns).map((key) =>
-                    t.columns[key] !== undefined ? (
-                      <span key={key} className="text-xs font-bold uppercase tracking-wide text-[#bfc7d5] min-w-[80px]">
-                        {key}
-                      </span>
-                    ) : null
-                  )}
-                </div>
                 {/* Card content */}
                 <div className="flex flex-col gap-1">{cardContent}</div>
                 {/* Card actions */}
