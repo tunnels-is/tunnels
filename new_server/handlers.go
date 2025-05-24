@@ -30,7 +30,7 @@ func API_AcceptUserConnections(w http.ResponseWriter, r *http.Request) {
 		senderr(w, 400, err.Error())
 		return
 	}
-	fmt.Println(SCR)
+	// fmt.Println(SCR)
 
 	err = crypt.VerifySignature(SCR.Payload, SCR.Signature, PubKey)
 	if err != nil {
@@ -45,7 +45,7 @@ func API_AcceptUserConnections(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if time.Since(CR.Created).Seconds() > 20 {
+	if time.Since(CR.Created).Seconds() > 30 {
 		senderr(w, 401, "request not valid")
 		return
 	}
@@ -74,7 +74,6 @@ func API_AcceptUserConnections(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Println("MAKE SEAL", SCR.UserHandshake)
 	EH.SEAL.PublicKey, err = EH.SEAL.NewPublicKeyFromBytes(SCR.UserHandshake)
 	if err != nil {
 		ERR("Port allocation failed", err)
@@ -540,10 +539,7 @@ func API_DeviceList(w http.ResponseWriter, r *http.Request) {
 
 func API_DeviceCreate(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
-	hasAPIKey := false
-	if HTTP_validateKey(r) {
-		hasAPIKey = true
-	}
+	hasAPIKey := HTTP_validateKey(r)
 
 	F := new(FORM_CREATE_DEVICE)
 	err := decodeBody(r, F)
@@ -567,7 +563,7 @@ func API_DeviceCreate(w http.ResponseWriter, r *http.Request) {
 
 	}
 
-	if F.Device == nil || F.Device.Hostname == "" {
+	if F.Device == nil || F.Device.Tag == "" {
 		senderr(w, 400, "Invalid device format")
 		return
 	}
@@ -650,8 +646,8 @@ func API_GroupAdd(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var u *User
-	var s *Server
-	var d *Device
+	var s *types.Server
+	var d *types.Device
 
 	switch F.Type {
 	case "device":
@@ -797,6 +793,28 @@ func API_GroupDelete(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(200)
 }
 
+func API_DeviceGet(w http.ResponseWriter, r *http.Request) {
+	defer BasicRecover()
+	F := new(types.FORM_GET_DEVICE)
+	err := decodeBody(r, F)
+	if err != nil {
+		senderr(w, 400, "Invalid request body", slog.Any("error", err))
+		return
+	}
+
+	device, err := DB_FindDeviceByID(F.DeviceID)
+	if err != nil || device == nil {
+		if err != nil {
+			senderr(w, 400, "device  not found", slog.Any("err", err))
+		} else {
+			senderr(w, 400, "device not found")
+		}
+		return
+	}
+
+	sendObject(w, device)
+}
+
 func API_GroupGet(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 	F := new(FORM_GET_GROUP)
@@ -928,7 +946,7 @@ func API_ServersForUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	servers := make([]*Server, 0)
+	servers := make([]*types.Server, 0)
 	pservers, err := DB_FindServersWithoutGroups(100, int64(F.StartIndex))
 	if err != nil {
 		senderr(w, 500, "Unknown error, please try again in a moment")
@@ -1013,6 +1031,74 @@ func API_ServerCreate(w http.ResponseWriter, r *http.Request) {
 	sendObject(w, F.Server)
 }
 
+func API_ServerGet(w http.ResponseWriter, r *http.Request) {
+	defer BasicRecover()
+	F := new(types.FORM_GET_SERVER)
+	err := decodeBody(r, F)
+	if err != nil {
+		senderr(w, 400, "Invalid request body", slog.Any("error", err))
+		return
+	}
+	server, err := DB_FindServerByID(F.ServerID)
+	if err != nil {
+		senderr(w, 500, err.Error())
+		return
+	}
+	if server == nil {
+		senderr(w, 404, "unauthorized")
+		return
+	}
+
+	allowed := false
+	if F.DeviceKey != "" {
+		deviceID, err := primitive.ObjectIDFromHex(F.DeviceKey)
+		if err != nil {
+			senderr(w, 400, "invalid device key")
+			return
+		}
+		device, err := DB_FindDeviceByID(deviceID)
+		if err != nil {
+			senderr(w, 500, err.Error())
+			return
+		}
+		if device == nil {
+			senderr(w, 401, "Unauthorized")
+			return
+		}
+		for _, g := range server.Groups {
+			for _, ug := range device.Groups {
+				if g == ug {
+					allowed = true
+				}
+			}
+		}
+	} else {
+		user, err := authenticateUserFromEmailOrIDAndToken("", F.UID, F.DeviceToken)
+		if err != nil {
+			senderr(w, 401, err.Error())
+			return
+		}
+		for _, ug := range user.Groups {
+			for _, sg := range server.Groups {
+				if sg == ug {
+					allowed = true
+				}
+			}
+		}
+	}
+
+	if len(server.Groups) == 0 {
+		allowed = true
+	}
+
+	if allowed {
+		sendObject(w, server)
+		return
+	}
+
+	senderr(w, 401, "unauthorized")
+}
+
 func API_SessionCreate(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 
@@ -1022,19 +1108,7 @@ func API_SessionCreate(w http.ResponseWriter, r *http.Request) {
 		senderr(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
-	fmt.Println("ENTER INTO ME!")
-	fmt.Println(CR)
-
-	user, err := authenticateUserFromEmailOrIDAndToken("", CR.UserID, CR.DeviceToken)
-	if err != nil {
-		senderr(w, 401, err.Error())
-		return
-	}
-
-	// _, code, err := ValidateSubscription(c, CR)
-	// if err != nil {
-	// 	return WriteErrorResponse(c, code, err.Error())
-	// }
+	fmt.Printf("%+v", CR)
 
 	server, err := DB_FindServerByID(CR.ServerID)
 	if err != nil {
@@ -1046,11 +1120,46 @@ func API_SessionCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// _, code, err := ValidateSubscription(c, CR)
+	// if err != nil {
+	// 	return WriteErrorResponse(c, code, err.Error())
+	// }
+
 	allowed := false
-	for _, g := range server.Groups {
-		for _, ug := range user.Groups {
-			if g == ug {
-				allowed = true
+	if CR.DeviceKey != "" {
+		deviceID, err := primitive.ObjectIDFromHex(CR.DeviceKey)
+		if err != nil {
+			senderr(w, 400, "invalid device key")
+			return
+		}
+		device, err := DB_FindDeviceByID(deviceID)
+		if err != nil {
+			senderr(w, 500, err.Error())
+			return
+		}
+		if device == nil {
+			senderr(w, 401, "Unauthorized")
+			return
+		}
+		for _, g := range server.Groups {
+			for _, ug := range device.Groups {
+				if g == ug {
+					allowed = true
+				}
+			}
+		}
+
+	} else {
+		user, err := authenticateUserFromEmailOrIDAndToken("", CR.UserID, CR.DeviceToken)
+		if err != nil {
+			senderr(w, 401, err.Error())
+			return
+		}
+		for _, g := range server.Groups {
+			for _, ug := range user.Groups {
+				if g == ug {
+					allowed = true
+				}
 			}
 		}
 	}
@@ -1059,24 +1168,24 @@ func API_SessionCreate(w http.ResponseWriter, r *http.Request) {
 		allowed = true
 	}
 
-	if !allowed {
-		senderr(w, 400, "Unauthorized")
+	if allowed {
+		SCR := new(types.SignedConnectRequest)
+		SCR.Payload, err = json.Marshal(CR)
+		if err != nil {
+			senderr(w, 500, "Unable to decode payload")
+			return
+		}
+		SCR.Signature, err = crypt.SignData(SCR.Payload, PrivKey)
+		if err != nil {
+			senderr(w, 500, "Unable to sign payload", slog.Any("err", err))
+			return
+		}
+
+		sendObject(w, SCR)
 		return
 	}
 
-	SCR := new(types.SignedConnectRequest)
-	SCR.Payload, err = json.Marshal(CR)
-	if err != nil {
-		senderr(w, 500, "Unable to decode payload")
-		return
-	}
-	SCR.Signature, err = crypt.SignData(SCR.Payload, PrivKey)
-	if err != nil {
-		senderr(w, 500, "Unable to sign payload", slog.Any("err", err))
-		return
-	}
-
-	sendObject(w, SCR)
+	senderr(w, 400, "Unauthorized")
 }
 
 func API_UserRequestPasswordCode(w http.ResponseWriter, r *http.Request) {

@@ -18,6 +18,8 @@ import (
 	"time"
 
 	"github.com/tunnels-is/tunnels/certs"
+	"github.com/tunnels-is/tunnels/types"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 func InitService() error {
@@ -32,15 +34,6 @@ func InitService() error {
 	INFO("Starting Tunnels")
 
 	conf := CONFIG.Load()
-
-	// over write config with cli options
-	cli := CLI.Load()
-	if cli.Minimal {
-		conf.Minimal = true
-		conf.OpenUI = false
-		CONFIG.Store(conf)
-	}
-
 	s := STATE.Load()
 
 	if !conf.ConsoleLogOnly {
@@ -60,13 +53,9 @@ func InitService() error {
 	printInfo()
 	printInfo2()
 
-	INFO("Loading certificates")
-
-	if !conf.Minimal {
-		doEvent(highPriorityChannel, func() {
-			reloadBlockLists(false, true)
-		})
-	}
+	doEvent(highPriorityChannel, func() {
+		reloadBlockLists(false, true)
+	})
 
 	INFO("Tunnels is ready")
 	return nil
@@ -105,7 +94,6 @@ func printInfo2() {
 
 func LaunchTunnels() {
 	defer RecoverAndLogToFile()
-	conf := CONFIG.Load()
 
 	CancelContext, CancelFunc = context.WithCancel(GlobalContext)
 	quit = make(chan os.Signal, 10)
@@ -122,21 +110,19 @@ func LaunchTunnels() {
 		StartLogQueueProcessor()
 	})
 
-	if !conf.Minimal {
-		newConcurrentSignal("APIServer", CancelContext, func() {
-			LaunchAPI()
-		})
+	newConcurrentSignal("APIServer", CancelContext, func() {
+		LaunchAPI()
+	})
 
-		newConcurrentSignal("UDPDNSHandler", CancelContext, func() {
-			StartUDPDNSHandler()
-		})
+	newConcurrentSignal("UDPDNSHandler", CancelContext, func() {
+		StartUDPDNSHandler()
+	})
 
-		config := CONFIG.Load()
-		if config.OpenUI {
-			newConcurrentSignal("OpenUI", CancelContext, func() {
-				popUI()
-			})
-		}
+	config := CONFIG.Load()
+	if config.OpenUI {
+		newConcurrentSignal("OpenUI", CancelContext, func() {
+			popUI()
+		})
 	}
 
 	newConcurrentSignal("Pinger", CancelContext, func() {
@@ -209,6 +195,145 @@ mainLoop:
 	}
 }
 
+func InitMinimalService() error {
+	defer RecoverAndLogToFile()
+	InitBaseFoldersAndPaths()
+	_ = loadConfigFromDisk()
+	loadTunnelsFromDisk()
+	loadDefaultGateway()
+	loadDefaultInterface()
+
+	conf := CONFIG.Load()
+	conf.OpenUI = false
+	conf.ConsoleLogOnly = true
+	CONFIG.Store(conf)
+
+	INFO("Operating specific initializations")
+	_ = OSSpecificInit()
+
+	INFO("Checking permissins")
+	AdminCheck()
+
+	cli := CLIConfig.Load()
+	if cli.DNS {
+		InitDNSHandler()
+		INFO("Starting Tunnels")
+		doEvent(highPriorityChannel, func() {
+			reloadBlockLists(false, true)
+		})
+	}
+
+	// err := getDeviceAndServer()
+	// if err != nil {
+	// 	return err
+	// }
+
+	newConcurrentSignal("Connect", CancelContext, func() {
+		code, err := PublicConnect(&ConnectionRequest{
+			URL:       cli.AuthServer,
+			Secure:    cli.Secure,
+			DeviceKey: cli.DeviceID,
+			Tag:       DefaultTunnelName,
+			ServerID:  cli.ServerID,
+		})
+		if code != 200 {
+			time.Sleep(5 * time.Second)
+		}
+		ERROR("Unable to connect", err)
+	})
+
+	return nil
+}
+
+func LaunchMinimalTunnels() {
+	defer RecoverAndLogToFile()
+	cli := CLIConfig.Load()
+
+	CancelContext, CancelFunc = context.WithCancel(GlobalContext)
+	quit = make(chan os.Signal, 10)
+
+	signal.Notify(
+		quit,
+		os.Interrupt,
+		syscall.SIGTERM,
+		syscall.SIGQUIT,
+		syscall.SIGILL,
+	)
+
+	newConcurrentSignal("LogProcessor", CancelContext, func() {
+		StartLogQueueProcessor()
+	})
+
+	if cli.DNS {
+		newConcurrentSignal("UDPDNSHandler", CancelContext, func() {
+			StartUDPDNSHandler()
+		})
+		newConcurrentSignal("BlockListUpdater", CancelContext, func() {
+			reloadBlockLists(true, true)
+		})
+		newConcurrentSignal("CleanDNSCache", CancelContext, func() {
+			CleanDNSCache()
+		})
+	}
+
+	newConcurrentSignal("Pinger", CancelContext, func() {
+		PingConnections()
+	})
+
+	newConcurrentSignal("LogMapCleaner", CancelContext, func() {
+		CleanUniqueLogMap()
+	})
+
+	newConcurrentSignal("CleanPortAllocs", CancelContext, func() {
+		CleanPortsForAllConnections()
+	})
+
+	newConcurrentSignal("StartTraceWorker", CancelContext, func() {
+		StartTraceProcessor()
+	})
+
+	newConcurrentSignal("DefaultGateway", CancelContext, func() {
+		GetDefaultGateway()
+	})
+
+mainLoop:
+	for {
+
+		select {
+		case high := <-highPriorityChannel:
+			go high.method()
+			continue mainLoop
+		case med := <-mediumPriorityChannel:
+			go med.method()
+			continue mainLoop
+		case low := <-lowPriorityChannel:
+			go low.method()
+			continue mainLoop
+		default:
+		}
+
+		select {
+		case sig := <-quit:
+			DEBUG("", "exit signal caught: ", sig.String())
+			CancelFunc()
+			CleanupOnClose()
+			os.Exit(1)
+
+		case IF := <-interfaceMonitor:
+			go IF.ReadFromTunnelInterface()
+		case Tun := <-tunnelMonitor:
+			go Tun.ReadFromServeTunnel()
+
+		case signal := <-concurrencyMonitor:
+			DEBUG(signal.tag)
+			go signal.execute()
+
+		default:
+			time.Sleep(200 * time.Millisecond)
+		}
+	}
+}
+
 func writeConfigToDisk() (err error) {
 	defer RecoverAndLogToFile()
 	conf := CONFIG.Load()
@@ -239,13 +364,6 @@ func writeConfigToDisk() (err error) {
 	}
 
 	return
-}
-
-func (m *TUN) LoadPrivateCerts(certpath string) (p *x509.CertPool, err error) {
-	if len(m.ServerCertBytes) > 0 {
-		return LoadPrivateCertFromBytes(m.ServerCertBytes)
-	}
-	return LoadPrivateCert(certpath)
 }
 
 func LoadPrivateCertFromBytes(data []byte) (pool *x509.CertPool, err error) {
@@ -378,10 +496,33 @@ func loadTunnelsFromDisk() {
 	}
 
 	if !foundDefault {
-		newTun := createDefaultTunnelMeta()
+		cli := CLIConfig.Load()
+		newTun := createDefaultTunnelMeta(cli.Enabled)
 		TunnelMetaMap.Store(newTun.Tag, newTun)
 		_ = writeTunnelsToDisk(newTun.Tag)
 	}
+}
+
+func DefaultMinimalConfig(withDNS bool) *configV2 {
+	conf := &configV2{
+		DebugLogging:     true,
+		InfoLogging:      true,
+		ErrorLogging:     true,
+		ConnectionTracer: false,
+		ConsoleLogging:   true,
+		ConsoleLogOnly:   true,
+	}
+	if withDNS {
+		conf.DNSServerIP = "0.0.0.0"
+		conf.DNSServerPort = "53"
+		conf.DNS1Default = "1.1.1.1"
+		conf.DNS2Default = "8.8.8.8"
+		conf.LogBlockedDomains = true
+		conf.LogAllDomains = true
+		conf.DNSstats = true
+		conf.DNSBlockLists = GetDefaultBlockLists()
+	}
+	return conf
 }
 
 // DefaultConfig returns a new configV2 with default values
@@ -415,8 +556,13 @@ func loadConfigFromDisk() error {
 		return nil
 	}
 
+	cli := CLIConfig.Load()
+	if cli.Enabled {
+		CONFIG.Store(DefaultMinimalConfig(cli.DNS))
+	} else {
+		CONFIG.Store(DefaultConfig())
+	}
 	DEBUG("Generating a new default config")
-	CONFIG.Store(DefaultConfig())
 	return writeConfigToDisk()
 }
 
@@ -521,4 +667,46 @@ func isWSL() bool {
 		return false
 	}
 	return strings.Contains(strings.ToLower(string(releaseData)), "microsoft")
+}
+
+func getServerByID(secure bool, authServer string, deviceKey string, deviceToken string, UserID string, ServerID string) (s *types.Server, err error) {
+	SID, _ := primitive.ObjectIDFromHex(ServerID)
+	UID, _ := primitive.ObjectIDFromHex(UserID)
+
+	FR := &FORWARD_REQUEST{
+		URL:     "https://" + authServer,
+		Secure:  secure,
+		Path:    "/v3/server",
+		Method:  "POST",
+		Timeout: 10000,
+		JSONData: &types.FORM_GET_SERVER{
+			DeviceToken: deviceToken,
+			DeviceKey:   deviceKey,
+			UID:         UID,
+			ServerID:    SID,
+		},
+	}
+	responseBytes, code, err := SendRequestToURL(
+		nil,
+		FR.Method,
+		FR.URL+FR.Path,
+		FR.JSONData,
+		FR.Timeout,
+		FR.Secure,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %s", "error calling controller", err)
+	}
+	if code != 200 {
+		return nil, fmt.Errorf("%s: %d", "invalid code from controller", code)
+	}
+
+	fmt.Println(responseBytes)
+	fmt.Println(string(responseBytes))
+	s = new(types.Server)
+	err = json.Unmarshal(responseBytes, s)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %s", "invalid response from controller", err)
+	}
+	return
 }

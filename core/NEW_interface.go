@@ -19,18 +19,26 @@ func AutoConnect() {
 	defer RecoverAndLogToFile()
 
 	tunnelMetaMapRange(func(meta *TunnelMETA) bool {
-		if !meta.AutoConnect {
+		if !meta.AutoConnect || meta.ServerID == "" {
 			return true
 		}
-		// code, err := PublicConnect(&ConnectionRequest{
-		// 	Tag:        meta.Tag,
-		// 	DeviceKey:  meta.deviceKey,
-		// 	ServerIP:   meta.ServerIP,
-		// 	ServerPort: meta.ServerPort,
-		// })
-		// if err != nil {
-		// 	ERROR("Unable to connect, return code: ", code, " // error: ", err)
+		// TODO: update when multi-user support is enabled
+		// if meta.Tag != DefaultTunnelName && meta.UserID == "" {
+		// 	return true
 		// }
+
+		user, err := loadUser()
+		if err != nil {
+			return true
+		}
+		code, err := PublicConnect(&ConnectionRequest{
+			Tag:         meta.Tag,
+			ServerID:    meta.ServerID,
+			DeviceToken: user.DeviceToken.DT,
+		})
+		if err != nil {
+			ERROR("Unable to connect, return code: ", code, " // error: ", err)
+		}
 		return true
 	})
 }
@@ -69,10 +77,10 @@ func PingConnections() {
 	}()
 	defer RecoverAndLogToFile()
 
-	conf := CONFIG.Load()
+	cli := CLIConfig.Load()
 
 	// Only send statistics for minimal clients
-	if conf.Minimal {
+	if cli.Enabled && cli.SendStats {
 		PopulatePingBufferWithStats()
 	}
 

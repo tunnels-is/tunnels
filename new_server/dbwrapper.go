@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/tunnels-is/tunnels/types"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -85,7 +86,7 @@ func DB_DeleteDeviceByID(id primitive.ObjectID) (err error) {
 	return
 }
 
-func DB_UpdateDevice(D *Device) (err error) {
+func DB_UpdateDevice(D *types.Device) (err error) {
 	defer BasicRecover()
 
 	filter := bson.M{
@@ -101,7 +102,7 @@ func DB_UpdateDevice(D *Device) (err error) {
 				{
 					Key: "$set",
 					Value: bson.D{
-						{Key: "Tag", Value: D.Hostname},
+						{Key: "Tag", Value: D.Tag},
 					},
 				},
 			},
@@ -122,7 +123,7 @@ func DB_UpdateDevice(D *Device) (err error) {
 	return
 }
 
-func DB_GetDevices(limit, offset int64) (DL []*Device, err error) {
+func DB_GetDevices(limit, offset int64) (DL []*types.Device, err error) {
 	defer BasicRecover()
 
 	opt := options.Find()
@@ -143,9 +144,9 @@ func DB_GetDevices(limit, offset int64) (DL []*Device, err error) {
 		return nil, err
 	}
 
-	DL = make([]*Device, 0)
+	DL = make([]*types.Device, 0)
 	for cursor.Next(context.TODO()) {
-		D := new(Device)
+		D := new(types.Device)
 		err = cursor.Decode(D)
 		if err != nil {
 			ADMIN(3, "Unable to decode user to struct: ", err)
@@ -494,7 +495,7 @@ func DB_userUpdateResetCode(user *User) error {
 	return nil
 }
 
-func DB_FindServersWithoutGroups(limit, offset int64) (DL []*Server, err error) {
+func DB_FindServersWithoutGroups(limit, offset int64) (DL []*types.Server, err error) {
 	defer BasicRecover()
 
 	opt := options.Find()
@@ -521,9 +522,9 @@ func DB_FindServersWithoutGroups(limit, offset int64) (DL []*Server, err error) 
 		return nil, err
 	}
 
-	DL = make([]*Server, 0)
+	DL = make([]*types.Server, 0)
 	for cursor.Next(context.TODO()) {
-		D := new(Server)
+		D := new(types.Server)
 		err = cursor.Decode(D)
 		if err != nil {
 			ADMIN(3, "Unable to decode device to struct: ", err)
@@ -535,7 +536,7 @@ func DB_FindServersWithoutGroups(limit, offset int64) (DL []*Server, err error) 
 	return
 }
 
-func DB_FindServersByGroups(groups []primitive.ObjectID, limit, offset int64) (DL []*Server, err error) {
+func DB_FindServersByGroups(groups []primitive.ObjectID, limit, offset int64) (DL []*types.Server, err error) {
 	defer BasicRecover()
 
 	opt := options.Find()
@@ -560,9 +561,9 @@ func DB_FindServersByGroups(groups []primitive.ObjectID, limit, offset int64) (D
 		return nil, err
 	}
 
-	DL = make([]*Server, 0)
+	DL = make([]*types.Server, 0)
 	for cursor.Next(context.TODO()) {
-		D := new(Server)
+		D := new(types.Server)
 		err = cursor.Decode(D)
 		if err != nil {
 			ADMIN(3, "Unable to decode device to struct: ", err)
@@ -617,7 +618,7 @@ func DB_FindEntitiesByGroupID(id primitive.ObjectID, objType string, limit, offs
 	for cursor.Next(context.TODO()) {
 		switch objType {
 		case "server":
-			E := new(Server)
+			E := new(types.Server)
 			err = cursor.Decode(E)
 			if err != nil {
 				ADMIN(3, "Unable to decode device to struct: ", err)
@@ -633,7 +634,7 @@ func DB_FindEntitiesByGroupID(id primitive.ObjectID, objType string, limit, offs
 			}
 			IL = append(IL, E)
 		case "device":
-			E := new(Device)
+			E := new(types.Device)
 			err = cursor.Decode(E)
 			if err != nil {
 				ADMIN(3, "Unable to decode device to struct: ", err)
@@ -683,7 +684,7 @@ func DB_UpdateGroup(G *Group) (err error) {
 	return
 }
 
-func DB_UpdateServer(S *Server) (RS *Server, err error) {
+func DB_UpdateServer(S *types.Server) (RS *types.Server, err error) {
 	defer BasicRecover()
 
 	filter := bson.M{
@@ -718,7 +719,7 @@ func DB_UpdateServer(S *Server) (RS *Server, err error) {
 	return
 }
 
-func DB_CreateDevice(D *Device) (err error) {
+func DB_CreateDevice(D *types.Device) (err error) {
 	defer BasicRecover()
 
 	_, err = DB.Database(DEVICE_DATABASE).
@@ -754,7 +755,7 @@ func DB_CreateGroup(G *Group) (err error) {
 	return
 }
 
-func DB_CreateServer(S *Server) (err error) {
+func DB_CreateServer(S *types.Server) (err error) {
 	defer BasicRecover()
 
 	_, err = DB.Database(SERVER_DATABASE).
@@ -772,14 +773,14 @@ func DB_CreateServer(S *Server) (err error) {
 	return
 }
 
-func DB_FindServerByID(ID primitive.ObjectID) (S *Server, err error) {
+func DB_FindServerByID(ID primitive.ObjectID) (S *types.Server, err error) {
 	defer BasicRecover()
 
 	filter := bson.M{
 		"_id": ID,
 	}
 
-	S = new(Server)
+	S = new(types.Server)
 	err = DB.Database(SERVER_DATABASE).
 		Collection(SERVER_COLLECTION).
 		FindOne(
@@ -975,11 +976,11 @@ func DB_RemoveFromGroup(groupID primitive.ObjectID, typeID primitive.ObjectID, o
 	return
 }
 
-func DB_FindDeviceByID(id primitive.ObjectID) (dev *Device, err error) {
+func DB_FindDeviceByID(id primitive.ObjectID) (dev *types.Device, err error) {
 	defer BasicRecover()
 
 	opt := options.FindOne()
-	dev = new(Device)
+	dev = new(types.Device)
 
 	filter := bson.M{"_id": id}
 	err = DB.Database(DEVICE_DATABASE).

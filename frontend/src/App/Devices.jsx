@@ -57,7 +57,7 @@ const Devices = () => {
 	}
 
 	const newDevice = () => {
-		setDevice({ Tag: "", Hostname: "", Groups: [] })
+		setDevice({ Tag: "", Groups: [] })
 		setEditModalOpen(true)
 	}
 
@@ -74,7 +74,6 @@ const Devices = () => {
 		},
 		columns: {
 			Tag: true,
-			Hostname: true,
 			_id: true,
 			CreatedAt: true,
 		},
@@ -96,7 +95,7 @@ const Devices = () => {
 			},
 		},
 		columnClass: {},
-		headers: ["Tag", "Hostname", "ID", "CreatedAt"],
+		headers: ["Tag", "ID", "CreatedAt"],
 		headerClass: {},
 		opts: {
 			RowPerPage: 50,

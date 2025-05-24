@@ -25,7 +25,6 @@ func saveUser(u *User) (err error) {
 
 	encryptged, err := Encrypt(ub, []byte("01234567890123456789012345678900"))
 	if err != nil {
-		fmt.Println("ENCVERR:", err)
 		return err
 	}
 

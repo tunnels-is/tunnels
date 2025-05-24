@@ -146,13 +146,13 @@ func ResolveDomainLocal(tun *TUN, m *dns.Msg, w dns.ResponseWriter) {
 	}
 }
 
-func ResolveDomain(m *dns.Msg, w dns.ResponseWriter) {
+func ResolveDomain(m *dns.Msg, w dns.ResponseWriter) (err error) {
 	if GlobalBlockEnabled(m, w) {
-		return
+		DEBUG("global dns lock enabled due to connection switching")
+		return fmt.Errorf("dns lock enabled")
 	}
 
 	start := time.Now()
-	var err error
 	var r *dns.Msg
 	var server string
 	conf := CONFIG.Load()
@@ -187,6 +187,7 @@ func ResolveDomain(m *dns.Msg, w dns.ResponseWriter) {
 	if err != nil {
 		ERROR("Unable to  write dns reply:", err)
 	}
+	return nil
 }
 
 func ProcessDNSMsg(m *dns.Msg, DNS *types.DNSRecord) (rm *dns.Msg) {
@@ -359,9 +360,15 @@ func DNSQuery(w dns.ResponseWriter, m *dns.Msg) {
 	}
 
 	if conf.DNSOverHTTPS {
-		ResolveDNSAsHTTPS(m, w)
+		err := ResolveDNSAsHTTPS(m, w)
+		if err != nil {
+			_ = w.WriteMsg(m)
+		}
 	} else {
-		ResolveDomain(m, w)
+		err := ResolveDomain(m, w)
+		if err != nil {
+			_ = w.WriteMsg(m)
+		}
 	}
 }
 
@@ -458,16 +465,18 @@ func isBlocked(m *dns.Msg) (ok bool, tag string) {
 	return ok, tag
 }
 
-func ResolveDNSAsHTTPS(m *dns.Msg, w dns.ResponseWriter) {
+func ResolveDNSAsHTTPS(m *dns.Msg, w dns.ResponseWriter) (err error) {
 	if GlobalBlockEnabled(m, w) {
-		return
+		DEBUG("global dns lock enabled due to connection switching")
+		return fmt.Errorf("dns lock enabled")
 	}
+
 	conf := CONFIG.Load()
 	start := time.Now()
 	x, err := m.Pack()
 	if err != nil {
 		ERROR("unable to prepare DNS msg as HTTPS msg")
-		return
+		return err
 	}
 
 	cln := &http.Client{
@@ -484,7 +493,7 @@ func ResolveDNSAsHTTPS(m *dns.Msg, w dns.ResponseWriter) {
 	req1, err = http.NewRequest("POST", "https://"+conf.DNS1Default+"/dns-query", bytes.NewBuffer(x))
 	if err != nil {
 		ERROR("unable to create http.request for DNS query")
-		return
+		return err
 	}
 
 	req1.Header.Add("accept", "application/dns-message")
@@ -497,7 +506,7 @@ func ResolveDNSAsHTTPS(m *dns.Msg, w dns.ResponseWriter) {
 			req2, err = http.NewRequest("POST", "https://"+conf.DNS2Default+"/dns-query", bytes.NewBuffer(x))
 			if err != nil {
 				ERROR("unable to create http.request for DNS query")
-				return
+				return err
 			}
 
 			req2.Header.Add("accept", "application/dns-message")
@@ -511,14 +520,14 @@ func ResolveDNSAsHTTPS(m *dns.Msg, w dns.ResponseWriter) {
 			} else {
 				ERROR("unable to query dns over https: ", m.Question[0].Name, " err: ", err)
 			}
-			return
+			return err
 		}
 	}
 
 	bb, err := io.ReadAll(resp.Body)
 	if err != nil {
 		ERROR("Unable to read DNS over HTTP response body:", err)
-		return
+		return err
 	}
 
 	newx := new(dns.Msg)
@@ -528,13 +537,14 @@ func ResolveDNSAsHTTPS(m *dns.Msg, w dns.ResponseWriter) {
 	w.Close()
 	if err != nil {
 		ERROR("Unable to  write dns reply:", err)
-		return
+		return err
 	}
 
 	INFO("DNS(https): ", m.Question[0].Name, fmt.Sprintf("(%d)ms ", time.Since(start).Milliseconds()), " @  ", server)
 	if conf.DNSstats {
 		IncrementDNSStats(m.Question[0].Name, false, "", newx.Answer)
 	}
+	return nil
 }
 
 func IncrementDNSStats(domain string, blocked bool, tag string, answers []dns.RR) {
