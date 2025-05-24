@@ -97,7 +97,7 @@ const Groups = () => {
       _id: true,
       CreatedAt: true,
     },
-    columFormat: {
+    columnFormat: {
       CreatedAt: (obj) => {
         return dayjs(obj.CreatedAt).format("HH:mm:ss DD-MM-YYYY")
       }

@@ -439,4 +439,5 @@ type Group struct {
 	ID          primitive.ObjectID `json:"_id" bson:"_id"`
 	Tag         string             `json:"Tag" bson:"Tag"`
 	Description string             `json:"Description" bson:"Description"`
+	CreatedAt   time.Time          `json:"CreatedAt" bson:"CreatedAt"`
 }

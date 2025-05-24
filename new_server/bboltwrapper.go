@@ -828,11 +828,6 @@ func objectIDToString(id interface{}) string {
 	}
 }
 
-func stringToObjectID(id string) primitive.ObjectID {
-	objID, _ := primitive.ObjectIDFromHex(id)
-	return objID
-}
-
 // Helper: convert []primitive.ObjectID <-> []string
 func objectIDSliceToString(slice interface{}) []string {
 	var out []string
