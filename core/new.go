@@ -35,6 +35,7 @@ const (
 var (
 	STATE  atomic.Pointer[stateV2]
 	CONFIG atomic.Pointer[configV2]
+	CLI    atomic.Pointer[CLIInfo]
 
 	// Tunnels, Servers, Meta
 	TunnelMetaMap sync.Map
@@ -67,6 +68,13 @@ var (
 	DNSCache       sync.Map
 	DNSStatsMap    sync.Map
 )
+
+type CLIInfo struct {
+	AuthServer  string
+	DeviceToken string
+	ServerID    string
+	Minimal     bool
+}
 
 type configV2 struct {
 	Minimal bool

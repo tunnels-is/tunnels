@@ -1,29 +1,26 @@
 package main
 
 import (
+	"flag"
+
 	"github.com/tunnels-is/tunnels/cmd/service"
+	"github.com/tunnels-is/tunnels/core"
 )
 
 func main() {
-	// cli := core.CLI.Load()
-	// flag.StringVar(&cli.DNS, "DNS", "", "Tunnels will use this DNS to fetch connection info ( optional )")
-	//
-	// // Non-DNS startup options
-	// flag.StringVar(&cli.Host, "host", "", "Custom server hostname ( not needed if dns is used )")
-	// flag.StringVar(&cli.Port, "port", "", "Custom port ( not needed if dns is used )")
-	// flag.StringVar(&cli.ServerID, "serverID", "", "Server ID ( not needed if dns is used )")
-	//
-	// // Other
-	// flag.StringVar(&cli.Hostname, "hostname", "", "Custom hostname for this device")
-	// flag.StringVar(&cli.DeviceKey, "deviceKey", "", "Device Key used to authenticate your account")
-	// flag.BoolVar(&cli.DisableVPLFirewall, "disableVPLFirewall", false, "Disable the VPL firewall, allowing all devices to communicate with this device")
-	// flag.StringVar(&cli.BasePath, "basePath", "", "manualy set base path for the config and log files ( optional, default location is in the binary dir )")
-	// flag.Parse()
-	//
-	// if cli.DeviceKey == "" {
-	// 	fmt.Println("-deviceKey missing")
-	// 	return
-	// }
+	cli := core.CLI.Load()
+	flag.StringVar(&cli.AuthServer, "auth", "api.tunnels.is", "The auth server you want to use")
+	flag.StringVar(&cli.DeviceToken, "device", "", "the device token")
+	flag.StringVar(&cli.DeviceToken, "serverID", "", "the server you want to connect to")
+	cli.Minimal = true
+	core.CLI.Store(cli)
+	flag.Parse()
+
+	// CAN WE SKIP DISK CONFIG ??
+
+	// GET SERVER AND DEVICE
+	// create default tunnel + assign
+	// connect ?
 
 	service.Start()
 }
