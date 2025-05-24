@@ -24,5 +24,5 @@ func main() {
 
 	core.DIST_EMBED = DIST
 	core.DLL_EMBED = DLL
-	service.Start()
+	service.Start(false)
 }

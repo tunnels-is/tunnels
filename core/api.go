@@ -23,7 +23,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/miekg/dns"
-	"github.com/tunnels-is/tunnels/certs"
 	"github.com/tunnels-is/tunnels/crypt"
 	"github.com/tunnels-is/tunnels/types"
 	"github.com/xlzd/gotp"
@@ -138,9 +137,9 @@ func ForwardToController(FR *FORWARD_REQUEST) (any, int) {
 		return er, 500
 	}
 
-	var respJSON any
+	var respObj any
 	if len(responseBytes) != 0 {
-		err = json.Unmarshal(responseBytes, &respJSON)
+		err = json.Unmarshal(responseBytes, &respObj)
 		if err != nil {
 			ERROR("Could not parse response data: ", err)
 			er.Error = "Unable to open response from controller"
@@ -148,7 +147,7 @@ func ForwardToController(FR *FORWARD_REQUEST) (any, int) {
 		}
 	}
 
-	return respJSON, code
+	return respObj, code
 }
 
 var AZ_CHAR_CHECK = regexp.MustCompile(`^[a-zA-Z0-9]*$`)
@@ -324,14 +323,16 @@ func InitializeTunnelFromCRR(TUN *TUN) (err error) {
 	TUN.localInterfaceIP4bytes[2] = TUN.localInterfaceNetIP[2]
 	TUN.localInterfaceIP4bytes[3] = TUN.localInterfaceNetIP[3]
 
-	TUN.localDNSClient = new(dns.Client)
-	TUN.localDNSClient.Dialer = new(net.Dialer)
-	TUN.localDNSClient.Dialer.LocalAddr = &net.UDPAddr{
-		IP: TUN.localInterfaceNetIP.To4(),
+	if DNSClient.Dialer != nil {
+		TUN.localDNSClient = new(dns.Client)
+		TUN.localDNSClient.Dialer = new(net.Dialer)
+		TUN.localDNSClient.Dialer.LocalAddr = &net.UDPAddr{
+			IP: TUN.localInterfaceNetIP.To4(),
+		}
+		TUN.localDNSClient.Dialer.Resolver = DNSClient.Dialer.Resolver
+		TUN.localDNSClient.Dialer.Timeout = time.Duration(5 * time.Second)
+		TUN.localDNSClient.Timeout = time.Second * 5
 	}
-	TUN.localDNSClient.Dialer.Resolver = DNSClient.Dialer.Resolver
-	TUN.localDNSClient.Dialer.Timeout = time.Duration(5 * time.Second)
-	TUN.localDNSClient.Timeout = time.Second * 5
 
 	TUN.serverInterfaceNetIP = net.ParseIP(TUN.ServerReponse.InterfaceIP).To4()
 	if TUN.serverInterfaceNetIP == nil {
@@ -418,10 +419,13 @@ func InitializeTunnelFromCRR(TUN *TUN) (err error) {
 	return nil
 }
 
-func PreConnectCheck() (int, error) {
+func PreConnectCheck(meta *TunnelMETA) (int, error) {
 	s := STATE.Load()
 	if !s.adminState {
 		return 400, errors.New("tunnels does not have the correct access permissions")
+	}
+	if meta.PreventIPv6 && IPv6Enabled() {
+		return 400, errors.New("IPV6 enabled, please disable before connecting")
 	}
 	return 0, nil
 }
@@ -429,7 +433,11 @@ func PreConnectCheck() (int, error) {
 var IsConnecting = atomic.Bool{}
 
 func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
-	fmt.Println(ClientCR)
+	if ClientCR.ServerID == "" {
+		ERROR("No Server id found when connecting: ", ClientCR)
+		return 400, errors.New("no server id found when connecting")
+	}
+
 	if !IsConnecting.CompareAndSwap(false, true) {
 		INFO("Already connecting to another connection, please wait a moment")
 		return 400, errors.New("Already connecting to another connection, please wait a moment")
@@ -442,11 +450,6 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		runtime.GC()
 	}()
 	defer RecoverAndLogToFile()
-
-	code, errm = PreConnectCheck()
-	if errm != nil {
-		return
-	}
 
 	state := STATE.Load()
 	loadDefaultGateway()
@@ -476,8 +479,9 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		return 400, errors.New("error fetching connection meta")
 	}
 
-	if meta.PreventIPv6 && IPv6Enabled() {
-		return 400, errors.New("IPV6 enabled, please disable before connecting")
+	code, errm = PreConnectCheck(meta)
+	if errm != nil {
+		return code, errm
 	}
 
 	isConnected := false
@@ -495,6 +499,7 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 
 		return true
 	})
+
 	if isConnected {
 		ERROR("Already connected to ", ClientCR.Tag)
 		return 400, errors.New("Already connected to " + ClientCR.Tag)
@@ -504,19 +509,23 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	tunnel.meta.Store(meta)
 	tunnel.CR = ClientCR
 
-	if meta.DNSDiscovery != "" {
-		DEBUG("looking for connection info @ ", meta.DNSDiscovery)
-		dnsInfo, err := certs.ResolveMetaTXT(meta.DNSDiscovery)
+	if ClientCR.ServerIP == "" {
+		server, err := getServerByID(
+			ClientCR.Secure,
+			ClientCR.URL,
+			ClientCR.DeviceKey,
+			ClientCR.DeviceToken,
+			ClientCR.UserID,
+			ClientCR.ServerID,
+		)
 		if err != nil {
-			ERROR("error looking up connection info: ", err)
+			ERROR("Error finding server", err)
 			return 400, err
 		}
 
-		DEBUG("DNS Info: ", dnsInfo.IP, dnsInfo.Port, dnsInfo.ServerID, "cert length: ", len(dnsInfo.Cert))
-		ClientCR.ServerPort = dnsInfo.Port
-		ClientCR.ServerIP = dnsInfo.IP
-		ClientCR.ServerID = dnsInfo.ServerID
-		tunnel.ServerCertBytes = dnsInfo.Cert
+		ClientCR.ServerPort = server.Port
+		ClientCR.ServerIP = server.IP
+		ClientCR.ServerPubKey = server.PubKey
 	}
 
 	if ClientCR.ServerIP == "" {
@@ -527,11 +536,10 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		ERROR("No Server Port found when connecting: ", ClientCR)
 		return 400, errors.New("no server port found when connecting")
 	}
-	if ClientCR.ServerID == "" {
-		ERROR("No Server id found when connecting: ", ClientCR)
-		return 400, errors.New("no server id found when connecting")
-	}
 
+	if ClientCR.DeviceKey != "" {
+		ClientCR.UserID = ClientCR.DeviceKey
+	}
 	UID, err := primitive.ObjectIDFromHex(ClientCR.UserID)
 	if err != nil {
 		ERROR("Invalid user ID")
@@ -539,24 +547,27 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	}
 	SID, err := primitive.ObjectIDFromHex(ClientCR.ServerID)
 	if err != nil {
-		ERROR("Invalid user ID")
-		return 400, errors.New("Invalid user ID")
+		ERROR("Invalid Server ID")
+		return 400, errors.New("Invalid Server ID")
 	}
 
 	FinalCR := new(types.ControllerConnectRequest)
 	FinalCR.Created = time.Now()
 	FinalCR.Version = apiVersion
 	FinalCR.UserID = UID
-	FinalCR.EncType = ClientCR.EncType
-	FinalCR.DHCPToken = meta.DHCPToken
 	FinalCR.ServerID = SID
-	FinalCR.CurveType = ClientCR.CurveType
 	FinalCR.DeviceKey = ClientCR.DeviceKey
 	FinalCR.DeviceToken = ClientCR.DeviceToken
+	FinalCR.EncType = meta.EncryptionType
+	FinalCR.CurveType = meta.CurveType
+	FinalCR.DHCPToken = meta.DHCPToken
 	FinalCR.RequestingPorts = meta.RequestVPNPorts
 	DEBUG("ConnectRequestFromClient", ClientCR)
 
-	// TODO.. think about private certs ? or just make auto let's encrypt service ?
+	if !strings.HasPrefix("https://", ClientCR.URL) {
+		ClientCR.URL = "https://" + ClientCR.URL
+	}
+
 	bytesFromController, code, err := SendRequestToURL(
 		nil,
 		"POST",
@@ -587,7 +598,7 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		return 502, errors.New("invalid response from controller")
 	}
 
-	tunnel.encWrapper, err = crypt.NewEncryptionHandler(ClientCR.EncType, ClientCR.CurveType)
+	tunnel.encWrapper, err = crypt.NewEncryptionHandler(meta.EncryptionType, meta.CurveType)
 	if err != nil {
 		ERROR("unable to create encryption handler: ", err)
 		return 502, errors.New("Unable to secure connection")

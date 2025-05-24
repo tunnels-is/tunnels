@@ -67,6 +67,31 @@ const (
 	ConfigStore SecretStore = "config"
 )
 
+type Device struct {
+	ID        primitive.ObjectID   `json:"_id" bson:"_id"`
+	CreatedAt time.Time            `json:"CreatedAt" bson:"CreatedAt"`
+	Tag       string               `json:"Tag" bson:"Tag"`
+	Groups    []primitive.ObjectID `json:"Groups" bson:"Groups"`
+}
+
+type FORM_GET_SERVER struct {
+	DeviceToken string             `json:"DeviceToken"`
+	DeviceKey   string             `json:"DeviceKey"`
+	UID         primitive.ObjectID `json:"UID"`
+	ServerID    primitive.ObjectID `json:"ServerID"`
+}
+
+type Server struct {
+	ID       primitive.ObjectID   `json:"_id" bson:"_id"`
+	Tag      string               `json:"Tag" bson:"Tag"`
+	Country  string               `json:"Country" bson:"Country"`
+	IP       string               `json:"IP" bson:"IP"`
+	Port     string               `json:"Port" bson:"Port"`
+	DataPort string               `json:"DataPort" bson:"DataPort"`
+	PubKey   string               `json:"PubKey,omitempty" bson:"PubKey"`
+	Groups   []primitive.ObjectID `json:"Groups,omitempty" bson:"Groups"`
+}
+
 type TwoFAPending struct {
 	AuthID  string
 	UserID  string
@@ -229,4 +254,8 @@ func (d *DHCPRecord) Assign() (ok bool) {
 		return
 	}
 	return
+}
+
+type FORM_GET_DEVICE struct {
+	DeviceID primitive.ObjectID
 }

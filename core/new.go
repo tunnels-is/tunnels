@@ -18,6 +18,7 @@ import (
 func init() {
 	STATE.Store(&stateV2{})
 	CONFIG.Store(&configV2{})
+	CLIConfig.Store(&CLIInfo{})
 }
 
 const (
@@ -33,9 +34,9 @@ const (
 )
 
 var (
-	STATE  atomic.Pointer[stateV2]
-	CONFIG atomic.Pointer[configV2]
-	CLI    atomic.Pointer[CLIInfo]
+	STATE     atomic.Pointer[stateV2]
+	CONFIG    atomic.Pointer[configV2]
+	CLIConfig atomic.Pointer[CLIInfo]
 
 	// Tunnels, Servers, Meta
 	TunnelMetaMap sync.Map
@@ -70,15 +71,17 @@ var (
 )
 
 type CLIInfo struct {
-	AuthServer  string
-	DeviceToken string
-	ServerID    string
-	Minimal     bool
+	AuthServer string
+	DeviceID   string
+	ServerID   string
+	DNS        bool
+	Secure     bool
+	Enabled    bool
+	SendStats  bool
 }
 
 type configV2 struct {
-	Minimal bool
-	OpenUI  bool
+	OpenUI bool
 
 	AuthServers        []string
 	DeviceKey          string
@@ -227,9 +230,9 @@ type TUN struct {
 	tunnel atomic.Pointer[TInterface] `json:"-"`
 
 	// encWrapper wraps connection with encryption
-	encWrapper      *crypt.SocketWrapper
-	connection      net.Conn
-	ServerCertBytes []byte `json:"-"`
+	encWrapper *crypt.SocketWrapper
+	connection net.Conn
+	// ServerCertBytes []byte `json:"-"`
 
 	// Connection Requests + Response
 	CR            *ConnectionRequest

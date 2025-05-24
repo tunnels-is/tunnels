@@ -8,19 +8,16 @@ import (
 )
 
 func main() {
-	cli := core.CLI.Load()
-	flag.StringVar(&cli.AuthServer, "auth", "api.tunnels.is", "The auth server you want to use")
-	flag.StringVar(&cli.DeviceToken, "device", "", "the device token")
-	flag.StringVar(&cli.DeviceToken, "serverID", "", "the server you want to connect to")
-	cli.Minimal = true
-	core.CLI.Store(cli)
+	cli := core.CLIConfig.Load()
+	flag.StringVar(&cli.AuthServer, "authHost", "api.tunnels.is", "The auth server you want to use")
+	flag.StringVar(&cli.DeviceID, "deviceID", "", "the device token")
+	flag.StringVar(&cli.ServerID, "serverID", "", "the server you want to connect to")
+	flag.BoolVar(&cli.DNS, "dns", false, "enable dns server")
+	flag.BoolVar(&cli.Secure, "secure", false, "validate TLS certificate")
+	flag.BoolVar(&cli.SendStats, "sendStats", true, "send device statistics")
+	cli.Enabled = true
+	core.CLIConfig.Store(cli)
 	flag.Parse()
 
-	// CAN WE SKIP DISK CONFIG ??
-
-	// GET SERVER AND DEVICE
-	// create default tunnel + assign
-	// connect ?
-
-	service.Start()
+	service.Start(true)
 }

@@ -19,11 +19,11 @@ func main() {
 	// core.CLIDeviceKey = "your-device-key"
 	// core.CLIDisableVPLFirewall = true
 
-	go service.StartWithExternalMonitor(ctx, 1, monitor)
+	go service.StartWithExternalMonitor(ctx, true, 1, monitor)
 	for {
 		select {
 		case id := <-monitor:
-			go service.StartWithExternalMonitor(ctx, id, monitor)
+			go service.StartWithExternalMonitor(ctx, true, id, monitor)
 		default:
 			time.Sleep(100 * time.Millisecond)
 		}
