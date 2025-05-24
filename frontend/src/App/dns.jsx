@@ -448,7 +448,7 @@ const DNS = () => {
           <GenericTable table={generateResolvesTable()} />
         </TabsContent>
         <TabsContent value="records">
-          <GenericTable table={generateDNSRecordsTable()} />
+          <GenericTable className={""} table={generateDNSRecordsTable()} />
           <NewObjectEditorDialog
             open={recordModal}
             onOpenChange={setRecordModal}
