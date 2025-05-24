@@ -58,16 +58,29 @@ const NewObjectEditor = (props) => {
           return
         }
 
+        let kk = props.opts?.nameMap[k] ? props.opts.nameMap[k] : k
+
         if (type === "array") {
           return walkArray(k)
         }
         if (k === "_id") {
           return
         }
+        if (props.opts?.fields[k] === "hidden") {
+          return
+        }
+        if (props.opts?.fields[k] === "readonly") {
+          return (< div key={k} className=" mt-2" >
+            <Label className="text-white" >{kk}</Label>
+            <Input disabled className={"w-[400px]" + state.Theme?.borderColor}
+              value={props.obj[k]} />
+          </div>)
+        }
+
         console.log(k)
         if (k === "CreatedAt" || k === "Added" || k === "UpdatedAt") {
           return (< div key={k} className=" mt-2" >
-            <Label className="text-white" >{k}</Label>
+            <Label className="text-white" >{kk}</Label>
             <Input disabled className={"w-[400px]" + state.Theme?.borderColor}
               value={props.obj[k]} />
           </div>
@@ -77,7 +90,7 @@ const NewObjectEditor = (props) => {
         if (k === "PubKey") {
           return (
             <div key={k} className="mt-4 mt-2">
-              <Label className="text-white" type="bool" >{k}</Label>
+              <Label className="text-white" type="bool" >{kk}</Label>
 
               <Textarea
                 className={"w-full" + state.Theme?.borderColor}
@@ -94,7 +107,7 @@ const NewObjectEditor = (props) => {
         if (type === "boolean") {
           return (
             <div key={k} className="mt-4 mt-2">
-              <Label className="text-white" type="bool" >{k}</Label>
+              <Label className="text-white" type="bool" >{kk}</Label>
               <Switch className="ml-2 "
                 checked={props.obj[k]}
                 onCheckedChange={(e) => {
@@ -109,7 +122,7 @@ const NewObjectEditor = (props) => {
         if (type === "string" || type === "number") {
           return (
             <div key={k} className=" mt-2">
-              <Label className="text-white" >{k}</Label>
+              <Label className="text-white" >{kk}</Label>
               <Input className={"w-[400px]" + state.Theme?.borderColor} onChange={(e) => {
                 if (type === "number") {
                   props.onChange(k, Number(e.target.value), type)

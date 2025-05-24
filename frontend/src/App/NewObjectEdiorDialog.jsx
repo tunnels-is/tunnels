@@ -21,9 +21,13 @@ const NewObjectEditorDialog = ({
   onChange,
   onArrayChange,
   saveButton,
+  opts,
   readOnly = false
 }) => {
   const state = GLOBAL_STATE("editor-dialog");
+  if (!object) {
+    return
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -40,6 +44,7 @@ const NewObjectEditorDialog = ({
         {object && (
           <div className=" max-h-[70vh] overflow-y-auto overflow-x-hidden pr-2">
             <NewObjectEditor
+              opts={opts}
               obj={object}
               onChange={onChange}
               onArrayChange={onArrayChange}

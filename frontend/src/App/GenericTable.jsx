@@ -120,7 +120,7 @@ const GenericTable = (props) => {
         if (t.columnFormat && t.columnFormat[key]) {
           cd = t.columnFormat[key](t.data[i]);
         }
-        if (key === "Tag") {
+        if (key === "Tag" || key === "Email") {
           return (
             <TableCell className={dc} onClick={() => click(t.data[i])}>
               <Badge className={"cursor-pointer" + state.Theme?.badgeNeutral}> {cd}</Badge>
@@ -260,7 +260,7 @@ const GenericTable = (props) => {
               className={"flex items-center gap-1" + state.Theme?.successBtn}
               onClick={() => t.Btn.New()}
             >
-              Create
+              {props.newButtonLabel ? props.newButtonLabel : "Create"}
             </Button>
           </div>
         )}

@@ -81,7 +81,7 @@ const SideBar = () => {
         ],
       },
       {
-        title: "Tunnels",
+        title: "",
         user: false,
         items: [
           { icon: LockClosedIcon, label: "VPN", route: "servers", user: true, },
@@ -188,7 +188,12 @@ const SideBar = () => {
                       return false;
                     }
 
-                    const isActive = sp[1] === i.route;
+                    let isActive = false
+                    if (sp[1].includes(i.route)) {
+                      isActive = true
+
+                    }
+                    // const isActive = sp[1] === i.route;
 
                     return (
                       <button

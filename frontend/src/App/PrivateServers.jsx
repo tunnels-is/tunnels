@@ -185,8 +185,7 @@ const PrivateServers = () => {
 			},
 			Country: true,
 			IP: true,
-			Port: true,
-			DataPort: true,
+			_id: true,
 		},
 		columFormat: {},
 		customColumns: {
@@ -209,7 +208,12 @@ const PrivateServers = () => {
 			},
 		},
 		columnClass: {},
-		headers: ["Tag", "Country", "IP", "Port", "DataPort", "Tunnels"],
+		headerFormat: {
+			_id: () => {
+				return "ID"
+			}
+		},
+		headers: ["Tag", "Country", "IP", "_id", "Interface"],
 		headerClass: {},
 		opts: {
 			RowPerPage: 50,

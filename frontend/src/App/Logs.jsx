@@ -16,7 +16,6 @@ const Logs = () => {
 
   let logs = state.logs
   let classes = "bottom-loader"
-  let hideClasses = "item"
 
   return (
     <div className={classes}  >

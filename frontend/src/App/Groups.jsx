@@ -90,7 +90,7 @@ const Groups = () => {
   let table = {
     data: groups,
     rowClick: (obj) => {
-      navigate("/inspect/group/" + obj._id)
+      navigate("/groups/" + obj._id)
     },
     columns: {
       Tag: true,
