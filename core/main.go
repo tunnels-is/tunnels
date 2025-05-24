@@ -31,10 +31,19 @@ func InitService() error {
 	InitDNSHandler()
 	INFO("Starting Tunnels")
 
-	set := CONFIG.Load()
+	conf := CONFIG.Load()
+
+	// over write config with cli options
+	cli := CLI.Load()
+	if cli.Minimal {
+		conf.Minimal = true
+		conf.OpenUI = false
+		CONFIG.Store(conf)
+	}
+
 	s := STATE.Load()
 
-	if !set.ConsoleLogOnly {
+	if !conf.ConsoleLogOnly {
 		var err error
 		LogFile, err = CreateFile(s.LogFileName)
 		if err != nil {
@@ -53,7 +62,7 @@ func InitService() error {
 
 	INFO("Loading certificates")
 
-	if !set.Minimal {
+	if !conf.Minimal {
 		doEvent(highPriorityChannel, func() {
 			reloadBlockLists(false, true)
 		})
