@@ -1,6 +1,6 @@
 //go:build darwin
 
-package core
+package client
 
 import (
 	"os"
