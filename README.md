@@ -5,7 +5,7 @@
 # Tunnels
 this readme is in progress..
 
-# Liecens
+# LICENSE
 https://github.com/tunnels-is/tunnels/blob/main/LICENSE
 
 # Block List Source
