@@ -20,6 +20,8 @@ cmd/min/tunnels*
 cmd/min/api.key
 cmd/min/api.crt
 cmd/min/private.crt
+cmd/min/*.tun.json
+cmd/min/*.tun.json.bak
 
 cmd/main/files
 cmd/main/logs
@@ -33,7 +35,8 @@ cmd/main/tunnels*
 cmd/main/api.key
 cmd/main/api.crt
 cmd/main/private.crt
-*.exe
+cmd/main/*.tun.json
+cmd/main/*.tun.json.bak*.exe
 
 node_modules
 files
