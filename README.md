@@ -6,23 +6,10 @@
 this readme is in progress..
 
 # Liecens
-A business source license will be added soon (tm)
-
-# Main golang module licenses
- - go-ping: MIT
- - google/uuid: BSD 3-Clause "New" or "Revised" License
- - jackpal/gateway: Using a copy of googles BSD 3-Claus license (not a valid license)
- - github.com/miekg/dns: BSD 3-Clause "New" or "Revised" License
- - github.com/shirou/gopsutil: BSD license
- - github.com/vishvananda/netlink: Apache License 2.0
- - github.com/xlzd/gotp: MIT
- - go.mongodb.org/mongo-driver: Apache License 2.0
- - kernel.org/pub/linux/libs/security/libcap/cap: BSD-3-Clause OR GPL-2.0-only
-  - https://sites.google.com/site/fullycapable
+https://github.com/tunnels-is/tunnels/blob/main/LICENSE
 
 # Block List Source
 - https://github.com/n00bady/bluam
-
 
 # Linux
 ## Binary permissions
@@ -34,36 +21,18 @@ Needs to run as admin
 # MacOS
 Needs to run as sudo
 
-# private server
- - run server with custom cert generation
- - create server in UI with serial
- - create tunnels for server
-    - assign server to tunnel
-    - give tunnel ip + port
-
-# notes
-InterfaceIP == vpn outgoing IP
-
 # iptables
 $ iptables -I OUTPUT -p tcp --src {interface_IP} --tcp-flags ACK,RST RST -j DROP
 
-
 # Building
- - toggle debug to false in app.jsx
- - $ goreleaser release --clean ( add GITHUB_TOKEN )
- - $ goreleaser build --snapchot --clean 
+ - DEV: ./releaser-build-snapshot.sh
+ - PROD: ./releaser-build-release.sh ( requires GITHUB_TOKEN )
 
 # Setting up a dev environment 
 ## GUI
-the entire gui is located in ./fronend just run `npm run dev` from that dir
+the entire gui is located in ./fronend just run `vite dev` from that dir
 ## Backend
-We have two backends, one is the `iot` client and the other is the full client.
-The full client can be found in: `cmd/main` just run `go build .` and then start the client.
-
-NOTE: macos requies sudo, windows requires admin, linux requires set cap:
-```bash
-$ sudo setcap 'cap_net_raw,cap_net_bind_service,cap_net_admin+eip' main
-```
+The client can be found in: `cmd/main` just run `go build .` the webUI should open in your default browser.
 
 # Live Development
 [Keyb1nd_ twitch stream](https://twitch.tv/keyb1nd_)
@@ -72,11 +41,9 @@ $ sudo setcap 'cap_net_raw,cap_net_bind_service,cap_net_admin+eip' main
 These are the real MVPs:
 
     - n00bady: creator of bluam
-    - 0xMALVEE: for being the first contributor
+    - 0xMALVEE: for major contributiosn to the front-end
     - keyb1nd_'s twitch chat for the backseat debugging and support!
-
-
-
+    - comahacks for security reviews
 
 [forks-shield]: https://img.shields.io/github/forks/tunnels-is/tunnels?style=for-the-badge&logo=github
 [forks-url]: https://github.com/tunnels-is/tunnels/network/members
