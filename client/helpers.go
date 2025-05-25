@@ -1,7 +1,6 @@
 package client
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -45,7 +44,6 @@ func InitBaseFoldersAndPaths() {
 		if err != nil {
 			wd, err := os.Getwd()
 			if err != nil {
-				fmt.Println("Unable to find working directory!", err.Error())
 				panic(err)
 			}
 			basePath = wd + string(os.PathSeparator)

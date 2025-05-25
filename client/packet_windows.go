@@ -3,7 +3,6 @@
 package client
 
 import (
-	"fmt"
 	"runtime/debug"
 	"time"
 
@@ -86,20 +85,17 @@ func (T *TInterface) ReadFromTunnelInterface() {
 		}
 
 		if Tun.GetState() == TUN_Disconnected {
-			fmt.Println("not connected..")
 			time.Sleep(5 * time.Millisecond)
 			continue
 		}
 
 		shouldSend := Tun.ProcessEgressPacket(&packet)
 		if !shouldSend {
-			fmt.Println("not sending:", len(packet))
 			continue
 		}
 
 		writtenBytes, err = Tun.connection.Write(Tun.encWrapper.SEAL.Seal1(packet, Tun.Index))
 		if err != nil {
-			fmt.Println("FAIL:", err)
 			ERROR("router write error: ", err)
 			continue
 		}
@@ -163,20 +159,17 @@ func (V *TUN) ReadFromServeTunnel() {
 		V.ingressBytes.Add(int64(n))
 
 		if len(packet) < 20 {
-			fmt.Println("PING!")
 			go V.RegisterPing(CopySlice(packet))
 			continue
 		}
 
 		if !V.ProcessIngressPacket(packet) {
-			fmt.Println("invalid ingres.....")
 			debugMissingIngressMapping(packet)
 			continue
 		}
 
 		outb, allocErr := inf.AllocateSendPacket(len(packet))
 		if allocErr != nil {
-			fmt.Println("ingress err:", allocErr)
 			ERROR("ingress packet allocation error: ", allocErr)
 			return
 		}

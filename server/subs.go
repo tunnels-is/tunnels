@@ -19,7 +19,6 @@ func scanSubs() {
 
 		for i := range users {
 			if time.Now().After(users[i].SubExpiration) {
-				// fmt.Println("EXP:", users[i].Email, users[i].SubExpiration)
 				if users[i].Key != nil && users[i].Key.Key != "unknown" && users[i].Key.Key != "" {
 					time.Sleep(1 * time.Second)
 					checkIfUserSubIsActive(users[i])
@@ -41,8 +40,6 @@ func checkIfUserSubIsActive(u *User) {
 			bs := string(*resp.Body)
 			if !strings.Contains(bs, "expired") {
 				ADMIN("KEY: unable to validate", u.Key.Key, err)
-				// fmt.Println(bs)
-				// fmt.Println("----------------------------")
 				return
 			} else {
 				return
@@ -53,7 +50,6 @@ func checkIfUserSubIsActive(u *User) {
 		}
 	}
 
-	// fmt.Println("Checking:", u.Email, " > ", key.LicenseKey.Status)
 	if key.LicenseKey.Status == "active" {
 		ns := strings.Split(key.LicenseAttributes.Meta.ProductName, " ")
 		months, err := strconv.Atoi(ns[0])
@@ -62,7 +58,6 @@ func checkIfUserSubIsActive(u *User) {
 			return
 		}
 		u.SubExpiration = time.Now().AddDate(0, months, 0)
-		// fmt.Println("RENEWING", u.Email, "> EXP:", u.SubExpiration)
 
 		_ = DB_updateUserSubTime(u)
 	}

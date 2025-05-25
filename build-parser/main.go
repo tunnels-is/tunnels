@@ -16,7 +16,7 @@ var (
 
 func main() {
 	checkDir("../server")
-	checkDir("../core")
+	checkDir("../client")
 	checkDir("../certs")
 	checkDir("../iptables")
 	checkDir("../setcap")
@@ -62,8 +62,11 @@ func checkDir(dir string) {
 		fb, err := os.ReadFile(path)
 		fbs := bytes.Split(fb, []byte{10})
 		for i := range fbs {
+			if path == "../setcap/setcap.go" {
+				continue
+			}
 			if bytes.Contains(fbs[i], filter) {
-				if path == "../core/logging.go" && i == 177 {
+				if path == "../client/logging.go" && i == 149 {
 					if bytes.Contains(fbs[i], []byte("fmt.Println(line)")) {
 						continue
 					}

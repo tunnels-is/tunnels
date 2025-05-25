@@ -701,8 +701,6 @@ func getServerByID(secure bool, authServer string, deviceKey string, deviceToken
 		return nil, fmt.Errorf("%s: %d", "invalid code from controller", code)
 	}
 
-	fmt.Println(responseBytes)
-	fmt.Println(string(responseBytes))
 	s = new(types.Server)
 	err = json.Unmarshal(responseBytes, s)
 	if err != nil {

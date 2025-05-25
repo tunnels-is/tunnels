@@ -41,10 +41,7 @@ func GENERATE_CODE() string {
 }
 
 func decodeBody(r *http.Request, target any) (err error) {
-	// ra, err := io.ReadAll(r.Body)
-	// fmt.Println(string(ra))
 	dec := json.NewDecoder(r.Body)
-	// dec.DisallowUnknownFields()
 	err = dec.Decode(target)
 	if err != nil {
 		return fmt.Errorf("Invalid request body: %s", err)
