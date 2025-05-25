@@ -50,7 +50,7 @@ var (
 	// Go Routine monitors
 	concurrencyMonitor = make(chan *goSignal, 1000)
 	tunnelMonitor      = make(chan *TUN, 1000)
-	interfaceMonitor   = make(chan *TInterface, 1000)
+	interfaceMonitor   = make(chan *TUN, 1000)
 
 	// NOT SURE YET
 	highPriorityChannel   = make(chan *event, 100)
@@ -149,14 +149,14 @@ type stateV2 struct {
 type TunnelState int
 
 const (
-	TUN_NotReady TunnelState = iota
-	TUN_Ready
-	TUN_Error
+	TUN_Error TunnelState = iota
 	TUN_Disconnecting
 	TUN_Disconnected
 	// >= TUN_Connected is reserved for connected or potentially connected states
 	TUN_Connected
 	TUN_Connecting
+	TUN_NotReady
+	TUN_Ready
 )
 
 func (t *TUN) GetState() TunnelState {
@@ -271,10 +271,8 @@ type TUN struct {
 	Index []byte
 
 	// Stats
-	egressBytes   atomic.Int64
-	egressString  string
-	ingressBytes  atomic.Int64
-	ingressString string
+	egressBytes  atomic.Int64
+	ingressBytes atomic.Int64
 
 	// Server States
 	CPU                 byte

@@ -73,7 +73,7 @@ var prevAllowedHosts = []string{}
 
 func PingConnections() {
 	defer func() {
-		time.Sleep(30 * time.Second)
+		time.Sleep(20 * time.Second)
 	}()
 	defer RecoverAndLogToFile()
 
@@ -109,7 +109,9 @@ func PingConnections() {
 				_, _ = PublicConnect(tun.CR)
 			} else {
 				DEBUG("30+ Seconds since ping from ", meta.Tag)
-				_ = Disconnect(tun.ID, false)
+				if !meta.KillSwitch {
+					_ = Disconnect(tun.ID, false)
+				}
 			}
 		}
 

@@ -9,19 +9,22 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-func (T *TInterface) ReadFromTunnelInterface() {
+func (tun *TUN) ReadFromTunnelInterface() {
 	defer func() {
 		if r := recover(); r != nil {
 			ERROR(r, string(debug.Stack()))
 		}
-		DEBUG("tun/tap listener exiting:", T.Name)
-		if T.shouldRestart {
-			interfaceMonitor <- T
+		DEBUG("tun/tap listener exiting:")
+		if tun.GetState() >= TUN_Connected {
+			interfaceMonitor <- tun
 		}
 
-		select {
-		case T.exitChannel <- 1:
-		default:
+		tif := tun.tunnel.Load()
+		if tif != nil {
+			select {
+			case tif.exitChannel <- 1:
+			default:
+			}
 		}
 	}()
 
@@ -33,18 +36,16 @@ func (T *TInterface) ReadFromTunnelInterface() {
 
 		err          error
 		writtenBytes int
-		Tun          *TUN
+		tunif        = tun.tunnel.Load()
 	)
 
-	Tun = *T.tunnel.Load()
-
 	for {
-		if T.shouldExit {
+		if tun.GetState() < TUN_Connected {
 			return
 		}
 
-		_ = T.ReleaseReceivePacket(packet)
-		packet, packetSize, readError = T.ReceivePacket()
+		_ = tunif.ReleaseReceivePacket(packet)
+		packet, packetSize, readError = tunif.ReceivePacket()
 
 		if readError == windows.ERROR_NO_MORE_ITEMS {
 
@@ -78,46 +79,36 @@ func (T *TInterface) ReadFromTunnelInterface() {
 			continue
 		}
 
-		Tun = *T.tunnel.Load()
-		if Tun == nil {
-			time.Sleep(1 * time.Millisecond)
-			continue
-		}
-
-		if Tun.GetState() == TUN_Disconnected {
-			time.Sleep(5 * time.Millisecond)
-			continue
-		}
-
-		shouldSend := Tun.ProcessEgressPacket(&packet)
+		shouldSend := tun.ProcessEgressPacket(&packet)
 		if !shouldSend {
 			continue
 		}
 
-		writtenBytes, err = Tun.connection.Write(Tun.encWrapper.SEAL.Seal1(packet, Tun.Index))
+		writtenBytes, err = tun.connection.Write(tun.encWrapper.SEAL.Seal1(packet, tun.Index))
 		if err != nil {
 			ERROR("router write error: ", err)
 			continue
 		}
-		Tun.egressBytes.Add(int64(writtenBytes))
-
+		tun.egressBytes.Add(int64(writtenBytes))
 	}
 }
 
-func (V *TUN) ReadFromServeTunnel() {
+func (tun *TUN) ReadFromServeTunnel() {
 	defer func() {
 		if r := recover(); r != nil {
 			ERROR(r, string(debug.Stack()))
 		}
-		meta := V.meta.Load()
-		inf := V.tunnel.Load()
+		meta := tun.meta.Load()
 		DEBUG("Server listener exiting:", meta.Tag)
-		if (V.GetState() == TUN_Connected) && inf.shouldRestart {
-			tunnelMonitor <- V
+		if tun.GetState() >= TUN_Connected {
+			tunnelMonitor <- tun
 		}
-		select {
-		case inf.exitChannel <- 1:
-		default:
+		inf := tun.tunnel.Load()
+		if inf != nil {
+			select {
+			case inf.exitChannel <- 1:
+			default:
+			}
 		}
 	}()
 
@@ -127,26 +118,25 @@ func (V *TUN) ReadFromServeTunnel() {
 
 		n       int
 		packet  []byte
-		buff    = make([]byte, 500000)
-		staging = make([]byte, 500000)
-		inf     = V.tunnel.Load()
+		buff    = make([]byte, 66000)
+		staging = make([]byte, 66000)
+		inf     = tun.tunnel.Load()
 		err     error
 	)
 
 	for {
-
-		if inf.shouldExit {
+		if tun.GetState() < TUN_Connected {
 			return
 		}
 
-		n, readErr = V.connection.Read(buff)
+		n, readErr = tun.connection.Read(buff)
 		if readErr != nil {
 			ERROR("error reading from server socket: ", readErr, n)
 			return
 		}
 
-		V.Nonce2Bytes = buff[2:10]
-		packet, err = V.encWrapper.SEAL.Open2(
+		tun.Nonce2Bytes = buff[2:10]
+		packet, err = tun.encWrapper.SEAL.Open2(
 			buff[10:n],
 			buff[2:10],
 			staging[:0],
@@ -156,14 +146,14 @@ func (V *TUN) ReadFromServeTunnel() {
 			ERROR("Packet authentication error: ", err)
 			return
 		}
-		V.ingressBytes.Add(int64(n))
+		tun.ingressBytes.Add(int64(n))
 
 		if len(packet) < 20 {
-			go V.RegisterPing(CopySlice(packet))
+			go tun.RegisterPing(CopySlice(packet))
 			continue
 		}
 
-		if !V.ProcessIngressPacket(packet) {
+		if !tun.ProcessIngressPacket(packet) {
 			debugMissingIngressMapping(packet)
 			continue
 		}

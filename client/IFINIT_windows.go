@@ -15,10 +15,8 @@ import (
 )
 
 type TInterface struct {
-	tunnel        atomic.Pointer[*TUN]
-	shouldRestart bool
-	shouldExit    bool
-	exitChannel   chan byte
+	tunnel      atomic.Pointer[*TUN]
+	exitChannel chan byte
 
 	Name        string
 	IPv4Address string
@@ -570,9 +568,6 @@ exitLoop:
 
 func (t *TInterface) Disconnect(tun *TUN) (err error) {
 	defer RecoverAndLogToFile()
-
-	t.shouldRestart = false
-	t.shouldExit = true
 
 	if tun.connection != nil {
 		tun.connection.Close()

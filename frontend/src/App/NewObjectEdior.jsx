@@ -46,44 +46,47 @@ const NewObjectEditor = (props) => {
         }} />
       </div>)
   }
+  let inputKeys = []
+  let boolKeys = []
+  let arrayKeys = []
+
+  Object.keys(props.obj).map(k => {
+    let type = getType(props.obj[k])
+    if (type === "array") {
+      arrayKeys.push(k)
+    } else if (type === "string" || type === "number") {
+      inputKeys.push(k)
+    } else if (type === "boolean") {
+      boolKeys.push(k)
+    }
+  })
 
   return (
     <Form>
-      {Object.keys(props.obj).map(k => {
+      {inputKeys.map(k => {
         let type = getType(props.obj[k])
-        if (type === "object") {
-          return
+        let kk = k
+        if (props.opts?.nameMap?.length > 0) {
+          kk = props.opts.nameMap[k] ? props.opts.nameMap[k] : k
         }
 
-        let kk = props.opts?.nameMap[k] ? props.opts.nameMap[k] : k
-
-        if (type === "array") {
-          return walkArray(k)
-        }
-        if (k === "_id") {
-          return
-        }
         if (props.opts?.fields[k] === "hidden") {
           return
         }
-        if (props.opts?.fields[k] === "readonly") {
+        if (props.opts?.fields[k] === "readonly" || k === "_id") {
           return (< div key={k} className=" mt-2" >
             <Label className="text-white" >{kk}</Label>
             <Input disabled className={"w-[400px]" + state.Theme?.borderColor}
               value={props.obj[k]} />
           </div>)
         }
-
-        console.log(k)
         if (k === "CreatedAt" || k === "Added" || k === "UpdatedAt") {
           return (< div key={k} className=" mt-2" >
             <Label className="text-white" >{kk}</Label>
             <Input disabled className={"w-[400px]" + state.Theme?.borderColor}
               value={props.obj[k]} />
-          </div>
-          )
+          </div>)
         }
-
         if (k === "PubKey") {
           return (
             <div key={k} className="mt-4 mt-2">
@@ -100,22 +103,6 @@ const NewObjectEditor = (props) => {
             </div>
           )
         }
-
-        if (type === "boolean") {
-          return (
-            <div key={k} className="mt-4 mt-2">
-              <Label className="text-white" type="bool" >{kk}</Label>
-              <Switch className="ml-2 "
-                checked={props.obj[k]}
-                onCheckedChange={(e) => {
-                  props.onChange(k, Boolean(e), type)
-                  reload()
-                }}
-              />
-            </div>
-          )
-        }
-
         if (type === "string" || type === "number") {
           return (
             <div key={k} className=" mt-2">
@@ -131,9 +118,36 @@ const NewObjectEditor = (props) => {
             </div>
           )
         }
-
       })}
-    </Form >
+      {boolKeys.map(k => {
+        let kk = k
+        if (props.opts?.nameMap?.length > 0) {
+          kk = props.opts.nameMap[k] ? props.opts.nameMap[k] : k
+        }
+
+        if (props.opts?.fields[k] === "hidden") {
+          return
+        }
+        return (
+          <div key={k} className="mt-4 mt-2">
+            <Label className="text-white" type="bool" >{kk}</Label>
+            <Switch className="ml-2 "
+              checked={props.obj[k]}
+              onCheckedChange={(e) => {
+                props.onChange(k, Boolean(e))
+                reload()
+              }}
+            />
+          </div>
+        )
+      })}
+      {arrayKeys.map(k => {
+        if (props.opts?.fields[k] === "hidden") {
+          return
+        }
+        return walkArray(k)
+      })}
+    </Form>
   )
 }
 

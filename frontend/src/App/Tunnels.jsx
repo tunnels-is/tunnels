@@ -26,20 +26,31 @@ const Tunnels = () => {
   }, []);
 
   const ConnectButton = (obj) => {
-    let active = false;
+    let active = undefined;
     state.ActiveTunnels?.map((x) => {
       if (x.CR?.Tag === obj.Tag) {
-        active = true;
+        active = x
         return;
       }
     });
 
-    let connect = undefined;
-    let label = "";
 
+    let connect = () => {
+      state.ConfirmAndExecute(
+        "success",
+        "connect",
+        10000,
+        "",
+        "Connect to " + obj.Tag,
+        () => {
+          state.connectToVPN(obj);
+        },
+      );
+    };
+
+    let disconnect = undefined
     if (active) {
-      label = "Disconnect";
-      connect = () => {
+      disconnect = () => {
         state.ConfirmAndExecute(
           "success",
           "disconnect",
@@ -47,33 +58,31 @@ const Tunnels = () => {
           "",
           "Disconnect from " + obj.Tag,
           () => {
-            state.disconnectFromVPN(obj);
-          },
-        );
-      };
-    } else {
-      label = "Connect";
-      connect = () => {
-        state.ConfirmAndExecute(
-          "success",
-          "connect",
-          10000,
-          "",
-          "Connect to " + obj.Tag,
-          () => {
-            state.connectToVPN(obj);
+            state.disconnectFromVPN(active);
           },
         );
       };
     }
 
-    return <DropdownMenuItem
-      key="connect"
-      onClick={() => connect()}
-      className="cursor-pointer text-emerald-500"
-    >
-      <AccessibilityIcon className="w-4 h-4 mr-2" /> {label}
-    </DropdownMenuItem >
+    return <div>
+      <DropdownMenuItem
+        key="connect"
+        onClick={() => connect()}
+        className="cursor-pointer text-[#3a994c] "
+      >
+        <AccessibilityIcon className="w-4 h-4 mr-2" /> Connect
+      </DropdownMenuItem >
+      {disconnect &&
+        <DropdownMenuItem
+          key="disconnect"
+          onClick={() => disconnect()}
+          className={"cursor-pointer text-[#ef4444]"}
+        >
+          <AccessibilityIcon className="w-4 h-4 mr-2" /> Disconnect
+        </DropdownMenuItem >
+      }
+    </div>
+
   };
 
   const newServer = async () => {
@@ -128,6 +137,15 @@ const Tunnels = () => {
         onOpenChange={setModalOpen}
         object={tunnel}
         title="Tunnel"
+        opts={{
+          fields: {
+            WindowsGUID: "readonly",
+            DHCPToken: "readonly",
+            DNSRecords: "hidden",
+            Networks: "hidden",
+            Routes: "hidden",
+          }
+        }}
         description=""
         readOnly={false}
         saveButton={async () => {
@@ -139,6 +157,9 @@ const Tunnels = () => {
         onChange={(key, value, type) => {
           tunnel[key] = value;
           // console.log(key, value, type);
+        }}
+        onArrayChange={(key, value, index) => {
+          tunnel[key][index] = value;
         }}
       />
     </div>
