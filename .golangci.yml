@@ -1,0 +1,78 @@
+version: "2"
+linters:
+  default: none
+  enable:
+    - durationcheck
+    # - forcetypeassert
+    # - gocritic
+    - gomodguard
+    - govet
+    - ineffassign
+    - misspell
+    # - revive
+    - staticcheck
+    - unconvert
+    - unused
+    - usetesting
+    # - whitespace
+    - testifylint
+  settings:
+    misspell:
+      locale: US
+    staticcheck:
+      checks:
+        - all
+        - -SA1008
+        - -SA1019
+        - -SA4000
+        - -SA9004
+        - -ST1000
+        - -ST1005
+        - -ST1016
+        - -U1000
+    testifylint:
+      disable:
+        - go-require
+  exclusions:
+    generated: lax
+    rules:
+      - linters:
+          - forcetypeassert
+        path: _test\.go
+      - path: (.+)\.go$
+        text: "empty-block:"
+      - path: (.+)\.go$
+        text: "unused-parameter:"
+      - path: (.+)\.go$
+        text: "dot-imports:"
+      - path: (.+)\.go$
+        text: should have a package comment
+      - path: (.+)\.go$
+        text: error strings should not be capitalized or end with punctuation or a newline
+      - path: (.+)\.go$
+        text: could be replaced by b.Context()
+      - path: (.+)\.go$
+        text: could be replaced by t.Context()
+      - path: (.+)\.go$
+        text: could be replaced by tb.Context()
+      - path: (.+)\.go$
+        text: ineffectual assignment to ctx
+      - path: (.+)\.go$
+        text: this value of ctx is never used
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+issues:
+  max-issues-per-linter: 100
+  max-same-issues: 100
+formatters:
+  enable:
+    # - gofumpt
+    - goimports
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
