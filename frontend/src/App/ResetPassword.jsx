@@ -1,8 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-
 import { ForwardToController } from "../../wailsjs/go/main/Service";
-
 import STORE from "../store";
 
 const useForm = (props) => {

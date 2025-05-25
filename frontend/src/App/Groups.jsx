@@ -1,35 +1,8 @@
 import React, { useEffect, useState } from "react";
-
 import dayjs from "dayjs";
 import GLOBAL_STATE from "../state";
-import ConfigDNSRecordEditor from "./component/ConfigDNSRecordEditor";
-import STORE from "../store";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Dialog,
-  DialogContent,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
-  Edit,
-  FileText,
-  Network,
-  Plus,
-  Save,
-  Server,
-  Trash2,
-} from "lucide-react";
-import { Switch } from "@/components/ui/switch";
-import { PlusCircle } from "lucide-react";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { Check } from "lucide-react";
-import { useNavigate } from "react-router-dom";
 import GenericTable from "./GenericTable";
 import NewObjectEditorDialog from "./NewObjectEdiorDialog";
-
 
 const Groups = () => {
   const state = GLOBAL_STATE("groups");

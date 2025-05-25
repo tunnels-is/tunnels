@@ -1,7 +1,6 @@
 
 import GLOBAL_STATE from "../state";
 import WS from "../ws";
-import STORE from "../store";
 import { useState } from "react";
 
 const Logs = () => {

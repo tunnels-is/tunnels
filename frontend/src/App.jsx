@@ -7,8 +7,6 @@ import { Toaster } from "react-hot-toast";
 import "./assets/style/app.scss";
 import "@fontsource-variable/inter";
 
-import InspectBlocklist from "./App/InspectBlocklist";
-import InspectConnection from "./App/InspectConnection";
 import ConnectionTable from "./App/ConnectionTable";
 import DNSAnswers from "./App/component/DNSAnswers";
 import PrivateServers from "./App/PrivateServers";
@@ -17,7 +15,6 @@ import InspectGroup from "./App/InspectGroup";
 import Enable2FA from "./App/Enable2FA";
 import Settings from "./App/Settings";
 import Account from "./App/Account";
-import Servers from "./App/Servers";
 import Welcome from "./App/Welcome";
 import SideBar from "./App/SideBar";
 import Login from "./App/Login";
@@ -94,10 +91,6 @@ const LaunchApp = () => {
                 <Route path="tunnels" element={<Tunnels />} />
                 <Route path="connections" element={<Stats />} />
                 <Route path="logs" element={<Logs />} />
-                <Route
-                  path="inspect/connection/:id"
-                  element={<InspectConnection />}
-                />
                 <Route path="routing" element={<ConnectionTable />} />
                 <Route path="settings" element={<Settings />} />
 
@@ -108,10 +101,6 @@ const LaunchApp = () => {
                 <Route path="all" element={<PrivateServers />} />
                 <Route path="private" element={<PrivateServers />} />
 
-                <Route
-                  path="inspect/blocklist/"
-                  element={<InspectBlocklist />}
-                />
 
                 <Route path="login" element={<Login />} />
                 <Route path="help" element={<Welcome />} />
@@ -121,7 +110,7 @@ const LaunchApp = () => {
                 {state.User && (
                   <>
                     <Route path="/" element={<Welcome />} />
-                    <Route path="*" element={<Servers />} />
+                    <Route path="*" element={<PrivateServers />} />
                   </>
                 )}
 
