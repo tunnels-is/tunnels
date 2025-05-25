@@ -4,17 +4,16 @@ package client
 
 import (
 	"runtime/debug"
-	"time"
 )
 
-func (T *TInterface) ReadFromTunnelInterface() {
+func (tun *TUN) ReadFromTunnelInterface() {
 	defer func() {
 		if r := recover(); r != nil {
 			ERROR(r, string(debug.Stack()))
 		}
-		DEBUG("tun/tap listener exiting:", T.Name)
-		if T.shouldRestart {
-			interfaceMonitor <- T
+		DEBUG("tun/tap listener exiting:")
+		if tun.GetState() >= TUN_Connected {
+			interfaceMonitor <- tun
 		}
 	}()
 
@@ -24,14 +23,17 @@ func (T *TInterface) ReadFromTunnelInterface() {
 		packet       []byte
 		writtenBytes int
 		sendRemote   bool
-		tempBytes    = make([]byte, 500000)
-		Tun          *TUN
+		tempBytes    = make([]byte, 66000)
 		out          []byte
+		tunif        = tun.tunnel.Load()
 	)
 
-	DEBUG("New tunnel interface reader:", T.Name)
+	DEBUG("New tunnel interface reader:", tunif.Name)
 	for {
-		packetLength, err = T.RWC.Read(tempBytes[0:])
+		if tun.GetState() < TUN_Connected {
+			return
+		}
+		packetLength, err = tunif.RWC.Read(tempBytes[0:])
 		if err != nil {
 			ERROR("error in tun/tap reader loop:", err)
 			return
@@ -42,28 +44,22 @@ func (T *TInterface) ReadFromTunnelInterface() {
 			continue
 		}
 
-		Tun = *T.tunnel.Load()
-		if Tun == nil {
-			time.Sleep(1 * time.Millisecond)
-			continue
-		}
-
 		packet = tempBytes[4:packetLength]
 
-		sendRemote = Tun.ProcessEgressPacket(&packet)
+		sendRemote = tun.ProcessEgressPacket(&packet)
 		if !sendRemote {
 			continue
 		}
 
-		out = Tun.encWrapper.SEAL.Seal1(packet, Tun.Index)
+		out = tun.encWrapper.SEAL.Seal1(packet, tun.Index)
 
-		writtenBytes, err = Tun.connection.Write(out)
+		writtenBytes, err = tun.connection.Write(out)
 		if err != nil {
 			ERROR("router write error: ", err)
 			continue
 		}
 
-		Tun.egressBytes.Add(int64(writtenBytes))
+		tun.egressBytes.Add(int64(writtenBytes))
 	}
 }
 
@@ -84,8 +80,8 @@ func (tun *TUN) ReadFromServeTunnel() {
 		readErr  error
 		n        int
 		packet   []byte
-		buff     = make([]byte, 500000)
-		staging  = make([]byte, 500000)
+		buff     = make([]byte, 66000)
+		staging  = make([]byte, 66000)
 		err      error
 		osTunnel = tun.tunnel.Load()
 		prePend  = []byte{0, 0, 0, 2}
@@ -93,7 +89,10 @@ func (tun *TUN) ReadFromServeTunnel() {
 
 	DEBUG("Server Tunnel listener initialized")
 	for {
-		osTunnel = tun.tunnel.Load()
+		if tun.GetState() < TUN_Connected {
+			return
+		}
+		// osTunnel = tun.tunnel.Load()
 		n, readErr = tun.connection.Read(buff)
 		if readErr != nil {
 			ERROR("error reading from server socket: ", readErr, n)

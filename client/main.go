@@ -180,8 +180,8 @@ mainLoop:
 			CleanupOnClose()
 			os.Exit(1)
 
-		case IF := <-interfaceMonitor:
-			go IF.ReadFromTunnelInterface()
+		case Tun := <-interfaceMonitor:
+			go Tun.ReadFromTunnelInterface()
 		case Tun := <-tunnelMonitor:
 			go Tun.ReadFromServeTunnel()
 

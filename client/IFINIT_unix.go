@@ -18,8 +18,7 @@ import (
 )
 
 type TInterface struct {
-	tunnel        atomic.Pointer[*TUN]
-	shouldRestart bool
+	tunnel atomic.Pointer[*TUN]
 
 	Name        string
 	IPv4Address string
@@ -58,16 +57,16 @@ func CreateNewTunnelInterface(
 	}
 
 	IF = &TInterface{
-		Name:          meta.IFName,
-		IPv4Address:   meta.IPv4Address,
-		NetMask:       meta.NetMask,
-		Gateway:       meta.IPv4Address,
-		TxQueuelen:    meta.TxQueueLen,
-		MTU:           meta.MTU,
-		shouldRestart: true,
+		Name:        meta.IFName,
+		IPv4Address: meta.IPv4Address,
+		NetMask:     meta.NetMask,
+		Gateway:     meta.IPv4Address,
+		TxQueuelen:  meta.TxQueueLen,
+		MTU:         meta.MTU,
 	}
 
 	err = IF.Create()
+
 	if err != nil {
 		return IF, err
 	}
@@ -125,13 +124,13 @@ func (t *TInterface) Create() (err error) {
 		}
 	}
 
+	t.RWC = os.NewFile(t.FD, "tun_"+t.Name)
 	// if t.Persistent {
 	// 	if err = tunnelCtl(t.FD, syscall.TUNSETPERSIST, uintptr(1)); err != nil {
 	// 		return err
 	// 	}
 	// }
 
-	t.RWC = os.NewFile(t.FD, "tun_"+t.Name)
 	return
 }
 
@@ -327,9 +326,8 @@ func (t *TInterface) Connect(tun *TUN) (err error) {
 
 func (t *TInterface) Disconnect(tun *TUN) (err error) {
 	defer RecoverAndLogToFile()
-	t.shouldRestart = false
 	if tun.connection != nil {
-		tun.connection.Close()
+		_ = tun.connection.Close()
 	}
 
 	err = t.Close()
@@ -338,34 +336,6 @@ func (t *TInterface) Disconnect(tun *TUN) (err error) {
 	}
 
 	_ = t.Delete()
-
-	// TODO .. might not be needed ?????
-	// meta := tun.meta.Load()
-	// if IsDefaultConnection(meta.IFName) || meta.EnableDefaultRoute {
-	// 	err = IP_DelRoute("default", t.IPv4Address, "0")
-	// }
-
-	// if tun.ServerReponse.LAN != nil && tun.ServerReponse.LAN.Nat != "" {
-	// 	err = IP_DelRoute(tun.ServerReponse.LAN.Nat, t.IPv4Address, "0")
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// }
-
-	// for _, n := range tun.ServerReponse.Networks {
-	// 	if n.Nat != "" {
-	// 		err = IP_DelRoute(n.Nat, t.IPv4Address, "0")
-	// 		if err != nil {
-	// 			return err
-	// 		}
-	// 	}
-	// }
-	// for _, r := range tun.ServerReponse.Routes {
-	// 	err = IP_DelRoute(r.Address, t.IPv4Address, r.Metric)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// }
 
 	return
 }

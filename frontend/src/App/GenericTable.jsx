@@ -61,16 +61,16 @@ const GenericTable = (props) => {
   };
 
   const newPage = async (offset, limit) => {
-    let shouldLoad = true;
-    setTimeout(() => {
-      if (shouldLoad === true) {
-        setLoading(true);
-      }
-    }, 200);
+    // let shouldLoad = true;
+    // setTimeout(() => {
+    //   if (shouldLoad === true) {
+    //     setLoading(true);
+    //   }
+    // }, 200);
     await t.more(offset, limit);
-    shouldLoad = false;
-    setLoading(false);
-    shouldLoad = false;
+    // shouldLoad = false;
+    // setLoading(false);
+    // shouldLoad = false;
   };
 
   const renderRows = () => {

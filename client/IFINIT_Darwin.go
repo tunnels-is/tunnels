@@ -17,8 +17,7 @@ import (
 )
 
 type TInterface struct {
-	tunnel        atomic.Pointer[*TUN]
-	shouldRestart bool
+	tunnel atomic.Pointer[*TUN]
 
 	Name        string
 	SystemName  string
@@ -45,13 +44,12 @@ func CreateNewTunnelInterface(
 	defer RecoverAndLogToFile()
 
 	IF = &TInterface{
-		Name:          meta.IFName,
-		IPv4Address:   meta.IPv4Address,
-		Gateway:       meta.IPv4Address,
-		NetMask:       meta.NetMask,
-		TxQueuelen:    meta.TxQueueLen,
-		MTU:           meta.MTU,
-		shouldRestart: true,
+		Name:        meta.IFName,
+		IPv4Address: meta.IPv4Address,
+		Gateway:     meta.IPv4Address,
+		NetMask:     meta.NetMask,
+		TxQueuelen:  meta.TxQueueLen,
+		MTU:         meta.MTU,
 	}
 
 	err = IF.Create()
@@ -256,7 +254,6 @@ func (t *TInterface) Connect(tun *TUN) (err error) {
 
 func (t *TInterface) Disconnect(V *TUN) (err error) {
 	defer RecoverAndLogToFile()
-	t.shouldRestart = false
 	if V.connection != nil {
 		V.connection.Close()
 	}

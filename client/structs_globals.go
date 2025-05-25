@@ -268,6 +268,7 @@ type TunnelMETA struct {
 	AutoConnect     bool
 	PreventIPv6     bool
 	RequestVPNPorts bool
+	KillSwitch      bool
 
 	EncryptionType crypt.EncType
 	CurveType      crypt.CurveType

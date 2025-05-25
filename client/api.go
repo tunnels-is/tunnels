@@ -484,7 +484,8 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		return code, errm
 	}
 
-	isConnected := false
+	// isConnected := false
+	var oldTunnel *TUN
 	tunnelMapRange(func(tun *TUN) bool {
 		m := tun.meta.Load()
 		if m == nil {
@@ -492,7 +493,8 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		}
 		if m.Tag == meta.Tag {
 			if tun.GetState() >= TUN_Connected {
-				isConnected = true
+				oldTunnel = tun
+				// isConnected = true
 			}
 			return false
 		}
@@ -500,10 +502,10 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		return true
 	})
 
-	if isConnected {
-		ERROR("Already connected to ", ClientCR.Tag)
-		return 400, errors.New("Already connected to " + ClientCR.Tag)
-	}
+	// if isConnected {
+	// 	ERROR("Already connected to ", ClientCR.Tag)
+	// 	return 400, errors.New("Already connected to " + ClientCR.Tag)
+	// }
 
 	tunnel := new(TUN)
 	tunnel.meta.Store(meta)
@@ -709,7 +711,12 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	// }
 	tunnel.connection = net.Conn(UDPConn)
 
-	inter, err := CreateAndConnectToInterface(tunnel)
+	var inter *TInterface
+	if oldTunnel != nil {
+		inter = oldTunnel.tunnel.Load()
+	} else {
+		inter, err = CreateAndConnectToInterface(tunnel)
+	}
 	if err != nil {
 		ERROR("Unable to initialize interface: ", err)
 		return 502, err
@@ -736,7 +743,7 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	}
 
 	go tunnel.ReadFromServeTunnel()
-	go inter.ReadFromTunnelInterface()
+	go tunnel.ReadFromTunnelInterface()
 
 	if tunnel.ServerReponse.DHCP != nil {
 		FR := &FirewallRequest{
@@ -760,6 +767,13 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		} else {
 			DEBUG("firewall updated")
 		}
+	}
+
+	if oldTunnel != nil {
+		Disconnect(oldTunnel.ID, true)
+		// oldTunnel.SetState(TUN_Disconnected)
+		// oldTunnel.connection.Close()
+		// TunnelMap.Delete(oldTunnel.ID)
 	}
 
 	return 200, nil
