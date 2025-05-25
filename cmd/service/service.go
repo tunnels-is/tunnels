@@ -7,7 +7,7 @@ import (
 	"runtime/debug"
 	"time"
 
-	"github.com/tunnels-is/tunnels/core"
+	"github.com/tunnels-is/tunnels/client"
 )
 
 func Start(minimal bool) {
@@ -20,25 +20,25 @@ func Start(minimal bool) {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	var err error
 	if minimal {
-		err = core.InitMinimalService()
+		err = client.InitMinimalService()
 	} else {
-		err = core.InitService()
+		err = client.InitService()
 	}
 	if err != nil {
 		time.Sleep(5 * time.Second)
 		panic(err)
 	}
 	if minimal {
-		core.LaunchMinimalTunnels()
+		client.LaunchMinimalTunnels()
 	} else {
-		core.LaunchTunnels()
+		client.LaunchTunnels()
 	}
 }
 
 func StartWithExternalMonitor(ctx context.Context, minimal bool, id int, monitor chan int) {
 	defer func() {
 		if r := recover(); r != nil {
-			core.ERROR(r, string(debug.Stack()))
+			client.ERROR(r, string(debug.Stack()))
 		}
 		if ctx.Err() != nil {
 			select {
@@ -51,17 +51,17 @@ func StartWithExternalMonitor(ctx context.Context, minimal bool, id int, monitor
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	var err error
 	if minimal {
-		err = core.InitMinimalService()
+		err = client.InitMinimalService()
 	} else {
-		err = core.InitService()
+		err = client.InitService()
 	}
 	if err != nil {
 		fmt.Println("Error initializing tunnels service:", err)
 		return
 	}
 	if minimal {
-		core.LaunchMinimalTunnels()
+		client.LaunchMinimalTunnels()
 	} else {
-		core.LaunchTunnels()
+		client.LaunchTunnels()
 	}
 }

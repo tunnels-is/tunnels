@@ -8,6 +8,23 @@ server.crt
 build/*
 builds/*
 
+cmd/min/files
+cmd/min/logs
+cmd/min/blocklists
+cmd/min/*.jsom
+cmd/min/*.exe
+cmd/min/*.exe~
+cmd/min/min
+cmd/min/enc
+cmd/min/tunnels*
+cmd/min/api.key
+cmd/min/api.crt
+cmd/min/cert.pem
+cmd/min/key.pem
+cmd/min/private.crt
+cmd/min/*.tun.json
+cmd/min/*.tun.json.bak
+
 cmd/main/files
 cmd/main/logs
 cmd/main/blocklists
@@ -15,10 +32,20 @@ cmd/main/*.jsom
 cmd/main/*.exe
 cmd/main/*.exe~
 cmd/main/main
+cmd/main/enc
+cmd/main/tunnels*
 cmd/main/api.key
 cmd/main/api.crt
+cmd/main/cert.pem
+cmd/main/key.pem
 cmd/main/private.crt
+cmd/main/*.tun.json
+cmd/main/*.tun.json.bak
 *.exe
+
+server/cert.pem
+server/config.json
+server/tunnels.db
 
 node_modules
 files
