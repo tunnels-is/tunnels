@@ -19,9 +19,12 @@ cmd/min/enc
 cmd/min/tunnels*
 cmd/min/api.key
 cmd/min/api.crt
+cmd/min/cert.pem
+cmd/min/key.pem
 cmd/min/private.crt
 cmd/min/*.tun.json
 cmd/min/*.tun.json.bak
+cmd/*/*
 
 cmd/main/files
 cmd/main/logs
@@ -34,6 +37,8 @@ cmd/main/enc
 cmd/main/tunnels*
 cmd/main/api.key
 cmd/main/api.crt
+cmd/main/cert.pem
+cmd/main/key.pem
 cmd/main/private.crt
 cmd/main/*.tun.json
 cmd/main/*.tun.json.bak
