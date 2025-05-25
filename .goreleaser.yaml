@@ -39,6 +39,8 @@ builds:
   - id: min
     goos:
       - linux
+      - windows
+      - darwin
     goarch:
       - amd64
       - arm64
@@ -92,6 +94,9 @@ archives:
       {{- else }}{{ .Arch }}{{ end }}
       {{- if .Arm }}v{{ .Arm }}{{ end }}
     allow_different_binary_count: true
+    format_overrides:
+      - goos: windows
+        format: zip
 
 release:
    draft: true  
