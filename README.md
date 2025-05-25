@@ -11,6 +11,9 @@ https://github.com/tunnels-is/tunnels/blob/main/LICENSE
 # Block List Source
 - https://github.com/n00bady/bluam
 
+# linting
+golangci-lint run --timeout=10m --config .golangci.yml
+
 # Linux
 ## Binary permissions
 sudo setcap 'cap_net_raw,cap_net_bind_service,cap_net_admin+eip' main
