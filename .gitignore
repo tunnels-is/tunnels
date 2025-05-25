@@ -8,6 +8,19 @@ server.crt
 build/*
 builds/*
 
+cmd/min/files
+cmd/min/logs
+cmd/min/blocklists
+cmd/min/*.jsom
+cmd/min/*.exe
+cmd/min/*.exe~
+cmd/min/min
+cmd/min/enc
+cmd/min/tunnels*
+cmd/min/api.key
+cmd/min/api.crt
+cmd/min/private.crt
+
 cmd/main/files
 cmd/main/logs
 cmd/main/blocklists
@@ -15,6 +28,8 @@ cmd/main/*.jsom
 cmd/main/*.exe
 cmd/main/*.exe~
 cmd/main/main
+cmd/main/enc
+cmd/main/tunnels*
 cmd/main/api.key
 cmd/main/api.crt
 cmd/main/private.crt
