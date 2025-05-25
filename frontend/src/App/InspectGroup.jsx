@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import {  useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import GLOBAL_STATE from "../state"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import GenericTable from "./GenericTable";
@@ -237,7 +237,7 @@ const InspectGroup = () => {
 				<TabsList
 					className={state.Theme?.borderColor}
 				>
-					<TabsTrigger className={state.Theme?.tabs} value="server">Server</TabsTrigger>
+					<TabsTrigger className={state.Theme?.tabs} value="server">Servers</TabsTrigger>
 					<TabsTrigger className={state.Theme?.tabs} value="device">Devices</TabsTrigger>
 					<TabsTrigger className={state.Theme?.tabs} value="user">Users</TabsTrigger>
 				</TabsList>

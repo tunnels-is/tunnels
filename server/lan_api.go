@@ -28,15 +28,11 @@ func API_Firewall(w http.ResponseWriter, r *http.Request) {
 	syncFirewallState(fr, mapping)
 
 	w.WriteHeader(200)
-	return
 }
+
 func API_ListDevices(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
-	hasAPIKey := false
-	if HTTP_validateKey(r) {
-		hasAPIKey = true
-	}
-
+	hasAPIKey := HTTP_validateKey(r)
 	if !hasAPIKey {
 		F := new(FORM_LIST_DEVICE)
 		err := decodeBody(r, F)

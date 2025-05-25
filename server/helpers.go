@@ -154,7 +154,7 @@ func authenticateUserFromEmailOrIDAndToken(email string, id primitive.ObjectID, 
 	} else if id != primitive.NilObjectID {
 		user, err = DB_findUserByID(id)
 	} else {
-		return nil, errors.New("user not found")
+		return nil, errors.New("user identifier missing")
 	}
 	if err != nil {
 		return nil, errors.New("Database error, please try again in a moment")
