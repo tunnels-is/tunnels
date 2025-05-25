@@ -568,3 +568,42 @@ func HTTP_ForwardToController(w http.ResponseWriter, r *http.Request) {
 	data, code := ForwardToController(form)
 	JSON(w, r, code, data)
 }
+
+// APIBridge provides Wails JS bindings for HTTPHandler logic
+// Wails will generate JS bindings for exported methods on this struct
+// You can extend this struct with more methods as needed
+//go:generate wails generate go
+
+type APIBridge struct{}
+
+// CallMethod exposes the HTTPHandler logic to Wails JS
+// method: the API method (e.g., "connect", "getState", etc.)
+// payload: the request body as JSON string
+// Returns: response as JSON string, or error string
+func (a *APIBridge) CallMethod(method string, payload string) (string, error) {
+	switch method {
+	case "connect":
+		// Unmarshal payload into ConnectionRequest
+		var req ConnectionRequest
+		if err := json.Unmarshal([]byte(payload), &req); err != nil {
+			return "", err
+		}
+		code, err := PublicConnect(&req)
+		if err != nil {
+			b, _ := json.Marshal(map[string]any{"error": err.Error(), "code": code})
+			return string(b), nil
+		}
+		b, _ := json.Marshal(map[string]any{"code": code})
+		return string(b), nil
+	case "getState":
+		state := GetFullState()
+		b, err := json.Marshal(state)
+		if err != nil {
+			return "", err
+		}
+		return string(b), nil
+	// Add more cases for other methods as needed
+	default:
+		return "", nil
+	}
+}
