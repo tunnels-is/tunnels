@@ -24,7 +24,6 @@ cmd/min/key.pem
 cmd/min/private.crt
 cmd/min/*.tun.json
 cmd/min/*.tun.json.bak
-cmd/*/*
 
 cmd/main/files
 cmd/main/logs
@@ -43,6 +42,10 @@ cmd/main/private.crt
 cmd/main/*.tun.json
 cmd/main/*.tun.json.bak
 *.exe
+
+server/cert.pem
+server/config.json
+server/tunnels.db
 
 node_modules
 files
