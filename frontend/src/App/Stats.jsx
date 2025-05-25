@@ -1,10 +1,6 @@
-
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent,  CardTitle } from "@/components/ui/card";
 import GLOBAL_STATE from "../state";
-import STORE from "../store";
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import InfoItem from "./component/InfoItem";
 import dayjs from "dayjs";
 
 const Stats = () => {

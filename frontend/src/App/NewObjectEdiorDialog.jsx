@@ -1,9 +1,7 @@
 import React from "react";
-import ObjectEditor from "./ObjectEditor";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
