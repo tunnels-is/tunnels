@@ -236,7 +236,7 @@ func HTTPhandler(w http.ResponseWriter, r *http.Request) {
 	case "getDNSStats":
 		JSON(w, r, 200, GetDNSStatsInternal())
 	default:
-		w.WriteHeader(200)
+		w.WriteHeader(404)
 		r.Body.Close()
 	}
 }

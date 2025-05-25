@@ -1293,15 +1293,37 @@ export var STATE = {
   },
   API: {
     async method(method, data, noLogout, timeout, ignoreError) {
+      // Wails detection: use Wails binding if available
+      if (
+        typeof window !== "undefined" &&
+        window.backend &&
+        window.backend.Client &&
+        window.backend.Client.APIBridge &&
+        typeof window.backend.Client.APIBridge.CallMethod === "function"
+      ) {
+        try {
+          const payload = data ? JSON.stringify(data) : "{}";
+          const result = await window.backend.Client.APIBridge.CallMethod(method, payload);
+          let parsed;
+          try {
+            parsed = JSON.parse(result);
+          } catch (e) {
+            parsed = result;
+          }
+          // Simulate axios-like response
+          return { data: parsed, status: 200 };
+        } catch (err) {
+          return { data: { error: err?.message || err }, status: 500 };
+        }
+      }
+      // Fallback: original axios HTTP logic
       try {
         let response = undefined;
         let host = STATE.GetURL();
-
         let to = 30000;
         if (timeout) {
           to = timeout;
         }
-
         let body = undefined;
         if (data) {
           try {
@@ -1311,18 +1333,15 @@ export var STATE = {
             return;
           }
         }
-
         response = await axios.post(host + "/v1/method/" + method, body, {
           timeout: to,
           headers: { "Content-Type": "application/json" },
         });
-
         if (response.data?.Message) {
           STATE.successNotification(response?.data?.Message);
         } else if (response.data?.Error) {
           STATE.errorNotification(response?.data?.Error);
         }
-
         return response;
       } catch (error) {
         console.dir(error);
@@ -1330,7 +1349,6 @@ export var STATE = {
           STATE.successNotification("Tunnel connected, network changed");
           return undefined;
         }
-
         if (!ignoreError) {
           if (!noLogout || noLogout === false) {
             if (error?.response?.status === 401) {
@@ -1338,7 +1356,6 @@ export var STATE = {
               return;
             }
           }
-
           if (error?.response?.data?.Message) {
             STATE.errorNotification(error?.response?.data?.Message);
           } else if (error?.response?.data?.Error) {
@@ -1363,7 +1380,6 @@ export var STATE = {
             }
           }
         }
-
         return error?.response;
       }
     },
