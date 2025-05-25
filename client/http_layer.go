@@ -368,7 +368,7 @@ func HTTP_Disconnect(w http.ResponseWriter, r *http.Request) {
 		JSON(w, r, 400, err)
 		return
 	}
-	err = Disconnect(DF.ID, true)
+	err = Disconnect(DF.ID, false)
 	if err != nil {
 		JSON(w, r, 400, err)
 		return

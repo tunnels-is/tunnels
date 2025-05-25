@@ -57,7 +57,6 @@ const PrivateServers = () => {
 	const ConnectColumn = (server) => {
 		let servertun = undefined
 		let assignedTunnels = 0
-		let label = "Connect"
 		state?.Tunnels?.map(c => {
 			if (c.ServerID === server._id) {
 				servertun = c
@@ -84,14 +83,10 @@ const PrivateServers = () => {
 				return
 			}
 		})
-		console.log("CON")
-		console.dir(con)
-		let classColor = "text-[#3a994c]"
 
+		let disconnectButton = undefined
 		if (con) {
-			classColor = "text-[#ef4444]"
-			label = "Disconnect"
-			conButton = function() {
+			disconnectButton = function() {
 				state.ConfirmAndExecute(
 					"success",
 					"disconnect",
@@ -111,13 +106,24 @@ const PrivateServers = () => {
 		}
 
 
-		return <DropdownMenuItem
-			key="connect"
-			onClick={() => conButton()}
-			className={"cursor-pointer " + classColor}
-		>
-			<AccessibilityIcon className="w-4 h-4 mr-2" /> {label}
-		</DropdownMenuItem >
+		return <div>
+			<DropdownMenuItem
+				key="connect"
+				onClick={() => conButton()}
+				className={"cursor-pointer text-[#3a994c]"}
+			>
+				<AccessibilityIcon className="w-4 h-4 mr-2" /> Connect
+			</DropdownMenuItem >
+			{disconnectButton &&
+				<DropdownMenuItem
+					key="disconnect"
+					onClick={() => disconnectButton()}
+					className={"cursor-pointer text-[#ef4444]"}
+				>
+					<AccessibilityIcon className="w-4 h-4 mr-2" /> Disconnect
+				</DropdownMenuItem >
+			}
+		</div >
 	}
 
 	const TunnelsColumn = (obj) => {

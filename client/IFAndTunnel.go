@@ -25,18 +25,25 @@ func Disconnect(tunID string, switching bool) (err error) {
 		if tun.ID == tunID {
 			tun.SetState(TUN_Disconnecting)
 			tunnel := tun.tunnel.Load()
-			_ = tunnel.Disconnect(tun)
+			if !switching {
+				_ = tunnel.Disconnect(tun)
+			} else {
+				if tun.connection != nil {
+					_ = tun.connection.Close()
+				}
+			}
 			if tun.encWrapper != nil {
 				if tun.encWrapper.HStream != nil {
-					tun.encWrapper.HStream.Close()
+					_ = tun.encWrapper.HStream.Close()
 				}
 				if tun.encWrapper.HConn != nil {
-					tun.encWrapper.HConn.Close()
+					_ = tun.encWrapper.HConn.Close()
 				}
 			}
 
 			TunnelMap.Delete(tun.ID)
 			m := tun.meta.Load()
+			tun.SetState(TUN_Disconnected)
 			if m != nil {
 				DEBUG("disconnected from ", m.Tag, tun.ID)
 			} else {
@@ -82,8 +89,9 @@ func createTunnel() (T *TunnelMETA) {
 	T.Networks = make([]*types.Network, 0)
 	T.DNSServers = make([]string, 0)
 	T.DNSRecords = make([]*types.DNSRecord, 0)
-	T.WindowsGUID = CreateConnectionUUID()
 	T.Routes = make([]*types.Route, 0)
+	T.WindowsGUID = CreateConnectionUUID()
+	T.KillSwitch = true
 	return
 }
 
