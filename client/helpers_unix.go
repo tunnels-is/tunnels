@@ -1,6 +1,6 @@
 //go:build aix || dragonfly || freebsd || (js && wasm) || linux || nacl || netbsd || openbsd || solaris
 
-package core
+package client
 
 import (
 	"os/exec"

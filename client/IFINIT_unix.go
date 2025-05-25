@@ -1,6 +1,6 @@
 //go:build freebsd || linux || openbsd
 
-package core
+package client
 
 import (
 	"errors"

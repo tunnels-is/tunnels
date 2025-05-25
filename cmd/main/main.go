@@ -4,8 +4,8 @@ import (
 	"embed"
 	"flag"
 
+	"github.com/tunnels-is/tunnels/client"
 	"github.com/tunnels-is/tunnels/cmd/service"
-	"github.com/tunnels-is/tunnels/core"
 )
 
 //go:embed dist
@@ -15,14 +15,14 @@ var DIST embed.FS
 var DLL embed.FS
 
 func main() {
-	s := core.STATE.Load()
+	s := client.STATE.Load()
 	createConfig := flag.Bool("createConfig", false, "generate a default config and exit")
 	flag.StringVar(&s.BasePath, "basePath", "", "manualy set base path for the config and log files")
 	flag.Parse()
 
-	core.CreateConfig(createConfig)
+	client.CreateConfig(createConfig)
 
-	core.DIST_EMBED = DIST
-	core.DLL_EMBED = DLL
+	client.DIST_EMBED = DIST
+	client.DLL_EMBED = DLL
 	service.Start(false)
 }

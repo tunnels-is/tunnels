@@ -1,4 +1,4 @@
-package core
+package client
 
 import (
 	"crypto/md5"
