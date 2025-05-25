@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"sync"
 	"time"
 
 	"slices"
@@ -16,7 +15,6 @@ import (
 
 var (
 	BBoltDB *gobolt.DB
-	bboltMu sync.RWMutex
 )
 
 const (
