@@ -11,7 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { DeleteIcon } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 // import { GridLoader } from "react-spinners";
 import {
   DropdownMenu,
@@ -31,14 +31,8 @@ import { Badge } from "@/components/ui/badge";
 
 const GenericTable = (props) => {
   const [offset, setOffset] = useState(0);
-  const [limit, setLimit] = useState(100);
   const [filter, setFilter] = useState("");
-  const [loading, setLoading] = useState(false);
   const state = GLOBAL_STATE("btn+?");
-
-  if (!props.table) {
-    return <></>;
-  }
 
   let t = props.table;
   let hdc = "w-[60px] text-white font-bold ";
@@ -266,16 +260,10 @@ const GenericTable = (props) => {
         )}
       </div>
 
-      {
-        !loading && (
-          <div className="shadow-sm">
-            <Table className="w-full overflow-visible text-sm text-foreground">
-              {renderHeaders()}
-              {renderRows()}
-            </Table>
-          </div>
-        )
-      }
+      <Table className="w-full overflow-visible text-sm text-foreground">
+        {renderHeaders()}
+        {renderRows()}
+      </Table>
     </div >
   );
 };
