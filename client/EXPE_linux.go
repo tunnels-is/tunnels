@@ -1,5 +1,5 @@
 // go build linux
-package core
+package client
 
 import (
 	"fmt"
