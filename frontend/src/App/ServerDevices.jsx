@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import GLOBAL_STATE from "../state"
 import dayjs from "dayjs";
-import NewObjectEditorDialog from "./NewObjectEdiorDialog";
 import GenericTable from "./GenericTable";
 import { TableCell } from "@/components/ui/table";
 import { useParams } from "react-router-dom";

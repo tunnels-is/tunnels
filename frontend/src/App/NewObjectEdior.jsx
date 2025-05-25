@@ -1,13 +1,10 @@
-import { Form, FormLabel } from "@/components/ui/form"
+import { Form } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { useState } from "react"
 import GLOBAL_STATE from "../state";
 import { Textarea } from "@/components/ui/textarea"
-import { PlusIcon } from "@radix-ui/react-icons"
-import { Plug } from "lucide-react"
-import { Plus } from "lucide-react"
 import { SquarePlus } from "lucide-react"
 import { SquareMinus } from "lucide-react"
 

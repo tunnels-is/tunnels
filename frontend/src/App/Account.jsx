@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import GLOBAL_STATE from "../state";
 import dayjs from "dayjs";
 import KeyValue from "./component/keyvalue";
-import NewTable from "./component/newtable";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import GenericTable from "./GenericTable";
 import { Button } from "@/components/ui/button";

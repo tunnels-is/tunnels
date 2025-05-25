@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import GLOBAL_STATE from "../state";
 import { BarLoader } from "react-spinners";
 

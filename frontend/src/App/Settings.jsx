@@ -1,9 +1,5 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import GLOBAL_STATE from "../state";
-import FormKeyValue from "./component/formkeyvalue";
-import KeyValue from "./component/keyvalue";
-import CustomToggle from "./component/CustomToggle";
-import FormKeyInput from "./component/formkeyrawvalue";
 import STORE from "../store";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -14,11 +10,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-
 import { Button } from "@/components/ui/button";
 import {
-  AlertCircle,
-  Save,
   Info,
   Bug,
   AlertTriangle,

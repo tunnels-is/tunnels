@@ -1,19 +1,7 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import {  useParams } from "react-router-dom";
 import GLOBAL_STATE from "../state"
-import dayjs from "dayjs";
-import NewTable from "./component/newtable";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-	Dialog,
-	DialogContent,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-	Save,
-} from "lucide-react";
-import { Label } from "@/components/ui/label";
 import GenericTable from "./GenericTable";
 import NewObjectEditorDialog from "./NewObjectEdiorDialog";
 
