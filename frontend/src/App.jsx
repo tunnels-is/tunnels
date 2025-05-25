@@ -33,7 +33,7 @@ import Stats from "./App/Stats";
 import ServerDevices from "./App/ServerDevices";
 
 // Use this to automatically turn on debug
-STORE.Cache.Set("debug", false);
+STORE.Cache.Set("debug", true);
 
 const appElement = document.getElementById("app");
 const root = createRoot(appElement);
@@ -44,7 +44,6 @@ const LaunchApp = () => {
   useEffect(() => {
     state.GetUser();
     state.GetBackendState();
-    WS.NewSocket(WS.GetURL("logs"), "logs", WS.ReceiveLogEvent);
   }, []);
 
   return (
@@ -157,13 +156,13 @@ class ErrorBoundary extends React.Component {
 
   async ProductionCheck() {
     if (!STATE.debug) {
-      window.console.apply = function() { };
-      window.console.dir = function() { };
-      window.console.log = function() { };
-      window.console.info = function() { };
-      window.console.warn = function() { };
-      window.console.error = function() { };
-      window.console.debug = function() { };
+      // window.console.apply = function() { };
+      // window.console.dir = function() { };
+      // window.console.log = function() { };
+      // window.console.info = function() { };
+      // window.console.warn = function() { };
+      // window.console.error = function() { };
+      // window.console.debug = function() { };
     }
   }
 

@@ -5,6 +5,7 @@ import axios from "axios";
 import dayjs from "dayjs";
 import { v4 as uuidv4 } from "uuid";
 import { Button } from "./components/ui/button";
+import { CallMethod } from "../wailsjs/go/client/APIBridge.js";
 
 const state = (page) => {
   const [value, reload] = useState({ x: 0 });
@@ -170,11 +171,16 @@ export var STATE = {
           return;
         }
       }
+      let resp = undefined
+      if (STATE.API.isWails) {
+        resp = await STATE.API.wailsmethod("forwardToController", body)
+      } else {
+        resp = await axios.post(STATE.GetURL() + "/v1/method/forwardToController", body, {
+          timeout: 10000,
+          headers: { "Content-Type": "application/json" },
+        });
 
-      let resp = await axios.post(STATE.GetURL() + "/v1/method/forwardToController", body, {
-        timeout: 10000,
-        headers: { "Content-Type": "application/json" },
-      });
+      }
 
       console.log("RESPONSE: ", FR.URL, FR.Path)
       console.dir(resp)
@@ -1251,13 +1257,19 @@ export var STATE = {
 
     try {
       let response = undefined;
-      let host = STATE.GetURL();
 
-      response = await axios.post(
-        host + "/v1/method/getState",
-        {},
-        { headers: { "Content-Type": "application/json" } },
-      );
+      if (STATE.API.isWails) {
+        response = await STATE.API.wailsmethod("getState", {})
+      } else {
+        let host = STATE.GetURL();
+        response = await axios.post(
+          host + "/v1/method/getState",
+          {},
+          { headers: { "Content-Type": "application/json" } },
+        );
+
+      }
+
 
       if (response.status === 200) {
         if (response.data) {
@@ -1292,30 +1304,48 @@ export var STATE = {
     }
   },
   API: {
-    async method(method, data, noLogout, timeout, ignoreError) {
-      // Wails detection: use Wails binding if available
-      if (
-        typeof window !== "undefined" &&
-        window.backend &&
-        window.backend.Client &&
-        window.backend.Client.APIBridge &&
-        typeof window.backend.Client.APIBridge.CallMethod === "function"
-      ) {
+    isWails: () => {
+      if (windows?.backend?.Client?.APIBride) {
+        return true
+      }
+      // if (
+      //   typeof window !== "undefined" &&
+      //   window.backend &&
+      //   window.backend.Client &&
+      //   window.backend.Client.APIBridge &&
+      //   typeof window.backend.Client.APIBridge.CallMethod === "function"
+      // ) {
+      //   return true
+      // }
+      return false
+    },
+    async wailsmethod(method, data) {
+      let parsed;
+      try {
+        const result = await CallMethod(method, data);
+        console.log("RESULT")
+        console.dir(result)
         try {
-          const payload = data ? JSON.stringify(data) : "{}";
-          const result = await window.backend.Client.APIBridge.CallMethod(method, payload);
-          let parsed;
-          try {
-            parsed = JSON.parse(result);
-          } catch (e) {
-            parsed = result;
-          }
-          // Simulate axios-like response
-          return { data: parsed, status: 200 };
-        } catch (err) {
+          parsed = JSON.parse(result);
+        } catch (e) {
+          parsed = result;
+        }
+        console.log("CALLLLLLL")
+        console.dir(result)
+        if (parsed?.error && parsed?.error !== "") {
+          console.log("RETURNING ERROR")
           return { data: { error: err?.message || err }, status: 500 };
         }
+
+        // Simulate axios-like response
+        console.log("RETURNING DATA")
+        return { data: parsed.data, status: 200 };
+      } catch (err) {
+        return { data: { error: parsed?.error ? parsed.error : "unknown error" }, status: 500 };
       }
+    },
+    async method(method, data, noLogout, timeout, ignoreError) {
+      // Wails detection: use Wails binding if available
       // Fallback: original axios HTTP logic
       try {
         let response = undefined;
@@ -1333,10 +1363,14 @@ export var STATE = {
             return;
           }
         }
-        response = await axios.post(host + "/v1/method/" + method, body, {
-          timeout: to,
-          headers: { "Content-Type": "application/json" },
-        });
+        if (STATE.API.isWails) {
+          response = await STATE.API.wailsmethod(method, data)
+        } else {
+          response = await axios.post(host + "/v1/method/" + method, body, {
+            timeout: to,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
         if (response.data?.Message) {
           STATE.successNotification(response?.data?.Message);
         } else if (response.data?.Error) {
