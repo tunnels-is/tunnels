@@ -1147,7 +1147,6 @@ func API_SessionCreate(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		}
-
 	} else {
 		user, err := authenticateUserFromEmailOrIDAndToken("", CR.UserID, CR.DeviceToken)
 		if err != nil {

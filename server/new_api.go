@@ -39,10 +39,6 @@ func launchAPIServer() {
 		mux.HandleFunc("/v3/user/reset/code", API_UserRequestPasswordCode)
 		mux.HandleFunc("/v3/user/reset/password", API_UserResetPassword)
 		mux.HandleFunc("/v3/user/2fa/confirm", API_UserTwoFactorConfirm)
-
-		// Device Initialization
-
-		// ADMIN
 		mux.HandleFunc("/v3/user/list", API_UserList)
 
 		mux.HandleFunc("/v3/device/list", API_DeviceList)
@@ -76,8 +72,7 @@ func launchAPIServer() {
 		Certificates:             []tls.Certificate{*KeyPair.Load()},
 		MinVersion:               tls.VersionTLS12,
 		PreferServerCipherSuites: true,
-		// CurvePreferences:         []tls.CurveID{tls.CurveP256, tls.X25519, tls.CurveP521},
-		CurvePreferences: []tls.CurveID{tls.X25519MLKEM768, tls.CurveP521},
+		CurvePreferences:         []tls.CurveID{tls.X25519MLKEM768, tls.CurveP521},
 		CipherSuites: []uint16{
 			tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
 			tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
@@ -117,13 +112,13 @@ func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusOK)
-	fmt.Fprintln(w, "OK")
+	_, _ = fmt.Fprintln(w, "OK")
 }
 
 func loggingTimingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		startTime := time.Now()
-		log.Printf("-> %s %s from %s", r.Method, r.URL.RequestURI(), r.RemoteAddr)
+		log.Printf("-> %s %s", r.Method, r.URL.RequestURI())
 		next.ServeHTTP(w, r)
 		duration := time.Since(startTime)
 		log.Printf("<- %s %s completed in %dms",
