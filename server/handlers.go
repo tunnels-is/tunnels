@@ -30,7 +30,6 @@ func API_AcceptUserConnections(w http.ResponseWriter, r *http.Request) {
 		senderr(w, 400, err.Error())
 		return
 	}
-	// fmt.Println(SCR)
 
 	err = crypt.VerifySignature(SCR.Payload, SCR.Signature, PubKey)
 	if err != nil {
@@ -1109,7 +1108,6 @@ func API_SessionCreate(w http.ResponseWriter, r *http.Request) {
 		senderr(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
-	fmt.Printf("%+v", CR)
 
 	server, err := DB_FindServerByID(CR.ServerID)
 	if err != nil {

@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/binary"
 	"errors"
-	"fmt"
 	"math"
 	"net"
 	"runtime/debug"
@@ -346,8 +345,6 @@ func fromUserChannel(index int) {
 			ERR("Authentication error:", err)
 			continue
 		}
-		fmt.Println("FROM USER!")
-		fmt.Println(PACKET)
 
 		CM.Addr = payload.addr
 		if len(PACKET) < 20 {
@@ -489,8 +486,6 @@ func toUserChannel(index int) {
 			shouldRestart = false
 			return
 		}
-		fmt.Println("TO USER!")
-		fmt.Println(PACKET)
 
 		if PACKET[9] != 6 && PACKET[9] != 17 {
 			continue
