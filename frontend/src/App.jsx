@@ -7,7 +7,6 @@ import { Toaster } from "react-hot-toast";
 import "./assets/style/app.scss";
 import "@fontsource-variable/inter";
 
-import ConnectionTable from "./App/ConnectionTable";
 import DNSAnswers from "./App/component/DNSAnswers";
 import PrivateServers from "./App/PrivateServers";
 import ScreenLoader from "./App/ScreenLoader";
@@ -91,7 +90,6 @@ const LaunchApp = () => {
                 <Route path="tunnels" element={<Tunnels />} />
                 <Route path="connections" element={<Stats />} />
                 <Route path="logs" element={<Logs />} />
-                <Route path="routing" element={<ConnectionTable />} />
                 <Route path="settings" element={<Settings />} />
 
                 <Route path="dns" element={<DNS />} />
