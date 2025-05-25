@@ -140,52 +140,372 @@ func HTTPhandler(w http.ResponseWriter, r *http.Request) {
 	method := r.PathValue("method")
 	switch method {
 	case "connect":
-		HTTP_Connect(w, r)
-		return
+		var req ConnectionRequest
+		_ = json.NewDecoder(r.Body).Decode(&req)
+		code, err := ConnectInternal(&req)
+		if err != nil {
+			STRING(w, r, code, err.Error())
+			return
+		}
+		JSON(w, r, code, nil)
 	case "disconnect":
-		HTTP_Disconnect(w, r)
-		return
+		var form DisconnectForm
+		_ = json.NewDecoder(r.Body).Decode(&form)
+		err := DisconnectInternal(&form)
+		if err != nil {
+			JSON(w, r, 400, err.Error())
+			return
+		}
+		JSON(w, r, 200, nil)
 	case "resetNetwork":
-		HTTP_ResetNetwork(w, r)
-		return
+		ResetNetworkInternal()
+		JSON(w, r, 200, nil)
 	case "getQRCode":
-		HTTP_GetQRCode(w, r)
-		return
+		var form TWO_FACTOR_CONFIRM
+		_ = json.NewDecoder(r.Body).Decode(&form)
+		QR, err := GetQRCodeInternal(&form)
+		if err != nil {
+			JSON(w, r, 400, err)
+			return
+		}
+		JSON(w, r, 200, QR)
 	case "forwardToController":
-		HTTP_ForwardToController(w, r)
-		return
+		var form FORWARD_REQUEST
+		_ = json.NewDecoder(r.Body).Decode(&form)
+		data, code := ForwardToControllerInternal(&form)
+		JSON(w, r, code, data)
 	case "createTunnel":
-		HTTP_CreateTunnel(w, r)
-		return
+		tun, err := CreateTunnelInternal()
+		if err != nil {
+			JSON(w, r, 400, err)
+			return
+		}
+		JSON(w, r, 200, tun)
 	case "deleteTunnel":
-		HTTP_DeleteTunnels(w, r)
-		return
+		var form TunnelMETA
+		_ = json.NewDecoder(r.Body).Decode(&form)
+		err := DeleteTunnelsInternal(&form)
+		if err != nil {
+			JSON(w, r, 400, err)
+			return
+		}
+		JSON(w, r, 200, nil)
 	case "setUser":
-		HTTP_SetUser(w, r)
-		return
+		var u User
+		_ = json.NewDecoder(r.Body).Decode(&u)
+		err := SetUserInternal(&u)
+		if err != nil {
+			JSON(w, r, 400, err)
+			return
+		}
+		JSON(w, r, 200, nil)
 	case "getUser":
-		HTTP_GetUser(w, r)
-		return
+		u, err := GetUserInternal()
+		if err != nil {
+			JSON(w, r, 400, err)
+			return
+		}
+		JSON(w, r, 200, u)
 	case "delUser":
-		HTTP_DelUser(w, r)
-		return
+		err := DelUserInternal()
+		if err != nil {
+			JSON(w, r, 400, err)
+			return
+		}
+		JSON(w, r, 200, nil)
 	case "getState":
-		HTTP_GetState(w, r)
-		return
+		JSON(w, r, 200, GetStateInternal())
 	case "setConfig":
-		HTTP_SetConfig(w, r)
-		return
+		var config configV2
+		_ = json.NewDecoder(r.Body).Decode(&config)
+		err := SetConfigInternal(&config)
+		if err != nil {
+			JSON(w, r, 400, err)
+			return
+		}
+		JSON(w, r, 200, nil)
 	case "setTunnel":
-		HTTP_SetTunnel(w, r)
-		return
+		var newForm saveTunnelForm
+		_ = json.NewDecoder(r.Body).Decode(&newForm)
+		err := SetTunnelInternal(&newForm)
+		if err != nil {
+			JSON(w, r, 400, err)
+			return
+		}
+		JSON(w, r, 200, nil)
 	case "getDNSStats":
-		HTTP_GetDNSStats(w, r)
-		return
+		JSON(w, r, 200, GetDNSStatsInternal())
 	default:
+		w.WriteHeader(200)
+		r.Body.Close()
 	}
+}
 
-	w.WriteHeader(200)
-	r.Body.Close()
+// --- Refactored internal logic functions ---
+
+func ConnectInternal(req *ConnectionRequest) (int, error) {
+	return PublicConnect(req)
+}
+
+func DisconnectInternal(form *DisconnectForm) error {
+	return Disconnect(form.ID, true)
+}
+
+func ResetNetworkInternal() {
+	ResetEverything()
+}
+
+func GetQRCodeInternal(form *TWO_FACTOR_CONFIRM) (any, error) {
+	return GetQRCode(form)
+}
+
+func ForwardToControllerInternal(form *FORWARD_REQUEST) (any, int) {
+	return ForwardToController(form)
+}
+
+func CreateTunnelInternal() (any, error) {
+	return createRandomTunnel()
+}
+
+func DeleteTunnelsInternal(form *TunnelMETA) error {
+	state := STATE.Load()
+	_ = os.Remove(state.TunnelsPath + form.Tag + tunnelFileSuffix)
+	// Remove from map
+	tunnelMetaMapRange(func(tun *TunnelMETA) bool {
+		if tun.Tag == form.Tag {
+			TunnelMetaMap.Delete(form.Tag)
+			return false
+		}
+		return true
+	})
+	return nil
+}
+
+func SetUserInternal(u *User) error {
+	if err := saveUser(u); err != nil {
+		return err
+	}
+	return nil
+}
+
+func GetUserInternal() (*User, error) {
+	return loadUser()
+}
+
+func DelUserInternal() error {
+	return delUser()
+}
+
+func GetStateInternal() *StateResponse {
+	return GetFullState()
+}
+
+func SetConfigInternal(config *configV2) error {
+	return SetConfig(config)
+}
+
+func SetTunnelInternal(newForm *saveTunnelForm) error {
+	isConnected := false
+	tunnelMapRange(func(t *TUN) bool {
+		if t.CR != nil && t.CR.Tag == newForm.Meta.Tag {
+			isConnected = true
+			return false
+		}
+		return true
+	})
+	if isConnected {
+		return &CustomError{"tunnel is connected"}
+	}
+	errs := validateTunnelMeta(newForm.Meta, newForm.OldTag)
+	if len(errs) > 0 {
+		return &CustomError{"validation error"}
+	}
+	TunnelMetaMap.Store(newForm.Meta.Tag, newForm.Meta)
+	if err := writeTunnelsToDisk(newForm.Meta.Tag); err != nil {
+		return err
+	}
+	if newForm.OldTag != newForm.Meta.Tag {
+		TunnelMetaMap.Delete(newForm.OldTag)
+		state := STATE.Load()
+		if err := os.Remove(state.TunnelsPath + newForm.OldTag + tunnelFileSuffix); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func GetTunnelsInternal() []*TunnelMETA {
+	out := make([]*TunnelMETA, 0)
+	tunnelMetaMapRange(func(tun *TunnelMETA) bool {
+		out = append(out, tun)
+		return true
+	})
+	return out
+}
+
+func GetDNSStatsInternal() map[string]any {
+	stats := make(map[string]any)
+	DNSStatsMap.Range(func(key, value any) bool {
+		ks, ok := key.(string)
+		if !ok {
+			return true
+		}
+		stats[ks] = value
+		return true
+	})
+	return stats
+}
+
+type CustomError struct {
+	Msg string
+}
+
+func (e *CustomError) Error() string {
+	return e.Msg
+}
+
+// APIBridge provides Wails JS bindings for HTTPHandler logic
+// Wails will generate JS bindings for exported methods on this struct
+// You can extend this struct with more methods as needed
+//go:generate wails generate go
+
+type APIBridge struct{}
+
+// CallMethod exposes the HTTPHandler logic to Wails JS
+// method: the API method (e.g., "connect", "getState", etc.)
+// payload: the request body as JSON string
+// Returns: response as JSON string, or error string
+func (a *APIBridge) CallMethod(method string, payload string) (string, error) {
+	switch method {
+	case "connect":
+		var req ConnectionRequest
+		if err := json.Unmarshal([]byte(payload), &req); err != nil {
+			return "", err
+		}
+		code, err := ConnectInternal(&req)
+		if err != nil {
+			b, _ := json.Marshal(map[string]any{"error": err.Error(), "code": code})
+			return string(b), nil
+		}
+		b, _ := json.Marshal(map[string]any{"code": code})
+		return string(b), nil
+	case "disconnect":
+		var form DisconnectForm
+		if err := json.Unmarshal([]byte(payload), &form); err != nil {
+			return "", err
+		}
+		err := DisconnectInternal(&form)
+		if err != nil {
+			b, _ := json.Marshal(map[string]any{"error": err.Error()})
+			return string(b), nil
+		}
+		b, _ := json.Marshal(map[string]any{"success": true})
+		return string(b), nil
+	case "resetNetwork":
+		ResetNetworkInternal()
+		b, _ := json.Marshal(map[string]any{"success": true})
+		return string(b), nil
+	case "getQRCode":
+		var form TWO_FACTOR_CONFIRM
+		if err := json.Unmarshal([]byte(payload), &form); err != nil {
+			return "", err
+		}
+		QR, err := GetQRCodeInternal(&form)
+		if err != nil {
+			b, _ := json.Marshal(map[string]any{"error": err.Error()})
+			return string(b), nil
+		}
+		b, _ := json.Marshal(QR)
+		return string(b), nil
+	case "forwardToController":
+		var form FORWARD_REQUEST
+		if err := json.Unmarshal([]byte(payload), &form); err != nil {
+			return "", err
+		}
+		data, code := ForwardToControllerInternal(&form)
+		b, _ := json.Marshal(map[string]any{"code": code, "data": data})
+		return string(b), nil
+	case "createTunnel":
+		tun, err := CreateTunnelInternal()
+		if err != nil {
+			b, _ := json.Marshal(map[string]any{"error": err.Error()})
+			return string(b), nil
+		}
+		b, _ := json.Marshal(tun)
+		return string(b), nil
+	case "deleteTunnel":
+		var form TunnelMETA
+		if err := json.Unmarshal([]byte(payload), &form); err != nil {
+			return "", err
+		}
+		err := DeleteTunnelsInternal(&form)
+		if err != nil {
+			b, _ := json.Marshal(map[string]any{"error": err.Error()})
+			return string(b), nil
+		}
+		b, _ := json.Marshal(map[string]any{"success": true})
+		return string(b), nil
+	case "setUser":
+		var u User
+		if err := json.Unmarshal([]byte(payload), &u); err != nil {
+			return "", err
+		}
+		err := SetUserInternal(&u)
+		if err != nil {
+			b, _ := json.Marshal(map[string]any{"error": err.Error()})
+			return string(b), nil
+		}
+		b, _ := json.Marshal(map[string]any{"success": true})
+		return string(b), nil
+	case "getUser":
+		u, err := GetUserInternal()
+		if err != nil {
+			b, _ := json.Marshal(map[string]any{"error": err.Error()})
+			return string(b), nil
+		}
+		b, _ := json.Marshal(u)
+		return string(b), nil
+	case "delUser":
+		err := DelUserInternal()
+		if err != nil {
+			b, _ := json.Marshal(map[string]any{"error": err.Error()})
+			return string(b), nil
+		}
+		b, _ := json.Marshal(map[string]any{"success": true})
+		return string(b), nil
+	case "getState":
+		b, _ := json.Marshal(GetStateInternal())
+		return string(b), nil
+	case "setConfig":
+		var config configV2
+		if err := json.Unmarshal([]byte(payload), &config); err != nil {
+			return "", err
+		}
+		err := SetConfigInternal(&config)
+		if err != nil {
+			b, _ := json.Marshal(map[string]any{"error": err.Error()})
+			return string(b), nil
+		}
+		b, _ := json.Marshal(map[string]any{"success": true})
+		return string(b), nil
+	case "setTunnel":
+		var newForm saveTunnelForm
+		if err := json.Unmarshal([]byte(payload), &newForm); err != nil {
+			return "", err
+		}
+		err := SetTunnelInternal(&newForm)
+		if err != nil {
+			b, _ := json.Marshal(map[string]any{"error": err.Error()})
+			return string(b), nil
+		}
+		b, _ := json.Marshal(map[string]any{"success": true})
+		return string(b), nil
+	case "getDNSStats":
+		b, _ := json.Marshal(GetDNSStatsInternal())
+		return string(b), nil
+	default:
+		return "", nil
+	}
 }
 
 var LogSocket *websocket.Conn
@@ -567,43 +887,4 @@ func HTTP_ForwardToController(w http.ResponseWriter, r *http.Request) {
 	}
 	data, code := ForwardToController(form)
 	JSON(w, r, code, data)
-}
-
-// APIBridge provides Wails JS bindings for HTTPHandler logic
-// Wails will generate JS bindings for exported methods on this struct
-// You can extend this struct with more methods as needed
-//go:generate wails generate go
-
-type APIBridge struct{}
-
-// CallMethod exposes the HTTPHandler logic to Wails JS
-// method: the API method (e.g., "connect", "getState", etc.)
-// payload: the request body as JSON string
-// Returns: response as JSON string, or error string
-func (a *APIBridge) CallMethod(method string, payload string) (string, error) {
-	switch method {
-	case "connect":
-		// Unmarshal payload into ConnectionRequest
-		var req ConnectionRequest
-		if err := json.Unmarshal([]byte(payload), &req); err != nil {
-			return "", err
-		}
-		code, err := PublicConnect(&req)
-		if err != nil {
-			b, _ := json.Marshal(map[string]any{"error": err.Error(), "code": code})
-			return string(b), nil
-		}
-		b, _ := json.Marshal(map[string]any{"code": code})
-		return string(b), nil
-	case "getState":
-		state := GetFullState()
-		b, err := json.Marshal(state)
-		if err != nil {
-			return "", err
-		}
-		return string(b), nil
-	// Add more cases for other methods as needed
-	default:
-		return "", nil
-	}
 }
