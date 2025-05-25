@@ -171,13 +171,14 @@ func main() {
 		if bboltEnabled {
 			err = ConnectToBBoltDB("tunnels.db")
 			if err != nil {
-				fmt.Println(err)
+				logger.Error("unable to connect to bbolt", slog.Any("err", err))
 				os.Exit(1)
 			}
 
 		} else {
 			err = ConnectToDB(loadSecret("DBurl"))
 			if err != nil {
+				logger.Error("unable to connect to mongodb", slog.Any("err", err))
 				os.Exit(1)
 			}
 		}

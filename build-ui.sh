@@ -5,4 +5,3 @@ cd ./frontend
 vite build
 cd ..
 cp -R ./frontend/dist ./cmd/main
-

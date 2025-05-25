@@ -3,7 +3,6 @@ package client
 import (
 	"crypto/tls"
 	"encoding/json"
-	"fmt"
 	"io/fs"
 	"net"
 	"net/http"
@@ -312,12 +311,7 @@ func HTTP_GetUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetFullState() (s *StateResponse) {
-	defer func() {
-		r := recover()
-		if r != nil {
-			fmt.Println(string(debug.Stack()))
-		}
-	}()
+	defer RecoverAndLogToFile()
 	state := STATE.Load()
 	s = new(StateResponse)
 	s.Version = version
