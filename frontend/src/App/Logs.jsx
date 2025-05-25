@@ -1,4 +1,5 @@
 
+import { useEffect } from "react";
 import GLOBAL_STATE from "../state";
 import WS from "../ws";
 import { useState } from "react";
@@ -8,10 +9,10 @@ const Logs = () => {
   const [filter, setFilter] = useState("");
   const [hide, setHide] = useState(false)
 
-  const reloadSocket = () => {
+  useEffect(() => {
     WS.sockets["logs"] = undefined
     WS.NewSocket(WS.GetURL("logs"), "logs", WS.ReceiveLogEvent)
-  }
+  }, [])
 
   let logs = state.logs
   let classes = "bottom-loader"

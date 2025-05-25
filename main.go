@@ -34,6 +34,9 @@ func main() {
 			app,
 			apiBridge,
 		},
+		Debug: options.Debug{
+			OpenInspectorOnStartup: true,
+		},
 	})
 
 	if err != nil {
