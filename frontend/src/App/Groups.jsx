@@ -3,6 +3,7 @@ import dayjs from "dayjs";
 import GLOBAL_STATE from "../state";
 import GenericTable from "./GenericTable";
 import NewObjectEditorDialog from "./NewObjectEdiorDialog";
+import { useNavigate } from "react-router-dom";
 
 const Groups = () => {
   const state = GLOBAL_STATE("groups");
@@ -10,7 +11,6 @@ const Groups = () => {
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [group, setGroup] = useState(undefined)
   const navigate = useNavigate()
-
 
   let getGroups = async (offset, limit) => {
     let resp = await state.callController(null, null, "POST", "/v3/group/list", {}, false, false)
@@ -22,7 +22,6 @@ const Groups = () => {
   useEffect(() => {
     getGroups(0, 50)
   }, []);
-
 
   const saveGroup = async () => {
     let resp = undefined

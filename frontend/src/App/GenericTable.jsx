@@ -9,9 +9,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useState } from "react";
-import { DeleteIcon } from "lucide-react";
-import { useState, useEffect } from "react";
-// import { GridLoader } from "react-spinners";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -19,7 +16,7 @@ import {
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
 import { MoreHorizontal, Edit, Trash2 } from "lucide-react";
-import { ArrowLeft, ArrowRight, Plus, BadgePlus } from "lucide-react";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 import GLOBAL_STATE from "../state";
 import { Badge } from "@/components/ui/badge";
 
