@@ -36,7 +36,8 @@ cmd/main/api.key
 cmd/main/api.crt
 cmd/main/private.crt
 cmd/main/*.tun.json
-cmd/main/*.tun.json.bak*.exe
+cmd/main/*.tun.json.bak
+*.exe
 
 node_modules
 files
