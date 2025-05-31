@@ -263,11 +263,11 @@ type TUN struct {
 	VPLIngress  map[[4]byte]struct{} `json:"-"`
 
 	// TCP and UDP Natting
+	AvailableTCPPorts []atomic.Pointer[VPNPort] `json:"-"`
+	AvailableUDPPorts []atomic.Pointer[VPNPort] `json:"-"`
 	// TODO: maps are racy, needs redesign
-	TCPEgress  map[[10]byte]*Mapping     `json:"-"`
-	UDPEgress  map[[10]byte]*Mapping     `json:"-"`
-	TCPPortMap []atomic.Pointer[VPNPort] `json:"-"`
-	UDPPortMap []atomic.Pointer[VPNPort] `json:"-"`
+	ActiveTCPMapping map[[10]byte]*Mapping `json:"-"`
+	ActiveUDPMapping map[[10]byte]*Mapping `json:"-"`
 
 	Index []byte
 
@@ -312,17 +312,17 @@ type TUN struct {
 }
 
 func (t *TUN) InitPortMap() {
-	t.TCPPortMap = make([]atomic.Pointer[VPNPort], t.endPort-t.startPort)
-	t.UDPPortMap = make([]atomic.Pointer[VPNPort], t.endPort-t.startPort)
+	t.AvailableTCPPorts = make([]atomic.Pointer[VPNPort], t.endPort-t.startPort)
+	t.AvailableUDPPorts = make([]atomic.Pointer[VPNPort], t.endPort-t.startPort)
 
-	for i := range t.TCPPortMap {
+	for i := range t.AvailableTCPPorts {
 		tm := new(VPNPort)
 		tm.M = make(map[[4]byte]*Mapping)
-		t.TCPPortMap[i].Store(tm)
+		t.AvailableTCPPorts[i].Store(tm)
 	}
-	for i := range t.UDPPortMap {
+	for i := range t.AvailableUDPPorts {
 		um := new(VPNPort)
 		um.M = make(map[[4]byte]*Mapping)
-		t.UDPPortMap[i].Store(um)
+		t.AvailableUDPPorts[i].Store(um)
 	}
 }

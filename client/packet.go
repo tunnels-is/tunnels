@@ -82,7 +82,7 @@ func (V *TUN) ProcessEgressPacket(p *[]byte) (sendRemote bool) {
 
 			V.EP_SYN = V.EP_TPHeader[13] & 0x2
 
-			V.EgressMapping = V.CreateNEWPortMapping(V.TCPEgress, V.TCPPortMap, packet[12:20], V.EP_TPHeader[0:4])
+			V.EgressMapping = V.CreateNEWPortMapping(V.ActiveTCPMapping, V.AvailableTCPPorts, packet[12:20], V.EP_TPHeader[0:4])
 			if V.EgressMapping == nil {
 				debugMissingEgressMapping(packet)
 				return false
@@ -90,7 +90,7 @@ func (V *TUN) ProcessEgressPacket(p *[]byte) (sendRemote bool) {
 
 		} else if V.EP_Protocol == 17 {
 
-			V.EgressMapping = V.CreateNEWPortMapping(V.UDPEgress, V.UDPPortMap, packet[12:20], V.EP_TPHeader[0:4])
+			V.EgressMapping = V.CreateNEWPortMapping(V.ActiveUDPMapping, V.AvailableUDPPorts, packet[12:20], V.EP_TPHeader[0:4])
 			if V.EgressMapping == nil {
 				debugMissingEgressMapping(packet)
 				return false
@@ -170,13 +170,13 @@ func (V *TUN) ProcessIngressPacket(packet []byte) bool {
 		}
 
 		if V.IP_Protocol == 6 {
-			V.IngressMapping = V.getIngressPortMapping(V.TCPPortMap, packet[12:16], V.IP_DstPort)
+			V.IngressMapping = V.getIngressPortMapping(V.AvailableTCPPorts, packet[12:16], V.IP_DstPort)
 			if V.IngressMapping == nil {
 				return false
 			}
 
 		} else if V.IP_Protocol == 17 {
-			V.IngressMapping = V.getIngressPortMapping(V.UDPPortMap, packet[12:16], V.IP_DstPort)
+			V.IngressMapping = V.getIngressPortMapping(V.AvailableUDPPorts, packet[12:16], V.IP_DstPort)
 			if V.IngressMapping == nil {
 				return false
 			}
