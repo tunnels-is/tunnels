@@ -52,9 +52,9 @@ $ iptables -I OUTPUT -p tcp --src {interface_IP} --tcp-flags ACK,RST RST -j DROP
 $ golangci-lint run --timeout=10m --config .golangci.yml
 ```
 ### Permissions
-Windows: admin
-macos: sudo
-linux: setcap 'cap_net_raw,cap_net_bind_service,cap_net_admin+eip' main
+ - Windows: admin
+ - macos: sudo
+ - linux: setcap 'cap_net_raw,cap_net_bind_service,cap_net_admin+eip' main
 
 ## Building
  - DEV: ./releaser-build-snapshot.sh
