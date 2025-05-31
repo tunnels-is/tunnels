@@ -120,7 +120,7 @@ type configV2 struct {
 	DNSstats      bool
 	DNSServerIP   string
 	DNSServerPort string
-	DNSBlockLists []*BlockList
+	DNSBlockLists []atomic.Pointer[BlockList]
 	DNSRecords    []*types.DNSRecord
 }
 
