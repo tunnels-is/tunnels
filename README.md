@@ -5,12 +5,11 @@ https://tunnels.is
 https://github.com/tunnels-is/tunnels/blob/main/LICENSE
 
 # Requirements
-
-## Client Web UI
+### Client Web UI
  - vite
-## Client Golang App
+### Client Golang App
  - golang (macos: ifconfig, route), (windows: netsh)
-## Server (supports linux and docker)
+### Server (supports linux and docker)
  - iptables (only needed when running the server)
  - golang
 
@@ -43,19 +42,16 @@ as long as the code makes sense, even small spellfixing
 contributions. Just remember to run the linter before submitting.
 
 # Random development / deployment information
-
-## iptables for the server
+### iptables for the server
 these are applied automatically on startup
 ```
 $ iptables -I OUTPUT -p tcp --src {interface_IP} --tcp-flags ACK,RST RST -j DROP
 ```
-
-## Linting
+### Linting
 ```
 $ golangci-lint run --timeout=10m --config .golangci.yml
 ```
-
-## Permissions
+### Permissions
 Windows: admin
 macos: sudo
 linux: setcap 'cap_net_raw,cap_net_bind_service,cap_net_admin+eip' main
