@@ -3,7 +3,10 @@
 [![Issues][issues-shield]][issues-url]
 
 # Tunnels
-this readme is in progress..
+This readme is work in progress.. 
+
+# Contact
+support@tunnels.is
 
 # LICENSE
 https://github.com/tunnels-is/tunnels/blob/main/LICENSE
@@ -14,17 +17,13 @@ https://github.com/tunnels-is/tunnels/blob/main/LICENSE
 # linting
 golangci-lint run --timeout=10m --config .golangci.yml
 
-# Linux
-## Binary permissions
-sudo setcap 'cap_net_raw,cap_net_bind_service,cap_net_admin+eip' main
+# Permissions
+.. we are working on narrowing down the windows and macos permissions
+Linux: sudo setcap 'cap_net_raw,cap_net_bind_service,cap_net_admin+eip' main
+windows: admin 
+macos: sudo
 
-# Windows
-Needs to run as admin
-
-# MacOS
-Needs to run as sudo
-
-# iptables
+# server iptables
 $ iptables -I OUTPUT -p tcp --src {interface_IP} --tcp-flags ACK,RST RST -j DROP
 
 # Building
