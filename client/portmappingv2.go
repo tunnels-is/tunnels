@@ -7,6 +7,7 @@ import (
 	"net"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -100,24 +101,21 @@ type VPNPort struct {
 }
 
 type Mapping struct {
-	Proto        byte
-	EFIN         byte
-	ESYN         byte
-	IFIN         byte
-	ERST         byte
-	IRST         byte
-	LastActivity time.Time
-	// IncementMS       int64
+	Proto            byte
+	EFIN             byte
+	ESYN             byte
+	IFIN             byte
+	ERST             byte
+	IRST             byte
+	LastActivity     time.Time
 	LocalPort        [2]byte
 	dstPort          [2]byte
 	VPNPort          [2]byte
 	OriginalSourceIP [4]byte
 	DestinationIP    [4]byte
-	// ingressBytes     int
-	// egressBytes      int
 }
 
-func (V *TUN) CreateNEWPortMapping(Emap map[[10]byte]*Mapping, PortMap []VPNPort, ips, port []byte) *Mapping {
+func (V *TUN) CreateNEWPortMapping(Emap map[[10]byte]*Mapping, PortMap []atomic.Pointer[VPNPort], ips, port []byte) *Mapping {
 	EID := [10]byte{
 		ips[0],
 		ips[1],
@@ -161,11 +159,11 @@ func (V *TUN) CreateNEWPortMapping(Emap map[[10]byte]*Mapping, PortMap []VPNPort
 
 	l := uint16(len(PortMap))
 	for i := uint16(0); i < l; i++ {
-		PortMap[i].L.Lock()
-		m, ok := PortMap[i].M[Emap[EID].DestinationIP]
+		p := PortMap[i].Load()
+		p.L.Lock()
+		m, ok := p.M[Emap[EID].DestinationIP]
 		if !ok || m == nil {
-			PortMap[i].M[Emap[EID].DestinationIP] = Emap[EID]
-			PortMap[i].L.Unlock()
+			p.M[Emap[EID].DestinationIP] = Emap[EID]
 			Emap[EID].Proto = V.EP_Protocol
 			Emap[EID].LastActivity = time.Now()
 			Emap[EID].LocalPort = [2]byte{port[0], port[1]}
@@ -175,9 +173,11 @@ func (V *TUN) CreateNEWPortMapping(Emap map[[10]byte]*Mapping, PortMap []VPNPort
 				Emap[EID].VPNPort[:],
 				i+V.startPort,
 			)
+			p.L.Unlock()
+			PortMap[i].Store(p)
 			break
 		}
-		PortMap[i].L.Unlock()
+		p.L.Unlock()
 	}
 
 	if Emap[EID].LocalPort == [2]byte{0, 0} {
@@ -188,15 +188,17 @@ func (V *TUN) CreateNEWPortMapping(Emap map[[10]byte]*Mapping, PortMap []VPNPort
 	return Emap[EID]
 }
 
-func (V *TUN) getIngressPortMapping(VPNPortMap []VPNPort, dstIP []byte, port [2]byte) *Mapping {
+func (V *TUN) getIngressPortMapping(VPNPortMap []atomic.Pointer[VPNPort], dstIP []byte, port [2]byte) *Mapping {
 	p := binary.BigEndian.Uint16(port[:]) - V.startPort
-	VPNPortMap[p].L.Lock()
-	mapping, ok := VPNPortMap[p].M[[4]byte(dstIP)]
-	VPNPortMap[p].L.Unlock()
+	vpnp := VPNPortMap[p].Load()
+	vpnp.L.Lock()
+	mapping, ok := vpnp.M[[4]byte(dstIP)]
+	vpnp.L.Unlock()
 	if !ok || mapping == nil {
 		return nil
 	}
 	mapping.LastActivity = time.Now()
+	VPNPortMap[p].Store(vpnp)
 	return mapping
 }
 
@@ -248,32 +250,35 @@ func debugMappStream(M *Mapping) {
 
 func (t *TUN) cleanPortMap() {
 	for i := range t.TCPPortMap {
-		t.TCPPortMap[i].L.Lock()
-		for k, v := range t.TCPPortMap[i].M {
+		tm := t.TCPPortMap[i].Load()
+		tm.L.Lock()
+		for k, v := range tm.M {
 			switch {
 			case v.EFIN > 0 && v.IFIN > 0:
 				if time.Since(v.LastActivity) > time.Second*10 {
 					debugMappStream(v)
-					delete(t.TCPPortMap[i].M, k)
+					delete(tm.M, k)
 				}
 			case v.ERST > 0 || v.IRST > 0:
 				if time.Since(v.LastActivity) > time.Second*10 {
 					debugMappStream(v)
-					delete(t.TCPPortMap[i].M, k)
+					delete(tm.M, k)
 				}
 			default:
 				if time.Since(v.LastActivity) > time.Second*360 {
 					debugMappStream(v)
-					delete(t.TCPPortMap[i].M, k)
+					delete(tm.M, k)
 				}
 			}
 		}
-		t.TCPPortMap[i].L.Unlock()
+		tm.L.Unlock()
+		t.TCPPortMap[i].Store(tm)
 	}
 
 	for i := range t.UDPPortMap {
-		t.UDPPortMap[i].L.Lock()
-		for k, v := range t.UDPPortMap[i].M {
+		um := t.UDPPortMap[i].Load()
+		um.L.Lock()
+		for k, v := range um.M {
 			dnsL := 0
 			if t.ServerReponse != nil {
 				dnsL = len(t.ServerReponse.DNSServers)
@@ -292,7 +297,7 @@ func (t *TUN) cleanPortMap() {
 				if isDNS {
 					if time.Since(v.LastActivity) > time.Second*15 {
 						debugMappStream(v)
-						delete(t.UDPPortMap[i].M, k)
+						delete(um.M, k)
 					}
 				}
 			}
@@ -300,11 +305,12 @@ func (t *TUN) cleanPortMap() {
 			if !isDNS {
 				if time.Since(v.LastActivity) > time.Second*150 {
 					debugMappStream(v)
-					delete(t.UDPPortMap[i].M, k)
+					delete(um.M, k)
 				}
 			}
 		}
-		t.UDPPortMap[i].L.Unlock()
+		um.L.Unlock()
+		t.UDPPortMap[i].Store(um)
 	}
 }
 

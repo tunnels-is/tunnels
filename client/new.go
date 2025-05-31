@@ -247,8 +247,10 @@ type TUN struct {
 	serverInterfaceIP4bytes [4]byte
 	startPort               uint16
 	endPort                 uint16
-	TCPEgress               map[[10]byte]*Mapping `json:"-"`
-	UDPEgress               map[[10]byte]*Mapping `json:"-"`
+	// TCPEgress               map[[10]byte]*Mapping `json:"-"`
+	// UDPEgress               map[[10]byte]*Mapping `json:"-"`
+	TCPEgress map[[10]byte]atomic.Pointer[Mapping] `json:"-"`
+	UDPEgress map[[10]byte]atomic.Pointer[Mapping] `json:"-"`
 
 	// Network Natting
 	NATEgress  map[[4]byte][4]byte `json:"-"`
@@ -265,6 +267,8 @@ type TUN struct {
 	VPLIngress  map[[4]byte]struct{} `json:"-"`
 
 	// TCP and UDP Natting
+	// TODO: these are racy, but they don't cause any
+	// real problems. We need to re-design all of this.
 	TCPPortMap []VPNPort `json:"-"`
 	UDPPortMap []VPNPort `json:"-"`
 
@@ -311,13 +315,17 @@ type TUN struct {
 }
 
 func (t *TUN) InitPortMap() {
-	t.TCPPortMap = make([]VPNPort, t.endPort-t.startPort)
-	t.UDPPortMap = make([]VPNPort, t.endPort-t.startPort)
+	t.TCPPortMap = make([]atomic.Pointer[VPNPort], t.endPort-t.startPort)
+	t.UDPPortMap = make([]atomic.Pointer[VPNPort], t.endPort-t.startPort)
 
 	for i := range t.TCPPortMap {
-		t.TCPPortMap[i].M = make(map[[4]byte]*Mapping)
+		tm := new(VPNPort)
+		tm.M = make(map[[4]byte]*Mapping)
+		t.TCPPortMap[i].Store(tm)
 	}
 	for i := range t.UDPPortMap {
-		t.UDPPortMap[i].M = make(map[[4]byte]*Mapping)
+		um := new(VPNPort)
+		um.M = make(map[[4]byte]*Mapping)
+		t.UDPPortMap[i].Store(um)
 	}
 }
