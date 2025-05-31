@@ -2,7 +2,7 @@
  - Website: https://tunnels.is
  - License: https://github.com/tunnels-is/tunnels/blob/main/LICENSE
  - Discord: https://discord.gg/7Ts3PCnCd9
- - LiveDev: https://twitch.tv/keyb1nd_
+ - (LiveDev)[https://twitch.tv/keyb1nd_]
 
 # Requirements
 ### Client Web UI
