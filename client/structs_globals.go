@@ -4,6 +4,7 @@ import (
 	"embed"
 	"net/http"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/miekg/dns"
@@ -27,6 +28,7 @@ type DNSStats struct {
 	LastResolved time.Time
 	LastBlocked  time.Time
 	Answers      []string
+	m            sync.Mutex
 }
 
 type ConnectionRequest struct {

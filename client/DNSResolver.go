@@ -552,27 +552,23 @@ func IncrementDNSStats(domain string, blocked bool, tag string, answers []dns.RR
 
 	var dnsStats *DNSStats
 	tn := time.Now()
-	dnsint, ok := DNSStatsMap.Load(domain)
-	if !ok {
-		DNSStatsMap.Store(domain, &DNSStats{})
-		dnsint, _ = DNSStatsMap.Load(domain)
-		dnsStats = dnsint.(*DNSStats)
-		dnsStats.Tag = tag
-		dnsStats.FirstSeen = tn
-	} else {
-		dnsStats = dnsint.(*DNSStats)
-	}
+	dnsint, ok := DNSStatsMap.LoadOrStore(domain, &DNSStats{})
+	dnsStats = dnsint.(*DNSStats)
 
+	dnsStats.m.Lock()
+	if !ok {
+		dnsStats.FirstSeen = tn
+	}
 	if blocked {
 		dnsStats.LastBlocked = tn
 	} else {
 		dnsStats.LastResolved = tn
 	}
-
+	dnsStats.Tag = tag
 	dnsStats.Count++
 	dnsStats.LastSeen = tn
 	for _, v := range answers {
 		dnsStats.Answers = append(dnsStats.Answers, v.String())
 	}
-	return
+	dnsStats.m.Unlock()
 }
