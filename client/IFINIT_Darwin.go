@@ -395,27 +395,3 @@ func AdjustRoutersForTunneling() (err error) {
 	// Since Darwin uses a different routing mechanism, this is a no-op
 	return nil
 }
-
-func PrintInterfaces() (error, []byte) {
-	out, err := exec.Command("ifconfig").Output()
-	if err != nil {
-		return err, nil
-	}
-	return nil, out
-}
-
-func PrintRoutes() (error, []byte) {
-	out, err := exec.Command("netstat", "-nr").Output()
-	if err != nil {
-		return err, nil
-	}
-	return nil, out
-}
-
-func PrintDNS() (error, []byte) {
-	out, err := exec.Command("scutil", "--dns").Output()
-	if err != nil {
-		return err, nil
-	}
-	return nil, out
-}
