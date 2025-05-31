@@ -247,10 +247,6 @@ type TUN struct {
 	serverInterfaceIP4bytes [4]byte
 	startPort               uint16
 	endPort                 uint16
-	// TCPEgress               map[[10]byte]*Mapping `json:"-"`
-	// UDPEgress               map[[10]byte]*Mapping `json:"-"`
-	TCPEgress map[[10]byte]atomic.Pointer[Mapping] `json:"-"`
-	UDPEgress map[[10]byte]atomic.Pointer[Mapping] `json:"-"`
 
 	// Network Natting
 	NATEgress  map[[4]byte][4]byte `json:"-"`
@@ -267,10 +263,11 @@ type TUN struct {
 	VPLIngress  map[[4]byte]struct{} `json:"-"`
 
 	// TCP and UDP Natting
-	// TODO: these are racy, but they don't cause any
-	// real problems. We need to re-design all of this.
-	TCPPortMap []VPNPort `json:"-"`
-	UDPPortMap []VPNPort `json:"-"`
+	// TODO: maps are racy, needs redesign
+	TCPEgress  map[[10]byte]*Mapping     `json:"-"`
+	UDPEgress  map[[10]byte]*Mapping     `json:"-"`
+	TCPPortMap []atomic.Pointer[VPNPort] `json:"-"`
+	UDPPortMap []atomic.Pointer[VPNPort] `json:"-"`
 
 	Index []byte
 
