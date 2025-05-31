@@ -55,6 +55,9 @@ func processBlockList(index int, wg *sync.WaitGroup, nm *sync.Map) {
 	defer RecoverAndLogToFile()
 	config := CONFIG.Load()
 	bl := config.DNSBlockLists[index].Load()
+	if bl == nil {
+		return
+	}
 
 	var listFile *os.File
 	var listBytes []byte
