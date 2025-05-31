@@ -1,8 +1,8 @@
 # Tunnels
-https://tunnels.is
-
-# LICENSE
-https://github.com/tunnels-is/tunnels/blob/main/LICENSE
+ - Website: https://tunnels.is
+ - License: https://github.com/tunnels-is/tunnels/blob/main/LICENSE
+ - Discord: https://discord.gg/7Ts3PCnCd9
+ - LiveDev: https://twitch.tv/keyb1nd_
 
 # Requirements
 ### Client Web UI
@@ -72,9 +72,6 @@ These are the real MVPs:
     - keyb1nd_'s twitch chat for the backseat debugging and support!
     - comahacks for security reviews
     - klauspost for development advice
-
-# Live Development
-[Keyb1nd_ twitch stream](https://twitch.tv/keyb1nd_)
 
 [forks-shield]: https://img.shields.io/github/forks/tunnels-is/tunnels?style=for-the-badge&logo=github
 [forks-url]: https://github.com/tunnels-is/tunnels/network/members
