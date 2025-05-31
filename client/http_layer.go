@@ -7,7 +7,7 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"runtime/debug"
+	"sync/atomic"
 	"time"
 
 	"github.com/tunnels-is/tunnels/certs"
@@ -188,25 +188,26 @@ func HTTPhandler(w http.ResponseWriter, r *http.Request) {
 	r.Body.Close()
 }
 
-var LogSocket *websocket.Conn
+var LogSocket atomic.Pointer[websocket.Conn]
 
 func handleWebSocket(ws *websocket.Conn) {
 	defer func() {
-		if r := recover(); r != nil {
-			ERROR("Possible UI reload: ", r, string(debug.Stack()))
-		}
 		if ws != nil {
 			ws.Close()
 		}
 	}()
+	defer RecoverAndLogToFile()
 
-	LogSocket = ws
+	LogSocket.Store(ws)
 	for event := range APILogQueue {
 		err := websocket.Message.Send(ws, event)
 		if err != nil {
 			// Make an attempt to delive this log line to the new LogSocket.
 			// if delivery fails, the event will be found in the log file.
-			_ = websocket.Message.Send(LogSocket, event)
+			gws := LogSocket.Load()
+			if gws != nil {
+				_ = websocket.Message.Send(gws, event)
+			}
 			return
 		}
 	}
