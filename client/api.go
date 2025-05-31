@@ -386,8 +386,8 @@ func InitializeTunnelFromCRR(TUN *TUN) (err error) {
 
 	TUN.startPort = TUN.ServerReponse.StartPort
 	TUN.endPort = TUN.ServerReponse.EndPort
-	TUN.TCPEgress = make(map[[10]byte]*Mapping)
-	TUN.UDPEgress = make(map[[10]byte]*Mapping)
+	TUN.ActiveTCPMapping = make(map[[10]byte]*Mapping)
+	TUN.ActiveUDPMapping = make(map[[10]byte]*Mapping)
 	TUN.InitPortMap()
 
 	err = TUN.InitVPLMap()

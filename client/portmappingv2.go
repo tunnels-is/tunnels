@@ -249,8 +249,8 @@ func debugMappStream(M *Mapping) {
 }
 
 func (t *TUN) cleanPortMap() {
-	for i := range t.TCPPortMap {
-		tm := t.TCPPortMap[i].Load()
+	for i := range t.AvailableTCPPorts {
+		tm := t.AvailableTCPPorts[i].Load()
 		tm.L.Lock()
 		for k, v := range tm.M {
 			switch {
@@ -272,11 +272,11 @@ func (t *TUN) cleanPortMap() {
 			}
 		}
 		tm.L.Unlock()
-		t.TCPPortMap[i].Store(tm)
+		t.AvailableTCPPorts[i].Store(tm)
 	}
 
-	for i := range t.UDPPortMap {
-		um := t.UDPPortMap[i].Load()
+	for i := range t.AvailableUDPPorts {
+		um := t.AvailableUDPPorts[i].Load()
 		um.L.Lock()
 		for k, v := range um.M {
 			dnsL := 0
@@ -310,7 +310,7 @@ func (t *TUN) cleanPortMap() {
 			}
 		}
 		um.L.Unlock()
-		t.UDPPortMap[i].Store(um)
+		t.AvailableUDPPorts[i].Store(um)
 	}
 }
 
