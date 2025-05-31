@@ -9,6 +9,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -53,7 +54,7 @@ func processBlockList(index int, wg *sync.WaitGroup, nm *sync.Map) {
 	}()
 	defer RecoverAndLogToFile()
 	config := CONFIG.Load()
-	bl := config.DNSBlockLists[index]
+	bl := config.DNSBlockLists[index].Load()
 
 	var listFile *os.File
 	var listBytes []byte
@@ -61,7 +62,6 @@ func processBlockList(index int, wg *sync.WaitGroup, nm *sync.Map) {
 	var err error
 
 	state := STATE.Load()
-
 	if time.Since(bl.LastDownload).Hours() > 24 {
 		if CheckIfURL(bl.URL) {
 			listBytes, err = downloadList(bl.URL)
@@ -112,26 +112,26 @@ func processBlockList(index int, wg *sync.WaitGroup, nm *sync.Map) {
 		return
 	}
 
-	config.DNSBlockLists[index].Count = 0
-
+	bl.Count = 0
 	buff := bytes.NewBuffer(listBytes)
 	scanner := bufio.NewScanner(buff)
 	for scanner.Scan() {
 		d := scanner.Text()
 		if CheckIfPlainDomain(d) {
 			if bl.Enabled {
-				nm.Store(d, config.DNSBlockLists[index])
+				nm.Store(d, bl)
 			}
-			config.DNSBlockLists[index].Count++
+			bl.Count++
 		} else {
 			badLines++
 		}
 	}
 
-	config.DNSBlockLists[index].LastDownload = time.Now()
+	bl.LastDownload = time.Now()
 	if badLines > 0 {
 		DEBUG(badLines, " invalid lines in list: ", bl.URL)
 	}
+	config.DNSBlockLists[index].Store(bl)
 }
 
 func downloadList(url string) ([]byte, error) {
@@ -172,59 +172,58 @@ retry:
 	return bb, nil
 }
 
-func GetDefaultBlockLists() []*BlockList {
-	return []*BlockList{
+func GetDefaultBlockLists() []atomic.Pointer[BlockList] {
+	bl := []*BlockList{
 		{
-			Tag:          "Ads",
-			URL:          "https://raw.githubusercontent.com/n00bady/bluam/master/dns/merged/ads.txt",
-			LastDownload: time.Now().AddDate(-2, 0, 0),
+			Tag: "Ads",
+			URL: "https://raw.githubusercontent.com/n00bady/bluam/master/dns/merged/ads.txt",
 		},
 		{
-			Tag:          "AdultContent",
-			URL:          "https://github.com/n00bady/bluam/raw/master/dns/merged/adult.txt",
-			LastDownload: time.Now().AddDate(-2, 0, 0),
+			Tag: "AdultContent",
+			URL: "https://github.com/n00bady/bluam/raw/master/dns/merged/adult.txt",
 		},
 		{
-			Tag:          "CryptoCurrency",
-			URL:          "https://github.com/n00bady/bluam/raw/master/dns/merged/crypto.txt",
-			LastDownload: time.Now().AddDate(-2, 0, 0),
+			Tag: "CryptoCurrency",
+			URL: "https://github.com/n00bady/bluam/raw/master/dns/merged/crypto.txt",
 		},
 		{
-			Tag:          "Drugs",
-			URL:          "https://github.com/n00bady/bluam/raw/master/dns/merged/drugs.txt",
-			LastDownload: time.Now().AddDate(-2, 0, 0),
+			Tag: "Drugs",
+			URL: "https://github.com/n00bady/bluam/raw/master/dns/merged/drugs.txt",
 		},
 		{
-			Tag:          "FakeNews",
-			URL:          "https://github.com/n00bady/bluam/raw/master/dns/merged/fakenews.txt",
-			LastDownload: time.Now().AddDate(-2, 0, 0),
+			Tag: "FakeNews",
+			URL: "https://github.com/n00bady/bluam/raw/master/dns/merged/fakenews.txt",
 		},
 		{
-			Tag:          "Fraud",
-			URL:          "https://github.com/n00bady/bluam/raw/master/dns/merged/fraud.txt",
-			LastDownload: time.Now().AddDate(-2, 0, 0),
+			Tag: "Fraud",
+			URL: "https://github.com/n00bady/bluam/raw/master/dns/merged/fraud.txt",
 		},
 		{
-			Tag:          "Gambling",
-			URL:          "https://github.com/n00bady/bluam/raw/master/dns/merged/gambling.txt",
-			LastDownload: time.Now().AddDate(-2, 0, 0),
+			Tag: "Gambling",
+			URL: "https://github.com/n00bady/bluam/raw/master/dns/merged/gambling.txt",
 		},
 		{
-			Tag:          "Malware",
-			URL:          "https://github.com/n00bady/bluam/raw/master/dns/merged/malware.txt",
-			LastDownload: time.Now().AddDate(-2, 0, 0),
+			Tag: "Malware",
+			URL: "https://github.com/n00bady/bluam/raw/master/dns/merged/malware.txt",
 		},
 		{
-			Tag:          "SocialMedia",
-			URL:          "https://github.com/n00bady/bluam/raw/master/dns/merged/socialmedia.txt",
-			LastDownload: time.Now().AddDate(-2, 0, 0),
+			Tag: "SocialMedia",
+			URL: "https://github.com/n00bady/bluam/raw/master/dns/merged/socialmedia.txt",
 		},
 		{
-			Tag:          "Surveillance",
-			URL:          "https://github.com/n00bady/bluam/raw/master/dns/merged/surveillance.txt",
-			LastDownload: time.Now().AddDate(-2, 0, 0),
+			Tag: "Surveillance",
+			URL: "https://github.com/n00bady/bluam/raw/master/dns/merged/surveillance.txt",
 		},
 	}
+
+	abl := make([]atomic.Pointer[BlockList], len(bl))
+	dlt := time.Now().AddDate(-2, 0, 0)
+	for i := range bl {
+		bl[i].LastDownload = dlt
+		abl[i].Store(bl[i])
+	}
+
+	return abl
 }
 
 func CheckIfURL(s string) bool {

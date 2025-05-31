@@ -550,10 +550,9 @@ func ResolveDNSAsHTTPS(m *dns.Msg, w dns.ResponseWriter) (err error) {
 func IncrementDNSStats(domain string, blocked bool, tag string, answers []dns.RR) {
 	defer RecoverAndLogToFile()
 
-	var dnsStats *DNSStats
 	tn := time.Now()
 	dnsint, ok := DNSStatsMap.LoadOrStore(domain, &DNSStats{})
-	dnsStats = dnsint.(*DNSStats)
+	dnsStats := dnsint.(*DNSStats)
 
 	dnsStats.m.Lock()
 	if !ok {
