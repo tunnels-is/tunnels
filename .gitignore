@@ -55,3 +55,5 @@ files
 .idea
 
 new_server/new_server
+api.crt
+api.key
