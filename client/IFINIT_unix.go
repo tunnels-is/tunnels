@@ -298,14 +298,14 @@ func (t *TInterface) Connect(tun *TUN) (err error) {
 		}
 	}
 
-	if tun.ServerReponse.LAN != nil && tun.ServerReponse.LAN.Nat != "" {
-		err = IP_AddRoute(tun.ServerReponse.LAN.Nat, "", t.IPv4Address, "0")
+	if tun.ServerResponse.LAN != nil && tun.ServerResponse.LAN.Nat != "" {
+		err = IP_AddRoute(tun.ServerResponse.LAN.Nat, "", t.IPv4Address, "0")
 		if err != nil {
 			return err
 		}
 	}
 
-	for _, n := range tun.ServerReponse.Networks {
+	for _, n := range tun.ServerResponse.Networks {
 		if n.Nat != "" {
 			err = IP_AddRoute(n.Nat, "", t.IPv4Address, "0")
 			if err != nil {
@@ -314,7 +314,7 @@ func (t *TInterface) Connect(tun *TUN) (err error) {
 		}
 	}
 
-	for _, v := range tun.ServerReponse.Routes {
+	for _, v := range tun.ServerResponse.Routes {
 		err = IP_AddRoute(v.Address, "", t.IPv4Address, v.Metric)
 		if err != nil {
 			return err

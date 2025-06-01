@@ -206,7 +206,7 @@ func (t *TUN) MarshalJSON() ([]byte, error) {
 	}{
 		t.ID,
 		t.CR,
-		t.ServerReponse,
+		t.ServerResponse,
 		pingTime,
 		int(t.startPort),
 		int(t.endPort),
@@ -219,6 +219,25 @@ func (t *TUN) MarshalJSON() ([]byte, error) {
 		ib,
 		t.ServerToClientMicro.Load(),
 	})
+}
+
+type mapwrap struct {
+	atomic.Pointer[Mapping]
+}
+
+type Mapping struct {
+	Proto            byte
+	EFIN             byte
+	ESYN             byte
+	IFIN             byte
+	ERST             byte
+	IRST             byte
+	LastActivity     time.Time
+	SrcPort          [2]byte
+	DstPort          [2]byte
+	MappedPort       [2]byte
+	OriginalSourceIP [4]byte
+	DestinationIP    [4]byte
 }
 
 type TUN struct {
@@ -235,8 +254,8 @@ type TUN struct {
 	// ServerCertBytes []byte `json:"-"`
 
 	// Connection Requests + Response
-	CR            *ConnectionRequest
-	ServerReponse *types.ServerConnectResponse
+	CR             *ConnectionRequest
+	ServerResponse *types.ServerConnectResponse
 
 	// NEW MAPPING STUFF
 	pingTime                atomic.Pointer[time.Time]
@@ -263,11 +282,22 @@ type TUN struct {
 	VPLIngress  map[[4]byte]struct{} `json:"-"`
 
 	// TCP and UDP Natting
-	AvailableTCPPorts []atomic.Pointer[VPNPort] `json:"-"`
-	AvailableUDPPorts []atomic.Pointer[VPNPort] `json:"-"`
+	// ingress
+	// index == local port number
+	// lport/dip/dp
+	AvailableTCPPorts []sync.Map // <- mapwrap
+	AvailableUDPPorts []sync.Map // <- mapwrap
+	// AvailableTCPPorts []atomic.Pointer[VPNPort] `json:"-"`
+	// AvailableUDPPorts []atomic.Pointer[VPNPort] `json:"-"`
+
+	// egress
+	// sip/dip/sp/dp
+	// key == [12]byte
+	ActiveTCPMapping *sync.Map // <- mapwrap
+	ActiveUDPMapping *sync.Map // <- mapwrap
 	// TODO: maps are racy, needs redesign
-	ActiveTCPMapping map[[10]byte]*Mapping `json:"-"`
-	ActiveUDPMapping map[[10]byte]*Mapping `json:"-"`
+	// ActiveTCPMapping map[[10]byte]*Mapping `json:"-"`
+	// ActiveUDPMapping map[[10]byte]*Mapping `json:"-"`
 
 	Index []byte
 
@@ -302,6 +332,7 @@ type TUN struct {
 	IP_IPv4Header       []byte
 	IP_TPHeader         []byte
 	IP_DstPort          [2]byte
+	IP_SrcPort          [2]byte
 	IP_NAT_IP           [4]byte
 	IP_NAT_OK           bool
 
@@ -312,17 +343,23 @@ type TUN struct {
 }
 
 func (t *TUN) InitPortMap() {
-	t.AvailableTCPPorts = make([]atomic.Pointer[VPNPort], t.endPort-t.startPort)
-	t.AvailableUDPPorts = make([]atomic.Pointer[VPNPort], t.endPort-t.startPort)
+	t.AvailableTCPPorts = make([]sync.Map, t.endPort-t.startPort)
+	t.AvailableUDPPorts = make([]sync.Map, t.endPort-t.startPort)
+	t.ActiveTCPMapping = new(sync.Map)
+	t.ActiveUDPMapping = new(sync.Map)
+	// t.ActiveTCPMapping = make(map[[10]byte]*Mapping)
+	// t.ActiveUDPMapping = make(map[[10]byte]*Mapping)
+	// t.AvailableTCPPorts = make([]atomic.Pointer[VPNPort], t.endPort-t.startPort)
+	// t.AvailableUDPPorts = make([]atomic.Pointer[VPNPort], t.endPort-t.startPort)
 
-	for i := range t.AvailableTCPPorts {
-		tm := new(VPNPort)
-		tm.M = make(map[[4]byte]*Mapping)
-		t.AvailableTCPPorts[i].Store(tm)
-	}
-	for i := range t.AvailableUDPPorts {
-		um := new(VPNPort)
-		um.M = make(map[[4]byte]*Mapping)
-		t.AvailableUDPPorts[i].Store(um)
-	}
+	// for i := range t.AvailableTCPPorts {
+	// 	tm := new(VPNPort)
+	// 	tm.M = make(map[[4]byte]*Mapping)
+	// 	t.AvailableTCPPorts[i].Store(tm)
+	// }
+	// for i := range t.AvailableUDPPorts {
+	// 	um := new(VPNPort)
+	// 	um.M = make(map[[4]byte]*Mapping)
+	// 	t.AvailableUDPPorts[i].Store(um)
+	// }
 }

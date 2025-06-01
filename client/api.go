@@ -312,7 +312,7 @@ func InitializeTunnelFromCRR(TUN *TUN) (err error) {
 
 	// This index is used to identify packet streams between server and user.
 	TUN.Index = make([]byte, 2)
-	binary.BigEndian.PutUint16(TUN.Index, uint16(TUN.ServerReponse.Index))
+	binary.BigEndian.PutUint16(TUN.Index, uint16(TUN.ServerResponse.Index))
 
 	TUN.localInterfaceNetIP = net.ParseIP(meta.IPv4Address).To4()
 	if TUN.localInterfaceNetIP == nil {
@@ -334,9 +334,9 @@ func InitializeTunnelFromCRR(TUN *TUN) (err error) {
 		TUN.localDNSClient.Timeout = time.Second * 5
 	}
 
-	TUN.serverInterfaceNetIP = net.ParseIP(TUN.ServerReponse.InterfaceIP).To4()
+	TUN.serverInterfaceNetIP = net.ParseIP(TUN.ServerResponse.InterfaceIP).To4()
 	if TUN.serverInterfaceNetIP == nil {
-		return fmt.Errorf("Interface ip (%s) was malformed", TUN.ServerReponse.InterfaceIP)
+		return fmt.Errorf("Interface ip (%s) was malformed", TUN.ServerResponse.InterfaceIP)
 	}
 
 	TUN.serverInterfaceIP4bytes[0] = TUN.serverInterfaceNetIP[0]
@@ -344,50 +344,48 @@ func InitializeTunnelFromCRR(TUN *TUN) (err error) {
 	TUN.serverInterfaceIP4bytes[2] = TUN.serverInterfaceNetIP[2]
 	TUN.serverInterfaceIP4bytes[3] = TUN.serverInterfaceNetIP[3]
 
-	if TUN.ServerReponse.DHCP != nil {
-		TUN.serverVPLIP[0] = TUN.ServerReponse.DHCP.IP[0]
-		TUN.serverVPLIP[1] = TUN.ServerReponse.DHCP.IP[1]
-		TUN.serverVPLIP[2] = TUN.ServerReponse.DHCP.IP[2]
-		TUN.serverVPLIP[3] = TUN.ServerReponse.DHCP.IP[3]
+	if TUN.ServerResponse.DHCP != nil {
+		TUN.serverVPLIP[0] = TUN.ServerResponse.DHCP.IP[0]
+		TUN.serverVPLIP[1] = TUN.ServerResponse.DHCP.IP[1]
+		TUN.serverVPLIP[2] = TUN.ServerResponse.DHCP.IP[2]
+		TUN.serverVPLIP[3] = TUN.ServerResponse.DHCP.IP[3]
 
-		TUN.dhcp = TUN.ServerReponse.DHCP
-		meta.DHCPToken = TUN.ServerReponse.DHCP.Token
+		TUN.dhcp = TUN.ServerResponse.DHCP
+		meta.DHCPToken = TUN.ServerResponse.DHCP.Token
 		_ = writeTunnelsToDisk(meta.Tag)
 	}
 
-	if TUN.ServerReponse.LAN != nil {
-		TUN.VPLNetwork = TUN.ServerReponse.LAN
+	if TUN.ServerResponse.LAN != nil {
+		TUN.VPLNetwork = TUN.ServerResponse.LAN
 	}
 
 	if meta.LocalhostNat {
 		NN := new(types.Network)
 		NN.Network = "127.0.0.1/32"
 		NN.Nat = TUN.serverInterfaceNetIP.String() + "/32"
-		TUN.ServerReponse.Networks = append(TUN.ServerReponse.Networks, NN)
+		TUN.ServerResponse.Networks = append(TUN.ServerResponse.Networks, NN)
 	}
 
 	if len(meta.Networks) > 0 {
-		TUN.ServerReponse.Networks = meta.Networks
+		TUN.ServerResponse.Networks = meta.Networks
 	}
 	if len(meta.Routes) > 0 {
-		TUN.ServerReponse.Routes = meta.Routes
+		TUN.ServerResponse.Routes = meta.Routes
 	}
 	if len(meta.DNSRecords) > 0 {
-		TUN.ServerReponse.DNSRecords = meta.DNSRecords
+		TUN.ServerResponse.DNSRecords = meta.DNSRecords
 	}
 	if len(meta.DNSServers) > 0 {
-		TUN.ServerReponse.DNSServers = meta.DNSServers
+		TUN.ServerResponse.DNSServers = meta.DNSServers
 	}
 
 	conf := CONFIG.Load()
-	if len(TUN.ServerReponse.DNSServers) < 1 {
-		TUN.ServerReponse.DNSServers = []string{conf.DNS1Default, conf.DNS2Default}
+	if len(TUN.ServerResponse.DNSServers) < 1 {
+		TUN.ServerResponse.DNSServers = []string{conf.DNS1Default, conf.DNS2Default}
 	}
 
-	TUN.startPort = TUN.ServerReponse.StartPort
-	TUN.endPort = TUN.ServerReponse.EndPort
-	TUN.ActiveTCPMapping = make(map[[10]byte]*Mapping)
-	TUN.ActiveUDPMapping = make(map[[10]byte]*Mapping)
+	TUN.startPort = TUN.ServerResponse.StartPort
+	TUN.endPort = TUN.ServerResponse.EndPort
 	TUN.InitPortMap()
 
 	err = TUN.InitVPLMap()
@@ -402,17 +400,17 @@ func InitializeTunnelFromCRR(TUN *TUN) (err error) {
 	DEBUG(fmt.Sprintf(
 		"Connection info: Addr(%s) StartPort(%d) EndPort(%d) srcIP(%s) ",
 		meta.IPv4Address,
-		TUN.ServerReponse.StartPort,
-		TUN.ServerReponse.EndPort,
-		TUN.ServerReponse.InterfaceIP,
+		TUN.ServerResponse.StartPort,
+		TUN.ServerResponse.EndPort,
+		TUN.ServerResponse.InterfaceIP,
 	))
 
-	if TUN.ServerReponse.LAN != nil && TUN.ServerReponse.DHCP != nil {
+	if TUN.ServerResponse.LAN != nil && TUN.ServerResponse.DHCP != nil {
 		DEBUG(fmt.Sprintf(
 			"DHCP/VPL info: Addr(%s) Network:(%s) Token(%s) ",
-			TUN.ServerReponse.DHCP.IP,
-			TUN.ServerReponse.LAN.Network,
-			TUN.ServerReponse.DHCP.Token,
+			TUN.ServerResponse.DHCP.IP,
+			TUN.ServerResponse.LAN.Network,
+			TUN.ServerResponse.DHCP.Token,
 		))
 	}
 
@@ -668,7 +666,7 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	ServerReponse.ServerHandshakeSignature = nil
 
 	DEBUG("ConnectionRequestResponse:", ServerReponse)
-	tunnel.ServerReponse = ServerReponse
+	tunnel.ServerResponse = ServerReponse
 
 	err = InitializeTunnelFromCRR(tunnel)
 	if err != nil {
@@ -745,7 +743,7 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	go tunnel.ReadFromServeTunnel()
 	go tunnel.ReadFromTunnelInterface()
 
-	if tunnel.ServerReponse.DHCP != nil {
+	if tunnel.ServerResponse.DHCP != nil {
 		FR := &FirewallRequest{
 			DHCPToken:       tunnel.dhcp.Token,
 			IP:              net.IP(tunnel.dhcp.IP[:]).String(),

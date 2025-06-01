@@ -98,7 +98,7 @@ func StartUDPDNSHandler() {
 }
 
 func ResolveDomainLocal(tun *TUN, m *dns.Msg, w dns.ResponseWriter) {
-	if len(tun.ServerReponse.DNSServers) == 0 {
+	if len(tun.ServerResponse.DNSServers) == 0 {
 		return
 	}
 
@@ -126,12 +126,12 @@ func ResolveDomainLocal(tun *TUN, m *dns.Msg, w dns.ResponseWriter) {
 		}
 	}()
 
-	r, _, err = tun.localDNSClient.Exchange(m, tun.ServerReponse.DNSServers[0]+":53")
-	server = tun.ServerReponse.DNSServers[0]
+	r, _, err = tun.localDNSClient.Exchange(m, tun.ServerResponse.DNSServers[0]+":53")
+	server = tun.ServerResponse.DNSServers[0]
 
-	if err != nil && len(tun.ServerReponse.DNSServers) > 1 {
-		r, _, err = tun.localDNSClient.Exchange(m, tun.ServerReponse.DNSServers[1]+":53")
-		server = tun.ServerReponse.DNSServers[1]
+	if err != nil && len(tun.ServerResponse.DNSServers) > 1 {
+		r, _, err = tun.localDNSClient.Exchange(m, tun.ServerResponse.DNSServers[1]+":53")
+		server = tun.ServerResponse.DNSServers[1]
 	}
 
 	if err != nil {
@@ -274,11 +274,11 @@ func DNSQuery(w dns.ResponseWriter, m *dns.Msg) {
 			return true
 		}
 
-		if tun.ServerReponse == nil {
+		if tun.ServerResponse == nil {
 			return true
 		}
 
-		ServerDNS = DNSAMapping(tun.ServerReponse.DNSRecords, m.Question[0].Name)
+		ServerDNS = DNSAMapping(tun.ServerResponse.DNSRecords, m.Question[0].Name)
 		if ServerDNS != nil {
 			DNSTunnel = tun
 			return false

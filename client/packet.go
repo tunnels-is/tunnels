@@ -2,6 +2,7 @@ package client
 
 import (
 	"encoding/binary"
+	"fmt"
 	"time"
 )
 
@@ -79,26 +80,7 @@ func (V *TUN) ProcessEgressPacket(p *[]byte) (sendRemote bool) {
 
 	if !V.IsEgressVPLIP(V.EP_DstIP) {
 		if V.EP_Protocol == 6 {
-
 			V.EP_SYN = V.EP_TPHeader[13] & 0x2
-
-			V.EgressMapping = V.CreateNEWPortMapping(V.ActiveTCPMapping, V.AvailableTCPPorts, packet[12:20], V.EP_TPHeader[0:4])
-			if V.EgressMapping == nil {
-				debugMissingEgressMapping(packet)
-				return false
-			}
-
-		} else if V.EP_Protocol == 17 {
-
-			V.EgressMapping = V.CreateNEWPortMapping(V.ActiveUDPMapping, V.AvailableUDPPorts, packet[12:20], V.EP_TPHeader[0:4])
-			if V.EgressMapping == nil {
-				debugMissingEgressMapping(packet)
-				return false
-			}
-
-		}
-
-		if V.EP_Protocol == 6 {
 			V.EgressMapping.ERST = V.EP_TPHeader[13] & 0x4
 			if V.EgressMapping.EFIN == 0 {
 				V.EgressMapping.EFIN = V.EP_TPHeader[13] & 0x1
@@ -108,10 +90,15 @@ func (V *TUN) ProcessEgressPacket(p *[]byte) (sendRemote bool) {
 			}
 		}
 
+		V.EgressMapping = V.CreateNEWPortMapping(p)
+		if V.EgressMapping == nil {
+			return false
+		}
+
 		V.EP_NAT_IP, V.EP_NAT_OK = V.TransLateIP(V.EP_DstIP)
 
-		V.EP_TPHeader[0] = V.EgressMapping.VPNPort[0]
-		V.EP_TPHeader[1] = V.EgressMapping.VPNPort[1]
+		V.EP_TPHeader[0] = V.EgressMapping.MappedPort[0]
+		V.EP_TPHeader[1] = V.EgressMapping.MappedPort[1]
 
 		V.EP_IPv4Header[12] = V.serverInterfaceIP4bytes[0]
 		V.EP_IPv4Header[13] = V.serverInterfaceIP4bytes[1]
@@ -152,6 +139,8 @@ func (V *TUN) ProcessIngressPacket(packet []byte) bool {
 	V.IP_IPv4Header = packet[:V.IP_IPv4HeaderLength]
 	V.IP_TPHeader = packet[V.IP_IPv4HeaderLength:]
 
+	V.IP_SrcPort[0] = V.IP_TPHeader[0]
+	V.IP_SrcPort[1] = V.IP_TPHeader[1]
 	V.IP_DstPort[0] = V.IP_TPHeader[2]
 	V.IP_DstPort[1] = V.IP_TPHeader[3]
 
@@ -169,17 +158,14 @@ func (V *TUN) ProcessIngressPacket(packet []byte) bool {
 			V.IP_SrcIP[3] = V.IP_NAT_IP[3]
 		}
 
-		if V.IP_Protocol == 6 {
-			V.IngressMapping = V.getIngressPortMapping(V.AvailableTCPPorts, packet[12:16], V.IP_DstPort)
-			if V.IngressMapping == nil {
-				return false
-			}
-
-		} else if V.IP_Protocol == 17 {
-			V.IngressMapping = V.getIngressPortMapping(V.AvailableUDPPorts, packet[12:16], V.IP_DstPort)
-			if V.IngressMapping == nil {
-				return false
-			}
+		x := time.Now()
+		V.IngressMapping = V.getIngressPortMapping()
+		if V.IngressMapping == nil {
+			return false
+		}
+		xx := time.Since(x).Nanoseconds()
+		if xx > 10000 {
+			fmt.Println(xx)
 		}
 
 		if V.IP_Protocol == 6 {
@@ -191,8 +177,8 @@ func (V *TUN) ProcessIngressPacket(packet []byte) bool {
 			}
 		}
 
-		V.IP_TPHeader[2] = V.IngressMapping.LocalPort[0]
-		V.IP_TPHeader[3] = V.IngressMapping.LocalPort[1]
+		V.IP_TPHeader[2] = V.IngressMapping.SrcPort[0]
+		V.IP_TPHeader[3] = V.IngressMapping.SrcPort[1]
 
 		V.IP_IPv4Header[16] = V.IngressMapping.OriginalSourceIP[0]
 		V.IP_IPv4Header[17] = V.IngressMapping.OriginalSourceIP[1]
