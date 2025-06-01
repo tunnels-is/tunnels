@@ -141,10 +141,6 @@ func LaunchTunnels() {
 		CleanPortsForAllConnections()
 	})
 
-	newConcurrentSignal("StartTraceWorker", CancelContext, func() {
-		StartTraceProcessor()
-	})
-
 	newConcurrentSignal("DefaultGateway", CancelContext, func() {
 		GetDefaultGateway()
 	})
@@ -286,10 +282,6 @@ func LaunchMinimalTunnels() {
 
 	newConcurrentSignal("CleanPortAllocs", CancelContext, func() {
 		CleanPortsForAllConnections()
-	})
-
-	newConcurrentSignal("StartTraceWorker", CancelContext, func() {
-		StartTraceProcessor()
 	})
 
 	newConcurrentSignal("DefaultGateway", CancelContext, func() {

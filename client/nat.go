@@ -19,11 +19,11 @@ func (t *TUN) TransLateVPLIP(ip [4]byte) ([4]byte, bool) {
 		return xxx, true
 	}
 
-	if t.ServerReponse.LAN == nil {
+	if t.ServerResponse.LAN == nil {
 		return ip, true
 	}
 
-	v := t.ServerReponse.LAN
+	v := t.ServerResponse.LAN
 	var newIP [4]byte
 
 	for i := range 3 {
@@ -42,12 +42,12 @@ func (V *TUN) TransLateIP(ip [4]byte) ([4]byte, bool) {
 		return xxx, true
 	}
 
-	if len(V.ServerReponse.Networks) == 0 {
+	if len(V.ServerResponse.Networks) == 0 {
 		return ip, true
 	}
 
 	var newIP [4]byte
-	for _, v := range V.ServerReponse.Networks {
+	for _, v := range V.ServerResponse.Networks {
 		if v.Nat == "" {
 			continue
 		}
@@ -92,27 +92,27 @@ func (V *TUN) IsIngressVPLIP(ip [4]byte) (ok bool) {
 func (t *TUN) InitVPLMap() (err error) {
 	meta := t.meta.Load()
 	DEBUG("Initializing VPL/NAT maps for tunnel:", meta.IFName)
-	if t.ServerReponse.LAN == nil {
+	if t.ServerResponse.LAN == nil {
 		return nil
 	}
 
-	if t.ServerReponse.LAN.Nat != "" {
-		_, t.ServerReponse.LAN.NatIPNet, err = net.ParseCIDR(t.ServerReponse.LAN.Nat)
+	if t.ServerResponse.LAN.Nat != "" {
+		_, t.ServerResponse.LAN.NatIPNet, err = net.ParseCIDR(t.ServerResponse.LAN.Nat)
 		if err != nil {
 			return err
 		}
 	}
 
-	_, t.ServerReponse.LAN.NetIPNet, err = net.ParseCIDR(t.ServerReponse.LAN.Network)
+	_, t.ServerResponse.LAN.NetIPNet, err = net.ParseCIDR(t.ServerResponse.LAN.Network)
 	if err != nil {
 		return err
 	}
 
 	toMap := ""
-	if t.ServerReponse.LAN.Nat != "" {
-		toMap = t.ServerReponse.LAN.Nat
+	if t.ServerResponse.LAN.Nat != "" {
+		toMap = t.ServerResponse.LAN.Nat
 	} else {
-		toMap = t.ServerReponse.LAN.Network
+		toMap = t.ServerResponse.LAN.Network
 	}
 
 	ip, network, err := net.ParseCIDR(toMap)
@@ -136,7 +136,7 @@ func (t *TUN) InitVPLMap() (err error) {
 func (t *TUN) InitNatMaps() (err error) {
 	meta := t.meta.Load()
 	DEBUG("Initializing NAT maps for tunnel:", meta.IFName)
-	for _, v := range t.ServerReponse.Networks {
+	for _, v := range t.ServerResponse.Networks {
 		if v.Nat == "" {
 			continue
 		}
