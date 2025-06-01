@@ -50,6 +50,7 @@ func (tun *TUN) ReadFromTunnelInterface() {
 
 		sendRemote = tun.ProcessEgressPacket(&packet)
 		if !sendRemote {
+			// debugMissingEgressMapping(packet)
 			continue
 		}
 
@@ -120,7 +121,7 @@ func (tun *TUN) ReadFromServeTunnel() {
 		}
 
 		if !tun.ProcessIngressPacket(packet) {
-			debugMissingIngressMapping(packet)
+			// debugMissingIngressMapping(packet)
 			continue
 		}
 
