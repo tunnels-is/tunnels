@@ -226,12 +226,10 @@ type mapwrap struct {
 }
 
 type Mapping struct {
-	Proto byte
-	EFIN  byte
-	ESYN  byte
-	IFIN  byte
-	ERST  byte
-	IRST  byte
+	Proto    byte
+	rstFound atomic.Bool
+	finCount atomic.Int32
+
 	// LastActivity     time.Time
 	SrcPort          [2]byte
 	DstPort          [2]byte
@@ -340,7 +338,7 @@ type TUN struct {
 	// NEW PORT MAPPING
 	EgressMapping  *Mapping
 	IngressMapping *Mapping
-	EP_SYN         byte
+	// EP_SYN         byte
 }
 
 func (t *TUN) InitPortMap() {
@@ -348,19 +346,4 @@ func (t *TUN) InitPortMap() {
 	t.AvailableUDPPorts = make([]sync.Map, t.endPort-t.startPort)
 	t.ActiveTCPMapping = new(sync.Map)
 	t.ActiveUDPMapping = new(sync.Map)
-	// t.ActiveTCPMapping = make(map[[10]byte]*Mapping)
-	// t.ActiveUDPMapping = make(map[[10]byte]*Mapping)
-	// t.AvailableTCPPorts = make([]atomic.Pointer[VPNPort], t.endPort-t.startPort)
-	// t.AvailableUDPPorts = make([]atomic.Pointer[VPNPort], t.endPort-t.startPort)
-
-	// for i := range t.AvailableTCPPorts {
-	// 	tm := new(VPNPort)
-	// 	tm.M = make(map[[4]byte]*Mapping)
-	// 	t.AvailableTCPPorts[i].Store(tm)
-	// }
-	// for i := range t.AvailableUDPPorts {
-	// 	um := new(VPNPort)
-	// 	um.M = make(map[[4]byte]*Mapping)
-	// 	t.AvailableUDPPorts[i].Store(um)
-	// }
 }
