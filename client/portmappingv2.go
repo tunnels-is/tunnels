@@ -45,7 +45,7 @@ func (V *TUN) CreateNEWPortMapping(p *[]byte) (m *Mapping) {
 	if ok && mm != nil {
 		m = mm.(*Mapping)
 		// TODO...
-		m.LastActivity = time.Now()
+		m.UnixTime.Store(time.Now().Unix())
 		if V.EP_SYN > 0 {
 			m.IRST = 0
 			m.IFIN = 0
@@ -60,10 +60,9 @@ func (V *TUN) CreateNEWPortMapping(p *[]byte) (m *Mapping) {
 		_, ok = aports[i].Load([6]byte{EID[4], EID[5], EID[6], EID[7], EID[10], EID[11]})
 		if !ok {
 			m = &Mapping{
-				Proto:        V.EP_Protocol,
-				LastActivity: time.Now(),
-				SrcPort:      [2]byte{V.EP_TPHeader[0], V.EP_TPHeader[1]},
-				DstPort:      [2]byte{V.EP_TPHeader[2], V.EP_TPHeader[3]},
+				Proto:   V.EP_Protocol,
+				SrcPort: [2]byte{V.EP_TPHeader[0], V.EP_TPHeader[1]},
+				DstPort: [2]byte{V.EP_TPHeader[2], V.EP_TPHeader[3]},
 				OriginalSourceIP: [4]byte{
 					EID[0],
 					EID[1],
@@ -77,6 +76,7 @@ func (V *TUN) CreateNEWPortMapping(p *[]byte) (m *Mapping) {
 					EID[7],
 				},
 			}
+			m.UnixTime.Store(time.Now().UnixMicro())
 			binary.BigEndian.PutUint16(
 				m.MappedPort[:],
 				uint16(i)+V.startPort,
@@ -95,7 +95,7 @@ func (V *TUN) CreateNEWPortMapping(p *[]byte) (m *Mapping) {
 }
 
 // func (V *TUN) getIngressPortMapping(VPNPortMap []atomic.Pointer[VPNPort], dstIP []byte, port [2]byte) *Mapping {
-func (V *TUN) getIngressPortMapping() *Mapping {
+func (V *TUN) getIngressPortMapping() (m *Mapping) {
 
 	var imap []sync.Map
 	if V.IP_Protocol == 6 {
@@ -107,6 +107,8 @@ func (V *TUN) getIngressPortMapping() *Mapping {
 		[6]byte{V.IP_SrcIP[0], V.IP_SrcIP[1], V.IP_SrcIP[2], V.IP_SrcIP[3], V.IP_SrcPort[0], V.IP_SrcPort[1]},
 	)
 	if ok && mm != nil {
+		m = mm.(*Mapping)
+		m.UnixTime.Store(time.Now().Unix())
 		return mm.(*Mapping)
 	}
 	// TODO ..
@@ -150,17 +152,18 @@ func (t *TUN) cleanPortMap() {
 		t.AvailableTCPPorts[i].Range(func(key, value any) bool {
 			m, ok := value.(*Mapping)
 			if ok {
+				ut := time.UnixMicro(m.UnixTime.Load())
 				switch {
 				case m.EFIN > 0 && m.IFIN > 0:
-					if time.Since(m.LastActivity) > time.Second*10 {
+					if time.Since(ut) > time.Second*10 {
 						t.AvailableTCPPorts[i].Delete(key)
 					}
 				case m.ERST > 0 || m.IRST > 0:
-					if time.Since(m.LastActivity) > time.Second*10 {
+					if time.Since(ut) > time.Second*10 {
 						t.AvailableTCPPorts[i].Delete(key)
 					}
 				default:
-					if time.Since(m.LastActivity) > time.Second*360 {
+					if time.Since(ut) > time.Second*360 {
 						t.AvailableTCPPorts[i].Delete(key)
 					}
 				}
@@ -202,12 +205,13 @@ func (t *TUN) cleanPortMap() {
 		t.AvailableUDPPorts[i].Range(func(key, value any) bool {
 			m, ok := value.(*Mapping)
 			if ok {
+				ut := time.UnixMicro(m.UnixTime.Load())
 				if slices.Contains(dnsServer, m.DestinationIP) {
-					if time.Since(m.LastActivity) > time.Second*15 {
+					if time.Since(ut) > time.Second*15 {
 						t.AvailableUDPPorts[i].Delete(key)
 					}
 				} else {
-					if time.Since(m.LastActivity) > time.Second*150 {
+					if time.Since(ut) > time.Second*150 {
 						t.AvailableUDPPorts[i].Delete(key)
 					}
 				}

@@ -226,18 +226,19 @@ type mapwrap struct {
 }
 
 type Mapping struct {
-	Proto            byte
-	EFIN             byte
-	ESYN             byte
-	IFIN             byte
-	ERST             byte
-	IRST             byte
-	LastActivity     time.Time
+	Proto byte
+	EFIN  byte
+	ESYN  byte
+	IFIN  byte
+	ERST  byte
+	IRST  byte
+	// LastActivity     time.Time
 	SrcPort          [2]byte
 	DstPort          [2]byte
 	MappedPort       [2]byte
 	OriginalSourceIP [4]byte
 	DestinationIP    [4]byte
+	UnixTime         atomic.Int64
 }
 
 type TUN struct {
