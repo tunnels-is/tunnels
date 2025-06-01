@@ -2,7 +2,6 @@ package client
 
 import (
 	"encoding/binary"
-	"fmt"
 	"time"
 )
 
@@ -79,20 +78,22 @@ func (V *TUN) ProcessEgressPacket(p *[]byte) (sendRemote bool) {
 	// }
 
 	if !V.IsEgressVPLIP(V.EP_DstIP) {
-		if V.EP_Protocol == 6 {
-			V.EP_SYN = V.EP_TPHeader[13] & 0x2
-			V.EgressMapping.ERST = V.EP_TPHeader[13] & 0x4
-			if V.EgressMapping.EFIN == 0 {
-				V.EgressMapping.EFIN = V.EP_TPHeader[13] & 0x1
-			}
-			if V.EgressMapping.ERST == 4 {
-				V.EP_TPHeader[13] = 0b00010100
-			}
-		}
 
 		V.EgressMapping = V.CreateNEWPortMapping(p)
 		if V.EgressMapping == nil {
 			return false
+		}
+		if V.EP_Protocol == 6 {
+			if V.EP_TPHeader[13]&0x1 > 0 {
+				V.EgressMapping.finCount.Add(1)
+			}
+
+			if V.EP_TPHeader[13]&0x4 == 4 {
+				V.EP_TPHeader[13] = 0b00010100
+				V.EgressMapping.rstFound.Store(true)
+			} else if V.EP_TPHeader[13]&0x4 > 0 {
+				V.EgressMapping.rstFound.Store(true)
+			}
 		}
 
 		V.EP_NAT_IP, V.EP_NAT_OK = V.TransLateIP(V.EP_DstIP)
@@ -158,22 +159,23 @@ func (V *TUN) ProcessIngressPacket(packet []byte) bool {
 			V.IP_SrcIP[3] = V.IP_NAT_IP[3]
 		}
 
-		x := time.Now()
+		// x := time.Now()
 		V.IngressMapping = V.getIngressPortMapping()
 		if V.IngressMapping == nil {
 			return false
 		}
-		xx := time.Since(x).Nanoseconds()
-		if xx > 10000 {
-			fmt.Println(xx)
-		}
+		// xx := time.Since(x).Nanoseconds()
+		// if xx > 10000 {
+		// 	fmt.Println(xx)
+		// }
 
 		if V.IP_Protocol == 6 {
-			if V.IngressMapping.IRST == 0 {
-				V.IngressMapping.IRST = V.IP_TPHeader[13] & 0x4
+			if V.IP_TPHeader[13]&0x4 > 0 {
+				V.IngressMapping.rstFound.Store(true)
 			}
-			if V.IngressMapping.IFIN == 0 {
-				V.IngressMapping.IFIN = V.IP_TPHeader[13] & 0x1
+
+			if V.IP_TPHeader[13]&0x1 > 0 {
+				V.IngressMapping.finCount.Add(1)
 			}
 		}
 

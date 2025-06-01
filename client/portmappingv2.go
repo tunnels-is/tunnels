@@ -45,13 +45,10 @@ func (V *TUN) CreateNEWPortMapping(p *[]byte) (m *Mapping) {
 	if ok && mm != nil {
 		m = mm.(*Mapping)
 		// TODO...
-		m.UnixTime.Store(time.Now().Unix())
-		if V.EP_SYN > 0 {
-			m.IRST = 0
-			m.IFIN = 0
-			m.ERST = 0
-			m.EFIN = 0
-			smap.Store(EID, m)
+		m.UnixTime.Store(time.Now().UnixMicro())
+		if V.EP_TPHeader[13]&0x2 > 0 {
+			m.rstFound.Store(false)
+			m.finCount.Store(0)
 		}
 		return m
 	}
@@ -108,11 +105,9 @@ func (V *TUN) getIngressPortMapping() (m *Mapping) {
 	)
 	if ok && mm != nil {
 		m = mm.(*Mapping)
-		m.UnixTime.Store(time.Now().Unix())
-		return mm.(*Mapping)
+		m.UnixTime.Store(time.Now().UnixMicro())
+		return
 	}
-	// TODO ..
-	// mapping.LastActivity = time.Now()
 	return nil
 }
 
@@ -153,21 +148,13 @@ func (t *TUN) cleanPortMap() {
 			m, ok := value.(*Mapping)
 			if ok {
 				ut := time.UnixMicro(m.UnixTime.Load())
-				switch {
-				case m.EFIN > 0 && m.IFIN > 0:
+				if m.rstFound.Load() || m.finCount.Load() > 1 {
 					if time.Since(ut) > time.Second*10 {
 						t.AvailableTCPPorts[i].Delete(key)
 					}
-				case m.ERST > 0 || m.IRST > 0:
-					if time.Since(ut) > time.Second*10 {
-						t.AvailableTCPPorts[i].Delete(key)
-					}
-				default:
-					if time.Since(ut) > time.Second*360 {
-						t.AvailableTCPPorts[i].Delete(key)
-					}
+				} else if time.Since(ut) > time.Second*360 {
+					t.AvailableTCPPorts[i].Delete(key)
 				}
-
 			}
 			return true
 		})
