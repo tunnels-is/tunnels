@@ -520,14 +520,14 @@ func (t *TInterface) Connect(tun *TUN) (err error) {
 	// _ = DNS_Del(strconv.Itoa(DEFAULT_INTERFACE_ID))
 	// err = DNS_Set(strconv.Itoa(DEFAULT_INTERFACE_ID), "127.0.0.1", "1")
 
-	if tun.ServerReponse.LAN != nil && tun.ServerReponse.LAN.Nat != "" {
-		err = IP_AddRoute(tun.ServerReponse.LAN.Nat, meta.IFName, t.IPv4Address, "0")
+	if tun.ServerResponse.LAN != nil && tun.ServerResponse.LAN.Nat != "" {
+		err = IP_AddRoute(tun.ServerResponse.LAN.Nat, meta.IFName, t.IPv4Address, "0")
 		if err != nil {
 			return err
 		}
 	}
 
-	for _, n := range tun.ServerReponse.Networks {
+	for _, n := range tun.ServerResponse.Networks {
 		if n.Nat != "" {
 			err = IP_AddRoute(n.Nat, meta.IFName, t.IPv4Address, "0")
 			if err != nil {
@@ -536,7 +536,7 @@ func (t *TInterface) Connect(tun *TUN) (err error) {
 		}
 	}
 
-	for _, v := range tun.ServerReponse.Routes {
+	for _, v := range tun.ServerResponse.Routes {
 		err = IP_AddRoute(v.Address, meta.IFName, t.IPv4Address, v.Metric)
 		if err != nil {
 			return err
@@ -586,14 +586,14 @@ func (t *TInterface) Disconnect(tun *TUN) (err error) {
 		err = IP_DelRoute("default", t.IPv4Address, "0")
 	}
 
-	if tun.ServerReponse.LAN != nil && tun.ServerReponse.LAN.Nat != "" {
-		err = IP_DelRoute(tun.ServerReponse.LAN.Nat, t.IPv4Address, "0")
+	if tun.ServerResponse.LAN != nil && tun.ServerResponse.LAN.Nat != "" {
+		err = IP_DelRoute(tun.ServerResponse.LAN.Nat, t.IPv4Address, "0")
 		if err != nil {
 			return err
 		}
 	}
 
-	for _, n := range tun.ServerReponse.Networks {
+	for _, n := range tun.ServerResponse.Networks {
 		if n.Nat != "" {
 			err = IP_DelRoute(n.Nat, t.IPv4Address, "0")
 			if err != nil {
@@ -601,7 +601,7 @@ func (t *TInterface) Disconnect(tun *TUN) (err error) {
 			}
 		}
 	}
-	for _, r := range tun.ServerReponse.Routes {
+	for _, r := range tun.ServerResponse.Routes {
 		err = IP_DelRoute(r.Address, t.IPv4Address, r.Metric)
 		if err != nil {
 			return err
