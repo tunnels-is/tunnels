@@ -42,7 +42,8 @@ func launchAPIServer() {
 		mux.HandleFunc("/v3/user/list", API_UserList)
 
 		mux.HandleFunc("/v3/device/list", API_DeviceList)
-		mux.HandleFunc("/v3/device/create", API_DeviceCreate) // supports APIKey
+		// supports ADMIN APIKey
+		mux.HandleFunc("/v3/device/create", API_DeviceCreate) // supports ADMIN APIKey
 		mux.HandleFunc("/v3/device/delete", API_DeviceDelete)
 		mux.HandleFunc("/v3/device/update", API_DeviceUpdate)
 		mux.HandleFunc("/v3/device", API_DeviceGet)

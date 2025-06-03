@@ -113,6 +113,9 @@ const Groups = () => {
             setEditModalOpen(false)
           }
         }}
+        onArrayChange={(key, value, index) => {
+          group[key][index] = value;
+        }}
         onChange={(key, value, type) => {
           group[key] = value
         }}

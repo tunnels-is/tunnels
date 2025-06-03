@@ -123,6 +123,9 @@ const Devices = () => {
 				onChange={(key, value, type) => {
 					device[key] = value
 				}}
+				onArrayChange={(key, value, index) => {
+					device[key][index] = value;
+				}}
 			/>
 
 		</div >

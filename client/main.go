@@ -223,20 +223,19 @@ func InitMinimalService() error {
 	// if err != nil {
 	// 	return err
 	// }
-
-	newConcurrentSignal("Connect", CancelContext, func() {
-		code, err := PublicConnect(&ConnectionRequest{
-			URL:       cli.AuthServer,
-			Secure:    cli.Secure,
-			DeviceKey: cli.DeviceID,
-			Tag:       DefaultTunnelName,
-			ServerID:  cli.ServerID,
-		})
-		if code != 200 {
-			time.Sleep(5 * time.Second)
-		}
-		ERROR("Unable to connect", err)
-	})
+	//
+	// doEvent(highPriorityChannel, func() {
+	// 	code, _ := PublicConnect(&ConnectionRequest{
+	// 		URL:       cli.AuthServer,
+	// 		Secure:    cli.Secure,
+	// 		DeviceKey: cli.DeviceID,
+	// 		Tag:       DefaultTunnelName,
+	// 		ServerID:  cli.ServerID,
+	// 	})
+	// 	if code != 200 {
+	// 		time.Sleep(5 * time.Second)
+	// 	}
+	// })
 
 	return nil
 }
@@ -274,6 +273,9 @@ func LaunchMinimalTunnels() {
 
 	newConcurrentSignal("Pinger", CancelContext, func() {
 		PingConnections()
+	})
+	newConcurrentSignal("AutoConnect", CancelContext, func() {
+		AutoConnect()
 	})
 
 	newConcurrentSignal("LogMapCleaner", CancelContext, func() {
@@ -666,7 +668,7 @@ func getServerByID(secure bool, authServer string, deviceKey string, deviceToken
 	UID, _ := primitive.ObjectIDFromHex(UserID)
 
 	FR := &FORWARD_REQUEST{
-		URL:     "https://" + authServer,
+		URL:     authServer,
 		Secure:  secure,
 		Path:    "/v3/server",
 		Method:  "POST",
@@ -695,6 +697,42 @@ func getServerByID(secure bool, authServer string, deviceKey string, deviceToken
 
 	s = new(types.Server)
 	err = json.Unmarshal(responseBytes, s)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %s", "invalid response from controller", err)
+	}
+	return
+}
+
+func GetDeviceByID(secure bool, authServer string, deviceID string) (d *types.Device, err error) {
+	DID, _ := primitive.ObjectIDFromHex(deviceID)
+
+	FR := &FORWARD_REQUEST{
+		URL:     "https://" + authServer,
+		Secure:  secure,
+		Path:    "/v3/device",
+		Method:  "POST",
+		Timeout: 10000,
+		JSONData: &types.FORM_GET_DEVICE{
+			DeviceID: DID,
+		},
+	}
+	responseBytes, code, err := SendRequestToURL(
+		nil,
+		FR.Method,
+		FR.URL+FR.Path,
+		FR.JSONData,
+		FR.Timeout,
+		FR.Secure,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %s", "error calling controller", err)
+	}
+	if code != 200 {
+		return nil, fmt.Errorf("%s: %d", "invalid code from controller", code)
+	}
+
+	d = new(types.Device)
+	err = json.Unmarshal(responseBytes, d)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %s", "invalid response from controller", err)
 	}

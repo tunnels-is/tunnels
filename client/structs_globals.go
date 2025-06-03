@@ -438,6 +438,7 @@ type User struct {
 	SubExpiration         time.Time       `json:"SubExpiration"`
 	AdditionalInformation string          `json:"AdditionalInformation,omitempty"`
 	AuthServer            string
+	Secure                bool
 	IsAdmin               bool `json:"IsAdmin"`
 	IsManager             bool `json:"IsManager"`
 }

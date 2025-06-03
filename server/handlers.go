@@ -514,16 +514,19 @@ func API_DeviceList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := authenticateUserFromEmailOrIDAndToken("", F.UID, F.DeviceToken)
-	if err != nil {
-		senderr(w, 500, err.Error())
-		return
-	}
-
-	if !user.IsAdmin {
-		if !user.IsManager {
-			senderr(w, 401, "You are not allowed to view groups")
+	hasAPIKey := HTTP_validateKey(r)
+	if !hasAPIKey {
+		user, err := authenticateUserFromEmailOrIDAndToken("", F.UID, F.DeviceToken)
+		if err != nil {
+			senderr(w, 500, err.Error())
 			return
+		}
+
+		if !user.IsAdmin {
+			if !user.IsManager {
+				senderr(w, 401, "You are not allowed to view groups")
+				return
+			}
 		}
 	}
 
