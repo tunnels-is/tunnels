@@ -104,6 +104,11 @@ func createDefaultTunnelMeta(minimal bool) (M *TunnelMETA) {
 	M.IFName = DefaultTunnelName
 	M.EnableDefaultRoute = true
 	if minimal {
+		cliConfig := CLIConfig.Load()
+		if cliConfig != nil {
+			M.ServerID = cliConfig.ServerID
+		}
+		M.AutoConnect = true
 		M.PreventIPv6 = false
 	}
 	return

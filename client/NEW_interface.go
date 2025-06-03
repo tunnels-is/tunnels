@@ -22,21 +22,50 @@ func AutoConnect() {
 		if !meta.AutoConnect || meta.ServerID == "" {
 			return true
 		}
+
+		isConnected := false
+		tunnelMapRange(func(tun *TUN) bool {
+			if tun.CR.Tag == meta.Tag {
+				isConnected = true
+				return false
+			}
+			return true
+		})
+		if isConnected {
+			return true
+		}
 		// TODO: update when multi-user support is enabled
 		// if meta.Tag != DefaultTunnelName && meta.UserID == "" {
 		// 	return true
 		// }
 
-		user, err := loadUser()
-		if err != nil {
-			return true
+		var code int
+		var err error
+		cliConfig := CLIConfig.Load()
+		if cliConfig.Enabled {
+			code, err = PublicConnect(&ConnectionRequest{
+				Secure:    cliConfig.Secure,
+				URL:       cliConfig.AuthServer,
+				Tag:       meta.Tag,
+				ServerID:  meta.ServerID,
+				DeviceKey: cliConfig.DeviceID,
+			})
+
+		} else {
+			user, err := loadUser()
+			if err != nil {
+				return true
+			}
+			code, err = PublicConnect(&ConnectionRequest{
+				Tag:         meta.Tag,
+				ServerID:    meta.ServerID,
+				DeviceToken: user.DeviceToken.DT,
+				URL:         user.AuthServer,
+				Secure:      user.Secure,
+			})
 		}
-		code, err := PublicConnect(&ConnectionRequest{
-			Tag:         meta.Tag,
-			ServerID:    meta.ServerID,
-			DeviceToken: user.DeviceToken.DT,
-		})
-		if err != nil {
+
+		if err != nil || code != 200 {
 			ERROR("Unable to connect, return code: ", code, " // error: ", err)
 		}
 		return true
