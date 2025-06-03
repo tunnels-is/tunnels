@@ -41,10 +41,16 @@ func API_ListDevices(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		_, err = authenticateUserFromEmailOrIDAndToken("", F.UID, F.DeviceToken)
+		user, err := authenticateUserFromEmailOrIDAndToken("", F.UID, F.DeviceToken)
 		if err != nil {
 			senderr(w, 500, err.Error())
 			return
+		}
+		if !user.IsAdmin {
+			if !user.IsManager {
+				senderr(w, 401, "You are not allowed to create groups")
+				return
+			}
 		}
 	}
 
@@ -84,7 +90,12 @@ outerloop:
 		d.Disk = clientCoreMappings[i].Disk
 		if clientCoreMappings[i].DHCP != nil {
 			response.DHCPAssigned++
-			d.DHCP = *clientCoreMappings[i].DHCP
+			d.DHCP = types.DHCPRecord{
+				IP:       clientCoreMappings[i].DHCP.IP,
+				Hostname: clientCoreMappings[i].DHCP.Hostname,
+				Token:    clientCoreMappings[i].DHCP.Token,
+				Activity: clientCoreMappings[i].DHCP.Activity,
+			}
 		}
 
 		d.IngressQueue = len(clientCoreMappings[i].ToUser)
@@ -109,5 +120,4 @@ outerloop:
 		senderr(w, 500, "encoding error", err)
 		return
 	}
-	return
 }
