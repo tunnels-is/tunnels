@@ -453,12 +453,12 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	loadDefaultGateway()
 	loadDefaultInterface()
 
-	var meta *TunnelMETA
+	// Fallback on the default tunnel if non is given
 	if ClientCR.Tag == "" {
-		ERROR("No tunnel tag given when connecting")
-		return 400, errors.New("no tunnel tag given when connecting")
+		ClientCR.Tag = DefaultTunnelName
 	}
 
+	var meta *TunnelMETA
 	tunnelMetaMapRange(func(tun *TunnelMETA) bool {
 		if tun.Tag == DefaultTunnelName && ClientCR.Tag == DefaultTunnelName {
 			meta = tun
