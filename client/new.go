@@ -73,6 +73,7 @@ var (
 type CLIInfo struct {
 	AuthServer string
 	DeviceID   string
+	DeviceKey  string
 	ServerID   string
 	DNS        bool
 	Secure     bool

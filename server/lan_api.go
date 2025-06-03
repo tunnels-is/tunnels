@@ -110,9 +110,9 @@ outerloop:
 
 	response.DHCPFree = len(DHCPMapping) - response.DHCPAssigned
 
-	for i := range response.Devices {
-		response.Devices[i].DHCP.Token = "redacted"
-	}
+	// for i := range response.Devices {
+	// 	response.Devices[i].DHCP.Token = "redacted"
+	// }
 
 	w.WriteHeader(200)
 	err := json.NewEncoder(w).Encode(response)
