@@ -41,8 +41,8 @@ func launchAPIServer() {
 		mux.HandleFunc("/v3/user/2fa/confirm", API_UserTwoFactorConfirm)
 		mux.HandleFunc("/v3/user/list", API_UserList)
 
-		mux.HandleFunc("/v3/device/list", API_DeviceList)
-		// supports ADMIN APIKey
+		mux.HandleFunc("/v3/device/list", API_DeviceList) // supports ADMIN APIKey
+
 		mux.HandleFunc("/v3/device/create", API_DeviceCreate) // supports ADMIN APIKey
 		mux.HandleFunc("/v3/device/delete", API_DeviceDelete)
 		mux.HandleFunc("/v3/device/update", API_DeviceUpdate)
@@ -61,7 +61,6 @@ func launchAPIServer() {
 		mux.HandleFunc("/v3/server/create", API_ServerCreate)
 		mux.HandleFunc("/v3/server/update", API_ServerUpdate)
 		mux.HandleFunc("/v3/servers", API_ServersForUser)
-
 		mux.HandleFunc("/v3/session", API_SessionCreate)
 
 		// Tunnels public network specific
