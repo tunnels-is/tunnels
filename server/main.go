@@ -58,6 +58,7 @@ var (
 	Config       atomic.Pointer[types.ServerConfig]
 	APITLSConfig atomic.Pointer[tls.Config]
 	PrivKey      any
+	SignKey      any
 	PubKey       any
 	KeyPair      atomic.Pointer[tls.Certificate]
 	lc           atomic.Pointer[lemonsqueezy.Client]
@@ -297,6 +298,15 @@ func loadCertificatesAndTLSSettings() (err error) {
 	}
 	PrivKey = priv
 	PubKey = pub
+	if AUTHEnabled && VPNEnabled {
+		SignKey = pub
+	} else {
+		sign, _, err := crypt.LoadPublicKey(loadSecret("SignPem"))
+		if err != nil {
+			return err
+		}
+		SignKey = sign
+	}
 	tlscert, err := tls.X509KeyPair(pubB, privB)
 	if err != nil {
 		return err
@@ -478,6 +488,7 @@ func makeConfigAndCerts() {
 		EmailKey:        "",
 		CertPem:         "./cert.pem",
 		KeyPem:          "./key.pem",
+		SignPem:         "./sign.pem",
 	}
 	f, err := os.Create(ep + "config.json")
 	if err != nil {

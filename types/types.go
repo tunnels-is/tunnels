@@ -58,6 +58,7 @@ type ServerConfig struct {
 	TwoFactorEncKey string
 	EmailKey        string
 	CertPem         string
+	SignPem         string
 	KeyPem          string
 }
 
