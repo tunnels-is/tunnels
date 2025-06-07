@@ -51,7 +51,7 @@ func checkIfUserSubIsActive(u *User) {
 	}
 
 	if key.LicenseKey.Status == "active" {
-		ns := strings.Split(key.LicenseAttributes.Meta.ProductName, " ")
+		ns := strings.Split(key.Meta.ProductName, " ")
 		months, err := strconv.Atoi(ns[0])
 		if err != nil {
 			ADMIN("unable to parse license key name:", err)
