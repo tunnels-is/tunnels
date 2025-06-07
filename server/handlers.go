@@ -31,7 +31,7 @@ func API_AcceptUserConnections(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = crypt.VerifySignature(SCR.Payload, SCR.Signature, PubKey)
+	err = crypt.VerifySignature(SCR.Payload, SCR.Signature, SignKey)
 	if err != nil {
 		senderr(w, 401, "Invalid signature", slog.Any("err", err))
 		return
