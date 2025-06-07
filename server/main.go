@@ -127,7 +127,8 @@ func ADMIN(x ...any) {
 }
 
 func main() {
-	configFlag := flag.Bool("config", false, "This command creates a new server config and certificates")
+	configFlag := flag.Bool("config", false, "This command runs the server and creates a config + certificates")
+	certsOnly := flag.Bool("certs", false, "This command generates certificates and exits")
 	logHandler := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug})
 	logger = slog.New(logHandler)
 	slog.SetDefault(logger)
@@ -136,6 +137,11 @@ func main() {
 	if *configFlag {
 		logger.Info("generating config")
 		makeConfigAndCerts()
+	}
+	if *certsOnly {
+		logger.Info("generating certs")
+		makeCertsOnly()
+		os.Exit(1)
 	}
 
 	runtime.GOMAXPROCS(runtime.NumCPU())
@@ -486,11 +492,15 @@ func makeConfigAndCerts() {
 		panic(err)
 	}
 
-	_, err = certs.MakeCertV2(
+	makeCerts(ep, interfaceIP)
+}
+
+func makeCerts(execPath string, IP string) {
+	_, err := certs.MakeCertV2(
 		certs.ECDSA,
-		filepath.Join(ep, "cert.pem"),
-		filepath.Join(ep, "key.pem"),
-		[]string{interfaceIP},
+		filepath.Join(execPath, "cert.pem"),
+		filepath.Join(execPath, "key.pem"),
+		[]string{IP},
 		[]string{""},
 		"",
 		time.Time{},
@@ -500,6 +510,23 @@ func makeConfigAndCerts() {
 		panic(err)
 	}
 
+}
+
+func makeCertsOnly() {
+	ep, err := os.Executable()
+	if err != nil {
+		panic(err)
+	}
+	eps := strings.Split(ep, "/")
+	ep = strings.Join(eps[:len(eps)-1], "/")
+	ep += "/"
+
+	IFIP, err := gateway.DiscoverInterface()
+	if err != nil {
+		panic(err)
+	}
+	interfaceIP := IFIP.String()
+	makeCerts(ep, interfaceIP)
 }
 
 func initializeNewServer() error {
