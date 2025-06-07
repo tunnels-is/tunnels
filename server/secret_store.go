@@ -21,7 +21,7 @@ func loadSecret(key string) (v string) {
 		case "AdminApiKey":
 			return config.AdminApiKey
 		case "TwoFactorKey":
-			return config.TwoFactorEncKey
+			return config.TwoFactorKey
 		case "EmailKey":
 			return config.EmailKey
 		case "DBurl":

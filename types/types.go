@@ -53,13 +53,13 @@ type ServerConfig struct {
 
 	SecretStore SecretStore `json:"SecretStore"`
 	// If SecretStore set to "config"
-	AdminApiKey     string
-	DBurl           string
-	TwoFactorEncKey string
-	EmailKey        string
-	CertPem         string
-	SignPem         string
-	KeyPem          string
+	AdminApiKey  string
+	DBurl        string
+	TwoFactorKey string
+	EmailKey     string
+	CertPem      string
+	SignPem      string
+	KeyPem       string
 }
 
 type SecretStore string

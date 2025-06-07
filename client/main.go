@@ -526,7 +526,7 @@ func DefaultConfig() *configV2 {
 		InfoLogging:       true,
 		ErrorLogging:      true,
 		ConnectionTracer:  false,
-		DNSServerIP:       "0.0.0.0",
+		DNSServerIP:       "127.0.0.1",
 		DNSServerPort:     "53",
 		DNS1Default:       "1.1.1.1",
 		DNS2Default:       "8.8.8.8",
@@ -534,7 +534,7 @@ func DefaultConfig() *configV2 {
 		LogAllDomains:     true,
 		DNSstats:          true,
 		DNSBlockLists:     GetDefaultBlockLists(),
-		APIIP:             "0.0.0.0",
+		APIIP:             "127.0.0.1",
 		APIPort:           "7777",
 		AuthServers:       []string{"https://api.tunnels.is", "https://127.0.0.1"},
 	}
