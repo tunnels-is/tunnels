@@ -482,13 +482,13 @@ func makeConfigAndCerts() {
 		DNSServers:         []string{},
 		SecretStore:        "config",
 		// secrets
-		DBurl:           "mongodb://127.0.0.1:27017",
-		AdminApiKey:     uuid.NewString(),
-		TwoFactorEncKey: strings.ReplaceAll(uuid.NewString(), "-", ""),
-		EmailKey:        "",
-		CertPem:         "./cert.pem",
-		KeyPem:          "./key.pem",
-		SignPem:         "./sign.pem",
+		DBurl:        "mongodb://127.0.0.1:27017",
+		AdminApiKey:  uuid.NewString(),
+		TwoFactorKey: strings.ReplaceAll(uuid.NewString(), "-", ""),
+		EmailKey:     "",
+		CertPem:      "./cert.pem",
+		KeyPem:       "./key.pem",
+		SignPem:      "./sign.pem",
 	}
 	f, err := os.Create(ep + "config.json")
 	if err != nil {
