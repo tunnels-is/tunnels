@@ -64,11 +64,12 @@ var (
 )
 
 var (
-	LANEnabled  bool
-	VPNEnabled  bool
-	AUTHEnabled bool
-	DNSEnabled  bool
-	logger      *slog.Logger
+	LANEnabled   bool
+	VPNEnabled   bool
+	AUTHEnabled  bool
+	DNSEnabled   bool
+	BBOLTEnabled bool
+	logger       *slog.Logger
 
 	slots int
 
@@ -157,6 +158,7 @@ func main() {
 	LANEnabled = slices.Contains(config.Features, types.LAN)
 	DNSEnabled = slices.Contains(config.Features, types.DNS)
 	VPNEnabled = slices.Contains(config.Features, types.VPN)
+	BBOLTEnabled = slices.Contains(config.Features, types.BBOLT)
 
 	err = loadCertificatesAndTLSSettings()
 	if err != nil {
@@ -168,7 +170,7 @@ func main() {
 	Cancel.Store(&cancel)
 
 	if AUTHEnabled {
-		if bboltEnabled {
+		if BBOLTEnabled {
 			err = ConnectToBBoltDB("tunnels.db")
 			if err != nil {
 				logger.Error("unable to connect to bbolt", slog.Any("err", err))
