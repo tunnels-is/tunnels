@@ -164,10 +164,6 @@ func (V *TUN) ProcessIngressPacket(packet []byte) bool {
 		if V.IngressMapping == nil {
 			return false
 		}
-		// xx := time.Since(x).Nanoseconds()
-		// if xx > 10000 {
-		// 	fmt.Println(xx)
-		// }
 
 		if V.IP_Protocol == 6 {
 			if V.IP_TPHeader[13]&0x4 > 0 {
