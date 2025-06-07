@@ -94,11 +94,11 @@ const NewObjectEditor = (props) => {
 
               <Textarea
                 className={"w-full" + state.Theme?.borderColor}
-                value={props.obj[k]}
                 onChange={(e) => {
                   props.onChange(k, String(e.target.value), type)
                 }}
               >
+                {props.obj[k]}
               </Textarea>
             </div>
           )
