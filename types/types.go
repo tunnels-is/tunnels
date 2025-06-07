@@ -14,10 +14,11 @@ import (
 type Feature string
 
 const (
-	VPN  Feature = "VPN"
-	LAN  Feature = "LAN"
-	AUTH Feature = "AUTH"
-	DNS  Feature = "DNS"
+	VPN   Feature = "VPN"
+	LAN   Feature = "LAN"
+	AUTH  Feature = "AUTH"
+	DNS   Feature = "DNS"
+	BBOLT Feature = "BBOLT"
 )
 
 type ServerConfig struct {

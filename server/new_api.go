@@ -41,8 +41,7 @@ func launchAPIServer() {
 		mux.HandleFunc("/v3/user/2fa/confirm", API_UserTwoFactorConfirm)
 		mux.HandleFunc("/v3/user/list", API_UserList)
 
-		mux.HandleFunc("/v3/device/list", API_DeviceList) // supports ADMIN APIKey
-
+		mux.HandleFunc("/v3/device/list", API_DeviceList)     // supports ADMIN APIKey
 		mux.HandleFunc("/v3/device/create", API_DeviceCreate) // supports ADMIN APIKey
 		mux.HandleFunc("/v3/device/delete", API_DeviceDelete)
 		mux.HandleFunc("/v3/device/update", API_DeviceUpdate)
@@ -64,8 +63,11 @@ func launchAPIServer() {
 		mux.HandleFunc("/v3/session", API_SessionCreate)
 
 		// Tunnels public network specific
-		mux.HandleFunc("/v3/key/activate", API_ActivateLicenseKey)
-		mux.HandleFunc("/v3/user/toggle/substatus", API_UserToggleSubStatus)
+		if loadSecret("PayKey") != "" {
+			mux.HandleFunc("/v3/key/activate", API_ActivateLicenseKey)
+			mux.HandleFunc("/v3/user/toggle/substatus", API_UserToggleSubStatus)
+		}
+
 	}
 
 	tlsConfig := &tls.Config{
@@ -169,7 +171,7 @@ func senderr(w http.ResponseWriter, code int, msg string, slogArgs ...any) {
 func HTTP_validateKey(r *http.Request) (ok bool) {
 	key := r.Header.Get("X-API-KEY")
 	Config := Config.Load()
-	if key != Config.AdminApiKey || Config.AdminApiKey != "" {
+	if key != Config.AdminApiKey || Config.AdminApiKey == "" {
 		return false
 	}
 	return true
