@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"os"
 	"runtime"
 	"sync"
@@ -75,19 +74,19 @@ type mapping struct {
 }
 
 func (t *tun) make() {
-	for i := range 100000 {
-		_, _ = t.sm.LoadOrStore(i, i)
-		// time.Sleep(1 * time.Millisecond)
-		// m := t.availablePorts.Load()
-		// p := m.p[i].Load()
-		// if p == nil {
-		// 	p = new(port)
-		// }
-		// p.l = i
-		// p.r = i + 1
-		// m.p[i].Store(p)
-		// t.availablePorts.Store(m)
-	}
+	// for i := range 100000 {
+	// _, _ = t.sm.LoadOrStore(i, i)
+	// time.Sleep(1 * time.Millisecond)
+	// m := t.availablePorts.Load()
+	// p := m.p[i].Load()
+	// if p == nil {
+	// 	p = new(port)
+	// }
+	// p.l = i
+	// p.r = i + 1
+	// m.p[i].Store(p)
+	// t.availablePorts.Store(m)
+	// }
 }
 
 var s time.Time
@@ -95,19 +94,19 @@ var r atomic.Uint64
 
 func (t *tun) get() {
 	// time.Sleep(1 * time.Nanosecond)
-	for i := range 100 {
-		s := time.Now()
-		x, ok := t.sm.Load(i)
-		ss := time.Since(s).Nanoseconds()
-		fmt.Println(ss)
-		if ok {
-			r.Add(1)
-			ii := x.(int)
-			if ii == 3000 {
+	// for i := range 100 {
+	// 	s := time.Now()
+	// 	// x, ok := t.sm.Load(i)
+	// 	ss := time.Since(s).Nanoseconds()
+	// 	fmt.Println(ss)
+	// 	if ok {
+	// 		r.Add(1)
+	// 		ii := x.(int)
+	// 		if ii == 3000 {
 
-			}
-		}
-	}
+	// 		}
+	// 	}
+	// }
 	// m := t.availablePorts.Load()
 	// for i := range m.p {
 	// 	p := m.p[i].Load()
