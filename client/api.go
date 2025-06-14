@@ -581,7 +581,7 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		if err == nil {
 			return code, errors.New(ER.Error)
 		} else {
-			return code, errors.New("Error code from controller")
+			return code, errors.New("Error code from controller:" + strconv.Itoa(code))
 		}
 	}
 	if err != nil {
@@ -622,13 +622,13 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		ClientCR.Secure,
 	)
 	if code != 200 {
-		ERROR("ErrFromServer:", string(bytesFromServer))
+		ERROR("ErrFromServer:", code, string(bytesFromServer))
 		ER := new(ErrorResponse)
 		err := json.Unmarshal(bytesFromServer, ER)
 		if err == nil {
 			return code, errors.New(ER.Error)
 		} else {
-			return code, errors.New("Error code from controller")
+			return code, errors.New("Error code from vpn server: " + strconv.Itoa(code))
 		}
 	}
 	if err != nil {
