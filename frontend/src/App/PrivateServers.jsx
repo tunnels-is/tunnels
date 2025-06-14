@@ -57,12 +57,21 @@ const PrivateServers = () => {
 	const ConnectColumn = (server) => {
 		let servertun = undefined
 		let assignedTunnels = 0
+		let defTunnel = undefined
 		state?.Tunnels?.map(c => {
 			if (c.ServerID === server._id) {
 				servertun = c
 				assignedTunnels++
+			} else if (c.Tag == "tunnels") {
+				defTunnel = c
 			}
 		})
+
+		if (assignedTunnels > 1) {
+			conButton = function() {
+				state.toggleError("too many tunnels assigned to server")
+			}
+		}
 
 		let con = undefined
 		let conButton = function() {
@@ -73,7 +82,11 @@ const PrivateServers = () => {
 				"",
 				"Connect to " + server.Tag,
 				() => {
-					state.connectToVPN(servertun, undefined)
+					if (assignedTunnels < 1) {
+						state.connectToVPN(undefined, server)
+					} else {
+						state.connectToVPN(servertun, undefined)
+					}
 				})
 		}
 
@@ -99,11 +112,6 @@ const PrivateServers = () => {
 			}
 		}
 
-		if (assignedTunnels > 1) {
-			conButton = function() {
-				state.toggleError("too many tunnels assigned to server")
-			}
-		}
 
 
 		return <div>

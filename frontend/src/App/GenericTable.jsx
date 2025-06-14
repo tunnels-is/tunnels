@@ -242,7 +242,7 @@ const GenericTable = (props) => {
           <div className="flex justify-end w-full">
             <Button
               variant="outline"
-              className={"flex fixed top-[10px] right-[10px]  items-center gap-1" + state.Theme?.successBtn}
+              className={"flex  items-center gap-1" + state.Theme?.successBtn}
               onClick={() => t.Btn.New()}
             >
               {props.newButtonLabel ? props.newButtonLabel : "Create"}
@@ -253,7 +253,7 @@ const GenericTable = (props) => {
 
       <Table className="w-full overflow-visible text-sm text-foreground">
         {renderHeaders()}
-          <div class="h-4"></div>
+        <div class="h-2"></div>
         {renderRows()}
       </Table>
     </div >

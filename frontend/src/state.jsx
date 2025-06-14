@@ -820,8 +820,6 @@ export var STATE = {
     STATE.Servers?.forEach((s) => {
       if (s._id === c.ServerID) {
         server = s;
-        connectionRequest.ServerIP = s.IP;
-        connectionRequest.ServerPort = s.Port;
         connectionRequest.ServerID = s._id;
       }
     });
@@ -830,18 +828,13 @@ export var STATE = {
       STATE.PrivateServers?.forEach((s) => {
         if (s._id === c.ServerID) {
           server = s;
-          connectionRequest.ServerIP = s.IP;
-          connectionRequest.ServerPort = s.Port;
           connectionRequest.ServerID = s._id;
         }
       });
     }
 
     if (server) {
-      connectionRequest.ServerIP = server.IP;
-      connectionRequest.ServerPort = server.Port;
       connectionRequest.ServerID = server._id;
-      connectionRequest.ServerPubKey = server.PubKey;
     } else {
       STATE.errorNotification("unable to find server with the given ID")
       return

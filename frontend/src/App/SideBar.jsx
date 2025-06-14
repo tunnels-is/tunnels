@@ -76,19 +76,14 @@ const SideBar = () => {
       {
         title: "",
         user: false,
-        shouldRender: showLogin,
         items: [
           {
             icon: LockOpen1Icon,
             label: "Login",
             route: "login",
+            user: false,
+            shouldRender: showLogin,
           },
-        ],
-      },
-      {
-        title: "",
-        user: false,
-        items: [
           { icon: LockClosedIcon, label: "VPN", route: "servers", user: true, },
           { icon: ContainerIcon, label: "DNS", route: "dns", user: false },
           { icon: MixerHorizontalIcon, label: "Connections", route: "connections", user: true, shouldRender: hasActiveTunnels },

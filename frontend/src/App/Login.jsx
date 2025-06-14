@@ -16,6 +16,8 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 import { Switch } from "@/components/ui/switch.jsx";
 import { Label } from "@/components/ui/label.jsx";
 import { useNavigate } from "react-router-dom";
+import { CopyPlusIcon } from "lucide-react";
+import NewObjectEditorDialog from "./NewObjectEdiorDialog";
 
 const useForm = () => {
   const [inputs, setInputs] = useState({});
@@ -27,7 +29,8 @@ const useForm = () => {
   const [authServer, setAuthServer] = useState(state.Config?.AuthServers?.length > 0 ? state.Config?.AuthServers[0] : "https://api.tunnels.is")
   const [secure, setSecure] = useState(true)
   const navigate = useNavigate()
-  const [newAuth, setNewAuth] = useState("")
+  const [newAuth, setNewAuth] = useState({ url: "" })
+  const [modalOpen, setModalOpen] = useState(false)
 
   const RemoveToken = () => {
     setTokenLogin(false);
@@ -43,8 +46,9 @@ const useForm = () => {
     setErrors({ ...errors });
     setInputs((inputs) => ({ ...inputs, ["email"]: token }));
   };
-
   const saveNewAuth = () => {
+    state.Config.AuthServers.push(newAuth.url)
+    state.ConfigSave()
     console.log(newAuth)
   }
 
@@ -342,6 +346,11 @@ const useForm = () => {
     setAuthServer,
     secure,
     setSecure,
+    modalOpen,
+    setModalOpen,
+    newAuth,
+    setNewAuth,
+    saveNewAuth,
   };
 };
 
@@ -368,6 +377,11 @@ const Login = (props) => {
     setAuthServer,
     secure,
     setSecure,
+    modalOpen,
+    setModalOpen,
+    newAuth,
+    setNewAuth,
+    saveNewAuth,
   } = useForm(props);
 
   const GetDefaults = () => {
@@ -579,22 +593,28 @@ const Login = (props) => {
     let opts = []
     state.Config?.AuthServers?.forEach(s => {
       if (s === authServer) {
+        let ss = s.replace("https://", "")
         opts.push({
-          value: s, key: s, selected: true
+          value: s, key: ss, selected: true
         })
       } else {
+        let ss = s.replace("https://", "")
         opts.push({
-          value: s, key: s, selected: false
+          value: s, key: ss, selected: false
         })
       }
     })
     return (
       <div className="flex  items-start">
+        <div className="flex mr-4 items-center space-x-2 mt-[8px] ml-[10px]">
+          <CopyPlusIcon onClick={() => setModalOpen(true)} className={"hover:stroke-emerald-500 cursor-pointer"} />
+        </div>
+
         <Select
           value={authServer}
           onValueChange={setAuthServer}
         >
-          <SelectTrigger className="w-[180px]">
+          <SelectTrigger className="w-[220px]">
             <SelectValue placeholder="Select Auth Server" />
           </SelectTrigger>
           <SelectContent
@@ -616,13 +636,14 @@ const Login = (props) => {
           </SelectContent>
         </Select >
 
-        <div className="flex items-center space-x-2 mt-[8px] ml-[10px]">
+        <div className="flex items-center space-x-2 mt-[8px] ml-4">
           <Switch
             checked={secure}
             onCheckedChange={() => setSecure(!secure)}
           />
           <Label htmlFor="airplane-mode">Secure</Label>
         </div>
+
       </div >
     )
   }
@@ -631,9 +652,6 @@ const Login = (props) => {
     return (
       <Card className="w-full max-w-md mx-auto bg-[#0B0E14] border border-[#1a1f2d] shadow-2xl">
         <CardContent className="space-y-6 p-6">
-          <div className="text-center mb-2">
-            <h1 className="text-lg font-medium text-white/80">Welcome back</h1>
-          </div>
           {EmailInput()}
           {DeviceInput()}
           {PasswordInput()}
@@ -771,6 +789,26 @@ const Login = (props) => {
 
   return (
     <div className="w-full flex flex-col items-center justify-center p-4 bg-black">
+
+
+      <NewObjectEditorDialog
+        open={modalOpen}
+        onOpenChange={setModalOpen}
+        object={newAuth}
+        title="New Auth Server"
+        description=""
+        readOnly={false}
+        saveButton={() => {
+          saveNewAuth()
+          setModalOpen(false)
+        }}
+        onChange={(key, value, type) => {
+          setNewAuth({ url: value })
+          console.log(key, value, type)
+        }}
+      />
+
+
       <div className="w-full max-w-md space-y-6">
         {mode === 1 && LoginForm()}
         {mode === 2 && RegisterForm()}
@@ -778,12 +816,11 @@ const Login = (props) => {
         {mode === 3 && RecoverTwoFactorForm()}
         {mode === 5 && RegisterAnonForm()}
         {mode === 6 && EnableAccountForm()}
-
         < div className="flex flex-wrap items-center justify-center gap-3 mt-4">
           <Button
             variant="ghost"
             onClick={() => setMode(1)}
-            className={`h-9 px-4 ${mode === 1
+            className={`h-9 px-4 text-[18px]  ${mode === 1
               ? 'text-[#4B7BF5] hover:text-[#4B7BF5] hover:bg-[#4B7BF5]/10'
               : 'text-white/50 hover:text-white hover:bg-white/5'
               }`}
@@ -796,7 +833,7 @@ const Login = (props) => {
               RemoveToken();
               setMode(2);
             }}
-            className={`h-9 px-4 ${mode === 2
+            className={`h-9 px-4 text-[18px] ${mode === 2
               ? 'text-[#4B7BF5] hover:text-[#4B7BF5] hover:bg-[#4B7BF5]/10'
               : 'text-white/50 hover:text-white hover:bg-white/5'
               }`}
@@ -809,7 +846,7 @@ const Login = (props) => {
               GenerateToken();
               setMode(5);
             }}
-            className={`h-9 px-4 ${mode === 5
+            className={`h-9 px-4 text-[18px] ${mode === 5
               ? 'text-[#4B7BF5] hover:text-[#4B7BF5] hover:bg-[#4B7BF5]/10'
               : 'text-white/50 hover:text-white hover:bg-white/5'
               }`}
@@ -819,7 +856,7 @@ const Login = (props) => {
           <Button
             variant="ghost"
             onClick={() => setMode(4)}
-            className={`h-9 px-4 ${mode === 4
+            className={`h-9 px-4 text-[18px] ${mode === 4
               ? 'text-[#4B7BF5] hover:text-[#4B7BF5] hover:bg-[#4B7BF5]/10'
               : 'text-white/50 hover:text-white hover:bg-white/5'
               }`}
@@ -829,7 +866,7 @@ const Login = (props) => {
           <Button
             variant="ghost"
             onClick={() => setMode(3)}
-            className={`h-9 px-4 ${mode === 3
+            className={`h-9 px-4 text-[18px] ${mode === 3
               ? 'text-[#4B7BF5] hover:text-[#4B7BF5] hover:bg-[#4B7BF5]/10'
               : 'text-white/50 hover:text-white hover:bg-white/5'
               }`}
