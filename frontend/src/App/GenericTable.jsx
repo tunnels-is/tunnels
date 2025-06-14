@@ -27,7 +27,7 @@ const GenericTable = (props) => {
 
   let t = props.table;
   let hdc = "w-[60px] text-white font-bold ";
-  let ddc = "w-[60px] text-white-100 font-medium ";
+  let ddc = "w-[60px] h-[20px] p-0 pl-2 text-white-100 font-medium ";
 
   const renderHeaders = () => {
     let rows = [];
@@ -242,7 +242,7 @@ const GenericTable = (props) => {
           <div className="flex justify-end w-full">
             <Button
               variant="outline"
-              className={"flex items-center gap-1" + state.Theme?.successBtn}
+              className={"flex fixed top-[10px] right-[10px]  items-center gap-1" + state.Theme?.successBtn}
               onClick={() => t.Btn.New()}
             >
               {props.newButtonLabel ? props.newButtonLabel : "Create"}

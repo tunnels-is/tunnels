@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.jsx";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.jsx";
 import { Switch } from "@/components/ui/switch.jsx";
 import { Label } from "@/components/ui/label.jsx";
 import { useNavigate } from "react-router-dom";
@@ -27,6 +27,7 @@ const useForm = () => {
   const [authServer, setAuthServer] = useState(state.Config?.AuthServers?.length > 0 ? state.Config?.AuthServers[0] : "https://api.tunnels.is")
   const [secure, setSecure] = useState(true)
   const navigate = useNavigate()
+  const [newAuth, setNewAuth] = useState("")
 
   const RemoveToken = () => {
     setTokenLogin(false);
@@ -42,6 +43,10 @@ const useForm = () => {
     setErrors({ ...errors });
     setInputs((inputs) => ({ ...inputs, ["email"]: token }));
   };
+
+  const saveNewAuth = () => {
+    console.log(newAuth)
+  }
 
   const RegisterSubmit = async () => {
     let errors = {};
@@ -385,28 +390,6 @@ const Login = (props) => {
     GetDefaults();
   }, []);
 
-  const EmailOnlyInput = () => {
-    return (
-      <div className="space-y-2">
-        <div className="relative">
-          <EnvelopeClosedIcon className="absolute left-3 top-2.5 h-5 w-5 text-muted-foreground" />
-          <Input
-            id="email"
-            className="pl-10"
-            type="email"
-            placeholder="Email"
-            value={inputs["email"]}
-            name="email"
-            onChange={HandleInputChange}
-          />
-        </div>
-        {errors["email"] !== "" && (
-          <p className="text-sm text-destructive">{errors["email"]}</p>
-        )}
-      </div>
-    );
-  };
-
   const EmailInput = () => {
     return (
       <div className="space-y-2">
@@ -446,27 +429,6 @@ const Login = (props) => {
         </div>
         {errors["devicename"] && (
           <p className="text-sm text-red-500">{errors["devicename"]}</p>
-        )}
-      </div>
-    );
-  };
-  const NewPasswordInput = () => {
-    return (
-      <div className="space-y-2">
-        <div className="relative">
-          <LockClosedIcon className="absolute left-3 top-2.5 h-5 w-5 text-muted-foreground" />
-          <Input
-            id="password"
-            className="pl-10"
-            type="password"
-            placeholder="New Password"
-            value={inputs["password"]}
-            name="password"
-            onChange={HandleInputChange}
-          />
-        </div>
-        {errors["password"] && (
-          <p className="text-sm text-destructive">{errors["password"]}</p>
         )}
       </div>
     );
@@ -614,23 +576,46 @@ const Login = (props) => {
     if (state === undefined) {
       return (<></>)
     }
+    let opts = []
+    state.Config?.AuthServers?.forEach(s => {
+      if (s === authServer) {
+        opts.push({
+          value: s, key: s, selected: true
+        })
+      } else {
+        opts.push({
+          value: s, key: s, selected: false
+        })
+      }
+    })
     return (
       <div className="flex  items-start">
         <Select
-          defaultValue={authServer}
+          value={authServer}
           onValueChange={setAuthServer}
         >
           <SelectTrigger className="w-[180px]">
             <SelectValue placeholder="Select Auth Server" />
           </SelectTrigger>
-          <SelectContent>
-            {state.Config?.AuthServers?.map(c => {
-              return (
-                <SelectItem value={c}>{c}</SelectItem>
-              )
-            })}
+          <SelectContent
+            className={"bg-transparent" + state.Theme.borderColor + state.Theme?.mainBG}
+          >
+            <SelectGroup>
+              {opts?.map(t => {
+                if (t.selected === true) {
+                  return (
+                    <SelectItem className={state.Theme?.activeSelect} value={t.value}>{t.key}</SelectItem>
+                  )
+                } else {
+                  return (
+                    <SelectItem className={state.Theme?.neutralSelect} value={t.value}>{t.key}</SelectItem>
+                  )
+                }
+              })}
+            </SelectGroup>
           </SelectContent>
         </Select >
+
         <div className="flex items-center space-x-2 mt-[8px] ml-[10px]">
           <Switch
             checked={secure}
@@ -668,6 +653,7 @@ const Login = (props) => {
       </Card>
     );
   };
+
   const RegisterAnonForm = () => {
     return (
       <Card className="w-full max-w-md mx-auto bg-[#0B0E14] border border-[#1a1f2d] shadow-2xl">
@@ -711,10 +697,6 @@ const Login = (props) => {
       </Card>
     );
   };
-
-  "use client"
-
-
 
   const ResetPasswordForm = () => {
     return (

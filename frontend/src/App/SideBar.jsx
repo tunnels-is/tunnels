@@ -64,6 +64,13 @@ const SideBar = () => {
     return false;
   }
 
+  const hasActiveTunnels = () => {
+    if (state.ActiveTunnels?.length > 0) {
+      return true
+    }
+    return false
+  }
+
   const menu = {
     groups: [
       {
@@ -84,7 +91,7 @@ const SideBar = () => {
         items: [
           { icon: LockClosedIcon, label: "VPN", route: "servers", user: true, },
           { icon: ContainerIcon, label: "DNS", route: "dns", user: false },
-          { icon: MixerHorizontalIcon, label: "Connections", route: "connections", user: false },
+          { icon: MixerHorizontalIcon, label: "Connections", route: "connections", user: true, shouldRender: hasActiveTunnels },
         ],
       },
       {
