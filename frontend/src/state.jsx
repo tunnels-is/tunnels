@@ -344,7 +344,12 @@ export var STATE = {
     return ok
   },
 
+  ConfigSaveInProgress: false,
   v2_ConfigSave: async () => {
+    if (STATE.ConfigSaveInProgress) {
+      return
+    }
+    STATE.ConfigSaveInProgress = true
 
     let newConfig = STATE.Config;
     let ok = false
@@ -369,6 +374,7 @@ export var STATE = {
     } catch (error) {
       console.dir(error);
     }
+    STATE.ConfigSaveInProgress = false
     STATE.toggleLoading(undefined);
     STATE.globalRerender();
     return ok
