@@ -52,6 +52,10 @@ const useForm = () => {
     console.log(newAuth)
   }
 
+  const saveNewAuth = () => {
+    console.log(newAuth)
+  }
+
   const RegisterSubmit = async () => {
     let errors = {};
     let hasErrors = false;
