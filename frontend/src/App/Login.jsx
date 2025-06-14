@@ -53,6 +53,8 @@ const useForm = () => {
   }
 
   const saveNewAuth = () => {
+    state.Config.AuthServers.push(newAuth.url)
+    state.ConfigSave()
     console.log(newAuth)
   }
 
