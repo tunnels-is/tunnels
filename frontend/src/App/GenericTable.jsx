@@ -204,6 +204,28 @@ const GenericTable = (props) => {
     <div className={"flex flex-col gap-5 " + (props.className ? props.className : "")} >
       <div className="flex flex-col md:flex-row justify-start items-center ">
 
+        {t.Btn?.Save && (
+          <div className="flex mr-2 ">
+            <Button
+              variant="outline"
+              className={"flex  items-center gap-1" + state.Theme?.successBtn}
+              onClick={() => t.Btn.Save()}
+            >
+              {props.saveButtonLabel ? props.saveButtonLabel : "Save"}
+            </Button>
+          </div>
+        )}
+        {t.Btn?.New && (
+          <div className="flex mr-2">
+            <Button
+              variant="outline"
+              className={"flex  items-center gap-1" + state.Theme?.successBtn}
+              onClick={() => t.Btn.New()}
+            >
+              {props.newButtonLabel ? props.newButtonLabel : "Create"}
+            </Button>
+          </div>
+        )}
         {t.more && (
           <div className="flex gap-2">
             <Input
@@ -238,17 +260,7 @@ const GenericTable = (props) => {
             </Button>
           </div>
         )}
-        {t.Btn?.New && (
-          <div className="flex justify-end w-full">
-            <Button
-              variant="outline"
-              className={"flex  items-center gap-1" + state.Theme?.successBtn}
-              onClick={() => t.Btn.New()}
-            >
-              {props.newButtonLabel ? props.newButtonLabel : "Create"}
-            </Button>
-          </div>
-        )}
+
       </div>
 
       <Table className="w-full overflow-visible text-sm text-foreground">
