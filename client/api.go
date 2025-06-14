@@ -194,11 +194,12 @@ func SetConfig(config *configV2) (err error) {
 
 	oldConf := CONFIG.Load()
 
-	dnsChange := oldConf.DNSServerIP == config.DNSServerIP ||
-		oldConf.DNSServerPort == config.DNSServerPort
+	dnsChange := oldConf.DNSServerIP != config.DNSServerIP ||
+		oldConf.DNSServerPort != config.DNSServerPort
 
 	if dnsChange {
-		_ = UDPDNSServer.Shutdown()
+		dnsserver := UDPDNSServer.Load()
+		_ = dnsserver.Shutdown()
 	}
 
 	apiChange := oldConf.APIPort != config.APIPort ||
@@ -212,12 +213,13 @@ func SetConfig(config *configV2) (err error) {
 		_ = API_SERVER.Shutdown(context.Background())
 	}
 
+	reloadBlockLists(false)
 	CONFIG.Store(config)
 	err = writeConfigToDisk()
-
 	INFO("Config saved")
 	DEBUG(fmt.Sprintf("%+v", *config))
-	return nil
+
+	return err
 }
 
 func BandwidthBytesToString(b int64) string {
