@@ -212,7 +212,6 @@ func SetConfig(config *configV2) (err error) {
 		_ = API_SERVER.Shutdown(context.Background())
 	}
 
-	reloadBlockLists(false, false)
 	CONFIG.Store(config)
 	err = writeConfigToDisk()
 

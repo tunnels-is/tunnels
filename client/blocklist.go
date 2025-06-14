@@ -9,17 +9,14 @@ import (
 	"os"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 )
 
-func reloadBlockLists(sleep bool, saveConfig bool) {
-	defer func() {
-		if sleep {
-			time.Sleep(1 * time.Hour)
-		}
-	}()
+func reloadBlockLists(sleep bool) {
 	defer RecoverAndLogToFile()
+	if sleep {
+		time.Sleep(1 * time.Hour)
+	}
 	config := CONFIG.Load()
 
 	if config.DisableBlockLists {
@@ -27,6 +24,19 @@ func reloadBlockLists(sleep bool, saveConfig bool) {
 	}
 
 	if len(config.DNSBlockLists) == 0 {
+		config.DNSBlockLists = GetDefaultBlockLists()
+	}
+	badList := false
+	for _, v := range config.DNSBlockLists {
+		if v == nil {
+			badList = true
+			break
+		}
+		if v.URL == "" && v.Disk == "" {
+			badList = true
+		}
+	}
+	if badList {
 		config.DNSBlockLists = GetDefaultBlockLists()
 	}
 
@@ -38,13 +48,12 @@ func reloadBlockLists(sleep bool, saveConfig bool) {
 		go processBlockList(i, wg, newMap)
 	}
 	wg.Wait()
+
 	DEBUG("finished updating blocklists")
 	DNSBlockList.Store(newMap)
-	if saveConfig {
-		err := writeConfigToDisk()
-		if err != nil {
-			ERROR("unable to write config to disk post blocklist update", err)
-		}
+	err := writeConfigToDisk()
+	if err != nil {
+		ERROR("unable to write config to disk post blocklist update", err)
 	}
 }
 
@@ -54,17 +63,16 @@ func processBlockList(index int, wg *sync.WaitGroup, nm *sync.Map) {
 	}()
 	defer RecoverAndLogToFile()
 	config := CONFIG.Load()
-	bl := config.DNSBlockLists[index].Load()
+	bl := config.DNSBlockLists[index]
 	if bl == nil {
 		return
 	}
 
-	var listFile *os.File
-	var listBytes []byte
-	var badLines int
 	var err error
-
+	var listBytes []byte
 	state := STATE.Load()
+	fname := state.BlockListPath + bl.Tag + ".txt"
+
 	if time.Since(bl.LastDownload).Hours() > 24 {
 		if CheckIfURL(bl.URL) {
 			listBytes, err = downloadList(bl.URL)
@@ -72,19 +80,12 @@ func processBlockList(index int, wg *sync.WaitGroup, nm *sync.Map) {
 				ERROR("Could not download", bl.URL, err)
 				return
 			}
-
-			_ = RemoveFile(state.BlockListPath + bl.Tag + ".txt")
-			listFile, err = CreateFile(state.BlockListPath + bl.Tag + ".txt")
+			err = os.WriteFile(fname, listBytes, 0666)
 			if err != nil {
 				ERROR("Could not save", bl.URL, err)
 				return
 			}
-			defer listFile.Close()
-			_, err = listFile.Write(listBytes)
-			if err != nil {
-				ERROR("unable to write dns block list:", err)
-			}
-			bl.Disk = listFile.Name()
+			bl.Disk = fname
 		}
 	} else if bl.Disk != "" {
 		listBytes, err = os.ReadFile(bl.Disk)
@@ -95,18 +96,12 @@ func processBlockList(index int, wg *sync.WaitGroup, nm *sync.Map) {
 				return
 			}
 
-			_ = RemoveFile(state.BlockListPath + bl.Tag + ".txt")
-			listFile, err = CreateFile(state.BlockListPath + bl.Tag + ".txt")
+			err = os.WriteFile(fname, listBytes, 0666)
 			if err != nil {
 				ERROR("Could not save", bl.URL, err)
 				return
 			}
-			defer listFile.Close()
-			_, err = listFile.Write(listBytes)
-			if err != nil {
-				ERROR("unable to write dns block list:", err)
-			}
-			bl.Disk = listFile.Name()
+			bl.Disk = fname
 		}
 	}
 
@@ -116,6 +111,7 @@ func processBlockList(index int, wg *sync.WaitGroup, nm *sync.Map) {
 	}
 
 	bl.Count = 0
+	var badLines int
 	buff := bytes.NewBuffer(listBytes)
 	scanner := bufio.NewScanner(buff)
 	for scanner.Scan() {
@@ -134,7 +130,7 @@ func processBlockList(index int, wg *sync.WaitGroup, nm *sync.Map) {
 	if badLines > 0 {
 		DEBUG(badLines, " invalid lines in list: ", bl.URL)
 	}
-	config.DNSBlockLists[index].Store(bl)
+	config.DNSBlockLists[index] = bl
 }
 
 func downloadList(url string) ([]byte, error) {
@@ -175,7 +171,7 @@ retry:
 	return bb, nil
 }
 
-func GetDefaultBlockLists() []atomic.Pointer[BlockList] {
+func GetDefaultBlockLists() []*BlockList {
 	bl := []*BlockList{
 		{
 			Tag: "Ads",
@@ -219,14 +215,12 @@ func GetDefaultBlockLists() []atomic.Pointer[BlockList] {
 		},
 	}
 
-	abl := make([]atomic.Pointer[BlockList], len(bl))
 	dlt := time.Now().AddDate(-2, 0, 0)
 	for i := range bl {
 		bl[i].LastDownload = dlt
-		abl[i].Store(bl[i])
 	}
 
-	return abl
+	return bl
 }
 
 func CheckIfURL(s string) bool {

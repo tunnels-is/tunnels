@@ -54,7 +54,7 @@ func InitService() error {
 	printInfo2()
 
 	doEvent(highPriorityChannel, func() {
-		reloadBlockLists(false, true)
+		reloadBlockLists(false)
 	})
 
 	INFO("Tunnels is ready")
@@ -130,7 +130,7 @@ func LaunchTunnels() {
 	})
 
 	newConcurrentSignal("BlockListUpdater", CancelContext, func() {
-		reloadBlockLists(true, true)
+		reloadBlockLists(true)
 	})
 
 	newConcurrentSignal("LogMapCleaner", CancelContext, func() {
@@ -215,7 +215,7 @@ func InitMinimalService() error {
 		InitDNSHandler()
 		INFO("Starting Tunnels")
 		doEvent(highPriorityChannel, func() {
-			reloadBlockLists(false, true)
+			reloadBlockLists(false)
 		})
 	}
 
@@ -264,7 +264,7 @@ func LaunchMinimalTunnels() {
 			StartUDPDNSHandler()
 		})
 		newConcurrentSignal("BlockListUpdater", CancelContext, func() {
-			reloadBlockLists(true, true)
+			reloadBlockLists(true)
 		})
 		newConcurrentSignal("CleanDNSCache", CancelContext, func() {
 			CleanDNSCache()
@@ -561,6 +561,7 @@ func loadConfigFromDisk() error {
 }
 
 func applyCertificateDefaultsToConfig(cfg *configV2) {
+
 	if cfg.APIKey == "" {
 		cfg.APIKey = "./api.key"
 	}
