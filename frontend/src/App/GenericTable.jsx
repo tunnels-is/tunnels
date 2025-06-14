@@ -253,6 +253,7 @@ const GenericTable = (props) => {
 
       <Table className="w-full overflow-visible text-sm text-foreground">
         {renderHeaders()}
+          <div class="h-4"></div>
         {renderRows()}
       </Table>
     </div >
