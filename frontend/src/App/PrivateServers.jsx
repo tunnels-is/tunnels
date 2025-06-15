@@ -201,7 +201,17 @@ const PrivateServers = () => {
 			IP: true,
 			_id: true,
 		},
-		columFormat: {},
+		columnFormat: {
+			Country: (row) => {
+				let x = state.GetCountryName(row.Country)
+				return x
+			}
+		},
+		columnClass: {
+			Country: () => {
+				return "min-w-[100px]"
+			}
+		},
 		customColumns: {
 			Tunnels: TunnelsColumn,
 		},
@@ -221,10 +231,12 @@ const PrivateServers = () => {
 				setEditModalOpen(true)
 			},
 		},
-		columnClass: {},
 		headerFormat: {
 			_id: () => {
 				return "ID"
+			},
+			Tag: () => {
+				return "Name"
 			}
 		},
 		headers: ["Tag", "Country", "IP", "_id", "Interface"],
