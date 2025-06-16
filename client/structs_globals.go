@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/miekg/dns"
@@ -86,11 +87,12 @@ var (
 	EGRESS_PACKETS  uint64 = 0
 	INGRESS_PACKETS uint64 = 0
 
-	TAG_ERROR    = "ERROR"
-	TAG_GENERAL  = "GENERAL"
-	LogFile      *os.File
-	TraceFile    *os.File
-	UDPDNSServer *dns.Server
+	TAG_ERROR   = "ERROR"
+	TAG_GENERAL = "GENERAL"
+	LogFile     *os.File
+	TraceFile   *os.File
+	// UDPDNSServer *dns.Server
+	UDPDNSServer atomic.Pointer[dns.Server]
 )
 
 type DNSReply struct {

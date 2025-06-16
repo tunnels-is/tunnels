@@ -1,4 +1,4 @@
-import { Card, CardContent,  CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardTitle } from "@/components/ui/card";
 import GLOBAL_STATE from "../state";
 import { Button } from "@/components/ui/button";
 import dayjs from "dayjs";
@@ -101,7 +101,6 @@ const Stats = () => {
 
         </CardContent>
         <Button
-          variant="outline"
           className={"mt-5 w-full" + state.Theme?.errorBtn}
           onClick={() => {
             state.disconnectFromVPN(ac)

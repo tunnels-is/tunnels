@@ -28,7 +28,7 @@ const NewObjectEditor = (props) => {
                 props.onArrayChange(key, e.target.value, i)
                 reload()
               }} type={"array"} value={props.obj[key][i]} />
-              <SquareMinus className={"mt-[14px]" + state.Theme?.redIcon} variant="outline" onClick={() => {
+              <SquareMinus className={"mt-[14px]" + state.Theme?.redIcon} onClick={() => {
                 props.obj[key].splice(i, i + 1)
                 reload()
               }} />
@@ -36,7 +36,7 @@ const NewObjectEditor = (props) => {
             </div>
           )
         })}
-        <SquarePlus className={"mt-2" + state.Theme?.greenIcon} variant="outline" onClick={() => {
+        <SquarePlus className={"mt-2" + state.Theme?.greenIcon} onClick={() => {
           if (props.obj[key].length > 0) {
             props.obj[key].push(props.obj[key][0])
           } else {

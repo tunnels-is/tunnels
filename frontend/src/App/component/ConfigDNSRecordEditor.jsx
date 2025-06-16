@@ -86,7 +86,6 @@ const ConfigDNSRecordEditor = () => {
       <div className="flex items-center justify-between mb-6">
         <Button
           onClick={addRecord}
-          variant="outline"
           className="flex items-center gap-2 text-white"
         >
           <PlusCircle className="h-4 w-4" />
@@ -110,7 +109,7 @@ const ConfigDNSRecordEditor = () => {
               </div>
             </div>
             {r.Wildcard && (
-              <Badge variant="outline" className="bg-green-700 text-white">
+              <Badge className="bg-green-700 text-white">
                 Wildcard <Check className="h-4 w-4" />
               </Badge>
             )}
@@ -168,7 +167,6 @@ const DNSRecordDialog = ({
             DNS Record {index + 1}
             {record.Wildcard && (
               <Badge
-                variant="outline"
                 className="ml-2 border-amber-800 bg-amber-900/30 text-amber-400"
               >
                 Wildcard
@@ -233,7 +231,6 @@ const DNSRecordDialog = ({
 
         <div className="flex justify-between mt-6 pt-4 border-t border-gray-800">
           <Button
-            variant="outline"
             className="flex items-center gap-2 bg-gray-950 border-gray-700 hover:bg-gray-700"
             onClick={saveAll}
           >
@@ -278,7 +275,6 @@ const RecordList = ({
       </div>
       <Button
         size="sm"
-        variant="outline"
         onClick={() => onAdd(index)}
         className="h-8 text-xs bg-gray-950 border-gray-700 hover:bg-gray-700 hover:text-white"
       >

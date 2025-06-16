@@ -83,15 +83,15 @@ func StartUDPDNSHandler() {
 		port = DefaultDNSPort
 	}
 
-	UDPDNSServer = &dns.Server{
+	UDPDNSServer.Store(&dns.Server{
 		Addr:         ip + ":" + port,
 		Net:          "udp4",
 		Handler:      udpHandler,
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 15 * time.Second,
-	}
+	})
 
-	err := UDPDNSServer.ListenAndServe()
+	err := UDPDNSServer.Load().ListenAndServe()
 	if err != nil {
 		ERROR("DNS SERVER SHUTDOWN: ", err)
 	}
