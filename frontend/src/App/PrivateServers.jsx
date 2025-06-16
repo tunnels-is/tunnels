@@ -150,9 +150,9 @@ const PrivateServers = () => {
 		})
 
 		let value = undefined
-		let assigned = "Assign To Tunnels"
+		let assigned = "Assign to tunnel"
 		if (assignedTunnels > 1) {
-			assigned = String(assignedTunnels) + " Assigned"
+			assigned = String(assignedTunnels) + " tunnels assigned"
 		} else {
 			value = servertun?.Tag
 		}
