@@ -194,11 +194,12 @@ func SetConfig(config *configV2) (err error) {
 
 	oldConf := CONFIG.Load()
 
-	dnsChange := oldConf.DNSServerIP == config.DNSServerIP ||
-		oldConf.DNSServerPort == config.DNSServerPort
+	dnsChange := oldConf.DNSServerIP != config.DNSServerIP ||
+		oldConf.DNSServerPort != config.DNSServerPort
 
 	if dnsChange {
-		_ = UDPDNSServer.Shutdown()
+		dnsserver := UDPDNSServer.Load()
+		_ = dnsserver.Shutdown()
 	}
 
 	apiChange := oldConf.APIPort != config.APIPort ||
@@ -212,12 +213,13 @@ func SetConfig(config *configV2) (err error) {
 		_ = API_SERVER.Shutdown(context.Background())
 	}
 
+	reloadBlockLists(false)
 	CONFIG.Store(config)
 	err = writeConfigToDisk()
-
 	INFO("Config saved")
 	DEBUG(fmt.Sprintf("%+v", *config))
-	return nil
+
+	return err
 }
 
 func BandwidthBytesToString(b int64) string {
@@ -581,7 +583,7 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		if err == nil {
 			return code, errors.New(ER.Error)
 		} else {
-			return code, errors.New("Error code from controller")
+			return code, errors.New("Error code from controller:" + strconv.Itoa(code))
 		}
 	}
 	if err != nil {
@@ -622,13 +624,13 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		ClientCR.Secure,
 	)
 	if code != 200 {
-		ERROR("ErrFromServer:", string(bytesFromServer))
+		ERROR("ErrFromServer:", code, string(bytesFromServer))
 		ER := new(ErrorResponse)
 		err := json.Unmarshal(bytesFromServer, ER)
 		if err == nil {
 			return code, errors.New(ER.Error)
 		} else {
-			return code, errors.New("Error code from controller")
+			return code, errors.New("Error code from vpn server: " + strconv.Itoa(code))
 		}
 	}
 	if err != nil {

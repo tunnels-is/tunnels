@@ -57,12 +57,21 @@ const PrivateServers = () => {
 	const ConnectColumn = (server) => {
 		let servertun = undefined
 		let assignedTunnels = 0
+		let defTunnel = undefined
 		state?.Tunnels?.map(c => {
 			if (c.ServerID === server._id) {
 				servertun = c
 				assignedTunnels++
+			} else if (c.Tag == "tunnels") {
+				defTunnel = c
 			}
 		})
+
+		if (assignedTunnels > 1) {
+			conButton = function() {
+				state.toggleError("too many tunnels assigned to server")
+			}
+		}
 
 		let con = undefined
 		let conButton = function() {
@@ -73,7 +82,11 @@ const PrivateServers = () => {
 				"",
 				"Connect to " + server.Tag,
 				() => {
-					state.connectToVPN(servertun, undefined)
+					if (assignedTunnels < 1) {
+						state.connectToVPN(undefined, server)
+					} else {
+						state.connectToVPN(servertun, undefined)
+					}
 				})
 		}
 
@@ -99,11 +112,6 @@ const PrivateServers = () => {
 			}
 		}
 
-		if (assignedTunnels > 1) {
-			conButton = function() {
-				state.toggleError("too many tunnels assigned to server")
-			}
-		}
 
 
 		return <div>
@@ -193,7 +201,17 @@ const PrivateServers = () => {
 			IP: true,
 			_id: true,
 		},
-		columFormat: {},
+		columnFormat: {
+			Country: (row) => {
+				let x = state.GetCountryName(row.Country)
+				return x
+			}
+		},
+		columnClass: {
+			Country: () => {
+				return "min-w-[100px]"
+			}
+		},
 		customColumns: {
 			Tunnels: TunnelsColumn,
 		},
@@ -213,10 +231,12 @@ const PrivateServers = () => {
 				setEditModalOpen(true)
 			},
 		},
-		columnClass: {},
 		headerFormat: {
 			_id: () => {
 				return "ID"
+			},
+			Tag: () => {
+				return "Name"
 			}
 		},
 		headers: ["Tag", "Country", "IP", "_id", "Interface"],

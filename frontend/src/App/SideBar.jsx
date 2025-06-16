@@ -64,27 +64,29 @@ const SideBar = () => {
     return false;
   }
 
+  const hasActiveTunnels = () => {
+    if (state.ActiveTunnels?.length > 0) {
+      return true
+    }
+    return false
+  }
+
   const menu = {
     groups: [
       {
         title: "",
         user: false,
-        shouldRender: showLogin,
         items: [
           {
             icon: LockOpen1Icon,
             label: "Login",
             route: "login",
+            user: false,
+            shouldRender: showLogin,
           },
-        ],
-      },
-      {
-        title: "",
-        user: false,
-        items: [
           { icon: LockClosedIcon, label: "VPN", route: "servers", user: true, },
           { icon: ContainerIcon, label: "DNS", route: "dns", user: false },
-          { icon: MixerHorizontalIcon, label: "Connections", route: "connections", user: false },
+          { icon: MixerHorizontalIcon, label: "Connections", route: "connections", user: true, shouldRender: hasActiveTunnels },
         ],
       },
       {

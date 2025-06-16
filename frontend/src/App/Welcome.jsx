@@ -58,7 +58,6 @@ const Welcome = () => {
               </div>
 
               <Button
-                variant="outline"
                 size="sm"
                 onClick={() => handleCopy(s.link)}
                 className="w-full sm:w-auto"

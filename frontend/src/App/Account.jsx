@@ -157,7 +157,6 @@ const Account = () => {
 
             <div className="flex flex-col gap-3 mt-6">
               <Button
-                variant="outline"
                 className={state.Theme?.neutralBtn}
                 onClick={() => state.refreshApiKey()}
               >
@@ -165,7 +164,6 @@ const Account = () => {
               </Button>
 
               <Button
-                variant="outline"
                 className={state.Theme?.neutralBtn}
                 onClick={() => navigate("/twofactor/create")}
               >
@@ -173,7 +171,6 @@ const Account = () => {
               </Button>
 
               <Button
-                variant="outline"
                 className={state.Theme?.errorBtn}
                 onClick={() => state.LogoutAllTokens()}
               >
@@ -204,7 +201,6 @@ const Account = () => {
           />
 
           <Button
-            variant="outline"
             className={state.Theme?.neutralBtn}
             key={state?.LicenseKey}
             onClick={() => state.ActivateLicense()}
