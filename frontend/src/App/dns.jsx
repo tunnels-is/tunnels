@@ -66,18 +66,6 @@ const DNS = () => {
     blockLists = [];
   }
 
-  const addRecord = () => {
-    if (!state.Config.DNSRecords) {
-      state.Config.DNSRecords = [];
-    }
-    state.Config.DNSRecords.push({
-      Domain: "domain.local",
-      IP: [""],
-      TXT: [""],
-      Wildcard: true,
-    });
-  };
-
   const generateDNSRecordsTable = () => {
 
     return {
@@ -288,21 +276,13 @@ const DNS = () => {
     },
   }
 
+  if (modified) {
+    bltable.Btn.Save = state.v2_ConfigSave
+  }
+
+
   return (
     <div className="">
-      {modified === true && (
-        <div className="mb-7 flex gap-[4px] items-center">
-          <Button
-            variant="outline"
-            className={state.Theme?.successBtn}
-            onClick={() => state.v2_ConfigSave()}>
-            Save
-          </Button>
-          <div className="ml-3 text-yellow-400 text-xl">
-            Your config has un-saved changes
-          </div>
-        </div>
-      )}
       <Tabs defaultValue="settings" >
         <TabsList
           className={state.Theme?.borderColor}

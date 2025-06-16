@@ -53,7 +53,6 @@ const NewObjectEditorDialog = ({
         <DialogFooter className="flex gap-2 mt-2 ">
           {!readOnly && saveButton && object && (
             <Button
-              variant="outline"
               className={state.Theme?.successBtn}
               onClick={() => saveButton(object)}
             >
@@ -62,7 +61,6 @@ const NewObjectEditorDialog = ({
             </Button>
           )}
           <Button
-            variant="outline"
             className={state.Theme?.warningBtn}
             onClick={() => onOpenChange(false)}
           >
