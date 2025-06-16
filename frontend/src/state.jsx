@@ -48,9 +48,12 @@ export var STATE = {
     borderColor: " border border-[#1a1f2d]  cursor-pointer",
     menuBG: " bg-[#0B0E14]",
     mainBG: " bg-black",
-    neutralBtn: " text-[#2056e1] border-[#2056e1] hover:bg-[#2056e1] hover:text-white cursor-pointer",
-    successBtn: " text-emerald-500 border-emerald-500 hover:bg-emerald-500 hover:text-white cursor-pointer",
-    warningBtn: " text-orange-500 border-orange-500 hover:bg-orange-500 hover:text-white cursor-pointer",
+    neutralBtn: " text-white bg-[#2056e1] hover:bg-blue-500 hover:text-white cursor-pointer",
+    successBtn: " text-white bg-emerald-500 hover:bg-emerald-400 hover:border-emerald-300 hover:text-white cursor-pointer",
+    warningBtn: " text-white bg-orange-500 hover:bg-orange-400 hover:text-white cursor-pointer",
+    // neutralBtn: " text-[#2056e1] border-[#2056e1] hover:bg-[#2056e1] hover:text-white cursor-pointer",
+    // successBtn: " text-emerald-500 border-emerald-500 hover:bg-emerald-500 hover:text-white cursor-pointer",
+    // warningBtn: " text-orange-500 border-orange-500 hover:bg-orange-500 hover:text-white cursor-pointer",
     errorBtn: " text-red-700 border-red-700 cursor-pointer hover:bg-red-500",
     activeSelect: " bg-[#2056e1] text-white cursor-pointer",
     neutralSelect: "  text-white focus:text-[#3168f3] cursor-pointer",
@@ -742,14 +745,12 @@ export var STATE = {
           < div className="text-base mb-6" > {subtitle}</div>
           <div className="flex justify-center gap-4">
             <Button
-              variant="outline"
               className={STATE.Theme?.errorBtn}
               onClick={() => toast.dismiss(t.id)}
             >
               NO
             </Button>
             <Button
-              variant="outline"
               className={STATE.Theme?.successBtn}
               onClick={async () => {
                 toast.dismiss(t.id);

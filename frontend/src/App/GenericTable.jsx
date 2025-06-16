@@ -27,7 +27,7 @@ const GenericTable = (props) => {
 
   let t = props.table;
   let hdc = "w-[60px] text-white font-bold ";
-  let ddc = "w-[60px] h-[20px] p-0 pl-2 text-white-100 font-medium ";
+  let ddc = "w-[60px] h-[30px] p-0 pl-2 text-white-100 font-medium ";
 
   const renderHeaders = () => {
     let rows = [];
@@ -207,7 +207,6 @@ const GenericTable = (props) => {
         {t.Btn?.Save && (
           <div className="flex mr-2 ">
             <Button
-              variant="outline"
               className={"flex  items-center gap-1" + state.Theme?.successBtn}
               onClick={() => t.Btn.Save()}
             >
@@ -218,7 +217,6 @@ const GenericTable = (props) => {
         {t.Btn?.New && (
           <div className="flex mr-2">
             <Button
-              variant="outline"
               className={"flex  items-center gap-1" + state.Theme?.successBtn}
               onClick={() => t.Btn.New()}
             >
@@ -228,13 +226,7 @@ const GenericTable = (props) => {
         )}
         {t.more && (
           <div className="flex gap-2">
-            <Input
-              className="w-full md:w-64 placeholder:text-muted-foreground text-white"
-              placeholder="Search..."
-              onChange={(e) => setFilter(e.target.value)}
-            />
             <Button
-              variant="outline"
               className={"flex items-center gap-1" + state.Theme?.neutralBtn}
               onClick={async () => {
                 let off = offset - t.opts.RowPerPage;
@@ -247,7 +239,6 @@ const GenericTable = (props) => {
             </Button>
 
             <Button
-              variant="outline"
               className={"flex items-center gap-1" + state.Theme?.neutralBtn}
               onClick={async () => {
                 let off = offset + t.opts.RowPerPage;
@@ -258,6 +249,11 @@ const GenericTable = (props) => {
             >
               <ArrowRight className="w-4 h-4" />
             </Button>
+            <Input
+              className="w-full md:w-64 placeholder:text-muted-foreground text-white"
+              placeholder="Search..."
+              onChange={(e) => setFilter(e.target.value)}
+            />
           </div>
         )}
 

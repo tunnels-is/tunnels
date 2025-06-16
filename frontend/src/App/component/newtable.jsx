@@ -185,10 +185,9 @@ const NewTable = (props) => {
               onClick={() => statusItem.click && statusItem.click()}
               className={`
 								font-medium text-xs py-1 px-2.5 rounded-md border cursor-pointer
-								${
-                  statusItem.s_state === "connect"
-                    ? "bg-green-500/10 text-green-400 border-green-500/20 hover:bg-green-500/20"
-                    : "bg-red-500/10 text-red-400 border-red-500/20 hover:bg-red-500/20"
+								${statusItem.s_state === "connect"
+                  ? "bg-green-500/10 text-green-400 border-green-500/20 hover:bg-green-500/20"
+                  : "bg-red-500/10 text-red-400 border-red-500/20 hover:bg-red-500/20"
                 }
 							`}
             >
@@ -216,7 +215,6 @@ const NewTable = (props) => {
         <div className="flex items-center gap-2">
           {props?.button && (
             <Button
-              variant="outline"
               size="sm"
               className="h-8 px-3 text-xs font-medium text-white border-[#222] bg-[#111] hover:bg-[#222] hover:text-white shadow-sm"
               onClick={(e) => props.button.click(e)}
@@ -227,7 +225,6 @@ const NewTable = (props) => {
 
           {props?.button2 && (
             <Button
-              variant="outline"
               size="sm"
               className="h-8 px-3 text-xs font-medium text-white border-[#222] bg-[#111] hover:bg-[#222] hover:text-white shadow-sm"
               onClick={(e) => props.button2.click(e)}
@@ -270,7 +267,6 @@ const NewTable = (props) => {
                 <p className="text-sm font-medium">No results found</p>
                 {filter && (
                   <Button
-                    variant="ghost"
                     size="sm"
                     onClick={() => setFilter("")}
                     className="mt-3 h-7 px-2 text-xs font-medium text-blue-400 hover:bg-blue-500/10"
@@ -338,7 +334,7 @@ const NewTable = (props) => {
                             ...(i.width && { width: `${i.width}%` }),
                           };
 
-                          const handleClick = i.click || (() => {});
+                          const handleClick = i.click || (() => { });
                           const classNames = i.className || "";
                           const isClickable = i.click ? "cursor-pointer" : "";
 
@@ -431,7 +427,6 @@ const NewTable = (props) => {
                           } else if (i.type === "action") {
                             cellContent = (
                               <Button
-                                variant="ghost"
                                 size="sm"
                                 onClick={(e) => handleClick(e)}
                                 className="h-7 px-2 text-xs font-medium text-blue-400 hover:bg-blue-500/10 hover:text-blue-300"
@@ -469,7 +464,6 @@ const NewTable = (props) => {
                 <p className="text-sm font-medium">No results found</p>
                 {filter && (
                   <Button
-                    variant="ghost"
                     size="sm"
                     onClick={() => setFilter("")}
                     className="mt-3 h-7 px-2 text-xs font-medium text-blue-400 hover:bg-blue-500/10"
@@ -492,7 +486,6 @@ const NewTable = (props) => {
           <div className="flex items-center gap-3">
             <div className="flex items-center overflow-hidden rounded-md border border-[#222] shadow-sm">
               <Button
-                variant="outline"
                 size="icon"
                 onClick={() => setPageWrap(pg.PrevPage, finalRows.length)}
                 disabled={!showPP}
@@ -502,7 +495,6 @@ const NewTable = (props) => {
               </Button>
 
               <Button
-                variant="outline"
                 size="icon"
                 onClick={() => setPageWrap(pg.NextPage, finalRows.length)}
                 disabled={!showNP}

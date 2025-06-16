@@ -117,7 +117,6 @@ const Settings = () => {
           <div className="mb-7 flex gap-[4px] items-center">
             <Button
               className={state.Theme?.successBtn}
-              variant="outline"
               onClick={() => state.v2_ConfigSave()}>
               Save
             </Button>
