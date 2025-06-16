@@ -8,20 +8,12 @@ const Devices = () => {
 	const [devices, setDevices] = useState([])
 	const state = GLOBAL_STATE("devices")
 	const [device, setDevice] = useState(undefined)
-	const [connectedDevices, setConnectedDevices] = useState([])
 	const [editModalOpen, setEditModalOpen] = useState(false)
 
 	const getDevices = async (offset, limit) => {
 		let resp = await state.callController(null, null, "POST", "/v3/device/list", { Offset: offset, Limit: limit }, false, false)
 		if (resp.status === 200) {
 			setDevices(resp.data)
-			state.renderPage("devices")
-		}
-	}
-	const getConnectedDevices = async () => {
-		let resp = await state.callController(null, null, "POST", "/v3/devices", {}, false, false)
-		if (resp.status === 200) {
-			setConnectedDevices(resp.data)
 			state.renderPage("devices")
 		}
 	}
@@ -61,7 +53,6 @@ const Devices = () => {
 
 	useEffect(() => {
 		getDevices(0, 100)
-		getConnectedDevices()
 	}, [])
 
 	let table = {
