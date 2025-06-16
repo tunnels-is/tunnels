@@ -46,10 +46,10 @@ const useForm = () => {
     setErrors({ ...errors });
     setInputs((inputs) => ({ ...inputs, ["email"]: token }));
   };
+
   const saveNewAuth = () => {
     state.Config.AuthServers.push(newAuth.url)
     state.ConfigSave()
-    console.log(newAuth)
   }
 
   const RegisterSubmit = async () => {
