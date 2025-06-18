@@ -12,7 +12,6 @@ import (
 
 	"github.com/miekg/dns"
 	"github.com/tunnels-is/tunnels/types"
-	"golang.org/x/net/idna"
 )
 
 func FullCleanDNSCache() {
@@ -373,11 +372,13 @@ func DNSQuery(w dns.ResponseWriter, m *dns.Msg) {
 
 func isValidDomain(m *dns.Msg, w dns.ResponseWriter) bool {
 	shouldDrop := false
-	_, err := idna.Lookup.ToASCII(m.Question[0].Name)
-	if err != nil {
-		shouldDrop = true
-		goto DONE
-	}
+	// TODO
+	// this is problematic on some domains
+	// _, err := idna.Lookup.ToASCII(m.Question[0].Name)
+	// if err != nil {
+	// 	shouldDrop = true
+	// 	goto DONE
+	// }
 
 	if strings.HasSuffix(m.Question[0].Name, ".arpa.") {
 		shouldDrop = true
