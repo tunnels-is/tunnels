@@ -59,6 +59,7 @@ func CreateNewTunnelInterface(
 	IF = &TInterface{
 		Name:        meta.IFName,
 		IPv4Address: meta.IPv4Address,
+		IPv6Address: meta.IPv6Address,
 		NetMask:     meta.NetMask,
 		Gateway:     meta.IPv4Address,
 		TxQueuelen:  meta.TxQueueLen,
@@ -144,6 +145,11 @@ type syscallAddAddrV4 struct {
 	syscall.RawSockaddrInet4
 }
 
+type syscallAddAddrV6 struct {
+	Name [16]byte
+	syscall.RawSockaddrInet6
+}
+
 func (t *TInterface) Addr() (err error) {
 	var ifr syscallAddAddrV4
 	ifr.Port = 0
@@ -151,6 +157,24 @@ func (t *TInterface) Addr() (err error) {
 
 	copy(ifr.Name[:], []byte(t.Name))
 	copy(ifr.Addr[:], net.ParseIP(t.IPv4Address).To4())
+
+	if err = socketCtl(
+		syscall.SIOCSIFADDR,
+		uintptr(unsafe.Pointer(&ifr)),
+	); err != nil {
+		return
+	}
+
+	return
+}
+
+func (t *TInterface) AddrV6() (err error) {
+	var ifr syscallAddAddrV6
+	ifr.Port = 0
+	ifr.Family = syscall.AF_INET6
+
+	copy(ifr.Name[:], []byte(t.Name))
+	copy(ifr.Addr[:], net.ParseIP(t.IPv6Address).To16())
 
 	if err = socketCtl(
 		syscall.SIOCSIFADDR,
@@ -277,6 +301,15 @@ func (t *TInterface) Connect(tun *TUN) (err error) {
 	if err != nil {
 		return
 	}
+
+	// Configure IPv6 address if available
+	if t.IPv6Address != "" {
+		err = t.AddrV6()
+		if err != nil {
+			return
+		}
+	}
+
 	err = t.Up()
 	if err != nil {
 		return
@@ -295,6 +328,14 @@ func (t *TInterface) Connect(tun *TUN) (err error) {
 		err = IP_AddRoute("default", "", t.IPv4Address, "0")
 		if err != nil {
 			return err
+		}
+
+		// Add default IPv6 route if IPv6 address is configured
+		if t.IPv6Address != "" {
+			err = IP_AddRouteV6("default", "", t.IPv6Address, "0")
+			if err != nil {
+				return err
+			}
 		}
 	}
 
@@ -432,6 +473,56 @@ func IP_AddRoute(
 	return
 }
 
+func IP_AddRouteV6(
+	network string,
+	_ string,
+	gateway string,
+	metric string,
+) (err error) {
+	_ = IP_DelRouteV6(network, gateway, metric)
+
+	mInt, err := strconv.Atoi(metric)
+	if err != nil {
+		return err
+	}
+
+	r := new(netlink.Route)
+	if network == "default" {
+		_, r.Dst, _ = net.ParseCIDR("::/0")
+	} else {
+		_, r.Dst, err = net.ParseCIDR(network)
+		if err != nil {
+			return err
+		}
+	}
+
+	r.Priority = mInt
+	r.Gw = net.ParseIP(gateway).To16()
+
+	DEBUG("ADD IPv6 ROUTE: ", r)
+	err = netlink.RouteAdd(r)
+	if err != nil {
+		if strings.Contains(err.Error(), "exists") {
+			return nil
+		}
+		return err
+	}
+
+	DEBUG(
+		"ip ",
+		"-6 ",
+		"route ",
+		"add ",
+		network,
+		" via ",
+		gateway,
+		" metric ",
+		metric,
+	)
+
+	return
+}
+
 func IP_DelRouteNoGW(network string, metric int) (err error) {
 	r := new(netlink.Route)
 	r.Dst = new(net.IPNet)
@@ -466,6 +557,34 @@ func IP_DelRoute(network string, gateway string, metric string) (err error) {
 	r.Gw = net.ParseIP(gateway).To4()
 
 	DEBUG("DEL ROUTE: ", r)
+	err = netlink.RouteDel(r)
+	if err != nil {
+		return err
+	}
+
+	return
+}
+
+func IP_DelRouteV6(network string, gateway string, metric string) (err error) {
+	mInt, err := strconv.Atoi(metric)
+	if err != nil {
+		return err
+	}
+
+	r := new(netlink.Route)
+	if network == "default" {
+		_, r.Dst, _ = net.ParseCIDR("::/0")
+	} else {
+		_, r.Dst, err = net.ParseCIDR(network)
+		if err != nil {
+			return err
+		}
+	}
+
+	r.Priority = mInt
+	r.Gw = net.ParseIP(gateway).To16()
+
+	DEBUG("DEL IPv6 ROUTE: ", r)
 	err = netlink.RouteDel(r)
 	if err != nil {
 		return err
