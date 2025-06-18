@@ -4,6 +4,7 @@ package client
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"os"
@@ -163,17 +164,23 @@ func (t *TInterface) Addr() (err error) {
 	return
 }
 
+func (t *TInterface) GetLink() (netlink.Link, error) {
+	link, err := netlink.LinkByName(t.Name)
+	if err != nil {
+		return nil, err
+	}
+	return link, nil
+
+}
+
 func (t *TInterface) AddrV6() (err error) {
-	// Find the network interface by name
 	link, err := netlink.LinkByName(t.Name)
 	if err != nil {
 		return err
 	}
 
-	// Parse the IPv6 address and create a network address
 	ipv6, ipv6Net, err := net.ParseCIDR(t.IPv6Address + "/64")
 	if err != nil {
-		// If it's not in CIDR format, assume /64 prefix
 		ipv6 = net.ParseIP(t.IPv6Address)
 		if ipv6 == nil {
 			return errors.New("invalid IPv6 address")
@@ -181,7 +188,6 @@ func (t *TInterface) AddrV6() (err error) {
 		_, ipv6Net, _ = net.ParseCIDR(t.IPv6Address + "/64")
 	}
 
-	// Create address object
 	addr := &netlink.Addr{
 		IPNet: &net.IPNet{
 			IP:   ipv6,
@@ -189,9 +195,8 @@ func (t *TInterface) AddrV6() (err error) {
 		},
 	}
 
-	// Add the IPv6 address to the interface
 	err = netlink.AddrAdd(link, addr)
-	if err != nil && !strings.Contains(err.Error(), "exists") {
+	if err != nil && !strings.Contains(err.Error(), "exists") && !strings.Contains(err.Error(), "permission denied") {
 		return err
 	}
 
@@ -313,13 +318,14 @@ func (t *TInterface) Delete() (err error) {
 func (t *TInterface) Connect(tun *TUN) (err error) {
 	err = t.Addr()
 	if err != nil {
+		fmt.Println("ADDR ERR:", err)
 		return
 	}
 
-	// Configure IPv6 address if available
 	if t.IPv6Address != "" {
 		err = t.AddrV6()
 		if err != nil {
+			DEBUG("Unable to add IPv6 address, maybe IPv6 is turned off ?, err : ", err)
 			return
 		}
 	}
@@ -346,9 +352,9 @@ func (t *TInterface) Connect(tun *TUN) (err error) {
 
 		// Add default IPv6 route if IPv6 address is configured
 		if t.IPv6Address != "" {
-			err = IP_AddRouteV6("default", "", t.IPv6Address, "0")
-			if err != nil {
-				return err
+			iperr := IP_AddRouteV6("default", t.Name, t.IPv6Address, "0")
+			if iperr != nil {
+				DEBUG("Unable to add IPv6 route, maybe IPv6 is turned off ?, err : ", err)
 			}
 		}
 	}
@@ -465,7 +471,6 @@ func IP_AddRoute(
 	r.Priority = mInt
 	r.Gw = net.ParseIP(gateway).To4()
 
-	DEBUG("ADD ROUTE: ", r)
 	err = netlink.RouteAdd(r)
 	if err != nil {
 		if strings.Contains(err.Error(), "exists") {
@@ -489,11 +494,16 @@ func IP_AddRoute(
 
 func IP_AddRouteV6(
 	network string,
-	_ string,
+	ifName string,
 	gateway string,
 	metric string,
 ) (err error) {
 	_ = IP_DelRouteV6(network, gateway, metric)
+
+	link, err := netlink.LinkByName(ifName)
+	if err != nil {
+		return err
+	}
 
 	mInt, err := strconv.Atoi(metric)
 	if err != nil {
@@ -501,6 +511,8 @@ func IP_AddRouteV6(
 	}
 
 	r := new(netlink.Route)
+	r.LinkIndex = link.Attrs().Index
+	r.Priority = mInt
 	if network == "default" {
 		_, r.Dst, _ = net.ParseCIDR("::/0")
 	} else {
@@ -508,15 +520,15 @@ func IP_AddRouteV6(
 		if err != nil {
 			return err
 		}
+		// r.Gw = net.ParseIP(gateway).To16()
 	}
 
-	r.Priority = mInt
-	r.Gw = net.ParseIP(gateway).To16()
-
-	DEBUG("ADD IPv6 ROUTE: ", r)
 	err = netlink.RouteAdd(r)
 	if err != nil {
 		if strings.Contains(err.Error(), "exists") {
+			return nil
+		}
+		if strings.Contains(err.Error(), "permission denied") {
 			return nil
 		}
 		return err
