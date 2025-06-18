@@ -288,8 +288,8 @@ const DNS = () => {
           className={state.Theme?.borderColor}
         >
           <TabsTrigger className={state.Theme?.tabs} value="settings">Settings</TabsTrigger>
-          <TabsTrigger className={state.Theme?.tabs} value="records">Records</TabsTrigger>
-          <TabsTrigger className={state.Theme?.tabs} value="blocklist">Block List</TabsTrigger>
+          <TabsTrigger className={state.Theme?.tabs} value="records">DNS Records</TabsTrigger>
+          <TabsTrigger className={state.Theme?.tabs} value="blocklist">Block Lists</TabsTrigger>
           <TabsTrigger className={state.Theme?.tabs} value="blockdomains">Blocked Domains</TabsTrigger>
           <TabsTrigger className={state.Theme?.tabs} value="resolveddomains">Resovled Domains</TabsTrigger>
         </TabsList>

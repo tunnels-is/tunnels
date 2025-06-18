@@ -15,11 +15,10 @@ type uniqueLog struct {
 
 func checkLogUniqueness(log *string) (shouldLog bool) {
 	hash := md5.Sum([]byte(*log))
-	_, exists := logRecordHash.Load(hash)
+	hashStr := string(hash[:])
+	_, exists := logRecordHash.Load(hashStr)
 	if !exists {
-		logRecordHash.Store(hash, uniqueLog{
-			date: time.Now(),
-		})
+		logRecordHash.Store(hashStr, true)
 		return true
 	}
 	return false
