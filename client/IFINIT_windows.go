@@ -774,7 +774,7 @@ func (t *TInterface) Disconnect(tun *TUN) (err error) {
 	meta := tun.meta.Load()
 	if IsDefaultConnection(meta.IFName) || meta.EnableDefaultRoute {
 		err = IP_DelRoute("default", t.IPv4Address, "0")
-		
+
 		// Clean up IPv6 default route if IPv6 was configured
 		if t.IPv6Address != "" {
 			iperr := IP_DelRouteV6("default", t.IPv6Address, "0")

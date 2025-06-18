@@ -42,10 +42,10 @@ func CreateNewTunnelInterface(
 	meta *TunnelMETA,
 ) (IF *TInterface, err error) {
 	defer RecoverAndLogToFile()
-
 	IF = &TInterface{
 		Name:        meta.IFName,
 		IPv4Address: meta.IPv4Address,
+		IPv6Address: meta.IPv6Address,
 		Gateway:     meta.IPv4Address,
 		NetMask:     meta.NetMask,
 		TxQueuelen:  meta.TxQueueLen,
@@ -203,6 +203,34 @@ func (t *TInterface) SetTXQueueLen() (err error) {
 	return nil
 }
 
+func (t *TInterface) AddrV6() (err error) {
+	// Configure IPv6 address using ifconfig
+	if t.IPv6Address == "" {
+		return nil
+	}
+
+	// Add /64 prefix if not specified
+	ipv6Addr := t.IPv6Address
+	if !strings.Contains(ipv6Addr, "/") {
+		ipv6Addr = ipv6Addr + "/64"
+	}
+
+	DEBUG("ifconfig", t.SystemName, "inet6", ipv6Addr)
+	out, err := exec.Command("ifconfig", t.SystemName, "inet6", ipv6Addr).CombinedOutput()
+	if err != nil {
+		// Check if the error is because the address already exists
+		if strings.Contains(string(out), "File exists") || strings.Contains(err.Error(), "exists") {
+			DEBUG("IPv6 address already exists on interface: ", t.SystemName)
+			return nil
+		}
+		ERROR("IPv6 address configuration failed: ", err, " out: ", string(out))
+		return err
+	}
+
+	DEBUG("Added IPv6 address ", t.IPv6Address, " to interface ", t.SystemName)
+	return nil
+}
+
 func (t *TInterface) Connect(tun *TUN) (err error) {
 	err = t.Up()
 	if err != nil {
@@ -217,12 +245,27 @@ func (t *TInterface) Connect(tun *TUN) (err error) {
 		return
 	}
 
+	if t.IPv6Address != "" {
+		err = t.AddrV6()
+		if err != nil {
+			DEBUG("Unable to add IPv6 address, maybe IPv6 is turned off ?, err : ", err)
+		}
+	}
+
 	meta := tun.meta.Load()
 	if IsDefaultConnection(meta.IFName) || meta.EnableDefaultRoute {
 		_ = IP_DelDefaultRoute()
 		err = IP_AddDefaultRoute(t.IPv4Address)
 		if err != nil {
 			return
+		}
+
+		// Add default IPv6 route if IPv6 address is configured
+		if t.IPv6Address != "" {
+			iperr := IP_AddRouteV6("default", t.SystemName, t.IPv6Address, "0")
+			if iperr != nil {
+				DEBUG("Unable to add IPv6 route, maybe IPv6 is turned off ?, err : ", iperr)
+			}
 		}
 	}
 
@@ -262,11 +305,18 @@ func (t *TInterface) Disconnect(V *TUN) (err error) {
 	if err != nil {
 		ERROR("unable to close the interface", err)
 	}
-
 	// TODO .. might not be needed ?????
 	// meta := tun.meta.Load()
 	// if IsDefaultConnection(meta.IFName) || meta.EnableDefaultRoute {
 	// 	err = IP_DelRoute("default", t.IPv4Address, "0")
+	//
+	// 	// Clean up IPv6 default route if IPv6 was configured
+	// 	if t.IPv6Address != "" {
+	// 		iperr := IP_DelRouteV6("default", t.IPv6Address, "0")
+	// 		if iperr != nil {
+	// 			DEBUG("Unable to delete IPv6 default route, err : ", iperr)
+	// 		}
+	// 	}
 	// }
 
 	// if tun.ServerReponse.LAN != nil && tun.ServerReponse.LAN.Nat != "" {
@@ -341,6 +391,62 @@ func IP_DelRoute(network string, gateway string, metric string) (err error) {
 	out, err := exec.Command("route", "-n", "delete", "-net", network).CombinedOutput()
 	if err != nil {
 		ERROR("Unable to delete route: ", string(out), " err: ", err)
+		return err
+	}
+
+	return
+}
+
+func IP_AddRouteV6(
+	network string,
+	ifName string,
+	gateway string,
+	metric string,
+) (err error) {
+	_ = IP_DelRouteV6(network, gateway, metric)
+
+	var cmd *exec.Cmd
+	if network == "default" {
+		// Add default IPv6 route
+		DEBUG("route", "-n", "add", "-inet6", "default", "-interface", ifName)
+		cmd = exec.Command("route", "-n", "add", "-inet6", "default", "-interface", ifName)
+	} else {
+		// Add specific IPv6 route
+		DEBUG("route", "-n", "add", "-inet6", "-net", network, "-interface", ifName)
+		cmd = exec.Command("route", "-n", "add", "-inet6", "-net", network, "-interface", ifName)
+	}
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		// Check if the error is because the route already exists
+		if strings.Contains(string(out), "File exists") || strings.Contains(err.Error(), "exists") {
+			DEBUG("IPv6 route already exists: ", network)
+			return nil
+		}
+		ERROR("Unable to add IPv6 route: ", err, " out: ", string(out))
+		return err
+	}
+
+	return
+}
+
+func IP_DelRouteV6(network string, _ string, _ string) (err error) {
+	var cmd *exec.Cmd
+	if network == "default" {
+		DEBUG("route", "-n", "delete", "-inet6", "default")
+		cmd = exec.Command("route", "-n", "delete", "-inet6", "default")
+	} else {
+		DEBUG("route", "-n", "delete", "-inet6", "-net", network)
+		cmd = exec.Command("route", "-n", "delete", "-inet6", "-net", network)
+	}
+
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		// Check if the route doesn't exist (common on cleanup)
+		if strings.Contains(string(out), "not in table") || strings.Contains(string(out), "No such process") {
+			DEBUG("IPv6 route doesn't exist (already deleted): ", network)
+			return nil
+		}
+		ERROR("Unable to delete IPv6 route: ", err, " out: ", string(out))
 		return err
 	}
 
