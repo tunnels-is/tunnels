@@ -145,11 +145,6 @@ type syscallAddAddrV4 struct {
 	syscall.RawSockaddrInet4
 }
 
-type syscallAddAddrV6 struct {
-	Name [16]byte
-	syscall.RawSockaddrInet6
-}
-
 func (t *TInterface) Addr() (err error) {
 	var ifr syscallAddAddrV4
 	ifr.Port = 0
@@ -169,21 +164,40 @@ func (t *TInterface) Addr() (err error) {
 }
 
 func (t *TInterface) AddrV6() (err error) {
-	var ifr syscallAddAddrV6
-	ifr.Port = 0
-	ifr.Family = syscall.AF_INET6
-
-	copy(ifr.Name[:], []byte(t.Name))
-	copy(ifr.Addr[:], net.ParseIP(t.IPv6Address).To16())
-
-	if err = socketCtl(
-		syscall.SIOCSIFADDR,
-		uintptr(unsafe.Pointer(&ifr)),
-	); err != nil {
-		return
+	// Find the network interface by name
+	link, err := netlink.LinkByName(t.Name)
+	if err != nil {
+		return err
 	}
 
-	return
+	// Parse the IPv6 address and create a network address
+	ipv6, ipv6Net, err := net.ParseCIDR(t.IPv6Address + "/64")
+	if err != nil {
+		// If it's not in CIDR format, assume /64 prefix
+		ipv6 = net.ParseIP(t.IPv6Address)
+		if ipv6 == nil {
+			return errors.New("invalid IPv6 address")
+		}
+		_, ipv6Net, _ = net.ParseCIDR(t.IPv6Address + "/64")
+	}
+
+	// Create address object
+	addr := &netlink.Addr{
+		IPNet: &net.IPNet{
+			IP:   ipv6,
+			Mask: ipv6Net.Mask,
+		},
+	}
+
+	// Add the IPv6 address to the interface
+	err = netlink.AddrAdd(link, addr)
+	if err != nil && !strings.Contains(err.Error(), "exists") {
+		return err
+	}
+
+	DEBUG("Added IPv6 address ", t.IPv6Address, " to interface ", t.Name)
+
+	return nil
 }
 
 func (t *TInterface) Up() (err error) {
