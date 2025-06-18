@@ -77,13 +77,16 @@ func createTunnel() (T *TunnelMETA) {
 	T.EnableDefaultRoute = false
 	T.IPv4Address = "777.777.777.777"
 	T.NetMask = "255.255.255.255"
+	randomPart1 := rand.Intn(0xFFFF)
+	randomPart2 := rand.Intn(0xFFFF)
+	T.IPv6Address = fmt.Sprintf("fd00:%04x:%04x::1", randomPart1, randomPart2)
 
 	T.EncryptionType = crypt.CHACHA20
 	T.CurveType = crypt.X25519
 	T.DNSBlocking = true
-	T.PreventIPv6 = true
+	T.PreventIPv6 = false
 	T.TxQueueLen = 2000
-	T.MTU = 1400
+	T.MTU = 1420
 	T.ServerID = ""
 	T.AutoReconnect = true
 	T.AutoConnect = false
@@ -101,12 +104,6 @@ func createDefaultTunnelMeta(minimal bool) (M *TunnelMETA) {
 	M.RequestVPNPorts = true
 	M.IPv4Address = "172.22.22.1"
 	M.NetMask = "255.255.255.255"
-
-	// Generate random IPv6 address in fd00::/8 private range
-	// Format: fd00:xxxx:xxxx::1 where x are random hex digits
-	randomPart1 := rand.Intn(0xFFFF)
-	randomPart2 := rand.Intn(0xFFFF)
-	M.IPv6Address = fmt.Sprintf("fd00:%04x:%04x::1", randomPart1, randomPart2)
 
 	M.Tag = DefaultTunnelName
 	M.IFName = DefaultTunnelName
