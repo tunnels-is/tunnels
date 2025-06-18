@@ -453,6 +453,7 @@ func makeConfigAndCerts() {
 			types.VPN,
 			types.AUTH,
 			types.DNS,
+			types.BBOLT,
 		},
 		VPNIP:     interfaceIP,
 		VPNPort:   "444",
