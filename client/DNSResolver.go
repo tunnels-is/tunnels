@@ -28,8 +28,7 @@ func CleanDNSCache() {
 	defer RecoverAndLogToFile()
 
 	INFO("Cleaning DNS cache")
-
-	DNSCache.Range(func(key, value any) bool {
+	DNSCache.Range(func(key string, value any) bool {
 		dr, ok := value.(*DNSReply)
 		if !ok {
 			return true
@@ -456,10 +455,9 @@ func isBlocked(m *dns.Msg) (ok bool, tag string) {
 		return false, ""
 	}
 
-	tagString, ok := bl.Load(name)
-	if ok && tagString != nil {
-		bl := tagString.(*BlockList)
-		tag = bl.Tag
+	blocked, ok := (*bl).Load(name)
+	if ok && blocked {
+		tag = "blocked"
 	}
 
 	return ok, tag

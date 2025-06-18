@@ -4,8 +4,9 @@ import (
 	"encoding/binary"
 	"net"
 	"slices"
-	"sync"
 	"time"
+
+	"github.com/puzpuzpuz/xsync/v3"
 )
 
 var (
@@ -31,8 +32,8 @@ func (V *TUN) CreateNEWPortMapping(p *[]byte) (m *Mapping) {
 		V.EP_TPHeader[3], // dst PORT
 	}
 
-	var smap *sync.Map
-	var aports []sync.Map
+	var smap *xsync.MapOf[any, *Mapping]
+	var aports []*xsync.MapOf[any, *Mapping]
 	if V.EP_Protocol == 6 {
 		smap = V.ActiveTCPMapping
 		aports = V.AvailableTCPPorts
@@ -43,7 +44,7 @@ func (V *TUN) CreateNEWPortMapping(p *[]byte) (m *Mapping) {
 
 	mm, ok := smap.Load(EID)
 	if ok && mm != nil {
-		m = mm.(*Mapping)
+		m = mm
 		// TODO...
 		m.UnixTime.Store(time.Now().UnixMicro())
 		if V.EP_TPHeader[13]&0x2 > 0 {
@@ -52,7 +53,6 @@ func (V *TUN) CreateNEWPortMapping(p *[]byte) (m *Mapping) {
 		}
 		return m
 	}
-
 	for i := range aports {
 		_, ok = aports[i].Load([6]byte{EID[4], EID[5], EID[6], EID[7], EID[10], EID[11]})
 		if !ok {
@@ -94,7 +94,7 @@ func (V *TUN) CreateNEWPortMapping(p *[]byte) (m *Mapping) {
 // func (V *TUN) getIngressPortMapping(VPNPortMap []atomic.Pointer[VPNPort], dstIP []byte, port [2]byte) *Mapping {
 func (V *TUN) getIngressPortMapping() (m *Mapping) {
 
-	var imap []sync.Map
+	var imap []*xsync.MapOf[any, *Mapping]
 	if V.IP_Protocol == 6 {
 		imap = V.AvailableTCPPorts
 	} else {
@@ -104,7 +104,7 @@ func (V *TUN) getIngressPortMapping() (m *Mapping) {
 		[6]byte{V.IP_SrcIP[0], V.IP_SrcIP[1], V.IP_SrcIP[2], V.IP_SrcIP[3], V.IP_SrcPort[0], V.IP_SrcPort[1]},
 	)
 	if ok && mm != nil {
-		m = mm.(*Mapping)
+		m = mm
 		m.UnixTime.Store(time.Now().UnixMicro())
 		return
 	}
@@ -144,9 +144,9 @@ func debugMissingIngressMapping(packet []byte) {
 
 func (t *TUN) cleanPortMap() {
 	for i := range t.AvailableTCPPorts {
-		t.AvailableTCPPorts[i].Range(func(key, value any) bool {
-			m, ok := value.(*Mapping)
-			if ok {
+		t.AvailableTCPPorts[i].Range(func(key any, value *Mapping) bool {
+			m := value
+			if m != nil {
 				ut := time.UnixMicro(m.UnixTime.Load())
 				if m.rstFound.Load() || m.finCount.Load() > 1 {
 					if time.Since(ut) > time.Second*10 {
@@ -187,11 +187,10 @@ func (t *TUN) cleanPortMap() {
 			dnsServer = append(dnsServer, [4]byte{dns[0], dns[1], dns[2], dns[3]})
 		}
 	}
-
 	for i := range t.AvailableUDPPorts {
-		t.AvailableUDPPorts[i].Range(func(key, value any) bool {
-			m, ok := value.(*Mapping)
-			if ok {
+		t.AvailableUDPPorts[i].Range(func(key any, value *Mapping) bool {
+			m := value
+			if m != nil {
 				ut := time.UnixMicro(m.UnixTime.Load())
 				if slices.Contains(dnsServer, m.DestinationIP) {
 					if time.Since(ut) > time.Second*15 {
