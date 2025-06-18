@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os/exec"
 	"strconv"
+	"strings"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -65,16 +66,14 @@ func CreateNewTunnelInterface(
 	} else {
 		GUID = *new(windows.GUID)
 	}
-
 	IF = &TInterface{
 		Name:        meta.IFName,
 		IPv4Address: meta.IPv4Address,
+		IPv6Address: meta.IPv6Address,
 		NetMask:     meta.NetMask,
 		TxQueuelen:  meta.TxQueueLen,
 		MTU:         meta.MTU,
 
-		// hardcoded for now
-		IPv6Address:   "fe80::1",
 		GatewayMetric: "2000",
 		// Gateway:       DEFAULT_GATEWAY.To4().String(),
 		// Gateway: "127.0.0.1",
@@ -223,7 +222,7 @@ func (t *TInterface) Addr() (err error) {
 		"ipv4",
 		"set",
 		"address",
-		`name="`+t.Name+`"`,
+		`name="`+t.Name+`"`, // Corrected quoting
 		"static",
 		t.IPv4Address,
 		t.NetMask,
@@ -238,7 +237,7 @@ func (t *TInterface) Addr() (err error) {
 		"ipv4",
 		"set",
 		"address",
-		`name="`+t.Name+`"`,
+		`name="`+t.Name+`"`, // Corrected quoting
 		"static",
 		t.IPv4Address,
 		t.NetMask,
@@ -253,6 +252,57 @@ func (t *TInterface) Addr() (err error) {
 		ERROR(fmt.Sprintf("%s - out: %s ", ob, err))
 		return err
 	}
+
+	return nil
+}
+
+func (t *TInterface) AddrV6() (err error) {
+	// Configure IPv6 address using netsh
+	ipv6Addr := t.IPv6Address
+	if ipv6Addr == "" {
+		return nil
+	}
+
+	// Add /64 prefix if not specified
+	if !strings.Contains(ipv6Addr, "/") {
+		ipv6Addr = ipv6Addr + "/64"
+	}
+
+	cmd := exec.Command(
+		"netsh",
+		"interface",
+		"ipv6",
+		"add",
+		"address",
+		`interface="`+t.Name+`"`,
+		"address="+ipv6Addr,
+		"store=persistent",
+	)
+
+	DEBUG(
+		"netsh",
+		"interface",
+		"ipv6",
+		"add",
+		"address",
+		`interface="`+t.Name+`"`,
+		"address="+ipv6Addr,
+		"store=persistent",
+	)
+
+	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+	ob, err := cmd.Output()
+	if err != nil {
+		// Check if the error is because the address already exists
+		if strings.Contains(string(ob), "already exists") || strings.Contains(err.Error(), "already exists") {
+			DEBUG("IPv6 address already exists on interface: ", t.Name)
+			return nil
+		}
+		ERROR(fmt.Sprintf("IPv6 address configuration failed: %s - out: %s", err, ob))
+		return err
+	}
+
+	DEBUG("Added IPv6 address ", t.IPv6Address, " to interface ", t.Name)
 
 	return nil
 }
@@ -387,6 +437,132 @@ func IP_DelRoute(network string, _ string, _ string) (err error) {
 	return
 }
 
+func IP_AddRouteV6(
+	network string,
+	ifName string,
+	gateway string,
+	metric string,
+) (err error) {
+	if metric == "0" {
+		metric = "1"
+	}
+
+	_ = IP_DelRouteV6(network, gateway, metric)
+
+	var cmd *exec.Cmd
+	if network == "default" {
+		// Add default IPv6 route
+		cmd = exec.Command(
+			"netsh",
+			"interface",
+			"ipv6",
+			"add",
+			"route",
+			"::/0",
+			`interface="`+ifName+`"`,
+			"metric="+metric,
+			"store=active",
+		)
+		DEBUG(
+			"netsh",
+			"interface",
+			"ipv6",
+			"add",
+			"route",
+			"::/0",
+			`interface="`+ifName+`"`,
+			"metric="+metric,
+			"store=active",
+		)
+	} else {
+		// Add specific IPv6 route
+		cmd = exec.Command(
+			"netsh",
+			"interface",
+			"ipv6",
+			"add",
+			"route",
+			network,
+			`interface="`+ifName+`"`,
+			"metric="+metric,
+			"store=active",
+		)
+		DEBUG(
+			"netsh",
+			"interface",
+			"ipv6",
+			"add",
+			"route",
+			network,
+			`interface="`+ifName+`"`,
+			"metric="+metric,
+			"store=active",
+		)
+	}
+
+	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+	ob, cerr := cmd.Output()
+
+	if cerr != nil {
+		// Check if the error is because the route already exists
+		if strings.Contains(string(ob), "already exists") || strings.Contains(cerr.Error(), "already exists") {
+			DEBUG("IPv6 route already exists: ", network)
+			return nil
+		}
+		return fmt.Errorf("IPv6 route add failed: %s - out: %s", cerr, ob)
+	}
+
+	return
+}
+
+func IP_DelRouteV6(network string, _ string, _ string) (err error) {
+	var cmd *exec.Cmd
+	if network == "default" {
+		cmd = exec.Command(
+			"netsh",
+			"interface",
+			"ipv6",
+			"delete",
+			"route",
+			"::/0",
+		)
+		DEBUG(
+			"netsh",
+			"interface",
+			"ipv6",
+			"delete",
+			"route",
+			"::/0",
+		)
+	} else {
+		cmd = exec.Command(
+			"netsh",
+			"interface",
+			"ipv6",
+			"delete",
+			"route",
+			network,
+		)
+		DEBUG(
+			"netsh",
+			"interface",
+			"ipv6",
+			"delete",
+			"route",
+			network,
+		)
+	}
+
+	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+	ob, cerr := cmd.Output()
+	if cerr != nil {
+		ERROR(fmt.Sprintf("IPv6 route delete failed: %s - out: %s", cerr, ob))
+		return cerr
+	}
+
+	return
+}
+
 func DNS_Del(IFNameOrIndex string) (err error) {
 	cmd := exec.Command(
 		"netsh",
@@ -482,11 +658,18 @@ func (t *TInterface) Connect(tun *TUN) (err error) {
 	if err != nil {
 		return
 	}
-
 	t.GatewayMetric = "2000"
 	if err = t.Addr(); err != nil {
 		return
 	}
+
+	if t.IPv6Address != "" {
+		err = t.AddrV6()
+		if err != nil {
+			DEBUG("Unable to add IPv6 address, maybe IPv6 is turned off ?, err : ", err)
+		}
+	}
+
 	if err = t.Up(); err != nil {
 		return
 	}
@@ -513,6 +696,14 @@ func (t *TInterface) Connect(tun *TUN) (err error) {
 		err = IP_RouteMetric("0.0.0.0/0", t.Name, "1")
 		if err != nil {
 			return
+		}
+
+		// Add default IPv6 route if IPv6 address is configured
+		if t.IPv6Address != "" {
+			iperr := IP_AddRouteV6("default", t.Name, t.IPv6Address, "0")
+			if iperr != nil {
+				DEBUG("Unable to add IPv6 route, maybe IPv6 is turned off ?, err : ", iperr)
+			}
 		}
 	}
 
@@ -579,11 +770,18 @@ func (t *TInterface) Disconnect(tun *TUN) (err error) {
 	}
 
 	t.CloseReadAndWriteLoop()
-
 	// TODO .. might not be needed ?????
 	meta := tun.meta.Load()
 	if IsDefaultConnection(meta.IFName) || meta.EnableDefaultRoute {
 		err = IP_DelRoute("default", t.IPv4Address, "0")
+		
+		// Clean up IPv6 default route if IPv6 was configured
+		if t.IPv6Address != "" {
+			iperr := IP_DelRouteV6("default", t.IPv6Address, "0")
+			if iperr != nil {
+				DEBUG("Unable to delete IPv6 default route, err : ", iperr)
+			}
+		}
 	}
 
 	if tun.ServerResponse.LAN != nil && tun.ServerResponse.LAN.Nat != "" {
@@ -607,7 +805,6 @@ func (t *TInterface) Disconnect(tun *TUN) (err error) {
 			return err
 		}
 	}
-
 	return
 }
 
