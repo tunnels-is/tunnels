@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/x509"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/fs"
 	"log"
@@ -406,13 +405,8 @@ func ReadConfigFileFromDisk() (err error) {
 
 func writeTunnelsToDisk(tag string) (outErr error) {
 	s := STATE.Load()
-	TunnelMetaMap.Range(func(key, value any) bool {
-		t, ok := value.(*TunnelMETA)
-		if !ok {
-			ERROR("Unable to save tunnel to disk: unable to cast any to meta")
-			outErr = errors.New("unable to save tunnel to disk")
-			return false
-		}
+	TunnelMetaMap.Range(func(key string, value *TunnelMETA) bool {
+		t := value
 		if tag != "" {
 			if t.Tag != tag {
 				return true

@@ -5,11 +5,11 @@ import (
 	"encoding/json"
 	"net"
 	"os"
-	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/miekg/dns"
+	"github.com/puzpuzpuz/xsync/v3"
 	"github.com/tunnels-is/tunnels/certs"
 	"github.com/tunnels-is/tunnels/crypt"
 	"github.com/tunnels-is/tunnels/types"
@@ -19,6 +19,13 @@ func init() {
 	STATE.Store(&stateV2{})
 	CONFIG.Store(&configV2{})
 	CLIConfig.Store(&CLIInfo{})
+	
+	// Initialize xsync maps
+	TunnelMetaMap = xsync.NewMapOf[string, *TunnelMETA]()
+	TunnelMap = xsync.NewMapOf[string, *TUN]()
+	logRecordHash = xsync.NewMapOf[string, bool]()
+	DNSCache = xsync.NewMapOf[string, any]()
+	DNSStatsMap = xsync.NewMapOf[string, any]()
 }
 
 const (
@@ -39,13 +46,13 @@ var (
 	CLIConfig atomic.Pointer[CLIInfo]
 
 	// Tunnels, Servers, Meta
-	TunnelMetaMap sync.Map
-	TunnelMap     sync.Map
+	TunnelMetaMap *xsync.MapOf[string, *TunnelMETA]
+	TunnelMap     *xsync.MapOf[string, *TUN]
 
 	// Logs stuff
 	LogQueue      = make(chan string, 1000)
 	APILogQueue   = make(chan string, 1000)
-	logRecordHash sync.Map
+	logRecordHash *xsync.MapOf[string, bool]
 
 	// Go Routine monitors
 	concurrencyMonitor = make(chan *goSignal, 1000)
@@ -65,9 +72,9 @@ var (
 
 	// DNS
 	DNSGlobalBlock atomic.Bool
-	DNSBlockList   atomic.Pointer[sync.Map]
-	DNSCache       sync.Map
-	DNSStatsMap    sync.Map
+	DNSBlockList   atomic.Pointer[*xsync.MapOf[string, bool]]
+	DNSCache       *xsync.MapOf[string, any]
+	DNSStatsMap    *xsync.MapOf[string, any]
 )
 
 type CLIInfo struct {
@@ -279,25 +286,18 @@ type TUN struct {
 	dhcp        *types.DHCPRecord
 	VPLNetwork  *types.Network
 	VPLEgress   map[[4]byte]struct{} `json:"-"`
-	VPLIngress  map[[4]byte]struct{} `json:"-"`
-
-	// TCP and UDP Natting
+	VPLIngress  map[[4]byte]struct{} `json:"-"`	// TCP and UDP Natting
 	// ingress
 	// index == local port number
 	// lport/dip/dp
-	AvailableTCPPorts []sync.Map // <- mapwrap
-	AvailableUDPPorts []sync.Map // <- mapwrap
-	// AvailableTCPPorts []atomic.Pointer[VPNPort] `json:"-"`
-	// AvailableUDPPorts []atomic.Pointer[VPNPort] `json:"-"`
+	AvailableTCPPorts []*xsync.MapOf[any, *Mapping]
+	AvailableUDPPorts []*xsync.MapOf[any, *Mapping]
 
 	// egress
 	// sip/dip/sp/dp
 	// key == [12]byte
-	ActiveTCPMapping *sync.Map // <- mapwrap
-	ActiveUDPMapping *sync.Map // <- mapwrap
-	// TODO: maps are racy, needs redesign
-	// ActiveTCPMapping map[[10]byte]*Mapping `json:"-"`
-	// ActiveUDPMapping map[[10]byte]*Mapping `json:"-"`
+	ActiveTCPMapping *xsync.MapOf[any, *Mapping]
+	ActiveUDPMapping *xsync.MapOf[any, *Mapping]
 
 	Index []byte
 
@@ -343,8 +343,17 @@ type TUN struct {
 }
 
 func (t *TUN) InitPortMap() {
-	t.AvailableTCPPorts = make([]sync.Map, t.endPort-t.startPort)
-	t.AvailableUDPPorts = make([]sync.Map, t.endPort-t.startPort)
-	t.ActiveTCPMapping = new(sync.Map)
-	t.ActiveUDPMapping = new(sync.Map)
+	t.AvailableTCPPorts = make([]*xsync.MapOf[any, *Mapping], t.endPort-t.startPort)
+	t.AvailableUDPPorts = make([]*xsync.MapOf[any, *Mapping], t.endPort-t.startPort)
+	
+	// Initialize each map in the slice
+	for i := range t.AvailableTCPPorts {
+		t.AvailableTCPPorts[i] = xsync.NewMapOf[any, *Mapping]()
+	}
+	for i := range t.AvailableUDPPorts {
+		t.AvailableUDPPorts[i] = xsync.NewMapOf[any, *Mapping]()
+	}
+	
+	t.ActiveTCPMapping = xsync.NewMapOf[any, *Mapping]()
+	t.ActiveUDPMapping = xsync.NewMapOf[any, *Mapping]()
 }
