@@ -10,6 +10,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+	
+	"github.com/puzpuzpuz/xsync/v3"
 )
 
 func reloadBlockLists(sleep bool) {
@@ -39,8 +41,7 @@ func reloadBlockLists(sleep bool) {
 	if badList {
 		config.DNSBlockLists = GetDefaultBlockLists()
 	}
-
-	newMap := new(sync.Map)
+	newMap := xsync.NewMapOf[string, bool]()
 
 	wg := new(sync.WaitGroup)
 	for i := range config.DNSBlockLists {
@@ -50,14 +51,14 @@ func reloadBlockLists(sleep bool) {
 	wg.Wait()
 
 	DEBUG("finished updating blocklists")
-	DNSBlockList.Store(newMap)
+	DNSBlockList.Store(&newMap)
 	err := writeConfigToDisk()
 	if err != nil {
 		ERROR("unable to write config to disk post blocklist update", err)
 	}
 }
 
-func processBlockList(index int, wg *sync.WaitGroup, nm *sync.Map) {
+func processBlockList(index int, wg *sync.WaitGroup, nm *xsync.MapOf[string, bool]) {
 	defer func() {
 		wg.Done()
 	}()
@@ -118,7 +119,7 @@ func processBlockList(index int, wg *sync.WaitGroup, nm *sync.Map) {
 		d := scanner.Text()
 		if CheckIfPlainDomain(d) {
 			if bl.Enabled {
-				nm.Store(d, bl)
+				nm.Store(d, true)
 			}
 			bl.Count++
 		} else {

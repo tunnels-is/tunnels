@@ -31,6 +31,7 @@ require (
 	github.com/kr/pretty v0.3.1 // indirect
 	github.com/montanaflynn/stats v0.7.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
+	github.com/puzpuzpuz/xsync/v3 v3.5.1 // indirect
 	github.com/rogpeppe/go-internal v1.13.1 // indirect
 	github.com/sendgrid/rest v2.6.9+incompatible // indirect
 	github.com/stretchr/objx v0.5.2 // indirect

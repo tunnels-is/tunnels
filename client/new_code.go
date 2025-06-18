@@ -8,22 +8,14 @@ import (
 )
 
 func tunnelMapRange(do func(tun *TUN) bool) {
-	TunnelMap.Range(func(key, value any) bool {
-		tun, ok := value.(*TUN)
-		if !ok {
-			return true
-		}
-		return do(tun)
+	TunnelMap.Range(func(key string, value *TUN) bool {
+		return do(value)
 	})
 }
 
 func tunnelMetaMapRange(do func(tun *TunnelMETA) bool) {
-	TunnelMetaMap.Range(func(key, value any) bool {
-		tun, ok := value.(*TunnelMETA)
-		if !ok {
-			return true
-		}
-		return do(tun)
+	TunnelMetaMap.Range(func(key string, value *TunnelMETA) bool {
+		return do(value)
 	})
 }
 

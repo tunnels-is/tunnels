@@ -268,12 +268,8 @@ type StateNetworkResponse struct {
 
 func HTTP_GetDNSStats(w http.ResponseWriter, r *http.Request) {
 	stats := make(map[string]any)
-	DNSStatsMap.Range(func(key, value any) bool {
-		ks, ok := key.(string)
-		if !ok {
-			return true
-		}
-		stats[ks] = value
+	DNSStatsMap.Range(func(key string, value any) bool {
+		stats[key] = value
 		return true
 	})
 	JSON(w, r, 200, stats)
