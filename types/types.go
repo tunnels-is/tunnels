@@ -30,14 +30,13 @@ type ServerConfig struct {
 	APIIP   string `json:"APIIP"`
 	APIPort string `json:"APIPort"`
 
-	Admins    []string `json:"Admins"`
 	NetAdmins []string `json:"NetAdmins"`
 
 	Hostname           string
 	Lan                *Network   `json:"Lan"`
 	DisableLanFirewall bool       `json:"DisableLanFirwall"`
-	SubNets            []*Network `json:"SubNets"`
 	Routes             []*Route   `json:"Routes"`
+	SubNets            []*Network `json:"SubNets"`
 
 	StartPort          int  `json:"StartPort"`
 	EndPort            int  `json:"EndPort"`
@@ -57,6 +56,7 @@ type ServerConfig struct {
 	DBurl        string
 	TwoFactorKey string
 	EmailKey     string
+	PayKey       string
 	CertPem      string
 	SignPem      string
 	KeyPem       string
