@@ -20,11 +20,14 @@ import (
 
 // Test data structure for organizing test cases
 type testCase struct {
-	name           string
-	header         string
-	jsonData       string
-	expectError    bool
+	name            string
+	header          string
+	jsonData        string
+	expectedStatus  int
+	expectedBodyContains []string // Strings that should be present in the response body
+	expectedError   bool
 	requiredFeature string // "LAN", "VPN", "AUTH", "PAY" (payment)
+	description     string // Description of what this test validates
 }
 
 // setupTestEnvironment sets up the test environment with necessary global variables
@@ -242,14 +245,16 @@ func createTestMessage(header string, jsonData string) []byte {
 func TestProcessTCPMessage(t *testing.T) {
 	setupTestEnvironment()
 	defer cleanupTestEnvironment()
-	
-	// Define test cases for all routes in the switch statement
+		// Define test cases for all routes in the switch statement
 	testCases := []testCase{
 		// Health check
 		{
-			name:     "health check",
-			header:   "health",
-			jsonData: `{}`,
+			name:           "health check",
+			header:         "health",
+			jsonData:       `{}`,
+			expectedStatus: 200,
+			expectedBodyContains: []string{"OK"},
+			description:    "Health check should return OK status",
 		},
 		
 		// LAN API routes
@@ -257,13 +262,19 @@ func TestProcessTCPMessage(t *testing.T) {
 			name:            "firewall API",
 			header:          "v3/firewall", 
 			jsonData:        `{"action": "list"}`,
+			expectedStatus:  200,
+			expectedBodyContains: []string{},
 			requiredFeature: "LAN",
+			description:     "Firewall API should return firewall rules",
 		},
 		{
 			name:            "list devices API",
 			header:          "v3/devices",
 			jsonData:        `{}`,
+			expectedStatus:  200,
+			expectedBodyContains: []string{},
 			requiredFeature: "LAN",
+			description:     "Devices API should return list of devices",
 		},
 		
 		// VPN API routes
@@ -271,7 +282,10 @@ func TestProcessTCPMessage(t *testing.T) {
 			name:            "connect API",
 			header:          "v3/connect",
 			jsonData:        `{"username": "test", "password": "test"}`,
+			expectedStatus:  400, // Likely to fail with invalid credentials
+			expectedBodyContains: []string{"error", "invalid"},
 			requiredFeature: "VPN",
+			description:     "Connect API should validate credentials",
 		},
 		
 		// Auth API routes - User management
@@ -279,49 +293,73 @@ func TestProcessTCPMessage(t *testing.T) {
 			name:            "user create API",
 			header:          "v3/user/create",
 			jsonData:        `{"username": "testuser", "password": "testpass", "email": "test@example.com"}`,
+			expectedStatus:  400, // May fail due to validation or existing user
+			expectedBodyContains: []string{},
 			requiredFeature: "AUTH",
+			description:     "User create API should validate input and create user",
 		},
 		{
 			name:            "user update API",
 			header:          "v3/user/update",
 			jsonData:        `{"id": "123", "username": "updateduser"}`,
+			expectedStatus:  400, // Likely to fail with invalid ID
+			expectedBodyContains: []string{},
 			requiredFeature: "AUTH",
+			description:     "User update API should validate user ID",
 		},
 		{
 			name:            "user login API",
 			header:          "v3/user/login",
 			jsonData:        `{"username": "testuser", "password": "testpass"}`,
+			expectedStatus:  400, // Will fail with non-existent user
+			expectedBodyContains: []string{"error"},
 			requiredFeature: "AUTH",
+			description:     "User login API should validate credentials",
 		},
 		{
 			name:            "user logout API",
 			header:          "v3/user/logout",
 			jsonData:        `{"session_id": "abc123"}`,
+			expectedStatus:  400, // Invalid session
+			expectedBodyContains: []string{},
 			requiredFeature: "AUTH",
+			description:     "User logout API should validate session",
 		},
 		{
 			name:            "user reset code API",
 			header:          "v3/user/reset/code",
 			jsonData:        `{"email": "test@example.com"}`,
+			expectedStatus:  200, // Should work if email service is configured
+			expectedBodyContains: []string{},
 			requiredFeature: "AUTH",
+			description:     "User reset code API should send reset code",
 		},
 		{
 			name:            "user reset password API",
 			header:          "v3/user/reset/password",
 			jsonData:        `{"code": "123456", "new_password": "newpass"}`,
+			expectedStatus:  400, // Invalid reset code
+			expectedBodyContains: []string{"error"},
 			requiredFeature: "AUTH",
+			description:     "User reset password API should validate reset code",
 		},
 		{
 			name:            "user 2FA confirm API",
 			header:          "v3/user/2fa/confirm",
 			jsonData:        `{"user_id": "123", "code": "123456"}`,
+			expectedStatus:  400, // Invalid user ID
+			expectedBodyContains: []string{},
 			requiredFeature: "AUTH",
+			description:     "User 2FA confirm API should validate 2FA code",
 		},
 		{
 			name:            "user list API",
 			header:          "v3/user/list",
 			jsonData:        `{}`,
+			expectedStatus:  200, // Should return list (may be empty)
+			expectedBodyContains: []string{},
 			requiredFeature: "AUTH",
+			description:     "User list API should return all users",
 		},
 		
 		// Device API routes
@@ -329,31 +367,46 @@ func TestProcessTCPMessage(t *testing.T) {
 			name:            "device list API",
 			header:          "v3/device/list",
 			jsonData:        `{"user_id": "123"}`,
+			expectedStatus:  400, // Invalid user ID format
+			expectedBodyContains: []string{},
 			requiredFeature: "AUTH",
+			description:     "Device list API should validate user ID",
 		},
 		{
 			name:            "device create API",
 			header:          "v3/device/create",
 			jsonData:        `{"name": "test-device", "user_id": "123"}`,
+			expectedStatus:  400, // Invalid user ID format
+			expectedBodyContains: []string{},
 			requiredFeature: "AUTH",
+			description:     "Device create API should validate input",
 		},
 		{
 			name:            "device delete API",
 			header:          "v3/device/delete",
 			jsonData:        `{"device_id": "456"}`,
+			expectedStatus:  400, // Invalid device ID format
+			expectedBodyContains: []string{},
 			requiredFeature: "AUTH",
+			description:     "Device delete API should validate device ID",
 		},
 		{
 			name:            "device update API",
 			header:          "v3/device/update",
 			jsonData:        `{"device_id": "456", "name": "updated-device"}`,
+			expectedStatus:  400, // Invalid device ID format
+			expectedBodyContains: []string{},
 			requiredFeature: "AUTH",
+			description:     "Device update API should validate device ID",
 		},
 		{
 			name:            "device get API",
 			header:          "v3/device",
 			jsonData:        `{"device_id": "456"}`,
+			expectedStatus:  400, // Invalid device ID format
+			expectedBodyContains: []string{},
 			requiredFeature: "AUTH",
+			description:     "Device get API should validate device ID",
 		},
 		
 		// Group API routes
@@ -361,49 +414,73 @@ func TestProcessTCPMessage(t *testing.T) {
 			name:            "group create API",
 			header:          "v3/group/create",
 			jsonData:        `{"name": "test-group", "description": "Test group"}`,
+			expectedStatus:  200, // Should succeed with valid input
+			expectedBodyContains: []string{},
 			requiredFeature: "AUTH",
+			description:     "Group create API should create new group",
 		},
 		{
 			name:            "group delete API",
 			header:          "v3/group/delete",
 			jsonData:        `{"group_id": "789"}`,
+			expectedStatus:  400, // Invalid group ID format
+			expectedBodyContains: []string{},
 			requiredFeature: "AUTH",
+			description:     "Group delete API should validate group ID",
 		},
 		{
 			name:            "group update API",
 			header:          "v3/group/update",
 			jsonData:        `{"group_id": "789", "name": "updated-group"}`,
+			expectedStatus:  400, // Invalid group ID format
+			expectedBodyContains: []string{},
 			requiredFeature: "AUTH",
+			description:     "Group update API should validate group ID",
 		},
 		{
 			name:            "group add API",
 			header:          "v3/group/add",
 			jsonData:        `{"group_id": "789", "user_id": "123"}`,
+			expectedStatus:  400, // Invalid ID formats
+			expectedBodyContains: []string{},
 			requiredFeature: "AUTH",
+			description:     "Group add API should validate group and user IDs",
 		},
 		{
 			name:            "group remove API",
 			header:          "v3/group/remove",
 			jsonData:        `{"group_id": "789", "user_id": "123"}`,
+			expectedStatus:  400, // Invalid ID formats
+			expectedBodyContains: []string{},
 			requiredFeature: "AUTH",
+			description:     "Group remove API should validate group and user IDs",
 		},
 		{
 			name:            "group list API",
 			header:          "v3/group/list",
 			jsonData:        `{}`,
+			expectedStatus:  200, // Should return list (may be empty)
+			expectedBodyContains: []string{},
 			requiredFeature: "AUTH",
+			description:     "Group list API should return all groups",
 		},
 		{
 			name:            "group get API",
 			header:          "v3/group",
 			jsonData:        `{"group_id": "789"}`,
+			expectedStatus:  400, // Invalid group ID format
+			expectedBodyContains: []string{},
 			requiredFeature: "AUTH",
+			description:     "Group get API should validate group ID",
 		},
 		{
 			name:            "group entities API",
 			header:          "v3/group/entities",
 			jsonData:        `{"group_id": "789"}`,
+			expectedStatus:  400, // Invalid group ID format
+			expectedBodyContains: []string{},
 			requiredFeature: "AUTH",
+			description:     "Group entities API should validate group ID",
 		},
 		
 		// Server API routes
@@ -411,31 +488,46 @@ func TestProcessTCPMessage(t *testing.T) {
 			name:            "server get API",
 			header:          "v3/server",
 			jsonData:        `{"server_id": "server123"}`,
+			expectedStatus:  400, // Invalid server ID format
+			expectedBodyContains: []string{},
 			requiredFeature: "AUTH",
+			description:     "Server get API should validate server ID",
 		},
 		{
 			name:            "server create API",
 			header:          "v3/server/create",
 			jsonData:        `{"name": "test-server", "region": "us-east-1"}`,
+			expectedStatus:  200, // Should succeed with valid input
+			expectedBodyContains: []string{},
 			requiredFeature: "AUTH",
+			description:     "Server create API should create new server",
 		},
 		{
 			name:            "server update API",
 			header:          "v3/server/update",
 			jsonData:        `{"server_id": "server123", "name": "updated-server"}`,
+			expectedStatus:  400, // Invalid server ID format
+			expectedBodyContains: []string{},
 			requiredFeature: "AUTH",
+			description:     "Server update API should validate server ID",
 		},
 		{
 			name:            "servers for user API",
 			header:          "v3/servers",
 			jsonData:        `{"user_id": "123"}`,
+			expectedStatus:  400, // Invalid user ID format
+			expectedBodyContains: []string{},
 			requiredFeature: "AUTH",
+			description:     "Servers for user API should validate user ID",
 		},
 		{
 			name:            "session create API",
 			header:          "v3/session",
 			jsonData:        `{"user_id": "123", "device_id": "456"}`,
+			expectedStatus:  400, // Invalid ID formats
+			expectedBodyContains: []string{},
 			requiredFeature: "AUTH",
+			description:     "Session create API should validate user and device IDs",
 		},
 		
 		// Payment API routes (these require PayKey to be configured)
@@ -443,45 +535,57 @@ func TestProcessTCPMessage(t *testing.T) {
 			name:            "license key activate API",
 			header:          "v3/key/activate",
 			jsonData:        `{"license_key": "test-key-123"}`,
+			expectedStatus:  400, // Will fail when PayKey not configured properly
+			expectedBodyContains: []string{"Payment API not enabled"},
 			requiredFeature: "PAY",
+			description:     "License key activate API should validate payment configuration",
 		},
 		{
 			name:            "user toggle sub status API",
 			header:          "v3/user/toggle/substatus",
 			jsonData:        `{"user_id": "123", "status": "active"}`,
+			expectedStatus:  400, // Will fail when PayKey not configured properly
+			expectedBodyContains: []string{"Payment API not enabled"},
 			requiredFeature: "PAY",
+			description:     "User toggle sub status API should validate payment configuration",
 		},
 		
 		// Unknown route test
 		{
-			name:        "unknown route",
-			header:      "v3/unknown/route",
-			jsonData:    `{}`,
-			expectError: true,
-		},
-	}
+			name:           "unknown route",
+			header:         "v3/unknown/route",
+			jsonData:       `{}`,
+			expectedStatus: 400,
+			expectedBodyContains: []string{"Unknown route"},			expectedError:  true,
+			description:    "Unknown routes should return error",
+		},	}
 	
 	// Test cases with disabled features
 	featureTestCases := []struct {
 		name            string
 		disableFeatures map[string]bool
 		testCases       []testCase
-	}{
-		{
+	}{		{
 			name: "LAN disabled",
 			disableFeatures: map[string]bool{"LAN": true},
 			testCases: []testCase{
 				{
-					name:        "firewall API with LAN disabled",
-					header:      "v3/firewall",
-					jsonData:    `{}`,
-					expectError: true,
+					name:           "firewall API with LAN disabled",
+					header:         "v3/firewall",
+					jsonData:       `{}`,
+					expectedStatus: 400,
+					expectedBodyContains: []string{"not enabled"},
+					expectedError:  true,
+					description:    "Firewall API should fail when LAN disabled",
 				},
 				{
-					name:        "devices API with LAN disabled", 
-					header:      "v3/devices",
-					jsonData:    `{}`,
-					expectError: true,
+					name:           "devices API with LAN disabled", 
+					header:         "v3/devices",
+					jsonData:       `{}`,
+					expectedStatus: 400,
+					expectedBodyContains: []string{"not enabled"},
+					expectedError:  true,
+					description:    "Devices API should fail when LAN disabled",
 				},
 			},
 		},
@@ -490,10 +594,13 @@ func TestProcessTCPMessage(t *testing.T) {
 			disableFeatures: map[string]bool{"VPN": true},
 			testCases: []testCase{
 				{
-					name:        "connect API with VPN disabled",
-					header:      "v3/connect",
-					jsonData:    `{}`,
-					expectError: true,
+					name:           "connect API with VPN disabled",
+					header:         "v3/connect",
+					jsonData:       `{}`,
+					expectedStatus: 400,
+					expectedBodyContains: []string{"not enabled"},
+					expectedError:  true,
+					description:    "Connect API should fail when VPN disabled",
 				},
 			},
 		},
@@ -502,16 +609,18 @@ func TestProcessTCPMessage(t *testing.T) {
 			disableFeatures: map[string]bool{"AUTH": true},
 			testCases: []testCase{
 				{
-					name:        "user create API with AUTH disabled",
-					header:      "v3/user/create",
-					jsonData:    `{}`,
-					expectError: true,
+					name:           "user create API with AUTH disabled",
+					header:         "v3/user/create",
+					jsonData:       `{}`,
+					expectedStatus: 400,
+					expectedBodyContains: []string{"not enabled"},
+					expectedError:  true,
+					description:    "User create API should fail when AUTH disabled",
 				},
 			},
 		},
 	}
-	
-	// Test message too short
+		// Test message too short
 	t.Run("message too short", func(t *testing.T) {
 		shortMessage := []byte("short")
 		response := processTCPMessage(shortMessage)
@@ -521,19 +630,21 @@ func TestProcessTCPMessage(t *testing.T) {
 			t.Fatalf("Failed to unmarshal response: %v", err)
 		}
 		
-		if result["status"].(float64) != 400 {
-			t.Errorf("Expected status 400, got %v", result["status"])
+		expectedStatus := 400
+		actualStatus := int(result["status"].(float64))
+		if actualStatus != expectedStatus {
+			t.Errorf("Expected status %d, got %d", expectedStatus, actualStatus)
 		}
 		
 		bodyStr := result["body"].(string)
-		if !strings.Contains(bodyStr, "message too short") {
+		expectedText := "message too short"
+		if !strings.Contains(bodyStr, expectedText) {
 			t.Errorf("Expected error message about message being too short, got: %s", bodyStr)
 		}
 	})
 	
 	// Test all normal routes
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
+	for _, tc := range testCases {		t.Run(tc.name, func(t *testing.T) {
 			// Skip payment tests unless we set up a mock PayKey
 			if tc.requiredFeature == "PAY" {
 				// For payment API tests, we need to test both with and without PayKey
@@ -546,20 +657,30 @@ func TestProcessTCPMessage(t *testing.T) {
 						t.Fatalf("Failed to unmarshal response: %v", err)
 					}
 					
-					// Should return error when PayKey is not configured
-					if result["status"].(float64) != 400 {
-						t.Errorf("Expected status 400 when PayKey not configured, got %v", result["status"])
+					// Validate expected status
+					if tc.expectedStatus != 0 {
+						actualStatus := int(result["status"].(float64))
+						if actualStatus != tc.expectedStatus {
+							t.Errorf("Expected status %d, got %d", tc.expectedStatus, actualStatus)
+						}
 					}
 					
-					bodyStr := result["body"].(string)
-					if !strings.Contains(bodyStr, "Payment API not enabled") {
-						t.Errorf("Expected Payment API not enabled error, got: %s", bodyStr)
+					// Check expected body content
+					if len(tc.expectedBodyContains) > 0 {
+						bodyStr := ""
+						if body, ok := result["body"]; ok {
+							bodyStr = body.(string)
+						}
+						for _, expectedText := range tc.expectedBodyContains {
+							if !strings.Contains(bodyStr, expectedText) {
+								t.Errorf("Expected response body to contain '%s', got: %s", expectedText, bodyStr)
+							}
+						}
 					}
 				})
 				return
 			}
-			
-			message := createTestMessage(tc.header, tc.jsonData)
+					message := createTestMessage(tc.header, tc.jsonData)
 			response := processTCPMessage(message)
 			
 			if len(response) == 0 {
@@ -572,21 +693,44 @@ func TestProcessTCPMessage(t *testing.T) {
 				t.Fatalf("Failed to unmarshal response: %v", err)
 			}
 			
-			// Check if we expect an error
-			if tc.expectError {
+			// Log test details for better visibility
+			t.Logf("Testing: %s", tc.description)
+			t.Logf("Header: %s, Expected Status: %d", tc.header, tc.expectedStatus)
+			t.Logf("Actual Response - Status: %v, Body: %v", result["status"], result["body"])
+					// Check if we expect an error
+			if tc.expectedError {
 				if result["status"].(float64) == 200 {
 					t.Errorf("Expected error status, got 200")
 				}
 			} else {
-				// For successful calls, we should get some response
-				// The actual API functions might return various status codes,
-				// so we just verify we got a structured response
-				if _, hasStatus := result["status"]; !hasStatus {
-					t.Error("Response missing status field")
+				// Validate expected status if specified
+				if tc.expectedStatus != 0 {
+					actualStatus := int(result["status"].(float64))
+					if actualStatus != tc.expectedStatus {
+						t.Errorf("Expected status %d, got %d", tc.expectedStatus, actualStatus)
+					}
 				}
-				if _, hasBody := result["body"]; !hasBody {
-					t.Error("Response missing body field")
+			}
+			
+			// Check expected body content if specified
+			if len(tc.expectedBodyContains) > 0 {
+				bodyStr := ""
+				if body, ok := result["body"]; ok {
+					bodyStr = body.(string)
 				}
+				for _, expectedText := range tc.expectedBodyContains {
+					if !strings.Contains(bodyStr, expectedText) {
+						t.Errorf("Expected response body to contain '%s', got: %s", expectedText, bodyStr)
+					}
+				}
+			}
+			
+			// Ensure response has required fields
+			if _, hasStatus := result["status"]; !hasStatus {
+				t.Error("Response missing status field")
+			}
+			if _, hasBody := result["body"]; !hasBody {
+				t.Error("Response missing body field")
 			}
 		})
 	}
@@ -616,8 +760,7 @@ func TestProcessTCPMessage(t *testing.T) {
 				AUTHEnabled = originalAUTH
 			}()
 			
-			for _, tc := range featureTest.testCases {
-				t.Run(tc.name, func(t *testing.T) {
+			for _, tc := range featureTest.testCases {				t.Run(tc.name, func(t *testing.T) {
 					message := createTestMessage(tc.header, tc.jsonData)
 					response := processTCPMessage(message)
 					
@@ -626,14 +769,25 @@ func TestProcessTCPMessage(t *testing.T) {
 						t.Fatalf("Failed to unmarshal response: %v", err)
 					}
 					
-					// Should return error when feature is disabled
-					if result["status"].(float64) != 400 {
-						t.Errorf("Expected status 400 when feature disabled, got %v", result["status"])
+					// Validate expected status
+					if tc.expectedStatus != 0 {
+						actualStatus := int(result["status"].(float64))
+						if actualStatus != tc.expectedStatus {
+							t.Errorf("Expected status %d, got %d", tc.expectedStatus, actualStatus)
+						}
 					}
 					
-					bodyStr := result["body"].(string)
-					if !strings.Contains(bodyStr, "not enabled") {
-						t.Errorf("Expected 'not enabled' error message, got: %s", bodyStr)
+					// Check expected body content
+					if len(tc.expectedBodyContains) > 0 {
+						bodyStr := ""
+						if body, ok := result["body"]; ok {
+							bodyStr = body.(string)
+						}
+						for _, expectedText := range tc.expectedBodyContains {
+							if !strings.Contains(bodyStr, expectedText) {
+								t.Errorf("Expected response body to contain '%s', got: %s", expectedText, bodyStr)
+							}
+						}
 					}
 				})
 			}
