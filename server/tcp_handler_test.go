@@ -190,18 +190,36 @@ func validateTCPResponse(t *testing.T, response []byte, expectedStatus int, expe
 		}
 		t.Fatalf("Failed to parse response body: %v. Body: %s", err, body)
 	}
-
+	
 	if expectError {
-		if _, hasError := bodyData["Error"]; !hasError {
+		// Check for both "Error" and "error" fields (different endpoints may use different cases)
+		if _, hasError := bodyData["Error"]; hasError {
+			// Expected error found
+		} else if _, hasError := bodyData["error"]; hasError {
+			// Expected error found (lowercase)
+		} else {
 			t.Errorf("Expected error in response body, but got: %v", bodyData)
 		}
 	} else {
 		if errorMsg, hasError := bodyData["Error"]; hasError {
 			t.Errorf("Unexpected error in response: %v", errorMsg)
+		} else if errorMsg, hasError := bodyData["error"]; hasError {
+			t.Errorf("Unexpected error in response: %v", errorMsg)
 		}
 	}
 
 	return bodyData
+}
+
+// Helper to extract error message from response body (handles both "Error" and "error" fields)
+func getErrorMessage(bodyData map[string]interface{}) string {
+	if err, hasError := bodyData["Error"]; hasError && err != nil {
+		return err.(string)
+	}
+	if err, hasError := bodyData["error"]; hasError && err != nil {
+		return err.(string)
+	}
+	return ""
 }
 
 func TestTCPHandler_UserCreate(t *testing.T) {
@@ -263,10 +281,10 @@ func TestTCPHandler_UserCreate(t *testing.T) {
 				AdditionalInformation: "Duplicate user",
 			},
 			expectedStatus: 400,
-			expectError:    true,
-			validateFunc: func(t *testing.T, bodyData map[string]interface{}) {
+			expectError:    true,			validateFunc: func(t *testing.T, bodyData map[string]interface{}) {
 				// Should contain error about existing user
-				if errorMsg := bodyData["Error"]; !strings.Contains(errorMsg.(string), "already") {
+				errorMsg := getErrorMessage(bodyData)
+				if !strings.Contains(errorMsg, "already") {
 					t.Errorf("Expected 'already' in error message, got: %v", errorMsg)
 				}
 			},
@@ -817,13 +835,12 @@ func TestTCPHandler_UserTwoFactorConfirm(t *testing.T) {
 		expectedStatus int
 		expectError    bool
 		validateFunc   func(t *testing.T, bodyData map[string]interface{})
-	}{
-		{
+	}{		{
 			name: "Valid two-factor confirmation with recovery code",
 			payload: TWO_FACTOR_FORM{
 				UID:         twoFactorUser.ID,
 				DeviceToken: "2fa-device-token",
-				Password:    "hashedpassword",
+				Password:    "2fapassword123",
 				Recovery:    "RECOVERY123",
 			},
 			expectedStatus: 200,
@@ -834,7 +851,7 @@ func TestTCPHandler_UserTwoFactorConfirm(t *testing.T) {
 					t.Errorf("Expected recovery codes in response")
 				}
 			},
-		}, {
+		},{
 			name: "Invalid password for two-factor",
 			payload: TWO_FACTOR_FORM{
 				UID:         twoFactorUser.ID,
@@ -1026,12 +1043,15 @@ func TestTCPHandler_PaymentEndpoints(t *testing.T) {
 			tcpData := createTCPPayload(tt.route, tt.payload)
 
 			// Process message
-			response := processTCPMessage(tcpData[2:])
-
-			// Should return payment API not enabled error
+			response := processTCPMessage(tcpData[2:])			// Should return payment API not enabled error
 			bodyData := validateTCPResponse(t, response, 400, true)
 
-			if errorMsg := bodyData["Error"]; !strings.Contains(errorMsg.(string), tt.expected) {
+			errorMsg := getErrorMessage(bodyData)
+			if errorMsg == "" {
+				t.Fatalf("No error message found in response: %v", bodyData)
+			}
+
+			if !strings.Contains(errorMsg, tt.expected) {
 				t.Errorf("Expected '%s' error, got: %v", tt.expected, errorMsg)
 			}
 		})
