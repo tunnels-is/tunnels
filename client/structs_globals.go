@@ -33,8 +33,7 @@ type DNSStats struct {
 }
 
 type ConnectionRequest struct {
-	URL          string
-	Secure       bool
+	AuthServer   *Server
 	ServerPubKey string
 
 	DeviceKey string `json:"DeviceKey"`
@@ -401,10 +400,12 @@ type DEBUG_OUT struct {
 type FORWARD_REQUEST struct {
 	URL      string
 	Secure   bool
+	NAT      bool
 	Path     string
 	Method   string
 	Timeout  int
 	JSONData any
+	Server   *Server
 }
 
 type TWO_FACTOR_CONFIRM struct {
@@ -424,6 +425,11 @@ type DEVICE_TOKEN struct {
 	Created time.Time `bson:"C"`
 }
 
+type SavedUserList struct {
+	Updated time.Time `json:"Updated"`
+	Users   []*User   `json:"User"`
+}
+
 // use struct you get from the login request
 type User struct {
 	ID                    string          `json:"_id,omitempty"`
@@ -439,10 +445,11 @@ type User struct {
 	Updated               time.Time       `json:"Updated"`
 	SubExpiration         time.Time       `json:"SubExpiration"`
 	AdditionalInformation string          `json:"AdditionalInformation,omitempty"`
-	AuthServer            string
-	Secure                bool
-	IsAdmin               bool `json:"IsAdmin"`
-	IsManager             bool `json:"IsManager"`
+	IsAdmin               bool            `json:"IsAdmin"`
+	IsManager             bool            `json:"IsManager"`
+
+	// Client side only
+	AuthServer string
 }
 
 type LicenseKey struct {

@@ -19,13 +19,14 @@ func init() {
 	STATE.Store(&stateV2{})
 	CONFIG.Store(&configV2{})
 	CLIConfig.Store(&CLIInfo{})
-	
+
 	// Initialize xsync maps
 	TunnelMetaMap = xsync.NewMapOf[string, *TunnelMETA]()
 	TunnelMap = xsync.NewMapOf[string, *TUN]()
 	logRecordHash = xsync.NewMapOf[string, bool]()
 	DNSCache = xsync.NewMapOf[string, any]()
 	DNSStatsMap = xsync.NewMapOf[string, any]()
+	NATPeers = xsync.NewMapOf[string, net.Conn]()
 }
 
 const (
@@ -48,6 +49,9 @@ var (
 	// Tunnels, Servers, Meta
 	TunnelMetaMap *xsync.MapOf[string, *TunnelMETA]
 	TunnelMap     *xsync.MapOf[string, *TUN]
+
+	// key(IP/domain+Protocol)
+	NATPeers *xsync.MapOf[string, net.Conn]
 
 	// Logs stuff
 	LogQueue      = make(chan string, 1000)
@@ -88,16 +92,26 @@ type CLIInfo struct {
 	SendStats  bool
 }
 
+type Server struct {
+	Address        string
+	Secure         bool
+	NatEnabled     bool
+	SignalServer   string
+	TryCount       int
+	TimeoutSeconds int
+	SecureKey      string
+}
+
 type configV2 struct {
 	OpenUI bool
 
-	AuthServers        []string
+	// AuthServers        []string
+	Servers            []*Server
 	DeviceKey          string
 	DNS                string
 	Host               string
 	Hostname           string
 	Port               string
-	ServerID           string
 	DisableBlockLists  bool
 	DisableVPLFirewall bool
 
@@ -286,7 +300,7 @@ type TUN struct {
 	dhcp        *types.DHCPRecord
 	VPLNetwork  *types.Network
 	VPLEgress   map[[4]byte]struct{} `json:"-"`
-	VPLIngress  map[[4]byte]struct{} `json:"-"`	// TCP and UDP Natting
+	VPLIngress  map[[4]byte]struct{} `json:"-"` // TCP and UDP Natting
 	// ingress
 	// index == local port number
 	// lport/dip/dp
@@ -345,7 +359,7 @@ type TUN struct {
 func (t *TUN) InitPortMap() {
 	t.AvailableTCPPorts = make([]*xsync.MapOf[any, *Mapping], t.endPort-t.startPort)
 	t.AvailableUDPPorts = make([]*xsync.MapOf[any, *Mapping], t.endPort-t.startPort)
-	
+
 	// Initialize each map in the slice
 	for i := range t.AvailableTCPPorts {
 		t.AvailableTCPPorts[i] = xsync.NewMapOf[any, *Mapping]()
@@ -353,7 +367,7 @@ func (t *TUN) InitPortMap() {
 	for i := range t.AvailableUDPPorts {
 		t.AvailableUDPPorts[i] = xsync.NewMapOf[any, *Mapping]()
 	}
-	
+
 	t.ActiveTCPMapping = xsync.NewMapOf[any, *Mapping]()
 	t.ActiveUDPMapping = xsync.NewMapOf[any, *Mapping]()
 }

@@ -18,11 +18,26 @@ func delUser() (err error) {
 }
 
 func saveUser(u *User) (err error) {
-	ub, err := json.Marshal(u)
+	ul, err := loadUsers()
+	if ul == nil {
+		ul = new(SavedUserList)
+	}
+
+	hasUser := false
+	for i, v := range ul.Users {
+		if v.ID == u.ID {
+			ul.Users[i] = u
+			hasUser = true
+		}
+	}
+	if !hasUser {
+		ul.Users = append(ul.Users, u)
+	}
+
+	ub, err := json.Marshal(ul)
 	if err != nil {
 		return err
 	}
-
 	encryptged, err := Encrypt(ub, []byte("01234567890123456789012345678900"))
 	if err != nil {
 		return err
@@ -36,10 +51,6 @@ func saveUser(u *User) (err error) {
 	}
 	defer f.Close()
 
-	err = f.Truncate(0)
-	if err != nil {
-		return err
-	}
 	_, err = f.Write(encryptged)
 	if err != nil {
 		return err
@@ -48,8 +59,8 @@ func saveUser(u *User) (err error) {
 	return nil
 }
 
-func loadUser() (u *User, err error) {
-	u = new(User)
+func loadUsers() (ul *SavedUserList, err error) {
+	ul = new(SavedUserList)
 
 	s := STATE.Load()
 	ub, err := os.ReadFile(s.BasePath + "enc")
@@ -68,7 +79,7 @@ func loadUser() (u *User, err error) {
 		return nil, err
 	}
 
-	err = json.Unmarshal(encrypted, u)
+	err = json.Unmarshal(encrypted, ul)
 	if err != nil {
 		return nil, err
 	}
@@ -76,7 +87,6 @@ func loadUser() (u *User, err error) {
 }
 
 func getSTREAM(key []byte, iv []byte) (cipher.Stream, []byte, error) {
-
 	// Create a new AES cipher block
 	block, err := aes.NewCipher(key)
 	if err != nil {
