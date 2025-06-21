@@ -115,12 +115,17 @@ func routeTCPMessage(header string, jsonData []byte) []byte {
 		return createErrorResponse("failed to create request")
 	}
 	req.Header.Set("Content-Type", "application/json")
-
 	// Route based on header string
 	switch strings.TrimSpace(header) {
 	// Health check
 	case "health":
-		healthCheckHandler(recorder, req)
+		// Health check expects GET request, create a new one
+		healthReq, err := http.NewRequest("GET", "/health", nil)
+		if err != nil {
+			logger.Error("failed to create health check request", slog.Any("err", err))
+			return createErrorResponse("failed to create health check request")
+		}
+		healthCheckHandler(recorder, healthReq)
 
 	// LAN API routes
 	case "v3/firewall":
