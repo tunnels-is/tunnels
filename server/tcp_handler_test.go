@@ -1,11 +1,21 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
+	"io/ioutil"
 	"log/slog"
+	"net"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/tunnels-is/tunnels/types"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // Test data structure for organizing test cases
@@ -30,6 +40,192 @@ func setupTestEnvironment() {
 	LANEnabled = true
 	VPNEnabled = true
 	AUTHEnabled = true
+	DNSEnabled = true
+	BBOLTEnabled = true
+	
+	// Setup context and cancel function
+	ctx, cancel := context.WithCancel(context.Background())
+	CTX.Store(&ctx)
+	Cancel.Store(&cancel)
+	
+	// Create test configuration
+	setupTestConfig()
+	
+	// Setup test certificates and TLS
+	setupTestCertificates()
+	
+	// Initialize test database
+	setupTestDatabase()
+	
+	// Create test admin user
+	setupTestUser()
+		// Setup LAN and VPN components
+	setupTestNetworking()
+}
+
+// setupTestConfig creates a minimal test configuration
+func setupTestConfig() {	testConfig := &types.ServerConfig{
+		Features: []types.Feature{
+			types.LAN,
+			types.VPN,
+			types.AUTH,
+			types.DNS,
+			types.BBOLT,
+		},
+		VPNIP:              "127.0.0.1",
+		VPNPort:            "444",
+		APIIP:              "127.0.0.1", 
+		APIPort:            "443",
+		NetAdmins:          []string{},
+		Hostname:           "test.local",
+		StartPort:          2000,
+		EndPort:            65530,
+		UserMaxConnections: 10,
+		InternetAccess:     true,
+		LocalNetworkAccess: false,
+		BandwidthMbps:      1000,
+		UserBandwidthMbps:  10,
+		DNSAllowCustomOnly: false,
+		DNSRecords:         []*types.DNSRecord{},
+		DNSServers:         []string{},
+		SecretStore:        "config",
+		Lan: &types.Network{
+			Tag:     "lan",
+			Network: "10.0.0.0/16",
+		},
+		Routes: []*types.Route{
+			{Address: "10.0.0.0/16", Metric: "0"},
+		},
+		SubNets:            []*types.Network{},
+		DisableLanFirewall: true, // Disable for testing
+		// Test secrets
+		DBurl:        "test.db",
+		AdminApiKey:  "test-admin-key",
+		TwoFactorKey: "testtesttest1234567890123456",
+		EmailKey:     "test-email-key",
+		CertPem:      "test-cert.pem",
+		KeyPem:       "test-key.pem", 
+		SignPem:      "test-sign.pem",
+		PayKey:       "test-pay-key", // For payment API testing
+	}
+	Config.Store(testConfig)
+}
+
+// setupTestCertificates creates test certificates and TLS config
+func setupTestCertificates() {
+	// For testing purposes, just create empty certificate files
+	// The actual certificate content isn't critical for TCP message processing tests
+	
+	ioutil.WriteFile("test-cert.pem", []byte("test-cert-content"), 0644)
+	ioutil.WriteFile("test-key.pem", []byte("test-key-content"), 0644)
+	ioutil.WriteFile("test-sign.pem", []byte("test-sign-content"), 0644)
+	
+	// Most tests don't actually need valid TLS certificates
+	// since we're testing the message processing logic, not TLS
+}
+
+// setupTestDatabase initializes the BBolt database for testing
+func setupTestDatabase() {
+	// Use a temporary test database file
+	testDBPath := filepath.Join(os.TempDir(), "test_tunnels.db")
+	
+	// Remove any existing test database
+	os.Remove(testDBPath)
+	
+	// Initialize BBolt database
+	err := ConnectToBBoltDB(testDBPath)
+	if err != nil {
+		// If BBolt fails, we'll continue without it for basic testing
+		logger.Warn("Failed to setup test database", slog.Any("error", err))
+	}
+}
+
+// setupTestUser creates a test admin user
+func setupTestUser() {
+	if !AUTHEnabled {
+		return
+	}
+	
+	// Create test admin user
+	hash, err := bcrypt.GenerateFromPassword([]byte("testpass"), 10)
+	if err != nil {
+		logger.Warn("Failed to create test user password", slog.Any("error", err))
+		return
+	}
+	
+	testUser := &User{
+		ID:                    primitive.NewObjectID(),
+		Email:                 "test@example.com",
+		Password:              string(hash),
+		IsAdmin:               true,
+		IsManager:             true,
+		AdditionalInformation: "Test user",
+		ResetCode:             "",
+		Updated:               time.Now(),
+		Trial:                 false,
+		APIKey:                uuid.NewString(),
+		SubExpiration:         time.Now().AddDate(1, 0, 0),
+		Groups:                make([]primitive.ObjectID, 0),
+		Tokens:                make([]*DeviceToken, 0),
+	}
+	
+	// Try to create the user (may fail if database not available)
+	err = DB_CreateUser(testUser)
+	if err != nil {
+		logger.Warn("Failed to create test user", slog.Any("error", err))
+	}
+}
+
+// setupTestNetworking initializes networking components for testing
+func setupTestNetworking() {
+	if !LANEnabled && !VPNEnabled {
+		return
+	}
+	
+	// Initialize DHCP mapping
+	if LANEnabled {
+		err := generateDHCPMap()
+		if err != nil {
+			logger.Warn("Failed to generate DHCP map", slog.Any("error", err))
+		}
+		lanFirewallDisabled = true // Disable firewall for testing
+	}
+	
+	// Initialize VPN components
+	if VPNEnabled {
+		InterfaceIP = net.ParseIP("127.0.0.1").To4()
+		
+		// Initialize port allocation (simplified for testing)
+		slots = 10
+		
+		// Initialize VPL core mappings
+		GenerateVPLCoreMappings()
+		
+		// Basic port range setup for testing
+		for i := 2000; i < 3000; i++ {
+			PR := &PortRange{
+				StartPort: uint16(2000),
+				EndPort:   uint16(3000),
+			}
+			portToCoreMapping[i] = PR		}
+	}
+}
+
+// cleanupTestEnvironment cleans up test resources
+func cleanupTestEnvironment() {
+	// Clean up test certificate files
+	os.Remove("test-cert.pem")
+	os.Remove("test-key.pem") 
+	os.Remove("test-sign.pem")
+	
+	// Clean up test database
+	testDBPath := filepath.Join(os.TempDir(), "test_tunnels.db")
+	os.Remove(testDBPath)
+	
+	// Cancel context
+	if cancel := Cancel.Load(); cancel != nil {
+		(*cancel)()
+	}
 }
 
 // createTestMessage creates a binary message with header and JSON data
@@ -45,6 +241,7 @@ func createTestMessage(header string, jsonData string) []byte {
 
 func TestProcessTCPMessage(t *testing.T) {
 	setupTestEnvironment()
+	defer cleanupTestEnvironment()
 	
 	// Define test cases for all routes in the switch statement
 	testCases := []testCase{
@@ -447,6 +644,7 @@ func TestProcessTCPMessage(t *testing.T) {
 // TestProcessTCPMessageEdgeCases tests edge cases and error conditions
 func TestProcessTCPMessageEdgeCases(t *testing.T) {
 	setupTestEnvironment()
+	defer cleanupTestEnvironment()
 	
 	t.Run("empty header", func(t *testing.T) {
 		message := createTestMessage("", `{}`)
@@ -532,6 +730,7 @@ func TestProcessTCPMessageEdgeCases(t *testing.T) {
 // BenchmarkProcessTCPMessage benchmarks the processTCPMessage function
 func BenchmarkProcessTCPMessage(b *testing.B) {
 	setupTestEnvironment()
+	defer cleanupTestEnvironment()
 	
 	message := createTestMessage("health", `{}`)
 	
