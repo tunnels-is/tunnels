@@ -499,6 +499,13 @@ func DefaultMinimalConfig(withDNS bool) *configV2 {
 		ConnectionTracer: false,
 		ConsoleLogging:   true,
 		ConsoleLogOnly:   true,
+		Servers: []*Server{
+			{
+				Address:    "https://api.tunnels.is",
+				Secure:     true,
+				NatEnabled: false,
+			},
+		},
 	}
 	if withDNS {
 		conf.DNSServerIP = "0.0.0.0"
@@ -530,7 +537,24 @@ func DefaultConfig() *configV2 {
 		DNSBlockLists:     GetDefaultBlockLists(),
 		APIIP:             "127.0.0.1",
 		APIPort:           "7777",
-		AuthServers:       []string{"https://api.tunnels.is", "https://127.0.0.1"},
+		Servers: []*Server{
+			{
+				Address:    "api.tunnels.is",
+				TLS:        true,
+				Secure:     true,
+				NatEnabled: false,
+			},
+			{
+				Address:        "my.auth.server",
+				TLS:            true,
+				Secure:         false,
+				NatEnabled:     false,
+				SignalServer:   "https://signal.tunnels.is",
+				TryCount:       300,
+				TimeoutSeconds: 10,
+				SecureKey:      "",
+			},
+		},
 	}
 	applyCertificateDefaultsToConfig(conf)
 	return conf
@@ -555,7 +579,6 @@ func loadConfigFromDisk() error {
 }
 
 func applyCertificateDefaultsToConfig(cfg *configV2) {
-
 	if cfg.APIKey == "" {
 		cfg.APIKey = "./api.key"
 	}

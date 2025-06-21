@@ -86,6 +86,7 @@ func makeTLSConfig() (tc *tls.Config) {
 	conf := CONFIG.Load()
 	tc = new(tls.Config)
 	tc.InsecureSkipVerify = true
+	// TODO: some OS's had issue with this
 	// tc.MinVersion = tls.VersionTLS12
 	// tc.MaxVersion = tls.VersionTLS13
 	// tc.CipherSuites = []uint16{

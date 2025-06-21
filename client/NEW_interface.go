@@ -34,34 +34,61 @@ func AutoConnect() {
 		if isConnected {
 			return true
 		}
-		// TODO: update when multi-user support is enabled
-		// if meta.Tag != DefaultTunnelName && meta.UserID == "" {
-		// 	return true
-		// }
 
 		var code int
 		var err error
 		cliConfig := CLIConfig.Load()
 		if cliConfig.Enabled {
+			server := &Server{
+				Address:        cliConfig.AuthServer,
+				Secure:         cliConfig.Secure,
+				NatEnabled:     false,
+				SignalServer:   "",
+				TryCount:       0,
+				TimeoutSeconds: 0,
+				SecureKey:      "",
+			}
 			code, err = PublicConnect(&ConnectionRequest{
-				Secure:    cliConfig.Secure,
-				URL:       cliConfig.AuthServer,
-				Tag:       meta.Tag,
-				ServerID:  meta.ServerID,
-				DeviceKey: cliConfig.DeviceID,
+				AuthServer: server,
+				Tag:        meta.Tag,
+				ServerID:   meta.ServerID,
+				DeviceKey:  cliConfig.DeviceID,
 			})
-
 		} else {
-			user, err := loadUser()
+			ul, err := loadUsers()
 			if err != nil {
+				return true
+			}
+			var user *User
+			for i := range ul.Users {
+				if ul.Users[i] == nil {
+					continue
+				}
+				if ul.Users[i].ID == meta.UserID {
+					user = ul.Users[i]
+				}
+			}
+			if user == nil {
+				return true
+			}
+			config := CONFIG.Load()
+			var server *Server
+			for i := range config.Servers {
+				if config.Servers[i] == nil {
+					continue
+				}
+				if config.Servers[i].Address == user.AuthServer {
+					server = config.Servers[i]
+				}
+			}
+			if server == nil {
 				return true
 			}
 			code, err = PublicConnect(&ConnectionRequest{
 				Tag:         meta.Tag,
 				ServerID:    meta.ServerID,
 				DeviceToken: user.DeviceToken.DT,
-				URL:         user.AuthServer,
-				Secure:      user.Secure,
+				AuthServer:  server,
 			})
 		}
 

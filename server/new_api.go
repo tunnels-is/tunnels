@@ -11,7 +11,6 @@ import (
 )
 
 func launchAPIServer() {
-
 	Config := Config.Load()
 	mux := http.NewServeMux()
 	var handler http.Handler = mux
@@ -41,7 +40,8 @@ func launchAPIServer() {
 		mux.HandleFunc("/v3/user/2fa/confirm", API_UserTwoFactorConfirm)
 		mux.HandleFunc("/v3/user/list", API_UserList)
 
-		mux.HandleFunc("/v3/device/list", API_DeviceList)     // supports ADMIN APIKey
+		mux.HandleFunc("/v3/device/list", API_DeviceList) // supports ADMIN APIKey
+
 		mux.HandleFunc("/v3/device/create", API_DeviceCreate) // supports ADMIN APIKey
 		mux.HandleFunc("/v3/device/delete", API_DeviceDelete)
 		mux.HandleFunc("/v3/device/update", API_DeviceUpdate)

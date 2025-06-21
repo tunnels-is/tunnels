@@ -23,6 +23,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/miekg/dns"
+	stunc "github.com/tunnels-is/stunturn/client"
 	"github.com/tunnels-is/tunnels/crypt"
 	"github.com/tunnels-is/tunnels/types"
 	"github.com/xlzd/gotp"
@@ -42,7 +43,7 @@ func ResetEverything() {
 	RestoreSaneDNSDefaults()
 }
 
-func SendRequestToURL(tc *tls.Config, method string, url string, data any, timeoutMS int, skipVerify bool) ([]byte, int, error) {
+func SendRequestToURL(tc *tls.Config, method string, path string, data any, timeoutMS int, Server *Server) ([]byte, int, error) {
 	defer RecoverAndLogToFile()
 
 	var body []byte
@@ -56,9 +57,9 @@ func SendRequestToURL(tc *tls.Config, method string, url string, data any, timeo
 
 	var req *http.Request
 	if method == "POST" {
-		req, err = http.NewRequest(method, url, bytes.NewBuffer(body))
+		req, err = http.NewRequest(method, Server.Address+path, bytes.NewBuffer(body))
 	} else if method == "GET" {
-		req, err = http.NewRequest(method, url, nil)
+		req, err = http.NewRequest(method, Server.Address+path, nil)
 	} else {
 		return nil, 400, errors.New("method not supported:" + method)
 	}
@@ -70,6 +71,10 @@ func SendRequestToURL(tc *tls.Config, method string, url string, data any, timeo
 	req.Header.Add("Content-Type", "application/json")
 
 	client := http.Client{Timeout: time.Duration(timeoutMS) * time.Millisecond}
+	if Server != nil {
+		clientTimeout := time.Duration(timeoutMS) * time.Millisecond
+		client.Timeout = (time.Duration(Server.TimeoutSeconds) * time.Second) + clientTimeout
+	}
 	if tc != nil {
 		client.Transport = &http.Transport{
 			TLSClientConfig: tc,
@@ -79,13 +84,26 @@ func SendRequestToURL(tc *tls.Config, method string, url string, data any, timeo
 			TLSClientConfig: &tls.Config{
 				MinVersion:         tls.VersionTLS13,
 				CurvePreferences:   []tls.CurveID{tls.X25519MLKEM768},
-				InsecureSkipVerify: !skipVerify,
+				InsecureSkipVerify: !Server.Secure,
+			},
+			Dial: func(network, addr string) (conn net.Conn, err error) {
+				if Server.NatEnabled {
+					var ok bool
+					conn, ok = NATPeers.Load(Server.Address + "tcp4")
+					if !ok {
+						conn, err = getAndDialTCPPeer(Server)
+					}
+					return
+				}
+
+				return net.Dial(network, addr)
 			},
 		}
 	}
 
 	resp, err := client.Do(req)
 	if err != nil {
+		// TODO: handle dead NAT PEER??
 		if resp != nil {
 			return nil, resp.StatusCode, err
 		} else {
@@ -118,10 +136,10 @@ func ForwardToController(FR *FORWARD_REQUEST) (any, int) {
 	responseBytes, code, err := SendRequestToURL(
 		nil,
 		FR.Method,
-		FR.URL+FR.Path,
+		FR.Path,
 		FR.JSONData,
-		FR.Timeout,
-		FR.Secure,
+		10000,
+		FR.Server,
 	)
 
 	er := new(ErrorResponse)
@@ -148,6 +166,20 @@ func ForwardToController(FR *FORWARD_REQUEST) (any, int) {
 	}
 
 	return respObj, code
+}
+
+func getAndDialTCPPeer(Server *Server) (conn net.Conn, err error) {
+	ips := strings.Split(Server.Address, ":")
+	resp, err := stunc.GetTCPPeer(nil, Server.SignalServer, Server.SecureKey, ips[0])
+	if err != nil {
+		return nil, err
+	}
+	fmt.Println(err, resp)
+	conn, err = stunc.PuncTCPhHole(resp, nil, Server.TryCount, Server.TimeoutSeconds)
+	if err != nil {
+		return nil, err
+	}
+	return
 }
 
 var AZ_CHAR_CHECK = regexp.MustCompile(`^[a-zA-Z0-9]*$`)
@@ -509,14 +541,14 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	tunnel := new(TUN)
 	tunnel.meta.Store(meta)
 	tunnel.CR = ClientCR
-	if !strings.HasPrefix(ClientCR.URL, "https://") {
-		ClientCR.URL = "https://" + ClientCR.URL
+	if !strings.HasPrefix(ClientCR.AuthServer.Address, "https://") {
+		ClientCR.AuthServer.Address = "https://" + ClientCR.AuthServer.Address
 	}
 
 	if ClientCR.ServerIP == "" {
 		server, err := getServerByID(
-			ClientCR.Secure,
-			ClientCR.URL,
+			ClientCR.AuthServer.Secure,
+			ClientCR.AuthServer.Address,
 			ClientCR.DeviceKey,
 			ClientCR.DeviceToken,
 			ClientCR.UserID,
@@ -571,10 +603,10 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	bytesFromController, code, err := SendRequestToURL(
 		nil,
 		"POST",
-		ClientCR.URL+"/v3/session",
+		"/v3/session",
 		FinalCR,
 		10000,
-		ClientCR.Secure,
+		ClientCR.AuthServer,
 	)
 	if code != 200 {
 		ERROR("ErrFromController:", err, string(bytesFromController))
@@ -615,13 +647,25 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		ERROR("Unable to load cert pem from controller: ", errm)
 		return 502, errors.New("Unable to load cert pem from controller")
 	}
+	server := ClientCR.AuthServer
+	if ClientCR.AuthServer.Address != ClientCR.ServerIP {
+		server = &Server{
+			Address:        ClientCR.ServerIP,
+			Secure:         ClientCR.AuthServer.Secure,
+			NatEnabled:     ClientCR.AuthServer.NatEnabled,
+			SignalServer:   ClientCR.AuthServer.SignalServer,
+			TryCount:       ClientCR.AuthServer.TryCount,
+			TimeoutSeconds: ClientCR.AuthServer.TimeoutSeconds,
+			SecureKey:      ClientCR.AuthServer.SecureKey,
+		}
+	}
 	bytesFromServer, code, err := SendRequestToURL(
 		tc,
 		"POST",
 		"https://"+ClientCR.ServerIP+":"+ClientCR.ServerPort+"/v3/connect",
 		SignedResponse,
 		10000,
-		ClientCR.Secure,
+		server,
 	)
 	if code != 200 {
 		ERROR("ErrFromServer:", code, string(bytesFromServer))
