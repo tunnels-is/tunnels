@@ -41,6 +41,7 @@ func AutoConnect() {
 
 		var code int
 		var err error
+		var user *User
 		cliConfig := CLIConfig.Load()
 		if cliConfig.Enabled {
 			code, err = PublicConnect(&ConnectionRequest{
@@ -52,7 +53,7 @@ func AutoConnect() {
 			})
 
 		} else {
-			user, err := loadUser()
+			user, err = loadUser()
 			if err != nil {
 				return true
 			}

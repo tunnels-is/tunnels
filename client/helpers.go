@@ -245,8 +245,5 @@ func DNSAMapping(DNS []*types.DNSRecord, fullDomain string) *types.DNSRecord {
 }
 
 func CheckIfPlainDomain(s string) bool {
-	if strings.Contains(s, ".") {
-		return true
-	}
-	return false
+	return strings.Contains(s, ".")
 }

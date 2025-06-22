@@ -18,14 +18,6 @@ func openURL(url string) error {
 	return windows.ShellExecute(0, nil, windows.StringToUTF16Ptr(url), nil, nil, windows.SW_SHOWNORMAL)
 }
 
-func stripSuffix(domain string) string {
-	if strings.HasSuffix(domain, ".lan.lan.") {
-		domain = strings.TrimSuffix(domain, ".lan.")
-		domain += "."
-	}
-	return domain
-}
-
 func ValidateAdapterID(meta *TunnelMETA) error {
 	_, err := windows.GUIDFromString(meta.WindowsGUID)
 	if err != nil {

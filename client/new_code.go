@@ -60,7 +60,6 @@ func (e *event) Wait(method func(any), timeout time.Duration) {
 		method(errors.New("timeout waiting"))
 	}
 
-	return
 }
 
 func newConcurrentSignal(tag string, ctx context.Context, method func()) {
