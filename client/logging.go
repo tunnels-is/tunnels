@@ -9,10 +9,6 @@ import (
 	"time"
 )
 
-type uniqueLog struct {
-	date time.Time
-}
-
 func checkLogUniqueness(log *string) (shouldLog bool) {
 	hash := md5.Sum([]byte(*log))
 	hashStr := string(hash[:])
