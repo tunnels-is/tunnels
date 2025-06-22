@@ -66,7 +66,7 @@ func checkDir(dir string) {
 				continue
 			}
 			if bytes.Contains(fbs[i], filter) {
-				if path == "../client/logging.go" && i == 149 {
+				if path == "../client/logging.go" && i == 144 {
 					if bytes.Contains(fbs[i], []byte("fmt.Println(line)")) {
 						continue
 					}
