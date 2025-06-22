@@ -16,13 +16,12 @@ import (
 	sig "os/signal"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"syscall"
 	"time"
-
-	"slices"
 
 	"github.com/NdoleStudio/lemonsqueezy-go"
 	"github.com/google/uuid"
@@ -94,7 +93,6 @@ var (
 )
 
 func GetVPLCM(ip [4]byte) {
-
 }
 
 func LOG(x ...any) {
@@ -363,6 +361,7 @@ func initializeVPN() {
 	}
 	GenerateVPLCoreMappings()
 }
+
 func initializeLAN() (err error) {
 	err = generateDHCPMap()
 	if err != nil {
@@ -388,6 +387,7 @@ func GenerateVPLCoreMappings() {
 		}
 	}
 }
+
 func GeneratePortAllocation() (err error) {
 	Config := Config.Load()
 	slots = Config.BandwidthMbps / Config.UserBandwidthMbps
@@ -459,7 +459,6 @@ func makeConfigAndCerts() {
 		VPNPort:   "444",
 		APIIP:     interfaceIP,
 		APIPort:   "443",
-		Admins:    []string{},
 		NetAdmins: []string{},
 		Hostname:  "tunnels.local",
 		Lan: &types.Network{
@@ -521,7 +520,6 @@ func makeCerts(execPath string, IP string) {
 	if err != nil {
 		panic(err)
 	}
-
 }
 
 func makeCertsOnly() {
@@ -542,7 +540,6 @@ func makeCertsOnly() {
 }
 
 func initializeNewServer() error {
-
 	user, err := DB_findUserByEmail("admin")
 	if err != nil {
 		return err
@@ -591,5 +588,4 @@ func initializeNewServer() error {
 		PubKey:   string(keyBytes),
 		Groups:   []primitive.ObjectID{},
 	})
-
 }

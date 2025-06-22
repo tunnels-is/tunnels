@@ -4,7 +4,6 @@ package client
 
 import (
 	"errors"
-	"fmt"
 	"io"
 	"net"
 	"os"
@@ -68,7 +67,6 @@ func CreateNewTunnelInterface(
 	}
 
 	err = IF.Create()
-
 	if err != nil {
 		return IF, err
 	}
@@ -170,7 +168,6 @@ func (t *TInterface) GetLink() (netlink.Link, error) {
 		return nil, err
 	}
 	return link, nil
-
 }
 
 func (t *TInterface) AddrV6() (err error) {
@@ -318,7 +315,6 @@ func (t *TInterface) Delete() (err error) {
 func (t *TInterface) Connect(tun *TUN) (err error) {
 	err = t.Addr()
 	if err != nil {
-		fmt.Println("ADDR ERR:", err)
 		return
 	}
 
