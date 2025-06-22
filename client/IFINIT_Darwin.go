@@ -194,12 +194,12 @@ func (t *TInterface) Netmask() (err error) {
 }
 
 func (t *TInterface) SetTXQueueLen() (err error) {
-	DEBUG("ifconfig", t.SystemName, "txqueuelen", strconv.FormatInt(int64(t.MTU), 10))
-	out, err := exec.Command("ifconfig", t.SystemName, "txqueuelen", strconv.FormatInt(int64(t.TxQueuelen), 10)).CombinedOutput()
-	if err != nil {
-		ERROR("Unable to change mtu out: ", string(out), " err: ", err)
-		return err
-	}
+	//DEBUG("ifconfig", t.SystemName, "txqueuelen", strconv.FormatInt(int64(t.TxQueuelen), 10))
+	//out, err := exec.Command("ifconfig", t.SystemName, "txqueuelen", strconv.FormatInt(int64(t.TxQueuelen), 10)).CombinedOutput()
+	//if err != nil {
+	//	ERROR("Unable to change txqueuelen out: ", string(out), " err: ", err)
+	//	return err
+	//}
 	return nil
 }
 
