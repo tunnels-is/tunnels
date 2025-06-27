@@ -5,6 +5,9 @@ import { useEffect } from "react";
 import NewObjectEditorDialog from "./NewObjectEdiorDialog";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { AccessibilityIcon } from "lucide-react";
+import { CircleArrowLeftIcon } from "lucide-react";
+import { CircleArrowRight } from "lucide-react";
+import { LogOut } from "lucide-react";
 
 const Tunnels = () => {
   const state = GLOBAL_STATE("tunnels");
@@ -70,7 +73,7 @@ const Tunnels = () => {
         onClick={() => connect()}
         className="cursor-pointer text-[#3a994c] "
       >
-        <AccessibilityIcon className="w-4 h-4 mr-2" /> Connect
+        <CircleArrowRight className="w-4 h-4 mr-2" /> Connect
       </DropdownMenuItem >
       {disconnect &&
         <DropdownMenuItem
@@ -78,7 +81,7 @@ const Tunnels = () => {
           onClick={() => disconnect()}
           className={"cursor-pointer text-[#ef4444]"}
         >
-          <AccessibilityIcon className="w-4 h-4 mr-2" /> Disconnect
+          <LogOut className="w-4 h-4 mr-2" /> Disconnect
         </DropdownMenuItem >
       }
     </div>

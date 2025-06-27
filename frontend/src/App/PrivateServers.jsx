@@ -7,6 +7,8 @@ import NewObjectEditorDialog from "./NewObjectEdiorDialog";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { AccessibilityIcon } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { CircleArrowRight } from "lucide-react";
+import { LogOut } from "lucide-react";
 
 const PrivateServers = () => {
 	const state = GLOBAL_STATE("pservers")
@@ -120,7 +122,7 @@ const PrivateServers = () => {
 				onClick={() => conButton()}
 				className={"cursor-pointer text-[#3a994c]"}
 			>
-				<AccessibilityIcon className="w-4 h-4 mr-2" /> Connect
+				<CircleArrowRight className="w-4 h-4 mr-2" /> Connect
 			</DropdownMenuItem >
 			{disconnectButton &&
 				<DropdownMenuItem
@@ -128,7 +130,7 @@ const PrivateServers = () => {
 					onClick={() => disconnectButton()}
 					className={"cursor-pointer text-[#ef4444]"}
 				>
-					<AccessibilityIcon className="w-4 h-4 mr-2" /> Disconnect
+					<LogOut className="w-4 h-4 mr-2" /> Disconnect
 				</DropdownMenuItem >
 			}
 		</div >
