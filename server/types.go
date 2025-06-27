@@ -238,12 +238,6 @@ type FORM_CREATE_GROUP struct {
 	Group       *Group             `json:"Group"`
 }
 
-type FORM_CREATE_DEVICE struct {
-	DeviceToken string             `json:"DeviceToken"`
-	UID         primitive.ObjectID `json:"UID"`
-	Device      *types.Device      `json:"Device"`
-}
-
 type FORM_UPDATE_SERVER struct {
 	DeviceToken string             `json:"DeviceToken"`
 	UID         primitive.ObjectID `json:"UID"`

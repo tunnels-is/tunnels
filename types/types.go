@@ -261,3 +261,9 @@ func (d *DHCPRecord) Assign() (ok bool) {
 type FORM_GET_DEVICE struct {
 	DeviceID primitive.ObjectID
 }
+
+type FORM_CREATE_DEVICE struct {
+	DeviceToken string             `json:"DeviceToken"`
+	UID         primitive.ObjectID `json:"UID"`
+	Device      *Device            `json:"Device"`
+}

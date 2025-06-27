@@ -10,7 +10,7 @@ import (
 func main() {
 	cli := client.CLIConfig.Load()
 	var disableAutoUpdate bool
-	
+
 	flag.StringVar(&cli.AuthServer, "authHost", "api.tunnels.is", "The auth server you want to use")
 	flag.StringVar(&cli.DeviceID, "deviceID", "", "the device token")
 	flag.StringVar(&cli.ServerID, "serverID", "", "the server you want to connect to")
