@@ -67,7 +67,7 @@ const InspectGroup = () => {
 				setServers([...s])
 			} else if (type === "device") {
 				let d = devices.filter((s) => s._id !== typeid)
-				setServers([...d])
+				setDevices([...d])
 			}
 		}
 	}
