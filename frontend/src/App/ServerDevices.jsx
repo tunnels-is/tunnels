@@ -60,7 +60,7 @@ const ServerDevices = () => {
 		},
 		columnFormat: {
 			Created: (obj) => {
-				return dayjs(obj.Created).format("HH:mm:ss DD-MM-YYYY")
+				return dayjs(obj.Created).fromNow()
 			}
 		},
 		Btn: {
