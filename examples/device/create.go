@@ -9,9 +9,20 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/tunnels-is/tunnels/types"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
+
+type FORM_CREATE_DEVICE struct {
+	DeviceToken string             `json:"DeviceToken"`
+	UID         primitive.ObjectID `json:"UID"`
+	Device      *Device            `json:"Device"`
+}
+type Device struct {
+	ID        primitive.ObjectID   `json:"_id" bson:"_id"`
+	CreatedAt time.Time            `json:"CreatedAt" bson:"CreatedAt"`
+	Tag       string               `json:"Tag" bson:"Tag"`
+	Groups    []primitive.ObjectID `json:"Groups" bson:"Groups"`
+}
 
 // CreateDevice creates a new device using the tunnels API with X-API-KEY authentication
 // Parameters:
@@ -23,9 +34,9 @@ import (
 // Returns:
 //   - *types.Device: The created device with populated ID and CreatedAt fields
 //   - error: Any error that occurred during the creation process
-func CreateDevice(serverURL, apiKey, deviceTag string, groups []primitive.ObjectID) (*types.Device, error) {
+func CreateDevice(serverURL, apiKey, deviceTag string, groups []primitive.ObjectID) (*Device, error) {
 	// Create a new device
-	newDevice := &types.Device{
+	newDevice := &Device{
 		Tag:    deviceTag,
 		Groups: groups,
 	}
@@ -33,7 +44,7 @@ func CreateDevice(serverURL, apiKey, deviceTag string, groups []primitive.Object
 	// Create the request body
 	// Note: When using X-API-KEY, DeviceToken and UID can be empty/nil
 	// The API handler will skip user authentication if a valid API key is provided
-	requestBody := &types.FORM_CREATE_DEVICE{
+	requestBody := &FORM_CREATE_DEVICE{
 		DeviceToken: "",                    // Not needed when using API key
 		UID:         primitive.NilObjectID, // Not needed when using API key
 		Device:      newDevice,
@@ -91,7 +102,7 @@ func CreateDevice(serverURL, apiKey, deviceTag string, groups []primitive.Object
 	}
 
 	// Parse the successful response
-	var createdDevice types.Device
+	var createdDevice Device
 	err = json.Unmarshal(responseBody, &createdDevice)
 	if err != nil {
 		return nil, fmt.Errorf("error parsing response JSON: %w", err)
