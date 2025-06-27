@@ -11,7 +11,6 @@ import (
 )
 
 func launchAPIServer() {
-
 	Config := Config.Load()
 	mux := http.NewServeMux()
 	var handler http.Handler = mux
@@ -24,7 +23,7 @@ func launchAPIServer() {
 
 	if LANEnabled {
 		mux.HandleFunc("/v3/firewall", API_Firewall)
-		mux.HandleFunc("/v3/devices", API_ListDevices)
+		mux.HandleFunc("/v3/devices", API_ListDevices) // supports ADMIN APIKey
 	}
 
 	if VPNEnabled {
