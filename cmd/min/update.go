@@ -202,39 +202,9 @@ func getCurrentBinaryPath() (string, error) {
 	return resolved, nil
 }
 
-// restartWithSameArgs restarts the application with the same command line arguments
 func restartWithSameArgs(newBinaryPath string) error {
-	// Get current command line arguments (excluding the program name)
-	args := os.Args[1:]
-
-	// Start the new process
-	cmd := exec.Command(newBinaryPath, args...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	cmd.Stdin = os.Stdin
-
-	// On Windows, we need to set the proper attributes
 	if runtime.GOOS == "windows" {
-		cmd.SysProcAttr = &syscall.SysProcAttr{
-			CreationFlags: syscall.CREATE_NEW_PROCESS_GROUP,
-		}
-	} else {
-		// On Unix systems, create a new process group
-		cmd.SysProcAttr = &syscall.SysProcAttr{}
-	}
-
-	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("failed to start new process: %w", err)
-	}
-
-	// The new process is now running, we can exit this one
-	os.Exit(0)
-	return nil // This line will never be reached
-}
-
-func restartProcess() error {
-	if runtime.GOOS == "windows" {
-		cmd := exec.Command(os.Args[0], os.Args[1:]...)
+		cmd := exec.Command(newBinaryPath, os.Args[1:]...)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		cmd.Stdin = os.Stdin

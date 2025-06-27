@@ -543,7 +543,7 @@ func API_DeviceCreate(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 	hasAPIKey := HTTP_validateKey(r)
 
-	F := new(FORM_CREATE_DEVICE)
+	F := new(types.FORM_CREATE_DEVICE)
 	err := decodeBody(r, F)
 	if err != nil {
 		senderr(w, 400, "Invalid request body", slog.Any("error", err))
