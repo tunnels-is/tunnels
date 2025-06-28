@@ -27,7 +27,6 @@ const Settings = () => {
 
   let DebugLogging = state.getKey("Config", "DebugLogging");
   let ErrorLogging = state.getKey("Config", "ErrorLogging");
-  let ConnectionTracer = state.getKey("Config", "ConnectionTracer");
   let InfoLogging = state.getKey("Config", "InfoLogging");
   let APICertDomains = state.getKey("Config", "APICertDomains");
   let APICertIPs = state.getKey("Config", "APICertIPs");
@@ -184,16 +183,6 @@ const Settings = () => {
                 description="Enables advanced debugging features"
               />
 
-              <SettingToggle
-                label="Connection Tracing"
-                icon={<Activity className="h-4 w-4 mt-1 text-green-500" />}
-                value={ConnectionTracer}
-                onToggle={() => {
-                  state.toggleKeyAndReloadDom("Config", "ConnectionTracer");
-                  state.renderPage("settings");
-                }}
-                description="Tracks all connection activities"
-              />
             </CardContent>
           </Card>
         </TabsContent>
