@@ -73,6 +73,9 @@ const NewObjectEditor = (props) => {
         if (props.opts?.fields[k] === "hidden") {
           return
         }
+        if (k === "_id") {
+          return
+        }
         if (props.opts?.fields[k] === "readonly" || k === "_id") {
           return (< div key={k} className=" mt-2" >
             <Label className="text-white" >{kk}</Label>
