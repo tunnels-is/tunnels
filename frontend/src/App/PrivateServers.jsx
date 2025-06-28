@@ -201,6 +201,7 @@ const PrivateServers = () => {
 			},
 			Country: true,
 			IP: true,
+			Port: true,
 			_id: true,
 		},
 		columnFormat: {
@@ -241,7 +242,7 @@ const PrivateServers = () => {
 				return "Name"
 			}
 		},
-		headers: ["Tag", "Country", "IP", "_id", "Interface"],
+		headers: ["Tag", "Country", "IP", "Port", "_id", "Interface"],
 		headerClass: {},
 		opts: {
 			RowPerPage: 50,

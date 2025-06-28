@@ -1,15 +1,10 @@
 import React, { useEffect } from "react";
-import { Button } from "@/components/ui/button";
-
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import CustomToggle from "./component/CustomToggle";
 import FormKeyValue from "./component/formkeyvalue";
 import { useNavigate } from "react-router-dom";
-import NewTable from "./component/newtable";
 import dayjs from "dayjs";
-import { Check, ExternalLink, Tag, Trash2, X } from "lucide-react";
 import GLOBAL_STATE from "../state";
 import STORE from "../store";
 import { Switch } from "@/components/ui/switch";
@@ -17,7 +12,6 @@ import GenericTable from "./GenericTable";
 import { TableCell } from "@/components/ui/table";
 import { useState } from "react";
 import NewObjectEditorDialog from "./NewObjectEdiorDialog";
-import { Badge } from "@/components/ui/badge";
 
 const DNSSort = (a, b) => {
   if (dayjs(a.LastSeen).unix() < dayjs(b.LastSeen).unix()) {
@@ -72,6 +66,9 @@ const DNS = () => {
       data: state.Config?.DNSRecords,
       columns: {
         Domain: true,
+        IP: true,
+        TXT: true,
+        Wildcard: true,
       },
       headerFormat: {
         TXT: () => {
@@ -82,39 +79,11 @@ const DNS = () => {
         // IP: (obj) => {
         //   return obj.IP.join(" | ")
         // },
-        // TXT: (obj) => {
-        //   return obj.TXT.join(" | ")
-        // },
+        Wildcard: (obj) => {
+          return obj.Wildcard === true ? "yes" : "no"
+        },
       },
       customColumns: {
-        IP: (obj) => {
-          return <TableCell className={""}>
-            <div className="flex flex-col">
-              {obj.IP?.map(ip => {
-                return <Badge className={"mt-1 size-fit" + state.Theme?.badgeNeutral} > {ip}</Badge>
-              })}
-            </div>
-          </TableCell >
-        },
-        TXT: (obj) => {
-          return <TableCell className={""}>
-            <div className="flex flex-col">
-              {obj.TXT?.map((txt) => {
-                return <Badge className={"mt-1 size-fit" + state.Theme?.badgeNeutral} > {txt}</Badge>
-              })}
-            </div>
-          </TableCell >
-        },
-        WildCard: (obj) => {
-          return <TableCell className={""}>
-            {(obj.Wildcard === true) &&
-              <Badge className={"mt-1 size-fit" + state.Theme?.badgeSuccess} > yes</Badge>
-            }
-            {(obj.Wildcard === false) &&
-              <Badge className={"mt-1 size-fit" + state.Theme?.badgeWarning} > no</Badge>
-            }
-          </TableCell >
-        }
       },
       columnClass: {},
       Btn: {
@@ -128,6 +97,7 @@ const DNS = () => {
           state.v2_ConfigSave();
         },
         New: () => {
+          setIsRecordEdit(false)
           setRecord({ Domain: "yourdomain.com", IP: ["127.0.0.1"], TXT: ["yourdomain.com text record"], Wildcard: true })
           setRecordModal(true)
         }
@@ -438,7 +408,7 @@ const DNS = () => {
             readOnly={false}
             saveButton={async (obj) => {
               if (!isRecordEdit) {
-                if (!state.Config?.DNSRecord) {
+                if (!state.Config?.DNSRecords) {
                   state.Config.DNSRecords = []
                 }
                 state.Config?.DNSRecords.push(obj)
