@@ -15,6 +15,7 @@ func main() {
 	// flag.BoolVar(&cli.DNS, "dns", false, "enable dns server")
 	flag.BoolVar(&cli.Secure, "secure", false, "validate TLS certificate")
 	flag.BoolVar(&cli.SendStats, "sendStats", true, "send device statistics")
+	flag.StringVar(&cli.Hostname, "hostname", "", "device hostname")
 	cli.Enabled = true
 	client.CLIConfig.Store(cli)
 	flag.Parse()

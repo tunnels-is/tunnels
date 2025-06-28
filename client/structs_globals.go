@@ -36,6 +36,7 @@ type ConnectionRequest struct {
 	URL          string
 	Secure       bool
 	ServerPubKey string
+	Hostname     string `json:"Hostname"`
 
 	DeviceKey string `json:"DeviceKey"`
 
