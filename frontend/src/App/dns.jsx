@@ -247,11 +247,11 @@ const DNS = () => {
       },
       New: () => {
         setIsBlocklistEdit(false)
-        setBlocklist({ 
-          Tag: "new-blocklist", 
-          URL: "https://example.com/blocklist.txt", 
-          Enabled: true, 
-          Count: 0 
+        setBlocklist({
+          Tag: "new-blocklist",
+          URL: "https://example.com/blocklist.txt",
+          Enabled: true,
+          Count: 0
         })
         setBlocklistModal(true)
       },
@@ -407,6 +407,38 @@ const DNS = () => {
         </TabsContent>
         <TabsContent value="blocklist">
           <GenericTable table={bltable} />
+          <NewObjectEditorDialog
+            open={blocklistModal}
+            onOpenChange={setBlocklistModal}
+            object={blocklist}
+            title="DNS Blocklist"
+            description=""
+            readOnly={false}
+            opts={{
+              fields: {
+                Count: "hidden"
+              }
+            }}
+            saveButton={async (obj) => {
+              if (!isBlocklistEdit) {
+                if (!state.Config?.DNSBlockLists) {
+                  state.Config.DNSBlockLists = []
+                }
+                state.Config?.DNSBlockLists.push(obj)
+              }
+              let ok = await state.v2_ConfigSave();
+              if (ok === true) {
+                setBlocklistModal(false)
+                setIsBlocklistEdit(false)
+              }
+            }}
+            onChange={(key, value, type) => {
+              blocklist[key] = value;
+            }}
+            onArrayChange={(key, value, index) => {
+              blocklist[key][index] = value;
+            }}
+          />
         </TabsContent>
         <TabsContent value="blockdomains">
           <GenericTable table={generateBlocksTable()} />
@@ -441,42 +473,6 @@ const DNS = () => {
             }}
             onArrayChange={(key, value, index) => {
               record[key][index] = value;
-            }}
-          />
-          <NewObjectEditorDialog
-            open={blocklistModal}
-            onOpenChange={setBlocklistModal}
-            object={blocklist}
-            title="DNS Blocklist"
-            description=""
-            readOnly={false}
-            saveButton={async (obj) => {
-              if (!isBlocklistEdit) {
-                // Creating a new blocklist
-                if (!state.Config?.DNSBlockLists) {
-                  state.Config.DNSBlockLists = []
-                }
-                state.Config?.DNSBlockLists.push(obj)
-              } else {
-                // Editing an existing blocklist
-                if (state.Config?.DNSBlockLists) {
-                  const index = state.Config.DNSBlockLists.findIndex(b => b.Tag === obj.Tag)
-                  if (index !== -1) {
-                    state.Config.DNSBlockLists[index] = obj
-                  }
-                }
-              }
-              let ok = await state.v2_ConfigSave();
-              if (ok === true) {
-                setBlocklistModal(false)
-                setIsBlocklistEdit(false)
-              }
-            }}
-            onChange={(key, value, type) => {
-              blocklist[key] = value;
-            }}
-            onArrayChange={(key, value, index) => {
-              blocklist[key][index] = value;
             }}
           />
         </TabsContent>
