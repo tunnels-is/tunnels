@@ -100,6 +100,8 @@ const Tunnels = () => {
     },
     columns: {
       Tag: true,
+      IPv4Address: true,
+      IPv6Address: true,
       IFName: true,
       ServerID: true,
     },
@@ -120,7 +122,7 @@ const Tunnels = () => {
         newServer();
       },
     },
-    headers: ["Tag", "IFName", "ServerID"],
+    headers: ["Tag", "IPv4", "IPv6", "IFName", "ServerID"],
     headerFormat: {
       IFName: () => {
         return "Interface";

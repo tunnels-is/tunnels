@@ -105,7 +105,7 @@ const GenericTable = (props) => {
         if (t.columnFormat && t.columnFormat[key]) {
           cd = t.columnFormat[key](t.data[i]);
         }
-        if (key === "Tag" || key === "Email") {
+        if (key === "Tag" || key === "Email" || key === "Domain") {
           return (
             <TableCell className={dc} onClick={() => click(t.data[i])}>
               <Badge className={"cursor-pointer" + state.Theme?.badgeNeutral}> {cd}</Badge>
