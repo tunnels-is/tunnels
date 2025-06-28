@@ -50,8 +50,8 @@ func AutoConnect() {
 				Tag:       meta.Tag,
 				ServerID:  meta.ServerID,
 				DeviceKey: cliConfig.DeviceID,
+				Hostname:  cliConfig.Hostname,
 			})
-
 		} else {
 			user, err = loadUser()
 			if err != nil {
