@@ -33,15 +33,23 @@ const Users = () => {
 			_id: (obj) => {
 				// alert(obj._id)
 			},
+			Trial: true,
+			SubExpires: true,
 			Updated: true,
 		},
 		columnFormat: {
 			Updated: (obj) => {
 				return dayjs(obj.Updated).format("HH:mm:ss DD-MM-YYYY")
+			},
+			SubExpires: (obj) => {
+				return dayjs(obj.Updated).format("HH:mm:ss DD-MM-YYYY")
+			},
+			Trial: (obj) => {
+				return obj.Trial === true ? "Yes" : "no"
 			}
 		},
 		columnClass: {},
-		headers: ["User", "ID", "Updated"],
+		headers: ["User", "ID", "Trial", "SubExpiration", "Updated"],
 		headerClass: {
 			ID: () => {
 				return ""

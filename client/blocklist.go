@@ -10,7 +10,7 @@ import (
 	"strings"
 	"sync"
 	"time"
-	
+
 	"github.com/puzpuzpuz/xsync/v3"
 )
 
@@ -74,14 +74,14 @@ func processBlockList(index int, wg *sync.WaitGroup, nm *xsync.MapOf[string, boo
 	state := STATE.Load()
 	fname := state.BlockListPath + bl.Tag + ".txt"
 
-	if time.Since(bl.LastDownload).Hours() > 24 {
+	if time.Since(bl.LastDownload).Hours() > 24 && bl.URL != "" {
 		if CheckIfURL(bl.URL) {
 			listBytes, err = downloadList(bl.URL)
 			if err != nil {
 				ERROR("Could not download", bl.URL, err)
 				return
 			}
-			err = os.WriteFile(fname, listBytes, 0666)
+			err = os.WriteFile(fname, listBytes, 0o666)
 			if err != nil {
 				ERROR("Could not save", bl.URL, err)
 				return
@@ -91,13 +91,14 @@ func processBlockList(index int, wg *sync.WaitGroup, nm *xsync.MapOf[string, boo
 	} else if bl.Disk != "" {
 		listBytes, err = os.ReadFile(bl.Disk)
 		if err != nil {
+			ERROR("Could not read blocklist", bl.Disk, err)
 			listBytes, err = downloadList(bl.URL)
 			if err != nil {
-				ERROR("Could not download", bl.URL, err)
+				ERROR("Could not read from disk or download", bl.URL, err)
 				return
 			}
 
-			err = os.WriteFile(fname, listBytes, 0666)
+			err = os.WriteFile(fname, listBytes, 0o666)
 			if err != nil {
 				ERROR("Could not save", bl.URL, err)
 				return
@@ -107,7 +108,7 @@ func processBlockList(index int, wg *sync.WaitGroup, nm *xsync.MapOf[string, boo
 	}
 
 	if len(listBytes) == 0 {
-		ERROR("No bytes in DNS blocklist: ", bl.URL)
+		ERROR("No bytes in DNS blocklist: ", bl.URL, bl.Disk)
 		return
 	}
 
