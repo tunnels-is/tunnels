@@ -233,7 +233,7 @@ const InspectGroup = () => {
 				}}
 			/>
 
-			<Tabs defaultValue="user" className="w-full" onValueChange={(v) => tagChange(v)}>
+			<Tabs defaultValue="server" className="w-full" onValueChange={(v) => tagChange(v)}>
 				<TabsList
 					className={state.Theme?.borderColor}
 				>

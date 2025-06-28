@@ -61,11 +61,17 @@ const Groups = () => {
 
   let table = {
     data: groups,
+    // rowClick: (obj) => {
+    //   navigate("/groups/" + obj._id)
+    // },
     rowClick: (obj) => {
-      navigate("/groups/" + obj._id)
+      console.log("row click!")
+      console.dir(obj)
     },
     columns: {
-      Tag: true,
+      Tag: (obj) => {
+        navigate("/groups/" + obj._id)
+      },
       _id: true,
       CreatedAt: true,
     },
