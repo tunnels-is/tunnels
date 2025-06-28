@@ -39,29 +39,30 @@ const ServerDevices = () => {
 		},
 		columns: {
 			Created: true,
+			IP: true,
+			Hostname: true,
+			Ports: true,
+			CPU: true,
+			RAM: true,
+			Disk: true,
+			IngressQueue: true,
+			EgressQueue: true
 		},
 		customColumns: {
-			IP: (obj) => {
-				return <TableCell className={""}>
-					{obj.DHCP?.IP.join(".")}
-				</TableCell >
-			},
-			Hostname: (obj) => {
-				return <TableCell className={""}>
-					{obj.DHCP?.Hostname}
-				</TableCell >
-			},
-			Ports: (obj) => {
-				return <TableCell className={""}>
-					{obj.StartPort} - {obj.EndPort}
-				</TableCell >
-			},
-
 		},
 		columnFormat: {
 			Created: (obj) => {
-				return dayjs(obj.Created).fromNow()
-			}
+				return dayjs(obj.Created).format("HH:mm:ss DD-MM-YYYY")
+			},
+			IP: (obj) => {
+				return obj.DHCP?.IP ? obj.DHCP.IP.join(".") : ""
+			},
+			Hostname: (obj) => {
+				return obj.DHCP?.Hostname ? obj.DHCP.Hostname : ""
+			},
+			Ports: (obj) => {
+				return "" + obj.StartPort + " - " + obj.EndPort
+			},
 		},
 		Btn: {
 			Delete: (obj) => {
@@ -74,7 +75,7 @@ const ServerDevices = () => {
 				return "Connected"
 			}
 		},
-		headers: ["Created", "IP", "Hostname", "Ports"],
+		headers: ["Created", "IP", "Hostname", "Ports", "CPU", "RAM", "DISK", "IQ", "EQ"],
 		headerClass: {},
 		opts: {
 			RowPerPage: 50,

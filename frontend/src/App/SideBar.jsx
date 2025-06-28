@@ -13,10 +13,12 @@ import {
   ContainerIcon,
   MixerHorizontalIcon,
   DesktopIcon,
+  ExitIcon,
 } from "@radix-ui/react-icons";
 import { cn } from "@/lib/utils";
 import GLOBAL_STATE from "../state";
 import { Logs } from "lucide-react";
+import STORE from "@/store";
 
 const IconWidth = 20;
 const IconHeight = 20;
@@ -50,6 +52,13 @@ const SideBar = () => {
     //   console.log(e);
     // }
   };
+
+  const logout = () => {
+    let t = state.User?.DeviceToken
+    if (t !== "") {
+      state.LogoutToken(t, false)
+    }
+  }
 
   const showLogin = () => {
     if (!state.User || state.User?.Email === "") {
@@ -110,7 +119,7 @@ const SideBar = () => {
           },
 
           { icon: PersonIcon, label: "Account", route: "account", user: true },
-          { icon: Logs, label: "Logs", route: "logs", user: true },
+          { icon: Logs, label: "Logs", route: "logs", user: false },
         ],
       },
       {
@@ -134,7 +143,9 @@ const SideBar = () => {
             click: () =>
               OpenWindowURL("https://www.github.com/tunnels-is/tunnels"),
           },
-          // { icon: Share1Icon, label: "Logs", route: "logs", user: false, advanced: false },
+          {
+            icon: ExitIcon, label: "Logout", click: logout, user: true
+          },
         ],
       },
     ],

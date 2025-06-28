@@ -918,6 +918,7 @@ export var STATE = {
     STATE.GetBackendState();
   },
   FinalizeLogout: async () => {
+    console.log("FINALIZING LOGOUT")
     STATE.DelUser();
     STORE.Cache.Clear();
     STATE.GetBackendState();
@@ -951,8 +952,8 @@ export var STATE = {
     if (resp && resp.status === 200) {
 
       STATE.successNotification("device logged out", undefined);
-
       if (logoutUser === true || all === true) {
+        STATE.DelUser();
         STATE.FinalizeLogout();
         return
       } else {
