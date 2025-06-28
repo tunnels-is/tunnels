@@ -86,6 +86,7 @@ type CLIInfo struct {
 	Secure     bool
 	Enabled    bool
 	SendStats  bool
+	Hostname   string
 }
 
 type configV2 struct {

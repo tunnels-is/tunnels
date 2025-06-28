@@ -213,11 +213,13 @@ type ControllerConnectRequest struct {
 }
 
 type DHCPRecord struct {
-	m        sync.Mutex `json:"-"`
-	IP       [4]byte
-	Hostname string
-	Token    string
-	Activity time.Time `json:"-"`
+	m  sync.Mutex `json:"-"`
+	IP [4]byte
+
+	DeviceKey string
+	Hostname  string
+	Token     string
+	Activity  time.Time `json:"-"`
 }
 type FirewallRequest struct {
 	DHCPToken       string

@@ -46,23 +46,102 @@ const NewObjectEditor = (props) => {
         }} />
       </div>)
   }
+
+  // Helper function to render read-only input fields
+  const renderReadOnlyField = (k) => {
+    let kk = k
+    if (props.opts?.nameMap?.length > 0) {
+      kk = props.opts.nameMap[k] ? props.opts.nameMap[k] : k
+    }
+
+    if (props.opts?.fields[k] === "hidden") {
+      return null
+    }
+
+    if (k === "PubKey") {
+      return (
+        <div key={k} className="mt-4 mt-2">
+          <Label className="text-white" type="bool" >{kk}</Label>
+          <Textarea
+            disabled
+            className={"w-full" + state.Theme?.borderColor}
+            value={props.obj[k]}
+          />
+        </div>
+      )
+    }
+
+    return (
+      <div key={k} className=" mt-2">
+        <Label className="text-white" >{kk}</Label>
+        <Input disabled className={"w-[400px]" + state.Theme?.borderColor}
+          value={props.obj[k]} />
+      </div>
+    )
+  }
+
+  // Helper function to render read-only boolean fields
+  const renderReadOnlyBoolField = (k) => {
+    let kk = k
+    if (props.opts?.nameMap?.length > 0) {
+      kk = props.opts.nameMap[k] ? props.opts.nameMap[k] : k
+    }
+
+    if (props.opts?.fields[k] === "hidden") {
+      return null
+    }
+
+    return (
+      <div key={k} className="mt-4 mt-2">
+        <Label className="text-white" type="bool" >{kk}</Label>
+        <Switch className="ml-2" disabled checked={props.obj[k]} />
+      </div>
+    )
+  }
   let inputKeys = []
   let boolKeys = []
   let arrayKeys = []
+  let readOnlyInputKeys = []
+  let readOnlyBoolKeys = []
+  let readOnlyArrayKeys = []
+
+  // Helper function to check if a field is read-only
+  const isReadOnly = (k) => {
+    return props.opts?.fields[k] === "readonly" || 
+           k === "_id" || 
+           k === "CreatedAt" || 
+           k === "Added" || 
+           k === "UpdatedAt"
+  }
 
   Object.keys(props.obj).map(k => {
     let type = getType(props.obj[k])
+    const readonly = isReadOnly(k)
+    
     if (type === "array") {
-      arrayKeys.push(k)
+      if (readonly) {
+        readOnlyArrayKeys.push(k)
+      } else {
+        arrayKeys.push(k)
+      }
     } else if (type === "string" || type === "number") {
-      inputKeys.push(k)
+      if (readonly) {
+        readOnlyInputKeys.push(k)
+      } else {
+        inputKeys.push(k)
+      }
     } else if (type === "boolean") {
-      boolKeys.push(k)
+      if (readonly) {
+        readOnlyBoolKeys.push(k)
+      } else {
+        boolKeys.push(k)
+      }
     }
   })
 
   return (
     <Form>
+      {/* Editable input fields */}
       {inputKeys.map(k => {
         let type = getType(props.obj[k])
         let kk = k
@@ -71,30 +150,13 @@ const NewObjectEditor = (props) => {
         }
 
         if (props.opts?.fields[k] === "hidden") {
-          return
+          return null
         }
-        if (k === "_id") {
-          return
-        }
-        if (props.opts?.fields[k] === "readonly" || k === "_id") {
-          return (< div key={k} className=" mt-2" >
-            <Label className="text-white" >{kk}</Label>
-            <Input disabled className={"w-[400px]" + state.Theme?.borderColor}
-              value={props.obj[k]} />
-          </div>)
-        }
-        if (k === "CreatedAt" || k === "Added" || k === "UpdatedAt") {
-          return (< div key={k} className=" mt-2" >
-            <Label className="text-white" >{kk}</Label>
-            <Input disabled className={"w-[400px]" + state.Theme?.borderColor}
-              value={props.obj[k]} />
-          </div>)
-        }
+
         if (k === "PubKey") {
           return (
             <div key={k} className="mt-4 mt-2">
               <Label className="text-white" type="bool" >{kk}</Label>
-
               <Textarea
                 className={"w-full" + state.Theme?.borderColor}
                 onChange={(e) => {
@@ -106,6 +168,7 @@ const NewObjectEditor = (props) => {
             </div>
           )
         }
+        
         if (type === "string" || type === "number") {
           return (
             <div key={k} className=" mt-2">
@@ -122,6 +185,8 @@ const NewObjectEditor = (props) => {
           )
         }
       })}
+      
+      {/* Editable boolean fields */}
       {boolKeys.map(k => {
         let kk = k
         if (props.opts?.nameMap?.length > 0) {
@@ -129,7 +194,7 @@ const NewObjectEditor = (props) => {
         }
 
         if (props.opts?.fields[k] === "hidden") {
-          return
+          return null
         }
         return (
           <div key={k} className="mt-4 mt-2">
@@ -144,11 +209,43 @@ const NewObjectEditor = (props) => {
           </div>
         )
       })}
+      
+      {/* Editable array fields */}
       {arrayKeys.map(k => {
         if (props.opts?.fields[k] === "hidden") {
-          return
+          return null
         }
         return walkArray(k)
+      })}
+      
+      {/* Read-only input fields */}
+      {readOnlyInputKeys.map(k => renderReadOnlyField(k))}
+      
+      {/* Read-only boolean fields */}
+      {readOnlyBoolKeys.map(k => renderReadOnlyBoolField(k))}
+      
+      {/* Read-only array fields (displayed as disabled) */}
+      {readOnlyArrayKeys.map(k => {
+        if (props.opts?.fields[k] === "hidden") {
+          return null
+        }
+        let kk = k
+        if (props.opts?.nameMap?.length > 0) {
+          kk = props.opts.nameMap[k] ? props.opts.nameMap[k] : k
+        }
+        return (
+          <div key={k} className="mt-4 mt-2">
+            <Label className="text-white" type="bool" >{kk}</Label>
+            {props.obj[k].map((item, i) => {
+              return (
+                <div key={i} className="flex">
+                  <Input disabled className={"w-[400px]" + state.Theme?.borderColor} 
+                    value={props.obj[k][i]} />
+                </div>
+              )
+            })}
+          </div>
+        )
       })}
     </Form>
   )

@@ -68,6 +68,7 @@ func assignDHCP(CR *types.ControllerConnectRequest, CRR *types.ServerConnectResp
 
 			assigned = DHCPMapping[i].Assign()
 			if assigned {
+				DHCPMapping[i].DeviceKey = CR.DeviceKey
 				DHCPMapping[i].AssignHostname(CR.Hostname, Config.Hostname)
 				CRR.DHCP = DHCPMapping[i]
 				clientCoreMappings[index].DHCP = DHCPMapping[i]
