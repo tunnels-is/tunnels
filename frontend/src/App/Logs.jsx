@@ -4,25 +4,40 @@ import GLOBAL_STATE from "../state";
 import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, ArrowRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 
 const Logs = () => {
   const state = GLOBAL_STATE("logs")
   const [currentPage, setCurrentPage] = useState(1)
   const [searchFilter, setSearchFilter] = useState("")
+  const [tagFilter, setTagFilter] = useState("")
   const itemsPerPage = 100
 
   let logs = STORE.Cache.GetObject("logs")
   let classes = "logs-loader"
 
-  // Filter logs based on search
+  // Filter logs based on search and tag filter
   const filteredLogs = useMemo(() => {
     if (!logs) return []
-    if (!searchFilter) return logs
-    return logs.filter(line => 
-      line.toLowerCase().includes(searchFilter.toLowerCase())
-    )
-  }, [logs, searchFilter])
+    let filtered = logs
+
+    // Apply search filter
+    if (searchFilter) {
+      filtered = filtered.filter(line => 
+        line.toLowerCase().includes(searchFilter.toLowerCase())
+      )
+    }
+
+    // Apply tag filter
+    if (tagFilter) {
+      filtered = filtered.filter(line => 
+        line.includes(`| ${tagFilter} |`)
+      )
+    }
+
+    return filtered
+  }, [logs, searchFilter, tagFilter])
 
   // Calculate pagination on filtered logs
   const totalLogs = filteredLogs?.length || 0
@@ -47,6 +62,12 @@ const Logs = () => {
     setCurrentPage(1)
   }
 
+  // Reset to page 1 when tag filter changes
+  const handleTagFilterChange = (value) => {
+    setTagFilter(value)
+    setCurrentPage(1)
+  }
+
   return (
     <div className={classes} style={{
       display: 'flex', flexDirection: 'column'
@@ -63,7 +84,7 @@ const Logs = () => {
         gap: '20px',
         flexShrink: 0
       }}>
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
           <Button
             className={"flex items-center gap-1" + state.Theme?.neutralBtn}
             onClick={() => goToPage(1)}
@@ -92,18 +113,35 @@ const Logs = () => {
           >
             <ChevronsRight className="w-4 h-4" />
           </Button>
+
+          <Select 
+            value={tagFilter} 
+            onValueChange={handleTagFilterChange}
+          >
+            <SelectTrigger className="w-[120px]">
+              <SelectValue placeholder="Tag filter" />
+            </SelectTrigger>
+            <SelectContent className={"bg-transparent" + state.Theme?.borderColor + state.Theme?.mainBG}>
+              <SelectGroup>
+                <SelectItem className={state.Theme?.neutralSelect} value="">All</SelectItem>
+                <SelectItem className={state.Theme?.neutralSelect} value="INFO">INFO</SelectItem>
+                <SelectItem className={state.Theme?.neutralSelect} value="ERROR">ERROR</SelectItem>
+                <SelectItem className={state.Theme?.neutralSelect} value="DEBUG">DEBUG</SelectItem>
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+
+          <Input
+            className="w-full md:w-64 placeholder:text-muted-foreground text-white"
+            placeholder="Search logs..."
+            value={searchFilter}
+            onChange={handleSearchChange}
+          />
         </div>
 
         <span>
-          Page {currentPage} of {totalPages} ({totalLogs} total logs{searchFilter && ` filtered from ${logs?.length || 0}`}, showing {itemsPerPage} per page)
+          Page {currentPage} of {totalPages} ({totalLogs} total logs{(searchFilter || tagFilter) && ` filtered from ${logs?.length || 0}`}, showing {itemsPerPage} per page)
         </span>
-
-        <Input
-          className="w-full md:w-64 placeholder:text-muted-foreground text-white"
-          placeholder="Search logs..."
-          value={searchFilter}
-          onChange={handleSearchChange}
-        />
       </div >
 
       <div className="logs-window custom-scrollbar" style={{ flex: 1, overflow: 'auto' }}>
