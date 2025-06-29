@@ -1,18 +1,138 @@
 
 import STORE from "@/store";
 import GLOBAL_STATE from "../state";
+import { useState, useMemo } from "react";
 
 const Logs = () => {
   const state = GLOBAL_STATE("logs")
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(50)
 
   let logs = STORE.Cache.GetObject("logs")
   let classes = "logs-loader"
 
+  // Calculate pagination
+  const totalLogs = logs?.length || 0
+  const totalPages = Math.ceil(totalLogs / itemsPerPage)
+  
+  // Get current page logs
+  const paginatedLogs = useMemo(() => {
+    if (!logs) return []
+    const reversedLogs = logs.toReversed()
+    const startIndex = (currentPage - 1) * itemsPerPage
+    const endIndex = startIndex + itemsPerPage
+    return reversedLogs.slice(startIndex, endIndex)
+  }, [logs, currentPage, itemsPerPage])
+
+  const goToPage = (page) => {
+    setCurrentPage(Math.max(1, Math.min(page, totalPages)))
+  }
+
+  const handleItemsPerPageChange = (newItemsPerPage) => {
+    setItemsPerPage(newItemsPerPage)
+    setCurrentPage(1) // Reset to first page when changing items per page
+  }
+
   return (
     <div className={classes}>
+      
+      {/* Pagination Controls */}
+      <div className="pagination-controls" style={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center', 
+        padding: '10px 0', 
+        borderBottom: '1px solid #333',
+        marginBottom: '10px'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <span>Items per page:</span>
+          <select 
+            value={itemsPerPage} 
+            onChange={(e) => handleItemsPerPageChange(Number(e.target.value))}
+            style={{
+              padding: '4px 8px',
+              backgroundColor: '#2a2a2a',
+              color: 'white',
+              border: '1px solid #555',
+              borderRadius: '4px'
+            }}
+          >
+            <option value={25}>25</option>
+            <option value={50}>50</option>
+            <option value={100}>100</option>
+            <option value={200}>200</option>
+          </select>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <span>
+            Page {currentPage} of {totalPages} ({totalLogs} total logs)
+          </span>
+          
+          <div style={{ display: 'flex', gap: '5px' }}>
+            <button 
+              onClick={() => goToPage(1)} 
+              disabled={currentPage === 1}
+              style={{
+                padding: '4px 8px',
+                backgroundColor: currentPage === 1 ? '#555' : '#007acc',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: currentPage === 1 ? 'not-allowed' : 'pointer'
+              }}
+            >
+              First
+            </button>
+            <button 
+              onClick={() => goToPage(currentPage - 1)} 
+              disabled={currentPage === 1}
+              style={{
+                padding: '4px 8px',
+                backgroundColor: currentPage === 1 ? '#555' : '#007acc',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: currentPage === 1 ? 'not-allowed' : 'pointer'
+              }}
+            >
+              Prev
+            </button>
+            <button 
+              onClick={() => goToPage(currentPage + 1)} 
+              disabled={currentPage === totalPages}
+              style={{
+                padding: '4px 8px',
+                backgroundColor: currentPage === totalPages ? '#555' : '#007acc',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: currentPage === totalPages ? 'not-allowed' : 'pointer'
+              }}
+            >
+              Next
+            </button>
+            <button 
+              onClick={() => goToPage(totalPages)} 
+              disabled={currentPage === totalPages}
+              style={{
+                padding: '4px 8px',
+                backgroundColor: currentPage === totalPages ? '#555' : '#007acc',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: currentPage === totalPages ? 'not-allowed' : 'pointer'
+              }}
+            >
+              Last
+            </button>
+          </div>
+        </div>
+      </div>
 
       <div className="logs-window custom-scrollbar">
-        {logs?.toReversed().map((line, index) => {
+        {paginatedLogs?.map((line, index) => {
           let splitLine = line.split(" || ")
           let error = line.includes("| ERROR |")
           let debug = line.includes("| DEBUG |")
