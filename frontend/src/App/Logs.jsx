@@ -1,44 +1,17 @@
 
 import STORE from "@/store";
 import GLOBAL_STATE from "../state";
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, ArrowRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 
 const Logs = () => {
   const state = GLOBAL_STATE("logs")
   const [currentPage, setCurrentPage] = useState(1)
-  const [itemsPerPage, setItemsPerPage] = useState(50)
-  const logWindowRef = useRef(null)
-  const logLineRef = useRef(null)
+  const itemsPerPage = 100
 
   let logs = STORE.Cache.GetObject("logs")
   let classes = "logs-loader"
-
-  // Calculate how many logs can fit in the viewport
-  useEffect(() => {
-    const calculateItemsPerPage = () => {
-      if (logWindowRef.current && logLineRef.current) {
-        const windowHeight = window.innerHeight
-        const logWindowRect = logWindowRef.current.getBoundingClientRect()
-        const availableHeight = windowHeight - logWindowRect.top - 20 // 20px padding
-        const lineHeight = logLineRef.current.offsetHeight || 25 // fallback to 25px
-        const calculatedItems = Math.floor(availableHeight / lineHeight)
-        const newItemsPerPage = Math.max(10, calculatedItems) // minimum 10 items
-        
-        if (newItemsPerPage !== itemsPerPage) {
-          setItemsPerPage(newItemsPerPage)
-          setCurrentPage(1) // Reset to first page when changing items per page
-        }
-      }
-    }
-
-    // Calculate on mount and window resize
-    calculateItemsPerPage()
-    window.addEventListener('resize', calculateItemsPerPage)
-    
-    return () => window.removeEventListener('resize', calculateItemsPerPage)
-  }, [logs, itemsPerPage])
 
   // Calculate pagination
   const totalLogs = logs?.length || 0
@@ -107,7 +80,7 @@ const Logs = () => {
         </span>
       </div>
 
-      <div className="logs-window custom-scrollbar" ref={logWindowRef} style={{ flex: 1, overflow: 'auto' }}>
+      <div className="logs-window custom-scrollbar" style={{ flex: 1, overflow: 'auto' }}>
         {paginatedLogs?.map((line, index) => {
           let splitLine = line.split(" || ")
           let error = line.includes("| ERROR |")
@@ -115,11 +88,7 @@ const Logs = () => {
           let info = line.includes("| INFO  |")
 
           return (
-            <div 
-              className={`line`} 
-              key={index}
-              ref={index === 0 ? logLineRef : null}
-            >
+            <div className={`line`} key={index}>
 
               <div className="time">{splitLine[0]}</div>
 
