@@ -163,12 +163,12 @@ const SideBar = () => {
 
   return (
     <div
-      className={"fixed top-0 left-0 w-44 h-screen bg-[#0B0E14] border-r flex flex-col py-6 z-[2000]" + state.Theme?.borderColor}
+      className={"fixed sidebarscroll top-0 left-0 w-44 h-screen bg-[#0B0E14] border-r flex flex-col py-6 z-[2000]" + state.Theme?.borderColor}
       ref={sideb}
       id="sidebar"
     >
       {/* Logo or Brand */}
-      < div className="flex-1 overflow-y-auto space-y-6" >
+      < div className="flex-1 sidebarscroll overflow-y-auto space-y-6 pb-2" >
         {
           menu.groups.map((g) => {
             if (g.user === true && (!user || user.Email === "")) {
