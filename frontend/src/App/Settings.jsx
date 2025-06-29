@@ -21,6 +21,7 @@ import {
   Key,
   Network,
 } from "lucide-react";
+import InfoItem from "./component/InfoItem";
 
 const Settings = () => {
   const state = GLOBAL_STATE("settings");
@@ -98,17 +99,6 @@ const Settings = () => {
     </div>
   );
 
-  const InfoItem = ({ label, value, icon }) => (
-    <div className="flex flex-col py-2 space-y-1">
-      <div className="flex items-center gap-2">
-        {icon}
-        <Label className="text-sm font-medium">{label}</Label>
-      </div>
-      <code className="text-md block font-mono bg-muted/60 px-2 py-1.5 h-9  w-full overflow-hidden  break-all text-ellipsis text-nowrap">
-        {value !== undefined && value !== null ? String(value) : "Unknown"}
-      </code>
-    </div>
-  );
 
   return (
     <div className="container max-w-5xl ">
@@ -278,11 +268,11 @@ const Settings = () => {
         </TabsContent>
         <TabsContent value="net" className="pl-2">
           <Card className="bg-black border-none">
-            <CardContent>
+            <CardContent className="space-y-0">
               <InfoItem
                 label="Interface"
                 value={state.Network?.DefaultInterfaceName}
-                icon={<Network className="h-4 w-4 text-blue-400" />}
+                icon={<Network className="h-5 w-4 text-blue-400" />}
               />
 
               <InfoItem

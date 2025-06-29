@@ -2,7 +2,6 @@ import dayjs from "dayjs";
 const DATA = "data_";
 
 var STORE = {
-  debug: false,
   // debug: Boolean(window.localStorage.getItem("debug")),
   EncryptionTypes: ["None", "AES128", "AES256", "CHACHA20"],
   SupportPlatforms: [
@@ -122,6 +121,7 @@ var STORE = {
     }
   },
 
+  debug: Boolean(window.sessionStorage.getItem("debug")) === true ? true : false,
   Session: window.sessionStorage,
   Local: window.localStorage,
   Cache: {
@@ -131,17 +131,17 @@ var STORE = {
       FetchingState: false,
       DashboardData: undefined,
     },
-    Clear: function () {
+    Clear: function() {
       return STORE.Cache.interface.clear();
     },
-    Get: function (key) {
+    Get: function(key) {
       let item = STORE.Cache.interface.getItem(key);
       if (item === null) {
         return undefined;
       }
       return item;
     },
-    GetBool: function (key) {
+    GetBool: function(key) {
       let data = STORE.Cache.interface.getItem(key);
       if (data === null) {
         return undefined;
@@ -154,24 +154,25 @@ var STORE = {
     SetRawData(key, value) {
       STORE.Cache.interface.setItem(DATA + key, value);
     },
-    Set: function (key, value) {
+    Set: function(key, value) {
       STORE.Cache.interface.setItem(key, value);
     },
-    Del: function (key) {
+    Del: function(key) {
       STORE.Cache.interface.removeItem(key);
     },
-    DelObject: function (key) {
+    DelObject: function(key) {
       STORE.Cache.interface.removeItem(DATA + key);
       STORE.Cache.interface.removeItem(DATA + key + "_ct");
     },
-    GetObject: function (key) {
+    GetObject: function(key) {
+      console.trace();
       let jsonData = undefined;
       try {
         let object = STORE.Cache.interface.getItem(DATA + key);
         if (object === "undefined") {
           return undefined;
         }
-        if (!object || object === '""'){
+        if (!object || object === '""') {
           return undefined
         }
         jsonData = JSON.parse(object);
@@ -197,7 +198,7 @@ var STORE = {
 
       return jsonData;
     },
-    SetObject: function (key, object) {
+    SetObject: function(key, object) {
       try {
         if (STORE.debug) {
           console.log(
