@@ -137,7 +137,7 @@ const GenericTable = (props) => {
             onClick={() => t.Btn.Edit(t.data[i])}
             className="cursor-pointer"
           >
-            <Edit className="w-4 h-4 mr-2" /> Edit
+            <Edit className="w-4 h-4" /> Edit
           </DropdownMenuItem>,
         );
       }
@@ -150,7 +150,7 @@ const GenericTable = (props) => {
             onClick={() => t.Btn.Delete(t.data[i])}
             className="cursor-pointer text-red-500"
           >
-            <Trash2 className="w-4 h-4 mr-2" /> Delete
+            <Trash2 className="w-4 h-4" /> Delete
           </DropdownMenuItem>,
         );
       }
@@ -201,61 +201,59 @@ const GenericTable = (props) => {
   };
 
   return (
-    <div className={"flex flex-col gap-5 " + (props.className ? props.className : "")} >
-      <div className="flex flex-col md:flex-row justify-start items-center ">
+    <div className={"flex flex-col gap-5  flex-nowrap" + (props.className ? props.className : "")} >
+      <div className="flex flex-col md:flex-row justify-start items-center  flex-nowrap">
 
-        {t.Btn?.Save && (
-          <div className="flex mr-2 ">
+        <div className="flex gap-2">
+          {t.Btn?.Save && (
             <Button
               className={"flex  items-center gap-1" + state.Theme?.successBtn}
               onClick={() => t.Btn.Save()}
             >
               {props.saveButtonLabel ? props.saveButtonLabel : "Save"}
             </Button>
-          </div>
-        )}
-        {t.Btn?.New && (
-          <div className="flex mr-2">
+          )}
+          {t.Btn?.New && (
             <Button
-              className={"flex  items-center gap-1" + state.Theme?.successBtn}
+              className={"flex items-center gap-1" + state.Theme?.successBtn}
               onClick={() => t.Btn.New()}
             >
               {props.newButtonLabel ? props.newButtonLabel : "Create"}
             </Button>
-          </div>
-        )}
-        {t.more && (
-          <div className="flex gap-2">
-            <Button
-              className={"flex items-center gap-1" + state.Theme?.neutralBtn}
-              onClick={async () => {
-                let off = offset - t.opts.RowPerPage;
-                if (off < 0) off = 0;
-                setOffset(off);
-                await newPage(off, t.opts.RowPerPage);
-              }}
-            >
-              <ArrowLeft className="w-4 h-4" />
-            </Button>
+          )}
+          {t.more && (
+            <>
+              <Button
+                className={"flex items-center gap-1" + state.Theme?.neutralBtn}
+                onClick={async () => {
+                  let off = offset - t.opts.RowPerPage;
+                  if (off < 0) off = 0;
+                  setOffset(off);
+                  await newPage(off, t.opts.RowPerPage);
+                }}
+              >
+                <ArrowLeft className="w-4 h-4" />
+              </Button>
 
-            <Button
-              className={"flex items-center gap-1" + state.Theme?.neutralBtn}
-              onClick={async () => {
-                let off = offset + t.opts.RowPerPage;
-                if (off < 0) off = 0;
-                setOffset(off);
-                await newPage(off, t.opts.RowPerPage);
-              }}
-            >
-              <ArrowRight className="w-4 h-4" />
-            </Button>
-            <Input
-              className="w-full md:w-64 placeholder:text-muted-foreground text-white"
-              placeholder="Search..."
-              onChange={(e) => setFilter(e.target.value)}
-            />
-          </div>
-        )}
+              <Button
+                className={"flex items-center gap-1" + state.Theme?.neutralBtn}
+                onClick={async () => {
+                  let off = offset + t.opts.RowPerPage;
+                  if (off < 0) off = 0;
+                  setOffset(off);
+                  await newPage(off, t.opts.RowPerPage);
+                }}
+              >
+                <ArrowRight className="w-4 h-4" />
+              </Button>
+              <Input
+                className="w-full md:w-64 placeholder:text-muted-foreground text-white"
+                placeholder="Search..."
+                onChange={(e) => setFilter(e.target.value)}
+              />
+            </>
+          )}
+        </div>
 
       </div>
 
