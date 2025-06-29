@@ -75,17 +75,8 @@ const Logs = () => {
     }}>
 
       {/* Pagination Controls */}
-      < div className="pagination-controls" style={{
-        // display: 'flex',
-        // justifyContent: 'flex-start',
-        // alignItems: 'center',
-        // padding: '10px 0',
-        // borderBottom: '1px solid #333',
-        marginBottom: '10px',
-        // gap: '20px',
-        // flexShrink: 0
-      }}>
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+      < div className="pagination-controls bg-black z-[1000] pb-[15px] pt-[20px] fixed top-[0px]" >
+        <div className="flex gap-[10px]" >
           <Select
             value={tagFilter || "all"}
             onValueChange={handleTagFilterChange}
@@ -142,7 +133,7 @@ const Logs = () => {
 
       </div >
 
-      <div className="logs-window custom-scrollbar" style={{ flex: 1, overflow: 'auto' }}>
+      <div className="logs-window custom-scrollbar flex flex-col mt-[50px] overflow-auto">
         {paginatedLogs?.map((line, index) => {
           let splitLine = line.split(" || ")
           let error = line.includes("| ERROR |")

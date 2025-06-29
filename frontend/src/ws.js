@@ -11,8 +11,9 @@ var WS = {
     if (!logs) {
       logs = [];
     }
-    if (logs.length > 500) {
-      logs.splice(0, 5000);
+    if (logs.length > 5000) {
+      logs = [];
+      STORE.Cache.SetObject("logs", logs);
     }
     logs.push(event.data);
     STORE.Cache.SetObject("logs", logs);
