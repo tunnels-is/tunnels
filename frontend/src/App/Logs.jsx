@@ -64,7 +64,8 @@ const Logs = () => {
 
   // Reset to page 1 when tag filter changes
   const handleTagFilterChange = (value) => {
-    setTagFilter(value)
+    // Convert "all" back to empty string for filtering logic
+    setTagFilter(value === "all" ? "" : value)
     setCurrentPage(1)
   }
 
@@ -115,7 +116,7 @@ const Logs = () => {
           </Button>
 
           <Select 
-            value={tagFilter} 
+            value={tagFilter || "all"} 
             onValueChange={handleTagFilterChange}
           >
             <SelectTrigger className="w-[120px]">
@@ -123,7 +124,7 @@ const Logs = () => {
             </SelectTrigger>
             <SelectContent className={"bg-transparent" + state.Theme?.borderColor + state.Theme?.mainBG}>
               <SelectGroup>
-                <SelectItem className={state.Theme?.neutralSelect} value="">All</SelectItem>
+                <SelectItem className={state.Theme?.neutralSelect} value="all">All</SelectItem>
                 <SelectItem className={state.Theme?.neutralSelect} value="INFO">INFO</SelectItem>
                 <SelectItem className={state.Theme?.neutralSelect} value="ERROR">ERROR</SelectItem>
                 <SelectItem className={state.Theme?.neutralSelect} value="DEBUG">DEBUG</SelectItem>
