@@ -626,7 +626,7 @@ body::-webkit-scrollbar {
 }
 
 
-.bottom-loader {
+.logs-loader {
 
 
   .logs-window {
@@ -637,7 +637,6 @@ body::-webkit-scrollbar {
     height: 100%;
     /* font-family: system-ui; */
     margin-top: 00px;
-    font-size: 0.9em;
     /* overflow-y: scroll; */
     overflow-x: hidden;
     border-radius: 0px;
@@ -647,7 +646,7 @@ body::-webkit-scrollbar {
       // margin-top: -3px;
       padding: 1px 0px 2px 0px;
       font-size: 14px;
-      border-bottom: 1px solid var(--line-border);
+      /* border-bottom: 1px solid var(--line-border); */
       display: flex;
       flex-wrap: wrap;
     }

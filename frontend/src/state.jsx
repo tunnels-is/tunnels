@@ -217,14 +217,6 @@ export var STATE = {
 
   },
 
-
-
-  // NEW
-  // NEW
-  // NEW
-  // NEW
-  // NEW
-  // NEW
   GetUser: async () => {
     try {
       let user = STORE.Cache.GetObject("user");
@@ -439,20 +431,21 @@ export var STATE = {
       STATE.toggleError("unable to create tunnel");
     }
   },
-  debug: STORE.Cache.GetBool("debug"),
+  debug: STORE.Cache.GetBool("debug") === true ? true : false,
   toggleDebug: () => {
     let debug = STORE.Cache.GetBool("debug");
-    if (debug && debug === true) {
-      debug = false;
+    if (!debug || debug === false) {
+      debug = true
     } else {
-      debug = true;
+      debug = false
     }
     STORE.Cache.Set("debug", debug);
     STATE.debug = debug;
+    console.log("debug:", debug)
+    window.location.reload()
   },
   update: undefined,
   updates: {},
-  logs: STORE.Cache.GetObject("logs"),
   fullRerender: () => {
     if (STATE.debug) {
       console.log("FULL RERENDER");

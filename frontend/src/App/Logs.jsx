@@ -1,23 +1,15 @@
 
+import STORE from "@/store";
 import GLOBAL_STATE from "../state";
-import WS from "../ws";
-import { useState } from "react";
 
 const Logs = () => {
-  const state = GLOBAL_STATE("loader")
-  const [filter, setFilter] = useState("");
-  const [hide, setHide] = useState(false)
+  const state = GLOBAL_STATE("logs")
 
-  const reloadSocket = () => {
-    WS.sockets["logs"] = undefined
-    WS.NewSocket(WS.GetURL("logs"), "logs", WS.ReceiveLogEvent)
-  }
-
-  let logs = state.logs
-  let classes = "bottom-loader"
+  let logs = STORE.Cache.GetObject("logs")
+  let classes = "logs-loader"
 
   return (
-    <div className={classes}  >
+    <div className={classes}>
 
       <div className="logs-window custom-scrollbar">
         {logs?.toReversed().map((line, index) => {
@@ -26,11 +18,6 @@ const Logs = () => {
           let debug = line.includes("| DEBUG |")
           let info = line.includes("| INFO  |")
 
-          if (filter !== "") {
-            if (!line.includes(filter)) {
-              return
-            }
-          }
           return (
             <div className={`line`} key={index}>
 
