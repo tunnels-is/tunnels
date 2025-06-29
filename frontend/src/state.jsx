@@ -45,7 +45,7 @@ export var STATE = {
   },
 
   Theme: {
-    borderColor: " border border-[#1a1f2d]  cursor-pointer",
+    borderColor: " border border-[#1a1f2d]  cursor-pointer rounded",
     menuBG: " bg-[#0B0E14]",
     mainBG: " bg-black",
     neutralBtn: " text-white bg-[#2056e1] hover:bg-blue-500 hover:text-white cursor-pointer",
