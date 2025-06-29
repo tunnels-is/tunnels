@@ -119,7 +119,7 @@ const Logs = () => {
             value={tagFilter || "all"} 
             onValueChange={handleTagFilterChange}
           >
-            <SelectTrigger className="w-[120px]">
+            <SelectTrigger className="w-[120px] text-white">
               <SelectValue placeholder="Tag filter" />
             </SelectTrigger>
             <SelectContent className={"bg-transparent" + state.Theme?.borderColor + state.Theme?.mainBG}>
