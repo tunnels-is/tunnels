@@ -272,7 +272,7 @@ const DNS = () => {
     <div className="">
       <Tabs defaultValue="settings" >
         <TabsList
-          className={state.Theme?.borderColor}
+          className={state.Theme?.borderColor + " rounded"}
         >
           <TabsTrigger className={state.Theme?.tabs} value="settings">Settings</TabsTrigger>
           <TabsTrigger className={state.Theme?.tabs} value="records">DNS Records</TabsTrigger>
