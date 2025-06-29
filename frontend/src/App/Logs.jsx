@@ -2,6 +2,8 @@
 import STORE from "@/store";
 import GLOBAL_STATE from "../state";
 import { useState, useMemo } from "react";
+import { Button } from "@/components/ui/button";
+import { ArrowLeft, ArrowRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 
 const Logs = () => {
   const state = GLOBAL_STATE("logs")
@@ -39,11 +41,13 @@ const Logs = () => {
       {/* Pagination Controls */}
       <div className="pagination-controls" style={{ 
         display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center', 
+        justifyContent: 'flex-start', 
+        alignItems: 'flex-start', 
+        flexDirection: 'column',
         padding: '10px 0', 
         borderBottom: '1px solid #333',
-        marginBottom: '10px'
+        marginBottom: '10px',
+        gap: '10px'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <span>Items per page:</span>
@@ -63,71 +67,40 @@ const Logs = () => {
             <option value={100}>100</option>
             <option value={200}>200</option>
           </select>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <span>
+          <span style={{ marginLeft: '20px' }}>
             Page {currentPage} of {totalPages} ({totalLogs} total logs)
           </span>
-          
-          <div style={{ display: 'flex', gap: '5px' }}>
-            <button 
-              onClick={() => goToPage(1)} 
-              disabled={currentPage === 1}
-              style={{
-                padding: '4px 8px',
-                backgroundColor: currentPage === 1 ? '#555' : '#007acc',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: currentPage === 1 ? 'not-allowed' : 'pointer'
-              }}
-            >
-              First
-            </button>
-            <button 
-              onClick={() => goToPage(currentPage - 1)} 
-              disabled={currentPage === 1}
-              style={{
-                padding: '4px 8px',
-                backgroundColor: currentPage === 1 ? '#555' : '#007acc',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: currentPage === 1 ? 'not-allowed' : 'pointer'
-              }}
-            >
-              Prev
-            </button>
-            <button 
-              onClick={() => goToPage(currentPage + 1)} 
-              disabled={currentPage === totalPages}
-              style={{
-                padding: '4px 8px',
-                backgroundColor: currentPage === totalPages ? '#555' : '#007acc',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: currentPage === totalPages ? 'not-allowed' : 'pointer'
-              }}
-            >
-              Next
-            </button>
-            <button 
-              onClick={() => goToPage(totalPages)} 
-              disabled={currentPage === totalPages}
-              style={{
-                padding: '4px 8px',
-                backgroundColor: currentPage === totalPages ? '#555' : '#007acc',
-                color: 'white',
-                border: 'none',
-                borderRadius: '4px',
-                cursor: currentPage === totalPages ? 'not-allowed' : 'pointer'
-              }}
-            >
-              Last
-            </button>
-          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <Button 
+            className={"flex items-center gap-1" + state.Theme?.neutralBtn}
+            onClick={() => goToPage(1)} 
+            disabled={currentPage === 1}
+          >
+            <ChevronsLeft className="w-4 h-4" />
+          </Button>
+          <Button 
+            className={"flex items-center gap-1" + state.Theme?.neutralBtn}
+            onClick={() => goToPage(currentPage - 1)} 
+            disabled={currentPage === 1}
+          >
+            <ArrowLeft className="w-4 h-4" />
+          </Button>
+          <Button 
+            className={"flex items-center gap-1" + state.Theme?.neutralBtn}
+            onClick={() => goToPage(currentPage + 1)} 
+            disabled={currentPage === totalPages}
+          >
+            <ArrowRight className="w-4 h-4" />
+          </Button>
+          <Button 
+            className={"flex items-center gap-1" + state.Theme?.neutralBtn}
+            onClick={() => goToPage(totalPages)} 
+            disabled={currentPage === totalPages}
+          >
+            <ChevronsRight className="w-4 h-4" />
+          </Button>
         </div>
       </div>
 
