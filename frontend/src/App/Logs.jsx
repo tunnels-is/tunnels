@@ -24,14 +24,14 @@ const Logs = () => {
 
     // Apply search filter
     if (searchFilter) {
-      filtered = filtered.filter(line => 
+      filtered = filtered.filter(line =>
         line.toLowerCase().includes(searchFilter.toLowerCase())
       )
     }
 
     // Apply tag filter
     if (tagFilter) {
-      filtered = filtered.filter(line => 
+      filtered = filtered.filter(line =>
         line.includes(`| ${tagFilter} |`)
       )
     }
@@ -76,16 +76,32 @@ const Logs = () => {
 
       {/* Pagination Controls */}
       < div className="pagination-controls" style={{
-        display: 'flex',
-        justifyContent: 'flex-start',
-        alignItems: 'center',
-        padding: '10px 0',
-        borderBottom: '1px solid #333',
+        // display: 'flex',
+        // justifyContent: 'flex-start',
+        // alignItems: 'center',
+        // padding: '10px 0',
+        // borderBottom: '1px solid #333',
         marginBottom: '10px',
-        gap: '20px',
-        flexShrink: 0
+        // gap: '20px',
+        // flexShrink: 0
       }}>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <Select
+            value={tagFilter || "all"}
+            onValueChange={handleTagFilterChange}
+          >
+            <SelectTrigger className="w-[120px] text-white">
+              <SelectValue placeholder="Tag filter" />
+            </SelectTrigger>
+            <SelectContent className={"bg-transparent" + state.Theme?.borderColor + state.Theme?.mainBG}>
+              <SelectGroup>
+                <SelectItem className={state.Theme?.neutralSelect} value="all">All</SelectItem>
+                <SelectItem className={state.Theme?.neutralSelect} value="INFO">INFO</SelectItem>
+                <SelectItem className={state.Theme?.neutralSelect} value="ERROR">ERROR</SelectItem>
+                <SelectItem className={state.Theme?.neutralSelect} value="DEBUG">DEBUG</SelectItem>
+              </SelectGroup>
+            </SelectContent>
+          </Select>
           <Button
             className={"flex items-center gap-1" + state.Theme?.neutralBtn}
             onClick={() => goToPage(1)}
@@ -115,22 +131,6 @@ const Logs = () => {
             <ChevronsRight className="w-4 h-4" />
           </Button>
 
-          <Select 
-            value={tagFilter || "all"} 
-            onValueChange={handleTagFilterChange}
-          >
-            <SelectTrigger className="w-[120px] text-white">
-              <SelectValue placeholder="Tag filter" />
-            </SelectTrigger>
-            <SelectContent className={"bg-transparent" + state.Theme?.borderColor + state.Theme?.mainBG}>
-              <SelectGroup>
-                <SelectItem className={state.Theme?.neutralSelect} value="all">All</SelectItem>
-                <SelectItem className={state.Theme?.neutralSelect} value="INFO">INFO</SelectItem>
-                <SelectItem className={state.Theme?.neutralSelect} value="ERROR">ERROR</SelectItem>
-                <SelectItem className={state.Theme?.neutralSelect} value="DEBUG">DEBUG</SelectItem>
-              </SelectGroup>
-            </SelectContent>
-          </Select>
 
           <Input
             className="w-full md:w-64 placeholder:text-muted-foreground text-white"
@@ -140,9 +140,6 @@ const Logs = () => {
           />
         </div>
 
-        <span>
-          Page {currentPage} of {totalPages} ({totalLogs} total logs{(searchFilter || tagFilter) && ` filtered from ${logs?.length || 0}`}, showing {itemsPerPage} per page)
-        </span>
       </div >
 
       <div className="logs-window custom-scrollbar" style={{ flex: 1, overflow: 'auto' }}>
