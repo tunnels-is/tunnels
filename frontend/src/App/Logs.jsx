@@ -3,31 +3,48 @@ import STORE from "@/store";
 import GLOBAL_STATE from "../state";
 import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { ArrowLeft, ArrowRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 
 const Logs = () => {
   const state = GLOBAL_STATE("logs")
   const [currentPage, setCurrentPage] = useState(1)
+  const [searchFilter, setSearchFilter] = useState("")
   const itemsPerPage = 100
 
   let logs = STORE.Cache.GetObject("logs")
   let classes = "logs-loader"
 
-  // Calculate pagination
-  const totalLogs = logs?.length || 0
+  // Filter logs based on search
+  const filteredLogs = useMemo(() => {
+    if (!logs) return []
+    if (!searchFilter) return logs
+    return logs.filter(line => 
+      line.toLowerCase().includes(searchFilter.toLowerCase())
+    )
+  }, [logs, searchFilter])
+
+  // Calculate pagination on filtered logs
+  const totalLogs = filteredLogs?.length || 0
   const totalPages = Math.ceil(totalLogs / itemsPerPage)
 
-  // Get current page logs
+  // Get current page logs from filtered results
   const paginatedLogs = useMemo(() => {
-    if (!logs) return []
-    const reversedLogs = logs.toReversed()
+    if (!filteredLogs) return []
+    const reversedLogs = filteredLogs.toReversed()
     const startIndex = (currentPage - 1) * itemsPerPage
     const endIndex = startIndex + itemsPerPage
     return reversedLogs.slice(startIndex, endIndex)
-  }, [logs, currentPage, itemsPerPage])
+  }, [filteredLogs, currentPage, itemsPerPage])
 
   const goToPage = (page) => {
     setCurrentPage(Math.max(1, Math.min(page, totalPages)))
+  }
+
+  // Reset to page 1 when search filter changes
+  const handleSearchChange = (e) => {
+    setSearchFilter(e.target.value)
+    setCurrentPage(1)
   }
 
   return (
@@ -78,8 +95,15 @@ const Logs = () => {
         </div>
 
         <span>
-          Page {currentPage} of {totalPages} ({totalLogs} total logs, showing {itemsPerPage} per page)
+          Page {currentPage} of {totalPages} ({totalLogs} total logs{searchFilter && ` filtered from ${logs?.length || 0}`}, showing {itemsPerPage} per page)
         </span>
+
+        <Input
+          className="w-full md:w-64 placeholder:text-muted-foreground text-white"
+          placeholder="Search logs..."
+          value={searchFilter}
+          onChange={handleSearchChange}
+        />
       </div >
 
       <div className="logs-window custom-scrollbar" style={{ flex: 1, overflow: 'auto' }}>
