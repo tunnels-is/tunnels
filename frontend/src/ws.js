@@ -1,6 +1,5 @@
 import { STATE } from "./state";
 import STORE from "./store";
-import dayjs from "dayjs";
 
 var WS = {
   sockets: {
@@ -8,15 +7,16 @@ var WS = {
     state: undefined,
   },
   ReceiveLogEvent: (event) => {
-    if (!STATE.logs) {
-      STATE.logs = [];
+    let logs = STORE.Cache.GetObject("logs")
+    if (!logs) {
+      logs = [];
     }
-    if (STATE.logs.length > 400) {
-      STATE.logs.splice(0, 5000);
+    if (logs.length > 500) {
+      logs.splice(0, 5000);
     }
-    STATE.logs.push(event.data);
-    STORE.Cache.SetObject("logs", STATE.logs);
-    STATE.renderPage("loader");
+    logs.push(event.data);
+    STORE.Cache.SetObject("logs", logs);
+    STATE.renderPage("logs");
   },
   GetURL: (route) => {
     // console.log("connecting socket...")
