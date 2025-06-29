@@ -4,6 +4,7 @@ import GLOBAL_STATE from "../state";
 import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, ArrowRight, ChevronsLeft, ChevronsRight } from "lucide-react";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const Logs = () => {
   const state = GLOBAL_STATE("logs")
@@ -42,36 +43,12 @@ const Logs = () => {
       <div className="pagination-controls" style={{ 
         display: 'flex', 
         justifyContent: 'flex-start', 
-        alignItems: 'flex-start', 
-        flexDirection: 'column',
+        alignItems: 'center', 
         padding: '10px 0', 
         borderBottom: '1px solid #333',
         marginBottom: '10px',
-        gap: '10px'
+        gap: '20px'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <span>Items per page:</span>
-          <select 
-            value={itemsPerPage} 
-            onChange={(e) => handleItemsPerPageChange(Number(e.target.value))}
-            style={{
-              padding: '4px 8px',
-              backgroundColor: '#2a2a2a',
-              color: 'white',
-              border: '1px solid #555',
-              borderRadius: '4px'
-            }}
-          >
-            <option value={25}>25</option>
-            <option value={50}>50</option>
-            <option value={100}>100</option>
-            <option value={200}>200</option>
-          </select>
-          <span style={{ marginLeft: '20px' }}>
-            Page {currentPage} of {totalPages} ({totalLogs} total logs)
-          </span>
-        </div>
-
         <div style={{ display: 'flex', gap: '8px' }}>
           <Button 
             className={"flex items-center gap-1" + state.Theme?.neutralBtn}
@@ -101,6 +78,32 @@ const Logs = () => {
           >
             <ChevronsRight className="w-4 h-4" />
           </Button>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span>Items per page:</span>
+            <Select 
+              value={itemsPerPage.toString()} 
+              onValueChange={(value) => handleItemsPerPageChange(Number(value))}
+            >
+              <SelectTrigger className="w-[80px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className={"bg-transparent" + state.Theme?.borderColor + state.Theme?.mainBG}>
+                <SelectGroup>
+                  <SelectItem className={state.Theme?.neutralSelect} value="25">25</SelectItem>
+                  <SelectItem className={state.Theme?.neutralSelect} value="50">50</SelectItem>
+                  <SelectItem className={state.Theme?.neutralSelect} value="100">100</SelectItem>
+                  <SelectItem className={state.Theme?.neutralSelect} value="200">200</SelectItem>
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          </div>
+          
+          <span>
+            Page {currentPage} of {totalPages} ({totalLogs} total logs)
+          </span>
         </div>
       </div>
 
