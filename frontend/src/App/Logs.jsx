@@ -16,7 +16,7 @@ const Logs = () => {
   // Calculate pagination
   const totalLogs = logs?.length || 0
   const totalPages = Math.ceil(totalLogs / itemsPerPage)
-  
+
   // Get current page logs
   const paginatedLogs = useMemo(() => {
     if (!logs) return []
@@ -31,44 +31,46 @@ const Logs = () => {
   }
 
   return (
-    <div className={classes} style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
-      
+    <div className={classes} style={{
+      display: 'flex', flexDirection: 'column'
+    }}>
+
       {/* Pagination Controls */}
-      <div className="pagination-controls" style={{ 
-        display: 'flex', 
-        justifyContent: 'flex-start', 
-        alignItems: 'center', 
-        padding: '10px 0', 
+      < div className="pagination-controls" style={{
+        display: 'flex',
+        justifyContent: 'flex-start',
+        alignItems: 'center',
+        padding: '10px 0',
         borderBottom: '1px solid #333',
         marginBottom: '10px',
         gap: '20px',
         flexShrink: 0
       }}>
         <div style={{ display: 'flex', gap: '8px' }}>
-          <Button 
+          <Button
             className={"flex items-center gap-1" + state.Theme?.neutralBtn}
-            onClick={() => goToPage(1)} 
+            onClick={() => goToPage(1)}
             disabled={currentPage === 1}
           >
             <ChevronsLeft className="w-4 h-4" />
           </Button>
-          <Button 
+          <Button
             className={"flex items-center gap-1" + state.Theme?.neutralBtn}
-            onClick={() => goToPage(currentPage - 1)} 
+            onClick={() => goToPage(currentPage - 1)}
             disabled={currentPage === 1}
           >
             <ArrowLeft className="w-4 h-4" />
           </Button>
-          <Button 
+          <Button
             className={"flex items-center gap-1" + state.Theme?.neutralBtn}
-            onClick={() => goToPage(currentPage + 1)} 
+            onClick={() => goToPage(currentPage + 1)}
             disabled={currentPage === totalPages}
           >
             <ArrowRight className="w-4 h-4" />
           </Button>
-          <Button 
+          <Button
             className={"flex items-center gap-1" + state.Theme?.neutralBtn}
-            onClick={() => goToPage(totalPages)} 
+            onClick={() => goToPage(totalPages)}
             disabled={currentPage === totalPages}
           >
             <ChevronsRight className="w-4 h-4" />
@@ -78,7 +80,7 @@ const Logs = () => {
         <span>
           Page {currentPage} of {totalPages} ({totalLogs} total logs, showing {itemsPerPage} per page)
         </span>
-      </div>
+      </div >
 
       <div className="logs-window custom-scrollbar" style={{ flex: 1, overflow: 'auto' }}>
         {paginatedLogs?.map((line, index) => {
@@ -111,7 +113,7 @@ const Logs = () => {
           )
         })}
       </div>
-    </div>
+    </div >
   )
 }
 
