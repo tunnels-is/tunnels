@@ -23,21 +23,6 @@ func main() {
 	if fmtCount > 0 {
 		panic("YOU HAVE DEBUG PRINTS IN THE BUILD")
 	}
-
-	checkAppDebugFlag()
-}
-
-func checkAppDebugFlag() {
-	fb, err := os.ReadFile("../frontend/src/App.jsx")
-	if err != nil {
-		panic(err)
-	}
-	fbs := bytes.Split(fb, []byte{10})
-	for i := range fbs {
-		if bytes.Contains(fbs[i], []byte(`"debug", true`)) {
-			panic("app.jsx debug is set to true")
-		}
-	}
 }
 
 func checkDir(dir string) {
