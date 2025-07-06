@@ -14,7 +14,7 @@
  - golang
 
 # Starting the golang client
-NOTE: Running the client on windows,macos and linux requires additional permissions
+NOTE: The client requires sudo/admin on windows and mac, but only narrow net admin permission on linux.
 ```bash
 $ cd ./cmd/main
 $ go build .
@@ -22,6 +22,7 @@ $ ./main
 ```
 
 # Starting the web UI
+NOTE: when opening the dev ui, you must first accept the TLS certificate on port 7777 (https://127.0.0.1:7777)
 ```bash
 $ cd ./frontend
 $ pnpm install .
