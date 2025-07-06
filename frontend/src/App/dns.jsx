@@ -12,6 +12,8 @@ import GenericTable from "./GenericTable";
 import { TableCell } from "@/components/ui/table";
 import { useState } from "react";
 import NewObjectEditorDialog from "./NewObjectEdiorDialog";
+import { Globe } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 const DNSSort = (a, b) => {
   if (dayjs(a.LastSeen).unix() < dayjs(b.LastSeen).unix()) {
@@ -31,20 +33,16 @@ const DNS = () => {
   const [blocklist, setBlocklist] = useState(undefined)
   const [blocklistModal, setBlocklistModal] = useState(false)
   const [isBlocklistEdit, setIsBlocklistEdit] = useState(false)
+  const [cfg, setCfg] = useState({ ...state.Config })
+  const [mod, setMod] = useState(false)
 
-
-  let LogBlockedDomains = state.getKey("Config", "LogBlockedDomains");
-  let LogAllDomains = state.getKey("Config", "LogAllDomains");
-  let dnsStats = state.getKey("Config", "DNSstats");
-
-  let DNS1 = state.getKey("Config", "DNS1Default");
-  let DNS2 = state.getKey("Config", "DNS2Default");
-
-  let DNSServerIP = state.getKey("Config", "DNSServerIP");
-  let DNSOverHTTPS = state.getKey("Config", "DNSOverHTTPS");
-  let DNSServerPort = state.getKey("Config", "DNSServerPort");
-
-  let modified = STORE.Cache.GetBool("modified_Config");
+  const updatecfg = (key, value) => {
+    console.log(key, value)
+    let x = { ...cfg }
+    x[key] = value
+    setMod(true)
+    setCfg(x)
+  }
 
   useEffect(() => {
     state.GetBackendState();
@@ -255,6 +253,7 @@ const DNS = () => {
         })
         setBlocklistModal(true)
       },
+      Save: state.v2_ConfigSave
     },
     headers: ["Tag", "Domain Count", "Enabled"],
     headerClass: {},
@@ -263,14 +262,29 @@ const DNS = () => {
     },
   }
 
-  if (modified) {
-    bltable.Btn.Save = state.v2_ConfigSave
-  }
-
-
   return (
     <div className="">
       <Tabs defaultValue="settings" >
+        <div className="flex items-center justify-between">
+          {mod === true && (
+            <div className="mb-7 flex gap-[4px] items-center">
+              <Button
+                className={state.Theme?.successBtn}
+                onClick={async () => {
+                  state.Config = cfg
+                  let ok = await state.v2_ConfigSave()
+                  if (ok === true) {
+                    setMod(false)
+                  }
+                }}>
+                Save
+              </Button>
+              <div className="ml-3 text-yellow-400 text-xl">
+                Your config has un-saved changes
+              </div>
+            </div>
+          )}
+        </div>
         <TabsList
           className={state.Theme?.borderColor + " rounded"}
         >
@@ -290,14 +304,10 @@ const DNS = () => {
               label="Server IP"
               value={
                 <Input
-                  value={DNSServerIP}
+                  value={cfg.DNSServerIP}
                   onChange={(e) => {
-                    state.setKeyAndReloadDom(
-                      "Config",
-                      "DNSServerIP",
-                      e.target.value,
-                    );
-                    state.renderPage("dns");
+                    updatecfg("DNSServerIP", e.target.value)
+                    // state.renderPage("dns");
                   }}
                   type="text"
                 />
@@ -308,14 +318,10 @@ const DNS = () => {
               label="Server Port"
               value={
                 <Input
-                  value={DNSServerPort}
+                  value={cfg.DNSServerPort}
                   onChange={(e) => {
-                    state.setKeyAndReloadDom(
-                      "Config",
-                      "DNSServerPort",
-                      e.target.value,
-                    );
-                    state.renderPage("dns");
+                    updatecfg("DNSServerPort", e.target.value)
+                    // state.renderPage("dns");
                   }}
                   type="text"
                 />
@@ -326,14 +332,10 @@ const DNS = () => {
               label="Primary DNS"
               value={
                 <Input
-                  value={DNS1}
+                  value={cfg.DNS1Default}
                   onChange={(e) => {
-                    state.setKeyAndReloadDom(
-                      "Config",
-                      "DNS1Default",
-                      e.target.value,
-                    );
-                    state.renderPage("dns");
+                    updatecfg("DNS1Default", e.target.value)
+                    // state.renderPage("dns");
                   }}
                   type="text"
                 />
@@ -344,14 +346,10 @@ const DNS = () => {
               label="Backup DNS"
               value={
                 <Input
-                  value={DNS2}
+                  value={cfg.DNS2Default}
                   onChange={(e) => {
-                    state.setKeyAndReloadDom(
-                      "Config",
-                      "DNS2Default",
-                      e.target.value,
-                    );
-                    state.renderPage("dns");
+                    updatecfg("DNS2Default", e.target.value)
+                    // state.renderPage("dns");
                   }}
                   type="text"
                 />
@@ -361,9 +359,9 @@ const DNS = () => {
               <div className="flex items-center justify-between py-1 w-full">
                 <Label className="text-white mr-3">Secure DNS</Label>
                 <Switch
-                  checked={DNSOverHTTPS}
+                  checked={state?.Config?.DNSOverHTTPS}
                   onCheckedChange={() => {
-                    state.toggleKeyAndReloadDom("Config", "DNSOverHTTPS");
+                    state.toggleConfigKeyAndSave("Config", "DNSOverHTTPS");
                     state.fullRerender();
                   }}
                 />
@@ -372,9 +370,9 @@ const DNS = () => {
               <div className="flex items-center justify-between py-1">
                 <Label className="text-white mr-3">Log Blocked</Label>
                 <Switch
-                  checked={LogBlockedDomains}
+                  checked={state?.Config?.LogBlockedDomains}
                   onCheckedChange={() => {
-                    state.toggleKeyAndReloadDom("Config", "LogBlockedDomains");
+                    state.toggleConfigKeyAndSave("Config", "LogBlockedDomains");
                     state.fullRerender();
                   }}
                 />
@@ -383,9 +381,9 @@ const DNS = () => {
               <div className="flex items-center justify-between py-1">
                 <Label className="text-white mr-3">Log All</Label>
                 <Switch
-                  checked={LogAllDomains}
+                  checked={state?.Config?.LogAllDomains}
                   onCheckedChange={() => {
-                    state.toggleKeyAndReloadDom("Config", "LogAllDomains");
+                    state.toggleConfigKeyAndSave("Config", "LogAllDomains");
                     state.fullRerender();
                   }}
                 />
@@ -394,9 +392,9 @@ const DNS = () => {
               <div className="flex items-center justify-between py-1">
                 <Label className="text-white mr-3">DNS Stats</Label>
                 <Switch
-                  checked={dnsStats}
+                  checked={state?.Config?.DNSstats}
                   onCheckedChange={() => {
-                    state.toggleKeyAndReloadDom("Config", "DNSstats");
+                    state.toggleConfigKeyAndSave("Config", "DNSstats");
                     state.fullRerender();
                   }}
                 />
