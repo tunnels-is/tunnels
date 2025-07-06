@@ -113,7 +113,7 @@ func createDefaultTunnelMeta(minimal bool) (M *TunnelMETA) {
 		if cliConfig != nil {
 			M.ServerID = cliConfig.ServerID
 		}
-		M.AutoConnect = true
+		M.AutoConnect = false
 		M.PreventIPv6 = false
 	}
 	return
