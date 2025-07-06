@@ -107,17 +107,17 @@ const NewObjectEditor = (props) => {
 
   // Helper function to check if a field is read-only
   const isReadOnly = (k) => {
-    return props.opts?.fields[k] === "readonly" || 
-           k === "_id" || 
-           k === "CreatedAt" || 
-           k === "Added" || 
-           k === "UpdatedAt"
+    return props.opts?.fields[k] === "readonly" ||
+      k === "_id" ||
+      k === "CreatedAt" ||
+      k === "Added" ||
+      k === "UpdatedAt"
   }
 
   Object.keys(props.obj).map(k => {
     let type = getType(props.obj[k])
     const readonly = isReadOnly(k)
-    
+
     if (type === "array") {
       if (readonly) {
         readOnlyArrayKeys.push(k)
@@ -149,6 +149,11 @@ const NewObjectEditor = (props) => {
           kk = props.opts.nameMap[k] ? props.opts.nameMap[k] : k
         }
 
+        if (props.opts?.nameFormat[k]) {
+          kk = props.opts.nameFormat[k](props.obj)
+        }
+
+
         if (props.opts?.fields[k] === "hidden") {
           return null
         }
@@ -168,7 +173,7 @@ const NewObjectEditor = (props) => {
             </div>
           )
         }
-        
+
         if (type === "string" || type === "number") {
           return (
             <div key={k} className=" mt-2">
@@ -185,7 +190,7 @@ const NewObjectEditor = (props) => {
           )
         }
       })}
-      
+
       {/* Editable boolean fields */}
       {boolKeys.map(k => {
         let kk = k
@@ -209,7 +214,7 @@ const NewObjectEditor = (props) => {
           </div>
         )
       })}
-      
+
       {/* Editable array fields */}
       {arrayKeys.map(k => {
         if (props.opts?.fields[k] === "hidden") {
@@ -217,13 +222,13 @@ const NewObjectEditor = (props) => {
         }
         return walkArray(k)
       })}
-      
+
       {/* Read-only input fields */}
       {readOnlyInputKeys.map(k => renderReadOnlyField(k))}
-      
+
       {/* Read-only boolean fields */}
       {readOnlyBoolKeys.map(k => renderReadOnlyBoolField(k))}
-      
+
       {/* Read-only array fields (displayed as disabled) */}
       {readOnlyArrayKeys.map(k => {
         if (props.opts?.fields[k] === "hidden") {
@@ -239,7 +244,7 @@ const NewObjectEditor = (props) => {
             {props.obj[k].map((item, i) => {
               return (
                 <div key={i} className="flex">
-                  <Input disabled className={"w-[400px]" + state.Theme?.borderColor} 
+                  <Input disabled className={"w-[400px]" + state.Theme?.borderColor}
                     value={props.obj[k][i]} />
                 </div>
               )

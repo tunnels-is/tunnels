@@ -61,7 +61,9 @@ const useForm = (props) => {
 
 		inputs.Code = secret
 
-		let x = await state.ConfirmTwoFactorCode(inputs)
+		let x = await state.callController(null, null, "POST", "/v3/user/2fa/confirm",
+			inputs,
+			false, false)
 		if (x.status === 200) {
 			let c = { ...code }
 			c.Recovery = x.data.Data
@@ -81,7 +83,7 @@ const useForm = (props) => {
 			Email: user.Email
 		}
 
-		let x = await state.GetQRCode(data)
+		let x = await state.API.method("getQRCode", data)
 		if (x?.data) {
 			setCode(x.data)
 		} else {
