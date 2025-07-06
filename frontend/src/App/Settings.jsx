@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import InfoItem from "./component/InfoItem";
 import { useState } from "react";
+import FormKeyValue from "./component/formkeyvalue";
 
 const Settings = () => {
   const state = GLOBAL_STATE("settings");
@@ -173,101 +174,92 @@ const Settings = () => {
           <Card className="bg-black border-none">
             <CardContent className="space-y-0">
 
-              <div className="space-y-1 py-2">
-                <div className="flex items-center gap-2">
-                  <Globe className="h-4 w-4 text-blue-500" />
-                  <Label className="text-sm font-medium">APIIP</Label>
-                </div>
-                <Input
-                  value={cfg?.APIIP}
-                  onChange={(e) => {
-                    updatecfg("APIIP", e.target.value)
-                  }}
-                  type={"text"}
-                  className="w-full"
-                  key={"APIIP"}
-                />
-              </div>
+              <FormKeyValue
+                label="API IP"
+                icon={Network}
+                iconClass={"text-green-400"}
+                value={
+                  <Input
+                    value={cfg.APIIP}
+                    onChange={(e) => {
+                      updatecfg("APIIP", e.target.value)
+                    }}
+                    type="text"
+                  />
+                }
+              />
 
-              <div className="space-y-1 py-2">
-                <div className="flex items-center gap-2">
-                  <Server className="h-4 w-4 text-indigo-500" />
-                  <Label className="text-sm font-medium">APIPort</Label>
-                </div>
-                <Input
-                  value={cfg?.APIPort}
-                  onChange={(e) => {
-                    updatecfg("APIPort", e.target.value)
-                  }}
-                  type={"text"}
-                  className="w-full"
-                  key={"APIPort"}
-                />
-              </div>
+              <FormKeyValue
+                label="API Port"
+                icon={Server}
+                iconClass={"text-green-400"}
+                value={
+                  <Input
+                    value={cfg.APIPort}
+                    onChange={(e) => {
+                      updatecfg("APIPort", e.target.value)
+                    }}
+                    type="text"
+                  />
+                }
+              />
 
-              <div className="space-y-1 py-2">
-                <div className="flex items-center gap-2">
-                  <Globe className="h-4 w-4 text-green-500" />
-                  <Label className="text-sm font-medium">API Cert Domains</Label>
-                </div>
-                <Input
-                  value={cfg?.APICertDomains}
-                  onChange={(e) => {
-                    updatecfg("APICertDomains", e.target.value)
-                  }}
-                  type={"text"}
-                  className="w-full"
-                  key={"APICD"}
-                />
-              </div>
+              <FormKeyValue
+                label="API Certificate Domains"
+                icon={Globe}
+                value={
+                  <Input
+                    value={cfg.APICertDomains}
+                    onChange={(e) => {
+                      updatecfg("APICertDomains", e.target.value)
+                    }}
+                    type="text"
+                  />
+                }
+              />
 
-              <div className="space-y-1 py-2">
-                <div className="flex items-center gap-2">
-                  <Network className="h-4 w-4 text-cyan-500" />
-                  <Label className="text-sm font-medium">API Cert IPs</Label>
-                </div>
-                <Input
-                  value={cfg?.APICertIPs}
-                  onChange={(e) => {
-                    updatecfg("APICertIPs", e.target.value)
-                  }}
-                  type={"text"}
-                  className="w-full"
-                  key={"APICI"}
-                />
-              </div>
+              <FormKeyValue
+                label="API Certificate IPs"
+                icon={Network}
+                value={
+                  <Input
+                    value={cfg.APICertIPs}
+                    onChange={(e) => {
+                      updatecfg("APICertIPs", e.target.value)
+                    }}
+                    type="text"
+                  />
+                }
+              />
 
-              <div className="space-y-1 py-2">
-                <div className="flex items-center gap-2">
-                  <Key className="h-4 w-4 text-cyan-500" />
-                  <Label className="text-sm font-medium">API Cert Path</Label>
-                </div>
-                <Input
-                  value={cfg?.APICert}
-                  onChange={(e) => {
-                    updatecfg("APICert", e.target.value)
-                  }}
-                  type={"text"}
-                  className="w-full"
-                  key={"APICert"}
-                />
-              </div>
-
-              <div className="space-y-1 py-2">
-                <div className="flex items-center gap-2">
-                  <Key className="h-4 w-4 text-cyan-500" />
-                  <Label className="text-sm font-medium">API Key Path</Label>
-                </div>
-                <Input
-                  value={cfg?.APIKey}
-                  onChange={(e) => {
-                    updatecfg("APIKey", e.target.value)
-                  }}
-                  type={"text"}
-                  className="w-full"
-                  key={"APIKey"}
-                />
-              </div>
+              <FormKeyValue
+                label="API Certificate Path"
+                icon={Key}
+                iconClass={"text-orange-400"}
+                value={
+                  <Input
+                    value={cfg.APICert}
+                    onChange={(e) => {
+                      updatecfg("APICert", e.target.value)
+                    }}
+                    type="text"
+                  />
+                }
+              />
+              <FormKeyValue
+                label="API Key Path"
+                icon={Key}
+                iconClass={"text-orange-400"}
+                value={
+                  <Input
+                    value={cfg.APIKey}
+                    onChange={(e) => {
+                      updatecfg("APIKey", e.target.value)
+                    }}
+                    type="text"
+                  />
+                }
+              />
 
             </CardContent>
           </Card>
