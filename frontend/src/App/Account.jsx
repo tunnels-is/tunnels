@@ -37,7 +37,7 @@ const Account = () => {
 
 
 
-  let APIKey = state.getKey("User", "APIKey");
+  let APIKey = state?.User?.APIKey
 
   const LogoutButton = (obj) => {
     return <DropdownMenuItem

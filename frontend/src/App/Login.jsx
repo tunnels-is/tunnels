@@ -49,7 +49,7 @@ const useForm = () => {
 
   const saveNewAuth = () => {
     state.Config.AuthServers.push(newAuth.url)
-    state.ConfigSave()
+    state.v2_ConfigSave()
   }
 
   const RegisterSubmit = async () => {

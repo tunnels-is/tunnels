@@ -365,7 +365,6 @@ export var STATE = {
         STORE.Cache.SetObject("config", newConfig);
         STATE.Config = newConfig;
         STATE.successNotification("Config saved", undefined);
-        STORE.Cache.Set("modified_Config", false);
       }
     } catch (error) {
       console.dir(error);
@@ -411,7 +410,6 @@ export var STATE = {
     }
 
     STATE.Config.DNSBlockLists = newLists;
-    STORE.Cache.Set("modified_Config", true);
     STATE.renderPage("dns");
   },
   createTunnel: async () => {
@@ -500,19 +498,9 @@ export var STATE = {
     toast.success(e);
   },
   User: STORE.Cache.GetObject("user"),
-  modifiedUser: STORE.Cache.GetObject("modifiedUser"),
   Config: STORE.Cache.GetObject("config"),
-  modifiedConfig: STORE.Cache.GetObject("modifiedConfig"),
-  SetConfigModifiedState: (state) => {
-    STORE.Cache.Set("configIsModified", state);
-  },
-  UserSaveModifiedSate: () => {
-    STORE.Cache.SetObject("modifiedUser", STATE.modifiedUser);
-  },
   refreshApiKey: async () => {
-    STATE.createObjectIfEmpty("modifiedUser");
-    STATE.modifiedUser.APIKey = uuidv4();
-    STATE.UserSaveModifiedSate();
+    STATE.User.APIKey = uuidv4();
     await STATE.UpdateUser()
     STATE.renderPage("account");
   },
@@ -548,123 +536,6 @@ export var STATE = {
 
     STATE.v2_TunnelSave(tun, tun.Tag);
   },
-  ConfigSave: async () => {
-    // STATE.createObjectIfEmpty("modifiedConfig")
-    // if (!STATE.modifiedConfig.Connections) {
-    // 	STATE.modifiedConfig.Connections = []
-    // }
-    //
-    // STATE.Tunnels?.forEach(cc => {
-    // 	let found = false
-    // 	STATE.modifiedConfig.Connections.forEach(mc => {
-    // 		if (mc.WindowsGUID == cc.WindowsGUID) {
-    // 			found = true
-    // 		}
-    // 	})
-    // 	if (!found) {
-    // 		STATE.modifiedConfig.Connections.push(cc)
-    // 	}
-    // });
-    // if (STATE.modifiedLists) {
-    // 	STATE.modifiedLists.forEach(l => {
-    // 		if (l.Enabled) {
-    // 			STATE.Config?.AvailableBlockLists.forEach(al => {
-    // 				if (al.Tag === l.Tag) {
-    // 					al.Enabled = l.Enabled
-    // 				}
-    // 			})
-    // 		}
-    // 	})
-    // }
-    STATE.modifiedConfig?.DNSRecords?.forEach((r, i) => {
-      r.IP = r.IP?.filter((ip) => ip !== "");
-      r.TXT = r.TXT?.filter((txt) => txt !== "");
-    });
-
-    let newConfig = {
-      ...STATE.Config,
-      ...STATE.modifiedConfig,
-    };
-
-    let success = false;
-    try {
-      STATE.toggleLoading({
-        tag: "config",
-        show: true,
-        msg: "Saving config..",
-      });
-
-      let resp = await STATE.API.method("setConfig", newConfig);
-      if (resp === undefined) {
-        STATE.errorNotification("Unknown error, please try again in a moment");
-      } else if (resp.status === 200) {
-        success = true;
-        STORE.Cache.SetObject("config", newConfig);
-        STORE.Cache.Set("darkMode", newConfig.DarkMode);
-        STATE.Config = newConfig;
-      }
-    } catch (error) {
-      console.dir(error);
-    }
-    STATE.toggleLoading(undefined);
-    STATE.globalRerender();
-    return success;
-  },
-  RemoveModifiedConfig: () => {
-    STATE.modifiedConfig = undefined;
-    STATE.modifiedLists = undefined;
-    STATE.ConfigSaveModifiedSate();
-    STATE.SetConfigModifiedState(false);
-    STATE.globalRerender();
-  },
-  ConfigSaveModifiedSate: () => {
-    STORE.Cache.SetObject("modifiedConfig", STATE.modifiedConfig);
-  },
-  ConfigSaveOriginalState: () => {
-    STORE.Cache.SetObject("config", STATE.Config);
-  },
-  SaveConnectionsToModifiedConfig: (connections) => {
-    STATE.createObjectIfEmpty("modifiedConfig");
-    STATE.modifiedConfig.Connections = connections;
-    STATE.ConfigSaveModifiedSate();
-  },
-  GetModifiedConnections: () => {
-    let cons = STATE.modifiedConfig?.Connections;
-    if (!cons) {
-      return [];
-    }
-    return cons;
-  },
-  DeleteConnection: async (id) => {
-    STATE.Config?.Connections.forEach((c, index) => {
-      if (c.WindowsGUID === id) {
-        // console.log("SPLICING:", c.WindowsGUID)
-        STATE.Config?.Connections.splice(index, 1);
-      } else if (c.WindowsGUID === "") {
-        STATE.Config?.Connections.splice(index, 1);
-      }
-    });
-    STATE.modifiedConfig?.Connections.forEach((c, index) => {
-      if (c.WindowsGUID === id) {
-        // console.log("SPLICING:", c.WindowsGUID)
-        STATE.modifiedConfig?.Connections.splice(index, 1);
-      } else if (c.WindowsGUID === "") {
-        STATE.modifiedConfig?.Connections.splice(index, 1);
-      }
-    });
-    STATE.ConfigSave();
-    STATE.globalRerender();
-  },
-  createObjectIfEmpty: (type) => {
-    if (STATE[type] === undefined) {
-      STATE[type] = {};
-    }
-  },
-  createArrayIfEmpty: (type) => {
-    if (STATE[type] === undefined) {
-      STATE[type] = [];
-    }
-  },
   toggleBlocklist: (list) => {
     let found = false;
     STATE.Config?.DNSBlockLists.forEach((l, i) => {
@@ -679,54 +550,18 @@ export var STATE = {
       STATE.Config.DNSBlockLists.push(list);
     }
 
-    STORE.Cache.Set("modified_Config", true);
     STATE.renderPage("dns");
   },
-  getKey: (type, key) => {
+  toggleConfigKeyAndSave: (_, key) => {
+    if (STATE.ConfigSaveInProgress) {
+      return
+    }
     try {
-      if (!STATE[type]) {
-        return undefined;
-      }
-      return STATE[type][key];
+      STATE.Config[key] = !STATE.Config[key]
     } catch (error) {
       console.dir(error);
     }
-    return undefined;
-  },
-  toggleKeyAndReloadDom: (type, key) => {
-    try {
-      let mod = STATE[type];
-      if (mod === undefined) {
-        STATE[type] = {};
-      }
-
-      STATE[type][key] = !STATE[type][key];
-      STORE.Cache.SetObject(type, STATE[type]);
-      STORE.Cache.Set("modified_" + type, true);
-      STATE.rerender();
-      return;
-    } catch (error) {
-      console.dir(error);
-    }
-  },
-  setArrayAndReloadDom: (type, key, value) => {
-    value = value.split(",");
-    STATE.setKeyAndReloadDom(type, key, value);
-  },
-  setKeyAndReloadDom: (type, key, value) => {
-    try {
-      let mod = STATE[type];
-      if (mod === undefined) {
-        STATE[type] = {};
-      }
-      STATE[type][key] = value;
-      STORE.Cache.SetObject(type, STATE[type]);
-      STORE.Cache.Set("modified_" + type, true);
-      STATE.rerender();
-      return;
-    } catch (error) {
-      console.dir(error);
-    }
+    STATE.v2_ConfigSave()
   },
   ConfirmAndExecute: async (type, id, duration, title, subtitle, method) => {
     if (type === "") {
@@ -761,19 +596,14 @@ export var STATE = {
   },
   UpdateUser: async () => {
     try {
-      let newUser = {
-        ...STATE.User,
-        ...STATE.modifiedUser,
-      };
+      let newUser = STATE.User
 
       let x = await STATE.callController(null, null, "POST", "/v3/user/update",
         { APIKey: newUser.APIKey },
         false, true)
       if (x === true) {
         STORE.Cache.SetObject("user", newUser);
-        STORE.Cache.DelObject("modifiedUser");
         STORE.User = newUser;
-        STORE.modifiedUser = undefined;
         STATE.successNotification("User updated")
       } else {
         STATE.toggleError(x);
@@ -1360,22 +1190,6 @@ export var STATE = {
         return error?.response;
       }
     },
-  },
-  // 299,792,458
-  updateNodes: (nodes) => {
-    if (nodes && nodes.length > 0) {
-      STORE.Cache.SetObject("nodes", nodes);
-      STATE.Servers = nodes;
-      STATE.rerender();
-    } else {
-      STORE.Cache.SetObject("nodes", []);
-      STATE.Servers = [];
-      STATE.rerender();
-    }
-  },
-  ModifiedNodes: STORE.Cache.GetObject("modifiedNodes"),
-  SaveModifiedNodes: () => {
-    STORE.Cache.SetObject("modifiedNodes", STATE.ModifiedNodes);
   },
   GetCountryName: (countryCode) => {
     let x = STATE.countryCodeMap[countryCode]
