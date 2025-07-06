@@ -10,7 +10,8 @@ const FormKeyValue = (props) => {
     <div className="max-w-[400px] py-2">
       <div className="flex mb-1">
         {props?.icon &&
-          <props.icon className="h-4 w-4 pb-[1px] text-green-500" />
+          <props.icon
+            className={`h-4 w-4 pb-[1px] text-cyan-500 ${props.iconClass} `} />
         }
         <Label className="ml-1 text-white">{props?.label}</Label>
       </div>
