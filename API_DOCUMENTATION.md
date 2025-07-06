@@ -1,5 +1,7 @@
 # Tunnels API Documentation
 
+# WARNING: this was generate using machine learning, it might not be 100% accurate.
+
 This document provides comprehensive documentation for the Tunnels API endpoints, including request/response formats and example usage.
 
 ## Base URL and Authentication
