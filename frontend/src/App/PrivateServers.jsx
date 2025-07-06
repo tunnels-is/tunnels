@@ -63,8 +63,6 @@ const PrivateServers = () => {
 			if (c.ServerID === server._id) {
 				servertun = c
 				assignedTunnels++
-			} else if (c.Tag == "tunnels") {
-				defTunnel = c
 			}
 		})
 
