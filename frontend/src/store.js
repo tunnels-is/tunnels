@@ -121,7 +121,8 @@ var STORE = {
     }
   },
 
-  debug: Boolean(window.sessionStorage.getItem("debug")) === true ? true : false,
+  // debug: Boolean(window.sessionStorage.getItem("debug")) === true ? true : false,
+  debug: false,
   Session: window.sessionStorage,
   Local: window.localStorage,
   Cache: {
@@ -165,7 +166,7 @@ var STORE = {
       STORE.Cache.interface.removeItem(DATA + key + "_ct");
     },
     GetObject: function(key) {
-      console.trace();
+      // console.trace();
       let jsonData = undefined;
       try {
         let object = STORE.Cache.interface.getItem(DATA + key);

@@ -4,7 +4,6 @@ import STORE from "../../store";
 import {
   Table,
   TableBody,
-  TableCaption,
   TableCell,
   TableHead,
   TableHeader,
@@ -23,7 +22,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Search,
-  ArrowRight,
   Filter,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";

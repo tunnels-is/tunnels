@@ -22,22 +22,22 @@ import {
   Network,
 } from "lucide-react";
 import InfoItem from "./component/InfoItem";
+import { useState } from "react";
 
 const Settings = () => {
   const state = GLOBAL_STATE("settings");
+  const [cfg, setCfg] = useState({ ...state.Config })
+  const [mod, setMod] = useState(false)
 
-  let DebugLogging = state.getKey("Config", "DebugLogging");
-  let ConsoleLogging = state.getKey("Config", "ConsoleLogging");
-  let ErrorLogging = state.getKey("Config", "ErrorLogging");
-  let InfoLogging = state.getKey("Config", "InfoLogging");
-  let APICertDomains = state.getKey("Config", "APICertDomains");
-  let APICertIPs = state.getKey("Config", "APICertIPs");
-  let APICert = state.getKey("Config", "APICert");
-  let APIKey = state.getKey("Config", "APIKey");
-  let APIIP = state.getKey("Config", "APIIP");
-  let APIPort = state.getKey("Config", "APIPort");
-
-  let modified = STORE.Cache.GetBool("modified_Config");
+  const updatecfg = (key, value) => {
+    if (key === "APICertDomains" || key === "APICertIPs") {
+      value = value.split(",")
+    }
+    let x = { ...cfg }
+    x[key] = value
+    setMod(true)
+    setCfg(x)
+  }
 
   useEffect(() => {
     state.GetBackendState();
@@ -76,38 +76,20 @@ const Settings = () => {
     </div>
   );
 
-  const SettingInput = ({
-    label,
-    icon,
-    value,
-    onChange,
-    type = "text",
-    placeholder = "",
-  }) => (
-    <div className="space-y-1 py-2">
-      <div className="flex items-center gap-2">
-        {icon}
-        <Label className="text-sm font-medium">{label}</Label>
-      </div>
-      <Input
-        value={value}
-        onChange={onChange}
-        type={type}
-        placeholder={placeholder}
-        className="w-full"
-      />
-    </div>
-  );
-
-
   return (
     <div className="container max-w-5xl ">
       <div className="flex items-center justify-between">
-        {modified === true && (
+        {mod === true && (
           <div className="mb-7 flex gap-[4px] items-center">
             <Button
               className={state.Theme?.successBtn}
-              onClick={() => state.v2_ConfigSave()}>
+              onClick={async () => {
+                state.Config = cfg
+                let ok = await state.v2_ConfigSave()
+                if (ok === true) {
+                  setMod(false)
+                }
+              }}>
               Save
             </Button>
             <div className="ml-3 text-yellow-400 text-xl">
@@ -133,9 +115,9 @@ const Settings = () => {
               <SettingToggle
                 label="Basic Logging"
                 icon={<Info className="h-4 w-4 mt-1 text-blue-500" />}
-                value={InfoLogging}
+                value={state?.Config?.InfoLogging}
                 onToggle={() => {
-                  state.toggleKeyAndReloadDom("Config", "InfoLogging");
+                  state.toggleConfigKeyAndSave("Config", "InfoLogging");
                   state.renderPage("settings");
                 }}
                 description="Logs basic information about application operations"
@@ -144,9 +126,9 @@ const Settings = () => {
               <SettingToggle
                 label="Error Logging"
                 icon={<AlertTriangle className="h-4 w-4 mt-1 text-red-500" />}
-                value={ErrorLogging}
+                value={state?.Config?.ErrorLogging}
                 onToggle={() => {
-                  state.toggleKeyAndReloadDom("Config", "ErrorLogging");
+                  state.toggleConfigKeyAndSave("Config", "ErrorLogging");
                   state.renderPage("settings");
                 }}
                 description="Logs errors and exceptions"
@@ -154,9 +136,9 @@ const Settings = () => {
               <SettingToggle
                 label="Console Logging"
                 icon={<Bug className="h-4 w-4 mt-1 text-amber-500" />}
-                value={ConsoleLogging}
+                value={state?.Config?.ConsoleLogging}
                 onToggle={() => {
-                  state.toggleKeyAndReloadDom("Config", "ConsoleLogging");
+                  state.toggleConfigKeyAndSave("Config", "ConsoleLogging");
                   state.renderPage("settings");
                 }}
                 description="Detailed logs for troubleshooting"
@@ -165,9 +147,9 @@ const Settings = () => {
               <SettingToggle
                 label="Debug Logging"
                 icon={<Bug className="h-4 w-4 mt-1 text-amber-500" />}
-                value={DebugLogging}
+                value={state?.Config?.DebugLogging}
                 onToggle={() => {
-                  state.toggleKeyAndReloadDom("Config", "DebugLogging");
+                  state.toggleConfigKeyAndSave("Config", "DebugLogging");
                   state.renderPage("settings");
                 }}
                 description="Detailed logs for troubleshooting"
@@ -190,79 +172,103 @@ const Settings = () => {
         <TabsContent value="apiconfig" className="pl-2">
           <Card className="bg-black border-none">
             <CardContent className="space-y-0">
-              <SettingInput
-                label="API IP"
-                icon={<Globe className="h-4 w-4 text-blue-500" />}
-                value={APIIP}
-                onChange={(e) => {
-                  state.setKeyAndReloadDom("Config", "APIIP", e.target.value);
-                  state.renderPage("settings");
-                }}
-                placeholder="Enter API IP address"
-              />
 
-              <SettingInput
-                label="API Port"
-                icon={<Server className="h-4 w-4 text-indigo-500" />}
-                value={APIPort}
-                onChange={(e) => {
-                  state.setKeyAndReloadDom("Config", "APIPort", e.target.value);
-                  state.renderPage("settings");
-                }}
-                placeholder="Enter API port"
-              />
+              <div className="space-y-1 py-2">
+                <div className="flex items-center gap-2">
+                  <Globe className="h-4 w-4 text-blue-500" />
+                  <Label className="text-sm font-medium">APIIP</Label>
+                </div>
+                <Input
+                  value={cfg?.APIIP}
+                  onChange={(e) => {
+                    updatecfg("APIIP", e.target.value)
+                  }}
+                  type={"text"}
+                  className="w-full"
+                  key={"APIIP"}
+                />
+              </div>
 
-              <SettingInput
-                label="API Cert Domains"
-                icon={<Globe className="h-4 w-4 text-green-500" />}
-                value={APICertDomains}
-                onChange={(e) => {
-                  state.setArrayAndReloadDom(
-                    "Config",
-                    "APICertDomains",
-                    e.target.value,
-                  );
-                  state.renderPage("settings");
-                }}
-                placeholder="Enter domain names"
-              />
+              <div className="space-y-1 py-2">
+                <div className="flex items-center gap-2">
+                  <Server className="h-4 w-4 text-indigo-500" />
+                  <Label className="text-sm font-medium">APIPort</Label>
+                </div>
+                <Input
+                  value={cfg?.APIPort}
+                  onChange={(e) => {
+                    updatecfg("APIPort", e.target.value)
+                  }}
+                  type={"text"}
+                  className="w-full"
+                  key={"APIPort"}
+                />
+              </div>
 
-              <SettingInput
-                label="API Cert IPs"
-                icon={<Network className="h-4 w-4 text-cyan-500" />}
-                value={APICertIPs}
-                onChange={(e) => {
-                  state.setArrayAndReloadDom(
-                    "Config",
-                    "APICertIPs",
-                    e.target.value,
-                  );
-                  state.renderPage("settings");
-                }}
-                placeholder="Enter IP addresses"
-              />
+              <div className="space-y-1 py-2">
+                <div className="flex items-center gap-2">
+                  <Globe className="h-4 w-4 text-green-500" />
+                  <Label className="text-sm font-medium">API Cert Domains</Label>
+                </div>
+                <Input
+                  value={cfg?.APICertDomains}
+                  onChange={(e) => {
+                    updatecfg("APICertDomains", e.target.value)
+                  }}
+                  type={"text"}
+                  className="w-full"
+                  key={"APICD"}
+                />
+              </div>
 
-              <SettingInput
-                label="API Cert"
-                icon={<Key className="h-4 w-4 text-amber-500" />}
-                value={APICert}
-                onChange={(e) => {
-                  state.setKeyAndReloadDom("Config", "APICert", e.target.value);
-                  state.renderPage("settings");
-                }}
-                placeholder="Enter certificate path"
-              />
+              <div className="space-y-1 py-2">
+                <div className="flex items-center gap-2">
+                  <Network className="h-4 w-4 text-cyan-500" />
+                  <Label className="text-sm font-medium">API Cert IPs</Label>
+                </div>
+                <Input
+                  value={cfg?.APICertIPs}
+                  onChange={(e) => {
+                    updatecfg("APICertIPs", e.target.value)
+                  }}
+                  type={"text"}
+                  className="w-full"
+                  key={"APICI"}
+                />
+              </div>
 
-              <SettingInput
-                label="API Key"
-                icon={<Key className="h-4 w-4 text-rose-500" />}
-                value={APIKey}
-                onChange={(e) => {
-                  state.setKeyAndReloadDom("Config", "APIKey", e.target.value);
-                  state.renderPage("settings");
-                }}
-                placeholder="Enter API key"
-              />
+              <div className="space-y-1 py-2">
+                <div className="flex items-center gap-2">
+                  <Key className="h-4 w-4 text-cyan-500" />
+                  <Label className="text-sm font-medium">API Cert Path</Label>
+                </div>
+                <Input
+                  value={cfg?.APICert}
+                  onChange={(e) => {
+                    updatecfg("APICert", e.target.value)
+                  }}
+                  type={"text"}
+                  className="w-full"
+                  key={"APICert"}
+                />
+              </div>
+
+              <div className="space-y-1 py-2">
+                <div className="flex items-center gap-2">
+                  <Key className="h-4 w-4 text-cyan-500" />
+                  <Label className="text-sm font-medium">API Key Path</Label>
+                </div>
+                <Input
+                  value={cfg?.APIKey}
+                  onChange={(e) => {
+                    updatecfg("APIKey", e.target.value)
+                  }}
+                  type={"text"}
+                  className="w-full"
+                  key={"APIKey"}
+                />
+              </div>
+
             </CardContent>
           </Card>
         </TabsContent>
