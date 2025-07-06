@@ -280,7 +280,6 @@ export var STATE = {
       return undefined;
     }
   },
-  v2_Cleanup: () => { },
   v2_TunnelDelete: async (tun) => {
     try {
       STATE.toggleLoading({
@@ -373,33 +372,6 @@ export var STATE = {
     STATE.toggleLoading(undefined);
     STATE.globalRerender();
     return ok
-  },
-
-  // OLD
-  // OLD
-  // OLD
-  // OLD
-  // OLD
-  // OLD
-  // OLD
-  TablePageSize: Number(STORE.Cache.Get("pageSize")),
-  setPageSize: (id, count) => {
-    let pg = STORE.Cache.GetObject("table_" + id);
-    console.log("HIT!", id, pg);
-    if (pg) {
-      pg.TableSize = Number(count);
-      STORE.Cache.SetObject("table_" + id, pg);
-    }
-    STATE.renderPage(id);
-  },
-  setPage: (id, page) => {
-    let pg = STORE.Cache.GetObject("table_" + id);
-    console.log("HIT!", id, pg);
-    if (pg) {
-      pg.CurrentPage = Number(page);
-      STORE.Cache.SetObject("table_" + id, pg);
-    }
-    STATE.renderPage(id);
   },
   deleteBlocklist: (blocklist) => {
     let newLists = STATE.Config.DNSBlockLists;
@@ -524,18 +496,6 @@ export var STATE = {
     }
     STATE.v2_TunnelSave(tun, tun.Tag);
   },
-  changeServerOnTunnel: (tun, index) => {
-    let tunnels = [...STATE.Tunnels];
-
-    tunnels?.forEach((t, i) => {
-      if (t.Tag.toLowerCase() === tun.Tag.toLowerCase()) {
-        tunnels[i].ServerID = index;
-        return;
-      }
-    });
-
-    STATE.v2_TunnelSave(tun, tun.Tag);
-  },
   toggleBlocklist: (list) => {
     let found = false;
     STATE.Config?.DNSBlockLists.forEach((l, i) => {
@@ -615,9 +575,6 @@ export var STATE = {
     STATE.toggleLoading(undefined);
   },
   connectToVPN: async (c, server) => {
-    console.log("CONNECTING")
-    console.dir(c)
-    console.dir(server)
     if (!server && !c) {
       STATE.errorNotification("no server or tunnel given when connecting");
       return;
@@ -648,13 +605,6 @@ export var STATE = {
       connectionRequest.EncType = c.EncryptionType;
     }
 
-    STATE.Servers?.forEach((s) => {
-      if (s._id === c.ServerID) {
-        server = s;
-        connectionRequest.ServerID = s._id;
-      }
-    });
-
     if (!server) {
       STATE.PrivateServers?.forEach((s) => {
         if (s._id === c.ServerID) {
@@ -673,10 +623,6 @@ export var STATE = {
 
     connectionRequest.URL = STATE.User.AuthServer
     connectionRequest.Secure = STATE.User.Secure
-
-    console.log("CONR");
-    console.dir(connectionRequest);
-
     try {
       STATE.toggleLoading({
         logTag: "connect",
@@ -741,7 +687,6 @@ export var STATE = {
     STATE.GetBackendState();
   },
   FinalizeLogout: async () => {
-    console.log("FINALIZING LOGOUT")
     STATE.DelUser();
     STORE.Cache.Clear();
     STATE.GetBackendState();
@@ -797,73 +742,14 @@ export var STATE = {
     STATE.rerender();
   },
 
-  ForwardToController: async (req, loader) => {
-    if (!req.URL || req.URL === "") {
-      req.URL = state.User?.AuthServer
-    }
-    if (!req.URL || req.URL === "") {
-      STATE.toggleError("no server selected")
-    }
-    req.Secure = req.Secure === undefined ? true : req.Secure
-    STATE.toggleLoading(loader);
-    console.log("FW:", req.Secure)
-    let x = await STATE.API.method("forwardToController", req);
-    STATE.toggleLoading(undefined);
-    return x;
-  },
-  // ForwardToController: async (req, loader) => {
-  //   if (!req.URL) {
-  //     req.URL = state.User?.AuthServer
-  //   }
-  //   if (!req.URL) {
-  //     STATE.toggleError("no server selected")
-  //     return
-  //   }
-  //   if (req.URL) {
-  //     if (!req.URL.endsWith("/")) {
-  //       req.URL += "/"
-  //     }
-  //   }
-
-  //   let url = req.URL + req.Path
-  //   let data = req.JSONData ? req.JSONData : null
-  //   let noLogout = req.NoLogout ? req.NoLogout : true
-  //   let timeout = req.Timeout ? req.Timeout : 20000
-  //   let ignoreError = req.InoreError ? req.IgnoreError : false
-
-
-  //   STATE.toggleLoading(loader);
-  //   let x = await STATE.API.methodv2(url, data, noLogout, timeout, ignoreError);
-  //   STATE.toggleLoading(undefined);
-  //   return x;
-  // },
-
   LicenseKey: "",
   UpdateLicenseInput: (value) => {
     STATE.LicenseKey = value;
     STATE.rerender();
   },
-  GetPrivateServersInProgress: false,
-  Servers: STORE.Cache.GetObject("servers"),
   PrivateServers: STORE.Cache.GetObject("private-servers"),
   updatePrivateServers: () => {
     STORE.Cache.SetObject("private-servers", STATE.PrivateServers);
-  },
-  ModifiedServers: [],
-  UpdateModifiedServer: function(server, key, value) {
-    let found = false;
-    STATE.ModifiedServers.forEach((s, i) => {
-      if (s._id === server._id) {
-        STATE.ModifiedServers[i][key] = value;
-        found = true;
-        return;
-      }
-    });
-    if (!found) {
-      server[key] = value;
-      STATE.ModifiedServers.push(server);
-    }
-    STATE.renderPage("inspect-server");
   },
   ActivateLicense: async () => {
     if (!STATE.User) {
@@ -886,160 +772,6 @@ export var STATE = {
 
     STORE.Cache.SetObject("user", { ...STATE.User });
     STATE.rerender();
-  },
-  GetQRCode: async (inputs) => {
-    return STATE.API.method("getQRCode", inputs);
-  },
-  ConfirmTwoFactorCode: async (inputs, url) => {
-
-
-    return await STATE.callController(null, null, "POST", "/v3/user/2fa/confirm",
-      inputs,
-      false, false)
-
-    return STATE.ForwardToController(
-      {
-        URL: url,
-        Path: "v3/user/2fa/confirm",
-        Method: "POST",
-        JSONData: inputs,
-        Timeout: 20000,
-      },
-      {
-        tag: "two-factor",
-        show: true,
-        msg: "confirming two-factor authentication ..",
-      },
-    );
-  },
-
-  Org: STORE.Cache.GetObject("org"),
-  updateOrg: (org) => {
-    if (org) {
-      STORE.Cache.SetObject("org", org);
-      STATE.Org = org;
-      STATE.rerender();
-    }
-  },
-  UpdateOrgInProgress: false,
-  API_UpdateOrg: async (org) => {
-    if (STATE.UpdateOrgInProgress) {
-      return;
-    }
-    STATE.UpdateOrgInProgress = true;
-
-    let resp = undefined;
-    try {
-      let FR = {
-        Path: "v3/org/update",
-        Method: "POST",
-        Timeout: 10000,
-      };
-
-      if (STATE.User) {
-        FR.JSONData = {
-          UID: STATE.User._id,
-          DeviceToken: STATE.User.DeviceToken.DT,
-          Org: org,
-        };
-      } else {
-        STATE.UpdateOrgInProgress = false;
-        return undefined;
-      }
-
-      STATE.toggleLoading({
-        tag: "ORG_UPDATE",
-        show: true,
-        msg: "updating organization ...",
-      });
-
-      resp = await STATE.API.method("forwardToController", FR);
-      if (resp?.status === 200) {
-        STATE.updateOrg(org);
-      }
-    } catch (error) {
-      console.dir(error);
-    }
-
-    STATE.toggleLoading(undefined);
-    STATE.UpdateOrgInProgress = false;
-  },
-  CreateOrgInProgress: false,
-  API_GetUsers: async (offset, limit) => {
-    try {
-      let FR = {
-        URL: STATE.User.AuthServer,
-        Secure: STATE.User.Secure,
-        Path: "v3/user/list",
-        Method: "POST",
-        Timeout: 10000,
-      };
-      if (STATE.User) {
-        FR.JSONData = {
-          UID: STATE.User._id,
-          DeviceToken: STATE.User.DeviceToken.DT,
-          Offset: offset,
-          Limit: limit,
-        };
-      } else {
-        return undefined;
-      }
-
-      STATE.toggleLoading({
-        tag: "USERS_LIST",
-        show: true,
-        msg: "fetching users..",
-      });
-
-      let resp = await STATE.API.method("forwardToController", FR);
-      if (resp?.status === 200) {
-        STATE.toggleLoading(undefined);
-        return resp.data
-      }
-    } catch (error) {
-      console.dir(error);
-    }
-
-    STATE.toggleLoading(undefined);
-    return undefined;
-  },
-  API_GetDevices: async (offset, limit) => {
-    try {
-      let FR = {
-        URL: STATE.User.AuthServer,
-        Secure: STATE.User.Secure,
-        Path: "v3/device/list",
-        Method: "POST",
-        Timeout: 10000,
-      };
-      if (STATE.User) {
-        FR.JSONData = {
-          UID: STATE.User._id,
-          DeviceToken: STATE.User.DeviceToken.DT,
-          Offset: offset,
-          Limit: limit,
-        };
-      } else {
-        return undefined;
-      }
-
-      STATE.toggleLoading({
-        tag: "DEVICE_LIST",
-        show: true,
-        msg: "fetching devices..",
-      });
-
-      let resp = await STATE.API.method("forwardToController", FR);
-      if (resp?.status === 200) {
-        STATE.toggleLoading(undefined);
-        return resp.data
-      }
-    } catch (error) {
-      console.dir(error);
-    }
-
-    STATE.toggleLoading(undefined);
-    return undefined;
   },
   DNSStats: STORE.Cache.GetObject("dns-stats"),
   DNSListDateFormat: "ddd D. HH:mm:ss",

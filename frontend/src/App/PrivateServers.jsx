@@ -59,7 +59,6 @@ const PrivateServers = () => {
 	const ConnectColumn = (server) => {
 		let servertun = undefined
 		let assignedTunnels = 0
-		let defTunnel = undefined
 		state?.Tunnels?.map(c => {
 			if (c.ServerID === server._id) {
 				servertun = c
@@ -69,13 +68,6 @@ const PrivateServers = () => {
 			}
 		})
 
-		if (assignedTunnels > 1) {
-			conButton = function() {
-				state.toggleError("too many tunnels assigned to server")
-			}
-		}
-
-		let con = undefined
 		let conButton = function() {
 			state.ConfirmAndExecute(
 				"success",
@@ -91,6 +83,14 @@ const PrivateServers = () => {
 					}
 				})
 		}
+
+		if (assignedTunnels > 1) {
+			conButton = function() {
+				state.toggleError("too many tunnels assigned to server")
+			}
+		}
+
+		let con = undefined
 
 		state?.ActiveTunnels?.forEach((x, i) => {
 			if (x.CR?.ServerID === server._id) {
