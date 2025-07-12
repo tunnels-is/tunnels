@@ -111,9 +111,16 @@ func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
 		return
 	}
+
+	errData, okData := APIv2_Health()
+	if errData != nil {
+		sendHTTPErrorResponse(w, errData)
+		return
+	}
+
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusOK)
-	_, _ = fmt.Fprintln(w, "OK")
+	_, _ = fmt.Fprintln(w, okData)
 }
 
 func loggingTimingMiddleware(next http.Handler) http.Handler {

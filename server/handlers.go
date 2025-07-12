@@ -520,3 +520,41 @@ func API_ActivateLicenseKey(w http.ResponseWriter, r *http.Request) {
 	}
 	sendHTTPOKResponse(w, 200, okData)
 }
+
+func API_Firewall(w http.ResponseWriter, r *http.Request) {
+	defer BasicRecover()
+	fr := new(types.FirewallRequest)
+	err := decodeBody(r, fr)
+	if err != nil {
+		senderr(w, 400, "Invalid request body", slog.Any("error", err))
+		return
+	}
+
+	errData, okData := APIv2_Firewall(fr)
+	if errData != nil {
+		sendHTTPErrorResponse(w, errData)
+		return
+	}
+	sendHTTPOKResponse(w, 200, okData)
+}
+
+func API_ListDevices(w http.ResponseWriter, r *http.Request) {
+	defer BasicRecover()
+	hasAPIKey := HTTP_validateKey(r)
+
+	F := new(FORM_LIST_DEVICE)
+	if !hasAPIKey {
+		err := decodeBody(r, F)
+		if err != nil {
+			senderr(w, 400, "Invalid request body", slog.Any("error", err))
+			return
+		}
+	}
+
+	errData, okData := APIv2_ListDevices(hasAPIKey, F)
+	if errData != nil {
+		sendHTTPErrorResponse(w, errData)
+		return
+	}
+	sendHTTPOKResponse(w, 200, okData)
+}
