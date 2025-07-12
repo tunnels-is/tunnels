@@ -116,6 +116,13 @@ func routeNetConMessage(message *netConMessage) any {
 	case "/v3/connect":
 		return handleAcceptUserConnections(message.Data)
 
+	case "/v3/firewall":
+		return handleFirewall(message.Data)
+	case "/v3/devices":
+		return handleListDevices(message.Data)
+	case "/health":
+		return handleHealth(message.Data)
+
 	default:
 		return makeErr(400, fmt.Sprintf("Unknown method: %s", message.Method), slog.String("method", message.Method))
 	}
@@ -468,6 +475,39 @@ func handleAcceptUserConnections(data any) any {
 		return makeErr(400, "Invalid request format", slog.Any("err", err))
 	}
 	errData, okData := APIv2_AcceptUserConnections(form)
+	if errData != nil {
+		return errData
+	}
+	return okData
+}
+
+// LAN and health management handlers
+func handleFirewall(data any) any {
+	form, err := castToStruct[types.FirewallRequest](data)
+	if err != nil {
+		return makeErr(400, "Invalid request format", slog.Any("err", err))
+	}
+	errData, okData := APIv2_Firewall(form)
+	if errData != nil {
+		return errData
+	}
+	return okData
+}
+
+func handleListDevices(data any) any {
+	form, err := castToStruct[FORM_LIST_DEVICE](data)
+	if err != nil {
+		return makeErr(400, "Invalid request format", slog.Any("err", err))
+	}
+	errData, okData := APIv2_ListDevices(false, form) // No API key for TCP connections
+	if errData != nil {
+		return errData
+	}
+	return okData
+}
+
+func handleHealth(data any) any {
+	errData, okData := APIv2_Health()
 	if errData != nil {
 		return errData
 	}
