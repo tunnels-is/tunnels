@@ -7,7 +7,6 @@ import (
 	"io"
 	"log/slog"
 	"net"
-	"reflect"
 
 	"github.com/tunnels-is/tunnels/types"
 )
@@ -54,14 +53,9 @@ func handleUDPConnection(conn net.Conn) {
 		return
 	}
 
-	// Route to appropriate APIv2 method based on the Method field
-	response := routeNetConMessage(&message)
-
-	// Send response back to client
-	sendNetConResponse(conn, response)
+	sendNetConResponse(conn, routeNetConMessage(&message))
 }
 
-// routeNetConMessage routes the message to the appropriate APIv2 function
 func routeNetConMessage(message *netConMessage) any {
 	switch message.Method {
 	// User management methods
@@ -138,7 +132,7 @@ func routeNetConMessage(message *netConMessage) any {
 }
 
 // User management handlers
-func handleUserLogin(data interface{}) interface{} {
+func handleUserLogin(data any) any {
 	form, err := castToStruct[LOGIN_FORM](data)
 	if err != nil {
 		return makeErr(400, "Invalid request format", slog.Any("err", err))
@@ -150,7 +144,7 @@ func handleUserLogin(data interface{}) interface{} {
 	return okData
 }
 
-func handleUserCreate(data interface{}) interface{} {
+func handleUserCreate(data any) any {
 	form, err := castToStruct[REGISTER_FORM](data)
 	if err != nil {
 		return makeErr(400, "Invalid request format", slog.Any("err", err))
@@ -162,7 +156,7 @@ func handleUserCreate(data interface{}) interface{} {
 	return okData
 }
 
-func handleUserUpdate(data interface{}) interface{} {
+func handleUserUpdate(data any) any {
 	form, err := castToStruct[USER_UPDATE_FORM](data)
 	if err != nil {
 		return makeErr(400, "Invalid request format", slog.Any("err", err))
@@ -174,7 +168,7 @@ func handleUserUpdate(data interface{}) interface{} {
 	return okData
 }
 
-func handleUserLogout(data interface{}) interface{} {
+func handleUserLogout(data any) any {
 	form, err := castToStruct[LOGOUT_FORM](data)
 	if err != nil {
 		return makeErr(400, "Invalid request format", slog.Any("err", err))
@@ -186,7 +180,7 @@ func handleUserLogout(data interface{}) interface{} {
 	return okData
 }
 
-func handleUserList(data interface{}) interface{} {
+func handleUserList(data any) any {
 	form, err := castToStruct[FORM_LIST_USERS](data)
 	if err != nil {
 		return makeErr(400, "Invalid request format", slog.Any("err", err))
@@ -198,7 +192,7 @@ func handleUserList(data interface{}) interface{} {
 	return okData
 }
 
-func handleUserRequestPasswordCode(data interface{}) interface{} {
+func handleUserRequestPasswordCode(data any) any {
 	form, err := castToStruct[PASSWORD_RESET_FORM](data)
 	if err != nil {
 		return makeErr(400, "Invalid request format", slog.Any("err", err))
@@ -210,7 +204,7 @@ func handleUserRequestPasswordCode(data interface{}) interface{} {
 	return okData
 }
 
-func handleUserResetPassword(data interface{}) interface{} {
+func handleUserResetPassword(data any) any {
 	form, err := castToStruct[PASSWORD_RESET_FORM](data)
 	if err != nil {
 		return makeErr(400, "Invalid request format", slog.Any("err", err))
@@ -222,7 +216,7 @@ func handleUserResetPassword(data interface{}) interface{} {
 	return okData
 }
 
-func handleUserTwoFactorConfirm(data interface{}) interface{} {
+func handleUserTwoFactorConfirm(data any) any {
 	form, err := castToStruct[TWO_FACTOR_FORM](data)
 	if err != nil {
 		return makeErr(400, "Invalid request format", slog.Any("err", err))
@@ -234,7 +228,7 @@ func handleUserTwoFactorConfirm(data interface{}) interface{} {
 	return okData
 }
 
-func handleUserToggleSubStatus(data interface{}) interface{} {
+func handleUserToggleSubStatus(data any) any {
 	form, err := castToStruct[USER_UPDATE_SUB_FORM](data)
 	if err != nil {
 		return makeErr(400, "Invalid request format", slog.Any("err", err))
@@ -246,7 +240,7 @@ func handleUserToggleSubStatus(data interface{}) interface{} {
 	return okData
 }
 
-func handleActivateLicenseKey(data interface{}) interface{} {
+func handleActivateLicenseKey(data any) any {
 	form, err := castToStruct[KEY_ACTIVATE_FORM](data)
 	if err != nil {
 		return makeErr(400, "Invalid request format", slog.Any("err", err))
@@ -259,7 +253,7 @@ func handleActivateLicenseKey(data interface{}) interface{} {
 }
 
 // Device management handlers
-func handleDeviceCreate(data interface{}) interface{} {
+func handleDeviceCreate(data any) any {
 	form, err := castToStruct[FORM_CREATE_DEVICE](data)
 	if err != nil {
 		return makeErr(400, "Invalid request format", slog.Any("err", err))
@@ -271,7 +265,7 @@ func handleDeviceCreate(data interface{}) interface{} {
 	return okData
 }
 
-func handleDeviceUpdate(data interface{}) interface{} {
+func handleDeviceUpdate(data any) any {
 	form, err := castToStruct[FORM_UPDATE_DEVICE](data)
 	if err != nil {
 		return makeErr(400, "Invalid request format", slog.Any("err", err))
@@ -283,7 +277,7 @@ func handleDeviceUpdate(data interface{}) interface{} {
 	return okData
 }
 
-func handleDeviceDelete(data interface{}) interface{} {
+func handleDeviceDelete(data any) any {
 	form, err := castToStruct[FORM_DELETE_DEVICE](data)
 	if err != nil {
 		return makeErr(400, "Invalid request format", slog.Any("err", err))
@@ -295,7 +289,7 @@ func handleDeviceDelete(data interface{}) interface{} {
 	return okData
 }
 
-func handleDeviceList(data interface{}) interface{} {
+func handleDeviceList(data any) any {
 	form, err := castToStruct[FORM_LIST_DEVICE](data)
 	if err != nil {
 		return makeErr(400, "Invalid request format", slog.Any("err", err))
@@ -307,7 +301,7 @@ func handleDeviceList(data interface{}) interface{} {
 	return okData
 }
 
-func handleDeviceGet(data interface{}) interface{} {
+func handleDeviceGet(data any) any {
 	form, err := castToStruct[types.FORM_GET_DEVICE](data)
 	if err != nil {
 		return makeErr(400, "Invalid request format", slog.Any("err", err))
@@ -320,7 +314,7 @@ func handleDeviceGet(data interface{}) interface{} {
 }
 
 // Group management handlers
-func handleGroupCreate(data interface{}) interface{} {
+func handleGroupCreate(data any) any {
 	form, err := castToStruct[FORM_CREATE_GROUP](data)
 	if err != nil {
 		return makeErr(400, "Invalid request format", slog.Any("err", err))
@@ -332,7 +326,7 @@ func handleGroupCreate(data interface{}) interface{} {
 	return okData
 }
 
-func handleGroupUpdate(data interface{}) interface{} {
+func handleGroupUpdate(data any) any {
 	form, err := castToStruct[FORM_UPDATE_GROUP](data)
 	if err != nil {
 		return makeErr(400, "Invalid request format", slog.Any("err", err))
@@ -344,7 +338,7 @@ func handleGroupUpdate(data interface{}) interface{} {
 	return okData
 }
 
-func handleGroupDelete(data interface{}) interface{} {
+func handleGroupDelete(data any) any {
 	form, err := castToStruct[FORM_DELETE_GROUP](data)
 	if err != nil {
 		return makeErr(400, "Invalid request format", slog.Any("err", err))
@@ -356,7 +350,7 @@ func handleGroupDelete(data interface{}) interface{} {
 	return okData
 }
 
-func handleGroupList(data interface{}) interface{} {
+func handleGroupList(data any) any {
 	form, err := castToStruct[FORM_LIST_GROUP](data)
 	if err != nil {
 		return makeErr(400, "Invalid request format", slog.Any("err", err))
@@ -368,7 +362,7 @@ func handleGroupList(data interface{}) interface{} {
 	return okData
 }
 
-func handleGroupGet(data interface{}) interface{} {
+func handleGroupGet(data any) any {
 	form, err := castToStruct[FORM_GET_GROUP](data)
 	if err != nil {
 		return makeErr(400, "Invalid request format", slog.Any("err", err))
@@ -380,7 +374,7 @@ func handleGroupGet(data interface{}) interface{} {
 	return okData
 }
 
-func handleGroupGetEntities(data interface{}) interface{} {
+func handleGroupGetEntities(data any) any {
 	form, err := castToStruct[FORM_GET_GROUP_ENTITIES](data)
 	if err != nil {
 		return makeErr(400, "Invalid request format", slog.Any("err", err))
@@ -392,7 +386,7 @@ func handleGroupGetEntities(data interface{}) interface{} {
 	return okData
 }
 
-func handleGroupAdd(data interface{}) interface{} {
+func handleGroupAdd(data any) any {
 	form, err := castToStruct[FORM_GROUP_ADD](data)
 	if err != nil {
 		return makeErr(400, "Invalid request format", slog.Any("err", err))
@@ -404,7 +398,7 @@ func handleGroupAdd(data interface{}) interface{} {
 	return okData
 }
 
-func handleGroupRemove(data interface{}) interface{} {
+func handleGroupRemove(data any) any {
 	form, err := castToStruct[FORM_GROUP_REMOVE](data)
 	if err != nil {
 		return makeErr(400, "Invalid request format", slog.Any("err", err))
@@ -417,7 +411,7 @@ func handleGroupRemove(data interface{}) interface{} {
 }
 
 // Server management handlers
-func handleServerCreate(data interface{}) interface{} {
+func handleServerCreate(data any) any {
 	form, err := castToStruct[FORM_CREATE_SERVER](data)
 	if err != nil {
 		return makeErr(400, "Invalid request format", slog.Any("err", err))
@@ -429,7 +423,7 @@ func handleServerCreate(data interface{}) interface{} {
 	return okData
 }
 
-func handleServerUpdate(data interface{}) interface{} {
+func handleServerUpdate(data any) any {
 	form, err := castToStruct[FORM_UPDATE_SERVER](data)
 	if err != nil {
 		return makeErr(400, "Invalid request format", slog.Any("err", err))
@@ -441,7 +435,7 @@ func handleServerUpdate(data interface{}) interface{} {
 	return okData
 }
 
-func handleServerGet(data interface{}) interface{} {
+func handleServerGet(data any) any {
 	form, err := castToStruct[types.FORM_GET_SERVER](data)
 	if err != nil {
 		return makeErr(400, "Invalid request format", slog.Any("err", err))
@@ -453,7 +447,7 @@ func handleServerGet(data interface{}) interface{} {
 	return okData
 }
 
-func handleServersForUser(data interface{}) interface{} {
+func handleServersForUser(data any) any {
 	form, err := castToStruct[FORM_GET_SERVERS](data)
 	if err != nil {
 		return makeErr(400, "Invalid request format", slog.Any("err", err))
@@ -466,7 +460,7 @@ func handleServersForUser(data interface{}) interface{} {
 }
 
 // Connection handlers
-func handleSessionCreate(data interface{}) interface{} {
+func handleSessionCreate(data any) any {
 	form, err := castToStruct[types.ControllerConnectRequest](data)
 	if err != nil {
 		return makeErr(400, "Invalid request format", slog.Any("err", err))
@@ -478,7 +472,7 @@ func handleSessionCreate(data interface{}) interface{} {
 	return okData
 }
 
-func handleAcceptUserConnections(data interface{}) interface{} {
+func handleAcceptUserConnections(data any) any {
 	form, err := castToStruct[types.SignedConnectRequest](data)
 	if err != nil {
 		return makeErr(400, "Invalid request format", slog.Any("err", err))
@@ -499,7 +493,7 @@ func castToStruct[T any](data any) (*T, error) {
 	return result, nil
 }
 
-func sendNetConResponse(conn net.Conn, response interface{}) {
+func sendNetConResponse(conn net.Conn, response any) {
 	responseData, err := json.Marshal(response)
 	if err != nil {
 		logger.Error("Failed to marshal response", slog.Any("err", err))
