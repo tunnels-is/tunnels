@@ -125,7 +125,7 @@ func routeNetConMessage(message *types.NetConMessage) any {
 }
 
 // User management handlers
-func handleUserLogin(data any) any {
+func handleUserLogin(data []byte) any {
 	form, err := castToStruct[LOGIN_FORM](data)
 	if err != nil {
 		return makeErr(400, "Invalid request format", slog.Any("err", err))
@@ -137,7 +137,7 @@ func handleUserLogin(data any) any {
 	return okData
 }
 
-func handleUserCreate(data any) any {
+func handleUserCreate(data []byte) any {
 	form, err := castToStruct[REGISTER_FORM](data)
 	if err != nil {
 		return makeErr(400, "Invalid request format", slog.Any("err", err))
@@ -149,7 +149,7 @@ func handleUserCreate(data any) any {
 	return okData
 }
 
-func handleUserUpdate(data any) any {
+func handleUserUpdate(data []byte) any {
 	form, err := castToStruct[USER_UPDATE_FORM](data)
 	if err != nil {
 		return makeErr(400, "Invalid request format", slog.Any("err", err))
@@ -161,7 +161,7 @@ func handleUserUpdate(data any) any {
 	return okData
 }
 
-func handleUserLogout(data any) any {
+func handleUserLogout(data []byte) any {
 	form, err := castToStruct[LOGOUT_FORM](data)
 	if err != nil {
 		return makeErr(400, "Invalid request format", slog.Any("err", err))
@@ -173,7 +173,7 @@ func handleUserLogout(data any) any {
 	return okData
 }
 
-func handleUserList(data any) any {
+func handleUserList(data []byte) any {
 	form, err := castToStruct[FORM_LIST_USERS](data)
 	if err != nil {
 		return makeErr(400, "Invalid request format", slog.Any("err", err))
@@ -185,7 +185,7 @@ func handleUserList(data any) any {
 	return okData
 }
 
-func handleUserRequestPasswordCode(data any) any {
+func handleUserRequestPasswordCode(data []byte) any {
 	form, err := castToStruct[PASSWORD_RESET_FORM](data)
 	if err != nil {
 		return makeErr(400, "Invalid request format", slog.Any("err", err))
@@ -197,7 +197,7 @@ func handleUserRequestPasswordCode(data any) any {
 	return okData
 }
 
-func handleUserResetPassword(data any) any {
+func handleUserResetPassword(data []byte) any {
 	form, err := castToStruct[PASSWORD_RESET_FORM](data)
 	if err != nil {
 		return makeErr(400, "Invalid request format", slog.Any("err", err))
@@ -209,7 +209,7 @@ func handleUserResetPassword(data any) any {
 	return okData
 }
 
-func handleUserTwoFactorConfirm(data any) any {
+func handleUserTwoFactorConfirm(data []byte) any {
 	form, err := castToStruct[TWO_FACTOR_FORM](data)
 	if err != nil {
 		return makeErr(400, "Invalid request format", slog.Any("err", err))
@@ -221,7 +221,7 @@ func handleUserTwoFactorConfirm(data any) any {
 	return okData
 }
 
-func handleUserToggleSubStatus(data any) any {
+func handleUserToggleSubStatus(data []byte) any {
 	form, err := castToStruct[USER_UPDATE_SUB_FORM](data)
 	if err != nil {
 		return makeErr(400, "Invalid request format", slog.Any("err", err))
@@ -233,7 +233,7 @@ func handleUserToggleSubStatus(data any) any {
 	return okData
 }
 
-func handleActivateLicenseKey(data any) any {
+func handleActivateLicenseKey(data []byte) any {
 	form, err := castToStruct[KEY_ACTIVATE_FORM](data)
 	if err != nil {
 		return makeErr(400, "Invalid request format", slog.Any("err", err))
@@ -246,7 +246,7 @@ func handleActivateLicenseKey(data any) any {
 }
 
 // Device management handlers
-func handleDeviceCreate(data any) any {
+func handleDeviceCreate(data []byte) any {
 	form, err := castToStruct[FORM_CREATE_DEVICE](data)
 	if err != nil {
 		return makeErr(400, "Invalid request format", slog.Any("err", err))
@@ -258,7 +258,7 @@ func handleDeviceCreate(data any) any {
 	return okData
 }
 
-func handleDeviceUpdate(data any) any {
+func handleDeviceUpdate(data []byte) any {
 	form, err := castToStruct[FORM_UPDATE_DEVICE](data)
 	if err != nil {
 		return makeErr(400, "Invalid request format", slog.Any("err", err))
@@ -270,7 +270,7 @@ func handleDeviceUpdate(data any) any {
 	return okData
 }
 
-func handleDeviceDelete(data any) any {
+func handleDeviceDelete(data []byte) any {
 	form, err := castToStruct[FORM_DELETE_DEVICE](data)
 	if err != nil {
 		return makeErr(400, "Invalid request format", slog.Any("err", err))
@@ -282,7 +282,7 @@ func handleDeviceDelete(data any) any {
 	return okData
 }
 
-func handleDeviceList(data any) any {
+func handleDeviceList(data []byte) any {
 	form, err := castToStruct[FORM_LIST_DEVICE](data)
 	if err != nil {
 		return makeErr(400, "Invalid request format", slog.Any("err", err))
@@ -294,7 +294,7 @@ func handleDeviceList(data any) any {
 	return okData
 }
 
-func handleDeviceGet(data any) any {
+func handleDeviceGet(data []byte) any {
 	form, err := castToStruct[types.FORM_GET_DEVICE](data)
 	if err != nil {
 		return makeErr(400, "Invalid request format", slog.Any("err", err))
@@ -307,7 +307,7 @@ func handleDeviceGet(data any) any {
 }
 
 // Group management handlers
-func handleGroupCreate(data any) any {
+func handleGroupCreate(data []byte) any {
 	form, err := castToStruct[FORM_CREATE_GROUP](data)
 	if err != nil {
 		return makeErr(400, "Invalid request format", slog.Any("err", err))
@@ -319,7 +319,7 @@ func handleGroupCreate(data any) any {
 	return okData
 }
 
-func handleGroupUpdate(data any) any {
+func handleGroupUpdate(data []byte) any {
 	form, err := castToStruct[FORM_UPDATE_GROUP](data)
 	if err != nil {
 		return makeErr(400, "Invalid request format", slog.Any("err", err))
@@ -331,7 +331,7 @@ func handleGroupUpdate(data any) any {
 	return okData
 }
 
-func handleGroupDelete(data any) any {
+func handleGroupDelete(data []byte) any {
 	form, err := castToStruct[FORM_DELETE_GROUP](data)
 	if err != nil {
 		return makeErr(400, "Invalid request format", slog.Any("err", err))
@@ -343,7 +343,7 @@ func handleGroupDelete(data any) any {
 	return okData
 }
 
-func handleGroupList(data any) any {
+func handleGroupList(data []byte) any {
 	form, err := castToStruct[FORM_LIST_GROUP](data)
 	if err != nil {
 		return makeErr(400, "Invalid request format", slog.Any("err", err))
@@ -355,7 +355,7 @@ func handleGroupList(data any) any {
 	return okData
 }
 
-func handleGroupGet(data any) any {
+func handleGroupGet(data []byte) any {
 	form, err := castToStruct[FORM_GET_GROUP](data)
 	if err != nil {
 		return makeErr(400, "Invalid request format", slog.Any("err", err))
@@ -367,7 +367,7 @@ func handleGroupGet(data any) any {
 	return okData
 }
 
-func handleGroupGetEntities(data any) any {
+func handleGroupGetEntities(data []byte) any {
 	form, err := castToStruct[FORM_GET_GROUP_ENTITIES](data)
 	if err != nil {
 		return makeErr(400, "Invalid request format", slog.Any("err", err))
@@ -379,7 +379,7 @@ func handleGroupGetEntities(data any) any {
 	return okData
 }
 
-func handleGroupAdd(data any) any {
+func handleGroupAdd(data []byte) any {
 	form, err := castToStruct[FORM_GROUP_ADD](data)
 	if err != nil {
 		return makeErr(400, "Invalid request format", slog.Any("err", err))
@@ -391,7 +391,7 @@ func handleGroupAdd(data any) any {
 	return okData
 }
 
-func handleGroupRemove(data any) any {
+func handleGroupRemove(data []byte) any {
 	form, err := castToStruct[FORM_GROUP_REMOVE](data)
 	if err != nil {
 		return makeErr(400, "Invalid request format", slog.Any("err", err))
@@ -404,7 +404,7 @@ func handleGroupRemove(data any) any {
 }
 
 // Server management handlers
-func handleServerCreate(data any) any {
+func handleServerCreate(data []byte) any {
 	form, err := castToStruct[FORM_CREATE_SERVER](data)
 	if err != nil {
 		return makeErr(400, "Invalid request format", slog.Any("err", err))
@@ -416,7 +416,7 @@ func handleServerCreate(data any) any {
 	return okData
 }
 
-func handleServerUpdate(data any) any {
+func handleServerUpdate(data []byte) any {
 	form, err := castToStruct[FORM_UPDATE_SERVER](data)
 	if err != nil {
 		return makeErr(400, "Invalid request format", slog.Any("err", err))
@@ -428,7 +428,7 @@ func handleServerUpdate(data any) any {
 	return okData
 }
 
-func handleServerGet(data any) any {
+func handleServerGet(data []byte) any {
 	form, err := castToStruct[types.FORM_GET_SERVER](data)
 	if err != nil {
 		return makeErr(400, "Invalid request format", slog.Any("err", err))
@@ -440,7 +440,7 @@ func handleServerGet(data any) any {
 	return okData
 }
 
-func handleServersForUser(data any) any {
+func handleServersForUser(data []byte) any {
 	form, err := castToStruct[FORM_GET_SERVERS](data)
 	if err != nil {
 		return makeErr(400, "Invalid request format", slog.Any("err", err))
@@ -453,7 +453,7 @@ func handleServersForUser(data any) any {
 }
 
 // Connection handlers
-func handleSessionCreate(data any) any {
+func handleSessionCreate(data []byte) any {
 	form, err := castToStruct[types.ControllerConnectRequest](data)
 	if err != nil {
 		return makeErr(400, "Invalid request format", slog.Any("err", err))
@@ -465,7 +465,7 @@ func handleSessionCreate(data any) any {
 	return okData
 }
 
-func handleAcceptUserConnections(data any) any {
+func handleAcceptUserConnections(data []byte) any {
 	form, err := castToStruct[types.SignedConnectRequest](data)
 	if err != nil {
 		return makeErr(400, "Invalid request format", slog.Any("err", err))
@@ -478,7 +478,7 @@ func handleAcceptUserConnections(data any) any {
 }
 
 // LAN and health management handlers
-func handleFirewall(data any) any {
+func handleFirewall(data []byte) any {
 	form, err := castToStruct[types.FirewallRequest](data)
 	if err != nil {
 		return makeErr(400, "Invalid request format", slog.Any("err", err))
@@ -490,7 +490,7 @@ func handleFirewall(data any) any {
 	return okData
 }
 
-func handleListDevices(data any) any {
+func handleListDevices(data []byte) any {
 	form, err := castToStruct[FORM_LIST_DEVICE](data)
 	if err != nil {
 		return makeErr(400, "Invalid request format", slog.Any("err", err))
@@ -502,7 +502,7 @@ func handleListDevices(data any) any {
 	return okData
 }
 
-func handleHealth(data any) any {
+func handleHealth(data []byte) any {
 	errData, okData := APIv2_Health()
 	if errData != nil {
 		return errData
