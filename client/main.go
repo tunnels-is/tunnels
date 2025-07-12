@@ -555,7 +555,6 @@ func loadConfigFromDisk() error {
 }
 
 func applyCertificateDefaultsToConfig(cfg *configV2) {
-
 	if cfg.APIKey == "" {
 		cfg.APIKey = "./api.key"
 	}
@@ -675,7 +674,7 @@ func getServerByID(secure bool, authServer string, deviceKey string, deviceToken
 			ServerID:    SID,
 		},
 	}
-	responseBytes, code, err := SendRequestToURL(
+	responseBytes, code, err := sendRequestToURL(
 		nil,
 		FR.Method,
 		FR.URL+FR.Path,
@@ -711,7 +710,7 @@ func GetDeviceByID(secure bool, authServer string, deviceID string) (d *types.De
 			DeviceID: DID,
 		},
 	}
-	responseBytes, code, err := SendRequestToURL(
+	responseBytes, code, err := sendRequestToURL(
 		nil,
 		FR.Method,
 		FR.URL+FR.Path,

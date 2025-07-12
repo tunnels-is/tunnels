@@ -35,7 +35,7 @@ func sendHTTPErrorResponse(w http.ResponseWriter, errResp *ErrorResponse) {
 	}
 }
 
-func sendHTTPOKResponse(w http.ResponseWriter, code int, data interface{}) {
+func sendHTTPOKResponse(w http.ResponseWriter, code int, data any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(code)
 	err := json.NewEncoder(w).Encode(data)
@@ -44,23 +44,16 @@ func sendHTTPOKResponse(w http.ResponseWriter, code int, data interface{}) {
 	}
 }
 
-func prepData(obj any) (data []byte) {
-	var err error
+func cleanData(obj any) (data any) {
 	u, ok := obj.(*User)
 	if ok {
 		u.RemoveSensitiveInformation()
-		data, err = json.Marshal(u)
-	} else {
-		data, err = json.Marshal(obj)
-	}
-	if err != nil {
-		logger.Error("unable to encode response object", slog.Any("err", err))
-		return nil
+		return u
 	}
 	return
 }
 
-func APIv2_UserLogin(LF *LOGIN_FORM) (errData *ErrorResponse, okData interface{}) {
+func APIv2_UserLogin(LF *LOGIN_FORM) (errData *ErrorResponse, okData any) {
 	defer BasicRecover()
 
 	user, err := DB_findUserByEmail(LF.Email)
@@ -87,10 +80,10 @@ func APIv2_UserLogin(LF *LOGIN_FORM) (errData *ErrorResponse, okData interface{}
 		return makeErr(500, "Database error, please try again in a moment"), nil
 	}
 
-	return nil, prepData(user)
+	return nil, cleanData(user)
 }
 
-func APIv2_UserCreate(RF *REGISTER_FORM) (errData *ErrorResponse, okData interface{}) {
+func APIv2_UserCreate(RF *REGISTER_FORM) (errData *ErrorResponse, okData any) {
 	defer BasicRecover()
 
 	if RF.Password == "" {
@@ -146,10 +139,10 @@ func APIv2_UserCreate(RF *REGISTER_FORM) (errData *ErrorResponse, okData interfa
 		return makeErr(500, "Unexpected error, please try again in a moment"), nil
 	}
 
-	return nil, prepData(newUser)
+	return nil, cleanData(newUser)
 }
 
-func APIv2_UserUpdate(UF *USER_UPDATE_FORM) (errData *ErrorResponse, okData interface{}) {
+func APIv2_UserUpdate(UF *USER_UPDATE_FORM) (errData *ErrorResponse, okData any) {
 	defer BasicRecover()
 
 	_, err := authenticateUserFromEmailOrIDAndToken("", UF.UID, UF.DeviceToken)
@@ -165,7 +158,7 @@ func APIv2_UserUpdate(UF *USER_UPDATE_FORM) (errData *ErrorResponse, okData inte
 	return nil, map[string]string{"status": "user updated"}
 }
 
-func APIv2_UserLogout(LF *LOGOUT_FORM) (errData *ErrorResponse, okData interface{}) {
+func APIv2_UserLogout(LF *LOGOUT_FORM) (errData *ErrorResponse, okData any) {
 	defer BasicRecover()
 
 	user, err := authenticateUserFromEmailOrIDAndToken("", LF.UID, LF.DeviceToken)
@@ -196,7 +189,7 @@ func APIv2_UserLogout(LF *LOGOUT_FORM) (errData *ErrorResponse, okData interface
 	return nil, map[string]string{"status": "logged out"}
 }
 
-func APIv2_UserRequestPasswordCode(PRF *PASSWORD_RESET_FORM) (errData *ErrorResponse, okData interface{}) {
+func APIv2_UserRequestPasswordCode(PRF *PASSWORD_RESET_FORM) (errData *ErrorResponse, okData any) {
 	defer BasicRecover()
 
 	user, err := DB_findUserByEmail(PRF.Email)
@@ -229,7 +222,7 @@ func APIv2_UserRequestPasswordCode(PRF *PASSWORD_RESET_FORM) (errData *ErrorResp
 	return nil, map[string]string{"status": "password reset code sent"}
 }
 
-func APIv2_UserResetPassword(PRF *PASSWORD_RESET_FORM) (errData *ErrorResponse, okData interface{}) {
+func APIv2_UserResetPassword(PRF *PASSWORD_RESET_FORM) (errData *ErrorResponse, okData any) {
 	defer BasicRecover()
 
 	if PRF.Password == "" {
@@ -277,7 +270,7 @@ func APIv2_UserResetPassword(PRF *PASSWORD_RESET_FORM) (errData *ErrorResponse, 
 	return nil, map[string]string{"status": "password reset successful"}
 }
 
-func APIv2_UserTwoFactorConfirm(TF *TWO_FACTOR_FORM) (errData *ErrorResponse, okData interface{}) {
+func APIv2_UserTwoFactorConfirm(TF *TWO_FACTOR_FORM) (errData *ErrorResponse, okData any) {
 	defer BasicRecover()
 
 	user, err := authenticateUserFromEmailOrIDAndToken("", TF.UID, TF.DeviceToken)
@@ -349,7 +342,7 @@ func APIv2_UserTwoFactorConfirm(TF *TWO_FACTOR_FORM) (errData *ErrorResponse, ok
 	return nil, out
 }
 
-func APIv2_UserList(F *FORM_LIST_USERS) (errData *ErrorResponse, okData interface{}) {
+func APIv2_UserList(F *FORM_LIST_USERS) (errData *ErrorResponse, okData any) {
 	defer BasicRecover()
 
 	user, err := authenticateUserFromEmailOrIDAndToken("", F.UID, F.DeviceToken)
@@ -369,7 +362,7 @@ func APIv2_UserList(F *FORM_LIST_USERS) (errData *ErrorResponse, okData interfac
 	}
 
 	if users == nil {
-		return nil, []interface{}{
+		return nil, []any{
 			// empty response
 		}
 	}
@@ -381,7 +374,7 @@ func APIv2_UserList(F *FORM_LIST_USERS) (errData *ErrorResponse, okData interfac
 	return nil, users
 }
 
-func APIv2_DeviceDelete(F *FORM_DELETE_DEVICE) (errData *ErrorResponse, okData interface{}) {
+func APIv2_DeviceDelete(F *FORM_DELETE_DEVICE) (errData *ErrorResponse, okData any) {
 	defer BasicRecover()
 
 	user, err := authenticateUserFromEmailOrIDAndToken("", F.UID, F.DeviceToken)
@@ -403,7 +396,7 @@ func APIv2_DeviceDelete(F *FORM_DELETE_DEVICE) (errData *ErrorResponse, okData i
 	return nil, map[string]string{"status": "device deleted"}
 }
 
-func APIv2_DeviceList(F *FORM_LIST_DEVICE, hasAPIKey bool) (errData *ErrorResponse, okData interface{}) {
+func APIv2_DeviceList(F *FORM_LIST_DEVICE, hasAPIKey bool) (errData *ErrorResponse, okData any) {
 	defer BasicRecover()
 
 	if !hasAPIKey {
@@ -427,7 +420,7 @@ func APIv2_DeviceList(F *FORM_LIST_DEVICE, hasAPIKey bool) (errData *ErrorRespon
 	return nil, devices
 }
 
-func APIv2_DeviceCreate(F *FORM_CREATE_DEVICE, hasAPIKey bool) (errData *ErrorResponse, okData interface{}) {
+func APIv2_DeviceCreate(F *FORM_CREATE_DEVICE, hasAPIKey bool) (errData *ErrorResponse, okData any) {
 	defer BasicRecover()
 
 	if !hasAPIKey {
@@ -460,7 +453,7 @@ func APIv2_DeviceCreate(F *FORM_CREATE_DEVICE, hasAPIKey bool) (errData *ErrorRe
 	return nil, F.Device
 }
 
-func APIv2_DeviceUpdate(F *FORM_UPDATE_DEVICE) (errData *ErrorResponse, okData interface{}) {
+func APIv2_DeviceUpdate(F *FORM_UPDATE_DEVICE) (errData *ErrorResponse, okData any) {
 	defer BasicRecover()
 
 	user, err := authenticateUserFromEmailOrIDAndToken("", F.UID, F.DeviceToken)
@@ -482,7 +475,7 @@ func APIv2_DeviceUpdate(F *FORM_UPDATE_DEVICE) (errData *ErrorResponse, okData i
 	return nil, map[string]string{"status": "device updated"}
 }
 
-func APIv2_DeviceGet(F *types.FORM_GET_DEVICE) (errData *ErrorResponse, okData interface{}) {
+func APIv2_DeviceGet(F *types.FORM_GET_DEVICE) (errData *ErrorResponse, okData any) {
 	defer BasicRecover()
 
 	device, err := DB_FindDeviceByID(F.DeviceID)
@@ -497,7 +490,7 @@ func APIv2_DeviceGet(F *types.FORM_GET_DEVICE) (errData *ErrorResponse, okData i
 	return nil, device
 }
 
-func APIv2_GroupCreate(F *FORM_CREATE_GROUP) (errData *ErrorResponse, okData interface{}) {
+func APIv2_GroupCreate(F *FORM_CREATE_GROUP) (errData *ErrorResponse, okData any) {
 	defer BasicRecover()
 
 	if F.Group == nil || F.Group.Tag == "" {
@@ -526,7 +519,7 @@ func APIv2_GroupCreate(F *FORM_CREATE_GROUP) (errData *ErrorResponse, okData int
 	return nil, F.Group
 }
 
-func APIv2_GroupAdd(F *FORM_GROUP_ADD) (errData *ErrorResponse, okData interface{}) {
+func APIv2_GroupAdd(F *FORM_GROUP_ADD) (errData *ErrorResponse, okData any) {
 	defer BasicRecover()
 
 	user, err := authenticateUserFromEmailOrIDAndToken("", F.UID, F.DeviceToken)
@@ -587,7 +580,7 @@ func APIv2_GroupAdd(F *FORM_GROUP_ADD) (errData *ErrorResponse, okData interface
 	}
 }
 
-func APIv2_GroupRemove(F *FORM_GROUP_REMOVE) (errData *ErrorResponse, okData interface{}) {
+func APIv2_GroupRemove(F *FORM_GROUP_REMOVE) (errData *ErrorResponse, okData any) {
 	defer BasicRecover()
 
 	user, err := authenticateUserFromEmailOrIDAndToken("", F.UID, F.DeviceToken)
@@ -609,7 +602,7 @@ func APIv2_GroupRemove(F *FORM_GROUP_REMOVE) (errData *ErrorResponse, okData int
 	return nil, map[string]string{"status": "removed from group"}
 }
 
-func APIv2_GroupUpdate(F *FORM_UPDATE_GROUP) (errData *ErrorResponse, okData interface{}) {
+func APIv2_GroupUpdate(F *FORM_UPDATE_GROUP) (errData *ErrorResponse, okData any) {
 	defer BasicRecover()
 
 	user, err := authenticateUserFromEmailOrIDAndToken("", F.UID, F.DeviceToken)
@@ -631,7 +624,7 @@ func APIv2_GroupUpdate(F *FORM_UPDATE_GROUP) (errData *ErrorResponse, okData int
 	return nil, map[string]string{"status": "group updated"}
 }
 
-func APIv2_GroupDelete(F *FORM_DELETE_GROUP) (errData *ErrorResponse, okData interface{}) {
+func APIv2_GroupDelete(F *FORM_DELETE_GROUP) (errData *ErrorResponse, okData any) {
 	defer BasicRecover()
 
 	user, err := authenticateUserFromEmailOrIDAndToken("", F.UID, F.DeviceToken)
@@ -653,7 +646,7 @@ func APIv2_GroupDelete(F *FORM_DELETE_GROUP) (errData *ErrorResponse, okData int
 	return nil, map[string]string{"status": "group deleted"}
 }
 
-func APIv2_GroupGet(F *FORM_GET_GROUP) (errData *ErrorResponse, okData interface{}) {
+func APIv2_GroupGet(F *FORM_GET_GROUP) (errData *ErrorResponse, okData any) {
 	defer BasicRecover()
 
 	user, err := authenticateUserFromEmailOrIDAndToken("", F.UID, F.DeviceToken)
@@ -679,7 +672,7 @@ func APIv2_GroupGet(F *FORM_GET_GROUP) (errData *ErrorResponse, okData interface
 	return nil, group
 }
 
-func APIv2_GroupGetEntities(F *FORM_GET_GROUP_ENTITIES) (errData *ErrorResponse, okData interface{}) {
+func APIv2_GroupGetEntities(F *FORM_GET_GROUP_ENTITIES) (errData *ErrorResponse, okData any) {
 	defer BasicRecover()
 
 	user, err := authenticateUserFromEmailOrIDAndToken("", F.UID, F.DeviceToken)
@@ -706,7 +699,7 @@ func APIv2_GroupGetEntities(F *FORM_GET_GROUP_ENTITIES) (errData *ErrorResponse,
 	return nil, entities
 }
 
-func APIv2_GroupList(F *FORM_LIST_GROUP) (errData *ErrorResponse, okData interface{}) {
+func APIv2_GroupList(F *FORM_LIST_GROUP) (errData *ErrorResponse, okData any) {
 	defer BasicRecover()
 
 	user, err := authenticateUserFromEmailOrIDAndToken("", F.UID, F.DeviceToken)
@@ -728,7 +721,7 @@ func APIv2_GroupList(F *FORM_LIST_GROUP) (errData *ErrorResponse, okData interfa
 	return nil, groups
 }
 
-func APIv2_ServersForUser(F *FORM_GET_SERVERS) (errData *ErrorResponse, okData interface{}) {
+func APIv2_ServersForUser(F *FORM_GET_SERVERS) (errData *ErrorResponse, okData any) {
 	defer BasicRecover()
 
 	user, err := authenticateUserFromEmailOrIDAndToken("", F.UID, F.DeviceToken)
@@ -754,7 +747,7 @@ func APIv2_ServersForUser(F *FORM_GET_SERVERS) (errData *ErrorResponse, okData i
 	return nil, servers
 }
 
-func APIv2_ServerUpdate(F *FORM_UPDATE_SERVER) (errData *ErrorResponse, okData interface{}) {
+func APIv2_ServerUpdate(F *FORM_UPDATE_SERVER) (errData *ErrorResponse, okData any) {
 	defer BasicRecover()
 
 	user, err := authenticateUserFromEmailOrIDAndToken("", F.UID, F.DeviceToken)
@@ -776,7 +769,7 @@ func APIv2_ServerUpdate(F *FORM_UPDATE_SERVER) (errData *ErrorResponse, okData i
 	return nil, map[string]string{"status": "server updated"}
 }
 
-func APIv2_ServerCreate(F *FORM_CREATE_SERVER) (errData *ErrorResponse, okData interface{}) {
+func APIv2_ServerCreate(F *FORM_CREATE_SERVER) (errData *ErrorResponse, okData any) {
 	defer BasicRecover()
 
 	user, err := authenticateUserFromEmailOrIDAndToken("", F.UID, F.DeviceToken)
@@ -800,7 +793,7 @@ func APIv2_ServerCreate(F *FORM_CREATE_SERVER) (errData *ErrorResponse, okData i
 	return nil, F.Server
 }
 
-func APIv2_ServerGet(F *types.FORM_GET_SERVER) (errData *ErrorResponse, okData interface{}) {
+func APIv2_ServerGet(F *types.FORM_GET_SERVER) (errData *ErrorResponse, okData any) {
 	defer BasicRecover()
 
 	server, err := DB_FindServerByID(F.ServerID)
@@ -856,7 +849,7 @@ func APIv2_ServerGet(F *types.FORM_GET_SERVER) (errData *ErrorResponse, okData i
 	return nil, server
 }
 
-func APIv2_UserToggleSubStatus(UF *USER_UPDATE_SUB_FORM) (*ErrorResponse, interface{}) {
+func APIv2_UserToggleSubStatus(UF *USER_UPDATE_SUB_FORM) (*ErrorResponse, any) {
 	user, err := authenticateUserFromEmailOrIDAndToken(UF.Email, primitive.NilObjectID, UF.DeviceToken)
 	if err != nil || user == nil {
 		return makeErr(401, "Authentication failed", slog.Any("err", err)), nil
@@ -870,7 +863,7 @@ func APIv2_UserToggleSubStatus(UF *USER_UPDATE_SUB_FORM) (*ErrorResponse, interf
 	return nil, map[string]string{"status": "success"}
 }
 
-func APIv2_ActivateLicenseKey(AF *KEY_ACTIVATE_FORM) (*ErrorResponse, interface{}) {
+func APIv2_ActivateLicenseKey(AF *KEY_ACTIVATE_FORM) (*ErrorResponse, any) {
 	user, err := authenticateUserFromEmailOrIDAndToken("", AF.UID, AF.DeviceToken)
 	if err != nil {
 		return makeErr(401, "Authentication failed", slog.Any("err", err)), nil
@@ -952,7 +945,7 @@ func APIv2_ActivateLicenseKey(AF *KEY_ACTIVATE_FORM) (*ErrorResponse, interface{
 	return nil, map[string]string{"status": "success"}
 }
 
-func APIv2_SessionCreate(CR *types.ControllerConnectRequest) (*ErrorResponse, interface{}) {
+func APIv2_SessionCreate(CR *types.ControllerConnectRequest) (*ErrorResponse, any) {
 	server, err := DB_FindServerByID(CR.ServerID)
 	if err != nil {
 		return makeErr(500, "Server lookup failed", slog.Any("err", err)), nil
@@ -1091,7 +1084,7 @@ func APIv2_AcceptUserConnections(SCR *types.SignedConnectRequest) (*ErrorRespons
 	return nil, CRR
 }
 
-func APIv2_Firewall(fr *types.FirewallRequest) (errData *ErrorResponse, okData interface{}) {
+func APIv2_Firewall(fr *types.FirewallRequest) (errData *ErrorResponse, okData any) {
 	defer BasicRecover()
 
 	mapping := validateDHCPTokenAndIP(fr)
@@ -1104,7 +1097,7 @@ func APIv2_Firewall(fr *types.FirewallRequest) (errData *ErrorResponse, okData i
 	return nil, map[string]string{"status": "firewall updated"}
 }
 
-func APIv2_ListDevices(hasAPIKey bool, F *FORM_LIST_DEVICE) (errData *ErrorResponse, okData interface{}) {
+func APIv2_ListDevices(hasAPIKey bool, F *FORM_LIST_DEVICE) (errData *ErrorResponse, okData any) {
 	defer BasicRecover()
 
 	if !hasAPIKey {
@@ -1179,7 +1172,7 @@ outerloop:
 	return nil, response
 }
 
-func APIv2_Health() (errData *ErrorResponse, okData interface{}) {
+func APIv2_Health() (errData *ErrorResponse, okData any) {
 	return nil, "OK"
 }
 

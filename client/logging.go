@@ -123,7 +123,7 @@ func INFO(Line ...any) {
 
 	select {
 	case LogQueue <- fmt.Sprintf(
-		"%s || INFO  || %s || %s",
+		"%s || INFO || %s || %s",
 		time.Now().Format("01-02 15:04:05"),
 		GET_FUNC(3),
 		fmt.Sprint(x),

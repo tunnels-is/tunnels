@@ -211,7 +211,6 @@ func handleWebSocket(ws *websocket.Conn) {
 			return
 		}
 	}
-
 }
 
 func Bind[I any](form I, r *http.Request) (err error) {
@@ -562,6 +561,6 @@ func HTTP_ForwardToController(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		JSON(w, r, 400, err)
 	}
-	data, code := ForwardToController(form)
+	data, code := forwardToController(form)
 	JSON(w, r, code, data)
 }

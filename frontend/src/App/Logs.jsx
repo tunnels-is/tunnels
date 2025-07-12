@@ -32,7 +32,7 @@ const Logs = () => {
     // Apply tag filter
     if (tagFilter) {
       filtered = filtered.filter(line =>
-        line.includes(`| ${tagFilter} |`)
+        line.includes(`${tagFilter}`)
       )
     }
 

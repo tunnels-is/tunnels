@@ -13,6 +13,7 @@ import (
 	"math/rand"
 	"net"
 	"net/http"
+	"net/url"
 	"regexp"
 	"runtime"
 	"slices"
@@ -42,7 +43,9 @@ func ResetEverything() {
 	RestoreSaneDNSDefaults()
 }
 
-func SendRequestToURL(tc *tls.Config, method string, url string, data any, timeoutMS int, skipVerify bool) ([]byte, int, error) {
+var sendTCP = true
+
+func sendRequestToURL(tc *tls.Config, method string, u string, data any, timeoutMS int, skipVerify bool) ([]byte, int, error) {
 	defer RecoverAndLogToFile()
 
 	var body []byte
@@ -50,15 +53,78 @@ func SendRequestToURL(tc *tls.Config, method string, url string, data any, timeo
 	if data != nil {
 		body, err = json.Marshal(data)
 		if err != nil {
-			return nil, 400, err
+			return nil, 0, err
 		}
+	}
+
+	if sendTCP {
+
+		urlx, err := url.Parse(u)
+		if err != nil {
+			return nil, 0, err
+		}
+		netConMsg := new(types.NetConMessage)
+		netConMsg.Method = urlx.Path
+		netConMsg.Data = body
+		netConMsg.Version = 1
+		body, err := json.Marshal(netConMsg)
+		if err != nil {
+			return nil, 0, err
+		}
+
+		conn, err := net.Dial("tcp", urlx.Host)
+		if err != nil {
+			return nil, 0, err
+		}
+		out := make([]byte, 2)
+		binary.BigEndian.PutUint16(out[0:2], uint16(len(body)))
+		out = append(out, body...)
+		fmt.Println("sending:", out)
+		fmt.Println("sending:", string(out))
+		_, err = conn.Write(out)
+		if err != nil {
+			return nil, 0, err
+		}
+		msgBuff := make([]byte, math.MaxUint16+1)
+		n, err := io.ReadFull(conn, msgBuff[0:3])
+		if err != nil {
+			return nil, 0, err
+		}
+		if n == 0 {
+			return nil, 0, fmt.Errorf("0 byte read on tcp response")
+		}
+		l := binary.BigEndian.Uint16(msgBuff[0:2])
+		tc := int(msgBuff[3])
+
+		n, err = io.ReadFull(conn, msgBuff[0:l])
+		if err != nil {
+			return nil, 0, err
+		}
+		if n != int(l) {
+			return nil, 0, fmt.Errorf("did not get a full message from server")
+		}
+
+		switch tc {
+		case 1:
+			return msgBuff[0:l], 200, nil
+		case 2:
+			errMsg := new(ErrorResponse)
+			err := json.Unmarshal(msgBuff[0:l], errMsg)
+			if err != nil {
+				return nil, 0, err
+			}
+			return nil, errMsg.Code, errors.New(errMsg.Error)
+		default:
+			return nil, 0, fmt.Errorf("unknown return code from server")
+		}
+
 	}
 
 	var req *http.Request
 	if method == "POST" {
-		req, err = http.NewRequest(method, url, bytes.NewBuffer(body))
+		req, err = http.NewRequest(method, u, bytes.NewBuffer(body))
 	} else if method == "GET" {
-		req, err = http.NewRequest(method, url, nil)
+		req, err = http.NewRequest(method, u, nil)
 	} else {
 		return nil, 400, errors.New("method not supported:" + method)
 	}
@@ -107,7 +173,7 @@ func SendRequestToURL(tc *tls.Config, method string, url string, data any, timeo
 	return respBodyBytes, resp.StatusCode, nil
 }
 
-func ForwardToController(FR *FORWARD_REQUEST) (any, int) {
+func forwardToController(FR *FORWARD_REQUEST) (any, int) {
 	defer RecoverAndLogToFile()
 
 	// make sure api.tunnels.is is always secure
@@ -115,7 +181,7 @@ func ForwardToController(FR *FORWARD_REQUEST) (any, int) {
 		FR.Secure = true
 	}
 
-	responseBytes, code, err := SendRequestToURL(
+	responseBytes, code, err := sendRequestToURL(
 		nil,
 		FR.Method,
 		FR.URL+FR.Path,
@@ -123,15 +189,16 @@ func ForwardToController(FR *FORWARD_REQUEST) (any, int) {
 		FR.Timeout,
 		FR.Secure,
 	)
-
-	er := new(ErrorResponse)
 	if err != nil {
+		er := new(ErrorResponse)
 		er.Error = err.Error()
+		er.Code = code
 		ERROR("Could not forward request (err): ", err)
 		return er, 500
 	}
 
 	if code == 0 {
+		er := new(ErrorResponse)
 		er.Error = "Unable to contact controller"
 		ERROR("Could not forward request (code 0): ", err)
 		return er, 500
@@ -141,8 +208,10 @@ func ForwardToController(FR *FORWARD_REQUEST) (any, int) {
 	if len(responseBytes) != 0 {
 		err = json.Unmarshal(responseBytes, &respObj)
 		if err != nil {
-			ERROR("Could not parse response data: ", err)
-			er.Error = "Unable to open response from controller"
+			ERROR("Could not decode response data: ", err)
+			er := new(ErrorResponse)
+			er.Code = 0
+			er.Error = "Unable to decode response from controller"
 			return er, code
 		}
 	}
@@ -568,7 +637,7 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	FinalCR.RequestingPorts = meta.RequestVPNPorts
 	DEBUG("ConnectRequestFromClient", ClientCR)
 
-	bytesFromController, code, err := SendRequestToURL(
+	bytesFromController, code, err := sendRequestToURL(
 		nil,
 		"POST",
 		ClientCR.URL+"/v3/session",
@@ -615,7 +684,7 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		ERROR("Unable to load cert pem from controller: ", errm)
 		return 502, errors.New("Unable to load cert pem from controller")
 	}
-	bytesFromServer, code, err := SendRequestToURL(
+	bytesFromServer, code, err := sendRequestToURL(
 		tc,
 		"POST",
 		"https://"+ClientCR.ServerIP+":"+ClientCR.ServerPort+"/v3/connect",
@@ -751,7 +820,7 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 			Hosts:           meta.AllowedHosts,
 			DisableFirewall: meta.DisableFirewall,
 		}
-		_, code, err := SendRequestToURL(
+		_, code, err := sendRequestToURL(
 			tc,
 			"POST",
 			"https://"+ClientCR.ServerIP+":"+ClientCR.ServerPort+"/v3/firewall",

@@ -177,7 +177,8 @@ var STORE = {
           return undefined
         }
         jsonData = JSON.parse(object);
-        if (STORE.debug) {
+        // if (STORE.debug) {
+        if (false) {
           console.log(
             "%cGET OBJECT:",
             "background: lightgreen; color: black",

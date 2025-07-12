@@ -86,7 +86,6 @@ func API_UserLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	sendHTTPOKResponse(w, 200, okData)
-	return
 }
 
 func API_UserLogout(w http.ResponseWriter, r *http.Request) {
@@ -262,6 +261,7 @@ func API_GroupRemove(w http.ResponseWriter, r *http.Request) {
 	}
 	sendHTTPOKResponse(w, 200, okData)
 }
+
 func API_GroupUpdate(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 	F := new(FORM_UPDATE_GROUP)
@@ -503,6 +503,7 @@ func API_UserToggleSubStatus(w http.ResponseWriter, r *http.Request) {
 	}
 	sendHTTPOKResponse(w, 200, okData)
 }
+
 func API_ActivateLicenseKey(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 
