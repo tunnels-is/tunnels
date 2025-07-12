@@ -53,67 +53,67 @@ func handleTCPConnection(conn net.Conn) {
 
 func routeNetConMessage(message *netConMessage) any {
 	switch message.Method {
-	case "user.login":
+	case "/v3/user/login":
 		return handleUserLogin(message.Data)
-	case "user.create":
+	case "/v3/user/create":
 		return handleUserCreate(message.Data)
-	case "user.update":
+	case "/v3/user/update":
 		return handleUserUpdate(message.Data)
-	case "user.logout":
+	case "/v3/user/logout":
 		return handleUserLogout(message.Data)
-	case "user.list":
+	case "/v3/user/list":
 		return handleUserList(message.Data)
-	case "user.requestPasswordCode":
+	case "/v3/user/reset/code":
 		return handleUserRequestPasswordCode(message.Data)
-	case "user.resetPassword":
+	case "/v3/user/reset/password":
 		return handleUserResetPassword(message.Data)
-	case "user.twoFactorConfirm":
+	case "/v3/user/2fa/confirm":
 		return handleUserTwoFactorConfirm(message.Data)
-	case "user.toggleSubStatus":
+	case "/v3/user/toggle/substatus":
 		return handleUserToggleSubStatus(message.Data)
-	case "user.activateLicenseKey":
+	case "/v3/key/activate":
 		return handleActivateLicenseKey(message.Data)
 
-	case "device.create":
+	case "/v3/device/create":
 		return handleDeviceCreate(message.Data)
-	case "device.update":
+	case "/v3/device/update":
 		return handleDeviceUpdate(message.Data)
-	case "device.delete":
+	case "/v3/device/delete":
 		return handleDeviceDelete(message.Data)
-	case "device.list":
+	case "/v3/device/list":
 		return handleDeviceList(message.Data)
-	case "device.get":
+	case "/v3/device":
 		return handleDeviceGet(message.Data)
 
-	case "group.create":
+	case "/v3/group/create":
 		return handleGroupCreate(message.Data)
-	case "group.update":
+	case "/v3/group/update":
 		return handleGroupUpdate(message.Data)
-	case "group.delete":
+	case "/v3/group/delete":
 		return handleGroupDelete(message.Data)
-	case "group.list":
+	case "/v3/group/list":
 		return handleGroupList(message.Data)
-	case "group.get":
+	case "/v3/group":
 		return handleGroupGet(message.Data)
-	case "group.getEntities":
+	case "/v3/group/entities":
 		return handleGroupGetEntities(message.Data)
-	case "group.add":
+	case "/v3/group/add":
 		return handleGroupAdd(message.Data)
-	case "group.remove":
+	case "/v3/group/remove":
 		return handleGroupRemove(message.Data)
 
-	case "server.create":
+	case "/v3/server/create":
 		return handleServerCreate(message.Data)
-	case "server.update":
+	case "/v3/server/update":
 		return handleServerUpdate(message.Data)
-	case "server.get":
+	case "/v3/server":
 		return handleServerGet(message.Data)
-	case "server.forUser":
+	case "/v3/servers":
 		return handleServersForUser(message.Data)
 
-	case "session.create":
+	case "/v3/session":
 		return handleSessionCreate(message.Data)
-	case "connection.accept":
+	case "/v3/connect":
 		return handleAcceptUserConnections(message.Data)
 
 	default:
