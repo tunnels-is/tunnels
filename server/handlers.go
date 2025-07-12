@@ -237,37 +237,13 @@ func API_UserLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := DB_findUserByEmail(LF.Email)
-	if err != nil {
-		senderr(w, 500, "Unknown error, please try again in a moment")
+	errData, okData := APIv2_UserLogin(LF)
+	if errData != nil {
+		sendHTTPErrorResponse(w, errData)
 		return
 	}
-	if user == nil {
-		senderr(w, 401, "Invalid login credentials")
-		return
-	}
-
-	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(LF.Password))
-	if err != nil {
-		senderr(w, 401, "Invalid login credentials")
-		return
-	}
-
-	err = validateUserTwoFactor(user, LF)
-	if err != nil {
-		senderr(w, 401, err.Error())
-		return
-	}
-
-	userLoginUpdate := handleUserDeviceToken(user, LF)
-	err = DB_updateUserDeviceTokens(userLoginUpdate)
-	if err != nil {
-		senderr(w, 500, "Database error, please try again in a moment")
-		return
-	}
-
-	user.RemoveSensitiveInformation()
-	sendObject(w, user)
+	sendHTTPOKResponse(w, 200, okData)
+	return
 }
 
 func API_UserLogout(w http.ResponseWriter, r *http.Request) {
