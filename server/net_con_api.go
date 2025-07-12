@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net"
 
+	"github.com/tunnels-is/tunnels/crypt"
 	"github.com/tunnels-is/tunnels/types"
 )
 
@@ -15,8 +16,20 @@ func handleTCPConnection(conn net.Conn) {
 	defer conn.Close()
 	defer BasicRecover()
 
+	EC, err := crypt.NewEncryptionHandler(crypt.CHACHA20, crypt.X25519)
+	if err != nil {
+		logger.Error("failed to receive handshake", slog.Any("err", err))
+		return
+	}
+	EC.SetHandshakeConn(conn)
+	err = EC.ReceiveHandshake()
+	if err != nil {
+		logger.Error("failed to receive handshake", slog.Any("err", err))
+		return
+	}
+
 	lengthBytes := make([]byte, 2)
-	_, err := io.ReadFull(conn, lengthBytes)
+	_, err = io.ReadFull(conn, lengthBytes)
 	if err != nil {
 		logger.Error("Failed to read message length", slog.Any("err", err))
 		return
@@ -28,17 +41,27 @@ func handleTCPConnection(conn net.Conn) {
 		return
 	}
 
-	messageData := make([]byte, messageLength)
-	_, err = io.ReadFull(conn, messageData)
+	encData := make([]byte, messageLength)
+	_, err = io.ReadFull(conn, encData)
 	if err != nil {
 		logger.Error("Failed to read message data", slog.Any("err", err))
 		return
 	}
-	fmt.Println(messageData)
-	fmt.Println(string(messageData))
+
+	staging := make([]byte, 0)
+	decData, err := EC.SEAL.Open1(
+		encData[10:messageLength],
+		encData[2:10],
+		staging[0:],
+		encData[0:2],
+	)
+	if err != nil {
+		logger.Error("could not decrypt tcp packet", slog.Any("err", err))
+		return
+	}
 
 	var message types.NetConMessage
-	err = json.Unmarshal(messageData, &message)
+	err = json.Unmarshal(decData, &message)
 	if err != nil {
 		logger.Error("Failed to unmarshal netConMessage", slog.Any("err", err))
 		return
@@ -511,7 +534,6 @@ func handleHealth(data []byte) any {
 }
 
 func castToStruct[T any](data []byte) (out *T, err error) {
-	fmt.Println("DATA:", data)
 	out = new(T)
 	err = json.Unmarshal(data, out)
 	if err != nil {
