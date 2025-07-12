@@ -19,6 +19,7 @@ const (
 
 type ErrorResponse struct {
 	Error string
+	Code  int
 }
 type PortRange struct {
 	StartPort uint16
