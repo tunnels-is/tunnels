@@ -65,6 +65,7 @@ var (
 
 var (
 	LANEnabled   bool
+	TCPEnabled   bool
 	VPNEnabled   bool
 	AUTHEnabled  bool
 	DNSEnabled   bool
@@ -160,6 +161,7 @@ func main() {
 	}
 
 	AUTHEnabled = slices.Contains(config.Features, types.AUTH)
+	TCPEnabled = slices.Contains(config.Features, types.TCPAPI)
 	LANEnabled = slices.Contains(config.Features, types.LAN)
 	DNSEnabled = slices.Contains(config.Features, types.DNS)
 	VPNEnabled = slices.Contains(config.Features, types.VPN)
@@ -233,7 +235,11 @@ func main() {
 		go signal.NewSignal("PING", ctx, cancel, 10*time.Second, goroutineLogger, pingActiveUsers)
 	}
 
-	go signal.NewSignal("API", ctx, cancel, 1*time.Second, goroutineLogger, launchAPIServer)
+	if TCPEnabled {
+		go signal.NewSignal("TCPAPI", ctx, cancel, 1*time.Second, goroutineLogger, StartTCPServer)
+	} else {
+		go signal.NewSignal("API", ctx, cancel, 1*time.Second, goroutineLogger, launchAPIServer)
+	}
 
 	go signal.NewSignal("CONFIG", ctx, cancel, 30*time.Second, goroutineLogger, func() {
 		_ = LoadServerConfig("./config.json")
