@@ -76,11 +76,24 @@ func sendRequestToURL(tc *tls.Config, method string, u string, data any, timeout
 		if err != nil {
 			return nil, 0, err
 		}
+
+		EC, err := crypt.NewEncryptionHandler(crypt.CHACHA20, crypt.X25519)
+		if err != nil {
+			return nil, 0, err
+		}
+		EC.SetHandshakeConn(conn)
+		err = EC.InitHandshake()
+		if err != nil {
+			return nil, 0, err
+		}
+
+		tmpIndex := []byte{0, 2}
+		outBody := EC.SEAL.Seal1(body, tmpIndex)
+
 		out := make([]byte, 2)
-		binary.BigEndian.PutUint16(out[0:2], uint16(len(body)))
-		out = append(out, body...)
-		fmt.Println("sending:", out)
-		fmt.Println("sending:", string(out))
+		binary.BigEndian.PutUint16(out[0:2], uint16(len(outBody)))
+		out = append(out, outBody...)
+
 		_, err = conn.Write(out)
 		if err != nil {
 			return nil, 0, err
@@ -94,7 +107,8 @@ func sendRequestToURL(tc *tls.Config, method string, u string, data any, timeout
 			return nil, 0, fmt.Errorf("0 byte read on tcp response")
 		}
 		l := binary.BigEndian.Uint16(msgBuff[0:2])
-		tc := int(msgBuff[3])
+		tc := int(msgBuff[2])
+		// fmt.Println("C:", msgBuff[0:3])
 
 		n, err = io.ReadFull(conn, msgBuff[0:l])
 		if err != nil {

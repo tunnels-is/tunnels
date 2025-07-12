@@ -313,39 +313,40 @@ func NewEncryptionHandler(
 	T.SEAL.Nonce2U.Store(0)
 	return
 }
+
 func (T *SocketWrapper) GetPublicKey() (key []byte) {
 	return T.SEAL.PrivateKey.PublicKey().Bytes()
 }
 
-// func (T *SocketWrapper) InitHandshake() (err error) {
-// 	err = T.SendPublicKey()
-// 	if err != nil {
-// 		return
-// 	}
+func (T *SocketWrapper) InitHandshake() (err error) {
+	err = T.SendPublicKey()
+	if err != nil {
+		return
+	}
 
-// 	err = T.ReceivePublicKey()
-// 	if err != nil {
-// 		return
-// 	}
+	err = T.ReceivePublicKey()
+	if err != nil {
+		return
+	}
 
-// 	err = T.SEAL.CreateAEAD()
-// 	return
-// }
+	err = T.SEAL.CreateAEAD()
+	return
+}
 
-// func (T *SocketWrapper) ReceiveHandshake() (err error) {
-// 	err = T.ReceivePublicKey()
-// 	if err != nil {
-// 		return
-// 	}
+func (T *SocketWrapper) ReceiveHandshake() (err error) {
+	err = T.ReceivePublicKey()
+	if err != nil {
+		return
+	}
 
-// 	err = T.SendPublicKey()
-// 	if err != nil {
-// 		return
-// 	}
+	err = T.SendPublicKey()
+	if err != nil {
+		return
+	}
 
-// 	err = T.SEAL.CreateAEAD()
-// 	return
-// }
+	err = T.SEAL.CreateAEAD()
+	return
+}
 
 func (T *SocketWrapper) SendPublicKey() (err error) {
 	defer func() {
