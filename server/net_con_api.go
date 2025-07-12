@@ -17,12 +17,10 @@ type netConMessage struct {
 	Data    any    `json:"data"`
 }
 
-// handleUDPConnection processes incoming UDP connections and routes to APIv2 methods
-func handleUDPConnection(conn net.Conn) {
+func handleTCPConnection(conn net.Conn) {
 	defer conn.Close()
 	defer BasicRecover()
 
-	// Read 2 bytes representing the length of the incoming message
 	lengthBytes := make([]byte, 2)
 	_, err := io.ReadFull(conn, lengthBytes)
 	if err != nil {
@@ -30,14 +28,12 @@ func handleUDPConnection(conn net.Conn) {
 		return
 	}
 
-	// Convert 2 bytes to uint16 (big-endian)
 	messageLength := binary.BigEndian.Uint16(lengthBytes)
 	if messageLength == 0 {
 		logger.Error("Invalid message length: 0")
 		return
 	}
 
-	// Read the rest of the data based on the length
 	messageData := make([]byte, messageLength)
 	_, err = io.ReadFull(conn, messageData)
 	if err != nil {
@@ -45,7 +41,6 @@ func handleUDPConnection(conn net.Conn) {
 		return
 	}
 
-	// Unmarshal the netConMessage
 	var message netConMessage
 	err = json.Unmarshal(messageData, &message)
 	if err != nil {
@@ -58,7 +53,6 @@ func handleUDPConnection(conn net.Conn) {
 
 func routeNetConMessage(message *netConMessage) any {
 	switch message.Method {
-	// User management methods
 	case "user.login":
 		return handleUserLogin(message.Data)
 	case "user.create":
@@ -80,7 +74,6 @@ func routeNetConMessage(message *netConMessage) any {
 	case "user.activateLicenseKey":
 		return handleActivateLicenseKey(message.Data)
 
-	// Device management methods
 	case "device.create":
 		return handleDeviceCreate(message.Data)
 	case "device.update":
@@ -92,7 +85,6 @@ func routeNetConMessage(message *netConMessage) any {
 	case "device.get":
 		return handleDeviceGet(message.Data)
 
-	// Group management methods
 	case "group.create":
 		return handleGroupCreate(message.Data)
 	case "group.update":
@@ -110,7 +102,6 @@ func routeNetConMessage(message *netConMessage) any {
 	case "group.remove":
 		return handleGroupRemove(message.Data)
 
-	// Server management methods
 	case "server.create":
 		return handleServerCreate(message.Data)
 	case "server.update":
@@ -120,7 +111,6 @@ func routeNetConMessage(message *netConMessage) any {
 	case "server.forUser":
 		return handleServersForUser(message.Data)
 
-	// Connection methods
 	case "session.create":
 		return handleSessionCreate(message.Data)
 	case "connection.accept":
@@ -521,23 +511,29 @@ func sendNetConResponse(conn net.Conn, response any) {
 	}
 }
 
-func StartUDPServer(address string) error {
-	listener, err := net.Listen("tcp", address)
+func StartTCPServer() {
+	Config := Config.Load()
+	addr := fmt.Sprintf("%s:%s",
+		Config.APIIP,
+		Config.APIPort,
+	)
+
+	listener, err := net.Listen("tcp4", addr)
 	if err != nil {
-		return fmt.Errorf("failed to start UDP server: %w", err)
+		logger.Error("TCPAPI", slog.Any("err", err.Error()))
+		return
 	}
 	defer listener.Close()
 
-	logger.Info("UDP API server listening", slog.String("address", address))
+	logger.Info("TCP API server listening", slog.String("address", addr))
 
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
-			logger.Error("Failed to accept connection", slog.Any("err", err))
+			logger.Error("Failed to udp datagram", slog.Any("err", err))
 			continue
 		}
 
-		// Handle connection in a goroutine
-		go handleUDPConnection(conn)
+		go handleTCPConnection(conn)
 	}
 }
