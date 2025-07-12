@@ -1091,5 +1091,97 @@ func APIv2_AcceptUserConnections(SCR *types.SignedConnectRequest) (*ErrorRespons
 	return nil, CRR
 }
 
+func APIv2_Firewall(fr *types.FirewallRequest) (errData *ErrorResponse, okData interface{}) {
+	defer BasicRecover()
+
+	mapping := validateDHCPTokenAndIP(fr)
+	if mapping == nil {
+		return makeErr(401, "Unauthorized"), nil
+	}
+
+	syncFirewallState(fr, mapping)
+
+	return nil, map[string]string{"status": "firewall updated"}
+}
+
+func APIv2_ListDevices(hasAPIKey bool, F *FORM_LIST_DEVICE) (errData *ErrorResponse, okData interface{}) {
+	defer BasicRecover()
+
+	if !hasAPIKey {
+		user, err := authenticateUserFromEmailOrIDAndToken("", F.UID, F.DeviceToken)
+		if err != nil {
+			return makeErr(500, err.Error()), nil
+		}
+		if !user.IsAdmin {
+			if !user.IsManager {
+				return makeErr(401, "You are not allowed to list devices"), nil
+			}
+		}
+	}
+
+	response := new(types.DeviceListResponse)
+	response.Devices = make([]*types.ListDevice, 0)
+outerloop:
+	for i := range clientCoreMappings {
+		if clientCoreMappings[i] == nil {
+			continue
+		}
+
+		if clientCoreMappings[i].DHCP != nil {
+			for _, v := range response.Devices {
+				if v.DHCP.Token == clientCoreMappings[i].DHCP.Token {
+					continue outerloop
+				}
+			}
+		}
+
+		d := new(types.ListDevice)
+		d.AllowedIPs = make([]string, 0)
+		for _, v := range clientCoreMappings[i].AllowedHosts {
+			if v.Type == "auto" {
+				continue
+			}
+			d.AllowedIPs = append(d.AllowedIPs,
+				fmt.Sprintf("%d-%d-%d-%d",
+					v.IP[0],
+					v.IP[1],
+					v.IP[2],
+					v.IP[3],
+				))
+		}
+
+		d.RAM = clientCoreMappings[i].RAM
+		d.CPU = clientCoreMappings[i].CPU
+		d.Disk = clientCoreMappings[i].Disk
+		if clientCoreMappings[i].DHCP != nil {
+			response.DHCPAssigned++
+			d.DHCP = types.DHCPRecord{
+				DeviceKey: clientCoreMappings[i].DHCP.DeviceKey,
+				IP:        clientCoreMappings[i].DHCP.IP,
+				Hostname:  clientCoreMappings[i].DHCP.Hostname,
+				Token:     clientCoreMappings[i].DHCP.Token,
+				Activity:  clientCoreMappings[i].DHCP.Activity,
+			}
+		}
+
+		d.IngressQueue = len(clientCoreMappings[i].ToUser)
+		d.EgressQueue = len(clientCoreMappings[i].FromUser)
+		d.Created = clientCoreMappings[i].Created
+		if clientCoreMappings[i].PortRange != nil {
+			d.StartPort = clientCoreMappings[i].PortRange.StartPort
+			d.EndPort = clientCoreMappings[i].PortRange.EndPort
+		}
+		response.Devices = append(response.Devices, d)
+	}
+
+	response.DHCPFree = len(DHCPMapping) - response.DHCPAssigned
+
+	return nil, response
+}
+
+func APIv2_Health() (errData *ErrorResponse, okData interface{}) {
+	return nil, "OK"
+}
+
 // Additional APIv2 functions can be added here as needed for other routes
 // For brevity, I'm implementing the most critical ones that demonstrate the pattern
