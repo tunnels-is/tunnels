@@ -1,14 +1,20 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
+	"math/rand"
 	"net/http"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/tunnels-is/tunnels/crypt"
+	"github.com/tunnels-is/tunnels/signal"
 	"github.com/tunnels-is/tunnels/types"
 	"github.com/xlzd/gotp"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -848,6 +854,241 @@ func APIv2_ServerGet(F *types.FORM_GET_SERVER) (errData *ErrorResponse, okData i
 	}
 
 	return nil, server
+}
+
+func APIv2_UserToggleSubStatus(UF *USER_UPDATE_SUB_FORM) (*ErrorResponse, interface{}) {
+	user, err := authenticateUserFromEmailOrIDAndToken(UF.Email, primitive.NilObjectID, UF.DeviceToken)
+	if err != nil || user == nil {
+		return makeErr(401, "Authentication failed", slog.Any("err", err)), nil
+	}
+
+	err = DB_toggleUserSubscriptionStatus(UF)
+	if err != nil {
+		return makeErr(500, "Failed to toggle subscription status", slog.Any("err", err)), nil
+	}
+
+	return nil, map[string]string{"status": "success"}
+}
+
+func APIv2_ActivateLicenseKey(AF *KEY_ACTIVATE_FORM) (*ErrorResponse, interface{}) {
+	user, err := authenticateUserFromEmailOrIDAndToken("", AF.UID, AF.DeviceToken)
+	if err != nil {
+		return makeErr(401, "Authentication failed", slog.Any("err", err)), nil
+	}
+
+	INFO(3, "KEY attempt:", AF.Key)
+
+	lemonClient := lc.Load()
+	key, resp, err := lemonClient.Licenses.Validate(context.Background(), AF.Key, "")
+	if err != nil {
+		if resp != nil && resp.Body != nil {
+			return makeErr(500, "License validation failed", slog.Any("err", err)), nil
+		}
+		return makeErr(500, "License validation failed", slog.Any("err", err)), nil
+	}
+
+	if key.LicenseKey.ActivationUsage > 0 {
+		return makeErr(400, "Key is already in use, please contact customer support"), nil
+	}
+
+	if strings.Contains(strings.ToLower(key.Meta.ProductName), "anonymous") {
+		if user.SubExpiration.IsZero() {
+			user.SubExpiration = time.Now()
+		}
+		if time.Until(user.SubExpiration).Seconds() > 1 {
+			user.SubExpiration = time.Now()
+		}
+		user.SubExpiration = user.SubExpiration.AddDate(0, 1, 0).Add(time.Duration(rand.Intn(60)+60) * time.Minute)
+		INFO(3, "KEY +1:", key.LicenseKey.Key, " - check activation in lemon")
+
+		user.Key = &LicenseKey{
+			Created: key.LicenseKey.CreatedAt,
+			Months:  1,
+			Key:     "unknown",
+		}
+	} else {
+		ns := strings.Split(key.Meta.ProductName, " ")
+		months, err := strconv.Atoi(ns[0])
+		if err != nil {
+			ADMIN(3, "unable to parse license key name:", err)
+			return makeErr(500, "Something went wrong, please contact customer support", slog.Any("err", err)), nil
+		}
+		if user.SubExpiration.IsZero() {
+			user.SubExpiration = time.Now()
+		}
+		user.SubExpiration = time.Now().AddDate(0, months, 0).Add(time.Duration(rand.Intn(600)+60) * time.Minute)
+		INFO(3, "KEY +", months, ":", key.LicenseKey.Key, " - check activate in lemon")
+
+		user.Key = &LicenseKey{
+			Created: key.LicenseKey.CreatedAt,
+			Months:  months,
+			Key:     key.LicenseKey.Key,
+		}
+	}
+
+	user.Trial = false
+	user.Disabled = false
+	err = DB_UserActivateKey(user.SubExpiration, user.Key, user.ID)
+	if err != nil {
+		return makeErr(500, "Failed to activate key", slog.Any("err", err)), nil
+	}
+
+	activeKey, resp, err := lemonClient.Licenses.Activate(context.Background(), AF.Key, "tunnels")
+	if err != nil {
+		if resp != nil && resp.Body != nil {
+			return makeErr(500, "License activation failed", slog.Any("err", err)), nil
+		}
+		return makeErr(500, "License activation failed", slog.Any("err", err)), nil
+	}
+
+	if activeKey.Error != "" {
+		return makeErr(400, activeKey.Error), nil
+	}
+
+	if key != nil {
+		INFO(3, "KEY: Activated:", key.LicenseKey.Key)
+	}
+
+	return nil, map[string]string{"status": "success"}
+}
+
+func APIv2_SessionCreate(CR *types.ControllerConnectRequest) (*ErrorResponse, interface{}) {
+	server, err := DB_FindServerByID(CR.ServerID)
+	if err != nil {
+		return makeErr(500, "Server lookup failed", slog.Any("err", err)), nil
+	}
+	if server == nil {
+		return makeErr(204, "Server not found"), nil
+	}
+
+	allowed := false
+	if CR.DeviceKey != "" {
+		deviceID, err := primitive.ObjectIDFromHex(CR.DeviceKey)
+		if err != nil {
+			return makeErr(400, "Invalid device key", slog.Any("err", err)), nil
+		}
+		device, err := DB_FindDeviceByID(deviceID)
+		if err != nil {
+			return makeErr(500, "Device lookup failed", slog.Any("err", err)), nil
+		}
+		if device == nil {
+			return makeErr(401, "Unauthorized"), nil
+		}
+		for _, g := range server.Groups {
+			for _, ug := range device.Groups {
+				if g == ug {
+					allowed = true
+				}
+			}
+		}
+	} else {
+		user, err := authenticateUserFromEmailOrIDAndToken("", CR.UserID, CR.DeviceToken)
+		if err != nil {
+			return makeErr(401, "Authentication failed", slog.Any("err", err)), nil
+		}
+		for _, g := range server.Groups {
+			for _, ug := range user.Groups {
+				if g == ug {
+					allowed = true
+				}
+			}
+		}
+	}
+
+	if len(server.Groups) == 0 {
+		allowed = true
+	}
+
+	if !allowed {
+		return makeErr(400, "Unauthorized"), nil
+	}
+
+	SCR := new(types.SignedConnectRequest)
+	SCR.Payload, err = json.Marshal(CR)
+	if err != nil {
+		return makeErr(500, "Unable to decode payload", slog.Any("err", err)), nil
+	}
+	SCR.Signature, err = crypt.SignData(SCR.Payload, PrivKey)
+	if err != nil {
+		return makeErr(500, "Unable to sign payload", slog.Any("err", err)), nil
+	}
+
+	return nil, SCR
+}
+
+func APIv2_AcceptUserConnections(SCR *types.SignedConnectRequest) (*ErrorResponse, *types.ServerConnectResponse) {
+	err := crypt.VerifySignature(SCR.Payload, SCR.Signature, SignKey)
+	if err != nil {
+		return makeErr(401, "Invalid signature", slog.Any("err", err)), nil
+	}
+
+	CR := new(types.ControllerConnectRequest)
+	err = json.Unmarshal(SCR.Payload, CR)
+	if err != nil {
+		return makeErr(400, "Unable to decode Payload", slog.Any("err", err)), nil
+	}
+
+	if time.Since(CR.Created).Seconds() > 30 {
+		return makeErr(401, "Request not valid"), nil
+	}
+	if CR.UserID.IsZero() {
+		return makeErr(401, "Invalid user identifier"), nil
+	}
+
+	totalC, totalUserC := countConnections(CR.UserID.Hex())
+	if CR.RequestingPorts {
+		if totalC >= slots {
+			return makeErr(400, "Server is full"), nil
+		}
+	}
+
+	Config := Config.Load()
+	if totalUserC > Config.UserMaxConnections {
+		return makeErr(400, "User has too many active connections"), nil
+	}
+
+	var EH *crypt.SocketWrapper
+	EH, err = crypt.NewEncryptionHandler(CR.EncType, CR.CurveType)
+	if err != nil {
+		ERR("unable to create encryption handler", err)
+		return makeErr(500, "Unable to create encryption handler", slog.Any("err", err)), nil
+	}
+
+	EH.SEAL.PublicKey, err = EH.SEAL.NewPublicKeyFromBytes(SCR.UserHandshake)
+	if err != nil {
+		ERR("Port allocation failed", err)
+		return makeErr(500, "Port allocation failed", slog.Any("err", err)), nil
+	}
+	err = EH.SEAL.CreateAEAD()
+	if err != nil {
+		ERR("Port allocation failed", err)
+		return makeErr(500, "Port allocation failed", slog.Any("err", err)), nil
+	}
+
+	CRR := types.CreateCRRFromServer(Config)
+	index, err := CreateClientCoreMapping(CRR, CR, EH)
+	if err != nil {
+		ERR("Port allocation failed", err)
+		return makeErr(500, "Port allocation failed", slog.Any("err", err)), nil
+	}
+
+	CRR.ServerHandshake = EH.GetPublicKey()
+	CRR.ServerHandshakeSignature, err = crypt.SignData(CRR.ServerHandshake, PrivKey)
+	if err != nil {
+		ERR("Unable to sign server handshake", err)
+		return makeErr(500, "Unable to sign server handshake", slog.Any("err", err)), nil
+	}
+
+	// Setup signal handling for this connection
+	clientCoreMappings[index].ToSignal = signal.NewSignal(fmt.Sprintf("TO:%d", index), *CTX.Load(), *Cancel.Load(), time.Second, goroutineLogger, func() {
+		toUserChannel(index)
+	})
+
+	clientCoreMappings[index].FromSignal = signal.NewSignal(fmt.Sprintf("FROM:%d", index), *CTX.Load(), *Cancel.Load(), time.Second, goroutineLogger, func() {
+		fromUserChannel(index)
+	})
+
+	return nil, CRR
 }
 
 // Additional APIv2 functions can be added here as needed for other routes
