@@ -7,9 +7,16 @@ import (
 	"io"
 	"log/slog"
 	"net"
+	"reflect"
 
 	"github.com/tunnels-is/tunnels/types"
 )
+
+type netConMessage struct {
+	Version int    `json:"version"`
+	Method  string `json:"method"`
+	Data    any    `json:"data"`
+}
 
 // handleUDPConnection processes incoming UDP connections and routes to APIv2 methods
 func handleUDPConnection(conn net.Conn) {
@@ -55,7 +62,7 @@ func handleUDPConnection(conn net.Conn) {
 }
 
 // routeNetConMessage routes the message to the appropriate APIv2 function
-func routeNetConMessage(message *netConMessage) interface{} {
+func routeNetConMessage(message *netConMessage) any {
 	switch message.Method {
 	// User management methods
 	case "user.login":
@@ -483,21 +490,13 @@ func handleAcceptUserConnections(data interface{}) interface{} {
 	return okData
 }
 
-// Helper functions
-func castToStruct[T any](data interface{}) (*T, error) {
-	// Convert interface{} to JSON and then unmarshal to the target struct
-	jsonData, err := json.Marshal(data)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal data: %w", err)
+func castToStruct[T any](data any) (*T, error) {
+	result, ok := data.(*T)
+	if !ok {
+		return nil, fmt.Errorf("unable to cast data to type")
 	}
 
-	var result T
-	err = json.Unmarshal(jsonData, &result)
-	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal to target struct: %w", err)
-	}
-
-	return &result, nil
+	return result, nil
 }
 
 func sendNetConResponse(conn net.Conn, response interface{}) {
