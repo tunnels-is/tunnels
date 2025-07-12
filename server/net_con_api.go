@@ -11,12 +11,6 @@ import (
 	"github.com/tunnels-is/tunnels/types"
 )
 
-type netConMessage struct {
-	Version int    `json:"version"`
-	Method  string `json:"method"`
-	Data    any    `json:"data"`
-}
-
 func handleTCPConnection(conn net.Conn) {
 	defer conn.Close()
 	defer BasicRecover()
@@ -40,8 +34,10 @@ func handleTCPConnection(conn net.Conn) {
 		logger.Error("Failed to read message data", slog.Any("err", err))
 		return
 	}
+	fmt.Println(messageData)
+	fmt.Println(string(messageData))
 
-	var message netConMessage
+	var message types.NetConMessage
 	err = json.Unmarshal(messageData, &message)
 	if err != nil {
 		logger.Error("Failed to unmarshal netConMessage", slog.Any("err", err))
@@ -51,7 +47,7 @@ func handleTCPConnection(conn net.Conn) {
 	sendNetConResponse(conn, routeNetConMessage(&message))
 }
 
-func routeNetConMessage(message *netConMessage) any {
+func routeNetConMessage(message *types.NetConMessage) any {
 	switch message.Method {
 	case "/v3/user/login":
 		return handleUserLogin(message.Data)
@@ -514,13 +510,15 @@ func handleHealth(data any) any {
 	return okData
 }
 
-func castToStruct[T any](data any) (*T, error) {
-	result, ok := data.(*T)
-	if !ok {
-		return nil, fmt.Errorf("unable to cast data to type")
+func castToStruct[T any](data []byte) (out *T, err error) {
+	fmt.Println("DATA:", data)
+	out = new(T)
+	err = json.Unmarshal(data, out)
+	if err != nil {
+		return nil, err
 	}
 
-	return result, nil
+	return
 }
 
 func sendNetConResponse(conn net.Conn, response any) {

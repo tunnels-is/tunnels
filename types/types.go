@@ -22,6 +22,11 @@ const (
 	TCPAPI Feature = "TCP"
 )
 
+type NetConMessage struct {
+	Version int
+	Method  string
+	Data    []byte
+}
 type ServerConfig struct {
 	Features []Feature `json:"Features"`
 

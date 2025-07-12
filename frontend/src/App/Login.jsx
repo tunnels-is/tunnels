@@ -160,6 +160,8 @@ const useForm = () => {
     }
 
     let x = await state.callController(authServer, secure, "POST", "/v3/user/login", inputs, true, false)
+    console.log("LOGIN!")
+    console.dir(x)
     if (x && x.status === 200) {
       STORE.Local.setItem("default-device-name", inputs["devicename"]);
       STORE.Cache.Set("default-email", inputs["email"]);

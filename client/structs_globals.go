@@ -53,6 +53,7 @@ type ConnectionRequest struct {
 
 type ErrorResponse struct {
 	Error string `json:"Error"`
+	Code  int    `json:"Code"`
 }
 
 type SignedConnectRequest struct {
