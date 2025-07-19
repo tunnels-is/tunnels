@@ -64,13 +64,14 @@ var (
 )
 
 var (
-	LANEnabled   bool
-	TCPEnabled   bool
-	VPNEnabled   bool
-	AUTHEnabled  bool
-	DNSEnabled   bool
-	BBOLTEnabled bool
-	logger       *slog.Logger
+	LANEnabled      bool
+	TCPEnabled      bool
+	VPNEnabled      bool
+	AUTHEnabled     bool
+	DNSEnabled      bool
+	BBOLTEnabled    bool
+	STUNTURNEnabled bool
+	logger          *slog.Logger
 
 	slots int
 
@@ -200,7 +201,7 @@ func main() {
 				os.Exit(1)
 			}
 			lc.Store(lemonClient)
-			go signal.NewSignal("SUBSCANNER", ctx, cancel, 12*time.Hour, goroutineLogger, scanSubs)
+			go signal.New("SUBSCANNER", ctx, cancel, 12*time.Hour, goroutineLogger, scanSubs)
 		}
 
 		if *configFlag {
@@ -229,19 +230,21 @@ func main() {
 			initializeVPN()
 		}
 
-		go signal.NewSignal("DATA", ctx, cancel, 1*time.Second, goroutineLogger, DataSocketListener)
-		go signal.NewSignal("TCP", ctx, cancel, 1*time.Second, goroutineLogger, ExternalTCPListener)
-		go signal.NewSignal("UDP", ctx, cancel, 1*time.Second, goroutineLogger, ExternalUDPListener)
-		go signal.NewSignal("PING", ctx, cancel, 10*time.Second, goroutineLogger, pingActiveUsers)
+		go signal.New("DATA", ctx, cancel, 1*time.Second, goroutineLogger, DataSocketListener)
+		go signal.New("TCP", ctx, cancel, 1*time.Second, goroutineLogger, ExternalTCPListener)
+		go signal.New("UDP", ctx, cancel, 1*time.Second, goroutineLogger, ExternalUDPListener)
+		go signal.New("PING", ctx, cancel, 10*time.Second, goroutineLogger, pingActiveUsers)
 	}
 
 	if TCPEnabled {
-		go signal.NewSignal("TCPAPI", ctx, cancel, 1*time.Second, goroutineLogger, StartTCPServer)
+		if STUNTURNEnabled {
+		}
+		go signal.New("TCPAPI", ctx, cancel, 1*time.Second, goroutineLogger, StartTCPServer)
 	} else {
-		go signal.NewSignal("API", ctx, cancel, 1*time.Second, goroutineLogger, launchAPIServer)
+		go signal.New("API", ctx, cancel, 1*time.Second, goroutineLogger, launchAPIServer)
 	}
 
-	go signal.NewSignal("CONFIG", ctx, cancel, 30*time.Second, goroutineLogger, func() {
+	go signal.New("CONFIG", ctx, cancel, 30*time.Second, goroutineLogger, func() {
 		_ = LoadServerConfig("./config.json")
 	})
 
