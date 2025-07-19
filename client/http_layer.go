@@ -48,13 +48,6 @@ func LaunchAPI() {
 		return
 	}
 
-	// addr := strings.Split(ln.Addr().String(), ":")
-	// API_PORT = addr[len(addr)-1]
-	// C.APIPort = API_PORT
-	// if C.APIIP != "0.0.0.0" {
-	// 	C.APIIP = addr[0]
-	// }
-
 	INFO("====== API SERVER =========")
 	INFO("ADDR: ", ln.Addr())
 	INFO("IP: ", ip)

@@ -14,12 +14,13 @@ import (
 type Feature string
 
 const (
-	VPN    Feature = "VPN"
-	LAN    Feature = "LAN"
-	AUTH   Feature = "AUTH"
-	DNS    Feature = "DNS"
-	BBOLT  Feature = "BBOLT"
-	TCPAPI Feature = "TCP"
+	VPN      Feature = "VPN"
+	LAN      Feature = "LAN"
+	AUTH     Feature = "AUTH"
+	DNS      Feature = "DNS"
+	BBOLT    Feature = "BBOLT"
+	TCPAPI   Feature = "TCP"
+	STUNTURN Feature = "STUNTURN"
 )
 
 type NetConMessage struct {

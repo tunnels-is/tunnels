@@ -1073,11 +1073,11 @@ func APIv2_AcceptUserConnections(SCR *types.SignedConnectRequest) (*ErrorRespons
 	}
 
 	// Setup signal handling for this connection
-	clientCoreMappings[index].ToSignal = signal.NewSignal(fmt.Sprintf("TO:%d", index), *CTX.Load(), *Cancel.Load(), time.Second, goroutineLogger, func() {
+	clientCoreMappings[index].ToSignal = signal.New(fmt.Sprintf("TO:%d", index), *CTX.Load(), *Cancel.Load(), time.Second, goroutineLogger, func() {
 		toUserChannel(index)
 	})
 
-	clientCoreMappings[index].FromSignal = signal.NewSignal(fmt.Sprintf("FROM:%d", index), *CTX.Load(), *Cancel.Load(), time.Second, goroutineLogger, func() {
+	clientCoreMappings[index].FromSignal = signal.New(fmt.Sprintf("FROM:%d", index), *CTX.Load(), *Cancel.Load(), time.Second, goroutineLogger, func() {
 		fromUserChannel(index)
 	})
 
