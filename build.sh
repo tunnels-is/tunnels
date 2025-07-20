@@ -14,10 +14,11 @@ cd ..
 cp -R ./frontend/dist ./cmd/main
 cd ./cmd/main
 
+GIT_TAG=$(git describe --tags --abbrev=0)
 if [[ "windows" == "$PLATFORM" ]];then
-go build -o Tunnels-$PLATFORM.exe .
+GOOS=$PLATFORM go build -ldflags "-s -w -X github.com/tunnels-is/tunnels/client.Version=$GIT_TAG" -o Tunnels-$PLATFORM.exe .
 else
-go build -o Tunnels-$PLATFORM .
+go build -ldflags "-s -w -X github.com/tunnels-is/tunnels/client.Version=$GIT_TAG" -o Tunnels-$PLATFORM .
 fi
 
 mv Tunnels-* ../../build/
