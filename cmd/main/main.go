@@ -3,6 +3,8 @@ package main
 import (
 	"embed"
 	"flag"
+	"fmt"
+	"os"
 
 	"github.com/tunnels-is/tunnels/client"
 	"github.com/tunnels-is/tunnels/cmd/service"
@@ -15,10 +17,18 @@ var DIST embed.FS
 var DLL embed.FS
 
 func main() {
+	showVersion := false
+	flag.BoolVar(&showVersion, "version", false, "show version and exit")
+
 	s := client.STATE.Load()
 	createConfig := flag.Bool("createConfig", false, "generate a default config and exit")
 	flag.StringVar(&s.BasePath, "basePath", "", "manualy set base path for the config and log files")
 	flag.Parse()
+
+	if showVersion {
+		fmt.Println(client.Version)
+		os.Exit(1)
+	}
 
 	client.CreateConfig(createConfig)
 
