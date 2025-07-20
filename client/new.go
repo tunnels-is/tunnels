@@ -28,9 +28,11 @@ func init() {
 	DNSStatsMap = xsync.NewMapOf[string, any]()
 }
 
+var Version = "unknown"
+
 const (
-	apiVersion       = 1
-	version          = "2.0.0"
+	apiVersion = 1
+
 	tunnelFileSuffix = ".tun.json"
 
 	DefaultAPIIP   = "127.0.0.1"

@@ -311,7 +311,7 @@ func GetFullState() (s *StateResponse) {
 	defer RecoverAndLogToFile()
 	state := STATE.Load()
 	s = new(StateResponse)
-	s.Version = version
+	s.Version = Version
 	s.APIVersion = apiVersion
 	s.Config = CONFIG.Load()
 	s.State = state
