@@ -16,34 +16,48 @@ import (
 	"github.com/joho/godotenv"
 )
 
-const tag = "(cert verficiation) "
+var (
+	tag     = "(cert verification) "
+	role    = ""
+	webhook = ""
+)
 
 func main() {
+	err := godotenv.Load(".env")
+	if err != nil {
+		panic(err)
+	}
+	role = os.Getenv("ROLE")
+	webhook = os.Getenv("WEBHOOK")
 	var prevsum [16]byte
+	start := time.Now()
+	isFirst := true
+	SendDiscordWebhook(webhook, fmt.Sprintf("Starting certificate scanner for %s %s", os.Args[1], role))
 	for {
-		sum, code, err := ResolveAndRequest("api.tunnels.is")
+
+		sum, code, err := ResolveAndRequest(os.Args[1])
 		if err != nil {
-			SendDiscordWebhook(os.Getenv("WEBHOOK"), tag+err.Error())
+			SendDiscordWebhook(webhook, fmt.Sprintf("%s %s %s", role, tag, err.Error()))
 			continue
 		}
 		if code != 200 {
-			SendDiscordWebhook(os.Getenv("WEBHOOK"), tag+"Invalid response code from controller")
+			SendDiscordWebhook(webhook, fmt.Sprintf("%s %s Invalid response code from controller", role, tag))
 		}
-		if prevsum != sum {
-			SendDiscordWebhook(os.Getenv("WEBHOOK"), tag+"CHECKSUM MISSMATCH")
+		if prevsum != sum && !isFirst {
+			SendDiscordWebhook(webhook, fmt.Sprintf("%s %s CHECKSUM MISSMATCH (CONTACT SUPPORT ASAP)", role, tag))
 		}
 		prevsum = sum
-		SendDiscordWebhook(os.Getenv("WEBHOOK"), fmt.Sprintf("%s%x > %d", tag, sum, code))
+		if time.Since(start).Hours() > 1 {
+			SendDiscordWebhook(webhook, fmt.Sprintf(" %s %s%x > %d", role, tag, sum, code))
+			start = time.Now()
+		}
+		isFirst = false
 		time.Sleep(10 * time.Second)
 	}
 }
 
 func ResolveAndRequest(domain string) ([16]byte, int, error) {
 	var err error
-	err = godotenv.Load(".env")
-	if err != nil {
-		return [16]byte{}, 0, err
-	}
 	ips, err := net.LookupIP(domain)
 	if err != nil {
 		return [16]byte{}, 0, err
