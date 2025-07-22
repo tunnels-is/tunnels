@@ -8,6 +8,7 @@ import (
 
 	"github.com/tunnels-is/tunnels/client"
 	"github.com/tunnels-is/tunnels/cmd/service"
+	"github.com/tunnels-is/tunnels/version"
 )
 
 //go:embed dist
@@ -26,7 +27,7 @@ func main() {
 	flag.Parse()
 
 	if showVersion {
-		fmt.Println(client.Version)
+		fmt.Println(version.Version)
 		os.Exit(1)
 	}
 

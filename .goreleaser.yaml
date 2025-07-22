@@ -26,7 +26,7 @@ builds:
       - amd64
       - arm64
     main: ./cmd/main
-    ldflags: '-s -w -X github.com/tunnels-is/tunnels/client.Version={{.Version}} -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}} -X main.builtBy=goreleaser'
+    ldflags: '-s -w -X github.com/tunnels-is/tunnels/version.Version={{.Version}} -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}} -X main.builtBy=goreleaser'
 
   - id: server
     goos:
@@ -36,6 +36,7 @@ builds:
       - arm64
       - arm
     main: ./server
+    ldflags: '-s -w -X github.com/tunnels-is/tunnels/version.Version={{.Version}} -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}} -X main.builtBy=goreleaser'
 
   - id: min
     goos:
@@ -45,7 +46,7 @@ builds:
       - arm64
       - arm
     main: ./cmd/min
-    ldflags: '-s -w -X github.com/tunnels-is/tunnels/client.Version={{.Version}} -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}} -X main.builtBy=goreleaser'
+    ldflags: '-s -w -X github.com/tunnels-is/tunnels/version.Version={{.Version}} -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}} -X main.builtBy=goreleaser'
 
 dist: ./builds
 

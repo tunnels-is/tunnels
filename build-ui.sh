@@ -1,6 +1,6 @@
 #!/bin/bash
-rm -R ./frontend/dist 
-rm -R ./cmd/main/dist 
+rm -Rf ./frontend/dist
+rm -Rf ./cmd/main/dist
 cd ./frontend
 npm run build
 cd ..

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/tunnels-is/tunnels/certs"
+	"github.com/tunnels-is/tunnels/version"
 	"golang.org/x/net/websocket"
 )
 
@@ -311,8 +312,8 @@ func GetFullState() (s *StateResponse) {
 	defer RecoverAndLogToFile()
 	state := STATE.Load()
 	s = new(StateResponse)
-	s.Version = Version
-	s.APIVersion = apiVersion
+	s.Version = version.Version
+	s.APIVersion = version.ApiVersion
 	s.Config = CONFIG.Load()
 	s.State = state
 
