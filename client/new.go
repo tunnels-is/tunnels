@@ -29,8 +29,6 @@ func init() {
 }
 
 const (
-	apiVersion       = 1
-	version          = "2.0.0"
 	tunnelFileSuffix = ".tun.json"
 
 	DefaultAPIIP   = "127.0.0.1"
