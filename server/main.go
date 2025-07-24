@@ -33,6 +33,7 @@ import (
 	"github.com/tunnels-is/tunnels/setcap"
 	"github.com/tunnels-is/tunnels/signal"
 	"github.com/tunnels-is/tunnels/types"
+	"github.com/tunnels-is/tunnels/version"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -126,6 +127,9 @@ func ADMIN(x ...any) {
 }
 
 func main() {
+	showVersion := false
+	flag.BoolVar(&showVersion, "version", false, "show version and exit")
+
 	configFlag := flag.Bool("config", false, "This command runs the server and creates a config + certificates")
 	certsOnly := flag.Bool("certs", false, "This command generates certificates and exits")
 	logHandler := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug})
@@ -133,6 +137,11 @@ func main() {
 	slog.SetDefault(logger)
 
 	flag.Parse()
+	if showVersion {
+		fmt.Println(version.Version)
+		os.Exit(1)
+	}
+
 	if *configFlag {
 		logger.Info("generating config")
 		makeConfigAndCerts()
