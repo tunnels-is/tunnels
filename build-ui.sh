@@ -1,7 +1,7 @@
 #!/bin/bash
-rm -R ./frontend/dist 
-rm -R ./cmd/main/dist 
+rm -Rf ./frontend/dist
+rm -Rf ./cmd/main/dist
 cd ./frontend
-vite build
+npm run build
 cd ..
 cp -R ./frontend/dist ./cmd/main
