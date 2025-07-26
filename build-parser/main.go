@@ -56,6 +56,11 @@ func checkDir(dir string) {
 						continue
 					}
 				}
+				if path == "../server/main.go" && i == 140 {
+					if bytes.Contains(fbs[i], []byte("fmt.Println(version.Version)")) {
+						continue
+					}
+				}
 				fmt.Println(i, string(fbs[i]))
 				fmtCount++
 			}

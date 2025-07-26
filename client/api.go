@@ -25,6 +25,7 @@ import (
 	"github.com/miekg/dns"
 	"github.com/tunnels-is/tunnels/crypt"
 	"github.com/tunnels-is/tunnels/types"
+	"github.com/tunnels-is/tunnels/version"
 	"github.com/xlzd/gotp"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -554,7 +555,7 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 
 	FinalCR := new(types.ControllerConnectRequest)
 	FinalCR.Created = time.Now()
-	FinalCR.Version = apiVersion
+	FinalCR.Version = version.ApiVersion
 	FinalCR.UserID = UID
 	FinalCR.ServerID = SID
 	FinalCR.DeviceKey = ClientCR.DeviceKey
