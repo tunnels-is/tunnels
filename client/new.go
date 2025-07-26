@@ -30,8 +30,6 @@ func init() {
 }
 
 const (
-	apiVersion       = 1
-	version          = "2.0.3"
 	tunnelFileSuffix = ".conf"
 	configFileSuffix = ".conf"
 	backupFileSuffix = ".bak"
