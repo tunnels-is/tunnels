@@ -15,7 +15,7 @@ import (
 )
 
 func FullCleanDNSCache() {
-	defer RecoverAndLogToFile()
+	defer RecoverAndLog()
 	INFO("Dumping DNS cache")
 	DNSCache.Clear()
 }
@@ -24,7 +24,7 @@ func CleanDNSCache() {
 	defer func() {
 		time.Sleep(30 * time.Second)
 	}()
-	defer RecoverAndLogToFile()
+	defer RecoverAndLog()
 
 	INFO("Cleaning DNS cache")
 	DNSCache.Range(func(key string, value any) bool {
@@ -65,7 +65,7 @@ func InitDNSHandler() {
 }
 
 func StartUDPDNSHandler() {
-	defer RecoverAndLogToFile()
+	defer RecoverAndLog()
 
 	udpHandler := dns.NewServeMux()
 	udpHandler.HandleFunc(".", DNSQuery)
@@ -240,7 +240,7 @@ func GlobalBlockEnabled(m *dns.Msg, w dns.ResponseWriter) bool {
 }
 
 func DNSQuery(w dns.ResponseWriter, m *dns.Msg) {
-	defer RecoverAndLogToFile()
+	defer RecoverAndLog()
 
 	// if isAppDNS(m, w) {
 	// 	return
@@ -547,7 +547,7 @@ func ResolveDNSAsHTTPS(m *dns.Msg, w dns.ResponseWriter) (err error) {
 }
 
 func IncrementDNSStats(domain string, blocked bool, tag string, answers []dns.RR) {
-	defer RecoverAndLogToFile()
+	defer RecoverAndLog()
 
 	tn := time.Now()
 	dnsint, ok := DNSStatsMap.LoadOrStore(domain, &DNSStats{})

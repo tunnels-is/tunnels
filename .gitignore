@@ -24,6 +24,7 @@ cmd/min/key.pem
 cmd/min/private.crt
 cmd/min/*.tun.json
 cmd/min/*.tun.json.bak
+cmd/min/users
 
 cmd/main/files
 cmd/main/logs
@@ -32,6 +33,7 @@ cmd/main/*.jsom
 cmd/main/*.exe
 cmd/main/*.exe~
 cmd/main/main
+cmd/main/users
 cmd/main/enc
 cmd/main/tunnels*
 cmd/main/api.key

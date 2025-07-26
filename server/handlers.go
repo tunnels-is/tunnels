@@ -23,7 +23,6 @@ import (
 )
 
 func API_AcceptUserConnections(w http.ResponseWriter, r *http.Request) {
-
 	SCR := new(types.SignedConnectRequest)
 	err := decodeBody(r, SCR)
 	if err != nil {
@@ -656,13 +655,13 @@ func API_GroupAdd(w http.ResponseWriter, r *http.Request) {
 	case "device":
 		d, err = DB_FindDeviceByID(F.TypeID)
 		if err != nil {
-			senderr(w, 500, err.Error())
+			senderr(w, 400, err.Error())
 			return
 		}
 	case "server":
 		s, err = DB_FindServerByID(F.TypeID)
 		if err != nil {
-			senderr(w, 500, err.Error())
+			senderr(w, 400, err.Error())
 			return
 		}
 	case "user":
@@ -672,7 +671,7 @@ func API_GroupAdd(w http.ResponseWriter, r *http.Request) {
 			u, err = DB_findUserByID(F.TypeID)
 		}
 		if err != nil {
-			senderr(w, 500, err.Error())
+			senderr(w, 400, err.Error())
 			return
 		}
 		if u == nil {
@@ -698,7 +697,6 @@ func API_GroupAdd(w http.ResponseWriter, r *http.Request) {
 	default:
 		senderr(w, 500, "Unknown error, please try again in a moment")
 	}
-
 }
 
 func API_GroupRemove(w http.ResponseWriter, r *http.Request) {
@@ -731,6 +729,7 @@ func API_GroupRemove(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(200)
 }
+
 func API_GroupUpdate(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 	F := new(FORM_UPDATE_GROUP)
@@ -1274,7 +1273,6 @@ func API_UserResetPassword(w http.ResponseWriter, r *http.Request) {
 			senderr(w, 401, "Invalid reset code")
 			return
 		}
-
 	}
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(RF.Password), 13)
@@ -1316,6 +1314,7 @@ func API_UserToggleSubStatus(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(200)
 }
+
 func API_ActivateLicenseKey(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 

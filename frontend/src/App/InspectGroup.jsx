@@ -18,7 +18,7 @@ const InspectGroup = () => {
 
 	const addToGroup = async () => {
 		console.log("ID:", addForm.id)
-		let e = await state.callController(null, null, "POST", "/v3/group/add",
+		let e = await state.callController(null, "POST", "/v3/group/add",
 			{
 				GroupID: id,
 				TypeID: addForm.id,
@@ -42,7 +42,7 @@ const InspectGroup = () => {
 	}
 
 	const getEntities = async (type) => {
-		let resp = await state.callController(null, null, "POST", "/v3/group/entities",
+		let resp = await state.callController(null, "POST", "/v3/group/entities",
 			{ GID: id, Type: type, Limit: 1000, Offset: 0 },
 			false, false)
 		if (type === "user") {
@@ -55,7 +55,7 @@ const InspectGroup = () => {
 	}
 
 	const removeEntity = async (gid, typeid, type) => {
-		let e = await state.callController(null, null, "POST", "/v3/group/remove",
+		let e = await state.callController(null, "POST", "/v3/group/remove",
 			{ GroupID: gid, TypeID: typeid, Type: type },
 			false, true)
 		if (e === true) {
@@ -80,7 +80,7 @@ const InspectGroup = () => {
 	}
 
 	const getGroup = async () => {
-		let resp = await state.callController(null, null, "POST", "/v3/group", { GID: id, }, false, false)
+		let resp = await state.callController(null, "POST", "/v3/group", { GID: id, }, false, false)
 		if (resp.status === 200) {
 			setGroup(resp.data)
 		}
@@ -145,7 +145,7 @@ const InspectGroup = () => {
 				console.dir(obj)
 			},
 			columns: {
-				Tag: (obj) => {
+				Tag: (_) => {
 					// TODO
 					// navigate("/inspect/server/" + obj._id)
 				},

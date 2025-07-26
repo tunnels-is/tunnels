@@ -30,7 +30,7 @@ import (
 )
 
 func ResetEverything() {
-	defer RecoverAndLogToFile()
+	defer RecoverAndLog()
 	tunnelMapRange(func(tun *TUN) bool {
 		tunnel := tun.tunnel.Load()
 		if tunnel != nil {
@@ -43,7 +43,7 @@ func ResetEverything() {
 }
 
 func SendRequestToURL(tc *tls.Config, method string, url string, data any, timeoutMS int, skipVerify bool) ([]byte, int, error) {
-	defer RecoverAndLogToFile()
+	defer RecoverAndLog()
 
 	var body []byte
 	var err error
@@ -108,20 +108,21 @@ func SendRequestToURL(tc *tls.Config, method string, url string, data any, timeo
 }
 
 func ForwardToController(FR *FORWARD_REQUEST) (any, int) {
-	defer RecoverAndLogToFile()
+	defer RecoverAndLog()
 
 	// make sure api.tunnels.is is always secure
-	if strings.Contains(FR.URL, "api.tunnels.is") {
-		FR.Secure = true
+	if strings.Contains(FR.Server.Host, "api.tunnels.is") {
+		FR.Server.ValidateCertificate = true
 	}
 
+	url := FR.Server.GetURL(FR.Path)
 	responseBytes, code, err := SendRequestToURL(
 		nil,
 		FR.Method,
-		FR.URL+FR.Path,
+		url,
 		FR.JSONData,
 		FR.Timeout,
-		FR.Secure,
+		FR.Server.ValidateCertificate,
 	)
 
 	er := new(ErrorResponse)
@@ -190,7 +191,7 @@ func validateTunnelMeta(tun *TunnelMETA, oldTag string) (err []string) {
 }
 
 func SetConfig(config *configV2) (err error) {
-	defer RecoverAndLogToFile()
+	defer RecoverAndLog()
 
 	oldConf := CONFIG.Load()
 
@@ -304,7 +305,7 @@ func BandwidthBytesToString(b int64) string {
 func InitializeTunnelFromCRR(TUN *TUN) (err error) {
 	DNSGlobalBlock.Store(true)
 	defer func() {
-		RecoverAndLogToFile()
+		RecoverAndLog()
 		DNSGlobalBlock.Store(false)
 	}()
 	go FullCleanDNSCache()
@@ -448,7 +449,7 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		DEBUG("Session creation finished in: ", fmt.Sprintf("%.0f", math.Abs(time.Since(start).Seconds())), " seconds")
 		runtime.GC()
 	}()
-	defer RecoverAndLogToFile()
+	defer RecoverAndLog()
 
 	state := STATE.Load()
 	loadDefaultGateway()
@@ -509,14 +510,10 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	tunnel := new(TUN)
 	tunnel.meta.Store(meta)
 	tunnel.CR = ClientCR
-	if !strings.HasPrefix(ClientCR.URL, "https://") {
-		ClientCR.URL = "https://" + ClientCR.URL
-	}
 
 	if ClientCR.ServerIP == "" {
 		server, err := getServerByID(
-			ClientCR.Secure,
-			ClientCR.URL,
+			ClientCR.Server,
 			ClientCR.DeviceKey,
 			ClientCR.DeviceToken,
 			ClientCR.UserID,
@@ -568,13 +565,14 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	FinalCR.RequestingPorts = meta.RequestVPNPorts
 	DEBUG("ConnectRequestFromClient", ClientCR)
 
+	url := ClientCR.Server.GetURL("/v3/session")
 	bytesFromController, code, err := SendRequestToURL(
 		nil,
 		"POST",
-		ClientCR.URL+"/v3/session",
+		url,
 		FinalCR,
 		10000,
-		ClientCR.Secure,
+		ClientCR.Server.ValidateCertificate,
 	)
 	if code != 200 {
 		ERROR("ErrFromController:", err, string(bytesFromController))
@@ -621,7 +619,7 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		"https://"+ClientCR.ServerIP+":"+ClientCR.ServerPort+"/v3/connect",
 		SignedResponse,
 		10000,
-		ClientCR.Secure,
+		ClientCR.Server.ValidateCertificate,
 	)
 	if code != 200 {
 		ERROR("ErrFromServer:", code, string(bytesFromServer))
@@ -757,7 +755,7 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 			"https://"+ClientCR.ServerIP+":"+ClientCR.ServerPort+"/v3/firewall",
 			FR,
 			10000,
-			ClientCR.Secure,
+			ClientCR.Server.ValidateCertificate,
 		)
 		if err != nil {
 			ERROR("unable to update firewall: ", err)

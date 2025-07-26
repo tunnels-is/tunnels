@@ -16,7 +16,7 @@ func AutoConnect() {
 	defer func() {
 		time.Sleep(30 * time.Second)
 	}()
-	defer RecoverAndLogToFile()
+	defer RecoverAndLog()
 
 	tunnelMetaMapRange(func(meta *TunnelMETA) bool {
 		if !meta.AutoConnect || meta.ServerID == "" {
@@ -34,10 +34,10 @@ func AutoConnect() {
 		if isConnected {
 			return true
 		}
-		// TODO: update when multi-user support is enabled
-		// if meta.Tag != DefaultTunnelName && meta.UserID == "" {
-		// 	return true
-		// }
+		// TODO: if there is only one user then we connect with that one.
+		if meta.UserID == "" {
+			return true
+		}
 
 		var code int
 		var err error
@@ -45,24 +45,24 @@ func AutoConnect() {
 		cliConfig := CLIConfig.Load()
 		if cliConfig.Enabled {
 			code, err = PublicConnect(&ConnectionRequest{
-				Secure:    cliConfig.Secure,
-				URL:       cliConfig.AuthServer,
+				// Secure:    cliConfig.Secure,
+				// URL:       cliConfig.AuthServer,
 				Tag:       meta.Tag,
 				ServerID:  meta.ServerID,
 				DeviceKey: cliConfig.DeviceID,
 				Hostname:  cliConfig.Hostname,
 			})
 		} else {
-			user, err = loadUser()
-			if err != nil {
-				return true
-			}
+			// user, err = getUser()
+			// if err != nil {
+			// 	return true
+			// }
 			code, err = PublicConnect(&ConnectionRequest{
 				Tag:         meta.Tag,
 				ServerID:    meta.ServerID,
 				DeviceToken: user.DeviceToken.DT,
-				URL:         user.AuthServer,
-				Secure:      user.Secure,
+				// URL:         user.AuthServer,
+				// Secure: user.Secure,
 			})
 		}
 
@@ -105,7 +105,7 @@ func PingConnections() {
 	defer func() {
 		time.Sleep(20 * time.Second)
 	}()
-	defer RecoverAndLogToFile()
+	defer RecoverAndLog()
 
 	cli := CLIConfig.Load()
 
@@ -167,7 +167,7 @@ func isInterfaceATunnel(interf net.IP) (isTunnel bool) {
 }
 
 func loadDefaultInterface() {
-	defer RecoverAndLogToFile()
+	defer RecoverAndLog()
 	s := STATE.Load()
 	oldInterface := make([]byte, 4)
 	var newInterface net.IP
@@ -221,7 +221,7 @@ LOOP:
 }
 
 func loadDefaultGateway() {
-	defer RecoverAndLogToFile()
+	defer RecoverAndLog()
 	s := STATE.Load()
 
 	var err error

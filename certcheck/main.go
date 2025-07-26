@@ -35,20 +35,23 @@ func main() {
 	SendDiscordWebhook(webhook, fmt.Sprintf("Starting certificate scanner for %s %s", os.Args[1], role))
 	for {
 
-		sum, code, err := ResolveAndRequest(os.Args[1])
+		sum, code, ip, err := ResolveAndRequest(os.Args[1])
 		if err != nil {
 			SendDiscordWebhook(webhook, fmt.Sprintf("%s %s %s", role, tag, err.Error()))
 			continue
 		}
 		if code != 200 {
-			SendDiscordWebhook(webhook, fmt.Sprintf("%s %s Invalid response code from controller", role, tag))
+			SendDiscordWebhook(webhook, fmt.Sprintf("%s %s domain( %s )  Invalid response code from controller", role, tag, os.Args[1]))
 		}
 		if prevsum != sum && !isFirst {
-			SendDiscordWebhook(webhook, fmt.Sprintf("%s %s CHECKSUM MISSMATCH (CONTACT SUPPORT ASAP)", role, tag))
+			SendDiscordWebhook(webhook, fmt.Sprintf("%s %s domain( %s )  HASH ( %s ) MISSMATCH (CONTACT SUPPORT ASAP)", sum, role, tag, os.Args[1]))
+		}
+		if ip != os.Args[2] {
+			SendDiscordWebhook(webhook, fmt.Sprintf("%s %s domain( %s )  IP( %s ) MISSMATCH (CONTACT SUPPORT ASAP)", role, tag, os.Args[1], ip))
 		}
 		prevsum = sum
 		if time.Since(start).Hours() > 1 {
-			SendDiscordWebhook(webhook, fmt.Sprintf(" %s %s%x > %d", role, tag, sum, code))
+			SendDiscordWebhook(webhook, fmt.Sprintf("%s domain( %s ) hash( %x ) code( %d ) ip( %s )", tag, os.Args[1], sum, code, ip))
 			start = time.Now()
 		}
 		isFirst = false
@@ -56,15 +59,15 @@ func main() {
 	}
 }
 
-func ResolveAndRequest(domain string) ([16]byte, int, error) {
+func ResolveAndRequest(domain string) ([16]byte, int, string, error) {
 	var err error
 	ips, err := net.LookupIP(domain)
 	if err != nil {
-		return [16]byte{}, 0, err
+		return [16]byte{}, 0, "", err
 	}
 
 	if len(ips) == 0 {
-		return [16]byte{}, 0, fmt.Errorf("no ips found for domain")
+		return [16]byte{}, 0, "", fmt.Errorf("no ips found for domain")
 	}
 
 	preHashString := ""
@@ -109,11 +112,11 @@ func ResolveAndRequest(domain string) ([16]byte, int, error) {
 	url := fmt.Sprintf("https://%s", domain)
 	resp, err := client.Get(url)
 	if err != nil {
-		return [16]byte{}, 0, err
+		return [16]byte{}, 0, "", err
 	}
 	defer resp.Body.Close()
 	sum := md5.Sum([]byte(preHashString))
-	return sum, resp.StatusCode, nil
+	return sum, resp.StatusCode, ips[0].String(), nil
 }
 
 func SendDiscordWebhook(webhookURL string, message string) error {

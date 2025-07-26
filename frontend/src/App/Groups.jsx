@@ -13,7 +13,7 @@ const Groups = () => {
   const navigate = useNavigate()
 
   let getGroups = async (offset, limit) => {
-    let resp = await state.callController(null, null, "POST", "/v3/group/list", {}, false, false)
+    let resp = await state.callController(null, "POST", "/v3/group/list", {}, false, false)
     if (resp.status === 200) {
       setGroups(resp.data)
     }
@@ -27,9 +27,9 @@ const Groups = () => {
     let resp = undefined
     let ok = false
     if (group._id !== undefined) {
-      resp = await state.callController(null, null, "POST", "/v3/group/update", { Group: group }, false, false)
+      resp = await state.callController(null, "POST", "/v3/group/update", { Group: group }, false, false)
     } else {
-      resp = await state.callController(null, null, "POST", "/v3/group/create", { Group: group }, false, false)
+      resp = await state.callController(null, "POST", "/v3/group/create", { Group: group }, false, false)
     }
 
     if (resp.status === 200) {
@@ -52,7 +52,7 @@ const Groups = () => {
   }
 
   const deleteGroup = async (id) => {
-    let resp = await state.callController(null, null, "POST", "/v3/group/delete", { GID: id, }, false, false)
+    let resp = await state.callController(null, "POST", "/v3/group/delete", { GID: id, }, false, false)
     if (resp.status === 200) {
       let g = groups.filter(g => g._id !== id)
       setGroups([...g])

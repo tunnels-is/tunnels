@@ -149,7 +149,7 @@ const NewObjectEditor = (props) => {
           kk = props.opts.nameMap[k] ? props.opts.nameMap[k] : k
         }
 
-        if (props.opts?.nameFormat[k]) {
+        if (props.opts?.nameFormat && props.opts?.nameFormat[k]) {
           kk = props.opts.nameFormat[k](props.obj)
         }
 

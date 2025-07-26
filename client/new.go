@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net"
 	"os"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -30,8 +31,10 @@ func init() {
 
 const (
 	apiVersion       = 1
-	version          = "2.0.0"
-	tunnelFileSuffix = ".tun.json"
+	version          = "2.0.3"
+	tunnelFileSuffix = ".conf"
+	configFileSuffix = ".conf"
+	backupFileSuffix = ".bak"
 
 	DefaultAPIIP   = "127.0.0.1"
 	DefaultAPIPort = "7777"
@@ -89,10 +92,36 @@ type CLIInfo struct {
 	Hostname   string
 }
 
+type ControlServer struct {
+	ID                  string
+	Host                string
+	Port                string
+	CertificatePath     string
+	ValidateCertificate bool
+	// STUNHost string
+	// STUNKey  string
+}
+
+func (c *ControlServer) GetHostAndPort() string {
+	hostPort := c.Host
+	if c.Port != "" {
+		hostPort += ":" + c.Port
+	}
+	return hostPort
+}
+
+func (c *ControlServer) GetURL(path string) string {
+	url := c.GetHostAndPort()
+	path = strings.TrimPrefix(path, "/")
+	url = "https://" + url + "/" + path
+
+	return url
+}
+
 type configV2 struct {
 	OpenUI bool
 
-	AuthServers       []string
+	ControlServers    []*ControlServer
 	DisableBlockLists bool
 
 	// API Setting
@@ -142,10 +171,9 @@ type stateV2 struct {
 	LogPath        string
 	ConfigFileName string
 	BasePath       string
-	TracePath      string
 	TunnelsPath    string
-	TraceFileName  string
 	LogFileName    string
+	UserPath       string
 }
 
 type TunnelState int

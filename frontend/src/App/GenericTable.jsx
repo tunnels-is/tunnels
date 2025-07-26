@@ -257,11 +257,17 @@ const GenericTable = (props) => {
 
       </div>
 
-      <Table className="w-full overflow-visible text-sm text-foreground">
-        {renderHeaders()}
-        <div class="h-2"></div>
-        {renderRows()}
-      </Table>
+      {t.data?.length > 0 &&
+        <Table className="w-full overflow-visible text-sm text-foreground">
+          {renderHeaders()}
+          <div class="h-2"></div>
+          {renderRows()}
+        </Table>
+      }
+      {t.data?.length < 1 &&
+        <div className="w-full overflow-visible text-center text-lg text-foreground">table has no records</div>
+      }
+
     </div >
   );
 };

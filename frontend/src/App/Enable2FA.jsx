@@ -61,7 +61,7 @@ const useForm = (props) => {
 
 		inputs.Code = secret
 
-		let x = await state.callController(null, null, "POST", "/v3/user/2fa/confirm",
+		let x = await state.callController(null, "POST", "/v3/user/2fa/confirm",
 			inputs,
 			false, false)
 		if (x.status === 200) {

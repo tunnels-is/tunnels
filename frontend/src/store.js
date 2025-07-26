@@ -121,7 +121,8 @@ var STORE = {
     }
   },
 
-  debug: Boolean(window.sessionStorage.getItem("debug")) === true ? true : false,
+  // debug: Boolean(window.sessionStorage.getItem("debug")) === true ? true : false,
+  debug: false,
   // debug: false,
   Session: window.sessionStorage,
   Local: window.localStorage,
