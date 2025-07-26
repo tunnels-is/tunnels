@@ -222,17 +222,14 @@ export var STATE = {
   },
   GetUsers: async () => {
     try {
-      let users = STORE.Cache.GetObject("users");
-      if (!users || users.length === 0) {
-        users = await STATE.LoadUsers();
-        console.log("POST FETCH");
-        console.dir(users);
-        if (users) {
-          STORE.Cache.SetObject("users", users);
-        }
+      let users = await STATE.LoadUsers();
+      console.log("POST FETCH");
+      console.dir(users);
+      if (users && users.length > 0) {
+        STORE.Cache.SetObject("users", users);
+        STATE.Users = users
       }
       STATE.renderPage("user-select")
-      STATE.Users = users
       return users;
     } catch (err) {
       console.dir(err);
@@ -622,8 +619,7 @@ export var STATE = {
       return
     }
 
-    connectionRequest.URL = STATE.User.AuthServer
-    connectionRequest.Secure = STATE.User.Secure
+    connectionRequest.Server = STATE.User.ControlServer
     try {
       STATE.toggleLoading({
         logTag: "connect",

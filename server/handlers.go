@@ -69,17 +69,20 @@ func API_AcceptUserConnections(w http.ResponseWriter, r *http.Request) {
 	EH, err = crypt.NewEncryptionHandler(CR.EncType, CR.CurveType)
 	if err != nil {
 		ERR("unable to create encryption handler", err)
+		senderr(w, 400, "unable to initialize encryption handler")
 		return
 	}
 
 	EH.SEAL.PublicKey, err = EH.SEAL.NewPublicKeyFromBytes(SCR.UserHandshake)
 	if err != nil {
 		ERR("Port allocation failed", err)
+		senderr(w, 400, "unable to create public key")
 		return
 	}
 	err = EH.SEAL.CreateAEAD()
 	if err != nil {
-		ERR("Port allocation failed", err)
+		ERR("unable to create encryption AEAD", err)
+		senderr(w, 400, "unable to create encryption AEAD")
 		return
 	}
 
@@ -87,6 +90,7 @@ func API_AcceptUserConnections(w http.ResponseWriter, r *http.Request) {
 	index, err := CreateClientCoreMapping(CRR, CR, EH)
 	if err != nil {
 		ERR("Port allocation failed", err)
+		senderr(w, 400, "unable to allocate ports")
 		return
 	}
 
@@ -94,11 +98,13 @@ func API_AcceptUserConnections(w http.ResponseWriter, r *http.Request) {
 	CRR.ServerHandshakeSignature, err = crypt.SignData(CRR.ServerHandshake, PrivKey)
 	if err != nil {
 		ERR("Unable to sign server handshake", err)
+		senderr(w, 400, "unable to sign server handshake")
 		return
 	}
 	CRRB, err := json.Marshal(CRR)
 	if err != nil {
 		ERR("Unable to marshal CCR", err)
+		senderr(w, 400, "unable to decode connection request")
 		return
 	}
 
