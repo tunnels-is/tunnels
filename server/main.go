@@ -456,60 +456,64 @@ func makeConfigAndCerts() {
 		panic(err)
 	}
 	interfaceIP := IFIP.String()
-	Config := &types.ServerConfig{
-		Features: []types.Feature{
-			types.LAN,
-			types.VPN,
-			types.AUTH,
-			types.DNS,
-			types.BBOLT,
-		},
-		VPNIP:     interfaceIP,
-		VPNPort:   "444",
-		APIIP:     interfaceIP,
-		APIPort:   "443",
-		NetAdmins: []string{},
-		Hostname:  "tunnels.local",
-		Lan: &types.Network{
-			Tag:     "lan",
-			Network: "10.0.0.0/16",
-		},
-		Routes: []*types.Route{
-			{Address: "10.0.0.0/16", Metric: "0"},
-		},
-		SubNets:            []*types.Network{},
-		DisableLanFirewall: false,
-		StartPort:          2000,
-		EndPort:            65530,
-		UserMaxConnections: 10,
-		InternetAccess:     true,
-		LocalNetworkAccess: false,
-		BandwidthMbps:      1000,
-		UserBandwidthMbps:  10,
-		DNSAllowCustomOnly: false,
-		DNSRecords:         []*types.DNSRecord{},
-		DNSServers:         []string{},
-		SecretStore:        "config",
-		// secrets
-		DBurl:        "mongodb://127.0.0.1:27017",
-		AdminApiKey:  uuid.NewString(),
-		TwoFactorKey: strings.ReplaceAll(uuid.NewString(), "-", ""),
-		EmailKey:     "",
-		CertPem:      "./cert.pem",
-		KeyPem:       "./key.pem",
-		SignPem:      "./sign.pem",
-	}
-	f, err := os.Create(ep + "config.json")
+
+	err = LoadServerConfig("./config.json")
 	if err != nil {
-		panic(err)
-	}
-	defer func() {
-		_ = f.Close()
-	}()
-	encoder := json.NewEncoder(f)
-	encoder.SetIndent("", "    ")
-	if err := encoder.Encode(Config); err != nil {
-		panic(err)
+		Config := &types.ServerConfig{
+			Features: []types.Feature{
+				types.LAN,
+				types.VPN,
+				types.AUTH,
+				types.DNS,
+				types.BBOLT,
+			},
+			VPNIP:     interfaceIP,
+			VPNPort:   "444",
+			APIIP:     interfaceIP,
+			APIPort:   "443",
+			NetAdmins: []string{},
+			Hostname:  "tunnels.local",
+			Lan: &types.Network{
+				Tag:     "lan",
+				Network: "10.0.0.0/16",
+			},
+			Routes: []*types.Route{
+				{Address: "10.0.0.0/16", Metric: "0"},
+			},
+			SubNets:            []*types.Network{},
+			DisableLanFirewall: false,
+			StartPort:          2000,
+			EndPort:            65530,
+			UserMaxConnections: 10,
+			InternetAccess:     true,
+			LocalNetworkAccess: false,
+			BandwidthMbps:      1000,
+			UserBandwidthMbps:  10,
+			DNSAllowCustomOnly: false,
+			DNSRecords:         []*types.DNSRecord{},
+			DNSServers:         []string{},
+			SecretStore:        "config",
+			// secrets
+			DBurl:        "mongodb://127.0.0.1:27017",
+			AdminApiKey:  uuid.NewString(),
+			TwoFactorKey: strings.ReplaceAll(uuid.NewString(), "-", ""),
+			EmailKey:     "",
+			CertPem:      "./cert.pem",
+			KeyPem:       "./key.pem",
+			SignPem:      "./sign.pem",
+		}
+		f, err := os.Create(ep + "config.json")
+		if err != nil {
+			panic(err)
+		}
+		defer func() {
+			_ = f.Close()
+		}()
+		encoder := json.NewEncoder(f)
+		encoder.SetIndent("", "    ")
+		if err := encoder.Encode(Config); err != nil {
+			panic(err)
+		}
 	}
 
 	makeCerts(ep, interfaceIP)

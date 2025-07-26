@@ -254,23 +254,28 @@ func MakeCertV2(ct CertType, certPath string, keyPath string, ips []string, doma
 
 	CR.X509KeyPair, err = tls.X509KeyPair(CR.CertPem, CR.KeyPem)
 	if saveToDisk {
-		cpem, err := os.Create(certPath)
+		_, err := os.Stat(certPath)
 		if err != nil {
-			return nil, err
+			cpem, err := os.Create(certPath)
+			if err != nil {
+				return nil, err
+			}
+			defer cpem.Close()
+			if err := pem.Encode(cpem, &pem.Block{Type: "CERTIFICATE", Bytes: CR.CertBytes}); err != nil {
+				return nil, fmt.Errorf("failed to write certificate data to %s: %w", certPath, err)
+			}
 		}
-		defer cpem.Close()
 
-		kpem, err := os.Create(keyPath)
+		_, err = os.Stat(keyPath)
 		if err != nil {
-			return nil, err
-		}
-		defer kpem.Close()
-
-		if err := pem.Encode(cpem, &pem.Block{Type: "CERTIFICATE", Bytes: CR.CertBytes}); err != nil {
-			return nil, fmt.Errorf("failed to write certificate data to %s: %w", certPath, err)
-		}
-		if err := pem.Encode(kpem, &pem.Block{Type: "PRIVATE KEY", Bytes: CR.KeyPKCS8}); err != nil {
-			return nil, fmt.Errorf("failed to write certificate data to %s: %w", certPath, err)
+			kpem, err := os.Create(keyPath)
+			if err != nil {
+				return nil, err
+			}
+			defer kpem.Close()
+			if err := pem.Encode(kpem, &pem.Block{Type: "PRIVATE KEY", Bytes: CR.KeyPKCS8}); err != nil {
+				return nil, fmt.Errorf("failed to write certificate data to %s: %w", certPath, err)
+			}
 		}
 	}
 	return
