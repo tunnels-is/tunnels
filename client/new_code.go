@@ -20,7 +20,7 @@ func tunnelMetaMapRange(do func(tun *TunnelMETA) bool) {
 }
 
 func doEvent(channel chan *event, method func()) {
-	defer RecoverAndLogToFile()
+	defer RecoverAndLog()
 	select {
 	case channel <- &event{
 		method: method,
@@ -50,7 +50,7 @@ type event struct {
 }
 
 func (e *event) Wait(method func(any), timeout time.Duration) {
-	defer RecoverAndLogToFile()
+	defer RecoverAndLog()
 	tick := time.NewTimer(timeout)
 	select {
 	case done := <-e.done:
@@ -59,11 +59,10 @@ func (e *event) Wait(method func(any), timeout time.Duration) {
 	case <-tick.C:
 		method(errors.New("timeout waiting"))
 	}
-
 }
 
 func newConcurrentSignal(tag string, ctx context.Context, method func()) {
-	defer RecoverAndLogToFile()
+	defer RecoverAndLog()
 	select {
 	case concurrencyMonitor <- &goSignal{
 		monitor: concurrencyMonitor,
@@ -85,7 +84,7 @@ type goSignal struct {
 }
 
 func (s *goSignal) execute() {
-	defer RecoverAndLogToFile()
+	defer RecoverAndLog()
 	s.method()
 	time.Sleep(1 * time.Second)
 

@@ -93,7 +93,6 @@ func (V *TUN) CreateNEWPortMapping(p *[]byte) (m *Mapping) {
 
 // func (V *TUN) getIngressPortMapping(VPNPortMap []atomic.Pointer[VPNPort], dstIP []byte, port [2]byte) *Mapping {
 func (V *TUN) getIngressPortMapping() (m *Mapping) {
-
 	var imap []*xsync.MapOf[any, *Mapping]
 	if V.IP_Protocol == 6 {
 		imap = V.AvailableTCPPorts
@@ -139,7 +138,6 @@ func debugMissingIngressMapping(packet []byte) {
 		}
 		return
 	}
-
 }
 
 func (t *TUN) cleanPortMap() {
@@ -205,14 +203,13 @@ func (t *TUN) cleanPortMap() {
 			return true
 		})
 	}
-
 }
 
 func CleanPortsForAllConnections() {
 	defer func() {
 		time.Sleep(10 * time.Second)
 	}()
-	defer RecoverAndLogToFile()
+	defer RecoverAndLog()
 	tunnelMapRange(func(tun *TUN) bool {
 		tun.cleanPortMap()
 		return true

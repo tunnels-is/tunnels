@@ -16,13 +16,14 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/tunnels-is/tunnels/certs"
 	"github.com/tunnels-is/tunnels/types"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 func InitService() error {
-	defer RecoverAndLogToFile()
+	defer RecoverAndLog()
 
 	InitBaseFoldersAndPaths()
 	_ = loadConfigFromDisk()
@@ -92,7 +93,7 @@ func printInfo2() {
 }
 
 func LaunchTunnels() {
-	defer RecoverAndLogToFile()
+	defer RecoverAndLog()
 
 	CancelContext, CancelFunc = context.WithCancel(GlobalContext)
 	quit = make(chan os.Signal, 10)
@@ -191,7 +192,7 @@ mainLoop:
 }
 
 func InitMinimalService() error {
-	defer RecoverAndLogToFile()
+	defer RecoverAndLog()
 	InitBaseFoldersAndPaths()
 	_ = loadConfigFromDisk()
 	loadTunnelsFromDisk()
@@ -240,7 +241,7 @@ func InitMinimalService() error {
 }
 
 func LaunchMinimalTunnels() {
-	defer RecoverAndLogToFile()
+	defer RecoverAndLog()
 	cli := CLIConfig.Load()
 
 	CancelContext, CancelFunc = context.WithCancel(GlobalContext)
@@ -328,7 +329,7 @@ mainLoop:
 }
 
 func writeConfigToDisk() (err error) {
-	defer RecoverAndLogToFile()
+	defer RecoverAndLog()
 	conf := CONFIG.Load()
 	s := STATE.Load()
 
@@ -398,6 +399,20 @@ func ReadConfigFileFromDisk() (err error) {
 		return
 	}
 
+	if len(Conf.ControlServers) < 1 {
+		Conf.ControlServers = append(Conf.ControlServers, &ControlServer{
+			ID:                  uuid.NewString(),
+			Host:                "api.tunnels.is",
+			Port:                "443",
+			CertificatePath:     "",
+			ValidateCertificate: true,
+		})
+		err = writeConfigToDisk()
+		if err != nil {
+			ERROR("unable to ad api.tunnels.is to default config")
+		}
+	}
+
 	CONFIG.Store(Conf)
 
 	return
@@ -419,7 +434,7 @@ func writeTunnelsToDisk(tag string) (outErr error) {
 			return false
 		}
 
-		err = RenameFile(s.TunnelsPath+t.Tag+tunnelFileSuffix, s.TunnelsPath+t.Tag+tunnelFileSuffix+".bak")
+		err = RenameFile(s.TunnelsPath+t.Tag+tunnelFileSuffix, s.TunnelsPath+t.Tag+tunnelFileSuffix+backupFileSuffix)
 		if err != nil {
 			ERROR("Unable to rename tunnel file:", err)
 		}
@@ -530,14 +545,27 @@ func DefaultConfig() *configV2 {
 		DNSBlockLists:     GetDefaultBlockLists(),
 		APIIP:             "127.0.0.1",
 		APIPort:           "7777",
-		AuthServers:       []string{"https://api.tunnels.is", "https://127.0.0.1"},
 	}
+	conf.ControlServers = append(conf.ControlServers, &ControlServer{
+		ID:                  uuid.NewString(),
+		Host:                "api.tunnels.is",
+		Port:                "443",
+		CertificatePath:     "",
+		ValidateCertificate: true,
+	})
+	conf.ControlServers = append(conf.ControlServers, &ControlServer{
+		ID:                  uuid.NewString(),
+		Host:                "127.0.0.1",
+		Port:                "443",
+		CertificatePath:     "",
+		ValidateCertificate: false,
+	})
 	applyCertificateDefaultsToConfig(conf)
 	return conf
 }
 
 func loadConfigFromDisk() error {
-	defer RecoverAndLogToFile()
+	defer RecoverAndLog()
 	DEBUG("Loading configurations from file")
 
 	if err := ReadConfigFileFromDisk(); err == nil {
@@ -555,7 +583,6 @@ func loadConfigFromDisk() error {
 }
 
 func applyCertificateDefaultsToConfig(cfg *configV2) {
-
 	if cfg.APIKey == "" {
 		cfg.APIKey = "./api.key"
 	}
@@ -610,7 +637,7 @@ func applyCertificateDefaultsToConfig(cfg *configV2) {
 //	}
 
 func CleanupOnClose() {
-	defer RecoverAndLogToFile()
+	defer RecoverAndLog()
 	tunnelMapRange(func(tun *TUN) bool {
 		tunnel := tun.tunnel.Load()
 		err := tunnel.Disconnect(tun)
@@ -628,7 +655,7 @@ func CleanupOnClose() {
 }
 
 func popUI() {
-	defer RecoverAndLogToFile()
+	defer RecoverAndLog()
 	<-uiChan
 	time.Sleep(2 * time.Second)
 
@@ -658,13 +685,12 @@ func isWSL() bool {
 	return strings.Contains(strings.ToLower(string(releaseData)), "microsoft")
 }
 
-func getServerByID(secure bool, authServer string, deviceKey string, deviceToken string, UserID string, ServerID string) (s *types.Server, err error) {
+func getServerByID(server *ControlServer, deviceKey string, deviceToken string, UserID string, ServerID string) (s *types.Server, err error) {
 	SID, _ := primitive.ObjectIDFromHex(ServerID)
 	UID, _ := primitive.ObjectIDFromHex(UserID)
 
 	FR := &FORWARD_REQUEST{
-		URL:     authServer,
-		Secure:  secure,
+		Server:  server,
 		Path:    "/v3/server",
 		Method:  "POST",
 		Timeout: 10000,
@@ -675,13 +701,14 @@ func getServerByID(secure bool, authServer string, deviceKey string, deviceToken
 			ServerID:    SID,
 		},
 	}
+	url := FR.Server.GetURL(FR.Path)
 	responseBytes, code, err := SendRequestToURL(
 		nil,
 		FR.Method,
-		FR.URL+FR.Path,
+		url,
 		FR.JSONData,
 		FR.Timeout,
-		FR.Secure,
+		FR.Server.ValidateCertificate,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %s", "error calling controller", err)
@@ -698,12 +725,11 @@ func getServerByID(secure bool, authServer string, deviceKey string, deviceToken
 	return
 }
 
-func GetDeviceByID(secure bool, authServer string, deviceID string) (d *types.Device, err error) {
+func GetDeviceByID(server *ControlServer, deviceID string) (d *types.Device, err error) {
 	DID, _ := primitive.ObjectIDFromHex(deviceID)
 
 	FR := &FORWARD_REQUEST{
-		URL:     "https://" + authServer,
-		Secure:  secure,
+		Server:  server,
 		Path:    "/v3/device",
 		Method:  "POST",
 		Timeout: 10000,
@@ -711,13 +737,14 @@ func GetDeviceByID(secure bool, authServer string, deviceID string) (d *types.De
 			DeviceID: DID,
 		},
 	}
+	url := FR.Server.GetURL(FR.Path)
 	responseBytes, code, err := SendRequestToURL(
 		nil,
 		FR.Method,
-		FR.URL+FR.Path,
+		url,
 		FR.JSONData,
 		FR.Timeout,
-		FR.Secure,
+		FR.Server.ValidateCertificate,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %s", "error calling controller", err)

@@ -18,7 +18,7 @@ import {
 import { cn } from "@/lib/utils";
 import GLOBAL_STATE from "../state";
 import { Logs } from "lucide-react";
-import STORE from "@/store";
+import { UsersIcon } from "lucide-react";
 
 const IconWidth = 20;
 const IconHeight = 20;
@@ -118,7 +118,7 @@ const SideBar = () => {
             user: false,
           },
 
-          { icon: PersonIcon, label: "Account", route: "account", user: true },
+          { icon: UsersIcon, label: "Accounts", route: "accounts", user: false },
           { icon: Logs, label: "Logs", route: "logs", user: false },
         ],
       },
@@ -163,11 +163,10 @@ const SideBar = () => {
 
   return (
     <div
-      className={"fixed sidebarscroll top-0 left-0 w-44 h-screen bg-[#0B0E14] border-r flex flex-col py-6 z-[2000]" + state.Theme?.borderColor}
+      className={"fixed sidebarscroll top-0 left-0 w-44 h-screen bg-[#0B0E14] border-r flex flex-col pt-6 z-[2000]" + state.Theme?.borderColor}
       ref={sideb}
       id="sidebar"
     >
-      {/* Logo or Brand */}
       < div className="flex-1 sidebarscroll overflow-y-auto space-y-6 pb-2" >
         {
           menu.groups.map((g) => {
@@ -242,23 +241,28 @@ const SideBar = () => {
         }
       </div >
 
-      {/* User Section at Bottom */}
       {
         user && user.Email && (
-          <div className="px-3 pt-6 border-t border-[#1a1f2d]">
-            <div className="flex items-center gap-3 px-3 py-3 rounded-md bg-[#1a1f2d]/50">
-              <div className="w-8 h-8 rounded-full bg-[#4B7BF5]/20 flex items-center justify-center">
+          <div className="px-3 pb-2 pt-6  " onClick={() => navigate("/account")}>
+            <div className="flex items-center px-2 py-2 rounded-md bg-[#1a1f2d]/50">
+              <div className="w-8 h-8 rounded-full mr-2 bg-[#4B7BF5]/20 flex items-center justify-center">
                 <PersonIcon className="w-4 h-4 text-[#4B7BF5]" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-white truncate">
-                  {user.Email}
-                </p>
+                <div className="relative group">
+                  <div className="text-sm font-medium text-white truncate">
+                    {user.Email}
+                  </div>
+                  <div className="absolute hidden group-hover:block bg-[#1a1f2d] text-white text-xs rounded  py-1 px-2 -top-8 left-4 transform whitespace-nowrap">
+                    {user.Email}
+                  </div>
+                </div>
               </div>
             </div>
           </div>
         )
       }
+
     </div >
   );
 };

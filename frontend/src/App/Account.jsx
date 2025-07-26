@@ -16,8 +16,12 @@ const Account = () => {
   const navigate = useNavigate();
   const state = GLOBAL_STATE("account");
 
+  const gotoAccountSelect = () => {
+    navigate("/accounts");
+  }
+
   if (state.User?.Email === "" || !state.User) {
-    navigate("/login");
+    gotoAccountSelect()
     return;
   }
 
@@ -156,6 +160,12 @@ const Account = () => {
             </div>
 
             <div className="flex flex-col gap-3 mt-6">
+              <Button
+                className={state.Theme?.neutralBtn}
+                onClick={() => gotoAccountSelect()}
+              >
+                Switch Account
+              </Button>
               <Button
                 className={state.Theme?.neutralBtn}
                 onClick={() => state.refreshApiKey()}

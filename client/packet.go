@@ -17,7 +17,7 @@ type packetDebugOut struct {
 func (t *TUN) RegisterPing(packet []byte) {
 	t.registerPing(time.Now())
 
-	defer RecoverAndLogToFile()
+	defer RecoverAndLog()
 	t.CPU = packet[0]
 	t.MEM = packet[1]
 	t.DISK = packet[2]
@@ -27,7 +27,7 @@ func (t *TUN) RegisterPing(packet []byte) {
 }
 
 func debugProcessPacket(packet []byte) (P *packetDebugOut) {
-	defer RecoverAndLogToFile()
+	defer RecoverAndLog()
 	P = new(packetDebugOut)
 	P.Version = packet[0] >> 4
 	P.Proto = packet[9]

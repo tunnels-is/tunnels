@@ -33,8 +33,7 @@ type DNSStats struct {
 }
 
 type ConnectionRequest struct {
-	URL          string
-	Secure       bool
+	Server       *ControlServer
 	ServerPubKey string
 	Hostname     string `json:"Hostname"`
 
@@ -400,8 +399,9 @@ type DEBUG_OUT struct {
 }
 
 type FORWARD_REQUEST struct {
-	URL      string
-	Secure   bool
+	Server *ControlServer
+	// URL      string
+	// Secure   bool
 	Path     string
 	Method   string
 	Timeout  int
@@ -440,10 +440,11 @@ type User struct {
 	Updated               time.Time       `json:"Updated"`
 	SubExpiration         time.Time       `json:"SubExpiration"`
 	AdditionalInformation string          `json:"AdditionalInformation,omitempty"`
-	AuthServer            string
-	Secure                bool
-	IsAdmin               bool `json:"IsAdmin"`
-	IsManager             bool `json:"IsManager"`
+	IsAdmin               bool            `json:"IsAdmin"`
+	IsManager             bool            `json:"IsManager"`
+
+	// Client only
+	ControlServer *ControlServer
 }
 
 type LicenseKey struct {

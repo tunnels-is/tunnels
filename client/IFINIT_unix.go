@@ -46,7 +46,7 @@ func (t *TInterface) Close() error {
 func CreateNewTunnelInterface(
 	meta *TunnelMETA,
 ) (IF *TInterface, err error) {
-	defer RecoverAndLogToFile()
+	defer RecoverAndLog()
 
 	// Some kernels seem to not be compiled with
 	// /dev/net/tun ... we need to create it.
@@ -382,7 +382,7 @@ func (t *TInterface) Connect(tun *TUN) (err error) {
 }
 
 func (t *TInterface) Disconnect(tun *TUN) (err error) {
-	defer RecoverAndLogToFile()
+	defer RecoverAndLog()
 	if tun.connection != nil {
 		_ = tun.connection.Close()
 	}
@@ -643,7 +643,7 @@ func IPv6Enabled() bool {
 }
 
 func AdjustRoutersForTunneling() (err error) {
-	defer RecoverAndLogToFile()
+	defer RecoverAndLog()
 
 	links, _ := netlink.LinkList()
 	for _, v := range links {

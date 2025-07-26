@@ -2,7 +2,6 @@ import React, { useEffect, useState } from "react";
 import GLOBAL_STATE from "../state"
 import dayjs from "dayjs";
 import GenericTable from "./GenericTable";
-import { TableCell } from "@/components/ui/table";
 import { useParams } from "react-router-dom";
 
 const ServerDevices = () => {
@@ -20,7 +19,9 @@ const ServerDevices = () => {
 		if (!server) {
 			return
 		}
-		let resp = await state.callController("https://" + server.IP, null, "POST", "/v3/devices", {}, false, false)
+		let s = { ...state.User?.ControlServer }
+		s.Host = server.IP
+		let resp = await state.callController(s, "POST", "/v3/devices", {}, false, false)
 		if (resp.status === 200) {
 			setConnectedDevices(resp.data)
 			state.renderPage("devices")

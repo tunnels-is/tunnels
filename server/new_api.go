@@ -122,7 +122,7 @@ func loggingTimingMiddleware(next http.Handler) http.Handler {
 		log.Printf("-> %s %s", r.Method, r.URL.RequestURI())
 		next.ServeHTTP(w, r)
 		duration := time.Since(startTime)
-		log.Printf("<- %s %s completed in %dms",
+		log.Printf("<- %s %s completed in %d ms",
 			r.Method,
 			r.URL.RequestURI(),
 			duration.Milliseconds(),

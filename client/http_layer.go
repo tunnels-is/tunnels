@@ -15,7 +15,7 @@ import (
 )
 
 func LaunchAPI() {
-	defer RecoverAndLogToFile()
+	defer RecoverAndLog()
 
 	assetHandler := http.FileServer(getFileSystem())
 
@@ -196,7 +196,7 @@ func handleWebSocket(ws *websocket.Conn) {
 			ws.Close()
 		}
 	}()
-	defer RecoverAndLogToFile()
+	defer RecoverAndLog()
 
 	LogSocket.Store(ws)
 	for event := range APILogQueue {
@@ -211,7 +211,6 @@ func handleWebSocket(ws *websocket.Conn) {
 			return
 		}
 	}
-
 }
 
 func Bind[I any](form I, r *http.Request) (err error) {
@@ -227,10 +226,14 @@ func STRING(w http.ResponseWriter, r *http.Request, code int, data string) {
 
 func JSON(w http.ResponseWriter, r *http.Request, code int, data any) {
 	if data == nil {
-		w.WriteHeader(200)
+		if code == 0 {
+			w.WriteHeader(500)
+		} else {
+			w.WriteHeader(code)
+		}
 		return
 	}
-	defer RecoverAndLogToFile()
+	defer RecoverAndLog()
 	defer func() {
 		if r.Body != nil {
 			r.Body.Close()
@@ -295,11 +298,17 @@ func HTTP_SetUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func HTTP_DelUser(w http.ResponseWriter, r *http.Request) {
-	JSON(w, r, 200, delUser())
+	u := new(User)
+	err := Bind(u, r)
+	if err != nil {
+		JSON(w, r, 400, err)
+		return
+	}
+	JSON(w, r, 200, delUser(u))
 }
 
 func HTTP_GetUser(w http.ResponseWriter, r *http.Request) {
-	u, err := loadUser()
+	u, err := getUsers()
 	if err != nil {
 		JSON(w, r, 400, err)
 		return
@@ -308,7 +317,7 @@ func HTTP_GetUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetFullState() (s *StateResponse) {
-	defer RecoverAndLogToFile()
+	defer RecoverAndLog()
 	state := STATE.Load()
 	s = new(StateResponse)
 	s.Version = version

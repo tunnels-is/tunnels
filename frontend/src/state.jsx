@@ -97,34 +97,34 @@ export var STATE = {
   },
 
   GetServers: async () => {
-    let resp = await STATE.callController(null, null, "POST", "/v3/servers", { StartIndex: 0 }, false, false)
+    let resp = await STATE.callController(null, "POST", "/v3/servers", { StartIndex: 0 }, false, false)
     if (resp?.status === 200) {
       if (resp.data?.length > 0) {
-        STORE.Cache.SetObject("private-servers", resp.data);
+        STORE.Cache.SetObject("servers", resp.data);
         STATE.PrivateServers = resp.data;
       } else {
         STATE.errorNotification("Unable to find servers");
-        STORE.Cache.SetObject("private-servers", []);
+        STORE.Cache.SetObject("servers", []);
         STATE.PrivateServers = [];
       }
       STATE.renderPage("pservers");
     } else if (resp?.status !== 0) {
       STATE.errorNotification("Unable to find servers");
-      STORE.Cache.SetObject("private-servers", []);
+      STORE.Cache.SetObject("servers", []);
       STATE.PrivateServers = [];
     }
   },
   // NEW API
   calls: new Map(),
-  callController: async (url, secure, method, route, data, skipAuth, boolResponse) => {
+  callController: async (server, method, route, data, skipAuth, boolResponse) => {
     if (STATE.calls.get(route) === true) {
       console.log("call already in progress, backing off")
       return { status: 0, }
     }
     STATE.calls.set(route, true)
 
-    let URL = url ? url : STATE.User?.AuthServer
-    if (!URL || URL === "") {
+    let SRV = server ? server : STATE.User?.ControlServer
+    if (!SRV || SRV === "") {
       console.log("no user auth server found")
       STATE.calls.set(route, false)
       return { status: 0, }
@@ -134,7 +134,7 @@ export var STATE = {
         logTag: "",
         tag: uuidv4(),
         show: true,
-        msg: URL + route,
+        msg: SRV + route,
         includeLogs: false,
       });
 
@@ -155,9 +155,7 @@ export var STATE = {
       }
 
       let FR = {
-        URL: URL,
-        // URL: url ? url : STATE.User.AuthServer,
-        Secure: secure !== undefined ? secure : STATE.User.Secure,
+        Server: SRV,
         Path: route,
         Method: method,
         JSONData: data,
@@ -205,6 +203,8 @@ export var STATE = {
 
       if (error?.response?.data?.Error) {
         STATE.errorNotification(error?.response?.data?.Error);
+      } else {
+        STATE.errorNotification("unknown error");
       }
 
       if (boolResponse === true) {
@@ -216,30 +216,31 @@ export var STATE = {
     }
 
   },
-
-  GetUser: async () => {
+  SetUser: (u) => {
+    STORE.Cache.SetObject("user", u);
+    STATE.User = u;
+  },
+  GetUsers: async () => {
     try {
-      let user = STORE.Cache.GetObject("user");
-      if (!user) {
-        user = await STATE.LoadUser();
+      let users = STORE.Cache.GetObject("users");
+      if (!users || users.length === 0) {
+        users = await STATE.LoadUsers();
         console.log("POST FETCH");
-        console.dir(user);
-        if (user) {
-          STORE.Cache.SetObject("user", user);
+        console.dir(users);
+        if (users) {
+          STORE.Cache.SetObject("users", users);
         }
       }
-      if (user) {
-        STATE.User = user;
-      }
-      return user;
+      STATE.renderPage("user-select")
+      STATE.Users = users
+      return users;
     } catch (err) {
       console.dir(err);
     }
   },
-  v2_SetUser: async (u, saveToDisk, server, secure) => {
+  v2_SetUser: async (u, saveToDisk, server) => {
     try {
-      u.AuthServer = server
-      u.Secure = secure
+      u.ControlServer = server
       STATE.User = u;
       STORE.Cache.SetObject("user", u);
       if (saveToDisk) {
@@ -247,13 +248,12 @@ export var STATE = {
       }
     } catch (err) {
       console.dir(err);
-      // STORE.Cache.interface = window.sessionStorage;
     }
   },
-  DelUser: async () => {
+  DelUser: async (u) => {
     try {
       console.log("DELETING USER FROM DISK");
-      await STATE.API.method("delUser", null, true, 10000, false);
+      await STATE.API.method("delUser", u, true, 10000, false);
     } catch (error) {
       STATE.toggleError("unable to delete encrypted user from disk");
     }
@@ -265,7 +265,7 @@ export var STATE = {
       STATE.toggleError("unable to save encrypted user to disk");
     }
   },
-  LoadUser: async () => {
+  LoadUsers: async () => {
     try {
       let resp = await STATE.API.method("getUser", null, true, 10000, true);
       console.log("LOAD USER");
@@ -470,6 +470,7 @@ export var STATE = {
     toast.success(e);
   },
   User: STORE.Cache.GetObject("user"),
+  Users: [],
   Config: STORE.Cache.GetObject("config"),
   refreshApiKey: async () => {
     STATE.User.APIKey = uuidv4();
@@ -558,7 +559,7 @@ export var STATE = {
     try {
       let newUser = STATE.User
 
-      let x = await STATE.callController(null, null, "POST", "/v3/user/update",
+      let x = await STATE.callController(null, "POST", "/v3/user/update",
         { APIKey: newUser.APIKey },
         false, true)
       if (x === true) {
@@ -580,7 +581,7 @@ export var STATE = {
       return;
     }
 
-    let user = await STATE.GetUser();
+    let user = STATE.User;
     if (!user.DeviceToken) {
       STATE.errorNotification("You are not logged in");
       STORE.Cache.Clear();
@@ -687,7 +688,6 @@ export var STATE = {
     STATE.GetBackendState();
   },
   FinalizeLogout: async () => {
-    STATE.DelUser();
     STORE.Cache.Clear();
     STATE.GetBackendState();
     window.location.replace("/#/login");
@@ -714,14 +714,14 @@ export var STATE = {
       logoutUser = true;
     }
 
-    let resp = await STATE.callController(null, null, "POST", "/v3/user/logout",
+    let resp = await STATE.callController(null, "POST", "/v3/user/logout",
       { DeviceToken: token.DT, UserID: user._id, All: all },
       false, false)
     if (resp && resp.status === 200) {
 
       STATE.successNotification("device logged out", undefined);
       if (logoutUser === true || all === true) {
-        STATE.DelUser();
+        STATE.DelUser(user);
         STATE.FinalizeLogout();
         return
       } else {
@@ -747,9 +747,9 @@ export var STATE = {
     STATE.LicenseKey = value;
     STATE.rerender();
   },
-  PrivateServers: STORE.Cache.GetObject("private-servers"),
+  PrivateServers: STORE.Cache.GetObject("servers"),
   updatePrivateServers: () => {
-    STORE.Cache.SetObject("private-servers", STATE.PrivateServers);
+    STORE.Cache.SetObject("servers", STATE.PrivateServers);
   },
   ActivateLicense: async () => {
     if (!STATE.User) {
@@ -761,7 +761,7 @@ export var STATE = {
       return;
     }
 
-    let ok = await STATE.callController(null, null, "POST", "/v3/key/activate",
+    let ok = await STATE.callController(null, "POST", "/v3/key/activate",
       { Key: STATE.LicenseKey },
       false, true)
     if (ok) {

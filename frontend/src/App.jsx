@@ -9,28 +9,27 @@ import "@fontsource-variable/inter";
 
 import DNSAnswers from "./App/component/DNSAnswers";
 import PrivateServers from "./App/PrivateServers";
+import ServerDevices from "./App/ServerDevices";
 import ScreenLoader from "./App/ScreenLoader";
 import InspectGroup from "./App/InspectGroup";
+import UserSelect from "./App/UserSelect";
 import Enable2FA from "./App/Enable2FA";
 import Settings from "./App/Settings";
+import Devices from "./App/Devices";
+import Tunnels from "./App/Tunnels";
 import Account from "./App/Account";
 import Welcome from "./App/Welcome";
 import SideBar from "./App/SideBar";
-import Login from "./App/Login";
-import DNS from "./App/dns";
-
 import GLOBAL_STATE from "./state";
-import { STATE } from "./state";
-import STORE from "./store";
-import WS from "./ws";
 import Groups from "./App/Groups";
+import Login from "./App/Login";
+import { STATE } from "./state";
 import Users from "./App/Users";
-import Devices from "./App/Devices";
-import NewObjectEditor from "./App/NewObjectEdior";
-import Tunnels from "./App/Tunnels";
-import Logs from "./App/Logs";
 import Stats from "./App/Stats";
-import ServerDevices from "./App/ServerDevices";
+import Logs from "./App/Logs";
+import STORE from "./store";
+import DNS from "./App/dns";
+import WS from "./ws";
 
 const appElement = document.getElementById("app");
 const root = createRoot(appElement);
@@ -38,8 +37,8 @@ const root = createRoot(appElement);
 const LaunchApp = () => {
   const state = GLOBAL_STATE("root");
 
+
   useEffect(() => {
-    state.GetUser();
     state.GetBackendState();
     WS.NewSocket(WS.GetURL("logs"), "logs", WS.ReceiveLogEvent);
   }, []);
@@ -68,53 +67,50 @@ const LaunchApp = () => {
         <ScreenLoader />
         <SideBar />
 
-        {/* Main Content Area */}
         <main className="pl-44 pb-[300px]">
           <div className="">
             <div className="p-6 w-full">
               <Routes>
-                <Route path="account" element={<Account />} />
+                {!state.User && (
+                  <>
+                    <Route path="/" element={<UserSelect />} />
+                    <Route path="*" element={<UserSelect />} />
+                  </>
+                )}
+
+                {state.User && (
+                  <>
+                    <Route path="/" element={<Welcome />} />
+                    <Route path="*" element={<PrivateServers />} />
+
+                    <Route path="groups" element={<Groups />} />
+                    <Route path="users" element={<Users />} />
+                    <Route path="devices" element={<Devices />} />
+                    <Route path="groups/:id" element={<InspectGroup />} />
+
+                    <Route path="tunnels" element={<Tunnels />} />
+                    <Route path="connections" element={<Stats />} />
+                    <Route path="account" element={<Account />} />
+
+                    <Route path="servers" element={<PrivateServers />} />
+                    <Route path="server/:id" element={<ServerDevices />} />
+
+                  </>
+                )}
+                <Route path="accounts" element={<UserSelect />} />
+
 
                 <Route path="twofactor/create" element={<Enable2FA />} />
 
-                <Route path="groups" element={<Groups />} />
-                <Route path="users" element={<Users />} />
-                <Route path="devices" element={<Devices />} />
-                <Route path="server/:id" element={<ServerDevices />} />
-
-                <Route path="groups/:id" element={<InspectGroup />} />
-
-                <Route path="tunnels" element={<Tunnels />} />
-                <Route path="connections" element={<Stats />} />
                 <Route path="logs" element={<Logs />} />
                 <Route path="settings" element={<Settings />} />
 
                 <Route path="dns" element={<DNS />} />
                 <Route path="dns/answers/:domain" element={<DNSAnswers />} />
 
-                <Route path="servers" element={<PrivateServers />} />
-                <Route path="all" element={<PrivateServers />} />
-                <Route path="private" element={<PrivateServers />} />
-
-
                 <Route path="login" element={<Login />} />
                 <Route path="help" element={<Welcome />} />
 
-                <Route path="test" element={<NewObjectEditor />} />
-
-                {state.User && (
-                  <>
-                    <Route path="/" element={<Welcome />} />
-                    <Route path="*" element={<PrivateServers />} />
-                  </>
-                )}
-
-                {!state.User && (
-                  <>
-                    <Route path="/" element={<Login />} />
-                    <Route path="*" element={<Login />} />
-                  </>
-                )}
               </Routes>
             </div>
           </div>
