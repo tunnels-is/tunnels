@@ -21,6 +21,10 @@ const UserSelect = () => {
     window.location.reload()
   }
 
+  const gotoLogin = () => {
+    navigate("/login")
+  }
+
   const loadUsers = async () => {
     await state.GetUsers()
   }
