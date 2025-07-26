@@ -19,12 +19,20 @@ import { useNavigate } from "react-router-dom";
 import { CopyPlusIcon } from "lucide-react";
 import NewObjectEditorDialog from "./NewObjectEdiorDialog";
 import { Edit2Icon } from "lucide-react";
+import { useParams } from "react-router-dom";
 
 const useForm = () => {
+  const { modeParam } = useParams()
+  let mm = 0
+  if (!modeParam || modeParam === 0) {
+    mm = 1
+  } else {
+    mm = modeParam
+  }
   const [inputs, setInputs] = useState({});
   const [tokenLogin, setTokenLogin] = useState(false);
   const [errors, setErrors] = useState({});
-  const [mode, setMode] = useState(1);
+  const [mode, setMode] = useState(Number(mm));
   const [remember, setRememeber] = useState(false);
   const state = GLOBAL_STATE("login");
   const [authServer, setAuthServer] = useState(state.Config?.ControlServers?.length > 0 ? state.Config?.ControlServers[0] : {

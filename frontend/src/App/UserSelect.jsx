@@ -4,10 +4,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import dayjs from "dayjs";
 import InfoItem from "./component/InfoItem";
-import { Network } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useEffect } from "react";
-import { useState } from "react";
 
 
 const UserSelect = () => {
@@ -22,7 +20,7 @@ const UserSelect = () => {
   }
 
   const gotoLogin = () => {
-    navigate("/login")
+    navigate("/login/1")
   }
 
   const loadUsers = async () => {
@@ -37,6 +35,13 @@ const UserSelect = () => {
 
   return (
     <div className="p-6 space-y-6">
+      <Button
+        className={"flex items-center gap-1" + state.Theme?.successBtn}
+        onClick={() => gotoLogin()}
+      >
+        {"Add Account"}
+      </Button>
+
       <div className="flex flex-row gap-4">
         {state.Users?.map((u) => (
           <Card

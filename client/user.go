@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 
 	"github.com/tunnels-is/tunnels/argon"
+	"github.com/tunnels-is/tunnels/version"
 )
 
 func delUser(u *User) (err error) {
@@ -31,7 +32,7 @@ func saveUser(u *User) (err error) {
 		return err
 	}
 
-	key, err := argon.GetKeyFromLocalInfo(version)
+	key, err := argon.GetKeyFromLocalInfo(version.Version)
 	if err != nil {
 		return err
 	}
@@ -64,7 +65,7 @@ func saveUser(u *User) (err error) {
 func getUsers() (ul []*User, err error) {
 	ul = make([]*User, 0)
 	s := STATE.Load()
-	key, err := argon.GetKeyFromLocalInfo(version)
+	key, err := argon.GetKeyFromLocalInfo(version.Version)
 	if err != nil {
 		return nil, err
 	}
@@ -76,6 +77,7 @@ func getUsers() (ul []*User, err error) {
 			ERROR("unable to walk path", err)
 			return nil
 		}
+		DEBUG("loading user:", path)
 		fb, er := os.ReadFile(path)
 		if er != nil {
 			ERROR("unable to read user file:", er)
@@ -83,16 +85,19 @@ func getUsers() (ul []*User, err error) {
 		data := fb[aes.BlockSize:]
 		iv := fb[:aes.BlockSize]
 
-		DEBUG("loading user:", path)
 		decrypted, er := Decrypt(data, iv, key)
 		if er != nil {
 			return er
+		}
+		if len(decrypted) == 0 {
+			return nil
 		}
 
 		u := new(User)
 		er = json.Unmarshal(decrypted, u)
 		if er != nil {
 			ERROR("unable to decode user file:", er)
+			return nil
 		}
 
 		ul = append(ul, u)
