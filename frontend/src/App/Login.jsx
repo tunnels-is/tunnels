@@ -18,6 +18,7 @@ import { Label } from "@/components/ui/label.jsx";
 import { useNavigate } from "react-router-dom";
 import { CopyPlusIcon } from "lucide-react";
 import NewObjectEditorDialog from "./NewObjectEdiorDialog";
+import { Edit2Icon } from "lucide-react";
 
 const useForm = () => {
   const [inputs, setInputs] = useState({});
@@ -26,11 +27,33 @@ const useForm = () => {
   const [mode, setMode] = useState(1);
   const [remember, setRememeber] = useState(false);
   const state = GLOBAL_STATE("login");
-  const [authServer, setAuthServer] = useState(state.Config?.AuthServers?.length > 0 ? state.Config?.AuthServers[0] : "https://api.tunnels.is")
-  const [secure, setSecure] = useState(true)
+  const [authServer, setAuthServer] = useState(state.Config?.ControlServers?.length > 0 ? state.Config?.ControlServers[0] : {
+    ID: "temp-authserver",
+    Host: "api.tunnels.is",
+    Port: "443",
+    HTTPS: true,
+    ValidateCertificate: true,
+    CertiticatePath: "",
+  })
   const navigate = useNavigate()
-  const [newAuth, setNewAuth] = useState({ url: "" })
+  const [newAuth, setNewAuth] = useState({
+    ID: uuidv4(),
+    Host: "",
+    Port: "",
+    HTTPS: true,
+    ValidateCertificate: true,
+    CertificatePath: "",
+  })
   const [modalOpen, setModalOpen] = useState(false)
+
+  const changeAuthServer = (id) => {
+    state.Config?.ControlServers?.forEach(s => {
+      if (s.ID === id) {
+        setAuthServer(s)
+      }
+    })
+
+  }
 
   const RemoveToken = () => {
     setTokenLogin(false);
@@ -48,7 +71,18 @@ const useForm = () => {
   };
 
   const saveNewAuth = () => {
-    state.Config.AuthServers.push(newAuth.url)
+    let found = false
+    state.Config?.ControlServers?.forEach((s, i) => {
+      if (s.ID === newAuth.ID) {
+        state.Config.ControlServers[i] = { ...newAuth }
+        found = true
+      }
+    })
+
+    if (!found) {
+      state.Config.ControlServers.push(newAuth)
+    }
+
     state.v2_ConfigSave()
   }
 
@@ -105,9 +139,9 @@ const useForm = () => {
       return;
     }
 
-    let x = await state.callController(authServer, secure, "POST", "/v3/user/create", inputs, true, false)
+    let x = await state.callController(authServer, "POST", "/v3/user/create", inputs, true, false)
     if (x.status === 200) {
-      state.v2_SetUser(x.data, remember, authServer, secure);
+      state.v2_SetUser(x.data, remember, authServer);
       navigate("/servers")
       return
     }
@@ -159,11 +193,11 @@ const useForm = () => {
       return;
     }
 
-    let x = await state.callController(authServer, secure, "POST", "/v3/user/login", inputs, true, false)
+    let x = await state.callController(authServer, "POST", "/v3/user/login", inputs, true, false)
     if (x && x.status === 200) {
       STORE.Local.setItem("default-device-name", inputs["devicename"]);
       STORE.Cache.Set("default-email", inputs["email"]);
-      state.v2_SetUser(x.data, remember, authServer, secure);
+      state.v2_SetUser(x.data, remember, authServer);
       if (mode === 3) {
         navigate("/twofactor/recover")
       } else {
@@ -171,7 +205,6 @@ const useForm = () => {
       }
       return
     }
-    // await state.Login(inputs, remember, authServer, secure);
     setErrors({});
   };
   const EnableSubmit = async () => {
@@ -205,7 +238,7 @@ const useForm = () => {
       ConfirmCode: inputs["code"],
     };
 
-    let x = await state.callController(authServer, secure, "POST", "/v3/user/enable", request, true, false)
+    let x = await state.callController(authServer, "POST", "/v3/user/enable", request, true, false)
     if (x.status === 200) {
       inputs["code"] = "";
       setInputs({ ...inputs });
@@ -273,8 +306,7 @@ const useForm = () => {
       UseTwoFactor: inputs["usetwofactor"] ? inputs["usetwofactor"] : false
     };
 
-    let x = await state.callController(authServer, secure, "POST", "/v3/user/reset/password", request, true, false)
-    // let x = await state.ResetPassword(request, authServer, secure);
+    let x = await state.callController(authServer, "POST", "/v3/user/reset/password", request, true, false)
     if (x.status === 200) {
       inputs["password"] = "";
       inputs["password2"] = "";
@@ -310,7 +342,7 @@ const useForm = () => {
       Email: inputs["email"],
     };
 
-    let x = await state.callController(authServer, secure, "POST", "/v3/user/reset/code", request, true, false)
+    let x = await state.callController(authServer, "POST", "/v3/user/reset/code", request, true, false)
     if (x.status === 200) {
       state.successNotification("reset code sent")
     }
@@ -344,13 +376,12 @@ const useForm = () => {
     EnableSubmit,
     authServer,
     setAuthServer,
-    secure,
-    setSecure,
     modalOpen,
     setModalOpen,
     newAuth,
     setNewAuth,
     saveNewAuth,
+    changeAuthServer
   };
 };
 
@@ -375,13 +406,12 @@ const Login = (props) => {
     EnableSubmit,
     authServer,
     setAuthServer,
-    secure,
-    setSecure,
     modalOpen,
     setModalOpen,
     newAuth,
     setNewAuth,
     saveNewAuth,
+    changeAuthServer
   } = useForm(props);
 
   const GetDefaults = () => {
@@ -591,30 +621,25 @@ const Login = (props) => {
       return (<></>)
     }
     let opts = []
-    state.Config?.AuthServers?.forEach(s => {
-      if (s === authServer) {
-        let ss = s.replace("https://", "")
+    state.Config?.ControlServers?.forEach(s => {
+      if (s.ID === authServer.ID) {
         opts.push({
-          value: s, key: ss, selected: true
+          value: s.ID, key: s.Host + ":" + s.Port, selected: true
         })
       } else {
-        let ss = s.replace("https://", "")
         opts.push({
-          value: s, key: ss, selected: false
+          value: s.ID, key: s.Host + ":" + s.Port, selected: false
         })
       }
     })
     return (
       <div className="flex  items-start">
-        <div className="flex mr-4 items-center space-x-2 mt-[8px] ml-[10px]">
-          <CopyPlusIcon onClick={() => setModalOpen(true)} className={"hover:stroke-emerald-500 cursor-pointer"} />
-        </div>
 
         <Select
-          value={authServer}
-          onValueChange={setAuthServer}
+          value={authServer?.ID}
+          onValueChange={changeAuthServer}
         >
-          <SelectTrigger className="w-[220px]">
+          <SelectTrigger className="w-[320px]">
             <SelectValue placeholder="Select Auth Server" />
           </SelectTrigger>
           <SelectContent
@@ -635,13 +660,16 @@ const Login = (props) => {
             </SelectGroup>
           </SelectContent>
         </Select >
-
-        <div className="flex items-center space-x-2 mt-[8px] ml-4">
-          <Switch
-            checked={secure}
-            onCheckedChange={() => setSecure(!secure)}
-          />
-          <Label htmlFor="airplane-mode">Secure</Label>
+        <div className="flex mr-4 items-center space-x-2 mt-[8px] ml-[25px]">
+          <CopyPlusIcon onClick={() => setModalOpen(true)} className={"hover:stroke-emerald-500 cursor-pointer"} />
+        </div>
+        <div className="flex mr-4 items-center space-x-2 mt-[8px] ml-[10px]">
+          <Edit2Icon
+            onClick={() => {
+              setNewAuth(authServer)
+              setModalOpen(true)
+            }}
+            className={"hover:stroke-emerald-500 cursor-pointer"} />
         </div>
 
       </div >
@@ -795,7 +823,6 @@ const Login = (props) => {
         open={modalOpen}
         onOpenChange={setModalOpen}
         object={newAuth}
-        title="New Auth Server"
         description=""
         readOnly={false}
         saveButton={() => {
@@ -803,11 +830,12 @@ const Login = (props) => {
           setModalOpen(false)
         }}
         onChange={(key, value, type) => {
-          setNewAuth({ url: value })
+          let a = { ...newAuth }
+          a[key] = value
+          setNewAuth({ ...a })
           console.log(key, value, type)
         }}
       />
-
 
       <div className="w-full max-w-md space-y-6">
         {mode === 1 && LoginForm()}

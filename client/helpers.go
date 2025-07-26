@@ -30,7 +30,7 @@ func CreateConfig(flag *bool) {
 }
 
 func InitBaseFoldersAndPaths() {
-	defer RecoverAndLogToFile()
+	defer RecoverAndLog()
 	DEBUG("Creating base folders and paths")
 	s := STATE.Load()
 
@@ -53,17 +53,18 @@ func InitBaseFoldersAndPaths() {
 	}
 
 	s.BasePath = basePath
-	s.TunnelsPath = s.BasePath
+	s.TunnelsPath = s.BasePath + "tunnels" + string(os.PathSeparator)
+	CreateFolder(s.TunnelsPath)
+
+	s.UserPath = s.BasePath + "users" + string(os.PathSeparator)
+	CreateFolder(s.UserPath)
 
 	CreateFolder(s.BasePath)
-	s.ConfigFileName = s.BasePath + "tunnels.json"
+	s.ConfigFileName = s.BasePath + "tunnels" + configFileSuffix
 
 	s.LogPath = s.BasePath + "logs" + string(os.PathSeparator)
 	CreateFolder(s.LogPath)
 	s.LogFileName = s.LogPath + time.Now().Format("2006-01-02") + ".log"
-
-	s.TracePath = s.LogPath
-	s.TraceFileName = s.TracePath + time.Now().Format("2006-01-02-15-04-05") + ".trace.log"
 
 	s.BlockListPath = s.BasePath + "blocklists" + string(os.PathSeparator)
 	CreateFolder(s.BlockListPath)
@@ -112,7 +113,7 @@ func RemoveFile(file string) (err error) {
 }
 
 func CreateFile(file string) (f *os.File, err error) {
-	f, err = os.OpenFile(file, os.O_APPEND|os.O_CREATE|os.O_RDWR, 0o777)
+	f, err = os.OpenFile(file, os.O_APPEND|os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0o777)
 	if err != nil {
 		ERROR("Unable to open file: ", err)
 		return
@@ -138,7 +139,7 @@ func IsDefaultConnection(IFName string) bool {
 	return strings.EqualFold(IFName, DefaultTunnelName)
 }
 
-func RecoverAndLogToFile() {
+func RecoverAndLog() {
 	if r := recover(); r != nil {
 		ERROR(r, string(debug.Stack()))
 	}

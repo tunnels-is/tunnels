@@ -5,7 +5,6 @@ import { TableCell } from "@/components/ui/table";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import NewObjectEditorDialog from "./NewObjectEdiorDialog";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
-import { AccessibilityIcon } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { CircleArrowRight } from "lucide-react";
 import { LogOut } from "lucide-react";
@@ -17,7 +16,14 @@ const PrivateServers = () => {
 	const navigate = useNavigate()
 
 	useEffect(() => {
-		state.GetServers()
+		let x = async () => {
+			// if (!state.User) {
+			// 	return
+			// }
+			await state.GetServers();
+			state.GetBackendState();
+		};
+		x();
 	}, [])
 
 	const saveServer = () => {
@@ -30,7 +36,7 @@ const PrivateServers = () => {
 	}
 
 	const UpdateServer = async () => {
-		let resp = await state.callController(null, null, "POST", "/v3/server/update", { Server: server }, false, false)
+		let resp = await state.callController(null, "POST", "/v3/server/update", { Server: server }, false, false)
 		if (resp?.status === 200) {
 			state.PrivateServers.forEach((s, i) => {
 				if (s._id === server._id) {
@@ -44,7 +50,7 @@ const PrivateServers = () => {
 	}
 
 	const CreateServer = async () => {
-		let resp = await state.callController(null, null, "POST", "/v3/server/create", { Server: server }, false, false)
+		let resp = await state.callController(null, "POST", "/v3/server/create", { Server: server }, false, false)
 		if (resp?.status === 200) {
 			if (!state.PrivateServers) {
 				state.PrivateServers = [];

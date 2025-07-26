@@ -15,7 +15,7 @@ import (
 )
 
 func reloadBlockLists(sleep bool) {
-	defer RecoverAndLogToFile()
+	defer RecoverAndLog()
 	if sleep {
 		time.Sleep(1 * time.Hour)
 	}
@@ -62,7 +62,7 @@ func processBlockList(index int, wg *sync.WaitGroup, nm *xsync.MapOf[string, boo
 	defer func() {
 		wg.Done()
 	}()
-	defer RecoverAndLogToFile()
+	defer RecoverAndLog()
 	config := CONFIG.Load()
 	bl := config.DNSBlockLists[index]
 	if bl == nil {
@@ -136,7 +136,7 @@ func processBlockList(index int, wg *sync.WaitGroup, nm *xsync.MapOf[string, boo
 }
 
 func downloadList(url string) ([]byte, error) {
-	defer RecoverAndLogToFile()
+	defer RecoverAndLog()
 
 	DEBUG("Downloading Blocklist: ", url)
 	start := time.Now()

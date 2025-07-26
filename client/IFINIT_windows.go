@@ -54,7 +54,7 @@ func (t *TInterface) VerifyOrLoadPointer(method string) {
 func CreateNewTunnelInterface(
 	meta *TunnelMETA,
 ) (IF *TInterface, err error) {
-	defer RecoverAndLogToFile()
+	defer RecoverAndLog()
 
 	var GUID windows.GUID
 	if meta.WindowsGUID != "" {
@@ -308,7 +308,6 @@ func (t *TInterface) AddrV6() (err error) {
 }
 
 func (t *TInterface) Close() (err error) {
-
 	add, err := t.WDLL.GetAddr(4)
 	if err != nil {
 		return

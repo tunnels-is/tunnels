@@ -4,23 +4,19 @@ import GenericTable from "./GenericTable";
 import { useEffect } from "react";
 import NewObjectEditorDialog from "./NewObjectEdiorDialog";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
-import { AccessibilityIcon } from "lucide-react";
-import { CircleArrowLeftIcon } from "lucide-react";
 import { CircleArrowRight } from "lucide-react";
 import { LogOut } from "lucide-react";
 
 const Tunnels = () => {
   const state = GLOBAL_STATE("tunnels");
   const [tunnel, setTunnel] = useState(undefined);
-  const [tunnels, setTunnels] = useState([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [tunTag, setTunTag] = useState("")
 
   useEffect(() => {
     let x = async () => {
-      let user = await state.GetUser();
-      if (!user) {
-        return <Navigate to={"/login"} />;
+      if (!state.User) {
+        return
       }
       await state.GetServers();
       state.GetBackendState();
@@ -36,7 +32,6 @@ const Tunnels = () => {
         return;
       }
     });
-
 
     let connect = () => {
       state.ConfirmAndExecute(

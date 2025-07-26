@@ -8,7 +8,7 @@ const Users = () => {
 	const state = GLOBAL_STATE("groups")
 
 	const getUsers = async (offset, limit) => {
-		let resp = await state.callController(null, null, "POST", "/v3/user/list", { Offset: offset, Limit: limit }, false, false)
+		let resp = await state.callController(null, "POST", "/v3/user/list", { Offset: offset, Limit: limit }, false, false)
 		if (resp.status === 200) {
 			if (resp.data?.length === 0) {
 				state.successNotification("no more users")

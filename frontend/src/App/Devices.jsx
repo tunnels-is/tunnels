@@ -11,14 +11,14 @@ const Devices = () => {
 	const [editModalOpen, setEditModalOpen] = useState(false)
 
 	const getDevices = async (offset, limit) => {
-		let resp = await state.callController(null, null, "POST", "/v3/device/list", { Offset: offset, Limit: limit }, false, false)
+		let resp = await state.callController(null, "POST", "/v3/device/list", { Offset: offset, Limit: limit }, false, false)
 		if (resp.status === 200) {
 			setDevices(resp.data)
 			state.renderPage("devices")
 		}
 	}
 	const deleteDevice = async (id) => {
-		let ok = await state.callController(null, null, "POST", "/v3/device/delete", { DID: id }, false, true)
+		let ok = await state.callController(null, "POST", "/v3/device/delete", { DID: id }, false, true)
 		if (ok === true) {
 			let d = devices.filter((d) => d._id !== id)
 			setDevices([...d])
@@ -30,12 +30,12 @@ const Devices = () => {
 		let resp = undefined
 		let ok = false
 		if (device._id !== undefined) {
-			resp = await state.callController(null, null, "POST", "/v3/device/update", { Device: device }, false, false)
+			resp = await state.callController(null, "POST", "/v3/device/update", { Device: device }, false, false)
 			if (resp.status === 200) {
 				ok = true
 			}
 		} else {
-			resp = await state.callController(null, null, "POST", "/v3/device/create", { Device: device }, false, false)
+			resp = await state.callController(null, "POST", "/v3/device/create", { Device: device }, false, false)
 			if (resp.status === 200) {
 				ok = true
 				devices.push(resp.data)

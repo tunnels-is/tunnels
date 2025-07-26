@@ -24,7 +24,7 @@ func CleanUniqueLogMap() {
 	defer func() {
 		time.Sleep(10 * time.Second)
 	}()
-	defer RecoverAndLogToFile()
+	defer RecoverAndLog()
 	logRecordHash.Clear()
 }
 
@@ -134,7 +134,7 @@ func INFO(Line ...any) {
 }
 
 func StartLogQueueProcessor() {
-	defer RecoverAndLogToFile()
+	defer RecoverAndLog()
 	DEBUG("Starting the log processor")
 
 	var line string

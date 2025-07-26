@@ -8,12 +8,20 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
+	"path/filepath"
+
+	"github.com/tunnels-is/tunnels/argon"
 )
 
-func delUser() (err error) {
+func delUser(u *User) (err error) {
 	s := STATE.Load()
-	_ = os.Remove(s.BasePath + "enc")
+	userFile, err := argon.GenerateUserFolderHash(u.ID)
+	if err != nil {
+		return err
+	}
+	_ = os.Remove(s.UserPath + fmt.Sprintf("%x", userFile))
 	return
 }
 
@@ -23,23 +31,28 @@ func saveUser(u *User) (err error) {
 		return err
 	}
 
-	encryptged, err := Encrypt(ub, []byte("01234567890123456789012345678900"))
+	key, err := argon.GetKeyFromLocalInfo(version)
+	if err != nil {
+		return err
+	}
+	userFile, err := argon.GenerateUserFolderHash(u.ID)
+	if err != nil {
+		return err
+	}
+
+	encryptged, err := Encrypt(ub, key)
 	if err != nil {
 		return err
 	}
 
 	s := STATE.Load()
-	_ = RemoveFile(s.BasePath + "enc")
-	f, err := CreateFile(s.BasePath + "enc")
+	DEBUG("Saving user:", fmt.Sprintf("%x", userFile))
+	f, err := CreateFile(s.UserPath + fmt.Sprintf("%x", userFile))
 	if err != nil {
 		return err
 	}
 	defer f.Close()
 
-	err = f.Truncate(0)
-	if err != nil {
-		return err
-	}
 	_, err = f.Write(encryptged)
 	if err != nil {
 		return err
@@ -48,35 +61,48 @@ func saveUser(u *User) (err error) {
 	return nil
 }
 
-func loadUser() (u *User, err error) {
-	u = new(User)
-
+func getUsers() (ul []*User, err error) {
+	ul = make([]*User, 0)
 	s := STATE.Load()
-	ub, err := os.ReadFile(s.BasePath + "enc")
+	key, err := argon.GetKeyFromLocalInfo(version)
 	if err != nil {
 		return nil, err
 	}
-	if len(ub) == 0 {
-		return nil, fmt.Errorf("no user found")
-	}
+	err = filepath.WalkDir(s.UserPath, func(path string, d fs.DirEntry, err error) error {
+		if d.IsDir() {
+			return nil
+		}
+		if err != nil {
+			ERROR("unable to walk path", err)
+			return nil
+		}
+		fb, er := os.ReadFile(path)
+		if er != nil {
+			ERROR("unable to read user file:", er)
+		}
+		data := fb[aes.BlockSize:]
+		iv := fb[:aes.BlockSize]
 
-	data := ub[aes.BlockSize:]
-	iv := ub[:aes.BlockSize]
+		DEBUG("loading user:", path)
+		decrypted, er := Decrypt(data, iv, key)
+		if er != nil {
+			return er
+		}
 
-	encrypted, err := Decrypt(data, iv, []byte("01234567890123456789012345678900"))
-	if err != nil {
-		return nil, err
-	}
+		u := new(User)
+		er = json.Unmarshal(decrypted, u)
+		if er != nil {
+			ERROR("unable to decode user file:", er)
+		}
 
-	err = json.Unmarshal(encrypted, u)
-	if err != nil {
-		return nil, err
-	}
-	return
+		ul = append(ul, u)
+		return nil
+	})
+
+	return ul, err
 }
 
 func getSTREAM(key []byte, iv []byte) (cipher.Stream, []byte, error) {
-
 	// Create a new AES cipher block
 	block, err := aes.NewCipher(key)
 	if err != nil {
