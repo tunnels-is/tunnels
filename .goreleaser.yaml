@@ -26,6 +26,7 @@ builds:
       - amd64
       - arm64
     main: ./cmd/main
+    ldflags: '-s -w -X github.com/tunnels-is/tunnels/version.Version={{.Version}} -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}} -X main.builtBy=goreleaser'
 
   - id: server
     goos:
@@ -35,6 +36,7 @@ builds:
       - arm64
       - arm
     main: ./server
+    ldflags: '-s -w -X github.com/tunnels-is/tunnels/version.Version={{.Version}} -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}} -X main.builtBy=goreleaser'
 
   - id: min
     goos:
@@ -44,6 +46,7 @@ builds:
       - arm64
       - arm
     main: ./cmd/min
+    ldflags: '-s -w -X github.com/tunnels-is/tunnels/version.Version={{.Version}} -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}} -X main.builtBy=goreleaser'
 
 dist: ./builds
 
@@ -52,8 +55,8 @@ archives:
     # use zip for windows archives
 
   - id: a1
-    builds: [tunnels]
-    format: tar.gz
+    ids: [tunnels]
+    formats: [tar.gz]
     name_template: >-
       tunnels_
       {{- title .Version}}_
@@ -65,11 +68,11 @@ archives:
     allow_different_binary_count: true
     format_overrides:
       - goos: windows
-        format: zip
+        formats: [zip]
 
   - id: a2
-    builds: [server]
-    format: tar.gz
+    ids: [server]
+    formats: [tar.gz]
     name_template: >-
       server_
       {{- title .Version }}_
@@ -81,8 +84,8 @@ archives:
     allow_different_binary_count: true
 
   - id: a3
-    builds: [min]
-    format: tar.gz
+    ids: [min]
+    formats: [tar.gz]
     name_template: >-
       min_
       {{- title .Version }}_
