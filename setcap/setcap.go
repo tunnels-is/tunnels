@@ -43,7 +43,7 @@ func CheckCapabilities() (err error) {
 	fmt.Println("Tunnels needs access to manage network capabilities, this access does NOT include root/sudo access to the system")
 	fmt.Println("Enter Password: ")
 
-	bytePassword, err := term.ReadPassword(int(syscall.Stdin))
+	bytePassword, err := term.ReadPassword(syscall.Stdin)
 	if err == nil {
 		password := string(bytePassword)
 		cmd := exec.Command("sudo", "-S", "/usr/sbin/setcap", "cap_net_raw,cap_net_bind_service,cap_net_admin+eip", os.Args[0])
