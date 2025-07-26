@@ -46,6 +46,7 @@ cmd/main/*.tun.json.bak
 *.exe
 
 server/cert.pem
+server/key.pem
 server/config.json
 server/tunnels.db
 
