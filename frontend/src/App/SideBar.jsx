@@ -118,7 +118,7 @@ const SideBar = () => {
             user: false,
           },
 
-          { icon: UsersIcon, label: "Accounts", route: "accounts", user: false },
+          { icon: UsersIcon, label: "Accounts", route: "accounts", shouldRender: showLogin, user: false },
           { icon: Logs, label: "Logs", route: "logs", user: false },
         ],
       },
