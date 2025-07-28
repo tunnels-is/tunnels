@@ -11,18 +11,16 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/tunnels-is/tunnels/argon"
 	"github.com/tunnels-is/tunnels/version"
 )
 
-func delUser(u *User) (err error) {
+func delUser(hash string) (err error) {
 	s := STATE.Load()
-	userFile, err := argon.GenerateUserFolderHash(u.ID)
-	if err != nil {
-		return err
-	}
-	_ = os.Remove(s.UserPath + fmt.Sprintf("%x", userFile))
+	DEBUG("removing user: ", hash)
+	_ = os.Remove(s.UserPath + hash)
 	return
 }
 
@@ -40,6 +38,7 @@ func saveUser(u *User) (err error) {
 	if err != nil {
 		return err
 	}
+	u.SaveFileHash = fmt.Sprintf("%x", userFile)
 
 	encryptged, err := Encrypt(ub, key)
 	if err != nil {
@@ -98,6 +97,10 @@ func getUsers() (ul []*User, err error) {
 		if er != nil {
 			ERROR("unable to decode user file:", er)
 			return nil
+		}
+		if u.SaveFileHash == "" {
+			sp := strings.Split(path, string(os.PathSeparator))
+			u.SaveFileHash = sp[len(sp)-1]
 		}
 
 		ul = append(ul, u)
