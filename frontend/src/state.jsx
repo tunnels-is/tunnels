@@ -247,10 +247,10 @@ export var STATE = {
       console.dir(err);
     }
   },
-  DelUser: async (u) => {
+  DelUser: async (hash) => {
     try {
       console.log("DELETING USER FROM DISK");
-      await STATE.API.method("delUser", u, true, 10000, false);
+      await STATE.API.method("delUser", { Hash: hash }, true, 10000, false);
     } catch (error) {
       STATE.toggleError("unable to delete encrypted user from disk");
     }

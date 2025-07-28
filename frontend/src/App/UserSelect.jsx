@@ -6,6 +6,8 @@ import dayjs from "dayjs";
 import InfoItem from "./component/InfoItem";
 import { useNavigate } from "react-router-dom";
 import { useEffect } from "react";
+import { DeleteIcon } from "lucide-react";
+import { SquareX } from "lucide-react";
 
 
 const UserSelect = () => {
@@ -48,7 +50,12 @@ const UserSelect = () => {
             onClick={() => selectUser(u)}
             key={u._id}
             className="hover:!border-emerald-500 rounded">
-            <CardContent className=" cursor-pointer flex flex-col p-4">
+            <div className="flex items-center -mt-1 -mr-1">
+              <SquareX
+                onClick={() => state.DelUser(u.SaveFileHash)}
+                className={'ml-auto' + state.Theme?.redIcon} />
+            </div>
+            <CardContent className=" -mt-3 cursor-pointer flex flex-col p-4">
               <InfoItem
                 label="Email"
                 value={u.Email}
