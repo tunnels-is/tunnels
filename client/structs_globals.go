@@ -425,6 +425,10 @@ type DEVICE_TOKEN struct {
 	Created time.Time `bson:"C"`
 }
 
+type DelUserForm struct {
+	Hash string
+}
+
 // use struct you get from the login request
 type User struct {
 	ID                    string          `json:"_id,omitempty"`
@@ -445,6 +449,7 @@ type User struct {
 
 	// Client only
 	ControlServer *ControlServer
+	SaveFileHash  string
 }
 
 type LicenseKey struct {

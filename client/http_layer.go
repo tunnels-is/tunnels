@@ -299,13 +299,13 @@ func HTTP_SetUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func HTTP_DelUser(w http.ResponseWriter, r *http.Request) {
-	u := new(User)
+	u := new(DelUserForm)
 	err := Bind(u, r)
 	if err != nil {
 		JSON(w, r, 400, err)
 		return
 	}
-	JSON(w, r, 200, delUser(u))
+	JSON(w, r, 200, delUser(u.Hash))
 }
 
 func HTTP_GetUser(w http.ResponseWriter, r *http.Request) {

@@ -50,6 +50,8 @@ server/key.pem
 server/config.json
 server/tunnels.db
 
+certcheck/.env
+
 node_modules
 files
 
