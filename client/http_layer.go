@@ -164,8 +164,8 @@ func HTTPhandler(w http.ResponseWriter, r *http.Request) {
 	case "setUser":
 		HTTP_SetUser(w, r)
 		return
-	case "getUser":
-		HTTP_GetUser(w, r)
+	case "getUsers":
+		HTTP_GetUsers(w, r)
 		return
 	case "delUser":
 		HTTP_DelUser(w, r)
@@ -308,7 +308,7 @@ func HTTP_DelUser(w http.ResponseWriter, r *http.Request) {
 	JSON(w, r, 200, delUser(u.Hash))
 }
 
-func HTTP_GetUser(w http.ResponseWriter, r *http.Request) {
+func HTTP_GetUsers(w http.ResponseWriter, r *http.Request) {
 	u, err := getUsers()
 	if err != nil {
 		JSON(w, r, 400, err)
