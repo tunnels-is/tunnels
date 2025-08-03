@@ -35,14 +35,7 @@ const useForm = () => {
   const [mode, setMode] = useState(Number(mm));
   const [remember, setRememeber] = useState(false);
   const state = GLOBAL_STATE("login");
-  const [authServer, setAuthServer] = useState(state.Config?.ControlServers?.length > 0 ? state.Config?.ControlServers[0] : {
-    ID: "temp-authserver",
-    Host: "api.tunnels.is",
-    Port: "443",
-    HTTPS: true,
-    ValidateCertificate: true,
-    CertiticatePath: "",
-  })
+  const [authServer, setAuthServer] = useState(state.Config?.ControlServers[0])
   const navigate = useNavigate()
   const [newAuth, setNewAuth] = useState({
     ID: uuidv4(),
@@ -383,7 +376,6 @@ const useForm = () => {
     RemoveToken,
     EnableSubmit,
     authServer,
-    setAuthServer,
     modalOpen,
     setModalOpen,
     newAuth,
@@ -413,7 +405,6 @@ const Login = (props) => {
     RemoveToken,
     EnableSubmit,
     authServer,
-    setAuthServer,
     modalOpen,
     setModalOpen,
     newAuth,
@@ -440,7 +431,7 @@ const Login = (props) => {
 
   useEffect(() => {
     GetDefaults();
-  }, []);
+  }, [authServer]);
 
   const EmailInput = () => {
     return (
@@ -629,8 +620,12 @@ const Login = (props) => {
       return (<></>)
     }
     let opts = []
+    let tunID = ""
     state.Config?.ControlServers?.forEach(s => {
-      if (s.ID === authServer.ID) {
+      if (s.Host.includes("api.tunnels.is")) {
+        tunID = s.ID
+      }
+      if (s.ID === authServer?.ID) {
         opts.push({
           value: s.ID, key: s.Host + ":" + s.Port, selected: true
         })
@@ -644,7 +639,7 @@ const Login = (props) => {
       <div className="flex  items-start">
 
         <Select
-          value={authServer?.ID}
+          value={authServer ? authServer.ID : tunID}
           onValueChange={changeAuthServer}
         >
           <SelectTrigger className="w-[320px]">
@@ -824,7 +819,7 @@ const Login = (props) => {
   };
 
   return (
-    <div className="w-full flex flex-col items-center justify-center p-4 bg-black">
+    <div className="w-full flex flex-col items-center justify-center p-4 bg-black mt-10">
 
 
       <NewObjectEditorDialog

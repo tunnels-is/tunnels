@@ -11,7 +11,6 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/tunnels-is/tunnels/argon"
 	"github.com/tunnels-is/tunnels/version"
@@ -64,7 +63,7 @@ func saveUser(u *User) (err error) {
 func getUsers() (ul []*User, err error) {
 	ul = make([]*User, 0)
 	s := STATE.Load()
-	key, err := argon.GetKeyFromLocalInfo(version.Version)
+	key, err := argon.GetKeyFromLocalInfo()
 	if err != nil {
 		return nil, err
 	}
@@ -76,7 +75,8 @@ func getUsers() (ul []*User, err error) {
 			ERROR("unable to walk path", err)
 			return nil
 		}
-		DEBUG("loading user:", path)
+		base := filepath.Base(path)
+		DEBUG("loading user:", base)
 		fb, er := os.ReadFile(path)
 		if er != nil {
 			ERROR("unable to read user file:", er)
@@ -95,12 +95,12 @@ func getUsers() (ul []*User, err error) {
 		u := new(User)
 		er = json.Unmarshal(decrypted, u)
 		if er != nil {
-			ERROR("unable to decode user file:", er)
+			ERROR("unable to decode user file (user will be removed):", base)
+			_ = os.Remove(path)
 			return nil
 		}
 		if u.SaveFileHash == "" {
-			sp := strings.Split(path, string(os.PathSeparator))
-			u.SaveFileHash = sp[len(sp)-1]
+			u.SaveFileHash = base
 		}
 
 		ul = append(ul, u)

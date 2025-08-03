@@ -264,7 +264,7 @@ export var STATE = {
   },
   LoadUsers: async () => {
     try {
-      let resp = await STATE.API.method("getUser", null, true, 10000, true);
+      let resp = await STATE.API.method("getUsers", null, true, 10000, true);
       console.log("LOAD USER");
       console.dir(resp);
       if (resp?.status === 200 && resp.data) {
@@ -825,6 +825,7 @@ export var STATE = {
           STORE.Cache.SetObject("tunnels", STATE.Tunnels);
           STORE.Cache.SetObject("state", STATE.State);
           STORE.Cache.SetObject("config", STATE.Config);
+          STATE.renderPage("login")
 
           // STORE.Cache.SetObject("user", STATE.User);
           // STORE.Cache.Set("darkMode", STATE.Config.DarkMode);
