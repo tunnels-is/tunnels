@@ -73,7 +73,7 @@ const LaunchApp = () => {
               <Routes>
                 {!state.User && (
                   <>
-                    <Route path="/" element={<UserSelect />} />
+                    <Route path="/" element={<Login />} />
                     <Route path="*" element={<UserSelect />} />
                   </>
                 )}

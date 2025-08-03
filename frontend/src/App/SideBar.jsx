@@ -199,9 +199,8 @@ const SideBar = () => {
                     }
 
                     let isActive = false
-                    if (sp[1].includes(i.route)) {
+                    if (sp[1].includes(i.route) || (sp[1] === "" && i.route == "login")) {
                       isActive = true
-
                     }
                     // const isActive = sp[1] === i.route;
 
