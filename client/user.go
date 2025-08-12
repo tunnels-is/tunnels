@@ -13,7 +13,6 @@ import (
 	"path/filepath"
 
 	"github.com/tunnels-is/tunnels/argon"
-	"github.com/tunnels-is/tunnels/version"
 )
 
 func delUser(hash string) (err error) {
@@ -29,7 +28,7 @@ func saveUser(u *User) (err error) {
 		return err
 	}
 
-	key, err := argon.GetKeyFromLocalInfo(version.Version)
+	key, err := argon.GetKeyFromLocalInfo()
 	if err != nil {
 		return err
 	}

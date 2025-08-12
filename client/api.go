@@ -561,7 +561,6 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	FinalCR.DeviceKey = ClientCR.DeviceKey
 	FinalCR.DeviceToken = ClientCR.DeviceToken
 	FinalCR.EncType = meta.EncryptionType
-	FinalCR.CurveType = meta.CurveType
 	FinalCR.DHCPToken = meta.DHCPToken
 	FinalCR.RequestingPorts = meta.RequestVPNPorts
 	DEBUG("ConnectRequestFromClient", ClientCR)
@@ -597,17 +596,19 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		return 502, errors.New("invalid response from controller")
 	}
 
-	tunnel.encWrapper, err = crypt.NewEncryptionHandler(meta.EncryptionType, meta.CurveType)
+	tunnel.encWrapper = crypt.NewEncryptionHandler(meta.EncryptionType)
+	err = tunnel.encWrapper.InitializeClient()
 	if err != nil {
 		ERROR("unable to create encryption handler: ", err)
 		return 502, errors.New("Unable to secure connection")
 	}
-	SignedResponse.UserHandshake = tunnel.encWrapper.GetPublicKey()
+	SignedResponse.X25519PeerPub = tunnel.encWrapper.SEAL.X25519Pub.Bytes()
+	SignedResponse.Mlkem1024Encap = tunnel.encWrapper.SEAL.Mlkem1024Encap.Bytes()
 
 	tc := &tls.Config{
 		MinVersion:         tls.VersionTLS13,
 		CurvePreferences:   []tls.CurveID{tls.X25519MLKEM768},
-		InsecureSkipVerify: false,
+		InsecureSkipVerify: ClientCR.Server.ValidateCertificate,
 	}
 	tc.RootCAs, errm = tunnel.LoadCertPEMBytes([]byte(ClientCR.ServerPubKey))
 	if errm != nil {
@@ -639,7 +640,7 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	ServerReponse := new(types.ServerConnectResponse)
 	err = json.Unmarshal(bytesFromServer, ServerReponse)
 	if err != nil {
-		return 500, errors.New("Unable to decode reponse from server")
+		return 500, errors.New("Unable to decode response from server")
 	}
 
 	pubKey, _, err := crypt.LoadPublicKeyBytes([]byte(ClientCR.ServerPubKey))
@@ -647,23 +648,23 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		return 500, errors.New("Unable to load server public key")
 	}
 
-	err = crypt.VerifySignature(ServerReponse.ServerHandshake, ServerReponse.ServerHandshakeSignature, pubKey)
+	err = crypt.VerifySignature(ServerReponse.X25519Pub, ServerReponse.ServerHandshakeSignature, pubKey)
 	if err != nil {
 		return 500, errors.New("Unable to verify server signature")
 	}
 
-	tunnel.encWrapper.SEAL.PublicKey, err = tunnel.encWrapper.SEAL.NewPublicKeyFromBytes(ServerReponse.ServerHandshake)
-	if err != nil {
-		return 500, errors.New("Unable to create public key from server handshake response")
-	}
-	err = tunnel.encWrapper.SEAL.CreateAEAD()
+	err = tunnel.encWrapper.FinalizeClient(ServerReponse.X25519Pub, ServerReponse.Mlkem1024Cipher)
 	if err != nil {
 		return 500, errors.New("Unable to create encryption wrapper seal")
 	}
 
 	// clear out handshake data
-	ServerReponse.ServerHandshake = nil
+	SignedResponse.X25519PeerPub = nil
+	SignedResponse.Mlkem1024Encap = nil
+	ServerReponse.X25519Pub = nil
+	ServerReponse.Mlkem1024Cipher = nil
 	ServerReponse.ServerHandshakeSignature = nil
+	tunnel.encWrapper.SEAL.CleanPostSecretGeneration()
 
 	DEBUG("ConnectionRequestResponse:", ServerReponse)
 	tunnel.ServerResponse = ServerReponse
