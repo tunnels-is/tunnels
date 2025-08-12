@@ -275,7 +275,6 @@ type TunnelMETA struct {
 	KillSwitch      bool
 
 	EncryptionType crypt.EncType
-	CurveType      crypt.CurveType
 
 	TxQueueLen int32
 	MTU        int32

@@ -38,7 +38,7 @@ const Stats = () => {
           {renderKeyValue("DNS Blocking", tunnel?.DNSBlocking ? "enabled" : "disabled")}
           {renderKeyValue("DNS Servers", tunnel?.DNSServers?.join(" "))}
           {renderKeyValue("Encryption", state.GetEncType(tunnel?.EncryptionType))}
-          {renderKeyValue("Curve", state.GetCurveType(tunnel?.CurveType))}
+          {renderKeyValue("Handshake", "mlkem + x25519")}
           {renderKeyValue("Auto Connect", tunnel?.AutoConnect ? "enabled" : "disabled")}
           {renderKeyValue("Auto Re-Connect", tunnel?.AutoReconnect ? "enabled" : "disabled")}
           {renderKeyValue("Download", ac.Ingress)}
