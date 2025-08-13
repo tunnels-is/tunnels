@@ -69,19 +69,7 @@ export var STATE = {
   },
 
   // new form
-  GetCurveType: (int) => {
-    console.log("CT:", int)
-    switch (String(int)) {
-      case "0":
-        return "P521"
-      case "1":
-        return "X25519"
-      default:
-        return "unknown"
-    }
-  },
   GetEncType: (int) => {
-    console.log("CT:", int)
     switch (String(int)) {
       case "0":
         return "None"

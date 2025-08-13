@@ -5,30 +5,22 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/ecdh"
+	"crypto/mlkem"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
+	"crypto/sha512"
 	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"io"
-	"log"
-	"math"
 	"net"
-	"runtime/debug"
 	"sync/atomic"
 	"time"
 
 	"golang.org/x/crypto/chacha20poly1305"
 	"golang.org/x/crypto/hkdf"
 	"golang.org/x/net/quic"
-)
-
-type CurveType int
-
-const (
-	P521 CurveType = iota
-	X25519
 )
 
 type EncType int
@@ -41,38 +33,48 @@ const (
 )
 
 type SEAL struct {
-	Created   time.Time
-	CurveType CurveType
+	Created time.Time
 
-	secret1   []byte
 	key1      []byte
 	AEAD1     cipher.AEAD
 	Nonce1    []byte
 	Nonce1Len int
 	Nonce1U   atomic.Uint64
 
-	secret2   []byte
 	key2      []byte
 	AEAD2     cipher.AEAD
 	Nonce2    []byte
 	Nonce2Len int
 	Nonce2U   atomic.Uint64
 
-	PrivateKey *ecdh.PrivateKey
-	PublicKey  *ecdh.PublicKey
+	Mlkem1024Decap     *mlkem.DecapsulationKey1024
+	Mlkem1024Encap     *mlkem.EncapsulationKey1024
+	Mlkem1024PeerEncap *mlkem.EncapsulationKey1024
+	Mlkem1024Cipher    []byte
+
+	X25519Priv    *ecdh.PrivateKey
+	X25519Pub     *ecdh.PublicKey
+	X25519PeerPub *ecdh.PublicKey
 
 	Type EncType
 }
 
-func (S *SEAL) HKDF(keySize int) (err error) {
-	hash := sha256.New
+func (S *SEAL) CleanPostSecretGeneration() {
+	S.Mlkem1024Cipher = nil
+	S.Mlkem1024Decap = nil
+	S.Mlkem1024Encap = nil
+	S.Mlkem1024PeerEncap = nil
 
-	// KYBER IS NOT YET IMPLEMENTED
-	// Once kyber is implemented we will assign it's
-	// secret key to S.key2 and add it to the HKDF.
-	// h := hkdf.New(hash, append(S.secret1, S.secret2...), nil, nil)
+	S.X25519PeerPub = nil
+	S.X25519Pub = nil
+	S.X25519Priv = nil
 
-	h := hkdf.New(hash, S.secret1, nil, nil)
+	S.key1 = nil
+	S.key2 = nil
+}
+
+func (S *SEAL) HKDF(keySize int, sharedSecret []byte) (err error) {
+	h := hkdf.New(sha512.New, sharedSecret, nil, nil)
 	var n int
 	S.key1 = make([]byte, keySize)
 	n, err = io.ReadFull(h, S.key1)
@@ -83,6 +85,7 @@ func (S *SEAL) HKDF(keySize int) (err error) {
 		return errors.New("could not read keySize finalKey 1")
 	}
 
+	// Key2 might be used later to store a separate shared secret if we want to encrypt each direction with a different key.
 	S.key2 = make([]byte, keySize)
 	n, err = io.ReadFull(h, S.key2)
 	if err != nil {
@@ -95,20 +98,11 @@ func (S *SEAL) HKDF(keySize int) (err error) {
 	return
 }
 
-func (S *SEAL) CreateAEAD() (err error) {
-	err = S.GetSecret1()
-	if err != nil {
-		return
-	}
-	err = S.GetSecret2()
-	if err != nil {
-		return
-	}
-
+func (S *SEAL) CreateAEAD(sharedSecret []byte) (err error) {
 	if S.Type == AES128 {
-		err = S.HKDF(16)
+		err = S.HKDF(16, sharedSecret)
 	} else {
-		err = S.HKDF(32)
+		err = S.HKDF(32, sharedSecret)
 	}
 	if err != nil {
 		return
@@ -233,55 +227,6 @@ func (S *SEAL) Open2(data []byte, nonce []byte, staging []byte, index []byte) (d
 	return
 }
 
-func (S *SEAL) GetSecret2() (err error) {
-	S.secret2 = make([]byte, 32)
-	return
-}
-
-func (S *SEAL) GetSecret1() (err error) {
-	var nk []byte
-	nk, err = S.PrivateKey.ECDH(S.PublicKey)
-	sk := sha256.Sum256(nk)
-	S.secret1 = sk[:]
-	return
-}
-
-func (S *SEAL) PublicKeyFromBytes(publicKey []byte) (err error) {
-	if S.CurveType == X25519 {
-		S.PublicKey, err = ecdh.X25519().NewPublicKey(publicKey)
-	} else {
-		S.PublicKey, err = ecdh.P521().NewPublicKey(publicKey)
-	}
-	if err != nil {
-		return
-	}
-	return
-}
-
-func (S *SEAL) NewPrivateKey() (PK *ecdh.PrivateKey, err error) {
-	if S.CurveType == X25519 {
-		PK, err = ecdh.X25519().GenerateKey(rand.Reader)
-	} else {
-		PK, err = ecdh.P521().GenerateKey(rand.Reader)
-	}
-	if err != nil {
-		return
-	}
-	return
-}
-
-func (S *SEAL) NewPublicKeyFromBytes(b []byte) (PK *ecdh.PublicKey, err error) {
-	if S.CurveType == X25519 {
-		PK, err = ecdh.X25519().NewPublicKey(b)
-	} else {
-		PK, err = ecdh.P521().NewPublicKey(b)
-	}
-	if err != nil {
-		return
-	}
-	return
-}
-
 type SocketWrapper struct {
 	LocalPK  *ecdh.PrivateKey
 	RemotePK *ecdh.PublicKey
@@ -301,92 +246,92 @@ func (T *SocketWrapper) SetHandshakeConn(c net.Conn) {
 
 func NewEncryptionHandler(
 	encryptionType EncType,
-	curveType CurveType,
-) (T *SocketWrapper, err error) {
+) (T *SocketWrapper) {
 	T = new(SocketWrapper)
 	T.SEAL = new(SEAL)
-	T.SEAL.CurveType = curveType
 	T.SEAL.Created = time.Now()
 	T.SEAL.Type = encryptionType
-	T.SEAL.PrivateKey, err = T.SEAL.NewPrivateKey()
 	T.SEAL.Nonce1U.Store(0)
 	T.SEAL.Nonce2U.Store(0)
 	return
 }
-func (T *SocketWrapper) GetPublicKey() (key []byte) {
-	return T.SEAL.PrivateKey.PublicKey().Bytes()
+
+func (T *SocketWrapper) InitializeClient() (err error) {
+	T.SEAL.X25519Priv, err = ecdh.X25519().GenerateKey(rand.Reader)
+	if err != nil {
+		return
+	}
+	T.SEAL.X25519Pub = T.SEAL.X25519Priv.PublicKey()
+	T.SEAL.Mlkem1024Decap, err = mlkem.GenerateKey1024()
+	if err != nil {
+		return err
+	}
+	T.SEAL.Mlkem1024Encap = T.SEAL.Mlkem1024Decap.EncapsulationKey()
+	return nil
 }
 
-// func (T *SocketWrapper) InitHandshake() (err error) {
-// 	err = T.SendPublicKey()
-// 	if err != nil {
-// 		return
-// 	}
+func (T *SocketWrapper) FinalizeClient(X25519PeerPub []byte, Mlkem1024Cipher []byte) (err error) {
+	T.SEAL.X25519PeerPub, err = ecdh.X25519().NewPublicKey(X25519PeerPub)
+	if err != nil {
+		return
+	}
+	nk, err := T.SEAL.X25519Priv.ECDH(T.SEAL.X25519PeerPub)
+	if err != nil {
+		return err
+	}
+	ss1 := sha256.Sum256(nk)
+	s1 := ss1[:]
 
-// 	err = T.ReceivePublicKey()
-// 	if err != nil {
-// 		return
-// 	}
-
-// 	err = T.SEAL.CreateAEAD()
-// 	return
-// }
-
-// func (T *SocketWrapper) ReceiveHandshake() (err error) {
-// 	err = T.ReceivePublicKey()
-// 	if err != nil {
-// 		return
-// 	}
-
-// 	err = T.SendPublicKey()
-// 	if err != nil {
-// 		return
-// 	}
-
-// 	err = T.SEAL.CreateAEAD()
-// 	return
-// }
-
-func (T *SocketWrapper) SendPublicKey() (err error) {
-	defer func() {
-		r := recover()
-		if r != nil {
-			log.Println(r, string(debug.Stack()))
-		}
-	}()
-
-	if T.HConn != nil {
-		_, err = T.HConn.Write(T.SEAL.PrivateKey.PublicKey().Bytes())
-	} else {
-		_, err = T.HStream.Write(T.SEAL.PrivateKey.PublicKey().Bytes())
-		T.HStream.Flush()
+	s2, err := T.SEAL.Mlkem1024Decap.Decapsulate(Mlkem1024Cipher)
+	if err != nil {
+		return err
 	}
 
-	return err
+	fss := make([]byte, 0)
+	fss = append(fss, s1...)
+	fss = append(fss, s2...)
+	fss = append(fss, T.SEAL.X25519Pub.Bytes()...)
+	fss = append(fss, T.SEAL.X25519PeerPub.Bytes()...)
+
+	return T.SEAL.CreateAEAD(fss)
 }
 
-func (T *SocketWrapper) ReceivePublicKey() (err error) {
-	defer func() {
-		r := recover()
-		if r != nil {
-			log.Println(r, string(debug.Stack()))
-		}
-	}()
-
-	PublicKey := make([]byte, math.MaxUint16)
-	var n int
-	var re error
-	if T.HConn != nil {
-		n, re = T.HConn.Read(PublicKey)
-	} else {
-		n, re = T.HStream.Read(PublicKey)
+func (T *SocketWrapper) InitializeServer(X25519PeerPub []byte, Mlkem1024Encap []byte) (err error) {
+	T.SEAL.X25519Priv, err = ecdh.X25519().GenerateKey(rand.Reader)
+	if err != nil {
+		return
 	}
-	if re != nil {
-		return re
-	}
+	T.SEAL.X25519Pub = T.SEAL.X25519Priv.PublicKey()
 
-	T.SEAL.PublicKey, err = T.SEAL.NewPublicKeyFromBytes(PublicKey[:n])
+	T.SEAL.X25519PeerPub, err = ecdh.X25519().NewPublicKey(X25519PeerPub)
+	if err != nil {
+		return
+	}
+	T.SEAL.Mlkem1024Encap, err = mlkem.NewEncapsulationKey1024(Mlkem1024Encap)
+	if err != nil {
+		return
+	}
 	return
+}
+
+func (T *SocketWrapper) FinalizeServer() (err error) {
+	nk, err := T.SEAL.X25519Priv.ECDH(T.SEAL.X25519PeerPub)
+	if err != nil {
+		return err
+	}
+	ss1 := sha256.Sum256(nk)
+	s1 := ss1[:]
+
+	s2, cipherText := T.SEAL.Mlkem1024Encap.Encapsulate()
+	T.SEAL.Mlkem1024Cipher = cipherText
+
+	fss := make([]byte, 0)
+	fss = append(fss, s1...)
+	fss = append(fss, s2...)
+	fss = append(fss, T.SEAL.X25519PeerPub.Bytes()...)
+	fss = append(fss, T.SEAL.X25519Pub.Bytes()...)
+
+	return T.SEAL.CreateAEAD(fss)
 }
 
 type SignedConnectRequest struct {
@@ -429,26 +374,3 @@ func ValidateSignature(wrapper []byte, publicKey *rsa.PublicKey) (w SignedConnec
 	err = errors.New("Signatures do not match")
 	return
 }
-
-// func LoadPrivateKey(path string) (privateKey *rsa.PrivateKey, err error) {
-// 	privateKeyPEM, err := os.ReadFile(path)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	privateKeyBlock, _ := pem.Decode(privateKeyPEM)
-
-// 	var anyKey any
-// 	anyKey, err = x509.ParsePKCS8PrivateKey(privateKeyBlock.Bytes)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	var ok bool
-// 	privateKey, ok = anyKey.(*rsa.PrivateKey)
-// 	if !ok {
-// 		return nil, errors.New("private signing key was not rsa.PrivateKey")
-// 	}
-
-// 	return
-// }
