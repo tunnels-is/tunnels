@@ -143,13 +143,16 @@ type ListDevice struct {
 }
 
 type SignedConnectRequest struct {
-	Signature     []byte
-	Payload       []byte
-	UserHandshake []byte
+	Signature      []byte
+	Payload        []byte
+	X25519PeerPub  []byte
+	Mlkem1024Encap []byte
 }
 
 type ServerConnectResponse struct {
-	ServerHandshake          []byte
+	X25519Pub       []byte
+	Mlkem1024Cipher []byte
+	// ServerHandshake          []byte
 	ServerHandshakeSignature []byte
 	Index                    int `json:"Index"`
 	AvailableMbps            int `json:"AvailableMbps"`
@@ -199,9 +202,8 @@ type ControllerConnectRequest struct {
 	UserID      primitive.ObjectID `json:"UserID"`
 
 	// General
-	EncType   crypt.EncType      `json:"EncType"`
-	CurveType crypt.CurveType    `json:"CurveType"`
-	ServerID  primitive.ObjectID `json:"ServerID"`
+	EncType  crypt.EncType      `json:"EncType"`
+	ServerID primitive.ObjectID `json:"ServerID"`
 
 	// These are added by the golang client
 	Version int       `json:"Version"`

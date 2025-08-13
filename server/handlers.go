@@ -65,24 +65,18 @@ func API_AcceptUserConnections(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var EH *crypt.SocketWrapper
-	EH, err = crypt.NewEncryptionHandler(CR.EncType, CR.CurveType)
+	EH := crypt.NewEncryptionHandler(CR.EncType)
+	err = EH.InitializeServer(SCR.X25519PeerPub, SCR.Mlkem1024Encap)
 	if err != nil {
 		ERR("unable to create encryption handler", err)
 		senderr(w, 400, "unable to initialize encryption handler")
 		return
 	}
 
-	EH.SEAL.PublicKey, err = EH.SEAL.NewPublicKeyFromBytes(SCR.UserHandshake)
+	err = EH.FinalizeServer()
 	if err != nil {
-		ERR("Port allocation failed", err)
-		senderr(w, 400, "unable to create public key")
-		return
-	}
-	err = EH.SEAL.CreateAEAD()
-	if err != nil {
-		ERR("unable to create encryption AEAD", err)
-		senderr(w, 400, "unable to create encryption AEAD")
+		ERR("Unable to finalize server encryption", err)
+		senderr(w, 400, "unablie to finalize server encryption")
 		return
 	}
 
@@ -94,8 +88,9 @@ func API_AcceptUserConnections(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	CRR.ServerHandshake = EH.GetPublicKey()
-	CRR.ServerHandshakeSignature, err = crypt.SignData(CRR.ServerHandshake, PrivKey)
+	CRR.X25519Pub = EH.SEAL.X25519Pub.Bytes()
+	CRR.Mlkem1024Cipher = EH.SEAL.Mlkem1024Cipher
+	CRR.ServerHandshakeSignature, err = crypt.SignData(CRR.X25519Pub, PrivKey)
 	if err != nil {
 		ERR("Unable to sign server handshake", err)
 		senderr(w, 400, "unable to sign server handshake")
@@ -113,6 +108,12 @@ func API_AcceptUserConnections(w http.ResponseWriter, r *http.Request) {
 		ERR("Unable to marshal CCR", err)
 		return
 	}
+
+	SCR = nil
+	CRR.X25519Pub = nil
+	CRR.Mlkem1024Cipher = nil
+	CRR.ServerHandshakeSignature = nil
+	EH.SEAL.CleanPostSecretGeneration()
 
 	clientCoreMappings[index].ToSignal = signal.NewSignal(fmt.Sprintf("TO:%d", index), *CTX.Load(), *Cancel.Load(), time.Second, goroutineLogger, func() {
 		toUserChannel(index)
