@@ -142,9 +142,6 @@ const Tunnels = () => {
             EncryptionType: (obj) => {
               return "Encryption [ " + state.GetEncType(obj.EncryptionType) + " ]"
             },
-            CurveType: (obj) => {
-              return "Curve [ " + state.GetCurveType(obj.CurveType) + " ]"
-            }
           },
           fields: {
             WindowsGUID: "readonly",
@@ -152,6 +149,7 @@ const Tunnels = () => {
             DNSRecords: "hidden",
             Networks: "hidden",
             Routes: "hidden",
+            CurveType: "hidden",
           }
         }}
         description=""

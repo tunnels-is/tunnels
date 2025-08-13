@@ -82,7 +82,6 @@ func createTunnel() (T *TunnelMETA) {
 	T.IPv6Address = fmt.Sprintf("fd00:%04x:%04x::1", randomPart1, randomPart2)
 
 	T.EncryptionType = crypt.CHACHA20
-	T.CurveType = crypt.X25519
 	T.DNSBlocking = true
 	T.PreventIPv6 = false
 	T.TxQueueLen = 2000
