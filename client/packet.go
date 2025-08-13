@@ -219,25 +219,6 @@ func RecalculateIPv4HeaderChecksum(bytes []byte) {
 	bytes[11] = byte(^csum & 0xFF)
 }
 
-func RecalculateAndReplaceIPv4HeaderChecksum_old_donotremoveyet(bytes []byte) {
-	bytes[10] = 0
-	bytes[11] = 0
-
-	var csum uint32
-	for i := 0; i < len(bytes); i += 2 {
-		csum += uint32(bytes[i]) << 8
-		csum += uint32(bytes[i+1])
-	}
-	for {
-		if csum <= 65535 {
-			break
-		}
-		csum = (csum >> 16) + uint32(uint16(csum))
-	}
-
-	binary.BigEndian.PutUint16(bytes[10:12], ^uint16(csum))
-}
-
 func RecalculateTransportChecksum(IPv4Header []byte, TPPacket []byte) {
 	// wipe the old checksum before calculating
 	if IPv4Header[9] == 6 {
@@ -253,7 +234,7 @@ func RecalculateTransportChecksum(IPv4Header []byte, TPPacket []byte) {
 	csum += uint32(IPv4Header[13]) + uint32(IPv4Header[15])
 	csum += (uint32(IPv4Header[16]) + uint32(IPv4Header[18])) << 8
 	csum += uint32(IPv4Header[17]) + uint32(IPv4Header[19])
-	csum += uint32(uint8(IPv4Header[9]))
+	csum += uint32(IPv4Header[9])
 	tcpLength := uint32(len(TPPacket))
 
 	csum += tcpLength & 0xffff
