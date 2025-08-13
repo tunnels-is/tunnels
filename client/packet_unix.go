@@ -41,8 +41,8 @@ func (tun *TUN) ReadFromTunnelInterface() {
 			return
 		}
 
-		if packetLength == 0 {
-			DEEP("tun/tap read size was 0")
+		if packetLength < 20 {
+			DEEP("tun/tap read size was less then 20 (no valid ip header)")
 			continue
 		}
 
@@ -95,7 +95,7 @@ func (tun *TUN) ReadFromServeTunnel() {
 			return
 		}
 		osTunnel = tun.tunnel.Load()
-		n, readErr = tun.connection.Read(buff)
+		n, readErr = tun.connection.Read(buff[0:])
 		if readErr != nil {
 			ERROR("error reading from server socket: ", readErr, n)
 			return
