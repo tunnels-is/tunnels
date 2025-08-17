@@ -690,6 +690,7 @@ export var STATE = {
   LogoutToken: async (token, all) => {
     let user = STORE.Cache.GetObject("user");
     if (!user) {
+      STATE.FinalizeLogout();
       return;
     }
 
@@ -722,6 +723,9 @@ export var STATE = {
       STATE.User = user;
     } else {
       STATE.errorNotification("Unable to log out device", undefined);
+      if (logoutUser === true || all === true) {
+        STATE.FinalizeLogout();
+      }
     }
     STATE.rerender();
   },
