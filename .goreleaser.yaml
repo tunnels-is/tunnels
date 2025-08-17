@@ -27,6 +27,7 @@ builds:
       - arm64
     main: ./cmd/main
     ldflags: '-s -w -X github.com/tunnels-is/tunnels/version.Version={{.Version}} -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}} -X main.builtBy=goreleaser'
+    flags: [ '-trimpath' ]
 
   - id: server
     goos:
@@ -37,6 +38,7 @@ builds:
       - arm
     main: ./server
     ldflags: '-s -w -X github.com/tunnels-is/tunnels/version.Version={{.Version}} -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}} -X main.builtBy=goreleaser'
+    flags: [ '-trimpath' ]
 
   - id: min
     goos:
@@ -47,6 +49,7 @@ builds:
       - arm
     main: ./cmd/min
     ldflags: '-s -w -X github.com/tunnels-is/tunnels/version.Version={{.Version}} -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}} -X main.builtBy=goreleaser'
+    flags: [ '-trimpath' ]
 
 dist: ./builds
 
