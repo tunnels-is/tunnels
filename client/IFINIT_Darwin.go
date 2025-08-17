@@ -295,51 +295,59 @@ func (t *TInterface) Connect(tun *TUN) (err error) {
 	return nil
 }
 
-func (t *TInterface) Disconnect(V *TUN) (err error) {
+func (t *TInterface) Disconnect(tun *TUN) (err error) {
 	defer RecoverAndLog()
-	if V.connection != nil {
-		V.connection.Close()
+	if tun.connection != nil {
+		tun.connection.Close()
 	}
 
 	err = t.Close()
 	if err != nil {
 		ERROR("unable to close the interface", err)
 	}
-	// TODO .. might not be needed ?????
-	// meta := tun.meta.Load()
-	// if IsDefaultConnection(meta.IFName) || meta.EnableDefaultRoute {
-	// 	err = IP_DelRoute("default", t.IPv4Address, "0")
-	//
-	// 	// Clean up IPv6 default route if IPv6 was configured
-	// 	if t.IPv6Address != "" {
-	// 		iperr := IP_DelRouteV6("default", t.IPv6Address, "0")
-	// 		if iperr != nil {
-	// 			DEBUG("Unable to delete IPv6 default route, err : ", iperr)
-	// 		}
-	// 	}
-	// }
 
-	// if tun.ServerReponse.LAN != nil && tun.ServerReponse.LAN.Nat != "" {
-	// 	err = IP_DelRoute(tun.ServerReponse.LAN.Nat, t.IPv4Address, "0")
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// }
+	meta := tun.meta.Load()
+	if IsDefaultConnection(meta.IFName) || meta.EnableDefaultRoute {
+		err = IP_DelRoute("default", t.IPv4Address, "0")
 
-	// for _, n := range tun.ServerReponse.Networks {
-	// 	if n.Nat != "" {
-	// 		err = IP_DelRoute(n.Nat, t.IPv4Address, "0")
-	// 		if err != nil {
-	// 			return err
-	// 		}
-	// 	}
-	// }
-	// for _, r := range tun.ServerReponse.Routes {
-	// 	err = IP_DelRoute(r.Address, t.IPv4Address, r.Metric)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// }
+		gateway := STATE.Load().DefaultGateway.Load()
+		if gateway != nil {
+			_ = IP_AddDefaultRoute(gateway.To4().String())
+		} else {
+			ERROR("default gateway not found in STATE")
+		}
+
+		// Clean up IPv6 default route if IPv6 was configured
+		if t.IPv6Address != "" {
+			iperr := IP_DelRouteV6("default", t.IPv6Address, "0")
+			if iperr != nil {
+				DEBUG("Unable to delete IPv6 default route, err : ", iperr)
+			}
+		}
+	}
+
+	if tun.ServerResponse.LAN != nil && tun.ServerResponse.LAN.Nat != "" {
+		err = IP_DelRoute(tun.ServerResponse.LAN.Nat, t.IPv4Address, "0")
+		if err != nil {
+			return err
+		}
+	}
+
+	for _, n := range tun.ServerResponse.Networks {
+		if n.Nat != "" {
+			err = IP_DelRoute(n.Nat, t.IPv4Address, "0")
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	for _, r := range tun.ServerResponse.Routes {
+		err = IP_DelRoute(r.Address, t.IPv4Address, r.Metric)
+		if err != nil {
+			return err
+		}
+	}
 
 	return nil
 }
