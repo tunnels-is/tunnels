@@ -118,7 +118,7 @@ func GetDNSServers(intf string) (err error) {
 
 // https://coolaj86.com/articles/golang-and-windows-and-admins-oh-my/
 func AdminCheck() {
-	defer RecoverAndLogToFile()
+	defer RecoverAndLog()
 
 	fd, err := os.Open("\\\\.\\PHYSICALDRIVE0")
 	if err != nil {
@@ -136,7 +136,7 @@ func AdminCheck() {
 }
 
 func IPv6Enabled() bool {
-	defer RecoverAndLogToFile()
+	defer RecoverAndLog()
 	state := STATE.Load()
 	ifname := state.DefaultInterfaceName.Load()
 	if ifname == nil {

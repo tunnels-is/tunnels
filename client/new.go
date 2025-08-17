@@ -164,6 +164,9 @@ type stateV2 struct {
 	DefaultInterfaceID   atomic.Int32           `json:"-"`
 	DefaultInterfaceName atomic.Pointer[string] `json:"-"`
 
+	// Flags
+	Debug bool
+
 	// Disk Paths and filenames
 	BlockListPath  string
 	LogPath        string

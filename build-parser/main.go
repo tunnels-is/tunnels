@@ -42,16 +42,16 @@ func checkDir(dir string) {
 		if strings.HasSuffix(path, "server") {
 			return nil
 		}
+		if path == "../setcap/setcap.go" {
+			return nil
+		}
 
 		fmt.Println(path)
 		fb, err := os.ReadFile(path)
 		fbs := bytes.Split(fb, []byte{10})
 		for i := range fbs {
-			if path == "../setcap/setcap.go" {
-				continue
-			}
 			if bytes.Contains(fbs[i], filter) {
-				if path == "../client/logging.go" && i == 144 {
+				if path == "../client/logging.go" && i == 157 {
 					if bytes.Contains(fbs[i], []byte("fmt.Println(line)")) {
 						continue
 					}

@@ -25,8 +25,11 @@ import (
 func InitService() error {
 	defer RecoverAndLog()
 
+	cfgError := loadConfigFromDisk(false)
 	InitBaseFoldersAndPaths()
-	_ = loadConfigFromDisk()
+	if cfgError != nil {
+		_ = loadConfigFromDisk(true)
+	}
 	loadTunnelsFromDisk()
 	loadDefaultGateway()
 	loadDefaultInterface()
@@ -193,8 +196,11 @@ mainLoop:
 
 func InitMinimalService() error {
 	defer RecoverAndLog()
+	cfgError := loadConfigFromDisk(false)
 	InitBaseFoldersAndPaths()
-	_ = loadConfigFromDisk()
+	if cfgError != nil {
+		_ = loadConfigFromDisk(true)
+	}
 	loadTunnelsFromDisk()
 	loadDefaultGateway()
 	loadDefaultInterface()
@@ -463,6 +469,9 @@ func loadTunnelsFromDisk() {
 	s := STATE.Load()
 	foundDefault := false
 	err := filepath.WalkDir(s.TunnelsPath, func(path string, d fs.DirEntry, err error) error {
+		if d == nil {
+			return nil
+		}
 		if d.IsDir() {
 			return nil
 		}
@@ -564,21 +573,25 @@ func DefaultConfig() *configV2 {
 	return conf
 }
 
-func loadConfigFromDisk() error {
+func loadConfigFromDisk(newConfig bool) error {
 	defer RecoverAndLog()
 	DEBUG("Loading configurations from file")
-
-	if err := ReadConfigFileFromDisk(); err == nil {
-		return nil
+	if !newConfig {
+		return ReadConfigFileFromDisk()
+	} else {
+		err := ReadConfigFileFromDisk()
+		if err == nil {
+			return nil
+		}
 	}
 
+	DEBUG("Generating a new default config")
 	cli := CLIConfig.Load()
 	if cli.Enabled {
 		CONFIG.Store(DefaultMinimalConfig(cli.DNS))
 	} else {
 		CONFIG.Store(DefaultConfig())
 	}
-	DEBUG("Generating a new default config")
 	return writeConfigToDisk()
 }
 

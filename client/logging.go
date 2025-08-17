@@ -42,8 +42,11 @@ func GET_FUNC(skip int) string {
 
 func DEEP(Line ...any) {
 	conf := CONFIG.Load()
-	if !conf.DeepDebugLoggin {
-		return
+	state := STATE.Load()
+	if !state.Debug {
+		if !conf.DebugLogging {
+			return
+		}
 	}
 
 	x := ""
@@ -65,8 +68,11 @@ func DEEP(Line ...any) {
 
 func DEBUG(Line ...any) {
 	conf := CONFIG.Load()
-	if !conf.DebugLogging {
-		return
+	state := STATE.Load()
+	if !state.Debug {
+		if !conf.DebugLogging {
+			return
+		}
 	}
 
 	x := ""
@@ -88,8 +94,11 @@ func DEBUG(Line ...any) {
 
 func ERROR(Line ...any) {
 	conf := CONFIG.Load()
-	if !conf.ErrorLogging {
-		return
+	state := STATE.Load()
+	if !state.Debug {
+		if !conf.DebugLogging {
+			return
+		}
 	}
 
 	x := ""
@@ -112,8 +121,11 @@ func ERROR(Line ...any) {
 
 func INFO(Line ...any) {
 	conf := CONFIG.Load()
-	if !conf.InfoLogging {
-		return
+	state := STATE.Load()
+	if !state.Debug {
+		if !conf.DebugLogging {
+			return
+		}
 	}
 
 	x := ""
@@ -141,7 +153,8 @@ func StartLogQueueProcessor() {
 	for {
 		line = <-LogQueue
 		conf := CONFIG.Load()
-		if conf.ConsoleLogging {
+		state := STATE.Load()
+		if conf.ConsoleLogging || state.Debug {
 			fmt.Println(line)
 		}
 

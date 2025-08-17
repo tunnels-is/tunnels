@@ -3,7 +3,9 @@ package client
 import (
 	"crypto/tls"
 	"encoding/json"
+	"io"
 	"io/fs"
+	"log"
 	"net"
 	"net/http"
 	"os"
@@ -13,6 +15,11 @@ import (
 	"github.com/tunnels-is/tunnels/certs"
 	"github.com/tunnels-is/tunnels/version"
 	"golang.org/x/net/websocket"
+)
+
+var (
+	discardLogger   = log.New(io.Discard, "", 0)
+	httpErrorLogger = log.New(os.Stdout, "", 0)
 )
 
 func LaunchAPI() {
@@ -28,6 +35,12 @@ func LaunchAPI() {
 	API_SERVER = http.Server{
 		Handler:   mux,
 		TLSConfig: makeTLSConfig(),
+	}
+	state := STATE.Load()
+	if state.Debug {
+		API_SERVER.ErrorLog = httpErrorLogger
+	} else {
+		API_SERVER.ErrorLog = discardLogger
 	}
 
 	conf := CONFIG.Load()
