@@ -41,7 +41,7 @@ type TInterface struct {
 func CreateNewTunnelInterface(
 	meta *TunnelMETA,
 ) (IF *TInterface, err error) {
-	defer RecoverAndLogToFile()
+	defer RecoverAndLog()
 	IF = &TInterface{
 		Name:        meta.IFName,
 		IPv4Address: meta.IPv4Address,
@@ -296,7 +296,7 @@ func (t *TInterface) Connect(tun *TUN) (err error) {
 }
 
 func (t *TInterface) Disconnect(V *TUN) (err error) {
-	defer RecoverAndLogToFile()
+	defer RecoverAndLog()
 	if V.connection != nil {
 		V.connection.Close()
 	}

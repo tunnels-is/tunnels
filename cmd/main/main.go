@@ -23,7 +23,8 @@ func main() {
 
 	s := client.STATE.Load()
 	createConfig := flag.Bool("createConfig", false, "generate a default config and exit")
-	flag.StringVar(&s.BasePath, "basePath", "", "manualy set base path for the config and log files")
+	flag.StringVar(&s.BasePath, "basePath", "", "manually set base path for the config and log files")
+	flag.BoolVar(&s.Debug, "debug", false, "manually enable debug")
 	flag.Parse()
 
 	if showVersion {
