@@ -757,7 +757,7 @@ exitLoop:
 }
 
 func (t *TInterface) Disconnect(tun *TUN) (err error) {
-	defer RecoverAndLogToFile()
+	defer RecoverAndLog()
 
 	if tun.connection != nil {
 		tun.connection.Close()

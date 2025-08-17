@@ -24,7 +24,7 @@ func IsAlphanumeric(s string) bool {
 func CreateConfig(flag *bool) {
 	if *flag {
 		InitBaseFoldersAndPaths()
-		loadConfigFromDisk()
+		loadConfigFromDisk(true)
 		os.Exit(1)
 	}
 }
@@ -53,7 +53,7 @@ func InitBaseFoldersAndPaths() {
 	}
 
 	s.BasePath = basePath
-	s.TunnelsPath = s.BasePath + "tunnels" + string(os.PathSeparator)
+	s.TunnelsPath = s.BasePath + "tunnel" + string(os.PathSeparator)
 	CreateFolder(s.TunnelsPath)
 
 	s.UserPath = s.BasePath + "users" + string(os.PathSeparator)
@@ -131,8 +131,8 @@ func CreateFolder(path string) {
 			ERROR("Unable to create base folder: ", err)
 			return
 		}
-		DEBUG("New directory:", path)
 	}
+	DEBUG("New directory:", path)
 }
 
 func IsDefaultConnection(IFName string) bool {
