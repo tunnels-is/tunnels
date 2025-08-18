@@ -122,7 +122,7 @@ export var STATE = {
         logTag: "",
         tag: uuidv4(),
         show: true,
-        msg: SRV + route,
+        msg: SRV.Host + route,
         includeLogs: false,
       });
 
