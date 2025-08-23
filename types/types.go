@@ -219,7 +219,7 @@ type DHCPRecord struct {
 
 	Hostname string
 	Token    string
-	Activity time.Time `json:"-"`
+	Activity time.Time
 }
 type FirewallRequest struct {
 	DHCPToken       string
