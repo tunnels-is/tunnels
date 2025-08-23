@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"net"
 
 	"github.com/tunnels-is/tunnels/types"
@@ -33,6 +34,9 @@ func assignDHCP(CR *types.ControllerConnectRequest, CRR *types.ServerConnectResp
 	var assigned bool
 	for i := range DHCPMapping {
 		if DHCPMapping[i] == nil {
+			continue
+		}
+		if DHCPMapping[i].Token == "" {
 			continue
 		}
 
