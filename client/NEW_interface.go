@@ -138,7 +138,7 @@ func PingConnections() {
 		}
 
 		ping := tun.pingTime.Load()
-		if time.Since(*ping).Seconds() > 30 || err != nil {
+		if time.Since(*ping).Seconds() > 60 || err != nil {
 			if meta.AutoReconnect {
 				DEBUG("30+ Seconds since ping from ", meta.Tag, " attempting reconnection")
 				_, _ = PublicConnect(tun.CR)
