@@ -10,6 +10,7 @@ builds/*
 
 cmd/main/files
 cmd/main/logs
+cmd/main/tunnel
 cmd/main/blocklists
 cmd/main/*.json
 cmd/main/*.conf
