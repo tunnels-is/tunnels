@@ -495,11 +495,6 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		return true
 	})
 
-	// if isConnected {
-	// 	ERROR("Already connected to ", ClientCR.Tag)
-	// 	return 400, errors.New("Already connected to " + ClientCR.Tag)
-	// }
-
 	tunnel := new(TUN)
 	tunnel.meta.Store(meta)
 	tunnel.CR = ClientCR
