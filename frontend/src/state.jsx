@@ -398,7 +398,6 @@ export var STATE = {
     }
     STORE.Cache.Set("debug", debug);
     STATE.debug = debug;
-    console.log("debug:", debug)
     window.location.reload()
   },
   update: undefined,
