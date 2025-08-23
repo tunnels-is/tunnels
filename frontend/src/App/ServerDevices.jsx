@@ -55,21 +55,21 @@ const ServerDevices = () => {
 			Created: (obj) => {
 				return dayjs(obj.Created).format("HH:mm:ss DD-MM-YYYY")
 			},
+			Activity: (obj) => {
+				return obj.DHCP?.Activity ? dayjs(obj.DHCP.Activity).format("HH:mm:ss DD-MM-YYYY") : ""
+			},
 			IP: (obj) => {
 				return obj.DHCP?.IP ? obj.DHCP.IP.join(".") : ""
 			},
 			Token: (obj) => {
 				return obj.DHCP?.Token ? obj.DHCP.Token : ""
 			},
-			Ports: (obj) => {
-				return "" + obj.StartPort + " - " + obj.EndPort
-			},
 			Hostname: (obj) => {
 				return obj.DHCP?.Hostname ? obj.DHCP.Hostname : ""
 			},
-			Activity: (obj) => {
-				return obj.DHCP?.Activity ? dayjs(obj.DHCP.Activity).format("HH:mm:ss DD-MM-YYYY") : ""
-			}
+			Ports: (obj) => {
+				return "" + obj.StartPort + " - " + obj.EndPort
+			},
 		},
 		Btn: {
 			Delete: (obj) => {
