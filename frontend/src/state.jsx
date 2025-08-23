@@ -228,6 +228,7 @@ export var STATE = {
       u.ControlServer = server
       STATE.User = u;
       STORE.Cache.SetObject("user", u);
+      STATE.renderPage("root")
       if (saveToDisk) {
         await STATE.SaveUser(u);
       }
@@ -386,7 +387,8 @@ export var STATE = {
       STATE.toggleError("unable to create tunnel");
     }
   },
-  debug: STORE.Cache.GetBool("debug") === true ? true : false,
+  // debug: STORE.Cache.GetBool("debug") === true ? true : false,
+  debug: true,
   toggleDebug: () => {
     let debug = STORE.Cache.GetBool("debug");
     if (!debug || debug === false) {
