@@ -75,6 +75,9 @@ func pingActiveUsers() {
 		if u == nil {
 			continue
 		}
+		if len(u.Uindex) == 0 {
+			continue
+		}
 
 		binary.BigEndian.PutUint64(PingPongStatsBuffer[3:], uint64(time.Now().UnixNano()))
 		out := u.EH.SEAL.Seal2(PingPongStatsBuffer, u.Uindex)
@@ -91,8 +94,8 @@ func pingActiveUsers() {
 
 		cfg := Config.Load()
 
-		if time.Since(u.LastPingFromClient).Seconds() > float64(cfg.PingTimeoutMinutes) {
-			LOG("Index ping timeout: ", index)
+		if time.Since(u.LastPingFromClient).Minutes() > float64(cfg.PingTimeoutMinutes) {
+			LOG("Ping timeout:", index, "last seen:", time.Since(u.LastPingFromClient).Minutes(), "minutes ago")
 			NukeClient(index)
 			continue
 		}
