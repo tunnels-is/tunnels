@@ -8,8 +8,6 @@ import (
 	"os/exec"
 	"regexp"
 	"strconv"
-	"strings"
-	"syscall"
 
 	"golang.org/x/sys/windows"
 )
