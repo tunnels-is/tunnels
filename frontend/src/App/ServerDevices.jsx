@@ -82,7 +82,7 @@ const ServerDevices = () => {
 				return "Connected"
 			}
 		},
-		headers: ["Created", "Activity", "IP", "Device", "Ports", "CPU", "RAM", "DISK", "IQ", "EQ"],
+		headers: ["Created", "Activity", "IP", "Device", "Ports", "CPU", "RAM", "DISK"],
 		headerClass: {},
 		opts: {
 			RowPerPage: 50,
