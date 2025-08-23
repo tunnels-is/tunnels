@@ -24,6 +24,7 @@ type ServerConfig struct {
 	Features           []Feature `json:"Features"`
 	PingTimeoutMinutes int       `json:"PingTimeoutMinutes"`
 	DHCPTimeoutHours   int       `json:"DHCPTimeoutHours"`
+	LogAPIHosts        bool      `json:"LogAPIHosts"`
 
 	VPNIP   string `json:"VPNIP"`
 	VPNPort string `json:"VPNPort"`

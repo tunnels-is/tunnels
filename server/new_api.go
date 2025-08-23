@@ -119,7 +119,13 @@ func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
 func loggingTimingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		startTime := time.Now()
-		log.Printf("-> %s %s", r.Method, r.URL.RequestURI())
+		conf := Config.Load()
+		if conf.LogAPIHosts {
+			log.Printf("-> %s %s %s", r.RemoteAddr, r.Method, r.URL.RequestURI())
+		} else {
+			log.Printf("-> %s %s", r.Method, r.URL.RequestURI())
+		}
+
 		next.ServeHTTP(w, r)
 		duration := time.Since(startTime)
 		log.Printf("<- %s %s completed in %d ms",
