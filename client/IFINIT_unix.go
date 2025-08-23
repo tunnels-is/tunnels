@@ -522,9 +522,11 @@ func IP_AddRouteV6(
 	err = netlink.RouteAdd(r)
 	if err != nil {
 		if strings.Contains(err.Error(), "exists") {
+			DEBUG("default ipv6 route already exists")
 			return nil
 		}
 		if strings.Contains(err.Error(), "permission denied") {
+			DEBUG("missing permission or ipv6 disabled when adding ipv6 route")
 			return nil
 		}
 		return err
