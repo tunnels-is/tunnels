@@ -35,7 +35,7 @@ const useForm = () => {
   const [mode, setMode] = useState(Number(mm));
   const [remember, setRememeber] = useState(false);
   const state = GLOBAL_STATE("login");
-  const [authServer, setAuthServer] = useState(state.Config?.ControlServers[0])
+  const [authServer, setAuthServer] = useState()
   const navigate = useNavigate()
   const [newAuth, setNewAuth] = useState({
     ID: uuidv4(),
@@ -48,8 +48,10 @@ const useForm = () => {
   const [modalOpen, setModalOpen] = useState(false)
 
   const changeAuthServer = (id) => {
+    console.log("changing auth servers to:", id)
     state.Config?.ControlServers?.forEach(s => {
       if (s.ID === id) {
+        console.log("new auth server:", id)
         setAuthServer(s)
       }
     })
@@ -139,6 +141,7 @@ const useForm = () => {
       setErrors({ ...errors });
       return;
     }
+
 
     let x = await state.callController(authServer, "POST", "/v3/user/create", inputs, true, false)
     if (x.status === 200) {
@@ -413,7 +416,9 @@ const Login = (props) => {
     changeAuthServer
   } = useForm(props);
 
-  const GetDefaults = () => {
+  const GetDefaults = async () => {
+    await state.GetBackendState();
+    changeAuthServer(state.Config?.ControlServers[0]?.ID)
     let i = { ...inputs };
 
     let defaultDeviceName = STORE.Local.getItem("default-device-name");
@@ -431,7 +436,7 @@ const Login = (props) => {
 
   useEffect(() => {
     GetDefaults();
-  }, [authServer]);
+  }, []);
 
   const EmailInput = () => {
     return (
