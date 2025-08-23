@@ -40,14 +40,14 @@ const ServerDevices = () => {
 		},
 		columns: {
 			Created: true,
+			Activity: true,
 			IP: true,
 			Token: true,
+			Hostname: true,
 			Ports: true,
 			CPU: true,
 			RAM: true,
 			Disk: true,
-			IngressQueue: true,
-			EgressQueue: true
 		},
 		customColumns: {
 		},
@@ -58,9 +58,18 @@ const ServerDevices = () => {
 			IP: (obj) => {
 				return obj.DHCP?.IP ? obj.DHCP.IP.join(".") : ""
 			},
+			Token: (obj) => {
+				return obj.DHCP?.Token ? obj.DHCP.Token : ""
+			},
 			Ports: (obj) => {
 				return "" + obj.StartPort + " - " + obj.EndPort
 			},
+			Hostname: (obj) => {
+				return obj.DHCP?.Hostname ? obj.DHCP.Hostname : ""
+			},
+			Activity: (obj) => {
+				return obj.DHCP?.Activity ? dayjs(obj.DHCP.Activity).format("HH:mm:ss DD-MM-YYYY") : ""
+			}
 		},
 		Btn: {
 			Delete: (obj) => {
