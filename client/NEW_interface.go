@@ -19,7 +19,7 @@ func AutoConnect() {
 	defer RecoverAndLog()
 
 	tunnelMetaMapRange(func(meta *TunnelMETA) bool {
-		if !meta.AutoConnect || meta.ServerID == "" {
+		if !meta.AutoConnect {
 			return true
 		}
 
@@ -34,36 +34,41 @@ func AutoConnect() {
 		if isConnected {
 			return true
 		}
-		// TODO: if there is only one user then we connect with that one.
-		if meta.UserID == "" {
-			return true
-		}
 
 		var code int
 		var err error
-		var user *User
-		cliConfig := CLIConfig.Load()
-		if cliConfig.Enabled {
+		// var user *User
+		conf := CONFIG.Load()
+		cliConf := conf.CLIConfig
+		if cliConf != nil {
+			var cs *ControlServer
+			for i := range conf.ControlServers {
+				if conf.ControlServers[i].ID == cliConf.ControlServerID {
+					cs = conf.ControlServers[i]
+				}
+			}
+			if cs == nil {
+				DEBUG("No control server found")
+				return true
+			}
 			code, err = PublicConnect(&ConnectionRequest{
-				// Secure:    cliConfig.Secure,
-				// URL:       cliConfig.AuthServer,
+				Server:    cs,
 				Tag:       meta.Tag,
-				ServerID:  meta.ServerID,
-				DeviceKey: cliConfig.DeviceID,
-				Hostname:  cliConfig.Hostname,
+				ServerID:  cliConf.ServerID,
+				DeviceKey: cliConf.DeviceID,
 			})
 		} else {
 			// user, err = getUser()
 			// if err != nil {
 			// 	return true
 			// }
-			code, err = PublicConnect(&ConnectionRequest{
-				Tag:         meta.Tag,
-				ServerID:    meta.ServerID,
-				DeviceToken: user.DeviceToken.DT,
-				// URL:         user.AuthServer,
-				// Secure: user.Secure,
-			})
+			// code, err = PublicConnect(&ConnectionRequest{
+			// 	Tag:         meta.Tag,
+			// 	ServerID:    meta.ServerID,
+			// 	DeviceToken: user.DeviceToken.DT,
+			// 	// URL:         user.AuthServer,
+			// 	// Secure: user.Secure,
+			// })
 		}
 
 		if err != nil || code != 200 {
@@ -103,14 +108,13 @@ var prevAllowedHosts = []string{}
 
 func PingConnections() {
 	defer func() {
-		time.Sleep(20 * time.Second)
+		time.Sleep(10 * time.Second)
 	}()
 	defer RecoverAndLog()
 
-	cli := CLIConfig.Load()
-
 	// Only send statistics for minimal clients
-	if cli.Enabled && cli.SendStats {
+	conf := CONFIG.Load()
+	if conf.CLIConfig != nil && conf.CLIConfig.SendStats {
 		PopulatePingBufferWithStats()
 	}
 
@@ -124,6 +128,7 @@ func PingConnections() {
 		if tun.encWrapper != nil {
 			out := tun.encWrapper.SEAL.Seal1(PingPongStatsBuffer, tun.Index)
 			if len(out) > 0 {
+				DEEP("Ping:", meta.Tag)
 				_, err = tun.connection.Write(out)
 				if err != nil {
 					ERROR("unable to ping tunnel: ", tun.ID, meta.Tag)

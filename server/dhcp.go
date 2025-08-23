@@ -3,7 +3,6 @@ package main
 import (
 	"errors"
 	"net"
-	"time"
 
 	"github.com/tunnels-is/tunnels/types"
 )
@@ -32,26 +31,22 @@ func generateDHCPMap() (err error) {
 func assignDHCP(CR *types.ControllerConnectRequest, CRR *types.ServerConnectResponse, index int) (err error) {
 	Config := Config.Load()
 	var assigned bool
-	if CR.DHCPToken != "" {
-		for i := range DHCPMapping {
-			if DHCPMapping[i] == nil {
-				continue
-			}
+	for i := range DHCPMapping {
+		if DHCPMapping[i] == nil {
+			continue
+		}
 
-			if DHCPMapping[i].Token == CR.DHCPToken {
-				DHCPMapping[i].AssignHostname(CR.Hostname, Config.Hostname)
-				DHCPMapping[i].Activity = time.Now()
+		if DHCPMapping[i].Token == CR.DeviceKey || DHCPMapping[i].Token == CR.DeviceToken {
+			DHCPMapping[i].AssignHostname(Config.Hostname)
+			CRR.DHCP = DHCPMapping[i]
 
-				CRR.DHCP = DHCPMapping[i]
+			assigned = true
+			clientCoreMappings[index].DHCP = DHCPMapping[i]
 
-				assigned = true
-				clientCoreMappings[index].DHCP = DHCPMapping[i]
+			ip := clientCoreMappings[index].DHCP.IP
+			VPLIPToCore[ip[0]][ip[1]][ip[2]][ip[3]] = clientCoreMappings[index]
 
-				ip := clientCoreMappings[index].DHCP.IP
-				VPLIPToCore[ip[0]][ip[1]][ip[2]][ip[3]] = clientCoreMappings[index]
-
-				break
-			}
+			break
 		}
 	}
 
@@ -66,10 +61,14 @@ func assignDHCP(CR *types.ControllerConnectRequest, CRR *types.ServerConnectResp
 				continue
 			}
 
-			assigned = DHCPMapping[i].Assign()
+			token := CR.DeviceToken
+			if token == "" {
+				token = CR.DeviceKey
+			}
+
+			assigned = DHCPMapping[i].Assign(float64(Config.DHCPTimeoutHours), token)
 			if assigned {
-				DHCPMapping[i].DeviceKey = CR.DeviceKey
-				DHCPMapping[i].AssignHostname(CR.Hostname, Config.Hostname)
+				DHCPMapping[i].AssignHostname(Config.Hostname)
 				CRR.DHCP = DHCPMapping[i]
 				clientCoreMappings[index].DHCP = DHCPMapping[i]
 

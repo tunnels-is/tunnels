@@ -122,6 +122,7 @@ func (tun *TUN) ReadFromServeTunnel() {
 		staging = make([]byte, 66000)
 		inf     = tun.tunnel.Load()
 		err     error
+		meta    = tun.meta.Load()
 	)
 
 	for {
@@ -149,7 +150,7 @@ func (tun *TUN) ReadFromServeTunnel() {
 		tun.ingressBytes.Add(int64(n))
 
 		if len(packet) < 20 {
-			go tun.RegisterPing(CopySlice(packet))
+			go tun.RegisterPing(meta.Tag, CopySlice(packet))
 			continue
 		}
 

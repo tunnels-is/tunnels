@@ -85,6 +85,7 @@ func (tun *TUN) ReadFromServeTunnel() {
 		err      error
 		osTunnel = tun.tunnel.Load()
 		prePend  = []byte{0, 0, 0, 2}
+		meta     = tun.meta.Load()
 	)
 
 	DEBUG("Server Tunnel listener initialized")
@@ -114,7 +115,7 @@ func (tun *TUN) ReadFromServeTunnel() {
 		tun.ingressBytes.Add(int64(n))
 
 		if len(packet) < 20 {
-			tun.RegisterPing(CopySlice(packet))
+			tun.RegisterPing(meta.Tag, CopySlice(packet))
 			continue
 		}
 

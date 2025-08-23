@@ -35,7 +35,6 @@ type DNSStats struct {
 type ConnectionRequest struct {
 	Server       *ControlServer
 	ServerPubKey string
-	Hostname     string `json:"Hostname"`
 
 	DeviceKey string `json:"DeviceKey"`
 
@@ -247,22 +246,6 @@ type ActiveConnectionMeta struct {
 }
 
 type TunnelMETA struct {
-	// Manual server configuration
-	// ServerIP   string
-	// ServerPort string
-	// ServerCert string
-
-	// Alternitive authentication
-	// deviceKey string
-
-	ServerID string
-	UserID   string
-
-	// Automatic DNS discovery (user managed)
-	// DNSDiscovery string
-
-	DHCPToken string
-
 	WindowsGUID string
 
 	// controlled by user only
@@ -270,7 +253,6 @@ type TunnelMETA struct {
 	LocalhostNat    bool
 	AutoReconnect   bool
 	AutoConnect     bool
-	PreventIPv6     bool
 	RequestVPNPorts bool
 	KillSwitch      bool
 
