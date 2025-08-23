@@ -8,28 +8,12 @@ server.crt
 build/*
 builds/*
 
-cmd/min/files
-cmd/min/logs
-cmd/min/blocklists
-cmd/min/*.jsom
-cmd/min/*.exe
-cmd/min/*.exe~
-cmd/min/min
-cmd/min/enc
-cmd/min/tunnels*
-cmd/min/api.key
-cmd/min/api.crt
-cmd/min/cert.pem
-cmd/min/key.pem
-cmd/min/private.crt
-cmd/min/*.tun.json
-cmd/min/*.tun.json.bak
-cmd/min/users
-
 cmd/main/files
 cmd/main/logs
 cmd/main/blocklists
-cmd/main/*.jsom
+cmd/main/*.json
+cmd/main/*.conf
+cmd/main/*.bak
 cmd/main/*.exe
 cmd/main/*.exe~
 cmd/main/main
@@ -49,6 +33,7 @@ server/cert.pem
 server/key.pem
 server/config.json
 server/tunnels.db
+server/server
 
 certcheck/.env
 
