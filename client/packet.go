@@ -2,6 +2,7 @@ package client
 
 import (
 	"encoding/binary"
+	"fmt"
 	"time"
 )
 
@@ -14,7 +15,7 @@ type packetDebugOut struct {
 	TCPH    []byte
 }
 
-func (t *TUN) RegisterPing(packet []byte) {
+func (t *TUN) RegisterPing(tag string, packet []byte) {
 	t.registerPing(time.Now())
 
 	defer RecoverAndLog()
@@ -24,6 +25,7 @@ func (t *TUN) RegisterPing(packet []byte) {
 	if len(packet) > 10 {
 		t.ServerToClientMicro.Store(time.Since(time.Unix(0, int64(binary.BigEndian.Uint64(packet[3:])))).Microseconds())
 	}
+	DEEP(fmt.Sprintf("ping from server (%s) cpu(%d) mem(%d) disk(%d) micro(%d)", tag, t.CPU, t.MEM, t.DISK, t.ServerToClientMicro.Load()))
 }
 
 func debugProcessPacket(packet []byte) (P *packetDebugOut) {

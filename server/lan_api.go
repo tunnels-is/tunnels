@@ -91,11 +91,10 @@ outerloop:
 		if clientCoreMappings[i].DHCP != nil {
 			response.DHCPAssigned++
 			d.DHCP = types.DHCPRecord{
-				DeviceKey: clientCoreMappings[i].DHCP.DeviceKey,
-				IP:        clientCoreMappings[i].DHCP.IP,
-				Hostname:  clientCoreMappings[i].DHCP.Hostname,
-				Token:     clientCoreMappings[i].DHCP.Token,
-				Activity:  clientCoreMappings[i].DHCP.Activity,
+				IP:       clientCoreMappings[i].DHCP.IP,
+				Hostname: clientCoreMappings[i].DHCP.Hostname,
+				Token:    clientCoreMappings[i].DHCP.Token,
+				Activity: clientCoreMappings[i].DHCP.Activity,
 			}
 		}
 

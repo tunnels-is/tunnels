@@ -6,7 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/tunnels-is/tunnels/crypt"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -22,7 +21,9 @@ const (
 )
 
 type ServerConfig struct {
-	Features []Feature `json:"Features"`
+	Features           []Feature `json:"Features"`
+	PingTimeoutMinutes int       `json:"PingTimeoutMinutes"`
+	DHCPTimeoutHours   int       `json:"DHCPTimeoutHours"`
 
 	VPNIP   string `json:"VPNIP"`
 	VPNPort string `json:"VPNPort"`
@@ -209,19 +210,16 @@ type ControllerConnectRequest struct {
 	Version int       `json:"Version"`
 	Created time.Time `json:"Created"`
 
-	Hostname        string `json:"Hostname"`
-	RequestingPorts bool   `json:"RequestingPorts"`
-	DHCPToken       string `json:"DHCPToken"`
+	RequestingPorts bool `json:"RequestingPorts"`
 }
 
 type DHCPRecord struct {
 	m  sync.Mutex `json:"-"`
 	IP [4]byte
 
-	DeviceKey string
-	Hostname  string
-	Token     string
-	Activity  time.Time `json:"-"`
+	Hostname string
+	Token    string
+	Activity time.Time `json:"-"`
 }
 type FirewallRequest struct {
 	DHCPToken       string
@@ -230,15 +228,16 @@ type FirewallRequest struct {
 	DisableFirewall bool
 }
 
-func (d *DHCPRecord) AssignHostname(host string, defaultHostname string) {
-	if host == "" {
-		host = fmt.Sprintf("%d-%d-%d-%d",
-			d.IP[0],
-			d.IP[1],
-			d.IP[2],
-			d.IP[3],
-		)
-	}
+func (d *DHCPRecord) AssignHostname(defaultHostname string) {
+	d.m.Lock()
+	defer d.m.Unlock()
+	d.Activity = time.Now()
+	host := fmt.Sprintf("%d-%d-%d-%d",
+		d.IP[0],
+		d.IP[1],
+		d.IP[2],
+		d.IP[3],
+	)
 
 	if defaultHostname != "" {
 		d.Hostname = host + "." + defaultHostname
@@ -247,14 +246,16 @@ func (d *DHCPRecord) AssignHostname(host string, defaultHostname string) {
 	}
 }
 
-func (d *DHCPRecord) Assign() (ok bool) {
-	if d.Token != "" {
-		return
+func (d *DHCPRecord) Assign(timeoutHours float64, token string) (ok bool) {
+	if !d.Activity.IsZero() {
+		if time.Since(d.Activity).Hours() < timeoutHours {
+			return
+		}
 	}
 	d.m.Lock()
 	defer d.m.Unlock()
 	if d.Token == "" {
-		d.Token = uuid.NewString()
+		d.Token = token
 		d.Activity = time.Now()
 		ok = true
 		return

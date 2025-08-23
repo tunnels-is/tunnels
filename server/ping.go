@@ -76,21 +76,23 @@ func pingActiveUsers() {
 			continue
 		}
 
-		if time.Since(u.Created).Seconds() < 20 {
-			continue
-		}
-
-		if time.Since(u.LastPingFromClient).Seconds() > 120 {
-			LOG("Index ping timeout: ", index)
-			NukeClient(index)
-			continue
-		}
-
 		binary.BigEndian.PutUint64(PingPongStatsBuffer[3:], uint64(time.Now().UnixNano()))
 		out := u.EH.SEAL.Seal2(PingPongStatsBuffer, u.Uindex)
 		err := syscall.Sendto(dataSocketFD, out, 0, u.Addr)
 		if err != nil {
 			LOG("Index ping error: ", index, err)
+			NukeClient(index)
+			continue
+		}
+
+		if time.Since(u.Created).Seconds() < 30 {
+			continue
+		}
+
+		cfg := Config.Load()
+
+		if time.Since(u.LastPingFromClient).Seconds() > float64(cfg.PingTimeoutMinutes) {
+			LOG("Index ping timeout: ", index)
 			NukeClient(index)
 			continue
 		}

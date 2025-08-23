@@ -263,6 +263,12 @@ func validateConfig(Config *types.ServerConfig) (err error) {
 	if Config.UserMaxConnections < 1 {
 		Config.UserMaxConnections = 2
 	}
+	if Config.PingTimeoutMinutes < 2 {
+		Config.PingTimeoutMinutes = 2
+	}
+	if Config.DHCPTimeoutHours < 1 {
+		Config.DHCPTimeoutHours = 1
+	}
 
 	if len(Config.Features) == 0 {
 		return fmt.Errorf("no features enbaled")

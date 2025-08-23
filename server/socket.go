@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"math"
 	"net"
 	"runtime/debug"
@@ -55,11 +56,15 @@ func CreateClientCoreMapping(CRR *types.ServerConnectResponse, CR *types.Control
 			}
 
 			clientCoreMappings[i].ID = CR.UserID.Hex()
-			clientCoreMappings[i].DeviceToken = CR.DeviceToken
+			if CR.DeviceToken != "" {
+				clientCoreMappings[i].DeviceToken = CR.DeviceToken
+			} else {
+				clientCoreMappings[i].DeviceToken = CR.DeviceKey
+			}
 			clientCoreMappings[i].EH = EH
 			clientCoreMappings[i].Created = time.Now()
-			clientCoreMappings[i].ToUser = make(chan []byte, 300000)
-			clientCoreMappings[i].FromUser = make(chan Packet, 300000)
+			clientCoreMappings[i].ToUser = make(chan []byte, 3_000_000)
+			clientCoreMappings[i].FromUser = make(chan Packet, 3_000_000)
 			clientCoreMappings[i].LastPingFromClient = time.Now()
 			clientCoreMappings[i].Uindex = make([]byte, 2)
 			binary.BigEndian.PutUint16(clientCoreMappings[i].Uindex, uint16(index))
@@ -81,6 +86,7 @@ func CreateClientCoreMapping(CRR *types.ServerConnectResponse, CR *types.Control
 			NukeClient(index)
 			return 0, err
 		}
+		LOG(fmt.Sprintf("Assigned Index (%d)", index))
 	}
 
 	if CR.RequestingPorts {
@@ -99,7 +105,6 @@ func CreateClientCoreMapping(CRR *types.ServerConnectResponse, CR *types.Control
 }
 
 func ExternalTCPListener() {
-
 	var err error
 	rawTCPSockFD, err = syscall.Socket(
 		syscall.AF_INET,
@@ -361,6 +366,7 @@ func fromUserChannel(index int) {
 				}
 			default:
 				CM.LastPingFromClient = time.Now()
+				INFO("ping from: ", index)
 			}
 			continue
 		}

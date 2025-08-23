@@ -52,17 +52,18 @@ func API_AcceptUserConnections(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	totalC, totalUserC := countConnections(CR.UserID.Hex())
+	Config := Config.Load()
+
+	if totalUserC > Config.UserMaxConnections {
+		senderr(w, 400, "user has too many active connections")
+		return
+	}
+
 	if CR.RequestingPorts {
 		if totalC >= slots {
 			senderr(w, 400, "server is full")
 			return
 		}
-	}
-
-	Config := Config.Load()
-	if totalUserC > Config.UserMaxConnections {
-		senderr(w, 400, "user has too many active connections")
-		return
 	}
 
 	EH := crypt.NewEncryptionHandler(CR.EncType)
