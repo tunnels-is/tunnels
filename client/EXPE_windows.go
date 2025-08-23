@@ -71,9 +71,10 @@ func portString(port uint32) string {
 	return fmt.Sprintf("%d", binary.BigEndian.Uint16(portBytes[2:])) // Extract the 16-bit port
 }
 
+// closeAllOpenTCPconnections
+// EXPERIMENTAL
 func closeAllOpenTCPconnections() (err error) {
-	return nil
-	log.Println("Attempting to close all IPv4 TCP connections. Requires Administrator privileges.")
+	defer RecoverAndLog()
 
 	var pdwSize uint32
 	var ret uintptr
@@ -88,20 +89,18 @@ func closeAllOpenTCPconnections() (err error) {
 	)
 	// We expect ERROR_INSUFFICIENT_BUFFER (122)
 	if ret == 0 && pdwSize == 0 {
-		log.Fatalf("GetExtendedTcpTable failed to get size: %v", err) // Use syscall.GetLastError() for error code
-		return
+		return err
 	}
 	if err != syscall.Errno(ERROR_INSUFFICIENT_BUFFER) {
-		log.Printf("Warning: GetExtendedTcpTable (size check) returned unexpected error code: %v\n", err)
+		return err
 		// Continue anyway, pdwSize might be set correctly
 	}
 	if pdwSize == 0 {
-		log.Fatalf("GetExtendedTcpTable returned size 0.")
+		return fmt.Errorf("GetExtendedTcpTable returned size 0.")
 	}
 
 	buffer := make([]byte, pdwSize)
 
-	// Second call to get the actual table data
 	ret, _, err = procGetExtendedTcpTable.Call(
 		uintptr(unsafe.Pointer(&buffer[0])), // Pointer to buffer
 		uintptr(unsafe.Pointer(&pdwSize)),   // Pointer to size variable
@@ -111,8 +110,8 @@ func closeAllOpenTCPconnections() (err error) {
 		0,                                   // Reserved
 	)
 	if ret != 0 { // NO_ERROR (0) indicates success
-		log.Fatalf("GetExtendedTcpTable failed to get data: %v (Error code: %d)", err, ret)
-		return
+		// log.Fatalf("GetExtendedTcpTable failed to get data: %v (Error code: %d)", err, ret)
+		return err
 	}
 
 	// Cast the buffer to the table structure
@@ -156,14 +155,12 @@ func closeAllOpenTCPconnections() (err error) {
 		// Call SetTcpEntry
 		ret, _, err = procSetTcpEntry.Call(uintptr(unsafe.Pointer(&tcpRow)))
 		if ret != 0 { // NO_ERROR (0) indicates success
-			log.Printf(" -> Failed to close connection: %v (Error code: %d)\n", err, ret)
+			// log.Printf(" -> Failed to close connection: %v (Error code: %d)\n", err, ret)
 		} else {
 			log.Println(" -> Connection closure requested successfully.")
 			closedCount++
 		}
 	}
-
-	log.Printf("Finished. Requested closure for %d connections.\n", closedCount)
 
 	return nil
 }

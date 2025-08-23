@@ -22,9 +22,9 @@ func main() {
 	flag.BoolVar(&showVersion, "version", false, "show version and exit")
 
 	s := client.STATE.Load()
-	createConfig := flag.Bool("createConfig", false, "generate a default config and exit")
 	flag.StringVar(&s.BasePath, "basePath", "", "manually set base path for the config and log files")
 	flag.BoolVar(&s.Debug, "debug", false, "manually enable debug")
+	flag.BoolVar(&s.RequireConfig, "requireConfig", false, "Force tunnels to require disk config to start")
 	flag.Parse()
 
 	if showVersion {
@@ -32,9 +32,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	client.CreateConfig(createConfig)
-
 	client.DIST_EMBED = DIST
 	client.DLL_EMBED = DLL
-	service.Start(false)
+	service.Start()
 }

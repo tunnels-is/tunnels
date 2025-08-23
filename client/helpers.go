@@ -21,14 +21,6 @@ func IsAlphanumeric(s string) bool {
 	return matched
 }
 
-func CreateConfig(flag *bool) {
-	if *flag {
-		InitBaseFoldersAndPaths()
-		loadConfigFromDisk(true)
-		os.Exit(1)
-	}
-}
-
 func InitBaseFoldersAndPaths() {
 	defer RecoverAndLog()
 	DEBUG("Creating base folders and paths")

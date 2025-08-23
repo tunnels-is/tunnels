@@ -16,53 +16,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/tunnels-is/tunnels/certs"
 	"github.com/tunnels-is/tunnels/types"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
-
-func InitService() error {
-	defer RecoverAndLog()
-
-	cfgError := loadConfigFromDisk(false)
-	InitBaseFoldersAndPaths()
-	if cfgError != nil {
-		_ = loadConfigFromDisk(true)
-	}
-	loadTunnelsFromDisk()
-	loadDefaultGateway()
-	loadDefaultInterface()
-	InitDNSHandler()
-	INFO("Starting Tunnels")
-
-	conf := CONFIG.Load()
-	s := STATE.Load()
-
-	if !conf.ConsoleLogOnly {
-		var err error
-		LogFile, err = CreateFile(s.LogFileName)
-		if err != nil {
-			return err
-		}
-	}
-
-	INFO("Operating specific initializations")
-	_ = OSSpecificInit()
-
-	INFO("Checking permissins")
-	AdminCheck()
-
-	printInfo()
-	printInfo2()
-
-	doEvent(highPriorityChannel, func() {
-		reloadBlockLists(false)
-	})
-
-	INFO("Tunnels is ready")
-	return nil
-}
 
 func printInfo() {
 	log.Println("")
@@ -95,6 +52,72 @@ func printInfo2() {
 	log.Println("=======================================================================")
 }
 
+func InitService() error {
+	defer RecoverAndLog()
+
+	InitBaseFoldersAndPaths()
+	state := STATE.Load()
+
+	cfgError := loadConfigFromDisk(false)
+	if cfgError != nil {
+		if state.RequireConfig {
+			return cfgError
+		}
+		_ = loadConfigFromDisk(true)
+	}
+
+	conf := CONFIG.Load()
+	loadTunnelsFromDisk()
+	loadDefaultGateway()
+	loadDefaultInterface()
+
+	if conf.CLIConfig != nil {
+		DEBUG("CLI CONFIG DETECTED")
+		wasChanged := false
+		if conf.OpenUI {
+			conf.OpenUI = false
+			wasChanged = true
+		}
+		if conf.ConsoleLogOnly {
+			conf.ConsoleLogOnly = true
+			wasChanged = true
+		}
+		if wasChanged {
+			CONFIG.Store(conf)
+		}
+	}
+
+	INFO("Starting Tunnels")
+
+	if !conf.ConsoleLogOnly {
+		var err error
+		LogFile, err = CreateFile(state.LogFileName)
+		if err != nil {
+			return err
+		}
+	}
+
+	INFO("Operating specific initializations")
+	_ = OSSpecificInit()
+
+	INFO("Checking permissins")
+	AdminCheck()
+
+	printInfo()
+	printInfo2()
+
+	if !conf.DisableDNS {
+		InitDNSHandler()
+		INFO("Starting DNS Proxy")
+		doEvent(highPriorityChannel, func() {
+			reloadBlockLists(false)
+		})
+	}
+
+	INFO("Tunnels is ready")
+	return nil
+}
+
 func LaunchTunnels() {
 	defer RecoverAndLog()
 
@@ -112,29 +135,31 @@ func LaunchTunnels() {
 	newConcurrentSignal("LogProcessor", CancelContext, func() {
 		StartLogQueueProcessor()
 	})
+	conf := CONFIG.Load()
 
-	newConcurrentSignal("APIServer", CancelContext, func() {
-		LaunchAPI()
-	})
+	if conf.CLIConfig == nil {
+		newConcurrentSignal("APIServer", CancelContext, func() {
+			LaunchAPI()
+		})
+	}
 
-	newConcurrentSignal("UDPDNSHandler", CancelContext, func() {
-		StartUDPDNSHandler()
-	})
+	if !conf.DisableDNS {
+		newConcurrentSignal("UDPDNSHandler", CancelContext, func() {
+			StartUDPDNSHandler()
+		})
+		newConcurrentSignal("BlockListUpdater", CancelContext, func() {
+			reloadBlockLists(true)
+		})
+		newConcurrentSignal("CleanDNSCache", CancelContext, func() {
+			CleanDNSCache()
+		})
+	}
 
-	config := CONFIG.Load()
-	if config.OpenUI {
+	if conf.OpenUI {
 		newConcurrentSignal("OpenUI", CancelContext, func() {
 			popUI()
 		})
 	}
-
-	newConcurrentSignal("Pinger", CancelContext, func() {
-		PingConnections()
-	})
-
-	newConcurrentSignal("BlockListUpdater", CancelContext, func() {
-		reloadBlockLists(true)
-	})
 
 	newConcurrentSignal("LogMapCleaner", CancelContext, func() {
 		CleanUniqueLogMap()
@@ -148,12 +173,12 @@ func LaunchTunnels() {
 		GetDefaultGateway()
 	})
 
-	newConcurrentSignal("CleanDNSCache", CancelContext, func() {
-		CleanDNSCache()
-	})
-
 	newConcurrentSignal("AutoConnect", CancelContext, func() {
 		AutoConnect()
+	})
+
+	newConcurrentSignal("Pinger", CancelContext, func() {
+		PingConnections()
 	})
 
 mainLoop:
@@ -181,146 +206,6 @@ mainLoop:
 
 		case Tun := <-interfaceMonitor:
 			go Tun.ReadFromTunnelInterface()
-		case Tun := <-tunnelMonitor:
-			go Tun.ReadFromServeTunnel()
-
-		case signal := <-concurrencyMonitor:
-			DEBUG(signal.tag)
-			go signal.execute()
-
-		default:
-			time.Sleep(200 * time.Millisecond)
-		}
-	}
-}
-
-func InitMinimalService() error {
-	defer RecoverAndLog()
-	cfgError := loadConfigFromDisk(false)
-	InitBaseFoldersAndPaths()
-	if cfgError != nil {
-		_ = loadConfigFromDisk(true)
-	}
-	loadTunnelsFromDisk()
-	loadDefaultGateway()
-	loadDefaultInterface()
-
-	conf := CONFIG.Load()
-	conf.OpenUI = false
-	conf.ConsoleLogOnly = true
-	CONFIG.Store(conf)
-
-	INFO("Operating specific initializations")
-	_ = OSSpecificInit()
-
-	INFO("Checking permissins")
-	AdminCheck()
-
-	cli := CLIConfig.Load()
-	if cli.DNS {
-		InitDNSHandler()
-		INFO("Starting Tunnels")
-		doEvent(highPriorityChannel, func() {
-			reloadBlockLists(false)
-		})
-	}
-
-	// err := getDeviceAndServer()
-	// if err != nil {
-	// 	return err
-	// }
-	//
-	// doEvent(highPriorityChannel, func() {
-	// 	code, _ := PublicConnect(&ConnectionRequest{
-	// 		URL:       cli.AuthServer,
-	// 		Secure:    cli.Secure,
-	// 		DeviceKey: cli.DeviceID,
-	// 		Tag:       DefaultTunnelName,
-	// 		ServerID:  cli.ServerID,
-	// 	})
-	// 	if code != 200 {
-	// 		time.Sleep(5 * time.Second)
-	// 	}
-	// })
-
-	return nil
-}
-
-func LaunchMinimalTunnels() {
-	defer RecoverAndLog()
-	cli := CLIConfig.Load()
-
-	CancelContext, CancelFunc = context.WithCancel(GlobalContext)
-	quit = make(chan os.Signal, 10)
-
-	signal.Notify(
-		quit,
-		os.Interrupt,
-		syscall.SIGTERM,
-		syscall.SIGQUIT,
-		syscall.SIGILL,
-	)
-
-	newConcurrentSignal("LogProcessor", CancelContext, func() {
-		StartLogQueueProcessor()
-	})
-
-	if cli.DNS {
-		newConcurrentSignal("UDPDNSHandler", CancelContext, func() {
-			StartUDPDNSHandler()
-		})
-		newConcurrentSignal("BlockListUpdater", CancelContext, func() {
-			reloadBlockLists(true)
-		})
-		newConcurrentSignal("CleanDNSCache", CancelContext, func() {
-			CleanDNSCache()
-		})
-	}
-
-	newConcurrentSignal("Pinger", CancelContext, func() {
-		PingConnections()
-	})
-	newConcurrentSignal("AutoConnect", CancelContext, func() {
-		AutoConnect()
-	})
-
-	newConcurrentSignal("LogMapCleaner", CancelContext, func() {
-		CleanUniqueLogMap()
-	})
-
-	newConcurrentSignal("CleanPortAllocs", CancelContext, func() {
-		CleanPortsForAllConnections()
-	})
-
-	newConcurrentSignal("DefaultGateway", CancelContext, func() {
-		GetDefaultGateway()
-	})
-
-mainLoop:
-	for {
-
-		select {
-		case high := <-highPriorityChannel:
-			go high.method()
-			continue mainLoop
-		case med := <-mediumPriorityChannel:
-			go med.method()
-			continue mainLoop
-		case low := <-lowPriorityChannel:
-			go low.method()
-			continue mainLoop
-		default:
-		}
-
-		select {
-		case sig := <-quit:
-			DEBUG("", "exit signal caught: ", sig.String())
-			CancelFunc()
-			CleanupOnClose()
-			os.Exit(1)
-
-		case IF := <-interfaceMonitor:
-			go IF.ReadFromTunnelInterface()
 		case Tun := <-tunnelMonitor:
 			go Tun.ReadFromServeTunnel()
 
@@ -407,7 +292,7 @@ func ReadConfigFileFromDisk() (err error) {
 
 	if len(Conf.ControlServers) < 1 {
 		Conf.ControlServers = append(Conf.ControlServers, &ControlServer{
-			ID:                  uuid.NewString(),
+			ID:                  "tunnels",
 			Host:                "api.tunnels.is",
 			Port:                "443",
 			CertificatePath:     "",
@@ -465,10 +350,10 @@ func writeTunnelsToDisk(tag string) (outErr error) {
 	return
 }
 
-func loadTunnelsFromDisk() {
+func loadTunnelsFromDisk() (err error) {
 	s := STATE.Load()
 	foundDefault := false
-	err := filepath.WalkDir(s.TunnelsPath, func(path string, d fs.DirEntry, err error) error {
+	err = filepath.WalkDir(s.TunnelsPath, func(path string, d fs.DirEntry, err error) error {
 		if d == nil {
 			return nil
 		}
@@ -505,36 +390,21 @@ func loadTunnelsFromDisk() {
 	})
 	if err != nil {
 		ERROR("Unable to walk tunnel path:", err)
+		return err
 	}
 
 	if !foundDefault {
-		cli := CLIConfig.Load()
-		newTun := createDefaultTunnelMeta(cli.Enabled)
-		TunnelMetaMap.Store(newTun.Tag, newTun)
-		_ = writeTunnelsToDisk(newTun.Tag)
+		state := STATE.Load()
+		if !state.RequireConfig {
+			newTun := createDefaultTunnelMeta()
+			TunnelMetaMap.Store(newTun.Tag, newTun)
+			_ = writeTunnelsToDisk(newTun.Tag)
+		} else {
+			ERROR("unable to find default tunnel: ", err)
+			return fmt.Errorf("unable to find default tunnel: %s", err)
+		}
 	}
-}
-
-func DefaultMinimalConfig(withDNS bool) *configV2 {
-	conf := &configV2{
-		DebugLogging:     true,
-		InfoLogging:      true,
-		ErrorLogging:     true,
-		ConnectionTracer: false,
-		ConsoleLogging:   true,
-		ConsoleLogOnly:   true,
-	}
-	if withDNS {
-		conf.DNSServerIP = "0.0.0.0"
-		conf.DNSServerPort = "53"
-		conf.DNS1Default = "1.1.1.1"
-		conf.DNS2Default = "8.8.8.8"
-		conf.LogBlockedDomains = true
-		conf.LogAllDomains = true
-		conf.DNSstats = true
-		conf.DNSBlockLists = GetDefaultBlockLists()
-	}
-	return conf
+	return nil
 }
 
 // DefaultConfig returns a new configV2 with default values
@@ -556,18 +426,11 @@ func DefaultConfig() *configV2 {
 		APIPort:           "7777",
 	}
 	conf.ControlServers = append(conf.ControlServers, &ControlServer{
-		ID:                  uuid.NewString(),
+		ID:                  "tunnels",
 		Host:                "api.tunnels.is",
 		Port:                "443",
 		CertificatePath:     "",
 		ValidateCertificate: true,
-	})
-	conf.ControlServers = append(conf.ControlServers, &ControlServer{
-		ID:                  uuid.NewString(),
-		Host:                "127.0.0.1",
-		Port:                "443",
-		CertificatePath:     "",
-		ValidateCertificate: false,
 	})
 	applyCertificateDefaultsToConfig(conf)
 	return conf
@@ -586,12 +449,8 @@ func loadConfigFromDisk(newConfig bool) error {
 	}
 
 	DEBUG("Generating a new default config")
-	cli := CLIConfig.Load()
-	if cli.Enabled {
-		CONFIG.Store(DefaultMinimalConfig(cli.DNS))
-	} else {
-		CONFIG.Store(DefaultConfig())
-	}
+
+	CONFIG.Store(DefaultConfig())
 	return writeConfigToDisk()
 }
 
@@ -613,41 +472,6 @@ func applyCertificateDefaultsToConfig(cfg *configV2) {
 		cfg.APICertDomains = []string{"tunnels.app", "app.tunnels.is"}
 	}
 }
-
-//	func LoadDNSWhitelist() (err error) {
-//		defer RecoverAndLogToFile()
-//
-//		if C.DomainWhitelist == "" {
-//			return nil
-//		}
-//
-//		WFile, err := os.OpenFile(C.DomainWhitelist, os.O_RDWR|os.O_CREATE, 0o777)
-//		if err != nil {
-//			return err
-//		}
-//		defer WFile.Close()
-//
-//		scanner := bufio.NewScanner(WFile)
-//
-//		WhitelistMap := make(map[string]bool)
-//		for scanner.Scan() {
-//			domain := scanner.Text()
-//			if domain == "" {
-//				continue
-//			}
-//			WhitelistMap[domain] = true
-//		}
-//
-//		err = scanner.Err()
-//		if err != nil {
-//			ERROR("Unable to load domain whitelist: ", err)
-//			return err
-//		}
-//
-//		DNSWhitelist = WhitelistMap
-//
-//		return nil
-//	}
 
 func CleanupOnClose() {
 	defer RecoverAndLog()

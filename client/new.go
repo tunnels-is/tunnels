@@ -19,7 +19,6 @@ import (
 func init() {
 	STATE.Store(&stateV2{})
 	CONFIG.Store(&configV2{})
-	CLIConfig.Store(&CLIInfo{})
 
 	// Initialize xsync maps
 	TunnelMetaMap = xsync.NewMapOf[string, *TunnelMETA]()
@@ -42,9 +41,8 @@ const (
 )
 
 var (
-	STATE     atomic.Pointer[stateV2]
-	CONFIG    atomic.Pointer[configV2]
-	CLIConfig atomic.Pointer[CLIInfo]
+	STATE  atomic.Pointer[stateV2]
+	CONFIG atomic.Pointer[configV2]
 
 	// Tunnels, Servers, Meta
 	TunnelMetaMap *xsync.MapOf[string, *TunnelMETA]
@@ -87,7 +85,6 @@ type CLIInfo struct {
 	Secure     bool
 	Enabled    bool
 	SendStats  bool
-	Hostname   string
 }
 
 type ControlServer struct {
@@ -116,11 +113,20 @@ func (c *ControlServer) GetURL(path string) string {
 	return url
 }
 
+type CLIConfig struct {
+	// Cli specific settings
+	ControlServerID string
+	DeviceID        string
+	ServerID        string
+	SendStats       bool
+}
+
 type configV2 struct {
 	OpenUI bool
 
 	ControlServers    []*ControlServer
 	DisableBlockLists bool
+	CLIConfig         *CLIConfig
 
 	// API Setting
 	APIIP          string
@@ -132,6 +138,7 @@ type configV2 struct {
 	APICertType    certs.CertType
 
 	// Generic
+	DisableDNS        bool
 	LogBlockedDomains bool
 	LogAllDomains     bool
 	DebugLogging      bool
@@ -165,7 +172,8 @@ type stateV2 struct {
 	DefaultInterfaceName atomic.Pointer[string] `json:"-"`
 
 	// Flags
-	Debug bool
+	Debug         bool
+	RequireConfig bool
 
 	// Disk Paths and filenames
 	BlockListPath  string

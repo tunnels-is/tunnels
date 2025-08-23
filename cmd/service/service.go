@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"os"
 	"runtime"
 	"runtime/debug"
 	"time"
@@ -10,7 +11,7 @@ import (
 	"github.com/tunnels-is/tunnels/client"
 )
 
-func Start(minimal bool) {
+func Start() {
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Println(r, string(debug.Stack()))
@@ -18,24 +19,18 @@ func Start(minimal bool) {
 	}()
 
 	runtime.GOMAXPROCS(runtime.NumCPU())
-	var err error
-	if minimal {
-		err = client.InitMinimalService()
-	} else {
-		err = client.InitService()
-	}
+	err := client.InitService()
 	if err != nil {
 		time.Sleep(5 * time.Second)
-		panic(err)
+		fmt.Println("Unable to initialize tunnels:", err)
+		os.Exit(1)
 	}
-	if minimal {
-		client.LaunchMinimalTunnels()
-	} else {
-		client.LaunchTunnels()
-	}
+	client.LaunchTunnels()
 }
 
-func StartWithExternalMonitor(ctx context.Context, minimal bool, id int, monitor chan int) {
+// StartWithExternalMonitor
+// always start this as a goroutine
+func StartWithExternalMonitor(ctx context.Context, minimal bool, id int, monitor chan int) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			client.ERROR(r, string(debug.Stack()))
@@ -49,19 +44,10 @@ func StartWithExternalMonitor(ctx context.Context, minimal bool, id int, monitor
 	}()
 
 	runtime.GOMAXPROCS(runtime.NumCPU())
-	var err error
-	if minimal {
-		err = client.InitMinimalService()
-	} else {
-		err = client.InitService()
-	}
+	err = client.InitService()
 	if err != nil {
-		fmt.Println("Error initializing tunnels service:", err)
 		return
 	}
-	if minimal {
-		client.LaunchMinimalTunnels()
-	} else {
-		client.LaunchTunnels()
-	}
+	client.LaunchTunnels()
+	return
 }

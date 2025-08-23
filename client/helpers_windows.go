@@ -134,32 +134,3 @@ func AdminCheck() {
 	s.adminState = true
 	_ = fd.Close()
 }
-
-func IPv6Enabled() bool {
-	defer RecoverAndLog()
-	state := STATE.Load()
-	ifname := state.DefaultInterfaceName.Load()
-	if ifname == nil {
-		ERROR("No default interface name found!")
-		return true
-	}
-
-	cmd := exec.Command("netsh", "interface", "ipv6", "show", "interface", *ifname)
-	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		if strings.Contains(string(out), "Element not found") {
-			return false
-		}
-		ERROR("Unable to detect IPv6 setting // msg: ", err, " // output: ", string(out), "// IF:", *ifname)
-		return true
-	}
-
-	// windows will inject a bunch of random control characters
-	// but it's always size 24, so if the len(out) is < 30
-	// then ipv6 is disabled on the adapter.
-	if len(out) > 30 {
-		return true
-	}
-	return false
-}

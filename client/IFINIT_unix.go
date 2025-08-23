@@ -340,7 +340,7 @@ func (t *TInterface) Connect(tun *TUN) (err error) {
 	}
 
 	meta := tun.meta.Load()
-	if IsDefaultConnection(meta.IFName) || meta.EnableDefaultRoute {
+	if meta.EnableDefaultRoute {
 		err = IP_AddRoute("default", "", t.IPv4Address, "0")
 		if err != nil {
 			return err
@@ -621,25 +621,6 @@ func RestoreDNSOnClose() {
 
 func RestoreSaneDNSDefaults() {
 	// not implemented for unix
-}
-
-func IPv6Enabled() bool {
-	s := STATE.Load()
-	defIntName := s.DefaultInterfaceName.Load()
-	if defIntName == nil {
-		return false
-	}
-
-	out, err := exec.Command("bash", "-c", "cat /proc/sys/net/ipv6/conf/"+*defIntName+"/disable_ipv6").CombinedOutput()
-	if err != nil {
-		ERROR("Error getting ipv6 settings for interface: ", s.DefaultInterfaceName.Load(), " || msg: ", err, " || output: ", string(out))
-		return true
-	}
-
-	outString := string(out)
-	outString = strings.TrimSpace(outString)
-
-	return outString == "0"
 }
 
 func AdjustRoutersForTunneling() (err error) {

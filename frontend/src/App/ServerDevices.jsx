@@ -41,7 +41,7 @@ const ServerDevices = () => {
 		columns: {
 			Created: true,
 			IP: true,
-			Hostname: true,
+			Token: true,
 			Ports: true,
 			CPU: true,
 			RAM: true,
@@ -58,9 +58,6 @@ const ServerDevices = () => {
 			IP: (obj) => {
 				return obj.DHCP?.IP ? obj.DHCP.IP.join(".") : ""
 			},
-			Hostname: (obj) => {
-				return obj.DHCP?.Hostname ? obj.DHCP.Hostname : ""
-			},
 			Ports: (obj) => {
 				return "" + obj.StartPort + " - " + obj.EndPort
 			},
@@ -76,7 +73,7 @@ const ServerDevices = () => {
 				return "Connected"
 			}
 		},
-		headers: ["Created", "IP", "Hostname", "Ports", "CPU", "RAM", "DISK", "IQ", "EQ"],
+		headers: ["Created", "IP", "Device", "Ports", "CPU", "RAM", "DISK", "IQ", "EQ"],
 		headerClass: {},
 		opts: {
 			RowPerPage: 50,

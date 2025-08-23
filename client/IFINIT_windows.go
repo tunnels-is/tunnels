@@ -687,7 +687,7 @@ func (t *TInterface) Connect(tun *TUN) (err error) {
 	t.exitChannel = make(chan byte, 10)
 	meta := tun.meta.Load()
 
-	if IsDefaultConnection(meta.IFName) || meta.EnableDefaultRoute {
+	if meta.EnableDefaultRoute {
 		// Gateway metric is what determines default
 		// routing on windows. The interface will always
 		// have a default route on creation.

@@ -83,10 +83,8 @@ func createTunnel() (T *TunnelMETA) {
 
 	T.EncryptionType = crypt.CHACHA20
 	T.DNSBlocking = true
-	T.PreventIPv6 = false
 	T.TxQueueLen = 2000
 	T.MTU = 1420
-	T.ServerID = ""
 	T.AutoReconnect = true
 	T.AutoConnect = false
 	T.Networks = make([]*types.Network, 0)
@@ -98,7 +96,7 @@ func createTunnel() (T *TunnelMETA) {
 	return
 }
 
-func createDefaultTunnelMeta(minimal bool) (M *TunnelMETA) {
+func createDefaultTunnelMeta() (M *TunnelMETA) {
 	M = createTunnel()
 	M.RequestVPNPorts = true
 	M.IPv4Address = "172.22.22.1"
@@ -107,13 +105,5 @@ func createDefaultTunnelMeta(minimal bool) (M *TunnelMETA) {
 	M.Tag = DefaultTunnelName
 	M.IFName = DefaultTunnelName
 	M.EnableDefaultRoute = true
-	if minimal {
-		cliConfig := CLIConfig.Load()
-		if cliConfig != nil {
-			M.ServerID = cliConfig.ServerID
-		}
-		M.AutoConnect = false
-		M.PreventIPv6 = false
-	}
 	return
 }

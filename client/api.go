@@ -352,10 +352,7 @@ func InitializeTunnelFromCRR(TUN *TUN) (err error) {
 		TUN.serverVPLIP[1] = TUN.ServerResponse.DHCP.IP[1]
 		TUN.serverVPLIP[2] = TUN.ServerResponse.DHCP.IP[2]
 		TUN.serverVPLIP[3] = TUN.ServerResponse.DHCP.IP[3]
-
 		TUN.dhcp = TUN.ServerResponse.DHCP
-		meta.DHCPToken = TUN.ServerResponse.DHCP.Token
-		_ = writeTunnelsToDisk(meta.Tag)
 	}
 
 	if TUN.ServerResponse.LAN != nil {
@@ -410,10 +407,9 @@ func InitializeTunnelFromCRR(TUN *TUN) (err error) {
 
 	if TUN.ServerResponse.LAN != nil && TUN.ServerResponse.DHCP != nil {
 		DEBUG(fmt.Sprintf(
-			"DHCP/VPL info: Addr(%s) Network:(%s) Token(%s) ",
+			"DHCP/VPL info: Addr(%s) Network:(%s)",
 			TUN.ServerResponse.DHCP.IP,
 			TUN.ServerResponse.LAN.Network,
-			TUN.ServerResponse.DHCP.Token,
 		))
 	}
 
@@ -424,9 +420,6 @@ func PreConnectCheck(meta *TunnelMETA) (int, error) {
 	s := STATE.Load()
 	if !s.adminState {
 		return 400, errors.New("tunnels does not have the correct access permissions")
-	}
-	if meta.PreventIPv6 && IPv6Enabled() {
-		return 400, errors.New("IPV6 enabled, please disable before connecting")
 	}
 	return 0, nil
 }
@@ -465,7 +458,6 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	tunnelMetaMapRange(func(tun *TunnelMETA) bool {
 		if tun.Tag == DefaultTunnelName && ClientCR.Tag == DefaultTunnelName {
 			meta = tun
-			tun.ServerID = ClientCR.ServerID
 			_ = writeTunnelsToDisk(DefaultTunnelName)
 			return false
 		} else if tun.Tag == ClientCR.Tag {
@@ -561,7 +553,6 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	FinalCR.DeviceKey = ClientCR.DeviceKey
 	FinalCR.DeviceToken = ClientCR.DeviceToken
 	FinalCR.EncType = meta.EncryptionType
-	FinalCR.DHCPToken = meta.DHCPToken
 	FinalCR.RequestingPorts = meta.RequestVPNPorts
 	DEBUG("ConnectRequestFromClient", ClientCR)
 
