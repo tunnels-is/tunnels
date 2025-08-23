@@ -387,8 +387,7 @@ export var STATE = {
       STATE.toggleError("unable to create tunnel");
     }
   },
-  // debug: STORE.Cache.GetBool("debug") === true ? true : false,
-  debug: true,
+  debug: STORE.Cache.GetBool("debug") === true ? true : false,
   toggleDebug: () => {
     let debug = STORE.Cache.GetBool("debug");
     if (!debug || debug === false) {
