@@ -364,9 +364,10 @@ func fromUserChannel(index int) {
 					CM.RAM = PACKET[2]
 					CM.Disk = PACKET[3]
 				}
+				INFO("ping from:", index)
 			default:
 				CM.LastPingFromClient = time.Now()
-				INFO("ping from: ", index)
+				INFO("ping from:", index)
 			}
 			continue
 		}
