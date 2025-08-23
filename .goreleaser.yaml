@@ -40,17 +40,6 @@ builds:
     ldflags: '-s -w -X github.com/tunnels-is/tunnels/version.Version={{.Version}} -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}} -X main.builtBy=goreleaser'
     flags: [ '-trimpath' ]
 
-  - id: min
-    goos:
-      - linux
-    goarch:
-      - amd64
-      - arm64
-      - arm
-    main: ./cmd/min
-    ldflags: '-s -w -X github.com/tunnels-is/tunnels/version.Version={{.Version}} -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}} -X main.builtBy=goreleaser'
-    flags: [ '-trimpath' ]
-
 dist: ./builds
 
 archives:
@@ -78,19 +67,6 @@ archives:
     formats: [tar.gz]
     name_template: >-
       server_
-      {{- title .Version }}_
-      {{- title .Os }}_
-      {{- if eq .Arch "amd64" }}x86_64
-      {{- else if eq .Arch "386" }}i386
-      {{- else }}{{ .Arch }}{{ end }}
-      {{- if .Arm }}v{{ .Arm }}{{ end }}
-    allow_different_binary_count: true
-
-  - id: a3
-    ids: [min]
-    formats: [tar.gz]
-    name_template: >-
-      min_
       {{- title .Version }}_
       {{- title .Os }}_
       {{- if eq .Arch "amd64" }}x86_64
