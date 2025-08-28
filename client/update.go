@@ -260,12 +260,10 @@ func replaceCurrentVersion() (err error) {
 	}
 
 	if conf.RestartPostUpdate {
-		fmt.Println("Post update restart..")
 		argv0, _ := exec.LookPath(os.Args[0])
 		syscall.Exec(argv0, os.Args, os.Environ())
 		os.Exit(1)
 	} else if conf.ExitPostUpdate {
-		fmt.Println("Update finished, exiting..")
 		os.Exit(1)
 	}
 
@@ -514,7 +512,6 @@ unziploop:
 
 		switch header.Typeflag {
 		case tar.TypeReg:
-			fmt.Println("ZIP:", header.Name)
 			if !strings.Contains(strings.ToLower(header.Name), "tunnels") {
 				continue unziploop
 			}
