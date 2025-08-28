@@ -63,8 +63,8 @@ func CreateClientCoreMapping(CRR *types.ServerConnectResponse, CR *types.Control
 			}
 			clientCoreMappings[i].EH = EH
 			clientCoreMappings[i].Created = time.Now()
-			clientCoreMappings[i].ToUser = make(chan []byte, 3_000_000)
-			clientCoreMappings[i].FromUser = make(chan Packet, 3_000_000)
+			clientCoreMappings[i].ToUser = make(chan []byte, 500_000)
+			clientCoreMappings[i].FromUser = make(chan Packet, 500_000)
 			clientCoreMappings[i].LastPingFromClient = time.Now()
 			clientCoreMappings[i].Uindex = make([]byte, 2)
 			binary.BigEndian.PutUint16(clientCoreMappings[i].Uindex, uint16(index))
@@ -210,6 +210,7 @@ func ExternalUDPListener() {
 	var n int
 	var version byte
 	buffer := make([]byte, math.MaxUint16)
+	// cfg := Config.Load()
 
 	for {
 		n, _, err = syscall.Recvfrom(rawUDPSockFD, buffer, 0)
@@ -226,6 +227,9 @@ func ExternalUDPListener() {
 		// TODO .. use mask
 		IHL = ((buffer[0] << 4) >> 4) * 4
 		DSTP = binary.BigEndian.Uint16(buffer[IHL+2 : IHL+4])
+		// if DSTP < uint16(cfg.StartPort) {
+		// 	continue
+		// }
 		PM = portToCoreMapping[DSTP]
 		if PM == nil || PM.Client == nil {
 			continue
@@ -291,6 +295,8 @@ func DataSocketListener() {
 				addr: addr,
 				data: CopySlice(buff[:n]),
 			}
+		} else {
+			WARN("no index found:", id, addr)
 		}
 	}
 }
@@ -359,12 +365,13 @@ func fromUserChannel(index int) {
 				if CM.DHCP != nil {
 					CM.DHCP.Activity = time.Now()
 				}
-				if len(PACKET) > 4 {
+				if len(PACKET) > 11 {
 					CM.CPU = PACKET[1]
 					CM.RAM = PACKET[2]
 					CM.Disk = PACKET[3]
+					CM.PingInt.Store(int64(binary.BigEndian.Uint64(PACKET[4:])))
 				}
-				INFO("ping from:", index)
+				INFO("ping from:", index, " count:", CM.PingInt.Load())
 			default:
 				CM.LastPingFromClient = time.Now()
 				INFO("ping from:", index)
@@ -389,7 +396,8 @@ func fromUserChannel(index int) {
 			targetCM = VPLIPToCore[D4[0]][D4[1]][D4[2]][D4[3]]
 			if targetCM == nil {
 				CM.DelHost(D4, "auto")
-				return
+				WARN("No target CM:", D4)
+				continue
 			}
 
 			if RST > 0 {
@@ -495,6 +503,7 @@ func toUserChannel(index int) {
 		}
 
 		if PACKET[9] != 6 && PACKET[9] != 17 {
+			WARN("invalid packet, index:", 7)
 			continue
 		}
 
@@ -525,6 +534,7 @@ func toUserChannel(index int) {
 
 				host := CM.IsHostAllowed(S4, S4Port)
 				if host == nil {
+					WARN("Unauthorized access:", index, S4)
 					continue
 				}
 				if RST > 0 {

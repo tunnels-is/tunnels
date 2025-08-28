@@ -65,14 +65,18 @@ func InitService() error {
 		}
 		_ = loadConfigFromDisk(true)
 	}
-
 	conf := CONFIG.Load()
+
+	if conf.AutoDownloadUpdate {
+		doStartupUpdate()
+	}
+
 	loadTunnelsFromDisk()
 	loadDefaultGateway()
 	loadDefaultInterface()
 
 	if conf.CLIConfig != nil {
-		DEBUG("CLI CONFIG DETECTED")
+		DEBUG("cli config loaded")
 		wasChanged := false
 		if conf.OpenUI {
 			conf.OpenUI = false
@@ -179,6 +183,10 @@ func LaunchTunnels() {
 
 	newConcurrentSignal("Pinger", CancelContext, func() {
 		PingConnections()
+	})
+
+	newConcurrentSignal("Updater", CancelContext, func() {
+		doUpdate()
 	})
 
 mainLoop:
@@ -343,6 +351,8 @@ func writeTunnelsToDisk(tag string) (outErr error) {
 			outErr = err
 			return false
 		}
+		tf.Sync()
+		tf.Close()
 
 		return true
 	})
@@ -394,15 +404,9 @@ func loadTunnelsFromDisk() (err error) {
 	}
 
 	if !foundDefault {
-		state := STATE.Load()
-		if !state.RequireConfig {
-			newTun := createDefaultTunnelMeta()
-			TunnelMetaMap.Store(newTun.Tag, newTun)
-			_ = writeTunnelsToDisk(newTun.Tag)
-		} else {
-			ERROR("unable to find default tunnel: ", err)
-			return fmt.Errorf("unable to find default tunnel: %s", err)
-		}
+		newTun := createDefaultTunnelMeta()
+		TunnelMetaMap.Store(newTun.Tag, newTun)
+		_ = writeTunnelsToDisk(newTun.Tag)
 	}
 	return nil
 }
@@ -410,20 +414,24 @@ func loadTunnelsFromDisk() (err error) {
 // DefaultConfig returns a new configV2 with default values
 func DefaultConfig() *configV2 {
 	conf := &configV2{
-		DebugLogging:      true,
-		InfoLogging:       true,
-		ErrorLogging:      true,
-		ConnectionTracer:  false,
-		DNSServerIP:       "127.0.0.1",
-		DNSServerPort:     "53",
-		DNS1Default:       "1.1.1.1",
-		DNS2Default:       "8.8.8.8",
-		LogBlockedDomains: true,
-		LogAllDomains:     true,
-		DNSstats:          true,
-		DNSBlockLists:     GetDefaultBlockLists(),
-		APIIP:             "127.0.0.1",
-		APIPort:           "7777",
+		DebugLogging:         true,
+		InfoLogging:          true,
+		ErrorLogging:         true,
+		ConnectionTracer:     false,
+		DNSServerIP:          "127.0.0.1",
+		DNSServerPort:        "53",
+		DNS1Default:          "1.1.1.1",
+		DNS2Default:          "8.8.8.8",
+		LogBlockedDomains:    true,
+		LogAllDomains:        true,
+		DNSstats:             true,
+		DNSBlockLists:        GetDefaultBlockLists(),
+		APIIP:                "127.0.0.1",
+		APIPort:              "7777",
+		RestartPostUpdate:    true,
+		ExitPostUpdate:       false,
+		AutoDownloadUpdate:   true,
+		UpdateWhileConnected: false,
 	}
 	conf.ControlServers = append(conf.ControlServers, &ControlServer{
 		ID:                  "tunnels",

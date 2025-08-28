@@ -2,6 +2,7 @@ package client
 
 import (
 	"bytes"
+	"encoding/binary"
 	"net"
 	"strings"
 	"time"
@@ -78,7 +79,10 @@ func AutoConnect() {
 	})
 }
 
-var PingPongStatsBuffer = []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+var PingPongStatsBuffer = []byte{
+	0, 0, 0, 0, // stats
+	0, 0, 0, 0, 0, 0, 0, 0, // ping counter
+}
 
 func PopulatePingBufferWithStats() {
 	cpuPercent, err := cpu.Percent(0, false)
@@ -126,10 +130,13 @@ func PingConnections() {
 
 		var err error
 		if tun.encWrapper != nil {
+
+			tun.PingInt.Add(1)
+			binary.BigEndian.PutUint64(PingPongStatsBuffer[4:], uint64(tun.PingInt.Load()))
 			out := tun.encWrapper.SEAL.Seal1(PingPongStatsBuffer, tun.Index)
 			if len(out) > 0 {
-				DEEP("Ping:", meta.Tag)
-				_, err = tun.connection.Write(out)
+				DEEP("Ping: ", meta.Tag, " ", tun.PingInt.Load())
+				_, err = tun.connection.Write(CopySlice(out))
 				if err != nil {
 					ERROR("unable to ping tunnel: ", tun.ID, meta.Tag)
 				}
