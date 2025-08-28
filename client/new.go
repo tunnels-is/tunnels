@@ -115,10 +115,12 @@ func (c *ControlServer) GetURL(path string) string {
 
 type CLIConfig struct {
 	// Cli specific settings
-	ControlServerID string
-	DeviceID        string
-	ServerID        string
-	SendStats       bool
+	ControlServerID  string
+	DeviceID         string
+	ServerID         string
+	SendStats        bool
+	PinVersion       bool
+	SkipUpdatePrompt bool
 }
 
 type configV2 struct {
@@ -127,6 +129,13 @@ type configV2 struct {
 	ControlServers    []*ControlServer
 	DisableBlockLists bool
 	CLIConfig         *CLIConfig
+
+	// Updating
+	AutoDownloadUpdate   bool
+	ExitPostUpdate       bool
+	RestartPostUpdate    bool
+	UpdateWhileConnected bool
+	UpdateCheckInterval  int
 
 	// API Setting
 	APIIP          string
@@ -174,6 +183,7 @@ type stateV2 struct {
 	// Flags
 	Debug         bool
 	RequireConfig bool
+	TunnelType    string
 
 	// Disk Paths and filenames
 	BlockListPath  string
@@ -289,13 +299,11 @@ type TUN struct {
 	// encWrapper wraps connection with encryption
 	encWrapper *crypt.SocketWrapper
 	connection net.Conn
-	// ServerCertBytes []byte `json:"-"`
 
 	// Connection Requests + Response
 	CR             *ConnectionRequest
 	ServerResponse *types.ServerConnectResponse
 
-	// NEW MAPPING STUFF
 	pingTime                atomic.Pointer[time.Time]
 	localInterfaceNetIP     net.IP
 	localDNSClient          *dns.Client
@@ -305,19 +313,18 @@ type TUN struct {
 	startPort               uint16
 	endPort                 uint16
 
-	// Network Natting
 	NATEgress  map[[4]byte][4]byte `json:"-"`
 	NATIngress map[[4]byte][4]byte `json:"-"`
 
-	// Nonce ?
 	Nonce2Bytes []byte
 
-	// VPL
 	serverVPLIP [4]byte
 	dhcp        *types.DHCPRecord
 	VPLNetwork  *types.Network
 	VPLEgress   map[[4]byte]struct{} `json:"-"`
-	VPLIngress  map[[4]byte]struct{} `json:"-"` // TCP and UDP Natting
+	VPLIngress  map[[4]byte]struct{} `json:"-"`
+
+	// TCP and UDP Natting
 	// ingress
 	// index == local port number
 	// lport/dip/dp
@@ -337,6 +344,7 @@ type TUN struct {
 	ingressBytes atomic.Int64
 
 	// Server States
+	PingInt             atomic.Int64
 	CPU                 byte
 	DISK                byte
 	MEM                 byte

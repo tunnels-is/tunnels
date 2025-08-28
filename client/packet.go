@@ -23,9 +23,22 @@ func (t *TUN) RegisterPing(tag string, packet []byte) {
 	t.MEM = packet[1]
 	t.DISK = packet[2]
 	if len(packet) > 10 {
-		t.ServerToClientMicro.Store(time.Since(time.Unix(0, int64(binary.BigEndian.Uint64(packet[3:])))).Microseconds())
+		t.ServerToClientMicro.Store(time.Since(time.Unix(0, int64(binary.BigEndian.Uint64(packet[3:11])))).Microseconds())
+		DEEP(fmt.Sprintf("ping from server (%s) cpu(%d) mem(%d) disk(%d) micro(%d) count(%d)", tag, t.CPU, t.MEM, t.DISK, t.ServerToClientMicro.Load(), t.PingInt.Load()))
+
+		count := int64(binary.BigEndian.Uint64(packet[11:]))
+		localCount := t.PingInt.Load()
+		if localCount > (count + 20) {
+			ERROR("Ping count of of balance local:", localCount, "server:", count, "server_max:", count+20)
+			meta := t.meta.Load()
+			if meta.AutoConnect {
+				_ = Disconnect(t.ID, false)
+				_, _ = PublicConnect(t.CR)
+			} else {
+				_ = Disconnect(t.ID, false)
+			}
+		}
 	}
-	DEEP(fmt.Sprintf("ping from server (%s) cpu(%d) mem(%d) disk(%d) micro(%d)", tag, t.CPU, t.MEM, t.DISK, t.ServerToClientMicro.Load()))
 }
 
 func debugProcessPacket(packet []byte) (P *packetDebugOut) {

@@ -20,11 +20,29 @@ const (
 	BBOLT Feature = "BBOLT"
 )
 
+type TunnelType string
+
+const (
+	StrictTun  TunnelType = "default" // not yet implemented
+	DefaultTun TunnelType = "strict"
+	IoTTun     TunnelType = "iot"
+)
+
+var Uptime = time.Now()
+
+type HealthResponse struct {
+	ServerVersion string
+	ClientVersion string
+	Uptime        time.Time
+}
+
 type ServerConfig struct {
 	Features           []Feature `json:"Features"`
 	PingTimeoutMinutes int       `json:"PingTimeoutMinutes"`
 	DHCPTimeoutHours   int       `json:"DHCPTimeoutHours"`
 	LogAPIHosts        bool      `json:"LogAPIHosts"`
+
+	ClientVersion string `json:"ClientVersion"`
 
 	VPNIP   string `json:"VPNIP"`
 	VPNPort string `json:"VPNPort"`

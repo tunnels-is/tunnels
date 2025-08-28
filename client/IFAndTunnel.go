@@ -104,6 +104,19 @@ func createDefaultTunnelMeta() (M *TunnelMETA) {
 
 	M.Tag = DefaultTunnelName
 	M.IFName = DefaultTunnelName
-	M.EnableDefaultRoute = true
+
+	state := STATE.Load()
+	switch types.TunnelType(state.TunnelType) {
+	case types.DefaultTun:
+		M.EnableDefaultRoute = true
+	case types.IoTTun:
+		M.EnableDefaultRoute = false
+		M.RequestVPNPorts = false
+		M.LocalhostNat = true
+		M.AutoConnect = true
+		M.AutoReconnect = true
+		M.MTU = 1320 // MTU is set low here due to many 5g networs. The LAN tunnels is mostly used to IoT.
+	}
+
 	return
 }

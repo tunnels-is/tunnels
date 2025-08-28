@@ -8,6 +8,9 @@ import (
 	"log/slog"
 	"net/http"
 	"time"
+
+	"github.com/tunnels-is/tunnels/types"
+	"github.com/tunnels-is/tunnels/version"
 )
 
 func launchAPIServer() {
@@ -105,15 +108,21 @@ func launchAPIServer() {
 	}
 }
 
-// healthCheckHandler responds with a simple OK status for health checks.
 func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
 		return
 	}
-	w.Header().Set("Content-Type", "text/plain")
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	_, _ = fmt.Fprintln(w, "OK")
+	rs := new(types.HealthResponse)
+	rs.ServerVersion = version.Version
+	cfg := Config.Load()
+	rs.ClientVersion = cfg.ClientVersion
+	rs.Uptime = types.Uptime
+	enc := json.NewEncoder(w)
+	enc.Encode(rs)
+	return
 }
 
 func loggingTimingMiddleware(next http.Handler) http.Handler {
