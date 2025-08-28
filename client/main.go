@@ -68,7 +68,10 @@ func InitService() error {
 	conf := CONFIG.Load()
 
 	if conf.AutoDownloadUpdate {
-		doStartupUpdate()
+		didUpdate := doStartupUpdate()
+		if didUpdate {
+			os.Exit(1)
+		}
 	}
 
 	loadTunnelsFromDisk()
@@ -428,10 +431,11 @@ func DefaultConfig() *configV2 {
 		DNSBlockLists:        GetDefaultBlockLists(),
 		APIIP:                "127.0.0.1",
 		APIPort:              "7777",
-		RestartPostUpdate:    true,
+		RestartPostUpdate:    false,
 		ExitPostUpdate:       false,
 		AutoDownloadUpdate:   true,
 		UpdateWhileConnected: false,
+		DisableUpdates:       true,
 	}
 	conf.ControlServers = append(conf.ControlServers, &ControlServer{
 		ID:                  "tunnels",

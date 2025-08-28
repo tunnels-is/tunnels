@@ -136,6 +136,7 @@ type configV2 struct {
 	RestartPostUpdate    bool
 	UpdateWhileConnected bool
 	UpdateCheckInterval  int
+	DisableUpdates       bool
 
 	// API Setting
 	APIIP          string
