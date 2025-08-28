@@ -53,9 +53,7 @@ archives:
       tunnels_
       {{- title .Version}}_
       {{- title .Os }}_
-      {{- if eq .Arch "amd64" }}x86_64
-      {{- else if eq .Arch "386" }}i386
-      {{- else }}{{ .Arch }}{{ end }}
+      {{ .Arch }}
       {{- if .Arm }}v{{ .Arm }}{{ end }}
     allow_different_binary_count: true
     format_overrides:
@@ -69,9 +67,7 @@ archives:
       server_
       {{- title .Version }}_
       {{- title .Os }}_
-      {{- if eq .Arch "amd64" }}x86_64
-      {{- else if eq .Arch "386" }}i386
-      {{- else }}{{ .Arch }}{{ end }}
+      {{ .Arch }}
       {{- if .Arm }}v{{ .Arm }}{{ end }}
     allow_different_binary_count: true
 
