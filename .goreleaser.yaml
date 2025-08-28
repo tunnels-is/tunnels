@@ -52,9 +52,8 @@ archives:
     name_template: >-
       tunnels_
       {{- title .Version}}_
-      {{- title .Os }}_
-      {{ .Arch }}
-      {{- if .Arm }}v{{ .Arm }}{{ end }}
+      {{- title .Os}}_
+      {{- .Arch }}
     allow_different_binary_count: true
     format_overrides:
       - goos: windows
@@ -65,10 +64,9 @@ archives:
     formats: [tar.gz]
     name_template: >-
       server_
-      {{- title .Version }}_
-      {{- title .Os }}_
-      {{ .Arch }}
-      {{- if .Arm }}v{{ .Arm }}{{ end }}
+      {{- title .Version}}_
+      {{- title .Os}}_
+      {{- .Arch}}
     allow_different_binary_count: true
 
 release:
