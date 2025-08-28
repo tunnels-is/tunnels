@@ -4,6 +4,7 @@ import (
 	"io"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -27,6 +28,7 @@ type PortRange struct {
 }
 type UserCoreMapping struct {
 	ID                 string
+	PingInt            atomic.Int64
 	DeviceToken        string
 	Version            int
 	PortRange          *PortRange

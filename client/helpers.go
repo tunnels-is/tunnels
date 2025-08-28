@@ -60,6 +60,7 @@ func InitBaseFoldersAndPaths() {
 
 	s.BlockListPath = s.BasePath + "blocklists" + string(os.PathSeparator)
 	CreateFolder(s.BlockListPath)
+	STATE.Store(s)
 }
 
 func RenameFile(oldName, newName string) (err error) {

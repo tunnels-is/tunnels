@@ -10,7 +10,11 @@ import (
 	"github.com/shirou/gopsutil/mem"
 )
 
-var PingPongStatsBuffer = []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+var PingPongStatsBuffer = []byte{
+	0, 0, 0, // stats
+	0, 0, 0, 0, 0, 0, 0, 0, // timestamp
+	0, 0, 0, 0, 0, 0, 0, 0, // ping counter
+}
 
 func PopulatePingBufferWithStats() {
 	cpuPercent, err := cpu.Percent(0, false)
@@ -51,14 +55,15 @@ func NukeClient(index int) {
 			}
 
 			if v.StartPort == cm.PortRange.StartPort {
+				WARN("removing port range:", v.StartPort)
 				portToCoreMapping[i].Client = nil
 			}
 		}
 	}
 
 	if clientCoreMappings[index].DHCP != nil {
-		ip := clientCoreMappings[index].DHCP.IP
-		VPLIPToCore[ip[0]][ip[1]][ip[2]][ip[3]] = nil
+		// ip := clientCoreMappings[index].DHCP.IP
+		// VPLIPToCore[ip[0]][ip[1]][ip[2]][ip[3]] = nil
 	}
 
 	close(clientCoreMappings[index].ToUser)
@@ -79,7 +84,8 @@ func pingActiveUsers() {
 			continue
 		}
 
-		binary.BigEndian.PutUint64(PingPongStatsBuffer[3:], uint64(time.Now().UnixNano()))
+		binary.BigEndian.PutUint64(PingPongStatsBuffer[11:], uint64(clientCoreMappings[index].PingInt.Load()))
+		binary.BigEndian.PutUint64(PingPongStatsBuffer[3:11], uint64(time.Now().UnixNano()))
 		out := u.EH.SEAL.Seal2(PingPongStatsBuffer, u.Uindex)
 		err := syscall.Sendto(dataSocketFD, out, 0, u.Addr)
 		if err != nil {
