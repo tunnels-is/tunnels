@@ -56,8 +56,8 @@ func skipUpdatePrompt() (pinned bool) {
 }
 
 func doUpdate() {
+	conf := CONFIG.Load()
 	defer func() {
-		conf := CONFIG.Load()
 		// never allow 0 update interval
 		if conf.UpdateCheckInterval == 0 {
 			conf.UpdateCheckInterval = 1440
@@ -66,10 +66,29 @@ func doUpdate() {
 	}()
 	defer RecoverAndLog()
 
+	if !conf.UpdateWhileConnected {
+		isConnected := false
+		tunnelMapRange(func(tun *TUN) bool {
+			if tun.connection != nil {
+				isConnected = true
+			}
+			return true
+		})
+		if isConnected {
+			return
+		}
+	}
+
+	if conf.DisableUpdates {
+		return
+	}
+
 	if runtime.GOOS == "darwin" || runtime.GOOS == "windows" {
 		return
 	}
+
 	isPinned := isPinned()
+	var shouldUpdate bool
 
 	var err error
 	if isPinned {
@@ -79,17 +98,21 @@ func doUpdate() {
 			return
 		}
 		DEBUG("downloading pinned version:", version)
-		err = downloadUpdate(version)
+		shouldUpdate, err = checkForAndDownloadUpdate(version)
 	} else {
 		DEBUG("downloading latest version")
-		err = downloadUpdate("")
+		shouldUpdate, err = checkForAndDownloadUpdate("")
+	}
+
+	if !shouldUpdate {
+		return
 	}
 
 	if err == nil {
-		DEBUG("performing in-place update")
+		DEBUG("launching update process")
 		err = replaceCurrentVersion()
 		if err != nil {
-			ERROR("error while performing in-place update:", err)
+			ERROR("error while performing update:", err)
 		}
 		err = cleanupUpdateFiles()
 		if err != nil {
@@ -97,31 +120,42 @@ func doUpdate() {
 		}
 		return
 	}
+
+	INFO("update finished")
 }
 
-func doStartupUpdate() {
+func doStartupUpdate() (didUpdate bool) {
 	if runtime.GOOS == "darwin" || runtime.GOOS == "windows" {
-		return
+		return false
+	}
+
+	conf := CONFIG.Load()
+	if conf.DisableUpdates {
+		return false
 	}
 
 	isPinned := isPinned()
 	var err error
+	var shouldUpdate bool
 
-	updatePrint("Downloading update..")
+	updatePrint("Starting updater")
 	if isPinned {
 		version, verr := getPinnedVersion()
 		if verr != nil {
 			err = verr
 		} else {
 			updatePrint("Pinned version from server:", version)
-			err = downloadUpdate(version)
+			shouldUpdate, err = checkForAndDownloadUpdate(version)
 		}
 	} else {
-		err = downloadUpdate("")
+		shouldUpdate, err = checkForAndDownloadUpdate("")
 	}
 
-	var shouldUpdate bool
-	if err != nil && !skipUpdatePrompt() {
+	if !shouldUpdate {
+		return false
+	}
+
+	if err == nil && !skipUpdatePrompt() {
 		shouldUpdate = yesNoPrompt("Update tunnels now ?")
 	}
 
@@ -129,54 +163,58 @@ func doStartupUpdate() {
 		err = replaceCurrentVersion()
 		if err != nil {
 			updatePrint("Unable to replace current version with new tunnels version:", err)
+			return false
 		}
 		err = cleanupUpdateFiles()
 		if err != nil {
 			updatePrint("cleaning up files post update", err)
+			return false
 		}
-		return
+		updatePrint("update finished")
+		return true
 	}
 
 	updatePrint("Unable to update:", err)
+	return false
 }
 
-func downloadUpdate(targetTag string) error {
+func checkForAndDownloadUpdate(targetTag string) (shouldUpdate bool, err error) {
 	if targetTag != "" && targetTag == version.Version {
-		return nil
+		return false, nil
 	}
 
 	url, tag, _, err := getReleaseInfo(targetTag)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	versionNumber := strings.ReplaceAll(tag, "v", "")
 	if versionNumber == version.Version {
-		return nil
+		return false, nil
 	}
 
 	expectedSum, err := getExpectedChecksum(tag)
 	if err != nil {
-		return fmt.Errorf("unable to get expecetd sha sum from source: %s", err)
+		return false, fmt.Errorf("unable to get expecetd sha sum from source: %s", err)
 	}
 
 	err = compareLocalArchiveToExpectedShaSum(expectedSum)
 	if err != nil {
 		assetResp, err := http.Get(url)
 		if err != nil {
-			return fmt.Errorf("failed to download asset: %w", err)
+			return false, fmt.Errorf("failed to download asset: %w", err)
 		}
 		defer assetResp.Body.Close()
 
 		if assetResp.StatusCode != http.StatusOK {
-			return fmt.Errorf("failed to download asset: received status code %d", assetResp.StatusCode)
+			return false, fmt.Errorf("failed to download asset: received status code %d", assetResp.StatusCode)
 		}
 
 		state := STATE.Load()
 		_ = os.Remove(state.BasePath + archive)
 		out, err := os.Create(state.BasePath + archive)
 		if err != nil {
-			return fmt.Errorf("failed to create output file: %w", err)
+			return false, fmt.Errorf("failed to create output file: %w", err)
 		}
 		defer out.Close()
 
@@ -185,17 +223,17 @@ func downloadUpdate(targetTag string) error {
 		reader := io.TeeReader(assetResp.Body, progress)
 		_, err = io.Copy(out, reader)
 		if err != nil {
-			return fmt.Errorf("failed to write update to file: %w", err)
+			return false, fmt.Errorf("failed to write update to file: %w", err)
 		}
 		out.Sync()
 	}
 
 	err = compareLocalArchiveToExpectedShaSum(expectedSum)
 	if err != nil {
-		return err
+		return false, err
 	}
 
-	return nil
+	return true, nil
 }
 
 func compareLocalArchiveToExpectedShaSum(remoteSum string) (err error) {
@@ -226,9 +264,6 @@ func cleanupUpdateFiles() (err error) {
 
 func replaceCurrentVersion() (err error) {
 	conf := CONFIG.Load()
-	if !conf.ExitPostUpdate && !conf.RestartPostUpdate {
-		return
-	}
 
 	ex, err := os.Executable()
 	if err != nil {
@@ -236,11 +271,7 @@ func replaceCurrentVersion() (err error) {
 	}
 	state := STATE.Load()
 	_ = os.Remove(ex + nextVersionSuffix)
-	if runtime.GOOS == "windows" {
-		// TODO...
-	} else {
-		err = untarGz(state.BasePath+archive, ex+nextVersionSuffix)
-	}
+	err = untarGz(state.BasePath+archive, ex+nextVersionSuffix)
 	if err != nil {
 		return err
 	}
@@ -339,13 +370,10 @@ func getReleaseInfo(targetTag string) (url, tag, hash string, err error) {
 		if r.Draft || r.Prerelease {
 			continue
 		}
-		if time.Since(r.PublishedAt).Hours() < 24 {
-			continue
-		}
 		return v.BrowserDownloadURL, r.TagName, v.Digest, nil
 	}
 
-	return "", "", "", fmt.Errorf("no release found for os( %s ) arch( %s ) version( %s )", runtime.GOOS, runtime.GOARCH, tag)
+	return "", "", "", fmt.Errorf("no release found for os( %s ) arch( %s ) version( %s )", runtime.GOOS, runtime.GOARCH, targetTag)
 }
 
 type Release struct {
