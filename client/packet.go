@@ -6,15 +6,6 @@ import (
 	"time"
 )
 
-type packetDebugOut struct {
-	Version byte
-	Proto   byte
-	SrcIP   []byte
-	DstIP   []byte
-	Flags   byte
-	TCPH    []byte
-}
-
 func (t *TUN) RegisterPing(tag string, packet []byte) {
 	t.registerPing(time.Now())
 
@@ -39,23 +30,6 @@ func (t *TUN) RegisterPing(tag string, packet []byte) {
 			}
 		}
 	}
-}
-
-func debugProcessPacket(packet []byte) (P *packetDebugOut) {
-	defer RecoverAndLog()
-	P = new(packetDebugOut)
-	P.Version = packet[0] >> 4
-	P.Proto = packet[9]
-	P.SrcIP = append(P.DstIP, packet[12:16]...)
-	P.DstIP = append(P.DstIP, packet[16:20]...)
-	il := (packet[0] << 4 >> 4) * 4
-	P.TCPH = packet[il:]
-	if len(P.TCPH) > 13 {
-		P.Flags = P.TCPH[13]
-	} else {
-		P.Flags = 0
-	}
-	return
 }
 
 func (V *TUN) ProcessEgressPacket(p *[]byte) (sendRemote bool) {
@@ -236,10 +210,11 @@ func RecalculateIPv4HeaderChecksum(bytes []byte) {
 
 func RecalculateTransportChecksum(IPv4Header []byte, TPPacket []byte) {
 	// wipe the old checksum before calculating
-	if IPv4Header[9] == 6 {
+	switch IPv4Header[9] {
+	case 6:
 		TPPacket[16] = 0
 		TPPacket[17] = 0
-	} else if IPv4Header[9] == 17 {
+	case 17:
 		TPPacket[6] = 0
 		TPPacket[7] = 0
 	}
@@ -267,9 +242,10 @@ func RecalculateTransportChecksum(IPv4Header []byte, TPPacket []byte) {
 		csum = (csum >> 16) + (csum & 0xffff)
 	}
 
-	if IPv4Header[9] == 6 {
+	switch IPv4Header[9] {
+	case 6:
 		binary.BigEndian.PutUint16(TPPacket[16:18], ^uint16(csum))
-	} else if IPv4Header[9] == 17 {
+	case 17:
 		binary.BigEndian.PutUint16(TPPacket[6:8], ^uint16(csum))
 	}
 }

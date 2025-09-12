@@ -271,10 +271,6 @@ func (t *TUN) MarshalJSON() ([]byte, error) {
 	})
 }
 
-type mapwrap struct {
-	atomic.Pointer[Mapping]
-}
-
 type Mapping struct {
 	Proto    byte
 	rstFound atomic.Bool
