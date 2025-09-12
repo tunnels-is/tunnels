@@ -407,7 +407,8 @@ func loadTunnelsFromDisk() (err error) {
 	}
 
 	if !foundDefault {
-		newTun := createDefaultTunnelMeta()
+		state := STATE.Load()
+		newTun := createDefaultTunnelMeta(types.TunnelType(state.TunnelType))
 		TunnelMetaMap.Store(newTun.Tag, newTun)
 		_ = writeTunnelsToDisk(newTun.Tag)
 	}

@@ -219,10 +219,6 @@ func main() {
 		}
 	}
 
-	if DNSEnabled {
-		// TODO: in development
-	}
-
 	if LANEnabled || VPNEnabled {
 		if LANEnabled {
 			err = initializeLAN()
@@ -419,7 +415,7 @@ func GeneratePortAllocation() (err error) {
 
 	for range slots {
 		PR := new(PortRange)
-		PR.StartPort = uint16(currentPort)
+		PR.StartPort = currentPort
 		PR.EndPort = PR.StartPort + uint16(portPerUser)
 
 		for i := PR.StartPort; i <= PR.EndPort; i++ {
@@ -501,7 +497,7 @@ func makeConfigAndCerts() {
 			SecretStore:        "config",
 			// secrets
 			DBurl:        "mongodb://127.0.0.1:27017",
-			AdminApiKey:  uuid.NewString(),
+			AdminAPIKey:  uuid.NewString(),
 			TwoFactorKey: strings.ReplaceAll(uuid.NewString(), "-", ""),
 			EmailKey:     "",
 			CertPem:      "./cert.pem",

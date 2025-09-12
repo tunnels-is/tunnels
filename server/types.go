@@ -109,7 +109,6 @@ func (u *UserCoreMapping) SetFin(host [4]byte, port [2]byte, fromUser bool) {
 			break
 		}
 	}
-	return
 }
 
 func (u *UserCoreMapping) AddHost(host [4]byte, port [2]byte, t string) {
@@ -428,7 +427,6 @@ func (u *User) RemoveSensitiveInformation() {
 	u.ConfirmCode = ""
 	u.RecoveryCodes = nil
 	u.TwoFactorCode = nil
-	return
 }
 
 type DeviceToken struct {
