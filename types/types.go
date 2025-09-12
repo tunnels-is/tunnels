@@ -23,8 +23,8 @@ const (
 type TunnelType string
 
 const (
-	StrictTun  TunnelType = "default" // not yet implemented
-	DefaultTun TunnelType = "strict"
+	StrictTun  TunnelType = "strict" // not yet implemented
+	DefaultTun TunnelType = "default"
 	IoTTun     TunnelType = "iot"
 )
 
@@ -72,7 +72,7 @@ type ServerConfig struct {
 
 	SecretStore SecretStore `json:"SecretStore"`
 	// If SecretStore set to "config"
-	AdminApiKey  string
+	AdminAPIKey  string
 	DBurl        string
 	TwoFactorKey string
 	EmailKey     string

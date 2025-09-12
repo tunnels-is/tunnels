@@ -96,7 +96,7 @@ func createTunnel() (T *TunnelMETA) {
 	return
 }
 
-func createDefaultTunnelMeta() (M *TunnelMETA) {
+func createDefaultTunnelMeta(t types.TunnelType) (M *TunnelMETA) {
 	M = createTunnel()
 	M.RequestVPNPorts = true
 	M.IPv4Address = "172.22.22.1"
@@ -105,8 +105,7 @@ func createDefaultTunnelMeta() (M *TunnelMETA) {
 	M.Tag = DefaultTunnelName
 	M.IFName = DefaultTunnelName
 
-	state := STATE.Load()
-	switch types.TunnelType(state.TunnelType) {
+	switch t {
 	case types.DefaultTun:
 		M.EnableDefaultRoute = true
 	case types.IoTTun:

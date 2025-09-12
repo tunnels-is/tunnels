@@ -122,7 +122,6 @@ func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
 	rs.Uptime = types.Uptime
 	enc := json.NewEncoder(w)
 	enc.Encode(rs)
-	return
 }
 
 func loggingTimingMiddleware(next http.Handler) http.Handler {
@@ -185,7 +184,7 @@ func senderr(w http.ResponseWriter, code int, msg string, slogArgs ...any) {
 func HTTP_validateKey(r *http.Request) (ok bool) {
 	key := r.Header.Get("X-API-KEY")
 	Config := Config.Load()
-	if key != Config.AdminApiKey || Config.AdminApiKey == "" {
+	if key != Config.AdminAPIKey || Config.AdminAPIKey == "" {
 		return false
 	}
 	return true

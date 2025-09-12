@@ -9,12 +9,6 @@ import (
 	"github.com/puzpuzpuz/xsync/v3"
 )
 
-var (
-	// STREAM_DEBUG    = false
-	streamDebugChan = make(chan Mapping, 1000)
-	noMappingChan   = make(chan []byte, 1000)
-)
-
 func (V *TUN) CreateNEWPortMapping(p *[]byte) (m *Mapping) {
 	packet := *p
 	EID := [12]byte{
@@ -108,36 +102,6 @@ func (V *TUN) getIngressPortMapping() (m *Mapping) {
 		return
 	}
 	return nil
-}
-
-func debugMissingEgressMapping(packet []byte) {
-	c := CONFIG.Load()
-	if !c.ConnectionTracer {
-		if len(packet) > 60 {
-			DEEP("Missing egress mapping: ", packet[0:60])
-		} else {
-			DEEP("Missing egress mapping: ", packet[0:len(packet)-1])
-		}
-		return
-	}
-
-	select {
-	case noMappingChan <- packet:
-	default:
-		DEEP("noMappingChan full")
-	}
-}
-
-func debugMissingIngressMapping(packet []byte) {
-	c := CONFIG.Load()
-	if !c.ConnectionTracer {
-		if len(packet) > 60 {
-			DEEP("Missing ingress mapping: ", packet[0:60])
-		} else {
-			DEEP("Missing ingress mapping: ", packet[0:len(packet)-1])
-		}
-		return
-	}
 }
 
 func (t *TUN) cleanPortMap() {

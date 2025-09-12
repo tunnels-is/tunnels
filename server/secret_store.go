@@ -18,8 +18,8 @@ func loadSecret(key string) (v string) {
 			return config.CertPem
 		case "SignPem":
 			return config.SignPem
-		case "AdminApiKey":
-			return config.AdminApiKey
+		case "AdminAPIKey":
+			return config.AdminAPIKey
 		case "TwoFactorKey":
 			return config.TwoFactorKey
 		case "EmailKey":
