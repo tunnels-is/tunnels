@@ -11,9 +11,9 @@ import (
 )
 
 var PingPongStatsBuffer = []byte{
-	0, 0, 0, // stats
-	0, 0, 0, 0, 0, 0, 0, 0, // timestamp
-	0, 0, 0, 0, 0, 0, 0, 0, // ping counter
+	0, 0, 0, // stats 0-3
+	0, 0, 0, 0, 0, 0, 0, 0, // timestamp 3-11
+	0, 0, 0, 0, 0, 0, 0, 0, // ping counter 11-19
 }
 
 func PopulatePingBufferWithStats() {
@@ -84,8 +84,8 @@ func pingActiveUsers() {
 			continue
 		}
 
-		binary.BigEndian.PutUint64(PingPongStatsBuffer[11:], uint64(clientCoreMappings[index].PingInt.Load()))
 		binary.BigEndian.PutUint64(PingPongStatsBuffer[3:11], uint64(time.Now().UnixNano()))
+		binary.BigEndian.PutUint64(PingPongStatsBuffer[11:], uint64(clientCoreMappings[index].PingInt.Load()))
 		out := u.EH.SEAL.Seal2(PingPongStatsBuffer, u.Uindex)
 		err := syscall.Sendto(dataSocketFD, out, 0, u.Addr)
 		if err != nil {
