@@ -120,7 +120,6 @@ func (tun *TUN) ReadFromServeTunnel() {
 		}
 
 		if !tun.ProcessIngressPacket(packet) {
-			debugMissingIngressMapping(packet)
 			continue
 		}
 
