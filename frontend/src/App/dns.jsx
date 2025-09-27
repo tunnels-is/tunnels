@@ -255,7 +255,7 @@ const DNS = () => {
       },
       Save: state.v2_ConfigSave
     },
-    headers: ["Tag", "Domain Count", "Enabled"],
+    headers: ["Tag", "Domains", "Blocked"],
     headerClass: {},
     opts: {
       RowPerPage: 50,
