@@ -470,6 +470,7 @@ func IP_AddRoute(
 	err = netlink.RouteAdd(r)
 	if err != nil {
 		if strings.Contains(err.Error(), "exists") {
+			DEBUG("Default IPv4 route already exists")
 			return nil
 		}
 		return err
