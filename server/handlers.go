@@ -1178,6 +1178,7 @@ func API_SessionCreate(w http.ResponseWriter, r *http.Request) {
 
 	if allowed {
 		SCR := new(types.SignedConnectRequest)
+		CR.Created = time.Now()
 		SCR.Payload, err = json.Marshal(CR)
 		if err != nil {
 			senderr(w, 500, "Unable to decode payload")
