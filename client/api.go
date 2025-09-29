@@ -541,7 +541,7 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	}
 
 	FinalCR := new(types.ControllerConnectRequest)
-	FinalCR.Created = time.Now()
+	// FinalCR.Created = time.Now() // We set this on the server
 	FinalCR.Version = version.ApiVersion
 	FinalCR.UserID = UID
 	FinalCR.ServerID = SID
