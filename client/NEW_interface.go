@@ -156,4 +156,3 @@ func PingConnections() {
 		return true
 	})
 }
-
