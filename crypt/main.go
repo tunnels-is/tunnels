@@ -108,9 +108,10 @@ func (S *SEAL) CreateAEAD(sharedSecret []byte) (err error) {
 		return
 	}
 
-	if S.Type == None {
+	switch S.Type {
+	case None:
 		return errors.New("no encryption is not supported")
-	} else if S.Type == AES256 || S.Type == AES128 {
+	case AES256, AES128:
 
 		if S.Type == AES128 {
 			S.key1 = S.key1[:16]
@@ -143,7 +144,7 @@ func (S *SEAL) CreateAEAD(sharedSecret []byte) (err error) {
 		S.Nonce2 = make([]byte, S.AEAD2.NonceSize())
 		S.Nonce2Len = S.AEAD2.NonceSize()
 
-	} else if S.Type == CHACHA20 {
+	case CHACHA20:
 
 		S.AEAD1, err = chacha20poly1305.NewX(S.key1)
 		if err != nil {
@@ -158,7 +159,7 @@ func (S *SEAL) CreateAEAD(sharedSecret []byte) (err error) {
 		}
 		S.Nonce2 = make([]byte, S.AEAD2.NonceSize())
 		S.Nonce2Len = S.AEAD2.NonceSize()
-	} else {
+	default:
 		return errors.New("no encryption is not supported")
 	}
 
