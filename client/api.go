@@ -175,7 +175,6 @@ func validateTunnelMeta(tun *TunnelMETA, oldTag string) (err []string) {
 	return
 }
 
-
 func BandwidthBytesToString(b int64) string {
 	if b <= 999 {
 		intS := strconv.FormatInt(b, 10)
@@ -196,4 +195,3 @@ func BandwidthBytesToString(b int64) string {
 
 	return "???"
 }
-
