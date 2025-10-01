@@ -496,7 +496,7 @@ func makeConfigAndCerts() {
 			DNSServers:         []string{},
 			SecretStore:        "config",
 			// secrets
-			DBurl:        "mongodb://127.0.0.1:27017",
+			DBurl:        "",
 			AdminAPIKey:  uuid.NewString(),
 			TwoFactorKey: strings.ReplaceAll(uuid.NewString(), "-", ""),
 			EmailKey:     "",
