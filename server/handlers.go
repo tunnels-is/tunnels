@@ -43,7 +43,7 @@ func API_AcceptUserConnections(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if time.Since(CR.Created).Seconds() > 30 {
+	if time.Since(CR.Created).Seconds() > 240 {
 		senderr(w, 401, "request not valid")
 		return
 	}
