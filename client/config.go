@@ -72,7 +72,7 @@ func ReadConfigFileFromDisk() (err error) {
 		})
 		err = writeConfigToDisk()
 		if err != nil {
-			ERROR("unable to ad api.tunnels.is to default config")
+			ERROR("unable to add api.tunnels.is to default config")
 		}
 	}
 

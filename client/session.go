@@ -204,7 +204,7 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	tc := &tls.Config{
 		MinVersion:         tls.VersionTLS13,
 		CurvePreferences:   []tls.CurveID{tls.X25519MLKEM768},
-		InsecureSkipVerify: ClientCR.Server.ValidateCertificate,
+		InsecureSkipVerify: !ClientCR.Server.ValidateCertificate,
 	}
 	tc.RootCAs, errm = tunnel.LoadCertPEMBytes([]byte(ClientCR.ServerPubKey))
 	if errm != nil {
