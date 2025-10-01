@@ -135,10 +135,11 @@ func BenchmarkTCPHeaderGemini(b *testing.B) {
 // CalculateTransportChecksum computes the checksum for the transport layer (TCP/UDP)
 func CalculateTransportChecksumv2(ipv4Header []byte, transportPacket []byte) {
 	// wipe the old checksum before calculating
-	if ipv4Header[9] == 6 {
+	switch ipv4Header[9] {
+	case 6:
 		transportPacket[16] = 0
 		transportPacket[17] = 0
-	} else if ipv4Header[9] == 17 {
+	case 17:
 		transportPacket[6] = 0
 		transportPacket[7] = 0
 	}
@@ -175,9 +176,10 @@ func CalculateTransportChecksumv2(ipv4Header []byte, transportPacket []byte) {
 	}
 
 	// Return the complement of the checksum
-	if ipv4Header[9] == 6 {
+	switch ipv4Header[9] {
+	case 6:
 		binary.BigEndian.PutUint16(transportPacket[16:18], ^uint16(checksum))
-	} else if ipv4Header[9] == 17 {
+	case 17:
 		binary.BigEndian.PutUint16(transportPacket[6:8], ^uint16(checksum))
 	}
 }
@@ -267,10 +269,11 @@ func RecalculateTransportChecksumv4(IPv4Header, TPPacket []byte) {
 
 func RecalculateTransportChecksumTest(IPv4Header []byte, TPPacket []byte) {
 	// wipe the old checksum before calculating
-	if IPv4Header[9] == 6 {
+	switch IPv4Header[9] {
+	case 6:
 		TPPacket[16] = 0
 		TPPacket[17] = 0
-	} else if IPv4Header[9] == 17 {
+	case 17:
 		TPPacket[6] = 0
 		TPPacket[7] = 0
 	}
@@ -298,9 +301,10 @@ func RecalculateTransportChecksumTest(IPv4Header []byte, TPPacket []byte) {
 		csum = (csum >> 16) + (csum & 0xffff)
 	}
 
-	if IPv4Header[9] == 6 {
+	switch IPv4Header[9] {
+	case 6:
 		binary.BigEndian.PutUint16(TPPacket[16:18], ^uint16(csum))
-	} else if IPv4Header[9] == 17 {
+	case 17:
 		binary.BigEndian.PutUint16(TPPacket[6:8], ^uint16(csum))
 	}
 }

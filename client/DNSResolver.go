@@ -195,7 +195,8 @@ func ProcessDNSMsg(m *dns.Msg, DNS *types.DNSRecord) (rm *dns.Msg) {
 	rm.Compress = true
 
 	for i := range rm.Question {
-		if rm.Question[i].Qtype == dns.TypeA {
+		switch rm.Question[i].Qtype {
+		case dns.TypeA:
 			if len(DNS.IP) > 0 {
 				for ii := range DNS.IP {
 					rm.Answer = append(rm.Answer, &dns.A{
@@ -209,7 +210,7 @@ func ProcessDNSMsg(m *dns.Msg, DNS *types.DNSRecord) (rm *dns.Msg) {
 					})
 				}
 			}
-		} else if rm.Question[i].Qtype == dns.TypeTXT {
+		case dns.TypeTXT:
 			if len(DNS.TXT) > 0 {
 				for ii := range DNS.TXT {
 					rm.Answer = append(rm.Answer, &dns.TXT{

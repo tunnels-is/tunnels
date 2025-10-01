@@ -75,7 +75,8 @@ func processPacket(packet []byte, addr syscall.Sockaddr) {
 	ethType := ethHeader.EtherType()
 
 	// Check for IPv4 (0x0800) or IPv6 (0x86DD)
-	if ethType == 0x0800 { // IPv4
+	switch ethType {
+	case 0x0800: // IPv4
 		ipHeader := IPv4Header(packet[14:]) // Ethernet header is 14 bytes
 		protocol := ipHeader.Protocol()
 		if protocol == 17 { // UDP
@@ -95,10 +96,10 @@ func processPacket(packet []byte, addr syscall.Sockaddr) {
 			_ = udpData                               // Use udpData for further processing
 
 		}
-	} else if ethType == 0x86DD { // IPv6
+	case 0x86DD: // IPv6
 		// IPv6 implementation would be similar
 		fmt.Println("Received IPv6 packet (implementation omitted)")
-	} else {
+	default:
 		fmt.Printf("Received non-IP packet of type 0x%X\n", ethType)
 	}
 
