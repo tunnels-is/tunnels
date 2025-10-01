@@ -30,6 +30,6 @@ func main() {
 		newIP2[i] = NetIPNet.IP[i]&NetIPNet.Mask[i] | ip2[i]&^NetIPNet.Mask[i]
 	}
 
-	fmt.Println("NEW IP:", newIP)
-	fmt.Println("NEW IP2:", newIP2)
+	fmt.Println("NEW IP:", string(newIP))
+	fmt.Println("NEW IP2:", string(newIP2))
 }

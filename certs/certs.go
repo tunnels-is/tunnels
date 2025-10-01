@@ -65,7 +65,8 @@ func MakeCert(ct CertType, certPath string, keyPath string, ips []string, domain
 		defer keyFile.Close()
 	}
 
-	if ct == RSA {
+	switch ct {
+	case RSA:
 		pk, err := rsa.GenerateKey(rand.Reader, 4096)
 		if err != nil {
 			return c, err
@@ -78,7 +79,7 @@ func MakeCert(ct CertType, certPath string, keyPath string, ips []string, domain
 			pem.Encode(keyFile, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: gg})
 		}
 
-	} else if ct == ECDSA {
+	case ECDSA:
 		pk, err := ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
 		if err != nil {
 			return c, err
@@ -169,7 +170,8 @@ func MakeCertV2(ct CertType, certPath string, keyPath string, ips []string, doma
 
 	CR = new(Certs)
 
-	if ct == RSA {
+	switch ct {
+	case RSA:
 		var pk *rsa.PrivateKey
 		pk, err = rsa.GenerateKey(rand.Reader, 4096)
 		if err != nil {
@@ -177,7 +179,7 @@ func MakeCertV2(ct CertType, certPath string, keyPath string, ips []string, doma
 		}
 		CR.Priv = pk
 		CR.Pub = &pk.PublicKey
-	} else if ct == ECDSA {
+	case ECDSA:
 		var pk *ecdsa.PrivateKey
 		pk, err = ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
 		if err != nil {

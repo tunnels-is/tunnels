@@ -40,11 +40,12 @@ func SendRequestToURL(tc *tls.Config, method string, url string, data any, timeo
 	}
 
 	var req *http.Request
-	if method == "POST" {
+	switch method {
+	case "POST":
 		req, err = http.NewRequest(method, url, bytes.NewBuffer(body))
-	} else if method == "GET" {
+	case "GET":
 		req, err = http.NewRequest(method, url, nil)
-	} else {
+	default:
 		return nil, 400, errors.New("method not supported:" + method)
 	}
 
