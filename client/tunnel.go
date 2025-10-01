@@ -119,7 +119,7 @@ func createDefaultTunnelMeta(t types.TunnelType) (M *TunnelMETA) {
 		M.LocalhostNat = true
 		M.AutoConnect = true
 		M.AutoReconnect = true
-		M.MTU = 1320 // MTU is set low here due to many 5g networs. The LAN tunnels is mostly used to IoT.
+		M.MTU = 1320 // MTU is set low here due to many 5g networks. The LAN tunnels is mostly used to IoT.
 	}
 
 	return
