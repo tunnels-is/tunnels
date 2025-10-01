@@ -53,7 +53,7 @@ func loadDefaultInterface() {
 		return
 	}
 
-	DEBUG("new defailt interface discovered", newInterface.To4())
+	DEBUG("new default interface discovered", newInterface.To4())
 	s.DefaultInterface.Store(&newInterface)
 
 	ifList, _ := net.Interfaces()
@@ -108,7 +108,7 @@ func loadDefaultGateway() {
 	if isInterfaceATunnel(newGateway.To4()) {
 		return
 	}
-	DEBUG("new defailt gateway discovered", newGateway.To4())
+	DEBUG("new default gateway discovered", newGateway.To4())
 	s.DefaultGateway.Store(&newGateway)
 
 	DEBUG(
