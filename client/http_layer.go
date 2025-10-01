@@ -9,6 +9,9 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
+	"runtime"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -537,4 +540,38 @@ func HTTP_ForwardToController(w http.ResponseWriter, r *http.Request) {
 	}
 	data, code := ForwardToController(form)
 	JSON(w, r, code, data)
+}
+
+// popUI opens the web interface in the default browser
+// does not work on all systems (experimental)
+func popUI() {
+	defer RecoverAndLog()
+	<-uiChan
+	time.Sleep(2 * time.Second)
+
+	url := "https://" + API_SERVER.Addr
+	INFO("opening UI @ ", url)
+
+	switch runtime.GOOS {
+	case "windows":
+		_ = openURL(url)
+
+	case "darwin":
+		_ = openURL(url)
+
+	default:
+		if !isWSL() {
+			_ = openURL(url)
+		}
+
+	}
+}
+
+// isWSL checks if the environment is running in Windows Subsystem for Linux
+func isWSL() bool {
+	releaseData, err := exec.Command("uname", "-r").Output()
+	if err != nil {
+		return false
+	}
+	return strings.Contains(strings.ToLower(string(releaseData)), "microsoft")
 }
