@@ -125,7 +125,6 @@ var STORE = {
   debug: false,
   // debug: false,
   Session: window.sessionStorage,
-  Local: window.localStorage,
   Cache: {
     // interface: window.localStorage,
     interface: window.sessionStorage,
