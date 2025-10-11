@@ -132,6 +132,8 @@ func main() {
 
 	configFlag := flag.Bool("config", false, "This command runs the server and creates a config + certificates")
 	certsOnly := flag.Bool("certs", false, "This command generates certificates and exits")
+	silent := flag.Bool("silent", false, "This command disables logging")
+	disableLogs = *silent
 	logHandler := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug})
 	logger = slog.New(logHandler)
 	slog.SetDefault(logger)
