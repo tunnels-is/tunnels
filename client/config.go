@@ -115,6 +115,7 @@ func DefaultConfig() *configV2 {
 		LogAllDomains:        true,
 		DNSstats:             true,
 		DNSBlockLists:        GetDefaultBlockLists(),
+		DNSWhiteLists:        GetDefaultWhiteLists(),
 		APIIP:                "127.0.0.1",
 		APIPort:              "7777",
 		RestartPostUpdate:    false,
@@ -278,6 +279,7 @@ func SetConfig(config *configV2) (err error) {
 
 	CONFIG.Store(config)
 	reloadBlockLists(false)
+	reloadWhiteLists(false)
 	err = writeConfigToDisk()
 	INFO("Config saved")
 	DEBUG(fmt.Sprintf("%+v", *config))
