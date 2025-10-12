@@ -308,13 +308,14 @@ type USER_UPDATE_FORM struct {
 }
 
 type USER_ADMIN_UPDATE_FORM struct {
-	DeviceToken  string             `json:"DeviceToken"`
-	UID          primitive.ObjectID `json:"UID"`
-	TargetUserID primitive.ObjectID `json:"TargetUserID"`
-	Email        string             `json:"Email,omitempty"`
-	Disabled     bool               `json:"Disabled"`
-	IsManager    bool               `json:"IsManager"`
-	Trial        bool               `json:"Trial"`
+	DeviceToken   string             `json:"DeviceToken"`
+	UID           primitive.ObjectID `json:"UID"`
+	TargetUserID  primitive.ObjectID `json:"TargetUserID"`
+	Email         string             `json:"Email,omitempty"`
+	Disabled      bool               `json:"Disabled"`
+	IsManager     bool               `json:"IsManager"`
+	Trial         bool               `json:"Trial"`
+	SubExpiration time.Time          `json:"SubExpiration,omitempty"`
 }
 
 type TWO_FACTOR_DB_PACKAGE struct {

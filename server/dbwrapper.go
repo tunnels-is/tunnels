@@ -420,6 +420,10 @@ func DB_updateUserAdmin(UF *USER_ADMIN_UPDATE_FORM) (err error) {
 		updateFields = append(updateFields, bson.E{Key: "Email", Value: UF.Email})
 	}
 
+	if !UF.SubExpiration.IsZero() {
+		updateFields = append(updateFields, bson.E{Key: "SubExpiration", Value: UF.SubExpiration})
+	}
+
 	updateFields = append(updateFields, bson.E{Key: "Disabled", Value: UF.Disabled})
 	updateFields = append(updateFields, bson.E{Key: "IsManager", Value: UF.IsManager})
 	updateFields = append(updateFields, bson.E{Key: "Trial", Value: UF.Trial})
