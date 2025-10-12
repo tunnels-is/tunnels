@@ -165,9 +165,13 @@ func StartLogQueueProcessor() {
 		select {
 		case APILogQueue <- line:
 		default:
-			APILogQueue = nil
-			APILogQueue = make(chan string, 1000)
-			log.Println("Log API queue full")
+			log.Println("Log queue full, draining first half of the queue")
+			for range len(APILogQueue) / 2 {
+				select {
+				case <-APILogQueue:
+				default:
+				}
+			}
 		}
 
 		if LogFile != nil {
