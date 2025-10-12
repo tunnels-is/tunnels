@@ -180,19 +180,6 @@ func API_UserCreate(w http.ResponseWriter, r *http.Request) {
 	newUser.Groups = make([]primitive.ObjectID, 0)
 	newUser.Tokens = make([]*DeviceToken, 0)
 
-	// if loadSecret("EmailKey") != "" {
-	// 	splitEmail := strings.Split(RF.Email, "@")
-	// 	if len(splitEmail) > 1 {
-	// 		newUser.ConfirmCode = uuid.NewString()
-	// 		err = SEND_CONFIRMATION(loadSecret("EmailKey"), newUser.Email, newUser.ConfirmCode)
-	// 		if err != nil {
-	// 			INFO("unable to send confirm email on signup", err, nil)
-	// 			senderr(w, 500, "Email system error, please contact support")
-	// 			return
-	// 		}
-	// 	}
-	// }
-
 	T := new(DeviceToken)
 	T.N = "registration"
 	T.DT = uuid.NewString()
@@ -1197,50 +1184,6 @@ func API_SessionCreate(w http.ResponseWriter, r *http.Request) {
 	senderr(w, 400, "Unauthorized")
 }
 
-func API_UserRequestPasswordCode(w http.ResponseWriter, r *http.Request) {
-	defer BasicRecover()
-
-	var user *User
-	RF := new(PASSWORD_RESET_FORM)
-	err := decodeBody(r, RF)
-	if err != nil {
-		senderr(w, 400, "Invalid request body", slog.Any("error", err))
-		return
-	}
-
-	user, err = DB_findUserByEmail(RF.Email)
-	if err != nil {
-		senderr(w, 500, "Unknown error, please try again in a moment")
-		return
-	}
-	if user == nil {
-		senderr(w, 401, "Invalid session token, please log in again")
-		return
-	}
-
-	if !user.LastResetRequest.IsZero() && time.Since(user.LastResetRequest).Seconds() < 30 {
-		senderr(w, 401, "You need to wait at least 30 seconds between password reset attempts")
-		return
-	}
-
-	user.ResetCode = uuid.NewString()
-	user.LastResetRequest = time.Now()
-
-	err = DB_userUpdateResetCode(user)
-	if err != nil {
-		senderr(w, 500, "Database error, please try again in a moment")
-		return
-	}
-
-	err = SEND_PASSWORD_RESET(loadSecret("EmailKey"), user.Email, user.ResetCode)
-	if err != nil {
-		senderr(w, 500, "Email system  error, please try again in a moment")
-		return
-	}
-
-	w.WriteHeader(200)
-}
-
 func API_UserResetPassword(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 
@@ -1266,22 +1209,16 @@ func API_UserResetPassword(w http.ResponseWriter, r *http.Request) {
 		senderr(w, 500, "Unknown error, please try again in a moment")
 		return
 	}
-	if RF.UseTwoFactor {
-		code, err := Decrypt(user.TwoFactorCode, []byte(loadSecret("TwoFactorKey")))
-		if err != nil {
-			ADMIN(err)
-			return
-		}
 
-		otp := gotp.NewDefaultTOTP(string(code)).Now()
-		if otp != RF.ResetCode {
-			return
-		}
-	} else {
-		if RF.ResetCode != user.ResetCode || user.ResetCode == "" {
-			senderr(w, 401, "Invalid reset code")
-			return
-		}
+	code, err := Decrypt(user.TwoFactorCode, []byte(loadSecret("TwoFactorKey")))
+	if err != nil {
+		ADMIN(err)
+		return
+	}
+
+	otp := gotp.NewDefaultTOTP(string(code)).Now()
+	if otp != RF.ResetCode {
+		return
 	}
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(RF.Password), 13)

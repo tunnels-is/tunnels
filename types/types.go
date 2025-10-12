@@ -37,45 +37,43 @@ type HealthResponse struct {
 }
 
 type ServerConfig struct {
-	Features           []Feature `json:"Features"`
-	PingTimeoutMinutes int       `json:"PingTimeoutMinutes"`
-	DHCPTimeoutHours   int       `json:"DHCPTimeoutHours"`
-	LogAPIHosts        bool      `json:"LogAPIHosts"`
+	Features           []Feature
+	PingTimeoutMinutes int
+	DHCPTimeoutHours   int
+	LogAPIHosts        bool
 
-	ClientVersion string `json:"ClientVersion"`
+	ClientVersion string
 
-	VPNIP   string `json:"VPNIP"`
-	VPNPort string `json:"VPNPort"`
+	VPNIP   string
+	VPNPort string
 
-	APIIP   string `json:"APIIP"`
-	APIPort string `json:"APIPort"`
+	APIIP   string
+	APIPort string
 
-	NetAdmins []string `json:"NetAdmins"`
+	NetAdmins []string
 
 	Hostname           string
-	Lan                *Network   `json:"Lan"`
-	DisableLanFirewall bool       `json:"DisableLanFirwall"`
-	Routes             []*Route   `json:"Routes"`
-	SubNets            []*Network `json:"SubNets"`
+	Lan                *Network
+	DisableLanFirewall bool
+	Routes             []*Route
+	SubNets            []*Network
 
-	StartPort          int  `json:"StartPort"`
-	EndPort            int  `json:"EndPort"`
-	UserMaxConnections int  `json:"UserMaxConnections"`
-	InternetAccess     bool `json:"InternetAccess"`
-	LocalNetworkAccess bool `json:"LocalNetworkAccess"`
-	BandwidthMbps      int  `json:"BandwidthMbps"`
-	UserBandwidthMbps  int  `json:"BandwidthUserMbps"`
+	StartPort           int
+	EndPort             int
+	UserMaxConnections  int
+	InternetAccess      bool
+	LocalNetworkAccess  bool
+	ServerBandwidthMbps int
+	UserBandwidthMbps   int
 
-	DNSAllowCustomOnly bool         `json:"DNSAllowCustomOnly"`
-	DNSRecords         []*DNSRecord `json:"DNSRecords"`
-	DNSServers         []string     `json:"DNSServers"`
+	DNSRecords []*DNSRecord
+	DNSServers []string
 
-	SecretStore SecretStore `json:"SecretStore"`
+	SecretStore SecretStore
 	// If SecretStore set to "config"
 	AdminAPIKey  string
 	DBurl        string
 	TwoFactorKey string
-	EmailKey     string
 	PayKey       string
 	CertPem      string
 	SignPem      string
@@ -186,11 +184,10 @@ type ServerConnectResponse struct {
 	StartPort   uint16 `json:"StartPort"`
 	EndPort     uint16 `json:"EndPort"`
 
-	DNSRecords         []*DNSRecord `json:"DNSRecords"`
-	Networks           []*Network   `json:"Networks"`
-	Routes             []*Route     `json:"Routes"`
-	DNSServers         []string     `json:"DNSServers"`
-	DNSAllowCustomOnly bool         `json:"DNSAllowCustomOnly"`
+	DNSRecords []*DNSRecord `json:"DNSRecords"`
+	Networks   []*Network   `json:"Networks"`
+	Routes     []*Route     `json:"Routes"`
+	DNSServers []string     `json:"DNSServers"`
 
 	DHCP *DHCPRecord `json:"DHCP"`
 	LAN  *Network    `json:"LANNetwork"`
@@ -203,7 +200,7 @@ func CreateCRRFromServer(S *ServerConfig) (CRR *ServerConnectResponse) {
 		EndPort:            0,
 		InterfaceIP:        S.VPNIP,
 		DataPort:           S.VPNPort,
-		AvailableMbps:      S.BandwidthMbps,
+		AvailableMbps:      S.ServerBandwidthMbps,
 		AvailableUserMbps:  S.UserBandwidthMbps,
 		InternetAccess:     S.InternetAccess,
 		LocalNetworkAccess: S.LocalNetworkAccess,
@@ -211,7 +208,6 @@ func CreateCRRFromServer(S *ServerConfig) (CRR *ServerConnectResponse) {
 		Networks:           S.SubNets,
 		Routes:             S.Routes,
 		DNSServers:         S.DNSServers,
-		DNSAllowCustomOnly: S.DNSAllowCustomOnly,
 		LAN:                S.Lan,
 	}
 }
