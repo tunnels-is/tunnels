@@ -36,6 +36,7 @@ func launchAPIServer() {
 	if AUTHEnabled {
 		mux.HandleFunc("/v3/user/create", API_UserCreate)
 		mux.HandleFunc("/v3/user/update", API_UserUpdate)
+		mux.HandleFunc("/v3/user/adminupdate", API_UserAdminUpdate)
 		mux.HandleFunc("/v3/user/login", API_UserLogin)
 		mux.HandleFunc("/v3/user/logout", API_UserLogout)
 		mux.HandleFunc("/v3/user/reset/password", API_UserResetPassword)

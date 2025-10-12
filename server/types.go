@@ -307,6 +307,16 @@ type USER_UPDATE_FORM struct {
 	AdditionalInformation string
 }
 
+type USER_ADMIN_UPDATE_FORM struct {
+	DeviceToken  string             `json:"DeviceToken"`
+	UID          primitive.ObjectID `json:"UID"`
+	TargetUserID primitive.ObjectID `json:"TargetUserID"`
+	Email        string             `json:"Email,omitempty"`
+	Disabled     bool               `json:"Disabled"`
+	IsManager    bool               `json:"IsManager"`
+	Trial        bool               `json:"Trial"`
+}
+
 type TWO_FACTOR_DB_PACKAGE struct {
 	UID      primitive.ObjectID
 	Code     []byte
@@ -375,7 +385,6 @@ type User struct {
 	// these do not get sent over the network for security reasons
 	Password         string         `json:"Password" bson:"Password" `
 	Password2        string         `json:"-" bson:"-"`
-	ResetCode        string         `json:"ResetCode" bson:"ResetCode"`
 	ConfirmCode      string         `json:"ConfirmCode" bson:"ConfirmCode"`
 	LastResetRequest time.Time      `json:"-" bson:"LastResetRequest"`
 	RecoveryCodes    []byte         `json:"RecoveryCodes" bson:"RecoveryCodes"`
@@ -423,7 +432,6 @@ func (u *User) RemoveSensitiveInformation() {
 
 	u.Password = ""
 	u.Password2 = ""
-	u.ResetCode = ""
 	u.ConfirmCode = ""
 	u.RecoveryCodes = nil
 	u.TwoFactorCode = nil

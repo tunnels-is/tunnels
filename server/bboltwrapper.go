@@ -4,18 +4,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"time"
-
 	"slices"
+	"time"
 
 	"github.com/tunnels-is/tunnels/types"
 	gobolt "go.etcd.io/bbolt"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-var (
-	BBoltDB *gobolt.DB
-)
+var BBoltDB *gobolt.DB
 
 const (
 	USERS_BUCKET   = "users"
@@ -26,7 +23,7 @@ const (
 )
 
 func ConnectToBBoltDB(path string) (err error) {
-	BBoltDB, err = gobolt.Open(path, 0600, &gobolt.Options{Timeout: 1 * time.Second})
+	BBoltDB, err = gobolt.Open(path, 0o600, &gobolt.Options{Timeout: 1 * time.Second})
 	if err != nil {
 		return err
 	}
@@ -249,6 +246,36 @@ func BBolt_updateUser(UF *USER_UPDATE_FORM) error {
 	})
 }
 
+// Admin update user (full update capabilities)
+func BBolt_updateUserAdmin(UF *USER_ADMIN_UPDATE_FORM) error {
+	return BBoltDB.Update(func(tx *gobolt.Tx) error {
+		b := tx.Bucket([]byte(USERS_BUCKET))
+		id := objectIDToString(UF.TargetUserID)
+		v := b.Get([]byte(id))
+		if v == nil {
+			return errors.New("user not found")
+		}
+		U := new(User)
+		if err := bboltUnmarshal(v, U); err != nil {
+			return err
+		}
+
+		if UF.Email != "" {
+			U.Email = UF.Email
+		}
+
+		U.Disabled = UF.Disabled
+		U.IsManager = UF.IsManager
+		U.Trial = UF.Trial
+
+		data, err := bboltMarshal(U)
+		if err != nil {
+			return err
+		}
+		return b.Put([]byte(id), data)
+	})
+}
+
 // Toggle user subscription status
 func BBolt_toggleUserSubscriptionStatus(UF *USER_UPDATE_SUB_FORM) error {
 	return BBoltDB.Update(func(tx *gobolt.Tx) error {
@@ -257,7 +284,7 @@ func BBolt_toggleUserSubscriptionStatus(UF *USER_UPDATE_SUB_FORM) error {
 		for k, v := c.First(); k != nil; k, v = c.Next() {
 			U := new(User)
 			if err := bboltUnmarshal(v, U); err == nil && U.Email == UF.Email {
-				//U.CancelSub = UF.Disable
+				// U.CancelSub = UF.Disable
 				data, err := bboltMarshal(U)
 				if err != nil {
 					return err
@@ -306,29 +333,6 @@ func BBolt_userResetPassword(user *User) error {
 		}
 		U.Password = user.Password
 		U.Tokens = []*DeviceToken{}
-		U.ResetCode = ""
-		data, err := bboltMarshal(U)
-		if err != nil {
-			return err
-		}
-		return b.Put([]byte(objectIDToString(U.ID)), data)
-	})
-}
-
-// Update user reset code
-func BBolt_userUpdateResetCode(user *User) error {
-	return BBoltDB.Update(func(tx *gobolt.Tx) error {
-		b := tx.Bucket([]byte(USERS_BUCKET))
-		v := b.Get([]byte(objectIDToString(user.ID)))
-		if v == nil {
-			return errors.New("user not found")
-		}
-		U := new(User)
-		if err := bboltUnmarshal(v, U); err != nil {
-			return err
-		}
-		U.ResetCode = user.ResetCode
-		U.LastResetRequest = user.LastResetRequest
 		data, err := bboltMarshal(U)
 		if err != nil {
 			return err
