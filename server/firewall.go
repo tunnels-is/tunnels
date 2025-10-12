@@ -58,8 +58,6 @@ func syncFirewallState(fr *types.FirewallRequest, mapping *UserCoreMapping) {
 			mapping.AddHost(ip4, [2]byte{}, "manual")
 		}
 	}
-
-	return
 }
 
 func getIP4FromHostOrDHCP(host string) (ip4 [4]byte, ok bool) {

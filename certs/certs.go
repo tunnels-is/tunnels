@@ -29,19 +29,6 @@ const (
 	ECDSA
 )
 
-func LoadTunnelsCACertPool() (pool *x509.CertPool, err error) {
-	pool = x509.NewCertPool()
-	ok := pool.AppendCertsFromPEM([]byte(CAcert1))
-	if !ok {
-		return nil, fmt.Errorf("Unable to load first CA certificate")
-	}
-	ok = pool.AppendCertsFromPEM([]byte(CAcert2))
-	if !ok {
-		return nil, fmt.Errorf("Unable to load second CA certificate")
-	}
-	return
-}
-
 func MakeCert(ct CertType, certPath string, keyPath string, ips []string, domains []string, org string, expirationDate time.Time, saveToDisk bool) (c tls.Certificate, err error) {
 	defer func() {
 		r := recover()
