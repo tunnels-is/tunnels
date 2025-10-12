@@ -33,6 +33,9 @@ const DNS = () => {
   const [blocklist, setBlocklist] = useState(undefined)
   const [blocklistModal, setBlocklistModal] = useState(false)
   const [isBlocklistEdit, setIsBlocklistEdit] = useState(false)
+  const [whitelist, setWhitelist] = useState(undefined)
+  const [whitelistModal, setWhitelistModal] = useState(false)
+  const [isWhitelistEdit, setIsWhitelistEdit] = useState(false)
   const [cfg, setCfg] = useState({ ...state.Config })
   const [mod, setMod] = useState(false)
 
@@ -59,6 +62,18 @@ const DNS = () => {
   });
   if (!blockLists) {
     blockLists = [];
+  }
+
+  let whiteLists = state.Config?.DNSWhiteLists;
+  state.modifiedLists?.forEach((l) => {
+    whiteLists?.forEach((ll, i) => {
+      if (ll.Tag === l.Tag) {
+        whiteLists[i] = l;
+      }
+    });
+  });
+  if (!whiteLists) {
+    whiteLists = [];
   }
 
   const generateDNSRecordsTable = () => {
@@ -217,6 +232,13 @@ const DNS = () => {
 
   }
 
+  const EnableColumnWhitelist = (obj) => {
+    return <TableCell className={"w-[10px] text-sky-100"}  >
+      <Switch checked={obj.Enabled} onCheckedChange={() => state.toggleWhitelist(obj)} />
+    </TableCell >
+
+  }
+
   let bltable = {
     data: blockLists,
     columns: {
@@ -256,6 +278,51 @@ const DNS = () => {
       Save: state.v2_ConfigSave
     },
     headers: ["Tag", "Domains", "Blocked"],
+    headerClass: {},
+    opts: {
+      RowPerPage: 50,
+    },
+  }
+
+  let wltable = {
+    data: whiteLists,
+    columns: {
+      Tag: true,
+      Count: true,
+    },
+    customColumns: {
+      Enabled: EnableColumnWhitelist,
+    },
+    columnClass: {
+      Enabled: (obj) => {
+        if (obj.Enabled === true) {
+          return "text-green-400"
+        }
+        return "text-red-400"
+      },
+    },
+    Btn: {
+      Edit: (obj) => {
+        setIsWhitelistEdit(true)
+        setWhitelist(obj)
+        setWhitelistModal(true)
+      },
+      Delete: (obj) => {
+        state.deleteWhitelist(obj);
+      },
+      New: () => {
+        setIsWhitelistEdit(false)
+        setWhitelist({
+          Tag: "new-whitelist",
+          URL: "https://example.com/whitelist.txt",
+          Enabled: true,
+          Count: 0
+        })
+        setWhitelistModal(true)
+      },
+      Save: state.v2_ConfigSave
+    },
+    headers: ["Tag", "Domains", "Allowed"],
     headerClass: {},
     opts: {
       RowPerPage: 50,
@@ -405,7 +472,40 @@ const DNS = () => {
 
         </TabsContent>
         <TabsContent value="whitelist">
-          <GenericTable table={bltable} />
+          <GenericTable table={wltable} />
+          <NewObjectEditorDialog
+            open={whitelistModal}
+            onOpenChange={setWhitelistModal}
+            object={whitelist}
+            title="DNS Whitelist"
+            description=""
+            readOnly={false}
+            opts={{
+              fields: {
+                Count: "hidden",
+                LastDownload: "hidden"
+              }
+            }}
+            saveButton={async (obj) => {
+              if (!isWhitelistEdit) {
+                if (!state.Config?.DNSWhiteLists) {
+                  state.Config.DNSWhiteLists = []
+                }
+                state.Config?.DNSWhiteLists.push(obj)
+              }
+              let ok = await state.v2_ConfigSave();
+              if (ok === true) {
+                setWhitelistModal(false)
+                setIsWhitelistEdit(false)
+              }
+            }}
+            onChange={(key, value, type) => {
+              whitelist[key] = value;
+            }}
+            onArrayChange={(key, value, index) => {
+              whitelist[key][index] = value;
+            }}
+          />
         </TabsContent>
         <TabsContent value="blocklist">
           <GenericTable table={bltable} />
