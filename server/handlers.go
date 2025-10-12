@@ -221,6 +221,38 @@ func API_UserUpdate(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(200)
 }
 
+func API_UserAdminUpdate(w http.ResponseWriter, r *http.Request) {
+	defer BasicRecover()
+
+	UF := new(USER_ADMIN_UPDATE_FORM)
+	err := decodeBody(r, UF)
+	if err != nil {
+		senderr(w, 400, "Invalid request body", slog.Any("error", err))
+		return
+	}
+
+	user, err := authenticateUserFromEmailOrIDAndToken("", UF.UID, UF.DeviceToken)
+	if err != nil {
+		senderr(w, 401, err.Error())
+		return
+	}
+
+	if !user.IsAdmin {
+		if !user.IsManager {
+			senderr(w, 401, "You are not allowed to admin update users")
+			return
+		}
+	}
+
+	err = DB_updateUserAdmin(UF)
+	if err != nil {
+		senderr(w, 500, "Unable to admin update user, please try again in a moment")
+		return
+	}
+
+	w.WriteHeader(200)
+}
+
 func API_UserLogin(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 

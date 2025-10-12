@@ -48,16 +48,9 @@ const Settings = () => {
   let logPath = "";
   let tracePath = "";
   let logFileName = state.State?.LogFileName?.replace(state.State?.LogPath, "");
-  let traceFileName = state.State?.TraceFileName?.replace(
-    state.State?.TracePath,
-    "",
-  );
   let configPath = state.State?.ConfigFileName;
   if (state.State?.LogPath !== basePath) {
     logPath = state.State?.LogPath;
-  }
-  if (state.State?.TracePath !== basePath) {
-    tracePath = state.State?.TracePath;
   }
   let version = state.Version ? state.Version : "unknown";
   let apiversion = state.APIVersion ? state.APIVersion : "unknown";
@@ -333,18 +326,6 @@ const Settings = () => {
                   label="Log File"
                   value={logFileName}
                   icon={<Info className="h-4 w-4 text-red-400" />}
-                />
-
-                <InfoItem
-                  label="Trace Path"
-                  value={tracePath || "Default"}
-                  icon={<Activity className="h-4 w-4 text-purple-400" />}
-                />
-
-                <InfoItem
-                  label="Trace File"
-                  value={traceFileName}
-                  icon={<Activity className="h-4 w-4 text-purple-400" />}
                 />
 
                 <InfoItem

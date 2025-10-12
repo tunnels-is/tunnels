@@ -561,8 +561,9 @@ func initializeNewServer() error {
 	if user != nil {
 		return nil
 	}
+	pw := GENERATE_CODE()
 
-	hash, err := bcrypt.GenerateFromPassword([]byte("admin"), 13)
+	hash, err := bcrypt.GenerateFromPassword([]byte(pw), 13)
 	if err != nil {
 		return err
 	}
@@ -574,7 +575,6 @@ func initializeNewServer() error {
 	newUser.IsManager = true
 	newUser.AdditionalInformation = ""
 	newUser.Email = "admin"
-	newUser.ResetCode = uuid.NewString()
 	newUser.Updated = time.Now()
 	newUser.Trial = false
 	newUser.APIKey = uuid.NewString()
@@ -587,7 +587,7 @@ func initializeNewServer() error {
 		return err
 	}
 
-	logger.Info("ADMIN RESET CODE", "code", newUser.ResetCode)
+	logger.Info("ADMIN PASSWORD (change this!!)", "pass", pw)
 
 	c := Config.Load()
 	keyBytes, err := os.ReadFile(c.CertPem)
