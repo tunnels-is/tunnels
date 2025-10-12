@@ -62,6 +62,10 @@ func InitBaseFoldersAndPaths() {
 
 	s.BlockListPath = s.BasePath + "blocklists" + string(os.PathSeparator)
 	CreateFolder(s.BlockListPath)
+
+	s.WhiteListPath = s.BasePath + "whitelists" + string(os.PathSeparator)
+	CreateFolder(s.WhiteListPath)
+
 	STATE.Store(s)
 }
 
