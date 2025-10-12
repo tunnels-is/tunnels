@@ -107,6 +107,9 @@ func InitService() error {
 		doEvent(highPriorityChannel, func() {
 			reloadBlockLists(false)
 		})
+		doEvent(highPriorityChannel, func() {
+			reloadWhiteLists(false)
+		})
 	}
 
 	INFO("Tunnels is ready")
@@ -144,6 +147,9 @@ func LaunchTunnels() {
 		})
 		newConcurrentSignal("BlockListUpdater", CancelContext, func() {
 			reloadBlockLists(true)
+		})
+		newConcurrentSignal("WhiteListUpdater", CancelContext, func() {
+			reloadWhiteLists(true)
 		})
 		newConcurrentSignal("CleanDNSCache", CancelContext, func() {
 			CleanDNSCache()

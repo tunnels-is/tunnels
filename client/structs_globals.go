@@ -69,6 +69,7 @@ var (
 	// DNS
 	DNSGlobalBlock atomic.Bool
 	DNSBlockList   atomic.Pointer[*xsync.MapOf[string, bool]]
+	DNSWhiteList   atomic.Pointer[*xsync.MapOf[string, bool]]
 	DNSCache       *xsync.MapOf[string, any]
 	DNSStatsMap    *xsync.MapOf[string, any]
 )
@@ -591,6 +592,7 @@ type configV2 struct {
 	DNSServerIP   string
 	DNSServerPort string
 	DNSBlockLists []*BlockList
+	DNSWhiteLists []*BlockList
 	DNSRecords    []*types.DNSRecord
 }
 
@@ -612,6 +614,7 @@ type stateV2 struct {
 
 	// Disk Paths and filenames
 	BlockListPath  string
+	WhiteListPath  string
 	LogPath        string
 	ConfigFileName string
 	BasePath       string
