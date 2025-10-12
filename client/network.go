@@ -27,6 +27,24 @@ func isInterfaceATunnel(interf net.IP) (isTunnel bool) {
 	return
 }
 
+// isInterfaceATunnel checks if the given IP is a tunnel interface
+func isDefaultRouteOnTunnel() (foundRoute bool) {
+	tunnelMapRange(func(tun *TUN) bool {
+		tunnel := tun.meta.Load()
+		if tunnel == nil {
+			return true
+		}
+
+		if tunnel.EnableDefaultRoute {
+			foundRoute = true
+			return false
+		}
+		return true
+	})
+
+	return
+}
+
 // loadDefaultInterface discovers and loads the default network interface
 func loadDefaultInterface() {
 	defer RecoverAndLog()
@@ -93,6 +111,10 @@ func loadDefaultGateway() {
 	def := s.DefaultGateway.Load()
 	if def != nil {
 		copy(oldGateway, def.To4())
+	}
+
+	if isDefaultRouteOnTunnel() {
+		return
 	}
 
 	newGateway, err = gateway.DiscoverGateway()
