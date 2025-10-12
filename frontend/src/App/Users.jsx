@@ -27,20 +27,6 @@ const Users = () => {
 		getUsers(0, 50)
 	}, [])
 
-	const EditUserButton = (obj) => {
-		return (
-			<DropdownMenuItem
-				key="edit"
-				onClick={() => {
-					setSelectedUser(obj)
-					setModalOpen(true)
-				}}
-				className="cursor-pointer text-[#3a994c]"
-			>
-				<Pencil className="w-4 h-4 mr-2" /> Edit User
-			</DropdownMenuItem>
-		)
-	}
 
 	const saveUser = async (user) => {
 		let resp = await state.callController(
@@ -72,8 +58,11 @@ const Users = () => {
 			console.log("row click!")
 			console.dir(obj)
 		},
-		customBtn: {
-			Edit: EditUserButton,
+		Btn: {
+			Edit: (obj) => {
+				setSelectedUser(obj)
+				setModalOpen(true)
+			},
 		},
 		columns: {
 			Email: true,
