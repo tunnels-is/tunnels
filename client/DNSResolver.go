@@ -255,7 +255,14 @@ func DNSQuery(w dns.ResponseWriter, m *dns.Msg) {
 		return
 	}
 
+	// Check if domain is whitelisted first - whitelisted domains bypass blocklists
+	whitelisted := isWhitelisted(m)
 	blocked, tag := isBlocked(m)
+
+	// If whitelisted, override blocked status
+	if whitelisted {
+		blocked = false
+	}
 
 	var DNSTunnel *TUN
 	var ServerDNS *types.DNSRecord
@@ -463,6 +470,17 @@ func isBlocked(m *dns.Msg) (ok bool, tag string) {
 	}
 
 	return ok, tag
+}
+
+func isWhitelisted(m *dns.Msg) bool {
+	name := strings.TrimSuffix(m.Question[0].Name, ".")
+	wl := DNSWhiteList.Load()
+	if wl == nil {
+		return false
+	}
+
+	whitelisted, ok := (*wl).Load(name)
+	return ok && whitelisted
 }
 
 func ResolveDNSAsHTTPS(m *dns.Msg, w dns.ResponseWriter) (err error) {
