@@ -370,6 +370,17 @@ export var STATE = {
     STATE.Config.DNSBlockLists = newLists;
     STATE.renderPage("dns");
   },
+  deleteWhitelist: (whitelist) => {
+    let newLists = STATE.Config.DNSWhiteLists;
+    const index = newLists.indexOf(whitelist);
+
+    if (index > -1) {
+      newLists.splice(index, 1);
+    }
+
+    STATE.Config.DNSWhiteLists = newLists;
+    STATE.renderPage("dns");
+  },
   createTunnel: async () => {
     try {
       let resp = await STATE.API.method("createTunnel");
@@ -494,6 +505,22 @@ export var STATE = {
 
     if (!found) {
       STATE.Config.DNSBlockLists.push(list);
+    }
+
+    STATE.renderPage("dns");
+  },
+  toggleWhitelist: (list) => {
+    let found = false;
+    STATE.Config?.DNSWhiteLists.forEach((l, i) => {
+      if (l.Tag === list.Tag) {
+        STATE.Config.DNSWhiteLists[i].Enabled =
+          !STATE.Config.DNSWhiteLists[i].Enabled;
+        found = true;
+      }
+    });
+
+    if (!found) {
+      STATE.Config.DNSWhiteLists.push(list);
     }
 
     STATE.renderPage("dns");
