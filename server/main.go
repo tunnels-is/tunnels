@@ -42,7 +42,6 @@ var (
 // twoFactorKey       = os.Getenv("TWO_FACTOR_KEY")
 // googleClientID     = os.Getenv("GOOGLE_CLIENT_ID")
 // googleClientSecret = os.Getenv("GOOGLE_CLIENT_SECRET")
-// emailKey           = os.Getenv("SENDMAIL_KEY")
 // googleRedirectURL  = "http://localhost:3000/auth/google/callback"
 // oauthStateString   = "random-pseudo-state"
 )
@@ -403,7 +402,7 @@ func GenerateVPLCoreMappings() {
 
 func GeneratePortAllocation() (err error) {
 	Config := Config.Load()
-	slots = Config.BandwidthMbps / Config.UserBandwidthMbps
+	slots = Config.ServerBandwidthMbps / Config.UserBandwidthMbps
 	portPerUser := (Config.EndPort - Config.StartPort) / slots
 
 	defer func() {
@@ -484,24 +483,22 @@ func makeConfigAndCerts() {
 			Routes: []*types.Route{
 				{Address: "10.0.0.0/16", Metric: "0"},
 			},
-			SubNets:            []*types.Network{},
-			DisableLanFirewall: false,
-			StartPort:          2000,
-			EndPort:            65530,
-			UserMaxConnections: 10,
-			InternetAccess:     true,
-			LocalNetworkAccess: false,
-			BandwidthMbps:      1000,
-			UserBandwidthMbps:  10,
-			DNSAllowCustomOnly: false,
-			DNSRecords:         []*types.DNSRecord{},
-			DNSServers:         []string{},
-			SecretStore:        "config",
+			SubNets:             []*types.Network{},
+			DisableLanFirewall:  false,
+			StartPort:           2000,
+			EndPort:             65530,
+			UserMaxConnections:  10,
+			InternetAccess:      true,
+			LocalNetworkAccess:  false,
+			ServerBandwidthMbps: 1000,
+			UserBandwidthMbps:   10,
+			DNSRecords:          []*types.DNSRecord{},
+			DNSServers:          []string{},
+			SecretStore:         "config",
 			// secrets
 			DBurl:        "",
 			AdminAPIKey:  uuid.NewString(),
 			TwoFactorKey: strings.ReplaceAll(uuid.NewString(), "-", ""),
-			EmailKey:     "",
 			CertPem:      "./cert.pem",
 			KeyPem:       "./key.pem",
 			SignPem:      "./sign.pem",
@@ -577,7 +574,7 @@ func initializeNewServer() error {
 	newUser.IsManager = true
 	newUser.AdditionalInformation = ""
 	newUser.Email = "admin"
-	newUser.ResetCode = "admin"
+	newUser.ResetCode = uuid.NewString()
 	newUser.Updated = time.Now()
 	newUser.Trial = false
 	newUser.APIKey = uuid.NewString()
@@ -590,6 +587,8 @@ func initializeNewServer() error {
 		return err
 	}
 
+	logger.Info("ADMIN RESET CODE", "code", newUser.ResetCode)
+
 	c := Config.Load()
 	keyBytes, err := os.ReadFile(c.CertPem)
 	if err != nil {
@@ -598,7 +597,7 @@ func initializeNewServer() error {
 	return DB_CreateServer(&types.Server{
 		ID:       primitive.NewObjectID(),
 		Tag:      "tunnels",
-		Country:  "X",
+		Country:  "tunnels",
 		IP:       c.VPNIP,
 		Port:     c.APIPort,
 		DataPort: c.VPNPort,
