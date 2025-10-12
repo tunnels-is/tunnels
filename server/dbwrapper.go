@@ -404,6 +404,52 @@ func DB_updateUser(UF *USER_UPDATE_FORM) (err error) {
 	return
 }
 
+func DB_updateUserAdmin(UF *USER_ADMIN_UPDATE_FORM) (err error) {
+	if BBOLTEnabled {
+		return BBolt_updateUserAdmin(UF)
+	}
+	defer BasicRecover()
+
+	filter := bson.M{
+		"_id": UF.TargetUserID,
+	}
+
+	updateFields := bson.D{}
+
+	if UF.Email != "" {
+		updateFields = append(updateFields, bson.E{Key: "Email", Value: UF.Email})
+	}
+
+	updateFields = append(updateFields, bson.E{Key: "Disabled", Value: UF.Disabled})
+	updateFields = append(updateFields, bson.E{Key: "IsManager", Value: UF.IsManager})
+	updateFields = append(updateFields, bson.E{Key: "Trial", Value: UF.Trial})
+
+	res, err := DB.Database(USERS_DATABASE).
+		Collection(USERS_COLLECTION).
+		UpdateOne(
+			context.Background(),
+			filter,
+			bson.D{
+				{
+					Key:   "$set",
+					Value: updateFields,
+				},
+			},
+			options.Update(),
+		)
+	if err != nil {
+		ADMIN(3, "Could not admin update user: ", err)
+		return err
+	}
+
+	if res.MatchedCount == 0 {
+		ADMIN(3, "Could not admin update user: user not found")
+		return errors.New("unable to modify document")
+	}
+
+	return
+}
+
 func DB_toggleUserSubscriptionStatus(UF *USER_UPDATE_SUB_FORM) (err error) {
 	if BBOLTEnabled {
 		return BBolt_toggleUserSubscriptionStatus(UF)
@@ -501,40 +547,6 @@ func DB_userResetPassword(user *User) error {
 	if res.MatchedCount == 0 {
 		ADMIN(3, "Unable to modify user password: ", user.ID)
 		return errors.New("user password could not be modified")
-	}
-
-	return nil
-}
-
-func DB_userUpdateResetCode(user *User) error {
-	if BBOLTEnabled {
-		return BBolt_userUpdateResetCode(user)
-	}
-	defer BasicRecover()
-
-	res, err := DB.Database(USERS_DATABASE).
-		Collection(USERS_COLLECTION).
-		UpdateOne(
-			context.Background(),
-			bson.M{"_id": user.ID},
-			bson.D{
-				{
-					Key: "$set",
-					Value: bson.D{
-						{Key: "ResetCode", Value: user.ResetCode},
-						{Key: "LastResetRequest", Value: user.LastResetRequest},
-					},
-				},
-			},
-		)
-	if err != nil {
-		ADMIN(3, "Unable to modify user reset code: ", user.ID)
-		return err
-	}
-
-	if res.MatchedCount == 0 {
-		ADMIN(3, "Unable to modify user password reset code: ", user.ID)
-		return errors.New("User reset code could not be modified")
 	}
 
 	return nil
@@ -700,6 +712,7 @@ func DB_FindEntitiesByGroupID(id primitive.ObjectID, objType string, limit, offs
 
 	return
 }
+
 func DB_UpdateGroup(G *Group) (err error) {
 	if BBOLTEnabled {
 		return BBolt_UpdateGroup(G)
