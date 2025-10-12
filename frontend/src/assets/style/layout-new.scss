@@ -653,10 +653,8 @@ body::-webkit-scrollbar {
     z-index: 41;
 
     .line {
-      // margin-top: -3px;
-      padding: 1px 0px 2px 0px;
+      padding: 0px 0px 0px 0px;
       font-size: 14px;
-      /* border-bottom: 1px solid var(--line-border); */
       display: flex;
       flex-wrap: wrap;
     }
