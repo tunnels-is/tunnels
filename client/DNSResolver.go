@@ -257,11 +257,10 @@ func DNSQuery(w dns.ResponseWriter, m *dns.Msg) {
 
 	// Check if domain is whitelisted first - whitelisted domains bypass blocklists
 	whitelisted := isWhitelisted(m)
-	blocked, tag := isBlocked(m)
-
-	// If whitelisted, override blocked status
-	if whitelisted {
-		blocked = false
+	var blocked bool
+	var tag string
+	if !whitelisted {
+		blocked, tag = isBlocked(m)
 	}
 
 	var DNSTunnel *TUN
