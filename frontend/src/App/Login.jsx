@@ -592,6 +592,27 @@ const Login = (props) => {
     );
   };
 
+  const ResetTwoFactorCodeInput = () => {
+    return (
+      <div className="space-y-2">
+        <div className="relative">
+          <FrameIcon className="absolute left-3 top-2.5 h-5 w-5 text-[#4B7BF5]" />
+          <Input
+            id="code"
+            className="pl-10 bg-[#0B0E14] border-[#1a1f2d] text-white focus:ring-[#4B7BF5] focus:border-[#4B7BF5] h-11"
+            type="text"
+            placeholder="Two-Factor Auth Code"
+            name="code"
+            onChange={HandleInputChange}
+          />
+        </div>
+        {errors["code"] && (
+          <p className="text-sm text-red-500">{errors["code"]}</p>
+        )}
+      </div>
+    );
+  };
+
   const RecoveryInput = () => {
     return (
       <div className="space-y-2">
@@ -756,21 +777,9 @@ const Login = (props) => {
           {EmailInput()}
           {PasswordInput()}
           {ConfirmPasswordInput()}
-          {CodeInput()}
-          <div className="flex items-center space-x-2 mt-[8px] ml-[10px]">
-            <Switch
-              checked={inputs["usetwofactor"]}
-              onCheckedChange={(e) => {
-                inputs["usetwofactor"] = e
-              }}
-            />
-            <Label htmlFor="airplane-mode">Use Two-Factor Authentication</Label>
-          </div>
+          {ResetTwoFactorCodeInput()}
           {selectForm()}
           <div className="flex space-x-2">
-            <Button className="flex-1 h-11 bg-[#0B0E14] border-[#1a1f2d] text-white hover:bg-[#1a1f2d] hover:text-white" onClick={() => GetCode()}>
-              Get Reset Code
-            </Button>
             <Button className="flex-1 h-11 bg-[#4B7BF5] hover:bg-[#4B7BF5]/90 text-white" onClick={() => ResetSubmit()}>
               Reset Password
             </Button>
