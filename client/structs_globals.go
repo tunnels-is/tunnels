@@ -495,7 +495,6 @@ type LicenseKey struct {
 type BlockList struct {
 	Tag          string
 	URL          string
-	Disk         string
 	Enabled      bool
 	Count        int
 	LastDownload time.Time
