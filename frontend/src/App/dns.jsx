@@ -141,9 +141,9 @@ const DNS = () => {
         "tag": () => {
           return "Domain"
         },
-        "Tag": () => {
-          return "List"
-        }
+        // "Tag": () => {
+        //   return "List"
+        // }
       },
       columnFormat: {
         FirstSeen: (obj) => {
@@ -156,7 +156,7 @@ const DNS = () => {
       customColumns: {},
       columnClass: {},
       Btn: {},
-      headers: ["tag", "Tag", "Count", "FirstSeen", "LastSeen"],
+      headers: ["tag", "Count", "FirstSeen", "LastSeen"],
       headerClass: {},
     }
   };
@@ -291,6 +291,7 @@ const DNS = () => {
           <TabsTrigger className={state.Theme?.tabs} value="settings">Settings</TabsTrigger>
           <TabsTrigger className={state.Theme?.tabs} value="records">DNS Records</TabsTrigger>
           <TabsTrigger className={state.Theme?.tabs} value="blocklist">Block Lists</TabsTrigger>
+          <TabsTrigger className={state.Theme?.tabs} value="whitelist">White Lists</TabsTrigger>
           <TabsTrigger className={state.Theme?.tabs} value="blockdomains">Blocked Domains</TabsTrigger>
           <TabsTrigger className={state.Theme?.tabs} value="resolveddomains">Resovled Domains</TabsTrigger>
         </TabsList>
@@ -403,6 +404,9 @@ const DNS = () => {
           </div>
 
         </TabsContent>
+        <TabsContent value="whitelist">
+          <GenericTable table={bltable} />
+        </TabsContent>
         <TabsContent value="blocklist">
           <GenericTable table={bltable} />
           <NewObjectEditorDialog
@@ -414,7 +418,8 @@ const DNS = () => {
             readOnly={false}
             opts={{
               fields: {
-                Count: "hidden"
+                Count: "hidden",
+                LastDownload: "hidden"
               }
             }}
             saveButton={async (obj) => {

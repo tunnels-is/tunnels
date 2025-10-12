@@ -51,7 +51,7 @@ func DEEP(Line ...any) {
 
 	x := ""
 	for _, v := range Line {
-		x += fmt.Sprintf("%v", v)
+		x += fmt.Sprintf("%v ", v)
 	}
 
 	select {
@@ -77,7 +77,7 @@ func DEBUG(Line ...any) {
 
 	x := ""
 	for _, v := range Line {
-		x += fmt.Sprintf("%v", v)
+		x += fmt.Sprintf("%v ", v)
 	}
 
 	select {
@@ -103,7 +103,7 @@ func ERROR(Line ...any) {
 
 	x := ""
 	for _, v := range Line {
-		x += fmt.Sprintf("%v", v)
+		x += fmt.Sprintf("%v ", v)
 	}
 	checkLogUniqueness(&x)
 
