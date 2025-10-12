@@ -264,6 +264,10 @@ func BBolt_updateUserAdmin(UF *USER_ADMIN_UPDATE_FORM) error {
 			U.Email = UF.Email
 		}
 
+		if !UF.SubExpiration.IsZero() {
+			U.SubExpiration = UF.SubExpiration
+		}
+
 		U.Disabled = UF.Disabled
 		U.IsManager = UF.IsManager
 		U.Trial = UF.Trial
