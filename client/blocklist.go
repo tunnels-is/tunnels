@@ -34,7 +34,7 @@ func reloadBlockLists(sleep bool) {
 			badList = true
 			break
 		}
-		if v.URL == "" && v.Disk == "" {
+		if v.URL == "" && v.Tag == "" {
 			badList = true
 		}
 	}
@@ -72,43 +72,38 @@ func processBlockList(index int, wg *sync.WaitGroup, nm *xsync.MapOf[string, boo
 	var err error
 	var listBytes []byte
 	state := STATE.Load()
-	fname := state.BlockListPath + bl.Tag + ".txt"
+	lowerTag := strings.ToLower(bl.Tag)
 
 	if time.Since(bl.LastDownload).Hours() > 24 && bl.URL != "" {
-		if CheckIfURL(bl.URL) {
-			listBytes, err = downloadList(bl.URL)
-			if err != nil {
-				ERROR("Could not download", bl.URL, err)
-				return
-			}
-			err = os.WriteFile(fname, listBytes, 0o666)
-			if err != nil {
-				ERROR("Could not save", bl.URL, err)
-				return
-			}
-			bl.Disk = fname
-		}
-	} else if bl.Disk != "" {
-		listBytes, err = os.ReadFile(bl.Disk)
+		listBytes, err = downloadList(bl.URL)
 		if err != nil {
-			ERROR("Could not read blocklist", bl.Disk, err)
+			ERROR("Could not download bocklist", bl.URL, err)
+			listBytes, err = os.ReadFile(state.BlockListPath + lowerTag)
+			if err != nil {
+				ERROR("Could not read from disk or download blocklist", bl.URL, err)
+				return
+			}
+		}
+	} else if bl.Tag != "" {
+		listBytes, err = os.ReadFile(state.BlockListPath + lowerTag)
+		if err != nil {
+			ERROR("Could not read blocklist", lowerTag, err)
 			listBytes, err = downloadList(bl.URL)
 			if err != nil {
-				ERROR("Could not read from disk or download", bl.URL, err)
+				ERROR("Could not read from disk or download blocklist", bl.URL, err)
 				return
 			}
-
-			err = os.WriteFile(fname, listBytes, 0o666)
-			if err != nil {
-				ERROR("Could not save", bl.URL, err)
-				return
-			}
-			bl.Disk = fname
 		}
 	}
 
 	if len(listBytes) == 0 {
-		ERROR("No bytes in DNS blocklist: ", bl.URL, bl.Disk)
+		ERROR("No bytes in DNS blocklist: ", bl.URL, lowerTag)
+		return
+	}
+
+	err = os.WriteFile(state.BlockListPath+lowerTag, listBytes, 0o666)
+	if err != nil {
+		ERROR("Could not save", bl.URL, err)
 		return
 	}
 
@@ -137,6 +132,9 @@ func processBlockList(index int, wg *sync.WaitGroup, nm *xsync.MapOf[string, boo
 
 func downloadList(url string) ([]byte, error) {
 	defer RecoverAndLog()
+	if !CheckIfURL(url) {
+		return nil, nil
+	}
 
 	DEBUG("Downloading Blocklist: ", url)
 	start := time.Now()
@@ -177,43 +175,43 @@ func GetDefaultBlockLists() []*BlockList {
 	bl := []*BlockList{
 		{
 			Tag: "Ads",
-			URL: "https://raw.githubusercontent.com/n00bady/bluam/master/dns/merged/ads.txt",
+			URL: "https://raw.githubusercontent.com/n00bady/bluam/master/dns/merged/ads",
 		},
 		{
 			Tag: "AdultContent",
-			URL: "https://github.com/n00bady/bluam/raw/master/dns/merged/adult.txt",
+			URL: "https://github.com/n00bady/bluam/raw/master/dns/merged/adult",
 		},
 		{
 			Tag: "CryptoCurrency",
-			URL: "https://github.com/n00bady/bluam/raw/master/dns/merged/crypto.txt",
+			URL: "https://github.com/n00bady/bluam/raw/master/dns/merged/crypto",
 		},
 		{
 			Tag: "Drugs",
-			URL: "https://github.com/n00bady/bluam/raw/master/dns/merged/drugs.txt",
+			URL: "https://github.com/n00bady/bluam/raw/master/dns/merged/drugs",
 		},
 		{
 			Tag: "FakeNews",
-			URL: "https://github.com/n00bady/bluam/raw/master/dns/merged/fakenews.txt",
+			URL: "https://github.com/n00bady/bluam/raw/master/dns/merged/fakenews",
 		},
 		{
 			Tag: "Fraud",
-			URL: "https://github.com/n00bady/bluam/raw/master/dns/merged/fraud.txt",
+			URL: "https://github.com/n00bady/bluam/raw/master/dns/merged/fraud",
 		},
 		{
 			Tag: "Gambling",
-			URL: "https://github.com/n00bady/bluam/raw/master/dns/merged/gambling.txt",
+			URL: "https://github.com/n00bady/bluam/raw/master/dns/merged/gambling",
 		},
 		{
 			Tag: "Malware",
-			URL: "https://github.com/n00bady/bluam/raw/master/dns/merged/malware.txt",
+			URL: "https://github.com/n00bady/bluam/raw/master/dns/merged/malware",
 		},
 		{
 			Tag: "SocialMedia",
-			URL: "https://github.com/n00bady/bluam/raw/master/dns/merged/socialmedia.txt",
+			URL: "https://github.com/n00bady/bluam/raw/master/dns/merged/socialmedia",
 		},
 		{
 			Tag: "Surveillance",
-			URL: "https://github.com/n00bady/bluam/raw/master/dns/merged/surveillance.txt",
+			URL: "https://github.com/n00bady/bluam/raw/master/dns/merged/surveillance",
 		},
 	}
 

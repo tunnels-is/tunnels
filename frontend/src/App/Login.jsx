@@ -199,7 +199,7 @@ const useForm = () => {
 
     let x = await state.callController(authServer, "POST", "/v3/user/login", inputs, true, false)
     if (x && x.status === 200) {
-      STORE.Cache.setItem("default-device-name", inputs["devicename"]);
+      STORE.Cache.Set("default-device-name", inputs["devicename"]);
       STORE.Cache.Set("default-email", inputs["email"]);
       state.v2_SetUser(x.data, remember, authServer);
       if (mode === 3) {
@@ -415,7 +415,7 @@ const Login = (props) => {
     changeAuthServer(state.Config?.ControlServers[0]?.ID)
     let i = { ...inputs };
 
-    let defaultDeviceName = STORE.Cache.getItem("default-device-name");
+    let defaultDeviceName = STORE.Cache.Get("default-device-name");
     if (defaultDeviceName) {
       i["devicename"] = defaultDeviceName;
     }
