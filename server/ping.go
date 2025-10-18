@@ -61,6 +61,7 @@ func NukeClient(index int) {
 		}
 	}
 
+	// Not removing yet, but there is no need to un-assign from the lan due to DHCP presistence.
 	if clientCoreMappings[index].DHCP != nil {
 		// ip := clientCoreMappings[index].DHCP.IP
 		// VPLIPToCore[ip[0]][ip[1]][ip[2]][ip[3]] = nil
