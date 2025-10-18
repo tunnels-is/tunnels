@@ -48,9 +48,35 @@ these are applied automatically on startup
 ```
 $ iptables -I OUTPUT -p tcp --src {interface_IP} --tcp-flags ACK,RST RST -j DROP
 ```
+### Testing
+The project includes comprehensive test coverage for all server components.
+
+```bash
+# Run all tests
+$ make test
+
+# Run tests with verbose output
+$ make test-server
+
+# Run tests with coverage report
+$ make test-coverage
+
+# Count total number of tests
+$ make test-count
+
+# Run tests with race detection
+$ make test-verbose
+
+# Or run tests directly with go
+$ go test ./server/...
+```
+
 ### Linting
 ```
 $ golangci-lint run --timeout=10m --config .golangci.yml
+
+# Or use make
+$ make lint
 ```
 ### Permissions
  - Windows: admin
@@ -58,8 +84,21 @@ $ golangci-lint run --timeout=10m --config .golangci.yml
  - linux: setcap 'cap_net_raw,cap_net_bind_service,cap_net_admin+eip' main
 
 ## Building
- - DEV: ./releaser-build-snapshot.sh
+Tests are automatically run before building in the goreleaser pipeline.
+
+ - DEV: ./releaser-build-snapshot.sh (or `make release`)
  - PROD: ./releaser-build-release.sh ( requires GITHUB_TOKEN )
+
+```bash
+# Build using make
+$ make build           # Build all binaries
+$ make build-server    # Build server only
+$ make build-client    # Build client only
+
+# Test before building
+$ make pre-commit      # Run tests and linting
+$ make ci              # Run CI checks locally
+```
 
 # Experimental
 ## Wails

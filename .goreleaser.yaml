@@ -12,6 +12,7 @@ before:
   hooks:
     # You may remove this if you don't use go modules.
     - go mod tidy
+    # Run all tests before building (fail fast if tests fail)
     - ./build-ui.sh
     - ./build-parser.sh
 
