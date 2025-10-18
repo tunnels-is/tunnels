@@ -1,7 +1,6 @@
 package main
 
 import (
-	"crypto/md5"
 	"encoding/binary"
 	"encoding/hex"
 	"errors"
@@ -16,12 +15,13 @@ import (
 
 	"github.com/tunnels-is/tunnels/crypt"
 	"github.com/tunnels-is/tunnels/types"
+	"golang.org/x/crypto/sha3"
 	"golang.org/x/sys/unix"
 )
 
-// HashIdentifierMD5 creates an MD5 hash from an identifier
-func HashIdentifierMD5(identifier string) string {
-	hash := md5.Sum([]byte(identifier))
+// HashIdentifier creates a SHA3-256 hash from an identifier
+func HashIdentifier(identifier string) string {
+	hash := sha3.Sum256([]byte(identifier))
 	return hex.EncodeToString(hash[:])
 }
 
@@ -63,14 +63,11 @@ func CreateClientCoreMapping(CRR *types.ServerConnectResponse, CR *types.Control
 				continue
 			}
 
-			// Hash the UserID and store it
-			clientCoreMappings[i].ID = HashIdentifierMD5(CR.UserID.Hex())
-
-			// Hash the DeviceToken or DeviceKey and store it
+			clientCoreMappings[i].ID = HashIdentifier(CR.UserID.Hex())
 			if CR.DeviceToken != "" {
-				clientCoreMappings[i].DeviceToken = HashIdentifierMD5(CR.DeviceToken)
+				clientCoreMappings[i].DeviceToken = HashIdentifier(CR.DeviceToken)
 			} else {
-				clientCoreMappings[i].DeviceToken = HashIdentifierMD5(CR.DeviceKey)
+				clientCoreMappings[i].DeviceToken = HashIdentifier(CR.DeviceKey)
 			}
 
 			clientCoreMappings[i].EH = EH
