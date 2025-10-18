@@ -1,7 +1,9 @@
 package main
 
 import (
+	"crypto/md5"
 	"encoding/binary"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math"
@@ -16,6 +18,12 @@ import (
 	"github.com/tunnels-is/tunnels/types"
 	"golang.org/x/sys/unix"
 )
+
+// HashIdentifierMD5 creates an MD5 hash from an identifier
+func HashIdentifierMD5(identifier string) string {
+	hash := md5.Sum([]byte(identifier))
+	return hex.EncodeToString(hash[:])
+}
 
 func countConnections(id string) (count int, userCount int) {
 	for i := range clientCoreMappings {
@@ -55,12 +63,16 @@ func CreateClientCoreMapping(CRR *types.ServerConnectResponse, CR *types.Control
 				continue
 			}
 
-			clientCoreMappings[i].ID = CR.UserID.Hex()
+			// Hash the UserID and store it
+			clientCoreMappings[i].ID = HashIdentifierMD5(CR.UserID.Hex())
+
+			// Hash the DeviceToken or DeviceKey and store it
 			if CR.DeviceToken != "" {
-				clientCoreMappings[i].DeviceToken = CR.DeviceToken
+				clientCoreMappings[i].DeviceToken = HashIdentifierMD5(CR.DeviceToken)
 			} else {
-				clientCoreMappings[i].DeviceToken = CR.DeviceKey
+				clientCoreMappings[i].DeviceToken = HashIdentifierMD5(CR.DeviceKey)
 			}
+
 			clientCoreMappings[i].EH = EH
 			clientCoreMappings[i].Created = time.Now()
 			clientCoreMappings[i].ToUser = make(chan []byte, 500_000)
