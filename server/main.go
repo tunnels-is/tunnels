@@ -154,7 +154,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Handle --admin flag
 	if *adminFlag != "" {
 		err := addAdminToConfig(*adminFlag)
 		if err != nil {
@@ -327,21 +326,17 @@ func SaveServerConfig(path string) (err error) {
 }
 
 func addAdminToConfig(identifier string) error {
-	// Load the config
 	err := LoadServerConfig("./config.json")
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
 
-	// Hash the identifier
-	hashedIdentifier := HashIdentifierMD5(identifier)
+	hashedIdentifier := HashIdentifier(identifier)
 
-	// Add to NetAdmins
 	C := Config.Load()
 	C.NetAdmins = append(C.NetAdmins, hashedIdentifier)
 	Config.Store(C)
 
-	// Save the config
 	err = SaveServerConfig("./config.json")
 	if err != nil {
 		return fmt.Errorf("failed to save config: %w", err)
