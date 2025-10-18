@@ -132,6 +132,7 @@ func main() {
 	configFlag := flag.Bool("config", false, "This command runs the server and creates a config + certificates")
 	certsOnly := flag.Bool("certs", false, "This command generates certificates and exits")
 	silent := flag.Bool("silent", false, "This command disables logging")
+	adminFlag := flag.String("admin", "", "Add an admin identifier (DeviceToken/DeviceKey/UserID) to NetAdmins")
 	disableLogs = *silent
 	logHandler := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug})
 	logger = slog.New(logHandler)
@@ -151,6 +152,16 @@ func main() {
 		logger.Info("generating certs")
 		makeCertsOnly()
 		os.Exit(1)
+	}
+
+	if *adminFlag != "" {
+		err := addAdminToConfig(*adminFlag)
+		if err != nil {
+			logger.Error("failed to add admin to config", slog.Any("err", err))
+			os.Exit(1)
+		}
+		logger.Info("successfully added admin to NetAdmins")
+		os.Exit(0)
 	}
 
 	runtime.GOMAXPROCS(runtime.NumCPU())
@@ -295,6 +306,43 @@ func LoadServerConfig(path string) (err error) {
 	}
 	Config.Store(C)
 	return
+}
+
+func SaveServerConfig(path string) (err error) {
+	C := Config.Load()
+	f, err := os.Create(path)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = f.Close()
+	}()
+	encoder := json.NewEncoder(f)
+	encoder.SetIndent("", "    ")
+	if err := encoder.Encode(C); err != nil {
+		return err
+	}
+	return nil
+}
+
+func addAdminToConfig(identifier string) error {
+	err := LoadServerConfig("./config.json")
+	if err != nil {
+		return fmt.Errorf("failed to load config: %w", err)
+	}
+
+	hashedIdentifier := HashIdentifier(identifier)
+
+	C := Config.Load()
+	C.NetAdmins = append(C.NetAdmins, hashedIdentifier)
+	Config.Store(C)
+
+	err = SaveServerConfig("./config.json")
+	if err != nil {
+		return fmt.Errorf("failed to save config: %w", err)
+	}
+
+	return nil
 }
 
 func loadCertificatesAndTLSSettings() (err error) {
