@@ -149,9 +149,16 @@ func Test_getIP4FromHostOrDHCP_IPv6ToIPv4Conversion(t *testing.T) {
 			expected: [4]byte{8, 8, 8, 8},
 			expectOk: true,
 		},
-		// NOTE: Pure IPv6 addresses (non-IPv4-mapped) will cause a panic in the current
-		// implementation because ip.To4() returns nil but the code doesn't check for it.
-		// This is a bug in the production code that should be fixed, but we're only testing.
+		{
+			name:     "pure IPv6 - should fail (not IPv4)",
+			host:     "2001:db8::1",
+			expectOk: false, // Pure IPv6 not convertible to IPv4
+		},
+		{
+			name:     "IPv6 loopback - ::1",
+			host:     "::1",
+			expectOk: false, // Pure IPv6 loopback
+		},
 	}
 
 	for _, tc := range tests {
