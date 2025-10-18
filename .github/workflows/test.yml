@@ -34,17 +34,9 @@ jobs:
       run: go mod download
 
     - name: Run server tests
-      run: go test -v -race -coverprofile=coverage.txt -covermode=atomic ./server/...
-
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v4
-      with:
-        file: ./coverage.txt
-        flags: server
-        name: server-coverage
-      continue-on-error: true
+      run: go test -v -race ./...
 
     - name: Test Summary
       run: |
         echo "## Test Results" >> $GITHUB_STEP_SUMMARY
-        go test ./server/... -v 2>&1 | grep -E "(PASS|FAIL|ok|RUN)" | tail -20 >> $GITHUB_STEP_SUMMARY
+        go test ./... -v 2>&1 | grep -E "(PASS|FAIL|ok|RUN)" | tail -20 >> $GITHUB_STEP_SUMMARY
