@@ -1,4 +1,4 @@
-import { HashRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { createRoot } from "react-dom/client";
 import React, { useEffect } from "react";
 import { createPortal } from "react-dom";
@@ -44,7 +44,7 @@ const LaunchApp = () => {
   }, []);
 
   return (
-    <HashRouter>
+    <BrowserRouter>
       {createPortal(
         <Toaster
           toastOptions={{
@@ -117,7 +117,7 @@ const LaunchApp = () => {
           </div>
         </main>
       </div>
-    </HashRouter>
+    </BrowserRouter>
   );
 };
 
