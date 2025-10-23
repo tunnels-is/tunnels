@@ -2,7 +2,7 @@ import React, { useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import FormKeyValue from "./component/formkeyvalue";
+import FormKeyValue from "../components/formkeyvalue";
 import { useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
 import GLOBAL_STATE from "../state";

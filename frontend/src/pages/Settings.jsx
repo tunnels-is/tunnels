@@ -21,9 +21,9 @@ import {
   Key,
   Network,
 } from "lucide-react";
-import InfoItem from "./component/InfoItem";
+import InfoItem from "../components/InfoItem";
 import { useState } from "react";
-import FormKeyValue from "./component/formkeyvalue";
+import FormKeyValue from "../components/formkeyvalue";
 
 const Settings = () => {
   const state = GLOBAL_STATE("settings");
