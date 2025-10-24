@@ -869,7 +869,7 @@ const Login = (props) => {
               RemoveToken();
               setMode(2);
             }}
-            className="text-xl"
+            className={`text-xl ${mode === 2 && "text-primary"}`}
           >
             Register
           </Button>
@@ -879,30 +879,21 @@ const Login = (props) => {
               GenerateToken();
               setMode(5);
             }}
-            className={`h-9 px-4 text-xl ${mode === 5
-              ? 'text-[#4B7BF5]'
-              : ''
-              }`}
+            className={`text-xl ${mode === 5 && "text-primary"}`}
           >
             Register Anonymously
           </Button>
           <Button
             variant="ghost"
             onClick={() => setMode(4)}
-            className={`h-9 px-4 text-xl ${mode === 4
-              ? 'text-[#4B7BF5]'
-              : ''
-              }`}
+            className={`text-xl ${mode === 4 && "text-primary"}`}
           >
             Reset Password
           </Button>
           <Button
             variant="ghost"
             onClick={() => setMode(3)}
-            className={`h-9 px-4 text-xl ${mode === 3
-              ? 'text-[#4B7BF5]'
-              : ''
-              }`}
+            className={`text-xl ${mode === 3 && "text-primary"}`}
           >
             2FA Recovery
           </Button>

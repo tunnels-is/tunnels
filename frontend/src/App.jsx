@@ -32,6 +32,7 @@ import WS from "./ws";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import AppSidebar from "./components/app-sidebar";
 import { ModeToggle } from "./components/mode-toggle";
+import { ThemeProvider } from "./components/theme-provider";
 
 const appElement = document.getElementById("app");
 const root = createRoot(appElement);
@@ -50,52 +51,54 @@ const LaunchApp = () => {
         <Toaster position="bottom-right" theme="light" />,
         document.body
       )}
-      <ModeToggle/>
-      <SidebarProvider>
-        <ScreenLoader />
-        <AppSidebar />
+      <ThemeProvider>
+        <ModeToggle />
+        <SidebarProvider>
+          <ScreenLoader />
+          <AppSidebar />
 
-        <Routes>
-          {!state.User && (
-            <>
-              <Route path="/" element={<Login />} />
-              <Route path="*" element={<UserSelect />} />
-            </>
-          )}
+          <Routes>
+            {!state.User && (
+              <>
+                <Route path="/" element={<Login />} />
+                <Route path="*" element={<UserSelect />} />
+              </>
+            )}
 
-          {state.User && (
-            <>
-              <Route path="/" element={<Welcome />} />
-              <Route path="*" element={<PrivateServers />} />
+            {state.User && (
+              <>
+                <Route path="/" element={<Welcome />} />
+                <Route path="*" element={<PrivateServers />} />
 
-              <Route path="groups" element={<Groups />} />
-              <Route path="users" element={<Users />} />
-              <Route path="devices" element={<Devices />} />
-              <Route path="groups/:id" element={<InspectGroup />} />
+                <Route path="groups" element={<Groups />} />
+                <Route path="users" element={<Users />} />
+                <Route path="devices" element={<Devices />} />
+                <Route path="groups/:id" element={<InspectGroup />} />
 
-              <Route path="tunnels" element={<Tunnels />} />
-              <Route path="connections" element={<Stats />} />
-              <Route path="account" element={<Account />} />
+                <Route path="tunnels" element={<Tunnels />} />
+                <Route path="connections" element={<Stats />} />
+                <Route path="account" element={<Account />} />
 
-              <Route path="servers" element={<PrivateServers />} />
-              <Route path="server/:id" element={<ServerDevices />} />
-            </>
-          )}
-          <Route path="accounts" element={<UserSelect />} />
+                <Route path="servers" element={<PrivateServers />} />
+                <Route path="server/:id" element={<ServerDevices />} />
+              </>
+            )}
+            <Route path="accounts" element={<UserSelect />} />
 
-          <Route path="twofactor/create" element={<Enable2FA />} />
+            <Route path="twofactor/create" element={<Enable2FA />} />
 
-          <Route path="logs" element={<Logs />} />
-          <Route path="settings" element={<Settings />} />
+            <Route path="logs" element={<Logs />} />
+            <Route path="settings" element={<Settings />} />
 
-          <Route path="dns" element={<DNS />} />
-          <Route path="dns/answers/:domain" element={<DNSAnswers />} />
+            <Route path="dns" element={<DNS />} />
+            <Route path="dns/answers/:domain" element={<DNSAnswers />} />
 
-          <Route path="login" element={<Login />} />
-          <Route path="login/:modeParam" element={<Login />} />
-          <Route path="help" element={<Welcome />} />
-        </Routes>
-      </SidebarProvider>
+            <Route path="login" element={<Login />} />
+            <Route path="login/:modeParam" element={<Login />} />
+            <Route path="help" element={<Welcome />} />
+          </Routes>
+        </SidebarProvider>
+      </ThemeProvider>
     </BrowserRouter>
   );
 };
