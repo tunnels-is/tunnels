@@ -2,9 +2,9 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { createRoot } from "react-dom/client";
 import React, { useEffect } from "react";
 import { createPortal } from "react-dom";
-import { Toaster } from "react-hot-toast";
+import { Toaster } from "@/components/ui/sonner";
 
-import "./assets/style/app.scss";
+import "./assets/style/main.css";
 import "@fontsource-variable/inter";
 
 import DNSAnswers from "./components/DNSAnswers";
@@ -19,7 +19,6 @@ import Devices from "./pages/Devices";
 import Tunnels from "./pages/Tunnels";
 import Account from "./pages/Account";
 import Welcome from "./pages/Welcome";
-import SideBar from "./pages/SideBar";
 import GLOBAL_STATE from "./state";
 import Groups from "./pages/Groups";
 import Login from "./pages/Login";
@@ -30,13 +29,15 @@ import Logs from "./pages/Logs";
 import STORE from "./store";
 import DNS from "./pages/dns";
 import WS from "./ws";
+import { SidebarProvider } from "@/components/ui/sidebar";
+import AppSidebar from "./components/app-sidebar";
+import { ModeToggle } from "./components/mode-toggle";
 
 const appElement = document.getElementById("app");
 const root = createRoot(appElement);
 
 const LaunchApp = () => {
   const state = GLOBAL_STATE("root");
-
 
   useEffect(() => {
     state.GetBackendState();
@@ -46,77 +47,55 @@ const LaunchApp = () => {
   return (
     <BrowserRouter>
       {createPortal(
-        <Toaster
-          toastOptions={{
-            className: "toast border-[2px] p-6 !text-white !bg-[#0B0E14] !border-[#1a1f2d]",
-            position: "top-right",
-            success: {
-              duration: 2000,
-            },
-
-            icon: null,
-            error: {
-              duration: 2000,
-            },
-          }
-          }
-        />,
-        document.body,
+        <Toaster position="bottom-right" theme="light" />,
+        document.body
       )}
-      <div className=" bg-black w-full">
+      <ModeToggle/>
+      <SidebarProvider>
         <ScreenLoader />
-        <SideBar />
+        <AppSidebar />
 
-        <main className="pl-44 pb-[300px]">
-          <div className="">
-            <div className="p-6 w-full">
-              <Routes>
-                {!state.User && (
-                  <>
-                    <Route path="/" element={<Login />} />
-                    <Route path="*" element={<UserSelect />} />
-                  </>
-                )}
+        <Routes>
+          {!state.User && (
+            <>
+              <Route path="/" element={<Login />} />
+              <Route path="*" element={<UserSelect />} />
+            </>
+          )}
 
-                {state.User && (
-                  <>
-                    <Route path="/" element={<Welcome />} />
-                    <Route path="*" element={<PrivateServers />} />
+          {state.User && (
+            <>
+              <Route path="/" element={<Welcome />} />
+              <Route path="*" element={<PrivateServers />} />
 
-                    <Route path="groups" element={<Groups />} />
-                    <Route path="users" element={<Users />} />
-                    <Route path="devices" element={<Devices />} />
-                    <Route path="groups/:id" element={<InspectGroup />} />
+              <Route path="groups" element={<Groups />} />
+              <Route path="users" element={<Users />} />
+              <Route path="devices" element={<Devices />} />
+              <Route path="groups/:id" element={<InspectGroup />} />
 
-                    <Route path="tunnels" element={<Tunnels />} />
-                    <Route path="connections" element={<Stats />} />
-                    <Route path="account" element={<Account />} />
+              <Route path="tunnels" element={<Tunnels />} />
+              <Route path="connections" element={<Stats />} />
+              <Route path="account" element={<Account />} />
 
-                    <Route path="servers" element={<PrivateServers />} />
-                    <Route path="server/:id" element={<ServerDevices />} />
+              <Route path="servers" element={<PrivateServers />} />
+              <Route path="server/:id" element={<ServerDevices />} />
+            </>
+          )}
+          <Route path="accounts" element={<UserSelect />} />
 
-                  </>
-                )}
-                <Route path="accounts" element={<UserSelect />} />
+          <Route path="twofactor/create" element={<Enable2FA />} />
 
+          <Route path="logs" element={<Logs />} />
+          <Route path="settings" element={<Settings />} />
 
-                <Route path="twofactor/create" element={<Enable2FA />} />
+          <Route path="dns" element={<DNS />} />
+          <Route path="dns/answers/:domain" element={<DNSAnswers />} />
 
-                <Route path="logs" element={<Logs />} />
-                <Route path="settings" element={<Settings />} />
-
-                <Route path="dns" element={<DNS />} />
-                <Route path="dns/answers/:domain" element={<DNSAnswers />} />
-
-                <Route path="login" element={<Login />} />
-                <Route path="login/:modeParam" element={<Login />} />
-                <Route path="help" element={<Welcome />} />
-
-              </Routes>
-            </div>
-          </div>
-        </main>
-      </div>
+          <Route path="login" element={<Login />} />
+          <Route path="login/:modeParam" element={<Login />} />
+          <Route path="help" element={<Welcome />} />
+        </Routes>
+      </SidebarProvider>
     </BrowserRouter>
   );
 };
@@ -151,13 +130,13 @@ class ErrorBoundary extends React.Component {
 
   async ProductionCheck() {
     if (!STATE.debug) {
-      window.console.apply = function() { };
-      window.console.dir = function() { };
-      window.console.log = function() { };
-      window.console.info = function() { };
-      window.console.warn = function() { };
-      window.console.error = function() { };
-      window.console.debug = function() { };
+      window.console.apply = function () {};
+      window.console.dir = function () {};
+      window.console.log = function () {};
+      window.console.info = function () {};
+      window.console.warn = function () {};
+      window.console.error = function () {};
+      window.console.debug = function () {};
     }
   }
 
@@ -184,5 +163,5 @@ root.render(
     <ErrorBoundary>
       <LaunchApp />
     </ErrorBoundary>
-  </React.StrictMode>,
+  </React.StrictMode>
 );

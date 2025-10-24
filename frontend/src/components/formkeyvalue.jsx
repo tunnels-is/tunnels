@@ -13,9 +13,9 @@ const FormKeyValue = (props) => {
           <props.icon
             className={`h-4 w-4 pb-[1px] text-cyan-500 ${props.iconClass} `} />
         }
-        <Label className="ml-1 text-white">{props?.label}</Label>
+        <Label className="ml-1">{props?.label}</Label>
       </div>
-      <div className="text-white">{props?.value}</div>
+      <div>{props?.value}</div>
     </div>
   );
 };

@@ -75,21 +75,21 @@ const Logs = () => {
     }}>
 
       {/* Pagination Controls */}
-      < div className="pagination-controls bg-black z-[1000] pb-[15px] pt-[20px] fixed top-[0px]" >
+      <div className="pagination-controls z-[1000] pb-[15px] pt-[20px] fixed top-[0px]" >
         <div className="flex gap-[10px]" >
           <Select
             value={tagFilter || "all"}
             onValueChange={handleTagFilterChange}
           >
-            <SelectTrigger className="w-[120px] text-white">
+            <SelectTrigger className="w-[120px]">
               <SelectValue placeholder="Tag filter" />
             </SelectTrigger>
-            <SelectContent className={"bg-transparent" + state.Theme?.borderColor + state.Theme?.mainBG}>
+            <SelectContent>
               <SelectGroup>
-                <SelectItem className={state.Theme?.neutralSelect} value="all">All</SelectItem>
-                <SelectItem className={state.Theme?.neutralSelect} value="INFO">INFO</SelectItem>
-                <SelectItem className={state.Theme?.neutralSelect} value="ERROR">ERROR</SelectItem>
-                <SelectItem className={state.Theme?.neutralSelect} value="DEBUG">DEBUG</SelectItem>
+                <SelectItem value="all">All</SelectItem>
+                <SelectItem value="INFO">INFO</SelectItem>
+                <SelectItem value="ERROR">ERROR</SelectItem>
+                <SelectItem value="DEBUG">DEBUG</SelectItem>
               </SelectGroup>
             </SelectContent>
           </Select>

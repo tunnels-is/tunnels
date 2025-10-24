@@ -71,7 +71,7 @@ const Settings = () => {
   );
 
   return (
-    <div className="container max-w-5xl ">
+    <div className="container max-w-5xl p-4">
       <div className="flex items-center justify-between">
         {mod === true && (
           <div className="mb-7 flex gap-[4px] items-center">
@@ -95,16 +95,14 @@ const Settings = () => {
 
 
       <Tabs defaultValue="general" className="size-fit">
-        <TabsList
-          className={state.Theme?.borderColor}
-        >
-          <TabsTrigger className={state.Theme?.tabs} value="general">General Settings</TabsTrigger>
-          <TabsTrigger className={state.Theme?.tabs} value="apiconfig">API Config</TabsTrigger>
-          <TabsTrigger className={state.Theme?.tabs} value="net">Network Information</TabsTrigger>
-          <TabsTrigger className={state.Theme?.tabs} value="sys">System Information</TabsTrigger>
+        <TabsList>
+          <TabsTrigger value="general">General Settings</TabsTrigger>
+          <TabsTrigger value="apiconfig">API Config</TabsTrigger>
+          <TabsTrigger value="net">Network Information</TabsTrigger>
+          <TabsTrigger value="sys">System Information</TabsTrigger>
         </TabsList>
         <TabsContent value="general" className="pl-2">
-          <Card className="bg-black border-none">
+          <Card className="border-none shadow-none">
             <CardContent>
               <SettingToggle
                 label="Basic Logging"
@@ -164,7 +162,7 @@ const Settings = () => {
           </Card>
         </TabsContent>
         <TabsContent value="apiconfig" className="pl-2">
-          <Card className="bg-black border-none">
+          <Card className="border-none shadow-none">
             <CardContent className="space-y-0">
 
               <FormKeyValue
@@ -258,7 +256,7 @@ const Settings = () => {
           </Card>
         </TabsContent>
         <TabsContent value="net" className="pl-2">
-          <Card className="bg-black border-none">
+          <Card className="border-none shadow-none">
             <CardContent className="space-y-0">
               <InfoItem
                 label="Interface"
@@ -287,7 +285,7 @@ const Settings = () => {
           </Card>
         </TabsContent>
         <TabsContent value="sys" className="pl-2">
-          <Card className="bg-black border-none">
+          <Card className="border-none shadow-none">
             <CardContent>
               <div className="grid grid-cols-2 gap-4">
                 <InfoItem

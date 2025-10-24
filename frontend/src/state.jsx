@@ -1,6 +1,6 @@
 import { useState } from "react";
 import STORE from "./store";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 import axios from "axios";
 import dayjs from "dayjs";
 import { v4 as uuidv4 } from "uuid";

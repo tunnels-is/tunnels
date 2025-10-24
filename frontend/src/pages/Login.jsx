@@ -439,7 +439,7 @@ const Login = (props) => {
           <EnvelopeClosedIcon className="absolute left-3 top-2.5 h-5 w-5 text-[#4B7BF5]" />
           <Input
             id="email"
-            className="pl-10 bg-[#0B0E14] border-[#1a1f2d] text-white focus:ring-[#4B7BF5] focus:border-[#4B7BF5] h-11"
+            className="pl-10 h-11"
             type="email"
             placeholder="Email / Token"
             value={inputs["email"]}
@@ -461,7 +461,7 @@ const Login = (props) => {
           <DesktopIcon className="absolute left-3 top-2.5 h-5 w-5 text-[#4B7BF5]" />
           <Input
             id="devicename"
-            className="pl-10 bg-[#0B0E14] border-[#1a1f2d] text-white focus:ring-[#4B7BF5] focus:border-[#4B7BF5] h-11"
+            className="pl-10 h-11"
             type="text"
             placeholder="Device Name"
             value={inputs["devicename"]}
@@ -483,7 +483,7 @@ const Login = (props) => {
           <LockClosedIcon className="absolute left-3 top-2.5 h-5 w-5 text-[#4B7BF5]" />
           <Input
             id="password"
-            className="pl-10 bg-[#0B0E14] border-[#1a1f2d] text-white focus:ring-[#4B7BF5] focus:border-[#4B7BF5] h-11"
+            className="pl-10 h-11"
             type="password"
             placeholder="Password"
             value={inputs["password"]}
@@ -505,7 +505,7 @@ const Login = (props) => {
           <LockClosedIcon className="absolute left-3 top-2.5 h-5 w-5 text-[#4B7BF5]" />
           <Input
             id="digits"
-            className="pl-10 bg-[#0B0E14] border-[#1a1f2d] text-white focus:ring-[#4B7BF5] focus:border-[#4B7BF5] h-11"
+            className="pl-10 h-11"
             type="text"
             placeholder="Authenticator Code (optional)"
             value={inputs["digits"]}
@@ -549,7 +549,7 @@ const Login = (props) => {
           <FrameIcon className="absolute left-3 top-2.5 h-5 w-5 text-[#4B7BF5]" />
           <Input
             id="token"
-            className="pl-10 bg-[#0B0E14] border-[#1a1f2d] text-white focus:ring-[#4B7BF5] focus:border-[#4B7BF5] h-11"
+            className="pl-10 h-11"
             type="text"
             placeholder="Token"
             value={inputs["email"]}
@@ -578,7 +578,7 @@ const Login = (props) => {
           <FrameIcon className="absolute left-3 top-2.5 h-5 w-5 text-[#4B7BF5]" />
           <Input
             id="code"
-            className="pl-10 bg-[#0B0E14] border-[#1a1f2d] text-white focus:ring-[#4B7BF5] focus:border-[#4B7BF5] h-11"
+            className="pl-10 h-11"
             type="text"
             placeholder="Code"
             name="code"
@@ -599,7 +599,7 @@ const Login = (props) => {
           <FrameIcon className="absolute left-3 top-2.5 h-5 w-5 text-[#4B7BF5]" />
           <Input
             id="code"
-            className="pl-10 bg-[#0B0E14] border-[#1a1f2d] text-white focus:ring-[#4B7BF5] focus:border-[#4B7BF5] h-11"
+            className="pl-10 -11"
             type="text"
             placeholder="Two-Factor Auth Code"
             name="code"
@@ -620,7 +620,7 @@ const Login = (props) => {
           <FrameIcon className="absolute left-3 top-2.5 h-5 w-5 text-[#4B7BF5]" />
           <Input
             id="recovery"
-            className="pl-10 bg-[#0B0E14] border-[#1a1f2d] text-white focus:ring-[#4B7BF5] focus:border-[#4B7BF5] h-11"
+            className="pl-10 h-11"
             type="text"
             placeholder="Two Factor Recovery Code"
             value={inputs["recovery"]}
@@ -656,7 +656,7 @@ const Login = (props) => {
       }
     })
     return (
-      <div className="flex  items-start">
+      <div className="flex items-start">
 
         <Select
           value={authServer ? authServer.ID : tunID}
@@ -701,14 +701,14 @@ const Login = (props) => {
 
   const LoginForm = () => {
     return (
-      <Card className="w-full max-w-md mx-auto bg-[#0B0E14] border border-[#1a1f2d] shadow-2xl">
+      <Card className="w-full max-w-md mx-auto shadow-xl">
         <CardContent className="space-y-6 p-6">
           {EmailInput()}
           {DeviceInput()}
           {PasswordInput()}
           {TwoFactorInput()}
           {selectForm()}
-          <Button className="w-full h-11 bg-[#4B7BF5] hover:bg-[#4B7BF5]/90 text-white" onClick={HandleSubmit}>
+          <Button className="w-full h-11 hover:bg-primary/90 text-white" onClick={HandleSubmit}>
             Login
           </Button>
           <div className="flex items-center space-x-2">
@@ -725,7 +725,7 @@ const Login = (props) => {
 
   const RegisterAnonForm = () => {
     return (
-      <Card className="w-full max-w-md mx-auto bg-[#0B0E14] border border-[#1a1f2d] shadow-2xl">
+      <Card className="w-full max-w-md mx-auto shadow-xl">
         <CardContent className="space-y-6 p-6">
           <div className="text-center mb-2">
             <h1 className="text-lg font-medium text-white/80">Anonymous Registration</h1>
@@ -749,7 +749,7 @@ const Login = (props) => {
 
   const RegisterForm = () => {
     return (
-      <Card className="w-full max-w-md mx-auto bg-[#0B0E14] border border-[#1a1f2d] shadow-2xl">
+      <Card className="w-full max-w-md mx-auto shadow-xl">
         <CardContent className="space-y-6 p-6">
           <div className="text-center mb-2">
             <h1 className="text-lg font-medium text-white/80">Create your account</h1>
@@ -769,7 +769,7 @@ const Login = (props) => {
 
   const ResetPasswordForm = () => {
     return (
-      <Card className="w-full max-w-md mx-auto bg-[#0B0E14] border border-[#1a1f2d] shadow-2xl">
+      <Card className="w-full max-w-md mx-auto shadow-xl">
         <CardContent className="space-y-6 p-6">
           <div className="text-center mb-2">
             <h1 className="text-lg font-medium text-white/80">Reset your password</h1>
@@ -780,7 +780,7 @@ const Login = (props) => {
           {ResetTwoFactorCodeInput()}
           {selectForm()}
           <div className="flex space-x-2">
-            <Button className="flex-1 h-11 bg-[#4B7BF5] hover:bg-[#4B7BF5]/90 text-white" onClick={() => ResetSubmit()}>
+            <Button className="flex-1 h-11 hover:bg-[#4B7BF5]/90 text-white" onClick={() => ResetSubmit()}>
               Reset Password
             </Button>
           </div>
@@ -791,10 +791,10 @@ const Login = (props) => {
 
   const RecoverTwoFactorForm = () => {
     return (
-      <Card className="w-full max-w-md mx-auto bg-[#0B0E14] border border-[#1a1f2d] shadow-2xl">
+      <Card className="w-full max-w-md mx-auto shadow-xl">
         <CardContent className="space-y-6 p-6">
           <div className="text-center mb-2">
-            <h1 className="text-lg font-medium text-white/80">Two-Factor Recovery</h1>
+            <h1 className="text-lg font-medium">Two-Factor Recovery</h1>
           </div>
           {EmailInput()}
           {PasswordInput()}
@@ -810,10 +810,10 @@ const Login = (props) => {
 
   const EnableAccountForm = () => {
     return (
-      <Card className="w-full max-w-md mx-auto bg-[#0B0E14] border border-[#1a1f2d] shadow-2xl">
+      <Card className="w-full max-w-md mx-auto shadow-xl">
         <CardContent className="space-y-6 p-6">
           <div className="text-center mb-2">
-            <h1 className="text-lg font-medium text-white/80">Enable your account</h1>
+            <h1 className="text-lg font-medium">Enable your account</h1>
           </div>
           {EmailInput()}
           {CodeInput()}
@@ -827,7 +827,7 @@ const Login = (props) => {
   };
 
   return (
-    <div className="w-full flex flex-col items-center justify-center p-4 bg-black mt-10">
+    <div className="w-full flex flex-col items-center justify-center p-4 mt-10">
 
 
       <NewObjectEditorDialog
@@ -859,10 +859,7 @@ const Login = (props) => {
           <Button
             variant="ghost"
             onClick={() => setMode(1)}
-            className={`h-9 px-4 text-[18px]  ${mode === 1
-              ? 'text-[#4B7BF5] hover:text-[#4B7BF5] hover:bg-[#4B7BF5]/10'
-              : 'text-white/50 hover:text-white hover:bg-white/5'
-              }`}
+            className={`text-xl ${mode === 1 && "text-primary"}`}
           >
             Login
           </Button>
@@ -872,10 +869,7 @@ const Login = (props) => {
               RemoveToken();
               setMode(2);
             }}
-            className={`h-9 px-4 text-[18px] ${mode === 2
-              ? 'text-[#4B7BF5] hover:text-[#4B7BF5] hover:bg-[#4B7BF5]/10'
-              : 'text-white/50 hover:text-white hover:bg-white/5'
-              }`}
+            className="text-xl"
           >
             Register
           </Button>
@@ -885,9 +879,9 @@ const Login = (props) => {
               GenerateToken();
               setMode(5);
             }}
-            className={`h-9 px-4 text-[18px] ${mode === 5
-              ? 'text-[#4B7BF5] hover:text-[#4B7BF5] hover:bg-[#4B7BF5]/10'
-              : 'text-white/50 hover:text-white hover:bg-white/5'
+            className={`h-9 px-4 text-xl ${mode === 5
+              ? 'text-[#4B7BF5]'
+              : ''
               }`}
           >
             Register Anonymously
@@ -895,9 +889,9 @@ const Login = (props) => {
           <Button
             variant="ghost"
             onClick={() => setMode(4)}
-            className={`h-9 px-4 text-[18px] ${mode === 4
-              ? 'text-[#4B7BF5] hover:text-[#4B7BF5] hover:bg-[#4B7BF5]/10'
-              : 'text-white/50 hover:text-white hover:bg-white/5'
+            className={`h-9 px-4 text-xl ${mode === 4
+              ? 'text-[#4B7BF5]'
+              : ''
               }`}
           >
             Reset Password
@@ -905,9 +899,9 @@ const Login = (props) => {
           <Button
             variant="ghost"
             onClick={() => setMode(3)}
-            className={`h-9 px-4 text-[18px] ${mode === 3
-              ? 'text-[#4B7BF5] hover:text-[#4B7BF5] hover:bg-[#4B7BF5]/10'
-              : 'text-white/50 hover:text-white hover:bg-white/5'
+            className={`h-9 px-4 text-xl ${mode === 3
+              ? 'text-[#4B7BF5]'
+              : ''
               }`}
           >
             2FA Recovery
