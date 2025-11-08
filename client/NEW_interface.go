@@ -104,8 +104,6 @@ func PopulatePingBufferWithStats() {
 	PingPongStatsBuffer[3] = byte(int(diskUsage.UsedPercent))
 }
 
-var prevAllowedHosts = []string{}
-
 func PingConnections() {
 	defer func() {
 		time.Sleep(10 * time.Second)
@@ -141,7 +139,8 @@ func PingConnections() {
 		}
 
 		ping := tun.pingTime.Load()
-		if time.Since(*ping).Seconds() > 60 || err != nil {
+		if time.Since(*ping).Seconds() > 60 || err != nil || tun.needsReconnect.Load() {
+			tun.needsReconnect.Store(false)
 			if meta.AutoReconnect {
 				DEBUG("30+ Seconds since ping from ", meta.Tag, " attempting reconnection")
 				_, _ = PublicConnect(tun.CR)
