@@ -23,8 +23,8 @@ func (t *TUN) RegisterPing(tag string, packet []byte) {
 		DEEP(fmt.Sprintf("ping from server (%s) cpu(%d) mem(%d) disk(%d)  count(%d)", tag, t.CPU, t.MEM, t.DISK, t.PingInt.Load()))
 
 		localCount := t.PingInt.Load()
-		if localCount > (count + 20) {
-			ERROR("Ping count of of balance local:", localCount, "server:", count, "server_max:", count+20)
+		if localCount > (count + 10) {
+			ERROR("Ping count of of balance local:", localCount, "server:", count, "server_max:", count+10)
 			t.needsReconnect.Store(true)
 		} else {
 			t.registerPing(time.Now())

@@ -632,11 +632,10 @@ const (
 	TUN_Error TunnelState = iota
 	TUN_Disconnecting
 	TUN_Disconnected
-	// >= TUN_Connected is reserved for connected or potentially connected states
-	TUN_Connected
-	TUN_Connecting
 	TUN_NotReady
 	TUN_Ready
+	TUN_Connecting
+	TUN_Connected
 )
 
 type Mapping struct {

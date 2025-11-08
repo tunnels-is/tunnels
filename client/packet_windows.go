@@ -17,6 +17,8 @@ func (tun *TUN) ReadFromTunnelInterface() {
 		DEBUG("tun/tap listener exiting:")
 		if tun.GetState() >= TUN_Connected {
 			interfaceMonitor <- tun
+		} else {
+			_ = tun.connection.Close()
 		}
 
 		tif := tun.tunnel.Load()
@@ -87,7 +89,7 @@ func (tun *TUN) ReadFromTunnelInterface() {
 		writtenBytes, err = tun.connection.Write(tun.encWrapper.SEAL.Seal1(packet, tun.Index))
 		if err != nil {
 			ERROR("router write error: ", err)
-			continue
+			return
 		}
 		tun.egressBytes.Add(int64(writtenBytes))
 	}
@@ -102,7 +104,10 @@ func (tun *TUN) ReadFromServeTunnel() {
 		DEBUG("Server listener exiting:", meta.Tag)
 		if tun.GetState() >= TUN_Connected {
 			tunnelMonitor <- tun
+		} else {
+			_ = tun.connection.Close()
 		}
+
 		inf := tun.tunnel.Load()
 		if inf != nil {
 			select {
