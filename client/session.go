@@ -395,9 +395,6 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 
 	if oldTunnel != nil {
 		Disconnect(oldTunnel.ID, true)
-		// oldTunnel.SetState(TUN_Disconnected)
-		// oldTunnel.connection.Close()
-		// TunnelMap.Delete(oldTunnel.ID)
 	}
 
 	return 200, nil
