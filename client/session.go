@@ -84,6 +84,7 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 
 	code, errm = PreConnectCheck(meta)
 	if errm != nil {
+		ERROR("pre connection check:", errm)
 		return code, errm
 	}
 
@@ -95,9 +96,8 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 			return true
 		}
 		if m.Tag == meta.Tag {
-			if tun.GetState() >= TUN_Connected {
+			if tun.GetState() >= TUN_NotReady {
 				oldTunnel = tun
-				// isConnected = true
 			}
 			return false
 		}
@@ -168,26 +168,26 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	if strings.Contains(ClientCR.Server.Host, "api.tunnels.is") {
 		err = IP_AddRoute(DefaultControllerIP+"/32", *ifName, gateway.To4().String(), "0")
 		if err != nil {
-			return 502, errors.New("unable to initialize controller route" + err.Error())
+			return 502, errors.New("unable to initialize controller route: " + err.Error())
 		}
 	} else {
 		netip := net.ParseIP(ClientCR.Server.Host)
 		if netip == nil {
 			addrs, err := net.LookupHost(ClientCR.Server.Host)
 			if err != nil {
-				return 502, errors.New("unable to resolve controller host:" + err.Error())
+				return 502, errors.New("unable to resolve controller host: " + err.Error())
 			}
 			if len(addrs) == 0 {
 				return 502, errors.New("did not find any addresses when resolving controller host")
 			}
 			err = IP_AddRoute(addrs[0]+"/32", *ifName, gateway.To4().String(), "0")
 			if err != nil {
-				return 502, errors.New("unable to initialize controller route" + err.Error())
+				return 502, errors.New("unable to initialize controller route: " + err.Error())
 			}
 		} else {
 			err = IP_AddRoute(ClientCR.Server.Host+"/32", *ifName, gateway.To4().String(), "0")
 			if err != nil {
-				return 502, errors.New("unable to initialize controller route" + err.Error())
+				return 502, errors.New("unable to initialize controller route: " + err.Error())
 			}
 
 		}
