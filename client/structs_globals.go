@@ -670,6 +670,7 @@ type TUN struct {
 	ServerResponse *types.ServerConnectResponse
 
 	pingTime                atomic.Pointer[time.Time]
+	needsReconnect          atomic.Bool
 	localInterfaceNetIP     net.IP
 	localDNSClient          *dns.Client
 	localInterfaceIP4bytes  [4]byte
@@ -709,11 +710,10 @@ type TUN struct {
 	ingressBytes atomic.Int64
 
 	// Server States
-	PingInt             atomic.Int64
-	CPU                 byte
-	DISK                byte
-	MEM                 byte
-	ServerToClientMicro atomic.Int64
+	PingInt atomic.Int64
+	CPU     byte
+	DISK    byte
+	MEM     byte
 
 	// Random mappint stuff
 	// LOCAL_IF_IP [4]byte
@@ -816,7 +816,6 @@ func (t *TUN) MarshalJSON() ([]byte, error) {
 		MEM        byte
 		Egress     string
 		Ingress    string
-		MS         int64
 	}{
 		t.ID,
 		t.CR,
@@ -831,7 +830,6 @@ func (t *TUN) MarshalJSON() ([]byte, error) {
 		t.MEM,
 		eb,
 		ib,
-		t.ServerToClientMicro.Load(),
 	})
 }
 

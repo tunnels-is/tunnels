@@ -12,7 +12,7 @@ import (
 
 var PingPongStatsBuffer = []byte{
 	0, 0, 0, // stats 0-3
-	0, 0, 0, 0, 0, 0, 0, 0, // timestamp 3-11
+	255, 1, 255, 2, 255, 3, 255, 4, // timestamp 3-11
 	0, 0, 0, 0, 0, 0, 0, 0, // ping counter 11-19
 }
 
@@ -61,6 +61,7 @@ func NukeClient(index int) {
 		}
 	}
 
+	// Not removing yet, but there is no need to un-assign from the lan due to DHCP presistence.
 	if clientCoreMappings[index].DHCP != nil {
 		// ip := clientCoreMappings[index].DHCP.IP
 		// VPLIPToCore[ip[0]][ip[1]][ip[2]][ip[3]] = nil
@@ -84,7 +85,6 @@ func pingActiveUsers() {
 			continue
 		}
 
-		binary.BigEndian.PutUint64(PingPongStatsBuffer[3:11], uint64(time.Now().UnixNano()))
 		binary.BigEndian.PutUint64(PingPongStatsBuffer[11:], uint64(clientCoreMappings[index].PingInt.Load()))
 		out := u.EH.SEAL.Seal2(PingPongStatsBuffer, u.Uindex)
 		err := syscall.Sendto(dataSocketFD, out, 0, u.Addr)
