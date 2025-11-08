@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/binary"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math"
@@ -14,8 +15,15 @@ import (
 
 	"github.com/tunnels-is/tunnels/crypt"
 	"github.com/tunnels-is/tunnels/types"
+	"golang.org/x/crypto/sha3"
 	"golang.org/x/sys/unix"
 )
+
+// HashIdentifier creates a SHA3-256 hash from an identifier
+func HashIdentifier(identifier string) string {
+	hash := sha3.Sum256([]byte(identifier))
+	return hex.EncodeToString(hash[:])
+}
 
 func countConnections(id string) (count int, userCount int) {
 	for i := range clientCoreMappings {
@@ -55,12 +63,13 @@ func CreateClientCoreMapping(CRR *types.ServerConnectResponse, CR *types.Control
 				continue
 			}
 
-			clientCoreMappings[i].ID = CR.UserID.Hex()
+			clientCoreMappings[i].ID = HashIdentifier(CR.UserID.Hex())
 			if CR.DeviceToken != "" {
-				clientCoreMappings[i].DeviceToken = CR.DeviceToken
+				clientCoreMappings[i].DeviceToken = HashIdentifier(CR.DeviceToken)
 			} else {
-				clientCoreMappings[i].DeviceToken = CR.DeviceKey
+				clientCoreMappings[i].DeviceToken = HashIdentifier(CR.DeviceKey)
 			}
+
 			clientCoreMappings[i].EH = EH
 			clientCoreMappings[i].Created = time.Now()
 			clientCoreMappings[i].ToUser = make(chan []byte, 500_000)
