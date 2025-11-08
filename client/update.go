@@ -25,6 +25,7 @@ import (
 const (
 	archive           = "update.archive"
 	nextVersionSuffix = ".next"
+	prevVersionSuffix = ".prev"
 	repo              = "tunnels"
 	owner             = "tunnels-is"
 )
@@ -58,7 +59,6 @@ func skipUpdatePrompt() (pinned bool) {
 func doUpdate() {
 	conf := CONFIG.Load()
 	defer func() {
-		// never allow 0 update interval
 		if conf.UpdateCheckInterval == 0 {
 			conf.UpdateCheckInterval = 1440
 		}
@@ -112,11 +112,11 @@ func doUpdate() {
 		DEBUG("launching update process")
 		err = replaceCurrentVersion()
 		if err != nil {
-			ERROR("error while performing update:", err)
+			ERROR("error switching binaries during update:", err)
 		}
-		err = cleanupUpdateFiles()
+		err = revertBackToOldVersion()
 		if err != nil {
-			ERROR("error while cleaning up post-update", err)
+			ERROR("error while revering back to prev version post update error:", err)
 		}
 		return
 	}
@@ -165,7 +165,7 @@ func doStartupUpdate() (didUpdate bool) {
 			updatePrint("Unable to replace current version with new tunnels version:", err)
 			return false
 		}
-		err = cleanupUpdateFiles()
+		err = revertBackToOldVersion()
 		if err != nil {
 			updatePrint("cleaning up files post update", err)
 			return false
@@ -251,23 +251,25 @@ func compareLocalArchiveToExpectedShaSum(remoteSum string) (err error) {
 	return nil
 }
 
-func cleanupUpdateFiles() (err error) {
+func revertBackToOldVersion() (err error) {
 	ex, err := os.Executable()
 	if err != nil {
 		return err
 	}
-	state := STATE.Load()
-	_ = os.Remove(state.BasePath + archive)
-	_ = os.Remove(state.BasePath + ex + ".prev")
+	err = os.Rename(ex+prevVersionSuffix, ex)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
 func replaceCurrentVersion() (err error) {
 	conf := CONFIG.Load()
 
-	ex, err := os.Executable()
-	if err != nil {
-		return err
+	var ex string
+	ex, err = os.Executable()
+	if err != nil || ex == "" {
+		return fmt.Errorf("Error finding executable string(%s) err: %s", ex, err)
 	}
 	state := STATE.Load()
 	_ = os.Remove(ex + nextVersionSuffix)
@@ -276,14 +278,14 @@ func replaceCurrentVersion() (err error) {
 		return err
 	}
 
-	err = os.Rename(ex, ex+".prev")
+	err = os.Rename(ex, ex+prevVersionSuffix)
 	if err != nil {
 		return err
 	}
 
 	err = os.Rename(ex+nextVersionSuffix, ex)
 	if err != nil {
-		err = os.Rename(ex+".prev", ex)
+		err = os.Rename(ex+prevVersionSuffix, ex)
 		if err != nil {
 			return err
 		}
@@ -292,13 +294,16 @@ func replaceCurrentVersion() (err error) {
 
 	if conf.RestartPostUpdate {
 		argv0, _ := exec.LookPath(os.Args[0])
-		syscall.Exec(argv0, os.Args, os.Environ())
-		os.Exit(1)
+		err = syscall.Exec(argv0, os.Args, os.Environ())
+		if err == nil {
+			os.Exit(1)
+		}
+
 	} else if conf.ExitPostUpdate {
 		os.Exit(1)
 	}
 
-	return nil
+	return
 }
 
 func calculateSha256(filePath string) (string, error) {
@@ -575,7 +580,7 @@ func getPinnedVersion() (version string, err error) {
 		return "", errors.New("no control server found")
 	}
 
-	resp, code, err := SendRequestToURL(
+	resp, code, _ := SendRequestToURL(
 		nil,
 		"GET",
 		cs.GetURL("/"),
