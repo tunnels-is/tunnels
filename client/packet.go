@@ -41,14 +41,19 @@ func (V *TUN) ProcessEgressPacket(p *[]byte) (sendRemote bool) {
 	}
 
 	V.EP_Protocol = packet[9]
-	if V.EP_Protocol != 6 && V.EP_Protocol != 17 {
+	if V.EP_Protocol != 17 && V.EP_Protocol != 6 {
 		return false
 	}
 
 	V.EP_IPv4HeaderLength = (packet[0] & 0x0F) * 4
-
 	V.EP_IPv4Header = packet[:V.EP_IPv4HeaderLength]
 	V.EP_TPHeader = packet[V.EP_IPv4HeaderLength:]
+
+	if V.EP_Protocol == 17 && len(V.EP_TPHeader) < 8 {
+		return false
+	} else if V.EP_Protocol == 6 && len(V.EP_TPHeader) < 20 {
+		return false
+	}
 
 	V.EP_DstIP[0] = packet[16]
 	V.EP_DstIP[1] = packet[17]

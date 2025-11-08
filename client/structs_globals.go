@@ -34,8 +34,11 @@ const (
 var (
 	PRODUCTION = true
 
+	// hardcoded public network controller IP
+	// This prevents DNS hijacking
+	DefaultControllerIP = "89.147.109.61"
+
 	DefaultTunnelName = "tunnels"
-	// CertPool          *x509.CertPool
 
 	// New global state and config
 	STATE  atomic.Pointer[stateV2]
