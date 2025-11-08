@@ -132,6 +132,8 @@ func PingConnections() {
 				DEEP("Ping: ", meta.Tag, " ", tun.PingInt.Load())
 				_, err = tun.connection.Write(CopySlice(out))
 				if err != nil {
+					tun.SetState(TUN_NotReady)
+					_ = tun.connection.Close()
 					ERROR("unable to ping tunnel: ", tun.ID, meta.Tag)
 				}
 			}
@@ -139,16 +141,23 @@ func PingConnections() {
 		}
 
 		ping := tun.pingTime.Load()
-		if time.Since(*ping).Seconds() > 60 || err != nil || tun.needsReconnect.Load() {
-			tun.needsReconnect.Store(false)
+		if time.Since(*ping).Seconds() > 45 || err != nil || tun.needsReconnect.Load() {
 			if meta.AutoReconnect {
-				DEBUG("30+ Seconds since ping from ", meta.Tag, " attempting reconnection")
-				_, _ = PublicConnect(tun.CR)
+				DEBUG("45+ Seconds since ping from ", meta.Tag, " attempting reconnection")
+				_, err = PublicConnect(tun.CR)
+				if err != nil {
+					tun.SetState(TUN_NotReady)
+					ERROR("unable to reconnect: ", err)
+				} else {
+					tun.needsReconnect.Store(false)
+				}
+
 			} else {
 				DEBUG("30+ Seconds since ping from ", meta.Tag)
 				if !meta.KillSwitch {
 					_ = Disconnect(tun.ID, false)
 				}
+				tun.needsReconnect.Store(false)
 			}
 		}
 
