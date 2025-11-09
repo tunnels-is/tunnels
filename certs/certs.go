@@ -189,7 +189,7 @@ func MakeCertV2(ct CertType, certPath string, keyPath string, ips []string, doma
 	}
 
 	if org == "" {
-		org = "Tunnels Server"
+		org = "Server"
 	}
 	if expirationDate.IsZero() {
 		expirationDate = time.Now().Add(10 * 365 * 24 * time.Hour)
@@ -281,20 +281,17 @@ func ExtractSerialNumberHex(cert tls.Certificate) string {
 }
 
 func ExtractSerialNumberFromCRT(path string) (serial string, err error) {
-	// Read the contents of the .crt file
 	var data []byte
 	data, err = os.ReadFile(path)
 	if err != nil {
 		return "", err
 	}
 
-	// PEM decode the certificate
 	pemBlock, _ := pem.Decode(data)
 	if pemBlock == nil {
 		return "", fmt.Errorf("unable to decode pem block")
 	}
 
-	// Parse the certificate
 	cert, err := x509.ParseCertificate(pemBlock.Bytes)
 	if err != nil {
 		return "", err
@@ -315,14 +312,12 @@ func ResolveMetaTXT(domain string) (info *DNSInfo, err error) {
 	if err != nil {
 		return nil, fmt.Errorf("error in base lookup: %s", err)
 	}
-	// certParts := make([][]byte, 100)
 	info = new(DNSInfo)
 	info.Cert = make([]byte, 0)
 
 	for _, v := range txt {
 		if strings.Contains(v, "----") {
 			info.Cert = []byte(v)
-			// info.Cert = bytes.Replace(info.Cert, []byte("\n"), []byte{}, -1)
 		} else {
 			split := strings.Split(v, ":")
 			if len(split) < 3 {
