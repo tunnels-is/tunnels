@@ -2,7 +2,7 @@ import React, { useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import FormKeyValue from "./component/formkeyvalue";
+import FormKeyValue from "../components/formkeyvalue";
 import { useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
 import GLOBAL_STATE from "../state";
@@ -355,12 +355,12 @@ const DNS = () => {
         <TabsList
           className={state.Theme?.borderColor + " rounded"}
         >
-          <TabsTrigger className={state.Theme?.tabs} value="settings">Settings</TabsTrigger>
-          <TabsTrigger className={state.Theme?.tabs} value="records">DNS Records</TabsTrigger>
-          <TabsTrigger className={state.Theme?.tabs} value="blocklist">Block Lists</TabsTrigger>
-          <TabsTrigger className={state.Theme?.tabs} value="whitelist">White Lists</TabsTrigger>
-          <TabsTrigger className={state.Theme?.tabs} value="blockdomains">Blocked Domains</TabsTrigger>
-          <TabsTrigger className={state.Theme?.tabs} value="resolveddomains">Resovled Domains</TabsTrigger>
+          <TabsTrigger value="settings">Settings</TabsTrigger>
+          <TabsTrigger value="records">DNS Records</TabsTrigger>
+          <TabsTrigger value="blocklist">Block Lists</TabsTrigger>
+          <TabsTrigger value="whitelist">White Lists</TabsTrigger>
+          <TabsTrigger value="blockdomains">Blocked Domains</TabsTrigger>
+          <TabsTrigger value="resolveddomains">Resovled Domains</TabsTrigger>
         </TabsList>
         <TabsContent value="settings" className="pl-2">
           <div className="">
@@ -425,7 +425,7 @@ const DNS = () => {
             />
             <div className="max-w-[300px]">
               <div className="flex items-center justify-between py-1 w-full">
-                <Label className="text-white mr-3">Secure DNS</Label>
+                <Label className="mr-3">Secure DNS</Label>
                 <Switch
                   checked={state?.Config?.DNSOverHTTPS}
                   onCheckedChange={() => {

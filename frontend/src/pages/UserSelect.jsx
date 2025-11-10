@@ -3,7 +3,7 @@ import GLOBAL_STATE from "../state";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import dayjs from "dayjs";
-import InfoItem from "./component/InfoItem";
+import InfoItem from "../components/InfoItem";
 import { useNavigate } from "react-router-dom";
 import { useEffect } from "react";
 import { DeleteIcon } from "lucide-react";

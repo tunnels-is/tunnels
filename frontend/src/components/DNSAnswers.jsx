@@ -1,6 +1,6 @@
 import React from "react";
 import { useParams } from "react-router-dom";
-import GLOBAL_STATE from "../../state"
+import GLOBAL_STATE from "@/state";
 
 const DNSAnswers = (props) => {
 	const state = GLOBAL_STATE("dns-answers")
