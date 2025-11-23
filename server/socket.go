@@ -319,7 +319,7 @@ func fromUserChannel(index int) {
 	shouldRestart := true
 	defer func() {
 		if r := recover(); r != nil {
-			ERR( r, string(debug.Stack()))
+			ERR(r, string(debug.Stack()))
 		}
 
 		if !shouldRestart {
@@ -335,7 +335,6 @@ func fromUserChannel(index int) {
 	var err error
 	var ok bool
 	staging := make([]byte, 100000)
-	// clientCache := make(map[[4]byte]*UserCoreMapping)
 	var D4 [4]byte
 	var D4Port [2]byte
 	var RST byte
@@ -394,20 +393,19 @@ func fromUserChannel(index int) {
 			D4[1] = NIP[1]
 			D4[2] = NIP[2]
 			D4[3] = NIP[3]
-			l := (PACKET[0] & 0x0F) * 4
-			D4Port[0] = PACKET[l+2]
-			D4Port[1] = PACKET[l+3]
-
-			RST = PACKET[l+13] & 0x4
-			FIN = PACKET[l+13] & 0x1
-			SYN = PACKET[l+13] & 0x2
 
 			targetCM = VPLIPToCore[D4[0]][D4[1]][D4[2]][D4[3]]
 			if targetCM == nil {
 				CM.DelHost(D4, "auto")
-				WARN("No target CM:", D4)
 				continue
 			}
+
+			l := (PACKET[0] & 0x0F) * 4
+			D4Port[0] = PACKET[l+2]
+			D4Port[1] = PACKET[l+3]
+			RST = PACKET[l+13] & 0x4
+			FIN = PACKET[l+13] & 0x1
+			SYN = PACKET[l+13] & 0x2
 
 			if RST > 0 {
 				CM.DelHost(D4, "auto")
@@ -483,7 +481,7 @@ func toUserChannel(index int) {
 
 	defer func() {
 		if r := recover(); r != nil {
-			ERR( r, string(debug.Stack()))
+			ERR(r, string(debug.Stack()))
 		}
 
 		if !shouldRestart {
@@ -501,7 +499,9 @@ func toUserChannel(index int) {
 	var FIN byte
 	var RST byte
 	var originCM *UserCoreMapping
-	var skipFirewall bool
+	var isAdmin bool
+	var headLength byte
+	var activeHost *AllowedHost
 	Config := Config.Load()
 
 	for {
@@ -512,47 +512,50 @@ func toUserChannel(index int) {
 		}
 
 		if PACKET[9] != 6 && PACKET[9] != 17 {
-			WARN("invalid packet, index:", 7)
 			continue
 		}
 
+		// Server LAN feature is hardcoded to 10.0.X.X
+		// We might change this later
 		if LANEnabled && (PACKET[12] == 10 && PACKET[13] == 0) {
-			S4[0] = PACKET[12]
-			S4[1] = PACKET[13]
-			S4[2] = PACKET[14]
-			S4[3] = PACKET[15]
-			originCM = VPLIPToCore[S4[0]][S4[1]][S4[2]][S4[3]]
-			skipFirewall = false
-			if originCM != nil {
-				for _, entity := range Config.NetAdmins {
-					if entity == originCM.DeviceToken || entity == originCM.ID {
-						skipFirewall = true
-						break
+			originCM = VPLIPToCore[PACKET[12]][PACKET[13]][PACKET[14]][PACKET[15]]
+			if !lanFirewallDisabled && !CM.DisableFirewall {
+				isAdmin = false
+				if originCM != nil {
+					for _, entity := range Config.NetAdmins {
+						if entity == originCM.DeviceToken || entity == originCM.ID {
+							isAdmin = true
+							break
+						}
 					}
 				}
-			}
 
-			if !lanFirewallDisabled && !CM.DisableFirewall && !skipFirewall {
+				if !isAdmin {
 
-				l := (PACKET[0] & 0x0F) * 4
-				S4Port[0] = PACKET[l]
-				S4Port[1] = PACKET[l+1]
+					headLength = (PACKET[0] & 0x0F) * 4
+					S4Port[0] = PACKET[headLength]
+					S4Port[1] = PACKET[headLength+1]
 
-				RST = PACKET[l+13] & 0x4
-				FIN = PACKET[l+13] & 0x1
+					S4[0] = PACKET[12]
+					S4[1] = PACKET[13]
+					S4[2] = PACKET[14]
+					S4[3] = PACKET[15]
 
-				host := CM.IsHostAllowed(S4, S4Port)
-				if host == nil {
-					WARN("Unauthorized access:", index, S4)
-					continue
-				}
-				if RST > 0 {
-					CM.DelHost(S4, "auto")
-				} else if FIN > 0 {
-					if host.FFIN {
+					activeHost = CM.IsHostAllowed(S4, S4Port)
+					if activeHost == nil {
+						continue
+					}
+
+					RST = PACKET[headLength+13] & 0x4
+					FIN = PACKET[headLength+13] & 0x1
+					if RST > 0 {
 						CM.DelHost(S4, "auto")
-					} else {
-						CM.SetFin(S4, S4Port, false)
+					} else if FIN > 0 {
+						if activeHost.FFIN {
+							CM.DelHost(S4, "auto")
+						} else {
+							CM.SetFin(S4, S4Port, false)
+						}
 					}
 				}
 			}
