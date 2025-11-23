@@ -214,12 +214,13 @@ func ExternalUDPListener() {
 	}
 
 	var DSTP uint16
-	var IHL byte
+	var IPHeadLength byte
 	var PM *PortRange
 	var n int
 	var version byte
 	buffer := make([]byte, math.MaxUint16)
-	// cfg := Config.Load()
+	cfg := Config.Load()
+	startPort := uint16(cfg.StartPort)
 
 	for {
 		n, _, err = syscall.Recvfrom(rawUDPSockFD, buffer, 0)
@@ -234,11 +235,11 @@ func ExternalUDPListener() {
 		}
 
 		// TODO .. use mask
-		IHL = ((buffer[0] << 4) >> 4) * 4
-		DSTP = binary.BigEndian.Uint16(buffer[IHL+2 : IHL+4])
-		// if DSTP < uint16(cfg.StartPort) {
-		// 	continue
-		// }
+		IPHeadLength = ((buffer[0] << 4) >> 4) * 4
+		DSTP = binary.BigEndian.Uint16(buffer[IPHeadLength+2 : IPHeadLength+4])
+		if DSTP < startPort {
+			continue
+		}
 		PM = portToCoreMapping[DSTP]
 		if PM == nil || PM.Client == nil {
 			continue
