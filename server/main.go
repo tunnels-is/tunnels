@@ -8,7 +8,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"log"
 	"log/slog"
 	"math"
 	"net"
@@ -79,33 +78,30 @@ var (
 )
 
 func LOG(x ...any) {
-	if !disableLogs {
-		log.Println(x...)
-	}
+	logger.Info("INFO", "msg", buildOut(x))
 }
 
 func INFO(x ...any) {
-	if !disableLogs {
-		log.Println(x...)
-	}
+	logger.Info("INFO", "msg", buildOut(x))
 }
 
 func WARN(x ...any) {
-	if !disableLogs {
-		log.Println(x...)
-	}
+	logger.Warn("WARN", "msg", buildOut(x))
 }
 
 func ERR(x ...any) {
-	if !disableLogs {
-		log.Println(x...)
-	}
+	logger.Error("ERROR", "msg", buildOut(x))
 }
 
 func ADMIN(x ...any) {
-	if !disableLogs {
-		log.Println(x...)
+	logger.Warn("ADMIN", "msg", buildOut(x))
+}
+
+func buildOut(x ...any) (out string) {
+	for _, v := range x {
+		out += fmt.Sprint(v)
 	}
+	return
 }
 
 func main() {
@@ -113,15 +109,29 @@ func main() {
 	flag.BoolVar(&showVersion, "version", false, "show version and exit")
 
 	configFlag := flag.Bool("config", false, "This command runs the server and creates a config + certificates")
+	jsonLogs := flag.Bool("json", true, "this disabled json logging")
 	certsOnly := flag.Bool("certs", false, "This command generates certificates and exits")
 	silent := flag.Bool("silent", false, "This command disables logging")
 	adminFlag := flag.String("admin", "", "Add an admin identifier (DeviceToken/DeviceKey/UserID) to NetAdmins")
-	disableLogs = *silent
-	logHandler := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug})
+	flag.Parse()
+	var logHandler slog.Handler
+	if !*silent {
+		if !*jsonLogs {
+			logHandler = slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug, AddSource: true})
+		} else {
+			logHandler = slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug, AddSource: true})
+		}
+	} else if *silent {
+		disableLogs = true
+		if !*jsonLogs {
+			logHandler = slog.NewTextHandler(io.Discard, &slog.HandlerOptions{Level: slog.LevelError})
+		} else {
+			logHandler = slog.NewJSONHandler(io.Discard, &slog.HandlerOptions{Level: slog.LevelError})
+		}
+	}
 	logger = slog.New(logHandler)
 	slog.SetDefault(logger)
 
-	flag.Parse()
 	if showVersion {
 		fmt.Println(version.Version)
 		os.Exit(1)
@@ -129,12 +139,20 @@ func main() {
 
 	if *configFlag {
 		logger.Info("generating config")
-		makeConfigAndCerts()
+		err := makeConfigAndCerts()
+		if err != nil {
+			logger.Error("unable to create certificates or config", "error", err)
+			os.Exit(1)
+		}
 	}
+
 	if *certsOnly {
 		logger.Info("generating certs")
-		makeCertsOnly()
-		os.Exit(1)
+		err := makeCertsOnly()
+		if err != nil {
+			logger.Error("unable to create certificates", "error", err)
+			os.Exit(1)
+		}
 	}
 
 	if *adminFlag != "" {
@@ -540,10 +558,10 @@ func GeneratePortAllocation() (err error) {
 	return nil
 }
 
-func makeConfigAndCerts() {
+func makeConfigAndCerts() (err error) {
 	ep, err := os.Executable()
 	if err != nil {
-		panic(err)
+		return err
 	}
 	eps := strings.Split(ep, "/")
 	ep = strings.Join(eps[:len(eps)-1], "/")
@@ -551,7 +569,7 @@ func makeConfigAndCerts() {
 
 	IFIP, err := gateway.DiscoverInterface()
 	if err != nil {
-		panic(err)
+		return err
 	}
 	interfaceIP := IFIP.String()
 
@@ -600,7 +618,7 @@ func makeConfigAndCerts() {
 		}
 		f, err := os.Create(ep + "config.json")
 		if err != nil {
-			panic(err)
+			return err
 		}
 		defer func() {
 			_ = f.Close()
@@ -608,15 +626,15 @@ func makeConfigAndCerts() {
 		encoder := json.NewEncoder(f)
 		encoder.SetIndent("", "    ")
 		if err := encoder.Encode(Config); err != nil {
-			panic(err)
+			return err
 		}
 	}
 
-	makeCerts(ep, interfaceIP)
+	return makeCerts(ep, interfaceIP)
 }
 
-func makeCerts(execPath string, IP string) {
-	_, err := certs.MakeCertV2(
+func makeCerts(execPath string, IP string) (err error) {
+	_, err = certs.MakeCertV2(
 		certs.ECDSA,
 		filepath.Join(execPath, "cert.pem"),
 		filepath.Join(execPath, "key.pem"),
@@ -626,15 +644,13 @@ func makeCerts(execPath string, IP string) {
 		time.Time{},
 		true,
 	)
-	if err != nil {
-		panic(err)
-	}
+	return
 }
 
-func makeCertsOnly() {
+func makeCertsOnly() (err error) {
 	ep, err := os.Executable()
 	if err != nil {
-		panic(err)
+		return err
 	}
 	eps := strings.Split(ep, "/")
 	ep = strings.Join(eps[:len(eps)-1], "/")
@@ -642,10 +658,10 @@ func makeCertsOnly() {
 
 	IFIP, err := gateway.DiscoverInterface()
 	if err != nil {
-		panic(err)
+		return err
 	}
 	interfaceIP := IFIP.String()
-	makeCerts(ep, interfaceIP)
+	return makeCerts(ep, interfaceIP)
 }
 
 func initializeNewServer() error {
