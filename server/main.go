@@ -36,6 +36,7 @@ import (
 	"github.com/tunnels-is/tunnels/version"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"golang.org/x/crypto/bcrypt"
+	"gopkg.in/yaml.v3"
 )
 
 var (
@@ -278,7 +279,18 @@ func LoadServerConfig(path string) (err error) {
 		return
 	}
 	C := new(types.ServerConfig)
-	err = json.Unmarshal(nb, &C)
+
+	// Determine format based on file extension
+	ext := strings.ToLower(filepath.Ext(path))
+	switch ext {
+	case ".yaml", ".yml":
+		err = yaml.Unmarshal(nb, &C)
+	case ".json", "":
+		err = json.Unmarshal(nb, &C)
+	default:
+		return fmt.Errorf("unsupported config file format: %s (supported: .json, .yaml, .yml)", ext)
+	}
+
 	if err != nil {
 		return
 	}
@@ -299,11 +311,27 @@ func SaveServerConfig(path string) (err error) {
 	defer func() {
 		_ = f.Close()
 	}()
-	encoder := json.NewEncoder(f)
-	encoder.SetIndent("", "    ")
-	if err := encoder.Encode(C); err != nil {
-		return err
+
+	// Determine format based on file extension
+	ext := strings.ToLower(filepath.Ext(path))
+	switch ext {
+	case ".yaml", ".yml":
+		encoder := yaml.NewEncoder(f)
+		encoder.SetIndent(2)
+		if err := encoder.Encode(C); err != nil {
+			return err
+		}
+		_ = encoder.Close()
+	case ".json", "":
+		encoder := json.NewEncoder(f)
+		encoder.SetIndent("", "    ")
+		if err := encoder.Encode(C); err != nil {
+			return err
+		}
+	default:
+		return fmt.Errorf("unsupported config file format: %s (supported: .json, .yaml, .yml)", ext)
 	}
+
 	return nil
 }
 
