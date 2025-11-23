@@ -1,6 +1,11 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"io"
+	"log/slog"
+	"os"
+)
 
 // LOG ...
 func LOG(x ...any) {
@@ -50,4 +55,28 @@ func getLogLevelInt(level string) int {
 	default:
 		return -4
 	}
+}
+
+func initLogging(silent, jsonLogs, sourceInfo bool, logLevel string) {
+	var logHandler slog.Handler
+	slogConfig := &slog.HandlerOptions{
+		Level:     slog.Level(getLogLevelInt(logLevel)),
+		AddSource: sourceInfo,
+	}
+	if !silent {
+		if !jsonLogs {
+			logHandler = slog.NewTextHandler(os.Stdout, slogConfig)
+		} else {
+			logHandler = slog.NewJSONHandler(os.Stdout, slogConfig)
+		}
+	} else if silent {
+		disableLogs = true
+		if !jsonLogs {
+			logHandler = slog.NewTextHandler(io.Discard, slogConfig)
+		} else {
+			logHandler = slog.NewJSONHandler(io.Discard, slogConfig)
+		}
+	}
+	logger = slog.New(logHandler)
+	slog.SetDefault(logger)
 }

@@ -90,27 +90,7 @@ func main() {
 	adminFlag := flag.String("admin", "", "Add an admin identifier (DeviceToken/DeviceKey/UserID) to NetAdmins")
 	flag.Parse()
 
-	var logHandler slog.Handler
-	slogConfig := &slog.HandlerOptions{
-		Level:     slog.Level(getLogLevelInt(*logLevel)),
-		AddSource: *sourceInfo,
-	}
-	if !*silent {
-		if !*jsonLogs {
-			logHandler = slog.NewTextHandler(os.Stdout, slogConfig)
-		} else {
-			logHandler = slog.NewJSONHandler(os.Stdout, slogConfig)
-		}
-	} else if *silent {
-		disableLogs = true
-		if !*jsonLogs {
-			logHandler = slog.NewTextHandler(io.Discard, slogConfig)
-		} else {
-			logHandler = slog.NewJSONHandler(io.Discard, slogConfig)
-		}
-	}
-	logger = slog.New(logHandler)
-	slog.SetDefault(logger)
+	initLogging(*silent, *jsonLogs, *sourceInfo, *logLevel)
 
 	if showVersion {
 		fmt.Println(version.Version)
