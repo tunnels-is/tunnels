@@ -39,39 +39,31 @@ import (
 )
 
 var (
-// twoFactorKey       = os.Getenv("TWO_FACTOR_KEY")
-// googleClientID     = os.Getenv("GOOGLE_CLIENT_ID")
-// googleClientSecret = os.Getenv("GOOGLE_CLIENT_SECRET")
-// googleRedirectURL  = "http://localhost:3000/auth/google/callback"
-// oauthStateString   = "random-pseudo-state"
-)
-
-const (
-// authHeader        = "X-Auth-Token"
-// googleUserInfoURL = "https://www.googleapis.com/oauth2/v2/userinfo?access_token="
-)
-
-var (
 	CTX          atomic.Pointer[context.Context]
 	Cancel       atomic.Pointer[context.CancelFunc]
 	Config       atomic.Pointer[types.ServerConfig]
 	APITLSConfig atomic.Pointer[tls.Config]
+	KeyPair      atomic.Pointer[tls.Certificate]
 	PrivKey      any
 	SignKey      any
 	PubKey       any
-	KeyPair      atomic.Pointer[tls.Certificate]
-	lc           atomic.Pointer[lemonsqueezy.Client]
-)
 
-var (
+	coreMutex          = sync.Mutex{}
+	slots              int
+	VPLNetwork         *net.IPNet
+	clientCoreMappings [math.MaxUint16 + 1]*UserCoreMapping
+	portToCoreMapping  [math.MaxUint16 + 1]*PortRange
+	DHCPMapping        [math.MaxUint16 + 1]*types.DHCPRecord
+	VPLIPToCore        = make([][][][]*UserCoreMapping, 255)
+
 	LANEnabled   bool
 	VPNEnabled   bool
 	AUTHEnabled  bool
 	DNSEnabled   bool
 	BBOLTEnabled bool
-	logger       *slog.Logger
 
-	slots int
+	lanFirewallDisabled bool
+	disableLogs         bool
 
 	dataSocketFD int
 	rawUDPSockFD int
@@ -79,21 +71,11 @@ var (
 	InterfaceIP  net.IP
 	TCPRWC       io.ReadWriteCloser
 	UDPRWC       io.ReadWriteCloser
+	logger       *slog.Logger
 
-	clientCoreMappings [math.MaxUint16 + 1]*UserCoreMapping
-	portToCoreMapping  [math.MaxUint16 + 1]*PortRange
-	coreMutex          = sync.Mutex{}
-
-	VPLNetwork  *net.IPNet
-	DHCPMapping [math.MaxUint16 + 1]*types.DHCPRecord
-
-	VPLIPToCore         = make([][][][]*UserCoreMapping, 255)
-	lanFirewallDisabled bool
-	disableLogs         bool
+	// Tunnels public network only
+	lc atomic.Pointer[lemonsqueezy.Client]
 )
-
-func GetVPLCM(ip [4]byte) {
-}
 
 func LOG(x ...any) {
 	if !disableLogs {

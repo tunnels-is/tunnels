@@ -360,14 +360,13 @@ func API_UserTwoFactorConfirm(w http.ResponseWriter, r *http.Request) {
 		recoveryFound := false
 		recoveryUpper := strings.ToUpper(LF.Recovery)
 		rc, err := Decrypt(user.RecoveryCodes, []byte(loadSecret("TwoFactorKey")))
-		// rc, err := encrypter.Decrypt(user.RecoveryCodes, []byte(ENV.F2KEY))
 		if err != nil {
 			ADMIN(err)
 			senderr(w, 500, "Encryption error")
 			return
 		}
 
-		rcs := strings.SplitSeq(string(rc), " ")
+		rcs := strings.SplitSeq(rc, " ")
 		for v := range rcs {
 			if v == recoveryUpper {
 				recoveryFound = true
@@ -1248,7 +1247,7 @@ func API_UserResetPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	otp := gotp.NewDefaultTOTP(string(code)).Now()
+	otp := gotp.NewDefaultTOTP(code).Now()
 	if otp != RF.ResetCode {
 		return
 	}
