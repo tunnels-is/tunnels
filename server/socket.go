@@ -19,8 +19,7 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-// HashIdentifier creates a SHA3-256 hash from an identifier
-func HashIdentifier(identifier string) string {
+func hashIdentifier(identifier string) string {
 	hash := sha3.Sum256([]byte(identifier))
 	return hex.EncodeToString(hash[:])
 }
@@ -37,7 +36,7 @@ func countConnections(id string) (count int, userCount int) {
 
 		count++
 	}
-	return
+	return count, userCount
 }
 
 func CreateClientCoreMapping(CRR *types.ServerConnectResponse, CR *types.ControllerConnectRequest, EH *crypt.SocketWrapper) (index int, err error) {
@@ -63,11 +62,11 @@ func CreateClientCoreMapping(CRR *types.ServerConnectResponse, CR *types.Control
 				continue
 			}
 
-			clientCoreMappings[i].ID = HashIdentifier(CR.UserID.Hex())
+			clientCoreMappings[i].ID = hashIdentifier(CR.UserID.Hex())
 			if CR.DeviceToken != "" {
-				clientCoreMappings[i].DeviceToken = HashIdentifier(CR.DeviceToken)
+				clientCoreMappings[i].DeviceToken = hashIdentifier(CR.DeviceToken)
 			} else {
-				clientCoreMappings[i].DeviceToken = HashIdentifier(CR.DeviceKey)
+				clientCoreMappings[i].DeviceToken = hashIdentifier(CR.DeviceKey)
 			}
 
 			clientCoreMappings[i].EH = EH
@@ -110,7 +109,7 @@ func CreateClientCoreMapping(CRR *types.ServerConnectResponse, CR *types.Control
 	Config := Config.Load()
 	CRR.LAN = Config.Lan
 
-	return
+	return index, err
 }
 
 func ExternalTCPListener() {
@@ -449,7 +448,6 @@ func fromUserChannel(index int) {
 				continue
 			}
 		}
-
 	}
 }
 
@@ -532,7 +530,6 @@ func toUserChannel(index int) {
 				}
 
 				if !isAdmin {
-
 					headLength = (PACKET[0] & 0x0F) * 4
 					S4Port[0] = PACKET[headLength]
 					S4Port[1] = PACKET[headLength+1]
@@ -580,7 +577,7 @@ func createRawTCPSocket() (
 	interfaceString := findInterfaceName()
 	if interfaceString == "" {
 		err = errors.New("no interface found")
-		return
+		return buffer, socket, err
 	}
 
 	buffer = make([]byte, math.MaxUint16)
@@ -594,12 +591,12 @@ func createRawTCPSocket() (
 
 	err = socket.Create()
 	if err != nil {
-		return
+		return buffer, socket, err
 	}
 
 	TCPRWC = socket.RWC
 
-	return
+	return buffer, socket, err
 }
 
 func findInterfaceName() (name string) {
@@ -613,7 +610,7 @@ func findInterfaceName() (name string) {
 			}
 		}
 	}
-	return
+	return name
 }
 
 func createRawUDPSocket() (
@@ -624,7 +621,7 @@ func createRawUDPSocket() (
 	interfaceString := findInterfaceName()
 	if interfaceString == "" {
 		err = errors.New("no interface found")
-		return
+		return buffer, socket, err
 	}
 
 	buffer = make([]byte, math.MaxUint16)
@@ -638,12 +635,12 @@ func createRawUDPSocket() (
 
 	err = socket.Create()
 	if err != nil {
-		return
+		return buffer, socket, err
 	}
 
 	UDPRWC = socket.RWC
 
-	return
+	return buffer, socket, err
 }
 
 func (r *RawSocket) Create() (err error) {
@@ -740,7 +737,7 @@ func (rwc *RWC) Read(data []byte) (n int, err error) {
 	)
 	n = int(rwc.r0)
 
-	return
+	return n, err
 }
 
 func (rwc *RWC) Write(data []byte) (n int, err error) {

@@ -165,7 +165,6 @@ func main() {
 				logger.Error("unable to connect to bbolt", slog.Any("err", err))
 				os.Exit(1)
 			}
-
 		} else {
 			err = ConnectToDB(loadSecret("DBurl"))
 			if err != nil {
@@ -258,7 +257,7 @@ func LoadServerConfig(path string) (err error) {
 	var nb []byte
 	nb, err = os.ReadFile(path)
 	if err != nil {
-		return
+		return err
 	}
 	C := new(types.ServerConfig)
 
@@ -274,14 +273,14 @@ func LoadServerConfig(path string) (err error) {
 	}
 
 	if err != nil {
-		return
+		return err
 	}
 	err = validateConfig(C)
 	if err != nil {
-		return
+		return err
 	}
 	Config.Store(C)
-	return
+	return err
 }
 
 func SaveServerConfig(path string) (err error) {
@@ -323,7 +322,7 @@ func addAdminToConfig(identifier string) error {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
 
-	hashedIdentifier := HashIdentifier(identifier)
+	hashedIdentifier := hashIdentifier(identifier)
 
 	C := Config.Load()
 	C.NetAdmins = append(C.NetAdmins, hashedIdentifier)
@@ -454,14 +453,14 @@ func initializeVPN() {
 func initializeLAN() (err error) {
 	err = generateDHCPMap()
 	if err != nil {
-		return
+		return err
 	}
 	Config := Config.Load()
 
 	if Config.Lan != nil {
 		lanFirewallDisabled = Config.DisableLanFirewall
 	}
-	return
+	return err
 }
 
 func GenerateVPLCoreMappings() {
@@ -497,7 +496,6 @@ func GeneratePortAllocation() (err error) {
 		PR.EndPort = PR.StartPort + uint16(portPerUser)
 
 		for i := PR.StartPort; i <= PR.EndPort; i++ {
-
 			if i < PR.StartPort {
 				return errors.New("start port is too small")
 			} else if i > PR.EndPort {
@@ -608,7 +606,7 @@ func makeCerts(execPath string, IP string) (err error) {
 		time.Time{},
 		true,
 	)
-	return
+	return err
 }
 
 func makeCertsOnly() (err error) {

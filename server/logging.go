@@ -39,7 +39,7 @@ func buildOut(x ...any) (out string) {
 	for _, v := range x {
 		out += fmt.Sprint(v)
 	}
-	return
+	return out
 }
 
 func getLogLevelInt(level string) int {

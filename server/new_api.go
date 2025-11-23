@@ -68,7 +68,6 @@ func launchAPIServer() {
 			mux.HandleFunc("/v3/key/activate", API_ActivateLicenseKey)
 			mux.HandleFunc("/v3/user/toggle/substatus", API_UserToggleSubStatus)
 		}
-
 	}
 
 	tlsConfig := APITLSConfig.Load()

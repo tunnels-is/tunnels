@@ -1,6 +1,6 @@
 module github.com/tunnels-is/tunnels
 
-go 1.24.0
+go 1.25.0
 
 require (
 	github.com/NdoleStudio/lemonsqueezy-go v1.2.4
