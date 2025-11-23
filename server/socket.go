@@ -319,7 +319,7 @@ func fromUserChannel(index int) {
 	shouldRestart := true
 	defer func() {
 		if r := recover(); r != nil {
-			ERR(3, r, string(debug.Stack()))
+			ERR( r, string(debug.Stack()))
 		}
 
 		if !shouldRestart {
@@ -483,7 +483,7 @@ func toUserChannel(index int) {
 
 	defer func() {
 		if r := recover(); r != nil {
-			ERR(3, r, string(debug.Stack()))
+			ERR( r, string(debug.Stack()))
 		}
 
 		if !shouldRestart {

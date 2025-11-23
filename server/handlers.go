@@ -491,7 +491,7 @@ func API_DeviceUpdate(w http.ResponseWriter, r *http.Request) {
 
 	err = DB_UpdateDevice(F.Device)
 	if err != nil {
-		ERR(3, err)
+		ERR( err)
 		senderr(w, 500, "Unknown error, please try again in a moment")
 		return
 	}
@@ -603,7 +603,7 @@ func API_DeviceCreate(w http.ResponseWriter, r *http.Request) {
 
 	err = DB_CreateDevice(F.Device)
 	if err != nil {
-		ERR(3, err)
+		ERR( err)
 		senderr(w, 500, "Unable to create group, please try again later")
 		return
 	}
@@ -643,7 +643,7 @@ func API_GroupCreate(w http.ResponseWriter, r *http.Request) {
 
 	err = DB_CreateGroup(F.Group)
 	if err != nil {
-		ERR(3, err)
+		ERR( err)
 		senderr(w, 500, "Unable to create group, please try again later")
 		return
 	}
@@ -780,7 +780,7 @@ func API_GroupUpdate(w http.ResponseWriter, r *http.Request) {
 
 	err = DB_UpdateGroup(F.Group)
 	if err != nil {
-		ERR(3, err)
+		ERR( err)
 		senderr(w, 500, "Unknown error, please try again in a moment")
 		return
 	}
@@ -1308,7 +1308,7 @@ func API_ActivateLicenseKey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	INFO(3, "KEY attempt:", AF.Key)
+	INFO( "KEY attempt:", AF.Key)
 
 	lemonClient := lc.Load()
 	key, resp, err := lemonClient.Licenses.Validate(context.Background(), AF.Key, "")
@@ -1334,7 +1334,7 @@ func API_ActivateLicenseKey(w http.ResponseWriter, r *http.Request) {
 			user.SubExpiration = time.Now()
 		}
 		user.SubExpiration = user.SubExpiration.AddDate(0, 1, 0).Add(time.Duration(rand.Intn(60)+60) * time.Minute)
-		INFO(3, "KEY +1:", key.LicenseKey.Key, " - check activation in lemon")
+		INFO( "KEY +1:", key.LicenseKey.Key, " - check activation in lemon")
 
 		user.Key = &LicenseKey{
 			Created: key.LicenseKey.CreatedAt,
@@ -1345,14 +1345,14 @@ func API_ActivateLicenseKey(w http.ResponseWriter, r *http.Request) {
 		ns := strings.Split(key.Meta.ProductName, " ")
 		months, err := strconv.Atoi(ns[0])
 		if err != nil {
-			ADMIN(3, "unable to parse license key name:", err)
+			ADMIN( "unable to parse license key name:", err)
 			senderr(w, 500, "Something went wrong, please contact customer support")
 		}
 		if user.SubExpiration.IsZero() {
 			user.SubExpiration = time.Now()
 		}
 		user.SubExpiration = time.Now().AddDate(0, months, 0).Add(time.Duration(rand.Intn(600)+60) * time.Minute)
-		INFO(3, "KEY +", months, ":", key.LicenseKey.Key, " - check activate in lemon")
+		INFO( "KEY +", months, ":", key.LicenseKey.Key, " - check activate in lemon")
 
 		user.Key = &LicenseKey{
 			Created: key.LicenseKey.CreatedAt,
@@ -1385,7 +1385,7 @@ func API_ActivateLicenseKey(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if key != nil {
-		INFO(3, "KEY: Activated:", key.LicenseKey.Key)
+		INFO( "KEY: Activated:", key.LicenseKey.Key)
 	}
 
 	w.WriteHeader(200)

@@ -48,20 +48,20 @@ func ConnectToDB(connectionString string) (err error) {
 
 	DB, err = mongo.Connect(context.Background(), opt.ApplyURI(connectionString))
 	if err != nil {
-		ERR(3, err)
-		ADMIN(3, "Database error, unable to connect local")
+		ERR( err)
+		ADMIN( "Database error, unable to connect local")
 		return
 	}
 
 	err = DB.Ping(context.Background(), nil)
 	if err != nil {
 		_ = DB.Disconnect(context.TODO())
-		ERR(3, err)
-		ADMIN(3, "Database error, unable to ping local")
+		ERR( err)
+		ADMIN( "Database error, unable to ping local")
 		return
 	}
 
-	INFO(3, "DATABASE CONNECTED")
+	INFO( "DATABASE CONNECTED")
 	return
 }
 
@@ -82,7 +82,7 @@ func DB_DeleteDeviceByID(id primitive.ObjectID) (err error) {
 			opt,
 		)
 	if err != nil {
-		ADMIN(3, "Unable to delete device by id: ", id, err)
+		ADMIN( "Unable to delete device by id: ", id, err)
 		return err
 	}
 
@@ -118,11 +118,11 @@ func DB_UpdateDevice(D *types.Device) (err error) {
 		if err == mongo.ErrNoDocuments {
 			return nil
 		}
-		ADMIN(3, "Unable to update device", D.ID.Hex(), err)
+		ADMIN( "Unable to update device", D.ID.Hex(), err)
 		return err
 	}
 	if res.MatchedCount == 0 {
-		ADMIN(3, "Unable to update device(no match count)", D.ID.Hex(), err)
+		ADMIN( "Unable to update device(no match count)", D.ID.Hex(), err)
 		return errors.New("unable to modify document")
 	}
 
@@ -149,7 +149,7 @@ func DB_GetDevices(limit, offset int64) (DL []*types.Device, err error) {
 			opt,
 		)
 	if err != nil {
-		ADMIN(3, "Unable to find device: ", err)
+		ADMIN( "Unable to find device: ", err)
 		return nil, err
 	}
 
@@ -158,7 +158,7 @@ func DB_GetDevices(limit, offset int64) (DL []*types.Device, err error) {
 		D := new(types.Device)
 		err = cursor.Decode(D)
 		if err != nil {
-			ADMIN(3, "Unable to decode user to struct: ", err)
+			ADMIN( "Unable to decode user to struct: ", err)
 			continue
 		}
 		DL = append(DL, D)
@@ -187,7 +187,7 @@ func DB_getUsers(limit, offset int64) (UL []*User, err error) {
 			opt,
 		)
 	if err != nil {
-		ADMIN(3, "Unable to find users: ", err)
+		ADMIN( "Unable to find users: ", err)
 		return nil, err
 	}
 
@@ -196,7 +196,7 @@ func DB_getUsers(limit, offset int64) (UL []*User, err error) {
 		D := new(User)
 		err = cursor.Decode(D)
 		if err != nil {
-			ADMIN(3, "Unable to decode user to struct: ", err)
+			ADMIN( "Unable to decode user to struct: ", err)
 			continue
 		}
 		UL = append(UL, D)
@@ -225,7 +225,7 @@ func DB_findUserByAPIKey(Key string) (USER *User, err error) {
 		if err == mongo.ErrNoDocuments {
 			return nil, nil
 		}
-		ADMIN(3, err)
+		ADMIN( err)
 	}
 
 	return
@@ -251,7 +251,7 @@ func DB_findUserByID(UID primitive.ObjectID) (USER *User, err error) {
 		if err == mongo.ErrNoDocuments {
 			return nil, nil
 		}
-		ADMIN(3, err)
+		ADMIN( err)
 	}
 
 	return
@@ -270,7 +270,7 @@ func DB_CreateUser(U *User) (err error) {
 			options.InsertOne(),
 		)
 	if err != nil {
-		ADMIN(3, err)
+		ADMIN( err)
 	}
 
 	return
@@ -293,7 +293,7 @@ func DB_findUserByEmail(Email string) (USER *User, err error) {
 		if err == mongo.ErrNoDocuments {
 			return nil, nil
 		}
-		ADMIN(3, err)
+		ADMIN( err)
 	}
 
 	return
@@ -321,7 +321,7 @@ func DB_updateUserDeviceTokens(TU *UPDATE_USER_TOKENS) (err error) {
 			},
 		)
 	if err != nil {
-		ADMIN(3, err)
+		ADMIN( err)
 	}
 
 	return
@@ -353,12 +353,12 @@ func DB_updateUserSubTime(u *User) (err error) {
 			options.Update(),
 		)
 	if err != nil {
-		ADMIN(3, "Could not update user sub time: ", err)
+		ADMIN( "Could not update user sub time: ", err)
 		return err
 	}
 
 	if res.MatchedCount == 0 {
-		ADMIN(3, "Could not update user sub time: ", err)
+		ADMIN( "Could not update user sub time: ", err)
 		return errors.New("unable to modify document")
 	}
 
@@ -392,12 +392,12 @@ func DB_updateUser(UF *USER_UPDATE_FORM) (err error) {
 			options.Update(),
 		)
 	if err != nil {
-		ADMIN(3, "Could not update user: ", err)
+		ADMIN( "Could not update user: ", err)
 		return err
 	}
 
 	if res.MatchedCount == 0 {
-		ADMIN(3, "Could not update user: ", err)
+		ADMIN( "Could not update user: ", err)
 		return errors.New("unable to modify document")
 	}
 
@@ -442,12 +442,12 @@ func DB_updateUserAdmin(UF *USER_ADMIN_UPDATE_FORM) (err error) {
 			options.Update(),
 		)
 	if err != nil {
-		ADMIN(3, "Could not admin update user: ", err)
+		ADMIN( "Could not admin update user: ", err)
 		return err
 	}
 
 	if res.MatchedCount == 0 {
-		ADMIN(3, "Could not admin update user: user not found")
+		ADMIN( "Could not admin update user: user not found")
 		return errors.New("unable to modify document")
 	}
 
@@ -480,12 +480,12 @@ func DB_toggleUserSubscriptionStatus(UF *USER_UPDATE_SUB_FORM) (err error) {
 			options.Update(),
 		)
 	if err != nil {
-		ADMIN(3, "Could not update user sub status: ", err)
+		ADMIN( "Could not update user sub status: ", err)
 		return err
 	}
 
 	if res.MatchedCount == 0 {
-		ADMIN(3, "Could not update user sub status: ", err)
+		ADMIN( "Could not update user sub status: ", err)
 		return errors.New("unable to modify document")
 	}
 
@@ -515,7 +515,7 @@ func DB_userUpdateTwoFactorCodes(TFP *TWO_FACTOR_DB_PACKAGE) (err error) {
 			},
 		)
 	if err != nil {
-		ADMIN(3, err)
+		ADMIN( err)
 	}
 
 	return
@@ -544,12 +544,12 @@ func DB_userResetPassword(user *User) error {
 			},
 		)
 	if err != nil {
-		ADMIN(3, "Unable to modify user password: ", user.ID)
+		ADMIN( "Unable to modify user password: ", user.ID)
 		return err
 	}
 
 	if res.MatchedCount == 0 {
-		ADMIN(3, "Unable to modify user password: ", user.ID)
+		ADMIN( "Unable to modify user password: ", user.ID)
 		return errors.New("user password could not be modified")
 	}
 
@@ -582,7 +582,7 @@ func DB_FindServersWithoutGroups(limit, offset int64) (DL []*types.Server, err e
 			opt,
 		)
 	if err != nil {
-		ADMIN(3, "Unable to find online devices: ", err)
+		ADMIN( "Unable to find online devices: ", err)
 		return nil, err
 	}
 
@@ -591,7 +591,7 @@ func DB_FindServersWithoutGroups(limit, offset int64) (DL []*types.Server, err e
 		D := new(types.Server)
 		err = cursor.Decode(D)
 		if err != nil {
-			ADMIN(3, "Unable to decode device to struct: ", err)
+			ADMIN( "Unable to decode device to struct: ", err)
 			continue
 		}
 		DL = append(DL, D)
@@ -624,7 +624,7 @@ func DB_FindServersByGroups(groups []primitive.ObjectID, limit, offset int64) (D
 			opt,
 		)
 	if err != nil {
-		ADMIN(3, "Unable to find online devices: ", err)
+		ADMIN( "Unable to find online devices: ", err)
 		return nil, err
 	}
 
@@ -633,7 +633,7 @@ func DB_FindServersByGroups(groups []primitive.ObjectID, limit, offset int64) (D
 		D := new(types.Server)
 		err = cursor.Decode(D)
 		if err != nil {
-			ADMIN(3, "Unable to decode device to struct: ", err)
+			ADMIN( "Unable to decode device to struct: ", err)
 			continue
 		}
 		DL = append(DL, D)
@@ -680,7 +680,7 @@ func DB_FindEntitiesByGroupID(id primitive.ObjectID, objType string, limit, offs
 			opt,
 		)
 	if err != nil {
-		ADMIN(3, "Unable to find online devices: ", err)
+		ADMIN( "Unable to find online devices: ", err)
 		return nil, err
 	}
 
@@ -691,7 +691,7 @@ func DB_FindEntitiesByGroupID(id primitive.ObjectID, objType string, limit, offs
 			E := new(types.Server)
 			err = cursor.Decode(E)
 			if err != nil {
-				ADMIN(3, "Unable to decode device to struct: ", err)
+				ADMIN( "Unable to decode device to struct: ", err)
 				continue
 			}
 			IL = append(IL, E)
@@ -699,7 +699,7 @@ func DB_FindEntitiesByGroupID(id primitive.ObjectID, objType string, limit, offs
 			E := new(User)
 			err = cursor.Decode(E)
 			if err != nil {
-				ADMIN(3, "Unable to decode device to struct: ", err)
+				ADMIN( "Unable to decode device to struct: ", err)
 				continue
 			}
 			IL = append(IL, E)
@@ -707,7 +707,7 @@ func DB_FindEntitiesByGroupID(id primitive.ObjectID, objType string, limit, offs
 			E := new(types.Device)
 			err = cursor.Decode(E)
 			if err != nil {
-				ADMIN(3, "Unable to decode device to struct: ", err)
+				ADMIN( "Unable to decode device to struct: ", err)
 				continue
 			}
 			IL = append(IL, E)
@@ -747,11 +747,11 @@ func DB_UpdateGroup(G *Group) (err error) {
 		if err == mongo.ErrNoDocuments {
 			return nil
 		}
-		ADMIN(3, "Unable to update group", G.ID.Hex(), err)
+		ADMIN( "Unable to update group", G.ID.Hex(), err)
 		return err
 	}
 	if res.MatchedCount == 0 {
-		ADMIN(3, "Unable to update group(no match count)", G.ID.Hex(), err)
+		ADMIN( "Unable to update group(no match count)", G.ID.Hex(), err)
 		return errors.New("unable to modify document")
 	}
 
@@ -789,7 +789,7 @@ func DB_UpdateServer(S *types.Server) (RS *types.Server, err error) {
 			options.FindOneAndUpdate(),
 		).Decode(&RS)
 	if err != nil {
-		ADMIN(3, "Unable to update server: ", S.ID.Hex())
+		ADMIN( "Unable to update server: ", S.ID.Hex())
 		return nil, err
 	}
 
@@ -810,7 +810,7 @@ func DB_CreateDevice(D *types.Device) (err error) {
 			options.InsertOne(),
 		)
 	if err != nil {
-		ADMIN(3, "Unable to create device: ", err)
+		ADMIN( "Unable to create device: ", err)
 		return err
 	}
 
@@ -831,7 +831,7 @@ func DB_CreateGroup(G *Group) (err error) {
 			options.InsertOne(),
 		)
 	if err != nil {
-		ADMIN(3, "Unable to create group: ", err)
+		ADMIN( "Unable to create group: ", err)
 		return err
 	}
 
@@ -852,7 +852,7 @@ func DB_CreateServer(S *types.Server) (err error) {
 			options.InsertOne(),
 		)
 	if err != nil {
-		ADMIN(3, "Unable to create server: ", err)
+		ADMIN( "Unable to create server: ", err)
 		return err
 	}
 
@@ -878,7 +878,7 @@ func DB_FindServerByID(ID primitive.ObjectID) (S *types.Server, err error) {
 			options.FindOne(),
 		).Decode(S)
 	if err != nil {
-		ADMIN(3, "Could not find server by id: ", ID, " / ", err)
+		ADMIN( "Could not find server by id: ", ID, " / ", err)
 		return nil, err
 	}
 
@@ -911,13 +911,13 @@ func DB_WipeUserConfirmCode(UF *USER_ENABLE_QUERY) (err error) {
 			options.Update(),
 		)
 	if err != nil {
-		ADMIN(3, "Could not enable user: ", err)
+		ADMIN( "Could not enable user: ", err)
 		return err
 	}
 
-	// INFO(3, "COUNTS:", res.MatchedCount, res.ModifiedCount)
+	// INFO( "COUNTS:", res.MatchedCount, res.ModifiedCount)
 	if res.MatchedCount == 0 {
-		ADMIN(3, "Could not enable user, user no found: ", err)
+		ADMIN( "Could not enable user, user no found: ", err)
 		return errors.New("unable to modify document")
 	}
 
@@ -953,12 +953,12 @@ func DB_UserActivateKey(SubExpiration time.Time, Key *LicenseKey, userID primiti
 			options.Update(),
 		)
 	if err != nil {
-		ADMIN(3, "Unable to update user post payment: ", userID, " / ", err)
+		ADMIN( "Unable to update user post payment: ", userID, " / ", err)
 		return err
 	}
 
 	if res.MatchedCount == 0 {
-		ADMIN(3, "Unable to update user post payment: ", userID)
+		ADMIN( "Unable to update user post payment: ", userID)
 		return errors.New("unable to modify document")
 	}
 
@@ -1010,11 +1010,11 @@ func DB_AddToGroup(groupID primitive.ObjectID, typeID primitive.ObjectID, objTyp
 		if err == mongo.ErrNoDocuments {
 			return nil
 		}
-		ADMIN(3, "Unable to update object", objType, typeID.Hex(), err)
+		ADMIN( "Unable to update object", objType, typeID.Hex(), err)
 		return err
 	}
 	if res.MatchedCount == 0 {
-		ADMIN(3, "Unable to update (no match count)", objType, typeID.Hex(), err)
+		ADMIN( "Unable to update (no match count)", objType, typeID.Hex(), err)
 		return errors.New("unable to modify document")
 	}
 
@@ -1066,11 +1066,11 @@ func DB_RemoveFromGroup(groupID primitive.ObjectID, typeID primitive.ObjectID, o
 		if err == mongo.ErrNoDocuments {
 			return nil
 		}
-		ADMIN(3, "Unable to update object", objType, typeID.Hex(), err)
+		ADMIN( "Unable to update object", objType, typeID.Hex(), err)
 		return err
 	}
 	if res.MatchedCount == 0 {
-		ADMIN(3, "Unable to update (no match count)", objType, typeID.Hex(), err)
+		ADMIN( "Unable to update (no match count)", objType, typeID.Hex(), err)
 		return errors.New("unable to modify document")
 	}
 
@@ -1098,7 +1098,7 @@ func DB_FindDeviceByID(id primitive.ObjectID) (dev *types.Device, err error) {
 		if err == mongo.ErrNoDocuments {
 			return nil, nil
 		}
-		ADMIN(3, "Unable to find device by id :", id, err)
+		ADMIN( "Unable to find device by id :", id, err)
 		return nil, err
 	}
 
@@ -1123,7 +1123,7 @@ func DB_findGroupByID(id primitive.ObjectID) (G *Group, err error) {
 			opt,
 		).Decode(&G)
 	if err != nil {
-		ADMIN(3, "Unable to find group by id: ", id, err)
+		ADMIN( "Unable to find group by id: ", id, err)
 		return nil, err
 	}
 
@@ -1147,7 +1147,7 @@ func DB_DeleteGroupByID(id primitive.ObjectID) (err error) {
 			opt,
 		)
 	if err != nil {
-		ADMIN(3, "Unable to delete group by id: ", id, err)
+		ADMIN( "Unable to delete group by id: ", id, err)
 		return err
 	}
 
@@ -1170,7 +1170,7 @@ func DB_findGroups() (gl []*Group, err error) {
 		opt,
 	)
 	if err != nil {
-		ADMIN(3, "Unable to find groups: ", err)
+		ADMIN( "Unable to find groups: ", err)
 		return nil, err
 	}
 
@@ -1179,7 +1179,7 @@ func DB_findGroups() (gl []*Group, err error) {
 		D := new(Group)
 		err = cursor.Decode(D)
 		if err != nil {
-			ADMIN(3, "Unable to decode group to struct: ", err)
+			ADMIN( "Unable to decode group to struct: ", err)
 			continue
 		}
 		gl = append(gl, D)

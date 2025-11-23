@@ -43,7 +43,7 @@ func Ratelimit(conn net.Conn) (allowed bool) {
 	} else {
 		limiter.Count++
 		if limiter.Count > 100 {
-			WARN(3, "RATELIMIT HIT FOR IP: ", IP)
+			WARN( "RATELIMIT HIT FOR IP: ", IP)
 			return false
 		}
 	}
