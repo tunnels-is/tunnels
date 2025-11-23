@@ -114,6 +114,7 @@ func main() {
 	silent := flag.Bool("silent", false, "This command disables logging")
 	adminFlag := flag.String("admin", "", "Add an admin identifier (DeviceToken/DeviceKey/UserID) to NetAdmins")
 	flag.Parse()
+
 	var logHandler slog.Handler
 	if !*silent {
 		if !*jsonLogs {

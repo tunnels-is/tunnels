@@ -114,19 +114,23 @@ func loggingTimingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		startTime := time.Now()
 		conf := Config.Load()
-		if conf.LogAPIHosts {
+		if conf.LogAPIHosts && !disableLogs {
 			log.Printf("-> %s %s %s", r.RemoteAddr, r.Method, r.URL.RequestURI())
 		} else {
-			log.Printf("-> %s %s", r.Method, r.URL.RequestURI())
+			if !disableLogs {
+				log.Printf("-> %s %s", r.Method, r.URL.RequestURI())
+			}
 		}
 
 		next.ServeHTTP(w, r)
-		duration := time.Since(startTime)
-		log.Printf("<- %s %s completed in %d ms",
-			r.Method,
-			r.URL.RequestURI(),
-			duration.Milliseconds(),
-		)
+		if !disableLogs {
+			duration := time.Since(startTime)
+			log.Printf("<- %s %s completed in %d ms",
+				r.Method,
+				r.URL.RequestURI(),
+				duration.Milliseconds(),
+			)
+		}
 	})
 }
 
