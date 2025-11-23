@@ -546,8 +546,8 @@ type CLIConfig struct {
 	DeviceID         string
 	ServerID         string
 	SendStats        bool
-	PinVersion       bool // deprecated
-	SkipUpdatePrompt bool // deprecated
+	PinVersion       bool
+	SkipUpdatePrompt bool
 }
 
 type configV2 struct {
@@ -564,8 +564,6 @@ type configV2 struct {
 	UpdateWhileConnected bool
 	UpdateCheckInterval  int
 	DisableUpdates       bool
-	SkipUpdatePrompt     bool
-	PinVersion           bool
 
 	// API Setting
 	APIIP          string
