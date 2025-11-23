@@ -78,31 +78,26 @@ var (
 )
 
 // LOG ...
-// deprecated, will be phased out slowly
 func LOG(x ...any) {
 	logger.Info("INFO", "msg", buildOut(x))
 }
 
 // INFO ...
-// deprecated, will be phased out slowly
 func INFO(x ...any) {
 	logger.Info("INFO", "msg", buildOut(x))
 }
 
 // WARN ...
-// deprecated, will be phased out slowly
 func WARN(x ...any) {
 	logger.Warn("WARN", "msg", buildOut(x))
 }
 
 // ERR ...
-// deprecated, will be phased out slowly
 func ERR(x ...any) {
 	logger.Error("ERROR", "msg", buildOut(x))
 }
 
 // ADMIN ...
-// deprecated, will be phased out slowly
 func ADMIN(x ...any) {
 	logger.Warn("ADMIN", "msg", buildOut(x))
 }
