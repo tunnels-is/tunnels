@@ -77,62 +77,36 @@ var (
 	lc atomic.Pointer[lemonsqueezy.Client]
 )
 
-// LOG ...
-func LOG(x ...any) {
-	logger.Info("INFO", "msg", buildOut(x))
-}
-
-// INFO ...
-func INFO(x ...any) {
-	logger.Info("INFO", "msg", buildOut(x))
-}
-
-// WARN ...
-func WARN(x ...any) {
-	logger.Warn("WARN", "msg", buildOut(x))
-}
-
-// ERR ...
-func ERR(x ...any) {
-	logger.Error("ERROR", "msg", buildOut(x))
-}
-
-// ADMIN ...
-func ADMIN(x ...any) {
-	logger.Warn("ADMIN", "msg", buildOut(x))
-}
-
-func buildOut(x ...any) (out string) {
-	for _, v := range x {
-		out += fmt.Sprint(v)
-	}
-	return
-}
-
 func main() {
 	showVersion := false
 	flag.BoolVar(&showVersion, "version", false, "show version and exit")
 
 	configFlag := flag.Bool("config", false, "This command runs the server and creates a config + certificates")
 	jsonLogs := flag.Bool("json", true, "this disabled json logging")
+	sourceInfo := flag.Bool("source", false, "disable source line information in logs")
 	certsOnly := flag.Bool("certs", false, "This command generates certificates and exits")
 	silent := flag.Bool("silent", false, "This command disables logging")
+	logLevel := flag.String("logLevel", "debug", "set the log level. Available levels: debug, info, warn, error")
 	adminFlag := flag.String("admin", "", "Add an admin identifier (DeviceToken/DeviceKey/UserID) to NetAdmins")
 	flag.Parse()
 
 	var logHandler slog.Handler
+	slogConfig := &slog.HandlerOptions{
+		Level:     slog.Level(getLogLevelInt(*logLevel)),
+		AddSource: *sourceInfo,
+	}
 	if !*silent {
 		if !*jsonLogs {
-			logHandler = slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug, AddSource: true})
+			logHandler = slog.NewTextHandler(os.Stdout, slogConfig)
 		} else {
-			logHandler = slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug, AddSource: true})
+			logHandler = slog.NewJSONHandler(os.Stdout, slogConfig)
 		}
 	} else if *silent {
 		disableLogs = true
 		if !*jsonLogs {
-			logHandler = slog.NewTextHandler(io.Discard, &slog.HandlerOptions{Level: slog.LevelError})
+			logHandler = slog.NewTextHandler(io.Discard, slogConfig)
 		} else {
-			logHandler = slog.NewJSONHandler(io.Discard, &slog.HandlerOptions{Level: slog.LevelError})
+			logHandler = slog.NewJSONHandler(io.Discard, slogConfig)
 		}
 	}
 	logger = slog.New(logHandler)
@@ -189,7 +163,8 @@ func main() {
 
 	AUTHEnabled = slices.Contains(config.Features, types.AUTH)
 	LANEnabled = slices.Contains(config.Features, types.LAN)
-	DNSEnabled = slices.Contains(config.Features, types.DNS)
+	// In development
+	// DNSEnabled = slices.Contains(config.Features, types.DNS)
 	VPNEnabled = slices.Contains(config.Features, types.VPN)
 	BBOLTEnabled = slices.Contains(config.Features, types.BBOLT)
 
@@ -271,7 +246,9 @@ func main() {
 }
 
 func goroutineLogger(msg string) {
-	logger.Debug(msg)
+	if !disableLogs {
+		logger.Debug(msg)
+	}
 }
 
 func validateConfig(Config *types.ServerConfig) (err error) {
