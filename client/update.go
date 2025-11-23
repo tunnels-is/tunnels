@@ -39,7 +39,7 @@ func updatePrint(s ...any) {
 func isPinned() (pinned bool) {
 	conf := CONFIG.Load()
 	if conf.CLIConfig != nil {
-		if conf.CLIConfig.PinVersion {
+		if conf.CLIConfig.PinVersion || conf.PinVersion {
 			return true
 		}
 	}
@@ -49,7 +49,7 @@ func isPinned() (pinned bool) {
 func skipUpdatePrompt() (pinned bool) {
 	conf := CONFIG.Load()
 	if conf.CLIConfig != nil {
-		if conf.CLIConfig.SkipUpdatePrompt {
+		if conf.CLIConfig.SkipUpdatePrompt || conf.SkipUpdatePrompt {
 			return true
 		}
 	}
