@@ -143,10 +143,11 @@ func main() {
 
 	AUTHEnabled = slices.Contains(config.Features, types.AUTH)
 	LANEnabled = slices.Contains(config.Features, types.LAN)
-	// In development
-	// DNSEnabled = slices.Contains(config.Features, types.DNS)
 	VPNEnabled = slices.Contains(config.Features, types.VPN)
 	BBOLTEnabled = slices.Contains(config.Features, types.BBOLT)
+
+	// In development
+	// DNSEnabled = slices.Contains(config.Features, types.DNS)
 
 	err = loadCertificatesAndTLSSettings()
 	if err != nil {
