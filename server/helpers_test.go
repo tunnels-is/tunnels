@@ -113,11 +113,6 @@ func TestGENERATE_CODE(t *testing.T) {
 			}
 		}
 
-		// Test 3: Code should be uppercase
-		if code != code {
-			t.Errorf("GENERATE_CODE produced code with lowercase characters: %s", code)
-		}
-
 		// Store for uniqueness test
 		codes[code] = true
 	}
