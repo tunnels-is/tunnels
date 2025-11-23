@@ -73,7 +73,7 @@ func InitService() error {
 			conf.OpenUI = false
 			wasChanged = true
 		}
-		if conf.ConsoleLogOnly {
+		if !conf.ConsoleLogOnly {
 			conf.ConsoleLogOnly = true
 			wasChanged = true
 		}

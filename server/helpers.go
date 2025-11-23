@@ -119,7 +119,7 @@ func validateUserTwoFactor(user *User, LF *LOGIN_FORM) (err error) {
 				return errors.New("encryption error")
 			}
 
-			rcs := strings.SplitSeq(string(rc), " ")
+			rcs := strings.SplitSeq(rc, " ")
 			for v := range rcs {
 				if v == recoveryUpper {
 					recoveryEnabled = true
@@ -139,7 +139,7 @@ func validateUserTwoFactor(user *User, LF *LOGIN_FORM) (err error) {
 				return errors.New("encryption error")
 			}
 
-			otp := gotp.NewDefaultTOTP(string(code)).Now()
+			otp := gotp.NewDefaultTOTP(code).Now()
 			if otp != LF.Digits {
 				return errors.New("Authenticator code was incorrect")
 			}

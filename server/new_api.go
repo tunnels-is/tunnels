@@ -28,6 +28,7 @@ func launchAPIServer() {
 		mux.HandleFunc("/v3/devices", API_ListDevices) // supports ADMIN APIKey
 	}
 
+	mux.HandleFunc("/v3/session", API_SessionCreate)
 	if VPNEnabled {
 		mux.HandleFunc("/v3/connect", API_AcceptUserConnections)
 	}
@@ -61,7 +62,6 @@ func launchAPIServer() {
 		mux.HandleFunc("/v3/server/create", API_ServerCreate)
 		mux.HandleFunc("/v3/server/update", API_ServerUpdate)
 		mux.HandleFunc("/v3/servers", API_ServersForUser)
-		mux.HandleFunc("/v3/session", API_SessionCreate)
 
 		// Tunnels public network specific
 		if loadSecret("PayKey") != "" {

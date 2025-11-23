@@ -355,7 +355,7 @@ func BBolt_FindServersWithoutGroups(limit, offset int64) ([]*types.Server, error
 		for k, v := c.First(); k != nil; k, v = c.Next() {
 			S := new(types.Server)
 			if err := bboltUnmarshal(v, S); err == nil {
-				if S.Groups == nil || len(S.Groups) == 0 {
+				if len(S.Groups) == 0 {
 					if skipped < offset {
 						skipped++
 						continue
@@ -701,7 +701,7 @@ func BBolt_AddToGroup(groupID, typeID, objType string) error {
 		switch objType {
 		case "device":
 			D := new(types.Device)
-			err = bboltUnmarshal(v, D)
+			_ = bboltUnmarshal(v, D)
 			groups := objectIDSliceToString(D.Groups)
 			if !contains(groups, groupID) {
 				groups = append(groups, groupID)
@@ -714,7 +714,7 @@ func BBolt_AddToGroup(groupID, typeID, objType string) error {
 			return b.Put([]byte(typeID), v)
 		case "user":
 			U := new(User)
-			err = bboltUnmarshal(v, U)
+			_ = bboltUnmarshal(v, U)
 			groups := objectIDSliceToString(U.Groups)
 			if !contains(groups, groupID) {
 				groups = append(groups, groupID)
@@ -723,7 +723,7 @@ func BBolt_AddToGroup(groupID, typeID, objType string) error {
 			v, err = bboltMarshal(U)
 		case "server":
 			S := new(types.Server)
-			err = bboltUnmarshal(v, S)
+			_ = bboltUnmarshal(v, S)
 			groups := objectIDSliceToString(S.Groups)
 			if !contains(groups, groupID) {
 				groups = append(groups, groupID)
@@ -761,21 +761,21 @@ func BBolt_RemoveFromGroup(groupID, typeID, objType string) error {
 		switch objType {
 		case "user":
 			U := new(User)
-			err = bboltUnmarshal(v, U)
+			_ = bboltUnmarshal(v, U)
 			groups := objectIDSliceToString(U.Groups)
 			groups = removeString(groups, groupID)
 			U.Groups = stringSliceToObjectID(groups)
 			v, err = bboltMarshal(U)
 		case "server":
 			S := new(types.Server)
-			err = bboltUnmarshal(v, S)
+			_ = bboltUnmarshal(v, S)
 			groups := objectIDSliceToString(S.Groups)
 			groups = removeString(groups, groupID)
 			S.Groups = stringSliceToObjectID(groups)
 			v, err = bboltMarshal(S)
 		case "device":
 			D := new(types.Device)
-			err = bboltUnmarshal(v, D)
+			_ = bboltUnmarshal(v, D)
 			groups := objectIDSliceToString(D.Groups)
 			groups = removeString(groups, groupID)
 			D.Groups = stringSliceToObjectID(groups)
@@ -821,7 +821,7 @@ func removeString(slice []string, s string) []string {
 }
 
 // Helper: convert primitive.ObjectID to string and vice versa
-func objectIDToString(id interface{}) string {
+func objectIDToString(id any) string {
 	switch v := id.(type) {
 	case string:
 		return v
@@ -835,7 +835,7 @@ func objectIDToString(id interface{}) string {
 }
 
 // Helper: convert []primitive.ObjectID <-> []string
-func objectIDSliceToString(slice interface{}) []string {
+func objectIDSliceToString(slice any) []string {
 	var out []string
 	switch v := slice.(type) {
 	case []string:
