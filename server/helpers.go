@@ -25,7 +25,7 @@ func BasicRecover() {
 func CopySlice(in []byte) (out []byte) {
 	out = make([]byte, len(in))
 	_ = copy(out, in)
-	return
+	return out
 }
 
 var letterRunes = []rune("ABCDEFGHIJKLMNOPQRSTUVWXYZ234567")
@@ -97,7 +97,7 @@ func handleUserDeviceToken(user *User, LF *LOGIN_FORM) (userTokenUpdate *UPDATE_
 	userTokenUpdate.Tokens = user.Tokens
 	userTokenUpdate.Version = LF.Version
 
-	return
+	return userTokenUpdate
 }
 
 func validateUserTwoFactor(user *User, LF *LOGIN_FORM) (err error) {
@@ -109,7 +109,6 @@ func validateUserTwoFactor(user *User, LF *LOGIN_FORM) (err error) {
 	}()
 	recoveryEnabled := false
 	if user.TwoFactorEnabled {
-
 		if LF.Recovery != "" {
 			recoveryFound := false
 			recoveryUpper := strings.ToUpper(LF.Recovery)
@@ -180,7 +179,7 @@ func authenticateUserFromEmailOrIDAndToken(email string, id primitive.ObjectID, 
 	}
 
 	if allowed {
-		return
+		return user, err
 	}
 
 	return nil, errors.New("unauthorized")
