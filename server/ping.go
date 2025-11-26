@@ -81,7 +81,7 @@ func pingActiveUsers() {
 		if u == nil {
 			continue
 		}
-		if len(u.Uindex) == 0 {
+		if len(u.Uindex) == 0 || u.Addr == nil {
 			continue
 		}
 
