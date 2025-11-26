@@ -68,7 +68,6 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	tunnelMetaMapRange(func(tun *TunnelMETA) bool {
 		if tun.Tag == DefaultTunnelName && ClientCR.Tag == DefaultTunnelName {
 			meta = tun
-			_ = writeTunnelsToDisk(DefaultTunnelName)
 			return false
 		} else if tun.Tag == ClientCR.Tag {
 			meta = tun

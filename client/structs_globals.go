@@ -302,7 +302,6 @@ type ActiveConnectionMeta struct {
 }
 
 type TunnelMETA struct {
-	ServerID    string
 	WindowsGUID string
 
 	// controlled by user only
