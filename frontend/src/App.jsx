@@ -28,7 +28,6 @@ import Stats from "./pages/Stats";
 import Logs from "./pages/Logs";
 import STORE from "./store";
 import DNS from "./pages/dns";
-import WS from "./ws";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import AppSidebar from "./components/app-sidebar";
 import { ModeToggle } from "./components/mode-toggle";
