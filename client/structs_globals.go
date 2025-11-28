@@ -34,8 +34,11 @@ const (
 var (
 	PRODUCTION = true
 
+	// hardcoded public network controller IP
+	// This prevents DNS hijacking
+	DefaultControllerIP = "89.147.109.61"
+
 	DefaultTunnelName = "tunnels"
-	// CertPool          *x509.CertPool
 
 	// New global state and config
 	STATE  atomic.Pointer[stateV2]
@@ -299,7 +302,6 @@ type ActiveConnectionMeta struct {
 }
 
 type TunnelMETA struct {
-	ServerID    string
 	WindowsGUID string
 
 	// controlled by user only
@@ -629,11 +631,10 @@ const (
 	TUN_Error TunnelState = iota
 	TUN_Disconnecting
 	TUN_Disconnected
-	// >= TUN_Connected is reserved for connected or potentially connected states
-	TUN_Connected
-	TUN_Connecting
 	TUN_NotReady
 	TUN_Ready
+	TUN_Connecting
+	TUN_Connected
 )
 
 type Mapping struct {
@@ -667,6 +668,7 @@ type TUN struct {
 	ServerResponse *types.ServerConnectResponse
 
 	pingTime                atomic.Pointer[time.Time]
+	needsReconnect          atomic.Bool
 	localInterfaceNetIP     net.IP
 	localDNSClient          *dns.Client
 	localInterfaceIP4bytes  [4]byte
@@ -706,11 +708,10 @@ type TUN struct {
 	ingressBytes atomic.Int64
 
 	// Server States
-	PingInt             atomic.Int64
-	CPU                 byte
-	DISK                byte
-	MEM                 byte
-	ServerToClientMicro atomic.Int64
+	PingInt atomic.Int64
+	CPU     byte
+	DISK    byte
+	MEM     byte
 
 	// Random mappint stuff
 	// LOCAL_IF_IP [4]byte
@@ -813,7 +814,6 @@ func (t *TUN) MarshalJSON() ([]byte, error) {
 		MEM        byte
 		Egress     string
 		Ingress    string
-		MS         int64
 	}{
 		t.ID,
 		t.CR,
@@ -828,7 +828,6 @@ func (t *TUN) MarshalJSON() ([]byte, error) {
 		t.MEM,
 		eb,
 		ib,
-		t.ServerToClientMicro.Load(),
 	})
 }
 

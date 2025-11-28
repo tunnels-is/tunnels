@@ -68,7 +68,6 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	tunnelMetaMapRange(func(tun *TunnelMETA) bool {
 		if tun.Tag == DefaultTunnelName && ClientCR.Tag == DefaultTunnelName {
 			meta = tun
-			_ = writeTunnelsToDisk(DefaultTunnelName)
 			return false
 		} else if tun.Tag == ClientCR.Tag {
 			meta = tun
@@ -84,6 +83,7 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 
 	code, errm = PreConnectCheck(meta)
 	if errm != nil {
+		ERROR("pre connection check:", errm)
 		return code, errm
 	}
 
@@ -95,9 +95,8 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 			return true
 		}
 		if m.Tag == meta.Tag {
-			if tun.GetState() >= TUN_Connected {
+			if tun.GetState() >= TUN_NotReady {
 				oldTunnel = tun
-				// isConnected = true
 			}
 			return false
 		}
@@ -148,6 +147,49 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	if err != nil {
 		ERROR("Invalid Server ID")
 		return 400, errors.New("Invalid Server ID")
+	}
+
+	// ensure gateway is not incorrect
+	gateway := state.DefaultGateway.Load()
+	if gateway != nil {
+		if isInterfaceATunnel(*gateway) {
+			return 502, errors.New("default gateway is a tunnel, please retry in a moment")
+		}
+	} else {
+		return 502, errors.New("no default gateway, check your connection settings")
+	}
+
+	ifName := state.DefaultInterfaceName.Load()
+	if ifName == nil {
+		return 502, errors.New("no default interface, please check try again")
+	}
+
+	if strings.Contains(ClientCR.Server.Host, "api.tunnels.is") {
+		err = IP_AddRoute(DefaultControllerIP+"/32", *ifName, gateway.To4().String(), "0")
+		if err != nil {
+			return 502, errors.New("unable to initialize controller route: " + err.Error())
+		}
+	} else {
+		netip := net.ParseIP(ClientCR.Server.Host)
+		if netip == nil {
+			addrs, err := net.LookupHost(ClientCR.Server.Host)
+			if err != nil {
+				return 502, errors.New("unable to resolve controller host: " + err.Error())
+			}
+			if len(addrs) == 0 {
+				return 502, errors.New("did not find any addresses when resolving controller host")
+			}
+			err = IP_AddRoute(addrs[0]+"/32", *ifName, gateway.To4().String(), "0")
+			if err != nil {
+				return 502, errors.New("unable to initialize controller route: " + err.Error())
+			}
+		} else {
+			err = IP_AddRoute(ClientCR.Server.Host+"/32", *ifName, gateway.To4().String(), "0")
+			if err != nil {
+				return 502, errors.New("unable to initialize controller route: " + err.Error())
+			}
+
+		}
 	}
 
 	FinalCR := new(types.ControllerConnectRequest)
@@ -270,20 +312,6 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		return 502, err
 	}
 
-	// ensure gateway is not incorrect
-	gateway := state.DefaultGateway.Load()
-	if gateway != nil {
-		if isInterfaceATunnel(*gateway) {
-			return 502, errors.New("default gateway is a tunnel, please retry in a moment")
-		}
-	} else {
-		return 502, errors.New("no default gateway, check your connection settings")
-	}
-
-	ifName := state.DefaultInterfaceName.Load()
-	if ifName == nil {
-		return 502, errors.New("no default interface, please check try again")
-	}
 	err = IP_AddRoute(ServerReponse.InterfaceIP+"/32", *ifName, gateway.To4().String(), "0")
 	if err != nil {
 		return 502, errors.New("unable to initialize routes")
@@ -366,9 +394,6 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 
 	if oldTunnel != nil {
 		Disconnect(oldTunnel.ID, true)
-		// oldTunnel.SetState(TUN_Disconnected)
-		// oldTunnel.connection.Close()
-		// TunnelMap.Delete(oldTunnel.ID)
 	}
 
 	return 200, nil

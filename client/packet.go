@@ -1,34 +1,33 @@
 package client
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"time"
 )
 
 func (t *TUN) RegisterPing(tag string, packet []byte) {
-	t.registerPing(time.Now())
-
 	defer RecoverAndLog()
-	t.CPU = packet[0]
-	t.MEM = packet[1]
-	t.DISK = packet[2]
 	if len(packet) > 18 {
-		t.ServerToClientMicro.Store(time.Since(time.Unix(0, int64(binary.BigEndian.Uint64(packet[3:11])))).Microseconds())
+		if !bytes.Equal(packet[3:11], []byte{255, 1, 255, 2, 255, 3, 255, 4}) {
+			DEEP("Short packet received, not a ping packet")
+			return
+		}
+
+		t.CPU = packet[0]
+		t.MEM = packet[1]
+		t.DISK = packet[2]
 		count := int64(binary.BigEndian.Uint64(packet[11:]))
 
-		DEEP(fmt.Sprintf("ping from server (%s) cpu(%d) mem(%d) disk(%d) micro(%d) count(%d)", tag, t.CPU, t.MEM, t.DISK, t.ServerToClientMicro.Load(), t.PingInt.Load()))
+		DEEP(fmt.Sprintf("ping from server (%s) cpu(%d) mem(%d) disk(%d)  count(%d)", tag, t.CPU, t.MEM, t.DISK, t.PingInt.Load()))
 
 		localCount := t.PingInt.Load()
-		if localCount > (count + 20) {
-			ERROR("Ping count of of balance local:", localCount, "server:", count, "server_max:", count+20)
-			meta := t.meta.Load()
-			if meta.AutoConnect {
-				_ = Disconnect(t.ID, false)
-				_, _ = PublicConnect(t.CR)
-			} else {
-				_ = Disconnect(t.ID, false)
-			}
+		if localCount > (count + 10) {
+			ERROR("Ping count of of balance local:", localCount, "server:", count, "server_max:", count+10)
+			t.needsReconnect.Store(true)
+		} else {
+			t.registerPing(time.Now())
 		}
 	}
 }
@@ -41,14 +40,19 @@ func (V *TUN) ProcessEgressPacket(p *[]byte) (sendRemote bool) {
 	}
 
 	V.EP_Protocol = packet[9]
-	if V.EP_Protocol != 6 && V.EP_Protocol != 17 {
+	if V.EP_Protocol != 17 && V.EP_Protocol != 6 {
 		return false
 	}
 
 	V.EP_IPv4HeaderLength = (packet[0] & 0x0F) * 4
-
 	V.EP_IPv4Header = packet[:V.EP_IPv4HeaderLength]
 	V.EP_TPHeader = packet[V.EP_IPv4HeaderLength:]
+
+	if V.EP_Protocol == 17 && len(V.EP_TPHeader) < 8 {
+		return false
+	} else if V.EP_Protocol == 6 && len(V.EP_TPHeader) < 20 {
+		return false
+	}
 
 	V.EP_DstIP[0] = packet[16]
 	V.EP_DstIP[1] = packet[17]
