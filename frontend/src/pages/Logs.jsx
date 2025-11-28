@@ -1,171 +1,258 @@
-
-import STORE from "@/store";
-import GLOBAL_STATE from "../state";
-import { useState, useMemo } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, ArrowRight, ChevronsLeft, ChevronsRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Search, Trash2 } from "lucide-react";
 
-const Logs = () => {
-  const state = GLOBAL_STATE("logs")
-  const [currentPage, setCurrentPage] = useState(1)
-  const [searchFilter, setSearchFilter] = useState("")
-  const [tagFilter, setTagFilter] = useState("")
-  const itemsPerPage = 100
+export default function LogsPage() {
+  const [logs, setLogs] = useState([]);
+  const [connectionStatus, setConnectionStatus] = useState("connecting");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const logsPerPage = 50;
+  const logsEndRef = useRef(null);
+  const wsRef = useRef(null);
 
-  let logs = STORE.Cache.GetObject("logs")
-  let classes = "logs-loader"
+  useEffect(() => {
+    const connectWebSocket = () => {
+      try {
+        let host = window.location.origin;
+        host = host.replace("http://", "wss://");
+        host = host.replace("https://", "wss://");
+        host = host.replace("5173", "7777");
+        const ws = new WebSocket(`${host}/logs`);
+        wsRef.current = ws;
 
-  // Filter logs based on search and tag filter
+        ws.onopen = () => {
+          setConnectionStatus("connected");
+        };
+
+        ws.onmessage = (event) => {
+          const logLine = event.data;
+          const parsed = parseLogLine(logLine);
+          if (parsed) {
+            setLogs((prev) => [...prev, parsed]);
+          }
+        };
+
+        ws.onerror = () => {
+          setConnectionStatus("error");
+        };
+
+        ws.onclose = () => {
+          setConnectionStatus("disconnected");
+          // Attempt to reconnect after 3 seconds
+          setTimeout(() => {
+            setConnectionStatus("connecting");
+            connectWebSocket();
+          }, 3000);
+        };
+      } catch (error) {
+        setConnectionStatus("error");
+      }
+    };
+
+    connectWebSocket();
+
+    return () => {
+      if (wsRef.current) {
+        wsRef.current.close();
+      }
+    };
+  }, []);
+  useEffect(() => {
+    // Auto-scroll to bottom when new logs arrive
+    logsEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [logs]);
+
   const filteredLogs = useMemo(() => {
-    if (!logs) return []
-    let filtered = logs
+    if (!searchTerm) return logs;
 
-    // Apply search filter
-    if (searchFilter) {
-      filtered = filtered.filter(line =>
-        line.toLowerCase().includes(searchFilter.toLowerCase())
-      )
+    const lowerSearch = searchTerm.toLowerCase();
+    return logs.filter(
+      (log) =>
+        log.functionName.toLowerCase().includes(lowerSearch) ||
+        log.identifier.toLowerCase().includes(lowerSearch) ||
+        log.level.toLowerCase().includes(lowerSearch) ||
+        log.timestamp.includes(lowerSearch)
+    );
+  }, [logs, searchTerm]);
+
+  const totalPages = Math.ceil(filteredLogs.length / logsPerPage);
+  const startIndex = (currentPage - 1) * logsPerPage;
+  const endIndex = startIndex + logsPerPage;
+  const paginatedLogs = filteredLogs.slice(startIndex, endIndex);
+
+  const parseLogLine = (line) => {
+    // Format: MM-DD hh:mm:ss || LOG_TYPE || function_name || identifier
+    const parts = line.split("||").map((part) => part.trim());
+
+    if (parts.length !== 4) {
+      return null;
     }
 
-    // Apply tag filter
-    if (tagFilter) {
-      filtered = filtered.filter(line =>
-        line.includes(`| ${tagFilter} |`)
-      )
+    const [timestamp, level, functionName, identifier] = parts;
+
+    if (!["DEBUG", "INFO", "ERROR"].includes(level)) {
+      return null;
     }
 
-    return filtered
-  }, [logs, searchFilter, tagFilter])
+    return {
+      timestamp,
+      level: level,
+      functionName,
+      identifier,
+      raw: line,
+    };
+  };
 
-  // Calculate pagination on filtered logs
-  const totalLogs = filteredLogs?.length || 0
-  const totalPages = Math.ceil(totalLogs / itemsPerPage)
+  const clearLogs = () => {
+    setLogs([]);
+    setSearchTerm("");
+    setCurrentPage(1);
+  };
 
-  // Get current page logs from filtered results
-  const paginatedLogs = useMemo(() => {
-    if (!filteredLogs) return []
-    const reversedLogs = filteredLogs.toReversed()
-    const startIndex = (currentPage - 1) * itemsPerPage
-    const endIndex = startIndex + itemsPerPage
-    return reversedLogs.slice(startIndex, endIndex)
-  }, [filteredLogs, currentPage, itemsPerPage])
+  const getStatusColor = () => {
+    switch (connectionStatus) {
+      case "connected":
+        return "bg-green-500";
+      case "connecting":
+        return "bg-yellow-500";
+      case "disconnected":
+      case "error":
+        return "bg-red-500";
+    }
+  };
 
-  const goToPage = (page) => {
-    setCurrentPage(Math.max(1, Math.min(page, totalPages)))
-  }
+  const getStatusText = () => {
+    switch (connectionStatus) {
+      case "connected":
+        return "Connected";
+      case "connecting":
+        return "Connecting...";
+      case "disconnected":
+        return "Disconnected";
+      case "error":
+        return "Error";
+    }
+  };
 
-  // Reset to page 1 when search filter changes
-  const handleSearchChange = (e) => {
-    setSearchFilter(e.target.value)
-    setCurrentPage(1)
-  }
-
-  // Reset to page 1 when tag filter changes
-  const handleTagFilterChange = (value) => {
-    // Convert "all" back to empty string for filtering logic
-    setTagFilter(value === "all" ? "" : value)
-    setCurrentPage(1)
-  }
+  const getLevelColor = (level) => {
+    switch (level) {
+      case "DEBUG":
+        return "text-blue-400";
+      case "INFO":
+        return "text-green-400";
+      case "ERROR":
+        return "text-red-400";
+      default:
+        return "text-foreground";
+    }
+  };
 
   return (
-    <div className={classes} style={{
-      display: 'flex', flexDirection: 'column'
-    }}>
-
-      {/* Pagination Controls */}
-      <div className="pagination-controls z-[1000] pb-[15px] pt-[20px] fixed top-[0px]" >
-        <div className="flex gap-[10px]" >
-          <Select
-            value={tagFilter || "all"}
-            onValueChange={handleTagFilterChange}
-          >
-            <SelectTrigger className="w-[120px]">
-              <SelectValue placeholder="Tag filter" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                <SelectItem value="all">All</SelectItem>
-                <SelectItem value="INFO">INFO</SelectItem>
-                <SelectItem value="ERROR">ERROR</SelectItem>
-                <SelectItem value="DEBUG">DEBUG</SelectItem>
-              </SelectGroup>
-            </SelectContent>
-          </Select>
+    <div className="w-full p-4 mt-20">
+      <div className="flex flex-row items-center justify-between space-y-0 pb-4">
+        <h3 className="text-xl font-semibold">Server Logs</h3>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <div className={`h-2 w-2 rounded-full ${getStatusColor()}`} />
+            <span className="text-sm text-muted-foreground">
+              {getStatusText()}
+            </span>
+          </div>
           <Button
-            className={"flex items-center gap-1" + state.Theme?.neutralBtn}
-            onClick={() => goToPage(1)}
-            disabled={currentPage === 1}
+            variant="outline"
+            size="sm"
+            onClick={clearLogs}
+            disabled={logs.length === 0}
           >
-            <ChevronsLeft className="w-4 h-4" />
+            <Trash2 className="h-4 w-4 mr-2" />
+            Clear
           </Button>
-          <Button
-            className={"flex items-center gap-1" + state.Theme?.neutralBtn}
-            onClick={() => goToPage(currentPage - 1)}
-            disabled={currentPage === 1}
-          >
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
-          <Button
-            className={"flex items-center gap-1" + state.Theme?.neutralBtn}
-            onClick={() => goToPage(currentPage + 1)}
-            disabled={currentPage === totalPages}
-          >
-            <ArrowRight className="w-4 h-4" />
-          </Button>
-          <Button
-            className={"flex items-center gap-1" + state.Theme?.neutralBtn}
-            onClick={() => goToPage(totalPages)}
-            disabled={currentPage === totalPages}
-          >
-            <ChevronsRight className="w-4 h-4" />
-          </Button>
-
-
+        </div>
+      </div>
+      <div className="space-y-4">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            className="w-full md:w-64 placeholder:text-muted-foreground text-white"
-            placeholder="Search logs..."
-            value={searchFilter}
-            onChange={handleSearchChange}
+            type="text"
+            placeholder="Search logs by function, identifier, level, or timestamp..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-9"
           />
         </div>
 
-      </div >
+        <div className="h-[600px] overflow-y-auto rounded-lg border bg-black/95 p-4 font-mono text-sm">
+          {filteredLogs.length === 0 ? (
+            <div className="flex h-full items-center justify-center text-muted-foreground">
+              {logs.length === 0
+                ? "Waiting for logs..."
+                : "No logs match your search."}
+            </div>
+          ) : (
+            <div className="space-y-1">
+              {paginatedLogs.map((log, index) => (
+                <div
+                  key={startIndex + index}
+                  className="flex items-start gap-3 text-xs leading-relaxed"
+                >
+                  <span className="text-gray-400 whitespace-nowrap">
+                    {log.timestamp}
+                  </span>
+                  <Badge
+                    variant="outline"
+                    className={`${getLevelColor(
+                      log.level
+                    )} min-w-[60px] justify-center border-0`}
+                  >
+                    {log.level}
+                  </Badge>
+                  <span className="text-cyan-400">{log.functionName}</span>
+                  <span className="text-gray-300">{log.identifier}</span>
+                </div>
+              ))}
+              <div ref={logsEndRef} />
+            </div>
+          )}
+        </div>
 
-      <div className="logs-window custom-scrollbar flex flex-col mt-[50px] overflow-auto">
-        {paginatedLogs?.map((line, index) => {
-          let splitLine = line.split(" || ")
-          let error = line.includes("| ERROR |")
-          let debug = line.includes("| DEBUG |")
-          let info = line.includes("| INFO  |")
-
-          return (
-            <div className={`line`} key={index}>
-
-              <div className="time">{splitLine[0]}</div>
-
-              {info &&
-                <div className="info">{splitLine[1]}</div>
-              }
-              {error &&
-                <div className="error">{splitLine[1]}</div>
-              }
-              {debug &&
-                <div className="debug">{splitLine[1]}</div>
-              }
-              {!debug && !error && !info &&
-                <div className="text"> {splitLine[1]}</div>
-              }
-
-              <div className="func">{splitLine[2]}</div>
-              <div className="text"> {splitLine.splice(3, 20).join("||")}</div>
-            </div >
-          )
-        })}
+        {filteredLogs.length > 0 && (
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-muted-foreground">
+              Showing {startIndex + 1}-{Math.min(endIndex, filteredLogs.length)}{" "}
+              of {filteredLogs.length} logs
+              {searchTerm && ` (filtered from ${logs.length} total)`}
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Previous
+              </Button>
+              <span className="text-sm text-muted-foreground">
+                Page {currentPage} of {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  setCurrentPage((prev) => Math.min(totalPages, prev + 1))
+                }
+                disabled={currentPage === totalPages}
+              >
+                Next
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
-    </div >
-  )
+    </div>
+  );
 }
-
-export default Logs
