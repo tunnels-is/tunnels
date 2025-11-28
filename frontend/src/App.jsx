@@ -42,7 +42,7 @@ const LaunchApp = () => {
 
   useEffect(() => {
     state.GetBackendState();
-    WS.NewSocket(WS.GetURL("logs"), "logs", WS.ReceiveLogEvent);
+    // WS.NewSocket(WS.GetURL("logs"), "logs", WS.ReceiveLogEvent);
   }, []);
 
   return (
