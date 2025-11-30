@@ -345,6 +345,23 @@ func addAdminToConfig(identifier string) error {
 	return nil
 }
 
+func loadKeyPair(key, cert string) (c tls.Certificate, err error) {
+	_, priv, err := crypt.LoadPrivateKey(key)
+	if err != nil {
+		return c, err
+	}
+	_, pub, err := crypt.LoadPublicKey(cert)
+	if err != nil {
+		return c, err
+	}
+	c, err = tls.X509KeyPair(pub, priv)
+	if err != nil {
+		return c, err
+	}
+
+	return c, nil
+}
+
 func loadCertificatesAndTLSSettings() (err error) {
 	priv, privB, err := crypt.LoadPrivateKey(loadSecret("KeyPem"))
 	if err != nil {
@@ -371,11 +388,31 @@ func loadCertificatesAndTLSSettings() (err error) {
 	}
 	KeyPair.Store(&tlscert)
 
+	apiCerts := []tls.Certificate{}
+	keyPems := loadStringSliceKey("KeyPems")
+	CertPems := loadStringSliceKey("CertPems")
+	for i := range keyPems {
+		fmt.Println(keyPems[i], CertPems[i])
+		tlsc, err := loadKeyPair(keyPems[i], CertPems[i])
+		if err != nil {
+			return err
+		}
+		apiCerts = append(apiCerts, tlsc)
+	}
+
+	apiCerts = append(apiCerts, *KeyPair.Load())
+
 	APITLSConfig.Store(&tls.Config{
 		MinVersion:       tls.VersionTLS13,
 		MaxVersion:       tls.VersionTLS13,
-		CurvePreferences: []tls.CurveID{tls.X25519MLKEM768, tls.CurveP521},
-		Certificates:     []tls.Certificate{*KeyPair.Load()},
+		CurvePreferences: []tls.CurveID{tls.X25519MLKEM768},
+		Certificates:     apiCerts,
+		CipherSuites: []uint16{
+			tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+			tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+			tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,
+			tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,
+		},
 	})
 
 	return nil
