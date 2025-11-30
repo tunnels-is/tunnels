@@ -1,7 +1,6 @@
 import { Card, CardContent, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import dayjs from "dayjs";
-import { Theme } from "@/theme";
 import { useAtomValue } from "jotai";
 import { activeTunnelsAtom } from "../stores/tunnelStore";
 import { useTunnels } from "../hooks/useTunnels";
@@ -117,7 +116,7 @@ const Stats = () => {
 
         </CardContent>
         <Button
-          className={"mt-5 w-full" + Theme.errorBtn}
+          className={"mt-5 w-full"}
           onClick={() => handleDisconnect(ac)}
         >
           Disconnect

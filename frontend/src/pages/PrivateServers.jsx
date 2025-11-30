@@ -1,8 +1,8 @@
 import React, { useState } from "react";
-import GenericTable from "./GenericTable";
+import GenericTable from "../components/GenericTable";
 import { TableCell } from "@/components/ui/table";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import NewObjectEditorDialog from "./NewObjectEditorDialog";
+import NewObjectEditorDialog from "@/components/NewObjectEditorDialog";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { useNavigate } from "react-router-dom";
 import { CircleArrowRight, LogOut, Server } from "lucide-react";
@@ -11,7 +11,7 @@ import { useTunnels, useConnectTunnel, useDisconnectTunnel, useUpdateTunnel } fr
 import { useAtomValue } from "jotai";
 import { userAtom } from "@/stores/userStore";
 import { activeTunnelsAtom } from "@/stores/tunnelStore";
-import { getCountryName } from "@/lib/utils";
+import { getCountryName } from "@/lib/constants";
 import { toast } from "sonner";
 
 const PrivateServers = () => {

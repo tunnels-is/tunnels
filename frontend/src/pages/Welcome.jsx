@@ -1,5 +1,5 @@
 import React from "react";
-import { SupportPlatforms } from "../constants";
+import { SupportPlatforms } from "../lib/constants";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";

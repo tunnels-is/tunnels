@@ -5,9 +5,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
 import { Switch } from "@/components/ui/switch";
-import GenericTable from "./GenericTable";
+import GenericTable from "../components/GenericTable";
 import { TableCell } from "@/components/ui/table";
-import NewObjectEditorDialog from "./NewObjectEditorDialog";
+import NewObjectEditorDialog from "@/components/NewObjectEditorDialog";
 import { Button } from "@/components/ui/button";
 
 import { useAtom } from "jotai";

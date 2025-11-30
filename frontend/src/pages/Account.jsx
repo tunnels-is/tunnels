@@ -3,14 +3,13 @@ import { useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
 import KeyValue from "../components/keyvalue";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import GenericTable from "./GenericTable";
+import GenericTable from "../components/GenericTable";
 import { Button } from "@/components/ui/button";
 import InfoItem from "../components/InfoItem";
 import { Network } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { ExitIcon } from "@radix-ui/react-icons";
-import { Theme } from "@/theme";
 import { useAtomValue, useSetAtom } from "jotai";
 import { userAtom } from "../stores/userStore";
 import { logout } from "../api/auth";
@@ -193,27 +192,23 @@ const Account = () => {
 
             <div className="flex flex-col gap-3 mt-6">
               <Button
-                className={Theme.neutralBtn}
                 onClick={() => gotoAccountSelect()}
               >
                 Switch Account
               </Button>
               <Button
-                className={Theme.neutralBtn}
                 onClick={refreshApiKey}
               >
                 Re-Generate API Key
               </Button>
 
               <Button
-                className={Theme.neutralBtn}
                 onClick={() => navigate("/twofactor/create")}
               >
                 Two-Factor Authentication
               </Button>
 
               <Button
-                className={Theme.errorBtn}
                 onClick={() => handleLogoutToken(user.DeviceToken, true)}
               >
                 Log Out All Devices
@@ -240,7 +235,6 @@ const Account = () => {
           />
 
           <Button
-            className={Theme.neutralBtn}
             onClick={handleActivateLicense}
           >
             Activate Key

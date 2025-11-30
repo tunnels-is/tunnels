@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import dayjs from "dayjs";
-import NewObjectEditorDialog from "./NewObjectEditorDialog";
-import GenericTable from "./GenericTable";
+import NewObjectEditorDialog from "@/components/NewObjectEditorDialog";
+import GenericTable from "@/components/GenericTable";
 import { useDevices, useDeleteDevice, useUpdateDevice, useCreateDevice } from "../hooks/useDevices";
 import { toast } from "sonner";
 

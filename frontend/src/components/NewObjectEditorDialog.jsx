@@ -36,10 +36,10 @@ const NewObjectEditorDialog = ({
               {title || "Edit Object"}
             </DialogTitle>
           </div>
-          {(description || object?._id) && (
+          {(description || object?.ID) && (
             <DialogDescription className="text-gray-400">
               {description}
-              {object?._id && <span className="font-mono text-xs ml-2 opacity-50">ID: {object._id}</span>}
+              {object?.ID && <span className="font-mono text-xs ml-2 opacity-50">ID: {object.ID}</span>}
             </DialogDescription>
           )}
         </DialogHeader>

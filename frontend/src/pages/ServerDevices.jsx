@@ -1,6 +1,6 @@
 import React from "react";
 import dayjs from "dayjs";
-import GenericTable from "./GenericTable";
+import GenericTable from "../components/GenericTable";
 import { useParams } from "react-router-dom";
 import { useServers } from "../hooks/useServers";
 import { useConnectedDevices } from "../hooks/useDevices";

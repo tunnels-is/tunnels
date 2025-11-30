@@ -10,7 +10,7 @@ import "@fontsource-variable/inter";
 import DNSAnswers from "./components/DNSAnswers";
 import PrivateServers from "./pages/PrivateServers";
 import ServerDevices from "./pages/ServerDevices";
-import ScreenLoader from "./pages/ScreenLoader";
+import ScreenLoader from "./components/ScreenLoader";
 import InspectGroup from "./pages/InspectGroup";
 import UserSelect from "./pages/UserSelect";
 import Enable2FA from "./pages/Enable2FA";
@@ -26,7 +26,6 @@ import Stats from "./pages/Stats";
 import Logs from "./pages/Logs";
 
 import DNS from "./pages/dns";
-import WS from "./ws";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import AppSidebar from "./components/app-sidebar";
 import { ModeToggle } from "./components/mode-toggle";

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import GenericTable from "./GenericTable";
-import NewObjectEditorDialog from "./NewObjectEditorDialog";
+import GenericTable from "../components/GenericTable";
+import NewObjectEditorDialog from "@/components/NewObjectEditorDialog";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { CircleArrowRight, LayoutGrid, List, Plus } from "lucide-react";
 import { LogOut } from "lucide-react";

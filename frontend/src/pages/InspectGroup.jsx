@@ -1,9 +1,8 @@
 import React, { useState } from "react";
 import { useParams } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import GenericTable from "./GenericTable";
-import NewObjectEditorDialog from "./NewObjectEditorDialog";
-import { Theme } from "@/theme";
+import GenericTable from "@/components/GenericTable";
+import NewObjectEditorDialog from "@/components/NewObjectEditorDialog";
 import { useGroup, useGroupEntities, useAddEntityToGroup, useRemoveEntityFromGroup } from "../hooks/useGroups";
 import { toast } from "sonner";
 import { useServers } from "../hooks/useServers";
@@ -195,11 +194,11 @@ const InspectGroup = () => {
 
 			<Tabs defaultValue="user" className="w-full" onValueChange={(v) => tagChange(v)}>
 				<TabsList
-					className={Theme.borderColor}
+					className="border border-[#1a1f2d] cursor-pointer rounded"
 				>
-					<TabsTrigger className={Theme.tabs} value="user">Users</TabsTrigger>
-					<TabsTrigger className={Theme.tabs} value="server">Servers</TabsTrigger>
-					<TabsTrigger className={Theme.tabs} value="device">Devices</TabsTrigger>
+					<TabsTrigger className="data-[state=active]:text-[#3168f3]" value="user">Users</TabsTrigger>
+					<TabsTrigger className="data-[state=active]:text-[#3168f3]" value="server">Servers</TabsTrigger>
+					<TabsTrigger className="data-[state=active]:text-[#3168f3]" value="device">Devices</TabsTrigger>
 				</TabsList>
 				<TabsContent value="user">
 					<GenericTable table={utable} newButtonLabel={"Add"} />

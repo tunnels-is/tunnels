@@ -5,7 +5,6 @@ import dayjs from "dayjs";
 import InfoItem from "../components/InfoItem";
 import { useNavigate } from "react-router-dom";
 import { SquareX } from "lucide-react";
-import { Theme } from "@/theme";
 import { useUsers, useDeleteUser } from "@/hooks/useUsers";
 import { useSetAtom } from "jotai";
 import { userAtom } from "@/stores/userStore";
@@ -31,7 +30,7 @@ const UserSelect = () => {
   return (
     <div className="p-6 space-y-6">
       <Button
-        className={"flex items-center gap-1" + Theme.successBtn}
+        className={"flex items-center gap-1"}
         onClick={() => gotoLogin()}
       >
         {"Add Account"}
@@ -50,7 +49,7 @@ const UserSelect = () => {
                   e.stopPropagation();
                   deleteUser(u.SaveFileHash);
                 }}
-                className={"ml-auto" + Theme.redIcon}
+                className="ml-auto text-red"
               />
             </div>
             <CardContent className=" -mt-3 cursor-pointer flex flex-col p-4">
