@@ -95,7 +95,6 @@ func loadConfigFromDisk(newConfig bool) error {
 	}
 
 	DEBUG("Generating a new default config")
-
 	CONFIG.Store(DefaultConfig())
 	return writeConfigToDisk()
 }
