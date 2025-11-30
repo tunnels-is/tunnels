@@ -1,7 +1,6 @@
 package main
 
 import (
-	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -72,20 +71,7 @@ func launchAPIServer() {
 
 	}
 
-	tlsConfig := &tls.Config{
-		Certificates:             []tls.Certificate{*KeyPair.Load()},
-		MinVersion:               tls.VersionTLS12,
-		PreferServerCipherSuites: true,
-		CurvePreferences:         []tls.CurveID{tls.X25519MLKEM768, tls.CurveP521},
-		CipherSuites: []uint16{
-			tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
-			tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
-			tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,
-			tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,
-			tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
-			tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
-		},
-	}
+	tlsConfig := APITLSConfig.Load()
 
 	addr := fmt.Sprintf("%s:%s",
 		Config.APIIP,
