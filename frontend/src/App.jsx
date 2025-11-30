@@ -30,7 +30,7 @@ import WS from "./ws";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import AppSidebar from "./components/app-sidebar";
 import { ModeToggle } from "./components/mode-toggle";
-import { ThemeProvider } from "./components/theme-provider";
+import { ThemeProvider } from "./providers/theme-provider";
 
 import { useInitialState } from "./hooks/useInitialState";
 import { useAtomValue } from "jotai";

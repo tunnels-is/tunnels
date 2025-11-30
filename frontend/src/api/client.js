@@ -5,7 +5,7 @@ import { controlServerAtom } from "@/stores/configStore";
 import { userAtom } from "@/stores/userStore";
 
 
-const baseURL = import.meta.env.VITE_BASE_URL;
+const baseURL = `https://${window.location.hostname}:7777`;
 
 export const client = axios.create({
   baseURL: baseURL + "/v1/method",
@@ -15,25 +15,6 @@ export const client = axios.create({
   timeout: 30000,
 });
 
-// client.interceptors.request.use((config) => {
-//   // You can add auth tokens here if needed, or handle them in the specific API methods
-//   // For now, we'll keep it simple as the original code passed tokens in the body
-//   return config;
-// });
-
-// client.interceptors.response.use(
-//   (response) => {
-//     return response;
-//   },
-//   (error) => {
-//     if (error.response?.status === 401) {
-//       // Handle unauthorized access
-//       // This might need to interact with the global store or router to redirect
-//       console.warn("Unauthorized access");
-//     }
-//     return Promise.reject(error);
-//   }
-// );
 
 export const handleApiError = (error) => {
   console.error(error);
