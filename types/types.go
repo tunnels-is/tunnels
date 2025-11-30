@@ -78,6 +78,10 @@ type ServerConfig struct {
 	CertPem      string
 	SignPem      string
 	KeyPem       string
+
+	// Enables multiple key/pairs for API SNI rotation
+	CertPems []string
+	KeyPems  []string
 }
 
 type SecretStore string
