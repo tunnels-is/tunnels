@@ -2,9 +2,28 @@ package main
 
 import (
 	"os"
+	"strings"
 
 	"github.com/tunnels-is/tunnels/types"
 )
+
+func loadStringSliceKey(key string) []string {
+	config := Config.Load()
+	switch config.SecretStore {
+	case types.ConfigStore:
+		switch key {
+		case "CertPems":
+			return config.CertPems
+		case "KeyPems":
+			return config.KeyPems
+		}
+		return config.KeyPems
+	case types.EnvStore:
+		return strings.Split(os.Getenv(key), ",")
+	}
+
+	return []string{}
+}
 
 func loadSecret(key string) (v string) {
 	config := Config.Load()
