@@ -1,24 +1,35 @@
-import { useNavigate, useLocation, Link } from "react-router-dom";
+import { useNavigate, useLocation, Link, NavLink } from "react-router-dom";
 import React, { useRef } from "react";
-import {
-  AccessibilityIcon,
-  GearIcon,
-  HomeIcon,
-  InfoCircledIcon,
-  LockOpen1Icon,
-  PersonIcon,
-  Share1Icon,
-  GitHubLogoIcon,
-  LockClosedIcon,
-  ContainerIcon,
-  MixerHorizontalIcon,
-  DesktopIcon,
-  ExitIcon,
-} from "@radix-ui/react-icons";
+import { useAtomValue, useSetAtom, useAtom } from "jotai";
+import { userAtom, isAuthenticatedAtom } from "@/stores/userStore";
+import { controlServerAtom, controlServersAtom } from "@/stores/configStore";
+import { activeTunnelsAtom } from "@/stores/tunnelStore";
+import { logout } from "@/api/auth";
 import { cn } from "@/lib/utils";
-import GLOBAL_STATE from "@/state";
-import { Logs } from "lucide-react";
-import { UsersIcon } from "lucide-react";
+import {
+  Home,
+  Settings,
+  Lock,
+  Container,
+  LogOut,
+  User,
+  Users,
+  Monitor,
+  Link as LinkIcon,
+  Shield,
+  HelpCircle,
+  BookOpen,
+  Github,
+  ChevronUp,
+  ChevronsUpDown,
+  Check,
+  Server,
+  Plus,
+  Sun,
+  Moon,
+  Laptop,
+  Logs
+} from "lucide-react";
 import {
   Sidebar,
   SidebarFooter,
@@ -29,8 +40,16 @@ import {
   SidebarGroupContent,
   SidebarGroupLabel,
   SidebarMenuButton,
-  SidebarMenuAction,
 } from "@/components/ui/sidebar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  DropdownMenuLabel,
+} from "@/components/ui/dropdown-menu";
+import { useTheme } from "@/components/theme-provider";
 
 const IconWidth = 20;
 const IconHeight = 20;
@@ -39,54 +58,48 @@ const AppSidebar = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const sideb = useRef(null);
-  const state = GLOBAL_STATE("sidebar");
+  const user = useAtomValue(userAtom);
+  const isAuthenticated = useAtomValue(isAuthenticatedAtom);
+  const setUser = useSetAtom(userAtom);
+  const [activeServer, setActiveServer] = useAtom(controlServerAtom);
+  const activeTunnels = useAtomValue(activeTunnelsAtom);
+  const { setTheme } = useTheme();
+
+  const formatServer = (server) => server.Host + " : " + server.Port;
+
 
   const OpenWindowURL = (url) => {
     window.open(url, "_blank");
-    if (navigator?.clipboard) {
-      navigator.clipboard.writeText(value);
-    }
-    // try {
-    //   state.ConfirmAndExecute(
-    //     "",
-    //     "clipboardCopy",
-    //     10000,
-    //     url,
-    //     "Copy link to clipboard ?",
-    //     () => {
-    //       if (navigator?.clipboard) {
-    //         navigator.clipboard.writeText(value);
-    //       }
-    //       runtime.ClipboardSetText(url);
-    //     },
-    //   );
-    // } catch (e) {
-    //   console.log(e);
-    // }
   };
 
-  const logout = () => {
-    let t = state.User?.DeviceToken;
-    if (t !== "") {
-      state.LogoutToken(t, false);
+  const handleLogout = async () => {
+    if (user?.DeviceToken) {
+      try {
+        await logout({ DeviceToken: user.DeviceToken.DT, UserID: user.ID, All: false });
+      } catch (e) {
+        console.error("Logout failed", e);
+      }
     }
+    setUser(null);
+    navigate("/login");
   };
 
   const showLogin = () => {
-    if (!state.User || state.User?.Email === "") {
+    if (!user || user?.Email === "") {
       return true;
     }
     return false;
   };
+
   const isManager = () => {
-    if (state.User?.IsAdmin === true || state.User?.IsManager === true) {
+    if (user?.IsAdmin === true || user?.IsManager === true) {
       return true;
     }
     return false;
   };
 
   const hasActiveTunnels = () => {
-    if (state.ActiveTunnels?.length > 0) {
+    if (activeTunnels?.length > 0) {
       return true;
     }
     return false;
@@ -99,21 +112,28 @@ const AppSidebar = () => {
         user: false,
         items: [
           {
-            icon: LockOpen1Icon,
+            icon: Lock,
             label: "Login",
             route: "login",
             user: false,
             shouldRender: showLogin,
           },
-          { icon: LockClosedIcon, label: "VPN", route: "servers", user: true },
-          { icon: ContainerIcon, label: "DNS", route: "dns", user: false },
+          { icon: Shield, label: "VPN", route: "servers", user: true },
+          { icon: Container, label: "DNS", route: "dns", user: false },
           {
-            icon: MixerHorizontalIcon,
+            icon: LinkIcon,
             label: "Connections",
             route: "connections",
             user: true,
             shouldRender: hasActiveTunnels,
           },
+          // {
+          //   icon: Users,
+          //   label: "Groups",
+          //   route: "groups",
+          //   user: true,
+          //   shouldRender: isManager,
+          // }
         ],
       },
       {
@@ -121,21 +141,21 @@ const AppSidebar = () => {
         isManager: true,
         items: [
           {
-            icon: PersonIcon,
+            icon: User,
             label: "Users",
             route: "users",
             user: true,
             shouldRender: isManager,
           },
           {
-            icon: DesktopIcon,
+            icon: Monitor,
             label: "Devices",
             route: "devices",
             user: true,
             shouldRender: isManager,
           },
           {
-            icon: HomeIcon,
+            icon: Home,
             label: "Groups",
             route: "groups",
             user: true,
@@ -146,16 +166,15 @@ const AppSidebar = () => {
       {
         title: "Settings",
         items: [
-          { icon: Share1Icon, label: "Tunnels", route: "tunnels", user: true },
+          { icon: LinkIcon, label: "Tunnels", route: "tunnels", user: true },
           {
-            icon: GearIcon,
+            icon: Settings,
             label: "Application",
             route: "settings",
             user: false,
           },
-
           {
-            icon: UsersIcon,
+            icon: Users,
             label: "Accounts",
             route: "accounts",
             shouldRender: showLogin,
@@ -168,33 +187,24 @@ const AppSidebar = () => {
         title: "Support",
         items: [
           {
-            icon: InfoCircledIcon,
+            icon: HelpCircle,
             label: "Support",
             route: "help",
             user: false,
           },
           {
-            icon: AccessibilityIcon,
+            icon: BookOpen,
             label: "Guides",
             route: "guides",
             user: false,
-
             click: () => OpenWindowURL("https://www.tunnels.is/docs"),
           },
           {
-            icon: GitHubLogoIcon,
+            icon: Github,
             label: "Github",
             route: "github",
             user: false,
-
-            click: () =>
-              OpenWindowURL("https://www.github.com/tunnels-is/tunnels"),
-          },
-          {
-            icon: ExitIcon,
-            label: "Logout",
-            click: logout,
-            user: true,
+            click: () => OpenWindowURL("https://www.github.com/tunnels-is/tunnels"),
           },
         ],
       },
@@ -203,98 +213,195 @@ const AppSidebar = () => {
 
   let { pathname } = location;
   let sp = pathname.split("/");
-
   const navHandler = (path) => {
     console.log("navigating to:", path);
     navigate(path);
   };
 
-  let user = state.User;
+  console.log(`isAuthenticated: ${isAuthenticated}`);
+  console.log(`user: ${user}`)
 
   return (
     <Sidebar>
       <SidebarContent>
-        {menu.groups.map((g) => {
-          if (g.user === true && (!user || user.Email === "")) {
-            return false;
-          }
-          if (g.shouldRender && !g.shouldRender()) {
-            return false;
-          }
-          if (g.isManager && !isManager()) {
-            return <></>;
-          }
-          return (
-            <SidebarGroup key={g.title}>
-              {g.title && (
-                <SidebarGroupLabel className="px-3 mb-2">
-                  <h2 className="text-xs font-semibold uppercase tracking-wider">
-                    {g.title}
-                  </h2>
-                </SidebarGroupLabel>
-              )}
-
+        {
+          !user ? (
+            <SidebarGroup>
               <SidebarGroupContent>
                 <SidebarMenu>
-                  {g.items.map((i) => {
-                    if (i.user && (!user || user.Email === "")) {
-                      return null;
-                    }
-                    if (i.shouldRender && !i.shouldRender()) {
-                      return false;
-                    }
-
-                    let isActive = false;
-                    if (
-                      sp[1].includes(i.route) ||
-                      (sp[1] === "" && i.route == "login")
-                    ) {
-                      isActive = true;
-                    }
-                    // const isActive = sp[1] === i.route;
-                    return (
-                      <SidebarMenuItem>
-                        <SidebarMenuButton
-                          key={i.label}
-                          onClick={() => {
-                            if (i.click) {
-                              i.click();
-                            } else {
-                              navHandler("/" + i.route);
-                            }
-                          }}
-                          isActive={isActive}
-                        >
-                          <i.icon
-                            className={cn(
-                              "flex-shrink-0",
-                              isActive && "text-primary"
-                            )}
-                            width={IconWidth}
-                            height={IconHeight}
-                          />
-                          <span className={isActive && "text-primary"}>{i.label}</span>
-                        </SidebarMenuButton>
-                      </SidebarMenuItem>
-                    );
-                  })}
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild>
+                      <Link to="/login"><Lock />Login</Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <SidebarMenuItem>
+                    <SidebarMenuButton asChild>
+                      <Link to="/help"><HelpCircle />Help</Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
                 </SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>
-          );
-        })}
+          ) : (
+            menu.groups.map((g) => {
+              if (g.user === true && (!user || user.Email === "")) {
+                return false;
+              }
+              if (g.shouldRender && !g.shouldRender()) {
+                return false;
+              }
+              if (g.isManager && !isManager()) {
+                return <></>;
+              }
+              return (
+                <SidebarGroup key={g.title}>
+                  {g.title && (
+                    <SidebarGroupLabel className="px-3 mb-2">
+                      <h2 className="text-xs font-semibold uppercase tracking-wider">
+                        {g.title}
+                      </h2>
+                    </SidebarGroupLabel>
+                  )}
+
+                  <SidebarGroupContent>
+                    <SidebarMenu>
+                      {g.items.map((i) => {
+                        if (i.user && (!user || user.Email === "")) {
+                          return null;
+                        }
+                        if (i.shouldRender && !i.shouldRender()) {
+                          return false;
+                        }
+
+                        let isActive = false;
+                        if (
+                          sp[1].includes(i.route) ||
+                          (sp[1] === "" && i.route == "login")
+                        ) {
+                          isActive = true;
+                        }
+                        return (
+                          <SidebarMenuItem key={i.label}>
+                            <SidebarMenuButton
+                              onClick={() => {
+                                if (i.click) {
+                                  i.click();
+                                } else {
+                                  navHandler("/" + i.route);
+                                }
+                              }}
+                              isActive={isActive}
+                            >
+                              <i.icon
+                                className={cn(
+                                  "flex-shrink-0",
+                                  isActive && "text-primary"
+                                )}
+                                width={IconWidth}
+                                height={IconHeight}
+                              />
+                              <span className={isActive ? "text-primary" : ""}>{i.label}</span>
+                            </SidebarMenuButton>
+                          </SidebarMenuItem>
+                        );
+                      })}
+                    </SidebarMenu>
+                  </SidebarGroupContent>
+                </SidebarGroup>
+              );
+            })
+          )
+        }
       </SidebarContent>
-      <SidebarFooter>
+      {user && <SidebarFooter>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton asChild>
-              <Link href="/">
-                <PersonIcon /> {!user ? "Not logged in" : user.Email}
-              </Link>
-            </SidebarMenuButton>
+            <DropdownMenu>
+              <DropdownMenuTrigger className="w-full">
+                <SidebarMenuButton
+                  size="lg"
+                  className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+                >
+                  <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
+                    <User className="size-4" />
+                  </div>
+                  <div className="grid flex-1 text-left text-sm leading-tight">
+                    <span className="truncate font-semibold">
+                      {user.Email}
+                    </span>
+                    <span className="truncate text-xs">
+                      {formatServer(user.ControlServer)}
+                    </span>
+                  </div>
+                  <ChevronsUpDown className="ml-auto size-4" />
+                </SidebarMenuButton>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                className="w-[--radix-dropdown-menu-trigger-width] min-w-56 rounded-lg"
+                side="bottom"
+                align="end"
+                sideOffset={4}
+              >
+                {user && (
+                  <>
+                    <DropdownMenuLabel className="p-0 font-normal">
+                      <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
+                          <User className="size-4" />
+                        </div>
+                        <div className="grid flex-1 text-left text-sm leading-tight">
+                          <span className="truncate font-semibold">
+                            {user.Email}
+                          </span>
+                          <span className="truncate text-xs">{formatServer(user.ControlServer)}</span>
+                        </div>
+                      </div>
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                  </>
+                )}
+
+                <DropdownMenuLabel className="text-xs text-muted-foreground">
+                  Theme
+                </DropdownMenuLabel>
+                <DropdownMenuItem onClick={() => setTheme("light")}>
+                  <Sun className="mr-2 h-4 w-4" />
+                  <span>Light</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setTheme("dark")}>
+                  <Moon className="mr-2 h-4 w-4" />
+                  <span>Dark</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setTheme("system")}>
+                  <Laptop className="mr-2 h-4 w-4" />
+                  <span>System</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+
+                {user && (
+                  <>
+                    <DropdownMenuItem>
+                      <User className="mr-2 h-4 w-4" />
+                      <span className="truncate">Profile</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleLogout}>
+                      <LogOut className="mr-2 h-4 w-4" />
+                      <span>Logout</span>
+                    </DropdownMenuItem>
+                  </>
+                )}
+                {!user && (
+                  <DropdownMenuItem onClick={() => navigate("/login")}>
+                    <Lock className="mr-2 h-4 w-4" />
+                    <span>Login</span>
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </SidebarMenuItem>
         </SidebarMenu>
-      </SidebarFooter>
+      </SidebarFooter>}
+
     </Sidebar>
   );
 };

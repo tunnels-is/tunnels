@@ -1,69 +1,61 @@
 import React from "react";
-import GLOBAL_STATE from "../state";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import dayjs from "dayjs";
 import InfoItem from "../components/InfoItem";
 import { useNavigate } from "react-router-dom";
-import { useEffect } from "react";
-import { DeleteIcon } from "lucide-react";
 import { SquareX } from "lucide-react";
-
+import { Theme } from "@/theme";
+import { useUsers, useDeleteUser } from "@/hooks/useUsers";
+import { useSetAtom } from "jotai";
+import { userAtom } from "@/stores/userStore";
 
 const UserSelect = () => {
-  const state = GLOBAL_STATE("user-select");
   const navigate = useNavigate();
+  const { data: users, isLoading } = useUsers();
+  const { mutate: deleteUser } = useDeleteUser();
+  const setUser = useSetAtom(userAtom);
 
   const selectUser = (user) => {
-    console.dir(user)
-    state.SetUser(user)
-    navigate("/account")
-    window.location.reload()
-  }
+    console.dir(user);
+    setUser(user);
+    navigate("/account");
+  };
 
   const gotoLogin = () => {
-    navigate("/login/1")
-  }
+    navigate("/login/1");
+  };
 
-  const loadUsers = async () => {
-    await state.GetUsers()
-  }
-
-  useEffect(() => {
-    loadUsers()
-  }, [])
-
-  console.dir(state.Users)
+  if (isLoading) return <div>Loading...</div>;
 
   return (
     <div className="p-6 space-y-6">
       <Button
-        className={"flex items-center gap-1" + state.Theme?.successBtn}
+        className={"flex items-center gap-1" + Theme.successBtn}
         onClick={() => gotoLogin()}
       >
         {"Add Account"}
       </Button>
 
       <div className="flex flex-row gap-4">
-        {state.Users?.map((u) => (
+        {users?.map((u) => (
           <Card
             onClick={() => selectUser(u)}
             key={u._id}
-            className="hover:!border-emerald-500 rounded">
+            className="hover:!border-emerald-500 rounded"
+          >
             <div className="flex items-center -mt-1 -mr-1">
               <SquareX
-                onClick={() => state.DelUser(u.SaveFileHash)}
-                className={'ml-auto' + state.Theme?.redIcon} />
+                onClick={(e) => {
+                  e.stopPropagation();
+                  deleteUser(u.SaveFileHash);
+                }}
+                className={"ml-auto" + Theme.redIcon}
+              />
             </div>
             <CardContent className=" -mt-3 cursor-pointer flex flex-col p-4">
-              <InfoItem
-                label="Email"
-                value={u.Email}
-              />
-              <InfoItem
-                label="ID"
-                value={u._id}
-              />
+              <InfoItem label="Email" value={u.Email} />
+              <InfoItem label="ID" value={u._id} />
               <InfoItem
                 label="Server"
                 value={u.ControlServer?.Host + ":" + u.ControlServer?.Port}
@@ -72,15 +64,12 @@ const UserSelect = () => {
                 label="Expiration"
                 value={dayjs(u.SubExpiration).format("HH:mm:ss DD-MM-YYYY")}
               />
-
             </CardContent>
           </Card>
         ))}
       </div>
     </div>
   );
+};
 
-
-}
-
-export default UserSelect
+export default UserSelect;

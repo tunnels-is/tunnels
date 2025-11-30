@@ -3,17 +3,19 @@ import { useNavigate } from "react-router-dom";
 import QRCode from "react-qr-code";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import STORE from "../store";
-import GLOBAL_STATE from "../state";
 import { EnvelopeClosedIcon, FrameIcon, LockClosedIcon } from "@radix-ui/react-icons";
 import { Input } from "@/components/ui/input";
+import { useAtomValue } from "jotai";
+import { userAtom } from "../stores/userStore";
+import { toast } from "sonner";
+import { client } from "../api/client";
 
 const useForm = (props) => {
 	const [inputs, setInputs] = useState({});
 	const [errors, setErrors] = useState({});
 	const [code, setCode] = useState({});
 	const navigate = useNavigate();
-	const state = GLOBAL_STATE()
+	const user = useAtomValue(userAtom);
 
 	const HandleSubmit = async () => {
 
@@ -44,7 +46,6 @@ const useForm = (props) => {
 			return
 		}
 
-		let user = STORE.Cache.GetObject("user")
 		if (!user) {
 			navigate("/login")
 		}
@@ -54,40 +55,46 @@ const useForm = (props) => {
 		let secondSPlit = firstSplit[1].split("=")
 		let secret = secondSPlit[1]
 		if (secret === "") {
-			state?.toggleError("Could not parse authenticator secret")
+			toast.error("Could not parse authenticator secret");
 			setErrors({})
 			return
 		}
 
 		inputs.Code = secret
 
-		let x = await state.callController(null, "POST", "/v3/user/2fa/confirm",
-			inputs,
-			false, false)
-		if (x.status === 200) {
-			let c = { ...code }
-			c.Recovery = x.data.Data
-			setCode(c)
+		try {
+			const response = await client.post("/v3/user/2fa/confirm", inputs);
+			if (response.status === 200) {
+				let c = { ...code }
+				c.Recovery = response.data.Data
+				setCode(c)
+			}
+		} catch (e) {
+			toast.error("Failed to confirm 2FA");
 		}
 
 		setErrors({})
 	}
 
 	const Get2FACode = async () => {
-		let user = STORE.Cache.GetObject("user")
 		if (!user) {
 			navigate("/login")
+			return;
 		}
 
 		let data = {
 			Email: user.Email
 		}
 
-		let x = await state.API.method("getQRCode", data)
-		if (x?.data) {
-			setCode(x.data)
-		} else {
-			state?.toggleError("Unknown error, please try again in a moment")
+		try {
+			const response = await client.post("/getQRCode", data);
+			if (response?.data) {
+				setCode(response.data)
+			} else {
+				toast.error("Unknown error, please try again in a moment");
+			}
+		} catch (e) {
+			toast.error("Failed to get QR code");
 		}
 
 		setErrors({})

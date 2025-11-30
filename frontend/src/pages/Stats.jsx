@@ -1,10 +1,30 @@
 import { Card, CardContent, CardTitle } from "@/components/ui/card";
-import GLOBAL_STATE from "../state";
 import { Button } from "@/components/ui/button";
 import dayjs from "dayjs";
+import { Theme } from "@/theme";
+import { useAtomValue } from "jotai";
+import { activeTunnelsAtom } from "../stores/tunnelStore";
+import { useTunnels } from "../hooks/useTunnels";
+import { toast } from "sonner";
+import { disconnectTunnel } from "../api/tunnels";
 
 const Stats = () => {
-  const state = GLOBAL_STATE("stats")
+  const activeTunnels = useAtomValue(activeTunnelsAtom);
+  const { data: tunnels } = useTunnels();
+
+  const handleDisconnect = async (ac) => {
+    try {
+      await disconnectTunnel(ac.CR?.Tag);
+      toast.success("Disconnected");
+    } catch (e) {
+      toast.error("Failed to disconnect");
+    }
+  };
+
+  const GetEncType = (int) => {
+    const types = ["None", "AES128", "AES256", "CHACHA20"];
+    return types[int] || "Unknown";
+  };
 
   const renderKeyValue = (key, value) => {
     return (
@@ -20,14 +40,10 @@ const Stats = () => {
   }
 
   const renderCard = (ac) => {
-    let tunnel = undefined
-    state.Tunnels?.forEach((t, i) => {
-      if (t.Tag === ac.CR?.Tag) {
-        tunnel = state.Tunnels[i]
-      }
-    })
+    let tunnel = tunnels?.find(t => t.Tag === ac.CR?.Tag);
+
     return (
-      <Card className="p-5">
+      <Card className="p-5" key={ac.CR?.Tag || Math.random()}>
 
         <CardContent>
           <CardTitle className="text-center mb-2">Tunnel Interface</CardTitle>
@@ -37,7 +53,7 @@ const Stats = () => {
           {renderKeyValue("MTU", tunnel?.MTU)}
           {renderKeyValue("DNS Blocking", tunnel?.DNSBlocking ? "enabled" : "disabled")}
           {renderKeyValue("DNS Servers", tunnel?.DNSServers?.join(" "))}
-          {renderKeyValue("Encryption", state.GetEncType(tunnel?.EncryptionType))}
+          {renderKeyValue("Encryption", GetEncType(tunnel?.EncryptionType))}
           {renderKeyValue("Handshake", "mlkem + x25519")}
           {renderKeyValue("Auto Connect", tunnel?.AutoConnect ? "enabled" : "disabled")}
           {renderKeyValue("Auto Re-Connect", tunnel?.AutoReconnect ? "enabled" : "disabled")}
@@ -76,8 +92,8 @@ const Stats = () => {
             </div>
           }
 
-          {ac.CRResponse?.Routes?.map(r => {
-            return <div className="flex flex-row gap-1">
+          {ac.CRResponse?.Routes?.map((r, i) => {
+            return <div className="flex flex-row gap-1" key={i}>
               <div className="">{r.Address}</div>
               <div className="text-muted-foreground">via</div>
               <div className="">{tunnel?.IPv4Address}</div>
@@ -89,8 +105,8 @@ const Stats = () => {
           {ac.CRResponse?.DNSRecords?.length > 0 &&
             <>
               <CardTitle className="text-center mb-2 mt-5">Domains</CardTitle>
-              {ac.CRResponse?.DNSRecords?.map(r => {
-                return <div className="flex flex-row gap-1">
+              {ac.CRResponse?.DNSRecords?.map((r, i) => {
+                return <div className="flex flex-row gap-1" key={i}>
                   <div className="">{r.Wildcard ? "*." : ""}{r.Domain}</div>
                 </div>
               })}
@@ -101,10 +117,8 @@ const Stats = () => {
 
         </CardContent>
         <Button
-          className={"mt-5 w-full" + state.Theme?.errorBtn}
-          onClick={() => {
-            state.disconnectFromVPN(ac)
-          }}
+          className={"mt-5 w-full" + Theme.errorBtn}
+          onClick={() => handleDisconnect(ac)}
         >
           Disconnect
         </Button>
@@ -114,7 +128,7 @@ const Stats = () => {
 
   return (
     <div className="flex">
-      {state.ActiveTunnels?.map(c => {
+      {activeTunnels?.map(c => {
         return renderCard(c)
       })}
     </div >

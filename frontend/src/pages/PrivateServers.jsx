@@ -1,207 +1,197 @@
-import React, { useEffect, useState } from "react";
-import GLOBAL_STATE from "../state";
+import React, { useState } from "react";
 import GenericTable from "./GenericTable";
 import { TableCell } from "@/components/ui/table";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import NewObjectEditorDialog from "./NewObjectEdiorDialog";
+import NewObjectEditorDialog from "./NewObjectEditorDialog";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { useNavigate } from "react-router-dom";
-import { CircleArrowRight } from "lucide-react";
-import { LogOut } from "lucide-react";
+import { CircleArrowRight, LogOut, Server } from "lucide-react";
+import { useServers, useCreateServer, useUpdateServer } from "../hooks/useServers";
+import { useTunnels, useConnectTunnel, useDisconnectTunnel, useUpdateTunnel } from "../hooks/useTunnels";
+import { useAtomValue } from "jotai";
+import { userAtom } from "@/stores/userStore";
+import { activeTunnelsAtom } from "@/stores/tunnelStore";
+import { getCountryName } from "@/lib/utils";
+import { toast } from "sonner";
 
 const PrivateServers = () => {
-	const state = GLOBAL_STATE("pservers")
-	const [server, setServer] = useState(undefined)
-	const [editModalOpen, setEditModalOpen] = useState(false)
-	const navigate = useNavigate()
+	const user = useAtomValue(userAtom);
+	const activeTunnels = useAtomValue(activeTunnelsAtom);
+	const { data: servers, isLoading: serversLoading } = useServers(user?.ControlServer);
+	const { data: tunnels, isLoading: tunnelsLoading } = useTunnels();
 
-	useEffect(() => {
-		let x = async () => {
-			// if (!state.User) {
-			// 	return
-			// }
-			await state.GetServers();
-			state.GetBackendState();
-		};
-		x();
-	}, [])
+	const createServerMutation = useCreateServer();
+	const updateServerMutation = useUpdateServer();
+	const connectTunnelMutation = useConnectTunnel();
+	const disconnectTunnelMutation = useDisconnectTunnel();
+	const updateTunnelMutation = useUpdateTunnel();
 
+	const [server, setServer] = useState(undefined);
+	const [editModalOpen, setEditModalOpen] = useState(false);
+	const navigate = useNavigate();
+
+	console.log(servers);
 	const saveServer = () => {
 		if (server._id !== undefined) {
-			UpdateServer()
-			return
+			UpdateServer();
+			return;
 		}
-
-		CreateServer()
-	}
+		CreateServer();
+	};
 
 	const UpdateServer = async () => {
-		let resp = await state.callController(null, "POST", "/v3/server/update", { Server: server }, false, false)
-		if (resp?.status === 200) {
-			state.PrivateServers.forEach((s, i) => {
-				if (s._id === server._id) {
-					state.PrivateServers[i] = server;
-				}
-			});
-			state.updatePrivateServers();
-			state.renderPage("pservers")
-			setEditModalOpen(false)
-		}
-	}
+		updateServerMutation.mutate({ controlServer: user?.ControlServer, serverData: server }, {
+			onSuccess: () => {
+				setEditModalOpen(false);
+			}
+		});
+	};
 
 	const CreateServer = async () => {
-		let resp = await state.callController(null, "POST", "/v3/server/create", { Server: server }, false, false)
-		if (resp?.status === 200) {
-			if (!state.PrivateServers) {
-				state.PrivateServers = [];
+		createServerMutation.mutate({ controlServer: user?.ControlServer, serverData: server }, {
+			onSuccess: () => {
+				setEditModalOpen(false);
 			}
-			state.PrivateServers.push(resp.data);
-			state.updatePrivateServers();
-			state.renderPage("pservers")
-			setEditModalOpen(false)
-		}
-	}
+		});
+	};
 
 	const ConnectColumn = (server) => {
-		let servertun = undefined
-		let assignedTunnels = 0
-		state?.Tunnels?.map(c => {
+		let servertun = undefined;
+		let assignedTunnels = 0;
+		tunnels?.forEach(c => {
 			if (c.ServerID === server._id) {
-				servertun = c
-				assignedTunnels++
+				servertun = c;
+				assignedTunnels++;
 			}
-		})
+		});
 
-		let conButton = function() {
-			state.ConfirmAndExecute(
-				"success",
-				"connect",
-				10000,
-				"",
-				"Connect to " + server.Tag,
-				() => {
-					if (assignedTunnels < 1) {
-						state.connectToVPN(undefined, server)
-					} else {
-						state.connectToVPN(servertun, undefined)
-					}
-				})
-		}
-
-		if (assignedTunnels > 1) {
-			conButton = function() {
-				state.toggleError("too many tunnels assigned to server")
+		const handleConnect = () => {
+			let tunnelToConnect = undefined;
+			if (assignedTunnels < 1) {
+				let defaultTunnel = tunnels?.find(t => t.Tag === "tunnels");
+				if (defaultTunnel) {
+					tunnelToConnect = defaultTunnel;
+				}
+			} else {
+				tunnelToConnect = servertun;
 			}
-		}
 
-		let con = undefined
-
-		state?.ActiveTunnels?.forEach((x, i) => {
-			if (x.CR?.ServerID === server._id) {
-				con = state?.ActiveTunnels[i]
-				return
+			if (!tunnelToConnect) {
+				toast.error("No suitable tunnel found to connect");
+				return;
 			}
-		})
 
-		let disconnectButton = undefined
-		if (con) {
-			disconnectButton = function() {
-				state.ConfirmAndExecute(
-					"success",
-					"disconnect",
-					10000,
-					"",
-					"Disconnect from " + server.Tag,
-					() => {
-						state.disconnectFromVPN(con)
-					})
+			if (!user?.DeviceToken) {
+				toast.error("You are not logged in");
+				return;
 			}
-		}
 
+			const connectionRequest = {
+				UserID: user._id,
+				DeviceToken: user.DeviceToken.DT,
+				Tag: tunnelToConnect.Tag,
+				EncType: tunnelToConnect.EncryptionType,
+				ServerID: server._id,
+				Server: user.ControlServer
+			};
 
+			connectTunnelMutation.mutate(connectionRequest);
+		};
 
-		return <div>
-			<DropdownMenuItem
-				key="connect"
-				onClick={() => conButton()}
-				className={"cursor-pointer text-[#3a994c]"}
-			>
-				<CircleArrowRight className="w-4 h-4 mr-2" /> Connect
-			</DropdownMenuItem >
-			{disconnectButton &&
+		let con = activeTunnels?.find(x => x.CR?.ServerID === server._id);
+
+		return (
+			<div>
 				<DropdownMenuItem
-					key="disconnect"
-					onClick={() => disconnectButton()}
-					className={"cursor-pointer text-[#ef4444]"}
+					key="connect"
+					onClick={() => {
+						if (assignedTunnels > 1) {
+							toast.error("Too many tunnels assigned to server");
+							return;
+						}
+						handleConnect();
+					}}
+					className="cursor-pointer text-[#3a994c]"
 				>
-					<LogOut className="w-4 h-4 mr-2" /> Disconnect
-				</DropdownMenuItem >
-			}
-		</div >
-	}
+					<CircleArrowRight className="w-4 h-4 mr-2" /> Connect
+				</DropdownMenuItem>
+				{con && (
+					<DropdownMenuItem
+						key="disconnect"
+						onClick={() => disconnectTunnelMutation.mutate(con.ID)}
+						className="cursor-pointer text-[#ef4444]"
+					>
+						<LogOut className="w-4 h-4 mr-2" /> Disconnect
+					</DropdownMenuItem>
+				)}
+			</div>
+		);
+	};
 
 	const TunnelsColumn = (obj) => {
-		let servertun = undefined
-		let assignedTunnels = 0
-		let opts = []
+		let servertun = undefined;
+		let assignedTunnels = 0;
+		let opts = [];
 
-		state?.Tunnels?.map(c => {
+		tunnels?.forEach(c => {
 			if (c.ServerID === obj._id) {
-				servertun = c
-				opts.push({ value: c.Tag, key: c.Tag, selected: true })
-				assignedTunnels++
+				servertun = c;
+				opts.push({ value: c.Tag, key: c.Tag, selected: true });
+				assignedTunnels++;
 			} else {
-				opts.push({ value: c.Tag, key: c.Tag, selected: false })
+				opts.push({ value: c.Tag, key: c.Tag, selected: false });
 			}
-		})
+		});
 
-		let value = undefined
-		let assigned = "Assign to tunnel"
+		let value = undefined;
+		let assigned = "Assign to tunnel";
 		if (assignedTunnels > 1) {
-			assigned = String(assignedTunnels) + " tunnels assigned"
+			assigned = String(assignedTunnels) + " tunnels assigned";
 		} else {
-			value = servertun?.Tag
+			value = servertun?.Tag;
 		}
 
-		return <TableCell className={"w-[100px] text-white"}  >
-			<Select value={value}
-				onValueChange={(e) => {
-					state.changeServerOnTunnelUsingTag(e, obj._id)
-				}}
-			>
-				<SelectTrigger className="w-full">
-					<SelectValue placeholder={assigned} />
-				</SelectTrigger>
-				<SelectContent
-					className={"bg-transparent" + state.Theme.borderColor + state.Theme?.mainBG}
+		return (
+			<TableCell className="w-[100px] text-white">
+				<Select
+					value={value}
+					onValueChange={(tag) => {
+						const tunnel = tunnels?.find(t => t.Tag === tag);
+						if (tunnel) {
+							const updatedTunnel = { ...tunnel, ServerID: obj._id };
+							updateTunnelMutation.mutate({ tunnel: updatedTunnel, oldTag: tunnel.Tag });
+						}
+					}}
 				>
-					<SelectGroup>
-						{opts?.map(t => {
-							if (t.selected === true) {
-								return (
-									<SelectItem className={state.Theme?.activeSelect} value={t.value}>{t.key}</SelectItem>
-								)
-							} else {
-								return (
-									<SelectItem className={state.Theme?.neutralSelect} value={t.value}>{t.key}</SelectItem>
-								)
-							}
-						})}
-					</SelectGroup>
-				</SelectContent>
-			</Select>
-		</TableCell >
-	}
+					<SelectTrigger className="w-full">
+						<SelectValue placeholder={assigned} />
+					</SelectTrigger>
+					<SelectContent>
+						<SelectGroup>
+							{opts?.map(t => (
+								<SelectItem
+									key={t.value}
+									value={t.value}
+								>
+									{t.key}
+								</SelectItem>
+							))}
+						</SelectGroup>
+					</SelectContent>
+				</Select>
+			</TableCell>
+		);
+	};
 
 	let table = {
-		data: state.PrivateServers,
+		data: servers || [],
 		rowClick: (obj) => {
-			console.log("row click!")
-			console.dir(obj)
+			console.log("row click!");
+			console.dir(obj);
 		},
 		columns: {
 			Tag: (obj) => {
-				navigate("/server/" + obj._id)
+				navigate("/server/" + obj._id);
 			},
 			Country: true,
 			IP: true,
@@ -210,13 +200,12 @@ const PrivateServers = () => {
 		},
 		columnFormat: {
 			Country: (row) => {
-				let x = state.GetCountryName(row.Country)
-				return x
+				return getCountryName(row.Country);
 			}
 		},
 		columnClass: {
 			Country: () => {
-				return "min-w-[100px]"
+				return "min-w-[100px]";
 			}
 		},
 		customColumns: {
@@ -227,35 +216,42 @@ const PrivateServers = () => {
 		},
 		Btn: {
 			Edit: (obj) => {
-				setServer(obj)
-				setEditModalOpen(true)
+				setServer(obj);
+				setEditModalOpen(true);
 			},
 			Delete: (obj) => {
-				// TODO
+				// TODO: Implement delete
 			},
 			New: () => {
-				setServer({ Tag: "", Country: "", IP: "", Port: "", DataPort: "", PubKey: "" })
-				setEditModalOpen(true)
+				setServer({ Tag: "", Country: "", IP: "", Port: "", DataPort: "", PubKey: "" });
+				setEditModalOpen(true);
 			},
 		},
 		headerFormat: {
-			_id: () => {
-				return "ID"
-			},
-			Tag: () => {
-				return "Name"
-			}
+			_id: () => "ID",
+			Tag: () => "Name"
 		},
 		headers: ["Tag", "Country", "IP", "Port", "_id", "Interface"],
 		headerClass: {},
 		opts: {
 			RowPerPage: 50,
 		},
-		more: state.GetServers,
+		more: undefined,
+	};
+
+	if (serversLoading || tunnelsLoading) {
+		return <div>Loading...</div>;
 	}
 
 	return (
-		<div className="ab private-server-wrapper w-full" >
+		<div className="w-full mt-16 p-4 space-y-6">
+			<div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+				<div>
+					<h1 className="text-2xl font-bold tracking-tight text-white">Private Servers</h1>
+					<p className="text-muted-foreground">Manage your private VPN servers and tunnel assignments.</p>
+				</div>
+			</div>
+
 			<GenericTable table={table} />
 
 			<NewObjectEditorDialog
@@ -263,20 +259,19 @@ const PrivateServers = () => {
 				onOpenChange={setEditModalOpen}
 				object={server}
 				title="Server"
-				description=""
+				description="Configure private server settings."
 				readOnly={false}
 				saveButton={() => {
-					saveServer()
-					setEditModalOpen(false)
+					saveServer();
+					setEditModalOpen(false);
 				}}
 				onChange={(key, value, type) => {
-					server[key] = value
-					console.log(key, value, type)
+					setServer(prev => ({ ...prev, [key]: value }));
+					console.log(key, value, type);
 				}}
 			/>
-
-		</div >
+		</div>
 	);
-}
+};
 
 export default PrivateServers;

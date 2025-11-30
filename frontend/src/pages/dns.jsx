@@ -1,19 +1,22 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import FormKeyValue from "../components/formkeyvalue";
 import { useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
-import GLOBAL_STATE from "../state";
-import STORE from "../store";
 import { Switch } from "@/components/ui/switch";
 import GenericTable from "./GenericTable";
 import { TableCell } from "@/components/ui/table";
-import { useState } from "react";
-import NewObjectEditorDialog from "./NewObjectEdiorDialog";
-import { Globe } from "lucide-react";
+import NewObjectEditorDialog from "./NewObjectEditorDialog";
 import { Button } from "@/components/ui/button";
+
+import { useAtom } from "jotai";
+import { configAtom } from "../stores/configStore";
+import { useSaveConfig } from "../hooks/useConfig";
+import { useDNSStats } from "../hooks/useDNS";
+import { getBackendState } from "../api/app";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Server, Shield, Activity, Save, AlertTriangle } from "lucide-react";
 
 const DNSSort = (a, b) => {
   if (dayjs(a.LastSeen).unix() < dayjs(b.LastSeen).unix()) {
@@ -25,8 +28,11 @@ const DNSSort = (a, b) => {
 };
 
 const DNS = () => {
-  const state = GLOBAL_STATE("dns");
   const navigate = useNavigate();
+  const [config, setConfig] = useAtom(configAtom);
+  const saveConfigMutation = useSaveConfig();
+  const { data: dnsStats } = useDNSStats();
+
   const [record, setRecord] = useState(undefined)
   const [recordModal, setRecordModal] = useState(false)
   const [isRecordEdit, setIsRecordEdit] = useState(false)
@@ -36,50 +42,38 @@ const DNS = () => {
   const [whitelist, setWhitelist] = useState(undefined)
   const [whitelistModal, setWhitelistModal] = useState(false)
   const [isWhitelistEdit, setIsWhitelistEdit] = useState(false)
-  const [cfg, setCfg] = useState({ ...state.Config })
+
+  const [cfg, setCfg] = useState(config || {})
   const [mod, setMod] = useState(false)
 
+  useEffect(() => {
+    if (config) setCfg(config);
+  }, [config]);
+
+  useEffect(() => {
+    getBackendState().then(state => {
+      if (state?.Config) setConfig(state.Config);
+    }).catch(console.error);
+  }, [setConfig]);
+
   const updatecfg = (key, value) => {
-    console.log(key, value)
     let x = { ...cfg }
     x[key] = value
     setMod(true)
     setCfg(x)
   }
 
-  useEffect(() => {
-    state.GetBackendState();
-    state.GetDNSStats();
-  }, []);
+  const toggleConfigKey = (key) => {
+    const newConfig = { ...config, [key]: !config[key] };
+    saveConfigMutation.mutate(newConfig);
+  };
 
-  let blockLists = state.Config?.DNSBlockLists;
-  state.modifiedLists?.forEach((l) => {
-    blockLists?.forEach((ll, i) => {
-      if (ll.Tag === l.Tag) {
-        blockLists[i] = l;
-      }
-    });
-  });
-  if (!blockLists) {
-    blockLists = [];
-  }
-
-  let whiteLists = state.Config?.DNSWhiteLists;
-  state.modifiedLists?.forEach((l) => {
-    whiteLists?.forEach((ll, i) => {
-      if (ll.Tag === l.Tag) {
-        whiteLists[i] = l;
-      }
-    });
-  });
-  if (!whiteLists) {
-    whiteLists = [];
-  }
+  let blockLists = config?.DNSBlockLists || [];
+  let whiteLists = config?.DNSWhiteLists || [];
 
   const generateDNSRecordsTable = () => {
-
     return {
-      data: state.Config?.DNSRecords,
+      data: config?.DNSRecords,
       columns: {
         Domain: true,
         IP: true,
@@ -87,21 +81,11 @@ const DNS = () => {
         Wildcard: true,
       },
       headerFormat: {
-        TXT: () => {
-          return "Text"
-        }
+        TXT: () => "Text"
       },
       columnFormat: {
-        // IP: (obj) => {
-        //   return obj.IP.join(" | ")
-        // },
-        Wildcard: (obj) => {
-          return obj.Wildcard === true ? "yes" : "no"
-        },
+        Wildcard: (obj) => obj.Wildcard === true ? "yes" : "no",
       },
-      customColumns: {
-      },
-      columnClass: {},
       Btn: {
         Edit: (obj) => {
           setIsRecordEdit(true)
@@ -109,8 +93,8 @@ const DNS = () => {
           setRecordModal(true)
         },
         Delete: (obj) => {
-          state.Config.DNSRecords = state.Config.DNSRecords.filter((r) => r.Domain !== obj.Domain)
-          state.v2_ConfigSave();
+          const newRecords = config.DNSRecords.filter((r) => r.Domain !== obj.Domain);
+          saveConfigMutation.mutate({ ...config, DNSRecords: newRecords });
         },
         New: () => {
           setIsRecordEdit(false)
@@ -119,20 +103,17 @@ const DNS = () => {
         }
       },
       headers: ["Domain", "IP", "Text", "Wildcard"],
-      headerClass: {},
     }
-
   }
 
   const generateBlocksTable = () => {
-    let dnsBlocks = state.DNSStats ? state.DNSStats : [];
+    let dnsBlocks = dnsStats || [];
     let rows = [];
     if (!dnsBlocks || dnsBlocks.length === 0) {
       return rows;
     }
 
     let stats = [];
-
     Object.entries(dnsBlocks).forEach(([key, value]) => {
       let lb = dayjs(value.LastBlocked);
       let ls = dayjs(value.LastSeen);
@@ -153,31 +134,18 @@ const DNS = () => {
         LastSeen: true,
       },
       headerFormat: {
-        "tag": () => {
-          return "Domain"
-        },
-        // "Tag": () => {
-        //   return "List"
-        // }
+        "tag": () => "Domain"
       },
       columnFormat: {
-        FirstSeen: (obj) => {
-          return dayjs(obj.FirstSeen).format(state.DNSListDateFormat)
-        },
-        LastSeen: (obj) => {
-          return dayjs(obj.LastSeen).format(state.DNSListDateFormat)
-        }
+        FirstSeen: (obj) => dayjs(obj.FirstSeen).format("HH:mm:ss DD-MM-YYYY"),
+        LastSeen: (obj) => dayjs(obj.LastSeen).format("HH:mm:ss DD-MM-YYYY")
       },
-      customColumns: {},
-      columnClass: {},
-      Btn: {},
       headers: ["tag", "Count", "FirstSeen", "LastSeen"],
-      headerClass: {},
     }
   };
 
   const generateResolvesTable = () => {
-    let dnsResolves = state.DNSStats ? state.DNSStats : [];
+    let dnsResolves = dnsStats || [];
     let rows = [];
     if (!dnsResolves || dnsResolves.length === 0) {
       return rows;
@@ -196,7 +164,7 @@ const DNS = () => {
     return {
       data: stats,
       columns: {
-        tag: () => {
+        tag: (value) => {
           navigate("/dns/answers/" + value.tag);
         },
         Count: true,
@@ -204,39 +172,31 @@ const DNS = () => {
         LastSeen: true,
       },
       headerFormat: {
-        "tag": () => {
-          return "Domain"
-        },
+        "tag": () => "Domain"
       },
       columnFormat: {
-        FirstSeen: (obj) => {
-          return dayjs(obj.FirstSeen).format(state.DNSListDateFormat)
-        },
-        LastSeen: (obj) => {
-          return dayjs(obj.LastSeen).format(state.DNSListDateFormat)
-        }
+        FirstSeen: (obj) => dayjs(obj.FirstSeen).format("HH:mm:ss DD-MM-YYYY"),
+        LastSeen: (obj) => dayjs(obj.LastSeen).format("HH:mm:ss DD-MM-YYYY")
       },
-      customColumns: {},
-      columnClass: {},
-      Btn: {},
       headers: ["tag", "Count", "FirstSeen", "LastSeen"],
-      headerClass: {},
     }
-
   };
+
+  const toggleList = (list, type, obj) => {
+    const newList = list.map(l => l.Tag === obj.Tag ? { ...l, Enabled: !l.Enabled } : l);
+    saveConfigMutation.mutate({ ...config, [type]: newList });
+  }
 
   const EnableColumn = (obj) => {
     return <TableCell className={"w-[10px] text-sky-100"}  >
-      <Switch checked={obj.Enabled} onCheckedChange={() => state.toggleBlocklist(obj)} />
+      <Switch checked={obj.Enabled} onCheckedChange={() => toggleList(blockLists, "DNSBlockLists", obj)} />
     </TableCell >
-
   }
 
   const EnableColumnWhitelist = (obj) => {
     return <TableCell className={"w-[10px] text-sky-100"}  >
-      <Switch checked={obj.Enabled} onCheckedChange={() => state.toggleWhitelist(obj)} />
+      <Switch checked={obj.Enabled} onCheckedChange={() => toggleList(whiteLists, "DNSWhiteLists", obj)} />
     </TableCell >
-
   }
 
   let bltable = {
@@ -249,12 +209,7 @@ const DNS = () => {
       Enabled: EnableColumn,
     },
     columnClass: {
-      Enabled: (obj) => {
-        if (obj.Enabled === true) {
-          return "text-green-400"
-        }
-        return "text-red-400"
-      },
+      Enabled: (obj) => obj.Enabled === true ? "text-green-400" : "text-red-400",
     },
     Btn: {
       Edit: (obj) => {
@@ -263,7 +218,8 @@ const DNS = () => {
         setBlocklistModal(true)
       },
       Delete: (obj) => {
-        state.deleteBlocklist(obj);
+        const newList = blockLists.filter(l => l.Tag !== obj.Tag);
+        saveConfigMutation.mutate({ ...config, DNSBlockLists: newList });
       },
       New: () => {
         setIsBlocklistEdit(false)
@@ -275,10 +231,9 @@ const DNS = () => {
         })
         setBlocklistModal(true)
       },
-      Save: state.v2_ConfigSave
+      Save: () => saveConfigMutation.mutate(config)
     },
     headers: ["Tag", "Domains", "Blocked"],
-    headerClass: {},
     opts: {
       RowPerPage: 50,
     },
@@ -294,12 +249,7 @@ const DNS = () => {
       Enabled: EnableColumnWhitelist,
     },
     columnClass: {
-      Enabled: (obj) => {
-        if (obj.Enabled === true) {
-          return "text-green-400"
-        }
-        return "text-red-400"
-      },
+      Enabled: (obj) => obj.Enabled === true ? "text-green-400" : "text-red-400",
     },
     Btn: {
       Edit: (obj) => {
@@ -308,7 +258,8 @@ const DNS = () => {
         setWhitelistModal(true)
       },
       Delete: (obj) => {
-        state.deleteWhitelist(obj);
+        const newList = whiteLists.filter(l => l.Tag !== obj.Tag);
+        saveConfigMutation.mutate({ ...config, DNSWhiteLists: newList });
       },
       New: () => {
         setIsWhitelistEdit(false)
@@ -320,157 +271,154 @@ const DNS = () => {
         })
         setWhitelistModal(true)
       },
-      Save: state.v2_ConfigSave
+      Save: () => saveConfigMutation.mutate(config)
     },
     headers: ["Tag", "Domains", "Allowed"],
-    headerClass: {},
     opts: {
       RowPerPage: 50,
     },
   }
 
   return (
-    <div className="">
-      <Tabs defaultValue="settings" >
-        <div className="flex items-center justify-between">
-          {mod === true && (
-            <div className="mb-7 flex gap-[4px] items-center">
-              <Button
-                className={state.Theme?.successBtn}
-                onClick={async () => {
-                  state.Config = cfg
-                  let ok = await state.v2_ConfigSave()
-                  if (ok === true) {
-                    setMod(false)
-                  }
-                }}>
-                Save
-              </Button>
-              <div className="ml-3 text-yellow-400 text-xl">
-                Your config has un-saved changes
-              </div>
-            </div>
-          )}
+    <div className="w-full mt-16 p-4 space-y-6">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-white">DNS Configuration</h1>
+          <p className="text-muted-foreground">Manage your DNS server settings, records, and filtering.</p>
         </div>
-        <TabsList
-          className={state.Theme?.borderColor + " rounded"}
-        >
-          <TabsTrigger value="settings">Settings</TabsTrigger>
-          <TabsTrigger value="records">DNS Records</TabsTrigger>
-          <TabsTrigger value="blocklist">Block Lists</TabsTrigger>
-          <TabsTrigger value="whitelist">White Lists</TabsTrigger>
-          <TabsTrigger value="blockdomains">Blocked Domains</TabsTrigger>
-          <TabsTrigger value="resolveddomains">Resovled Domains</TabsTrigger>
-        </TabsList>
-        <TabsContent value="settings" className="pl-2">
-          <div className="">
-            <div className="text-yellow-300">
-              Enabling blocklists will increase memory usage.
+        {mod === true && (
+          <div className="flex items-center gap-4 bg-yellow-900/20 border border-yellow-900/50 px-4 py-2 rounded-md">
+            <div className="flex items-center gap-2 text-yellow-500">
+              <AlertTriangle className="h-4 w-4" />
+              <span className="text-sm font-medium">Unsaved changes</span>
             </div>
-
-            <FormKeyValue
-              label="Server IP"
-              value={
-                <Input
-                  value={cfg.DNSServerIP}
-                  onChange={(e) => {
-                    updatecfg("DNSServerIP", e.target.value)
-                    // state.renderPage("dns");
-                  }}
-                  type="text"
-                />
-              }
-            />
-
-            <FormKeyValue
-              label="Server Port"
-              value={
-                <Input
-                  value={cfg.DNSServerPort}
-                  onChange={(e) => {
-                    updatecfg("DNSServerPort", e.target.value)
-                    // state.renderPage("dns");
-                  }}
-                  type="text"
-                />
-              }
-            />
-
-            <FormKeyValue
-              label="Primary DNS"
-              value={
-                <Input
-                  value={cfg.DNS1Default}
-                  onChange={(e) => {
-                    updatecfg("DNS1Default", e.target.value)
-                    // state.renderPage("dns");
-                  }}
-                  type="text"
-                />
-              }
-            />
-
-            <FormKeyValue
-              label="Backup DNS"
-              value={
-                <Input
-                  value={cfg.DNS2Default}
-                  onChange={(e) => {
-                    updatecfg("DNS2Default", e.target.value)
-                    // state.renderPage("dns");
-                  }}
-                  type="text"
-                />
-              }
-            />
-            <div className="max-w-[300px]">
-              <div className="flex items-center justify-between py-1 w-full">
-                <Label className="mr-3">Secure DNS</Label>
-                <Switch
-                  checked={state?.Config?.DNSOverHTTPS}
-                  onCheckedChange={() => {
-                    state.toggleConfigKeyAndSave("Config", "DNSOverHTTPS");
-                    state.fullRerender();
-                  }}
-                />
-              </div>
-
-              <div className="flex items-center justify-between py-1">
-                <Label className="text-white mr-3">Log Blocked</Label>
-                <Switch
-                  checked={state?.Config?.LogBlockedDomains}
-                  onCheckedChange={() => {
-                    state.toggleConfigKeyAndSave("Config", "LogBlockedDomains");
-                    state.fullRerender();
-                  }}
-                />
-              </div>
-
-              <div className="flex items-center justify-between py-1">
-                <Label className="text-white mr-3">Log All</Label>
-                <Switch
-                  checked={state?.Config?.LogAllDomains}
-                  onCheckedChange={() => {
-                    state.toggleConfigKeyAndSave("Config", "LogAllDomains");
-                    state.fullRerender();
-                  }}
-                />
-              </div>
-
-              <div className="flex items-center justify-between py-1">
-                <Label className="text-white mr-3">DNS Stats</Label>
-                <Switch
-                  checked={state?.Config?.DNSstats}
-                  onCheckedChange={() => {
-                    state.toggleConfigKeyAndSave("Config", "DNSstats");
-                    state.fullRerender();
-                  }}
-                />
-              </div>
-            </div>
+            <Button
+              size="sm"
+              onClick={() => {
+                saveConfigMutation.mutate(cfg, {
+                  onSuccess: () => setMod(false)
+                });
+              }}>
+              <Save className="h-4 w-4 mr-2" />
+              Save Changes
+            </Button>
           </div>
+        )}
+      </div>
 
+      <Tabs defaultValue="settings" className="space-y-6">
+        <TabsList className="bg-[#0B0E14] border border-[#1a1f2d] p-1 h-auto flex-wrap justify-start">
+          <TabsTrigger value="settings" className="data-[state=active]:bg-[#1a1f2d]">Settings</TabsTrigger>
+          <TabsTrigger value="records" className="data-[state=active]:bg-[#1a1f2d]">DNS Records</TabsTrigger>
+          <TabsTrigger value="blocklist" className="data-[state=active]:bg-[#1a1f2d]">Block Lists</TabsTrigger>
+          <TabsTrigger value="whitelist" className="data-[state=active]:bg-[#1a1f2d]">White Lists</TabsTrigger>
+          <TabsTrigger value="blockdomains" className="data-[state=active]:bg-[#1a1f2d]">Blocked Domains</TabsTrigger>
+          <TabsTrigger value="resolveddomains" className="data-[state=active]:bg-[#1a1f2d]">Resolved Domains</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="settings" className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Card className="bg-[#0B0E14] border-[#1a1f2d]">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Server className="h-5 w-5 text-blue-500" />
+                  Server Configuration
+                </CardTitle>
+                <CardDescription>Configure the DNS server listener.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Server IP</Label>
+                  <Input
+                    className="bg-[#151a25] border-[#2a3142]"
+                    value={cfg.DNSServerIP}
+                    onChange={(e) => updatecfg("DNSServerIP", e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Server Port</Label>
+                  <Input
+                    className="bg-[#151a25] border-[#2a3142]"
+                    value={cfg.DNSServerPort}
+                    onChange={(e) => updatecfg("DNSServerPort", e.target.value)}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-[#0B0E14] border-[#1a1f2d]">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Shield className="h-5 w-5 text-green-500" />
+                  Upstream DNS
+                </CardTitle>
+                <CardDescription>Configure upstream resolvers.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Primary DNS</Label>
+                  <Input
+                    className="bg-[#151a25] border-[#2a3142]"
+                    value={cfg.DNS1Default}
+                    onChange={(e) => updatecfg("DNS1Default", e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Backup DNS</Label>
+                  <Input
+                    className="bg-[#151a25] border-[#2a3142]"
+                    value={cfg.DNS2Default}
+                    onChange={(e) => updatecfg("DNS2Default", e.target.value)}
+                  />
+                </div>
+                <div className="flex items-center justify-between pt-2">
+                  <div className="space-y-0.5">
+                    <Label>Secure DNS (DoH)</Label>
+                    <div className="text-xs text-muted-foreground">Use DNS over HTTPS</div>
+                  </div>
+                  <Switch
+                    checked={config?.DNSOverHTTPS}
+                    onCheckedChange={() => toggleConfigKey("DNSOverHTTPS")}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-[#0B0E14] border-[#1a1f2d] md:col-span-2">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Activity className="h-5 w-5 text-purple-500" />
+                  Logging & Statistics
+                </CardTitle>
+                <CardDescription>Configure what events are logged and tracked.</CardDescription>
+              </CardHeader>
+              <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="flex items-center justify-between p-3 bg-[#151a25] rounded-lg border border-[#2a3142]">
+                  <Label className="cursor-pointer" onClick={() => toggleConfigKey("LogBlockedDomains")}>Log Blocked Domains</Label>
+                  <Switch
+                    checked={config?.LogBlockedDomains}
+                    onCheckedChange={() => toggleConfigKey("LogBlockedDomains")}
+                  />
+                </div>
+                <div className="flex items-center justify-between p-3 bg-[#151a25] rounded-lg border border-[#2a3142]">
+                  <Label className="cursor-pointer" onClick={() => toggleConfigKey("LogAllDomains")}>Log All Domains</Label>
+                  <Switch
+                    checked={config?.LogAllDomains}
+                    onCheckedChange={() => toggleConfigKey("LogAllDomains")}
+                  />
+                </div>
+                <div className="flex items-center justify-between p-3 bg-[#151a25] rounded-lg border border-[#2a3142]">
+                  <Label className="cursor-pointer" onClick={() => toggleConfigKey("DNSstats")}>Enable Statistics</Label>
+                  <Switch
+                    checked={config?.DNSstats}
+                    onCheckedChange={() => toggleConfigKey("DNSstats")}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
+
         <TabsContent value="whitelist">
           <GenericTable table={wltable} />
           <NewObjectEditorDialog
@@ -478,7 +426,7 @@ const DNS = () => {
             onOpenChange={setWhitelistModal}
             object={whitelist}
             title="DNS Whitelist"
-            description=""
+            description="Allow specific domains to bypass filters."
             readOnly={false}
             opts={{
               fields: {
@@ -487,26 +435,36 @@ const DNS = () => {
               }
             }}
             saveButton={async (obj) => {
+              let newWhitelists = [...(config?.DNSWhiteLists || [])];
               if (!isWhitelistEdit) {
-                if (!state.Config?.DNSWhiteLists) {
-                  state.Config.DNSWhiteLists = []
+                newWhitelists.push(obj);
+              } else {
+                if (isWhitelistEdit) {
+                  const index = newWhitelists.findIndex(l => l.Tag === obj.Tag);
+                  if (index !== -1) newWhitelists[index] = obj;
                 }
-                state.Config?.DNSWhiteLists.push(obj)
               }
-              let ok = await state.v2_ConfigSave();
-              if (ok === true) {
-                setWhitelistModal(false)
-                setIsWhitelistEdit(false)
-              }
+
+              saveConfigMutation.mutate({ ...config, DNSWhiteLists: newWhitelists }, {
+                onSuccess: () => {
+                  setWhitelistModal(false);
+                  setIsWhitelistEdit(false);
+                }
+              });
             }}
             onChange={(key, value, type) => {
-              whitelist[key] = value;
+              setWhitelist(prev => ({ ...prev, [key]: value }));
             }}
             onArrayChange={(key, value, index) => {
-              whitelist[key][index] = value;
+              setWhitelist(prev => {
+                const newArr = [...prev[key]];
+                newArr[index] = value;
+                return { ...prev, [key]: newArr };
+              });
             }}
           />
         </TabsContent>
+
         <TabsContent value="blocklist">
           <GenericTable table={bltable} />
           <NewObjectEditorDialog
@@ -514,7 +472,7 @@ const DNS = () => {
             onOpenChange={setBlocklistModal}
             object={blocklist}
             title="DNS Blocklist"
-            description=""
+            description="Block domains using external lists or custom rules."
             readOnly={false}
             opts={{
               fields: {
@@ -523,32 +481,43 @@ const DNS = () => {
               }
             }}
             saveButton={async (obj) => {
+              let newBlocklists = [...(config?.DNSBlockLists || [])];
               if (!isBlocklistEdit) {
-                if (!state.Config?.DNSBlockLists) {
-                  state.Config.DNSBlockLists = []
+                newBlocklists.push(obj);
+              } else {
+                if (isBlocklistEdit) {
+                  const index = newBlocklists.findIndex(l => l.Tag === obj.Tag);
+                  if (index !== -1) newBlocklists[index] = obj;
                 }
-                state.Config?.DNSBlockLists.push(obj)
               }
-              let ok = await state.v2_ConfigSave();
-              if (ok === true) {
-                setBlocklistModal(false)
-                setIsBlocklistEdit(false)
-              }
+              saveConfigMutation.mutate({ ...config, DNSBlockLists: newBlocklists }, {
+                onSuccess: () => {
+                  setBlocklistModal(false);
+                  setIsBlocklistEdit(false);
+                }
+              });
             }}
             onChange={(key, value, type) => {
-              blocklist[key] = value;
+              setBlocklist(prev => ({ ...prev, [key]: value }));
             }}
             onArrayChange={(key, value, index) => {
-              blocklist[key][index] = value;
+              setBlocklist(prev => {
+                const newArr = [...prev[key]];
+                newArr[index] = value;
+                return { ...prev, [key]: newArr };
+              });
             }}
           />
         </TabsContent>
+
         <TabsContent value="blockdomains">
           <GenericTable table={generateBlocksTable()} />
         </TabsContent>
+
         <TabsContent value="resolveddomains">
           <GenericTable table={generateResolvesTable()} />
         </TabsContent>
+
         <TabsContent value="records">
           <GenericTable className={""} table={generateDNSRecordsTable()} />
           <NewObjectEditorDialog
@@ -556,26 +525,32 @@ const DNS = () => {
             onOpenChange={setRecordModal}
             object={record}
             title="DNS Record"
-            description=""
+            description="Manage custom DNS records."
             readOnly={false}
             saveButton={async (obj) => {
+              let newRecords = [...(config?.DNSRecords || [])];
               if (!isRecordEdit) {
-                if (!state.Config?.DNSRecords) {
-                  state.Config.DNSRecords = []
+                newRecords.push(obj);
+              } else {
+                const index = newRecords.findIndex(r => r.Domain === obj.Domain);
+                if (index !== -1) newRecords[index] = obj;
+              }
+              saveConfigMutation.mutate({ ...config, DNSRecords: newRecords }, {
+                onSuccess: () => {
+                  setRecordModal(false);
+                  setIsRecordEdit(false);
                 }
-                state.Config?.DNSRecords.push(obj)
-              }
-              let ok = await state.v2_ConfigSave();
-              if (ok === true) {
-                setRecordModal(false)
-                setIsRecordEdit(false)
-              }
+              });
             }}
             onChange={(key, value, type) => {
-              record[key] = value;
+              setRecord(prev => ({ ...prev, [key]: value }));
             }}
             onArrayChange={(key, value, index) => {
-              record[key][index] = value;
+              setRecord(prev => {
+                const newArr = [...prev[key]];
+                newArr[index] = value;
+                return { ...prev, [key]: newArr };
+              });
             }}
           />
         </TabsContent>

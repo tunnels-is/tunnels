@@ -1,69 +1,53 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import dayjs from "dayjs";
-import GLOBAL_STATE from "../state";
 import GenericTable from "./GenericTable";
-import NewObjectEditorDialog from "./NewObjectEdiorDialog";
+import NewObjectEditorDialog from "./NewObjectEditorDialog";
 import { useNavigate } from "react-router-dom";
+import { useGroups, useCreateGroup, useUpdateGroup, useDeleteGroup } from "../hooks/useGroups";
+import { toast } from "sonner";
 
 const Groups = () => {
-  const state = GLOBAL_STATE("groups");
-  const [groups, setGroups] = useState([])
+  const [offset, setOffset] = useState(0);
+  const [limit, setLimit] = useState(50);
+  const { data: groups } = useGroups(offset, limit);
+  const createGroupMutation = useCreateGroup();
+  const updateGroupMutation = useUpdateGroup();
+  const deleteGroupMutation = useDeleteGroup();
+
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [group, setGroup] = useState(undefined)
   const navigate = useNavigate()
 
-  let getGroups = async (offset, limit) => {
-    let resp = await state.callController(null, "POST", "/v3/group/list", {}, false, false)
-    if (resp.status === 200) {
-      setGroups(resp.data)
-    }
-  }
-
-  useEffect(() => {
-    getGroups(0, 50)
-  }, []);
-
   const saveGroup = async () => {
-    let resp = undefined
-    let ok = false
-    if (group._id !== undefined) {
-      resp = await state.callController(null, "POST", "/v3/group/update", { Group: group }, false, false)
-    } else {
-      resp = await state.callController(null, "POST", "/v3/group/create", { Group: group }, false, false)
-    }
-
-    if (resp.status === 200) {
-      ok = true
-      if (group._id === undefined) {
-        groups.push(resp.data)
-        setGroups([...groups])
+    try {
+      if (group.ID !== undefined) {
+        await updateGroupMutation.mutateAsync(group);
+        toast.success("Group updated");
+      } else {
+        await createGroupMutation.mutateAsync(group);
+        toast.success("Group created");
       }
-    } else {
-      state.toggleError("unable to create group")
+      return true;
+    } catch (e) {
+      toast.error("Unable to save group");
+      return false;
     }
-    state.renderPage("groups");
-    return ok
   }
 
   const newGroup = () => {
     setGroup({ Tag: "my-new-group", Description: "This is a new group" })
     setEditModalOpen(true)
-    state.renderPage("groups");
   }
 
-  const deleteGroup = async (id) => {
-    let resp = await state.callController(null, "POST", "/v3/group/delete", { GID: id, }, false, false)
-    if (resp.status === 200) {
-      let g = groups.filter(g => g._id !== id)
-      setGroups([...g])
-    }
+  const deleteGroup = (id) => {
+    deleteGroupMutation.mutate(id, {
+      onSuccess: () => toast.success("Group deleted"),
+      onError: () => toast.error("Failed to delete group")
+    });
   }
 
   let table = {
-    data: groups,
-    // rowClick: (obj) => {
-    //   navigate("/groups/" + obj._id)
-    // },
+    data: groups || [],
     rowClick: (obj) => {
       console.log("row click!")
       console.dir(obj)
@@ -99,7 +83,7 @@ const Groups = () => {
     opts: {
       RowPerPage: 50,
     },
-    more: getGroups,
+    more: () => { }, // Pagination logic if needed
   }
 
   return (
@@ -120,10 +104,14 @@ const Groups = () => {
           }
         }}
         onArrayChange={(key, value, index) => {
-          group[key][index] = value;
+          setGroup(prev => {
+            const newArr = [...prev[key]];
+            newArr[index] = value;
+            return { ...prev, [key]: newArr };
+          });
         }}
         onChange={(key, value, type) => {
-          group[key] = value
+          setGroup(prev => ({ ...prev, [key]: value }));
         }}
       />
     </div >

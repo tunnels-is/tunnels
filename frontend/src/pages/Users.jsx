@@ -1,59 +1,31 @@
-import React, { useEffect, useState } from "react";
-import GLOBAL_STATE from "../state"
+import React, { useState } from "react";
 import dayjs from "dayjs";
 import GenericTable from "./GenericTable";
-import NewObjectEditorDialog from "./NewObjectEdiorDialog";
-import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
-import { Pencil } from "lucide-react";
+import NewObjectEditorDialog from "./NewObjectEditorDialog";
+import { useUsers, useAdminUpdateUser } from "../hooks/useUsers";
+import { toast } from "sonner";
 
 const Users = () => {
-	const [users, setUsers] = useState([])
+	const [offset, setOffset] = useState(0);
+	const [limit, setLimit] = useState(50);
+	const { data: users, refetch } = useUsers();
+	const adminUpdateUserMutation = useAdminUpdateUser();
+
 	const [selectedUser, setSelectedUser] = useState(undefined)
 	const [modalOpen, setModalOpen] = useState(false)
-	const state = GLOBAL_STATE("groups")
-
-	const getUsers = async (offset, limit) => {
-		let resp = await state.callController(null, "POST", "/v3/user/list", { Offset: offset, Limit: limit }, false, false)
-		if (resp.status === 200) {
-			if (resp.data?.length === 0) {
-				state.successNotification("no more users")
-			} else {
-				setUsers(resp.data)
-			}
-		}
-	}
-
-	useEffect(() => {
-		getUsers(0, 50)
-	}, [])
-
 
 	const saveUser = async (user) => {
-		let resp = await state.callController(
-			null,
-			"POST",
-			"/v3/user/adminupdate",
-			{
-				TargetUserID: user._id,
-				Email: user.Email,
-				Disabled: user.Disabled,
-				IsManager: user.IsManager,
-				Trial: user.Trial,
-				SubExpiration: user.SubExpiration
-			},
-			false,
-			true
-		)
-
-		if (resp === true) {
-			state.successNotification("User updated successfully")
-			setModalOpen(false)
-			await getUsers(0, 50)
+		try {
+			await adminUpdateUserMutation.mutateAsync(user);
+			toast.success("User updated successfully");
+			setModalOpen(false);
+		} catch (e) {
+			toast.error("Failed to update user");
 		}
 	}
 
 	let table = {
-		data: users,
+		data: users || [],
 		rowClick: (obj) => {
 			console.log("row click!")
 			console.dir(obj)
@@ -66,7 +38,7 @@ const Users = () => {
 		},
 		columns: {
 			Email: true,
-			_id: (obj) => {
+			ID: (obj) => {
 				// alert(obj._id)
 			},
 			Trial: true,
@@ -94,7 +66,7 @@ const Users = () => {
 		opts: {
 			RowPerPage: 50,
 		},
-		more: getUsers,
+		more: () => { }, // Pagination logic if needed
 	}
 
 	return (
@@ -109,14 +81,18 @@ const Users = () => {
 				readOnly={false}
 				saveButton={saveUser}
 				onChange={(key, value, type) => {
-					selectedUser[key] = value;
+					setSelectedUser(prev => ({ ...prev, [key]: value }));
 				}}
 				onArrayChange={(key, value, index) => {
-					selectedUser[key][index] = value;
+					setSelectedUser(prev => {
+						const newArr = [...prev[key]];
+						newArr[index] = value;
+						return { ...prev, [key]: newArr };
+					});
 				}}
 				opts={{
 					fields: {
-						_id: "readonly",
+						ID: "readonly",
 						APIKey: "hidden",
 						Password: "hidden",
 						Password2: "hidden",

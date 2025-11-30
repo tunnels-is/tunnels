@@ -1,4 +1,4 @@
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Route, Routes, useParams } from "react-router-dom";
 import { createRoot } from "react-dom/client";
 import React, { useEffect } from "react";
 import { createPortal } from "react-dom";
@@ -19,31 +19,30 @@ import Devices from "./pages/Devices";
 import Tunnels from "./pages/Tunnels";
 import Account from "./pages/Account";
 import Welcome from "./pages/Welcome";
-import GLOBAL_STATE from "./state";
 import Groups from "./pages/Groups";
 import Login from "./pages/Login";
-import { STATE } from "./state";
 import Users from "./pages/Users";
 import Stats from "./pages/Stats";
 import Logs from "./pages/Logs";
-import STORE from "./store";
+
 import DNS from "./pages/dns";
+import WS from "./ws";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import AppSidebar from "./components/app-sidebar";
 import { ModeToggle } from "./components/mode-toggle";
 import { ThemeProvider } from "./components/theme-provider";
 
+import { useInitialState } from "./hooks/useInitialState";
+import { useAtomValue } from "jotai";
+import { isAuthenticatedAtom, userAtom } from "./stores/userStore";
+
 const appElement = document.getElementById("app");
 const root = createRoot(appElement);
 
 const LaunchApp = () => {
-  const state = GLOBAL_STATE("root");
-
-  useEffect(() => {
-    state.GetBackendState();
-    // WS.NewSocket(WS.GetURL("logs"), "logs", WS.ReceiveLogEvent);
-  }, []);
-
+  useInitialState();
+  const user = useAtomValue(userAtom);
+  const isAuth = useAtomValue(isAuthenticatedAtom);
   return (
     <BrowserRouter>
       {createPortal(
@@ -57,17 +56,14 @@ const LaunchApp = () => {
           <AppSidebar />
 
           <Routes>
-            {!state.User && (
+            <Route path="help" element={<Welcome />} />
+            {!isAuth ? (
               <>
-                <Route path="/" element={<Login />} />
-                <Route path="*" element={<UserSelect />} />
+                <Route path="*" element={<Login />} />
               </>
-            )}
-
-            {state.User && (
+            ) : (
               <>
                 <Route path="/" element={<Welcome />} />
-                <Route path="*" element={<PrivateServers />} />
 
                 <Route path="groups" element={<Groups />} />
                 <Route path="users" element={<Users />} />
@@ -79,22 +75,16 @@ const LaunchApp = () => {
                 <Route path="account" element={<Account />} />
 
                 <Route path="servers" element={<PrivateServers />} />
+                <Route path="twofactor/create" element={<Enable2FA />} />
                 <Route path="server/:id" element={<ServerDevices />} />
+                <Route path="logs" element={<Logs />} />
+                <Route path="settings" element={<Settings />} />
+
+                <Route path="dns" element={<DNS />} />
+                <Route path="dns/answers/:domain" element={<DNSAnswers />} />
+                <Route path="accounts" element={<UserSelect />} />
               </>
             )}
-            <Route path="accounts" element={<UserSelect />} />
-
-            <Route path="twofactor/create" element={<Enable2FA />} />
-
-            <Route path="logs" element={<Logs />} />
-            <Route path="settings" element={<Settings />} />
-
-            <Route path="dns" element={<DNS />} />
-            <Route path="dns/answers/:domain" element={<DNSAnswers />} />
-
-            <Route path="login" element={<Login />} />
-            <Route path="login/:modeParam" element={<Login />} />
-            <Route path="help" element={<Welcome />} />
           </Routes>
         </SidebarProvider>
       </ThemeProvider>
@@ -121,25 +111,25 @@ class ErrorBoundary extends React.Component {
   }
 
   reloadAll() {
-    STORE.Cache.Clear();
+    sessionStorage.clear();
     window.location.reload();
   }
 
   async quit() {
-    STORE.Cache.Clear();
+    sessionStorage.clear();
     window.location.reload();
   }
 
   async ProductionCheck() {
-    if (!STATE.debug) {
-      window.console.apply = function () {};
-      window.console.dir = function () {};
-      window.console.log = function () {};
-      window.console.info = function () {};
-      window.console.warn = function () {};
-      window.console.error = function () {};
-      window.console.debug = function () {};
-    }
+    // if (!STATE.debug) {
+    // window.console.apply = function () {};
+    // window.console.dir = function () {};
+    // window.console.log = function () {};
+    // window.console.info = function () {};
+    // window.console.warn = function () {};
+    // window.console.error = function () {};
+    // window.console.debug = function () {};
+    // }
   }
 
   render() {
@@ -160,10 +150,17 @@ class ErrorBoundary extends React.Component {
   }
 }
 
+import { QueryProvider } from "./providers/QueryProvider";
+import NotFound from "./pages/not-found";
+
+// ... existing imports
+
 root.render(
   <React.StrictMode>
     <ErrorBoundary>
-      <LaunchApp />
+      <QueryProvider>
+        <LaunchApp />
+      </QueryProvider>
     </ErrorBoundary>
   </React.StrictMode>
 );

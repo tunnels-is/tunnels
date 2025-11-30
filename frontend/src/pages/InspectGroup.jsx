@@ -1,101 +1,66 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { useParams } from "react-router-dom";
-import GLOBAL_STATE from "../state"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import GenericTable from "./GenericTable";
-import NewObjectEditorDialog from "./NewObjectEdiorDialog";
+import NewObjectEditorDialog from "./NewObjectEditorDialog";
+import { Theme } from "@/theme";
+import { useGroup, useGroupEntities, useAddEntityToGroup, useRemoveEntityFromGroup } from "../hooks/useGroups";
+import { toast } from "sonner";
+import { useServers } from "../hooks/useServers";
+import { useAtomValue } from "jotai";
+import { userAtom } from "../stores/userStore";
 
 const InspectGroup = () => {
 	const { id } = useParams()
-	const [users, setUsers] = useState([])
-	const [servers, setServers] = useState([])
-	const [devices, setDevices] = useState([])
+	const user = useAtomValue(userAtom);
+	const { data: group } = useGroup(id);
 	const [dialog, setDialog] = useState(false)
 	const [addForm, setAddForm] = useState({})
-	const [group, setGroup] = useState()
-	const [tag, setTag] = useState("users")
-	const state = GLOBAL_STATE("groups")
+	const [tag, setTag] = useState("user") // Default to user to match useEffect
+
+	// Fetch entities based on current tab
+	const { data: users } = useGroupEntities(id, "user", 0, 1000);
+	const { data: servers } = useGroupEntities(id, "server", 0, 1000);
+	const { data: devices } = useGroupEntities(id, "device", 0, 1000);
+
+	// Fetch all servers to map IDs to Tags (if needed for display)
+	const { data: allServers } = useServers(user?.ControlServer);
+
+	const addEntityMutation = useAddEntityToGroup();
+	const removeEntityMutation = useRemoveEntityFromGroup();
 
 	const addToGroup = async () => {
 		console.log("ID:", addForm.id)
-		let e = await state.callController(null, "POST", "/v3/group/add",
-			{
-				GroupID: id,
-				TypeID: addForm.id,
-				Type: addForm.type,
-				TypeTag: addForm.idtype,
-			},
-			false, false)
-		if (e.status === 200) {
-			if (addForm.type === "user") {
-				users.push(e.data)
-				setUsers([...users])
-			} else if (addForm.type === "server") {
-				servers.push(e.data)
-				setServers([...servers])
-			} else if (addForm.type === "device") {
-				devices.push(e.data)
-				setDevices([...devices])
-			}
-			setDialog(false)
+		try {
+			await addEntityMutation.mutateAsync({
+				groupId: id,
+				typeId: addForm.id,
+				type: addForm.type,
+				typeTag: addForm.idtype,
+			});
+			setDialog(false);
+			toast.success("Added to group");
+		} catch (e) {
+			toast.error("Failed to add to group");
 		}
 	}
 
-	const getEntities = async (type) => {
-		let resp = await state.callController(null, "POST", "/v3/group/entities",
-			{ GID: id, Type: type, Limit: 1000, Offset: 0 },
-			false, false)
-		if (type === "user") {
-			setUsers(resp.data)
-		} else if (type === "server") {
-			setServers(resp.data)
-		} else if (type === "device") {
-			setDevices(resp.data)
-		}
+	const removeEntity = (gid, typeid, type) => {
+		removeEntityMutation.mutate({ groupId: gid, typeId: typeid, type: type }, {
+			onSuccess: () => toast.success("Removed from group"),
+			onError: () => toast.error("Failed to remove from group")
+		});
 	}
 
-	const removeEntity = async (gid, typeid, type) => {
-		let e = await state.callController(null, "POST", "/v3/group/remove",
-			{ GroupID: gid, TypeID: typeid, Type: type },
-			false, true)
-		if (e === true) {
-			if (type === "user") {
-				let u = users.filter((u) => u._id !== typeid)
-				setUsers([...u])
-			} else if (type === "server") {
-				let s = servers.filter((s) => s._id !== typeid)
-				setServers([...s])
-			} else if (type === "device") {
-				let d = devices.filter((s) => s._id !== typeid)
-				setDevices([...d])
-			}
-		}
-	}
-
-	const tagChange = async (tag) => {
+	const tagChange = (tag) => {
 		setDialog(false)
 		setTag(tag)
-		console.log("TAB:", tag)
-		await getEntities(tag)
 	}
-
-	const getGroup = async () => {
-		let resp = await state.callController(null, "POST", "/v3/group", { GID: id, }, false, false)
-		if (resp.status === 200) {
-			setGroup(resp.data)
-		}
-	}
-	useEffect(() => {
-		getGroup()
-		getEntities("user")
-	}, [])
-
-
 
 	const generateServerTable = () => {
 
 		return {
-			data: servers,
+			data: servers || [],
 			rowClick: (obj) => {
 				console.log("row click!")
 				console.dir(obj)
@@ -109,12 +74,8 @@ const InspectGroup = () => {
 			},
 			columFormat: {
 				Tag: (obj) => {
-					state?.PrivateServers?.forEach(sn => {
-						if (sn._id === obj._id) {
-							return sn.Tag
-						}
-					})
-					return "??"
+					const s = allServers?.find(sn => sn._id === obj._id);
+					return s ? s.Tag : "??";
 				},
 			},
 			Btn: {
@@ -139,7 +100,7 @@ const InspectGroup = () => {
 
 	const generateDevicesTables = () => {
 		return {
-			data: devices,
+			data: devices || [],
 			rowClick: (obj) => {
 				console.log("row click!")
 				console.dir(obj)
@@ -173,7 +134,7 @@ const InspectGroup = () => {
 
 
 	let utable = {
-		data: users,
+		data: users || [],
 		rowClick: (obj) => {
 			console.log("row click!")
 			console.dir(obj)
@@ -228,28 +189,26 @@ const InspectGroup = () => {
 					addToGroup()
 				}}
 				onChange={(key, value, type) => {
-					addForm[key] = value
-					console.log(key, value, type)
+					setAddForm(prev => ({ ...prev, [key]: value }));
 				}}
 			/>
 
-			<Tabs defaultValue="server" className="w-full" onValueChange={(v) => tagChange(v)}>
+			<Tabs defaultValue="user" className="w-full" onValueChange={(v) => tagChange(v)}>
 				<TabsList
-					className={state.Theme?.borderColor}
+					className={Theme.borderColor}
 				>
-					<TabsTrigger className={state.Theme?.tabs} value="server">Servers</TabsTrigger>
-					<TabsTrigger className={state.Theme?.tabs} value="device">Devices</TabsTrigger>
-					<TabsTrigger className={state.Theme?.tabs} value="user">Users</TabsTrigger>
+					<TabsTrigger className={Theme.tabs} value="user">Users</TabsTrigger>
+					<TabsTrigger className={Theme.tabs} value="server">Servers</TabsTrigger>
+					<TabsTrigger className={Theme.tabs} value="device">Devices</TabsTrigger>
 				</TabsList>
+				<TabsContent value="user">
+					<GenericTable table={utable} newButtonLabel={"Add"} />
+				</TabsContent>
 				<TabsContent className="w-full" value="server">
 					<GenericTable table={generateServerTable()} newButtonLabel={"Add"} />
 				</TabsContent>
 				<TabsContent value="device">
 					<GenericTable table={generateDevicesTables()} newButtonLabel={"Add"} />
-				</TabsContent>
-				<TabsContent value="user">
-
-					<GenericTable table={utable} newButtonLabel={"Add"} />
 				</TabsContent>
 			</Tabs>
 

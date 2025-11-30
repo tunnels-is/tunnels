@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ForwardToController } from "../../wailsjs/go/main/Service";
-import STORE from "../store";
+import { toast } from "sonner";
 
 const useForm = (props) => {
   const [inputs, setInputs] = useState({});
@@ -67,7 +67,7 @@ const useForm = (props) => {
       ResetCode: inputs["code"],
     }
 
-    props.toggleLoading({ tag: "RESET", show: true, msg: "Changing your password, please wait a moment..." })
+    // props.toggleLoading({ tag: "RESET", show: true, msg: "Changing your password, please wait a moment..." })
 
     let FR = {
       Path: "user/reset/password",
@@ -76,26 +76,26 @@ const useForm = (props) => {
       Timeout: 20000
     }
 
-    ForwardToController(FR).then((x) => {
+    ForwardToController(FR).then((e) => {
       if (e.Err) {
-        props.toggleError(e.Err)
+        toast.error(e.Err)
       } else {
         if (e.Code === 200) {
           setErrors({})
-          props.showSuccessToast("Password has been changed", undefined)
+          toast.success("Password has been changed")
           navigate("/login");
         } else {
           setErrors({})
-          props.toggleError("Unable to reset password, please try again in a few seconds..")
+          toast.error("Unable to reset password, please try again in a few seconds..")
         }
       }
 
     }).catch((e) => {
       console.dir(e)
-      props.toggleError("Unknown error, please try again in a moment")
+      toast.error("Unknown error, please try again in a moment")
     })
 
-    props.toggleLoading({ tag: "RESET", show: false })
+    // props.toggleLoading({ tag: "RESET", show: false })
   }
 
   const GetCode = async (event) => {
@@ -136,25 +136,25 @@ const useForm = (props) => {
       Timeout: 20000
     }
 
-    props.toggleLoading({ tag: "RESET", show: true, msg: "Requesting reset code, please wait..." })
+    // props.toggleLoading({ tag: "RESET", show: true, msg: "Requesting reset code, please wait..." })
 
-    ForwardToController(FR).then((x) => {
+    ForwardToController(FR).then((e) => {
       if (e.Err) {
-        props.toggleError(e.Err)
+        toast.error(e.Err)
       } else {
         if (e.Code === 200) {
-          props.showSuccessToast("Password reset code has been sent to your email inbox!")
+          toast.success("Password reset code has been sent to your email inbox!")
         } else {
-          props.toggleError("Unable to request password reset code, please try again in a few seconds..")
+          toast.error("Unable to request password reset code, please try again in a few seconds..")
         }
       }
 
     }).catch((e) => {
       console.dir(e)
-      props.toggleError("Unknown error, please try again in a moment")
+      toast.error("Unknown error, please try again in a moment")
     })
 
-    props.toggleLoading({ tag: "RESET", show: false })
+    // props.toggleLoading({ tag: "RESET", show: false })
   }
 
   const HandleInputChange = (event) => {
@@ -184,12 +184,12 @@ const ResetPassword = (props) => {
   const GetDefaults = () => {
     let i = { ...inputs }
 
-    let defaultDeviceName = STORE.Cache.Get("default-device-name")
+    let defaultDeviceName = localStorage.getItem("default-device-name")
     if (defaultDeviceName) {
       i["devicename"] = defaultDeviceName
     }
 
-    let defaultEmail = STORE.Cache.Get("default-email")
+    let defaultEmail = localStorage.getItem("default-email")
     if (defaultEmail) {
       i["email"] = defaultEmail
     }

@@ -1,213 +1,168 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, Edit, Trash2 } from "lucide-react";
-import { ArrowLeft, ArrowRight } from "lucide-react";
-import GLOBAL_STATE from "../state";
+import { MoreHorizontal, Edit, Trash2, ArrowLeft, ArrowRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+
+import { DataTable } from "@/components/DataTable";
 
 const GenericTable = (props) => {
   const [offset, setOffset] = useState(0);
   const [filter, setFilter] = useState("");
-  const state = GLOBAL_STATE("btn+?");
 
   let t = props.table;
-  let hdc = "w-[60px] text-white font-bold ";
-  let ddc = "w-[60px] h-[30px] p-0 pl-2 text-white-100 font-medium ";
 
-  const renderHeaders = () => {
-    let rows = [];
-    t.headers?.map((h) => {
-      let hc = hdc;
-      if (t.headerClass && t.headerClass[h]) {
-        hc += t.headerClass[h]();
-      }
-      let out = h;
-      if (t.headerFormat && t.headerFormat[h]) {
-        out = t.headerFormat[h]();
-      }
-      rows.push(<TableHead className={hc}>{out}</TableHead>);
-    });
+  const columns = useMemo(() => {
+    if (!t.columns) return [];
 
-    let hasButtons = false
-    if (t.Btn?.Edit) { hasButtons = true }
-    if (t.Btn?.Delete) { hasButtons = true }
-    if (t.customBtn) {
-      hasButtons = true
+    const cols = Object.keys(t.columns).map((key) => {
+      if (t.columns[key] === undefined) return null;
+
+      // Header
+      let headerText = key;
+      if (t.headerFormat && t.headerFormat[key]) {
+        headerText = t.headerFormat[key]();
+      }
+
+      return {
+        accessorKey: key,
+        header: headerText,
+        meta: {
+          className: (original) => {
+            let className = "p-2 pl-2 text-white-100 font-medium "; // Adjusted padding
+            if (t.columnClass && t.columnClass[key]) {
+              className += t.columnClass[key](original);
+            }
+            return className;
+          }
+        },
+        cell: ({ row, getValue }) => {
+          const original = row.original;
+          let content = getValue();
+
+          // Format
+          if (t.columnFormat && t.columnFormat[key]) {
+            content = t.columnFormat[key](original);
+          }
+
+          // Click
+          let click = t.rowClick ? t.rowClick : () => { };
+          if (t.columns[key] !== true) {
+            click = t.columns[key];
+          }
+
+          // Special handling for Tag, Email, Domain
+          if (key === "Tag" || key === "Email" || key === "Domain") {
+            return (
+              <div onClick={() => click(original)}>
+                <Badge variant="secondary" className="cursor-pointer"> {content}</Badge>
+              </div>
+            );
+          }
+
+          return (
+            <div onClick={() => click(original)}>
+              {content}
+            </div>
+          );
+        }
+      };
+    }).filter(Boolean);
+
+    // Custom Columns
+    if (t.customColumns) {
+      Object.keys(t.customColumns).forEach((key) => {
+        cols.push({
+          id: key,
+          header: key,
+          cell: ({ row }) => t.customColumns[key](row.original)
+        });
+      });
     }
+
+    // Actions
+    let hasButtons = t.Btn?.Edit || t.Btn?.Delete || t.customBtn;
     if (hasButtons) {
-      rows.push(<TableHead className={"btnx"}></TableHead>);
+      cols.push({
+        id: "actions",
+        header: "",
+        meta: {
+          className: "text-right w-[20px]"
+        },
+        cell: ({ row }) => {
+          const item = row.original;
+          const actionItems = [];
+          const customButton = [];
+
+          if (t.Btn?.Edit) {
+            actionItems.push(
+              <DropdownMenuItem
+                key="edit"
+                onClick={() => t.Btn.Edit(item)}
+                className="cursor-pointer"
+              >
+                <Edit className="w-4 h-4" /> Edit
+              </DropdownMenuItem>,
+            );
+          }
+          if (t.Btn?.Delete) {
+            actionItems.push(
+              <DropdownMenuItem
+                key="delete"
+                onClick={() => t.Btn.Delete(item)}
+                className="cursor-pointer text-red-500"
+              >
+                <Trash2 className="w-4 h-4" /> Delete
+              </DropdownMenuItem>,
+            );
+          }
+          if (t.customBtn) {
+            Object.keys(t.customBtn).forEach((key) => {
+              const customBtnEl = t.customBtn[key](item);
+              customButton.push(customBtnEl);
+            });
+          }
+
+          return (
+            <div className="flex justify-end gap-[5px]">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="h-8 w-8 p-0 text-white">
+                    <span className="sr-only">Open menu</span>
+                    <MoreHorizontal className="w-4 h-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  {customButton}
+                  {actionItems}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          );
+        }
+      });
     }
 
-    return (
-      <TableHeader className="bg-[#0B0E14] border border-[#1a1f2d] rounded-full">
-        <TableRow>{rows}</TableRow>
-      </TableHeader>
-    );
-  };
+    return cols;
+  }, [t]);
 
   const newPage = async (offset, limit) => {
-    // let shouldLoad = true;
-    // setTimeout(() => {
-    //   if (shouldLoad === true) {
-    //     setLoading(true);
-    //   }
-    // }, 200);
     await t.more(offset, limit);
-    // shouldLoad = false;
-    // setLoading(false);
-    // shouldLoad = false;
-  };
-
-  const renderRows = () => {
-    let rows = [];
-    let hasFilter = false;
-    t.data?.forEach((_, i) => {
-      hasFilter = false;
-      let cells = Object.keys(t.columns).map((key) => {
-        if (t.columns[key] === undefined) {
-          return;
-        }
-
-        let click = t.rowClick ? t.rowClick : () => { };
-        if (t.columns[key] !== true) {
-          click = t.columns[key];
-        }
-
-        let dc = ddc;
-        if (t.columnClass && t.columnClass[key]) {
-          dc += t.columnClass[key](t.data[i]);
-        }
-
-        if (t.data[i][key]?.includes && filter !== "") {
-          if (t.data[i][key].includes(filter)) {
-            hasFilter = true;
-          }
-        } else {
-          hasFilter = true;
-        }
-
-        let cd = t.data[i][key];
-        if (t.columnFormat && t.columnFormat[key]) {
-          cd = t.columnFormat[key](t.data[i]);
-        }
-        if (key === "Tag" || key === "Email" || key === "Domain") {
-          return (
-            <TableCell className={dc} onClick={() => click(t.data[i])}>
-              <Badge className={"cursor-pointer" + state.Theme?.badgeNeutral}> {cd}</Badge>
-            </TableCell>
-          );
-
-        }
-        return (
-          <TableCell className={dc} onClick={() => click(t.data[i])}>
-            {cd}
-          </TableCell>
-        );
-      });
-
-      if (t.customColumns) {
-        Object.keys(t.customColumns).forEach((key) => {
-          cells.push(t.customColumns[key](t.data[i]));
-        });
-      }
-
-      const actionItems = [];
-
-      let hasButtons = false
-      if (t.Btn?.Edit) {
-        hasButtons = true
-        actionItems.push(
-          <DropdownMenuItem
-            key="edit"
-            onClick={() => t.Btn.Edit(t.data[i])}
-            className="cursor-pointer"
-          >
-            <Edit className="w-4 h-4" /> Edit
-          </DropdownMenuItem>,
-        );
-      }
-
-      if (t.Btn?.Delete) {
-        hasButtons = true
-        actionItems.push(
-          <DropdownMenuItem
-            key="delete"
-            onClick={() => t.Btn.Delete(t.data[i])}
-            className="cursor-pointer text-red-500"
-          >
-            <Trash2 className="w-4 h-4" /> Delete
-          </DropdownMenuItem>,
-        );
-      }
-      const customButton = [];
-      if (t.customBtn) {
-        hasButtons = true
-        Object.keys(t.customBtn).forEach((key) => {
-          const customBtnEl = t.customBtn[key](t.data[i]);
-          customButton.push(customBtnEl);
-        });
-      }
-
-      if (hasButtons === true) {
-        cells.push(
-          <TableCell className="text-right w-[20px]">
-            <div className="flex justify-end gap-[5px]">
-              {hasButtons && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      className="h-8 w-8 p-0 text-white"
-                    >
-                      <span className="sr-only">Open menu</span>
-                      <MoreHorizontal className="w-4 h-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent
-                    align="end"
-                    className={"w-48 text-white " + state.Theme?.borderColor}
-                  >
-                    {customButton}
-                    {actionItems}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
-            </div>
-          </TableCell >,
-        );
-      }
-
-      if (hasFilter === true) {
-        rows.push(<TableRow key={i}>{cells}</TableRow>);
-      }
-    });
-
-    return <TableBody>{rows}</TableBody>;
   };
 
   return (
-    <div className={"flex flex-col gap-5  flex-nowrap" + (props.className ? props.className : "")} >
-      <div className="flex flex-col md:flex-row justify-start items-center  flex-nowrap">
-
+    <div className={"flex flex-col gap-5 flex-nowrap " + (props.className ? props.className : "")}>
+      <div className="flex flex-col md:flex-row justify-start items-center flex-nowrap">
         <div className="flex gap-2">
           {t.Btn?.Save && (
             <Button
-              className={"flex  items-center gap-1" + state.Theme?.successBtn}
+              className="flex items-center gap-1"
               onClick={() => t.Btn.Save()}
             >
               {props.saveButtonLabel ? props.saveButtonLabel : "Save"}
@@ -215,7 +170,7 @@ const GenericTable = (props) => {
           )}
           {t.Btn?.New && (
             <Button
-              className={"flex items-center gap-1" + state.Theme?.successBtn}
+              className="flex items-center gap-1"
               onClick={() => t.Btn.New()}
             >
               {props.newButtonLabel ? props.newButtonLabel : "Create"}
@@ -224,7 +179,8 @@ const GenericTable = (props) => {
           {t.more && (
             <>
               <Button
-                className={"flex items-center gap-1" + state.Theme?.neutralBtn}
+                variant="outline"
+                size="icon"
                 onClick={async () => {
                   let off = offset - t.opts.RowPerPage;
                   if (off < 0) off = 0;
@@ -236,7 +192,8 @@ const GenericTable = (props) => {
               </Button>
 
               <Button
-                className={"flex items-center gap-1" + state.Theme?.neutralBtn}
+                variant="outline"
+                size="icon"
                 onClick={async () => {
                   let off = offset + t.opts.RowPerPage;
                   if (off < 0) off = 0;
@@ -254,21 +211,17 @@ const GenericTable = (props) => {
             </>
           )}
         </div>
-
       </div>
 
-      {t.data?.length > 0 &&
-        <Table className="w-full overflow-visible text-sm text-foreground">
-          {renderHeaders()}
-          <div class="h-2"></div>
-          {renderRows()}
-        </Table>
-      }
-      {t.data?.length < 1 &&
-        <div className="w-full overflow-visible text-center text-lg text-foreground">table has no records</div>
-      }
-
-    </div >
+      <DataTable
+        columns={columns}
+        data={t.data || []}
+        pagination={!t.more}
+        globalFilter={filter}
+        setGlobalFilter={setFilter}
+        showSearch={!t.more}
+      />
+    </div>
   );
 };
 

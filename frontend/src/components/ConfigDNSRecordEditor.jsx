@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import GLOBAL_STATE from "../../state";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -20,57 +19,70 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
+import { useAtom } from "jotai";
+import { configAtom } from "../stores/configStore";
+import { useSaveConfig } from "../hooks/useConfig";
+import { toast } from "sonner";
 
 const ConfigDNSRecordEditor = () => {
-  const state = GLOBAL_STATE("DNSRecordForm");
+  const [config, setConfig] = useAtom(configAtom);
+  const { mutate: saveConfig } = useSaveConfig();
   const [selectedIndex, setSelectedIndex] = useState(null);
 
   const addRecord = () => {
-    if (!state.Config.DNSRecords) {
-      state.Config.DNSRecords = [];
+    const newConfig = { ...config };
+    if (!newConfig.DNSRecords) {
+      newConfig.DNSRecords = [];
     }
-    state.Config.DNSRecords.push({
+    newConfig.DNSRecords.push({
       Domain: "domain.local",
       IP: [""],
       TXT: [""],
       CNAME: "",
       Wildcard: true,
     });
-    state.renderPage("DNSRecordForm");
+    setConfig(newConfig);
   };
 
 
   const deleteRecord = (index) => {
-    if (state.Config.DNSRecords.length === 1) {
-      state.Config.DNSRecords = [];
+    const newConfig = { ...config };
+    if (newConfig.DNSRecords.length === 1) {
+      newConfig.DNSRecords = [];
     } else {
-      state.Config.DNSRecords.splice(index, 1);
+      newConfig.DNSRecords.splice(index, 1);
     }
-    state.v2_ConfigSave();
-    state.globalRerender();
+    setConfig(newConfig);
+    saveConfig(newConfig, {
+      onSuccess: () => toast.success("DNS Record deleted"),
+      onError: () => toast.error("Failed to delete DNS Record")
+    });
   };
 
   const updateRecord = (index, subindex, key, value) => {
+    const newConfig = { ...config };
     if (key === "IP") {
-      state.Config.DNSRecords[index].IP[subindex] = value;
+      newConfig.DNSRecords[index].IP[subindex] = value;
     } else if (key === "TXT") {
-      state.Config.DNSRecords[index].TXT[subindex] = value;
+      newConfig.DNSRecords[index].TXT[subindex] = value;
     } else if (key === "Wildcard") {
-      state.Config.DNSRecords[index].Wildcard = value;
+      newConfig.DNSRecords[index].Wildcard = value;
     } else {
-      state.Config.DNSRecords[index][key] = value;
+      newConfig.DNSRecords[index][key] = value;
     }
-    state.renderPage("DNSRecordForm");
+    setConfig(newConfig);
   };
 
   const addIP = (index) => {
-    state.Config.DNSRecords[index].IP.push("0.0.0.0");
-    state.renderPage("DNSRecordForm");
+    const newConfig = { ...config };
+    newConfig.DNSRecords[index].IP.push("0.0.0.0");
+    setConfig(newConfig);
   };
 
   const addTXT = (index) => {
-    state.Config.DNSRecords[index].TXT.push("new text record");
-    state.renderPage("DNSRecordForm");
+    const newConfig = { ...config };
+    newConfig.DNSRecords[index].TXT.push("new text record");
+    setConfig(newConfig);
   };
 
   const openDialog = (index) => {
@@ -80,6 +92,16 @@ const ConfigDNSRecordEditor = () => {
   const closeDialog = () => {
     setSelectedIndex(null);
   };
+
+  const saveAll = () => {
+    saveConfig(config, {
+      onSuccess: () => {
+        toast.success("DNS Records saved");
+        closeDialog();
+      },
+      onError: () => toast.error("Failed to save DNS Records")
+    });
+  }
 
   return (
     <div className="w-full max-w-4xl mx-auto p-4 space-y-6">
@@ -94,7 +116,7 @@ const ConfigDNSRecordEditor = () => {
       </div>
 
       <div className="space-y-6">
-        {state.Config?.DNSRecords?.map((r, i) => (
+        {config?.DNSRecords?.map((r, i) => (
           <div
             key={i}
             className="w-full flex flex-wrap items-center gap-3 bg-black p-4 rounded-lg border border-gray-800 mb-4 text-white"
@@ -123,8 +145,8 @@ const ConfigDNSRecordEditor = () => {
             </Button>
           </div>
         ))}
-        {(!state.Config?.DNSRecords ||
-          state.Config.DNSRecords.length === 0) && (
+        {(!config?.DNSRecords ||
+          config.DNSRecords.length === 0) && (
             <div className="text-center p-12 border border-dashed rounded-lg bg-muted/30">
               <p className="text-muted-foreground">
                 No DNS records found. Add your first record to get started.
@@ -135,7 +157,7 @@ const ConfigDNSRecordEditor = () => {
 
       {selectedIndex !== null && (
         <DNSRecordDialog
-          record={state.Config.DNSRecords[selectedIndex]}
+          record={config.DNSRecords[selectedIndex]}
           index={selectedIndex}
           updateRecord={updateRecord}
           addIP={addIP}

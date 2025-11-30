@@ -16,11 +16,8 @@ export default function LogsPage() {
   useEffect(() => {
     const connectWebSocket = () => {
       try {
-        let host = window.location.origin;
-        host = host.replace("http://", "wss://");
-        host = host.replace("https://", "wss://");
-        host = host.replace("5173", "7777");
-        const ws = new WebSocket(`${host}/logs`);
+        let host = window.location.hostname;
+        const ws = new WebSocket(`ws://${host}/logs`);
         wsRef.current = ws;
 
         ws.onopen = () => {
@@ -84,7 +81,7 @@ export default function LogsPage() {
   const paginatedLogs = filteredLogs.slice(startIndex, endIndex);
 
   const parseLogLine = (line) => {
-    // Format: MM-DD hh:mm:ss || LOG_TYPE || function_name || identifier
+    // Format: 11-26 22:45:05 || DEBUG/INFO/ERROR || LaunchTunnels || LogMapCleaner
     const parts = line.split("||").map((part) => part.trim());
 
     if (parts.length !== 4) {

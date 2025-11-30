@@ -1,17 +1,19 @@
 import React from "react";
-import GLOBAL_STATE from "../state";
+import { useAtomValue } from "jotai";
+import { loadingAtom } from "../stores/uiStore";
 import { BarLoader } from "react-spinners";
 
 const ScreenLoader = () => {
-	const state = GLOBAL_STATE("loader")
-	if (!state.loading?.msg) {
+	const loading = useAtomValue(loadingAtom);
+
+	if (!loading?.msg) {
 		return (<></>)
 	}
 
 	return (
 		<div className={"new-loader"}  >
-			<div key={state.loading?.tag} className="l-title">
-				{state.loading?.msg}
+			<div key={loading?.tag} className="l-title">
+				{loading?.msg}
 			</div>
 			<BarLoader width="100%" color={"blue"} height={"8px"} className="bar-loader" />
 		</div>

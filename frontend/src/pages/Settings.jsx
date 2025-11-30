@@ -1,12 +1,11 @@
-import React, { useEffect } from "react";
-import GLOBAL_STATE from "../state";
-import STORE from "../store";
+import React, { useEffect, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-
-import {
-  Card,
-  CardContent,
-} from "@/components/ui/card";
+import { useAtom } from "jotai";
+import { configAtom } from "../stores/configStore";
+import { debugAtom } from "../stores/uiStore";
+import { useSaveConfig } from "../hooks/useConfig";
+import { getBackendState } from "../api/app";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -15,285 +14,383 @@ import {
   Info,
   Bug,
   AlertTriangle,
-  Activity,
   Server,
   Globe,
   Key,
   Network,
+  Save,
+  Settings as SettingsIcon,
+  Monitor,
+  Plus,
+  Trash2,
 } from "lucide-react";
-import InfoItem from "../components/InfoItem";
-import { useState } from "react";
-import FormKeyValue from "../components/formkeyvalue";
 
 const Settings = () => {
-  const state = GLOBAL_STATE("settings");
-  const [cfg, setCfg] = useState({ ...state.Config })
-  const [mod, setMod] = useState(false)
+  const [config, setConfig] = useAtom(configAtom);
+  const [debug, setDebug] = useAtom(debugAtom);
+  const saveConfigMutation = useSaveConfig();
+
+  const [cfg, setCfg] = useState(config || {});
+  const [mod, setMod] = useState(false);
+  const [backendState, setBackendState] = useState(null);
+
+  useEffect(() => {
+    if (config) setCfg(config);
+  }, [config]);
+
+  useEffect(() => {
+    getBackendState().then(setBackendState).catch(console.error);
+  }, []);
 
   const updatecfg = (key, value) => {
-    if (key === "APICertDomains" || key === "APICertIPs") {
-      value = value.split(",")
-    }
     let x = { ...cfg }
     x[key] = value
     setMod(true)
     setCfg(x)
   }
 
-  useEffect(() => {
-    state.GetBackendState();
-  }, []);
+  const toggleConfigKey = (key) => {
+    const newConfig = { ...config, [key]: !config[key] };
+    saveConfigMutation.mutate(newConfig);
+  };
 
-  let basePath = state.State?.BasePath;
+  let basePath = backendState?.State?.BasePath;
   let logPath = "";
-  let tracePath = "";
-  let logFileName = state.State?.LogFileName?.replace(state.State?.LogPath, "");
-  let configPath = state.State?.ConfigFileName;
-  if (state.State?.LogPath !== basePath) {
-    logPath = state.State?.LogPath;
+  let logFileName = backendState?.State?.LogFileName?.replace(backendState?.State?.LogPath, "");
+  let configPath = backendState?.State?.ConfigFileName;
+  if (backendState?.State?.LogPath !== basePath) {
+    logPath = backendState?.State?.LogPath;
   }
-  let version = state.Version ? state.Version : "unknown";
-  let apiversion = state.APIVersion ? state.APIVersion : "unknown";
+  let version = backendState?.Version ? backendState?.Version : "unknown";
+  let apiversion = backendState?.APIVersion ? backendState?.APIVersion : "unknown";
 
-  const SettingToggle = ({ label, icon, value, onToggle, description }) => (
-    <div className="flex items-center justify-between py-3">
-      <div className="flex items-start gap-3">
+  const InfoItem = ({ label, value, icon }) => (
+    <div className="flex items-center justify-between py-2 border-b border-[#1a1f2d] last:border-0">
+      <div className="flex items-center gap-2 text-sm text-gray-400">
         {icon}
-        <div className="space-y-0.5">
-          <Label className="text-sm font-medium">{label}</Label>
-          {description && (
-            <p className="text-xs text-muted-foreground">{description}</p>
-          )}
-        </div>
+        <span>{label}</span>
       </div>
-      <Switch checked={value} onCheckedChange={onToggle} />
+      <span className="text-sm font-mono text-gray-200">{value || "N/A"}</span>
     </div>
   );
 
   return (
-    <div className="container max-w-5xl p-4">
-      <div className="flex items-center justify-between">
+    <div className="w-full mt-16 p-4 space-y-6">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-white">Settings</h1>
+          <p className="text-muted-foreground">Configure application settings and view system information.</p>
+        </div>
         {mod === true && (
-          <div className="mb-7 flex gap-[4px] items-center">
-            <Button
-              className={state.Theme?.successBtn}
-              onClick={async () => {
-                state.Config = cfg
-                let ok = await state.v2_ConfigSave()
-                if (ok === true) {
-                  setMod(false)
-                }
-              }}>
-              Save
-            </Button>
-            <div className="ml-3 text-yellow-400 text-xl">
-              Your config has un-saved changes
+          <div className="flex items-center gap-4 bg-yellow-900/20 border border-yellow-900/50 px-4 py-2 rounded-md">
+            <div className="flex items-center gap-2 text-yellow-500">
+              <AlertTriangle className="h-4 w-4" />
+              <span className="text-sm font-medium">Unsaved changes</span>
             </div>
+            <Button
+              size="sm"
+              onClick={() => {
+                saveConfigMutation.mutate(cfg, {
+                  onSuccess: () => setMod(false)
+                });
+              }}>
+              <Save className="h-4 w-4 mr-2" />
+              Save Changes
+            </Button>
           </div>
         )}
       </div>
 
-
-      <Tabs defaultValue="general" className="size-fit">
-        <TabsList>
-          <TabsTrigger value="general">General Settings</TabsTrigger>
-          <TabsTrigger value="apiconfig">API Config</TabsTrigger>
-          <TabsTrigger value="net">Network Information</TabsTrigger>
-          <TabsTrigger value="sys">System Information</TabsTrigger>
+      <Tabs defaultValue="general" className="space-y-6">
+        <TabsList className="bg-[#0B0E14] border border-[#1a1f2d] p-1 h-auto flex-wrap justify-start">
+          <TabsTrigger value="general" className="data-[state=active]:bg-[#1a1f2d]">General Settings</TabsTrigger>
+          <TabsTrigger value="apiconfig" className="data-[state=active]:bg-[#1a1f2d]">API Config</TabsTrigger>
+          <TabsTrigger value="net" className="data-[state=active]:bg-[#1a1f2d]">Network Info</TabsTrigger>
+          <TabsTrigger value="sys" className="data-[state=active]:bg-[#1a1f2d]">System Info</TabsTrigger>
         </TabsList>
-        <TabsContent value="general" className="pl-2">
-          <Card className="border-none shadow-none">
-            <CardContent>
-              <SettingToggle
-                label="Basic Logging"
-                icon={<Info className="h-4 w-4 mt-1 text-blue-500" />}
-                value={state?.Config?.InfoLogging}
-                onToggle={() => {
-                  state.toggleConfigKeyAndSave("Config", "InfoLogging");
-                  state.renderPage("settings");
-                }}
-                description="Logs basic information about application operations"
-              />
 
-              <SettingToggle
-                label="Error Logging"
-                icon={<AlertTriangle className="h-4 w-4 mt-1 text-red-500" />}
-                value={state?.Config?.ErrorLogging}
-                onToggle={() => {
-                  state.toggleConfigKeyAndSave("Config", "ErrorLogging");
-                  state.renderPage("settings");
-                }}
-                description="Logs errors and exceptions"
-              />
-              <SettingToggle
-                label="Console Logging"
-                icon={<Bug className="h-4 w-4 mt-1 text-amber-500" />}
-                value={state?.Config?.ConsoleLogging}
-                onToggle={() => {
-                  state.toggleConfigKeyAndSave("Config", "ConsoleLogging");
-                  state.renderPage("settings");
-                }}
-                description="Detailed logs for troubleshooting"
-              />
+        <TabsContent value="general" className="space-y-6">
+          <Card className="bg-[#0B0E14] border-[#1a1f2d]">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <SettingsIcon className="h-5 w-5 text-blue-500" />
+                Logging Configuration
+              </CardTitle>
+              <CardDescription>Configure what events are logged and tracked.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-1">
+              <div className="flex items-center justify-between p-3 bg-[#151a25] rounded-lg border border-[#2a3142]">
+                <div className="flex items-center gap-3">
+                  <Info className="h-4 w-4 text-blue-500" />
+                  <div className="space-y-0.5">
+                    <Label className="text-sm font-medium">Basic Logging</Label>
+                    <p className="text-xs text-muted-foreground">Logs basic information about operations</p>
+                  </div>
+                </div>
+                <Switch checked={config?.InfoLogging} onCheckedChange={() => toggleConfigKey("InfoLogging")} />
+              </div>
 
-              <SettingToggle
-                label="Debug Logging"
-                icon={<Bug className="h-4 w-4 mt-1 text-amber-500" />}
-                value={state?.Config?.DebugLogging}
-                onToggle={() => {
-                  state.toggleConfigKeyAndSave("Config", "DebugLogging");
-                  state.renderPage("settings");
-                }}
-                description="Detailed logs for troubleshooting"
-              />
+              <div className="flex items-center justify-between p-3 bg-[#151a25] rounded-lg border border-[#2a3142]">
+                <div className="flex items-center gap-3">
+                  <AlertTriangle className="h-4 w-4 text-red-500" />
+                  <div className="space-y-0.5">
+                    <Label className="text-sm font-medium">Error Logging</Label>
+                    <p className="text-xs text-muted-foreground">Logs errors and exceptions</p>
+                  </div>
+                </div>
+                <Switch checked={config?.ErrorLogging} onCheckedChange={() => toggleConfigKey("ErrorLogging")} />
+              </div>
 
-              <SettingToggle
-                label="Debug Mode"
-                icon={<Bug className="h-4 w-4 mt-1 text-purple-500" />}
-                value={state?.debug}
-                onToggle={() => {
-                  state.toggleDebug();
-                  state.renderPage("settings");
-                }}
-                description="Enables advanced debugging features"
-              />
+              <div className="flex items-center justify-between p-3 bg-[#151a25] rounded-lg border border-[#2a3142]">
+                <div className="flex items-center gap-3">
+                  <Bug className="h-4 w-4 text-amber-500" />
+                  <div className="space-y-0.5">
+                    <Label className="text-sm font-medium">Console Logging</Label>
+                    <p className="text-xs text-muted-foreground">Output logs to console</p>
+                  </div>
+                </div>
+                <Switch checked={config?.ConsoleLogging} onCheckedChange={() => toggleConfigKey("ConsoleLogging")} />
+              </div>
 
+              <div className="flex items-center justify-between p-3 bg-[#151a25] rounded-lg border border-[#2a3142]">
+                <div className="flex items-center gap-3">
+                  <Bug className="h-4 w-4 text-amber-500" />
+                  <div className="space-y-0.5">
+                    <Label className="text-sm font-medium">Debug Logging</Label>
+                    <p className="text-xs text-muted-foreground">Detailed logs for troubleshooting</p>
+                  </div>
+                </div>
+                <Switch checked={config?.DebugLogging} onCheckedChange={() => toggleConfigKey("DebugLogging")} />
+              </div>
+
+              <div className="flex items-center justify-between p-3 bg-[#151a25] rounded-lg border border-[#2a3142]">
+                <div className="flex items-center gap-3">
+                  <Bug className="h-4 w-4 text-purple-500" />
+                  <div className="space-y-0.5">
+                    <Label className="text-sm font-medium">Debug Mode</Label>
+                    <p className="text-xs text-muted-foreground">Enables advanced debugging features</p>
+                  </div>
+                </div>
+                <Switch checked={debug} onCheckedChange={() => setDebug(!debug)} />
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
-        <TabsContent value="apiconfig" className="pl-2">
-          <Card className="border-none shadow-none">
-            <CardContent className="space-y-0">
 
-              <FormKeyValue
-                label="API IP"
-                icon={Network}
-                iconClass={"text-green-400"}
-                value={
+        <TabsContent value="apiconfig" className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Card className="bg-[#0B0E14] border-[#1a1f2d]">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Server className="h-5 w-5 text-blue-500" />
+                  API Server
+                </CardTitle>
+                <CardDescription>Configure the API server listener.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label>API IP</Label>
                   <Input
+                    className="bg-[#151a25] border-[#2a3142]"
                     value={cfg.APIIP}
-                    onChange={(e) => {
-                      updatecfg("APIIP", e.target.value)
-                    }}
-                    type="text"
+                    onChange={(e) => updatecfg("APIIP", e.target.value)}
                   />
-                }
-              />
-
-              <FormKeyValue
-                label="API Port"
-                icon={Server}
-                iconClass={"text-green-400"}
-                value={
+                </div>
+                <div className="space-y-2">
+                  <Label>API Port</Label>
                   <Input
+                    className="bg-[#151a25] border-[#2a3142]"
                     value={cfg.APIPort}
-                    onChange={(e) => {
-                      updatecfg("APIPort", e.target.value)
-                    }}
-                    type="text"
+                    onChange={(e) => updatecfg("APIPort", e.target.value)}
                   />
-                }
-              />
+                </div>
+              </CardContent>
+            </Card>
 
-              <FormKeyValue
-                label="API Certificate Domains"
-                icon={Globe}
-                value={
+            <Card className="bg-[#0B0E14] border-[#1a1f2d]">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Key className="h-5 w-5 text-orange-500" />
+                  SSL Certificates
+                </CardTitle>
+                <CardDescription>Configure SSL certificate paths.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Certificate Path</Label>
                   <Input
-                    value={cfg.APICertDomains}
-                    onChange={(e) => {
-                      updatecfg("APICertDomains", e.target.value)
-                    }}
-                    type="text"
-                  />
-                }
-              />
-
-              <FormKeyValue
-                label="API Certificate IPs"
-                icon={Network}
-                value={
-                  <Input
-                    value={cfg.APICertIPs}
-                    onChange={(e) => {
-                      updatecfg("APICertIPs", e.target.value)
-                    }}
-                    type="text"
-                  />
-                }
-              />
-
-              <FormKeyValue
-                label="API Certificate Path"
-                icon={Key}
-                iconClass={"text-orange-400"}
-                value={
-                  <Input
+                    className="bg-[#151a25] border-[#2a3142]"
                     value={cfg.APICert}
-                    onChange={(e) => {
-                      updatecfg("APICert", e.target.value)
-                    }}
-                    type="text"
+                    onChange={(e) => updatecfg("APICert", e.target.value)}
                   />
-                }
-              />
-              <FormKeyValue
-                label="API Key Path"
-                icon={Key}
-                iconClass={"text-orange-400"}
-                value={
+                </div>
+                <div className="space-y-2">
+                  <Label>Key Path</Label>
                   <Input
+                    className="bg-[#151a25] border-[#2a3142]"
                     value={cfg.APIKey}
-                    onChange={(e) => {
-                      updatecfg("APIKey", e.target.value)
-                    }}
-                    type="text"
+                    onChange={(e) => updatecfg("APIKey", e.target.value)}
                   />
-                }
-              />
+                </div>
+              </CardContent>
+            </Card>
 
-            </CardContent>
-          </Card>
+            <Card className="bg-[#0B0E14] border-[#1a1f2d] md:col-span-2">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Globe className="h-5 w-5 text-green-500" />
+                  Certificate Domains & IPs
+                </CardTitle>
+                <CardDescription>Certificate SANs for SSL/TLS.</CardDescription>
+              </CardHeader>
+              <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label>Domains</Label>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0 hover:bg-green-900/30 text-green-500"
+                      onClick={() => {
+                        const newDomains = [...(cfg.APICertDomains || []), ""];
+                        updatecfg("APICertDomains", newDomains);
+                      }}
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <div className="space-y-2 pl-2 border-l-2 border-[#1a1f2d]">
+                    {(cfg.APICertDomains || []).map((domain, i) => (
+                      <div key={i} className="flex gap-2 items-center">
+                        <Input
+                          className="flex-1 bg-[#0B0E14] border-[#1a1f2d]"
+                          value={domain}
+                          onChange={(e) => {
+                            const newDomains = [...cfg.APICertDomains];
+                            newDomains[i] = e.target.value;
+                            updatecfg("APICertDomains", newDomains);
+                          }}
+                          placeholder="example.com"
+                        />
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-red-500 hover:text-red-400 hover:bg-red-950/20"
+                          onClick={() => {
+                            const newDomains = cfg.APICertDomains.filter((_, idx) => idx !== i);
+                            updatecfg("APICertDomains", newDomains);
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                    {(!cfg.APICertDomains || cfg.APICertDomains.length === 0) && (
+                      <div className="text-xs text-muted-foreground italic">No domains added</div>
+                    )}
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label>IP Addresses</Label>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0 hover:bg-green-900/30 text-green-500"
+                      onClick={() => {
+                        const newIPs = [...(cfg.APICertIPs || []), ""];
+                        updatecfg("APICertIPs", newIPs);
+                      }}
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <div className="space-y-2 pl-2 border-l-2 border-[#1a1f2d]">
+                    {(cfg.APICertIPs || []).map((ip, i) => (
+                      <div key={i} className="flex gap-2 items-center">
+                        <Input
+                          className="flex-1 bg-[#0B0E14] border-[#1a1f2d]"
+                          value={ip}
+                          onChange={(e) => {
+                            const newIPs = [...cfg.APICertIPs];
+                            newIPs[i] = e.target.value;
+                            updatecfg("APICertIPs", newIPs);
+                          }}
+                          placeholder="192.168.1.1"
+                        />
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-red-500 hover:text-red-400 hover:bg-red-950/20"
+                          onClick={() => {
+                            const newIPs = cfg.APICertIPs.filter((_, idx) => idx !== i);
+                            updatecfg("APICertIPs", newIPs);
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                    {(!cfg.APICertIPs || cfg.APICertIPs.length === 0) && (
+                      <div className="text-xs text-muted-foreground italic">No IPs added</div>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
-        <TabsContent value="net" className="pl-2">
-          <Card className="border-none shadow-none">
-            <CardContent className="space-y-0">
+
+        <TabsContent value="net">
+          <Card className="bg-[#0B0E14] border-[#1a1f2d]">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Network className="h-5 w-5 text-teal-500" />
+                Network Information
+              </CardTitle>
+              <CardDescription>System network configuration details.</CardDescription>
+            </CardHeader>
+            <CardContent>
               <InfoItem
                 label="Interface"
-                value={state.Network?.DefaultInterfaceName}
-                icon={<Network className="h-5 w-4 text-blue-400" />}
+                value={backendState?.Network?.DefaultInterfaceName}
+                icon={<Network className="h-4 w-4 text-blue-400" />}
               />
-
               <InfoItem
                 label="IP Address"
-                value={state.Network?.DefaultInterface}
+                value={backendState?.Network?.DefaultInterface}
                 icon={<Globe className="h-4 w-4 text-teal-400" />}
               />
-
               <InfoItem
                 label="Interface ID"
-                value={state.Network?.DefaultInterfaceID}
+                value={backendState?.Network?.DefaultInterfaceID}
                 icon={<Info className="h-4 w-4 text-indigo-400" />}
               />
-
               <InfoItem
                 label="Gateway"
-                value={state.Network?.DefaultGateway}
+                value={backendState?.Network?.DefaultGateway}
                 icon={<Server className="h-4 w-4 text-violet-400" />}
               />
             </CardContent>
           </Card>
         </TabsContent>
-        <TabsContent value="sys" className="pl-2">
-          <Card className="border-none shadow-none">
+
+        <TabsContent value="sys">
+          <Card className="bg-[#0B0E14] border-[#1a1f2d]">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Monitor className="h-5 w-5 text-indigo-500" />
+                System Information
+              </CardTitle>
+              <CardDescription>Application and system details.</CardDescription>
+            </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <InfoItem
                   label="API Version"
                   value={apiversion}
                   icon={<Info className="h-4 w-4 text-blue-400" />}
                 />
-
                 <InfoItem
                   label="App Version"
                   value={version}
@@ -301,34 +398,30 @@ const Settings = () => {
                 />
               </div>
 
-              <div className="space-y-1">
+              <div className="space-y-0">
                 <InfoItem
                   label="Base Path"
                   value={basePath}
                   icon={<Server className="h-4 w-4 text-neutral-400" />}
                 />
-
                 <InfoItem
                   label="Config File"
                   value={configPath}
                   icon={<Server className="h-4 w-4 text-amber-400" />}
                 />
-
                 <InfoItem
                   label="Log Path"
                   value={logPath || "Default"}
                   icon={<Server className="h-4 w-4 text-red-400" />}
                 />
-
                 <InfoItem
                   label="Log File"
                   value={logFileName}
                   icon={<Info className="h-4 w-4 text-red-400" />}
                 />
-
                 <InfoItem
                   label="Admin"
-                  value={state.State?.IsAdmin ? "Yes" : "No"}
+                  value={backendState?.State?.IsAdmin ? "Yes" : "No"}
                   icon={<Key className="h-4 w-4 text-yellow-400" />}
                 />
               </div>

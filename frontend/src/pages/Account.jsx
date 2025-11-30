@@ -1,6 +1,5 @@
-import React, { useEffect } from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import GLOBAL_STATE from "../state";
 import dayjs from "dayjs";
 import KeyValue from "../components/keyvalue";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -11,45 +10,60 @@ import { Network } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { ExitIcon } from "@radix-ui/react-icons";
+import { Theme } from "@/theme";
+import { useAtomValue, useSetAtom } from "jotai";
+import { userAtom } from "../stores/userStore";
+import { logout } from "../api/auth";
+import { toast } from "sonner";
+import { v4 as uuidv4 } from "uuid";
+import { useUpdateUser, useActivateLicense } from "../hooks/useAccount";
 
 const Account = () => {
   const navigate = useNavigate();
-  const state = GLOBAL_STATE("account");
+  const user = useAtomValue(userAtom);
+  const setUser = useSetAtom(userAtom);
+  const updateUserMutation = useUpdateUser();
+  const activateLicenseMutation = useActivateLicense();
+  const [licenseKey, setLicenseKey] = useState("");
 
   const gotoAccountSelect = () => {
     navigate("/accounts");
   }
 
-  if (state.User?.Email === "" || !state.User) {
+  if (!user || user.Email === "") {
     gotoAccountSelect()
     return;
   }
 
-  useEffect(() => {
-    state.GetBackendState();
-  }, []);
-
-  state.User?.Tokens?.sort(function(x, y) {
-    if (x.Created < y.Created) {
-      return 1;
-    }
-    if (x.Created > y.Created) {
-      return -1;
-    }
+  // Sorting tokens
+  const sortedTokens = user.Tokens ? [...user.Tokens].sort((x, y) => {
+    if (x.Created < y.Created) return 1;
+    if (x.Created > y.Created) return -1;
     return 0;
-  });
+  }) : [];
 
+  let APIKey = user?.APIKey
 
-
-  let APIKey = state?.User?.APIKey
+  const handleLogoutToken = async (token, all) => {
+    try {
+      await logout({ DeviceToken: token.DT, UserID: user.ID, All: all });
+      toast.success("Logged out");
+      if (all || token.DT === user.DeviceToken.DT) {
+        setUser(null);
+        navigate("/login");
+      } else {
+        const newTokens = user.Tokens.filter(t => t.DT !== token.DT);
+        setUser({ ...user, Tokens: newTokens });
+      }
+    } catch (e) {
+      toast.error("Logout failed");
+    }
+  };
 
   const LogoutButton = (obj) => {
     return <DropdownMenuItem
       key="connect"
-      onClick={() => {
-        state.LogoutToken(obj, false);
-      }
-      }
+      onClick={() => handleLogoutToken(obj, false)}
       className="cursor-pointer text-red-700 focus:text-red-500"
     >
       <ExitIcon className="w-4 h-4 mr-2" /> Logout
@@ -57,8 +71,28 @@ const Account = () => {
 
   }
 
+  const refreshApiKey = async () => {
+    const newUser = { ...user, APIKey: uuidv4() };
+    try {
+      await updateUserMutation.mutateAsync(newUser);
+      toast.success("API Key regenerated");
+    } catch (e) {
+      toast.error("Failed to regenerate API Key");
+    }
+  };
+
+  const handleActivateLicense = async () => {
+    try {
+      await activateLicenseMutation.mutateAsync(licenseKey);
+      toast.success("License activated");
+      setLicenseKey("");
+    } catch (e) {
+      toast.error("Failed to activate license");
+    }
+  }
+
   let table = {
-    data: state.User?.Tokens,
+    data: sortedTokens,
     columns: {
       N: true,
       Created: true,
@@ -69,7 +103,7 @@ const Account = () => {
       },
       N: (obj) => {
         console.dir(obj)
-        if (obj.DT === state?.User?.DeviceToken.DT) {
+        if (obj.DT === user?.DeviceToken.DT) {
           return obj.N + " (current)"
         }
         return obj.N
@@ -103,41 +137,39 @@ const Account = () => {
 
   return (
     <Tabs defaultValue="account">
-      <TabsList
-        className={state.Theme?.borderColor}
-      >
-        <TabsTrigger className={state.Theme?.tabs} value="account">Account</TabsTrigger>
-        <TabsTrigger className={state.Theme?.tabs} value="loggedin">Devices</TabsTrigger>
-        <TabsTrigger className={state.Theme?.tabs} value="license">License Key</TabsTrigger>
+      <TabsList>
+        <TabsTrigger value="account">Account</TabsTrigger>
+        <TabsTrigger value="loggedin">Devices</TabsTrigger>
+        <TabsTrigger value="license">License Key</TabsTrigger>
       </TabsList>
 
-      <TabsContent key={state?.User?._id} value="account" className="size-fit pl-2 w-[400px]">
-        {state?.User && (
+      <TabsContent key={user.ID} value="account" className="size-fit pl-2 w-[400px]">
+        {user && (
           <div className="">
             <div className="space-y-1 text-white">
               <InfoItem
                 label="User"
-                value={state.User?.Email}
+                value={user?.Email}
                 icon={<Network className="h-4 w-4 text-blue-400" />}
               />
               <InfoItem
                 label="ID"
-                value={state.User?._id}
+                value={user.ID}
                 icon={<Network className="h-4 w-4 text-blue-400" />}
               />
               <InfoItem
                 label="Update"
-                value={dayjs(state.User?.Updated).format(
+                value={dayjs(user?.Updated).format(
                   "DD-MM-YYYY HH:mm:ss",
                 )}
                 icon={<Network className="h-4 w-4 text-blue-400" />}
               />
 
 
-              {state.User?.SubExpiration && (
+              {user?.SubExpiration && (
                 <InfoItem
                   label="Subscription Expires"
-                  value={dayjs(state.User?.SubExpiration).format(
+                  value={dayjs(user?.SubExpiration).format(
                     "DD-MM-YYYY HH:mm:ss",
                   )}
                   icon={< Network className="h-4 w-4 text-blue-400" />}
@@ -149,10 +181,10 @@ const Account = () => {
                 icon={<Network className="h-4 w-4 text-blue-400" />}
               />
 
-              {state.User?.Trial && (
+              {user?.Trial && (
                 <InfoItem
                   label="Trial Status"
-                  value={state.User?.Trial ? "Active" : "Ended"}
+                  value={user?.Trial ? "Active" : "Ended"}
                   icon={<Network className="h-4 w-4 text-blue-400" />}
                 />
               )}
@@ -161,28 +193,28 @@ const Account = () => {
 
             <div className="flex flex-col gap-3 mt-6">
               <Button
-                className={state.Theme?.neutralBtn}
+                className={Theme.neutralBtn}
                 onClick={() => gotoAccountSelect()}
               >
                 Switch Account
               </Button>
               <Button
-                className={state.Theme?.neutralBtn}
-                onClick={() => state.refreshApiKey()}
+                className={Theme.neutralBtn}
+                onClick={refreshApiKey}
               >
                 Re-Generate API Key
               </Button>
 
               <Button
-                className={state.Theme?.neutralBtn}
+                className={Theme.neutralBtn}
                 onClick={() => navigate("/twofactor/create")}
               >
                 Two-Factor Authentication
               </Button>
 
               <Button
-                className={state.Theme?.errorBtn}
-                onClick={() => state.LogoutAllTokens()}
+                className={Theme.errorBtn}
+                onClick={() => handleLogoutToken(user.DeviceToken, true)}
               >
                 Log Out All Devices
               </Button>
@@ -197,23 +229,19 @@ const Account = () => {
         <GenericTable table={table} />
       </TabsContent>
       <TabsContent value="license" className="w-[500px]">
-        <KeyValue label="License" value={state.User.Key?.Key} />
+        <KeyValue label="License" value={user.Key?.Key} />
 
         <div className="space-y-3">
           <Input
-
-            onChange={(e) => {
-              state.UpdateLicenseInput(e.target.value);
-            }}
+            onChange={(e) => setLicenseKey(e.target.value)}
             name="license"
             placeholder="Insert License Key"
-            value={state.LicenseKey}
+            value={licenseKey}
           />
 
           <Button
-            className={state.Theme?.neutralBtn}
-            key={state?.LicenseKey}
-            onClick={() => state.ActivateLicense()}
+            className={Theme.neutralBtn}
+            onClick={handleActivateLicense}
           >
             Activate Key
           </Button>
