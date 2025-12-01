@@ -167,7 +167,7 @@ export default function Tunnels() {
   }
 
   return (
-    <div className="w-full p-4">
+    <div className="w-full">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-white">Tunnels</h1>

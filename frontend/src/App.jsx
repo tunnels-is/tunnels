@@ -1,4 +1,4 @@
-import { BrowserRouter, Route, Routes, useParams } from "react-router-dom";
+import { BrowserRouter, Route, Routes, useParams, Navigate } from "react-router-dom";
 import { createRoot } from "react-dom/client";
 import React, { useEffect } from "react";
 import { createPortal } from "react-dom";
@@ -40,7 +40,6 @@ const root = createRoot(appElement);
 
 const LaunchApp = () => {
   useInitialState();
-  const user = useAtomValue(userAtom);
   const isAuth = useAtomValue(isAuthenticatedAtom);
   return (
     <BrowserRouter>
@@ -53,38 +52,44 @@ const LaunchApp = () => {
         <SidebarProvider>
           <ScreenLoader />
           <AppSidebar />
+          <div className="p-4 w-full">
+            <Routes>
+              
+              {!isAuth ? (
+                <>
+                  <Route index path="help" element={<Welcome />} />
+                  <Route path="login" element={<Login />} />
+                  <Route path="*" element={<Navigate to="/login" replace />} />
+                </>
+              ) : (
+                <>
+                  <Route index path="help" element={<Welcome />} />
 
-          <Routes>
-            <Route path="help" element={<Welcome />} />
-            {!isAuth ? (
-              <>
-                <Route path="*" element={<Login />} />
-              </>
-            ) : (
-              <>
-                <Route path="/" element={<Welcome />} />
+                  <Route path="groups" element={<Groups />} />
+                  <Route path="users" element={<Users />} />
+                  <Route path="devices" element={<Devices />} />
+                  <Route path="groups/:id" element={<InspectGroup />} />
 
-                <Route path="groups" element={<Groups />} />
-                <Route path="users" element={<Users />} />
-                <Route path="devices" element={<Devices />} />
-                <Route path="groups/:id" element={<InspectGroup />} />
+                  <Route path="tunnels" element={<Tunnels />} />
+                  <Route path="connections" element={<Stats />} />
+                  <Route path="account" element={<Account />} />
 
-                <Route path="tunnels" element={<Tunnels />} />
-                <Route path="connections" element={<Stats />} />
-                <Route path="account" element={<Account />} />
+                  <Route path="servers" element={<PrivateServers />} />
+                  <Route path="twofactor/create" element={<Enable2FA />} />
+                  <Route path="server/:id" element={<ServerDevices />} />
+                  <Route path="logs" element={<Logs />} />
+                  <Route path="settings" element={<Settings />} />
 
-                <Route path="servers" element={<PrivateServers />} />
-                <Route path="twofactor/create" element={<Enable2FA />} />
-                <Route path="server/:id" element={<ServerDevices />} />
-                <Route path="logs" element={<Logs />} />
-                <Route path="settings" element={<Settings />} />
+                  <Route path="dns" element={<DNS />} />
+                  <Route path="dns/answers/:domain" element={<DNSAnswers />} />
+                  <Route path="accounts" element={<UserSelect />} />
+                  <Route path="*" element={<Navigate to="/help" replace />} />
+                </>
+              )}
+            </Routes>
+          </div>
 
-                <Route path="dns" element={<DNS />} />
-                <Route path="dns/answers/:domain" element={<DNSAnswers />} />
-                <Route path="accounts" element={<UserSelect />} />
-              </>
-            )}
-          </Routes>
+
         </SidebarProvider>
       </ThemeProvider>
     </BrowserRouter>

@@ -2,7 +2,7 @@ import { useNavigate, useLocation, Link, NavLink } from "react-router-dom";
 import React, { useRef } from "react";
 import { useAtomValue, useSetAtom, useAtom } from "jotai";
 import { userAtom, isAuthenticatedAtom } from "@/stores/userStore";
-import { controlServerAtom, controlServersAtom } from "@/stores/configStore";
+import { controlServerAtom } from "@/stores/configStore";
 import { activeTunnelsAtom } from "@/stores/tunnelStore";
 import { logout } from "@/api/auth";
 import { cn } from "@/lib/utils";
@@ -28,7 +28,8 @@ import {
   Sun,
   Moon,
   Laptop,
-  Logs
+  Logs,
+  PersonStanding,
 } from "lucide-react";
 import {
   Sidebar,
@@ -54,14 +55,41 @@ import { useTheme } from "@/providers/theme-provider";
 const IconWidth = 20;
 const IconHeight = 20;
 
+
+/**
+ * @param {Object} props
+ * @param {React.ReactNode} props.Icon
+ * @param {string} props.Label
+ * @param {string} props.Route
+ */
+const AppSidebarButton = ({ Icon, Label, Route }) => (
+  <SidebarMenuItem>
+
+    <NavLink to={"/" + Route}>
+      {
+        ({ isActive }) => (
+          <SidebarMenuButton isActive={isActive}>
+            <Icon
+              className={cn(
+                "flex-shrink-0",
+                isActive && "text-primary"
+              )}
+              width={IconWidth}
+              height={IconHeight}
+            />
+            <span className={isActive ? "text-primary" : ""}>{Label}</span>
+          </SidebarMenuButton>
+        )
+      }
+    </NavLink>
+  </SidebarMenuItem>
+);
+
 const AppSidebar = () => {
   const navigate = useNavigate();
-  const location = useLocation();
-  const sideb = useRef(null);
   const user = useAtomValue(userAtom);
   const isAuthenticated = useAtomValue(isAuthenticatedAtom);
   const setUser = useSetAtom(userAtom);
-  const [activeServer, setActiveServer] = useAtom(controlServerAtom);
   const activeTunnels = useAtomValue(activeTunnelsAtom);
   const { setTheme } = useTheme();
 
@@ -84,12 +112,7 @@ const AppSidebar = () => {
     navigate("/login");
   };
 
-  const showLogin = () => {
-    if (!user || user?.Email === "") {
-      return true;
-    }
-    return false;
-  };
+
 
   const isManager = () => {
     if (user?.IsAdmin === true || user?.IsManager === true) {
@@ -105,215 +128,80 @@ const AppSidebar = () => {
     return false;
   };
 
-  const menu = {
-    groups: [
-      {
-        title: "",
-        user: false,
-        items: [
-          {
-            icon: Lock,
-            label: "Login",
-            route: "login",
-            user: false,
-            shouldRender: showLogin,
-          },
-          { icon: Shield, label: "VPN", route: "servers", user: true },
-          { icon: Container, label: "DNS", route: "dns", user: false },
-          {
-            icon: LinkIcon,
-            label: "Connections",
-            route: "connections",
-            user: true,
-            shouldRender: hasActiveTunnels,
-          },
-          // {
-          //   icon: Users,
-          //   label: "Groups",
-          //   route: "groups",
-          //   user: true,
-          //   shouldRender: isManager,
-          // }
-        ],
-      },
-      {
-        title: "Admin",
-        isManager: true,
-        items: [
-          {
-            icon: User,
-            label: "Users",
-            route: "users",
-            user: true,
-            shouldRender: isManager,
-          },
-          {
-            icon: Monitor,
-            label: "Devices",
-            route: "devices",
-            user: true,
-            shouldRender: isManager,
-          },
-          {
-            icon: Home,
-            label: "Groups",
-            route: "groups",
-            user: true,
-            shouldRender: isManager,
-          },
-        ],
-      },
-      {
-        title: "Settings",
-        items: [
-          { icon: LinkIcon, label: "Tunnels", route: "tunnels", user: true },
-          {
-            icon: Settings,
-            label: "Application",
-            route: "settings",
-            user: false,
-          },
-          {
-            icon: Users,
-            label: "Accounts",
-            route: "accounts",
-            shouldRender: showLogin,
-            user: false,
-          },
-          { icon: Logs, label: "Logs", route: "logs", user: false },
-        ],
-      },
-      {
-        title: "Support",
-        items: [
-          {
-            icon: HelpCircle,
-            label: "Support",
-            route: "help",
-            user: false,
-          },
-          {
-            icon: BookOpen,
-            label: "Guides",
-            route: "guides",
-            user: false,
-            click: () => OpenWindowURL("https://www.tunnels.is/docs"),
-          },
-          {
-            icon: Github,
-            label: "Github",
-            route: "github",
-            user: false,
-            click: () => OpenWindowURL("https://www.github.com/tunnels-is/tunnels"),
-          },
-        ],
-      },
-    ],
-  };
-
-  let { pathname } = location;
-  let sp = pathname.split("/");
-  const navHandler = (path) => {
-    console.log("navigating to:", path);
-    navigate(path);
-  };
-
   console.log(`isAuthenticated: ${isAuthenticated}`);
   console.log(`user: ${user}`)
 
   return (
     <Sidebar>
-      <SidebarContent>
-        {
-          !user ? (
-            <SidebarGroup>
-              <SidebarGroupContent>
-                <SidebarMenu>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild>
-                      <Link to="/login"><Lock />Login</Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild>
-                      <Link to="/help"><HelpCircle />Help</Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
-          ) : (
-            menu.groups.map((g) => {
-              if (g.user === true && (!user || user.Email === "")) {
-                return false;
-              }
-              if (g.shouldRender && !g.shouldRender()) {
-                return false;
-              }
-              if (g.isManager && !isManager()) {
-                return <></>;
-              }
-              return (
-                <SidebarGroup key={g.title}>
-                  {g.title && (
-                    <SidebarGroupLabel className="px-3 mb-2">
-                      <h2 className="text-xs font-semibold uppercase tracking-wider">
-                        {g.title}
-                      </h2>
-                    </SidebarGroupLabel>
-                  )}
-
-                  <SidebarGroupContent>
-                    <SidebarMenu>
-                      {g.items.map((i) => {
-                        if (i.user && (!user || user.Email === "")) {
-                          return null;
-                        }
-                        if (i.shouldRender && !i.shouldRender()) {
-                          return false;
-                        }
-
-                        let isActive = false;
-                        if (
-                          sp[1].includes(i.route) ||
-                          (sp[1] === "" && i.route == "login")
-                        ) {
-                          isActive = true;
-                        }
-                        return (
-                          <SidebarMenuItem key={i.label}>
-                            <SidebarMenuButton
-                              onClick={() => {
-                                if (i.click) {
-                                  i.click();
-                                } else {
-                                  navHandler("/" + i.route);
-                                }
-                              }}
-                              isActive={isActive}
-                            >
-                              <i.icon
-                                className={cn(
-                                  "flex-shrink-0",
-                                  isActive && "text-primary"
-                                )}
-                                width={IconWidth}
-                                height={IconHeight}
-                              />
-                              <span className={isActive ? "text-primary" : ""}>{i.label}</span>
-                            </SidebarMenuButton>
-                          </SidebarMenuItem>
-                        );
-                      })}
-                    </SidebarMenu>
-                  </SidebarGroupContent>
-                </SidebarGroup>
-              );
-            })
-          )
-        }
-      </SidebarContent>
-      {user && <SidebarFooter>
+      {!isAuthenticated ? (
+        <SidebarContent>
+          <SidebarGroup>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <AppSidebarButton Icon={Lock} Label="Login" Route="login" />
+                <AppSidebarButton Icon={HelpCircle} Label="Help" Route="help" />
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        </SidebarContent>
+      ) : (
+        <SidebarContent>
+          <SidebarGroup>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <AppSidebarButton Icon={Shield} Label="VPN" Route="servers" />
+                <AppSidebarButton Icon={LinkIcon} Label="Connections" Route="connections" />
+                <AppSidebarButton Icon={Container} Label="DNS" Route="dns" />
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+          {
+            user.IsAdmin && (
+              <SidebarGroup>
+                <SidebarGroupLabel>Admin</SidebarGroupLabel>
+                <SidebarGroupContent>
+                  <SidebarMenu>
+                    <AppSidebarButton Icon={Users} Label="Users" Route="users" />
+                    <AppSidebarButton Icon={Monitor} Label="Devices" Route="devices" />
+                    <AppSidebarButton Icon={Home} Label="Groups" Route="groups" />
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </SidebarGroup>
+            )
+          }
+          <SidebarGroup>
+            <SidebarGroupLabel>Settings</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <AppSidebarButton Icon={Settings} Label="Settings" Route="settings" />
+                <AppSidebarButton Icon={Users} Label="Accounts" Route="accounts" />
+                <AppSidebarButton Icon={Logs} Label="Logs" Route="logs" />
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+          <SidebarGroup>
+            <SidebarGroupLabel>Support</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <AppSidebarButton Icon={HelpCircle} Label="Support" Route="help" />
+                <SidebarMenuItem>
+                  <SidebarMenuButton onClick={() => OpenWindowURL("https://www.tunnels.is/support")}>
+                    <PersonStanding width={IconWidth} height={IconHeight} />
+                    Guide
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton onClick={() => OpenWindowURL("https://github.com/tunnels-is/tunnels")}>
+                    <Github width={IconWidth} height={IconHeight} />
+                    Github
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        </SidebarContent>
+      )}
+      {isAuthenticated && <SidebarFooter>
         <SidebarMenu>
           <SidebarMenuItem>
             <DropdownMenu>

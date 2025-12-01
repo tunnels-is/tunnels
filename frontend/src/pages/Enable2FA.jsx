@@ -125,7 +125,7 @@ const Enable2FA = (props) => {
 
 
 	return (
-		<div className="w-full flex flex-col items-center justify-center p-4 bg-black">
+		<div className="w-full flex flex-col items-center justify-center bg-black">
 			<div className="w-full max-w-md space-y-6">
 
 				<Card className="w-full max-w-md mx-auto bg-[#0B0E14] border border-[#1a1f2d] shadow-2xl">

@@ -5,7 +5,7 @@ import { controlServerAtom } from "@/stores/configStore";
 import { userAtom } from "@/stores/userStore";
 
 
-const baseURL = `https://${window.location.hostname}:7777`;
+const baseURL = `http://${window.location.hostname}:7777`;
 
 export const client = axios.create({
   baseURL: baseURL + "/v1/method",

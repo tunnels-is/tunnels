@@ -2,6 +2,7 @@ import { client } from "./client";
 
 export const getTunnels = async () => {
     const response = await client.post("/getState", {});
+    console.log("getTunnels() = ", response.data);
     return response.data?.Tunnels || [];
 };
 
