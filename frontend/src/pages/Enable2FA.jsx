@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { useAtomValue } from "jotai";
 import { userAtom } from "../stores/userStore";
 import { toast } from "sonner";
-import { client } from "../api/client";
+import { client, forwardToController } from "../api/client";
 
 const useForm = (props) => {
 	const [inputs, setInputs] = useState({});
@@ -63,7 +63,7 @@ const useForm = (props) => {
 		inputs.Code = secret
 
 		try {
-			const response = await client.post("/v3/user/2fa/confirm", inputs);
+			const response = await forwardToController("POST", "/v3/user/2fa/confirm", inputs);
 			if (response.status === 200) {
 				let c = { ...code }
 				c.Recovery = response.data.Data
