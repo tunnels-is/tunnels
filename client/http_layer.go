@@ -85,9 +85,12 @@ func LaunchAPI() {
 	default:
 	}
 
-	if err := API_SERVER.ServeTLS(ln, conf.APICert, conf.APIKey); err != http.ErrServerClosed {
+	if err := API_SERVER.Serve(ln); err != http.ErrServerClosed {
 		ERROR("api start error: ", err)
 	}
+	//if err := API_SERVER.ServeTLS(ln, conf.APICert, conf.APIKey); err != http.ErrServerClosed {
+	//	ERROR("api start error: ", err)
+	//}
 }
 
 func getFileSystem() http.FileSystem {

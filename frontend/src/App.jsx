@@ -44,7 +44,7 @@ const LaunchApp = () => {
   return (
     <BrowserRouter>
       {createPortal(
-        <Toaster position="bottom-right" theme="light" />,
+        <Toaster position="bottom-right" />,
         document.body
       )}
       <ThemeProvider>
