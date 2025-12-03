@@ -317,9 +317,9 @@ const LoginForm = ({
   const saveUserMutation = useSaveUserToDisk();
 
   const [inputs, setInputs] = useState({
-    email: "deiocb@iofn.com",
-    password: "1234567897",
-    devicename: "windows",
+    email: "",
+    password: "",
+    devicename: "",
   });
   const [errors, setErrors] = useState({});
   const [remember, setRemember] = useState(false);
@@ -438,9 +438,9 @@ const RegisterForm = ({ config, authServer, setModalOpen, setNewAuth }) => {
   const saveUserMutation = useSaveUserToDisk();
 
   const [inputs, setInputs] = useState({
-    email: "ivfbh@igfn.com",
-    password: "1234567897",
-    password2: "1234567897",
+    email: "",
+    password: "",
+    password2: "",
   });
   const [errors, setErrors] = useState({});
   const [tokenLogin, setTokenLogin] = useState(false);
