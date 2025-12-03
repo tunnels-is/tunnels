@@ -35,6 +35,7 @@ func LaunchAPI() {
 	mux.Handle("/logs", websocket.Handler(handleWebSocket))
 	mux.Handle("/", assetHandler)
 	mux.Handle("/assets/", assetHandler)
+	mux.Handle("/app", assetHandler)
 	mux.HandleFunc("/v1/method/{method}", HTTPhandler)
 	API_SERVER = http.Server{
 		Handler:   mux,
