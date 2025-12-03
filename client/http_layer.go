@@ -25,6 +25,7 @@ var (
 	httpErrorLogger = log.New(os.Stdout, "", 0)
 )
 
+
 func LaunchAPI() {
 	defer RecoverAndLog()
 
@@ -140,20 +141,21 @@ func makeTLSConfig() (tc *tls.Config) {
 	return
 }
 
-func setupCORS(w *http.ResponseWriter, _ *http.Request) {
-	(*w).Header().Set("Access-Control-Allow-Origin", "*")
+func setupCORS(w *http.ResponseWriter, r *http.Request) {
+	origin := (*r).Header.Get("Origin")
+	(*w).Header().Set("Access-Control-Allow-Origin", origin)
 	(*w).Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
 	(*w).Header().Set("Access-Control-Allow-Headers", "*")
 }
 
 func HTTPhandler(w http.ResponseWriter, r *http.Request) {
 	setupCORS(&w, r)
-	if (*r).Method == "OPTIONS" {
+	if (*r).Method == http.MethodOptions {
 		w.WriteHeader(204)
 		r.Body.Close()
 		return
 	}
-
+	
 	method := r.PathValue("method")
 	switch method {
 	case "connect":

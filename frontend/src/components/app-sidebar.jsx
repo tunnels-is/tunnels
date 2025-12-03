@@ -1,0 +1,297 @@
+import { useNavigate, useLocation, Link, NavLink } from "react-router-dom";
+import React, { useRef } from "react";
+import { useAtomValue, useSetAtom, useAtom } from "jotai";
+import { userAtom, isAuthenticatedAtom } from "@/stores/userStore";
+import { controlServerAtom } from "@/stores/configStore";
+import { activeTunnelsAtom } from "@/stores/tunnelStore";
+import { logout } from "@/api/auth";
+import { cn } from "@/lib/utils";
+import {
+  Home,
+  Settings,
+  Lock,
+  Container,
+  LogOut,
+  User,
+  Users,
+  Monitor,
+  Link as LinkIcon,
+  Shield,
+  HelpCircle,
+  BookOpen,
+  Github,
+  ChevronUp,
+  ChevronsUpDown,
+  Check,
+  Server,
+  Plus,
+  Sun,
+  Moon,
+  Laptop,
+  Logs,
+  PersonStanding,
+} from "lucide-react";
+import {
+  Sidebar,
+  SidebarFooter,
+  SidebarContent,
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarMenuButton,
+} from "@/components/ui/sidebar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  DropdownMenuLabel,
+} from "@/components/ui/dropdown-menu";
+import { useTheme } from "@/providers/theme-provider";
+
+const IconWidth = 20;
+const IconHeight = 20;
+
+
+/**
+ * @param {Object} props
+ * @param {React.ReactNode} props.Icon
+ * @param {string} props.Label
+ * @param {string} props.Route
+ */
+const AppSidebarButton = ({ Icon, Label, Route }) => (
+  <SidebarMenuItem>
+
+    <NavLink to={"/" + Route}>
+      {
+        ({ isActive }) => (
+          <SidebarMenuButton isActive={isActive}>
+            <Icon
+              className={cn(
+                "flex-shrink-0",
+                isActive && "text-primary"
+              )}
+              width={IconWidth}
+              height={IconHeight}
+            />
+            <span className={isActive ? "text-primary" : ""}>{Label}</span>
+          </SidebarMenuButton>
+        )
+      }
+    </NavLink>
+  </SidebarMenuItem>
+);
+
+const AppSidebar = () => {
+  const navigate = useNavigate();
+  const user = useAtomValue(userAtom);
+  const isAuthenticated = useAtomValue(isAuthenticatedAtom);
+  const setUser = useSetAtom(userAtom);
+  const activeTunnels = useAtomValue(activeTunnelsAtom);
+  const { setTheme } = useTheme();
+
+  const formatServer = (server) => server.Host + " : " + server.Port;
+
+
+  const OpenWindowURL = (url) => {
+    window.open(url, "_blank");
+  };
+
+  const handleLogout = async () => {
+    if (user?.DeviceToken) {
+      try {
+        await logout({ DeviceToken: user.DeviceToken.DT, UserID: user.ID, All: false });
+      } catch (e) {
+        console.error("Logout failed", e);
+      }
+    }
+    setUser(null);
+    navigate("/login");
+  };
+
+
+
+  const isManager = () => {
+    if (user?.IsAdmin === true || user?.IsManager === true) {
+      return true;
+    }
+    return false;
+  };
+
+  const hasActiveTunnels = () => {
+    if (activeTunnels?.length > 0) {
+      return true;
+    }
+    return false;
+  };
+
+  console.log(`isAuthenticated: ${isAuthenticated}`);
+  console.log(`user: ${user}`)
+
+  return (
+    <Sidebar>
+      {!isAuthenticated ? (
+        <SidebarContent>
+          <SidebarGroup>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <AppSidebarButton Icon={Lock} Label="Login" Route="login" />
+                <AppSidebarButton Icon={HelpCircle} Label="Help" Route="help" />
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        </SidebarContent>
+      ) : (
+        <SidebarContent>
+          <SidebarGroup>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <AppSidebarButton Icon={Shield} Label="VPN" Route="servers" />
+                <AppSidebarButton Icon={LinkIcon} Label="Connections" Route="connections" />
+                <AppSidebarButton Icon={Container} Label="DNS" Route="dns" />
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+          {
+            user.IsAdmin && (
+              <SidebarGroup>
+                <SidebarGroupLabel>Admin</SidebarGroupLabel>
+                <SidebarGroupContent>
+                  <SidebarMenu>
+                    <AppSidebarButton Icon={Users} Label="Users" Route="users" />
+                    <AppSidebarButton Icon={Monitor} Label="Devices" Route="devices" />
+                    <AppSidebarButton Icon={Home} Label="Groups" Route="groups" />
+                  </SidebarMenu>
+                </SidebarGroupContent>
+              </SidebarGroup>
+            )
+          }
+          <SidebarGroup>
+            <SidebarGroupLabel>Settings</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <AppSidebarButton Icon={Settings} Label="Settings" Route="settings" />
+                <AppSidebarButton Icon={Users} Label="Accounts" Route="accounts" />
+                <AppSidebarButton Icon={Logs} Label="Logs" Route="logs" />
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+          <SidebarGroup>
+            <SidebarGroupLabel>Support</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <AppSidebarButton Icon={HelpCircle} Label="Support" Route="help" />
+                <SidebarMenuItem>
+                  <SidebarMenuButton onClick={() => OpenWindowURL("https://www.tunnels.is/support")}>
+                    <PersonStanding width={IconWidth} height={IconHeight} />
+                    Guide
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton onClick={() => OpenWindowURL("https://github.com/tunnels-is/tunnels")}>
+                    <Github width={IconWidth} height={IconHeight} />
+                    Github
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        </SidebarContent>
+      )}
+      {isAuthenticated && <SidebarFooter>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <DropdownMenu>
+              <DropdownMenuTrigger className="w-full">
+                <SidebarMenuButton
+                  size="lg"
+                  className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+                >
+                  <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
+                    <User className="size-4" />
+                  </div>
+                  <div className="grid flex-1 text-left text-sm leading-tight">
+                    <span className="truncate font-semibold">
+                      {user.Email}
+                    </span>
+                    <span className="truncate text-xs">
+                      {formatServer(user.ControlServer)}
+                    </span>
+                  </div>
+                  <ChevronsUpDown className="ml-auto size-4" />
+                </SidebarMenuButton>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                className="w-[--radix-dropdown-menu-trigger-width] min-w-56 rounded-lg"
+                side="bottom"
+                align="end"
+                sideOffset={4}
+              >
+                {user && (
+                  <>
+                    <DropdownMenuLabel className="p-0 font-normal">
+                      <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
+                          <User className="size-4" />
+                        </div>
+                        <div className="grid flex-1 text-left text-sm leading-tight">
+                          <span className="truncate font-semibold">
+                            {user.Email}
+                          </span>
+                          <span className="truncate text-xs">{formatServer(user.ControlServer)}</span>
+                        </div>
+                      </div>
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                  </>
+                )}
+
+                <DropdownMenuLabel className="text-xs text-muted-foreground">
+                  Theme
+                </DropdownMenuLabel>
+                <DropdownMenuItem onClick={() => setTheme("light")}>
+                  <Sun className="mr-2 h-4 w-4" />
+                  <span>Light</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setTheme("dark")}>
+                  <Moon className="mr-2 h-4 w-4" />
+                  <span>Dark</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setTheme("system")}>
+                  <Laptop className="mr-2 h-4 w-4" />
+                  <span>System</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+
+                {user && (
+                  <>
+                    <DropdownMenuItem>
+                      <User className="mr-2 h-4 w-4" />
+                      <span className="truncate">Profile</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleLogout}>
+                      <LogOut className="mr-2 h-4 w-4" />
+                      <span>Logout</span>
+                    </DropdownMenuItem>
+                  </>
+                )}
+                {!user && (
+                  <DropdownMenuItem onClick={() => navigate("/login")}>
+                    <Lock className="mr-2 h-4 w-4" />
+                    <span>Login</span>
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarFooter>}
+
+    </Sidebar>
+  );
+};
+
+export default AppSidebar;

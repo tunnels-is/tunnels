@@ -1,123 +1,98 @@
-import { HashRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Route, Routes, useParams, Navigate } from "react-router-dom";
 import { createRoot } from "react-dom/client";
 import React, { useEffect } from "react";
 import { createPortal } from "react-dom";
-import { Toaster } from "react-hot-toast";
+import { Toaster } from "@/components/ui/sonner";
 
-import "./assets/style/app.scss";
+import "./assets/style/main.css";
 import "@fontsource-variable/inter";
 
-import DNSAnswers from "./App/component/DNSAnswers";
-import PrivateServers from "./App/PrivateServers";
-import ServerDevices from "./App/ServerDevices";
-import ScreenLoader from "./App/ScreenLoader";
-import InspectGroup from "./App/InspectGroup";
-import UserSelect from "./App/UserSelect";
-import Enable2FA from "./App/Enable2FA";
-import Settings from "./App/Settings";
-import Devices from "./App/Devices";
-import Tunnels from "./App/Tunnels";
-import Account from "./App/Account";
-import Welcome from "./App/Welcome";
-import SideBar from "./App/SideBar";
-import GLOBAL_STATE from "./state";
-import Groups from "./App/Groups";
-import Login from "./App/Login";
-import { STATE } from "./state";
-import Users from "./App/Users";
-import Stats from "./App/Stats";
-import Logs from "./App/Logs";
-import STORE from "./store";
-import DNS from "./App/dns";
-import WS from "./ws";
+import DNSAnswers from "./components/DNSAnswers";
+import PrivateServers from "./pages/PrivateServers";
+import ServerDevices from "./pages/ServerDevices";
+import ScreenLoader from "./components/ScreenLoader";
+import InspectGroup from "./pages/InspectGroup";
+import UserSelect from "./pages/UserSelect";
+import Enable2FA from "./pages/Enable2FA";
+import Settings from "./pages/Settings";
+import Devices from "./pages/Devices";
+import Tunnels from "./pages/Tunnels";
+import Account from "./pages/Account";
+import Welcome from "./pages/Welcome";
+import Groups from "./pages/Groups";
+import Login from "./pages/Login";
+import Users from "./pages/Users";
+import Stats from "./pages/Stats";
+import Logs from "./pages/Logs";
+
+import DNS from "./pages/dns";
+import { SidebarProvider } from "@/components/ui/sidebar";
+import AppSidebar from "./components/app-sidebar";
+import { ModeToggle } from "./components/mode-toggle";
+import { ThemeProvider } from "./providers/theme-provider";
+
+import { useInitialState } from "./hooks/useInitialState";
+import { useAtomValue } from "jotai";
+import { isAuthenticatedAtom, userAtom } from "./stores/userStore";
 
 const appElement = document.getElementById("app");
 const root = createRoot(appElement);
 
 const LaunchApp = () => {
-  const state = GLOBAL_STATE("root");
-
-
-  useEffect(() => {
-    state.GetBackendState();
-    WS.NewSocket(WS.GetURL("logs"), "logs", WS.ReceiveLogEvent);
-  }, []);
-
+  useInitialState();
+  const isAuth = useAtomValue(isAuthenticatedAtom);
   return (
-    <HashRouter>
+    <BrowserRouter>
       {createPortal(
-        <Toaster
-          toastOptions={{
-            className: "toast border-[2px] p-6 !text-white !bg-[#0B0E14] !border-[#1a1f2d]",
-            position: "top-right",
-            success: {
-              duration: 2000,
-            },
-
-            icon: null,
-            error: {
-              duration: 2000,
-            },
-          }
-          }
-        />,
-        document.body,
+        <Toaster position="bottom-right" />,
+        document.body
       )}
-      <div className=" bg-black w-full">
-        <ScreenLoader />
-        <SideBar />
+      <ThemeProvider>
+        <ModeToggle />
+        <SidebarProvider>
+          <ScreenLoader />
+          <AppSidebar />
+          <div className="p-4 w-full">
+            <Routes>
+              
+              {!isAuth ? (
+                <>
+                  <Route index path="help" element={<Welcome />} />
+                  <Route path="login" element={<Login />} />
+                  <Route path="*" element={<Navigate to="/login" replace />} />
+                </>
+              ) : (
+                <>
+                  <Route index path="help" element={<Welcome />} />
 
-        <main className="pl-44 pb-[300px]">
-          <div className="">
-            <div className="p-6 w-full">
-              <Routes>
-                {!state.User && (
-                  <>
-                    <Route path="/" element={<Login />} />
-                    <Route path="*" element={<UserSelect />} />
-                  </>
-                )}
+                  <Route path="groups" element={<Groups />} />
+                  <Route path="users" element={<Users />} />
+                  <Route path="devices" element={<Devices />} />
+                  <Route path="groups/:id" element={<InspectGroup />} />
 
-                {state.User && (
-                  <>
-                    <Route path="/" element={<Welcome />} />
-                    <Route path="*" element={<PrivateServers />} />
+                  <Route path="tunnels" element={<Tunnels />} />
+                  <Route path="connections" element={<Stats />} />
+                  <Route path="account" element={<Account />} />
 
-                    <Route path="groups" element={<Groups />} />
-                    <Route path="users" element={<Users />} />
-                    <Route path="devices" element={<Devices />} />
-                    <Route path="groups/:id" element={<InspectGroup />} />
+                  <Route path="servers" element={<PrivateServers />} />
+                  <Route path="twofactor/create" element={<Enable2FA />} />
+                  <Route path="server/:id" element={<ServerDevices />} />
+                  <Route path="logs" element={<Logs />} />
+                  <Route path="settings" element={<Settings />} />
 
-                    <Route path="tunnels" element={<Tunnels />} />
-                    <Route path="connections" element={<Stats />} />
-                    <Route path="account" element={<Account />} />
-
-                    <Route path="servers" element={<PrivateServers />} />
-                    <Route path="server/:id" element={<ServerDevices />} />
-
-                  </>
-                )}
-                <Route path="accounts" element={<UserSelect />} />
-
-
-                <Route path="twofactor/create" element={<Enable2FA />} />
-
-                <Route path="logs" element={<Logs />} />
-                <Route path="settings" element={<Settings />} />
-
-                <Route path="dns" element={<DNS />} />
-                <Route path="dns/answers/:domain" element={<DNSAnswers />} />
-
-                <Route path="login" element={<Login />} />
-                <Route path="login/:modeParam" element={<Login />} />
-                <Route path="help" element={<Welcome />} />
-
-              </Routes>
-            </div>
+                  <Route path="dns" element={<DNS />} />
+                  <Route path="dns/answers/:domain" element={<DNSAnswers />} />
+                  <Route path="accounts" element={<UserSelect />} />
+                  <Route path="*" element={<Navigate to="/help" replace />} />
+                </>
+              )}
+            </Routes>
           </div>
-        </main>
-      </div>
-    </HashRouter>
+
+
+        </SidebarProvider>
+      </ThemeProvider>
+    </BrowserRouter>
   );
 };
 
@@ -140,25 +115,25 @@ class ErrorBoundary extends React.Component {
   }
 
   reloadAll() {
-    STORE.Cache.Clear();
+    sessionStorage.clear();
     window.location.reload();
   }
 
   async quit() {
-    STORE.Cache.Clear();
+    sessionStorage.clear();
     window.location.reload();
   }
 
   async ProductionCheck() {
-    if (!STATE.debug) {
-      window.console.apply = function() { };
-      window.console.dir = function() { };
-      window.console.log = function() { };
-      window.console.info = function() { };
-      window.console.warn = function() { };
-      window.console.error = function() { };
-      window.console.debug = function() { };
-    }
+    // if (!STATE.debug) {
+    // window.console.apply = function () {};
+    // window.console.dir = function () {};
+    // window.console.log = function () {};
+    // window.console.info = function () {};
+    // window.console.warn = function () {};
+    // window.console.error = function () {};
+    // window.console.debug = function () {};
+    // }
   }
 
   render() {
@@ -179,10 +154,17 @@ class ErrorBoundary extends React.Component {
   }
 }
 
+import { QueryProvider } from "./providers/QueryProvider";
+import NotFound from "./pages/not-found";
+
+// ... existing imports
+
 root.render(
   <React.StrictMode>
     <ErrorBoundary>
-      <LaunchApp />
+      <QueryProvider>
+        <LaunchApp />
+      </QueryProvider>
     </ErrorBoundary>
-  </React.StrictMode>,
+  </React.StrictMode>
 );
