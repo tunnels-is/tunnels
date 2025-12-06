@@ -41,7 +41,7 @@
 		"react-qr-code": "2.0.11",
 		"react-router-dom": "6.4.5",
 		"react-spinners": "0.13.7",
-		"tailwind-merge": "3.2.0",
+		"tailwind-merge": "3.4.0",
 		"tailwindcss-animate": "1.0.7",
 		"uuid": "9.0.0",
 		"zod": "3.24.2"
@@ -53,8 +53,8 @@
 		"autoprefixer": "10.4.21",
 		"postcss": "8.5.3",
 		"sass": "1.63.6",
-		"tailwindcss": "3",
-		"vite": "6.3.6"
+		"tailwindcss": "4.1.17",
+		"vite": "6.4.1"
 	},
 	"packageManager": "pnpm@10.10.0+sha512.d615db246fe70f25dcfea6d8d73dee782ce23e2245e3c4f6f888249fb568149318637dca73c2c5c8ef2a4ca0d5657fb9567188bfab47f566d1ee6ce987815c39"
 }
