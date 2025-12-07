@@ -15,7 +15,8 @@ import { userAtom } from "../stores/userStore";
 import { logout } from "../api/auth";
 import { toast } from "sonner";
 import { v4 as uuidv4 } from "uuid";
-import { useUpdateUser, useActivateLicense } from "../hooks/useAccount";
+import { useActivateLicense } from "../hooks/useAccount";
+import { useUpdateUser } from "../hooks/useUsers";
 
 const Account = () => {
   const navigate = useNavigate();

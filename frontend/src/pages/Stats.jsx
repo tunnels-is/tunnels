@@ -127,9 +127,11 @@ const Stats = () => {
 
   return (
     <div className="flex">
-      {activeTunnels?.map(c => {
-        return renderCard(c)
-      })}
+      {activeTunnels ? activeTunnels?.map(renderCard) : (
+        <div className="w-full">
+          <span className="text-center">No active tunnels</span>
+        </div>
+      )}
     </div >
   )
 }

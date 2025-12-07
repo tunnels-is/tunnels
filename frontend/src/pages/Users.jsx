@@ -2,21 +2,21 @@ import React, { useState } from "react";
 import dayjs from "dayjs";
 import GenericTable from "../components/GenericTable";
 import NewObjectEditorDialog from "@/components/NewObjectEditorDialog";
-import { useUsers, useAdminUpdateUser } from "../hooks/useUsers";
+import { useUsers, useUpdateUser } from "../hooks/useUsers";
 import { toast } from "sonner";
 
 const Users = () => {
   const [offset, setOffset] = useState(0);
   const [limit, setLimit] = useState(50);
   const { data: users, refetch } = useUsers();
-  const adminUpdateUserMutation = useAdminUpdateUser();
+  const updateUserMutation = useUpdateUser();
 
   const [selectedUser, setSelectedUser] = useState(undefined)
   const [modalOpen, setModalOpen] = useState(false)
 
   const saveUser = async (user) => {
     try {
-      await adminUpdateUserMutation.mutateAsync(user);
+      await updateUserMutation.mutateAsync(user);
       toast.success("User updated successfully");
       setModalOpen(false);
     } catch (e) {

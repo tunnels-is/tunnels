@@ -4,13 +4,14 @@ import {
   userAtom,
   defaultEmailAtom,
   defaultDeviceNameAtom,
-} from "../stores/userStore";
+  accountsAtom,
+} from "../../stores/userStore";
 import {
   configAtom,
   controlServerAtom,
   controlServersAtom,
-} from "../stores/configStore";
-import { useSaveControlServer } from "../hooks/useControlServers";
+} from "../../stores/configStore";
+import { useSaveControlServer } from "../../hooks/useControlServers";
 import { v4 as uuidv4 } from "uuid";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
@@ -18,29 +19,8 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupInput,
-} from "@/components/ui/input-group";
-import { ButtonGroup } from "@/components/ui/button-group";
-import {
-  Edit2 as Edit2Icon,
-  CopyPlus as CopyPlusIcon,
-  Monitor as DesktopIcon,
-  Lock as LockClosedIcon,
-  Mail as EnvelopeClosedIcon,
-  Frame as FrameIcon,
-} from "lucide-react";
-import AuthServerEditorDialog from "../components/AuthServerEditorDialog";
+
+import { AuthServerEditorDialog, AuthServerSelect } from "./auth-server-select";
 import { toast } from "sonner";
 import {
   useLoginUser,
@@ -48,258 +28,21 @@ import {
   useEnableUser,
   useResetPassword,
   useSendResetCode,
-  useSaveUserToDisk,
-} from "../hooks/useAuth";
-import { useSaveConfig } from "../hooks/useConfig";
+  useSetUser,
+} from "../../hooks/useAuth";
+import {
+  EmailInput,
+  PasswordInput,
+  ConfirmPasswordInput,
+  CodeInput,
+  TokenInput,
+  TwoFactorInput,
+  RecoveryInput,
+  ResetTwoFactorCodeInput,
+  DeviceInput
+} from "./inputs";
 
-const EmailInput = ({ value, error, onChange }) => (
-  <div className="space-y-2">
-    <InputGroup className="h-11">
-      <InputGroupAddon>
-        <EnvelopeClosedIcon className="h-5 w-5 text-[#4B7BF5]" />
-      </InputGroupAddon>
-      <InputGroupInput
-        id="email"
-        type="email"
-        placeholder="Email / Token"
-        value={value || ""}
-        name="email"
-        onChange={onChange}
-      />
-    </InputGroup>
-    {error && <p className="text-sm text-red-500">{error}</p>}
-  </div>
-);
-
-const DeviceInput = ({ value, error, onChange }) => (
-  <div className="space-y-2">
-    <InputGroup className="h-11">
-      <InputGroupAddon>
-        <DesktopIcon className="h-5 w-5 text-[#4B7BF5]" />
-      </InputGroupAddon>
-      <InputGroupInput
-        id="devicename"
-        type="text"
-        placeholder="Device Name"
-        value={value || ""}
-        name="devicename"
-        onChange={onChange}
-      />
-    </InputGroup>
-    {error && <p className="text-sm text-red-500">{error}</p>}
-  </div>
-);
-
-const PasswordInput = ({ value, error, onChange }) => (
-  <div className="space-y-2">
-    <InputGroup className="h-11">
-      <InputGroupAddon>
-        <LockClosedIcon className="h-5 w-5 text-[#4B7BF5]" />
-      </InputGroupAddon>
-      <InputGroupInput
-        id="password"
-        type="password"
-        placeholder="Password"
-        value={value || ""}
-        name="password"
-        onChange={onChange}
-      />
-    </InputGroup>
-    {error && <p className="text-sm text-red-500">{error}</p>}
-  </div>
-);
-
-const TwoFactorInput = ({ value, error, onChange }) => (
-  <div className="space-y-2">
-    <InputGroup className="h-11">
-      <InputGroupAddon>
-        <LockClosedIcon className="h-5 w-5 text-[#4B7BF5]" />
-      </InputGroupAddon>
-      <InputGroupInput
-        id="digits"
-        type="text"
-        placeholder="Two-Factor Auth Code (Optional)"
-        value={value || ""}
-        name="digits"
-        onChange={onChange}
-      />
-    </InputGroup>
-    {error && <p className="text-sm text-red-500">{error}</p>}
-  </div>
-);
-
-const ConfirmPasswordInput = ({ value, error, onChange }) => (
-  <div className="space-y-2">
-    <InputGroup className="h-11">
-      <InputGroupAddon>
-        <LockClosedIcon className="h-5 w-5 text-muted-foreground" />
-      </InputGroupAddon>
-      <InputGroupInput
-        id="password2"
-        type="password"
-        placeholder="Confirm Password"
-        value={value || ""}
-        name="password2"
-        onChange={onChange}
-      />
-    </InputGroup>
-    {error && <p className="text-sm text-destructive">{error}</p>}
-  </div>
-);
-
-const TokenInput = ({ value, error, onChange }) => (
-  <div className="space-y-2">
-    <InputGroup className="h-11">
-      <InputGroupAddon>
-        <FrameIcon className="h-5 w-5 text-[#4B7BF5]" />
-      </InputGroupAddon>
-      <InputGroupInput
-        id="token"
-        type="text"
-        placeholder="Token"
-        value={value || ""}
-        name="email"
-        onChange={onChange}
-      />
-    </InputGroup>
-    {value && (
-      <Alert variant="destructive" className="mt-2">
-        <AlertDescription className="font-semibold">
-          SAVE THIS TOKEN!
-        </AlertDescription>
-      </Alert>
-    )}
-    {error && <p className="text-sm text-red-500">{error}</p>}
-  </div>
-);
-
-const CodeInput = ({ error, onChange }) => (
-  <div className="space-y-2">
-    <InputGroup className="h-11">
-      <InputGroupAddon>
-        <FrameIcon className="h-5 w-5 text-[#4B7BF5]" />
-      </InputGroupAddon>
-      <InputGroupInput
-        id="code"
-        type="text"
-        placeholder="Code"
-        name="code"
-        onChange={onChange}
-      />
-    </InputGroup>
-    {error && <p className="text-sm text-red-500">{error}</p>}
-  </div>
-);
-
-const ResetTwoFactorCodeInput = ({ error, onChange }) => (
-  <div className="space-y-2">
-    <InputGroup className="h-11">
-      <InputGroupAddon>
-        <FrameIcon className="h-5 w-5 text-[#4B7BF5]" />
-      </InputGroupAddon>
-      <InputGroupInput
-        id="code"
-        type="text"
-        placeholder="Reset Code sent in email"
-        name="code"
-        onChange={onChange}
-      />
-    </InputGroup>
-    {error && <p className="text-sm text-red-500">{error}</p>}
-  </div>
-);
-
-const RecoveryInput = ({ value, error, onChange }) => (
-  <div className="space-y-2">
-    <InputGroup className="h-11">
-      <InputGroupAddon>
-        <FrameIcon className="h-5 w-5 text-[#4B7BF5]" />
-      </InputGroupAddon>
-      <InputGroupInput
-        id="recovery"
-        type="text"
-        placeholder="Two Factor Recovery Code"
-        value={value || ""}
-        name="recovery"
-        onChange={onChange}
-      />
-    </InputGroup>
-    {error && <p className="text-sm text-red-500">{error}</p>}
-  </div>
-);
-
-const AuthServerSelect = ({ setModalOpen, setNewAuth }) => {
-  const [authServer, setAuthServer] = useAtom(controlServerAtom);
-  const controlServers = useAtomValue(controlServersAtom);
-
-  const changeAuthServer = useCallback(
-    (id) => {
-      controlServers.forEach((s) => {
-        if (s.ID === id) setAuthServer(s);
-      });
-    },
-    [controlServers, setAuthServer]
-  );
-
-  const opts = useMemo(() => {
-    const options = [];
-    let tunID = "";
-    controlServers.forEach((s) => {
-      if (s.Host.includes("api.tunnels.is")) {
-        tunID = s.ID;
-      }
-      options.push({
-        value: s.ID,
-        key: s.Host + ":" + s.Port,
-        selected: s.ID === authServer?.ID,
-      });
-    });
-    return { options, tunID };
-  }, [controlServers, authServer?.ID]);
-
-  return (
-    <div className="flex items-start">
-      <Select
-        value={authServer ? authServer.ID : opts.tunID}
-        onValueChange={changeAuthServer}
-      >
-        <SelectTrigger className="w-[320px]">
-          <SelectValue placeholder="Select Auth Server" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectGroup>
-            {opts.options.map((t) => (
-              <SelectItem key={t.value} value={t.value}>
-                {t.key}
-              </SelectItem>
-            ))}
-          </SelectGroup>
-        </SelectContent>
-      </Select>
-      <ButtonGroup className="ml-4 mt-[2px]">
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={() => setModalOpen(true)}
-        >
-          <CopyPlusIcon className="h-4 w-4" />
-        </Button>
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={() => {
-            setNewAuth(authServer);
-            setModalOpen(true);
-          }}
-        >
-          <Edit2Icon className="h-4 w-4" />
-        </Button>
-      </ButtonGroup>
-    </div>
-  );
-};
-
-const LoginForm = ({
+export const LoginForm = ({
   config,
   authServer,
   setModalOpen,
@@ -312,9 +55,10 @@ const LoginForm = ({
   const [defaultDeviceName, setDefaultDeviceName] = useAtom(
     defaultDeviceNameAtom
   );
+  const [accounts, setAccounts] = useAtom(accountsAtom);
   const navigate = useNavigate();
   const loginMutation = useLoginUser();
-  const saveUserMutation = useSaveUserToDisk();
+  const setUserMutation = useSetUser();
 
   const [inputs, setInputs] = useState({
     email: "",
@@ -377,8 +121,14 @@ const LoginForm = ({
       if (data) {
         setDefaultDeviceName(inputs["devicename"]);
         setDefaultEmail(inputs["email"]);
-        setUser({ ...data, ControlServer: authServer, ID: data._id });
-        if (remember) saveUserMutation.mutate(data);
+        const newUser = { ...data, ControlServer: authServer, ID: data._id };
+        setUser(newUser);
+
+        setAccounts((prev) => {
+          const existing = prev.filter((u) => u.ID !== newUser.ID);
+          return [...existing, newUser];
+        });
+        setUserMutation.mutate(newUser);
         navigate("/servers");
       }
     } catch (error) {
@@ -431,11 +181,17 @@ const LoginForm = ({
   );
 };
 
-const RegisterForm = ({ config, authServer, setModalOpen, setNewAuth }) => {
+export const RegisterForm = ({
+  config,
+  authServer,
+  setModalOpen,
+  setNewAuth,
+}) => {
   const setUser = useSetAtom(userAtom);
+  const [accounts, setAccounts] = useAtom(accountsAtom);
   const navigate = useNavigate();
   const registerMutation = useRegisterUser();
-  const saveUserMutation = useSaveUserToDisk();
+  const setUserMutation = useSetUser();
 
   const [inputs, setInputs] = useState({
     email: "",
@@ -510,8 +266,12 @@ const RegisterForm = ({ config, authServer, setModalOpen, setNewAuth }) => {
       console.log("User registered", data);
       if (data) {
         data.ControlServer = authServer;
+        await setUserMutation.mutateAsync(data);
         setUser(data);
-        // Assuming remember is false for register as per original UI
+        setAccounts((prev) => {
+          const existing = prev.filter((u) => u.ID !== data.ID);
+          return [...existing, data];
+        });
         navigate("/servers");
       }
     } catch (error) {
@@ -580,8 +340,10 @@ const RegisterForm = ({ config, authServer, setModalOpen, setNewAuth }) => {
 
 const RegisterAnonForm = ({ config, authServer, setModalOpen, setNewAuth }) => {
   const setUser = useSetAtom(userAtom);
+  const [accounts, setAccounts] = useAtom(accountsAtom);
   const navigate = useNavigate();
   const registerMutation = useRegisterUser();
+  const setUserMutation = useSetUser();
 
   const [inputs, setInputs] = useState({});
   const [errors, setErrors] = useState({});
@@ -620,7 +382,12 @@ const RegisterAnonForm = ({ config, authServer, setModalOpen, setNewAuth }) => {
       });
       if (data) {
         data.ControlServer = authServer;
+        await setUserMutation.mutateAsync(data);
         setUser(data);
+        setAccounts((prev) => {
+          const existing = prev.filter((u) => u.ID !== data.ID);
+          return [...existing, data];
+        });
         navigate("/servers");
       }
     } catch (error) {}
@@ -888,7 +655,7 @@ const EnableAccountForm = ({
         data: { Email: inputs["email"], ConfirmCode: inputs["code"] },
       });
       setInputs((prev) => ({ ...prev, code: "" }));
-      setMode(6); // Stay or move? Original stayed or moved? Original setMode(6) which is self?
+      setMode(6);
     } catch (error) {}
   };
 
@@ -918,14 +685,12 @@ const EnableAccountForm = ({
 
 // --- Main Component ---
 
-const Login = (props) => {
+export default function LoginPage() {
   const [authServer, setAuthServer] = useAtom(controlServerAtom);
   const controlServers = useAtomValue(controlServersAtom);
   const saveControlServer = useSaveControlServer();
 
-  const [mode, setMode] = useState(
-    props.mode ? Number(props.mode) : props.mode === 0 ? 1 : 1
-  );
+  const [mode, setMode] = useState(1);
   const [modalOpen, setModalOpen] = useState(false);
   const [newAuth, setNewAuth] = useState({
     ID: uuidv4(),
@@ -1023,6 +788,4 @@ const Login = (props) => {
       />
     </div>
   );
-};
-
-export default Login;
+}

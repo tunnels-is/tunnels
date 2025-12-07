@@ -1,7 +1,7 @@
 import { useNavigate, useLocation, Link, NavLink } from "react-router-dom";
 import React, { useRef } from "react";
 import { useAtomValue, useSetAtom, useAtom } from "jotai";
-import { userAtom, isAuthenticatedAtom } from "@/stores/userStore";
+import { userAtom, isAuthenticatedAtom, accountsAtom } from "@/stores/userStore";
 import { controlServerAtom } from "@/stores/configStore";
 import { activeTunnelsAtom } from "@/stores/tunnelStore";
 import { logout } from "@/api/auth";
@@ -30,6 +30,7 @@ import {
   Laptop,
   Logs,
   PersonStanding,
+  Crown
 } from "lucide-react";
 import {
   Sidebar,
@@ -51,6 +52,7 @@ import {
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import { useTheme } from "@/providers/theme-provider";
+import { useSetUser } from "@/hooks/useAuth";
 
 const IconWidth = 20;
 const IconHeight = 20;
@@ -90,8 +92,11 @@ const AppSidebar = () => {
   const user = useAtomValue(userAtom);
   const isAuthenticated = useAtomValue(isAuthenticatedAtom);
   const setUser = useSetAtom(userAtom);
+  const [accounts, setAccounts] = useAtom(accountsAtom);
   const activeTunnels = useAtomValue(activeTunnelsAtom);
   const { setTheme } = useTheme();
+  const setUserMutation = useSetUser();
+
 
   const formatServer = (server) => server.Host + " : " + server.Port;
 
@@ -104,32 +109,26 @@ const AppSidebar = () => {
     if (user?.DeviceToken) {
       try {
         await logout({ DeviceToken: user.DeviceToken.DT, UserID: user.ID, All: false });
+        await setUserMutation.mutateAsync(null);
       } catch (e) {
         console.error("Logout failed", e);
       }
     }
+    setAccounts((prev) => prev.filter((u) => u.ID !== user.ID));
     setUser(null);
     navigate("/login");
   };
 
-
-
-  const isManager = () => {
-    if (user?.IsAdmin === true || user?.IsManager === true) {
-      return true;
-    }
-    return false;
+  const handleAddAccount = () => {
+    navigate("/login");
   };
 
-  const hasActiveTunnels = () => {
-    if (activeTunnels?.length > 0) {
-      return true;
-    }
-    return false;
+  const handleSwitchAccount = async (account) => {
+    setUser(account);
+    await setUserMutation.mutateAsync(account);
+    navigate("/servers");
   };
 
-  console.log(`isAuthenticated: ${isAuthenticated}`);
-  console.log(`user: ${user}`)
 
   return (
     <Sidebar>
@@ -156,7 +155,7 @@ const AppSidebar = () => {
             </SidebarGroupContent>
           </SidebarGroup>
           {
-            user.IsAdmin && (
+            user?.IsAdmin && (
               <SidebarGroup>
                 <SidebarGroupLabel>Admin</SidebarGroupLabel>
                 <SidebarGroupContent>
@@ -174,7 +173,6 @@ const AppSidebar = () => {
             <SidebarGroupContent>
               <SidebarMenu>
                 <AppSidebarButton Icon={Settings} Label="Settings" Route="settings" />
-                <AppSidebarButton Icon={Users} Label="Accounts" Route="accounts" />
                 <AppSidebarButton Icon={Logs} Label="Logs" Route="logs" />
               </SidebarMenu>
             </SidebarGroupContent>
@@ -211,7 +209,7 @@ const AppSidebar = () => {
                   className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
                 >
                   <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-                    <User className="size-4" />
+                    {user.IsAdmin ? <Crown className="size-4" /> : <User className="size-4" />}
                   </div>
                   <div className="grid flex-1 text-left text-sm leading-tight">
                     <span className="truncate font-semibold">
@@ -235,7 +233,7 @@ const AppSidebar = () => {
                     <DropdownMenuLabel className="p-0 font-normal">
                       <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
                         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-                          <User className="size-4" />
+                          {user.IsAdmin ? <Crown className="size-4" /> : <User className="size-4" />}
                         </div>
                         <div className="grid flex-1 text-left text-sm leading-tight">
                           <span className="truncate font-semibold">
@@ -248,6 +246,28 @@ const AppSidebar = () => {
                     <DropdownMenuSeparator />
                   </>
                 )}
+
+                <DropdownMenuLabel className="text-xs text-muted-foreground">
+                  Accounts
+                </DropdownMenuLabel>
+                {accounts.filter((u) => u.ID !== user?.ID).map((account) => (
+                  <DropdownMenuItem key={account.ID} onClick={() => handleSwitchAccount(account)}>
+                    <User className="mr-2 h-4 w-4" />
+                    <div className="grid flex-1 text-left text-sm leading-tight">
+                      <span className="truncate font-semibold">
+                        {account.Email}
+                      </span>
+                      <span className="truncate text-xs">{formatServer(account.ControlServer)}</span>
+                    </div>
+                  </DropdownMenuItem>
+                ))}
+                <DropdownMenuItem asChild>
+                  <Link to="/login">
+                    <Plus className="h-4 w-4" />
+                    <span>Add Account</span>
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
 
                 <DropdownMenuLabel className="text-xs text-muted-foreground">
                   Theme
@@ -268,9 +288,11 @@ const AppSidebar = () => {
 
                 {user && (
                   <>
-                    <DropdownMenuItem>
-                      <User className="mr-2 h-4 w-4" />
-                      <span className="truncate">Profile</span>
+                    <DropdownMenuItem asChild>
+                      <Link to="/profile">
+                        <User className="mr-2 h-4 w-4" />
+                        <span className="truncate">Profile</span>
+                      </Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={handleLogout}>
                       <LogOut className="mr-2 h-4 w-4" />
@@ -290,7 +312,7 @@ const AppSidebar = () => {
         </SidebarMenu>
       </SidebarFooter>}
 
-    </Sidebar>
+    </Sidebar >
   );
 };
 

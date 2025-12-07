@@ -20,11 +20,11 @@ import Tunnels from "./pages/Tunnels";
 import Account from "./pages/Account";
 import Welcome from "./pages/Welcome";
 import Groups from "./pages/Groups";
-import Login from "./pages/Login";
+import LoginPage from "./pages/login";
 import Users from "./pages/Users";
 import Stats from "./pages/Stats";
 import Logs from "./pages/Logs";
-
+import Profile from "./pages/profile";
 import DNS from "./pages/dns";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import AppSidebar from "./components/app-sidebar";
@@ -48,17 +48,15 @@ const LaunchApp = () => {
         document.body
       )}
       <ThemeProvider>
-        <ModeToggle />
         <SidebarProvider>
-          <ScreenLoader />
           <AppSidebar />
-          <div className="p-4 w-full">
+          <div className="px-4 w-full">
             <Routes>
-              
+
               {!isAuth ? (
                 <>
                   <Route index path="help" element={<Welcome />} />
-                  <Route path="login" element={<Login />} />
+                  <Route path="login" element={<LoginPage />} />
                   <Route path="*" element={<Navigate to="/login" replace />} />
                 </>
               ) : (
@@ -83,6 +81,8 @@ const LaunchApp = () => {
                   <Route path="dns" element={<DNS />} />
                   <Route path="dns/answers/:domain" element={<DNSAnswers />} />
                   <Route path="accounts" element={<UserSelect />} />
+                  <Route path="profile" element={<Profile />} />
+                  <Route path="login" element={<LoginPage />} />
                   <Route path="*" element={<Navigate to="/help" replace />} />
                 </>
               )}

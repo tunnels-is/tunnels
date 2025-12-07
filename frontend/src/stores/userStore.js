@@ -8,3 +8,4 @@ export const isAuthenticatedAtom = atom((get) => get(userAtom) !== null);
 
 export const defaultEmailAtom = atomWithStorage("default-email", "");
 export const defaultDeviceNameAtom = atomWithStorage("default-device-name", "");
+export const accountsAtom = atomWithStorage("accounts", []);

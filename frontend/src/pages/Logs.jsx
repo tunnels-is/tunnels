@@ -17,7 +17,7 @@ export default function LogsPage() {
     const connectWebSocket = () => {
       try {
         let host = window.location.hostname;
-        const ws = new WebSocket(`ws://${host}/logs`);
+        const ws = new WebSocket(`wss://${host}:7777/logs`);
         wsRef.current = ws;
 
         ws.onopen = () => {
@@ -148,7 +148,7 @@ export default function LogsPage() {
   };
 
   return (
-    <div className="w-full p-4 mt-20">
+    <div className="w-full p-4">
       <div className="flex flex-row items-center justify-between space-y-0 pb-4">
         <h3 className="text-xl font-semibold">Server Logs</h3>
         <div className="flex items-center gap-4">
