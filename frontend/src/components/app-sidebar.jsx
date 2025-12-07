@@ -2,8 +2,7 @@ import { useNavigate, useLocation, Link, NavLink } from "react-router-dom";
 import React, { useRef } from "react";
 import { useAtomValue, useSetAtom, useAtom } from "jotai";
 import { userAtom, isAuthenticatedAtom, accountsAtom } from "@/stores/userStore";
-import { controlServerAtom } from "@/stores/configStore";
-import { activeTunnelsAtom } from "@/stores/tunnelStore";
+import { toast } from "sonner";
 import { logout } from "@/api/auth";
 import { cn } from "@/lib/utils";
 import {
@@ -93,7 +92,6 @@ const AppSidebar = () => {
   const isAuthenticated = useAtomValue(isAuthenticatedAtom);
   const setUser = useSetAtom(userAtom);
   const [accounts, setAccounts] = useAtom(accountsAtom);
-  const activeTunnels = useAtomValue(activeTunnelsAtom);
   const { setTheme } = useTheme();
   const setUserMutation = useSetUser();
 
@@ -106,21 +104,28 @@ const AppSidebar = () => {
   };
 
   const handleLogout = async () => {
+    const newAccounts = accounts.filter((u) => u.ID !== user.ID);
+    console.log("remaining accounts", newAccounts)
     if (user?.DeviceToken) {
+      console.log("logging out", user)
       try {
-        await logout({ DeviceToken: user.DeviceToken.DT, UserID: user.ID, All: false });
-        await setUserMutation.mutateAsync(null);
+        await logout({ DeviceToken: user.DeviceToken.DT, LogoutToken: user.DeviceToken.DT, UID: user.ID, All: false });
+        if (newAccounts.length > 0) {
+          await setUserMutation.mutateAsync(newAccounts[0]);
+          setUser(newAccounts[0]);
+        }
+        else {
+          await setUserMutation.mutateAsync(null);
+          setUser(null);
+        }
+        setAccounts(newAccounts);
+        navigate("/login");
       } catch (e) {
         console.error("Logout failed", e);
+        toast.error("Logout failed");
       }
     }
-    setAccounts((prev) => prev.filter((u) => u.ID !== user.ID));
-    setUser(null);
-    navigate("/login");
-  };
 
-  const handleAddAccount = () => {
-    navigate("/login");
   };
 
   const handleSwitchAccount = async (account) => {
