@@ -69,3 +69,26 @@ export function formatNodeKey(key, value, pub) {
 }
 
 
+export function ActiveRouterSet(state) {
+  if (!state) {
+    return false;
+  } else if (!state.ActiveRouter) {
+    return false;
+  } else if (state.ActiveRouter.PublicIP === "") {
+    return false;
+  }
+  return true;
+}
+
+export function filterRoutersFromState(state) {
+  if (!state || !state.Routers) return [];
+  const routers = state.Routers.filter((r) => {
+    if (r !== null) {
+      return true;
+    }
+    return false;
+  });
+  return routers;
+}
+
+

@@ -1,0 +1,108 @@
+import React, { useMemo } from "react";
+import dayjs from "dayjs";
+import CustomTable from "@/components/custom-table";
+import { useParams } from "react-router-dom";
+import { useServers } from "@/hooks/useServers";
+import { useConnectedDevices } from "@/hooks/useDevices";
+import { useAtomValue } from "jotai";
+import { userAtom } from "@/stores/userStore";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Activity, Server } from "lucide-react";
+
+export default function ServerDevices() {
+  const user = useAtomValue(userAtom);
+  const { id } = useParams()
+
+  // We need the server list to find the IP of the current server
+  const { data: servers } = useServers(user?.ControlServer);
+
+  const server = servers?.find(s => s._id === id);
+  const serverIp = server?.IP;
+
+  const { data: connectedDevicesData } = useConnectedDevices(user?.ControlServer, serverIp);
+  const connectedDevices = connectedDevicesData || { Devices: [], DHCPAssigned: 0 };
+
+  const columns = useMemo(() => [
+    {
+      header: "Connected",
+      accessorKey: "Created",
+      cell: ({ row }) => dayjs(row.original.Created).format("HH:mm:ss DD-MM-YYYY")
+    },
+    {
+      header: "Activity",
+      accessorKey: "Activity",
+      cell: ({ row }) => row.original.DHCP?.Activity ? dayjs(row.original.DHCP.Activity).format("HH:mm:ss DD-MM-YYYY") : ""
+    },
+    {
+      header: "IP",
+      accessorKey: "IP",
+      cell: ({ row }) => row.original.DHCP?.IP ? row.original.DHCP.IP.join(".") : ""
+    },
+    {
+      header: "Device",
+      accessorKey: "Token",
+      cell: ({ row }) => row.original.DHCP?.Token || ""
+    },
+    {
+      header: "Hostname",
+      accessorKey: "Hostname",
+      cell: ({ row }) => row.original.DHCP?.Hostname || ""
+    },
+    {
+      header: "Ports",
+      accessorKey: "Ports",
+      cell: ({ row }) => `${row.original.StartPort} - ${row.original.EndPort}`
+    },
+    {
+      header: "CPU",
+      accessorKey: "CPU",
+    },
+    {
+      header: "RAM",
+      accessorKey: "RAM",
+    },
+    {
+      header: "DISK",
+      accessorKey: "Disk",
+    },
+  ], []);
+
+  return (
+    <div className="w-full mt-16 space-y-6">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-white">
+            {server?.Tag ? `${server.Tag} - Connected Devices` : "Server Devices"}
+          </h1>
+          <p className="text-muted-foreground">View devices connected to this server.</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <Card className="bg-[#0B0E14] border-[#1a1f2d]">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Connected Devices</CardTitle>
+            <Activity className="h-4 w-4 text-green-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-white">{connectedDevices.DHCPAssigned}</div>
+            <p className="text-xs text-muted-foreground">Currently active</p>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-[#0B0E14] border-[#1a1f2d]">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Server</CardTitle>
+            <Server className="h-4 w-4 text-blue-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-white">{server?.Tag || "N/A"}</div>
+            <p className="text-xs text-muted-foreground font-mono">{serverIp || "No IP"}</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <CustomTable data={connectedDevices.Devices || []} columns={columns} />
+    </div>
+  )
+}

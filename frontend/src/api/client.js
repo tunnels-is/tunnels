@@ -39,7 +39,6 @@ export const forwardToController = async (method, path, data, auth = false) => {
   const store = getDefaultStore();
   const controlServer = store.get(controlServerAtom);
   const user = store.get(userAtom);
-  console.log("control server: ", controlServer);
   const body = {
     Server: controlServer,
     Path: path,
@@ -47,7 +46,6 @@ export const forwardToController = async (method, path, data, auth = false) => {
     JSONData: auth ? { ...data, UID: user.ID, DeviceToken: user.DeviceToken.DT, Email: user.Email } : data,
     Timeout: 20000,
   };
-  console.log(body)
   const response = await client.post("/forwardToController", body);
   return response.data;
 };

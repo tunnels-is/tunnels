@@ -26,7 +26,7 @@ import { toast } from "sonner";
 import { GetEncType } from "@/lib/helpers";
 
 
-const TunnelCard = ({ tunnel, onConnect, onEdit, onDelete }) => {
+export default function TunnelCard({ tunnel, onConnect, onEdit, onDelete }) {
   const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text);
     toast.success("Copied to clipboard");
@@ -107,4 +107,4 @@ const TunnelCard = ({ tunnel, onConnect, onEdit, onDelete }) => {
   );
 };
 
-export default TunnelCard;
+

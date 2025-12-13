@@ -7,33 +7,27 @@ import { Toaster } from "@/components/ui/sonner";
 import "./assets/style/main.css";
 import "@fontsource-variable/inter";
 
-import DNSAnswers from "./components/DNSAnswers";
-import PrivateServers from "./pages/PrivateServers";
-import ServerDevices from "./pages/ServerDevices";
-import ScreenLoader from "./components/ScreenLoader";
-import InspectGroup from "./pages/InspectGroup";
-import UserSelect from "./pages/UserSelect";
-import Enable2FA from "./pages/Enable2FA";
-import Settings from "./pages/Settings";
-import Devices from "./pages/Devices";
-import Tunnels from "./pages/Tunnels";
-import Account from "./pages/Account";
-import Welcome from "./pages/Welcome";
-import Groups from "./pages/Groups";
+import ServersPage, { ServerDevices } from "./pages/servers";
+import SettingsPage from "./pages/settings";
+import DevicesPage from "./pages/devices";
+import TunnelsPage from "./pages/tunnels";
+import HelpPage from "./pages/help";
+import GroupsPage, { InspectGroup } from "./pages/groups";
 import LoginPage from "./pages/login";
-import Users from "./pages/Users";
-import Stats from "./pages/Stats";
-import Logs from "./pages/Logs";
-import Profile from "./pages/profile";
-import DNS from "./pages/dns";
+import StatsPage from "./pages/connections";
+import LogsPage from "./pages/logs";
+import ProfilePage from "./pages/profile";
+import DNSPage, { DNSAnswers } from "./pages/dns";
+import UsersPage from "./pages/users";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import AppSidebar from "./components/app-sidebar";
-import { ModeToggle } from "./components/mode-toggle";
+
+import { QueryProvider } from "./providers/query-provider";
 import { ThemeProvider } from "./providers/theme-provider";
 
 import { useInitialState } from "./hooks/useInitialState";
 import { useAtomValue } from "jotai";
-import { isAuthenticatedAtom, userAtom } from "./stores/userStore";
+import { isAuthenticatedAtom } from "./stores/userStore";
 
 const appElement = document.getElementById("app");
 const root = createRoot(appElement);
@@ -55,35 +49,32 @@ const LaunchApp = () => {
 
               {!isAuth ? (
                 <>
-                  <Route index path="help" element={<Welcome />} />
+                  <Route index path="help" element={<HelpPage />} />
                   <Route path="login" element={<LoginPage />} />
                   <Route path="*" element={<Navigate to="/login" replace />} />
                 </>
               ) : (
                 <>
-                  <Route index path="help" element={<Welcome />} />
+                  <Route index path="help" element={<HelpPage />} />
 
-                  <Route path="groups" element={<Groups />} />
-                  <Route path="users" element={<Users />} />
-                  <Route path="devices" element={<Devices />} />
+                  <Route path="groups" element={<GroupsPage />} />
+                  <Route path="users" element={<UsersPage />} />
+                  <Route path="devices" element={<DevicesPage />} />
                   <Route path="groups/:id" element={<InspectGroup />} />
 
-                  <Route path="tunnels" element={<Tunnels />} />
-                  <Route path="connections" element={<Stats />} />
-                  <Route path="account" element={<Account />} />
+                  <Route path="tunnels" element={<TunnelsPage />} />
+                  <Route path="connections" element={<StatsPage />} />
 
-                  <Route path="servers" element={<PrivateServers />} />
-                  <Route path="twofactor/create" element={<Enable2FA />} />
+                  <Route path="servers" element={<ServersPage />} />
                   <Route path="server/:id" element={<ServerDevices />} />
-                  <Route path="logs" element={<Logs />} />
-                  <Route path="settings" element={<Settings />} />
+                  <Route path="logs" element={<LogsPage />} />
+                  <Route path="settings" element={<SettingsPage />} />
 
-                  <Route path="dns" element={<DNS />} />
+                  <Route path="dns" element={<DNSPage />} />
                   <Route path="dns/answers/:domain" element={<DNSAnswers />} />
-                  <Route path="accounts" element={<UserSelect />} />
-                  <Route path="profile" element={<Profile />} />
+                  <Route path="profile" element={<ProfilePage />} />
                   <Route path="login" element={<LoginPage />} />
-                  <Route path="*" element={<Navigate to="/help" replace />} />
+                  <Route path="*" element={<Navigate to="/" />} />
                 </>
               )}
             </Routes>
@@ -154,10 +145,6 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-import { QueryProvider } from "./providers/QueryProvider";
-import NotFound from "./pages/not-found";
-
-// ... existing imports
 
 root.render(
   <React.StrictMode>

@@ -29,7 +29,8 @@ import {
   Laptop,
   Logs,
   PersonStanding,
-  Crown
+  Crown,
+  Zap
 } from "lucide-react";
 import {
   Sidebar,
@@ -105,9 +106,8 @@ const AppSidebar = () => {
 
   const handleLogout = async () => {
     const newAccounts = accounts.filter((u) => u.ID !== user.ID);
-    console.log("remaining accounts", newAccounts)
+
     if (user?.DeviceToken) {
-      console.log("logging out", user)
       try {
         await logout({ DeviceToken: user.DeviceToken.DT, LogoutToken: user.DeviceToken.DT, UID: user.ID, All: false });
         if (newAccounts.length > 0) {
@@ -156,6 +156,7 @@ const AppSidebar = () => {
                 <AppSidebarButton Icon={Shield} Label="VPN" Route="servers" />
                 <AppSidebarButton Icon={LinkIcon} Label="Connections" Route="connections" />
                 <AppSidebarButton Icon={Container} Label="DNS" Route="dns" />
+                <AppSidebarButton Icon={Zap} Label="Tunnels" Route="tunnels" />
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
@@ -255,8 +256,8 @@ const AppSidebar = () => {
                 <DropdownMenuLabel className="text-xs text-muted-foreground">
                   Accounts
                 </DropdownMenuLabel>
-                {accounts.filter((u) => u.ID !== user?.ID).map((account) => (
-                  <DropdownMenuItem key={account.ID} onClick={() => handleSwitchAccount(account)}>
+                {accounts.filter((u) => u.ID !== user?.ID).map((account, idx) => (
+                  <DropdownMenuItem key={idx} onClick={() => handleSwitchAccount(account)}>
                     <User className="mr-2 h-4 w-4" />
                     <div className="grid flex-1 text-left text-sm leading-tight">
                       <span className="truncate font-semibold">

@@ -2,6 +2,7 @@ import { forwardToController } from "./client";
 
 export const getUsers = async ({ offset, limit }) => {
   const data = await forwardToController("POST", "/v3/user/list", { Offset: offset, Limit: limit }, true);
+  console.log("getUsers() = ", data);
   return data;
 };
 

@@ -1,8 +1,8 @@
 import React from "react";
-import { SupportPlatforms } from "../lib/constants";
-import Logo from "../assets/images/fav/logo.svg";
-import DiscordLogo from "../assets/images/Discord-Symbol-White.svg";
-import RedditLogo from "../assets/images/reddit-logo-fill-svgrepo-com.svg";
+import { SupportPlatforms } from "@/lib/constants";
+import Logo from "@/assets/images/fav/logo.svg";
+import DiscordLogo from "@/assets/images/Discord-Symbol-White.svg";
+import RedditLogo from "@/assets/images/reddit-logo-fill-svgrepo-com.svg";
 
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -10,12 +10,11 @@ import {
   ExternalLink,
   Mail,
   MessageCircle,
-  MessageSquare,
   Twitter,
   Globe
 } from "lucide-react";
 
-const Welcome = () => {
+export default function HelpPage() {
   const version = "1.0.0";
 
   const getIcon = (name) => {
@@ -92,5 +91,3 @@ const Welcome = () => {
     </div>
   );
 };
-
-export default Welcome;
