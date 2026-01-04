@@ -277,8 +277,14 @@ export default function TunnelsPage() {
       accessorKey: "IFName",
     },
     {
-      header: "ServerID",
-      accessorKey: "ServerID",
+      header: "Status",
+      accessorKey: "status",
+      cell: ({ row }) => {
+        const corr = activeTunnels.data.find(at => at.CR.Tag === row.original.Tag);
+        return (
+          corr ? <Badge variant="success">Connected</Badge> : <Badge variant="destructive">Disconnected</Badge>
+        )
+      }
     },
     {
       id: "actions",
@@ -388,7 +394,7 @@ export default function TunnelsPage() {
           )}
         </div>
       ) : (
-        <CustomTable data={tunnels || []} columns={columns} />
+        <CustomTable data={tunnels.data || []} columns={columns} />
       )}
 
       <EditDialog
