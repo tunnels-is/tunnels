@@ -187,7 +187,7 @@ const AppSidebar = () => {
             <SidebarGroupLabel>Support</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
-                <AppSidebarButton Icon={HelpCircle} Label="Support" Route="help" />
+                <AppSidebarButton Icon={HelpCircle} Label="About" Route="help" />
                 <SidebarMenuItem>
                   <SidebarMenuButton onClick={() => OpenWindowURL("https://www.tunnels.is/support")}>
                     <PersonStanding width={IconWidth} height={IconHeight} />
