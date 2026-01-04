@@ -37,6 +37,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { GetEncType } from "@/lib/helpers";
 import { Field, FieldContent, FieldLabel } from "@/components/ui/field";
 import { Fragment } from "react";
+import { Unplug } from "lucide-react";
 
 
 
@@ -282,51 +283,66 @@ export default function TunnelsPage() {
       cell: ({ row }) => {
         const corr = activeTunnels.data.find(at => at.CR.Tag === row.original.Tag);
         return (
-          corr ? <Badge variant="success">Connected</Badge> : <Badge variant="destructive">Disconnected</Badge>
+          corr ? <Badge className="bg-green-400 text-white">Connected</Badge> : <Badge variant="destructive">Disconnected</Badge>
         )
       }
     },
     {
       id: "actions",
-      cell: ({ row }) => (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="h-8 w-8 p-0">
-              <span className="sr-only">Open menu</span>
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem
-              onClick={() => setConnectionDialogOpen(true)}
-              className="cursor-pointer text-[#3a994c]"
-            >
-              <CircleArrowRight className="mr-2 h-4 w-4" />
-              <span>Connect</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => {
-                setTunnel(row.original);
-                setTunTag(row.original.Tag)
-                setModalOpen(true);
-              }}
-              className="cursor-pointer"
-            >
-              <Pencil className="mr-2 h-4 w-4" />
-              <span>Edit</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => deleteTunnelMutation.mutate(row.original)}
-              className="cursor-pointer text-red-600 focus:text-red-500"
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
-              <span>Delete</span>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      )
+      cell: ({ row }) => {
+        const corr = activeTunnels.data.find(at => at.CR.Tag === row.original.Tag);
+
+        return (
+          <DropdownMenu modal={false}>
+            <DropdownMenuTrigger >
+              <Button variant="ghost" className="h-8 w-8 p-0">
+                <span className="sr-only">Open menu</span>
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {!corr ?
+                <DropdownMenuItem
+                  onSelect={() => {
+                    setTunnel(row.original);
+                    setTunTag(row.original.Tag);
+                    setConnectionDialogOpen(true)
+                  }}
+                >
+                  <CircleArrowRight className="mr-2 h-4 w-4" />
+                  <span>Connect</span>
+                </DropdownMenuItem>
+                : <DropdownMenuItem onSelect={() => {
+                  dcTunnel.mutate(corr.ID)
+                }}>
+                  <Unplug className="mr-2 h-4 w-4" />
+                  <span>Disconnect</span>
+                </DropdownMenuItem>
+              }
+              <DropdownMenuItem
+                onSelect={() => {
+                  setTunnel(row.original);
+                  setTunTag(row.original.Tag)
+                  setModalOpen(true);
+                }}
+                className="cursor-pointer"
+              >
+                <Pencil className="mr-2 h-4 w-4" />
+                <span>Edit</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onSelect={() => deleteTunnelMutation.mutate(row.original)}
+                className="cursor-pointer text-red-600 focus:text-red-500"
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                <span>Delete</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )
+      }
     }
-  ], [user]);
+  ], [activeTunnels.data]);
 
   if (tunnels.isLoading || activeTunnels.isLoading) {
     return <div>Loading...</div>;
