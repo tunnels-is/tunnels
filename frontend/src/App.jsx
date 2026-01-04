@@ -74,7 +74,7 @@ const LaunchApp = () => {
                   <Route path="dns/answers/:domain" element={<DNSAnswers />} />
                   <Route path="profile" element={<ProfilePage />} />
                   <Route path="login" element={<LoginPage />} />
-                  <Route path="*" element={<Navigate to="/" />} />
+                  <Route path="*" element={<Navigate to="/help" />} />
                 </>
               )}
             </Routes>

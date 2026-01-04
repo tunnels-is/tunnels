@@ -6,7 +6,7 @@ export const getServers = async (controlServer) => {
   return data || [];
 };
 
-export const createServer = async ({ controlServer, serverData }) => {
+export const createServer = async ({ serverData }) => {
   return forwardToController("POST", "/v3/server/create", { Server: serverData }, true);
 };
 

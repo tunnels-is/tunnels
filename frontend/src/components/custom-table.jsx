@@ -15,6 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 
 
 /**
@@ -51,7 +52,7 @@ function CustomTable({ data, columns }) {
             >
               {headerGroup.headers.map((header) => {
                 return (
-                  <TableHead key={header.id} className="text-white font-bold">
+                  <TableHead key={header.id} className="text-white font-bold text-center">
                     {header.isPlaceholder
                       ? null
                       : flexRender(
@@ -81,7 +82,7 @@ function CustomTable({ data, columns }) {
                       : metaClassName;
 
                   return (
-                    <TableCell key={cell.id} className={className}>
+                    <TableCell key={cell.id} className={cn("text-center", className)}>
                       {flexRender(
                         cell.column.columnDef.cell,
                         cell.getContext()

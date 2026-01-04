@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import CustomTable from "@/components/custom-table";
 import EditDialog from "@/components/edit-dialog";
 import { DropdownMenuItem, DropdownMenu, DropdownMenuTrigger, DropdownMenuContent } from "@/components/ui/dropdown-menu";
-import { CircleArrowRight, LayoutGrid, List, Plus, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { CircleArrowRight, LayoutGrid, List, Plus, MoreHorizontal, Pencil, Trash2, Network, Server, Shield, Copy, Edit } from "lucide-react";
 import { useTunnels, useCreateTunnel, useUpdateTunnel, useDeleteTunnel } from "@/hooks/useTunnels";
 import { connectTunnel, disconnectTunnel } from "@/api/tunnels";
 import { getServers } from "@/api/servers";
@@ -11,12 +11,220 @@ import { userAtom } from "@/stores/userStore";
 import { controlServerAtom } from "@/stores/configStore";
 import { toast } from "sonner";
 import { loadingAtom, toggleLoadingAtom } from "@/stores/uiStore";
-import TunnelCard from "./tunnel-card";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { useServers } from "@/hooks/useServers";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, DialogClose, DialogDescription } from "@/components/ui/dialog";
+import { Card, CardContent, CardTitle, CardAction, CardHeader, CardFooter } from "@/components/ui/card";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger
+} from "@/components/ui/popover";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Spinner } from "@/components/ui/spinner";
+import { ChevronsUpDown } from "lucide-react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { GetEncType } from "@/lib/helpers";
+import { Field, FieldContent, FieldLabel } from "@/components/ui/field";
+import { Fragment } from "react";
+
+
+
+
+function ConnectToServerDialog({ open, onOpenChange, tunnel }) {
+  const user = useAtomValue(userAtom);
+  const { data, isLoading, isFetched } = useServers(user.ControlServer);
+
+  const [loading, setLoading] = useState(false);
+  const [server, setServer] = useState({
+    id: "", tag: "", ip: ""
+  });
+  const [popoverOpen, setPopoverOpen] = useState(false);
+
+  const handleConnectTunnel = async (serverId) => {
+    if (!user || !user.DeviceToken) {
+      toast.error("You are not logged in");
+      return;
+    }
+
+    // Simplified connection request construction
+    const connectionRequest = {
+      UserID: user.ID,
+      DeviceToken: user.DeviceToken.DT,
+      Tag: tunnel.Tag,
+      EncType: tunnel.EncryptionType,
+      ServerID: serverId, // Needs proper server resolution if ID is index
+      Server: user.ControlServer // Or specific server
+    };
+
+    setLoading(true);
+    try {
+      console.log(connectionRequest);
+      await connectTunnel(connectionRequest);
+      toast.success("Connection ready");
+    } catch (e) {
+      // Error handled by api client or here
+    } finally {
+      setLoading(false);
+    }
+  };
+  console.log(tunnel); console.log('servers', data);
+  const queryClient = useQueryClient();
+  const connectMutation = useMutation({
+    mutationFn: handleConnectTunnel,
+    async onSuccess() { await queryClient.invalidateQueries({ queryKey: ["tunnels"] }) }
+  });
+  return tunnel && (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>
+            Connect Tunnel {tunnel.Tag} to:
+          </DialogTitle>
+        </DialogHeader>
+        <DialogDescription>
+          {
+            isLoading && <span> <Spinner /> Loading Servers... </span>
+          }
+          {
+            isFetched && (
+              <div className="my-2">
+                <Button onClick={() => setPopoverOpen(p => !p)} className="w-full" variant="outline">
+                  {server.tag && <Badge>{server.tag}</Badge>}
+                  {server.ip ? server.ip : "No server selected..."}</Button>
+                {popoverOpen &&
+                  <Command className="mt-2">
+                    <CommandInput placeholder="Search for a server..." />
+                    <CommandList>
+                      <CommandEmpty>No such server found....</CommandEmpty>
+                      <CommandGroup>
+                        {data.map(s => (
+                          <CommandItem key={s._id} value={s._id} onSelect={cv => {
+                            setServer(p => cv !== server.id ? ({ id: cv, tag: s.Tag, ip: s.IP }) : p);
+                            setPopoverOpen(false);
+                          }}>
+                            <Badge>{s.Tag}</Badge>
+
+                            <span>
+                              {s.IP}
+                              <span className="text-muted">{s._id}</span>
+                            </span>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                }</div>
+            )}
+        </DialogDescription>
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button onClick={() => connectMutation.mutate(server.id)}> <CircleArrowRight /> Connect</Button>
+          </DialogClose>
+
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+function TunnelCard({ tunnel, connectionDialogOpener, onEdit, onDelete }) {
+  const copyToClipboard = (text) => {
+    navigator.clipboard.writeText(text);
+    toast.success("Copied to clipboard");
+  };
+
+  return (
+    <Card className="border-[#1a1f2d] text-white hover:border-[#2a3142] transition-colors">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-lg font-bold flex items-center gap-2">
+          <Network className="w-5 h-5 text-blue-400" />
+          {tunnel.Tag}
+        </CardTitle>
+        <Badge
+          variant="outline"
+          className="bg-[#2a1db5] hover:bg-white hover:text-black text-white"
+        >
+          {GetEncType(tunnel.EncryptionType)}
+        </Badge>
+      </CardHeader>
+      <CardContent>
+        <div className="grid gap-4 py-4">
+          <div className="flex items-center gap-2 text-sm text-gray-400">
+            <Server className="w-4 h-4" />
+            <span>Server ID: {tunnel.ServerID}</span>
+          </div>
+          <div className="flex items-center gap-2 text-sm text-gray-400">
+            <Shield className="w-4 h-4" />
+            <span>Interface: {tunnel.IFName}</span>
+          </div>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between bg-[#151a25] p-2 rounded text-xs font-mono">
+              <span className="text-gray-300">IPv4: {tunnel.IPv4Address}</span>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                onClick={() => copyToClipboard(tunnel.IPv4Address)}
+              >
+                <Copy className="w-3 h-3" />
+              </Button>
+            </div>
+            <div className="flex items-center justify-between bg-[#151a25] p-2 rounded text-xs font-mono">
+              <span className="text-gray-300">IPv6: {tunnel.IPv6Address}</span>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                onClick={() => copyToClipboard(tunnel.IPv6Address)}
+              >
+                <Copy className="w-3 h-3" />
+              </Button>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+      <CardFooter className="flex justify-between">
+        <Button className="text-green-500" variant="outline" onClick={connectionDialogOpener}>
+          Connect
+        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => onEdit(tunnel)}
+            className="h-8 w-8 text-gray-400 hover:text-white"
+          >
+            <Edit className="w-4 h-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => onDelete(tunnel)}
+            className="h-8 w-8 text-red-500 hover:text-red-400 hover:bg-red-950/20"
+          >
+            <Trash2 className="w-4 h-4" />
+          </Button>
+        </div>
+      </CardFooter>
+    </Card>
+  );
+};
+
 
 export default function TunnelsPage() {
   const { data: tunnels, isLoading } = useTunnels();
+  console.dir(tunnels);
+  const [connectionDialogOpen, setConnectionDialogOpen] = useState(false);
   const createTunnelMutation = useCreateTunnel();
   const updateTunnelMutation = useUpdateTunnel();
   const deleteTunnelMutation = useDeleteTunnel();
@@ -40,34 +248,8 @@ export default function TunnelsPage() {
     }
   };
 
-  const handleConnectTunnel = async (obj) => {
-    if (!user || !user.DeviceToken) {
-      toast.error("You are not logged in");
-      return;
-    }
 
-    // Simplified connection request construction
-    const connectionRequest = {
-      UserID: user._id,
-      DeviceToken: user.DeviceToken.DT,
-      Tag: obj.Tag,
-      EncType: obj.EncryptionType,
-      ServerID: obj.ServerID, // Needs proper server resolution if ID is index
-      Server: user.ControlServer // Or specific server
-    };
-
-    setLoading({ show: true, msg: "Connecting..." });
-    try {
-      await connectTunnel(connectionRequest);
-      toast.success("Connection ready");
-    } catch (e) {
-      // Error handled by api client or here
-    } finally {
-      setLoading(undefined);
-    }
-  };
-
-  const newServer = async () => {
+  const newServer = () => {
     createTunnelMutation.mutate();
   };
 
@@ -104,7 +286,7 @@ export default function TunnelsPage() {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem
-              onClick={() => handleConnectTunnel(row.original)}
+              onClick={() => setConnectionDialogOpen(true)}
               className="cursor-pointer text-[#3a994c]"
             >
               <CircleArrowRight className="mr-2 h-4 w-4" />
@@ -160,22 +342,17 @@ export default function TunnelsPage() {
         </div>
       </div>
 
+      <ConnectToServerDialog open={connectionDialogOpen} onOpenChange={setConnectionDialogOpen} tunnel={tunnel} />
       {viewMode === 'grid' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {tunnels?.map((t) => (
             <TunnelCard
-              key={t.Tag}
+              key={t.ID}
               tunnel={t}
-              onConnect={() => (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="text-green-500 border-green-900 hover:bg-green-950/20"
-                  onClick={() => handleConnectTunnel(t)}
-                >
-                  <CircleArrowRight className="w-4 h-4 mr-2" /> Connect
-                </Button>
-              )}
+              connectionDialogOpener={() => {
+                setTunnel(t);
+                setConnectionDialogOpen(true);
+              }}
               onEdit={(obj) => {
                 setTunnel(obj);
                 setModalOpen(true);
