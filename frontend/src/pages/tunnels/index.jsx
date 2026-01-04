@@ -230,9 +230,6 @@ export default function TunnelsPage() {
   const updateTunnelMutation = useUpdateTunnel();
   const deleteTunnelMutation = useDeleteTunnel();
   const dcTunnel = useDisconnectTunnel();
-  const user = useAtomValue(userAtom);
-  const controlServer = useAtomValue(controlServerAtom);
-  const setLoading = useSetAtom(toggleLoadingAtom);
 
   const [tunnel, setTunnel] = useState(undefined);
   const [modalOpen, setModalOpen] = useState(false);

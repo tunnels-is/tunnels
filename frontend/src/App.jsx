@@ -25,7 +25,6 @@ import AppSidebar from "./components/app-sidebar";
 import { QueryProvider } from "./providers/query-provider";
 import { ThemeProvider } from "./providers/theme-provider";
 
-import { useInitialState } from "./hooks/useInitialState";
 import { useAtomValue } from "jotai";
 import { isAuthenticatedAtom } from "./stores/userStore";
 
@@ -33,7 +32,7 @@ const appElement = document.getElementById("app");
 const root = createRoot(appElement);
 
 const LaunchApp = () => {
-  useInitialState();
+  // useInitialState();
   const isAuth = useAtomValue(isAuthenticatedAtom);
   return (
     <BrowserRouter>
@@ -47,36 +46,38 @@ const LaunchApp = () => {
           <div className="px-4 w-full">
             <Routes>
 
-              {!isAuth ? (
-                <>
-                  <Route index path="help" element={<HelpPage />} />
-                  <Route path="login" element={<LoginPage />} />
-                  <Route path="*" element={<Navigate to="/login" replace />} />
-                </>
-              ) : (
-                <>
-                  <Route index path="help" element={<HelpPage />} />
+              {isAuth ?
+                (
+                  <>
+                    <Route path="help" element={<HelpPage />} />
 
-                  <Route path="groups" element={<GroupsPage />} />
-                  <Route path="users" element={<UsersPage />} />
-                  <Route path="devices" element={<DevicesPage />} />
-                  <Route path="groups/:id" element={<InspectGroup />} />
+                    <Route path="groups" element={<GroupsPage />} />
+                    <Route path="users" element={<UsersPage />} />
+                    <Route path="devices" element={<DevicesPage />} />
+                    <Route path="groups/:id" element={<InspectGroup />} />
 
-                  <Route path="tunnels" element={<TunnelsPage />} />
-                  <Route path="connections" element={<StatsPage />} />
+                    <Route path="tunnels" element={<TunnelsPage />} />
+                    <Route path="connections" element={<StatsPage />} />
 
-                  <Route path="servers" element={<ServersPage />} />
-                  <Route path="server/:id" element={<ServerDevices />} />
-                  <Route path="logs" element={<LogsPage />} />
-                  <Route path="settings" element={<SettingsPage />} />
+                    <Route path="servers" element={<ServersPage />} />
+                    <Route path="server/:id" element={<ServerDevices />} />
+                    <Route path="logs" element={<LogsPage />} />
+                    <Route path="settings" element={<SettingsPage />} />
 
-                  <Route path="dns" element={<DNSPage />} />
-                  <Route path="dns/answers/:domain" element={<DNSAnswers />} />
-                  <Route path="profile" element={<ProfilePage />} />
-                  <Route path="login" element={<LoginPage />} />
-                  <Route path="*" element={<Navigate to="/help" />} />
-                </>
-              )}
+                    <Route path="dns" element={<DNSPage />} />
+                    <Route path="dns/answers/:domain" element={<DNSAnswers />} />
+                    <Route path="profile" element={<ProfilePage />} />
+                    <Route path="login" element={<LoginPage />} />
+                    <Route path="*" element={<Navigate to="/help" />} />
+                  </>
+                ) :
+                (
+                  <>
+                    <Route index path="help" element={<HelpPage />} />
+                    <Route path="login" element={<LoginPage />} />
+                    <Route path="*" element={<Navigate to="/help" />} />
+                  </>)
+              }
             </Routes>
           </div>
 

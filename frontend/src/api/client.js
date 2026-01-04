@@ -32,15 +32,15 @@ export const handleApiError = (error) => {
  * @param {"POST"|"GET"} method HTTP(S) method
  * @param {string} path route on the control server
  * @param {any} data body
- * @param {boolean} auth authenticate the request or not
+ * @param {boolean} auth send with auth information
  * @returns {Promise<Record<string, any> | boolean>}
  */
 export const forwardToController = async (method, path, data, auth = false) => {
   const store = getDefaultStore();
-  const controlServer = store.get(controlServerAtom);
   const user = store.get(userAtom);
+  console.log("forwardToController() with control server: ", user.ControlServer);
   const body = {
-    Server: controlServer,
+    Server: user.ControlServer,
     Path: path,
     Method: method,
     JSONData: auth ? { ...data, UID: user.ID, DeviceToken: user.DeviceToken.DT, Email: user.Email } : data,

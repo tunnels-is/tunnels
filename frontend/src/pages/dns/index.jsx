@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -12,8 +13,8 @@ import DNSAnswers from "./answers/domain";
 import { useAtom } from "jotai";
 import { configAtom } from "@/stores/configStore";
 import { useSaveConfig } from "@/hooks/useConfig";
-import { useDNSStats } from "@/hooks/useDNS";
 import { getBackendState } from "@/api/app";
+import { getDNSStats } from "@/api/dns";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Server, Shield, Activity, Save, AlertTriangle, Plus, Trash2, Edit } from "lucide-react";
 
@@ -30,8 +31,11 @@ export default function DNSPage() {
   const navigate = useNavigate();
   const [config, setConfig] = useAtom(configAtom);
   const saveConfigMutation = useSaveConfig();
-  const { data: dnsStats } = useDNSStats();
-
+  const dnsStats = useQuery({
+    queryKey: ["dns-stats"],
+    queryFn: getDNSStats,
+    refetchInterval: 5000, // Refresh every 5 seconds as it's stats
+  });
   const [record, setRecord] = useState(undefined)
   const [recordModal, setRecordModal] = useState(false)
   const [isRecordEdit, setIsRecordEdit] = useState(false)
@@ -206,7 +210,7 @@ export default function DNSPage() {
   ], [config, saveConfigMutation]);
 
   const blockDomainsData = useMemo(() => {
-    let dnsBlocks = dnsStats || [];
+    let dnsBlocks = dnsStats.data || [];
     let stats = [];
     if (dnsBlocks) {
       Object.entries(dnsBlocks).forEach(([key, value]) => {
@@ -219,7 +223,7 @@ export default function DNSPage() {
       });
     }
     return stats.sort(DNSSort);
-  }, [dnsStats]);
+  }, [dnsStats.data]);
 
   const blockDomainsColumns = useMemo(() => [
     { header: "Domain", accessorKey: "tag" },
@@ -229,7 +233,7 @@ export default function DNSPage() {
   ], []);
 
   const resolvedDomainsData = useMemo(() => {
-    let dnsResolves = dnsStats || [];
+    let dnsResolves = dnsStats.data || [];
     let stats = [];
     if (dnsResolves) {
       Object.entries(dnsResolves).forEach(([key, value]) => {
@@ -241,7 +245,7 @@ export default function DNSPage() {
       });
     }
     return stats.sort(DNSSort);
-  }, [dnsStats]);
+  }, [dnsStats.data]);
 
   const resolvedDomainsColumns = useMemo(() => [
     {

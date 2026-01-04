@@ -266,6 +266,7 @@ export const RegisterForm = ({
       console.log("User registered", data);
       if (data) {
         data.ControlServer = authServer;
+        data.ID = data._id;
         await setUserMutation.mutateAsync(data);
         setUser(data);
         setAccounts((prev) => {
@@ -383,14 +384,14 @@ const RegisterAnonForm = ({ config, authServer, setModalOpen, setNewAuth }) => {
       if (data) {
         data.ControlServer = authServer;
         await setUserMutation.mutateAsync(data);
-        setUser(data);
+        setUser({ ...data, ID: data._id });
         setAccounts((prev) => {
-          const existing = prev.filter((u) => u.ID !== data.ID);
+          const existing = prev.filter((u) => u.ID !== data._id);
           return [...existing, data];
         });
         navigate("/servers");
       }
-    } catch (error) {}
+    } catch (error) { }
     setErrors({});
   };
 
@@ -461,7 +462,9 @@ const ResetPasswordForm = ({
       await sendResetCodeMutation.mutateAsync({ Email: inputs["email"] });
       toast.success("reset code sent");
       setErrors({});
-    } catch (error) {}
+    } catch (error) {
+      toast.error(error)
+    }
   };
 
   const ResetSubmit = async () => {
@@ -503,7 +506,7 @@ const ResetPasswordForm = ({
       });
       setInputs((prev) => ({ ...prev, password: "", password2: "", code: "" }));
       setMode(1);
-    } catch (error) {}
+    } catch (error) { }
     setErrors({});
   };
 
@@ -588,10 +591,10 @@ const RecoverTwoFactorForm = ({
       });
       if (data) {
         data.ControlServer = authServer;
-        setUser(data);
+        setUser({ ...data, ID: data._id });
         navigate("/servers");
       }
-    } catch (error) {}
+    } catch (error) { }
   };
 
   return (
@@ -656,7 +659,7 @@ const EnableAccountForm = ({
       });
       setInputs((prev) => ({ ...prev, code: "" }));
       setMode(6);
-    } catch (error) {}
+    } catch (error) { }
   };
 
   return (

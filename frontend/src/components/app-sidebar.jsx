@@ -111,11 +111,10 @@ const AppSidebar = () => {
       try {
         await logout({ DeviceToken: user.DeviceToken.DT, LogoutToken: user.DeviceToken.DT, UID: user.ID, All: false });
         if (newAccounts.length > 0) {
-          await setUserMutation.mutateAsync(newAccounts[0]);
           setUser(newAccounts[0]);
+          await setUserMutation.mutateAsync(newAccounts[0])
         }
         else {
-          await setUserMutation.mutateAsync(null);
           setUser(null);
         }
         setAccounts(newAccounts);
@@ -300,7 +299,7 @@ const AppSidebar = () => {
                         <span className="truncate">Profile</span>
                       </Link>
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={handleLogout}>
+                    <DropdownMenuItem onSelect={handleLogout}>
                       <LogOut className="mr-2 h-4 w-4" />
                       <span>Logout</span>
                     </DropdownMenuItem>

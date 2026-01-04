@@ -2,19 +2,20 @@ import React, { useState, useMemo } from "react";
 import dayjs from "dayjs";
 import EditDialog from "@/components/edit-dialog";
 import CustomTable from "@/components/custom-table";
-import { useDevices, useDeleteDevice, useUpdateDevice, useCreateDevice } from "@/hooks/useDevices";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Edit, Trash2, Plus } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { getDevices, updateDevice, createDevice, deleteDevice } from "@/api/devices";
+
+
 
 export default function DevicesPage() {
-  const [offset, setOffset] = useState(0);
-  const [limit, setLimit] = useState(100);
-  const { data: devices, refetch } = useDevices(offset, limit);
-  const deleteDeviceMutation = useDeleteDevice();
-  const updateDeviceMutation = useUpdateDevice();
-  const createDeviceMutation = useCreateDevice();
-
+  const devices = useQuery({
+    queryKey: ["devices"],
+    queryFn: () => getDevices({ offset: 0, limit: 50 })
+  });
+  const queryClient = useQueryClient();
   const [device, setDevice] = useState(undefined)
   const [editModalOpen, setEditModalOpen] = useState(false)
 
@@ -22,13 +23,14 @@ export default function DevicesPage() {
     const dataToSave = values || device;
     try {
       if (dataToSave._id !== undefined) {
-        await updateDeviceMutation.mutateAsync(dataToSave);
+        await updateDevice(dataToSave);
         toast.success("Device updated");
       } else {
-        await createDeviceMutation.mutateAsync(dataToSave);
+        await createDevice(dataToSave);
         toast.success("Device created");
       }
       setEditModalOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["devices"] });
     } catch (e) {
       toast.error("Failed to save device");
     }
@@ -39,6 +41,16 @@ export default function DevicesPage() {
     setEditModalOpen(true)
   }
 
+  const removeDevice = async (id) => {
+    try {
+      await deleteDevice(id);
+      queryClient.invalidateQueries({ queryKey: ["devices"] });
+      toast.success("Deleted device")
+    }
+    catch (e) {
+      toast.error("Failed to delete device");
+    }
+  }
   const columns = useMemo(() => [
     {
       header: "Tag",
@@ -72,11 +84,8 @@ export default function DevicesPage() {
             variant="ghost"
             size="icon"
             className="text-red-500 hover:text-red-700 hover:bg-red-950/20"
-            onClick={() => {
-              deleteDeviceMutation.mutate(row.original._id, {
-                onSuccess: () => toast.success("Device deleted"),
-                onError: () => toast.error("Failed to delete device")
-              });
+            onClick={async () => {
+              await removeDevice(row.original._id)
             }}
           >
             <Trash2 className="h-4 w-4" />
@@ -84,7 +93,7 @@ export default function DevicesPage() {
         </div>
       )
     }
-  ], [deleteDeviceMutation]);
+  ], [devices.data]);
 
   return (
     <div className="space-y-4">
@@ -94,7 +103,7 @@ export default function DevicesPage() {
           New Device
         </Button>
       </div>
-      <CustomTable data={devices || []} columns={columns} />
+      <CustomTable data={devices.data || []} columns={columns} />
 
       <EditDialog
         key={device?._id || 'new'}

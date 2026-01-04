@@ -1,14 +1,12 @@
 import { useSetAtom } from "jotai";
 import { configAtom } from "../stores/configStore";
 import { userAtom } from "../stores/userStore";
-import { activeTunnelsAtom } from "../stores/tunnelStore";
 import { getBackendState } from "../api/app";
 import { useEffect } from "react";
 
 export const useInitialState = () => {
   const setConfig = useSetAtom(configAtom);
   const setUser = useSetAtom(userAtom);
-  const setActiveTunnels = useSetAtom(activeTunnelsAtom);
 
   useEffect(() => {
     const fetchState = async () => {
@@ -17,9 +15,6 @@ export const useInitialState = () => {
         if (data) {
           if (data.Config) {
             setConfig(data.Config);
-          }
-          if (data.ActiveTunnels) {
-            setActiveTunnels(data.ActiveTunnels);
           }
           // Note: User might not be in GetBackendState response based on legacy code,
           // but if it is, we can set it.

@@ -1,10 +1,16 @@
 import React from "react";
 import { useParams } from "react-router-dom";
-import { useDNSStats } from "@/hooks/useDNS";
 import { toast } from "sonner";
+import { getDNSStats } from "@/api/dns";
+
 
 export default function DNSAnswers() {
-  const { data: dnsStats } = useDNSStats();
+  const { data: dnsStats } = useQuery({
+    queryKey: ["dns-stats"],
+    queryFn: getDNSStats,
+    refetchInterval: 5000, // Refresh every 5 seconds as it's stats
+  });
+
   const { domain } = useParams()
 
   const OpenWindowURL = (baseurl, value) => {

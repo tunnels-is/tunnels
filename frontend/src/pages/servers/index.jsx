@@ -4,13 +4,11 @@ import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useCreateServer, useServers, useUpdateServer } from "@/hooks/useServers";
 import { useConnectTunnel, useDisconnectTunnel, useTunnels, useUpdateTunnel } from "@/hooks/useTunnels";
-import { activeTunnelsAtom } from "@/stores/tunnelStore";
-import { userAtom } from "@/stores/userStore";
-import { useAtomValue } from "jotai";
 import { MoreHorizontal, Pencil, Plus, Trash } from "lucide-react";
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import ServerDevices from "./server-devices";
+import { useQuery } from "@tanstack/react-query";
+import { getServers } from "@/api/servers";
 
 
 function RowActions({ setEditModalOpen, deleteFn }) {
@@ -43,9 +41,11 @@ function RowActions({ setEditModalOpen, deleteFn }) {
 
 export { ServerDevices };
 export default function ServersPage() {
-  const user = useAtomValue(userAtom);
-  const { data: servers, isLoading: serversLoading } = useServers(user?.ControlServer);
-  const { isLoading: tunnelsLoading } = useTunnels();
+  const privateServers = useQuery({
+    queryKey: ["servers"],
+    queryFn: getServers
+  });
+  const tunnels = useTunnels();
 
   const createServerMutation = useCreateServer();
   const updateServerMutation = useUpdateServer();
@@ -53,11 +53,7 @@ export default function ServersPage() {
   const [server, setServer] = useState(undefined);
   const [editModalOpen, setEditModalOpen] = useState(false);
 
-
-
-
-
-  console.log("servers: ", servers);
+  console.log("servers: ", privateServers.data);
 
   const dataCols = [
     {
@@ -103,7 +99,7 @@ export default function ServersPage() {
         />
     },
   ]
-  if (serversLoading || tunnelsLoading) {
+  if (privateServers.isLoading || tunnels.isLoading) {
     return <div>Loading...</div>;
   }
 
@@ -131,7 +127,7 @@ export default function ServersPage() {
         </Button>
       </div>
 
-      <CustomTable data={servers || []} columns={dataCols} />
+      <CustomTable data={privateServers.data || []} columns={dataCols} />
 
       <EditDialog
         key={server?._id || 'new'}
@@ -144,12 +140,12 @@ export default function ServersPage() {
         onSubmit={async (values) => {
           if (values._id) {
             // update
-            updateServerMutation.mutate({ controlServer: user?.ControlServer, serverData: values }, {
+            updateServerMutation.mutate({ serverData: values }, {
               onSuccess: () => setEditModalOpen(false)
             });
           } else {
             // create
-            createServerMutation.mutate({ controlServer: user?.ControlServer, serverData: values }, {
+            createServerMutation.mutate({ serverData: values }, {
               onSuccess: () => setEditModalOpen(false)
             });
           }
