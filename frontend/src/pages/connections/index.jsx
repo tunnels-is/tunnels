@@ -1,23 +1,20 @@
 
-import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardAction, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { useAtomValue } from "jotai";
-import { activeTunnelsAtom } from "@/stores/tunnelStore";
 import { useTunnels, useDisconnectTunnel } from "@/hooks/useTunnels";
 import { toast } from "sonner";
 import dayjs from "dayjs";
 import { useQuery } from "@tanstack/react-query";
 import { getBackendState } from "@/api/app";
-import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
-import { Link } from "react-router-dom";
-import { Unplug } from "lucide-react";
-import { Spinner } from "@/components/ui/spinner";
 import { MoveHorizontal } from "lucide-react";
 import { Info } from "lucide-react";
-import { useState } from "react";
 import { Sheet, SheetClose, SheetContent, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Fragment } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { Unplug } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Spinner } from "@/components/ui/spinner";
 
 
 
@@ -160,12 +157,12 @@ function ConnectionCard({ tunnel, ac, onDisconnect }) {
 }
 
 export default function StatsPage() {
-  const { data: activeTunnels, isLoading: activeTunnelsLoading } = useQuery({
+  const activeTunnels = useQuery({
     queryKey: ["activeTunnels"],
     queryFn: async () => (await getBackendState()).ActiveTunnels ?? []
   });
 
-  const { data: tunnels } = useTunnels();
+  const tunnels = useTunnels();
   const dcTunnelMutation = useDisconnectTunnel();
 
 
@@ -182,14 +179,41 @@ export default function StatsPage() {
     <Fragment>
       <div className="p-2">
         <span className="text-lg">Manage connections.</span>
-        <div className="grid grid-cols-3">
-          {activeTunnels ? activeTunnels?.map(renderCard(tunnels, handleDisconnect)) : (
-            <div className="w-full">
-              <span className="text-center">No active tunnels</span>
-            </div>
-
-          )}
-        </div>
+        {
+          activeTunnels.isLoading && (
+            <span> <Spinner /> Loading... </span>
+          )
+        }
+        {
+          activeTunnels.isFetched
+            && activeTunnels.data.length > 0 ?
+            <div className="grid grid-cols-3">
+              {activeTunnels.data?.map(renderCard(tunnels, handleDisconnect))}
+            </div> : (
+              <Empty>
+                <EmptyHeader>
+                  <EmptyMedia variant="icon">
+                    <Unplug />
+                  </EmptyMedia>
+                  <EmptyTitle>No connections yet</EmptyTitle>
+                  <EmptyDescription>
+                    There's no active connections yet. Go look at listed private servers or tunnels to create a connection.
+                  </EmptyDescription>
+                </EmptyHeader>
+                <EmptyContent>
+                  <div className="flex gap-2">
+                    <Button asChild>
+                      <Link to="/tunnels">
+                        Tunnels
+                      </Link>
+                    </Button>
+                    <Button variant="outline" asChild>
+                      <Link to="/servers">Private Servers</Link>
+                    </Button>
+                  </div>
+                </EmptyContent>
+              </Empty>
+            )}
       </div>
 
     </Fragment>
