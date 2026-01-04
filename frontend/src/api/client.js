@@ -38,9 +38,9 @@ export const handleApiError = (error) => {
 export const forwardToController = async (method, path, data, auth = false) => {
   const store = getDefaultStore();
   const user = store.get(userAtom);
-  console.log("forwardToController() with control server: ", user.ControlServer);
+  const controlServer = store.get(controlServerAtom);
   const body = {
-    Server: user.ControlServer,
+    Server: auth ? user.ControlServer : controlServer,
     Path: path,
     Method: method,
     JSONData: auth ? { ...data, UID: user.ID, DeviceToken: user.DeviceToken.DT, Email: user.Email } : data,

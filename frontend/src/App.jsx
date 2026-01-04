@@ -26,67 +26,84 @@ import { QueryProvider } from "./providers/query-provider";
 import { ThemeProvider } from "./providers/theme-provider";
 
 import { useAtomValue } from "jotai";
-import { isAuthenticatedAtom } from "./stores/userStore";
+import { isAuthenticatedAtom, userAtom } from "./stores/userStore";
+import { Outlet } from "react-router-dom";
 
 const appElement = document.getElementById("app");
 const root = createRoot(appElement);
 
-const LaunchApp = () => {
-  // useInitialState();
-  const isAuth = useAtomValue(isAuthenticatedAtom);
+
+
+function AppLayout() {
   return (
-    <BrowserRouter>
+    <ThemeProvider>
       {createPortal(
         <Toaster position="bottom-right" />,
         document.body
       )}
-      <ThemeProvider>
+      <QueryProvider>
         <SidebarProvider>
           <AppSidebar />
           <div className="px-4 w-full">
-            <Routes>
-
-              {isAuth ?
-                (
-                  <>
-                    <Route path="help" element={<HelpPage />} />
-
-                    <Route path="groups" element={<GroupsPage />} />
-                    <Route path="users" element={<UsersPage />} />
-                    <Route path="devices" element={<DevicesPage />} />
-                    <Route path="groups/:id" element={<InspectGroup />} />
-
-                    <Route path="tunnels" element={<TunnelsPage />} />
-                    <Route path="connections" element={<StatsPage />} />
-
-                    <Route path="servers" element={<ServersPage />} />
-                    <Route path="server/:id" element={<ServerDevices />} />
-                    <Route path="logs" element={<LogsPage />} />
-                    <Route path="settings" element={<SettingsPage />} />
-
-                    <Route path="dns" element={<DNSPage />} />
-                    <Route path="dns/answers/:domain" element={<DNSAnswers />} />
-                    <Route path="profile" element={<ProfilePage />} />
-                    <Route path="login" element={<LoginPage />} />
-                    <Route path="*" element={<Navigate to="/help" />} />
-                  </>
-                ) :
-                (
-                  <>
-                    <Route index path="help" element={<HelpPage />} />
-                    <Route path="login" element={<LoginPage />} />
-                    <Route path="*" element={<Navigate to="/help" />} />
-                  </>)
-              }
-            </Routes>
+            <Outlet />
           </div>
 
 
         </SidebarProvider>
-      </ThemeProvider>
+      </QueryProvider>
+
+    </ThemeProvider>
+  );
+
+}
+
+const LaunchApp = () => {
+  const user = useAtomValue(userAtom);
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<AppLayout />}>
+
+          {user ?
+            (
+              <>
+                <Route index path="help" element={<HelpPage />} />
+                {user.IsAdmin && <>
+                  <Route path="groups" element={<GroupsPage />} />
+                  <Route path="users" element={<UsersPage />} />
+                  <Route path="devices" element={<DevicesPage />} />
+                  <Route path="groups/:id" element={<InspectGroup />} />
+                </>
+
+                }
+                <Route path="tunnels" element={<TunnelsPage />} />
+                <Route path="connections" element={<StatsPage />} />
+
+                <Route path="servers" element={<ServersPage />} />
+                <Route path="server/:id" element={<ServerDevices />} />
+                <Route path="logs" element={<LogsPage />} />
+                <Route path="settings" element={<SettingsPage />} />
+
+                <Route path="dns" element={<DNSPage />} />
+                <Route path="dns/answers/:domain" element={<DNSAnswers />} />
+                <Route path="profile" element={<ProfilePage />} />
+                <Route path="login" element={<LoginPage />} />
+                <Route path="*" element={<Navigate to="/help" />} />
+              </>
+            ) :
+            (
+              <>
+                <Route path="help" element={<HelpPage />} />
+                <Route path="login" element={<LoginPage />} />
+                <Route path="*" element={<Navigate to="/help" />} />
+              </>)
+          }
+
+        </Route>
+      </Routes>
     </BrowserRouter>
   );
-};
+}
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -150,9 +167,7 @@ class ErrorBoundary extends React.Component {
 root.render(
   <React.StrictMode>
     <ErrorBoundary>
-      <QueryProvider>
-        <LaunchApp />
-      </QueryProvider>
+      <LaunchApp />
     </ErrorBoundary>
   </React.StrictMode>
 );
