@@ -30,3 +30,7 @@ export const disconnectTunnel = async (id) => {
   return response.data;
 };
 
+export const getActiveTunnels = async () => {
+  const response = await client.post("/getState", {});
+  return response.data?.ActiveTunnels || [];
+}

@@ -3,8 +3,8 @@ import CustomTable from "@/components/custom-table";
 import EditDialog from "@/components/edit-dialog";
 import { DropdownMenuItem, DropdownMenu, DropdownMenuTrigger, DropdownMenuContent } from "@/components/ui/dropdown-menu";
 import { CircleArrowRight, LayoutGrid, List, Plus, MoreHorizontal, Pencil, Trash2, Network, Server, Shield, Copy, Edit } from "lucide-react";
-import { useTunnels, useCreateTunnel, useUpdateTunnel, useDeleteTunnel } from "@/hooks/useTunnels";
-import { connectTunnel, disconnectTunnel } from "@/api/tunnels";
+import { useTunnels, useCreateTunnel, useUpdateTunnel, useDeleteTunnel, useDisconnectTunnel } from "@/hooks/useTunnels";
+import { connectTunnel, disconnectTunnel, getActiveTunnels } from "@/api/tunnels";
 import { getServers } from "@/api/servers";
 import { useAtomValue, useSetAtom } from "jotai";
 import { userAtom } from "@/stores/userStore";
@@ -33,7 +33,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { ChevronsUpDown } from "lucide-react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { GetEncType } from "@/lib/helpers";
 import { Field, FieldContent, FieldLabel } from "@/components/ui/field";
 import { Fragment } from "react";
@@ -44,7 +44,7 @@ import { Fragment } from "react";
 function ConnectToServerDialog({ open, onOpenChange, tunnel }) {
   const user = useAtomValue(userAtom);
   const { data, isLoading, isFetched } = useServers(user.ControlServer);
-
+  const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
   const [server, setServer] = useState({
     id: "", tag: "", ip: ""
@@ -72,6 +72,7 @@ function ConnectToServerDialog({ open, onOpenChange, tunnel }) {
       console.log(connectionRequest);
       await connectTunnel(connectionRequest);
       toast.success("Connection ready");
+      queryClient.invalidateQueries({ queryKey: ["tunnles", "activeTunnels"] })
     } catch (e) {
       // Error handled by api client or here
     } finally {
@@ -79,7 +80,6 @@ function ConnectToServerDialog({ open, onOpenChange, tunnel }) {
     }
   };
   console.log(tunnel); console.log('servers', data);
-  const queryClient = useQueryClient();
   const connectMutation = useMutation({
     mutationFn: handleConnectTunnel,
     async onSuccess() { await queryClient.invalidateQueries({ queryKey: ["tunnels"] }) }
@@ -137,12 +137,12 @@ function ConnectToServerDialog({ open, onOpenChange, tunnel }) {
     </Dialog>
   );
 }
-function TunnelCard({ tunnel, connectionDialogOpener, onEdit, onDelete }) {
+function TunnelCard({ tunnel, serverId, connectionDialogOpener, onEdit, onDelete, isConnected, onDisconnect }) {
   const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text);
     toast.success("Copied to clipboard");
   };
-
+  console.log(isConnected)
   return (
     <Card className="border-[#1a1f2d] text-white hover:border-[#2a3142] transition-colors">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -152,7 +152,7 @@ function TunnelCard({ tunnel, connectionDialogOpener, onEdit, onDelete }) {
         </CardTitle>
         <Badge
           variant="outline"
-          className="bg-[#2a1db5] hover:bg-white hover:text-black text-white"
+          className="bg-primary hover:bg-white hover:text-black text-white"
         >
           {GetEncType(tunnel.EncryptionType)}
         </Badge>
@@ -161,7 +161,7 @@ function TunnelCard({ tunnel, connectionDialogOpener, onEdit, onDelete }) {
         <div className="grid gap-4 py-4">
           <div className="flex items-center gap-2 text-sm text-gray-400">
             <Server className="w-4 h-4" />
-            <span>Server ID: {tunnel.ServerID}</span>
+            <span>Server ID: {serverId || "(Tunnel not connected)"}</span>
           </div>
           <div className="flex items-center gap-2 text-sm text-gray-400">
             <Shield className="w-4 h-4" />
@@ -194,8 +194,8 @@ function TunnelCard({ tunnel, connectionDialogOpener, onEdit, onDelete }) {
         </div>
       </CardContent>
       <CardFooter className="flex justify-between">
-        <Button className="text-green-500" variant="outline" onClick={connectionDialogOpener}>
-          Connect
+        <Button className={isConnected ? "text-destructive" : "text-green-400"} variant="outline" onClick={isConnected ? onDisconnect : connectionDialogOpener}>
+          {isConnected ? "Disconnect" : "Connect"}
         </Button>
         <div className="flex gap-2">
           <Button
@@ -222,12 +222,13 @@ function TunnelCard({ tunnel, connectionDialogOpener, onEdit, onDelete }) {
 
 
 export default function TunnelsPage() {
-  const { data: tunnels, isLoading } = useTunnels();
-  console.dir(tunnels);
+  const tunnels = useTunnels();
+  console.dir(tunnels.data);
   const [connectionDialogOpen, setConnectionDialogOpen] = useState(false);
   const createTunnelMutation = useCreateTunnel();
   const updateTunnelMutation = useUpdateTunnel();
   const deleteTunnelMutation = useDeleteTunnel();
+  const dcTunnel = useDisconnectTunnel();
   const user = useAtomValue(userAtom);
   const controlServer = useAtomValue(controlServerAtom);
   const setLoading = useSetAtom(toggleLoadingAtom);
@@ -248,6 +249,11 @@ export default function TunnelsPage() {
     }
   };
 
+
+  const activeTunnels = useQuery({
+    queryKey: ["activeTunnels"],
+    queryFn: getActiveTunnels
+  });
 
   const newServer = () => {
     createTunnelMutation.mutate();
@@ -316,7 +322,7 @@ export default function TunnelsPage() {
     }
   ], [user]);
 
-  if (isLoading) {
+  if (tunnels.isLoading || activeTunnels.isLoading) {
     return <div>Loading...</div>;
   }
 
@@ -336,7 +342,7 @@ export default function TunnelsPage() {
               <List className="h-4 w-4" />
             </ToggleGroupItem>
           </ToggleGroup>
-          <Button onClick={newServer} className="bg-blue-600 hover:bg-blue-700 text-white">
+          <Button onClick={newServer}>
             <Plus className="w-4 h-4 mr-2" /> Create Tunnel
           </Button>
         </div>
@@ -345,25 +351,36 @@ export default function TunnelsPage() {
       <ConnectToServerDialog open={connectionDialogOpen} onOpenChange={setConnectionDialogOpen} tunnel={tunnel} />
       {viewMode === 'grid' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {tunnels?.map((t) => (
-            <TunnelCard
-              key={t.ID}
-              tunnel={t}
-              connectionDialogOpener={() => {
-                setTunnel(t);
-                setConnectionDialogOpen(true);
-              }}
-              onEdit={(obj) => {
-                setTunnel(obj);
-                setModalOpen(true);
-                setTunTag(obj.Tag)
-              }}
-              onDelete={(obj) => {
-                deleteTunnelMutation.mutate(obj);
-                setTunnel(undefined);
-              }}
-            />
-          ))}
+          {tunnels.data?.map((t) => {
+            const corr = activeTunnels.data.find(at => at.CR.Tag === t.Tag);
+            return (
+              <TunnelCard
+                key={t.Tag}
+                tunnel={t}
+                serverId={corr ? corr.CR.ServerID : ""}
+                isConnected={!!corr}
+                connectionDialogOpener={() => {
+                  setTunnel(t);
+                  setConnectionDialogOpen(true);
+                }}
+                onEdit={(obj) => {
+                  setTunnel(obj);
+                  setModalOpen(true);
+                  setTunTag(obj.Tag)
+                }}
+                onDelete={(obj) => {
+                  deleteTunnelMutation.mutate(obj);
+                  setTunnel();
+                }}
+                onDisconnect={() => {
+                  if (corr) dcTunnel.mutate(corr.ID, {
+                    onSuccess: () => toast.success(`Disconnected tunnel ${t.Tag}`),
+                    onError() { toast.error("Error disconnecting") }
+                  });
+                }}
+              />
+            )
+          })}
           {(!tunnels || tunnels.length === 0) && (
             <div className="col-span-full text-center py-10 text-muted-foreground">
               No tunnels found. Create one to get started.
