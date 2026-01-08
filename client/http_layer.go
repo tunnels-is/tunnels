@@ -198,6 +198,9 @@ func HTTPhandler(w http.ResponseWriter, r *http.Request) {
 	case "getDNSStats":
 		HTTP_GetDNSStats(w, r)
 		return
+	case "enableProxy":
+		HTTP_EnableProxy(w, r)
+		return
 	default:
 	}
 
@@ -584,4 +587,20 @@ func isWSL() bool {
 		return false
 	}
 	return strings.Contains(strings.ToLower(string(releaseData)), "microsoft")
+}
+
+func HTTP_EnableProxy(w http.ResponseWriter, r *http.Request) {
+	form := new(ProxyEnableRequest)
+	err := Bind(form, r)
+	if err != nil {
+		JSON(w, r, 400, err)
+		return
+	}
+
+	resp, code, err := EnableProxy(form)
+	if err != nil {
+		STRING(w, r, code, err.Error())
+		return
+	}
+	JSON(w, r, code, resp)
 }

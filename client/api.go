@@ -12,6 +12,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/tunnels-is/tunnels/types"
 )
 
 func ResetEverything() {
@@ -195,4 +197,71 @@ func BandwidthBytesToString(b int64) string {
 	}
 
 	return "???"
+}
+
+func EnableProxy(req *ProxyEnableRequest) (*types.ProxyResponse, int, error) {
+	defer RecoverAndLog()
+
+	var tunnel *TUN
+	tunnelMapRange(func(tun *TUN) bool {
+		if tun.ID == req.TunnelID {
+			tunnel = tun
+			return false
+		}
+		return true
+	})
+
+	if tunnel == nil {
+		return nil, 400, errors.New("tunnel not found")
+	}
+
+	if tunnel.CR == nil || tunnel.CR.Server == nil {
+		return nil, 400, errors.New("tunnel server info not available")
+	}
+
+	proxyReqData, code := ForwardToController(&FORWARD_REQUEST{
+		Server:   tunnel.CR.Server,
+		Path:     "/v3/proxy/request",
+		Method:   "POST",
+		Timeout:  10000,
+		JSONData: nil,
+	})
+
+	if code != 200 {
+		errMsg := "failed to request proxy token"
+		if errResp, ok := proxyReqData.(*ErrorResponse); ok {
+			errMsg = errResp.Error
+		}
+		return nil, code, errors.New(errMsg)
+	}
+
+	proxyConnData, code := ForwardToController(&FORWARD_REQUEST{
+		Server:   tunnel.CR.Server,
+		Path:     "/v3/proxy/connect",
+		Method:   "POST",
+		Timeout:  10000,
+		JSONData: proxyReqData,
+	})
+
+	if code != 200 {
+		errMsg := "failed to enable proxy"
+		if errResp, ok := proxyConnData.(*ErrorResponse); ok {
+			errMsg = errResp.Error
+		}
+		return nil, code, errors.New(errMsg)
+	}
+
+	respBytes, err := json.Marshal(proxyConnData)
+	if err != nil {
+		return nil, 500, errors.New("failed to parse proxy response")
+	}
+
+	proxyResp := new(types.ProxyResponse)
+	err = json.Unmarshal(respBytes, proxyResp)
+	if err != nil {
+		return nil, 500, errors.New("failed to parse proxy response")
+	}
+
+	INFO("Proxy enabled: ", proxyResp.Message)
+	return proxyResp, 200, nil
 }

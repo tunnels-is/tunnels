@@ -759,6 +759,10 @@ type goSignal struct {
 	tag    string
 }
 
+type ProxyEnableRequest struct {
+	TunnelID string `json:"TunnelID"`
+}
+
 func init() {
 	STATE.Store(&stateV2{})
 	CONFIG.Store(&configV2{})

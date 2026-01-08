@@ -33,6 +33,11 @@ func launchAPIServer() {
 		mux.HandleFunc("/v3/connect", API_AcceptUserConnections)
 	}
 
+	if SOCKSEnabled && AUTHEnabled {
+		mux.HandleFunc("/v3/proxy/request", API_ProxyRequest)
+		mux.HandleFunc("/v3/proxy/connect", API_ProxyConnect)
+	}
+
 	if AUTHEnabled {
 		mux.HandleFunc("/v3/user/create", API_UserCreate)
 		mux.HandleFunc("/v3/user/update", API_UserUpdate)

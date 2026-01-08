@@ -61,6 +61,7 @@ var (
 	AUTHEnabled  bool
 	DNSEnabled   bool
 	BBOLTEnabled bool
+	SOCKSEnabled bool
 
 	lanFirewallDisabled bool
 	disableLogs         bool
@@ -148,9 +149,28 @@ func main() {
 	LANEnabled = slices.Contains(config.Features, types.LAN)
 	VPNEnabled = slices.Contains(config.Features, types.VPN)
 	BBOLTEnabled = slices.Contains(config.Features, types.BBOLT)
+	SOCKSEnabled = slices.Contains(config.Features, types.SOCKS)
 
 	// In development
 	// DNSEnabled = slices.Contains(config.Features, types.DNS)
+
+	if SOCKSEnabled {
+		if config.SOCKSIP == "" {
+			config.SOCKSIP = config.VPNIP
+			Config.Store(config)
+		}
+
+		if VPNEnabled && config.SOCKSIP == config.VPNIP {
+			logger.Error("SOCKS and VPN features cannot use the same IP address",
+				slog.String("SOCKSIP", config.SOCKSIP),
+				slog.String("VPNIP", config.VPNIP))
+			os.Exit(1)
+		}
+
+		logger.Info("SOCKS5 proxy enabled",
+			slog.String("ip", config.SOCKSIP),
+			slog.String("port", config.SOCKSPort))
+	}
 
 	err = loadCertificatesAndTLSSettings()
 	if err != nil {
@@ -215,6 +235,11 @@ func main() {
 		go signal.NewSignal("PING", ctx, cancel, 10*time.Second, goroutineLogger, pingActiveUsers)
 	}
 
+	if SOCKSEnabled {
+		go signal.NewSignal("SOCKS5", ctx, cancel, 1*time.Second, goroutineLogger, LaunchSOCKS5Server)
+		StartProxyCleanupRoutine()
+	}
+
 	go signal.NewSignal("API", ctx, cancel, 1*time.Second, goroutineLogger, launchAPIServer)
 
 	go signal.NewSignal("CONFIG", ctx, cancel, 30*time.Second, goroutineLogger, func() {
@@ -251,6 +276,10 @@ func validateConfig(Config *types.ServerConfig) (err error) {
 
 	if Config.SecretStore == "" {
 		Config.SecretStore = types.EnvStore
+	}
+
+	if Config.SOCKSPort == "" {
+		Config.SOCKSPort = "80"
 	}
 
 	return nil
@@ -550,6 +579,8 @@ func makeConfigAndCerts() (err error) {
 			},
 			VPNIP:     interfaceIP,
 			VPNPort:   "444",
+			SOCKSIP:   interfaceIP,
+			SOCKSPort: "80",
 			APIIP:     interfaceIP,
 			APIPort:   "443",
 			NetAdmins: []string{},
