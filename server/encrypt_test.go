@@ -249,9 +249,9 @@ func TestEncryptDecryptWithDifferentPasswordLengths(t *testing.T) {
 	plaintext := "Test message for different password lengths"
 
 	passwords := [][]byte{
-		[]byte("a"),                           // 1 byte
-		[]byte("short"),                       // 5 bytes
-		[]byte("medium-password"),             // 15 bytes
+		[]byte("a"),                          // 1 byte
+		[]byte("short"),                      // 5 bytes
+		[]byte("medium-password"),            // 15 bytes
 		[]byte("a-longer-password-for-test"), // 27 bytes
 		[]byte(strings.Repeat("x", 100)),     // 100 bytes
 	}

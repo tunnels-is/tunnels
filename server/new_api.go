@@ -25,10 +25,11 @@ func launchAPIServer() {
 
 	if LANEnabled {
 		mux.HandleFunc("/v3/firewall", API_Firewall)
-		mux.HandleFunc("/v3/devices", API_ListDevices) // supports ADMIN APIKey
+		mux.HandleFunc("/v3/devices", API_ListDevices)
 	}
 
-	if VPNEnabled {
+	mux.HandleFunc("/v3/session", API_SessionCreate)
+	if VPNEnabled || LANEnabled {
 		mux.HandleFunc("/v3/connect", API_AcceptUserConnections)
 	}
 
@@ -42,8 +43,8 @@ func launchAPIServer() {
 		mux.HandleFunc("/v3/user/2fa/confirm", API_UserTwoFactorConfirm)
 		mux.HandleFunc("/v3/user/list", API_UserList)
 
-		mux.HandleFunc("/v3/device/list", API_DeviceList)     // supports ADMIN APIKey
-		mux.HandleFunc("/v3/device/create", API_DeviceCreate) // supports ADMIN APIKey
+		mux.HandleFunc("/v3/device/list", API_DeviceList)
+		mux.HandleFunc("/v3/device/create", API_DeviceCreate)
 		mux.HandleFunc("/v3/device/delete", API_DeviceDelete)
 		mux.HandleFunc("/v3/device/update", API_DeviceUpdate)
 		mux.HandleFunc("/v3/device", API_DeviceGet)
@@ -61,14 +62,12 @@ func launchAPIServer() {
 		mux.HandleFunc("/v3/server/create", API_ServerCreate)
 		mux.HandleFunc("/v3/server/update", API_ServerUpdate)
 		mux.HandleFunc("/v3/servers", API_ServersForUser)
-		mux.HandleFunc("/v3/session", API_SessionCreate)
 
 		// Tunnels public network specific
 		if loadSecret("PayKey") != "" {
 			mux.HandleFunc("/v3/key/activate", API_ActivateLicenseKey)
 			mux.HandleFunc("/v3/user/toggle/substatus", API_UserToggleSubStatus)
 		}
-
 	}
 
 	tlsConfig := APITLSConfig.Load()
@@ -114,19 +113,23 @@ func loggingTimingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		startTime := time.Now()
 		conf := Config.Load()
-		if conf.LogAPIHosts {
+		if conf.LogAPIHosts && !disableLogs {
 			log.Printf("-> %s %s %s", r.RemoteAddr, r.Method, r.URL.RequestURI())
 		} else {
-			log.Printf("-> %s %s", r.Method, r.URL.RequestURI())
+			if !disableLogs {
+				log.Printf("-> %s %s", r.Method, r.URL.RequestURI())
+			}
 		}
 
 		next.ServeHTTP(w, r)
-		duration := time.Since(startTime)
-		log.Printf("<- %s %s completed in %d ms",
-			r.Method,
-			r.URL.RequestURI(),
-			duration.Milliseconds(),
-		)
+		if !disableLogs {
+			duration := time.Since(startTime)
+			log.Printf("<- %s %s completed in %d ms",
+				r.Method,
+				r.URL.RequestURI(),
+				duration.Milliseconds(),
+			)
+		}
 	})
 }
 
