@@ -303,6 +303,11 @@ func loadTunnelsFromDisk() (err error) {
 			return fmt.Errorf("unsupported tunnel file format: %s", ext)
 		}
 
+		if tunnel.Tag == "" {
+			ERROR("Skipping tunnel file with empty Tag:", path)
+			return nil
+		}
+
 		tunnel.ConfigFormat = ext
 		TunnelMetaMap.Store(tunnel.Tag, tunnel)
 		DEBUG("Loaded tunnel:", tunnel.Tag)

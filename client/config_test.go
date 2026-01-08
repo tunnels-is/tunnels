@@ -629,64 +629,357 @@ func TestConfigFileErrors(t *testing.T) {
 	}
 }
 
-func TestLoadAndSaveTunnels_JSON(t *testing.T) {
-	// Save original state
+func TestTunnelConfigFormats(t *testing.T) {
+	originalState := STATE.Load()
+	defer STATE.Store(originalState)
+
+	formats := []struct {
+		name      string
+		extension string
+		marshal   func(v any) ([]byte, error)
+	}{
+		{"JSON", ".json", func(v any) ([]byte, error) { return json.MarshalIndent(v, "", "    ") }},
+		{"YAML", ".yaml", yaml.Marshal},
+		{"YML", ".yml", yaml.Marshal},
+		{"CONF", ".conf", func(v any) ([]byte, error) { return json.MarshalIndent(v, "", "    ") }},
+	}
+
+	for _, fmt := range formats {
+		t.Run(fmt.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			tunnelsPath := filepath.Join(tmpDir, "tunnels") + string(filepath.Separator)
+			if err := os.MkdirAll(tunnelsPath, 0o755); err != nil {
+				t.Fatalf("Failed to create tunnels directory: %v", err)
+			}
+
+			testState := &stateV2{
+				TunnelsPath: tunnelsPath,
+				TunnelType:  string(types.DefaultTun),
+			}
+			STATE.Store(testState)
+
+			testTunnel := &TunnelMETA{
+				Tag:           "test-tunnel-" + fmt.name,
+				IPv4Address:   "10.0.0.1",
+				DNSBlocking:   true,
+				AutoConnect:   false,
+				AutoReconnect: true,
+				ConfigFormat:  fmt.extension,
+			}
+
+			data, err := fmt.marshal(testTunnel)
+			if err != nil {
+				t.Fatalf("Failed to marshal tunnel: %v", err)
+			}
+
+			filePath := filepath.Join(tunnelsPath, testTunnel.Tag+fmt.extension)
+			if err := os.WriteFile(filePath, data, 0o644); err != nil {
+				t.Fatalf("Failed to write tunnel file: %v", err)
+			}
+
+			clearTunnelMap()
+
+			if err := loadTunnelsFromDisk(); err != nil {
+				t.Fatalf("Failed to load tunnels: %v", err)
+			}
+
+			loaded, ok := TunnelMetaMap.Load(testTunnel.Tag)
+			if !ok {
+				t.Fatalf("Tunnel %s was not loaded from %s file", testTunnel.Tag, fmt.extension)
+			}
+
+			if loaded.IPv4Address != testTunnel.IPv4Address {
+				t.Errorf("IPv4Address: got %s, expected %s", loaded.IPv4Address, testTunnel.IPv4Address)
+			}
+			if loaded.DNSBlocking != testTunnel.DNSBlocking {
+				t.Errorf("DNSBlocking: got %v, expected %v", loaded.DNSBlocking, testTunnel.DNSBlocking)
+			}
+			if loaded.AutoReconnect != testTunnel.AutoReconnect {
+				t.Errorf("AutoReconnect: got %v, expected %v", loaded.AutoReconnect, testTunnel.AutoReconnect)
+			}
+			if loaded.ConfigFormat != fmt.extension {
+				t.Errorf("ConfigFormat: got %s, expected %s", loaded.ConfigFormat, fmt.extension)
+			}
+
+			t.Logf("Tunnel %s format test passed", fmt.name)
+		})
+	}
+}
+
+func TestTunnelConfigFormatPreservation(t *testing.T) {
+	originalState := STATE.Load()
+	defer STATE.Store(originalState)
+
+	formats := []string{".json", ".yaml", ".yml", ".conf"}
+
+	for _, ext := range formats {
+		t.Run("format_"+ext, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			tunnelsPath := filepath.Join(tmpDir, "tunnels") + string(filepath.Separator)
+			if err := os.MkdirAll(tunnelsPath, 0o755); err != nil {
+				t.Fatalf("Failed to create tunnels directory: %v", err)
+			}
+
+			testState := &stateV2{
+				TunnelsPath: tunnelsPath,
+				TunnelType:  string(types.DefaultTun),
+			}
+			STATE.Store(testState)
+
+			testTunnel := &TunnelMETA{
+				Tag:          "format-test",
+				IPv4Address:  "192.168.1.1",
+				ConfigFormat: ext,
+			}
+
+			var data []byte
+			var err error
+			if ext == ".yaml" || ext == ".yml" {
+				data, err = yaml.Marshal(testTunnel)
+			} else {
+				data, err = json.MarshalIndent(testTunnel, "", "    ")
+			}
+			if err != nil {
+				t.Fatalf("Failed to marshal: %v", err)
+			}
+
+			if err := os.WriteFile(filepath.Join(tunnelsPath, "format-test"+ext), data, 0o644); err != nil {
+				t.Fatalf("Failed to write file: %v", err)
+			}
+
+			clearTunnelMap()
+			if err := loadTunnelsFromDisk(); err != nil {
+				t.Fatalf("Failed to load tunnels: %v", err)
+			}
+
+			loaded, ok := TunnelMetaMap.Load("format-test")
+			if !ok {
+				t.Fatal("Tunnel was not loaded")
+			}
+
+			if err := writeTunnelsToDisk("format-test"); err != nil {
+				t.Fatalf("Failed to write tunnel: %v", err)
+			}
+
+			savedPath := filepath.Join(tunnelsPath, "format-test"+ext)
+			if _, err := os.Stat(savedPath); os.IsNotExist(err) {
+				t.Errorf("Tunnel was not saved with correct extension %s", ext)
+			}
+
+			if loaded.ConfigFormat != ext {
+				t.Errorf("ConfigFormat not preserved: got %s, expected %s", loaded.ConfigFormat, ext)
+			}
+		})
+	}
+}
+
+func TestTunnelSkipsInvalidExtensions(t *testing.T) {
 	originalState := STATE.Load()
 	defer STATE.Store(originalState)
 
 	tmpDir := t.TempDir()
 	tunnelsPath := filepath.Join(tmpDir, "tunnels") + string(filepath.Separator)
-	err := os.MkdirAll(tunnelsPath, 0o755)
-	if err != nil {
+	if err := os.MkdirAll(tunnelsPath, 0o755); err != nil {
 		t.Fatalf("Failed to create tunnels directory: %v", err)
 	}
 
-	// Setup state
 	testState := &stateV2{
 		TunnelsPath: tunnelsPath,
 		TunnelType:  string(types.DefaultTun),
 	}
 	STATE.Store(testState)
 
-	// Create test tunnel
-	testTunnel := &TunnelMETA{
-		Tag:           "test-tunnel",
-		IPv4Address:   "10.0.0.1",
-		DNSBlocking:   true,
-		AutoConnect:   false,
-		AutoReconnect: false,
-	}
-	TunnelMetaMap.Store(testTunnel.Tag, testTunnel)
-
-	// Test writing
-	err = writeTunnelsToDisk(testTunnel.Tag)
-	if err != nil {
-		t.Fatalf("Failed to write tunnel: %v", err)
+	invalidFiles := []struct {
+		name    string
+		content string
+	}{
+		{"tunnel.txt", `{"Tag": "txt-tunnel", "IPv4Address": "10.0.0.1"}`},
+		{"tunnel.xml", `{"Tag": "xml-tunnel", "IPv4Address": "10.0.0.2"}`},
+		{"tunnel.bak", `{"Tag": "bak-tunnel", "IPv4Address": "10.0.0.3"}`},
+		{"README.md", `# Tunnel Config Directory`},
+		{".hidden", `{"Tag": "hidden-tunnel", "IPv4Address": "10.0.0.4"}`},
+		{"tunnel.toml", `Tag = "toml-tunnel"`},
+		{"tunnel.ini", `[tunnel]\nTag=ini-tunnel`},
+		{"tunnel.conf.bak", `{"Tag": "conf-bak-tunnel", "IPv4Address": "10.0.0.5"}`},
 	}
 
-	// Clear map and test loading
-	TunnelMetaMap.Delete(testTunnel.Tag)
+	for _, f := range invalidFiles {
+		if err := os.WriteFile(filepath.Join(tunnelsPath, f.name), []byte(f.content), 0o644); err != nil {
+			t.Fatalf("Failed to write %s: %v", f.name, err)
+		}
+	}
 
-	err = loadTunnelsFromDisk()
-	if err != nil {
+	validTunnel := &TunnelMETA{Tag: "valid-tunnel", IPv4Address: "10.0.0.100"}
+	data, _ := json.Marshal(validTunnel)
+	if err := os.WriteFile(filepath.Join(tunnelsPath, "valid-tunnel.json"), data, 0o644); err != nil {
+		t.Fatalf("Failed to write valid tunnel: %v", err)
+	}
+
+	clearTunnelMap()
+	if err := loadTunnelsFromDisk(); err != nil {
 		t.Fatalf("Failed to load tunnels: %v", err)
 	}
 
-	// Verify loaded tunnel
-	loaded, ok := TunnelMetaMap.Load(testTunnel.Tag)
-	if !ok {
-		t.Error("Tunnel was not loaded")
-		return
+	if _, ok := TunnelMetaMap.Load("valid-tunnel"); !ok {
+		t.Error("Valid tunnel was not loaded")
 	}
 
-	if loaded.IPv4Address != testTunnel.IPv4Address {
-		t.Errorf("IPv4Address: got %s, expected %s", loaded.IPv4Address, testTunnel.IPv4Address)
-	}
-	if loaded.DNSBlocking != testTunnel.DNSBlocking {
-		t.Errorf("DNSBlocking: got %v, expected %v", loaded.DNSBlocking, testTunnel.DNSBlocking)
+	invalidTags := []string{"txt-tunnel", "xml-tunnel", "bak-tunnel", "hidden-tunnel", "toml-tunnel", "ini-tunnel", "conf-bak-tunnel"}
+	for _, tag := range invalidTags {
+		if _, ok := TunnelMetaMap.Load(tag); ok {
+			t.Errorf("Invalid tunnel %s should not have been loaded", tag)
+		}
 	}
 
-	t.Log("Tunnel JSON save/load cycle completed successfully ✓")
+	t.Log("Invalid extension filtering test passed")
+}
+
+func TestTunnelSkipsEmptyTag(t *testing.T) {
+	originalState := STATE.Load()
+	defer STATE.Store(originalState)
+
+	tmpDir := t.TempDir()
+	tunnelsPath := filepath.Join(tmpDir, "tunnels") + string(filepath.Separator)
+	if err := os.MkdirAll(tunnelsPath, 0o755); err != nil {
+		t.Fatalf("Failed to create tunnels directory: %v", err)
+	}
+
+	testState := &stateV2{
+		TunnelsPath: tunnelsPath,
+		TunnelType:  string(types.DefaultTun),
+	}
+	STATE.Store(testState)
+
+	emptyTagTunnel := &TunnelMETA{Tag: "", IPv4Address: "10.0.0.1"}
+	data, _ := json.Marshal(emptyTagTunnel)
+	if err := os.WriteFile(filepath.Join(tunnelsPath, "empty-tag.json"), data, 0o644); err != nil {
+		t.Fatalf("Failed to write file: %v", err)
+	}
+
+	validTunnel := &TunnelMETA{Tag: "valid-tag", IPv4Address: "10.0.0.2"}
+	data, _ = json.Marshal(validTunnel)
+	if err := os.WriteFile(filepath.Join(tunnelsPath, "valid-tag.json"), data, 0o644); err != nil {
+		t.Fatalf("Failed to write file: %v", err)
+	}
+
+	clearTunnelMap()
+	if err := loadTunnelsFromDisk(); err != nil {
+		t.Fatalf("Failed to load tunnels: %v", err)
+	}
+
+	if _, ok := TunnelMetaMap.Load(""); ok {
+		t.Error("Tunnel with empty tag should not have been loaded")
+	}
+
+	if _, ok := TunnelMetaMap.Load("valid-tag"); !ok {
+		t.Error("Valid tunnel was not loaded")
+	}
+
+	t.Log("Empty tag filtering test passed")
+}
+
+func TestTunnelInvalidContent(t *testing.T) {
+	originalState := STATE.Load()
+	defer STATE.Store(originalState)
+
+	tmpDir := t.TempDir()
+	tunnelsPath := filepath.Join(tmpDir, "tunnels") + string(filepath.Separator)
+	if err := os.MkdirAll(tunnelsPath, 0o755); err != nil {
+		t.Fatalf("Failed to create tunnels directory: %v", err)
+	}
+
+	testState := &stateV2{
+		TunnelsPath: tunnelsPath,
+		TunnelType:  string(types.DefaultTun),
+	}
+	STATE.Store(testState)
+
+	if err := os.WriteFile(filepath.Join(tunnelsPath, "invalid.json"), []byte("{invalid json}"), 0o644); err != nil {
+		t.Fatalf("Failed to write file: %v", err)
+	}
+
+	clearTunnelMap()
+	err := loadTunnelsFromDisk()
+	if err == nil {
+		t.Error("Expected error for invalid JSON content")
+	}
+
+	t.Log("Invalid content error handling test passed")
+}
+
+func TestTunnelInvalidYAMLContent(t *testing.T) {
+	originalState := STATE.Load()
+	defer STATE.Store(originalState)
+
+	tmpDir := t.TempDir()
+	tunnelsPath := filepath.Join(tmpDir, "tunnels") + string(filepath.Separator)
+	if err := os.MkdirAll(tunnelsPath, 0o755); err != nil {
+		t.Fatalf("Failed to create tunnels directory: %v", err)
+	}
+
+	testState := &stateV2{
+		TunnelsPath: tunnelsPath,
+		TunnelType:  string(types.DefaultTun),
+	}
+	STATE.Store(testState)
+
+	if err := os.WriteFile(filepath.Join(tunnelsPath, "invalid.yaml"), []byte("invalid:\n  yaml:\n    - [unclosed"), 0o644); err != nil {
+		t.Fatalf("Failed to write file: %v", err)
+	}
+
+	clearTunnelMap()
+	err := loadTunnelsFromDisk()
+	if err == nil {
+		t.Error("Expected error for invalid YAML content")
+	}
+
+	t.Log("Invalid YAML content error handling test passed")
+}
+
+func TestTunnelDirectoriesAreSkipped(t *testing.T) {
+	originalState := STATE.Load()
+	defer STATE.Store(originalState)
+
+	tmpDir := t.TempDir()
+	tunnelsPath := filepath.Join(tmpDir, "tunnels") + string(filepath.Separator)
+	if err := os.MkdirAll(tunnelsPath, 0o755); err != nil {
+		t.Fatalf("Failed to create tunnels directory: %v", err)
+	}
+
+	subDir := filepath.Join(tunnelsPath, "subdir.json")
+	if err := os.MkdirAll(subDir, 0o755); err != nil {
+		t.Fatalf("Failed to create subdirectory: %v", err)
+	}
+
+	testState := &stateV2{
+		TunnelsPath: tunnelsPath,
+		TunnelType:  string(types.DefaultTun),
+	}
+	STATE.Store(testState)
+
+	validTunnel := &TunnelMETA{Tag: "valid", IPv4Address: "10.0.0.1"}
+	data, _ := json.Marshal(validTunnel)
+	if err := os.WriteFile(filepath.Join(tunnelsPath, "valid.json"), data, 0o644); err != nil {
+		t.Fatalf("Failed to write file: %v", err)
+	}
+
+	clearTunnelMap()
+	if err := loadTunnelsFromDisk(); err != nil {
+		t.Fatalf("Failed to load tunnels: %v", err)
+	}
+
+	if _, ok := TunnelMetaMap.Load("valid"); !ok {
+		t.Error("Valid tunnel was not loaded")
+	}
+
+	t.Log("Directory skipping test passed")
+}
+
+func clearTunnelMap() {
+	TunnelMetaMap.Range(func(key string, value *TunnelMETA) bool {
+		TunnelMetaMap.Delete(key)
+		return true
+	})
 }
 
 func TestConfigRoundTrip(t *testing.T) {
