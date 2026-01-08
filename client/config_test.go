@@ -650,11 +650,10 @@ func TestLoadAndSaveTunnels_JSON(t *testing.T) {
 
 	// Create test tunnel
 	testTunnel := &TunnelMETA{
-		Tag:          "test-tunnel",
-		ServerID:     "server1",
-		IPv4Address:  "10.0.0.1",
-		DNSBlocking:  true,
-		AutoConnect:  false,
+		Tag:           "test-tunnel",
+		IPv4Address:   "10.0.0.1",
+		DNSBlocking:   true,
+		AutoConnect:   false,
 		AutoReconnect: false,
 	}
 	TunnelMetaMap.Store(testTunnel.Tag, testTunnel)
@@ -680,9 +679,6 @@ func TestLoadAndSaveTunnels_JSON(t *testing.T) {
 		return
 	}
 
-	if loaded.ServerID != testTunnel.ServerID {
-		t.Errorf("ServerID: got %s, expected %s", loaded.ServerID, testTunnel.ServerID)
-	}
 	if loaded.IPv4Address != testTunnel.IPv4Address {
 		t.Errorf("IPv4Address: got %s, expected %s", loaded.IPv4Address, testTunnel.IPv4Address)
 	}

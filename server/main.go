@@ -64,6 +64,7 @@ var (
 
 	lanFirewallDisabled bool
 	disableLogs         bool
+	serverConfigPath    string
 
 	dataSocketFD int
 	rawUDPSockFD int
@@ -82,7 +83,8 @@ func main() {
 	flag.BoolVar(&showVersion, "version", false, "show version and exit")
 
 	configFlag := flag.Bool("config", false, "This command runs the server and creates a config + certificates")
-	jsonLogs := flag.Bool("json", true, "this disabled json logging")
+	configPath := flag.String("configPath", "./config.json", "path to config file (supports .json, .yaml, .yml)")
+	jsonLogs := flag.Bool("json", true, "enable/disable json logging")
 	sourceInfo := flag.Bool("source", false, "disable source line information in logs")
 	certsOnly := flag.Bool("certs", false, "This command generates certificates and exits")
 	silent := flag.Bool("silent", false, "This command disables logging")
@@ -90,6 +92,7 @@ func main() {
 	adminFlag := flag.String("admin", "", "Add an admin identifier (DeviceToken/DeviceKey/UserID) to NetAdmins")
 	flag.Parse()
 
+	serverConfigPath = *configPath
 	initLogging(*silent, *jsonLogs, *sourceInfo, *logLevel)
 
 	if showVersion {
@@ -127,7 +130,7 @@ func main() {
 
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
-	err := LoadServerConfig("./config.json")
+	err := LoadServerConfig(serverConfigPath)
 	if err != nil {
 		panic(err)
 	}
@@ -215,7 +218,7 @@ func main() {
 	go signal.NewSignal("API", ctx, cancel, 1*time.Second, goroutineLogger, launchAPIServer)
 
 	go signal.NewSignal("CONFIG", ctx, cancel, 30*time.Second, goroutineLogger, func() {
-		_ = LoadServerConfig("./config.json")
+		_ = LoadServerConfig(serverConfigPath)
 	})
 
 	logger.Info("Tunnels ready")
@@ -317,7 +320,7 @@ func SaveServerConfig(path string) (err error) {
 }
 
 func addAdminToConfig(identifier string) error {
-	err := LoadServerConfig("./config.json")
+	err := LoadServerConfig(serverConfigPath)
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
@@ -328,7 +331,7 @@ func addAdminToConfig(identifier string) error {
 	C.NetAdmins = append(C.NetAdmins, hashedIdentifier)
 	Config.Store(C)
 
-	err = SaveServerConfig("./config.json")
+	err = SaveServerConfig(serverConfigPath)
 	if err != nil {
 		return fmt.Errorf("failed to save config: %w", err)
 	}
@@ -535,9 +538,9 @@ func makeConfigAndCerts() (err error) {
 	}
 	interfaceIP := IFIP.String()
 
-	err = LoadServerConfig("./config.json")
+	err = LoadServerConfig(serverConfigPath)
 	if err != nil {
-		Config := &types.ServerConfig{
+		newConfig := &types.ServerConfig{
 			Features: []types.Feature{
 				types.LAN,
 				types.VPN,
@@ -570,24 +573,15 @@ func makeConfigAndCerts() (err error) {
 			DNSRecords:          []*types.DNSRecord{},
 			DNSServers:          []string{},
 			SecretStore:         "config",
-			// secrets
-			DBurl:        "",
-			AdminAPIKey:  uuid.NewString(),
-			TwoFactorKey: strings.ReplaceAll(uuid.NewString(), "-", ""),
-			CertPem:      "./cert.pem",
-			KeyPem:       "./key.pem",
-			SignPem:      "./sign.pem",
+			DBurl:               "",
+			AdminAPIKey:         uuid.NewString(),
+			TwoFactorKey:        strings.ReplaceAll(uuid.NewString(), "-", ""),
+			CertPem:             "./cert.pem",
+			KeyPem:              "./key.pem",
+			SignPem:             "./sign.pem",
 		}
-		f, err := os.Create(ep + "config.json")
-		if err != nil {
-			return err
-		}
-		defer func() {
-			_ = f.Close()
-		}()
-		encoder := json.NewEncoder(f)
-		encoder.SetIndent("", "    ")
-		if err := encoder.Encode(Config); err != nil {
+		Config.Store(newConfig)
+		if err := SaveServerConfig(serverConfigPath); err != nil {
 			return err
 		}
 	}

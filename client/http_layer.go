@@ -452,7 +452,11 @@ func HTTP_SetTunnel(w http.ResponseWriter, r *http.Request) {
 	if newForm.OldTag != newForm.Meta.Tag {
 		TunnelMetaMap.Delete(newForm.OldTag)
 		state := STATE.Load()
-		err = os.Remove(state.TunnelsPath + newForm.OldTag + tunnelFileSuffix)
+		ext := newForm.Meta.ConfigFormat
+		if ext == "" {
+			ext = tunnelFileSuffix
+		}
+		err = os.Remove(state.TunnelsPath + newForm.OldTag + ext)
 		if err != nil {
 			JSON(w, r, 400, err.Error())
 			return
@@ -519,7 +523,13 @@ func HTTP_DeleteTunnels(w http.ResponseWriter, r *http.Request) {
 	}
 
 	state := STATE.Load()
-	_ = os.Remove(state.TunnelsPath + form.Tag + tunnelFileSuffix)
+	ext := tunnelFileSuffix
+	if storedTun, ok := TunnelMetaMap.Load(form.Tag); ok {
+		if storedTun.ConfigFormat != "" {
+			ext = storedTun.ConfigFormat
+		}
+	}
+	_ = os.Remove(state.TunnelsPath + form.Tag + ext)
 
 	tunnelMetaMapRange(func(tun *TunnelMETA) bool {
 		if tun.Tag == form.Tag {
