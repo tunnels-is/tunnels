@@ -34,8 +34,8 @@ func TestHashIdentifierSHA3_Consistency(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			// Hash the same value twice
-			hash1 := HashIdentifier(tc.input)
-			hash2 := HashIdentifier(tc.input)
+			hash1 := hashIdentifier(tc.input)
+			hash2 := hashIdentifier(tc.input)
 
 			// Verify they are identical as strings
 			if hash1 != hash2 {
@@ -63,8 +63,8 @@ func TestHashIdentifierSHA3_Uniqueness(t *testing.T) {
 	input1 := "device-token-1"
 	input2 := "device-token-2"
 
-	hash1 := HashIdentifier(input1)
-	hash2 := HashIdentifier(input2)
+	hash1 := hashIdentifier(input1)
+	hash2 := hashIdentifier(input2)
 
 	if hash1 == hash2 {
 		t.Errorf("Different inputs produced the same hash!\nInput1: %s\nInput2: %s\nHash: %s",
@@ -80,7 +80,7 @@ func TestHashIdentifierSHA3_KnownValue(t *testing.T) {
 	input := "test-device-token-123"
 	expectedHash := "4d3d1ccc7011a8d1fa523c9e2bd91c188fbe657f77c8bc3f36981e11ca011e04"
 
-	hash := HashIdentifier(input)
+	hash := hashIdentifier(input)
 
 	if hash != expectedHash {
 		t.Errorf("Hash does not match expected value!\nExpected: %s\nGot:      %s", expectedHash, hash)

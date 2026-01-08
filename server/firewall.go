@@ -32,7 +32,6 @@ func syncFirewallState(fr *types.FirewallRequest, mapping *UserCoreMapping) {
 				found = true
 				break
 			}
-
 		}
 
 		if !found {
@@ -77,7 +76,7 @@ func getIP4FromHostOrDHCP(host string) (ip4 [4]byte, ok bool) {
 	} else {
 		ip4, ok = getHostnameFromDHCP(host)
 	}
-	return
+	return ip4, ok
 }
 
 func getHostnameFromDHCP(hostname string) (ip4b [4]byte, ok bool) {
