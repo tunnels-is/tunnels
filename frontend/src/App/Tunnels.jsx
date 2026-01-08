@@ -6,6 +6,7 @@ import NewObjectEditorDialog from "./NewObjectEdiorDialog";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { CircleArrowRight } from "lucide-react";
 import { LogOut } from "lucide-react";
+import { Globe } from "lucide-react";
 
 const Tunnels = () => {
   const state = GLOBAL_STATE("tunnels");
@@ -62,6 +63,22 @@ const Tunnels = () => {
       };
     }
 
+    let enableProxy = undefined;
+    if (active) {
+      enableProxy = () => {
+        state.ConfirmAndExecute(
+          "success",
+          "proxy",
+          10000,
+          "",
+          "Enable proxy for " + obj.Tag,
+          () => {
+            state.enableProxy(active);
+          },
+        );
+      };
+    }
+
     return <div>
       <DropdownMenuItem
         key="connect"
@@ -77,6 +94,15 @@ const Tunnels = () => {
           className={"cursor-pointer text-[#ef4444]"}
         >
           <LogOut className="w-4 h-4 mr-2" /> Disconnect
+        </DropdownMenuItem >
+      }
+      {enableProxy &&
+        <DropdownMenuItem
+          key="enableProxy"
+          onClick={() => enableProxy()}
+          className={"cursor-pointer text-[#2056e1]"}
+        >
+          <Globe className="w-4 h-4 mr-2" /> Enable Proxy
         </DropdownMenuItem >
       }
     </div>

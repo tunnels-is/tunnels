@@ -18,6 +18,7 @@ const (
 	AUTH  Feature = "AUTH"
 	DNS   Feature = "DNS"
 	BBOLT Feature = "BBOLT"
+	SOCKS Feature = "SOCKS" // SOCKS5 proxy feature
 )
 
 type TunnelType string
@@ -46,6 +47,9 @@ type ServerConfig struct {
 
 	VPNIP   string
 	VPNPort string
+
+	SOCKSIP   string
+	SOCKSPort string
 
 	APIIP   string
 	APIPort string
@@ -284,4 +288,23 @@ func (d *DHCPRecord) Assign(timeoutHours float64, token string) (ok bool) {
 
 type FORM_GET_DEVICE struct {
 	DeviceID primitive.ObjectID
+}
+
+type ControllerProxyRequest struct {
+	DeviceKey   string             `json:"DeviceKey"`
+	DeviceToken string             `json:"DeviceToken"`
+	UserID      primitive.ObjectID `json:"UserID"`
+	ServerID    primitive.ObjectID `json:"ServerID"`
+	Version     int                `json:"Version"`
+	Created     time.Time          `json:"Created"`
+}
+
+type SignedProxyRequest struct {
+	Signature []byte `json:"Signature"`
+	Payload   []byte `json:"Payload"`
+}
+
+type ProxyResponse struct {
+	Message string `json:"Message"`
+	IP      string `json:"IP"`
 }

@@ -698,6 +698,36 @@ export var STATE = {
     STATE.toggleLoading(undefined);
     STATE.GetBackendState();
   },
+  enableProxy: async (tunnel) => {
+    STATE.toggleLoading({
+      logTag: "proxy",
+      tag: "PROXY",
+      show: true,
+      msg: "Enabling proxy...",
+      includeLogs: false,
+    });
+
+    try {
+      let resp = await STATE.API.method(
+        "enableProxy",
+        { TunnelID: tunnel.ID },
+        false,
+        15000,
+      );
+      if (resp === undefined) {
+        STATE.errorNotification("Unknown error, please try again in a moment");
+      } else if (resp.status === 200) {
+        STATE.successNotification("Proxy enabled: " + resp.data?.Message);
+      } else {
+        STATE.errorNotification(resp.data || "Failed to enable proxy");
+      }
+    } catch (error) {
+      console.dir(error);
+      STATE.errorNotification("Error enabling proxy");
+    }
+
+    STATE.toggleLoading(undefined);
+  },
   FinalizeLogout: async () => {
     STORE.Cache.Clear();
     STATE.GetBackendState();

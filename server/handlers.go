@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"math/rand"
+	"net"
 	"net/http"
 	"reflect"
 	"slices"
@@ -1387,4 +1388,147 @@ func API_ActivateLicenseKey(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(200)
+}
+
+func API_ProxyRequest(w http.ResponseWriter, r *http.Request) {
+	defer BasicRecover()
+
+	PR := new(types.ControllerProxyRequest)
+	err := decodeBody(r, PR)
+	if err != nil {
+		senderr(w, 400, "Invalid request body", slog.Any("error", err))
+		return
+	}
+
+	server, err := DB_FindServerByID(PR.ServerID)
+	if err != nil {
+		senderr(w, 500, "Unknown error, please try again in a moment")
+		return
+	}
+	if server == nil {
+		senderr(w, 404, "Server not found")
+		return
+	}
+
+	allowed := false
+	if PR.DeviceKey != "" {
+		deviceID, err := primitive.ObjectIDFromHex(PR.DeviceKey)
+		if err != nil {
+			senderr(w, 400, "Invalid device key")
+			return
+		}
+		device, err := DB_FindDeviceByID(deviceID)
+		if err != nil {
+			senderr(w, 500, err.Error())
+			return
+		}
+		if device == nil {
+			senderr(w, 401, "Unauthorized")
+			return
+		}
+		for _, g := range server.Groups {
+			for _, ug := range device.Groups {
+				if g == ug {
+					allowed = true
+				}
+			}
+		}
+	} else {
+		user, err := authenticateUserFromEmailOrIDAndToken("", PR.UserID, PR.DeviceToken)
+		if err != nil {
+			senderr(w, 401, err.Error())
+			return
+		}
+		for _, g := range server.Groups {
+			for _, ug := range user.Groups {
+				if g == ug {
+					allowed = true
+				}
+			}
+		}
+	}
+
+	if len(server.Groups) == 0 {
+		allowed = true
+	}
+
+	if !allowed {
+		senderr(w, 401, "Unauthorized")
+		return
+	}
+
+	SPR := new(types.SignedProxyRequest)
+	PR.Created = time.Now()
+	SPR.Payload, err = json.Marshal(PR)
+	if err != nil {
+		senderr(w, 500, "Unable to encode payload")
+		return
+	}
+	SPR.Signature, err = crypt.SignData(SPR.Payload, PrivKey)
+	if err != nil {
+		senderr(w, 500, "Unable to sign payload", slog.Any("err", err))
+		return
+	}
+
+	sendObject(w, SPR)
+}
+
+func API_ProxyConnect(w http.ResponseWriter, r *http.Request) {
+	defer BasicRecover()
+
+	SPR := new(types.SignedProxyRequest)
+	err := decodeBody(r, SPR)
+	if err != nil {
+		senderr(w, 400, "Invalid request body", slog.Any("error", err))
+		return
+	}
+
+	err = crypt.VerifySignature(SPR.Payload, SPR.Signature, SignKey)
+	if err != nil {
+		senderr(w, 401, "Invalid signature", slog.Any("err", err))
+		return
+	}
+
+	PR := new(types.ControllerProxyRequest)
+	err = json.Unmarshal(SPR.Payload, PR)
+	if err != nil {
+		senderr(w, 400, "Unable to decode payload")
+		return
+	}
+
+	if time.Since(PR.Created).Seconds() > 240 {
+		senderr(w, 401, "Request expired")
+		return
+	}
+
+	clientIP := extractClientIP(r)
+	if clientIP == "" {
+		senderr(w, 400, "Unable to determine client IP")
+		return
+	}
+
+	AddProxyClient(clientIP)
+
+	config := Config.Load()
+	resp := &types.ProxyResponse{
+		Message: fmt.Sprintf("Proxy enabled for IP %s. Connect to %s:%s", clientIP, config.SOCKSIP, config.SOCKSPort),
+		IP:      clientIP,
+	}
+	sendObject(w, resp)
+}
+
+func extractClientIP(r *http.Request) string {
+	xff := r.Header.Get("X-Forwarded-For")
+	if xff != "" {
+		parts := strings.Split(xff, ",")
+		if len(parts) > 0 {
+			return strings.TrimSpace(parts[0])
+		}
+	}
+
+	ip, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return ip
 }
