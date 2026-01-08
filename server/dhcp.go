@@ -25,7 +25,7 @@ func generateDHCPMap() (err error) {
 		index++
 	}
 
-	return
+	return err
 }
 
 func assignDHCP(CR *types.ControllerConnectRequest, CRR *types.ServerConnectResponse, index int) (err error) {
@@ -87,7 +87,7 @@ func assignDHCP(CR *types.ControllerConnectRequest, CRR *types.ServerConnectResp
 		return errors.New("No DHCP ip address available")
 	}
 
-	return
+	return err
 }
 
 func inc(ip net.IP) {

@@ -19,8 +19,7 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-// HashIdentifier creates a SHA3-256 hash from an identifier
-func HashIdentifier(identifier string) string {
+func hashIdentifier(identifier string) string {
 	hash := sha3.Sum256([]byte(identifier))
 	return hex.EncodeToString(hash[:])
 }
@@ -37,7 +36,7 @@ func countConnections(id string) (count int, userCount int) {
 
 		count++
 	}
-	return
+	return count, userCount
 }
 
 func CreateClientCoreMapping(CRR *types.ServerConnectResponse, CR *types.ControllerConnectRequest, EH *crypt.SocketWrapper) (index int, err error) {
@@ -63,11 +62,11 @@ func CreateClientCoreMapping(CRR *types.ServerConnectResponse, CR *types.Control
 				continue
 			}
 
-			clientCoreMappings[i].ID = HashIdentifier(CR.UserID.Hex())
+			clientCoreMappings[i].ID = hashIdentifier(CR.UserID.Hex())
 			if CR.DeviceToken != "" {
-				clientCoreMappings[i].DeviceToken = HashIdentifier(CR.DeviceToken)
+				clientCoreMappings[i].DeviceToken = hashIdentifier(CR.DeviceToken)
 			} else {
-				clientCoreMappings[i].DeviceToken = HashIdentifier(CR.DeviceKey)
+				clientCoreMappings[i].DeviceToken = hashIdentifier(CR.DeviceKey)
 			}
 
 			clientCoreMappings[i].EH = EH
@@ -110,7 +109,7 @@ func CreateClientCoreMapping(CRR *types.ServerConnectResponse, CR *types.Control
 	Config := Config.Load()
 	CRR.LAN = Config.Lan
 
-	return
+	return index, err
 }
 
 func ExternalTCPListener() {
@@ -214,12 +213,13 @@ func ExternalUDPListener() {
 	}
 
 	var DSTP uint16
-	var IHL byte
+	var IPHeadLength byte
 	var PM *PortRange
 	var n int
 	var version byte
 	buffer := make([]byte, math.MaxUint16)
-	// cfg := Config.Load()
+	cfg := Config.Load()
+	startPort := uint16(cfg.StartPort)
 
 	for {
 		n, _, err = syscall.Recvfrom(rawUDPSockFD, buffer, 0)
@@ -234,11 +234,11 @@ func ExternalUDPListener() {
 		}
 
 		// TODO .. use mask
-		IHL = ((buffer[0] << 4) >> 4) * 4
-		DSTP = binary.BigEndian.Uint16(buffer[IHL+2 : IHL+4])
-		// if DSTP < uint16(cfg.StartPort) {
-		// 	continue
-		// }
+		IPHeadLength = ((buffer[0] << 4) >> 4) * 4
+		DSTP = binary.BigEndian.Uint16(buffer[IPHeadLength+2 : IPHeadLength+4])
+		if DSTP < startPort {
+			continue
+		}
 		PM = portToCoreMapping[DSTP]
 		if PM == nil || PM.Client == nil {
 			continue
@@ -319,7 +319,7 @@ func fromUserChannel(index int) {
 	shouldRestart := true
 	defer func() {
 		if r := recover(); r != nil {
-			ERR(3, r, string(debug.Stack()))
+			ERR(r, string(debug.Stack()))
 		}
 
 		if !shouldRestart {
@@ -335,7 +335,6 @@ func fromUserChannel(index int) {
 	var err error
 	var ok bool
 	staging := make([]byte, 100000)
-	// clientCache := make(map[[4]byte]*UserCoreMapping)
 	var D4 [4]byte
 	var D4Port [2]byte
 	var RST byte
@@ -394,20 +393,19 @@ func fromUserChannel(index int) {
 			D4[1] = NIP[1]
 			D4[2] = NIP[2]
 			D4[3] = NIP[3]
-			l := (PACKET[0] & 0x0F) * 4
-			D4Port[0] = PACKET[l+2]
-			D4Port[1] = PACKET[l+3]
-
-			RST = PACKET[l+13] & 0x4
-			FIN = PACKET[l+13] & 0x1
-			SYN = PACKET[l+13] & 0x2
 
 			targetCM = VPLIPToCore[D4[0]][D4[1]][D4[2]][D4[3]]
 			if targetCM == nil {
 				CM.DelHost(D4, "auto")
-				WARN("No target CM:", D4)
 				continue
 			}
+
+			l := (PACKET[0] & 0x0F) * 4
+			D4Port[0] = PACKET[l+2]
+			D4Port[1] = PACKET[l+3]
+			RST = PACKET[l+13] & 0x4
+			FIN = PACKET[l+13] & 0x1
+			SYN = PACKET[l+13] & 0x2
 
 			if RST > 0 {
 				CM.DelHost(D4, "auto")
@@ -450,7 +448,6 @@ func fromUserChannel(index int) {
 				continue
 			}
 		}
-
 	}
 }
 
@@ -483,7 +480,7 @@ func toUserChannel(index int) {
 
 	defer func() {
 		if r := recover(); r != nil {
-			ERR(3, r, string(debug.Stack()))
+			ERR(r, string(debug.Stack()))
 		}
 
 		if !shouldRestart {
@@ -501,7 +498,9 @@ func toUserChannel(index int) {
 	var FIN byte
 	var RST byte
 	var originCM *UserCoreMapping
-	var skipFirewall bool
+	var isAdmin bool
+	var headLength byte
+	var activeHost *AllowedHost
 	Config := Config.Load()
 
 	for {
@@ -512,47 +511,49 @@ func toUserChannel(index int) {
 		}
 
 		if PACKET[9] != 6 && PACKET[9] != 17 {
-			WARN("invalid packet, index:", 7)
 			continue
 		}
 
+		// Server LAN feature is hardcoded to 10.0.X.X
+		// We might change this later
 		if LANEnabled && (PACKET[12] == 10 && PACKET[13] == 0) {
-			S4[0] = PACKET[12]
-			S4[1] = PACKET[13]
-			S4[2] = PACKET[14]
-			S4[3] = PACKET[15]
-			originCM = VPLIPToCore[S4[0]][S4[1]][S4[2]][S4[3]]
-			skipFirewall = false
-			if originCM != nil {
-				for _, entity := range Config.NetAdmins {
-					if entity == originCM.DeviceToken || entity == originCM.ID {
-						skipFirewall = true
-						break
+			originCM = VPLIPToCore[PACKET[12]][PACKET[13]][PACKET[14]][PACKET[15]]
+			if !lanFirewallDisabled && !CM.DisableFirewall {
+				isAdmin = false
+				if originCM != nil {
+					for _, entity := range Config.NetAdmins {
+						if entity == originCM.DeviceToken || entity == originCM.ID {
+							isAdmin = true
+							break
+						}
 					}
 				}
-			}
 
-			if !lanFirewallDisabled && !CM.DisableFirewall && !skipFirewall {
+				if !isAdmin {
+					headLength = (PACKET[0] & 0x0F) * 4
+					S4Port[0] = PACKET[headLength]
+					S4Port[1] = PACKET[headLength+1]
 
-				l := (PACKET[0] & 0x0F) * 4
-				S4Port[0] = PACKET[l]
-				S4Port[1] = PACKET[l+1]
+					S4[0] = PACKET[12]
+					S4[1] = PACKET[13]
+					S4[2] = PACKET[14]
+					S4[3] = PACKET[15]
 
-				RST = PACKET[l+13] & 0x4
-				FIN = PACKET[l+13] & 0x1
+					activeHost = CM.IsHostAllowed(S4, S4Port)
+					if activeHost == nil {
+						continue
+					}
 
-				host := CM.IsHostAllowed(S4, S4Port)
-				if host == nil {
-					WARN("Unauthorized access:", index, S4)
-					continue
-				}
-				if RST > 0 {
-					CM.DelHost(S4, "auto")
-				} else if FIN > 0 {
-					if host.FFIN {
+					RST = PACKET[headLength+13] & 0x4
+					FIN = PACKET[headLength+13] & 0x1
+					if RST > 0 {
 						CM.DelHost(S4, "auto")
-					} else {
-						CM.SetFin(S4, S4Port, false)
+					} else if FIN > 0 {
+						if activeHost.FFIN {
+							CM.DelHost(S4, "auto")
+						} else {
+							CM.SetFin(S4, S4Port, false)
+						}
 					}
 				}
 			}
@@ -576,7 +577,7 @@ func createRawTCPSocket() (
 	interfaceString := findInterfaceName()
 	if interfaceString == "" {
 		err = errors.New("no interface found")
-		return
+		return buffer, socket, err
 	}
 
 	buffer = make([]byte, math.MaxUint16)
@@ -590,12 +591,12 @@ func createRawTCPSocket() (
 
 	err = socket.Create()
 	if err != nil {
-		return
+		return buffer, socket, err
 	}
 
 	TCPRWC = socket.RWC
 
-	return
+	return buffer, socket, err
 }
 
 func findInterfaceName() (name string) {
@@ -609,7 +610,7 @@ func findInterfaceName() (name string) {
 			}
 		}
 	}
-	return
+	return name
 }
 
 func createRawUDPSocket() (
@@ -620,7 +621,7 @@ func createRawUDPSocket() (
 	interfaceString := findInterfaceName()
 	if interfaceString == "" {
 		err = errors.New("no interface found")
-		return
+		return buffer, socket, err
 	}
 
 	buffer = make([]byte, math.MaxUint16)
@@ -634,12 +635,12 @@ func createRawUDPSocket() (
 
 	err = socket.Create()
 	if err != nil {
-		return
+		return buffer, socket, err
 	}
 
 	UDPRWC = socket.RWC
 
-	return
+	return buffer, socket, err
 }
 
 func (r *RawSocket) Create() (err error) {
@@ -736,7 +737,7 @@ func (rwc *RWC) Read(data []byte) (n int, err error) {
 	)
 	n = int(rwc.r0)
 
-	return
+	return n, err
 }
 
 func (rwc *RWC) Write(data []byte) (n int, err error) {

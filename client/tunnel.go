@@ -106,6 +106,7 @@ func createDefaultTunnelMeta(t types.TunnelType) (M *TunnelMETA) {
 	M.RequestVPNPorts = true
 	M.IPv4Address = "172.22.22.1"
 	M.NetMask = "255.255.255.255"
+	M.ConfigFormat = tunnelFileSuffix
 
 	M.Tag = DefaultTunnelName
 	M.IFName = DefaultTunnelName
@@ -119,7 +120,7 @@ func createDefaultTunnelMeta(t types.TunnelType) (M *TunnelMETA) {
 		M.LocalhostNat = true
 		M.AutoConnect = true
 		M.AutoReconnect = true
-		M.MTU = 1320 // MTU is set low here due to many 5g networks. The LAN tunnels is mostly used to IoT.
+		M.MTU = 1320 // MTU is set low here due to mobile networks
 	}
 
 	return

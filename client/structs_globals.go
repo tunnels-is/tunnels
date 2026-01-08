@@ -302,9 +302,9 @@ type ActiveConnectionMeta struct {
 }
 
 type TunnelMETA struct {
-	WindowsGUID string
+	WindowsGUID  string
+	ConfigFormat string
 
-	// controlled by user only
 	DNSBlocking     bool
 	LocalhostNat    bool
 	AutoReconnect   bool

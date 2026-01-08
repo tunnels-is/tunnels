@@ -8,7 +8,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"log"
 	"log/slog"
 	"math"
 	"net"
@@ -36,19 +35,7 @@ import (
 	"github.com/tunnels-is/tunnels/version"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"golang.org/x/crypto/bcrypt"
-)
-
-var (
-// twoFactorKey       = os.Getenv("TWO_FACTOR_KEY")
-// googleClientID     = os.Getenv("GOOGLE_CLIENT_ID")
-// googleClientSecret = os.Getenv("GOOGLE_CLIENT_SECRET")
-// googleRedirectURL  = "http://localhost:3000/auth/google/callback"
-// oauthStateString   = "random-pseudo-state"
-)
-
-const (
-// authHeader        = "X-Auth-Token"
-// googleUserInfoURL = "https://www.googleapis.com/oauth2/v2/userinfo?access_token="
+	"gopkg.in/yaml.v3"
 )
 
 var (
@@ -56,22 +43,28 @@ var (
 	Cancel       atomic.Pointer[context.CancelFunc]
 	Config       atomic.Pointer[types.ServerConfig]
 	APITLSConfig atomic.Pointer[tls.Config]
+	KeyPair      atomic.Pointer[tls.Certificate]
 	PrivKey      any
 	SignKey      any
 	PubKey       any
-	KeyPair      atomic.Pointer[tls.Certificate]
-	lc           atomic.Pointer[lemonsqueezy.Client]
-)
 
-var (
+	coreMutex          = sync.Mutex{}
+	slots              int
+	VPLNetwork         *net.IPNet
+	clientCoreMappings [math.MaxUint16 + 1]*UserCoreMapping
+	portToCoreMapping  [math.MaxUint16 + 1]*PortRange
+	DHCPMapping        [math.MaxUint16 + 1]*types.DHCPRecord
+	VPLIPToCore        = make([][][][]*UserCoreMapping, 255)
+
 	LANEnabled   bool
 	VPNEnabled   bool
 	AUTHEnabled  bool
 	DNSEnabled   bool
 	BBOLTEnabled bool
-	logger       *slog.Logger
 
-	slots int
+	lanFirewallDisabled bool
+	disableLogs         bool
+	serverConfigPath    string
 
 	dataSocketFD int
 	rawUDPSockFD int
@@ -79,66 +72,29 @@ var (
 	InterfaceIP  net.IP
 	TCPRWC       io.ReadWriteCloser
 	UDPRWC       io.ReadWriteCloser
+	logger       *slog.Logger
 
-	clientCoreMappings [math.MaxUint16 + 1]*UserCoreMapping
-	portToCoreMapping  [math.MaxUint16 + 1]*PortRange
-	coreMutex          = sync.Mutex{}
-
-	VPLNetwork  *net.IPNet
-	DHCPMapping [math.MaxUint16 + 1]*types.DHCPRecord
-
-	VPLIPToCore         = make([][][][]*UserCoreMapping, 255)
-	lanFirewallDisabled bool
-	disableLogs         bool
+	// Tunnels public network only
+	lc atomic.Pointer[lemonsqueezy.Client]
 )
-
-func GetVPLCM(ip [4]byte) {
-}
-
-func LOG(x ...any) {
-	if !disableLogs {
-		log.Println(x...)
-	}
-}
-
-func INFO(x ...any) {
-	if !disableLogs {
-		log.Println(x...)
-	}
-}
-
-func WARN(x ...any) {
-	if !disableLogs {
-		log.Println(x...)
-	}
-}
-
-func ERR(x ...any) {
-	if !disableLogs {
-		log.Println(x...)
-	}
-}
-
-func ADMIN(x ...any) {
-	if !disableLogs {
-		log.Println(x...)
-	}
-}
 
 func main() {
 	showVersion := false
 	flag.BoolVar(&showVersion, "version", false, "show version and exit")
 
 	configFlag := flag.Bool("config", false, "This command runs the server and creates a config + certificates")
+	configPath := flag.String("configPath", "./config.json", "path to config file (supports .json, .yaml, .yml)")
+	jsonLogs := flag.Bool("json", true, "enable/disable json logging")
+	sourceInfo := flag.Bool("source", false, "disable source line information in logs")
 	certsOnly := flag.Bool("certs", false, "This command generates certificates and exits")
 	silent := flag.Bool("silent", false, "This command disables logging")
+	logLevel := flag.String("logLevel", "debug", "set the log level. Available levels: debug, info, warn, error")
 	adminFlag := flag.String("admin", "", "Add an admin identifier (DeviceToken/DeviceKey/UserID) to NetAdmins")
-	disableLogs = *silent
-	logHandler := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug})
-	logger = slog.New(logHandler)
-	slog.SetDefault(logger)
-
 	flag.Parse()
+
+	serverConfigPath = *configPath
+	initLogging(*silent, *jsonLogs, *sourceInfo, *logLevel)
+
 	if showVersion {
 		fmt.Println(version.Version)
 		os.Exit(1)
@@ -146,12 +102,20 @@ func main() {
 
 	if *configFlag {
 		logger.Info("generating config")
-		makeConfigAndCerts()
+		err := makeConfigAndCerts()
+		if err != nil {
+			logger.Error("unable to create certificates or config", "error", err)
+			os.Exit(1)
+		}
 	}
+
 	if *certsOnly {
 		logger.Info("generating certs")
-		makeCertsOnly()
-		os.Exit(1)
+		err := makeCertsOnly()
+		if err != nil {
+			logger.Error("unable to create certificates", "error", err)
+			os.Exit(1)
+		}
 	}
 
 	if *adminFlag != "" {
@@ -166,7 +130,7 @@ func main() {
 
 	runtime.GOMAXPROCS(runtime.NumCPU())
 
-	err := LoadServerConfig("./config.json")
+	err := LoadServerConfig(serverConfigPath)
 	if err != nil {
 		panic(err)
 	}
@@ -182,9 +146,11 @@ func main() {
 
 	AUTHEnabled = slices.Contains(config.Features, types.AUTH)
 	LANEnabled = slices.Contains(config.Features, types.LAN)
-	DNSEnabled = slices.Contains(config.Features, types.DNS)
 	VPNEnabled = slices.Contains(config.Features, types.VPN)
 	BBOLTEnabled = slices.Contains(config.Features, types.BBOLT)
+
+	// In development
+	// DNSEnabled = slices.Contains(config.Features, types.DNS)
 
 	err = loadCertificatesAndTLSSettings()
 	if err != nil {
@@ -202,7 +168,6 @@ func main() {
 				logger.Error("unable to connect to bbolt", slog.Any("err", err))
 				os.Exit(1)
 			}
-
 		} else {
 			err = ConnectToDB(loadSecret("DBurl"))
 			if err != nil {
@@ -253,7 +218,7 @@ func main() {
 	go signal.NewSignal("API", ctx, cancel, 1*time.Second, goroutineLogger, launchAPIServer)
 
 	go signal.NewSignal("CONFIG", ctx, cancel, 30*time.Second, goroutineLogger, func() {
-		_ = LoadServerConfig("./config.json")
+		_ = LoadServerConfig(serverConfigPath)
 	})
 
 	logger.Info("Tunnels ready")
@@ -264,7 +229,9 @@ func main() {
 }
 
 func goroutineLogger(msg string) {
-	logger.Debug(msg)
+	if !disableLogs {
+		logger.Debug(msg)
+	}
 }
 
 func validateConfig(Config *types.ServerConfig) (err error) {
@@ -293,19 +260,30 @@ func LoadServerConfig(path string) (err error) {
 	var nb []byte
 	nb, err = os.ReadFile(path)
 	if err != nil {
-		return
+		return err
 	}
 	C := new(types.ServerConfig)
-	err = json.Unmarshal(nb, &C)
+
+	// Determine format based on file extension
+	ext := strings.ToLower(filepath.Ext(path))
+	switch ext {
+	case ".yaml", ".yml":
+		err = yaml.Unmarshal(nb, &C)
+	case ".json", "":
+		err = json.Unmarshal(nb, &C)
+	default:
+		return fmt.Errorf("unsupported config file format: %s (supported: .json, .yaml, .yml)", ext)
+	}
+
 	if err != nil {
-		return
+		return err
 	}
 	err = validateConfig(C)
 	if err != nil {
-		return
+		return err
 	}
 	Config.Store(C)
-	return
+	return err
 }
 
 func SaveServerConfig(path string) (err error) {
@@ -317,27 +295,43 @@ func SaveServerConfig(path string) (err error) {
 	defer func() {
 		_ = f.Close()
 	}()
-	encoder := json.NewEncoder(f)
-	encoder.SetIndent("", "    ")
-	if err := encoder.Encode(C); err != nil {
-		return err
+
+	// Determine format based on file extension
+	ext := strings.ToLower(filepath.Ext(path))
+	switch ext {
+	case ".yaml", ".yml":
+		encoder := yaml.NewEncoder(f)
+		encoder.SetIndent(2)
+		if err := encoder.Encode(C); err != nil {
+			return err
+		}
+		_ = encoder.Close()
+	case ".json", "":
+		encoder := json.NewEncoder(f)
+		encoder.SetIndent("", "    ")
+		if err := encoder.Encode(C); err != nil {
+			return err
+		}
+	default:
+		return fmt.Errorf("unsupported config file format: %s (supported: .json, .yaml, .yml)", ext)
 	}
+
 	return nil
 }
 
 func addAdminToConfig(identifier string) error {
-	err := LoadServerConfig("./config.json")
+	err := LoadServerConfig(serverConfigPath)
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
 
-	hashedIdentifier := HashIdentifier(identifier)
+	hashedIdentifier := hashIdentifier(identifier)
 
 	C := Config.Load()
 	C.NetAdmins = append(C.NetAdmins, hashedIdentifier)
 	Config.Store(C)
 
-	err = SaveServerConfig("./config.json")
+	err = SaveServerConfig(serverConfigPath)
 	if err != nil {
 		return fmt.Errorf("failed to save config: %w", err)
 	}
@@ -462,14 +456,14 @@ func initializeVPN() {
 func initializeLAN() (err error) {
 	err = generateDHCPMap()
 	if err != nil {
-		return
+		return err
 	}
 	Config := Config.Load()
 
 	if Config.Lan != nil {
 		lanFirewallDisabled = Config.DisableLanFirewall
 	}
-	return
+	return err
 }
 
 func GenerateVPLCoreMappings() {
@@ -505,7 +499,6 @@ func GeneratePortAllocation() (err error) {
 		PR.EndPort = PR.StartPort + uint16(portPerUser)
 
 		for i := PR.StartPort; i <= PR.EndPort; i++ {
-
 			if i < PR.StartPort {
 				return errors.New("start port is too small")
 			} else if i > PR.EndPort {
@@ -530,10 +523,10 @@ func GeneratePortAllocation() (err error) {
 	return nil
 }
 
-func makeConfigAndCerts() {
+func makeConfigAndCerts() (err error) {
 	ep, err := os.Executable()
 	if err != nil {
-		panic(err)
+		return err
 	}
 	eps := strings.Split(ep, "/")
 	ep = strings.Join(eps[:len(eps)-1], "/")
@@ -541,13 +534,13 @@ func makeConfigAndCerts() {
 
 	IFIP, err := gateway.DiscoverInterface()
 	if err != nil {
-		panic(err)
+		return err
 	}
 	interfaceIP := IFIP.String()
 
-	err = LoadServerConfig("./config.json")
+	err = LoadServerConfig(serverConfigPath)
 	if err != nil {
-		Config := &types.ServerConfig{
+		newConfig := &types.ServerConfig{
 			Features: []types.Feature{
 				types.LAN,
 				types.VPN,
@@ -580,33 +573,24 @@ func makeConfigAndCerts() {
 			DNSRecords:          []*types.DNSRecord{},
 			DNSServers:          []string{},
 			SecretStore:         "config",
-			// secrets
-			DBurl:        "",
-			AdminAPIKey:  uuid.NewString(),
-			TwoFactorKey: strings.ReplaceAll(uuid.NewString(), "-", ""),
-			CertPem:      "./cert.pem",
-			KeyPem:       "./key.pem",
-			SignPem:      "./sign.pem",
+			DBurl:               "",
+			AdminAPIKey:         uuid.NewString(),
+			TwoFactorKey:        strings.ReplaceAll(uuid.NewString(), "-", ""),
+			CertPem:             "./cert.pem",
+			KeyPem:              "./key.pem",
+			SignPem:             "./sign.pem",
 		}
-		f, err := os.Create(ep + "config.json")
-		if err != nil {
-			panic(err)
-		}
-		defer func() {
-			_ = f.Close()
-		}()
-		encoder := json.NewEncoder(f)
-		encoder.SetIndent("", "    ")
-		if err := encoder.Encode(Config); err != nil {
-			panic(err)
+		Config.Store(newConfig)
+		if err := SaveServerConfig(serverConfigPath); err != nil {
+			return err
 		}
 	}
 
-	makeCerts(ep, interfaceIP)
+	return makeCerts(ep, interfaceIP)
 }
 
-func makeCerts(execPath string, IP string) {
-	_, err := certs.MakeCertV2(
+func makeCerts(execPath string, IP string) (err error) {
+	_, err = certs.MakeCertV2(
 		certs.ECDSA,
 		filepath.Join(execPath, "cert.pem"),
 		filepath.Join(execPath, "key.pem"),
@@ -616,15 +600,13 @@ func makeCerts(execPath string, IP string) {
 		time.Time{},
 		true,
 	)
-	if err != nil {
-		panic(err)
-	}
+	return err
 }
 
-func makeCertsOnly() {
+func makeCertsOnly() (err error) {
 	ep, err := os.Executable()
 	if err != nil {
-		panic(err)
+		return err
 	}
 	eps := strings.Split(ep, "/")
 	ep = strings.Join(eps[:len(eps)-1], "/")
@@ -632,10 +614,10 @@ func makeCertsOnly() {
 
 	IFIP, err := gateway.DiscoverInterface()
 	if err != nil {
-		panic(err)
+		return err
 	}
 	interfaceIP := IFIP.String()
-	makeCerts(ep, interfaceIP)
+	return makeCerts(ep, interfaceIP)
 }
 
 func initializeNewServer() error {
