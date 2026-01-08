@@ -106,6 +106,7 @@ func createDefaultTunnelMeta(t types.TunnelType) (M *TunnelMETA) {
 	M.RequestVPNPorts = true
 	M.IPv4Address = "172.22.22.1"
 	M.NetMask = "255.255.255.255"
+	M.ConfigFormat = tunnelFileSuffix
 
 	M.Tag = DefaultTunnelName
 	M.IFName = DefaultTunnelName

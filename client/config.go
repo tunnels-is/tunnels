@@ -186,7 +186,6 @@ func applyCertificateDefaultsToConfig(cfg *configV2) {
 	}
 }
 
-// writeTunnelsToDisk writes tunnel configurations to disk
 func writeTunnelsToDisk(tag string) (outErr error) {
 	s := STATE.Load()
 	TunnelMetaMap.Range(func(key string, value *TunnelMETA) bool {
@@ -197,9 +196,13 @@ func writeTunnelsToDisk(tag string) (outErr error) {
 			}
 		}
 
+		ext := t.ConfigFormat
+		if ext == "" {
+			ext = tunnelFileSuffix
+		}
+
 		var tb []byte
 		var err error
-		ext := strings.ToLower(filepath.Ext(tunnelFileSuffix))
 
 		switch ext {
 		case ".yaml", ".yml":
@@ -223,12 +226,12 @@ func writeTunnelsToDisk(tag string) (outErr error) {
 			return false
 		}
 
-		err = RenameFile(s.TunnelsPath+t.Tag+tunnelFileSuffix, s.TunnelsPath+t.Tag+tunnelFileSuffix+backupFileSuffix)
+		err = RenameFile(s.TunnelsPath+t.Tag+ext, s.TunnelsPath+t.Tag+ext+backupFileSuffix)
 		if err != nil {
 			ERROR("Unable to rename tunnel file:", err)
 		}
 
-		tf, err := CreateFile(s.TunnelsPath + t.Tag + tunnelFileSuffix)
+		tf, err := CreateFile(s.TunnelsPath + t.Tag + ext)
 		if err != nil {
 			ERROR("Unable to save tunnel to disk:", err)
 			outErr = err
@@ -275,8 +278,8 @@ func loadTunnelsFromDisk() (err error) {
 
 		tb, ferr := os.ReadFile(path)
 		if ferr != nil {
-			ERROR("Unable to read tunnel file:", err)
-			return err
+			ERROR("Unable to read tunnel file:", ferr)
+			return ferr
 		}
 
 		tunnel := new(TunnelMETA)
@@ -300,6 +303,7 @@ func loadTunnelsFromDisk() (err error) {
 			return fmt.Errorf("unsupported tunnel file format: %s", ext)
 		}
 
+		tunnel.ConfigFormat = ext
 		TunnelMetaMap.Store(tunnel.Tag, tunnel)
 		DEBUG("Loaded tunnel:", tunnel.Tag)
 		if tunnel.Tag == DefaultTunnelName {

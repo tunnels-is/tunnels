@@ -73,6 +73,7 @@ func InitService() error {
 			conf.OpenUI = false
 			wasChanged = true
 		}
+		// CLI mode always forces console log only
 		if !conf.ConsoleLogOnly {
 			conf.ConsoleLogOnly = true
 			wasChanged = true
