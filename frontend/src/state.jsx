@@ -128,14 +128,14 @@ export var STATE = {
 
       if (!skipAuth || skipAuth === false) {
         data.UID = STATE.User?._id ? STATE.User?._id : ""
-        data.Email = STATE.User?.Email ? STATE.User?.Email : ""
+        // data.Email = STATE.User?.Email ? STATE.User?.Email : ""
         data.DeviceToken = STATE.User?.DeviceToken?.DT ? STATE.User?.DeviceToken?.DT : ""
         if (!data.DeviceToken || data.DeviceToken === "") {
           STATE.errorNotification("No auth token found, please log in again");
           STATE.calls.set(route, false)
           return { data: { Error: "Auth token not found, please log in again" }, status: 401 }
         }
-        if (!data.Email || data.Email === "") {
+        if ((!data.Email || data.Email === "") && (!data.UID || data.UID == "")) {
           STATE.errorNotification("No user email/username found, please log in again");
           STATE.calls.set(route, false)
           return { data: { Error: "No user email/username found, please log in again" }, status: 401 }
