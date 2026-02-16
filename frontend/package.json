@@ -47,12 +47,12 @@
 		"zod": "3.24.2"
 	},
 	"devDependencies": {
+		"@tailwindcss/postcss": "^4.1.18",
 		"@types/react": "18.0.17",
 		"@types/react-dom": "18.0.6",
 		"@vitejs/plugin-react": "4.3.4",
-		"autoprefixer": "10.4.21",
 		"postcss": "8.5.3",
-		"sass": "1.63.6",
+		"sass": "1.97.3",
 		"tailwindcss": "4.1.17",
 		"vite": "6.4.1"
 	},
