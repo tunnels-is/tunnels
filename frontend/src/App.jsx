@@ -8,7 +8,6 @@ import "./assets/style/app.scss";
 import "@fontsource-variable/inter";
 
 import DNSAnswers from "./App/component/DNSAnswers";
-import PrivateServers from "./App/PrivateServers";
 import ServerDevices from "./App/ServerDevices";
 import ScreenLoader from "./App/ScreenLoader";
 import InspectGroup from "./App/InspectGroup";
@@ -16,7 +15,6 @@ import UserSelect from "./App/UserSelect";
 import Enable2FA from "./App/Enable2FA";
 import Settings from "./App/Settings";
 import Devices from "./App/Devices";
-import Tunnels from "./App/Tunnels";
 import Account from "./App/Account";
 import Welcome from "./App/Welcome";
 import SideBar from "./App/SideBar";
@@ -28,6 +26,9 @@ import Users from "./App/Users";
 import Stats from "./App/Stats";
 import Logs from "./App/Logs";
 import STORE from "./store";
+import Graph from "./App/Graph";
+import DNSStats from "./App/DNSStats";
+import ConfirmDialog from "./App/ConfirmDialog";
 import DNS from "./App/dns";
 import WS from "./ws";
 
@@ -48,7 +49,7 @@ const LaunchApp = () => {
       {createPortal(
         <Toaster
           toastOptions={{
-            className: "toast border-[2px] p-6 !text-white !bg-[#0B0E14] !border-[#1a1f2d]",
+            className: "toast border !text-white !bg-[#0a0d14] !border-[#1e2433]",
             position: "top-right",
             success: {
               duration: 2000,
@@ -63,60 +64,56 @@ const LaunchApp = () => {
         />,
         document.body,
       )}
-      <div className=" bg-black w-full">
+      <div className="bg-[#060810] w-full min-h-screen">
         <ScreenLoader />
         <SideBar />
 
-        <main className="pl-44 pb-[300px]">
-          <div className="">
-            <div className="p-6 w-full">
-              <Routes>
-                {!state.User && (
-                  <>
-                    <Route path="/" element={<Login />} />
-                    <Route path="*" element={<UserSelect />} />
-                  </>
-                )}
+        <main className="pl-14 pb-8 min-h-screen">
+          <div className="px-6 py-5">
+            <Routes>
+              {!state.User && (
+                <>
+                  <Route path="/" element={<Login />} />
+                  <Route path="*" element={<UserSelect />} />
+                </>
+              )}
 
-                {state.User && (
-                  <>
-                    <Route path="/" element={<Welcome />} />
-                    <Route path="*" element={<PrivateServers />} />
+              {state.User && (
+                <>
+                  <Route path="/" element={<Graph />} />
+                  <Route path="*" element={<Graph />} />
 
-                    <Route path="groups" element={<Groups />} />
-                    <Route path="users" element={<Users />} />
-                    <Route path="devices" element={<Devices />} />
-                    <Route path="groups/:id" element={<InspectGroup />} />
+                  <Route path="groups" element={<Groups />} />
+                  <Route path="users" element={<Users />} />
+                  <Route path="devices" element={<Devices />} />
+                  <Route path="groups/:id" element={<InspectGroup />} />
 
-                    <Route path="tunnels" element={<Tunnels />} />
-                    <Route path="connections" element={<Stats />} />
-                    <Route path="account" element={<Account />} />
+                  <Route path="connections" element={<Stats />} />
+                  <Route path="tunnels" element={<Graph />} />
+                  <Route path="account" element={<Account />} />
 
-                    <Route path="servers" element={<PrivateServers />} />
-                    <Route path="server/:id" element={<ServerDevices />} />
+                  <Route path="server/:id" element={<ServerDevices />} />
+                </>
+              )}
+              <Route path="accounts" element={<UserSelect />} />
 
-                  </>
-                )}
-                <Route path="accounts" element={<UserSelect />} />
+              <Route path="twofactor/create" element={<Enable2FA />} />
 
+              <Route path="logs" element={<Logs />} />
+              <Route path="settings" element={<Settings />} />
 
-                <Route path="twofactor/create" element={<Enable2FA />} />
+              <Route path="dns" element={<DNS />} />
+              <Route path="dns/answers/:domain" element={<DNSAnswers />} />
+              <Route path="dnsstats" element={<DNSStats />} />
 
-                <Route path="logs" element={<Logs />} />
-                <Route path="settings" element={<Settings />} />
-
-                <Route path="dns" element={<DNS />} />
-                <Route path="dns/answers/:domain" element={<DNSAnswers />} />
-
-                <Route path="login" element={<Login />} />
-                <Route path="login/:modeParam" element={<Login />} />
-                <Route path="help" element={<Welcome />} />
-
-              </Routes>
-            </div>
+              <Route path="login" element={<Login />} />
+              <Route path="login/:modeParam" element={<Login />} />
+              <Route path="help" element={<Welcome />} />
+            </Routes>
           </div>
         </main>
       </div>
+      <ConfirmDialog />
     </HashRouter>
   );
 };

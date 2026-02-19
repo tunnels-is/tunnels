@@ -1,0 +1,10 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "tunnels",
+  "outputfilename": "tunnels-desktop",
+  "frontend:install": "",
+  "frontend:build": "",
+  "author": {
+    "name": "Tunnels.is"
+  }
+}

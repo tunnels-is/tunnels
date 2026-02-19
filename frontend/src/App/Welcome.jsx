@@ -1,72 +1,77 @@
 import React from "react";
 import STORE from "../store";
-
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { ExternalLink } from "lucide-react";
 
 const Welcome = () => {
+  const open = (url) => window.open(url, "_blank");
 
-  const Copy = (value) => {
-    window.open(value, "_blank");
-    // try {
-    //   state.ConfirmAndExecute("", "clipboardCopy", 10000, value, "Copy link to clipboard ?", () => {
-    //     if (navigator?.clipboard) {
-    //       navigator.clipboard.writeText(value);
-    //     }
-    //     runtime.ClipboardSetText(value)
-    //   })
-    // } catch (e) {
-    //   alert(e)
-    //   console.log(e)
-    // }
-  };
+  const resources = [
+    { label: "Documentation", value: "tunnels.is/docs", link: "https://www.tunnels.is/docs" },
+    { label: "GitHub", value: "tunnels-is/tunnels", link: "https://www.github.com/tunnels-is/tunnels" },
+  ];
+
+  const community = STORE.SupportPlatforms.filter((s) => s.type === "link");
+  const contact = STORE.SupportPlatforms.filter((s) => s.type === "email");
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="grid gap-4">
-        {STORE.SupportPlatforms.map((s) => (
-          <Card key={s.name} className="hover:shadow-md transition">
-            <CardContent className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4">
-              <div className="space-y-1">
-                <div
-                  onClick={() => Copy(s.link)}
-                  className="text-lg font-medium cursor-pointer hover:underline flex items-center gap-2"
-                >
-                  {s.name} <ExternalLink size={16} />
-                </div>
+    <div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
 
-                {s.type === "email" && (
-                  <div className="text-sm text-muted-foreground">
-                    <a href={`mailto:${s.link}`} className="underline">
-                      {s.link}
-                    </a>
-                  </div>
-                )}
-                {s.type === "link" && (
-                  <div className="text-sm text-muted-foreground">
-                    <a
-                      href={s.link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="underline"
-                    >
-                      {s.link}
-                    </a>
-                  </div>
-                )}
-              </div>
-
-              <Button
-                size="sm"
-                onClick={() => handleCopy(s.link)}
-                className="w-full sm:w-auto"
+        {/* Resources */}
+        <div>
+          <span className="text-[11px] text-white/30 font-medium uppercase tracking-wider block mb-3">Resources</span>
+          <div className="space-y-1">
+            {resources.map((row, i) => (
+              <div
+                key={i}
+                className="flex items-baseline gap-3 py-1.5 pl-3 border-l-2 border-cyan-500/20 hover:border-cyan-500/50 cursor-pointer transition-colors"
+                onClick={() => open(row.link)}
               >
-                Open
-              </Button>
-            </CardContent>
-          </Card>
-        ))}
+                <span className="text-[11px] text-white/25 shrink-0 w-[110px]">{row.label}</span>
+                <code className="text-[13px] text-white/60 font-mono truncate flex items-center gap-1.5">
+                  {row.value} <ExternalLink className="h-3 w-3 text-white/20" />
+                </code>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Community */}
+        <div>
+          <span className="text-[11px] text-white/30 font-medium uppercase tracking-wider block mb-3">Community</span>
+          <div className="space-y-1">
+            {community.map((s, i) => (
+              <div
+                key={i}
+                className="flex items-baseline gap-3 py-1.5 pl-3 border-l-2 border-violet-500/20 hover:border-violet-500/50 cursor-pointer transition-colors"
+                onClick={() => open(s.link)}
+              >
+                <span className="text-[11px] text-white/25 shrink-0 w-[110px]">{s.name}</span>
+                <code className="text-[13px] text-white/60 font-mono truncate flex items-center gap-1.5">
+                  {s.link.replace(/^https?:\/\/(www\.)?/, "")} <ExternalLink className="h-3 w-3 text-white/20" />
+                </code>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Contact */}
+        <div>
+          <span className="text-[11px] text-white/30 font-medium uppercase tracking-wider block mb-3">Contact</span>
+          <div className="space-y-1">
+            {contact.map((s, i) => (
+              <div
+                key={i}
+                className="flex items-baseline gap-3 py-1.5 pl-3 border-l-2 border-emerald-500/20 hover:border-emerald-500/50 cursor-pointer transition-colors"
+                onClick={() => { window.location.href = `mailto:${s.link}`; }}
+              >
+                <span className="text-[11px] text-white/25 shrink-0 w-[110px]">{s.name}</span>
+                <code className="text-[13px] text-white/60 font-mono truncate">{s.link}</code>
+              </div>
+            ))}
+          </div>
+        </div>
+
       </div>
     </div>
   );
