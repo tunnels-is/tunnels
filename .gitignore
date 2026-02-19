@@ -5,6 +5,7 @@ frontend/dist/
 */server.crt
 server.crt
 
+bin/
 build/*
 builds/*
 

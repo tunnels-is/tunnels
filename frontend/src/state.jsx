@@ -4,7 +4,6 @@ import toast from "react-hot-toast";
 import axios from "axios";
 import dayjs from "dayjs";
 import { v4 as uuidv4 } from "uuid";
-import { Button } from "./components/ui/button";
 
 const state = (page) => {
   const [value, reload] = useState({ x: 0 });
@@ -45,28 +44,26 @@ export var STATE = {
   },
 
   Theme: {
-    borderColor: " border border-[#1a1f2d]  cursor-pointer rounded",
-    menuBG: " bg-[#0B0E14]",
-    mainBG: " bg-black",
-    neutralBtn: " text-white bg-[#2056e1] hover:bg-blue-500 hover:text-white cursor-pointer",
-    successBtn: " text-white bg-emerald-500 hover:bg-emerald-400 hover:border-emerald-300 hover:text-white cursor-pointer",
-    warningBtn: " text-white bg-orange-500 hover:bg-orange-400 hover:text-white cursor-pointer",
-    // neutralBtn: " text-[#2056e1] border-[#2056e1] hover:bg-[#2056e1] hover:text-white cursor-pointer",
-    // successBtn: " text-emerald-500 border-emerald-500 hover:bg-emerald-500 hover:text-white cursor-pointer",
-    // warningBtn: " text-orange-500 border-orange-500 hover:bg-orange-500 hover:text-white cursor-pointer",
-    errorBtn: " text-white bg-red-500 hover:bg-red-400 hover:text-white cursor-pointer",
-    // errorBtn: " text-red-700 border-red-700 cursor-pointer hover:bg-red-500",
-    activeSelect: " bg-[#2056e1] text-white cursor-pointer",
-    neutralSelect: "  text-white focus:text-[#3168f3] cursor-pointer",
-    tabs: "data-[state=active]:text-[#3168f3]",
+    borderColor: " border border-[#1e2433] cursor-pointer rounded-md",
+    menuBG: " bg-[#0a0d14]",
+    mainBG: " bg-[#060810]",
+    neutralBtn: " text-white bg-[#4B7BF5] hover:bg-[#5d8af7] hover:text-white cursor-pointer rounded-md",
+    successBtn: " text-white bg-emerald-600 hover:bg-emerald-500 hover:text-white cursor-pointer rounded-md",
+    warningBtn: " text-white bg-amber-600 hover:bg-amber-500 hover:text-white cursor-pointer rounded-md",
+    errorBtn: " text-white bg-red-600 hover:bg-red-500 hover:text-white cursor-pointer rounded-md",
+    activeSelect: " bg-[#4B7BF5] text-white cursor-pointer rounded-md",
+    neutralSelect: " text-white/80 focus:text-[#4B7BF5] cursor-pointer",
+    tabs: "data-[state=active]:text-[#4B7BF5]",
     greenIcon: " text-emerald-500 border-emerald-500 hover:text-white cursor-pointer",
-    redIcon: " text-red-700 border-red-700 hover:text-white cursor-pointer",
-    badgeNeutral: " bg-[#2a1db5] hove:bg-white hover:text-black text-white ",
-    badgeSuccess: " bg-emerald-500 hove:bg-white hover:text-black text-white ",
-    badgeWarning: " bg-orange-500 hove:bg-white hover:text-black text-white ",
-    badgeError: " bg-red-500 hove:bg-white hover:text-black text-white ",
-    toast: " !text-white bg-[#0B0E14] border-[#1a1f2d]"
+    redIcon: " text-red-600 border-red-600 hover:text-white cursor-pointer",
+    badgeNeutral: " bg-[#4B7BF5]/15 text-[#6d9aff] hover:bg-[#4B7BF5]/25 rounded-md",
+    badgeSuccess: " bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25 rounded-md",
+    badgeWarning: " bg-amber-500/15 text-amber-400 hover:bg-amber-500/25 rounded-md",
+    badgeError: " bg-red-500/15 text-red-400 hover:bg-red-500/25 rounded-md",
+    toast: " !text-white bg-[#0a0d14] border-[#1e2433]"
   },
+
+  confirmDialog: null,
 
   // new form
   GetEncType: (int) => {
@@ -91,13 +88,13 @@ export var STATE = {
         STORE.Cache.SetObject("servers", resp.data);
         STATE.PrivateServers = resp.data;
       } else {
-        STATE.errorNotification("Unable to find servers");
+        STATE.toggleError("Unable to find servers");
         STORE.Cache.SetObject("servers", []);
         STATE.PrivateServers = [];
       }
       STATE.renderPage("pservers");
     } else if (resp?.status !== 0) {
-      STATE.errorNotification("Unable to find servers");
+      STATE.toggleError("Unable to find servers");
       STORE.Cache.SetObject("servers", []);
       STATE.PrivateServers = [];
     }
@@ -131,12 +128,12 @@ export var STATE = {
         // data.Email = STATE.User?.Email ? STATE.User?.Email : ""
         data.DeviceToken = STATE.User?.DeviceToken?.DT ? STATE.User?.DeviceToken?.DT : ""
         if (!data.DeviceToken || data.DeviceToken === "") {
-          STATE.errorNotification("No auth token found, please log in again");
+          STATE.toggleError("No auth token found, please log in again");
           STATE.calls.set(route, false)
           return { data: { Error: "Auth token not found, please log in again" }, status: 401 }
         }
         if ((!data.Email || data.Email === "") && (!data.UID || data.UID == "")) {
-          STATE.errorNotification("No user email/username found, please log in again");
+          STATE.toggleError("No user email/username found, please log in again");
           STATE.calls.set(route, false)
           return { data: { Error: "No user email/username found, please log in again" }, status: 401 }
         }
@@ -190,15 +187,15 @@ export var STATE = {
       }
 
       if (error?.response?.data?.Error) {
-        STATE.errorNotification(error?.response?.data?.Error);
+        STATE.toggleError(error?.response?.data?.Error);
       } else {
-        STATE.errorNotification("unknown error");
+        STATE.toggleError("unknown error");
       }
 
       if (boolResponse === true) {
         return false
       } else {
-        return { data: error.respones?.data, status: error.response?.status }
+        return { data: error.response?.data, status: error.response?.status }
       }
 
     }
@@ -214,7 +211,6 @@ export var STATE = {
       console.log("POST FETCH");
       console.dir(users);
       if (users && users.length > 0) {
-        STORE.Cache.SetObject("users", users);
         STATE.Users = users
       }
       STATE.renderPage("user-select")
@@ -276,9 +272,9 @@ export var STATE = {
 
       let resp = await STATE.API.method("deleteTunnel", tun);
       if (resp === undefined) {
-        STATE.errorNotification("Unknown error, please try again in a moment");
+        STATE.toggleError("Unknown error, please try again in a moment");
       } else if (resp.status === 200) {
-        STATE.Tunnels.map((t, i) => {
+        STATE.Tunnels.forEach((t, i) => {
           if (t.Tag === tun.Tag) {
             STATE.Tunnels.splice(i, 1);
           }
@@ -310,7 +306,7 @@ export var STATE = {
 
       let resp = await STATE.API.method("setTunnel", out);
       if (resp === undefined) {
-        STATE.errorNotification("Unknown error, please try again in a moment");
+        STATE.toggleError("Unknown error, please try again in a moment");
         ok = false
       } else if (resp.status === 200) {
         STATE.successNotification("Tunnel saved", undefined);
@@ -344,7 +340,7 @@ export var STATE = {
 
       let resp = await STATE.API.method("setConfig", newConfig, 120000, false);
       if (resp === undefined) {
-        STATE.errorNotification("Unknown error, please try again in a moment");
+        STATE.toggleError("Unknown error, please try again in a moment");
       } else if (resp.status === 200) {
         ok = true
         STORE.Cache.SetObject("config", newConfig);
@@ -385,7 +381,7 @@ export var STATE = {
     try {
       let resp = await STATE.API.method("createTunnel");
       if (resp.status != 200) {
-        STATE.errorNotification(
+        STATE.toggleError(
           "Cannot create new connection! Status Code: " + resp.status,
         );
         return undefined;
@@ -412,14 +408,6 @@ export var STATE = {
   },
   update: undefined,
   updates: {},
-  fullRerender: () => {
-    if (STATE.debug) {
-      console.log("FULL RERENDER");
-    }
-    Object.keys(STATE.updates).forEach((k) => {
-      STATE.updates[k]();
-    });
-  },
   // SYSTEM SPECIFIC
   loading: undefined,
   loadTimeout: undefined,
@@ -458,9 +446,6 @@ export var STATE = {
     }
     toast.error(e);
     STORE.Cache.Set("error-timeout", dayjs().unix());
-  },
-  errorNotification: (e) => {
-    STATE.toggleError(e)
   },
   successNotification: (e) => {
     toast.success(e);
@@ -536,36 +521,15 @@ export var STATE = {
     }
     STATE.v2_ConfigSave()
   },
-  ConfirmAndExecute: async (type, id, duration, title, subtitle, method) => {
-    if (type === "") {
-      type = "success";
-    }
-    await toast[type](
-      (t) => (
-        <div className={"text-center"} >
-          {title && <div className="text-2xl font-bold mb-3">{title}</div>}
-          < div className="text-base mb-6" > {subtitle}</div>
-          <div className="flex justify-center gap-4">
-            <Button
-              className={STATE.Theme?.errorBtn}
-              onClick={() => toast.dismiss(t.id)}
-            >
-              NO
-            </Button>
-            <Button
-              className={STATE.Theme?.successBtn}
-              onClick={async () => {
-                toast.dismiss(t.id);
-                await method();
-              }}
-            >
-              YES
-            </Button>
-          </div>
-        </div >
-      ),
-      { id: id, duration: duration },
-    );
+  ConfirmAndExecute: (type, _id, _duration, title, subtitle, method) => {
+    STATE.confirmDialog = {
+      open: true,
+      title: title || "",
+      subtitle: subtitle || "",
+      type: type || "success",
+      onConfirm: method,
+    };
+    STATE.renderPage("confirm");
   },
   UpdateUser: async () => {
     try {
@@ -576,7 +540,6 @@ export var STATE = {
         false, true)
       if (x === true) {
         STORE.Cache.SetObject("user", newUser);
-        STORE.User = newUser;
         STATE.successNotification("User updated")
       } else {
         STATE.toggleError(x);
@@ -589,13 +552,13 @@ export var STATE = {
   },
   connectToVPN: async (c, server) => {
     if (!server && !c) {
-      STATE.errorNotification("no server or tunnel given when connecting");
+      STATE.toggleError("no server or tunnel given when connecting");
       return;
     }
 
     let user = STATE.User;
     if (!user.DeviceToken) {
-      STATE.errorNotification("You are not logged in");
+      STATE.toggleError("You are not logged in");
       STORE.Cache.Clear();
       return;
     }
@@ -630,7 +593,7 @@ export var STATE = {
     if (server) {
       connectionRequest.ServerID = server._id;
     } else {
-      STATE.errorNotification("unable to find server with the given ID")
+      STATE.toggleError("unable to find server with the given ID")
       return
     }
 
@@ -647,7 +610,7 @@ export var STATE = {
       let method = "connect";
       let resp = await STATE.API.method(method, connectionRequest);
       if (resp === undefined) {
-        STATE.errorNotification("Unknown error, please try again in a moment");
+        STATE.toggleError("Unknown error, please try again in a moment");
       } else {
         if (resp.status === 401) {
           STATE.successNotification(
@@ -683,7 +646,7 @@ export var STATE = {
         20000,
       );
       if (x === undefined) {
-        STATE.errorNotification("Unknown error, please try again in a moment");
+        STATE.toggleError("Unknown error, please try again in a moment");
       } else {
         STATE.successNotification("Disconnected", {
           Title: "DISCONNECTED",
@@ -738,7 +701,7 @@ export var STATE = {
         return
       } else {
         let toks = [];
-        user.Tokens?.map((t) => {
+        user.Tokens?.forEach((t) => {
           if (t.DT !== token.DT) {
             toks.push(t);
           }
@@ -749,7 +712,7 @@ export var STATE = {
       STORE.Cache.SetObject("user", user);
       STATE.User = user;
     } else {
-      STATE.errorNotification("Unable to log out device", undefined);
+      STATE.toggleError("Unable to log out device", undefined);
       if (logoutUser === true || all === true) {
         STATE.FinalizeLogout();
       }
@@ -772,7 +735,7 @@ export var STATE = {
     }
 
     if (STATE.LicenseKey === "") {
-      STATE.errorNotification("License key is required");
+      STATE.toggleError("License key is required");
       return;
     }
 
@@ -804,10 +767,19 @@ export var STATE = {
   },
   State: STORE.Cache.GetObject("state"),
   StateFetchInProgress: false,
+  isWails: () => {
+    let h = window.location.hostname;
+    return h === 'wails.localhost' || h === 'wails' || window.location.protocol === 'wails:';
+  },
   GetURL: () => {
+    if (STATE.isWails()) {
+      return "http://127.0.0.1:7777";
+    }
     let host = window.location.origin;
-    host = host.replace("http://", "https://");
+    host = host.replace("https://", "http://");
     host = host.replace("5173", "7777");
+    host = host.replace("5174", "7777");
+    host = host.replace("5175", "7777");
     return host;
   },
   GetBackendState: async () => {
@@ -834,20 +806,14 @@ export var STATE = {
           STATE.State = response.data?.State;
           STATE.Config = response.data?.Config;
           STATE.Network = response.data?.Network;
-          // STATE.User = response.data?.User;
           STATE.Tunnels = response.data?.Tunnels;
           STATE.ActiveTunnels = response.data?.ActiveTunnels;
           STATE.Version = response.data?.Version;
           STATE.APIVersion = response.data?.APIVersion;
 
-          STORE.Cache.SetObject("active-tunnels", STATE.ActiveTunnels);
-          STORE.Cache.SetObject("tunnels", STATE.Tunnels);
           STORE.Cache.SetObject("state", STATE.State);
           STORE.Cache.SetObject("config", STATE.Config);
           STATE.renderPage("login")
-
-          // STORE.Cache.SetObject("user", STATE.User);
-          // STORE.Cache.Set("darkMode", STATE.Config.DarkMode);
         }
 
         STATE.globalRerender();
@@ -858,7 +824,7 @@ export var STATE = {
     } catch (error) {
       STATE.StateFetchInProgress = false;
       console.dir(error);
-      STATE.errorNotification("unable to load state...");
+      STATE.toggleError("unable to load state...");
       return undefined;
     }
   },
@@ -891,7 +857,7 @@ export var STATE = {
         if (response.data?.Message) {
           STATE.successNotification(response?.data?.Message);
         } else if (response.data?.Error) {
-          STATE.errorNotification(response?.data?.Error);
+          STATE.toggleError(response?.data?.Error);
         }
 
         return response;
@@ -911,25 +877,25 @@ export var STATE = {
           }
 
           if (error?.response?.data?.Message) {
-            STATE.errorNotification(error?.response?.data?.Message);
+            STATE.toggleError(error?.response?.data?.Message);
           } else if (error?.response?.data?.Error) {
-            STATE.errorNotification(error?.response?.data?.Error);
+            STATE.toggleError(error?.response?.data?.Error);
           } else if (error?.response?.data?.error) {
-            STATE.errorNotification(error?.response?.data.error);
+            STATE.toggleError(error?.response?.data.error);
           } else {
             console.log(typeof error.response.data);
             console.dir(error.response.data);
             if (typeof error?.response?.data === "string") {
-              STATE.errorNotification(error?.response?.data);
+              STATE.toggleError(error?.response?.data);
             } else {
               try {
                 let out = "";
                 error?.response?.data?.forEach((err) => {
                   out = out + err + ".\n";
                 });
-                STATE.errorNotification(out);
+                STATE.toggleError(out);
               } catch (error) {
-                STATE.errorNotification("Unknown error");
+                STATE.toggleError("Unknown error");
               }
             }
           }

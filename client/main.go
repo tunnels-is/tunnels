@@ -157,12 +157,6 @@ func LaunchTunnels() {
 		})
 	}
 
-	if conf.OpenUI {
-		newConcurrentSignal("OpenUI", CancelContext, func() {
-			popUI()
-		})
-	}
-
 	newConcurrentSignal("LogMapCleaner", CancelContext, func() {
 		CleanUniqueLogMap()
 	})
@@ -216,7 +210,7 @@ mainLoop:
 			go Tun.ReadFromServeTunnel()
 
 		case signal := <-concurrencyMonitor:
-			DEBUG(signal.tag)
+			ROUTINE(signal.tag)
 			go signal.execute()
 
 		default:

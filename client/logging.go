@@ -145,6 +145,32 @@ func INFO(Line ...any) {
 	}
 }
 
+func ROUTINE(Line ...any) {
+	conf := CONFIG.Load()
+	state := STATE.Load()
+	if !state.Debug {
+		if !conf.DebugLogging {
+			return
+		}
+	}
+
+	x := ""
+	for _, v := range Line {
+		x += fmt.Sprintf("%v ", v)
+	}
+
+	select {
+	case LogQueue <- fmt.Sprintf(
+		"%s || ROUTINE || %s || %s",
+		time.Now().Format("01-02 15:04:05"),
+		GET_FUNC(3),
+		fmt.Sprint(x),
+	):
+	default:
+		ErrorLog(false, "COULD NOT PLACE LOG IN THE LOG QUEUE")
+	}
+}
+
 func StartLogQueueProcessor() {
 	defer RecoverAndLog()
 	DEBUG("Starting the log processor")
@@ -173,6 +199,13 @@ func StartLogQueueProcessor() {
 				}
 			}
 		}
+
+		PollLogMu.Lock()
+		PollLogBuf = append(PollLogBuf, line)
+		if len(PollLogBuf) > 5000 {
+			PollLogBuf = PollLogBuf[len(PollLogBuf)-5000:]
+		}
+		PollLogMu.Unlock()
 
 		if LogFile != nil {
 			_, err := LogFile.WriteString(line + "\n")

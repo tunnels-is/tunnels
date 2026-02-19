@@ -1,4 +1,4 @@
-import { Card, CardContent, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import GLOBAL_STATE from "../state";
 import { Button } from "@/components/ui/button";
 import dayjs from "dayjs";
@@ -8,16 +8,22 @@ const Stats = () => {
 
   const renderKeyValue = (key, value) => {
     return (
-      <div className="flex flex-row gap-2 justify-between">
-        <p className="text-sm font-medium">
+      <div className="flex flex-row justify-between py-1">
+        <p className="text-[13px] font-medium text-white/60">
           {key}
         </p>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-[13px] text-white/80">
           {value}
         </p>
       </div>
     )
   }
+
+  const SectionTitle = ({ children }) => (
+    <div className="pt-4 pb-1 mt-2 border-t border-[#1e2433]">
+      <h3 className="text-[11px] uppercase tracking-widest text-white/30">{children}</h3>
+    </div>
+  )
 
   const renderCard = (ac) => {
     let tunnel = undefined
@@ -27,10 +33,9 @@ const Stats = () => {
       }
     })
     return (
-      <Card className="p-5">
-
+      <Card className="bg-[#0a0d14] border-[#1e2433] p-4" key={ac.CR?.Tag}>
         <CardContent>
-          <CardTitle className="text-center mb-2">Tunnel Interface</CardTitle>
+          <SectionTitle>Tunnel Interface</SectionTitle>
           {renderKeyValue("Tag", tunnel?.Tag)}
           {renderKeyValue("Interface", tunnel?.IFName)}
           {renderKeyValue("IP", tunnel?.IPv4Address)}
@@ -44,80 +49,80 @@ const Stats = () => {
           {renderKeyValue("Download", ac.Ingress)}
           {renderKeyValue("Upload", ac.Egress)}
 
-          <CardTitle className="text-center mb-2 mt-5">VPN Server</CardTitle>
+          <SectionTitle>VPN Server</SectionTitle>
           {renderKeyValue("CPU", String(ac.CPU) + "%")}
           {renderKeyValue("DISK", String(ac.DISK) + "%")}
           {renderKeyValue("MEMORY", String(ac.MEM) + "%")}
           {renderKeyValue("Ping", String(Math.floor(ac.MS / 1000)) + "ms")}
           {renderKeyValue("Ping Time", dayjs(ac.Ping).format("HH:mm:ss DD-MM-YYYY"))}
 
-          <CardTitle className="text-center mb-2 mt-5">Local Network</CardTitle>
+          <SectionTitle>Local Network</SectionTitle>
           {renderKeyValue("Hostname", ac.DHCP?.Hostname)}
           {renderKeyValue("IP", ac.DHCP?.IP?.join("."))}
           {renderKeyValue("Network", ac.LAN?.Network)}
           {renderKeyValue("NAT", ac.LAN?.Nat)}
           {renderKeyValue("Tag", ac.LAN?.Tag)}
 
-          <CardTitle className="text-center mb-2 mt-5">Public Network</CardTitle>
+          <SectionTitle>Public Network</SectionTitle>
           {renderKeyValue("IP", ac.CRResponse?.InterfaceIP)}
           {renderKeyValue("Ports", String(ac.CRResponse?.StartPort) + "-" + String(ac.CRResponse?.EndPort))}
           {renderKeyValue("Internet", ac.CRResponse?.InternetAccess ? "yes" : "no")}
           {renderKeyValue("Subnets", ac.CRResponse?.LocalNetworkAccess ? "yes" : "no")}
           {renderKeyValue("DNS Servers", ac.CRResponse?.DNSServers?.join(" "))}
 
-          <CardTitle className="text-center mb-2 mt-5">Routes</CardTitle>
+          <SectionTitle>Routes</SectionTitle>
           {(tunnel?.EnableDefaultRoute === true) &&
-            <div className="flex flex-row gap-1">
-              <div className="">default</div>
-              <div className="text-muted-foreground">via</div>
-              <div className="">{tunnel?.IPv4Address}</div>
-              <div className="text-muted-foreground">metric</div>
-              <div className="">0</div>
+            <div className="flex flex-row gap-1 text-[13px]">
+              <div>default</div>
+              <div className="text-white/40">via</div>
+              <div>{tunnel?.IPv4Address}</div>
+              <div className="text-white/40">metric</div>
+              <div>0</div>
             </div>
           }
 
-          {ac.CRResponse?.Routes?.map(r => {
-            return <div className="flex flex-row gap-1">
-              <div className="">{r.Address}</div>
-              <div className="text-muted-foreground">via</div>
-              <div className="">{tunnel?.IPv4Address}</div>
-              <div className="text-muted-foreground">metric</div>
-              <div className="">{r.Metric}</div>
+          {ac.CRResponse?.Routes?.map((r, idx) => {
+            return <div className="flex flex-row gap-1 text-[13px]" key={idx}>
+              <div>{r.Address}</div>
+              <div className="text-white/40">via</div>
+              <div>{tunnel?.IPv4Address}</div>
+              <div className="text-white/40">metric</div>
+              <div>{r.Metric}</div>
             </div>
           })}
 
           {ac.CRResponse?.DNSRecords?.length > 0 &&
             <>
-              <CardTitle className="text-center mb-2 mt-5">Domains</CardTitle>
-              {ac.CRResponse?.DNSRecords?.map(r => {
-                return <div className="flex flex-row gap-1">
-                  <div className="">{r.Wildcard ? "*." : ""}{r.Domain}</div>
+              <SectionTitle>Domains</SectionTitle>
+              {ac.CRResponse?.DNSRecords?.map((r, idx) => {
+                return <div className="flex flex-row gap-1 text-[13px]" key={idx}>
+                  <div>{r.Wildcard ? "*." : ""}{r.Domain}</div>
                 </div>
               })}
             </>
           }
 
-
-
         </CardContent>
         <Button
-          className={"mt-5 w-full" + state.Theme?.errorBtn}
+          className={"mt-4 w-full" + state.Theme?.errorBtn}
           onClick={() => {
             state.disconnectFromVPN(ac)
           }}
         >
           Disconnect
         </Button>
-      </Card >
+      </Card>
     )
   }
 
   return (
-    <div className="flex">
-      {state.ActiveTunnels?.map(c => {
-        return renderCard(c)
-      })}
-    </div >
+    <div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {state.ActiveTunnels?.map(c => {
+          return renderCard(c)
+        })}
+      </div>
+    </div>
   )
 }
 

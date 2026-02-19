@@ -20,13 +20,15 @@ var WS = {
     STATE.renderPage("logs");
   },
   GetURL: (route) => {
-    // console.log("connecting socket...")
+    if (STATE.isWails()) {
+      return "ws://127.0.0.1:7777/" + route;
+    }
     let host = window.location.origin;
-    // let port = STORE.Cache.Get("api_port")
-    // let ip = STORE.Cache.Get("api_ip")
-    host = host.replace("http://", "wss://");
-    host = host.replace("https://", "wss://");
+    host = host.replace("https://", "http://");
+    host = host.replace("http://", "ws://");
     host = host.replace("5173", "7777");
+    host = host.replace("5174", "7777");
+    host = host.replace("5175", "7777");
     return host + "/" + route;
   },
   NewSocket: (url, tag, messageHandler) => {
