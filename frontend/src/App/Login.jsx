@@ -1,25 +1,13 @@
 import React, { useEffect, useState } from "react";
 import { v4 as uuidv4 } from "uuid";
-import {
-  DesktopIcon,
-  EnvelopeClosedIcon,
-  FrameIcon,
-  LockClosedIcon,
-} from "@radix-ui/react-icons";
 import GLOBAL_STATE from "../state";
 import STORE from "../store";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.jsx";
-import { Switch } from "@/components/ui/switch.jsx";
-import { Label } from "@/components/ui/label.jsx";
-import { useNavigate } from "react-router-dom";
-import { CopyPlusIcon } from "lucide-react";
-import NewObjectEditorDialog from "./NewObjectEdiorDialog";
-import { Edit2Icon } from "lucide-react";
-import { useParams } from "react-router-dom";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.jsx";
+import { useNavigate, useParams } from "react-router-dom";
+import { CopyPlusIcon, Edit2Icon, Save } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 
 const useForm = () => {
   const { modeParam } = useParams()
@@ -146,7 +134,7 @@ const useForm = () => {
     let x = await state.callController(authServer, "POST", "/v3/user/create", inputs, true, false)
     if (x.status === 200) {
       state.v2_SetUser(x.data, remember, authServer);
-      navigate("/servers")
+      navigate("/")
       return
     }
     setErrors({});
@@ -205,7 +193,7 @@ const useForm = () => {
       if (mode === 3) {
         navigate("/twofactor/recover")
       } else {
-        navigate("/servers")
+        navigate("/")
       }
       return
     }
@@ -382,539 +370,245 @@ const useForm = () => {
   };
 };
 
+const Field = ({ label, name, type = "text", placeholder, value, error, onChange }) => (
+  <div>
+    <label className="text-[10px] text-white/30 uppercase block mb-1">{label}</label>
+    <Input
+      className="h-7 text-[12px] border-[#1e2433] bg-transparent"
+      type={type} placeholder={placeholder}
+      value={value || ""} name={name}
+      onChange={onChange}
+    />
+    {error && <p className="text-[11px] text-red-400/80 mt-1">{error}</p>}
+  </div>
+);
+
 const Login = (props) => {
   const {
-    state,
-    remember,
-    setRememeber,
-    inputs,
-    setInputs,
-    HandleInputChange,
-    HandleSubmit,
-    errors,
-    setMode,
-    mode,
-    RegisterSubmit,
-    GenerateToken,
-    tokenLogin,
-    ResetSubmit,
-    GetCode,
-    RemoveToken,
-    EnableSubmit,
-    authServer,
-    modalOpen,
-    setModalOpen,
-    newAuth,
-    setNewAuth,
-    saveNewAuth,
-    changeAuthServer
+    state, remember, setRememeber, inputs, setInputs,
+    HandleInputChange, HandleSubmit, errors, setMode, mode,
+    RegisterSubmit, GenerateToken, tokenLogin, ResetSubmit,
+    GetCode, RemoveToken, EnableSubmit,
+    authServer, modalOpen, setModalOpen, newAuth, setNewAuth,
+    saveNewAuth, changeAuthServer
   } = useForm(props);
 
   const GetDefaults = async () => {
     await state.GetBackendState();
     changeAuthServer(state.Config?.ControlServers[0]?.ID)
     let i = { ...inputs };
-
     let defaultDeviceName = STORE.Cache.Get("default-device-name");
-    if (defaultDeviceName) {
-      i["devicename"] = defaultDeviceName;
-    }
-
+    if (defaultDeviceName) i["devicename"] = defaultDeviceName;
     let defaultEmail = STORE.Cache.Get("default-email");
-    if (defaultEmail) {
-      i["email"] = defaultEmail;
-    }
-
+    if (defaultEmail) i["email"] = defaultEmail;
     setInputs(i);
   };
 
-  useEffect(() => {
-    GetDefaults();
-  }, []);
+  useEffect(() => { GetDefaults(); }, []);
 
-  const EmailInput = () => {
-    return (
-      <div className="space-y-2">
-        <div className="relative">
-          <EnvelopeClosedIcon className="absolute left-3 top-2.5 h-5 w-5 text-[#4B7BF5]" />
-          <Input
-            id="email"
-            className="pl-10 bg-[#0B0E14] border-[#1a1f2d] text-white focus:ring-[#4B7BF5] focus:border-[#4B7BF5] h-11"
-            type="email"
-            placeholder="Email / Token"
-            value={inputs["email"]}
-            name="email"
-            onChange={HandleInputChange}
-          />
-        </div>
-        {errors["email"] !== "" && (
-          <p className="text-sm text-red-500">{errors["email"]}</p>
-        )}
-      </div>
-    );
+  const modes = [
+    { value: 1, label: "Login" },
+    { value: 2, label: "Register" },
+    { value: 5, label: "Anonymous" },
+    { value: 4, label: "Reset" },
+    { value: 3, label: "2FA Recovery" },
+    { value: 6, label: "Enable" },
+  ];
+
+  const showEmail = [1, 2, 4, 6].includes(mode) && !tokenLogin;
+  const showToken = mode === 5 || (mode === 2 && tokenLogin);
+  const showDevice = mode === 1;
+  const showPassword = [1, 2, 3, 4, 5].includes(mode);
+  const showConfirmPassword = [2, 4, 5].includes(mode);
+  const showTwoFactor = mode === 1;
+  const showRecovery = mode === 3;
+  const showCode = mode === 6;
+  const showResetCode = mode === 4;
+
+  const handleSubmit = () => {
+    if (mode === 1 || mode === 3) HandleSubmit();
+    else if (mode === 2 || mode === 5) RegisterSubmit();
+    else if (mode === 4) ResetSubmit();
+    else if (mode === 6) EnableSubmit();
   };
 
-  const DeviceInput = () => {
-    return (
-      <div className="space-y-2">
-        <div className="relative">
-          <DesktopIcon className="absolute left-3 top-2.5 h-5 w-5 text-[#4B7BF5]" />
-          <Input
-            id="devicename"
-            className="pl-10 bg-[#0B0E14] border-[#1a1f2d] text-white focus:ring-[#4B7BF5] focus:border-[#4B7BF5] h-11"
-            type="text"
-            placeholder="Device Name"
-            value={inputs["devicename"]}
-            name="devicename"
-            onChange={HandleInputChange}
-          />
-        </div>
-        {errors["devicename"] && (
-          <p className="text-sm text-red-500">{errors["devicename"]}</p>
-        )}
-      </div>
-    );
-  };
+  const submitLabel = { 1: "Login", 2: "Register", 3: "Login", 4: "Reset Password", 5: "Register", 6: "Enable Account" }[mode];
 
-  const PasswordInput = () => {
-    return (
-      <div className="space-y-2">
-        <div className="relative">
-          <LockClosedIcon className="absolute left-3 top-2.5 h-5 w-5 text-[#4B7BF5]" />
-          <Input
-            id="password"
-            className="pl-10 bg-[#0B0E14] border-[#1a1f2d] text-white focus:ring-[#4B7BF5] focus:border-[#4B7BF5] h-11"
-            type="password"
-            placeholder="Password"
-            value={inputs["password"]}
-            name="password"
-            onChange={HandleInputChange}
-          />
-        </div>
-        {errors["password"] && (
-          <p className="text-sm text-red-500">{errors["password"]}</p>
-        )}
-      </div>
-    );
-  };
-
-  const TwoFactorInput = () => {
-    return (
-      <div className="space-y-2">
-        <div className="relative">
-          <LockClosedIcon className="absolute left-3 top-2.5 h-5 w-5 text-[#4B7BF5]" />
-          <Input
-            id="digits"
-            className="pl-10 bg-[#0B0E14] border-[#1a1f2d] text-white focus:ring-[#4B7BF5] focus:border-[#4B7BF5] h-11"
-            type="text"
-            placeholder="Authenticator Code (optional)"
-            value={inputs["digits"]}
-            name="digits"
-            onChange={HandleInputChange}
-          />
-        </div>
-        {errors["digits"] && (
-          <p className="text-sm text-red-500">{errors["digits"]}</p>
-        )}
-      </div>
-    );
-  };
-
-  const ConfirmPasswordInput = () => {
-    return (
-      <div className="space-y-2">
-        <div className="relative">
-          <LockClosedIcon className="absolute left-3 top-2.5 h-5 w-5 text-muted-foreground" />
-          <Input
-            id="password2"
-            className="pl-10"
-            type="password"
-            placeholder="Confirm Password"
-            value={inputs["password2"]}
-            name="password2"
-            onChange={HandleInputChange}
-          />
-        </div>
-        {errors["password2"] && (
-          <p className="text-sm text-destructive">{errors["password2"]}</p>
-        )}
-      </div>
-    );
-  };
-
-  const TokenInput = () => {
-    return (
-      <div className="space-y-2">
-        <div className="relative">
-          <FrameIcon className="absolute left-3 top-2.5 h-5 w-5 text-[#4B7BF5]" />
-          <Input
-            id="token"
-            className="pl-10 bg-[#0B0E14] border-[#1a1f2d] text-white focus:ring-[#4B7BF5] focus:border-[#4B7BF5] h-11"
-            type="text"
-            placeholder="Token"
-            value={inputs["email"]}
-            name="email"
-            onChange={HandleInputChange}
-          />
-        </div>
-        {inputs["email"] && (
-          <Alert variant="destructive" className="mt-2">
-            <AlertDescription className="font-semibold">
-              SAVE THIS TOKEN!
-            </AlertDescription>
-          </Alert>
-        )}
-        {errors["email"] && (
-          <p className="text-sm text-red-500">{errors["email"]}</p>
-        )}
-      </div>
-    );
-  };
-
-  const CodeInput = () => {
-    return (
-      <div className="space-y-2">
-        <div className="relative">
-          <FrameIcon className="absolute left-3 top-2.5 h-5 w-5 text-[#4B7BF5]" />
-          <Input
-            id="code"
-            className="pl-10 bg-[#0B0E14] border-[#1a1f2d] text-white focus:ring-[#4B7BF5] focus:border-[#4B7BF5] h-11"
-            type="text"
-            placeholder="Code"
-            name="code"
-            onChange={HandleInputChange}
-          />
-        </div>
-        {errors["code"] && (
-          <p className="text-sm text-red-500">{errors["code"]}</p>
-        )}
-      </div>
-    );
-  };
-
-  const ResetTwoFactorCodeInput = () => {
-    return (
-      <div className="space-y-2">
-        <div className="relative">
-          <FrameIcon className="absolute left-3 top-2.5 h-5 w-5 text-[#4B7BF5]" />
-          <Input
-            id="code"
-            className="pl-10 bg-[#0B0E14] border-[#1a1f2d] text-white focus:ring-[#4B7BF5] focus:border-[#4B7BF5] h-11"
-            type="text"
-            placeholder="Two-Factor Auth Code"
-            name="code"
-            onChange={HandleInputChange}
-          />
-        </div>
-        {errors["code"] && (
-          <p className="text-sm text-red-500">{errors["code"]}</p>
-        )}
-      </div>
-    );
-  };
-
-  const RecoveryInput = () => {
-    return (
-      <div className="space-y-2">
-        <div className="relative">
-          <FrameIcon className="absolute left-3 top-2.5 h-5 w-5 text-[#4B7BF5]" />
-          <Input
-            id="recovery"
-            className="pl-10 bg-[#0B0E14] border-[#1a1f2d] text-white focus:ring-[#4B7BF5] focus:border-[#4B7BF5] h-11"
-            type="text"
-            placeholder="Two Factor Recovery Code"
-            value={inputs["recovery"]}
-            name="recovery"
-            onChange={HandleInputChange}
-          />
-        </div>
-        {errors["recovery"] && (
-          <p className="text-sm text-red-500">{errors["recovery"]}</p>
-        )}
-      </div>
-    );
-  };
-
-  const selectForm = () => {
-    if (state === undefined) {
-      return (<></>)
-    }
-    let opts = []
-    let tunID = ""
-    state.Config?.ControlServers?.forEach(s => {
-      if (s.Host.includes("api.tunnels.is")) {
-        tunID = s.ID
-      }
-      if (s.ID === authServer?.ID) {
-        opts.push({
-          value: s.ID, key: s.Host + ":" + s.Port, selected: true
-        })
-      } else {
-        opts.push({
-          value: s.ID, key: s.Host + ":" + s.Port, selected: false
-        })
-      }
-    })
-    return (
-      <div className="flex  items-start">
-
-        <Select
-          value={authServer ? authServer.ID : tunID}
-          onValueChange={changeAuthServer}
-        >
-          <SelectTrigger className="w-[320px]">
-            <SelectValue placeholder="Select Auth Server" />
-          </SelectTrigger>
-          <SelectContent
-            className={"bg-transparent" + state.Theme.borderColor + state.Theme?.mainBG}
-          >
-            <SelectGroup>
-              {opts?.map(t => {
-                if (t.selected === true) {
-                  return (
-                    <SelectItem className={state.Theme?.activeSelect} value={t.value}>{t.key}</SelectItem>
-                  )
-                } else {
-                  return (
-                    <SelectItem className={state.Theme?.neutralSelect} value={t.value}>{t.key}</SelectItem>
-                  )
-                }
-              })}
-            </SelectGroup>
-          </SelectContent>
-        </Select >
-        <div className="flex mr-4 items-center space-x-2 mt-[8px] ml-[25px]">
-          <CopyPlusIcon onClick={() => setModalOpen(true)} className={"hover:stroke-emerald-500 cursor-pointer"} />
-        </div>
-        <div className="flex mr-4 items-center space-x-2 mt-[8px] ml-[10px]">
-          <Edit2Icon
-            onClick={() => {
-              setNewAuth(authServer)
-              setModalOpen(true)
-            }}
-            className={"hover:stroke-emerald-500 cursor-pointer"} />
-        </div>
-
-      </div >
-    )
-  }
-
-  const LoginForm = () => {
-    return (
-      <Card className="w-full max-w-md mx-auto bg-[#0B0E14] border border-[#1a1f2d] shadow-2xl">
-        <CardContent className="space-y-6 p-6">
-          {EmailInput()}
-          {DeviceInput()}
-          {PasswordInput()}
-          {TwoFactorInput()}
-          {selectForm()}
-          <Button className="w-full h-11 bg-[#4B7BF5] hover:bg-[#4B7BF5]/90 text-white" onClick={HandleSubmit}>
-            Login
-          </Button>
-          <div className="flex items-center space-x-2">
-            <Switch
-              checked={remember}
-              onCheckedChange={() => setRememeber(!remember)}
-            />
-            <Label htmlFor="airplane-mode">Remember Login</Label>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  };
-
-  const RegisterAnonForm = () => {
-    return (
-      <Card className="w-full max-w-md mx-auto bg-[#0B0E14] border border-[#1a1f2d] shadow-2xl">
-        <CardContent className="space-y-6 p-6">
-          <div className="text-center mb-2">
-            <h1 className="text-lg font-medium text-white/80">Anonymous Registration</h1>
-          </div>
-          <Alert className="border-2 border-red-500 bg-red-500/10">
-            <AlertDescription className="font-medium text-red-500">
-              Save your login token in a secure place, it is the only form of authentication you have for your account. If you lose the token your account is lost forever.
-            </AlertDescription>
-          </Alert>
-          {TokenInput()}
-          {PasswordInput()}
-          {ConfirmPasswordInput()}
-          {selectForm()}
-          <Button className="w-full h-11 bg-[#4B7BF5] hover:bg-[#4B7BF5]/90 text-white" onClick={RegisterSubmit}>
-            Register
-          </Button>
-        </CardContent>
-      </Card>
-    );
-  };
-
-  const RegisterForm = () => {
-    return (
-      <Card className="w-full max-w-md mx-auto bg-[#0B0E14] border border-[#1a1f2d] shadow-2xl">
-        <CardContent className="space-y-6 p-6">
-          <div className="text-center mb-2">
-            <h1 className="text-lg font-medium text-white/80">Create your account</h1>
-          </div>
-          {tokenLogin && TokenInput()}
-          {!tokenLogin && EmailInput()}
-          {PasswordInput()}
-          {ConfirmPasswordInput()}
-          {selectForm()}
-          <Button className="w-full h-11 bg-[#4B7BF5] hover:bg-[#4B7BF5]/90 text-white" onClick={RegisterSubmit}>
-            Register
-          </Button>
-        </CardContent>
-      </Card>
-    );
-  };
-
-  const ResetPasswordForm = () => {
-    return (
-      <Card className="w-full max-w-md mx-auto bg-[#0B0E14] border border-[#1a1f2d] shadow-2xl">
-        <CardContent className="space-y-6 p-6">
-          <div className="text-center mb-2">
-            <h1 className="text-lg font-medium text-white/80">Reset your password</h1>
-          </div>
-          {EmailInput()}
-          {PasswordInput()}
-          {ConfirmPasswordInput()}
-          {ResetTwoFactorCodeInput()}
-          {selectForm()}
-          <div className="flex space-x-2">
-            <Button className="flex-1 h-11 bg-[#4B7BF5] hover:bg-[#4B7BF5]/90 text-white" onClick={() => ResetSubmit()}>
-              Reset Password
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  };
-
-  const RecoverTwoFactorForm = () => {
-    return (
-      <Card className="w-full max-w-md mx-auto bg-[#0B0E14] border border-[#1a1f2d] shadow-2xl">
-        <CardContent className="space-y-6 p-6">
-          <div className="text-center mb-2">
-            <h1 className="text-lg font-medium text-white/80">Two-Factor Recovery</h1>
-          </div>
-          {EmailInput()}
-          {PasswordInput()}
-          {RecoveryInput()}
-          {selectForm()}
-          <Button className="w-full h-11 bg-[#4B7BF5] hover:bg-[#4B7BF5]/90 text-white" onClick={HandleSubmit}>
-            Login
-          </Button>
-        </CardContent>
-      </Card>
-    );
-  };
-
-  const EnableAccountForm = () => {
-    return (
-      <Card className="w-full max-w-md mx-auto bg-[#0B0E14] border border-[#1a1f2d] shadow-2xl">
-        <CardContent className="space-y-6 p-6">
-          <div className="text-center mb-2">
-            <h1 className="text-lg font-medium text-white/80">Enable your account</h1>
-          </div>
-          {EmailInput()}
-          {CodeInput()}
-          {selectForm()}
-          <Button className="w-full h-11 bg-[#4B7BF5] hover:bg-[#4B7BF5]/90 text-white" onClick={EnableSubmit}>
-            Enable Account
-          </Button>
-        </CardContent>
-      </Card>
-    );
-  };
+  let serverOpts = [];
+  let tunID = "";
+  state.Config?.ControlServers?.forEach(s => {
+    if (s.Host.includes("api.tunnels.is")) tunID = s.ID;
+    serverOpts.push({ value: s.ID, label: s.Host + ":" + s.Port });
+  });
 
   return (
-    <div className="w-full flex flex-col items-center justify-center p-4 bg-black mt-10">
+    <div className="w-full max-w-md mx-auto mt-[100px]">
 
+      {/* ── Auth server dialog ── */}
+      <Dialog open={modalOpen} onOpenChange={setModalOpen}>
+        <DialogContent className="sm:max-w-[480px] text-white bg-[#0a0d14] border-[#1e2433]">
+          {newAuth && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="text-lg font-bold text-white">Auth Server</DialogTitle>
+              </DialogHeader>
 
-      <NewObjectEditorDialog
-        open={modalOpen}
-        onOpenChange={setModalOpen}
-        object={newAuth}
-        description=""
-        readOnly={false}
-        saveButton={() => {
-          saveNewAuth()
-          setModalOpen(false)
-        }}
-        onChange={(key, value, type) => {
-          let a = { ...newAuth }
-          a[key] = value
-          setNewAuth({ ...a })
-          console.log(key, value, type)
-        }}
-      />
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[10px] text-white/30 uppercase block mb-1">Host</label>
+                    <Input className="h-7 text-[12px] border-[#1e2433] bg-transparent" value={newAuth.Host || ""} onChange={(e) => setNewAuth({ ...newAuth, Host: e.target.value })} />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-white/30 uppercase block mb-1">Port</label>
+                    <Input className="h-7 text-[12px] border-[#1e2433] bg-transparent" value={newAuth.Port || ""} onChange={(e) => setNewAuth({ ...newAuth, Port: e.target.value })} />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[10px] text-white/30 uppercase block mb-1">Certificate Path</label>
+                  <Input className="h-7 text-[12px] border-[#1e2433] bg-transparent" value={newAuth.CertificatePath || ""} onChange={(e) => setNewAuth({ ...newAuth, CertificatePath: e.target.value })} />
+                </div>
+                <div className="flex items-center gap-2">
+                  {[
+                    { key: "HTTPS", label: "HTTPS" },
+                    { key: "ValidateCertificate", label: "Validate Cert" },
+                  ].map((opt) => (
+                    <button
+                      key={opt.key}
+                      className={`text-[11px] px-3 py-1 rounded-full border transition-all cursor-pointer ${
+                        newAuth[opt.key]
+                          ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.12)]"
+                          : "border-white/[0.06] bg-white/[0.02] text-white/30 hover:text-white/50 hover:border-white/15 hover:bg-white/[0.04]"
+                      }`}
+                      onClick={() => setNewAuth({ ...newAuth, [opt.key]: !newAuth[opt.key] })}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
-      <div className="w-full max-w-md space-y-6">
-        {mode === 1 && LoginForm()}
-        {mode === 2 && RegisterForm()}
-        {mode === 4 && ResetPasswordForm()}
-        {mode === 3 && RecoverTwoFactorForm()}
-        {mode === 5 && RegisterAnonForm()}
-        {mode === 6 && EnableAccountForm()}
-        < div className="flex flex-wrap items-center justify-center gap-3 mt-4">
+              <DialogFooter className="flex gap-2 mt-2">
+                <Button className="text-white bg-emerald-600 hover:bg-emerald-500 h-6 text-[11px] px-2.5" onClick={() => { saveNewAuth(); setModalOpen(false); }}>
+                  <Save className="h-3 w-3 mr-1" /> Save
+                </Button>
+                <button className="text-[11px] text-white/30 hover:text-white/50 px-2" onClick={() => setModalOpen(false)}>Cancel</button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Form ── */}
+      <div className="space-y-3 mb-6">
+
+        {mode === 5 && (
+          <div className="py-2 px-3 rounded border border-red-500/30 bg-red-500/5 text-[11px] text-red-400/80 leading-relaxed">
+            Save your login token in a secure place. It is the only form of authentication for your account. If you lose the token your account is lost forever.
+          </div>
+        )}
+
+        {showToken && (
+          <>
+            <Field label="Token" name="email" placeholder="Token" value={inputs["email"]} error={errors["email"]} onChange={HandleInputChange} />
+            {inputs["email"] && (
+              <div className="py-2 px-3 rounded border border-amber-500/30 bg-amber-500/5 text-[11px] text-amber-400/80 font-medium">
+                Save this token!
+              </div>
+            )}
+          </>
+        )}
+
+        {showEmail && <Field label="Email" name="email" type="email" placeholder="Email" value={inputs["email"]} error={errors["email"]} onChange={HandleInputChange} />}
+        {showDevice && <Field label="Device Name" name="devicename" placeholder="Device Name" value={inputs["devicename"]} error={errors["devicename"]} onChange={HandleInputChange} />}
+        {showPassword && <Field label="Password" name="password" type="password" placeholder="Password" value={inputs["password"]} error={errors["password"]} onChange={HandleInputChange} />}
+        {showConfirmPassword && <Field label="Confirm Password" name="password2" type="password" placeholder="Confirm Password" value={inputs["password2"]} error={errors["password2"]} onChange={HandleInputChange} />}
+        {showTwoFactor && <Field label="2FA Code" name="digits" placeholder="Authenticator Code (optional)" value={inputs["digits"]} error={errors["digits"]} onChange={HandleInputChange} />}
+        {showRecovery && <Field label="Recovery Code" name="recovery" placeholder="Two Factor Recovery Code" value={inputs["recovery"]} error={errors["recovery"]} onChange={HandleInputChange} />}
+        {showCode && <Field label="Code" name="code" placeholder="Confirmation Code" value={inputs["code"]} error={errors["code"]} onChange={HandleInputChange} />}
+        {showResetCode && <Field label="Reset Code" name="code" placeholder="Reset Code" value={inputs["code"]} error={errors["code"]} onChange={HandleInputChange} />}
+
+        {/* ── Actions ── */}
+        <div className="flex items-center gap-3 pt-1">
           <Button
-            variant="ghost"
-            onClick={() => setMode(1)}
-            className={`h-9 px-4 text-[18px]  ${mode === 1
-              ? 'text-[#4B7BF5] hover:text-[#4B7BF5] hover:bg-[#4B7BF5]/10'
-              : 'text-white/50 hover:text-white hover:bg-white/5'
-              }`}
+            className="text-white bg-emerald-600 hover:bg-emerald-500 h-7 text-[11px] px-3"
+            onClick={handleSubmit}
           >
-            Login
+            {submitLabel}
           </Button>
-          <Button
-            variant="ghost"
-            onClick={() => {
-              RemoveToken();
-              setMode(2);
-            }}
-            className={`h-9 px-4 text-[18px] ${mode === 2
-              ? 'text-[#4B7BF5] hover:text-[#4B7BF5] hover:bg-[#4B7BF5]/10'
-              : 'text-white/50 hover:text-white hover:bg-white/5'
+
+          {mode === 4 && (
+            <button
+              className="text-[11px] text-cyan-400/60 hover:text-cyan-400 transition-colors"
+              onClick={GetCode}
+            >
+              Send Reset Code
+            </button>
+          )}
+
+          {mode === 1 && (
+            <button
+              className={`text-[11px] px-3 py-1 rounded-full border transition-all cursor-pointer ${
+                remember
+                  ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.12)]"
+                  : "border-white/[0.06] bg-white/[0.02] text-white/30 hover:text-white/50 hover:border-white/15 hover:bg-white/[0.04]"
               }`}
-          >
-            Register
-          </Button>
-          <Button
-            variant="ghost"
-            onClick={() => {
-              GenerateToken();
-              setMode(5);
-            }}
-            className={`h-9 px-4 text-[18px] ${mode === 5
-              ? 'text-[#4B7BF5] hover:text-[#4B7BF5] hover:bg-[#4B7BF5]/10'
-              : 'text-white/50 hover:text-white hover:bg-white/5'
-              }`}
-          >
-            Register Anonymously
-          </Button>
-          <Button
-            variant="ghost"
-            onClick={() => setMode(4)}
-            className={`h-9 px-4 text-[18px] ${mode === 4
-              ? 'text-[#4B7BF5] hover:text-[#4B7BF5] hover:bg-[#4B7BF5]/10'
-              : 'text-white/50 hover:text-white hover:bg-white/5'
-              }`}
-          >
-            Reset Password
-          </Button>
-          <Button
-            variant="ghost"
-            onClick={() => setMode(3)}
-            className={`h-9 px-4 text-[18px] ${mode === 3
-              ? 'text-[#4B7BF5] hover:text-[#4B7BF5] hover:bg-[#4B7BF5]/10'
-              : 'text-white/50 hover:text-white hover:bg-white/5'
-              }`}
-          >
-            2FA Recovery
-          </Button>
+              onClick={() => setRememeber(!remember)}
+            >
+              Remember
+            </button>
+          )}
         </div>
       </div>
-    </div >
+
+      {/* ── Server banner ── */}
+      <div className="flex items-center gap-3 py-3 px-4 rounded-lg bg-[#0a0d14]/80 border border-[#1e2433] mb-4">
+        <span className="text-[10px] text-white/25 uppercase tracking-wider shrink-0">Server</span>
+        <Select value={authServer ? authServer.ID : tunID} onValueChange={changeAuthServer}>
+          <SelectTrigger className="h-7 text-[12px] border-[#1e2433] bg-transparent flex-1">
+            <SelectValue placeholder="Select Auth Server" />
+          </SelectTrigger>
+          <SelectContent className="bg-[#0a0d14] border-[#1e2433]">
+            {serverOpts.map(t => (
+              <SelectItem key={t.value} value={t.value} className="text-[12px]">{t.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <button
+          className="p-1.5 rounded text-white/20 hover:text-white/50 hover:bg-white/[0.04] transition-colors"
+          onClick={() => setModalOpen(true)}
+        >
+          <CopyPlusIcon className="h-3.5 w-3.5" />
+        </button>
+        <button
+          className="p-1.5 rounded text-white/20 hover:text-white/50 hover:bg-white/[0.04] transition-colors"
+          onClick={() => { setNewAuth(authServer); setModalOpen(true); }}
+        >
+          <Edit2Icon className="h-3.5 w-3.5" />
+        </button>
+      </div>
+
+      {/* ── Mode pills ── */}
+      <div className="flex items-center gap-1.5 flex-wrap">
+        {modes.map(m => (
+          <button
+            key={m.value}
+            className={`text-[11px] px-3 py-1 rounded-full border transition-all cursor-pointer ${
+              mode === m.value
+                ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.12)]"
+                : "border-white/[0.06] bg-white/[0.02] text-white/30 hover:text-white/50 hover:border-white/15 hover:bg-white/[0.04]"
+            }`}
+            onClick={() => {
+              if (m.value === 5) GenerateToken();
+              else if (tokenLogin) RemoveToken();
+              setMode(m.value);
+            }}
+          >
+            {m.label}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 };
 

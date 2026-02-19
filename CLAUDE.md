@@ -29,7 +29,7 @@ The project follows a client-server architecture:
 ## Technologies Used
 - **Backend**: Go 1.24, MongoDB, BoltDB
 - **Frontend**: React 18, Vite, TailwindCSS, Radix UI
-- **Networking**: WireGuard-style cryptography, raw sockets
+- **Networking**: raw sockets, tcp, udp
 - **Security**: bcrypt, 2FA/TOTP, TLS 1.2+, signed requests
 
 ## Build Process

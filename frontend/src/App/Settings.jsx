@@ -1,44 +1,22 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import GLOBAL_STATE from "../state";
-import STORE from "../store";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-
-import {
-  Card,
-  CardContent,
-} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
-import {
-  Info,
-  Bug,
-  AlertTriangle,
-  Activity,
-  Server,
-  Globe,
-  Key,
-  Network,
-} from "lucide-react";
-import InfoItem from "./component/InfoItem";
-import { useState } from "react";
-import FormKeyValue from "./component/formkeyvalue";
+import { Save, Settings as SettingsIcon } from "lucide-react";
 
 const Settings = () => {
   const state = GLOBAL_STATE("settings");
-  const [cfg, setCfg] = useState({ ...state.Config })
-  const [mod, setMod] = useState(false)
+  const [editing, setEditing] = useState(false);
+  const [cfg, setCfg] = useState({ ...state.Config });
+  const [mod, setMod] = useState(false);
 
   const updatecfg = (key, value) => {
     if (key === "APICertDomains" || key === "APICertIPs") {
-      value = value.split(",")
+      value = value.split(",");
     }
-    let x = { ...cfg }
-    x[key] = value
-    setMod(true)
-    setCfg(x)
-  }
+    setCfg((prev) => ({ ...prev, [key]: value }));
+    setMod(true);
+  };
 
   useEffect(() => {
     state.GetBackendState();
@@ -46,7 +24,6 @@ const Settings = () => {
 
   let basePath = state.State?.BasePath;
   let logPath = "";
-  let tracePath = "";
   let logFileName = state.State?.LogFileName?.replace(state.State?.LogPath, "");
   let configPath = state.State?.ConfigFileName;
   if (state.State?.LogPath !== basePath) {
@@ -55,289 +32,231 @@ const Settings = () => {
   let version = state.Version ? state.Version : "unknown";
   let apiversion = state.APIVersion ? state.APIVersion : "unknown";
 
-  const SettingToggle = ({ label, icon, value, onToggle, description }) => (
-    <div className="flex items-center justify-between py-3">
-      <div className="flex items-start gap-3">
-        {icon}
-        <div className="space-y-0.5">
-          <Label className="text-sm font-medium">{label}</Label>
-          {description && (
-            <p className="text-xs text-muted-foreground">{description}</p>
-          )}
-        </div>
-      </div>
-      <Switch checked={value} onCheckedChange={onToggle} />
-    </div>
-  );
+  const loggingOptions = [
+    { key: "InfoLogging", label: "Info", checked: state?.Config?.InfoLogging },
+    { key: "ErrorLogging", label: "Errors", checked: state?.Config?.ErrorLogging },
+    { key: "ConsoleLogging", label: "Console", checked: state?.Config?.ConsoleLogging },
+    { key: "DebugLogging", label: "Debug", checked: state?.Config?.DebugLogging },
+  ];
 
   return (
-    <div className="container max-w-5xl ">
-      <div className="flex items-center justify-between">
-        {mod === true && (
-          <div className="mb-7 flex gap-[4px] items-center">
-            <Button
-              className={state.Theme?.successBtn}
-              onClick={async () => {
-                state.Config = cfg
-                let ok = await state.v2_ConfigSave()
-                if (ok === true) {
-                  setMod(false)
-                }
-              }}>
-              Save
-            </Button>
-            <div className="ml-3 text-yellow-400 text-xl">
-              Your config has un-saved changes
+    <div>
+
+      {/* ── API config banner ── */}
+      <div className="flex items-center gap-5 py-3 px-4 rounded-lg bg-[#0a0d14]/80 border border-[#1e2433] mb-6">
+        {!editing ? (
+          <>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] text-white/25 uppercase tracking-wider">API</span>
+              <code className="text-[13px] text-cyan-400/70 font-mono">
+                {cfg.APIIP || "0.0.0.0"}:{cfg.APIPort || "—"}
+              </code>
+            </div>
+            {(cfg.APICert || cfg.APIKey) && (
+              <>
+                <div className="w-px h-4 bg-white/[0.06]" />
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-white/25 uppercase tracking-wider">TLS</span>
+                  <code className="text-[13px] text-white/50 font-mono truncate max-w-[200px]">{cfg.APICert || "none"}</code>
+                </div>
+              </>
+            )}
+            <button
+              className="ml-auto p-1.5 rounded text-white/20 hover:text-white/50 hover:bg-white/[0.04] transition-colors"
+              onClick={() => setEditing(true)}
+            >
+              <SettingsIcon className="h-3.5 w-3.5" />
+            </button>
+          </>
+        ) : (
+          <div className="flex-1">
+            <div className="grid grid-cols-4 gap-3">
+              <div>
+                <label className="text-[10px] text-white/30 uppercase block mb-1">IP</label>
+                <Input className="h-7 text-[12px] border-[#1e2433] bg-transparent" value={cfg.APIIP || ""} onChange={(e) => updatecfg("APIIP", e.target.value)} />
+              </div>
+              <div>
+                <label className="text-[10px] text-white/30 uppercase block mb-1">Port</label>
+                <Input className="h-7 text-[12px] border-[#1e2433] bg-transparent" value={cfg.APIPort || ""} onChange={(e) => updatecfg("APIPort", e.target.value)} />
+              </div>
+              <div>
+                <label className="text-[10px] text-white/30 uppercase block mb-1">Cert Domains</label>
+                <Input className="h-7 text-[12px] border-[#1e2433] bg-transparent" value={cfg.APICertDomains || ""} onChange={(e) => updatecfg("APICertDomains", e.target.value)} />
+              </div>
+              <div>
+                <label className="text-[10px] text-white/30 uppercase block mb-1">Cert IPs</label>
+                <Input className="h-7 text-[12px] border-[#1e2433] bg-transparent" value={cfg.APICertIPs || ""} onChange={(e) => updatecfg("APICertIPs", e.target.value)} />
+              </div>
+            </div>
+            <div className="grid grid-cols-4 gap-3 mt-2">
+              <div>
+                <label className="text-[10px] text-white/30 uppercase block mb-1">Cert Path</label>
+                <Input className="h-7 text-[12px] border-[#1e2433] bg-transparent" value={cfg.APICert || ""} onChange={(e) => updatecfg("APICert", e.target.value)} />
+              </div>
+              <div>
+                <label className="text-[10px] text-white/30 uppercase block mb-1">Key Path</label>
+                <Input className="h-7 text-[12px] border-[#1e2433] bg-transparent" value={cfg.APIKey || ""} onChange={(e) => updatecfg("APIKey", e.target.value)} />
+              </div>
+            </div>
+            <div className="flex gap-2 mt-2">
+              {mod && (
+                <Button
+                  className="text-white bg-emerald-600 hover:bg-emerald-500 h-6 text-[11px] px-2.5"
+                  onClick={async () => {
+                    state.Config = cfg;
+                    let ok = await state.v2_ConfigSave();
+                    if (ok) { setMod(false); setEditing(false); }
+                  }}
+                >
+                  <Save className="h-3 w-3 mr-1" /> Save
+                </Button>
+              )}
+              <button className="text-[11px] text-white/30 hover:text-white/50 px-2" onClick={() => { setCfg({ ...state.Config }); setMod(false); setEditing(false); }}>
+                Cancel
+              </button>
             </div>
           </div>
         )}
       </div>
 
+      {/* ── Logging ── */}
+      <div className="mb-8">
+        <span className="text-[11px] text-white/30 font-medium uppercase tracking-wider block mb-3">Logging</span>
+        <div className="flex items-center gap-2 flex-wrap">
+          {loggingOptions.map((opt) => (
+            <button
+              key={opt.key}
+              className={`text-[11px] px-3 py-1 rounded-full border transition-all cursor-pointer ${
+                opt.checked
+                  ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.12)]"
+                  : "border-white/[0.06] bg-white/[0.02] text-white/30 hover:text-white/50 hover:border-white/15 hover:bg-white/[0.04]"
+              }`}
+              onClick={() => { state.toggleConfigKeyAndSave("Config", opt.key); state.renderPage("settings"); }}
+            >
+              {opt.label}
+            </button>
+          ))}
+          <button
+            className={`text-[11px] px-3 py-1 rounded-full border transition-all cursor-pointer ${
+              state?.Config?.ConsoleLogOnly
+                ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.12)]"
+                : "border-white/[0.06] bg-white/[0.02] text-white/30 hover:text-white/50 hover:border-white/15 hover:bg-white/[0.04]"
+            }`}
+            onClick={() => { state.toggleConfigKeyAndSave("Config", "ConsoleLogOnly"); state.renderPage("settings"); }}
+          >
+            Console Only
+          </button>
+          <button
+            className={`text-[11px] px-3 py-1 rounded-full border transition-all cursor-pointer ${
+              state?.Config?.DeepDebugLoggin
+                ? "border-amber-500/40 bg-amber-500/15 text-amber-400 shadow-[0_0_12px_rgba(245,158,11,0.12)]"
+                : "border-white/[0.06] bg-white/[0.02] text-white/30 hover:text-white/50 hover:border-white/15 hover:bg-white/[0.04]"
+            }`}
+            onClick={() => { state.toggleConfigKeyAndSave("Config", "DeepDebugLoggin"); state.renderPage("settings"); }}
+          >
+            Deep Debug
+          </button>
+          <button
+            className={`text-[11px] px-3 py-1 rounded-full border transition-all cursor-pointer ${
+              state?.debug
+                ? "border-amber-500/40 bg-amber-500/15 text-amber-400 shadow-[0_0_12px_rgba(245,158,11,0.12)]"
+                : "border-white/[0.06] bg-white/[0.02] text-white/30 hover:text-white/50 hover:border-white/15 hover:bg-white/[0.04]"
+            }`}
+            onClick={() => { state.toggleDebug(); state.renderPage("settings"); }}
+          >
+            Debug Mode
+          </button>
+        </div>
+      </div>
 
-      <Tabs defaultValue="general" className="size-fit">
-        <TabsList
-          className={state.Theme?.borderColor}
-        >
-          <TabsTrigger className={state.Theme?.tabs} value="general">General Settings</TabsTrigger>
-          <TabsTrigger className={state.Theme?.tabs} value="apiconfig">API Config</TabsTrigger>
-          <TabsTrigger className={state.Theme?.tabs} value="net">Network Information</TabsTrigger>
-          <TabsTrigger className={state.Theme?.tabs} value="sys">System Information</TabsTrigger>
-        </TabsList>
-        <TabsContent value="general" className="pl-2">
-          <Card className="bg-black border-none">
-            <CardContent>
-              <SettingToggle
-                label="Basic Logging"
-                icon={<Info className="h-4 w-4 mt-1 text-blue-500" />}
-                value={state?.Config?.InfoLogging}
-                onToggle={() => {
-                  state.toggleConfigKeyAndSave("Config", "InfoLogging");
-                  state.renderPage("settings");
-                }}
-                description="Logs basic information about application operations"
-              />
+      {/* ── Updates ── */}
+      <div className="mb-8">
+        <span className="text-[11px] text-white/30 font-medium uppercase tracking-wider block mb-3">Updates</span>
+        <div className="flex items-center gap-2 flex-wrap mb-3">
+          {[
+            { key: "DisableUpdates", label: "Disable Updates", checked: state?.Config?.DisableUpdates, amber: true },
+            { key: "AutoDownloadUpdate", label: "Auto Download", checked: state?.Config?.AutoDownloadUpdate },
+            { key: "UpdateWhileConnected", label: "While Connected", checked: state?.Config?.UpdateWhileConnected },
+            { key: "RestartPostUpdate", label: "Restart After", checked: state?.Config?.RestartPostUpdate },
+            { key: "ExitPostUpdate", label: "Exit After", checked: state?.Config?.ExitPostUpdate, amber: true },
+          ].map((opt) => (
+            <button
+              key={opt.key}
+              className={`text-[11px] px-3 py-1 rounded-full border transition-all cursor-pointer ${
+                opt.checked
+                  ? opt.amber
+                    ? "border-amber-500/40 bg-amber-500/15 text-amber-400 shadow-[0_0_12px_rgba(245,158,11,0.12)]"
+                    : "border-emerald-500/40 bg-emerald-500/15 text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.12)]"
+                  : "border-white/[0.06] bg-white/[0.02] text-white/30 hover:text-white/50 hover:border-white/15 hover:bg-white/[0.04]"
+              }`}
+              onClick={() => { state.toggleConfigKeyAndSave("Config", opt.key); state.renderPage("settings"); }}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
-              <SettingToggle
-                label="Error Logging"
-                icon={<AlertTriangle className="h-4 w-4 mt-1 text-red-500" />}
-                value={state?.Config?.ErrorLogging}
-                onToggle={() => {
-                  state.toggleConfigKeyAndSave("Config", "ErrorLogging");
-                  state.renderPage("settings");
-                }}
-                description="Logs errors and exceptions"
-              />
-              <SettingToggle
-                label="Console Logging"
-                icon={<Bug className="h-4 w-4 mt-1 text-amber-500" />}
-                value={state?.Config?.ConsoleLogging}
-                onToggle={() => {
-                  state.toggleConfigKeyAndSave("Config", "ConsoleLogging");
-                  state.renderPage("settings");
-                }}
-                description="Detailed logs for troubleshooting"
-              />
+      {/* ── DNS ── */}
+      <div className="mb-8">
+        <span className="text-[11px] text-white/30 font-medium uppercase tracking-wider block mb-3">DNS</span>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            className={`text-[11px] px-3 py-1 rounded-full border transition-all cursor-pointer ${
+              state?.Config?.DisableDNS
+                ? "border-amber-500/40 bg-amber-500/15 text-amber-400 shadow-[0_0_12px_rgba(245,158,11,0.12)]"
+                : "border-white/[0.06] bg-white/[0.02] text-white/30 hover:text-white/50 hover:border-white/15 hover:bg-white/[0.04]"
+            }`}
+            onClick={() => { state.toggleConfigKeyAndSave("Config", "DisableDNS"); state.renderPage("settings"); }}
+          >
+            Disable DNS
+          </button>
+        </div>
+      </div>
 
-              <SettingToggle
-                label="Debug Logging"
-                icon={<Bug className="h-4 w-4 mt-1 text-amber-500" />}
-                value={state?.Config?.DebugLogging}
-                onToggle={() => {
-                  state.toggleConfigKeyAndSave("Config", "DebugLogging");
-                  state.renderPage("settings");
-                }}
-                description="Detailed logs for troubleshooting"
-              />
+      {/* ── Network + System ── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
 
-              <SettingToggle
-                label="Debug Mode"
-                icon={<Bug className="h-4 w-4 mt-1 text-purple-500" />}
-                value={state?.debug}
-                onToggle={() => {
-                  state.toggleDebug();
-                  state.renderPage("settings");
-                }}
-                description="Enables advanced debugging features"
-              />
-
-            </CardContent>
-          </Card>
-        </TabsContent>
-        <TabsContent value="apiconfig" className="pl-2">
-          <Card className="bg-black border-none">
-            <CardContent className="space-y-0">
-
-              <FormKeyValue
-                label="API IP"
-                icon={Network}
-                iconClass={"text-green-400"}
-                value={
-                  <Input
-                    value={cfg.APIIP}
-                    onChange={(e) => {
-                      updatecfg("APIIP", e.target.value)
-                    }}
-                    type="text"
-                  />
-                }
-              />
-
-              <FormKeyValue
-                label="API Port"
-                icon={Server}
-                iconClass={"text-green-400"}
-                value={
-                  <Input
-                    value={cfg.APIPort}
-                    onChange={(e) => {
-                      updatecfg("APIPort", e.target.value)
-                    }}
-                    type="text"
-                  />
-                }
-              />
-
-              <FormKeyValue
-                label="API Certificate Domains"
-                icon={Globe}
-                value={
-                  <Input
-                    value={cfg.APICertDomains}
-                    onChange={(e) => {
-                      updatecfg("APICertDomains", e.target.value)
-                    }}
-                    type="text"
-                  />
-                }
-              />
-
-              <FormKeyValue
-                label="API Certificate IPs"
-                icon={Network}
-                value={
-                  <Input
-                    value={cfg.APICertIPs}
-                    onChange={(e) => {
-                      updatecfg("APICertIPs", e.target.value)
-                    }}
-                    type="text"
-                  />
-                }
-              />
-
-              <FormKeyValue
-                label="API Certificate Path"
-                icon={Key}
-                iconClass={"text-orange-400"}
-                value={
-                  <Input
-                    value={cfg.APICert}
-                    onChange={(e) => {
-                      updatecfg("APICert", e.target.value)
-                    }}
-                    type="text"
-                  />
-                }
-              />
-              <FormKeyValue
-                label="API Key Path"
-                icon={Key}
-                iconClass={"text-orange-400"}
-                value={
-                  <Input
-                    value={cfg.APIKey}
-                    onChange={(e) => {
-                      updatecfg("APIKey", e.target.value)
-                    }}
-                    type="text"
-                  />
-                }
-              />
-
-            </CardContent>
-          </Card>
-        </TabsContent>
-        <TabsContent value="net" className="pl-2">
-          <Card className="bg-black border-none">
-            <CardContent className="space-y-0">
-              <InfoItem
-                label="Interface"
-                value={state.Network?.DefaultInterfaceName}
-                icon={<Network className="h-5 w-4 text-blue-400" />}
-              />
-
-              <InfoItem
-                label="IP Address"
-                value={state.Network?.DefaultInterface}
-                icon={<Globe className="h-4 w-4 text-teal-400" />}
-              />
-
-              <InfoItem
-                label="Interface ID"
-                value={state.Network?.DefaultInterfaceID}
-                icon={<Info className="h-4 w-4 text-indigo-400" />}
-              />
-
-              <InfoItem
-                label="Gateway"
-                value={state.Network?.DefaultGateway}
-                icon={<Server className="h-4 w-4 text-violet-400" />}
-              />
-            </CardContent>
-          </Card>
-        </TabsContent>
-        <TabsContent value="sys" className="pl-2">
-          <Card className="bg-black border-none">
-            <CardContent>
-              <div className="grid grid-cols-2 gap-4">
-                <InfoItem
-                  label="API Version"
-                  value={apiversion}
-                  icon={<Info className="h-4 w-4 text-blue-400" />}
-                />
-
-                <InfoItem
-                  label="App Version"
-                  value={version}
-                  icon={<Info className="h-4 w-4 text-green-400" />}
-                />
+        {/* Network */}
+        <div>
+          <span className="text-[11px] text-white/30 font-medium uppercase tracking-wider block mb-3">Network</span>
+          <div className="space-y-1">
+            {[
+              { label: "Interface", value: state.Network?.DefaultInterfaceName },
+              { label: "IP Address", value: state.Network?.DefaultInterface },
+              { label: "Interface ID", value: state.Network?.DefaultInterfaceID },
+              { label: "Gateway", value: state.Network?.DefaultGateway },
+            ].map((row, i) => (
+              <div key={i} className="flex items-baseline gap-3 py-1.5 pl-3 border-l-2 border-blue-500/20">
+                <span className="text-[11px] text-white/25 shrink-0 w-[90px]">{row.label}</span>
+                <code className="text-[13px] text-white/60 font-mono truncate">{row.value ?? "unknown"}</code>
               </div>
+            ))}
+          </div>
+        </div>
 
-              <div className="space-y-1">
-                <InfoItem
-                  label="Base Path"
-                  value={basePath}
-                  icon={<Server className="h-4 w-4 text-neutral-400" />}
-                />
-
-                <InfoItem
-                  label="Config File"
-                  value={configPath}
-                  icon={<Server className="h-4 w-4 text-amber-400" />}
-                />
-
-                <InfoItem
-                  label="Log Path"
-                  value={logPath || "Default"}
-                  icon={<Server className="h-4 w-4 text-red-400" />}
-                />
-
-                <InfoItem
-                  label="Log File"
-                  value={logFileName}
-                  icon={<Info className="h-4 w-4 text-red-400" />}
-                />
-
-                <InfoItem
-                  label="Admin"
-                  value={state.State?.IsAdmin ? "Yes" : "No"}
-                  icon={<Key className="h-4 w-4 text-yellow-400" />}
-                />
+        {/* System */}
+        <div>
+          <span className="text-[11px] text-white/30 font-medium uppercase tracking-wider block mb-3">System</span>
+          <div className="space-y-1">
+            {[
+              { label: "API Version", value: apiversion },
+              { label: "App Version", value: version },
+              { label: "Base Path", value: basePath },
+              { label: "Config", value: configPath },
+              { label: "Log Path", value: logPath || "Default" },
+              { label: "Log File", value: logFileName },
+              { label: "Admin", value: state.State?.IsAdmin ? "Yes" : "No" },
+            ].map((row, i) => (
+              <div key={i} className="flex items-baseline gap-3 py-1.5 pl-3 border-l-2 border-violet-500/20">
+                <span className="text-[11px] text-white/25 shrink-0 w-[90px]">{row.label}</span>
+                <code className="text-[13px] text-white/60 font-mono truncate">{row.value ?? "unknown"}</code>
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+            ))}
+          </div>
+        </div>
+
+      </div>
     </div>
   );
 };

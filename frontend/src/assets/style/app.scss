@@ -6,7 +6,39 @@
 @import "./layout-new";
 
 body {
-  background-color: black;
+  background-color: #060810;
+}
+
+/* Custom scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.08) transparent;
+}
+
+*:hover {
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
 }
 
 @theme {
@@ -69,26 +101,26 @@ body {
     --radius: 0.5rem
   }
   .dark {
-    --background: 224 71.4% 4.1%;
-    --foreground: 210 20% 98%;
-    --card: 224 71.4% 4.1%;
-    --card-foreground: 210 20% 98%;
-    --popover: 224 71.4% 4.1%;
-    --popover-foreground: 210 20% 98%;
-    --primary: 210 20% 98%;
-    --primary-foreground: 220.9 39.3% 11%;
-    --secondary: 215 27.9% 16.9%;
-    --secondary-foreground: 210 20% 98%;
-    --muted: 215 27.9% 16.9%;
-    --muted-foreground: 217.9 10.6% 64.9%;
-    --accent: 215 27.9% 16.9%;
-    --accent-foreground: 210 20% 98%;
-    --destructive: 0 62.8% 30.6%;
+    --background: 225 50% 3.5%;
+    --foreground: 210 20% 93%;
+    --card: 225 40% 5%;
+    --card-foreground: 210 20% 93%;
+    --popover: 225 40% 5%;
+    --popover-foreground: 210 20% 93%;
+    --primary: 222 90% 63%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 25% 12%;
+    --secondary-foreground: 210 20% 93%;
+    --muted: 220 25% 12%;
+    --muted-foreground: 218 10% 55%;
+    --accent: 220 25% 14%;
+    --accent-foreground: 210 20% 93%;
+    --destructive: 0 70% 45%;
     --destructive-foreground: 210 20% 98%;
-    --border: 215 27.9% 16.9%;
-    --input: 215 27.9% 16.9%;
-    --ring: 216 12.2% 83.9%;
-    --chart-1: 220 70% 50%;
+    --border: 220 25% 14%;
+    --input: 220 25% 14%;
+    --ring: 222 90% 63%;
+    --chart-1: 222 80% 63%;
     --chart-2: 160 60% 45%;
     --chart-3: 30 80% 55%;
     --chart-4: 280 65% 60%;
@@ -102,5 +134,9 @@ body {
   }
   body {
     @apply bg-background text-foreground;
+  }
+  .dark {
+    color: hsl(var(--foreground));
+    background-color: hsl(var(--background));
   }
 }

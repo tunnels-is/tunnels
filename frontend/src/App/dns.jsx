@@ -1,585 +1,441 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import FormKeyValue from "./component/formkeyvalue";
-import { useNavigate } from "react-router-dom";
-import dayjs from "dayjs";
-import GLOBAL_STATE from "../state";
-import STORE from "../store";
-import { Switch } from "@/components/ui/switch";
-import GenericTable from "./GenericTable";
-import { TableCell } from "@/components/ui/table";
-import { useState } from "react";
-import NewObjectEditorDialog from "./NewObjectEdiorDialog";
-import { Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
-
-const DNSSort = (a, b) => {
-  if (dayjs(a.LastSeen).unix() < dayjs(b.LastSeen).unix()) {
-    return 1;
-  } else if (dayjs(a.LastSeen).unix() > dayjs(b.LastSeen).unix()) {
-    return -1;
-  }
-  return 0;
-};
+import { Save, Plus, Pencil, Trash2, Settings, Minus } from "lucide-react";
+import GLOBAL_STATE from "../state";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 
 const DNS = () => {
   const state = GLOBAL_STATE("dns");
-  const navigate = useNavigate();
-  const [record, setRecord] = useState(undefined)
-  const [recordModal, setRecordModal] = useState(false)
-  const [isRecordEdit, setIsRecordEdit] = useState(false)
-  const [blocklist, setBlocklist] = useState(undefined)
-  const [blocklistModal, setBlocklistModal] = useState(false)
-  const [isBlocklistEdit, setIsBlocklistEdit] = useState(false)
-  const [whitelist, setWhitelist] = useState(undefined)
-  const [whitelistModal, setWhitelistModal] = useState(false)
-  const [isWhitelistEdit, setIsWhitelistEdit] = useState(false)
-  const [cfg, setCfg] = useState({ ...state.Config })
-  const [mod, setMod] = useState(false)
+  const [editing, setEditing] = useState(false);
+  const [record, setRecord] = useState(undefined);
+  const [recordModal, setRecordModal] = useState(false);
+  const [isRecordEdit, setIsRecordEdit] = useState(false);
+  const [blocklist, setBlocklist] = useState(undefined);
+  const [blocklistModal, setBlocklistModal] = useState(false);
+  const [isBlocklistEdit, setIsBlocklistEdit] = useState(false);
+  const [whitelist, setWhitelist] = useState(undefined);
+  const [whitelistModal, setWhitelistModal] = useState(false);
+  const [isWhitelistEdit, setIsWhitelistEdit] = useState(false);
+  const [cfg, setCfg] = useState({ ...state.Config });
+  const [mod, setMod] = useState(false);
 
   const updatecfg = (key, value) => {
-    console.log(key, value)
-    let x = { ...cfg }
-    x[key] = value
-    setMod(true)
-    setCfg(x)
-  }
+    setCfg((prev) => ({ ...prev, [key]: value }));
+    setMod(true);
+  };
 
   useEffect(() => {
     state.GetBackendState();
-    state.GetDNSStats();
   }, []);
 
   let blockLists = state.Config?.DNSBlockLists;
   state.modifiedLists?.forEach((l) => {
     blockLists?.forEach((ll, i) => {
-      if (ll.Tag === l.Tag) {
-        blockLists[i] = l;
-      }
+      if (ll.Tag === l.Tag) blockLists[i] = l;
     });
   });
-  if (!blockLists) {
-    blockLists = [];
-  }
+  if (!blockLists) blockLists = [];
 
   let whiteLists = state.Config?.DNSWhiteLists;
   state.modifiedLists?.forEach((l) => {
     whiteLists?.forEach((ll, i) => {
-      if (ll.Tag === l.Tag) {
-        whiteLists[i] = l;
-      }
+      if (ll.Tag === l.Tag) whiteLists[i] = l;
     });
   });
-  if (!whiteLists) {
-    whiteLists = [];
-  }
+  if (!whiteLists) whiteLists = [];
 
-  const generateDNSRecordsTable = () => {
+  const records = state.Config?.DNSRecords || [];
 
-    return {
-      data: state.Config?.DNSRecords,
-      columns: {
-        Domain: true,
-        IP: true,
-        TXT: true,
-        Wildcard: true,
-      },
-      headerFormat: {
-        TXT: () => {
-          return "Text"
-        }
-      },
-      columnFormat: {
-        // IP: (obj) => {
-        //   return obj.IP.join(" | ")
-        // },
-        Wildcard: (obj) => {
-          return obj.Wildcard === true ? "yes" : "no"
-        },
-      },
-      customColumns: {
-      },
-      columnClass: {},
-      Btn: {
-        Edit: (obj) => {
-          setIsRecordEdit(true)
-          setRecord(obj)
-          setRecordModal(true)
-        },
-        Delete: (obj) => {
-          state.Config.DNSRecords = state.Config.DNSRecords.filter((r) => r.Domain !== obj.Domain)
-          state.v2_ConfigSave();
-        },
-        New: () => {
-          setIsRecordEdit(false)
-          setRecord({ Domain: "yourdomain.com", IP: ["127.0.0.1"], TXT: ["yourdomain.com text record"], Wildcard: true })
-          setRecordModal(true)
-        }
-      },
-      headers: ["Domain", "IP", "Text", "Wildcard"],
-      headerClass: {},
-    }
-
-  }
-
-  const generateBlocksTable = () => {
-    let dnsBlocks = state.DNSStats ? state.DNSStats : [];
-    let rows = [];
-    if (!dnsBlocks || dnsBlocks.length === 0) {
-      return rows;
-    }
-
-    let stats = [];
-
-    Object.entries(dnsBlocks).forEach(([key, value]) => {
-      let lb = dayjs(value.LastBlocked);
-      let ls = dayjs(value.LastSeen);
-      if (ls.diff(lb, "s") > 0) {
-        return true;
-      }
-      stats.push({ ...value, tag: key });
-    });
-
-    stats = stats.sort(DNSSort);
-    return {
-      data: stats,
-      columns: {
-        tag: true,
-        Tag: true,
-        Count: true,
-        FirstSeen: true,
-        LastSeen: true,
-      },
-      headerFormat: {
-        "tag": () => {
-          return "Domain"
-        },
-        // "Tag": () => {
-        //   return "List"
-        // }
-      },
-      columnFormat: {
-        FirstSeen: (obj) => {
-          return dayjs(obj.FirstSeen).format(state.DNSListDateFormat)
-        },
-        LastSeen: (obj) => {
-          return dayjs(obj.LastSeen).format(state.DNSListDateFormat)
-        }
-      },
-      customColumns: {},
-      columnClass: {},
-      Btn: {},
-      headers: ["tag", "Count", "FirstSeen", "LastSeen"],
-      headerClass: {},
-    }
+  const openRecord = (obj, edit) => {
+    setIsRecordEdit(edit);
+    setRecord(edit ? obj : { Domain: "yourdomain.com", IP: ["127.0.0.1"], TXT: ["yourdomain.com text record"], Wildcard: true });
+    setRecordModal(true);
+  };
+  const deleteRecord = (obj) => {
+    state.Config.DNSRecords = state.Config.DNSRecords.filter((r) => r.Domain !== obj.Domain);
+    state.v2_ConfigSave();
+  };
+  const openBlocklist = (obj, edit) => {
+    setIsBlocklistEdit(edit);
+    setBlocklist(edit ? obj : { Tag: "new-blocklist", URL: "https://example.com/blocklist.txt", Enabled: true, Count: 0 });
+    setBlocklistModal(true);
+  };
+  const openWhitelist = (obj, edit) => {
+    setIsWhitelistEdit(edit);
+    setWhitelist(edit ? obj : { Tag: "new-whitelist", URL: "https://example.com/whitelist.txt", Enabled: true, Count: 0 });
+    setWhitelistModal(true);
   };
 
-  const generateResolvesTable = () => {
-    let dnsResolves = state.DNSStats ? state.DNSStats : [];
-    let rows = [];
-    if (!dnsResolves || dnsResolves.length === 0) {
-      return rows;
-    }
-
-    let stats = [];
-    Object.entries(dnsResolves).forEach(([key, value]) => {
-      let lb = dayjs(value.LastBlocked);
-      let ls = dayjs(value.LastSeen);
-      if (ls.diff(lb, "s") > 0) {
-        stats.push({ ...value, tag: key });
-      }
-    });
-
-    stats = stats.sort(DNSSort);
-    return {
-      data: stats,
-      columns: {
-        tag: () => {
-          navigate("/dns/answers/" + value.tag);
-        },
-        Count: true,
-        FirstSeen: true,
-        LastSeen: true,
-      },
-      headerFormat: {
-        "tag": () => {
-          return "Domain"
-        },
-      },
-      columnFormat: {
-        FirstSeen: (obj) => {
-          return dayjs(obj.FirstSeen).format(state.DNSListDateFormat)
-        },
-        LastSeen: (obj) => {
-          return dayjs(obj.LastSeen).format(state.DNSListDateFormat)
-        }
-      },
-      customColumns: {},
-      columnClass: {},
-      Btn: {},
-      headers: ["tag", "Count", "FirstSeen", "LastSeen"],
-      headerClass: {},
-    }
-
-  };
-
-  const EnableColumn = (obj) => {
-    return <TableCell className={"w-[10px] text-sky-100"}  >
-      <Switch checked={obj.Enabled} onCheckedChange={() => state.toggleBlocklist(obj)} />
-    </TableCell >
-
-  }
-
-  const EnableColumnWhitelist = (obj) => {
-    return <TableCell className={"w-[10px] text-sky-100"}  >
-      <Switch checked={obj.Enabled} onCheckedChange={() => state.toggleWhitelist(obj)} />
-    </TableCell >
-
-  }
-
-  let bltable = {
-    data: blockLists,
-    columns: {
-      Tag: true,
-      Count: true,
-    },
-    customColumns: {
-      Enabled: EnableColumn,
-    },
-    columnClass: {
-      Enabled: (obj) => {
-        if (obj.Enabled === true) {
-          return "text-green-400"
-        }
-        return "text-red-400"
-      },
-    },
-    Btn: {
-      Edit: (obj) => {
-        setIsBlocklistEdit(true)
-        setBlocklist(obj)
-        setBlocklistModal(true)
-      },
-      Delete: (obj) => {
-        state.deleteBlocklist(obj);
-      },
-      New: () => {
-        setIsBlocklistEdit(false)
-        setBlocklist({
-          Tag: "new-blocklist",
-          URL: "https://example.com/blocklist.txt",
-          Enabled: true,
-          Count: 0
-        })
-        setBlocklistModal(true)
-      },
-      Save: state.v2_ConfigSave
-    },
-    headers: ["Tag", "Domains", "Blocked"],
-    headerClass: {},
-    opts: {
-      RowPerPage: 50,
-    },
-  }
-
-  let wltable = {
-    data: whiteLists,
-    columns: {
-      Tag: true,
-      Count: true,
-    },
-    customColumns: {
-      Enabled: EnableColumnWhitelist,
-    },
-    columnClass: {
-      Enabled: (obj) => {
-        if (obj.Enabled === true) {
-          return "text-green-400"
-        }
-        return "text-red-400"
-      },
-    },
-    Btn: {
-      Edit: (obj) => {
-        setIsWhitelistEdit(true)
-        setWhitelist(obj)
-        setWhitelistModal(true)
-      },
-      Delete: (obj) => {
-        state.deleteWhitelist(obj);
-      },
-      New: () => {
-        setIsWhitelistEdit(false)
-        setWhitelist({
-          Tag: "new-whitelist",
-          URL: "https://example.com/whitelist.txt",
-          Enabled: true,
-          Count: 0
-        })
-        setWhitelistModal(true)
-      },
-      Save: state.v2_ConfigSave
-    },
-    headers: ["Tag", "Domains", "Allowed"],
-    headerClass: {},
-    opts: {
-      RowPerPage: 50,
-    },
-  }
+  const options = [
+    { key: "DNSOverHTTPS", label: "Secure DNS", checked: state?.Config?.DNSOverHTTPS },
+    { key: "LogBlockedDomains", label: "Log Blocked", checked: state?.Config?.LogBlockedDomains },
+    { key: "LogAllDomains", label: "Log All", checked: state?.Config?.LogAllDomains },
+    { key: "DNSstats", label: "Stats", checked: state?.Config?.DNSstats },
+  ];
 
   return (
-    <div className="">
-      <Tabs defaultValue="settings" >
-        <div className="flex items-center justify-between">
-          {mod === true && (
-            <div className="mb-7 flex gap-[4px] items-center">
-              <Button
-                className={state.Theme?.successBtn}
-                onClick={async () => {
-                  state.Config = cfg
-                  let ok = await state.v2_ConfigSave()
-                  if (ok === true) {
-                    setMod(false)
-                  }
-                }}>
-                Save
-              </Button>
-              <div className="ml-3 text-yellow-400 text-xl">
-                Your config has un-saved changes
+    <div>
+
+      {/* ── Config banner ── */}
+      <div className="flex items-center gap-5 py-3 px-4 rounded-lg bg-[#0a0d14]/80 border border-[#1e2433] mb-6">
+        {!editing ? (
+          <>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] text-white/25 uppercase tracking-wider">Server</span>
+              <code className="text-[13px] text-cyan-400/70 font-mono">
+                {cfg.DNSServerIP || "0.0.0.0"}:{cfg.DNSServerPort || "53"}
+              </code>
+            </div>
+            <div className="w-px h-4 bg-white/[0.06]" />
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] text-white/25 uppercase tracking-wider">Resolvers</span>
+              <code className="text-[13px] text-white/50 font-mono">{cfg.DNS1Default || "—"}</code>
+              <span className="text-[11px] text-white/15">&#8250;</span>
+              <code className="text-[13px] text-white/50 font-mono">{cfg.DNS2Default || "—"}</code>
+            </div>
+            <button
+              className="ml-auto p-1.5 rounded text-white/20 hover:text-white/50 hover:bg-white/[0.04] transition-colors"
+              onClick={() => setEditing(true)}
+            >
+              <Settings className="h-3.5 w-3.5" />
+            </button>
+          </>
+        ) : (
+          <div className="flex-1">
+            <div className="grid grid-cols-4 gap-3">
+              <div>
+                <label className="text-[10px] text-white/30 uppercase block mb-1">Server IP</label>
+                <Input className="h-7 text-[12px] border-[#1e2433] bg-transparent" value={cfg.DNSServerIP || ""} onChange={(e) => updatecfg("DNSServerIP", e.target.value)} />
+              </div>
+              <div>
+                <label className="text-[10px] text-white/30 uppercase block mb-1">Port</label>
+                <Input className="h-7 text-[12px] border-[#1e2433] bg-transparent" value={cfg.DNSServerPort || ""} onChange={(e) => updatecfg("DNSServerPort", e.target.value)} />
+              </div>
+              <div>
+                <label className="text-[10px] text-white/30 uppercase block mb-1">Primary DNS</label>
+                <Input className="h-7 text-[12px] border-[#1e2433] bg-transparent" value={cfg.DNS1Default || ""} onChange={(e) => updatecfg("DNS1Default", e.target.value)} />
+              </div>
+              <div>
+                <label className="text-[10px] text-white/30 uppercase block mb-1">Backup DNS</label>
+                <Input className="h-7 text-[12px] border-[#1e2433] bg-transparent" value={cfg.DNS2Default || ""} onChange={(e) => updatecfg("DNS2Default", e.target.value)} />
               </div>
             </div>
-          )}
-        </div>
-        <TabsList
-          className={state.Theme?.borderColor + " rounded"}
-        >
-          <TabsTrigger className={state.Theme?.tabs} value="settings">Settings</TabsTrigger>
-          <TabsTrigger className={state.Theme?.tabs} value="records">DNS Records</TabsTrigger>
-          <TabsTrigger className={state.Theme?.tabs} value="blocklist">Block Lists</TabsTrigger>
-          <TabsTrigger className={state.Theme?.tabs} value="whitelist">White Lists</TabsTrigger>
-          <TabsTrigger className={state.Theme?.tabs} value="blockdomains">Blocked Domains</TabsTrigger>
-          <TabsTrigger className={state.Theme?.tabs} value="resolveddomains">Resovled Domains</TabsTrigger>
-        </TabsList>
-        <TabsContent value="settings" className="pl-2">
-          <div className="">
-            <div className="text-yellow-300">
-              Enabling blocklists will increase memory usage.
-            </div>
-
-            <FormKeyValue
-              label="Server IP"
-              value={
-                <Input
-                  value={cfg.DNSServerIP}
-                  onChange={(e) => {
-                    updatecfg("DNSServerIP", e.target.value)
-                    // state.renderPage("dns");
+            <div className="flex gap-2 mt-2">
+              {mod && (
+                <Button
+                  className="text-white bg-emerald-600 hover:bg-emerald-500 h-6 text-[11px] px-2.5"
+                  onClick={async () => {
+                    state.Config = cfg;
+                    let ok = await state.v2_ConfigSave();
+                    if (ok) { setMod(false); setEditing(false); }
                   }}
-                  type="text"
-                />
-              }
-            />
-
-            <FormKeyValue
-              label="Server Port"
-              value={
-                <Input
-                  value={cfg.DNSServerPort}
-                  onChange={(e) => {
-                    updatecfg("DNSServerPort", e.target.value)
-                    // state.renderPage("dns");
-                  }}
-                  type="text"
-                />
-              }
-            />
-
-            <FormKeyValue
-              label="Primary DNS"
-              value={
-                <Input
-                  value={cfg.DNS1Default}
-                  onChange={(e) => {
-                    updatecfg("DNS1Default", e.target.value)
-                    // state.renderPage("dns");
-                  }}
-                  type="text"
-                />
-              }
-            />
-
-            <FormKeyValue
-              label="Backup DNS"
-              value={
-                <Input
-                  value={cfg.DNS2Default}
-                  onChange={(e) => {
-                    updatecfg("DNS2Default", e.target.value)
-                    // state.renderPage("dns");
-                  }}
-                  type="text"
-                />
-              }
-            />
-            <div className="max-w-[300px]">
-              <div className="flex items-center justify-between py-1 w-full">
-                <Label className="text-white mr-3">Secure DNS</Label>
-                <Switch
-                  checked={state?.Config?.DNSOverHTTPS}
-                  onCheckedChange={() => {
-                    state.toggleConfigKeyAndSave("Config", "DNSOverHTTPS");
-                    state.fullRerender();
-                  }}
-                />
-              </div>
-
-              <div className="flex items-center justify-between py-1">
-                <Label className="text-white mr-3">Log Blocked</Label>
-                <Switch
-                  checked={state?.Config?.LogBlockedDomains}
-                  onCheckedChange={() => {
-                    state.toggleConfigKeyAndSave("Config", "LogBlockedDomains");
-                    state.fullRerender();
-                  }}
-                />
-              </div>
-
-              <div className="flex items-center justify-between py-1">
-                <Label className="text-white mr-3">Log All</Label>
-                <Switch
-                  checked={state?.Config?.LogAllDomains}
-                  onCheckedChange={() => {
-                    state.toggleConfigKeyAndSave("Config", "LogAllDomains");
-                    state.fullRerender();
-                  }}
-                />
-              </div>
-
-              <div className="flex items-center justify-between py-1">
-                <Label className="text-white mr-3">DNS Stats</Label>
-                <Switch
-                  checked={state?.Config?.DNSstats}
-                  onCheckedChange={() => {
-                    state.toggleConfigKeyAndSave("Config", "DNSstats");
-                    state.fullRerender();
-                  }}
-                />
-              </div>
+                >
+                  <Save className="h-3 w-3 mr-1" /> Save
+                </Button>
+              )}
+              <button className="text-[11px] text-white/30 hover:text-white/50 px-2" onClick={() => { setCfg({ ...state.Config }); setMod(false); setEditing(false); }}>
+                Cancel
+              </button>
             </div>
           </div>
+        )}
+      </div>
 
-        </TabsContent>
-        <TabsContent value="whitelist">
-          <GenericTable table={wltable} />
-          <NewObjectEditorDialog
-            open={whitelistModal}
-            onOpenChange={setWhitelistModal}
-            object={whitelist}
-            title="DNS Whitelist"
-            description=""
-            readOnly={false}
-            opts={{
-              fields: {
-                Count: "hidden",
-                LastDownload: "hidden"
-              }
-            }}
-            saveButton={async (obj) => {
-              if (!isWhitelistEdit) {
-                if (!state.Config?.DNSWhiteLists) {
-                  state.Config.DNSWhiteLists = []
-                }
-                state.Config?.DNSWhiteLists.push(obj)
-              }
-              let ok = await state.v2_ConfigSave();
-              if (ok === true) {
-                setWhitelistModal(false)
-                setIsWhitelistEdit(false)
-              }
-            }}
-            onChange={(key, value, type) => {
-              whitelist[key] = value;
-            }}
-            onArrayChange={(key, value, index) => {
-              whitelist[key][index] = value;
-            }}
-          />
-        </TabsContent>
-        <TabsContent value="blocklist">
-          <GenericTable table={bltable} />
-          <NewObjectEditorDialog
-            open={blocklistModal}
-            onOpenChange={setBlocklistModal}
-            object={blocklist}
-            title="DNS Blocklist"
-            description=""
-            readOnly={false}
-            opts={{
-              fields: {
-                Count: "hidden",
-                LastDownload: "hidden"
-              }
-            }}
-            saveButton={async (obj) => {
-              if (!isBlocklistEdit) {
-                if (!state.Config?.DNSBlockLists) {
-                  state.Config.DNSBlockLists = []
-                }
-                state.Config?.DNSBlockLists.push(obj)
-              }
-              let ok = await state.v2_ConfigSave();
-              if (ok === true) {
-                setBlocklistModal(false)
-                setIsBlocklistEdit(false)
-              }
-            }}
-            onChange={(key, value, type) => {
-              blocklist[key] = value;
-            }}
-            onArrayChange={(key, value, index) => {
-              blocklist[key][index] = value;
-            }}
-          />
-        </TabsContent>
-        <TabsContent value="blockdomains">
-          <GenericTable table={generateBlocksTable()} />
-        </TabsContent>
-        <TabsContent value="resolveddomains">
-          <GenericTable table={generateResolvesTable()} />
-        </TabsContent>
-        <TabsContent value="records">
-          <GenericTable className={""} table={generateDNSRecordsTable()} />
-          <NewObjectEditorDialog
-            open={recordModal}
-            onOpenChange={setRecordModal}
-            object={record}
-            title="DNS Record"
-            description=""
-            readOnly={false}
-            saveButton={async (obj) => {
-              if (!isRecordEdit) {
-                if (!state.Config?.DNSRecords) {
-                  state.Config.DNSRecords = []
-                }
-                state.Config?.DNSRecords.push(obj)
-              }
-              let ok = await state.v2_ConfigSave();
-              if (ok === true) {
-                setRecordModal(false)
-                setIsRecordEdit(false)
-              }
-            }}
-            onChange={(key, value, type) => {
-              record[key] = value;
-            }}
-            onArrayChange={(key, value, index) => {
-              record[key][index] = value;
-            }}
-          />
-        </TabsContent>
-      </Tabs>
+      {/* ── Option pills ── */}
+      <div className="flex items-center gap-2 mb-8">
+        {options.map((opt) => (
+          <button
+            key={opt.key}
+            className={`text-[11px] px-3 py-1 rounded-full border transition-all cursor-pointer ${
+              opt.checked
+                ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.12)]"
+                : "border-white/[0.06] bg-white/[0.02] text-white/30 hover:text-white/50 hover:border-white/15 hover:bg-white/[0.04]"
+            }`}
+            onClick={() => { state.toggleConfigKeyAndSave("Config", opt.key); state.rerender(); }}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
+
+      {/* ── Sections ── */}
+      <div className="flex flex-wrap gap-8 mb-8">
+        {/* Records */}
+        <div className="min-w-[280px] flex-1">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-[11px] text-white/30 font-medium uppercase tracking-wider">Records</span>
+            <button className="text-white/20 hover:text-white/50 transition-colors" onClick={() => openRecord(null, false)}>
+              <Plus className="h-3.5 w-3.5" />
+            </button>
+          </div>
+          <div className="space-y-1">
+            {records.length > 0 ? records.map((r, i) => (
+              <div key={i} className="group flex items-center gap-3 py-1.5 pl-3 border-l-2 border-cyan-500/20 hover:border-cyan-500/50 transition-colors">
+                <div className="flex-1 min-w-0">
+                  <div className="text-[13px] text-white/80 font-medium truncate">{r.Domain}</div>
+                  <div className="text-[11px] text-white/25 font-mono truncate">
+                    {r.IP?.join(", ")}{r.Wildcard ? " *" : ""}
+                  </div>
+                </div>
+                <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button className="p-1 text-white/20 hover:text-white/50" onClick={() => openRecord(r, true)}><Pencil className="h-3 w-3" /></button>
+                  <button className="p-1 text-red-500/25 hover:text-red-400" onClick={() => deleteRecord(r)}><Trash2 className="h-3 w-3" /></button>
+                </div>
+              </div>
+            )) : (
+              <div className="py-4 pl-3 border-l-2 border-white/[0.04] text-[12px] text-white/15">No records</div>
+            )}
+          </div>
+        </div>
+
+        {/* Block Lists */}
+        <div className="min-w-[280px] flex-1">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-[11px] text-white/30 font-medium uppercase tracking-wider">Block Lists</span>
+            <button className="text-white/20 hover:text-white/50 transition-colors" onClick={() => openBlocklist(null, false)}>
+              <Plus className="h-3.5 w-3.5" />
+            </button>
+          </div>
+          <div className="space-y-1">
+            {blockLists.length > 0 ? blockLists.map((bl, i) => (
+              <div key={i} className="group flex items-center gap-3 py-1.5 pl-3 border-l-2 border-amber-500/20 hover:border-amber-500/50 transition-colors">
+                <button
+                  className={`text-[10px] px-2 py-0.5 rounded-full border transition-all cursor-pointer shrink-0 ${
+                    bl.Enabled
+                      ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.12)]"
+                      : "border-white/[0.06] bg-white/[0.02] text-white/30 hover:text-white/50 hover:border-white/15 hover:bg-white/[0.04]"
+                  }`}
+                  onClick={(e) => { e.stopPropagation(); state.toggleBlocklist(bl); state.v2_ConfigSave(); }}
+                >{bl.Enabled ? "On" : "Off"}</button>
+                <div className="flex-1 min-w-0">
+                  <span className="text-[13px] text-white/80 font-medium">{bl.Tag}</span>
+                  <span className="text-[11px] text-white/20 ml-2">{bl.Count}</span>
+                </div>
+                <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button className="p-1 text-white/20 hover:text-white/50" onClick={() => openBlocklist(bl, true)}><Pencil className="h-3 w-3" /></button>
+                  <button className="p-1 text-red-500/25 hover:text-red-400" onClick={() => state.deleteBlocklist(bl)}><Trash2 className="h-3 w-3" /></button>
+                </div>
+              </div>
+            )) : (
+              <div className="py-4 pl-3 border-l-2 border-white/[0.04] text-[12px] text-white/15">No block lists</div>
+            )}
+          </div>
+        </div>
+
+        {/* White Lists */}
+        <div className="min-w-[280px] flex-1">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-[11px] text-white/30 font-medium uppercase tracking-wider">White Lists</span>
+            <button className="text-white/20 hover:text-white/50 transition-colors" onClick={() => openWhitelist(null, false)}>
+              <Plus className="h-3.5 w-3.5" />
+            </button>
+          </div>
+          <div className="space-y-1">
+            {whiteLists.length > 0 ? whiteLists.map((wl, i) => (
+              <div key={i} className="group flex items-center gap-3 py-1.5 pl-3 border-l-2 border-emerald-500/20 hover:border-emerald-500/50 transition-colors">
+                <button
+                  className={`text-[10px] px-2 py-0.5 rounded-full border transition-all cursor-pointer shrink-0 ${
+                    wl.Enabled
+                      ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.12)]"
+                      : "border-white/[0.06] bg-white/[0.02] text-white/30 hover:text-white/50 hover:border-white/15 hover:bg-white/[0.04]"
+                  }`}
+                  onClick={(e) => { e.stopPropagation(); state.toggleWhitelist(wl); state.v2_ConfigSave(); }}
+                >{wl.Enabled ? "On" : "Off"}</button>
+                <div className="flex-1 min-w-0">
+                  <span className="text-[13px] text-white/80 font-medium">{wl.Tag}</span>
+                  <span className="text-[11px] text-white/20 ml-2">{wl.Count}</span>
+                </div>
+                <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button className="p-1 text-white/20 hover:text-white/50" onClick={() => openWhitelist(wl, true)}><Pencil className="h-3 w-3" /></button>
+                  <button className="p-1 text-red-500/25 hover:text-red-400" onClick={() => state.deleteWhitelist(wl)}><Trash2 className="h-3 w-3" /></button>
+                </div>
+              </div>
+            )) : (
+              <div className="py-4 pl-3 border-l-2 border-white/[0.04] text-[12px] text-white/15">No white lists</div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ── DNS Record dialog ── */}
+      <Dialog open={recordModal} onOpenChange={setRecordModal}>
+        <DialogContent className="sm:max-w-[480px] text-white bg-[#0a0d14] border-[#1e2433]">
+          {record && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="text-lg font-bold text-white">
+                  {isRecordEdit ? "Edit DNS Record" : "New DNS Record"}
+                </DialogTitle>
+              </DialogHeader>
+
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="flex-1">
+                    <label className="text-[10px] text-white/30 uppercase block mb-1">Domain</label>
+                    <Input className="h-7 text-[12px] border-[#1e2433] bg-transparent" value={record.Domain || ""} onChange={(e) => { record.Domain = e.target.value; setRecord({ ...record }); }} />
+                  </div>
+                  <div className="pt-4">
+                    <button
+                      className={`text-[11px] px-3 py-1 rounded-full border transition-all cursor-pointer ${
+                        record.Wildcard
+                          ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.12)]"
+                          : "border-white/[0.06] bg-white/[0.02] text-white/30 hover:text-white/50 hover:border-white/15 hover:bg-white/[0.04]"
+                      }`}
+                      onClick={() => { record.Wildcard = !record.Wildcard; setRecord({ ...record }); }}
+                    >
+                      Wildcard
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[10px] text-white/30 uppercase block mb-1">IP Addresses</label>
+                  <div className="space-y-1">
+                    {(record.IP || []).map((ip, i) => (
+                      <div key={i} className="flex items-center gap-1">
+                        <Input className="flex-1 h-7 text-[12px] border-[#1e2433] bg-transparent" value={ip} onChange={(e) => { record.IP[i] = e.target.value; setRecord({ ...record }); }} />
+                        <button className="p-1 text-red-400/60 hover:text-red-400" onClick={() => { record.IP.splice(i, 1); setRecord({ ...record }); }}>
+                          <Minus className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                    <button className="flex items-center gap-1 text-[11px] text-emerald-400/60 hover:text-emerald-400 mt-1" onClick={() => { record.IP = [...(record.IP || []), ""]; setRecord({ ...record }); }}>
+                      <Plus className="w-3 h-3" /> Add IP
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[10px] text-white/30 uppercase block mb-1">TXT Records</label>
+                  <div className="space-y-1">
+                    {(record.TXT || []).map((txt, i) => (
+                      <div key={i} className="flex items-center gap-1">
+                        <Input className="flex-1 h-7 text-[12px] border-[#1e2433] bg-transparent" value={txt} onChange={(e) => { record.TXT[i] = e.target.value; setRecord({ ...record }); }} />
+                        <button className="p-1 text-red-400/60 hover:text-red-400" onClick={() => { record.TXT.splice(i, 1); setRecord({ ...record }); }}>
+                          <Minus className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                    <button className="flex items-center gap-1 text-[11px] text-emerald-400/60 hover:text-emerald-400 mt-1" onClick={() => { record.TXT = [...(record.TXT || []), ""]; setRecord({ ...record }); }}>
+                      <Plus className="w-3 h-3" /> Add TXT
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <DialogFooter className="flex gap-2 mt-2">
+                <Button className="text-white bg-emerald-600 hover:bg-emerald-500 h-6 text-[11px] px-2.5" onClick={async () => {
+                  if (!isRecordEdit) { if (!state.Config?.DNSRecords) state.Config.DNSRecords = []; state.Config.DNSRecords.push(record); }
+                  let ok = await state.v2_ConfigSave();
+                  if (ok) { setRecordModal(false); setIsRecordEdit(false); }
+                }}>
+                  <Save className="h-3 w-3 mr-1" /> Save
+                </Button>
+                <button className="text-[11px] text-white/30 hover:text-white/50 px-2" onClick={() => setRecordModal(false)}>Cancel</button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Blocklist dialog ── */}
+      <Dialog open={blocklistModal} onOpenChange={setBlocklistModal}>
+        <DialogContent className="sm:max-w-[480px] text-white bg-[#0a0d14] border-[#1e2433]">
+          {blocklist && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="text-lg font-bold text-white">
+                  {isBlocklistEdit ? "Edit Block List" : "New Block List"}
+                </DialogTitle>
+              </DialogHeader>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="text-[10px] text-white/30 uppercase block mb-1">Tag</label>
+                  <Input className="h-7 text-[12px] border-[#1e2433] bg-transparent" value={blocklist.Tag || ""} onChange={(e) => { blocklist.Tag = e.target.value; setBlocklist({ ...blocklist }); }} />
+                </div>
+                <div>
+                  <label className="text-[10px] text-white/30 uppercase block mb-1">URL</label>
+                  <Input className="h-7 text-[12px] border-[#1e2433] bg-transparent" value={blocklist.URL || ""} onChange={(e) => { blocklist.URL = e.target.value; setBlocklist({ ...blocklist }); }} />
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    className={`text-[11px] px-3 py-1 rounded-full border transition-all cursor-pointer ${
+                      blocklist.Enabled
+                        ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.12)]"
+                        : "border-white/[0.06] bg-white/[0.02] text-white/30 hover:text-white/50 hover:border-white/15 hover:bg-white/[0.04]"
+                    }`}
+                    onClick={() => { blocklist.Enabled = !blocklist.Enabled; setBlocklist({ ...blocklist }); }}
+                  >
+                    Enabled
+                  </button>
+                </div>
+              </div>
+
+              <DialogFooter className="flex gap-2 mt-2">
+                <Button className="text-white bg-emerald-600 hover:bg-emerald-500 h-6 text-[11px] px-2.5" onClick={async () => {
+                  if (!isBlocklistEdit) { if (!state.Config?.DNSBlockLists) state.Config.DNSBlockLists = []; state.Config.DNSBlockLists.push(blocklist); }
+                  let ok = await state.v2_ConfigSave();
+                  if (ok) { setBlocklistModal(false); setIsBlocklistEdit(false); }
+                }}>
+                  <Save className="h-3 w-3 mr-1" /> Save
+                </Button>
+                <button className="text-[11px] text-white/30 hover:text-white/50 px-2" onClick={() => setBlocklistModal(false)}>Cancel</button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Whitelist dialog ── */}
+      <Dialog open={whitelistModal} onOpenChange={setWhitelistModal}>
+        <DialogContent className="sm:max-w-[480px] text-white bg-[#0a0d14] border-[#1e2433]">
+          {whitelist && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="text-lg font-bold text-white">
+                  {isWhitelistEdit ? "Edit White List" : "New White List"}
+                </DialogTitle>
+              </DialogHeader>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="text-[10px] text-white/30 uppercase block mb-1">Tag</label>
+                  <Input className="h-7 text-[12px] border-[#1e2433] bg-transparent" value={whitelist.Tag || ""} onChange={(e) => { whitelist.Tag = e.target.value; setWhitelist({ ...whitelist }); }} />
+                </div>
+                <div>
+                  <label className="text-[10px] text-white/30 uppercase block mb-1">URL</label>
+                  <Input className="h-7 text-[12px] border-[#1e2433] bg-transparent" value={whitelist.URL || ""} onChange={(e) => { whitelist.URL = e.target.value; setWhitelist({ ...whitelist }); }} />
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    className={`text-[11px] px-3 py-1 rounded-full border transition-all cursor-pointer ${
+                      whitelist.Enabled
+                        ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.12)]"
+                        : "border-white/[0.06] bg-white/[0.02] text-white/30 hover:text-white/50 hover:border-white/15 hover:bg-white/[0.04]"
+                    }`}
+                    onClick={() => { whitelist.Enabled = !whitelist.Enabled; setWhitelist({ ...whitelist }); }}
+                  >
+                    Enabled
+                  </button>
+                </div>
+              </div>
+
+              <DialogFooter className="flex gap-2 mt-2">
+                <Button className="text-white bg-emerald-600 hover:bg-emerald-500 h-6 text-[11px] px-2.5" onClick={async () => {
+                  if (!isWhitelistEdit) { if (!state.Config?.DNSWhiteLists) state.Config.DNSWhiteLists = []; state.Config.DNSWhiteLists.push(whitelist); }
+                  let ok = await state.v2_ConfigSave();
+                  if (ok) { setWhitelistModal(false); setIsWhitelistEdit(false); }
+                }}>
+                  <Save className="h-3 w-3 mr-1" /> Save
+                </Button>
+                <button className="text-[11px] text-white/30 hover:text-white/50 px-2" onClick={() => setWhitelistModal(false)}>Cancel</button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

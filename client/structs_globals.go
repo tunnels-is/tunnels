@@ -52,6 +52,8 @@ var (
 	LogQueue      = make(chan string, 1000)
 	APILogQueue   = make(chan string, 1000)
 	logRecordHash *xsync.MapOf[string, bool]
+	PollLogMu     sync.Mutex
+	PollLogBuf    []string
 
 	// Go Routine monitors
 	concurrencyMonitor = make(chan *goSignal, 1000)
@@ -123,15 +125,14 @@ type SignedConnectRequest struct {
 var (
 	DIST_EMBED embed.FS
 	DLL_EMBED  embed.FS
+	EnableTLS  bool
 )
 
 var (
 	AppStartTime        = time.Now()
 	DEFAULT_TUNNEL      *TInterface
 	DEFAULT_DNS_SERVERS []string
-	DNSClient           = new(dns.Client)
-
-	uiChan = make(chan struct{}, 1)
+	DNSClient = new(dns.Client)
 
 	// HTTP
 	API_SERVER http.Server
@@ -319,6 +320,7 @@ type TunnelMETA struct {
 	IFName     string
 
 	Tag         string
+	ServerID    string
 	IPv4Address string
 	IPv6Address string
 	NetMask     string

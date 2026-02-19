@@ -2,15 +2,10 @@ import React, { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import GLOBAL_STATE from "../state";
 import dayjs from "dayjs";
-import KeyValue from "./component/keyvalue";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import GenericTable from "./GenericTable";
-import { Button } from "@/components/ui/button";
-import InfoItem from "./component/InfoItem";
-import { Network } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
 import { ExitIcon } from "@radix-ui/react-icons";
+import { Key, RefreshCw, Shield, LogOut } from "lucide-react";
 
 const Account = () => {
   const navigate = useNavigate();
@@ -18,10 +13,10 @@ const Account = () => {
 
   const gotoAccountSelect = () => {
     navigate("/accounts");
-  }
+  };
 
   if (state.User?.Email === "" || !state.User) {
-    gotoAccountSelect()
+    gotoAccountSelect();
     return;
   }
 
@@ -29,197 +24,173 @@ const Account = () => {
     state.GetBackendState();
   }, []);
 
-  state.User?.Tokens?.sort(function(x, y) {
-    if (x.Created < y.Created) {
-      return 1;
-    }
-    if (x.Created > y.Created) {
-      return -1;
-    }
+  state.User?.Tokens?.sort(function (x, y) {
+    if (x.Created < y.Created) return 1;
+    if (x.Created > y.Created) return -1;
     return 0;
   });
 
+  let APIKey = state?.User?.APIKey;
+  const [tab, setTab] = React.useState("account");
 
-
-  let APIKey = state?.User?.APIKey
-
-  const LogoutButton = (obj) => {
-    return <DropdownMenuItem
-      key="connect"
-      onClick={() => {
-        state.LogoutToken(obj, false);
-      }
-      }
-      className="cursor-pointer text-red-700 focus:text-red-500"
-    >
-      <ExitIcon className="w-4 h-4 mr-2" /> Logout
-    </DropdownMenuItem >
-
-  }
-
-  let table = {
-    data: state.User?.Tokens,
-    columns: {
-      N: true,
-      Created: true,
-    },
-    columnFormat: {
-      Created: (obj) => {
-        return dayjs(obj.Created).format("HH:mm:ss DD-MM-YYYY")
-      },
-      N: (obj) => {
-        console.dir(obj)
-        if (obj.DT === state?.User?.DeviceToken.DT) {
-          return obj.N + " (current)"
-        }
-        return obj.N
-      }
-    },
-    columnClass: {
-      N: (obj) => {
-        return "w-[200px]"
-      },
-      Created: (obj) => {
-        console.log("CCCC")
-        return "w-[400px]"
-      }
-    },
-    customBtn: {
-      Logout: LogoutButton,
-    },
-    Btn: {},
-    headers: ["N", "Created"],
-    headerFormat: {
-      N: () => {
-        return "Device"
-      }
-    },
-    headerClass: {},
-    opts: {
-      RowPerPage: 50,
-    },
-  }
-
+  const tabs = [
+    { key: "account", label: "Account" },
+    { key: "loggedin", label: "Devices" },
+    { key: "license", label: "License Key" },
+  ];
 
   return (
-    <Tabs defaultValue="account">
-      <TabsList
-        className={state.Theme?.borderColor}
-      >
-        <TabsTrigger className={state.Theme?.tabs} value="account">Account</TabsTrigger>
-        <TabsTrigger className={state.Theme?.tabs} value="loggedin">Devices</TabsTrigger>
-        <TabsTrigger className={state.Theme?.tabs} value="license">License Key</TabsTrigger>
-      </TabsList>
-
-      <TabsContent key={state?.User?._id} value="account" className="size-fit pl-2 w-[400px]">
-        {state?.User && (
-          <div className="">
-            <div className="space-y-1 text-white">
-              <InfoItem
-                label="User"
-                value={state.User?.Email}
-                icon={<Network className="h-4 w-4 text-blue-400" />}
-              />
-              <InfoItem
-                label="ID"
-                value={state.User?._id}
-                icon={<Network className="h-4 w-4 text-blue-400" />}
-              />
-              <InfoItem
-                label="Update"
-                value={dayjs(state.User?.Updated).format(
-                  "DD-MM-YYYY HH:mm:ss",
-                )}
-                icon={<Network className="h-4 w-4 text-blue-400" />}
-              />
-
-
-              {state.User?.SubExpiration && (
-                <InfoItem
-                  label="Subscription Expires"
-                  value={dayjs(state.User?.SubExpiration).format(
-                    "DD-MM-YYYY HH:mm:ss",
-                  )}
-                  icon={< Network className="h-4 w-4 text-blue-400" />}
-                />
-              )}
-              <InfoItem
-                label="API Key"
-                value={APIKey}
-                icon={<Network className="h-4 w-4 text-blue-400" />}
-              />
-
-              {state.User?.Trial && (
-                <InfoItem
-                  label="Trial Status"
-                  value={state.User?.Trial ? "Active" : "Ended"}
-                  icon={<Network className="h-4 w-4 text-blue-400" />}
-                />
-              )}
-
-            </div>
-
-            <div className="flex flex-col gap-3 mt-6">
-              <Button
-                className={state.Theme?.neutralBtn}
-                onClick={() => gotoAccountSelect()}
-              >
-                Switch Account
-              </Button>
-              <Button
-                className={state.Theme?.neutralBtn}
-                onClick={() => state.refreshApiKey()}
-              >
-                Re-Generate API Key
-              </Button>
-
-              <Button
-                className={state.Theme?.neutralBtn}
-                onClick={() => navigate("/twofactor/create")}
-              >
-                Two-Factor Authentication
-              </Button>
-
-              <Button
-                className={state.Theme?.errorBtn}
-                onClick={() => state.LogoutAllTokens()}
-              >
-                Log Out All Devices
-              </Button>
-
-            </div>
-
-          </div>
-        )}
-      </TabsContent>
-
-      <TabsContent value="loggedin" className="size-fit">
-        <GenericTable table={table} />
-      </TabsContent>
-      <TabsContent value="license" className="w-[500px]">
-        <KeyValue label="License" value={state.User.Key?.Key} />
-
-        <div className="space-y-3">
-          <Input
-
-            onChange={(e) => {
-              state.UpdateLicenseInput(e.target.value);
-            }}
-            name="license"
-            placeholder="Insert License Key"
-            value={state.LicenseKey}
-          />
-
-          <Button
-            className={state.Theme?.neutralBtn}
-            key={state?.LicenseKey}
-            onClick={() => state.ActivateLicense()}
-          >
-            Activate Key
-          </Button>
+    <div>
+      {/* ── Tab bar ── */}
+      <div className="flex items-center gap-5 py-3 px-4 rounded-lg bg-[#0a0d14]/80 border border-[#1e2433] mb-6">
+        <div className="flex gap-1">
+          {tabs.map((t) => (
+            <button
+              key={t.key}
+              className={`text-[11px] px-2.5 py-0.5 rounded transition-colors ${
+                tab === t.key ? "bg-white/[0.07] text-white/70" : "text-white/20 hover:text-white/40"
+              }`}
+              onClick={() => setTab(t.key)}
+            >
+              {t.label}
+            </button>
+          ))}
         </div>
-      </TabsContent>
-    </Tabs>
+      </div>
+
+      {/* ── Account tab ── */}
+      {tab === "account" && state?.User && (
+        <div className="max-w-lg">
+          <div className="space-y-px mb-6">
+            {[
+              { label: "User", value: state.User?.Email },
+              { label: "ID", value: state.User?._id },
+              { label: "Updated", value: state.User?.Updated ? dayjs(state.User.Updated).format("DD-MM-YYYY HH:mm:ss") : "—" },
+              state.User?.SubExpiration && { label: "Subscription", value: dayjs(state.User.SubExpiration).format("DD-MM-YYYY HH:mm:ss") },
+              { label: "API Key", value: APIKey },
+              state.User?.Trial && { label: "Trial", value: state.User?.Trial ? "Active" : "Ended" },
+            ]
+              .filter(Boolean)
+              .map((item, i) => (
+                <div key={i} className="flex items-baseline gap-3 py-1.5 pl-3 border-l-2 border-blue-500/20 hover:border-blue-500/50 transition-colors">
+                  <span className="text-[11px] text-white/25 shrink-0 w-[100px]">{item.label}</span>
+                  <code className="text-[13px] text-white/60 font-mono truncate">{item.value ?? "—"}</code>
+                </div>
+              ))}
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="ghost"
+              className="h-7 px-2.5 text-[11px] text-white/40 hover:text-white/70 hover:bg-white/[0.04] border border-white/[0.06]"
+              onClick={() => gotoAccountSelect()}
+            >
+              Switch Account
+            </Button>
+            <Button
+              variant="ghost"
+              className="h-7 px-2.5 text-[11px] text-white/40 hover:text-white/70 hover:bg-white/[0.04] border border-white/[0.06]"
+              onClick={() => state.refreshApiKey()}
+            >
+              <RefreshCw className="h-3 w-3 mr-1" /> Re-Generate API Key
+            </Button>
+            <Button
+              variant="ghost"
+              className="h-7 px-2.5 text-[11px] text-white/40 hover:text-white/70 hover:bg-white/[0.04] border border-white/[0.06]"
+              onClick={() => navigate("/twofactor/create")}
+            >
+              <Shield className="h-3 w-3 mr-1" /> Two-Factor Auth
+            </Button>
+            <Button
+              variant="ghost"
+              className="h-7 px-2.5 text-[11px] text-red-400/60 hover:text-red-400 hover:bg-red-500/[0.04] border border-red-500/10"
+              onClick={() => state.LogoutAllTokens()}
+            >
+              <LogOut className="h-3 w-3 mr-1" /> Log Out All Devices
+            </Button>
+            <Button
+              variant="ghost"
+              className="h-7 px-2.5 text-[11px] text-red-400/60 hover:text-red-400 hover:bg-red-500/[0.04] border border-red-500/10"
+              onClick={() => {
+                let t = state.User?.DeviceToken;
+                if (t !== "") state.LogoutToken(t, false);
+              }}
+            >
+              <LogOut className="h-3 w-3 mr-1" /> Logout
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Devices tab ── */}
+      {tab === "loggedin" && (
+        <div>
+          <div className="flex items-center gap-4 pl-3 border-l-2 border-transparent mb-1">
+            <span className="text-[10px] text-white/15 uppercase tracking-wider flex-1 min-w-0">Device</span>
+            <span className="text-[10px] text-white/15 uppercase tracking-wider shrink-0 w-36 text-right">Created</span>
+            <span className="shrink-0 w-16" />
+          </div>
+          <div className="space-y-px">
+            {state.User?.Tokens?.length > 0 ? state.User.Tokens.map((t, i) => {
+              const isCurrent = t.DT === state?.User?.DeviceToken?.DT;
+              return (
+                <div key={i} className="group flex items-center gap-4 py-1.5 pl-3 border-l-2 border-cyan-500/20 hover:border-cyan-500/50 transition-colors">
+                  <div className="flex-1 min-w-0">
+                    <span className="text-[13px] text-white/80 font-medium truncate block">
+                      {t.N}{isCurrent ? " (current)" : ""}
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-white/20 tabular-nums shrink-0 w-36 text-right">
+                    {t.Created ? dayjs(t.Created).format("HH:mm:ss DD-MM-YYYY") : "—"}
+                  </span>
+                  <div className="shrink-0 w-16 flex justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Button
+                      variant="ghost"
+                      onClick={() => state.LogoutToken(t, false)}
+                      className="h-6 px-2 text-red-500/60 hover:text-red-400 text-[11px] gap-1"
+                    >
+                      <ExitIcon className="w-3 h-3" /> Logout
+                    </Button>
+                  </div>
+                </div>
+              );
+            }) : (
+              <div className="py-6 pl-3 border-l-2 border-white/[0.04] text-[12px] text-white/15">No active sessions</div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── License tab ── */}
+      {tab === "license" && (
+        <div className="max-w-lg space-y-4">
+          {state.User.Key?.Key && (
+            <div className="flex items-baseline gap-3 py-1.5 pl-3 border-l-2 border-amber-500/20">
+              <span className="text-[11px] text-white/25 shrink-0 w-[60px]">Current</span>
+              <code className="text-[13px] text-white/60 font-mono truncate">{state.User.Key.Key}</code>
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <label className="text-[10px] text-white/30 uppercase block">Activate License Key</label>
+            <div className="flex items-center gap-2">
+              <Input
+                className="h-7 text-[12px] border-[#1e2433] bg-transparent flex-1"
+                onChange={(e) => state.UpdateLicenseInput(e.target.value)}
+                placeholder="Insert License Key"
+                value={state.LicenseKey}
+              />
+              <Button
+                className="text-white bg-emerald-600 hover:bg-emerald-500 h-7 text-[11px] px-3"
+                onClick={() => state.ActivateLicense()}
+              >
+                <Key className="h-3 w-3 mr-1" /> Activate
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 };
 

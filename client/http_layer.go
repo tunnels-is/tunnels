@@ -9,9 +9,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"os/exec"
-	"runtime"
-	"strings"
 	"sync/atomic"
 	"time"
 
@@ -36,8 +33,10 @@ func LaunchAPI() {
 	mux.Handle("/assets/", assetHandler)
 	mux.HandleFunc("/v1/method/{method}", HTTPhandler)
 	API_SERVER = http.Server{
-		Handler:   mux,
-		TLSConfig: makeTLSConfig(),
+		Handler: mux,
+	}
+	if EnableTLS {
+		API_SERVER.TLSConfig = makeTLSConfig()
 	}
 	state := STATE.Load()
 	if state.Debug {
@@ -80,13 +79,14 @@ func LaunchAPI() {
 	INFO("Cert: ", conf.APICert)
 	INFO("===========================")
 
-	select {
-	case uiChan <- struct{}{}:
-	default:
-	}
-
-	if err := API_SERVER.ServeTLS(ln, conf.APICert, conf.APIKey); err != http.ErrServerClosed {
-		ERROR("api start error: ", err)
+	if EnableTLS {
+		if err := API_SERVER.ServeTLS(ln, conf.APICert, conf.APIKey); err != http.ErrServerClosed {
+			ERROR("api start error: ", err)
+		}
+	} else {
+		if err := API_SERVER.Serve(ln); err != http.ErrServerClosed {
+			ERROR("api start error: ", err)
+		}
 	}
 }
 
@@ -198,6 +198,9 @@ func HTTPhandler(w http.ResponseWriter, r *http.Request) {
 	case "getDNSStats":
 		HTTP_GetDNSStats(w, r)
 		return
+	case "getLogs":
+		HTTP_GetLogs(w, r)
+		return
 	default:
 	}
 
@@ -284,6 +287,14 @@ type StateNetworkResponse struct {
 	DefaultInterface     net.IP
 	DefaultInterfaceID   int32
 	DefaultInterfaceName string
+}
+
+func HTTP_GetLogs(w http.ResponseWriter, r *http.Request) {
+	PollLogMu.Lock()
+	logs := PollLogBuf
+	PollLogBuf = nil
+	PollLogMu.Unlock()
+	JSON(w, r, 200, logs)
 }
 
 func HTTP_GetDNSStats(w http.ResponseWriter, r *http.Request) {
@@ -552,36 +563,3 @@ func HTTP_ForwardToController(w http.ResponseWriter, r *http.Request) {
 	JSON(w, r, code, data)
 }
 
-// popUI opens the web interface in the default browser
-// does not work on all systems (experimental)
-func popUI() {
-	defer RecoverAndLog()
-	<-uiChan
-	time.Sleep(2 * time.Second)
-
-	url := "https://" + API_SERVER.Addr
-	INFO("opening UI @ ", url)
-
-	switch runtime.GOOS {
-	case "windows":
-		_ = openURL(url)
-
-	case "darwin":
-		_ = openURL(url)
-
-	default:
-		if !isWSL() {
-			_ = openURL(url)
-		}
-
-	}
-}
-
-// isWSL checks if the environment is running in Windows Subsystem for Linux
-func isWSL() bool {
-	releaseData, err := exec.Command("uname", "-r").Output()
-	if err != nil {
-		return false
-	}
-	return strings.Contains(strings.ToLower(string(releaseData)), "microsoft")
-}

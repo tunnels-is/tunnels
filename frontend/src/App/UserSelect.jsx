@@ -6,7 +6,6 @@ import dayjs from "dayjs";
 import InfoItem from "./component/InfoItem";
 import { useNavigate } from "react-router-dom";
 import { useEffect } from "react";
-import { DeleteIcon } from "lucide-react";
 import { SquareX } from "lucide-react";
 
 
@@ -36,15 +35,17 @@ const UserSelect = () => {
   console.dir(state.Users)
 
   return (
-    <div className="p-6 space-y-6">
-      <Button
-        className={"flex items-center gap-1" + state.Theme?.successBtn}
-        onClick={() => gotoLogin()}
-      >
-        {"Add Account"}
-      </Button>
+    <div className="space-y-4">
+      <div className="flex justify-end mb-4">
+        <Button
+          className={"flex items-center gap-1" + state.Theme?.successBtn}
+          onClick={() => gotoLogin()}
+        >
+          Add Account
+        </Button>
+      </div>
 
-      <div className="flex flex-row gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {state.Users?.map((u) => (
           <Card
             onClick={() => selectUser(u)}
