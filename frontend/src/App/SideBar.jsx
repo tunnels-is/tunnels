@@ -131,7 +131,7 @@ const SideBar = () => {
               <div key={g.title}>
                 {g.title && (
                   <div className="px-[20px] mb-1 overflow-hidden">
-                    <h2 className="text-[11px] font-semibold text-white/25 uppercase tracking-widest whitespace-nowrap opacity-0 group-hover/sidebar:opacity-100 transition-opacity duration-200">
+                    <h2 className="text-[11px] font-semibold text-white/45 uppercase tracking-widest whitespace-nowrap opacity-0 group-hover/sidebar:opacity-100 transition-opacity duration-200">
                       {g.title}
                     </h2>
                   </div>

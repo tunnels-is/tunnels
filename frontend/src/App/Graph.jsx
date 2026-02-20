@@ -8,7 +8,7 @@ import ServerFormDialog from "./ServerFormDialog";
 
 const StatPill = ({ label, value, warn }) => (
   <div className="flex items-center gap-1">
-    <span className="text-[10px] uppercase tracking-wider text-white/25">{label}</span>
+    <span className="text-[10px] uppercase tracking-wider text-white/45">{label}</span>
     <span className={cn(
       "text-[11px] font-mono",
       warn ? "text-amber-400" : "text-white/60"
@@ -156,7 +156,7 @@ const TunnelNode = React.forwardRef(({ tunnel, active, state, selected, linking,
         ) : (
           <button
             onClick={(e) => { e.stopPropagation(); onConnect?.(tunnel); }}
-            className="p-1 rounded text-white/30 hover:text-emerald-400 hover:bg-white/5"
+            className="p-1 rounded text-white/50 hover:text-emerald-400 hover:bg-white/5"
             title="Connect"
           >
             <Zap className="w-3 h-3" />
@@ -164,21 +164,21 @@ const TunnelNode = React.forwardRef(({ tunnel, active, state, selected, linking,
         )}
         <button
           onClick={(e) => { e.stopPropagation(); copyToClipboard(tunnel.Tag, state); }}
-          className="p-1 rounded text-white/30 hover:text-white/70 hover:bg-white/5"
+          className="p-1 rounded text-white/50 hover:text-white/70 hover:bg-white/5"
           title="Copy Tag"
         >
           <Copy className="w-3 h-3" />
         </button>
         <button
           onClick={(e) => { e.stopPropagation(); onEdit?.(tunnel); }}
-          className="p-1 rounded text-white/30 hover:text-white/70 hover:bg-white/5"
+          className="p-1 rounded text-white/50 hover:text-white/70 hover:bg-white/5"
           title="Edit"
         >
           <Pencil className="w-3 h-3" />
         </button>
         <button
           onClick={(e) => { e.stopPropagation(); onDelete?.(tunnel); }}
-          className="p-1 rounded text-white/30 hover:text-red-400 hover:bg-white/5"
+          className="p-1 rounded text-white/50 hover:text-red-400 hover:bg-white/5"
           title="Delete"
         >
           <Trash2 className="w-3 h-3" />
@@ -199,7 +199,7 @@ const TunnelNode = React.forwardRef(({ tunnel, active, state, selected, linking,
         <div className="text-[11px] text-white/40 font-mono">
           {tunnel.IPv4Address || "no address"}
         </div>
-        <div className="text-[11px] text-white/30">
+        <div className="text-[11px] text-white/50">
           {tunnel.IFName || "no interface"} &middot; {state.GetEncType(tunnel.EncryptionType)}
         </div>
       </div>
@@ -212,22 +212,22 @@ const TunnelNode = React.forwardRef(({ tunnel, active, state, selected, linking,
         <div className="mt-2 pt-2 border-t border-[#1e2433] space-y-0.5 ml-4">
         {tunnel.ServerID && (
           <div className="text-[10px]">
-            <span className="text-white/25 uppercase tracking-wider">Server ID </span>
+            <span className="text-white/45 uppercase tracking-wider">Server ID </span>
             <span className="text-white/40 font-mono">{tunnel.ServerID}</span>
           </div>
         )}
         <div className="text-[10px]">
-          <span className="text-white/25 uppercase tracking-wider">IPv6 </span>
+          <span className="text-white/45 uppercase tracking-wider">IPv6 </span>
           <span className="text-white/40 font-mono">{tunnel.IPv6Address || "none"}</span>
         </div>
         <div className="text-[10px]">
-          <span className="text-white/25 uppercase tracking-wider">Mask </span>
+          <span className="text-white/45 uppercase tracking-wider">Mask </span>
           <span className="text-white/40 font-mono">{tunnel.NetMask || "none"}</span>
         </div>
         <div className="text-[10px]">
-          <span className="text-white/25 uppercase tracking-wider">MTU </span>
+          <span className="text-white/45 uppercase tracking-wider">MTU </span>
           <span className="text-white/40 font-mono">{tunnel.MTU}</span>
-          <span className="text-white/25 uppercase tracking-wider ml-2">TxQ </span>
+          <span className="text-white/45 uppercase tracking-wider ml-2">TxQ </span>
           <span className="text-white/40 font-mono">{tunnel.TxQueueLen}</span>
         </div>
         </div>
@@ -284,7 +284,7 @@ const ServerNode = React.forwardRef(({ server, hasActive, hasLinked, activeStats
         ) : (
           <button
             onClick={(e) => { e.stopPropagation(); onConnect?.(server); }}
-            className="p-1 rounded text-white/30 hover:text-emerald-400 hover:bg-white/5"
+            className="p-1 rounded text-white/50 hover:text-emerald-400 hover:bg-white/5"
             title="Connect"
           >
             <Zap className="w-3 h-3" />
@@ -292,14 +292,14 @@ const ServerNode = React.forwardRef(({ server, hasActive, hasLinked, activeStats
         )}
         <button
           onClick={(e) => { e.stopPropagation(); copyToClipboard(server._id, state); }}
-          className="p-1 rounded text-white/30 hover:text-white/70 hover:bg-white/5"
+          className="p-1 rounded text-white/50 hover:text-white/70 hover:bg-white/5"
           title="Copy ID"
         >
           <Copy className="w-3 h-3" />
         </button>
         <button
           onClick={(e) => { e.stopPropagation(); onEdit?.(server); }}
-          className="p-1 rounded text-white/30 hover:text-white/70 hover:bg-white/5"
+          className="p-1 rounded text-white/50 hover:text-white/70 hover:bg-white/5"
           title="Edit"
         >
           <Pencil className="w-3 h-3" />
@@ -329,8 +329,8 @@ const ServerNode = React.forwardRef(({ server, hasActive, hasLinked, activeStats
       <div className="space-y-0.5 ml-[22px]">
         <div className="text-[11px] text-white/40 font-mono">
           {server.IP}:{server.Port}
-          <span className="text-white/25 ml-2">&middot;</span>
-          <span className="text-white/30 ml-2">{state.GetCountryName(server.Country)}</span>
+          <span className="text-white/45 ml-2">&middot;</span>
+          <span className="text-white/50 ml-2">{state.GetCountryName(server.Country)}</span>
         </div>
       </div>
 
@@ -341,18 +341,18 @@ const ServerNode = React.forwardRef(({ server, hasActive, hasLinked, activeStats
       )}>
         <div className="mt-2 pt-2 border-t border-[#1e2433] space-y-0.5 ml-[22px]">
         <div className="text-[10px]">
-          <span className="text-white/25 uppercase tracking-wider">ID </span>
+          <span className="text-white/45 uppercase tracking-wider">ID </span>
           <span className="text-white/40 font-mono">{server._id}</span>
         </div>
         {server.DataPort && (
           <div className="text-[10px]">
-            <span className="text-white/25 uppercase tracking-wider">Data Port </span>
+            <span className="text-white/45 uppercase tracking-wider">Data Port </span>
             <span className="text-white/40 font-mono">{server.DataPort}</span>
           </div>
         )}
 {server.Groups?.length > 0 && (
           <div className="text-[10px]">
-            <span className="text-white/25 uppercase tracking-wider">Groups </span>
+            <span className="text-white/45 uppercase tracking-wider">Groups </span>
             <span className="text-white/40 font-mono">{server.Groups.join(", ")}</span>
           </div>
         )}
@@ -726,16 +726,16 @@ const Graph = () => {
         {selectedTunnel && (
           <div className="flex items-center gap-2 ml-3 text-[12px] text-amber-400 animate-pulse">
             <span>Click a server to assign <strong>{selectedTunnel.Tag}</strong></span>
-            <span className="text-white/30 text-[11px]">(Esc to cancel)</span>
+            <span className="text-white/50 text-[11px]">(Esc to cancel)</span>
           </div>
         )}
       </div>
 
       {isEmpty && (
-        <div className="flex flex-col items-center justify-center py-20 text-white/30 border border-dashed border-[#1e2433] rounded-lg">
-          <Network className="w-10 h-10 mb-3 text-white/15" />
+        <div className="flex flex-col items-center justify-center py-20 text-white/50 border border-dashed border-[#1e2433] rounded-lg">
+          <Network className="w-10 h-10 mb-3 text-white/40" />
           <div className="text-[13px]">No tunnels or servers configured</div>
-          <div className="text-[11px] mt-1 text-white/20">Add servers and tunnels to see the network graph</div>
+          <div className="text-[11px] mt-1 text-white/40">Add servers and tunnels to see the network graph</div>
         </div>
       )}
 
@@ -753,7 +753,7 @@ const Graph = () => {
           {/* Tunnels — left column */}
           <div className="absolute left-0 top-0 w-[260px] space-y-3" style={{ zIndex: 2 }}>
             <div className="flex items-center justify-between mb-1 pl-1 pr-1">
-              <span className="text-[11px] uppercase tracking-widest text-white/25">
+              <span className="text-[11px] uppercase tracking-widest text-white/45">
                 Tunnels
               </span>
               <button
@@ -832,7 +832,7 @@ const Graph = () => {
           {/* Servers — right column */}
           <div className="absolute right-0 top-0 w-[260px] space-y-3" style={{ zIndex: 2 }}>
             <div className="flex items-center justify-between mb-1 pl-4 pr-1">
-              <span className="text-[11px] uppercase tracking-widest text-white/25">
+              <span className="text-[11px] uppercase tracking-widest text-white/45">
                 Servers
               </span>
               {(state.User?.IsAdmin || state.User?.IsManager) && (

@@ -48,7 +48,7 @@ const Account = () => {
             <button
               key={t.key}
               className={`text-[11px] px-2.5 py-0.5 rounded transition-colors ${
-                tab === t.key ? "bg-white/[0.07] text-white/70" : "text-white/20 hover:text-white/40"
+                tab === t.key ? "bg-white/[0.07] text-white/70" : "text-white/40 hover:text-white/60"
               }`}
               onClick={() => setTab(t.key)}
             >
@@ -73,7 +73,7 @@ const Account = () => {
               .filter(Boolean)
               .map((item, i) => (
                 <div key={i} className="flex items-baseline gap-3 py-1.5 pl-3 border-l-2 border-blue-500/20 hover:border-blue-500/50 transition-colors">
-                  <span className="text-[11px] text-white/25 shrink-0 w-[100px]">{item.label}</span>
+                  <span className="text-[11px] text-white/45 shrink-0 w-[100px]">{item.label}</span>
                   <code className="text-[13px] text-white/60 font-mono truncate">{item.value ?? "—"}</code>
                 </div>
               ))}
@@ -126,8 +126,8 @@ const Account = () => {
       {tab === "loggedin" && (
         <div>
           <div className="flex items-center gap-4 pl-3 border-l-2 border-transparent mb-1">
-            <span className="text-[10px] text-white/15 uppercase tracking-wider flex-1 min-w-0">Device</span>
-            <span className="text-[10px] text-white/15 uppercase tracking-wider shrink-0 w-36 text-right">Created</span>
+            <span className="text-[10px] text-white/40 uppercase tracking-wider flex-1 min-w-0">Device</span>
+            <span className="text-[10px] text-white/40 uppercase tracking-wider shrink-0 w-36 text-right">Created</span>
             <span className="shrink-0 w-16" />
           </div>
           <div className="space-y-px">
@@ -140,7 +140,7 @@ const Account = () => {
                       {t.N}{isCurrent ? " (current)" : ""}
                     </span>
                   </div>
-                  <span className="text-[11px] text-white/20 tabular-nums shrink-0 w-36 text-right">
+                  <span className="text-[11px] text-white/40 tabular-nums shrink-0 w-36 text-right">
                     {t.Created ? dayjs(t.Created).format("HH:mm:ss DD-MM-YYYY") : "—"}
                   </span>
                   <div className="shrink-0 w-16 flex justify-end opacity-0 group-hover:opacity-100 transition-opacity">
@@ -155,7 +155,7 @@ const Account = () => {
                 </div>
               );
             }) : (
-              <div className="py-6 pl-3 border-l-2 border-white/[0.04] text-[12px] text-white/15">No active sessions</div>
+              <div className="py-6 pl-3 border-l-2 border-white/[0.04] text-[12px] text-white/40">No active sessions</div>
             )}
           </div>
         </div>
@@ -166,13 +166,13 @@ const Account = () => {
         <div className="max-w-lg space-y-4">
           {state.User.Key?.Key && (
             <div className="flex items-baseline gap-3 py-1.5 pl-3 border-l-2 border-amber-500/20">
-              <span className="text-[11px] text-white/25 shrink-0 w-[60px]">Current</span>
+              <span className="text-[11px] text-white/45 shrink-0 w-[60px]">Current</span>
               <code className="text-[13px] text-white/60 font-mono truncate">{state.User.Key.Key}</code>
             </div>
           )}
 
           <div className="space-y-2">
-            <label className="text-[10px] text-white/30 uppercase block">Activate License Key</label>
+            <label className="text-[10px] text-white/50 uppercase block">Activate License Key</label>
             <div className="flex items-center gap-2">
               <Input
                 className="h-7 text-[12px] border-[#1e2433] bg-transparent flex-1"

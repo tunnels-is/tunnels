@@ -59,7 +59,7 @@ const Logs = () => {
     if (line.includes("| DEBUG |")) return "text-amber-400/60";
     if (line.includes("| INFO  |")) return "text-blue-400/60";
     if (line.includes("| ROUTINE |")) return "text-cyan-400/60";
-    return "text-white/30";
+    return "text-white/50";
   };
 
   return (
@@ -68,16 +68,16 @@ const Logs = () => {
       <div className="flex items-center gap-5 py-3 px-4 rounded-lg bg-[#0a0d14]/80 border border-[#1e2433] mb-4 shrink-0">
         <div className="flex items-center gap-1.5">
           <div className="relative">
-            <Search className="h-3 w-3 absolute left-2 top-1/2 -translate-y-1/2 text-white/15" />
+            <Search className="h-3 w-3 absolute left-2 top-1/2 -translate-y-1/2 text-white/40" />
             <input
-              className="h-6 w-48 pl-7 pr-2 text-[11px] rounded bg-white/[0.03] border border-white/[0.06] text-white/60 placeholder:text-white/15 outline-none focus:border-white/15 transition-colors"
+              className="h-6 w-48 pl-7 pr-2 text-[11px] rounded bg-white/[0.03] border border-white/[0.06] text-white/60 placeholder:text-white/50 outline-none focus:border-white/25 transition-colors"
               placeholder="Filter logs..."
               value={filter}
               onChange={(e) => { setFilter(e.target.value); setPage(0); }}
             />
           </div>
           <button
-            className="p-1 text-white/20 hover:text-red-400/60 transition-colors"
+            className="p-1 text-white/40 hover:text-red-400/60 transition-colors"
             onClick={() => { STORE.Cache.SetObject("logs", []); state.renderPage("logs"); }}
             title="Clear logs"
           >
@@ -86,17 +86,17 @@ const Logs = () => {
           {filteredLogs.length > PAGE_SIZE && (
             <div className="flex items-center gap-1">
               <button
-                className="p-0.5 text-white/20 hover:text-white/50 disabled:opacity-30 disabled:cursor-default transition-colors"
+                className="p-0.5 text-white/40 hover:text-white/60 disabled:opacity-30 disabled:cursor-default transition-colors"
                 disabled={safePage === 0}
                 onClick={() => setPage(safePage - 1)}
               >
                 <ChevronLeft className="h-3.5 w-3.5" />
               </button>
-              <span className="text-[10px] text-white/20 tabular-nums">
+              <span className="text-[10px] text-white/40 tabular-nums">
                 {safePage + 1}/{totalPages}
               </span>
               <button
-                className="p-0.5 text-white/20 hover:text-white/50 disabled:opacity-30 disabled:cursor-default transition-colors"
+                className="p-0.5 text-white/40 hover:text-white/60 disabled:opacity-30 disabled:cursor-default transition-colors"
                 disabled={safePage >= totalPages - 1}
                 onClick={() => setPage(safePage + 1)}
               >
@@ -105,7 +105,7 @@ const Logs = () => {
             </div>
           )}
           {filteredLogs.length > 0 && (
-            <span className="text-[10px] text-white/15 tabular-nums">{filteredLogs.length}</span>
+            <span className="text-[10px] text-white/40 tabular-nums">{filteredLogs.length}</span>
           )}
         </div>
 
@@ -116,7 +116,7 @@ const Logs = () => {
               className={`text-[11px] px-2.5 py-0.5 rounded transition-colors ${
                 tagFilter === t.key
                   ? "bg-white/[0.07] text-white/70"
-                  : "text-white/20 hover:text-white/40"
+                  : "text-white/40 hover:text-white/60"
               }`}
               onClick={() => { setTagFilter(t.key); setPage(0); }}
             >
@@ -155,7 +155,7 @@ const Logs = () => {
             </div>
           );
         }) : (
-          <div className="py-6 pl-3 border-l-2 border-white/[0.04] text-[12px] text-white/15">
+          <div className="py-6 pl-3 border-l-2 border-white/[0.04] text-[12px] text-white/40">
             {filter || tagFilter ? "No matching logs" : "No logs"}
           </div>
         )}

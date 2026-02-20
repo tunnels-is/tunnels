@@ -79,7 +79,7 @@ const ServerFormDialog = ({ open, onOpenChange, server, onSave }) => {
           {/* Read-only ID */}
           {form._id && (
             <div className="flex items-baseline gap-3 py-1.5 pl-3 border-l-2 border-white/[0.06]">
-              <span className="text-[11px] text-white/25 shrink-0 w-[50px]">ID</span>
+              <span className="text-[11px] text-white/45 shrink-0 w-[50px]">ID</span>
               <code className="text-[13px] text-white/50 font-mono truncate">{form._id}</code>
             </div>
           )}
@@ -87,29 +87,29 @@ const ServerFormDialog = ({ open, onOpenChange, server, onSave }) => {
           {/* Editable fields */}
           <div className="pt-3 grid grid-cols-2 gap-x-3 gap-y-3">
             <div>
-              <label className="text-[10px] text-white/30 uppercase block mb-1">Tag</label>
+              <label className="text-[10px] text-white/50 uppercase block mb-1">Tag</label>
               <Input className="h-7 text-[12px] border-[#1e2433] bg-transparent" value={form.Tag || ""} onChange={(e) => set("Tag", e.target.value)} />
             </div>
             <div>
-              <label className="text-[10px] text-white/30 uppercase block mb-1">Country</label>
+              <label className="text-[10px] text-white/50 uppercase block mb-1">Country</label>
               <Input className="h-7 text-[12px] border-[#1e2433] bg-transparent" value={form.Country || ""} onChange={(e) => set("Country", e.target.value)} />
             </div>
             <div>
-              <label className="text-[10px] text-white/30 uppercase block mb-1">IP</label>
+              <label className="text-[10px] text-white/50 uppercase block mb-1">IP</label>
               <Input className="h-7 text-[12px] border-[#1e2433] bg-transparent" value={form.IP || ""} onChange={(e) => set("IP", e.target.value)} />
             </div>
             <div>
-              <label className="text-[10px] text-white/30 uppercase block mb-1">Port</label>
+              <label className="text-[10px] text-white/50 uppercase block mb-1">Port</label>
               <Input className="h-7 text-[12px] border-[#1e2433] bg-transparent" value={form.Port || ""} onChange={(e) => set("Port", e.target.value)} />
             </div>
             <div>
-              <label className="text-[10px] text-white/30 uppercase block mb-1">Data Port</label>
+              <label className="text-[10px] text-white/50 uppercase block mb-1">Data Port</label>
               <Input className="h-7 text-[12px] border-[#1e2433] bg-transparent" value={form.DataPort || ""} onChange={(e) => set("DataPort", e.target.value)} />
             </div>
           </div>
 
           <div className="pt-3">
-            <label className="text-[10px] text-white/30 uppercase block mb-1">Public Key</label>
+            <label className="text-[10px] text-white/50 uppercase block mb-1">Public Key</label>
             <Textarea
               className="text-[12px] border-[#1e2433] bg-transparent min-h-[60px] font-mono"
               value={form.PubKey || ""}
@@ -128,7 +128,7 @@ const ServerFormDialog = ({ open, onOpenChange, server, onSave }) => {
             {saving ? "Saving..." : "Save"}
           </Button>
           <button
-            className="text-[11px] text-white/30 hover:text-white/50 px-2"
+            className="text-[11px] text-white/50 hover:text-white/70 px-2"
             onClick={() => onOpenChange(false)}
           >
             Cancel

@@ -372,7 +372,7 @@ const useForm = () => {
 
 const Field = ({ label, name, type = "text", placeholder, value, error, onChange }) => (
   <div>
-    <label className="text-[10px] text-white/30 uppercase block mb-1">{label}</label>
+    <label className="text-[10px] text-white/50 uppercase block mb-1">{label}</label>
     <Input
       className="h-7 text-[12px] border-[#1e2433] bg-transparent"
       type={type} placeholder={placeholder}
@@ -456,16 +456,16 @@ const Login = (props) => {
               <div className="space-y-3">
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-[10px] text-white/30 uppercase block mb-1">Host</label>
+                    <label className="text-[10px] text-white/50 uppercase block mb-1">Host</label>
                     <Input className="h-7 text-[12px] border-[#1e2433] bg-transparent" value={newAuth.Host || ""} onChange={(e) => setNewAuth({ ...newAuth, Host: e.target.value })} />
                   </div>
                   <div>
-                    <label className="text-[10px] text-white/30 uppercase block mb-1">Port</label>
+                    <label className="text-[10px] text-white/50 uppercase block mb-1">Port</label>
                     <Input className="h-7 text-[12px] border-[#1e2433] bg-transparent" value={newAuth.Port || ""} onChange={(e) => setNewAuth({ ...newAuth, Port: e.target.value })} />
                   </div>
                 </div>
                 <div>
-                  <label className="text-[10px] text-white/30 uppercase block mb-1">Certificate Path</label>
+                  <label className="text-[10px] text-white/50 uppercase block mb-1">Certificate Path</label>
                   <Input className="h-7 text-[12px] border-[#1e2433] bg-transparent" value={newAuth.CertificatePath || ""} onChange={(e) => setNewAuth({ ...newAuth, CertificatePath: e.target.value })} />
                 </div>
                 <div className="flex items-center gap-2">
@@ -478,7 +478,7 @@ const Login = (props) => {
                       className={`text-[11px] px-3 py-1 rounded-full border transition-all cursor-pointer ${
                         newAuth[opt.key]
                           ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.12)]"
-                          : "border-white/[0.06] bg-white/[0.02] text-white/30 hover:text-white/50 hover:border-white/15 hover:bg-white/[0.04]"
+                          : "border-white/[0.06] bg-white/[0.02] text-white/50 hover:text-white/70 hover:border-white/25 hover:bg-white/[0.04]"
                       }`}
                       onClick={() => setNewAuth({ ...newAuth, [opt.key]: !newAuth[opt.key] })}
                     >
@@ -492,7 +492,7 @@ const Login = (props) => {
                 <Button className="text-white bg-emerald-600 hover:bg-emerald-500 h-6 text-[11px] px-2.5" onClick={() => { saveNewAuth(); setModalOpen(false); }}>
                   <Save className="h-3 w-3 mr-1" /> Save
                 </Button>
-                <button className="text-[11px] text-white/30 hover:text-white/50 px-2" onClick={() => setModalOpen(false)}>Cancel</button>
+                <button className="text-[11px] text-white/50 hover:text-white/70 px-2" onClick={() => setModalOpen(false)}>Cancel</button>
               </DialogFooter>
             </>
           )}
@@ -551,7 +551,7 @@ const Login = (props) => {
               className={`text-[11px] px-3 py-1 rounded-full border transition-all cursor-pointer ${
                 remember
                   ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.12)]"
-                  : "border-white/[0.06] bg-white/[0.02] text-white/30 hover:text-white/50 hover:border-white/15 hover:bg-white/[0.04]"
+                  : "border-white/[0.06] bg-white/[0.02] text-white/50 hover:text-white/70 hover:border-white/25 hover:bg-white/[0.04]"
               }`}
               onClick={() => setRememeber(!remember)}
             >
@@ -563,7 +563,7 @@ const Login = (props) => {
 
       {/* ── Server banner ── */}
       <div className="flex items-center gap-3 py-3 px-4 rounded-lg bg-[#0a0d14]/80 border border-[#1e2433] mb-4">
-        <span className="text-[10px] text-white/25 uppercase tracking-wider shrink-0">Server</span>
+        <span className="text-[10px] text-white/45 uppercase tracking-wider shrink-0">Server</span>
         <Select value={authServer ? authServer.ID : tunID} onValueChange={changeAuthServer}>
           <SelectTrigger className="h-7 text-[12px] border-[#1e2433] bg-transparent flex-1">
             <SelectValue placeholder="Select Auth Server" />
@@ -575,13 +575,13 @@ const Login = (props) => {
           </SelectContent>
         </Select>
         <button
-          className="p-1.5 rounded text-white/20 hover:text-white/50 hover:bg-white/[0.04] transition-colors"
+          className="p-1.5 rounded text-white/40 hover:text-white/60 hover:bg-white/[0.04] transition-colors"
           onClick={() => setModalOpen(true)}
         >
           <CopyPlusIcon className="h-3.5 w-3.5" />
         </button>
         <button
-          className="p-1.5 rounded text-white/20 hover:text-white/50 hover:bg-white/[0.04] transition-colors"
+          className="p-1.5 rounded text-white/40 hover:text-white/60 hover:bg-white/[0.04] transition-colors"
           onClick={() => { setNewAuth(authServer); setModalOpen(true); }}
         >
           <Edit2Icon className="h-3.5 w-3.5" />
@@ -596,7 +596,7 @@ const Login = (props) => {
             className={`text-[11px] px-3 py-1 rounded-full border transition-all cursor-pointer ${
               mode === m.value
                 ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.12)]"
-                : "border-white/[0.06] bg-white/[0.02] text-white/30 hover:text-white/50 hover:border-white/15 hover:bg-white/[0.04]"
+                : "border-white/[0.06] bg-white/[0.02] text-white/50 hover:text-white/70 hover:border-white/25 hover:bg-white/[0.04]"
             }`}
             onClick={() => {
               if (m.value === 5) GenerateToken();
