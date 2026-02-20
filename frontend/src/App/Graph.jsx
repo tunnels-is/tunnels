@@ -324,14 +324,13 @@ const ServerNode = React.forwardRef(({ server, hasActive, hasLinked, activeStats
         <span className="text-[13px] font-semibold text-white truncate">
           {server.Tag}
         </span>
-        <span className="text-[11px] text-white/30 ml-auto shrink-0 pr-5">
-          {state.GetCountryName(server.Country)}
-        </span>
       </div>
 
       <div className="space-y-0.5 ml-[22px]">
         <div className="text-[11px] text-white/40 font-mono">
           {server.IP}:{server.Port}
+          <span className="text-white/25 ml-2">&middot;</span>
+          <span className="text-white/30 ml-2">{state.GetCountryName(server.Country)}</span>
         </div>
       </div>
 
@@ -525,10 +524,17 @@ const Graph = () => {
     return () => observer.disconnect();
   }, [recalculateLines]);
 
-  // Recalculate lines when hover expands/collapses cards
+  // Recalculate lines continuously during the 300ms hover expand/collapse transition
   useEffect(() => {
-    const id = requestAnimationFrame(recalculateLines);
-    return () => cancelAnimationFrame(id);
+    let running = true;
+    const loop = () => {
+      if (!running) return;
+      recalculateLines();
+      requestAnimationFrame(loop);
+    };
+    requestAnimationFrame(loop);
+    const timeout = setTimeout(() => { running = false; }, 350);
+    return () => { running = false; clearTimeout(timeout); };
   }, [hoveredConn, recalculateLines]);
 
   const handleContainerMouseMove = (e) => {
