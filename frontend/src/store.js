@@ -18,7 +18,7 @@ var STORE = {
   ],
   debug: false,
   Cache: {
-    interface: window.localStorage,
+    interface: window.sessionStorage,
     Clear: function() {
       return STORE.Cache.interface.clear();
     },
