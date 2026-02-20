@@ -13,7 +13,7 @@ set -e
 #
 # Prerequisites:
 #   - Go 1.22+, pnpm
-#   - Linux:   sudo apt install libgtk-3-dev libwebkit2gtk-4.0-dev
+#   - Linux:   sudo apt install libgtk-3-dev libwebkit2gtk-4.1-dev
 #   - macOS:   xcode-select --install
 #   - Windows: WebView2 runtime (bundled with Win 11, install on Win 10)
 
@@ -56,7 +56,7 @@ build_linux() {
     fi
     echo "==> Building linux/amd64"
     CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build \
-        -tags "$TAGS" -trimpath -ldflags "$LDFLAGS" \
+        -tags "$TAGS,webkit2_41" -trimpath -ldflags "$LDFLAGS" \
         -o "$BIN_DIR/tunnels-desktop-linux-amd64" \
         ./cmd/wails
     echo "    -> bin/tunnels-desktop-linux-amd64"
