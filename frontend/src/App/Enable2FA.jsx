@@ -116,9 +116,9 @@ const Enable2FA = () => {
 
               <div className="space-y-3 mt-6">
                 <div>
-                  <label className="text-[10px] text-white/30 uppercase block mb-1">Password</label>
+                  <label className="text-[10px] text-white/50 uppercase block mb-1">Password</label>
                   <div className="relative">
-                    <Lock className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/15" />
+                    <Lock className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/40" />
                     <Input
                       className="h-7 pl-8 text-[12px] border-[#1e2433] bg-transparent"
                       type="password"
@@ -132,9 +132,9 @@ const Enable2FA = () => {
                 </div>
 
                 <div>
-                  <label className="text-[10px] text-white/30 uppercase block mb-1">Authenticator Code</label>
+                  <label className="text-[10px] text-white/50 uppercase block mb-1">Authenticator Code</label>
                   <div className="relative">
-                    <KeyRound className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/15" />
+                    <KeyRound className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/40" />
                     <Input
                       className="h-7 pl-8 text-[12px] border-[#1e2433] bg-transparent"
                       type="text"
@@ -155,13 +155,13 @@ const Enable2FA = () => {
                 </Button>
 
                 <div className="pt-3 border-t border-[#1e2433]">
-                  <p className="text-[11px] text-white/30 mb-2">
+                  <p className="text-[11px] text-white/50 mb-2">
                     Have a recovery code? Enter it below to replace existing 2FA.
                   </p>
                   <div>
-                    <label className="text-[10px] text-white/30 uppercase block mb-1">Recovery Code</label>
+                    <label className="text-[10px] text-white/50 uppercase block mb-1">Recovery Code</label>
                     <div className="relative">
-                      <KeyRound className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/15" />
+                      <KeyRound className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/40" />
                       <Input
                         className="h-7 pl-8 text-[12px] border-[#1e2433] bg-transparent"
                         type="text"
@@ -179,7 +179,7 @@ const Enable2FA = () => {
 
           {code.Recovery && (
             <div className="flex flex-col w-full">
-              <span className="text-[11px] text-white/30 font-medium uppercase tracking-wider mb-3">Recovery Codes</span>
+              <span className="text-[11px] text-white/50 font-medium uppercase tracking-wider mb-3">Recovery Codes</span>
               <div className="py-3 px-4 rounded bg-red-500/5 border border-red-500/15 mb-3">
                 <p className="text-[11px] text-red-400/80">DO NOT STORE THESE CODES WITH YOUR PASSWORD</p>
               </div>

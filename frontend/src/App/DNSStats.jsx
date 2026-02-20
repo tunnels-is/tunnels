@@ -62,7 +62,7 @@ const DNSStats = () => {
             <button
               key={t.key}
               className={`text-[11px] px-2.5 py-0.5 rounded transition-colors ${
-                tab === t.key ? "bg-white/[0.07] text-white/70" : "text-white/20 hover:text-white/40"
+                tab === t.key ? "bg-white/[0.07] text-white/70" : "text-white/40 hover:text-white/60"
               }`}
               onClick={() => { setTab(t.key); setPage(0); setFilter(""); }}
             >
@@ -72,15 +72,15 @@ const DNSStats = () => {
         </div>
         <div className="flex items-center gap-1.5 ml-auto">
           <button
-            className="p-1 text-white/20 hover:text-white/50 transition-colors"
+            className="p-1 text-white/40 hover:text-white/60 transition-colors"
             onClick={() => state.GetDNSStats()}
           >
             <RefreshCw className="h-3 w-3" />
           </button>
           <div className="relative">
-            <Search className="h-3 w-3 absolute left-2 top-1/2 -translate-y-1/2 text-white/15" />
+            <Search className="h-3 w-3 absolute left-2 top-1/2 -translate-y-1/2 text-white/40" />
             <input
-              className="h-6 w-40 pl-7 pr-2 text-[11px] rounded bg-white/[0.03] border border-white/[0.06] text-white/60 placeholder:text-white/15 outline-none focus:border-white/15 transition-colors"
+              className="h-6 w-40 pl-7 pr-2 text-[11px] rounded bg-white/[0.03] border border-white/[0.06] text-white/60 placeholder:text-white/50 outline-none focus:border-white/25 transition-colors"
               placeholder="Filter domains..."
               value={filter}
               onChange={(e) => { setFilter(e.target.value); setPage(0); }}
@@ -89,15 +89,15 @@ const DNSStats = () => {
           {filtered.length > PAGE_SIZE && (
             <div className="flex items-center gap-1">
               <button
-                className="p-0.5 text-white/20 hover:text-white/50 disabled:opacity-30 disabled:cursor-default transition-colors"
+                className="p-0.5 text-white/40 hover:text-white/60 disabled:opacity-30 disabled:cursor-default transition-colors"
                 disabled={safePage === 0}
                 onClick={() => setPage(safePage - 1)}
               >
                 <ChevronLeft className="h-3.5 w-3.5" />
               </button>
-              <span className="text-[10px] text-white/20 tabular-nums">{safePage + 1}/{totalPages}</span>
+              <span className="text-[10px] text-white/40 tabular-nums">{safePage + 1}/{totalPages}</span>
               <button
-                className="p-0.5 text-white/20 hover:text-white/50 disabled:opacity-30 disabled:cursor-default transition-colors"
+                className="p-0.5 text-white/40 hover:text-white/60 disabled:opacity-30 disabled:cursor-default transition-colors"
                 disabled={safePage >= totalPages - 1}
                 onClick={() => setPage(safePage + 1)}
               >
@@ -106,17 +106,17 @@ const DNSStats = () => {
             </div>
           )}
           {filtered.length > 0 && (
-            <span className="text-[10px] text-white/15 tabular-nums">{filtered.length}</span>
+            <span className="text-[10px] text-white/40 tabular-nums">{filtered.length}</span>
           )}
         </div>
       </div>
 
       {/* Column headers */}
       <div className="flex items-center gap-4 pl-3 border-l-2 border-transparent mb-1">
-        <span className="text-[10px] text-white/15 uppercase tracking-wider flex-1">Domain</span>
-        <span className="text-[10px] text-white/15 uppercase tracking-wider shrink-0 w-12 text-right">Count</span>
-        <span className="text-[10px] text-white/15 uppercase tracking-wider shrink-0 w-28 text-right hidden md:block">First seen</span>
-        <span className="text-[10px] text-white/15 uppercase tracking-wider shrink-0 w-28 text-right">Last seen</span>
+        <span className="text-[10px] text-white/40 uppercase tracking-wider flex-1">Domain</span>
+        <span className="text-[10px] text-white/40 uppercase tracking-wider shrink-0 w-12 text-right">Count</span>
+        <span className="text-[10px] text-white/40 uppercase tracking-wider shrink-0 w-28 text-right hidden md:block">First seen</span>
+        <span className="text-[10px] text-white/40 uppercase tracking-wider shrink-0 w-28 text-right">Last seen</span>
       </div>
 
       {/* Rows */}
@@ -124,12 +124,12 @@ const DNSStats = () => {
         {paged.length > 0 ? paged.map((d, i) => (
           <div key={i} className={`group flex items-center gap-4 py-1.5 pl-3 border-l-2 ${borderClass} transition-colors`}>
             <span className="text-[13px] text-white/75 font-mono flex-1 min-w-0 truncate">{d.tag}</span>
-            <span className="text-[11px] text-white/30 tabular-nums shrink-0 w-12 text-right">{d.Count}</span>
-            <span className="text-[11px] text-white/15 tabular-nums shrink-0 w-28 text-right hidden md:block">{dayjs(d.FirstSeen).format(state.DNSListDateFormat)}</span>
-            <span className="text-[11px] text-white/20 tabular-nums shrink-0 w-28 text-right">{dayjs(d.LastSeen).format(state.DNSListDateFormat)}</span>
+            <span className="text-[11px] text-white/50 tabular-nums shrink-0 w-12 text-right">{d.Count}</span>
+            <span className="text-[11px] text-white/40 tabular-nums shrink-0 w-28 text-right hidden md:block">{dayjs(d.FirstSeen).format(state.DNSListDateFormat)}</span>
+            <span className="text-[11px] text-white/40 tabular-nums shrink-0 w-28 text-right">{dayjs(d.LastSeen).format(state.DNSListDateFormat)}</span>
           </div>
         )) : (
-          <div className="py-6 pl-3 border-l-2 border-white/[0.04] text-[12px] text-white/15">
+          <div className="py-6 pl-3 border-l-2 border-white/[0.04] text-[12px] text-white/40">
             {filter ? "No matching domains" : "No data"}
           </div>
         )}

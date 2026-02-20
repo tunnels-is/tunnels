@@ -81,21 +81,23 @@ const DNS = () => {
       <div className="flex items-center gap-5 py-3 px-4 rounded-lg bg-[#0a0d14]/80 border border-[#1e2433] mb-6">
         {!editing ? (
           <>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] text-white/25 uppercase tracking-wider">Server</span>
-              <code className="text-[13px] text-cyan-400/70 font-mono">
+            <div>
+              <span className="text-[9px] text-white/35 uppercase tracking-widest block mb-0.5">Server</span>
+              <code className="text-[13px] text-white/80 font-mono">
                 {cfg.DNSServerIP || "0.0.0.0"}:{cfg.DNSServerPort || "53"}
               </code>
             </div>
-            <div className="w-px h-4 bg-white/[0.06]" />
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] text-white/25 uppercase tracking-wider">Resolvers</span>
-              <code className="text-[13px] text-white/50 font-mono">{cfg.DNS1Default || "—"}</code>
-              <span className="text-[11px] text-white/15">&#8250;</span>
-              <code className="text-[13px] text-white/50 font-mono">{cfg.DNS2Default || "—"}</code>
+            <div className="w-px h-8 bg-white/[0.06]" />
+            <div>
+              <span className="text-[9px] text-white/35 uppercase tracking-widest block mb-0.5">Resolvers</span>
+              <div className="flex items-center gap-2">
+                <code className="text-[13px] text-white/80 font-mono">{cfg.DNS1Default || "—"}</code>
+                <span className="text-[11px] text-white/30">|</span>
+                <code className="text-[13px] text-white/80 font-mono">{cfg.DNS2Default || "—"}</code>
+              </div>
             </div>
             <button
-              className="ml-auto p-1.5 rounded text-white/20 hover:text-white/50 hover:bg-white/[0.04] transition-colors"
+              className="ml-auto p-1.5 rounded text-white/40 hover:text-white/60 hover:bg-white/[0.04] transition-colors"
               onClick={() => setEditing(true)}
             >
               <Settings className="h-3.5 w-3.5" />
@@ -105,19 +107,19 @@ const DNS = () => {
           <div className="flex-1">
             <div className="grid grid-cols-4 gap-3">
               <div>
-                <label className="text-[10px] text-white/30 uppercase block mb-1">Server IP</label>
+                <label className="text-[10px] text-white/50 uppercase block mb-1">Server IP</label>
                 <Input className="h-7 text-[12px] border-[#1e2433] bg-transparent" value={cfg.DNSServerIP || ""} onChange={(e) => updatecfg("DNSServerIP", e.target.value)} />
               </div>
               <div>
-                <label className="text-[10px] text-white/30 uppercase block mb-1">Port</label>
+                <label className="text-[10px] text-white/50 uppercase block mb-1">Port</label>
                 <Input className="h-7 text-[12px] border-[#1e2433] bg-transparent" value={cfg.DNSServerPort || ""} onChange={(e) => updatecfg("DNSServerPort", e.target.value)} />
               </div>
               <div>
-                <label className="text-[10px] text-white/30 uppercase block mb-1">Primary DNS</label>
+                <label className="text-[10px] text-white/50 uppercase block mb-1">Primary DNS</label>
                 <Input className="h-7 text-[12px] border-[#1e2433] bg-transparent" value={cfg.DNS1Default || ""} onChange={(e) => updatecfg("DNS1Default", e.target.value)} />
               </div>
               <div>
-                <label className="text-[10px] text-white/30 uppercase block mb-1">Backup DNS</label>
+                <label className="text-[10px] text-white/50 uppercase block mb-1">Backup DNS</label>
                 <Input className="h-7 text-[12px] border-[#1e2433] bg-transparent" value={cfg.DNS2Default || ""} onChange={(e) => updatecfg("DNS2Default", e.target.value)} />
               </div>
             </div>
@@ -134,7 +136,7 @@ const DNS = () => {
                   <Save className="h-3 w-3 mr-1" /> Save
                 </Button>
               )}
-              <button className="text-[11px] text-white/30 hover:text-white/50 px-2" onClick={() => { setCfg({ ...state.Config }); setMod(false); setEditing(false); }}>
+              <button className="text-[11px] text-white/50 hover:text-white/70 px-2" onClick={() => { setCfg({ ...state.Config }); setMod(false); setEditing(false); }}>
                 Cancel
               </button>
             </div>
@@ -150,7 +152,7 @@ const DNS = () => {
             className={`text-[11px] px-3 py-1 rounded-full border transition-all cursor-pointer ${
               opt.checked
                 ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.12)]"
-                : "border-white/[0.06] bg-white/[0.02] text-white/30 hover:text-white/50 hover:border-white/15 hover:bg-white/[0.04]"
+                : "border-white/[0.06] bg-white/[0.02] text-white/50 hover:text-white/70 hover:border-white/25 hover:bg-white/[0.04]"
             }`}
             onClick={() => { state.toggleConfigKeyAndSave("Config", opt.key); state.rerender(); }}
           >
@@ -164,9 +166,9 @@ const DNS = () => {
         {/* Records */}
         <div className="min-w-[280px] flex-1">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-[11px] text-white/30 font-medium uppercase tracking-wider">Records</span>
-            <button className="text-white/20 hover:text-white/50 transition-colors" onClick={() => openRecord(null, false)}>
-              <Plus className="h-3.5 w-3.5" />
+            <span className="text-[11px] text-white/50 font-medium uppercase tracking-wider">Records</span>
+            <button className="flex items-center gap-1 text-[11px] text-emerald-400/60 hover:text-emerald-400 transition-colors" onClick={() => openRecord(null, false)}>
+              <Plus className="h-3 w-3" /> New
             </button>
           </div>
           <div className="space-y-1">
@@ -174,17 +176,17 @@ const DNS = () => {
               <div key={i} className="group flex items-center gap-3 py-1.5 pl-3 border-l-2 border-cyan-500/20 hover:border-cyan-500/50 transition-colors">
                 <div className="flex-1 min-w-0">
                   <div className="text-[13px] text-white/80 font-medium truncate">{r.Domain}</div>
-                  <div className="text-[11px] text-white/25 font-mono truncate">
+                  <div className="text-[11px] text-white/45 font-mono truncate">
                     {r.IP?.join(", ")}{r.Wildcard ? " *" : ""}
                   </div>
                 </div>
                 <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button className="p-1 text-white/20 hover:text-white/50" onClick={() => openRecord(r, true)}><Pencil className="h-3 w-3" /></button>
+                  <button className="p-1 text-white/40 hover:text-white/60" onClick={() => openRecord(r, true)}><Pencil className="h-3 w-3" /></button>
                   <button className="p-1 text-red-500/25 hover:text-red-400" onClick={() => deleteRecord(r)}><Trash2 className="h-3 w-3" /></button>
                 </div>
               </div>
             )) : (
-              <div className="py-4 pl-3 border-l-2 border-white/[0.04] text-[12px] text-white/15">No records</div>
+              <div className="py-4 pl-3 border-l-2 border-white/[0.04] text-[12px] text-white/40">No records</div>
             )}
           </div>
         </div>
@@ -192,9 +194,9 @@ const DNS = () => {
         {/* Block Lists */}
         <div className="min-w-[280px] flex-1">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-[11px] text-white/30 font-medium uppercase tracking-wider">Block Lists</span>
-            <button className="text-white/20 hover:text-white/50 transition-colors" onClick={() => openBlocklist(null, false)}>
-              <Plus className="h-3.5 w-3.5" />
+            <span className="text-[11px] text-white/50 font-medium uppercase tracking-wider">Block Lists</span>
+            <button className="flex items-center gap-1 text-[11px] text-emerald-400/60 hover:text-emerald-400 transition-colors" onClick={() => openBlocklist(null, false)}>
+              <Plus className="h-3 w-3" /> New
             </button>
           </div>
           <div className="space-y-1">
@@ -204,21 +206,21 @@ const DNS = () => {
                   className={`text-[10px] px-2 py-0.5 rounded-full border transition-all cursor-pointer shrink-0 ${
                     bl.Enabled
                       ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.12)]"
-                      : "border-white/[0.06] bg-white/[0.02] text-white/30 hover:text-white/50 hover:border-white/15 hover:bg-white/[0.04]"
+                      : "border-white/[0.06] bg-white/[0.02] text-white/50 hover:text-white/70 hover:border-white/25 hover:bg-white/[0.04]"
                   }`}
                   onClick={(e) => { e.stopPropagation(); state.toggleBlocklist(bl); state.v2_ConfigSave(); }}
                 >{bl.Enabled ? "On" : "Off"}</button>
                 <div className="flex-1 min-w-0">
                   <span className="text-[13px] text-white/80 font-medium">{bl.Tag}</span>
-                  <span className="text-[11px] text-white/20 ml-2">{bl.Count}</span>
+                  <span className="text-[11px] text-white/40 ml-2">{bl.Count}</span>
                 </div>
                 <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button className="p-1 text-white/20 hover:text-white/50" onClick={() => openBlocklist(bl, true)}><Pencil className="h-3 w-3" /></button>
+                  <button className="p-1 text-white/40 hover:text-white/60" onClick={() => openBlocklist(bl, true)}><Pencil className="h-3 w-3" /></button>
                   <button className="p-1 text-red-500/25 hover:text-red-400" onClick={() => state.deleteBlocklist(bl)}><Trash2 className="h-3 w-3" /></button>
                 </div>
               </div>
             )) : (
-              <div className="py-4 pl-3 border-l-2 border-white/[0.04] text-[12px] text-white/15">No block lists</div>
+              <div className="py-4 pl-3 border-l-2 border-white/[0.04] text-[12px] text-white/40">No block lists</div>
             )}
           </div>
         </div>
@@ -226,9 +228,9 @@ const DNS = () => {
         {/* White Lists */}
         <div className="min-w-[280px] flex-1">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-[11px] text-white/30 font-medium uppercase tracking-wider">White Lists</span>
-            <button className="text-white/20 hover:text-white/50 transition-colors" onClick={() => openWhitelist(null, false)}>
-              <Plus className="h-3.5 w-3.5" />
+            <span className="text-[11px] text-white/50 font-medium uppercase tracking-wider">White Lists</span>
+            <button className="flex items-center gap-1 text-[11px] text-emerald-400/60 hover:text-emerald-400 transition-colors" onClick={() => openWhitelist(null, false)}>
+              <Plus className="h-3 w-3" /> New
             </button>
           </div>
           <div className="space-y-1">
@@ -238,21 +240,21 @@ const DNS = () => {
                   className={`text-[10px] px-2 py-0.5 rounded-full border transition-all cursor-pointer shrink-0 ${
                     wl.Enabled
                       ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.12)]"
-                      : "border-white/[0.06] bg-white/[0.02] text-white/30 hover:text-white/50 hover:border-white/15 hover:bg-white/[0.04]"
+                      : "border-white/[0.06] bg-white/[0.02] text-white/50 hover:text-white/70 hover:border-white/25 hover:bg-white/[0.04]"
                   }`}
                   onClick={(e) => { e.stopPropagation(); state.toggleWhitelist(wl); state.v2_ConfigSave(); }}
                 >{wl.Enabled ? "On" : "Off"}</button>
                 <div className="flex-1 min-w-0">
                   <span className="text-[13px] text-white/80 font-medium">{wl.Tag}</span>
-                  <span className="text-[11px] text-white/20 ml-2">{wl.Count}</span>
+                  <span className="text-[11px] text-white/40 ml-2">{wl.Count}</span>
                 </div>
                 <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button className="p-1 text-white/20 hover:text-white/50" onClick={() => openWhitelist(wl, true)}><Pencil className="h-3 w-3" /></button>
+                  <button className="p-1 text-white/40 hover:text-white/60" onClick={() => openWhitelist(wl, true)}><Pencil className="h-3 w-3" /></button>
                   <button className="p-1 text-red-500/25 hover:text-red-400" onClick={() => state.deleteWhitelist(wl)}><Trash2 className="h-3 w-3" /></button>
                 </div>
               </div>
             )) : (
-              <div className="py-4 pl-3 border-l-2 border-white/[0.04] text-[12px] text-white/15">No white lists</div>
+              <div className="py-4 pl-3 border-l-2 border-white/[0.04] text-[12px] text-white/40">No white lists</div>
             )}
           </div>
         </div>
@@ -272,7 +274,7 @@ const DNS = () => {
               <div className="space-y-3">
                 <div className="flex items-center gap-3">
                   <div className="flex-1">
-                    <label className="text-[10px] text-white/30 uppercase block mb-1">Domain</label>
+                    <label className="text-[10px] text-white/50 uppercase block mb-1">Domain</label>
                     <Input className="h-7 text-[12px] border-[#1e2433] bg-transparent" value={record.Domain || ""} onChange={(e) => { record.Domain = e.target.value; setRecord({ ...record }); }} />
                   </div>
                   <div className="pt-4">
@@ -280,7 +282,7 @@ const DNS = () => {
                       className={`text-[11px] px-3 py-1 rounded-full border transition-all cursor-pointer ${
                         record.Wildcard
                           ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.12)]"
-                          : "border-white/[0.06] bg-white/[0.02] text-white/30 hover:text-white/50 hover:border-white/15 hover:bg-white/[0.04]"
+                          : "border-white/[0.06] bg-white/[0.02] text-white/50 hover:text-white/70 hover:border-white/25 hover:bg-white/[0.04]"
                       }`}
                       onClick={() => { record.Wildcard = !record.Wildcard; setRecord({ ...record }); }}
                     >
@@ -290,7 +292,7 @@ const DNS = () => {
                 </div>
 
                 <div>
-                  <label className="text-[10px] text-white/30 uppercase block mb-1">IP Addresses</label>
+                  <label className="text-[10px] text-white/50 uppercase block mb-1">IP Addresses</label>
                   <div className="space-y-1">
                     {(record.IP || []).map((ip, i) => (
                       <div key={i} className="flex items-center gap-1">
@@ -307,7 +309,7 @@ const DNS = () => {
                 </div>
 
                 <div>
-                  <label className="text-[10px] text-white/30 uppercase block mb-1">TXT Records</label>
+                  <label className="text-[10px] text-white/50 uppercase block mb-1">TXT Records</label>
                   <div className="space-y-1">
                     {(record.TXT || []).map((txt, i) => (
                       <div key={i} className="flex items-center gap-1">
@@ -332,7 +334,7 @@ const DNS = () => {
                 }}>
                   <Save className="h-3 w-3 mr-1" /> Save
                 </Button>
-                <button className="text-[11px] text-white/30 hover:text-white/50 px-2" onClick={() => setRecordModal(false)}>Cancel</button>
+                <button className="text-[11px] text-white/50 hover:text-white/70 px-2" onClick={() => setRecordModal(false)}>Cancel</button>
               </DialogFooter>
             </>
           )}
@@ -352,11 +354,11 @@ const DNS = () => {
 
               <div className="space-y-3">
                 <div>
-                  <label className="text-[10px] text-white/30 uppercase block mb-1">Tag</label>
+                  <label className="text-[10px] text-white/50 uppercase block mb-1">Tag</label>
                   <Input className="h-7 text-[12px] border-[#1e2433] bg-transparent" value={blocklist.Tag || ""} onChange={(e) => { blocklist.Tag = e.target.value; setBlocklist({ ...blocklist }); }} />
                 </div>
                 <div>
-                  <label className="text-[10px] text-white/30 uppercase block mb-1">URL</label>
+                  <label className="text-[10px] text-white/50 uppercase block mb-1">URL</label>
                   <Input className="h-7 text-[12px] border-[#1e2433] bg-transparent" value={blocklist.URL || ""} onChange={(e) => { blocklist.URL = e.target.value; setBlocklist({ ...blocklist }); }} />
                 </div>
                 <div className="flex items-center gap-2">
@@ -364,7 +366,7 @@ const DNS = () => {
                     className={`text-[11px] px-3 py-1 rounded-full border transition-all cursor-pointer ${
                       blocklist.Enabled
                         ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.12)]"
-                        : "border-white/[0.06] bg-white/[0.02] text-white/30 hover:text-white/50 hover:border-white/15 hover:bg-white/[0.04]"
+                        : "border-white/[0.06] bg-white/[0.02] text-white/50 hover:text-white/70 hover:border-white/25 hover:bg-white/[0.04]"
                     }`}
                     onClick={() => { blocklist.Enabled = !blocklist.Enabled; setBlocklist({ ...blocklist }); }}
                   >
@@ -381,7 +383,7 @@ const DNS = () => {
                 }}>
                   <Save className="h-3 w-3 mr-1" /> Save
                 </Button>
-                <button className="text-[11px] text-white/30 hover:text-white/50 px-2" onClick={() => setBlocklistModal(false)}>Cancel</button>
+                <button className="text-[11px] text-white/50 hover:text-white/70 px-2" onClick={() => setBlocklistModal(false)}>Cancel</button>
               </DialogFooter>
             </>
           )}
@@ -401,11 +403,11 @@ const DNS = () => {
 
               <div className="space-y-3">
                 <div>
-                  <label className="text-[10px] text-white/30 uppercase block mb-1">Tag</label>
+                  <label className="text-[10px] text-white/50 uppercase block mb-1">Tag</label>
                   <Input className="h-7 text-[12px] border-[#1e2433] bg-transparent" value={whitelist.Tag || ""} onChange={(e) => { whitelist.Tag = e.target.value; setWhitelist({ ...whitelist }); }} />
                 </div>
                 <div>
-                  <label className="text-[10px] text-white/30 uppercase block mb-1">URL</label>
+                  <label className="text-[10px] text-white/50 uppercase block mb-1">URL</label>
                   <Input className="h-7 text-[12px] border-[#1e2433] bg-transparent" value={whitelist.URL || ""} onChange={(e) => { whitelist.URL = e.target.value; setWhitelist({ ...whitelist }); }} />
                 </div>
                 <div className="flex items-center gap-2">
@@ -413,7 +415,7 @@ const DNS = () => {
                     className={`text-[11px] px-3 py-1 rounded-full border transition-all cursor-pointer ${
                       whitelist.Enabled
                         ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.12)]"
-                        : "border-white/[0.06] bg-white/[0.02] text-white/30 hover:text-white/50 hover:border-white/15 hover:bg-white/[0.04]"
+                        : "border-white/[0.06] bg-white/[0.02] text-white/50 hover:text-white/70 hover:border-white/25 hover:bg-white/[0.04]"
                     }`}
                     onClick={() => { whitelist.Enabled = !whitelist.Enabled; setWhitelist({ ...whitelist }); }}
                   >
@@ -430,7 +432,7 @@ const DNS = () => {
                 }}>
                   <Save className="h-3 w-3 mr-1" /> Save
                 </Button>
-                <button className="text-[11px] text-white/30 hover:text-white/50 px-2" onClick={() => setWhitelistModal(false)}>Cancel</button>
+                <button className="text-[11px] text-white/50 hover:text-white/70 px-2" onClick={() => setWhitelistModal(false)}>Cancel</button>
               </DialogFooter>
             </>
           )}

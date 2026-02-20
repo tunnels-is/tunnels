@@ -21,7 +21,7 @@ const Stats = () => {
 
   const SectionTitle = ({ children }) => (
     <div className="pt-4 pb-1 mt-2 border-t border-[#1e2433]">
-      <h3 className="text-[11px] uppercase tracking-widest text-white/30">{children}</h3>
+      <h3 className="text-[11px] uppercase tracking-widest text-white/50">{children}</h3>
     </div>
   )
 

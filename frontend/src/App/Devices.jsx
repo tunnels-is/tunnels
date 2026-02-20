@@ -94,21 +94,21 @@ const Devices = () => {
     <div>
       {/* ── Header bar ── */}
       <div className="flex items-center gap-5 py-3 px-4 rounded-lg bg-[#0a0d14]/80 border border-[#1e2433] mb-4">
-        <span className="text-[10px] text-white/25 uppercase tracking-wider">Devices</span>
+        <span className="text-[10px] text-white/45 uppercase tracking-wider">Devices</span>
         {filtered.length > 0 && (
           <>
             <div className="w-px h-4 bg-white/[0.06]" />
-            <span className="text-[10px] text-white/15 tabular-nums">{filtered.length} total</span>
+            <span className="text-[10px] text-white/40 tabular-nums">{filtered.length} total</span>
           </>
         )}
         <div className="flex items-center gap-1.5 ml-auto">
-          <button className="text-white/20 hover:text-white/50 transition-colors mr-1" onClick={openNew}>
-            <Plus className="h-3.5 w-3.5" />
+          <button className="flex items-center gap-1 text-[11px] text-emerald-400/60 hover:text-emerald-400 transition-colors mr-1" onClick={openNew}>
+            <Plus className="h-3 w-3" /> New
           </button>
           <div className="relative">
-            <Search className="h-3 w-3 absolute left-2 top-1/2 -translate-y-1/2 text-white/15" />
+            <Search className="h-3 w-3 absolute left-2 top-1/2 -translate-y-1/2 text-white/40" />
             <input
-              className="h-6 w-40 pl-7 pr-2 text-[11px] rounded bg-white/[0.03] border border-white/[0.06] text-white/60 placeholder:text-white/15 outline-none focus:border-white/15 transition-colors"
+              className="h-6 w-40 pl-7 pr-2 text-[11px] rounded bg-white/[0.03] border border-white/[0.06] text-white/60 placeholder:text-white/50 outline-none focus:border-white/25 transition-colors"
               placeholder="Filter devices..."
               value={filter}
               onChange={(e) => { setFilter(e.target.value); setPage(0); }}
@@ -117,15 +117,15 @@ const Devices = () => {
           {filtered.length > PAGE_SIZE && (
             <div className="flex items-center gap-1">
               <button
-                className="p-0.5 text-white/20 hover:text-white/50 disabled:opacity-30 disabled:cursor-default transition-colors"
+                className="p-0.5 text-white/40 hover:text-white/60 disabled:opacity-30 disabled:cursor-default transition-colors"
                 disabled={safePage === 0}
                 onClick={() => setPage(safePage - 1)}
               >
                 <ChevronLeft className="h-3.5 w-3.5" />
               </button>
-              <span className="text-[10px] text-white/20 tabular-nums">{safePage + 1}/{totalPages}</span>
+              <span className="text-[10px] text-white/40 tabular-nums">{safePage + 1}/{totalPages}</span>
               <button
-                className="p-0.5 text-white/20 hover:text-white/50 disabled:opacity-30 disabled:cursor-default transition-colors"
+                className="p-0.5 text-white/40 hover:text-white/60 disabled:opacity-30 disabled:cursor-default transition-colors"
                 disabled={safePage >= totalPages - 1}
                 onClick={() => setPage(safePage + 1)}
               >
@@ -138,8 +138,8 @@ const Devices = () => {
 
       {/* ── Column headers ── */}
       <div className="flex items-center gap-4 pl-3 border-l-2 border-transparent mb-1">
-        <span className="text-[10px] text-white/15 uppercase tracking-wider flex-1 min-w-0">Device</span>
-        <span className="text-[10px] text-white/15 uppercase tracking-wider shrink-0 w-36 text-right">Created</span>
+        <span className="text-[10px] text-white/40 uppercase tracking-wider flex-1 min-w-0">Device</span>
+        <span className="text-[10px] text-white/40 uppercase tracking-wider shrink-0 w-36 text-right">Created</span>
         <span className="shrink-0 w-12" />
       </div>
 
@@ -149,13 +149,13 @@ const Devices = () => {
           <div key={d._id || i} className="group flex items-center gap-4 py-1.5 pl-3 border-l-2 border-cyan-500/20 hover:border-cyan-500/50 transition-colors">
             <div className="flex-1 min-w-0">
               <span className="text-[13px] text-white/80 font-medium truncate block">{d.Tag || "Unnamed"}</span>
-              <span className="text-[11px] text-white/20 font-mono truncate block">{d._id}</span>
+              <span className="text-[11px] text-white/40 font-mono truncate block">{d._id}</span>
             </div>
-            <span className="text-[11px] text-white/20 tabular-nums shrink-0 w-36 text-right">
+            <span className="text-[11px] text-white/40 tabular-nums shrink-0 w-36 text-right">
               {d.CreatedAt ? dayjs(d.CreatedAt).format("HH:mm DD-MM-YYYY") : "—"}
             </span>
             <div className="shrink-0 w-12 flex justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-              <button className="p-1 text-white/20 hover:text-white/50" onClick={() => openEdit(d)}>
+              <button className="p-1 text-white/40 hover:text-white/60" onClick={() => openEdit(d)}>
                 <Pencil className="h-3 w-3" />
               </button>
               <button className="p-1 text-red-500/25 hover:text-red-400" onClick={() => deleteDevice(d._id)}>
@@ -164,7 +164,7 @@ const Devices = () => {
             </div>
           </div>
         )) : (
-          <div className="py-6 pl-3 border-l-2 border-white/[0.04] text-[12px] text-white/15">
+          <div className="py-6 pl-3 border-l-2 border-white/[0.04] text-[12px] text-white/40">
             {filter ? "No matching devices" : "No devices"}
           </div>
         )}
@@ -185,20 +185,20 @@ const Devices = () => {
                 {/* Read-only ID */}
                 {form._id && (
                   <div className="flex items-baseline gap-3 py-1.5 pl-3 border-l-2 border-white/[0.06]">
-                    <span className="text-[11px] text-white/25 shrink-0 w-[50px]">ID</span>
+                    <span className="text-[11px] text-white/45 shrink-0 w-[50px]">ID</span>
                     <code className="text-[13px] text-white/50 font-mono truncate">{form._id}</code>
                   </div>
                 )}
 
                 <div className="pt-3 space-y-3">
                   <div>
-                    <label className="text-[10px] text-white/30 uppercase block mb-1">Tag</label>
+                    <label className="text-[10px] text-white/50 uppercase block mb-1">Tag</label>
                     <Input className="h-7 text-[12px] border-[#1e2433] bg-transparent" value={form.Tag || ""} onChange={(e) => set("Tag", e.target.value)} />
                   </div>
 
                   {/* Groups array */}
                   <div>
-                    <label className="text-[10px] text-white/30 uppercase block mb-1">Groups</label>
+                    <label className="text-[10px] text-white/50 uppercase block mb-1">Groups</label>
                     <div className="space-y-1">
                       {(form.Groups || []).map((g, i) => (
                         <div key={i} className="flex items-center gap-1">
@@ -227,7 +227,7 @@ const Devices = () => {
                 <Button className="text-white bg-emerald-600 hover:bg-emerald-500 h-6 text-[11px] px-2.5" onClick={saveDevice}>
                   <Save className="h-3 w-3 mr-1" /> Save
                 </Button>
-                <button className="text-[11px] text-white/30 hover:text-white/50 px-2" onClick={() => setEditModalOpen(false)}>
+                <button className="text-[11px] text-white/50 hover:text-white/70 px-2" onClick={() => setEditModalOpen(false)}>
                   Cancel
                 </button>
               </DialogFooter>

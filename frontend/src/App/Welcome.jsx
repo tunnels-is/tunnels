@@ -19,7 +19,7 @@ const Welcome = () => {
 
         {/* Resources */}
         <div>
-          <span className="text-[11px] text-white/30 font-medium uppercase tracking-wider block mb-3">Resources</span>
+          <span className="text-[11px] text-white/50 font-medium uppercase tracking-wider block mb-3">Resources</span>
           <div className="space-y-1">
             {resources.map((row, i) => (
               <div
@@ -27,9 +27,9 @@ const Welcome = () => {
                 className="flex items-baseline gap-3 py-1.5 pl-3 border-l-2 border-cyan-500/20 hover:border-cyan-500/50 cursor-pointer transition-colors"
                 onClick={() => open(row.link)}
               >
-                <span className="text-[11px] text-white/25 shrink-0 w-[110px]">{row.label}</span>
+                <span className="text-[11px] text-white/45 shrink-0 w-[110px]">{row.label}</span>
                 <code className="text-[13px] text-white/60 font-mono truncate flex items-center gap-1.5">
-                  {row.value} <ExternalLink className="h-3 w-3 text-white/20" />
+                  {row.value} <ExternalLink className="h-3 w-3 text-white/40" />
                 </code>
               </div>
             ))}
@@ -38,7 +38,7 @@ const Welcome = () => {
 
         {/* Community */}
         <div>
-          <span className="text-[11px] text-white/30 font-medium uppercase tracking-wider block mb-3">Community</span>
+          <span className="text-[11px] text-white/50 font-medium uppercase tracking-wider block mb-3">Community</span>
           <div className="space-y-1">
             {community.map((s, i) => (
               <div
@@ -46,9 +46,9 @@ const Welcome = () => {
                 className="flex items-baseline gap-3 py-1.5 pl-3 border-l-2 border-violet-500/20 hover:border-violet-500/50 cursor-pointer transition-colors"
                 onClick={() => open(s.link)}
               >
-                <span className="text-[11px] text-white/25 shrink-0 w-[110px]">{s.name}</span>
+                <span className="text-[11px] text-white/45 shrink-0 w-[110px]">{s.name}</span>
                 <code className="text-[13px] text-white/60 font-mono truncate flex items-center gap-1.5">
-                  {s.link.replace(/^https?:\/\/(www\.)?/, "")} <ExternalLink className="h-3 w-3 text-white/20" />
+                  {s.link.replace(/^https?:\/\/(www\.)?/, "")} <ExternalLink className="h-3 w-3 text-white/40" />
                 </code>
               </div>
             ))}
@@ -57,7 +57,7 @@ const Welcome = () => {
 
         {/* Contact */}
         <div>
-          <span className="text-[11px] text-white/30 font-medium uppercase tracking-wider block mb-3">Contact</span>
+          <span className="text-[11px] text-white/50 font-medium uppercase tracking-wider block mb-3">Contact</span>
           <div className="space-y-1">
             {contact.map((s, i) => (
               <div
@@ -65,7 +65,7 @@ const Welcome = () => {
                 className="flex items-baseline gap-3 py-1.5 pl-3 border-l-2 border-emerald-500/20 hover:border-emerald-500/50 cursor-pointer transition-colors"
                 onClick={() => { window.location.href = `mailto:${s.link}`; }}
               >
-                <span className="text-[11px] text-white/25 shrink-0 w-[110px]">{s.name}</span>
+                <span className="text-[11px] text-white/45 shrink-0 w-[110px]">{s.name}</span>
                 <code className="text-[13px] text-white/60 font-mono truncate">{s.link}</code>
               </div>
             ))}

@@ -81,21 +81,21 @@ const Groups = () => {
     <div>
       {/* ── Header bar ── */}
       <div className="flex items-center gap-5 py-3 px-4 rounded-lg bg-[#0a0d14]/80 border border-[#1e2433] mb-4">
-        <span className="text-[10px] text-white/25 uppercase tracking-wider">Groups</span>
+        <span className="text-[10px] text-white/45 uppercase tracking-wider">Groups</span>
         {filtered.length > 0 && (
           <>
             <div className="w-px h-4 bg-white/[0.06]" />
-            <span className="text-[10px] text-white/15 tabular-nums">{filtered.length} total</span>
+            <span className="text-[10px] text-white/40 tabular-nums">{filtered.length} total</span>
           </>
         )}
         <div className="flex items-center gap-1.5 ml-auto">
-          <button className="text-white/20 hover:text-white/50 transition-colors mr-1" onClick={openNew}>
-            <Plus className="h-3.5 w-3.5" />
+          <button className="flex items-center gap-1 text-[11px] text-emerald-400/60 hover:text-emerald-400 transition-colors mr-1" onClick={openNew}>
+            <Plus className="h-3 w-3" /> New
           </button>
           <div className="relative">
-            <Search className="h-3 w-3 absolute left-2 top-1/2 -translate-y-1/2 text-white/15" />
+            <Search className="h-3 w-3 absolute left-2 top-1/2 -translate-y-1/2 text-white/40" />
             <input
-              className="h-6 w-40 pl-7 pr-2 text-[11px] rounded bg-white/[0.03] border border-white/[0.06] text-white/60 placeholder:text-white/15 outline-none focus:border-white/15 transition-colors"
+              className="h-6 w-40 pl-7 pr-2 text-[11px] rounded bg-white/[0.03] border border-white/[0.06] text-white/60 placeholder:text-white/50 outline-none focus:border-white/25 transition-colors"
               placeholder="Filter groups..."
               value={filter}
               onChange={(e) => { setFilter(e.target.value); setPage(0); }}
@@ -104,15 +104,15 @@ const Groups = () => {
           {filtered.length > PAGE_SIZE && (
             <div className="flex items-center gap-1">
               <button
-                className="p-0.5 text-white/20 hover:text-white/50 disabled:opacity-30 disabled:cursor-default transition-colors"
+                className="p-0.5 text-white/40 hover:text-white/60 disabled:opacity-30 disabled:cursor-default transition-colors"
                 disabled={safePage === 0}
                 onClick={() => setPage(safePage - 1)}
               >
                 <ChevronLeft className="h-3.5 w-3.5" />
               </button>
-              <span className="text-[10px] text-white/20 tabular-nums">{safePage + 1}/{totalPages}</span>
+              <span className="text-[10px] text-white/40 tabular-nums">{safePage + 1}/{totalPages}</span>
               <button
-                className="p-0.5 text-white/20 hover:text-white/50 disabled:opacity-30 disabled:cursor-default transition-colors"
+                className="p-0.5 text-white/40 hover:text-white/60 disabled:opacity-30 disabled:cursor-default transition-colors"
                 disabled={safePage >= totalPages - 1}
                 onClick={() => setPage(safePage + 1)}
               >
@@ -125,8 +125,8 @@ const Groups = () => {
 
       {/* ── Column headers ── */}
       <div className="flex items-center gap-4 pl-3 border-l-2 border-transparent mb-1">
-        <span className="text-[10px] text-white/15 uppercase tracking-wider flex-1 min-w-0">Group</span>
-        <span className="text-[10px] text-white/15 uppercase tracking-wider shrink-0 w-36 text-right hidden md:block">Created</span>
+        <span className="text-[10px] text-white/40 uppercase tracking-wider flex-1 min-w-0">Group</span>
+        <span className="text-[10px] text-white/40 uppercase tracking-wider shrink-0 w-36 text-right hidden md:block">Created</span>
         <span className="shrink-0 w-16" />
       </div>
 
@@ -136,19 +136,19 @@ const Groups = () => {
           <div key={g._id || i} className="group flex items-center gap-4 py-1.5 pl-3 border-l-2 border-violet-500/20 hover:border-violet-500/50 transition-colors">
             <div className="flex-1 min-w-0 cursor-pointer" onClick={() => navigate("/groups/" + g._id)}>
               <span className="text-[13px] text-white/80 font-medium truncate block hover:text-white transition-colors">{g.Tag}</span>
-              <span className="text-[11px] text-white/20 font-mono truncate block">{g._id}</span>
+              <span className="text-[11px] text-white/40 font-mono truncate block">{g._id}</span>
               {g.Description && (
-                <span className="text-[11px] text-white/15 truncate block">{g.Description}</span>
+                <span className="text-[11px] text-white/40 truncate block">{g.Description}</span>
               )}
             </div>
-            <span className="text-[11px] text-white/20 tabular-nums shrink-0 w-36 text-right hidden md:block">
+            <span className="text-[11px] text-white/40 tabular-nums shrink-0 w-36 text-right hidden md:block">
               {g.CreatedAt ? dayjs(g.CreatedAt).format("HH:mm DD-MM-YYYY") : "—"}
             </span>
             <div className="shrink-0 w-16 flex justify-end gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-              <button className="p-1 text-white/20 hover:text-white/50" onClick={(e) => { e.stopPropagation(); navigate("/groups/" + g._id); }}>
+              <button className="p-1 text-white/40 hover:text-white/60" onClick={(e) => { e.stopPropagation(); navigate("/groups/" + g._id); }}>
                 <Arrow className="h-3 w-3" />
               </button>
-              <button className="p-1 text-white/20 hover:text-white/50" onClick={(e) => { e.stopPropagation(); openEdit(g); }}>
+              <button className="p-1 text-white/40 hover:text-white/60" onClick={(e) => { e.stopPropagation(); openEdit(g); }}>
                 <Pencil className="h-3 w-3" />
               </button>
               <button className="p-1 text-red-500/25 hover:text-red-400" onClick={(e) => { e.stopPropagation(); deleteGroup(g._id); }}>
@@ -157,7 +157,7 @@ const Groups = () => {
             </div>
           </div>
         )) : (
-          <div className="py-6 pl-3 border-l-2 border-white/[0.04] text-[12px] text-white/15">
+          <div className="py-6 pl-3 border-l-2 border-white/[0.04] text-[12px] text-white/40">
             {filter ? "No matching groups" : "No groups"}
           </div>
         )}
@@ -177,18 +177,18 @@ const Groups = () => {
               <div className="space-y-1">
                 {form._id && (
                   <div className="flex items-baseline gap-3 py-1.5 pl-3 border-l-2 border-white/[0.06]">
-                    <span className="text-[11px] text-white/25 shrink-0 w-[50px]">ID</span>
+                    <span className="text-[11px] text-white/45 shrink-0 w-[50px]">ID</span>
                     <code className="text-[13px] text-white/50 font-mono truncate">{form._id}</code>
                   </div>
                 )}
 
                 <div className="pt-3 space-y-3">
                   <div>
-                    <label className="text-[10px] text-white/30 uppercase block mb-1">Tag</label>
+                    <label className="text-[10px] text-white/50 uppercase block mb-1">Tag</label>
                     <Input className="h-7 text-[12px] border-[#1e2433] bg-transparent" value={form.Tag || ""} onChange={(e) => set("Tag", e.target.value)} />
                   </div>
                   <div>
-                    <label className="text-[10px] text-white/30 uppercase block mb-1">Description</label>
+                    <label className="text-[10px] text-white/50 uppercase block mb-1">Description</label>
                     <Input className="h-7 text-[12px] border-[#1e2433] bg-transparent" value={form.Description || ""} onChange={(e) => set("Description", e.target.value)} />
                   </div>
                 </div>
@@ -198,7 +198,7 @@ const Groups = () => {
                 <Button className="text-white bg-emerald-600 hover:bg-emerald-500 h-6 text-[11px] px-2.5" onClick={saveGroup}>
                   <Save className="h-3 w-3 mr-1" /> Save
                 </Button>
-                <button className="text-[11px] text-white/30 hover:text-white/50 px-2" onClick={() => setEditModalOpen(false)}>
+                <button className="text-[11px] text-white/50 hover:text-white/70 px-2" onClick={() => setEditModalOpen(false)}>
                   Cancel
                 </button>
               </DialogFooter>
