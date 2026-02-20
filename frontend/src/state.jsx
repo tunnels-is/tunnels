@@ -816,6 +816,18 @@ export var STATE = {
           STATE.renderPage("login")
         }
 
+        // Auto-load saved users if no user is currently set
+        if (!STATE.User) {
+          let users = await STATE.LoadUsers();
+          if (users && users.length === 1) {
+            STATE.SetUser(users[0]);
+            window.location.hash = "#/tunnels";
+          } else if (users && users.length > 0) {
+            STATE.Users = users;
+            window.location.hash = "#/accounts";
+          }
+        }
+
         STATE.globalRerender();
       }
       STATE.StateFetchInProgress = false;
