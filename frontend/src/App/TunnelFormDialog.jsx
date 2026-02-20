@@ -32,7 +32,7 @@ const Section = ({ title, children, defaultOpen = true }) => {
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-white/25 hover:text-white/40 transition-colors mb-2"
+        className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-white/45 hover:text-white/60 transition-colors mb-2"
       >
         {open ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
         {title}
@@ -49,7 +49,7 @@ const StringArrayField = ({ label, items, onChange }) => {
 
   return (
     <div className="mt-3">
-      {label && <label className="text-[10px] text-white/30 uppercase block mb-1">{label}</label>}
+      {label && <label className="text-[10px] text-white/50 uppercase block mb-1">{label}</label>}
       <div className="space-y-1">
         {items.map((item, i) => (
           <div key={i} className="flex items-center gap-1">
@@ -82,7 +82,7 @@ const DNSRecordEditor = ({ record, onChange, onRemove }) => {
           className={`text-[10px] px-2 py-0.5 rounded-full border transition-all cursor-pointer shrink-0 ${
             record.Wildcard
               ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.12)]"
-              : "border-white/[0.06] bg-white/[0.02] text-white/30 hover:text-white/50 hover:border-white/15 hover:bg-white/[0.04]"
+              : "border-white/[0.06] bg-white/[0.02] text-white/50 hover:text-white/70 hover:border-white/25 hover:bg-white/[0.04]"
           }`}
           onClick={() => set("Wildcard", !record.Wildcard)}
         >*</button>
@@ -92,7 +92,7 @@ const DNSRecordEditor = ({ record, onChange, onRemove }) => {
       </div>
       {/* IP addresses */}
       <div>
-        <span className="text-[10px] text-white/20 uppercase">IPs</span>
+        <span className="text-[10px] text-white/40 uppercase">IPs</span>
         <div className="space-y-1 mt-0.5">
           {(record.IP || []).map((ip, i) => (
             <div key={i} className="flex items-center gap-1">
@@ -105,7 +105,7 @@ const DNSRecordEditor = ({ record, onChange, onRemove }) => {
       </div>
       {/* TXT records */}
       <div>
-        <span className="text-[10px] text-white/20 uppercase">TXT</span>
+        <span className="text-[10px] text-white/40 uppercase">TXT</span>
         <div className="space-y-1 mt-0.5">
           {(record.TXT || []).map((txt, i) => (
             <div key={i} className="flex items-center gap-1">
@@ -225,15 +225,15 @@ const TunnelFormDialog = ({ open, onOpenChange, tunnel, servers, onSave }) => {
           <Section title="Identity" defaultOpen={true}>
             <div className="grid grid-cols-2 gap-x-3 gap-y-3">
               <div>
-                <label className="text-[10px] text-white/30 uppercase block mb-1">Tag</label>
+                <label className="text-[10px] text-white/50 uppercase block mb-1">Tag</label>
                 <Input className="h-7 text-[12px] border-[#1e2433] bg-transparent" value={form.Tag || ""} onChange={(e) => set("Tag", e.target.value)} />
               </div>
               <div>
-                <label className="text-[10px] text-white/30 uppercase block mb-1">Interface</label>
+                <label className="text-[10px] text-white/50 uppercase block mb-1">Interface</label>
                 <Input className="h-7 text-[12px] border-[#1e2433] bg-transparent" value={form.IFName || ""} onChange={(e) => set("IFName", e.target.value)} />
               </div>
               <div>
-                <label className="text-[10px] text-white/30 uppercase block mb-1">Server</label>
+                <label className="text-[10px] text-white/50 uppercase block mb-1">Server</label>
                 <Select value={form.ServerID || "_none"} onValueChange={(v) => set("ServerID", v === "_none" ? "" : v)}>
                   <SelectTrigger className="h-7 text-[12px] border-[#1e2433] bg-transparent">
                     <SelectValue placeholder="No server" />
@@ -247,7 +247,7 @@ const TunnelFormDialog = ({ open, onOpenChange, tunnel, servers, onSave }) => {
                 </Select>
               </div>
               <div>
-                <label className="text-[10px] text-white/30 uppercase block mb-1">Encryption</label>
+                <label className="text-[10px] text-white/50 uppercase block mb-1">Encryption</label>
                 <Select value={String(form.EncryptionType ?? 0)} onValueChange={(v) => set("EncryptionType", Number(v))}>
                   <SelectTrigger className="h-7 text-[12px] border-[#1e2433] bg-transparent">
                     <SelectValue />
@@ -266,23 +266,23 @@ const TunnelFormDialog = ({ open, onOpenChange, tunnel, servers, onSave }) => {
           <Section title="Network" defaultOpen={true}>
             <div className="grid grid-cols-2 gap-x-3 gap-y-3">
               <div>
-                <label className="text-[10px] text-white/30 uppercase block mb-1">IPv4 Address</label>
+                <label className="text-[10px] text-white/50 uppercase block mb-1">IPv4 Address</label>
                 <Input className="h-7 text-[12px] border-[#1e2433] bg-transparent" value={form.IPv4Address || ""} onChange={(e) => set("IPv4Address", e.target.value)} />
               </div>
               <div>
-                <label className="text-[10px] text-white/30 uppercase block mb-1">IPv6 Address</label>
+                <label className="text-[10px] text-white/50 uppercase block mb-1">IPv6 Address</label>
                 <Input className="h-7 text-[12px] border-[#1e2433] bg-transparent" value={form.IPv6Address || ""} onChange={(e) => set("IPv6Address", e.target.value)} />
               </div>
               <div>
-                <label className="text-[10px] text-white/30 uppercase block mb-1">Netmask</label>
+                <label className="text-[10px] text-white/50 uppercase block mb-1">Netmask</label>
                 <Input className="h-7 text-[12px] border-[#1e2433] bg-transparent" value={form.NetMask || ""} onChange={(e) => set("NetMask", e.target.value)} />
               </div>
               <div>
-                <label className="text-[10px] text-white/30 uppercase block mb-1">MTU</label>
+                <label className="text-[10px] text-white/50 uppercase block mb-1">MTU</label>
                 <Input className="h-7 text-[12px] border-[#1e2433] bg-transparent" type="number" value={form.MTU ?? 1420} onChange={(e) => set("MTU", Number(e.target.value))} />
               </div>
               <div>
-                <label className="text-[10px] text-white/30 uppercase block mb-1">TX Queue Length</label>
+                <label className="text-[10px] text-white/50 uppercase block mb-1">TX Queue Length</label>
                 <Input className="h-7 text-[12px] border-[#1e2433] bg-transparent" type="number" value={form.TxQueueLen ?? 2000} onChange={(e) => set("TxQueueLen", Number(e.target.value))} />
               </div>
             </div>
@@ -300,7 +300,7 @@ const TunnelFormDialog = ({ open, onOpenChange, tunnel, servers, onSave }) => {
                       ? opt.key === "DisableFirewall" || opt.key === "KillSwitch"
                         ? "border-amber-500/40 bg-amber-500/15 text-amber-400 shadow-[0_0_12px_rgba(245,158,11,0.12)]"
                         : "border-emerald-500/40 bg-emerald-500/15 text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.12)]"
-                      : "border-white/[0.06] bg-white/[0.02] text-white/30 hover:text-white/50 hover:border-white/15 hover:bg-white/[0.04]"
+                      : "border-white/[0.06] bg-white/[0.02] text-white/50 hover:text-white/70 hover:border-white/25 hover:bg-white/[0.04]"
                   }`}
                   onClick={() => set(opt.key, !form[opt.key])}
                 >
@@ -383,13 +383,13 @@ const TunnelFormDialog = ({ open, onOpenChange, tunnel, servers, onSave }) => {
               <div className="space-y-px">
                 {form.WindowsGUID && (
                   <div className="flex items-baseline gap-3 py-1.5 pl-3 border-l-2 border-white/[0.06]">
-                    <span className="text-[11px] text-white/25 shrink-0 w-[100px]">Windows GUID</span>
+                    <span className="text-[11px] text-white/45 shrink-0 w-[100px]">Windows GUID</span>
                     <code className="text-[12px] text-white/50 font-mono truncate">{form.WindowsGUID}</code>
                   </div>
                 )}
                 {form.ConfigFormat && (
                   <div className="flex items-baseline gap-3 py-1.5 pl-3 border-l-2 border-white/[0.06]">
-                    <span className="text-[11px] text-white/25 shrink-0 w-[100px]">Config Format</span>
+                    <span className="text-[11px] text-white/45 shrink-0 w-[100px]">Config Format</span>
                     <code className="text-[12px] text-white/50 font-mono">{form.ConfigFormat}</code>
                   </div>
                 )}
@@ -408,7 +408,7 @@ const TunnelFormDialog = ({ open, onOpenChange, tunnel, servers, onSave }) => {
             {saving ? "Saving..." : "Save"}
           </Button>
           <button
-            className="text-[11px] text-white/30 hover:text-white/50 px-2"
+            className="text-[11px] text-white/50 hover:text-white/70 px-2"
             onClick={() => onOpenChange(false)}
           >
             Cancel

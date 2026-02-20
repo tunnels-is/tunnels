@@ -46,23 +46,23 @@ const Settings = () => {
       <div className="flex items-center gap-5 py-3 px-4 rounded-lg bg-[#0a0d14]/80 border border-[#1e2433] mb-6">
         {!editing ? (
           <>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] text-white/25 uppercase tracking-wider">API</span>
-              <code className="text-[13px] text-cyan-400/70 font-mono">
+            <div>
+              <span className="text-[9px] text-white/35 uppercase tracking-widest block mb-0.5">API</span>
+              <code className="text-[13px] text-white/80 font-mono">
                 {cfg.APIIP || "0.0.0.0"}:{cfg.APIPort || "—"}
               </code>
             </div>
             {(cfg.APICert || cfg.APIKey) && (
               <>
-                <div className="w-px h-4 bg-white/[0.06]" />
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] text-white/25 uppercase tracking-wider">TLS</span>
-                  <code className="text-[13px] text-white/50 font-mono truncate max-w-[200px]">{cfg.APICert || "none"}</code>
+                <div className="w-px h-8 bg-white/[0.06]" />
+                <div>
+                  <span className="text-[9px] text-white/35 uppercase tracking-widest block mb-0.5">TLS Cert</span>
+                  <code className="text-[13px] text-white/80 font-mono truncate block max-w-[200px]">{cfg.APICert || "none"}</code>
                 </div>
               </>
             )}
             <button
-              className="ml-auto p-1.5 rounded text-white/20 hover:text-white/50 hover:bg-white/[0.04] transition-colors"
+              className="ml-auto p-1.5 rounded text-white/40 hover:text-white/60 hover:bg-white/[0.04] transition-colors"
               onClick={() => setEditing(true)}
             >
               <SettingsIcon className="h-3.5 w-3.5" />
@@ -72,29 +72,29 @@ const Settings = () => {
           <div className="flex-1">
             <div className="grid grid-cols-4 gap-3">
               <div>
-                <label className="text-[10px] text-white/30 uppercase block mb-1">IP</label>
+                <label className="text-[10px] text-white/50 uppercase block mb-1">IP</label>
                 <Input className="h-7 text-[12px] border-[#1e2433] bg-transparent" value={cfg.APIIP || ""} onChange={(e) => updatecfg("APIIP", e.target.value)} />
               </div>
               <div>
-                <label className="text-[10px] text-white/30 uppercase block mb-1">Port</label>
+                <label className="text-[10px] text-white/50 uppercase block mb-1">Port</label>
                 <Input className="h-7 text-[12px] border-[#1e2433] bg-transparent" value={cfg.APIPort || ""} onChange={(e) => updatecfg("APIPort", e.target.value)} />
               </div>
               <div>
-                <label className="text-[10px] text-white/30 uppercase block mb-1">Cert Domains</label>
+                <label className="text-[10px] text-white/50 uppercase block mb-1">Cert Domains</label>
                 <Input className="h-7 text-[12px] border-[#1e2433] bg-transparent" value={cfg.APICertDomains || ""} onChange={(e) => updatecfg("APICertDomains", e.target.value)} />
               </div>
               <div>
-                <label className="text-[10px] text-white/30 uppercase block mb-1">Cert IPs</label>
+                <label className="text-[10px] text-white/50 uppercase block mb-1">Cert IPs</label>
                 <Input className="h-7 text-[12px] border-[#1e2433] bg-transparent" value={cfg.APICertIPs || ""} onChange={(e) => updatecfg("APICertIPs", e.target.value)} />
               </div>
             </div>
             <div className="grid grid-cols-4 gap-3 mt-2">
               <div>
-                <label className="text-[10px] text-white/30 uppercase block mb-1">Cert Path</label>
+                <label className="text-[10px] text-white/50 uppercase block mb-1">Cert Path</label>
                 <Input className="h-7 text-[12px] border-[#1e2433] bg-transparent" value={cfg.APICert || ""} onChange={(e) => updatecfg("APICert", e.target.value)} />
               </div>
               <div>
-                <label className="text-[10px] text-white/30 uppercase block mb-1">Key Path</label>
+                <label className="text-[10px] text-white/50 uppercase block mb-1">Key Path</label>
                 <Input className="h-7 text-[12px] border-[#1e2433] bg-transparent" value={cfg.APIKey || ""} onChange={(e) => updatecfg("APIKey", e.target.value)} />
               </div>
             </div>
@@ -111,7 +111,7 @@ const Settings = () => {
                   <Save className="h-3 w-3 mr-1" /> Save
                 </Button>
               )}
-              <button className="text-[11px] text-white/30 hover:text-white/50 px-2" onClick={() => { setCfg({ ...state.Config }); setMod(false); setEditing(false); }}>
+              <button className="text-[11px] text-white/50 hover:text-white/70 px-2" onClick={() => { setCfg({ ...state.Config }); setMod(false); setEditing(false); }}>
                 Cancel
               </button>
             </div>
@@ -121,7 +121,7 @@ const Settings = () => {
 
       {/* ── Logging ── */}
       <div className="mb-8">
-        <span className="text-[11px] text-white/30 font-medium uppercase tracking-wider block mb-3">Logging</span>
+        <span className="text-[11px] text-white/50 font-medium uppercase tracking-wider block mb-3">Logging</span>
         <div className="flex items-center gap-2 flex-wrap">
           {loggingOptions.map((opt) => (
             <button
@@ -129,7 +129,7 @@ const Settings = () => {
               className={`text-[11px] px-3 py-1 rounded-full border transition-all cursor-pointer ${
                 opt.checked
                   ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.12)]"
-                  : "border-white/[0.06] bg-white/[0.02] text-white/30 hover:text-white/50 hover:border-white/15 hover:bg-white/[0.04]"
+                  : "border-white/[0.06] bg-white/[0.02] text-white/50 hover:text-white/70 hover:border-white/25 hover:bg-white/[0.04]"
               }`}
               onClick={() => { state.toggleConfigKeyAndSave("Config", opt.key); state.renderPage("settings"); }}
             >
@@ -140,7 +140,7 @@ const Settings = () => {
             className={`text-[11px] px-3 py-1 rounded-full border transition-all cursor-pointer ${
               state?.Config?.ConsoleLogOnly
                 ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.12)]"
-                : "border-white/[0.06] bg-white/[0.02] text-white/30 hover:text-white/50 hover:border-white/15 hover:bg-white/[0.04]"
+                : "border-white/[0.06] bg-white/[0.02] text-white/50 hover:text-white/70 hover:border-white/25 hover:bg-white/[0.04]"
             }`}
             onClick={() => { state.toggleConfigKeyAndSave("Config", "ConsoleLogOnly"); state.renderPage("settings"); }}
           >
@@ -150,7 +150,7 @@ const Settings = () => {
             className={`text-[11px] px-3 py-1 rounded-full border transition-all cursor-pointer ${
               state?.Config?.DeepDebugLoggin
                 ? "border-amber-500/40 bg-amber-500/15 text-amber-400 shadow-[0_0_12px_rgba(245,158,11,0.12)]"
-                : "border-white/[0.06] bg-white/[0.02] text-white/30 hover:text-white/50 hover:border-white/15 hover:bg-white/[0.04]"
+                : "border-white/[0.06] bg-white/[0.02] text-white/50 hover:text-white/70 hover:border-white/25 hover:bg-white/[0.04]"
             }`}
             onClick={() => { state.toggleConfigKeyAndSave("Config", "DeepDebugLoggin"); state.renderPage("settings"); }}
           >
@@ -160,7 +160,7 @@ const Settings = () => {
             className={`text-[11px] px-3 py-1 rounded-full border transition-all cursor-pointer ${
               state?.debug
                 ? "border-amber-500/40 bg-amber-500/15 text-amber-400 shadow-[0_0_12px_rgba(245,158,11,0.12)]"
-                : "border-white/[0.06] bg-white/[0.02] text-white/30 hover:text-white/50 hover:border-white/15 hover:bg-white/[0.04]"
+                : "border-white/[0.06] bg-white/[0.02] text-white/50 hover:text-white/70 hover:border-white/25 hover:bg-white/[0.04]"
             }`}
             onClick={() => { state.toggleDebug(); state.renderPage("settings"); }}
           >
@@ -171,7 +171,7 @@ const Settings = () => {
 
       {/* ── Updates ── */}
       <div className="mb-8">
-        <span className="text-[11px] text-white/30 font-medium uppercase tracking-wider block mb-3">Updates</span>
+        <span className="text-[11px] text-white/50 font-medium uppercase tracking-wider block mb-3">Updates</span>
         <div className="flex items-center gap-2 flex-wrap mb-3">
           {[
             { key: "DisableUpdates", label: "Disable Updates", checked: state?.Config?.DisableUpdates, amber: true },
@@ -187,7 +187,7 @@ const Settings = () => {
                   ? opt.amber
                     ? "border-amber-500/40 bg-amber-500/15 text-amber-400 shadow-[0_0_12px_rgba(245,158,11,0.12)]"
                     : "border-emerald-500/40 bg-emerald-500/15 text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.12)]"
-                  : "border-white/[0.06] bg-white/[0.02] text-white/30 hover:text-white/50 hover:border-white/15 hover:bg-white/[0.04]"
+                  : "border-white/[0.06] bg-white/[0.02] text-white/50 hover:text-white/70 hover:border-white/25 hover:bg-white/[0.04]"
               }`}
               onClick={() => { state.toggleConfigKeyAndSave("Config", opt.key); state.renderPage("settings"); }}
             >
@@ -199,13 +199,13 @@ const Settings = () => {
 
       {/* ── DNS ── */}
       <div className="mb-8">
-        <span className="text-[11px] text-white/30 font-medium uppercase tracking-wider block mb-3">DNS</span>
+        <span className="text-[11px] text-white/50 font-medium uppercase tracking-wider block mb-3">DNS</span>
         <div className="flex items-center gap-2 flex-wrap">
           <button
             className={`text-[11px] px-3 py-1 rounded-full border transition-all cursor-pointer ${
               state?.Config?.DisableDNS
                 ? "border-amber-500/40 bg-amber-500/15 text-amber-400 shadow-[0_0_12px_rgba(245,158,11,0.12)]"
-                : "border-white/[0.06] bg-white/[0.02] text-white/30 hover:text-white/50 hover:border-white/15 hover:bg-white/[0.04]"
+                : "border-white/[0.06] bg-white/[0.02] text-white/50 hover:text-white/70 hover:border-white/25 hover:bg-white/[0.04]"
             }`}
             onClick={() => { state.toggleConfigKeyAndSave("Config", "DisableDNS"); state.renderPage("settings"); }}
           >
@@ -219,7 +219,7 @@ const Settings = () => {
 
         {/* Network */}
         <div>
-          <span className="text-[11px] text-white/30 font-medium uppercase tracking-wider block mb-3">Network</span>
+          <span className="text-[11px] text-white/50 font-medium uppercase tracking-wider block mb-3">Network</span>
           <div className="space-y-1">
             {[
               { label: "Interface", value: state.Network?.DefaultInterfaceName },
@@ -228,7 +228,7 @@ const Settings = () => {
               { label: "Gateway", value: state.Network?.DefaultGateway },
             ].map((row, i) => (
               <div key={i} className="flex items-baseline gap-3 py-1.5 pl-3 border-l-2 border-blue-500/20">
-                <span className="text-[11px] text-white/25 shrink-0 w-[90px]">{row.label}</span>
+                <span className="text-[11px] text-white/45 shrink-0 w-[90px]">{row.label}</span>
                 <code className="text-[13px] text-white/60 font-mono truncate">{row.value ?? "unknown"}</code>
               </div>
             ))}
@@ -237,7 +237,7 @@ const Settings = () => {
 
         {/* System */}
         <div>
-          <span className="text-[11px] text-white/30 font-medium uppercase tracking-wider block mb-3">System</span>
+          <span className="text-[11px] text-white/50 font-medium uppercase tracking-wider block mb-3">System</span>
           <div className="space-y-1">
             {[
               { label: "API Version", value: apiversion },
@@ -249,7 +249,7 @@ const Settings = () => {
               { label: "Admin", value: state.State?.IsAdmin ? "Yes" : "No" },
             ].map((row, i) => (
               <div key={i} className="flex items-baseline gap-3 py-1.5 pl-3 border-l-2 border-violet-500/20">
-                <span className="text-[11px] text-white/25 shrink-0 w-[90px]">{row.label}</span>
+                <span className="text-[11px] text-white/45 shrink-0 w-[90px]">{row.label}</span>
                 <code className="text-[13px] text-white/60 font-mono truncate">{row.value ?? "unknown"}</code>
               </div>
             ))}

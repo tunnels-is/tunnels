@@ -104,19 +104,19 @@ const InspectGroup = () => {
       {/* ── Group banner ── */}
       <div className="flex items-center gap-5 py-3 px-4 rounded-lg bg-[#0a0d14]/80 border border-[#1e2433] mb-6">
         <div className="flex items-center gap-2">
-          <span className="text-[10px] text-white/25 uppercase tracking-wider">Group</span>
+          <span className="text-[10px] text-white/45 uppercase tracking-wider">Group</span>
           <code className="text-[13px] text-cyan-400/70 font-mono">{group.Tag}</code>
         </div>
         {group.Description && (
           <>
             <div className="w-px h-4 bg-white/[0.06]" />
-            <span className="text-[12px] text-white/30">{group.Description}</span>
+            <span className="text-[12px] text-white/50">{group.Description}</span>
           </>
         )}
         <div className="w-px h-4 bg-white/[0.06]" />
         <div className="flex items-center gap-2">
-          <span className="text-[10px] text-white/25 uppercase tracking-wider">ID</span>
-          <code className="text-[11px] text-white/30 font-mono">{group._id}</code>
+          <span className="text-[10px] text-white/45 uppercase tracking-wider">ID</span>
+          <code className="text-[11px] text-white/50 font-mono">{group._id}</code>
         </div>
       </div>
 
@@ -126,7 +126,7 @@ const InspectGroup = () => {
           {tabs.map((t) => (
             <button
               key={t.key}
-              className={`text-[11px] px-2.5 py-0.5 rounded transition-colors ${tab === t.key ? "bg-white/[0.07] text-white/70" : "text-white/20 hover:text-white/40"}`}
+              className={`text-[11px] px-2.5 py-0.5 rounded transition-colors ${tab === t.key ? "bg-white/[0.07] text-white/70" : "text-white/40 hover:text-white/40"}`}
               onClick={() => switchTab(t.key)}
             >
               {t.label}
@@ -135,16 +135,16 @@ const InspectGroup = () => {
         </div>
         <div className="w-px h-4 bg-white/[0.06]" />
         <button
-          className="text-white/20 hover:text-white/50 transition-colors"
+          className="flex items-center gap-1 text-[11px] text-emerald-400/60 hover:text-emerald-400 transition-colors"
           onClick={() => { setAddId(""); setDialog(true); }}
         >
-          <Plus className="h-3.5 w-3.5" />
+          <Plus className="h-3 w-3" /> Add
         </button>
         <div className="flex items-center gap-1.5 ml-auto">
           <div className="relative">
-            <Search className="h-3 w-3 absolute left-2 top-1/2 -translate-y-1/2 text-white/15" />
+            <Search className="h-3 w-3 absolute left-2 top-1/2 -translate-y-1/2 text-white/40" />
             <input
-              className="h-6 w-40 pl-7 pr-2 text-[11px] rounded bg-white/[0.03] border border-white/[0.06] text-white/60 placeholder:text-white/15 outline-none focus:border-white/15 transition-colors"
+              className="h-6 w-40 pl-7 pr-2 text-[11px] rounded bg-white/[0.03] border border-white/[0.06] text-white/60 placeholder:text-white/50 outline-none focus:border-white/25 transition-colors"
               placeholder={`Filter ${tab}s...`}
               value={filter}
               onChange={(e) => { setFilter(e.target.value); setPage(0); }}
@@ -153,15 +153,15 @@ const InspectGroup = () => {
           {filtered.length > PAGE_SIZE && (
             <div className="flex items-center gap-1">
               <button
-                className="p-0.5 text-white/20 hover:text-white/50 disabled:opacity-30 disabled:cursor-default transition-colors"
+                className="p-0.5 text-white/40 hover:text-white/60 disabled:opacity-30 disabled:cursor-default transition-colors"
                 disabled={safePage === 0}
                 onClick={() => setPage(safePage - 1)}
               >
                 <ChevronLeft className="h-3.5 w-3.5" />
               </button>
-              <span className="text-[10px] text-white/20 tabular-nums">{safePage + 1}/{totalPages}</span>
+              <span className="text-[10px] text-white/40 tabular-nums">{safePage + 1}/{totalPages}</span>
               <button
-                className="p-0.5 text-white/20 hover:text-white/50 disabled:opacity-30 disabled:cursor-default transition-colors"
+                className="p-0.5 text-white/40 hover:text-white/60 disabled:opacity-30 disabled:cursor-default transition-colors"
                 disabled={safePage >= totalPages - 1}
                 onClick={() => setPage(safePage + 1)}
               >
@@ -170,17 +170,17 @@ const InspectGroup = () => {
             </div>
           )}
           {filtered.length > 0 && (
-            <span className="text-[10px] text-white/15 tabular-nums">{filtered.length}</span>
+            <span className="text-[10px] text-white/40 tabular-nums">{filtered.length}</span>
           )}
         </div>
       </div>
 
       {/* ── Column headers ── */}
       <div className="flex items-center gap-4 pl-3 border-l-2 border-transparent mb-1">
-        <span className="text-[10px] text-white/15 uppercase tracking-wider flex-1 min-w-0">
+        <span className="text-[10px] text-white/40 uppercase tracking-wider flex-1 min-w-0">
           {tab === "user" ? "Email" : "Tag"}
         </span>
-        <span className="text-[10px] text-white/15 uppercase tracking-wider shrink-0 w-48 text-right hidden md:block">ID</span>
+        <span className="text-[10px] text-white/40 uppercase tracking-wider shrink-0 w-48 text-right hidden md:block">ID</span>
         <span className="shrink-0 w-6" />
       </div>
 
@@ -191,7 +191,7 @@ const InspectGroup = () => {
             <span className="text-[13px] text-white/80 font-medium flex-1 min-w-0 truncate">
               {item[labelKey] || item._id || "—"}
             </span>
-            <span className="text-[11px] text-white/20 font-mono tabular-nums shrink-0 w-48 text-right hidden md:block truncate">
+            <span className="text-[11px] text-white/40 font-mono tabular-nums shrink-0 w-48 text-right hidden md:block truncate">
               {item._id}
             </span>
             <div className="shrink-0 w-6 flex justify-end opacity-0 group-hover:opacity-100 transition-opacity">
@@ -201,7 +201,7 @@ const InspectGroup = () => {
             </div>
           </div>
         )) : (
-          <div className="py-6 pl-3 border-l-2 border-white/[0.04] text-[12px] text-white/15">
+          <div className="py-6 pl-3 border-l-2 border-white/[0.04] text-[12px] text-white/40">
             {filter ? `No matching ${tab}s` : `No ${tab}s in this group`}
           </div>
         )}
@@ -215,7 +215,7 @@ const InspectGroup = () => {
           </DialogHeader>
 
           <div className="pt-2">
-            <label className="text-[10px] text-white/30 uppercase block mb-1">{tab} ID</label>
+            <label className="text-[10px] text-white/50 uppercase block mb-1">{tab} ID</label>
             <Input
               className="h-7 text-[12px] border-[#1e2433] bg-transparent"
               placeholder={`Enter ${tab} ID...`}
@@ -228,7 +228,7 @@ const InspectGroup = () => {
             <Button className="text-white bg-emerald-600 hover:bg-emerald-500 h-6 text-[11px] px-2.5" onClick={addToGroup}>
               <Save className="h-3 w-3 mr-1" /> Add
             </Button>
-            <button className="text-[11px] text-white/30 hover:text-white/50 px-2" onClick={() => setDialog(false)}>
+            <button className="text-[11px] text-white/50 hover:text-white/70 px-2" onClick={() => setDialog(false)}>
               Cancel
             </button>
           </DialogFooter>
