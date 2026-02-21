@@ -210,26 +210,26 @@ const TunnelNode = React.forwardRef(({ tunnel, active, state, selected, linking,
         expanded ? "max-h-40 opacity-100" : "max-h-0 opacity-0 group-hover/node:max-h-40 group-hover/node:opacity-100"
       )}>
         <div className="mt-2 pt-2 border-t border-[#1e2433] space-y-0.5 ml-4">
-        {tunnel.ServerID && (
+          {tunnel.ServerID && (
+            <div className="text-[10px]">
+              <span className="text-white/45 uppercase tracking-wider">Server ID </span>
+              <span className="text-white/40 font-mono">{tunnel.ServerID}</span>
+            </div>
+          )}
           <div className="text-[10px]">
-            <span className="text-white/45 uppercase tracking-wider">Server ID </span>
-            <span className="text-white/40 font-mono">{tunnel.ServerID}</span>
+            <span className="text-white/45 uppercase tracking-wider">IPv6 </span>
+            <span className="text-white/40 font-mono">{tunnel.IPv6Address || "none"}</span>
           </div>
-        )}
-        <div className="text-[10px]">
-          <span className="text-white/45 uppercase tracking-wider">IPv6 </span>
-          <span className="text-white/40 font-mono">{tunnel.IPv6Address || "none"}</span>
-        </div>
-        <div className="text-[10px]">
-          <span className="text-white/45 uppercase tracking-wider">Mask </span>
-          <span className="text-white/40 font-mono">{tunnel.NetMask || "none"}</span>
-        </div>
-        <div className="text-[10px]">
-          <span className="text-white/45 uppercase tracking-wider">MTU </span>
-          <span className="text-white/40 font-mono">{tunnel.MTU}</span>
-          <span className="text-white/45 uppercase tracking-wider ml-2">TxQ </span>
-          <span className="text-white/40 font-mono">{tunnel.TxQueueLen}</span>
-        </div>
+          <div className="text-[10px]">
+            <span className="text-white/45 uppercase tracking-wider">Mask </span>
+            <span className="text-white/40 font-mono">{tunnel.NetMask || "none"}</span>
+          </div>
+          <div className="text-[10px]">
+            <span className="text-white/45 uppercase tracking-wider">MTU </span>
+            <span className="text-white/40 font-mono">{tunnel.MTU}</span>
+            <span className="text-white/45 uppercase tracking-wider ml-2">TxQ </span>
+            <span className="text-white/40 font-mono">{tunnel.TxQueueLen}</span>
+          </div>
         </div>
       </div>
 
@@ -340,22 +340,22 @@ const ServerNode = React.forwardRef(({ server, hasActive, hasLinked, activeStats
         expanded ? "max-h-40 opacity-100" : "max-h-0 opacity-0 group-hover/node:max-h-40 group-hover/node:opacity-100"
       )}>
         <div className="mt-2 pt-2 border-t border-[#1e2433] space-y-0.5 ml-[22px]">
-        <div className="text-[10px]">
-          <span className="text-white/45 uppercase tracking-wider">ID </span>
-          <span className="text-white/40 font-mono">{server._id}</span>
-        </div>
-        {server.DataPort && (
           <div className="text-[10px]">
-            <span className="text-white/45 uppercase tracking-wider">Data Port </span>
-            <span className="text-white/40 font-mono">{server.DataPort}</span>
+            <span className="text-white/45 uppercase tracking-wider">ID </span>
+            <span className="text-white/40 font-mono">{server._id}</span>
           </div>
-        )}
-{server.Groups?.length > 0 && (
-          <div className="text-[10px]">
-            <span className="text-white/45 uppercase tracking-wider">Groups </span>
-            <span className="text-white/40 font-mono">{server.Groups.join(", ")}</span>
-          </div>
-        )}
+          {server.DataPort && (
+            <div className="text-[10px]">
+              <span className="text-white/45 uppercase tracking-wider">Data Port </span>
+              <span className="text-white/40 font-mono">{server.DataPort}</span>
+            </div>
+          )}
+          {server.Groups?.length > 0 && (
+            <div className="text-[10px]">
+              <span className="text-white/45 uppercase tracking-wider">Groups </span>
+              <span className="text-white/40 font-mono">{server.Groups.join(", ")}</span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -555,11 +555,46 @@ const Graph = () => {
     }
   };
 
-  const handleServerClick = (server) => {
+  const handleServerClick = async (server) => {
     if (!selectedTunnel) return;
-    state.changeServerOnTunnelUsingTag(selectedTunnel.Tag, server._id);
-    setSelectedTunnel(null);
-    setVersion(v => v + 1);
+
+    const tunnelTag = selectedTunnel?.Tag;
+    const activeTunnel = activeMap[tunnelTag];
+
+    // if currently connected, dc first, then change server.
+    if (activeTunnel) {
+      state.ConfirmAndExecute(
+        "success",
+        "connect",
+        10000,
+        "",
+        `Connect ${tunnelTag} to ${server.Tag}?`,
+        async () => {
+          setSelectedTunnel(null);
+          try {
+            await state.disconnectFromVPN(activeTunnel);
+            state.changeServerOnTunnelUsingTag(tunnelTag, server._id);
+
+            await new Promise(r => setTimeout(r, 500));
+
+            let updatedTunnel = state.Tunnels?.find(t => t.Tag === tunnelTag);
+            if (updatedTunnel) {
+              await state.connectToVPN(updatedTunnel, server);
+            }
+          } catch (err) {
+            console.error("err switching server:", err);
+          }
+          setVersion(v => v + 1);
+          return;
+        }
+      );
+    } else {
+
+      state.changeServerOnTunnelUsingTag(tunnelTag, server._id);
+      setSelectedTunnel(null);
+
+      setVersion(v => v + 1);
+    }
   };
 
   // CRUD handlers
