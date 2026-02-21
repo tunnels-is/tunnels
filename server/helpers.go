@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"runtime/debug"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -22,10 +23,23 @@ func BasicRecover() {
 	}
 }
 
+var packetPool = sync.Pool{
+	New: func() any {
+		return make([]byte, 65536)
+	},
+}
+
 func CopySlice(in []byte) (out []byte) {
-	out = make([]byte, len(in))
-	_ = copy(out, in)
+	buf := packetPool.Get().([]byte)
+	out = buf[:len(in)]
+	copy(out, in)
 	return out
+}
+
+func ReturnPacketBuf(buf []byte) {
+	if buf != nil && cap(buf) >= 65536 {
+		packetPool.Put(buf[:65536])
+	}
 }
 
 var letterRunes = []rune("ABCDEFGHIJKLMNOPQRSTUVWXYZ234567")

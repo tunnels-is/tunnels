@@ -71,8 +71,8 @@ func CreateClientCoreMapping(CRR *types.ServerConnectResponse, CR *types.Control
 
 			clientCoreMappings[i].EH = EH
 			clientCoreMappings[i].Created = time.Now()
-			clientCoreMappings[i].ToUser = make(chan []byte, 500_000)
-			clientCoreMappings[i].FromUser = make(chan Packet, 500_000)
+			clientCoreMappings[i].ToUser = make(chan []byte, 10_000)
+			clientCoreMappings[i].FromUser = make(chan Packet, 10_000)
 			clientCoreMappings[i].LastPingFromClient = time.Now()
 			clientCoreMappings[i].Uindex = make([]byte, 2)
 			binary.BigEndian.PutUint16(clientCoreMappings[i].Uindex, uint16(index))
@@ -141,6 +141,9 @@ func ExternalTCPListener() {
 		ERR("Unable to bind net listener socket err:", err)
 		return
 	}
+
+	syscall.SetsockoptInt(rawTCPSockFD, syscall.SOL_SOCKET, syscall.SO_RCVBUF, 8*1024*1024)
+	syscall.SetsockoptInt(rawTCPSockFD, syscall.SOL_SOCKET, syscall.SO_SNDBUF, 8*1024*1024)
 
 	var DSTP uint16
 	var IHL byte
@@ -211,6 +214,9 @@ func ExternalUDPListener() {
 		ERR("Unable to bind net listener socket err:", err)
 		return
 	}
+
+	syscall.SetsockoptInt(rawUDPSockFD, syscall.SOL_SOCKET, syscall.SO_RCVBUF, 8*1024*1024)
+	syscall.SetsockoptInt(rawUDPSockFD, syscall.SOL_SOCKET, syscall.SO_SNDBUF, 8*1024*1024)
 
 	var DSTP uint16
 	var IPHeadLength byte
@@ -290,6 +296,9 @@ func DataSocketListener() {
 		panic(err)
 	}
 
+	syscall.SetsockoptInt(dataSocketFD, syscall.SOL_SOCKET, syscall.SO_RCVBUF, 8*1024*1024)
+	syscall.SetsockoptInt(dataSocketFD, syscall.SOL_SOCKET, syscall.SO_SNDBUF, 8*1024*1024)
+
 	buff := make([]byte, math.MaxUint16)
 	var id uint16
 	for {
@@ -360,6 +369,7 @@ func fromUserChannel(index int) {
 			staging[:0],
 			payload.data[0:2],
 		)
+		ReturnPacketBuf(payload.data)
 		if err != nil {
 			ERR("Authentication error:", err)
 			continue
@@ -511,6 +521,7 @@ func toUserChannel(index int) {
 		}
 
 		if PACKET[9] != 6 && PACKET[9] != 17 {
+			ReturnPacketBuf(PACKET)
 			continue
 		}
 
@@ -541,6 +552,7 @@ func toUserChannel(index int) {
 
 					activeHost = CM.IsHostAllowed(S4, S4Port)
 					if activeHost == nil {
+						ReturnPacketBuf(PACKET)
 						continue
 					}
 
@@ -562,6 +574,7 @@ func toUserChannel(index int) {
 		err = syscall.Sendto(dataSocketFD,
 			CM.EH.SEAL.Seal2(PACKET, CM.Uindex),
 			0, CM.Addr)
+		ReturnPacketBuf(PACKET)
 		if err != nil {
 			WARN("dataSocketFD sendTo err:", err)
 			return

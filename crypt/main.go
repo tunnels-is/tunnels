@@ -175,56 +175,38 @@ func (S *SEAL) Encrypt2(data []byte, staging []byte) []byte {
 }
 
 func (S *SEAL) Seal1(data []byte, index []byte) (out []byte) {
-	n := make([]byte, S.Nonce1Len)
-	binary.BigEndian.PutUint64(n, S.Nonce1U.Add(1))
-	out = []byte{index[0], index[1], n[0], n[1], n[2], n[3], n[4], n[5], n[6], n[7]}
-	out = S.AEAD1.Seal(out, n, data, index)
+	var n [24]byte
+	binary.BigEndian.PutUint64(n[:], S.Nonce1U.Add(1))
+	out = make([]byte, 10, 10+len(data)+S.AEAD1.Overhead())
+	out[0] = index[0]
+	out[1] = index[1]
+	copy(out[2:10], n[:8])
+	out = S.AEAD1.Seal(out, n[:S.Nonce1Len], data, index)
 	return
 }
 
 func (S *SEAL) Seal2(data []byte, index []byte) (out []byte) {
-	n := make([]byte, S.Nonce2Len)
-	binary.BigEndian.PutUint64(n, S.Nonce2U.Add(1))
-	out = []byte{index[0], index[1], n[0], n[1], n[2], n[3], n[4], n[5], n[6], n[7]}
-	out = S.AEAD2.Seal(out, n, data, index)
+	var n [24]byte
+	binary.BigEndian.PutUint64(n[:], S.Nonce2U.Add(1))
+	out = make([]byte, 10, 10+len(data)+S.AEAD2.Overhead())
+	out[0] = index[0]
+	out[1] = index[1]
+	copy(out[2:10], n[:8])
+	out = S.AEAD2.Seal(out, n[:S.Nonce2Len], data, index)
 	return
 }
 
 func (S *SEAL) Open1(data []byte, nonce []byte, staging []byte, index []byte) (decrypted []byte, err error) {
-	n := make([]byte, S.Nonce1Len)
-	n[0] = nonce[0]
-	n[1] = nonce[1]
-	n[2] = nonce[2]
-	n[3] = nonce[3]
-	n[4] = nonce[4]
-	n[5] = nonce[5]
-	n[6] = nonce[6]
-	n[7] = nonce[7]
-	decrypted, err = S.AEAD1.Open(
-		staging,
-		n,
-		data,
-		index,
-	)
+	var n [24]byte
+	copy(n[:8], nonce[:8])
+	decrypted, err = S.AEAD1.Open(staging, n[:S.Nonce1Len], data, index)
 	return
 }
 
 func (S *SEAL) Open2(data []byte, nonce []byte, staging []byte, index []byte) (decrypted []byte, err error) {
-	n := make([]byte, S.Nonce2Len)
-	n[0] = nonce[0]
-	n[1] = nonce[1]
-	n[2] = nonce[2]
-	n[3] = nonce[3]
-	n[4] = nonce[4]
-	n[5] = nonce[5]
-	n[6] = nonce[6]
-	n[7] = nonce[7]
-	decrypted, err = S.AEAD2.Open(
-		staging,
-		n,
-		data,
-		index,
-	)
+	var n [24]byte
+	copy(n[:8], nonce[:8])
+	decrypted, err = S.AEAD2.Open(staging, n[:S.Nonce2Len], data, index)
 	return
 }
 

@@ -327,11 +327,8 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		DEBUG("Unable to open data tunnel: ", err)
 		return 502, errors.New("unable to open data tunnel")
 	}
-	// EXPERIMENTAL
-	// err = setDontFragment(UDPConn)
-	// if err != nil {
-	// 	DEBUG("unable to disable IP fragmentation", err)
-	// }
+	UDPConn.SetReadBuffer(8 * 1024 * 1024)
+	UDPConn.SetWriteBuffer(8 * 1024 * 1024)
 	tunnel.connection = net.Conn(UDPConn)
 
 	var inter *TInterface
