@@ -188,7 +188,6 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 			if err != nil {
 				return 502, errors.New("unable to initialize controller route: " + err.Error())
 			}
-
 		}
 	}
 

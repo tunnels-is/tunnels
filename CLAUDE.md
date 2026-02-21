@@ -1,72 +1,97 @@
-# Tunnels.is VPN Project - Root Context
+# CLAUDE.md
 
-## Project Overview
-Tunnels.is is a comprehensive VPN solution with both server and client components, featuring a web-based management interface. The project is built in Go with a React frontend and provides enterprise-grade VPN functionality with user management, device management, group-based access control, and real-time monitoring.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Build Commands
+
+```bash
+# Client binary
+cd cmd/main && go build .
+
+# Server binary (linux only)
+cd server && go build .
+
+# Frontend
+cd frontend && pnpm install && pnpm run build
+
+# Frontend dev server (must first accept TLS cert at https://127.0.0.1:7777)
+cd frontend && pnpm run dev
+
+# Linting
+golangci-lint run --timeout=10m --config .golangci.yml
+
+# All tests
+make test
+
+# Server tests only (verbose)
+make test-server
+
+# Tests with coverage
+make test-coverage
+
+# Run tests directly
+go test ./server/...
+go test ./client/...
+
+# Single test
+go test -v -run TestName ./server/...
+
+# Pre-commit checks (mod tidy + tests + lint)
+make pre-commit
+```
 
 ## Architecture
-The project follows a client-server architecture:
-- **Server**: Go-based VPN server with REST API for management
-- **Client**: Go-based VPN client with embedded web UI
-- **Frontend**: React-based web interface for configuration and management
 
-## Key Components
+### Three-Component System
+- **Server** (`server/`) - VPN server with REST API, runs on Linux. Uses MongoDB or BoltDB for storage.
+- **Client** (`client/`) - VPN client with embedded web UI. Cross-platform (Linux/macOS/Windows).
+- **Frontend** (`frontend/`) - React 18 + Vite + TailwindCSS 4 + Radix UI. Built and embedded into the client binary via `//go:embed dist`.
 
-### Core Directories
-- `server/` - VPN server implementation with API endpoints
-- `client/` - VPN client implementation with local web server
-- `frontend/` - React web UI for both client and server management
-- `cmd/main/` - Main client executable entry point
-- `types/` - Shared data structures and types
-- `certs/`, `crypt/`, `iptables/`, `setcap/` - Supporting utilities
+### Entry Points
+- `cmd/main/main.go` - CLI client entry point (embeds frontend dist)
+- `cmd/wails/main.go` - Desktop app entry point (Wails framework, experimental)
+- `cmd/service/` - Windows service wrapper
+- `server/main.go` - Server entry point
 
-### Features (Configurable)
-- **VPN**: Core VPN tunneling functionality
-- **LAN**: Local network access and device management
-- **AUTH**: User authentication and authorization
-- **DNS**: Custom DNS resolution and records
-- **BBOLT**: Local database storage option
+### Connection Flow
+1. Client calls `PublicConnect()` in `client/session.go`
+2. Client contacts controller at `/v3/session` with signed request
+3. TLS 1.3 handshake with server, hybrid encryption (X25519 + ML-KEM1024)
+4. Tunnel interface created, UDP data channel established
+5. Packet forwarding goroutines started (`ReadFromServeTunnel`/`ReadFromTunnelInterface`)
 
-## Technologies Used
-- **Backend**: Go 1.24, MongoDB, BoltDB
-- **Frontend**: React 18, Vite, TailwindCSS, Radix UI
-- **Networking**: raw sockets, tcp, udp
-- **Security**: bcrypt, 2FA/TOTP, TLS 1.2+, signed requests
+### Server Feature Flags
+Server config enables/disables features: `VPN`, `LAN`, `AUTH`, `DNS`, `BBOLT`. These are defined in `types/types.go` as the `Feature` enum.
 
-## Build Process
-- Client: `cd cmd/main && go build .`
-- Server: `cd server && go build .`
-- Frontend: `cd frontend && pnpm install && vite build`
-- Linting: `golangci-lint run --timeout=10m --config .golangci.yml`
+### Platform-Specific Code
+Build tags separate platform code in `client/`:
+- `IFINIT_Darwin.go`, `IFINIT_unix.go`, `IFINIT_windows.go` - Interface initialization
+- `packet_darwin.go`, `packet_unix.go`, `packet_windows.go` - Packet handling
+- `helpers_darwin.go`, `helpers_unix.go`, `helpers_windows.go` - OS helpers
 
-## Configuration
-- Server config: `server/config.json` with feature toggles
-- Client auto-generates config if not present
-- Environment variables or config file for secrets
-- Supports multiple tunnel types: default, strict, iot
+### Key Packages
+- `types/` - Shared data structures (`ServerConfig`, `ControllerConnectRequest`, `Device`, `Server`, `Network`, `DNSRecord`, etc.)
+- `crypt/` - Hybrid post-quantum encryption (X25519 + ML-KEM1024, AES128/256, ChaCha20)
+- `signal/` - Named goroutine scheduler pattern (`NewSignal(tag, ctx, cancel, sleep, logFunc, method)`)
+- `server/handlers.go` - API endpoint handlers
+- `server/dbwrapper.go` - MongoDB layer; `server/bboltwrapper.go` - BoltDB alternative
 
-## Network Architecture
-- VPN uses custom protocol over UDP
-- Raw socket programming for packet handling
-- DHCP-style IP assignment for LAN clients
-- Firewall rules automatically configured via iptables
-- Support for custom DNS resolution and blocking
+### Frontend Structure
+- `frontend/src/App.jsx` - HashRouter, main routing
+- `frontend/src/state.jsx` - Global state with manual re-render triggers (`STATE.renderPage()`, `STATE.globalRerender()`)
+- `frontend/src/store.js` - Session storage cache (prefixed `data_`)
+- `frontend/src/ws.js` - WebSocket for real-time logs
+- `frontend/src/App/` - Page components (Login, Users, Groups, Devices, Settings, etc.)
+- `frontend/src/components/ui/` - Radix UI wrappers
+- Path alias: `@` maps to `frontend/src/`
 
-## Development Notes
-- Cross-platform support (Linux, macOS, Windows)
-- Requires network admin permissions to run
-- Embedded frontend in client binary
-- Hot reloading in development mode
-- Comprehensive API documentation available
+### Concurrency Patterns
+- `atomic.Pointer` for thread-safe config/state access (no locks)
+- `signal.Signal` for recurring goroutine tasks with named tags and intervals
+- Client uses priority channels (high/medium/low) in a select loop
+- `puzpuzpuz/xsync` for concurrent maps
 
-## Important Files
-- `README.md` - Setup and usage instructions
-- `API_DOCUMENTATION.md` - Complete API reference
-- `go.mod` - Go module dependencies
-- `.golangci.yml` - Linting configuration
-- `.goreleaser.yaml` - Release automation
-
-## Client vs Server
-- **Client**: Connects to servers, runs local web UI, manages user tunnels
-- **Server**: Accepts client connections, manages users/devices/groups, provides API
-
-This project represents a production-ready VPN solution with enterprise features, suitable for both individual and organizational use.
+### Permissions Required
+- Linux: `setcap 'cap_net_raw,cap_net_bind_service,cap_net_admin+eip' main`
+- macOS: `sudo`
+- Windows: Administrator

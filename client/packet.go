@@ -64,12 +64,7 @@ func (V *TUN) ProcessEgressPacket(p *[]byte) (sendRemote bool) {
 	V.EP_DstPort[0] = V.EP_TPHeader[2]
 	V.EP_DstPort[1] = V.EP_TPHeader[3]
 
-	// Prep work for blocking ports
-	// for i := range V.Meta.ParsedBlockedPorts {
-	// 	if bytes.Equal(V.Meta.ParsedBlockedPorts[i], V.EP_DstPort[:]) {
-	// 		return false
-	// 	}
-	// }
+	// TODO .. IMPLEMENT PORT BLOCKING
 
 	if !V.IsEgressVPLIP(V.EP_DstIP) {
 
