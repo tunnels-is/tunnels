@@ -763,12 +763,12 @@ func (t *TInterface) Disconnect(tun *TUN) (err error) {
 		tun.connection.Close()
 	}
 
+	t.CloseReadAndWriteLoop()
+
 	err = t.Close()
 	if err != nil {
 		ERROR("unable to delete the interface", err)
 	}
-
-	t.CloseReadAndWriteLoop()
 	// TODO .. might not be needed ?????
 	meta := tun.meta.Load()
 	if IsDefaultConnection(meta.IFName) || meta.EnableDefaultRoute {
