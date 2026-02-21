@@ -561,6 +561,7 @@ func InitializeTunnelFromCRR(TUN *TUN) (err error) {
 	TUN.startPort = TUN.ServerResponse.StartPort
 	TUN.endPort = TUN.ServerResponse.EndPort
 	TUN.InitPortMap()
+	TUN.InitializeBlockedPorts(meta.BlockedPorts)
 
 	err = TUN.InitVPLMap()
 	if err != nil {
