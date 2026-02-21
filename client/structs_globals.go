@@ -132,7 +132,7 @@ var (
 	AppStartTime        = time.Now()
 	DEFAULT_TUNNEL      *TInterface
 	DEFAULT_DNS_SERVERS []string
-	DNSClient = new(dns.Client)
+	DNSClient           = new(dns.Client)
 
 	// HTTP
 	API_SERVER http.Server
@@ -336,6 +336,7 @@ type TunnelMETA struct {
 	DNSRecords         []*types.DNSRecord
 	Networks           []*types.Network
 	Routes             []*types.Route
+	BlockedPorts       []uint16
 }
 
 type AllowedHost struct {
@@ -579,6 +580,7 @@ type configV2 struct {
 	// Generic
 	DisableDNS        bool
 	LogBlockedDomains bool
+	LogBlockedPorts   bool
 	LogAllDomains     bool
 	DebugLogging      bool
 	DeepDebugLoggin   bool
@@ -668,6 +670,9 @@ type TUN struct {
 	// Connection Requests + Response
 	CR             *ConnectionRequest
 	ServerResponse *types.ServerConnectResponse
+
+	// blocked port ([2]byte) to uint16 version for quick lookup
+	blockedPortsSet map[[2]byte]uint16 `json:"-"`
 
 	pingTime                atomic.Pointer[time.Time]
 	needsReconnect          atomic.Bool
@@ -831,6 +836,22 @@ func (t *TUN) MarshalJSON() ([]byte, error) {
 		eb,
 		ib,
 	})
+}
+
+func (t *TUN) InitBlockedPorts(ports []uint16) {
+	if len(ports) == 0 {
+		return
+	}
+
+	t.blockedPortsSet = make(map[[2]byte]uint16)
+	for _, port := range ports {
+		var portBytes [2]byte
+
+		portBytes[0] = byte(port >> 8)
+		portBytes[1] = byte(port & 0xFF)
+
+		t.blockedPortsSet[portBytes] = port
+	}
 }
 
 func (t *TUN) InitPortMap() {
