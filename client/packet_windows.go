@@ -41,6 +41,11 @@ func (tun *TUN) ReadFromTunnelInterface() {
 		tunif        = tun.tunnel.Load()
 	)
 
+	if tunif == nil {
+		ERROR("ReadFromTunnelInterface: tunnel interface is nil")
+		return
+	}
+
 	for {
 		if tun.GetState() < TUN_Connected {
 			return
@@ -129,6 +134,11 @@ func (tun *TUN) ReadFromServeTunnel() {
 		err     error
 		meta    = tun.meta.Load()
 	)
+
+	if inf == nil {
+		ERROR("ReadFromServeTunnel: tunnel interface is nil")
+		return
+	}
 
 	for {
 		if tun.GetState() < TUN_Connected {
