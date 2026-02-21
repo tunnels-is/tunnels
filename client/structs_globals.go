@@ -671,7 +671,8 @@ type TUN struct {
 	CR             *ConnectionRequest
 	ServerResponse *types.ServerConnectResponse
 
-	blockedPortsSet *xsync.MapOf[uint16, bool] `json:"-"`
+	// blocked port ([2]byte) to uint16 version for quick lookup
+	blockedPortsSet map[[2]byte]uint16 `json:"-"`
 
 	pingTime                atomic.Pointer[time.Time]
 	needsReconnect          atomic.Bool
@@ -777,16 +778,6 @@ func init() {
 	DNSStatsMap = xsync.NewMapOf[string, any]()
 }
 
-
-func (t *TUN) IsPortBlocked(port uint16) bool {
-	if t.blockedPortsSet == nil {
-		return false
-	}
-
-	_, ok := t.blockedPortsSet.Load(port)
-	return ok
-}
-
 func (t *TUN) GetState() TunnelState {
 	ts := t.state.Load()
 	if ts == nil {
@@ -852,9 +843,14 @@ func (t *TUN) InitializeBlockedPorts(ports []uint16) {
         return
     }
 	
-    t.blockedPortsSet = xsync.NewMapOf[uint16, bool]()
+    t.blockedPortsSet = make(map[[2]byte]uint16)
     for _, port := range ports {
-        t.blockedPortsSet.Store(port, true)
+        var portBytes [2]byte
+        
+		portBytes[0] = byte(port >> 8)
+        portBytes[1] = byte(port & 0xFF)
+
+        t.blockedPortsSet[portBytes] = port
     }
 }
 
