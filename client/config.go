@@ -144,6 +144,7 @@ func DefaultConfig() *configV2 {
 		DNS2Default:          "8.8.8.8",
 		LogBlockedDomains:    true,
 		LogAllDomains:        true,
+		BandwidthGraphs:     true,
 		DNSstats:             true,
 		DNSBlockLists:        GetDefaultBlockLists(),
 		DNSWhiteLists:        GetDefaultWhiteLists(),

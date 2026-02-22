@@ -587,6 +587,7 @@ type configV2 struct {
 	ErrorLogging      bool
 	ConsoleLogOnly    bool
 	ConnectionTracer  bool
+	BandwidthGraphs  bool
 
 	// DNS
 	DNS1Default   string
@@ -641,7 +642,7 @@ const (
 
 const (
 	// 7 days
-	MaxBandwidthRecords = 7 * 24 * 60 * 60 // 604800
+	MaxBandwidthRecords = 24 * 60 * 60 // ~90k
 )
 
 type BandwidthRecord struct {
@@ -856,6 +857,10 @@ func (t *TUN) RecordBandwidth() {
 		case <-ticker.C:
 			if t.GetState() < TUN_Connected {
 				return
+			}
+
+			if (CONFIG.Load().BandwidthGraphs) {
+				continue
 			}
 
 			currentEgress := t.egressBytes.Load()

@@ -10,6 +10,18 @@ const TIME_RANGES = [
   { label: "7d", seconds: 604800 },
 ]
 
+// Rotating palette for multiple tunnels
+const TUNNEL_COLORS = [
+  "#4B7BF5", // blue (site accent)
+  "#f59e0b", // amber
+  "#10b981", // emerald
+  "#f43f5e", // rose
+  "#a855f7", // purple
+  "#06b6d4", // cyan
+  "#ec4899", // pink
+  "#84cc16", // lime
+]
+
 function formatBytes(bytes) {
   if (bytes === 0) return "0 B"
   const units = ["B", "KB", "MB", "GB", "TB"]
@@ -60,12 +72,30 @@ function aggregateRecords(records, rangeSeconds) {
   return buckets
 }
 
-function Graph({ data, dataKey, color, label, rangeSeconds, height = 180 }) {
+// series: [{ data: [{ts, eg, ig}], color: string, label: string }]
+function MultiGraph({ series, dataKey, rangeSeconds, height = 180 }) {
   const canvasRef = useRef(null)
   const containerRef = useRef(null)
 
-  const values = useMemo(() => data.map((d) => d[dataKey]), [data, dataKey])
-  const maxVal = useMemo(() => Math.max(...values, 1), [values])
+  // Compute global max across all series
+  const globalMax = useMemo(() => {
+    let max = 1
+    for (const s of series) {
+      for (const d of s.data) {
+        if (d[dataKey] > max) max = d[dataKey]
+      }
+    }
+    return max
+  }, [series, dataKey])
+
+  // Find the series with the most data points (for x-axis labels)
+  const longestSeries = useMemo(() => {
+    let longest = []
+    for (const s of series) {
+      if (s.data.length > longest.length) longest = s.data
+    }
+    return longest
+  }, [series])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -91,16 +121,14 @@ function Graph({ data, dataKey, color, label, rangeSeconds, height = 180 }) {
     const graphWidth = width - paddingLeft - paddingRight
     const graphHeight = height - paddingTop - paddingBottom
 
-    // Clear & fill background
     ctx.clearRect(0, 0, width, height)
     ctx.fillStyle = "#060810"
     ctx.fillRect(0, 0, width, height)
 
     const textColor = "rgba(255,255,255,0.30)"
     const gridColor = "rgba(255,255,255,0.04)"
-    const areaColor = color + "12"
 
-    if (data.length === 0) {
+    if (longestSeries.length === 0) {
       ctx.fillStyle = "rgba(255,255,255,0.25)"
       ctx.font = "11px system-ui, -apple-system, sans-serif"
       ctx.textAlign = "center"
@@ -114,7 +142,7 @@ function Graph({ data, dataKey, color, label, rangeSeconds, height = 180 }) {
     ctx.textAlign = "right"
     for (let i = 0; i <= yTicks; i++) {
       const y = paddingTop + (graphHeight / yTicks) * i
-      const val = maxVal * (1 - i / yTicks)
+      const val = globalMax * (1 - i / yTicks)
 
       ctx.strokeStyle = gridColor
       ctx.lineWidth = 1
@@ -127,47 +155,52 @@ function Graph({ data, dataKey, color, label, rangeSeconds, height = 180 }) {
       ctx.fillText(formatBytesPerSec(val), paddingLeft - 8, y + 3)
     }
 
-    // X-axis labels
-    const xLabelCount = Math.min(data.length, 5)
+    // X-axis labels (use longest series for time reference)
+    const xLabelCount = Math.min(longestSeries.length, 5)
     ctx.textAlign = "center"
     ctx.fillStyle = textColor
     ctx.font = "10px ui-monospace, SFMono-Regular, monospace"
     for (let i = 0; i < xLabelCount; i++) {
-      const idx = Math.floor((i / (xLabelCount - 1)) * (data.length - 1))
-      if (!data[idx]) continue
-      const x = paddingLeft + (idx / (data.length - 1)) * graphWidth
-      const date = new Date(data[idx].ts)
+      const idx = Math.floor((i / (xLabelCount - 1)) * (longestSeries.length - 1))
+      if (!longestSeries[idx]) continue
+      const x = paddingLeft + (idx / (longestSeries.length - 1)) * graphWidth
+      const date = new Date(longestSeries[idx].ts)
       ctx.fillText(formatTimeLabel(date, rangeSeconds), x, height - 6)
     }
 
-    if (data.length < 2) return
+    // Draw each series
+    for (const s of series) {
+      if (s.data.length < 2) continue
 
-    // Area fill
-    ctx.beginPath()
-    ctx.moveTo(paddingLeft, paddingTop + graphHeight)
-    for (let i = 0; i < data.length; i++) {
-      const x = paddingLeft + (i / (data.length - 1)) * graphWidth
-      const y = paddingTop + graphHeight - (values[i] / maxVal) * graphHeight
-      ctx.lineTo(x, y)
-    }
-    ctx.lineTo(paddingLeft + graphWidth, paddingTop + graphHeight)
-    ctx.closePath()
-    ctx.fillStyle = areaColor
-    ctx.fill()
+      const values = s.data.map((d) => d[dataKey])
 
-    // Line
-    ctx.beginPath()
-    for (let i = 0; i < data.length; i++) {
-      const x = paddingLeft + (i / (data.length - 1)) * graphWidth
-      const y = paddingTop + graphHeight - (values[i] / maxVal) * graphHeight
-      if (i === 0) ctx.moveTo(x, y)
-      else ctx.lineTo(x, y)
+      // Area fill
+      ctx.beginPath()
+      ctx.moveTo(paddingLeft, paddingTop + graphHeight)
+      for (let i = 0; i < s.data.length; i++) {
+        const x = paddingLeft + (i / (s.data.length - 1)) * graphWidth
+        const y = paddingTop + graphHeight - (values[i] / globalMax) * graphHeight
+        ctx.lineTo(x, y)
+      }
+      ctx.lineTo(paddingLeft + graphWidth, paddingTop + graphHeight)
+      ctx.closePath()
+      ctx.fillStyle = s.color + "0a"
+      ctx.fill()
+
+      // Line
+      ctx.beginPath()
+      for (let i = 0; i < s.data.length; i++) {
+        const x = paddingLeft + (i / (s.data.length - 1)) * graphWidth
+        const y = paddingTop + graphHeight - (values[i] / globalMax) * graphHeight
+        if (i === 0) ctx.moveTo(x, y)
+        else ctx.lineTo(x, y)
+      }
+      ctx.strokeStyle = s.color
+      ctx.lineWidth = 1.5
+      ctx.lineJoin = "round"
+      ctx.stroke()
     }
-    ctx.strokeStyle = color
-    ctx.lineWidth = 1.5
-    ctx.lineJoin = "round"
-    ctx.stroke()
-  }, [data, dataKey, values, maxVal, color, label, height, rangeSeconds])
+  }, [series, dataKey, globalMax, longestSeries, height, rangeSeconds])
 
   return (
     <div ref={containerRef} className="w-full">
@@ -176,30 +209,47 @@ function Graph({ data, dataKey, color, label, rangeSeconds, height = 180 }) {
   )
 }
 
-function StatsRow({ data, dataKey }) {
-  const vals = useMemo(() => data.map((d) => d[dataKey]), [data, dataKey])
-  if (vals.length === 0) return null
-
-  const current = vals[vals.length - 1] || 0
-  const max = Math.max(...vals)
-  const avg = vals.reduce((a, b) => a + b, 0) / vals.length
-  const total = vals.reduce((a, b) => a + b, 0)
-
-  const items = [
-    { label: "Current", value: formatBytesPerSec(current) },
-    { label: "Average", value: formatBytesPerSec(avg) },
-    { label: "Peak", value: formatBytesPerSec(max) },
-    { label: "Total", value: formatBytes(total) },
-  ]
+function MultiStatsRow({ series, dataKey }) {
+  if (series.length === 0) return null
 
   return (
-    <div className="flex items-center gap-6 px-1">
-      {items.map((it) => (
-        <div key={it.label} className="flex items-center gap-1.5">
-          <span className="text-[10px] uppercase tracking-wider text-white/35">{it.label}</span>
-          <span className="text-[11px] font-mono text-white/60">{it.value}</span>
-        </div>
-      ))}
+    <div className="flex flex-col gap-1.5">
+      {series.map((s) => {
+        const vals = s.rawData.map((d) => d[dataKey])
+        if (vals.length === 0) return null
+
+        const current = vals[vals.length - 1] || 0
+        const max = Math.max(...vals)
+        const avg = vals.reduce((a, b) => a + b, 0) / vals.length
+        const total = vals.reduce((a, b) => a + b, 0)
+
+        return (
+          <div key={s.id} className="flex items-center gap-4 px-1">
+            <div className="flex items-center gap-1.5 shrink-0 w-28">
+              <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
+              <span className="text-[10px] font-mono text-white/50 truncate">{s.label}</span>
+            </div>
+            <div className="flex items-center gap-5">
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] uppercase tracking-wider text-white/35">Cur</span>
+                <span className="text-[11px] font-mono text-white/60">{formatBytesPerSec(current)}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] uppercase tracking-wider text-white/35">Avg</span>
+                <span className="text-[11px] font-mono text-white/60">{formatBytesPerSec(avg)}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] uppercase tracking-wider text-white/35">Peak</span>
+                <span className="text-[11px] font-mono text-white/60">{formatBytesPerSec(max)}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] uppercase tracking-wider text-white/35">Total</span>
+                <span className="text-[11px] font-mono text-white/60">{formatBytes(total)}</span>
+              </div>
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -208,12 +258,9 @@ export default function Bandwidth() {
   const state = GLOBAL_STATE("bandwidth")
 
   const [range_, setRange] = useState(TIME_RANGES[0])
-  const [records, setRecords] = useState([])
+  const [disabledTunnels, setDisabledTunnels] = useState({})
 
-  const getTunnel = () => {
-    if (!state.ActiveTunnels || state.ActiveTunnels.length === 0) return null
-    return state.ActiveTunnels[0]
-  }
+  const tunnels = state.ActiveTunnels || []
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -222,36 +269,49 @@ export default function Bandwidth() {
     return () => clearInterval(interval)
   }, [])
 
-  useEffect(() => {
-    if (!getTunnel()?.BandwidthHistory) {
-      setRecords([])
-      return
-    }
-    const now = new Date()
-    const cutoff = new Date(now.getTime() - range_.seconds * 1000)
-    const filtered = getTunnel().BandwidthHistory.filter((r) => {
-      return new Date(r?.ts) >= cutoff
+  const toggleTunnel = (id) => {
+    setDisabledTunnels((prev) => ({ ...prev, [id]: !prev[id] }))
+  }
+
+  // build per tunnel filtered + aggregated series
+  const { egressSeries, ingressSeries, totalSamples } = useMemo(() => {
+    const eg = []
+    const ig = []
+    let samples = 0
+
+    tunnels.forEach((tun, idx) => {
+      if (disabledTunnels[tun.ID]) return
+      if (!tun.BandwidthHistory || tun.BandwidthHistory.length === 0) return
+
+      const now = new Date()
+      const cutoff = new Date(now.getTime() - range_.seconds * 1000)
+      const filtered = tun.BandwidthHistory.filter((r) => new Date(r?.ts) >= cutoff)
+      const aggregated = aggregateRecords(filtered, range_.seconds)
+      const color = TUNNEL_COLORS[idx % TUNNEL_COLORS.length]
+      const label = tun.CR?.Tag || tun.ID?.slice(0, 8)
+
+      samples += filtered.length
+
+      eg.push({ id: tun.ID, data: aggregated, rawData: filtered, color, label })
+      ig.push({ id: tun.ID, data: aggregated, rawData: filtered, color, label })
     })
-    setRecords(filtered)
-  }, [state.ActiveTunnels, range_])
 
-  const aggregated = useMemo(
-    () => aggregateRecords(records, range_.seconds),
-    [records, range_.seconds]
-  )
+    return { egressSeries: eg, ingressSeries: ig, totalSamples: samples }
+  }, [tunnels, range_, disabledTunnels])
 
-  if (!getTunnel()) {
+  if (tunnels.length === 0) {
     return (
       <div className="flex items-center justify-center h-40 text-white/40 text-[13px]">
-        No active tunnel
+        No active tunnels
       </div>
     )
   }
 
   return (
     <div>
-      {/* Header bar — matches DNS/Settings style */}
+      {/* Header bar */}
       <div className="flex items-center gap-5 py-3 px-4 rounded-lg bg-[#0a0d14]/80 border border-[#1e2433] mb-6">
+        {/* Time range tabs */}
         <div className="flex gap-1">
           {TIME_RANGES.map((r) => (
             <button
@@ -267,9 +327,44 @@ export default function Bandwidth() {
             </button>
           ))}
         </div>
+
+        {/* Separator */}
+        {tunnels.length > 1 && <div className="w-px h-5 bg-white/[0.06]" />}
+
+        {/* Tunnel toggles */}
+        {tunnels.length > 1 && (
+          <div className="flex items-center gap-1.5">
+            {tunnels.map((tun, idx) => {
+              const color = TUNNEL_COLORS[idx % TUNNEL_COLORS.length]
+              const disabled = disabledTunnels[tun.ID]
+              const label = tun.CR?.Tag || tun.ID?.slice(0, 8)
+              return (
+                <button
+                  key={tun.ID}
+                  onClick={() => toggleTunnel(tun.ID)}
+                  className={`flex items-center gap-1.5 text-[11px] px-2 py-0.5 rounded transition-colors ${
+                    disabled
+                      ? "text-white/20 hover:text-white/35"
+                      : "text-white/60 hover:text-white/75 bg-white/[0.04]"
+                  }`}
+                >
+                  <div
+                    className="w-2 h-2 rounded-full shrink-0 transition-opacity"
+                    style={{
+                      backgroundColor: color,
+                      opacity: disabled ? 0.2 : 1,
+                    }}
+                  />
+                  <span className={disabled ? "line-through" : ""}>{label}</span>
+                </button>
+              )
+            })}
+          </div>
+        )}
+
         <div className="ml-auto flex items-center gap-3">
           <span className="text-[10px] text-white/35 tabular-nums">
-            {records.length} sample{records.length !== 1 ? "s" : ""}
+            {totalSamples} sample{totalSamples !== 1 ? "s" : ""}
           </span>
         </div>
       </div>
@@ -281,16 +376,14 @@ export default function Bandwidth() {
           <span className="text-[11px] uppercase tracking-widest text-white/45">Upload</span>
         </div>
         <div className="rounded-lg bg-[#0a0d14] border border-[#1e2433] p-3">
-          <Graph
-            data={aggregated}
+          <MultiGraph
+            series={egressSeries}
             dataKey="eg"
-            color="#f59e0b"
-            label="Egress"
             rangeSeconds={range_.seconds}
             height={170}
           />
           <div className="mt-2.5 pt-2 border-t border-[#1e2433]">
-            <StatsRow data={records} dataKey="eg" />
+            <MultiStatsRow series={egressSeries} dataKey="eg" />
           </div>
         </div>
       </div>
@@ -302,16 +395,14 @@ export default function Bandwidth() {
           <span className="text-[11px] uppercase tracking-widest text-white/45">Download</span>
         </div>
         <div className="rounded-lg bg-[#0a0d14] border border-[#1e2433] p-3">
-          <Graph
-            data={aggregated}
+          <MultiGraph
+            series={ingressSeries}
             dataKey="ig"
-            color="#4B7BF5"
-            label="Ingress"
             rangeSeconds={range_.seconds}
             height={170}
           />
           <div className="mt-2.5 pt-2 border-t border-[#1e2433]">
-            <StatsRow data={records} dataKey="ig" />
+            <MultiStatsRow series={ingressSeries} dataKey="ig" />
           </div>
         </div>
       </div>
