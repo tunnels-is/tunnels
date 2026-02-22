@@ -149,6 +149,15 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		return 400, errors.New("Invalid Server ID")
 	}
 
+	if meta.ServerID != ClientCR.ServerID {
+		meta.ServerID = ClientCR.ServerID
+		err = writeTunnelsToDisk(meta.Tag)
+		if err != nil {
+			ERROR("unable to write tunnel meta to drive", err)
+			return 400, errors.New("unable to write tunnel meta to drive")
+		}
+	}
+
 	// ensure gateway is not incorrect
 	gateway := state.DefaultGateway.Load()
 	if gateway != nil {
