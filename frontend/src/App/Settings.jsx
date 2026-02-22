@@ -37,6 +37,8 @@ const Settings = () => {
     { key: "ErrorLogging", label: "Errors", checked: state?.Config?.ErrorLogging },
     { key: "ConsoleLogging", label: "Console", checked: state?.Config?.ConsoleLogging },
     { key: "DebugLogging", label: "Debug", checked: state?.Config?.DebugLogging },
+    { key: "BandwidthGraphs", label: "Bandwidth Graphs", checked: state?.Config?.BandwidthGraphs },
+
   ];
 
   return (

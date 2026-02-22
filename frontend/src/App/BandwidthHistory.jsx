@@ -299,6 +299,13 @@ export default function Bandwidth() {
     return { egressSeries: eg, ingressSeries: ig, totalSamples: samples }
   }, [tunnels, range_, disabledTunnels])
 
+  if (!state.Config.BandwidthGraphs) { 
+    return (
+      <div className="flex items-center justify-center h-40 text-white/40 text-[13px]">
+        Bandwidth history is disabled
+      </div>
+    )
+  }
   if (tunnels.length === 0) {
     return (
       <div className="flex items-center justify-center h-40 text-white/40 text-[13px]">
