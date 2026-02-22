@@ -146,10 +146,7 @@ const SideBar = () => {
                       return false;
                     }
 
-                    let isActive = false
-                    if (sp[1].includes(i.route) || (sp[1] === "" && i.route === "login") || (sp[1] === "" && i.route === "tunnels")) {
-                      isActive = true
-                    }
+                    let isActive = sp.includes(i.route) || (sp[1] === "" && i.route === "login") || (sp[1] === "" && i.route === "tunnels");
 
                     return (
                       <button
