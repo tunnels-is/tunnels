@@ -361,7 +361,6 @@ const ServerNode = React.forwardRef(({ server, hasActive, hasLinked, activeStats
 
       {activeStats && (
         <div className="mt-2 pt-2 border-t border-[#1e2433] flex gap-3 ml-[22px]">
-          <StatPill label="PING" value={Math.floor(activeStats.MS / 1000) + "ms"} />
           <StatPill label="CPU" value={activeStats.CPU + "%"} warn={activeStats.CPU > 80} />
           <StatPill label="MEM" value={activeStats.MEM + "%"} warn={activeStats.MEM > 80} />
         </div>
@@ -561,40 +560,40 @@ const Graph = () => {
     const tunnelTag = selectedTunnel?.Tag;
     const activeTunnel = activeMap[tunnelTag];
 
-    // if currently connected, dc first, then change server.
-    if (activeTunnel) {
-      state.ConfirmAndExecute(
-        "success",
-        "connect",
-        10000,
-        "",
-        `Connect ${tunnelTag} to ${server.Tag}?`,
-        async () => {
-          setSelectedTunnel(null);
-          try {
-            await state.disconnectFromVPN(activeTunnel);
-            state.changeServerOnTunnelUsingTag(tunnelTag, server._id);
-
-            await new Promise(r => setTimeout(r, 500));
-
-            let updatedTunnel = state.Tunnels?.find(t => t.Tag === tunnelTag);
-            if (updatedTunnel) {
-              await state.connectToVPN(updatedTunnel, server);
-            }
-          } catch (err) {
-            console.error("err switching server:", err);
-          }
-          setVersion(v => v + 1);
-          return;
-        }
-      );
-    } else {
-
+    if (!activeTunnel) {
       state.changeServerOnTunnelUsingTag(tunnelTag, server._id);
       setSelectedTunnel(null);
 
       setVersion(v => v + 1);
     }
+
+    // if currently connected, dc first, then change server.
+    state.ConfirmAndExecute(
+      "success",
+      "connect",
+      10000,
+      "",
+      `Connect ${tunnelTag} to ${server.Tag}?`,
+      async () => {
+        setSelectedTunnel(null);
+        try {
+          await state.disconnectFromVPN(activeTunnel);
+          state.changeServerOnTunnelUsingTag(tunnelTag, server._id);
+
+          await new Promise(r => setTimeout(r, 500));
+
+          let updatedTunnel = state.Tunnels?.find(t => t.Tag === tunnelTag);
+          if (updatedTunnel) {
+            await state.connectToVPN(updatedTunnel, server);
+          }
+
+        } catch (err) {
+          console.error("err switching server:", err);
+        }
+        setVersion(v => v + 1);
+        return;
+      }
+    );
   };
 
   // CRUD handlers

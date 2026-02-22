@@ -55,7 +55,7 @@ const SideBar = () => {
             shouldRender: showLogin,
           },
           { icon: Network, label: "Tunnels", route: "tunnels", user: true },
-          { icon: MixerHorizontalIcon, label: "Connections", route: "connections", user: true, shouldRender: hasActiveTunnels },
+          // { icon: MixerHorizontalIcon, label: "Connections", route: "connections", user: true, shouldRender: hasActiveTunnels },
         ],
       },
       {
