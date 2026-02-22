@@ -557,9 +557,17 @@ const Graph = () => {
 
   const handleServerClick = (server) => {
     if (!selectedTunnel) return;
-    state.changeServerOnTunnelUsingTag(selectedTunnel.Tag, server._id);
+    const wasActive = !!activeMap[selectedTunnel.Tag];
+    const tunnel = selectedTunnel;
+    state.changeServerOnTunnelUsingTag(tunnel.Tag, server._id);
     setSelectedTunnel(null);
     setVersion(v => v + 1);
+
+    if (wasActive) {
+      state.connectToVPN(tunnel, server).then(() => {
+        setVersion(v => v + 1);
+      });
+    }
   };
 
   // CRUD handlers
