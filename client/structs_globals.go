@@ -859,7 +859,7 @@ func (t *TUN) RecordBandwidth() {
 				return
 			}
 
-			if (CONFIG.Load().BandwidthGraphs) {
+			if !CONFIG.Load().BandwidthGraphs {
 				continue
 			}
 
