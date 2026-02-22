@@ -132,7 +132,7 @@ var (
 	AppStartTime        = time.Now()
 	DEFAULT_TUNNEL      *TInterface
 	DEFAULT_DNS_SERVERS []string
-	DNSClient = new(dns.Client)
+	DNSClient           = new(dns.Client)
 
 	// HTTP
 	API_SERVER http.Server
@@ -639,6 +639,51 @@ const (
 	TUN_Connected
 )
 
+const (
+	// 7 days
+	MaxBandwidthRecords = 7 * 24 * 60 * 60 // 604800
+)
+
+type BandwidthRecord struct {
+	Timestamp    time.Time `json:"ts"`
+	EgressBytes  int64     `json:"eg"` // bytes uploaded this second
+	IngressBytes int64     `json:"ig"` // bytes downloaded this second
+}
+
+type BandwidthHistory struct {
+	mu      sync.RWMutex
+	records []BandwidthRecord
+}
+
+// appends record and deletes older than 7 days (if any)
+func (bh *BandwidthHistory) Append(r BandwidthRecord) {
+	bh.mu.Lock()
+	defer bh.mu.Unlock()
+
+	bh.records = append(bh.records, r)
+
+	// Trim oldest entries beyond the 7-day window
+	if len(bh.records) > MaxBandwidthRecords {
+		excess := len(bh.records) - MaxBandwidthRecords
+		bh.records = bh.records[excess:]
+	}
+}
+
+// returns a copy of all records
+func (bh *BandwidthHistory) Snapshot() []BandwidthRecord {
+	bh.mu.RLock()
+	defer bh.mu.RUnlock()
+	out := make([]BandwidthRecord, len(bh.records))
+	copy(out, bh.records)
+	return out
+}
+
+func (bh *BandwidthHistory) Len() int {
+	bh.mu.RLock()
+	defer bh.mu.RUnlock()
+	return len(bh.records)
+}
+
 type Mapping struct {
 	Proto    byte
 	rstFound atomic.Bool
@@ -706,8 +751,9 @@ type TUN struct {
 	Index []byte
 
 	// Stats
-	egressBytes  atomic.Int64
-	ingressBytes atomic.Int64
+	egressBytes      atomic.Int64
+	ingressBytes     atomic.Int64
+	BandwidthHistory *BandwidthHistory
 
 	// Server States
 	PingInt atomic.Int64
@@ -790,6 +836,46 @@ func (t *TUN) registerPing(ping time.Time) {
 	t.pingTime.Store(&ping)
 }
 
+// RecordBandwidth runs as a goroutine and samples egress/ingress byte counters
+// once per second, storing the delta in BandwidthHistory. It stops when the
+// tunnel is no longer in the Connected state.
+func (t *TUN) RecordBandwidth() {
+	defer RecoverAndLog()
+
+	t.BandwidthHistory = &BandwidthHistory{
+		records: make([]BandwidthRecord, 0, 3600), // pre alloc 1 hour
+	}
+
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	var lastEgress, lastIngress int64
+
+	for {
+		select {
+		case <-ticker.C:
+			if t.GetState() < TUN_Connected {
+				return
+			}
+
+			currentEgress := t.egressBytes.Load()
+			currentIngress := t.ingressBytes.Load()
+
+			deltaEgress := currentEgress - lastEgress
+			deltaIngress := currentIngress - lastIngress
+
+			lastEgress = currentEgress
+			lastIngress = currentIngress
+
+			t.BandwidthHistory.Append(BandwidthRecord{
+				Timestamp:    time.Now(),
+				EgressBytes:  deltaEgress,
+				IngressBytes: deltaIngress,
+			})
+		}
+	}
+}
+
 // Implement MarshalJSON method
 func (t *TUN) MarshalJSON() ([]byte, error) {
 	// Create a type alias to avoid recursion
@@ -801,21 +887,27 @@ func (t *TUN) MarshalJSON() ([]byte, error) {
 	eb := BandwidthBytesToString(t.egressBytes.Load())
 	ib := BandwidthBytesToString(t.ingressBytes.Load())
 
+	var bwHistory []BandwidthRecord
+	if t.BandwidthHistory != nil {
+		bwHistory = t.BandwidthHistory.Snapshot()
+	}
+
 	// Define the structure we want in JSON
 	return json.Marshal(struct {
-		ID         string
-		CR         *ConnectionRequest
-		CRResponse *types.ServerConnectResponse
-		Ping       time.Time
-		StartPort  int
-		EndPort    int
-		DHCP       *types.DHCPRecord
-		LAN        *types.Network
-		CPU        byte
-		DISK       byte
-		MEM        byte
-		Egress     string
-		Ingress    string
+		ID               string
+		CR               *ConnectionRequest
+		CRResponse       *types.ServerConnectResponse
+		Ping             time.Time
+		StartPort        int
+		EndPort          int
+		DHCP             *types.DHCPRecord
+		LAN              *types.Network
+		CPU              byte
+		DISK             byte
+		MEM              byte
+		Egress           string
+		Ingress          string
+		BandwidthHistory []BandwidthRecord `json:"BandwidthHistory,omitempty"`
 	}{
 		t.ID,
 		t.CR,
@@ -830,6 +922,7 @@ func (t *TUN) MarshalJSON() ([]byte, error) {
 		t.MEM,
 		eb,
 		ib,
+		bwHistory,
 	})
 }
 

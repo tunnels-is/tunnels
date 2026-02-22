@@ -7,13 +7,12 @@ import {
   LockOpen1Icon,
   PersonIcon,
   ContainerIcon,
-  MixerHorizontalIcon,
   DesktopIcon,
 } from "@radix-ui/react-icons";
 import { cn } from "@/lib/utils";
 import GLOBAL_STATE from "../state";
 import logoSvg from "../assets/images/fav/logo.svg";
-import { Logs, Network, BarChart3 } from "lucide-react";
+import { Logs, Network, Gauge, BarChart3 } from "lucide-react";
 import { UsersIcon } from "lucide-react";
 
 const SideBar = () => {
@@ -55,6 +54,7 @@ const SideBar = () => {
             shouldRender: showLogin,
           },
           { icon: Network, label: "Tunnels", route: "tunnels", user: true },
+          { icon: Gauge, label: "Bandwidth History", route: "bandwidth", user: true },
           // { icon: MixerHorizontalIcon, label: "Connections", route: "connections", user: true, shouldRender: hasActiveTunnels },
         ],
       },
