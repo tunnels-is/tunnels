@@ -557,43 +557,17 @@ const Graph = () => {
   const handleServerClick = async (server) => {
     if (!selectedTunnel) return;
 
-    const tunnelTag = selectedTunnel?.Tag;
-    const activeTunnel = activeMap[tunnelTag];
+    const wasActive = !!activeMap[selectedTunnel.Tag];
+    const tunnel = selectedTunnel;
+    state.changeServerOnTunnelUsingTag(tunnel.Tag, server._id);
+    setSelectedTunnel(null);
+    setVersion(v => v + 1);
 
-    if (!activeTunnel) {
-      state.changeServerOnTunnelUsingTag(tunnelTag, server._id);
-      setSelectedTunnel(null);
-
-      setVersion(v => v + 1);
-    }
-
-    // if currently connected, dc first, then change server.
-    state.ConfirmAndExecute(
-      "success",
-      "connect",
-      10000,
-      "",
-      `Connect ${tunnelTag} to ${server.Tag}?`,
-      async () => {
-        setSelectedTunnel(null);
-        try {
-          await state.disconnectFromVPN(activeTunnel);
-          state.changeServerOnTunnelUsingTag(tunnelTag, server._id);
-
-          await new Promise(r => setTimeout(r, 500));
-
-          let updatedTunnel = state.Tunnels?.find(t => t.Tag === tunnelTag);
-          if (updatedTunnel) {
-            await state.connectToVPN(updatedTunnel, server);
-          }
-
-        } catch (err) {
-          console.error("err switching server:", err);
-        }
+    if (wasActive) {
+      state.connectToVPN(tunnel, server).then(() => {
         setVersion(v => v + 1);
-        return;
-      }
-    );
+      });
+    }
   };
 
   // CRUD handlers
