@@ -230,6 +230,11 @@ func (t *TInterface) AddrV6() (err error) {
 	return nil
 }
 
+func (t *TInterface) PrepareForSwitch() {
+	// On Darwin, goroutines exit when the connection is closed.
+	// No session cleanup needed.
+}
+
 func (t *TInterface) Connect(tun *TUN) (err error) {
 	err = t.Up()
 	if err != nil {

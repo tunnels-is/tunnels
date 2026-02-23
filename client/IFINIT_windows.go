@@ -738,6 +738,25 @@ func (t *TInterface) Connect(tun *TUN) (err error) {
 	return
 }
 
+func (t *TInterface) EndSession() {
+	if t.SessionHandle == 0 {
+		return
+	}
+	add, err := t.WDLL.GetAddr(4)
+	if err != nil {
+		ERROR("unable to get EndSession address: ", err)
+		return
+	}
+	_, _, msg := syscall.SyscallN(add.UPTR, t.SessionHandle)
+	DEBUG(fmt.Sprintf("Interface/Adapter (%s) session ended: %s", t.Name, msg))
+	t.SessionHandle = 0
+}
+
+func (t *TInterface) PrepareForSwitch() {
+	t.CloseReadAndWriteLoop()
+	t.EndSession()
+}
+
 func (t *TInterface) CloseReadAndWriteLoop() {
 	exitTimeout := time.NewTicker(10 * time.Second)
 	exitCount := 0
