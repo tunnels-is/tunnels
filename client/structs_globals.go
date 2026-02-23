@@ -679,12 +679,6 @@ func (bh *BandwidthHistory) Snapshot() []BandwidthRecord {
 	return out
 }
 
-func (bh *BandwidthHistory) Len() int {
-	bh.mu.RLock()
-	defer bh.mu.RUnlock()
-	return len(bh.records)
-}
-
 type Mapping struct {
 	Proto    byte
 	rstFound atomic.Bool
