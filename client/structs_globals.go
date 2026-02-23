@@ -641,8 +641,8 @@ const (
 )
 
 const (
-	// 1 day
-	MaxBandwidthRecords = 24 * 60 * 60 // ~90k
+	// 1 day worth of seconds
+	MaxBandwidthRecords = 24 * 60 * 60 // 86 400
 )
 
 type BandwidthRecord struct {
@@ -837,7 +837,7 @@ func (t *TUN) RecordBandwidth() {
 	defer RecoverAndLog()
 
 	t.BandwidthHistory = &BandwidthHistory{
-		records: make([]BandwidthRecord, 0, 3600), // pre alloc 1 hour
+		records: make([]BandwidthRecord, 0, MaxBandwidthRecords), // pre alloc 1 day
 	}
 
 	ticker := time.NewTicker(1 * time.Second)
