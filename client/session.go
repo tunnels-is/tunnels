@@ -345,6 +345,14 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	var inter *TInterface
 	if oldTunnel != nil {
 		inter = oldTunnel.tunnel.Load()
+		// Stop old goroutines before reconfiguring the interface.
+		// On Windows, the wintun session must be ended before a new
+		// one can be started on the same adapter.
+		oldTunnel.SetState(TUN_Disconnecting)
+		if oldTunnel.connection != nil {
+			_ = oldTunnel.connection.Close()
+		}
+		inter.PrepareForSwitch()
 	} else {
 		inter, err = CreateAndConnectToInterface(tunnel)
 	}

@@ -312,6 +312,11 @@ func (t *TInterface) Delete() (err error) {
 	return
 }
 
+func (t *TInterface) PrepareForSwitch() {
+	// On Linux, goroutines exit when the connection is closed.
+	// No session cleanup needed.
+}
+
 func (t *TInterface) Connect(tun *TUN) (err error) {
 	err = t.Addr()
 	if err != nil {
