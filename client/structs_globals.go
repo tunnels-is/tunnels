@@ -641,7 +641,7 @@ const (
 )
 
 const (
-	// 7 days
+	// 1 day
 	MaxBandwidthRecords = 24 * 60 * 60 // ~90k
 )
 
@@ -656,14 +656,13 @@ type BandwidthHistory struct {
 	records []BandwidthRecord
 }
 
-// appends record and deletes older than 7 days (if any)
+// appends record and deletes older than 1 day (if any)
 func (bh *BandwidthHistory) Append(r BandwidthRecord) {
 	bh.mu.Lock()
 	defer bh.mu.Unlock()
 
 	bh.records = append(bh.records, r)
 
-	// Trim oldest entries beyond the 7-day window
 	if len(bh.records) > MaxBandwidthRecords {
 		excess := len(bh.records) - MaxBandwidthRecords
 		bh.records = bh.records[excess:]
