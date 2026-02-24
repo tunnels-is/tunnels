@@ -31,6 +31,7 @@ import DNSStats from "./App/DNSStats";
 import ConfirmDialog from "./App/ConfirmDialog";
 import DNS from "./App/dns";
 import WS from "./ws";
+import Bandwidth from "./App/BandwidthHistory";
 
 const appElement = document.getElementById("app");
 const root = createRoot(appElement);
@@ -89,6 +90,8 @@ const LaunchApp = () => {
                   <Route path="groups/:id" element={<InspectGroup />} />
 
                   <Route path="connections" element={<Stats />} />
+                  <Route path="bandwidth" element={<Bandwidth />} />
+
                   <Route path="tunnels" element={<Graph />} />
                   <Route path="account" element={<Account />} />
 
