@@ -383,6 +383,7 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 
 	go tunnel.ReadFromServeTunnel()
 	go tunnel.ReadFromTunnelInterface()
+	go tunnel.RecordBandwidth()
 
 	if tunnel.ServerResponse.DHCP != nil {
 		FR := &FirewallRequest{
