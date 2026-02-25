@@ -106,9 +106,6 @@ func CreateClientCoreMapping(CRR *types.ServerConnectResponse, CR *types.Control
 		}
 	}
 
-	Config := Config.Load()
-	CRR.LAN = Config.Lan
-
 	return index, err
 }
 
@@ -394,7 +391,7 @@ func fromUserChannel(index int) {
 			D4[2] = NIP[2]
 			D4[3] = NIP[3]
 
-			targetCM = VPLIPToCore[D4[0]][D4[1]][D4[2]][D4[3]]
+			targetCM = VPLIPToCore[uint16(D4[2])<<8|uint16(D4[3])].Load()
 			if targetCM == nil {
 				CM.DelHost(D4, "auto")
 				continue
@@ -517,7 +514,7 @@ func toUserChannel(index int) {
 		// Server LAN feature is hardcoded to 10.0.X.X
 		// We might change this later
 		if LANEnabled && (PACKET[12] == 10 && PACKET[13] == 0) {
-			originCM = VPLIPToCore[PACKET[12]][PACKET[13]][PACKET[14]][PACKET[15]]
+			originCM = VPLIPToCore[uint16(PACKET[14])<<8|uint16(PACKET[15])].Load()
 			if !lanFirewallDisabled && !CM.DisableFirewall {
 				isAdmin = false
 				if originCM != nil {

@@ -54,7 +54,7 @@ var (
 	clientCoreMappings [math.MaxUint16 + 1]*UserCoreMapping
 	portToCoreMapping  [math.MaxUint16 + 1]*PortRange
 	DHCPMapping        [math.MaxUint16 + 1]*types.DHCPRecord
-	VPLIPToCore        = make([][][][]*UserCoreMapping, 255)
+	VPLIPToCore        [65536]atomic.Pointer[UserCoreMapping]
 
 	LANEnabled   bool
 	VPNEnabled   bool
@@ -450,7 +450,6 @@ func initializeVPN() {
 	if err != nil {
 		panic(err)
 	}
-	GenerateVPLCoreMappings()
 }
 
 func initializeLAN() (err error) {
@@ -459,25 +458,10 @@ func initializeLAN() (err error) {
 		return err
 	}
 	Config := Config.Load()
-
-	if Config.Lan != nil {
-		lanFirewallDisabled = Config.DisableLanFirewall
-	}
+	lanFirewallDisabled = Config.DisableLanFirewall
 	return err
 }
 
-func GenerateVPLCoreMappings() {
-	VPLIPToCore[10] = make([][][]*UserCoreMapping, 11)
-	VPLIPToCore[10][0] = make([][]*UserCoreMapping, 256)
-
-	for ii := range 256 {
-		VPLIPToCore[10][0][ii] = make([]*UserCoreMapping, 256)
-
-		for iii := range 256 {
-			VPLIPToCore[10][0][ii][iii] = nil
-		}
-	}
-}
 
 func GeneratePortAllocation() (err error) {
 	Config := Config.Load()
@@ -554,10 +538,6 @@ func makeConfigAndCerts() (err error) {
 			APIPort:   "443",
 			NetAdmins: []string{},
 			Hostname:  "tunnels.local",
-			Lan: &types.Network{
-				Tag:     "lan",
-				Network: "10.0.0.0/16",
-			},
 			Routes: []*types.Route{
 				{Address: "10.0.0.0/16", Metric: "0"},
 			},

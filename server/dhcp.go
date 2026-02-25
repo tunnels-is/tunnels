@@ -8,9 +8,8 @@ import (
 )
 
 func generateDHCPMap() (err error) {
-	Config := Config.Load()
 	var ip net.IP
-	ip, VPLNetwork, err = net.ParseCIDR(Config.Lan.Network)
+	ip, VPLNetwork, err = net.ParseCIDR("10.0.0.0/16")
 	if err != nil {
 		return err
 	}
@@ -47,7 +46,7 @@ func assignDHCP(CR *types.ControllerConnectRequest, CRR *types.ServerConnectResp
 			clientCoreMappings[index].DHCP = DHCPMapping[i]
 
 			ip := clientCoreMappings[index].DHCP.IP
-			VPLIPToCore[ip[0]][ip[1]][ip[2]][ip[3]] = clientCoreMappings[index]
+			VPLIPToCore[uint16(ip[2])<<8|uint16(ip[3])].Store(clientCoreMappings[index])
 
 			break
 		}
@@ -76,7 +75,7 @@ func assignDHCP(CR *types.ControllerConnectRequest, CRR *types.ServerConnectResp
 				clientCoreMappings[index].DHCP = DHCPMapping[i]
 
 				ip := clientCoreMappings[index].DHCP.IP
-				VPLIPToCore[ip[0]][ip[1]][ip[2]][ip[3]] = clientCoreMappings[index]
+				VPLIPToCore[uint16(ip[2])<<8|uint16(ip[3])].Store(clientCoreMappings[index])
 
 				break
 			}
