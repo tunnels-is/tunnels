@@ -270,6 +270,22 @@ func Test_getIP4FromHostOrDHCP_BroadcastAddress(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// Counting helpers (same package — can access unexported initHosts)
+// ---------------------------------------------------------------------------
+
+func autoHostCount(cm *UserCoreMapping) (n int) {
+	cm.initHosts()
+	cm.AutoHosts.Range(func(_ [6]byte, _ *AllowedHost) bool { n++; return true })
+	return
+}
+
+func manualHostCount(cm *UserCoreMapping) (n int) {
+	cm.initHosts()
+	cm.ManualHosts.Range(func(_ [4]byte, _ *AllowedHost) bool { n++; return true })
+	return
+}
+
+// ---------------------------------------------------------------------------
 // AddHost
 // ---------------------------------------------------------------------------
 
@@ -277,11 +293,11 @@ func TestAddHost(t *testing.T) {
 	t.Run("adds new entry", func(t *testing.T) {
 		cm := &UserCoreMapping{}
 		cm.AddHost(ip4b(10, 0, 0, 5), pt(0, 80), "auto")
-		if len(cm.AllowedHosts) != 1 {
-			t.Fatalf("expected 1 host, got %d", len(cm.AllowedHosts))
+		if autoHostCount(cm) != 1 {
+			t.Fatalf("expected 1 host, got %d", autoHostCount(cm))
 		}
-		h := cm.AllowedHosts[0]
-		if h.IP != ip4b(10, 0, 0, 5) || h.PORT != pt(0, 80) || h.Type != "auto" {
+		h := cm.IsHostAllowed(ip4b(10, 0, 0, 5), pt(0, 80))
+		if h == nil || h.IP != ip4b(10, 0, 0, 5) || h.PORT != pt(0, 80) || h.Type != "auto" {
 			t.Errorf("unexpected entry: %+v", h)
 		}
 	})
@@ -290,8 +306,8 @@ func TestAddHost(t *testing.T) {
 		cm := &UserCoreMapping{}
 		cm.AddHost(ip4b(10, 0, 0, 5), pt(0, 80), "auto")
 		cm.AddHost(ip4b(10, 0, 0, 5), pt(0, 80), "auto")
-		if len(cm.AllowedHosts) != 1 {
-			t.Errorf("expected 1 entry, got %d", len(cm.AllowedHosts))
+		if autoHostCount(cm) != 1 {
+			t.Errorf("expected 1 entry, got %d", autoHostCount(cm))
 		}
 	})
 
@@ -299,8 +315,9 @@ func TestAddHost(t *testing.T) {
 		cm := &UserCoreMapping{}
 		cm.AddHost(ip4b(10, 0, 0, 5), pt(0, 0), "manual")
 		cm.AddHost(ip4b(10, 0, 0, 5), pt(0, 80), "auto")
-		if len(cm.AllowedHosts) != 1 {
-			t.Errorf("expected 1 entry, got %d", len(cm.AllowedHosts))
+		if manualHostCount(cm) != 1 || autoHostCount(cm) != 0 {
+			t.Errorf("expected 1 manual, 0 auto; got manual=%d auto=%d",
+				manualHostCount(cm), autoHostCount(cm))
 		}
 	})
 
@@ -308,8 +325,8 @@ func TestAddHost(t *testing.T) {
 		cm := &UserCoreMapping{}
 		cm.AddHost(ip4b(10, 0, 0, 5), pt(0, 80), "auto")
 		cm.AddHost(ip4b(10, 0, 0, 6), pt(0, 80), "auto")
-		if len(cm.AllowedHosts) != 2 {
-			t.Errorf("expected 2 entries, got %d", len(cm.AllowedHosts))
+		if autoHostCount(cm) != 2 {
+			t.Errorf("expected 2 entries, got %d", autoHostCount(cm))
 		}
 	})
 }
@@ -322,27 +339,27 @@ func TestDelHost(t *testing.T) {
 	t.Run("removes existing entry", func(t *testing.T) {
 		cm := &UserCoreMapping{}
 		cm.AddHost(ip4b(10, 0, 0, 5), pt(0, 80), "auto")
-		cm.DelHost(ip4b(10, 0, 0, 5), "auto")
-		if len(cm.AllowedHosts) != 0 {
-			t.Errorf("expected 0 entries, got %d", len(cm.AllowedHosts))
+		cm.DelHost(ip4b(10, 0, 0, 5), pt(0, 80), "auto")
+		if autoHostCount(cm) != 0 {
+			t.Errorf("expected 0 entries, got %d", autoHostCount(cm))
 		}
 	})
 
 	t.Run("does not remove entry with wrong type", func(t *testing.T) {
 		cm := &UserCoreMapping{}
 		cm.AddHost(ip4b(10, 0, 0, 5), pt(0, 80), "auto")
-		cm.DelHost(ip4b(10, 0, 0, 5), "manual")
-		if len(cm.AllowedHosts) != 1 {
-			t.Errorf("expected 1 entry to remain, got %d", len(cm.AllowedHosts))
+		cm.DelHost(ip4b(10, 0, 0, 5), pt(0, 0), "manual") // targets ManualHosts, nothing there
+		if autoHostCount(cm) != 1 {
+			t.Errorf("expected 1 entry to remain, got %d", autoHostCount(cm))
 		}
 	})
 
 	t.Run("does not remove entry with wrong IP", func(t *testing.T) {
 		cm := &UserCoreMapping{}
 		cm.AddHost(ip4b(10, 0, 0, 5), pt(0, 80), "auto")
-		cm.DelHost(ip4b(10, 0, 0, 6), "auto")
-		if len(cm.AllowedHosts) != 1 {
-			t.Errorf("expected 1 entry to remain, got %d", len(cm.AllowedHosts))
+		cm.DelHost(ip4b(10, 0, 0, 6), pt(0, 80), "auto")
+		if autoHostCount(cm) != 1 {
+			t.Errorf("expected 1 entry to remain, got %d", autoHostCount(cm))
 		}
 	})
 
@@ -350,18 +367,18 @@ func TestDelHost(t *testing.T) {
 		cm := &UserCoreMapping{}
 		cm.AddHost(ip4b(10, 0, 0, 5), pt(0, 80), "auto")
 		cm.AddHost(ip4b(10, 0, 0, 6), pt(0, 80), "auto")
-		cm.DelHost(ip4b(10, 0, 0, 5), "auto")
-		if len(cm.AllowedHosts) != 1 {
-			t.Fatalf("expected 1 entry to remain, got %d", len(cm.AllowedHosts))
+		cm.DelHost(ip4b(10, 0, 0, 5), pt(0, 80), "auto")
+		if autoHostCount(cm) != 1 {
+			t.Fatalf("expected 1 entry to remain, got %d", autoHostCount(cm))
 		}
-		if cm.AllowedHosts[0].IP != ip4b(10, 0, 0, 6) {
-			t.Errorf("wrong entry remained: %+v", cm.AllowedHosts[0])
+		if cm.IsHostAllowed(ip4b(10, 0, 0, 6), pt(0, 80)) == nil {
+			t.Errorf("entry for .6 should still be present")
 		}
 	})
 
 	t.Run("no-op on empty list", func(t *testing.T) {
 		cm := &UserCoreMapping{}
-		cm.DelHost(ip4b(10, 0, 0, 5), "auto") // must not panic
+		cm.DelHost(ip4b(10, 0, 0, 5), pt(0, 80), "auto") // must not panic
 	})
 }
 
@@ -422,11 +439,11 @@ func TestSetFin(t *testing.T) {
 		cm := &UserCoreMapping{}
 		cm.AddHost(ip4b(10, 0, 0, 5), pt(0, 80), "auto")
 		cm.SetFin(ip4b(10, 0, 0, 5), pt(0, 80), true)
-		h := cm.AllowedHosts[0]
-		if !h.FFIN {
+		h := cm.IsHostAllowed(ip4b(10, 0, 0, 5), pt(0, 80))
+		if h == nil || !h.FFIN.Load() {
 			t.Error("expected FFIN=true")
 		}
-		if h.TFIN {
+		if h != nil && h.TFIN.Load() {
 			t.Error("expected TFIN to remain false")
 		}
 	})
@@ -435,11 +452,11 @@ func TestSetFin(t *testing.T) {
 		cm := &UserCoreMapping{}
 		cm.AddHost(ip4b(10, 0, 0, 5), pt(0, 80), "auto")
 		cm.SetFin(ip4b(10, 0, 0, 5), pt(0, 80), false)
-		h := cm.AllowedHosts[0]
-		if h.FFIN {
+		h := cm.IsHostAllowed(ip4b(10, 0, 0, 5), pt(0, 80))
+		if h != nil && h.FFIN.Load() {
 			t.Error("expected FFIN to remain false")
 		}
-		if !h.TFIN {
+		if h == nil || !h.TFIN.Load() {
 			t.Error("expected TFIN=true")
 		}
 	})
@@ -448,8 +465,8 @@ func TestSetFin(t *testing.T) {
 		cm := &UserCoreMapping{}
 		cm.AddHost(ip4b(10, 0, 0, 5), pt(0, 80), "auto")
 		cm.SetFin(ip4b(10, 0, 0, 6), pt(0, 80), true)
-		h := cm.AllowedHosts[0]
-		if h.FFIN || h.TFIN {
+		h := cm.IsHostAllowed(ip4b(10, 0, 0, 5), pt(0, 80))
+		if h != nil && (h.FFIN.Load() || h.TFIN.Load()) {
 			t.Error("expected no FIN flags set for wrong IP")
 		}
 	})
@@ -458,8 +475,8 @@ func TestSetFin(t *testing.T) {
 		cm := &UserCoreMapping{}
 		cm.AddHost(ip4b(10, 0, 0, 5), pt(0, 80), "auto")
 		cm.SetFin(ip4b(10, 0, 0, 5), pt(1, 187), true)
-		h := cm.AllowedHosts[0]
-		if h.FFIN || h.TFIN {
+		h := cm.IsHostAllowed(ip4b(10, 0, 0, 5), pt(0, 80))
+		if h != nil && (h.FFIN.Load() || h.TFIN.Load()) {
 			t.Error("expected no FIN flags set for wrong port")
 		}
 	})
@@ -474,32 +491,33 @@ func TestClearHost(t *testing.T) {
 		cm := &UserCoreMapping{}
 		cm.AddHost(ip4b(10, 0, 0, 5), pt(0, 80), "auto")
 		cm.ClearHost(ip4b(10, 0, 0, 5))
-		if len(cm.AllowedHosts) != 0 {
-			t.Errorf("expected 0 entries, got %d", len(cm.AllowedHosts))
+		if autoHostCount(cm) != 0 {
+			t.Errorf("expected 0 entries, got %d", autoHostCount(cm))
 		}
 	})
 
 	t.Run("removes all ports for the same IP", func(t *testing.T) {
 		cm := &UserCoreMapping{}
-		cm.AllowedHosts = []*AllowedHost{
-			{IP: ip4b(10, 0, 0, 5), PORT: pt(0, 80), Type: "auto"},
-			{IP: ip4b(10, 0, 0, 5), PORT: pt(1, 187), Type: "auto"},
-		}
+		cm.AddHost(ip4b(10, 0, 0, 5), pt(0, 80), "auto")
+		cm.AddHost(ip4b(10, 0, 0, 5), pt(1, 187), "auto")
 		cm.ClearHost(ip4b(10, 0, 0, 5))
-		if len(cm.AllowedHosts) != 0 {
-			t.Errorf("expected 0 entries, got %d", len(cm.AllowedHosts))
+		if autoHostCount(cm) != 0 {
+			t.Errorf("expected 0 entries, got %d", autoHostCount(cm))
 		}
 	})
 
 	t.Run("removes both auto and manual entries for the same IP", func(t *testing.T) {
 		cm := &UserCoreMapping{}
-		cm.AllowedHosts = []*AllowedHost{
-			{IP: ip4b(10, 0, 0, 5), PORT: pt(0, 0), Type: "manual"},
-			{IP: ip4b(10, 0, 0, 5), PORT: pt(0, 80), Type: "auto"},
-		}
-		cm.ClearHost(ip4b(10, 0, 0, 5))
-		if len(cm.AllowedHosts) != 0 {
-			t.Errorf("expected 0 entries, got %d", len(cm.AllowedHosts))
+		// Seed both maps directly so we can have both auto and manual for same IP.
+		cm.initHosts()
+		ip := ip4b(10, 0, 0, 5)
+		cm.ManualHosts.Store(ip, &AllowedHost{IP: ip, PORT: pt(0, 0), Type: "manual"})
+		autoKey := [6]byte{10, 0, 0, 5, 0, 80}
+		cm.AutoHosts.Store(autoKey, &AllowedHost{IP: ip, PORT: pt(0, 80), Type: "auto"})
+		cm.ClearHost(ip)
+		if autoHostCount(cm) != 0 || manualHostCount(cm) != 0 {
+			t.Errorf("expected 0 entries, got auto=%d manual=%d",
+				autoHostCount(cm), manualHostCount(cm))
 		}
 	})
 
@@ -508,11 +526,11 @@ func TestClearHost(t *testing.T) {
 		cm.AddHost(ip4b(10, 0, 0, 5), pt(0, 80), "auto")
 		cm.AddHost(ip4b(10, 0, 0, 6), pt(0, 80), "auto")
 		cm.ClearHost(ip4b(10, 0, 0, 5))
-		if len(cm.AllowedHosts) != 1 {
-			t.Fatalf("expected 1 entry to remain, got %d", len(cm.AllowedHosts))
+		if autoHostCount(cm) != 1 {
+			t.Fatalf("expected 1 entry to remain, got %d", autoHostCount(cm))
 		}
-		if cm.AllowedHosts[0].IP != ip4b(10, 0, 0, 6) {
-			t.Errorf("wrong entry remained: %+v", cm.AllowedHosts[0])
+		if cm.IsHostAllowed(ip4b(10, 0, 0, 6), pt(0, 80)) == nil {
+			t.Errorf("entry for .6 should still be present")
 		}
 	})
 
@@ -520,8 +538,8 @@ func TestClearHost(t *testing.T) {
 		cm := &UserCoreMapping{}
 		cm.AddHost(ip4b(10, 0, 0, 5), pt(0, 80), "auto")
 		cm.ClearHost(ip4b(10, 0, 0, 6))
-		if len(cm.AllowedHosts) != 1 {
-			t.Errorf("expected list unchanged, got %d entries", len(cm.AllowedHosts))
+		if autoHostCount(cm) != 1 {
+			t.Errorf("expected list unchanged, got %d entries", autoHostCount(cm))
 		}
 	})
 }
@@ -579,8 +597,8 @@ func TestFirewall_TCPLifecycle(t *testing.T) {
 		// socket.go fromUserChannel (cmA) line ~413: SYN > 0 → AddHost(D4=bIP, D4Port=portEph, "auto")
 		// Entry already exists from pre-condition; AddHost is idempotent.
 		cmA.AddHost(bIP, portEph, "auto")
-		if len(cmA.AllowedHosts) != 1 {
-			t.Errorf("SYN-ACK: AddHost must be idempotent, expected 1 entry got %d", len(cmA.AllowedHosts))
+		if autoHostCount(cmA) != 1 {
+			t.Errorf("SYN-ACK: AddHost must be idempotent, expected 1 entry got %d", autoHostCount(cmA))
 		}
 
 		// socket.go toUserChannel (cmB) line ~542: IsHostAllowed(S4=aIP, S4Port=port80)
@@ -604,10 +622,10 @@ func TestFirewall_TCPLifecycle(t *testing.T) {
 		if h == nil {
 			t.Fatal("FIN send B: entry for aIP must still exist after sending FIN")
 		}
-		if !h.FFIN {
+		if !h.FFIN.Load() {
 			t.Error("FIN send B: FFIN must be true after B sends FIN")
 		}
-		if h.TFIN {
+		if h.TFIN.Load() {
 			t.Error("FIN send B: TFIN must still be false before A replies")
 		}
 
@@ -619,10 +637,10 @@ func TestFirewall_TCPLifecycle(t *testing.T) {
 		}
 		cmA.SetFin(bIP, portEph, false)
 		h = cmA.IsHostAllowed(bIP, portEph)
-		if h == nil || !h.TFIN {
+		if h == nil || !h.TFIN.Load() {
 			t.Fatal("FIN recv A: cmA entry for bIP must have TFIN=true")
 		}
-		if h.FFIN {
+		if h.FFIN.Load() {
 			t.Error("FIN recv A: FFIN must still be false — A has not sent its own FIN yet")
 		}
 
@@ -633,8 +651,9 @@ func TestFirewall_TCPLifecycle(t *testing.T) {
 		if h == nil {
 			t.Fatal("FIN-ACK send A: entry for bIP must still exist")
 		}
-		if !h.FFIN || !h.TFIN {
-			t.Errorf("FIN-ACK send A: expected FFIN=true TFIN=true, got FFIN=%v TFIN=%v", h.FFIN, h.TFIN)
+		if !h.FFIN.Load() || !h.TFIN.Load() {
+			t.Errorf("FIN-ACK send A: expected FFIN=true TFIN=true, got FFIN=%v TFIN=%v",
+				h.FFIN.Load(), h.TFIN.Load()) //nolint:copylocks
 		}
 
 		// socket.go toUserChannel (cmB) line ~551–553:
@@ -643,14 +662,14 @@ func TestFirewall_TCPLifecycle(t *testing.T) {
 		if cmB.IsHostAllowed(aIP, port80) == nil {
 			t.Fatal("FIN-ACK recv B: cmB must have entry for aIP to process FIN-ACK")
 		}
-		cmB.DelHost(aIP, "auto") // both sides have sent FIN → remove entry
+		cmB.DelHost(aIP, port80, "auto") // both sides have sent FIN → remove entry
 		if cmB.IsHostAllowed(aIP, port80) != nil {
 			t.Error("FIN-ACK recv B: cmB entry for aIP must be removed (both FINs exchanged)")
 		}
 
 		// ── Final state ───────────────────────────────────────────────────────
-		if len(cmB.AllowedHosts) != 0 {
-			t.Errorf("after graceful close: cmB AllowedHosts must be empty, got %d entries", len(cmB.AllowedHosts))
+		if autoHostCount(cmB) != 0 {
+			t.Errorf("after graceful close: cmB must have 0 auto entries, got %d", autoHostCount(cmB))
 		}
 		// A's entry for B stays until a subsequent RST or disconnect — B's final
 		// ACK carries no FIN bit so socket.go has no hook to remove it here.
@@ -672,43 +691,48 @@ func TestFirewall_TCPLifecycle(t *testing.T) {
 		}
 
 		// ── RST: B → A ───────────────────────────────────────────────────────
-		// socket.go fromUserChannel (cmB) line ~411: RST > 0 → DelHost(D4=aIP, "auto")
-		cmB.DelHost(aIP, "auto")
+		// socket.go fromUserChannel (cmB) line ~411: RST > 0 → DelHost(D4=aIP, D4Port=port80, "auto")
+		cmB.DelHost(aIP, port80, "auto")
 		if cmB.IsHostAllowed(aIP, port80) != nil {
 			t.Error("RST send B: cmB entry for aIP must be removed immediately")
 		}
 
-		// socket.go toUserChannel (cmA) line ~549–550: RST > 0 → DelHost(S4=bIP, "auto")
-		cmA.DelHost(bIP, "auto")
+		// socket.go toUserChannel (cmA) line ~549–550: RST > 0 → DelHost(S4=bIP, S4Port=portEph, "auto")
+		cmA.DelHost(bIP, portEph, "auto")
 		if cmA.IsHostAllowed(bIP, portEph) != nil {
 			t.Error("RST recv A: cmA entry for bIP must be removed immediately")
 		}
 
-		if len(cmB.AllowedHosts) != 0 {
-			t.Errorf("RST: cmB AllowedHosts must be empty, got %d", len(cmB.AllowedHosts))
+		if autoHostCount(cmB) != 0 {
+			t.Errorf("RST: cmB must be empty, got %d auto entries", autoHostCount(cmB))
 		}
-		if len(cmA.AllowedHosts) != 0 {
-			t.Errorf("RST: cmA AllowedHosts must be empty, got %d", len(cmA.AllowedHosts))
+		if autoHostCount(cmA) != 0 {
+			t.Errorf("RST: cmA must be empty, got %d auto entries", autoHostCount(cmA))
 		}
 	})
 
-	t.Run("nil VPLIPToCore removes sender firewall entry (target disconnected)", func(t *testing.T) {
-		// socket.go fromUserChannel ~line 394:
-		//   targetCM = VPLIPToCore[uint16(D4[2])<<8|uint16(D4[3])].Load()
-		//   if targetCM == nil { CM.DelHost(D4, "auto"); continue }
-		// Intentional NAT-like cleanup: if the target is not reachable,
-		// the sender's firewall entry is immediately removed.
+	t.Run("nil VPLIPToCore clears all entries for target IP (target disconnected)", func(t *testing.T) {
+		// socket.go fromUserChannel:
+		//   if targetCM == nil { CM.ClearHost(D4); continue }
+		// When the target peer is gone, ALL firewall entries for that IP are stale
+		// regardless of port or type — ClearHost removes them all in one shot.
 		cmB := &UserCoreMapping{}
 		cmB.AddHost(aIP, port80, "auto")
+		cmB.AddHost(aIP, portEph, "auto")  // second connection to same peer
+		cmB.AddHost(aIP, [2]byte{}, "manual") // admin-configured rule
 
-		// Simulate VPLIPToCore[aIP] == nil → DelHost fires
-		cmB.DelHost(aIP, "auto")
+		// Simulate VPLIPToCore[aIP] == nil → ClearHost fires
+		cmB.ClearHost(aIP)
 
 		if cmB.IsHostAllowed(aIP, port80) != nil {
-			t.Error("nil VPLIPToCore: cmB entry for aIP must be removed")
+			t.Error("nil VPLIPToCore: cmB auto entry (port80) must be removed")
 		}
-		if len(cmB.AllowedHosts) != 0 {
-			t.Errorf("nil VPLIPToCore: cmB AllowedHosts must be empty, got %d", len(cmB.AllowedHosts))
+		if cmB.IsHostAllowed(aIP, portEph) != nil {
+			t.Error("nil VPLIPToCore: cmB auto entry (portEph) must be removed")
+		}
+		if autoHostCount(cmB) != 0 || manualHostCount(cmB) != 0 {
+			t.Errorf("nil VPLIPToCore: cmB must be fully empty, got auto=%d manual=%d",
+				autoHostCount(cmB), manualHostCount(cmB))
 		}
 	})
 
@@ -728,19 +752,19 @@ func TestFirewall_TCPLifecycle(t *testing.T) {
 		cmB.SetFin(aIP, port80, true)
 
 		// toUserChannel (cmA) receives FIN from B: activeHost.FFIN=true → DelHost
-		if ah := cmA.IsHostAllowed(bIP, portEph); ah != nil && ah.FFIN {
-			cmA.DelHost(bIP, "auto")
+		if ah := cmA.IsHostAllowed(bIP, portEph); ah != nil && ah.FFIN.Load() {
+			cmA.DelHost(bIP, portEph, "auto")
 		}
 		// toUserChannel (cmB) receives FIN from A: activeHost.FFIN=true → DelHost
-		if ah := cmB.IsHostAllowed(aIP, port80); ah != nil && ah.FFIN {
-			cmB.DelHost(aIP, "auto")
+		if ah := cmB.IsHostAllowed(aIP, port80); ah != nil && ah.FFIN.Load() {
+			cmB.DelHost(aIP, port80, "auto")
 		}
 
-		if len(cmA.AllowedHosts) != 0 {
-			t.Errorf("simultaneous FIN: cmA AllowedHosts must be empty, got %d", len(cmA.AllowedHosts))
+		if autoHostCount(cmA) != 0 {
+			t.Errorf("simultaneous FIN: cmA must be empty, got %d auto entries", autoHostCount(cmA))
 		}
-		if len(cmB.AllowedHosts) != 0 {
-			t.Errorf("simultaneous FIN: cmB AllowedHosts must be empty, got %d", len(cmB.AllowedHosts))
+		if autoHostCount(cmB) != 0 {
+			t.Errorf("simultaneous FIN: cmB must be empty, got %d auto entries", autoHostCount(cmB))
 		}
 	})
 }
@@ -775,11 +799,7 @@ func TestNukeClient_ClearsFirewallOnDisconnect(t *testing.T) {
 		FromSignal: &signal.Signal{},
 	}
 	cmB.AddHost(disconnectingIP, pt(0, 80), "auto")
-	cmB.AllowedHosts = append(cmB.AllowedHosts, &AllowedHost{
-		IP:   disconnectingIP,
-		PORT: pt(0, 0),
-		Type: "manual",
-	})
+	cmB.AddHost(disconnectingIP, pt(0, 0), "manual")
 	clientCoreMappings[1] = cmB
 
 	NukeClient(0)
