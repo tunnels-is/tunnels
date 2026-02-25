@@ -62,7 +62,7 @@ func NukeClient(index int) {
 
 	if cm.DHCP != nil {
 		ip := cm.DHCP.IP
-		VPLIPToCore[ip[0]][ip[1]][ip[2]][ip[3]] = nil
+		VPLIPToCore[uint16(ip[2])<<8|uint16(ip[3])].Store(nil)
 		for i, other := range clientCoreMappings {
 			if i == index || other == nil {
 				continue

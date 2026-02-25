@@ -693,10 +693,10 @@ func TestFirewall_TCPLifecycle(t *testing.T) {
 	})
 
 	t.Run("nil VPLIPToCore removes sender firewall entry (target disconnected)", func(t *testing.T) {
-		// socket.go fromUserChannel lines ~397–401:
-		//   targetCM = VPLIPToCore[D4[0]][D4[1]][D4[2]][D4[3]]
+		// socket.go fromUserChannel ~line 394:
+		//   targetCM = VPLIPToCore[uint16(D4[2])<<8|uint16(D4[3])].Load()
 		//   if targetCM == nil { CM.DelHost(D4, "auto"); continue }
-		// This is intentional NAT-like cleanup: if the target is not reachable,
+		// Intentional NAT-like cleanup: if the target is not reachable,
 		// the sender's firewall entry is immediately removed.
 		cmB := &UserCoreMapping{}
 		cmB.AddHost(aIP, port80, "auto")
@@ -754,11 +754,6 @@ func TestFirewall_TCPLifecycle(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestNukeClient_ClearsFirewallOnDisconnect(t *testing.T) {
-	// Initialise the VPLIPToCore inner slices for 10.0.0.x
-	VPLIPToCore[10] = make([][][]*UserCoreMapping, 1)
-	VPLIPToCore[10][0] = make([][]*UserCoreMapping, 256)
-	VPLIPToCore[10][0][0] = make([]*UserCoreMapping, 256)
-
 	disconnectingIP := ip4b(10, 0, 0, 5)
 
 	// Client A — the one that will disconnect
@@ -770,7 +765,7 @@ func TestNukeClient_ClearsFirewallOnDisconnect(t *testing.T) {
 		DHCP:       &types.DHCPRecord{IP: disconnectingIP},
 	}
 	clientCoreMappings[0] = cmA
-	VPLIPToCore[10][0][0][5] = cmA
+	VPLIPToCore[5].Store(cmA) // ip={10,0,0,5}: uint16(0)<<8|uint16(5) = 5
 
 	// Client B — has A's IP in its allowed-host list (both auto and manual)
 	cmB := &UserCoreMapping{
@@ -790,7 +785,7 @@ func TestNukeClient_ClearsFirewallOnDisconnect(t *testing.T) {
 	NukeClient(0)
 
 	// VPLIPToCore must be nil so future LAN packets to A's IP are dropped cleanly
-	if VPLIPToCore[10][0][0][5] != nil {
+	if VPLIPToCore[5].Load() != nil {
 		t.Error("VPLIPToCore entry was not cleared on disconnect")
 	}
 
