@@ -53,7 +53,6 @@ type ServerConfig struct {
 	NetAdmins []string
 
 	Hostname           string
-	Lan                *Network
 	DisableLanFirewall bool
 	Routes             []*Route
 	SubNets            []*Network
@@ -212,7 +211,7 @@ func CreateCRRFromServer(S *ServerConfig) (CRR *ServerConnectResponse) {
 		Networks:           S.SubNets,
 		Routes:             S.Routes,
 		DNSServers:         S.DNSServers,
-		LAN:                S.Lan,
+		LAN:                &Network{Network: "10.0.0.0/16"},
 	}
 }
 
