@@ -107,7 +107,11 @@ outerloop:
 		response.Devices = append(response.Devices, d)
 	}
 
-	response.DHCPFree = len(DHCPMapping) - response.DHCPAssigned
+	for i := range DHCPMapping {
+		if DHCPMapping[i] != nil && DHCPMapping[i].Token == "" {
+			response.DHCPFree++
+		}
+	}
 
 	// for i := range response.Devices {
 	// 	response.Devices[i].DHCP.Token = "redacted"

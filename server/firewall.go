@@ -79,7 +79,13 @@ func getHostnameFromDHCP(hostname string) (ip4b [4]byte, ok bool) {
 
 func validateDHCPTokenAndIP(fr *types.FirewallRequest) (mapping *UserCoreMapping) {
 	ip := net.ParseIP(fr.IP)
+	if ip == nil {
+		return nil
+	}
 	ip = ip.To4()
+	if ip == nil {
+		return nil
+	}
 	ip4b := [4]byte{ip[0], ip[1], ip[2], ip[3]}
 
 	for i := range clientCoreMappings {
