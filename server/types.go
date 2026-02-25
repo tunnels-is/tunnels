@@ -136,6 +136,18 @@ func (u *UserCoreMapping) AddHost(host [4]byte, port [2]byte, t string) {
 	}
 }
 
+func (u *UserCoreMapping) ClearHost(host [4]byte) {
+	u.Allowedm.Lock()
+	defer u.Allowedm.Unlock()
+	filtered := u.AllowedHosts[:0]
+	for _, v := range u.AllowedHosts {
+		if v.IP != host {
+			filtered = append(filtered, v)
+		}
+	}
+	u.AllowedHosts = filtered
+}
+
 func (u *UserCoreMapping) DelHost(host [4]byte, t string) {
 	u.Allowedm.Lock()
 	defer u.Allowedm.Unlock()
