@@ -72,10 +72,8 @@ outerloop:
 
 		d := new(types.ListDevice)
 		d.AllowedIPs = make([]string, 0)
-		for _, v := range clientCoreMappings[i].AllowedHosts {
-			if v.Type == "auto" {
-				continue
-			}
+		clientCoreMappings[i].initHosts()
+		clientCoreMappings[i].ManualHosts.Range(func(_ [4]byte, v *AllowedHost) bool {
 			d.AllowedIPs = append(d.AllowedIPs,
 				fmt.Sprintf("%d-%d-%d-%d",
 					v.IP[0],
@@ -83,7 +81,8 @@ outerloop:
 					v.IP[2],
 					v.IP[3],
 				))
-		}
+			return true
+		})
 
 		d.RAM = clientCoreMappings[i].RAM
 		d.CPU = clientCoreMappings[i].CPU

@@ -15,47 +15,30 @@ func syncFirewallState(fr *types.FirewallRequest, mapping *UserCoreMapping) {
 		}
 	}()
 
-	originalList := make([]*AllowedHost, len(mapping.AllowedHosts))
-	copy(originalList, mapping.AllowedHosts)
-
 	mapping.DisableFirewall = fr.DisableFirewall
 
-	for i := range originalList {
-		found := false
-		for ii := range fr.Hosts {
-			ip4, ok := getIP4FromHostOrDHCP(fr.Hosts[ii])
-			if !ok {
-				continue
-			}
-
-			if ip4 == originalList[i].IP && originalList[i].Type == "manual" {
-				found = true
-				break
-			}
-		}
-
-		if !found {
-			mapping.DelHost(originalList[i].IP, "manual")
-		}
-	}
-
+	// Build the set of IPs from the new host list.
+	newIPs := make(map[[4]byte]struct{}, len(fr.Hosts))
 	for i := range fr.Hosts {
 		ip4, ok := getIP4FromHostOrDHCP(fr.Hosts[i])
 		if !ok {
 			continue
 		}
+		newIPs[ip4] = struct{}{}
+	}
 
-		found := false
-		for ii := range mapping.AllowedHosts {
-			if ip4 == originalList[ii].IP && originalList[ii].Type == "manual" {
-				found = true
-				break
-			}
+	// Remove manual entries not present in the new list.
+	mapping.ManualHosts.Range(func(ip [4]byte, _ *AllowedHost) bool {
+		if _, ok := newIPs[ip]; !ok {
+			mapping.ManualHosts.Delete(ip)
 		}
+		return true
+	})
 
-		if !found {
-			mapping.AddHost(ip4, [2]byte{}, "manual")
-		}
+	// Add new manual entries (LoadOrStore is idempotent for existing IPs).
+	for ip := range newIPs {
+		ip := ip // avoid loop-variable capture
+		mapping.ManualHosts.LoadOrStore(ip, &AllowedHost{IP: ip, Type: "manual"})
 	}
 }
 
