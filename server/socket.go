@@ -392,10 +392,6 @@ func fromUserChannel(index int) {
 			D4[3] = NIP[3]
 
 			targetCM = VPLIPToCore[uint16(D4[2])<<8|uint16(D4[3])].Load()
-			if targetCM == nil {
-				CM.DelHost(D4, "auto")
-				continue
-			}
 
 			l := (PACKET[0] & 0x0F) * 4
 			D4Port[0] = PACKET[l+2]
@@ -404,8 +400,13 @@ func fromUserChannel(index int) {
 			FIN = PACKET[l+13] & 0x1
 			SYN = PACKET[l+13] & 0x2
 
+			if targetCM == nil {
+				CM.ClearHost(D4)
+				continue
+			}
+
 			if RST > 0 {
-				CM.DelHost(D4, "auto")
+				CM.DelHost(D4, D4Port, "auto")
 			} else if SYN > 0 {
 				CM.AddHost(D4, D4Port, "auto")
 			} else if FIN > 0 {
@@ -544,10 +545,10 @@ func toUserChannel(index int) {
 					RST = PACKET[headLength+13] & 0x4
 					FIN = PACKET[headLength+13] & 0x1
 					if RST > 0 {
-						CM.DelHost(S4, "auto")
+						CM.DelHost(S4, S4Port, "auto")
 					} else if FIN > 0 {
-						if activeHost.FFIN {
-							CM.DelHost(S4, "auto")
+						if activeHost.FFIN.Load() {
+							CM.DelHost(S4, S4Port, "auto")
 						} else {
 							CM.SetFin(S4, S4Port, false)
 						}

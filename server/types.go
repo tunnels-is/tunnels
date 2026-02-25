@@ -8,6 +8,7 @@ import (
 	"syscall"
 	"time"
 
+	xsync "github.com/puzpuzpuz/xsync/v3"
 	"github.com/tunnels-is/tunnels/crypt"
 	"github.com/tunnels-is/tunnels/signal"
 	"github.com/tunnels-is/tunnels/types"
@@ -45,8 +46,9 @@ type UserCoreMapping struct {
 	Addr syscall.Sockaddr
 
 	APIToken        string
-	Allowedm        sync.Mutex
-	AllowedHosts    []*AllowedHost
+	hostsInit       sync.Once
+	AutoHosts       *xsync.MapOf[[6]byte, *AllowedHost]
+	ManualHosts     *xsync.MapOf[[4]byte, *AllowedHost]
 	DHCP            *types.DHCPRecord
 	DisableFirewall bool
 
@@ -79,90 +81,74 @@ type AllowedHost struct {
 	IP   [4]byte
 	PORT [2]byte
 	Type string
-	FFIN bool
-	TFIN bool
+	FFIN atomic.Bool
+	TFIN atomic.Bool
+}
+
+func (u *UserCoreMapping) initHosts() {
+	u.hostsInit.Do(func() {
+		u.AutoHosts = xsync.NewMapOf[[6]byte, *AllowedHost]()
+		u.ManualHosts = xsync.NewMapOf[[4]byte, *AllowedHost]()
+	})
 }
 
 func (u *UserCoreMapping) IsHostAllowed(host [4]byte, port [2]byte) *AllowedHost {
-	for i, v := range u.AllowedHosts {
-		if v.IP == host {
-			if v.Type == "manual" {
-				return u.AllowedHosts[i]
-			} else if v.PORT == port {
-				return u.AllowedHosts[i]
-			}
-		}
+	u.initHosts()
+	if v, ok := u.ManualHosts.Load(host); ok {
+		return v
+	}
+	key := [6]byte{host[0], host[1], host[2], host[3], port[0], port[1]}
+	if v, ok := u.AutoHosts.Load(key); ok {
+		return v
 	}
 	return nil
 }
 
 func (u *UserCoreMapping) SetFin(host [4]byte, port [2]byte, fromUser bool) {
-	for i := range u.AllowedHosts {
-		if u.AllowedHosts[i].IP == host {
-			if u.AllowedHosts[i].PORT == port {
-				if fromUser {
-					u.AllowedHosts[i].FFIN = true
-				} else {
-					u.AllowedHosts[i].TFIN = true
-				}
-			}
-			break
+	u.initHosts()
+	key := [6]byte{host[0], host[1], host[2], host[3], port[0], port[1]}
+	if v, ok := u.AutoHosts.Load(key); ok {
+		if fromUser {
+			v.FFIN.Store(true)
+		} else {
+			v.TFIN.Store(true)
 		}
 	}
 }
 
 func (u *UserCoreMapping) AddHost(host [4]byte, port [2]byte, t string) {
-	found := false
-	for i := range u.AllowedHosts {
-		if u.AllowedHosts[i].IP == host {
-			if u.AllowedHosts[i].Type == "manual" {
-				found = true
-			} else if u.AllowedHosts[i].PORT == port {
-				found = true
-			}
-			break
-		}
+	u.initHosts()
+	if t == "manual" {
+		u.ManualHosts.LoadOrStore(host, &AllowedHost{IP: host, PORT: port, Type: "manual"})
+		return
 	}
-
-	if !found {
-		u.Allowedm.Lock()
-		u.AllowedHosts = append(u.AllowedHosts,
-			&AllowedHost{
-				IP:   host,
-				PORT: port,
-				Type: t,
-			})
-		u.Allowedm.Unlock()
+	// Skip if a manual entry already covers this IP (manual matches any port)
+	if _, ok := u.ManualHosts.Load(host); ok {
+		return
 	}
+	key := [6]byte{host[0], host[1], host[2], host[3], port[0], port[1]}
+	u.AutoHosts.LoadOrStore(key, &AllowedHost{IP: host, PORT: port, Type: "auto"})
 }
 
 func (u *UserCoreMapping) ClearHost(host [4]byte) {
-	u.Allowedm.Lock()
-	defer u.Allowedm.Unlock()
-	filtered := u.AllowedHosts[:0]
-	for _, v := range u.AllowedHosts {
-		if v.IP != host {
-			filtered = append(filtered, v)
+	u.initHosts()
+	u.AutoHosts.Range(func(key [6]byte, _ *AllowedHost) bool {
+		if [4]byte{key[0], key[1], key[2], key[3]} == host {
+			u.AutoHosts.Delete(key)
 		}
-	}
-	u.AllowedHosts = filtered
+		return true
+	})
+	u.ManualHosts.Delete(host)
 }
 
-func (u *UserCoreMapping) DelHost(host [4]byte, t string) {
-	u.Allowedm.Lock()
-	defer u.Allowedm.Unlock()
-	for i := range u.AllowedHosts {
-		if u.AllowedHosts[i].IP == host && u.AllowedHosts[i].Type == t {
-			if len(u.AllowedHosts) < 2 {
-				u.AllowedHosts = make([]*AllowedHost, 0)
-				break
-			} else {
-				u.AllowedHosts[i] = u.AllowedHosts[len(u.AllowedHosts)-1]
-				u.AllowedHosts = u.AllowedHosts[:len(u.AllowedHosts)-1]
-				break
-			}
-		}
+func (u *UserCoreMapping) DelHost(host [4]byte, port [2]byte, t string) {
+	u.initHosts()
+	if t == "manual" {
+		u.ManualHosts.Delete(host)
+		return
 	}
+	key := [6]byte{host[0], host[1], host[2], host[3], port[0], port[1]}
+	u.AutoHosts.Delete(key)
 }
 
 type USER_ENABLE_FORM struct {
