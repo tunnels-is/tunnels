@@ -75,7 +75,9 @@ func NukeClient(index int) {
 	close(clientCoreMappings[index].FromUser)
 	clientCoreMappings[index].FromSignal.ShouldStop.Store(true)
 	clientCoreMappings[index].ToSignal.ShouldStop.Store(true)
+	coreMutex.Lock()
 	clientCoreMappings[index] = nil
+	coreMutex.Unlock()
 }
 
 func pingActiveUsers() {
