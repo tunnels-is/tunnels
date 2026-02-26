@@ -116,11 +116,12 @@ func API_AcceptUserConnections(w http.ResponseWriter, r *http.Request) {
 	CRR.ServerHandshakeSignature = nil
 	EH.SEAL.CleanPostSecretGeneration()
 
-	clientCoreMappings[index].ToSignal = signal.NewSignal(fmt.Sprintf("TO:%d", index), *CTX.Load(), *Cancel.Load(), time.Second, goroutineLogger, func() {
+	cm := clientCoreMappings[index].Load()
+	cm.ToSignal = signal.NewSignal(fmt.Sprintf("TO:%d", index), *CTX.Load(), *Cancel.Load(), time.Second, goroutineLogger, func() {
 		toUserChannel(index)
 	})
 
-	clientCoreMappings[index].FromSignal = signal.NewSignal(fmt.Sprintf("FROM:%d", index), *CTX.Load(), *Cancel.Load(), time.Second, goroutineLogger, func() {
+	cm.FromSignal = signal.NewSignal(fmt.Sprintf("FROM:%d", index), *CTX.Load(), *Cancel.Load(), time.Second, goroutineLogger, func() {
 		fromUserChannel(index)
 	})
 }

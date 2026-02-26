@@ -25,16 +25,15 @@ func hashIdentifier(identifier string) string {
 }
 
 func countConnections(id string) (count int, userCount int) {
-	for i := range clientCoreMappings {
-		if clientCoreMappings[i] == nil {
+	for i := range clientCoreMappings[:slots] {
+		cm := clientCoreMappings[i].Load()
+		if cm == nil || cm == sessionSentinel {
 			continue
 		}
-
-		if clientCoreMappings[i].ID == id {
+		count++
+		if cm.ID == id {
 			userCount++
 		}
-
-		count++
 	}
 	return count, userCount
 }
@@ -47,43 +46,42 @@ func CreateClientCoreMapping(CRR *types.ServerConnectResponse, CR *types.Control
 		}
 	}()
 
-	wasAllocated := false
-	for i := range clientCoreMappings {
-		if clientCoreMappings[i] == nil {
+	index = -1
+	for i := range slots {
+		if clientCoreMappings[i].CompareAndSwap(nil, sessionSentinel) {
 			index = i
-
-			coreMutex.Lock()
-			if clientCoreMappings[i] == nil {
-				clientCoreMappings[i] = new(UserCoreMapping)
-				wasAllocated = true
-			}
-			coreMutex.Unlock()
-			if !wasAllocated {
-				continue
-			}
-
-			clientCoreMappings[i].ID = hashIdentifier(CR.UserID.Hex())
-			if CR.DeviceToken != "" {
-				clientCoreMappings[i].DeviceToken = hashIdentifier(CR.DeviceToken)
-			} else {
-				clientCoreMappings[i].DeviceToken = hashIdentifier(CR.DeviceKey)
-			}
-
-			clientCoreMappings[i].EH = EH
-			clientCoreMappings[i].Created = time.Now()
-			clientCoreMappings[i].ToUser = make(chan []byte, 500_000)
-			clientCoreMappings[i].FromUser = make(chan Packet, 500_000)
-			clientCoreMappings[i].LastPingFromClient = time.Now()
-			clientCoreMappings[i].Uindex = make([]byte, 2)
-			binary.BigEndian.PutUint16(clientCoreMappings[i].Uindex, uint16(index))
-
 			break
 		}
 	}
-
-	if !wasAllocated {
+	if index < 0 {
 		return 0, errors.New("No session slots available on the server")
 	}
+	defer func() {
+		r := recover()
+		if r != nil {
+			ERR(r, string(debug.Stack()))
+		}
+		if err != nil {
+			clientCoreMappings[index].Store(nil)
+		}
+	}()
+
+	cm := new(UserCoreMapping)
+	cm.ID = hashIdentifier(CR.UserID.Hex())
+	if CR.DeviceToken != "" {
+		cm.DeviceToken = hashIdentifier(CR.DeviceToken)
+	} else {
+		cm.DeviceToken = hashIdentifier(CR.DeviceKey)
+	}
+	cm.EH = EH
+	cm.Created = time.Now()
+	cm.ToUser = make(chan []byte, 500_000)
+	cm.FromUser = make(chan Packet, 500_000)
+	cm.LastPingFromClient = time.Now()
+	cm.Uindex = make([]byte, 2)
+	binary.BigEndian.PutUint16(cm.Uindex, uint16(index))
+
+	clientCoreMappings[index].Store(cm)
 
 	CRR.Index = index
 
@@ -98,12 +96,7 @@ func CreateClientCoreMapping(CRR *types.ServerConnectResponse, CR *types.Control
 	}
 
 	if CR.RequestingPorts {
-		err := allocatePorts(CRR, index)
-		if err != nil {
-			NukeClient(index)
-			WARN("Unable to assign user to port mapping, no available space")
-			return 0, err
-		}
+		allocatePorts(CRR, index)
 	}
 
 	return index, err
@@ -141,7 +134,6 @@ func ExternalTCPListener() {
 
 	var DSTP uint16
 	var IHL byte
-	var PM *PortRange
 	var n int
 	var version byte
 	buffer := make([]byte, math.MaxUint16)
@@ -161,18 +153,25 @@ func ExternalTCPListener() {
 		// TODO .. use mask
 		IHL = ((buffer[0] << 4) >> 4) * 4
 		DSTP = binary.BigEndian.Uint16(buffer[IHL+2 : IHL+4])
-		PM = portToCoreMapping[DSTP]
-		if PM == nil || PM.Client == nil {
+		if DSTP < startPort || portPerUser == 0 {
 			continue
 		}
-
-		if PM.Client.Addr == nil {
+		idx := int(DSTP-startPort) / portPerUser
+		if idx >= slots {
+			continue
+		}
+		tcpClient := clientCoreMappings[idx].Load()
+		if tcpClient == nil || tcpClient.PortEnd == 0 {
+			continue
+		}
+		tcpAddr, _ := tcpClient.Addr.Load().(syscall.Sockaddr)
+		if tcpAddr == nil {
 			WARN("TCP: no mapping addr: ", DSTP)
 			continue
 		}
 
 		select {
-		case PM.Client.ToUser <- CopySlice(buffer[:n]):
+		case tcpClient.ToUser <- CopySlice(buffer[:n]):
 		default:
 			WARN("TCP: packet channel full: ", DSTP)
 		}
@@ -211,12 +210,9 @@ func ExternalUDPListener() {
 
 	var DSTP uint16
 	var IPHeadLength byte
-	var PM *PortRange
 	var n int
 	var version byte
 	buffer := make([]byte, math.MaxUint16)
-	cfg := Config.Load()
-	startPort := uint16(cfg.StartPort)
 
 	for {
 		n, _, err = syscall.Recvfrom(rawUDPSockFD, buffer, 0)
@@ -233,21 +229,25 @@ func ExternalUDPListener() {
 		// TODO .. use mask
 		IPHeadLength = ((buffer[0] << 4) >> 4) * 4
 		DSTP = binary.BigEndian.Uint16(buffer[IPHeadLength+2 : IPHeadLength+4])
-		if DSTP < startPort {
+		if DSTP < startPort || portPerUser == 0 {
 			continue
 		}
-		PM = portToCoreMapping[DSTP]
-		if PM == nil || PM.Client == nil {
+		idx := int(DSTP-startPort) / portPerUser
+		if idx >= slots {
 			continue
 		}
-
-		if PM.Client.Addr == nil {
+		udpClient := clientCoreMappings[idx].Load()
+		if udpClient == nil || udpClient.PortEnd == 0 {
+			continue
+		}
+		udpAddr, _ := udpClient.Addr.Load().(syscall.Sockaddr)
+		if udpAddr == nil {
 			WARN("UDP: no mapping addr: ", DSTP)
 			continue
 		}
 
 		select {
-		case PM.Client.ToUser <- CopySlice(buffer[:n]):
+		case udpClient.ToUser <- CopySlice(buffer[:n]):
 		default:
 			WARN("UDP: packet channel full: ", DSTP)
 		}
@@ -296,8 +296,8 @@ func DataSocketListener() {
 			return
 		}
 		id = binary.BigEndian.Uint16(buff[0:2])
-		if clientCoreMappings[id] != nil {
-			clientCoreMappings[id].FromUser <- Packet{
+		if cm := clientCoreMappings[id].Load(); cm != nil && cm != sessionSentinel {
+			cm.FromUser <- Packet{
 				addr: addr,
 				data: CopySlice(buff[:n]),
 			}
@@ -308,7 +308,7 @@ func DataSocketListener() {
 }
 
 func fromUserChannel(index int) {
-	CM := clientCoreMappings[index]
+	CM := clientCoreMappings[index].Load()
 	if CM == nil {
 		return
 	}
@@ -362,7 +362,7 @@ func fromUserChannel(index int) {
 			continue
 		}
 
-		CM.Addr = payload.addr
+		CM.Addr.Store(payload.addr)
 		if len(PACKET) < 20 {
 			switch PACKET[0] {
 			case ping:
@@ -470,7 +470,7 @@ func IS_LOCAL(ip net.IP) bool {
 }
 
 func toUserChannel(index int) {
-	CM := clientCoreMappings[index]
+	CM := clientCoreMappings[index].Load()
 	if CM == nil {
 		return
 	}
@@ -516,7 +516,7 @@ func toUserChannel(index int) {
 		// We might change this later
 		if LANEnabled && (PACKET[12] == 10 && PACKET[13] == 0) {
 			originCM = VPLIPToCore[uint16(PACKET[14])<<8|uint16(PACKET[15])].Load()
-			if !lanFirewallDisabled && !CM.DisableFirewall {
+			if !lanFirewallDisabled && !CM.DisableFirewall.Load() {
 				isAdmin = false
 				if originCM != nil {
 					for _, entity := range Config.NetAdmins {
@@ -557,9 +557,13 @@ func toUserChannel(index int) {
 			}
 		}
 
+		sendAddr, _ := CM.Addr.Load().(syscall.Sockaddr)
+		if sendAddr == nil {
+			continue
+		}
 		err = syscall.Sendto(dataSocketFD,
 			CM.EH.SEAL.Seal2(PACKET, CM.Uindex),
-			0, CM.Addr)
+			0, sendAddr)
 		if err != nil {
 			WARN("dataSocketFD sendTo err:", err)
 			return

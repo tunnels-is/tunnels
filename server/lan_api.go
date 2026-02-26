@@ -57,14 +57,15 @@ func API_ListDevices(w http.ResponseWriter, r *http.Request) {
 	response := new(types.DeviceListResponse)
 	response.Devices = make([]*types.ListDevice, 0)
 outerloop:
-	for i := range clientCoreMappings {
-		if clientCoreMappings[i] == nil {
+	for i := range clientCoreMappings[:slots] {
+		cm := clientCoreMappings[i].Load()
+		if cm == nil {
 			continue
 		}
 
-		if clientCoreMappings[i].DHCP != nil {
+		if cm.DHCP != nil {
 			for _, v := range response.Devices {
-				if v.DHCP.Token == clientCoreMappings[i].DHCP.Token {
+				if v.DHCP.Token == cm.DHCP.Token {
 					continue outerloop
 				}
 			}
@@ -72,8 +73,8 @@ outerloop:
 
 		d := new(types.ListDevice)
 		d.AllowedIPs = make([]string, 0)
-		clientCoreMappings[i].initHosts()
-		clientCoreMappings[i].ManualHosts.Range(func(_ [4]byte, v *AllowedHost) bool {
+		cm.initHosts()
+		cm.ManualHosts.Range(func(_ [4]byte, v *AllowedHost) bool {
 			d.AllowedIPs = append(d.AllowedIPs,
 				fmt.Sprintf("%d-%d-%d-%d",
 					v.IP[0],
@@ -84,25 +85,25 @@ outerloop:
 			return true
 		})
 
-		d.RAM = clientCoreMappings[i].RAM
-		d.CPU = clientCoreMappings[i].CPU
-		d.Disk = clientCoreMappings[i].Disk
-		if clientCoreMappings[i].DHCP != nil {
+		d.RAM = cm.RAM
+		d.CPU = cm.CPU
+		d.Disk = cm.Disk
+		if cm.DHCP != nil {
 			response.DHCPAssigned++
 			d.DHCP = types.DHCPRecord{
-				IP:       clientCoreMappings[i].DHCP.IP,
-				Hostname: clientCoreMappings[i].DHCP.Hostname,
-				Token:    clientCoreMappings[i].DHCP.Token,
-				Activity: clientCoreMappings[i].DHCP.Activity,
+				IP:       cm.DHCP.IP,
+				Hostname: cm.DHCP.Hostname,
+				Token:    cm.DHCP.Token,
+				Activity: cm.DHCP.Activity,
 			}
 		}
 
-		d.IngressQueue = len(clientCoreMappings[i].ToUser)
-		d.EgressQueue = len(clientCoreMappings[i].FromUser)
-		d.Created = clientCoreMappings[i].Created
-		if clientCoreMappings[i].PortRange != nil {
-			d.StartPort = clientCoreMappings[i].PortRange.StartPort
-			d.EndPort = clientCoreMappings[i].PortRange.EndPort
+		d.IngressQueue = len(cm.ToUser)
+		d.EgressQueue = len(cm.FromUser)
+		d.Created = cm.Created
+		if cm.PortEnd > 0 {
+			d.StartPort = cm.PortStart
+			d.EndPort = cm.PortEnd
 		}
 		response.Devices = append(response.Devices, d)
 	}
@@ -112,10 +113,6 @@ outerloop:
 			response.DHCPFree++
 		}
 	}
-
-	// for i := range response.Devices {
-	// 	response.Devices[i].DHCP.Token = "redacted"
-	// }
 
 	w.WriteHeader(200)
 	err := json.NewEncoder(w).Encode(response)
