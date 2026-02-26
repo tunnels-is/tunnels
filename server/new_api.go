@@ -173,8 +173,10 @@ func senderr(w http.ResponseWriter, code int, msg string, slogArgs ...any) {
 func HTTP_validateKey(r *http.Request) (ok bool) {
 	key := r.Header.Get("X-API-KEY")
 	Config := Config.Load()
-	if key != Config.AdminAPIKey || Config.AdminAPIKey == "" {
-		return false
+	if Config.AdminAPIKey != "" {
+		if key == Config.AdminAPIKey {
+			return true
+		}
 	}
-	return true
+	return false
 }

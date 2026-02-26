@@ -15,7 +15,7 @@ func syncFirewallState(fr *types.FirewallRequest, mapping *UserCoreMapping) {
 		}
 	}()
 
-	mapping.DisableFirewall = fr.DisableFirewall
+	mapping.DisableFirewall.Store(fr.DisableFirewall)
 
 	// Build the set of IPs from the new host list.
 	newIPs := make(map[[4]byte]struct{}, len(fr.Hosts))
@@ -63,15 +63,16 @@ func getIP4FromHostOrDHCP(host string) (ip4 [4]byte, ok bool) {
 }
 
 func getHostnameFromDHCP(hostname string) (ip4b [4]byte, ok bool) {
-	for i := range clientCoreMappings {
-		if clientCoreMappings[i] == nil {
+	for i := range clientCoreMappings[:slots] {
+		cm := clientCoreMappings[i].Load()
+		if cm == nil {
 			continue
 		}
-		if clientCoreMappings[i].DHCP == nil {
+		if cm.DHCP == nil {
 			continue
 		}
-		if clientCoreMappings[i].DHCP.Hostname == hostname {
-			return clientCoreMappings[i].DHCP.IP, true
+		if cm.DHCP.Hostname == hostname {
+			return cm.DHCP.IP, true
 		}
 	}
 	return [4]byte{}, false
@@ -88,16 +89,17 @@ func validateDHCPTokenAndIP(fr *types.FirewallRequest) (mapping *UserCoreMapping
 	}
 	ip4b := [4]byte{ip[0], ip[1], ip[2], ip[3]}
 
-	for i := range clientCoreMappings {
-		if clientCoreMappings[i] == nil {
+	for i := range clientCoreMappings[:slots] {
+		cm := clientCoreMappings[i].Load()
+		if cm == nil {
 			continue
 		}
-		if clientCoreMappings[i].DHCP == nil {
+		if cm.DHCP == nil {
 			continue
 		}
-		if clientCoreMappings[i].DHCP.Token == fr.DHCPToken {
-			if clientCoreMappings[i].DHCP.IP == ip4b {
-				return clientCoreMappings[i]
+		if cm.DHCP.Token == fr.DHCPToken {
+			if cm.DHCP.IP == ip4b {
+				return cm
 			}
 		}
 	}

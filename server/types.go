@@ -22,17 +22,13 @@ const (
 type ErrorResponse struct {
 	Error string
 }
-type PortRange struct {
-	StartPort uint16
-	EndPort   uint16
-	Client    *UserCoreMapping
-}
 type UserCoreMapping struct {
 	ID                 string
 	PingInt            atomic.Int64
 	DeviceToken        string
 	Version            int
-	PortRange          *PortRange
+	PortStart          uint16
+	PortEnd            uint16
 	LastPingFromClient time.Time
 	EH                 *crypt.SocketWrapper
 	Uindex             []byte
@@ -43,14 +39,14 @@ type UserCoreMapping struct {
 	FromUser   chan Packet
 	FromSignal *signal.Signal
 
-	Addr syscall.Sockaddr
+	Addr atomic.Value // always stores syscall.Sockaddr (*syscall.SockaddrInet4)
 
 	APIToken        string
 	hostsInit       sync.Once
 	AutoHosts       *xsync.MapOf[[6]byte, *AllowedHost]
 	ManualHosts     *xsync.MapOf[[4]byte, *AllowedHost]
 	DHCP            *types.DHCPRecord
-	DisableFirewall bool
+	DisableFirewall atomic.Bool
 
 	CPU  byte
 	RAM  byte

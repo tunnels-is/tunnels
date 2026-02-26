@@ -1,39 +1,17 @@
 package main
 
 import (
-	"errors"
-
 	"github.com/tunnels-is/tunnels/types"
 )
 
-func allocatePorts(CRR *types.ServerConnectResponse, index int) (err error) {
-	Config := Config.Load()
-	var startPort uint16 = 0
-	var endPort uint16 = 0
-	for i := range portToCoreMapping {
-		if i < int(Config.StartPort) {
-			continue
-		}
+func allocatePorts(CRR *types.ServerConnectResponse, index int) {
+	portStart := startPort + uint16(index)*uint16(portPerUser)
+	portEnd := portStart + uint16(portPerUser)
 
-		if portToCoreMapping[i] == nil {
-			// WARN("PORT TO CLIENT MAPPING IS NIL: ", i)
-			continue
-		}
+	cm := clientCoreMappings[index].Load()
+	cm.PortStart = portStart
+	cm.PortEnd = portEnd
 
-		if portToCoreMapping[i].Client == nil {
-			portToCoreMapping[i].Client = clientCoreMappings[index]
-			clientCoreMappings[index].PortRange = portToCoreMapping[i]
-			startPort = portToCoreMapping[i].StartPort
-			endPort = portToCoreMapping[i].EndPort
-			break
-		}
-	}
-
-	if startPort == 0 {
-		return errors.New("No port mappings available on the server")
-	}
-
-	CRR.StartPort = startPort
-	CRR.EndPort = endPort
-	return nil
+	CRR.StartPort = portStart
+	CRR.EndPort = portEnd
 }
