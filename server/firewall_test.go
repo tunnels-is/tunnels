@@ -780,6 +780,9 @@ func TestFirewall_TCPLifecycle(t *testing.T) {
 func TestNukeClient_ClearsFirewallOnDisconnect(t *testing.T) {
 	disconnectingIP := ip4b(10, 0, 0, 5)
 
+	// NukeClient ranges over clientCoreMappings[:slots], so slots must be set.
+	slots = 2
+
 	// Client A — the one that will disconnect
 	cmA := &UserCoreMapping{
 		ToUser:     make(chan []byte, 1),
@@ -788,7 +791,7 @@ func TestNukeClient_ClearsFirewallOnDisconnect(t *testing.T) {
 		FromSignal: &signal.Signal{},
 		DHCP:       &types.DHCPRecord{IP: disconnectingIP},
 	}
-	clientCoreMappings[0] = cmA
+	clientCoreMappings[0].Store(cmA)
 	VPLIPToCore[5].Store(cmA) // ip={10,0,0,5}: uint16(0)<<8|uint16(5) = 5
 
 	// Client B — has A's IP in its allowed-host list (both auto and manual)
@@ -800,7 +803,7 @@ func TestNukeClient_ClearsFirewallOnDisconnect(t *testing.T) {
 	}
 	cmB.AddHost(disconnectingIP, pt(0, 80), "auto")
 	cmB.AddHost(disconnectingIP, pt(0, 0), "manual")
-	clientCoreMappings[1] = cmB
+	clientCoreMappings[1].Store(cmB)
 
 	NukeClient(0)
 
@@ -818,5 +821,5 @@ func TestNukeClient_ClearsFirewallOnDisconnect(t *testing.T) {
 	}
 
 	// Cleanup
-	clientCoreMappings[1] = nil
+	clientCoreMappings[1].Store(nil)
 }

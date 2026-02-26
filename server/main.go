@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"math"
 	"net"
 	"os"
 	sig "os/signal"
@@ -17,7 +16,6 @@ import (
 	"runtime"
 	"slices"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"syscall"
 	"time"
@@ -48,12 +46,13 @@ var (
 	SignKey      any
 	PubKey       any
 
-	coreMutex          = sync.Mutex{}
 	slots              int
+	portPerUser        int
+	startPort          uint16
 	VPLNetwork         *net.IPNet
-	clientCoreMappings [math.MaxUint16 + 1]*UserCoreMapping
-	portToCoreMapping  [math.MaxUint16 + 1]*PortRange
-	DHCPMapping        [math.MaxUint16 + 1]*types.DHCPRecord
+	sessionSentinel    = new(UserCoreMapping)
+	clientCoreMappings [65536]atomic.Pointer[UserCoreMapping]
+	DHCPMapping        [65536]*types.DHCPRecord
 	VPLIPToCore        [65536]atomic.Pointer[UserCoreMapping]
 
 	LANEnabled   bool
@@ -462,48 +461,16 @@ func initializeLAN() (err error) {
 	return err
 }
 
-
 func GeneratePortAllocation() (err error) {
 	Config := Config.Load()
 	slots = Config.ServerBandwidthMbps / Config.UserBandwidthMbps
-	portPerUser := (Config.EndPort - Config.StartPort) / slots
+	portPerUser = (Config.EndPort - Config.StartPort) / slots
 
-	defer func() {
-		BasicRecover()
-		if err != nil {
-			panic(err)
-		}
-	}()
-
-	currentPort := uint16(Config.StartPort)
-
-	for range slots {
-		PR := new(PortRange)
-		PR.StartPort = currentPort
-		PR.EndPort = PR.StartPort + uint16(portPerUser)
-
-		for i := PR.StartPort; i <= PR.EndPort; i++ {
-			if i < PR.StartPort {
-				return errors.New("start port is too small")
-			} else if i > PR.EndPort {
-				return errors.New("end port is too big")
-			}
-
-			if portToCoreMapping[i] != nil {
-				if portToCoreMapping[i].StartPort < PR.StartPort {
-					return errors.New("start port is too small")
-				}
-				if portToCoreMapping[i].StartPort < PR.EndPort {
-					return errors.New("end port is too big")
-				}
-			}
-
-			portToCoreMapping[i] = PR
-		}
-
-		currentPort = PR.EndPort + 1
+	if Config.StartPort+slots*portPerUser > Config.EndPort {
+		return errors.New("port range too small for configured number of slots")
 	}
 
+	startPort = uint16(Config.StartPort)
 	return nil
 }
 

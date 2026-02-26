@@ -41,59 +41,56 @@ func PopulatePingBufferWithStats() {
 
 func NukeClient(index int) {
 	LOG("Removing index:", index)
-	cm := clientCoreMappings[index]
+	cm := clientCoreMappings[index].Load()
 	if cm == nil {
-		ERR("Nuke client on nill index", index)
+		ERR("NukeClient on nil index", index)
 		return
-	}
-
-	if cm.PortRange != nil {
-		for i, v := range portToCoreMapping {
-			if v == nil {
-				continue
-			}
-
-			if v.StartPort == cm.PortRange.StartPort {
-				WARN("removing port range:", v.StartPort)
-				portToCoreMapping[i].Client = nil
-			}
-		}
 	}
 
 	if cm.DHCP != nil {
 		ip := cm.DHCP.IP
 		VPLIPToCore[uint16(ip[2])<<8|uint16(ip[3])].Store(nil)
-		for i, other := range clientCoreMappings {
-			if i == index || other == nil {
+		for i := range clientCoreMappings[:slots] {
+			if i == index {
 				continue
 			}
-			other.ClearHost(ip)
+			if o := clientCoreMappings[i].Load(); o != nil {
+				o.ClearHost(ip)
+			}
 		}
 	}
 
-	close(clientCoreMappings[index].ToUser)
-	close(clientCoreMappings[index].FromUser)
-	clientCoreMappings[index].FromSignal.ShouldStop.Store(true)
-	clientCoreMappings[index].ToSignal.ShouldStop.Store(true)
-	coreMutex.Lock()
-	clientCoreMappings[index] = nil
-	coreMutex.Unlock()
+	close(cm.ToUser)
+	close(cm.FromUser)
+	if cm.FromSignal != nil {
+		cm.FromSignal.ShouldStop.Store(true)
+	}
+	if cm.ToSignal != nil {
+		cm.ToSignal.ShouldStop.Store(true)
+	}
+
+	clientCoreMappings[index].Store(nil)
 }
 
 func pingActiveUsers() {
 	PopulatePingBufferWithStats()
 
-	for index, u := range clientCoreMappings {
+	for index := range clientCoreMappings[:slots] {
+		u := clientCoreMappings[index].Load()
 		if u == nil {
 			continue
 		}
-		if len(u.Uindex) == 0 || u.Addr == nil {
+		if len(u.Uindex) == 0 {
+			continue
+		}
+		addr, _ := u.Addr.Load().(syscall.Sockaddr)
+		if addr == nil {
 			continue
 		}
 
-		binary.BigEndian.PutUint64(PingPongStatsBuffer[11:], uint64(clientCoreMappings[index].PingInt.Load()))
+		binary.BigEndian.PutUint64(PingPongStatsBuffer[11:], uint64(u.PingInt.Load()))
 		out := u.EH.SEAL.Seal2(PingPongStatsBuffer, u.Uindex)
-		err := syscall.Sendto(dataSocketFD, out, 0, u.Addr)
+		err := syscall.Sendto(dataSocketFD, out, 0, addr)
 		if err != nil {
 			LOG("Index ping error: ", index, err)
 			NukeClient(index)

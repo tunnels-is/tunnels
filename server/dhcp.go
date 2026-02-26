@@ -43,10 +43,11 @@ func assignDHCP(CR *types.ControllerConnectRequest, CRR *types.ServerConnectResp
 			CRR.DHCP = DHCPMapping[i]
 
 			assigned = true
-			clientCoreMappings[index].DHCP = DHCPMapping[i]
+			cm := clientCoreMappings[index].Load()
+			cm.DHCP = DHCPMapping[i]
 
-			ip := clientCoreMappings[index].DHCP.IP
-			VPLIPToCore[uint16(ip[2])<<8|uint16(ip[3])].Store(clientCoreMappings[index])
+			ip := cm.DHCP.IP
+			VPLIPToCore[uint16(ip[2])<<8|uint16(ip[3])].Store(cm)
 
 			break
 		}
@@ -72,10 +73,11 @@ func assignDHCP(CR *types.ControllerConnectRequest, CRR *types.ServerConnectResp
 			if assigned {
 				DHCPMapping[i].AssignHostname(Config.Hostname)
 				CRR.DHCP = DHCPMapping[i]
-				clientCoreMappings[index].DHCP = DHCPMapping[i]
+				cm := clientCoreMappings[index].Load()
+				cm.DHCP = DHCPMapping[i]
 
-				ip := clientCoreMappings[index].DHCP.IP
-				VPLIPToCore[uint16(ip[2])<<8|uint16(ip[3])].Store(clientCoreMappings[index])
+				ip := cm.DHCP.IP
+				VPLIPToCore[uint16(ip[2])<<8|uint16(ip[3])].Store(cm)
 
 				break
 			}
