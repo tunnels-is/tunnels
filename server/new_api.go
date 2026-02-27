@@ -63,6 +63,12 @@ func launchAPIServer() {
 		mux.HandleFunc("/v3/server/update", API_ServerUpdate)
 		mux.HandleFunc("/v3/servers", API_ServersForUser)
 
+		// WireGuard peer management
+		mux.HandleFunc("/v3/wg/register", API_WGRegister)
+		mux.HandleFunc("/v3/wg/unregister", API_WGUnregister)
+		mux.HandleFunc("/v3/wg/peers", API_WGPeers)
+		mux.HandleFunc("/v3/wg/config", API_WGConfig)
+
 		// Tunnels public network specific
 		if loadSecret("PayKey") != "" {
 			mux.HandleFunc("/v3/key/activate", API_ActivateLicenseKey)
