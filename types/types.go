@@ -18,6 +18,7 @@ const (
 	AUTH  Feature = "AUTH"
 	DNS   Feature = "DNS"
 	BBOLT Feature = "BBOLT"
+	WG    Feature = "WG"
 )
 
 type TunnelType string
@@ -81,6 +82,9 @@ type ServerConfig struct {
 	// Enables multiple key/pairs for API SNI rotation
 	CertPems []string
 	KeyPems  []string
+
+	// WireGuard
+	WireGuardSubnet string
 }
 
 type SecretStore string
@@ -95,6 +99,9 @@ type Device struct {
 	CreatedAt time.Time            `json:"CreatedAt" bson:"CreatedAt"`
 	Tag       string               `json:"Tag" bson:"Tag"`
 	Groups    []primitive.ObjectID `json:"Groups" bson:"Groups"`
+
+	WireGuardKey string `json:"WireGuardKey,omitempty" bson:"WireGuardKey"`
+	WireGuardIP  string `json:"WireGuardIP,omitempty" bson:"WireGuardIP"`
 }
 
 type FORM_GET_SERVER struct {
@@ -113,6 +120,9 @@ type Server struct {
 	DataPort string               `json:"DataPort" bson:"DataPort"`
 	PubKey   string               `json:"PubKey,omitempty" bson:"PubKey"`
 	Groups   []primitive.ObjectID `json:"Groups,omitempty" bson:"Groups"`
+
+	WireGuardPort   string `json:"WireGuardPort,omitempty" bson:"WireGuardPort"`
+	WireGuardPubKey string `json:"WireGuardPubKey,omitempty" bson:"WireGuardPubKey"`
 }
 
 type TwoFAPending struct {
@@ -283,4 +293,29 @@ func (d *DHCPRecord) Assign(timeoutHours float64, token string) (ok bool) {
 
 type FORM_GET_DEVICE struct {
 	DeviceID primitive.ObjectID
+}
+
+// WireGuard types
+
+type WGPeer struct {
+	PublicKeyHex string `json:"PublicKeyHex"`
+	AllowedIP    string `json:"AllowedIP"`
+	DeviceID     string `json:"DeviceID"`
+}
+
+type WGPeersResponse struct {
+	Peers []WGPeer `json:"Peers"`
+}
+
+type WGRegisterRequest struct {
+	DeviceID     string `json:"DeviceID"`
+	PublicKeyB64 string `json:"PublicKeyB64"`
+}
+
+type WGRegisterResponse struct {
+	AssignedIP   string `json:"AssignedIP"`
+	ServerPubKey string `json:"ServerPubKey"`
+	ServerIP     string `json:"ServerIP"`
+	ServerPort   string `json:"ServerPort"`
+	Conf         string `json:"Conf"`
 }
