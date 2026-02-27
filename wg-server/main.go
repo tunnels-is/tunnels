@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"net/http"
 	"os"
 	ossig "os/signal"
 	"syscall"
@@ -77,6 +78,24 @@ func main() {
 	}
 
 	initSyncClient(cfg)
+
+	if cfg.SyncListenAddr != "" {
+		mux := http.NewServeMux()
+		mux.HandleFunc("/v3/wg/sync", func(w http.ResponseWriter, r *http.Request) {
+			if r.Method != http.MethodPost {
+				w.WriteHeader(http.StatusMethodNotAllowed)
+				return
+			}
+			go SyncPeers()
+			w.WriteHeader(http.StatusOK)
+		})
+		go func() {
+			if listenErr := http.ListenAndServe(cfg.SyncListenAddr, mux); listenErr != nil {
+				ERR("sync listener error: ", listenErr)
+			}
+		}()
+		INFO("sync listener started on ", cfg.SyncListenAddr)
+	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 

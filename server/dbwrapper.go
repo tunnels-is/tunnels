@@ -109,6 +109,8 @@ func DB_UpdateDevice(D *types.Device) (err error) {
 					Key: "$set",
 					Value: bson.D{
 						{Key: "Tag", Value: D.Tag},
+						{Key: "WireGuardKey", Value: D.WireGuardKey},
+						{Key: "WireGuardIP", Value: D.WireGuardIP},
 					},
 				},
 			},

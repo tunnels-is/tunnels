@@ -50,19 +50,25 @@ func (tun *TUN) ReadFromTunnelInterface() {
 
 		sendRemote = tun.ProcessEgressPacket(&packet)
 		if !sendRemote {
-			// debugMissingEgressMapping(packet)
+			if tun.wgTun != nil && len(packet) >= 10 {
+				DEEP("WG: ProcessEgressPacket dropped packet proto=", packet[9])
+			}
 			continue
 		}
 
-		out = tun.encWrapper.SEAL.Seal1(packet, tun.Index)
-
-		writtenBytes, err = tun.connection.Write(out)
-		if err != nil {
-			ERROR("router write error: ", err)
-			return
+		if tun.wgTun != nil {
+			DEEP("WG egress: sending", len(packet), "bytes to chanTUN")
+			tun.wgTun.writeEgress(packet)
+			tun.egressBytes.Add(int64(len(packet)))
+		} else {
+			out = tun.encWrapper.SEAL.Seal1(packet, tun.Index)
+			writtenBytes, err = tun.connection.Write(out)
+			if err != nil {
+				ERROR("router write error: ", err)
+				return
+			}
+			tun.egressBytes.Add(int64(writtenBytes))
 		}
-
-		tun.egressBytes.Add(int64(writtenBytes))
 	}
 }
 
@@ -76,7 +82,11 @@ func (tun *TUN) ReadFromServeTunnel() {
 		if tun.GetState() >= TUN_Connected {
 			tunnelMonitor <- tun
 		} else {
-			_ = tun.connection.Close()
+			if tun.wgDevice != nil {
+				tun.wgDevice.Close()
+			} else {
+				_ = tun.connection.Close()
+			}
 		}
 	}()
 
@@ -88,6 +98,7 @@ func (tun *TUN) ReadFromServeTunnel() {
 		buff     = make([]byte, 66000)
 		staging  = make([]byte, 66000)
 		err      error
+		ok       bool
 		osTunnel = tun.tunnel.Load()
 		meta     = tun.meta.Load()
 	)
@@ -98,33 +109,45 @@ func (tun *TUN) ReadFromServeTunnel() {
 			return
 		}
 		osTunnel = tun.tunnel.Load()
-		n, readErr = tun.connection.Read(buff[0:])
-		if readErr != nil {
-			ERROR("error reading from server socket: ", readErr, n)
-			return
-		}
 
-		tun.Nonce2Bytes = buff[2:10]
-		packet, err = tun.encWrapper.SEAL.Open2(
-			buff[10:n],
-			buff[2:10],
-			staging[:0],
-			buff[0:2],
-		)
-		if err != nil {
-			ERROR("Packet authentication error: ", err)
-			return
-		}
+		if tun.wgTun != nil {
+			packet, ok = tun.wgTun.readIngress()
+			if !ok {
+				return
+			}
+			DEEP("WG ingress: received", len(packet), "bytes from chanTUN")
+			tun.ingressBytes.Add(int64(len(packet)))
+		} else {
+			n, readErr = tun.connection.Read(buff[0:])
+			if readErr != nil {
+				ERROR("error reading from server socket: ", readErr, n)
+				return
+			}
 
-		tun.ingressBytes.Add(int64(n))
+			tun.Nonce2Bytes = buff[2:10]
+			packet, err = tun.encWrapper.SEAL.Open2(
+				buff[10:n],
+				buff[2:10],
+				staging[:0],
+				buff[0:2],
+			)
+			if err != nil {
+				ERROR("Packet authentication error: ", err)
+				return
+			}
 
-		if len(packet) < 20 {
-			tun.RegisterPing(meta.Tag, CopySlice(packet))
-			continue
+			tun.ingressBytes.Add(int64(n))
+
+			if len(packet) < 20 {
+				tun.RegisterPing(meta.Tag, CopySlice(packet))
+				continue
+			}
 		}
 
 		if !tun.ProcessIngressPacket(packet) {
-			// debugMissingIngressMapping(packet)
+			if tun.wgTun != nil && len(packet) >= 20 {
+				DEEP("WG: ProcessIngressPacket dropped packet proto=", packet[9])
+			}
 			continue
 		}
 
