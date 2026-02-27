@@ -82,6 +82,23 @@ func API_AcceptUserConnections(w http.ResponseWriter, r *http.Request) {
 	}
 
 	CRR := types.CreateCRRFromServer(Config)
+
+	// Populate WireGuard fields if this is a device connection with WG credentials
+	if CR.DeviceKey != "" {
+		if deviceID, devIDErr := primitive.ObjectIDFromHex(CR.DeviceKey); devIDErr == nil {
+			if dev, devErr := DB_FindDeviceByID(deviceID); devErr == nil && dev != nil {
+				if dev.WireGuardIP != "" {
+					CRR.WireGuardIP = dev.WireGuardIP
+					CRR.InterfaceIP = dev.WireGuardIP
+				}
+			}
+		}
+	}
+	if srv, srvErr := DB_FindServerByID(CR.ServerID); srvErr == nil && srv != nil {
+		CRR.WireGuardPubKey = srv.WireGuardPubKey
+		CRR.WireGuardPort = srv.WireGuardPort
+	}
+
 	index, err := CreateClientCoreMapping(CRR, CR, EH)
 	if err != nil {
 		ERR("Port allocation failed", err)
@@ -1166,6 +1183,23 @@ func API_SessionCreate(w http.ResponseWriter, r *http.Request) {
 		if device == nil {
 			senderr(w, 401, "Unauthorized")
 			return
+		}
+		if CR.WireGuardPubKey != "" {
+			if device.WireGuardIP == "" {
+				if ip, ipErr := assignNextWGIP(); ipErr == nil {
+					device.WireGuardIP = ip
+				}
+			}
+			device.WireGuardKey = CR.WireGuardPubKey
+			_ = DB_UpdateDevice(device)
+			if syncURL := Config.Load().WGServerSyncURL; syncURL != "" {
+				go func() {
+					resp, postErr := http.Post(syncURL+"/v3/wg/sync", "application/json", nil)
+					if postErr == nil {
+						resp.Body.Close()
+					}
+				}()
+			}
 		}
 		for _, g := range server.Groups {
 			for _, ug := range device.Groups {

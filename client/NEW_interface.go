@@ -139,7 +139,11 @@ func PingConnections() {
 		}
 
 		var err error
-		if tun.encWrapper != nil {
+		if tun.wgTun != nil {
+			// WireGuard tunnel: keepalive is handled by persistent_keepalive_interval.
+			// Reset ping timer so the 45s reconnect threshold doesn't fire.
+			tun.registerPing(time.Now())
+		} else if tun.encWrapper != nil {
 
 			tun.PingInt.Add(1)
 			binary.BigEndian.PutUint64(PingPongStatsBuffer[4:], uint64(tun.PingInt.Load()))

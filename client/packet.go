@@ -97,18 +97,8 @@ func (V *TUN) ProcessEgressPacket(p *[]byte) (sendRemote bool) {
 		V.EP_TPHeader[0] = V.EgressMapping.MappedPort[0]
 		V.EP_TPHeader[1] = V.EgressMapping.MappedPort[1]
 
-		V.EP_IPv4Header[12] = V.serverInterfaceIP4bytes[0]
-		V.EP_IPv4Header[13] = V.serverInterfaceIP4bytes[1]
-		V.EP_IPv4Header[14] = V.serverInterfaceIP4bytes[2]
-		V.EP_IPv4Header[15] = V.serverInterfaceIP4bytes[3]
-
 	} else {
 		V.EP_NAT_IP, V.EP_NAT_OK = V.TransLateVPLIP(V.EP_DstIP)
-
-		V.EP_IPv4Header[12] = V.serverVPLIP[0]
-		V.EP_IPv4Header[13] = V.serverVPLIP[1]
-		V.EP_IPv4Header[14] = V.serverVPLIP[2]
-		V.EP_IPv4Header[15] = V.serverVPLIP[3]
 	}
 
 	if V.EP_NAT_OK {

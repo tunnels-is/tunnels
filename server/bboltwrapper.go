@@ -528,6 +528,8 @@ func BBolt_UpdateServer(S *types.Server) (*types.Server, error) {
 		SS.Port = S.Port
 		SS.DataPort = S.DataPort
 		SS.PubKey = S.PubKey
+		SS.WireGuardPort = S.WireGuardPort
+		SS.WireGuardPubKey = S.WireGuardPubKey
 		data, err := bboltMarshal(SS)
 		if err != nil {
 			return err
