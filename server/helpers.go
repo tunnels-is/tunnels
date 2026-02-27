@@ -5,10 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math"
 	"math/rand"
 	"net/http"
 	"runtime/debug"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -26,6 +28,23 @@ func CopySlice(in []byte) (out []byte) {
 	out = make([]byte, len(in))
 	_ = copy(out, in)
 	return out
+}
+
+var packetPool = &sync.Pool{
+	New: func() any {
+		b := make([]byte, math.MaxUint16)
+		return b
+	},
+}
+
+func getPacketBuf() []byte {
+	return packetPool.Get().([]byte)
+}
+
+func putPacketBuf(b []byte) {
+	if b != nil {
+		packetPool.Put(b[:cap(b)])
+	}
 }
 
 var letterRunes = []rune("ABCDEFGHIJKLMNOPQRSTUVWXYZ234567")

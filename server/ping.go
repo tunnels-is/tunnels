@@ -93,7 +93,7 @@ func pingActiveUsers() {
 		err := syscall.Sendto(dataSocketFD, out, 0, addr)
 		if err != nil {
 			LOG("Index ping error: ", index, err)
-			NukeClient(index)
+			u.Delete.Do(func() { NukeClient(index) })
 			continue
 		}
 
@@ -105,7 +105,7 @@ func pingActiveUsers() {
 
 		if time.Since(u.LastPingFromClient).Minutes() > float64(cfg.PingTimeoutMinutes) {
 			LOG("Ping timeout:", index, "last seen:", time.Since(u.LastPingFromClient).Minutes(), "minutes ago")
-			NukeClient(index)
+			u.Delete.Do(func() { NukeClient(index) })
 			continue
 		}
 	}

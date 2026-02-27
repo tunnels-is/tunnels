@@ -75,8 +75,8 @@ func CreateClientCoreMapping(CRR *types.ServerConnectResponse, CR *types.Control
 	}
 	cm.EH = EH
 	cm.Created = time.Now()
-	cm.ToUser = make(chan []byte, 500_000)
-	cm.FromUser = make(chan Packet, 500_000)
+	cm.ToUser = make(chan []byte, 10_000)
+	cm.FromUser = make(chan Packet, 10_000)
 	cm.LastPingFromClient = time.Now()
 	cm.Uindex = make([]byte, 2)
 	binary.BigEndian.PutUint16(cm.Uindex, uint16(index))
@@ -170,9 +170,12 @@ func ExternalTCPListener() {
 			continue
 		}
 
+		buf := getPacketBuf()
+		copy(buf, buffer[:n])
 		select {
-		case tcpClient.ToUser <- CopySlice(buffer[:n]):
+		case tcpClient.ToUser <- buf[:n]:
 		default:
+			putPacketBuf(buf)
 			WARN("TCP: packet channel full: ", DSTP)
 		}
 	}
@@ -246,9 +249,12 @@ func ExternalUDPListener() {
 			continue
 		}
 
+		buf := getPacketBuf()
+		copy(buf, buffer[:n])
 		select {
-		case udpClient.ToUser <- CopySlice(buffer[:n]):
+		case udpClient.ToUser <- buf[:n]:
 		default:
+			putPacketBuf(buf)
 			WARN("UDP: packet channel full: ", DSTP)
 		}
 	}
@@ -297,9 +303,13 @@ func DataSocketListener() {
 		}
 		id = binary.BigEndian.Uint16(buff[0:2])
 		if cm := clientCoreMappings[id].Load(); cm != nil && cm != sessionSentinel {
-			cm.FromUser <- Packet{
-				addr: addr,
-				data: CopySlice(buff[:n]),
+			buf := getPacketBuf()
+			copy(buf, buff[:n])
+			select {
+			case cm.FromUser <- Packet{addr: addr, data: buf[:n]}:
+			default:
+				putPacketBuf(buf)
+				WARN("Data: packet channel full:", id)
 			}
 		} else {
 			WARN("no index found:", id, addr)
@@ -357,6 +367,7 @@ func fromUserChannel(index int) {
 			staging[:0],
 			payload.data[0:2],
 		)
+		putPacketBuf(payload.data)
 		if err != nil {
 			ERR("Authentication error:", err)
 			continue
@@ -413,9 +424,12 @@ func fromUserChannel(index int) {
 				CM.SetFin(D4, D4Port, true)
 			}
 
+			buf := getPacketBuf()
+			copy(buf, PACKET)
 			select {
-			case targetCM.ToUser <- CopySlice(PACKET):
+			case targetCM.ToUser <- buf[:len(PACKET)]:
 			default:
+				putPacketBuf(buf)
 				WARN("Client channel full:", PACKET[12:16], ">", D4)
 			}
 			continue
@@ -509,6 +523,7 @@ func toUserChannel(index int) {
 		}
 
 		if PACKET[9] != 6 && PACKET[9] != 17 {
+			putPacketBuf(PACKET)
 			continue
 		}
 
@@ -539,6 +554,7 @@ func toUserChannel(index int) {
 
 					activeHost = CM.IsHostAllowed(S4, S4Port)
 					if activeHost == nil {
+						putPacketBuf(PACKET)
 						continue
 					}
 
@@ -559,11 +575,13 @@ func toUserChannel(index int) {
 
 		sendAddr, _ := CM.Addr.Load().(syscall.Sockaddr)
 		if sendAddr == nil {
+			putPacketBuf(PACKET)
 			continue
 		}
 		err = syscall.Sendto(dataSocketFD,
 			CM.EH.SEAL.Seal2(PACKET, CM.Uindex),
 			0, sendAddr)
+		putPacketBuf(PACKET)
 		if err != nil {
 			WARN("dataSocketFD sendTo err:", err)
 			return
