@@ -17,6 +17,7 @@ import (
 	"github.com/tunnels-is/tunnels/certs"
 	"github.com/tunnels-is/tunnels/crypt"
 	"github.com/tunnels-is/tunnels/types"
+	"golang.zx2c4.com/wireguard/device"
 )
 
 const (
@@ -337,6 +338,11 @@ type TunnelMETA struct {
 	Networks           []*types.Network
 	Routes             []*types.Route
 	BlockedPorts       []uint16
+
+	// WireGuard: persistent base64 Curve25519 private key for this device.
+	// Generated on first use and reused across sessions so the server can
+	// keep a stable peer entry (Device.WireGuardKey).
+	WireGuardPrivKey string
 }
 
 type AllowedHost struct {
@@ -702,9 +708,13 @@ type TUN struct {
 	// server atomic.Pointer[any]
 	tunnel atomic.Pointer[TInterface] `json:"-"`
 
-	// encWrapper wraps connection with encryption
+	// encWrapper wraps connection with encryption (tunnels protocol)
 	encWrapper *crypt.SocketWrapper
 	connection net.Conn
+
+	// WireGuard transport (non-nil when WG mode is active; encWrapper/connection unused)
+	wgDevice *device.Device
+	wgTun    *chanTUN
 
 	// Connection Requests + Response
 	CR             *ConnectionRequest

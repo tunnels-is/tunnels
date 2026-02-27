@@ -91,12 +91,17 @@ func (tun *TUN) ReadFromTunnelInterface() {
 			continue
 		}
 
-		writtenBytes, err = tun.connection.Write(tun.encWrapper.SEAL.Seal1(packet, tun.Index))
-		if err != nil {
-			ERROR("router write error: ", err)
-			return
+		if tun.wgTun != nil {
+			tun.wgTun.writeEgress(packet)
+			tun.egressBytes.Add(int64(len(packet)))
+		} else {
+			writtenBytes, err = tun.connection.Write(tun.encWrapper.SEAL.Seal1(packet, tun.Index))
+			if err != nil {
+				ERROR("router write error: ", err)
+				return
+			}
+			tun.egressBytes.Add(int64(writtenBytes))
 		}
-		tun.egressBytes.Add(int64(writtenBytes))
 	}
 }
 
@@ -132,6 +137,7 @@ func (tun *TUN) ReadFromServeTunnel() {
 		staging = make([]byte, 66000)
 		inf     = tun.tunnel.Load()
 		err     error
+		ok      bool
 		meta    = tun.meta.Load()
 	)
 
@@ -145,28 +151,36 @@ func (tun *TUN) ReadFromServeTunnel() {
 			return
 		}
 
-		n, readErr = tun.connection.Read(buff)
-		if readErr != nil {
-			ERROR("error reading from server socket: ", readErr, n)
-			return
-		}
+		if tun.wgTun != nil {
+			packet, ok = tun.wgTun.readIngress()
+			if !ok {
+				return
+			}
+			tun.ingressBytes.Add(int64(len(packet)))
+		} else {
+			n, readErr = tun.connection.Read(buff)
+			if readErr != nil {
+				ERROR("error reading from server socket: ", readErr, n)
+				return
+			}
 
-		tun.Nonce2Bytes = buff[2:10]
-		packet, err = tun.encWrapper.SEAL.Open2(
-			buff[10:n],
-			buff[2:10],
-			staging[:0],
-			buff[0:2],
-		)
-		if err != nil {
-			ERROR("Packet authentication error: ", err)
-			return
-		}
-		tun.ingressBytes.Add(int64(n))
+			tun.Nonce2Bytes = buff[2:10]
+			packet, err = tun.encWrapper.SEAL.Open2(
+				buff[10:n],
+				buff[2:10],
+				staging[:0],
+				buff[0:2],
+			)
+			if err != nil {
+				ERROR("Packet authentication error: ", err)
+				return
+			}
+			tun.ingressBytes.Add(int64(n))
 
-		if len(packet) < 20 {
-			go tun.RegisterPing(meta.Tag, CopySlice(packet))
-			continue
+			if len(packet) < 20 {
+				go tun.RegisterPing(meta.Tag, CopySlice(packet))
+				continue
+			}
 		}
 
 		if !tun.ProcessIngressPacket(packet) {

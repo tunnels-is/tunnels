@@ -36,6 +36,12 @@ type Config struct {
 	// InsecureSkipVerify disables TLS cert verification for the controller.
 	// Set to true only when using self-signed certificates in dev/test.
 	InsecureSkipVerify bool `json:"InsecureSkipVerify" yaml:"InsecureSkipVerify"`
+
+	// SyncListenAddr is the local HTTP address for the instant-sync endpoint.
+	// The controller POSTs to <SyncListenAddr>/v3/wg/sync after a new peer
+	// registers, triggering an immediate SyncPeers() call. Defaults to
+	// "127.0.0.1:8181". Set to "" to disable.
+	SyncListenAddr string `json:"SyncListenAddr" yaml:"SyncListenAddr"`
 }
 
 func defaultConfig() *Config {
@@ -45,6 +51,7 @@ func defaultConfig() *Config {
 		WireGuardIface:   "wg0",
 		SyncIntervalSecs: 30,
 		LogLevel:         "debug",
+		SyncListenAddr:   "127.0.0.1:8181",
 	}
 }
 

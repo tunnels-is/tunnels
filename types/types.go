@@ -85,6 +85,12 @@ type ServerConfig struct {
 
 	// WireGuard
 	WireGuardSubnet string
+	// WGServerSyncURL is an optional HTTP URL for the wg-server local sync
+	// endpoint (e.g. "http://127.0.0.1:8181"). When set, the controller calls
+	// POST <WGServerSyncURL>/v3/wg/sync after registering a new WG peer so the
+	// wg-server picks up the key immediately instead of waiting for the next
+	// periodic poll.
+	WGServerSyncURL string
 }
 
 type SecretStore string
@@ -204,6 +210,11 @@ type ServerConnectResponse struct {
 
 	DHCP *DHCPRecord `json:"DHCP"`
 	LAN  *Network    `json:"LANNetwork"`
+
+	// WireGuard transport fields (populated when server has WG enabled)
+	WireGuardIP     string `json:"WireGuardIP,omitempty"`
+	WireGuardPubKey string `json:"WireGuardPubKey,omitempty"`
+	WireGuardPort   string `json:"WireGuardPort,omitempty"`
 }
 
 func CreateCRRFromServer(S *ServerConfig) (CRR *ServerConnectResponse) {
@@ -239,6 +250,9 @@ type ControllerConnectRequest struct {
 	Created time.Time `json:"Created"`
 
 	RequestingPorts bool `json:"RequestingPorts"`
+
+	// WireGuard: client's base64 Curve25519 public key; triggers inline WG registration
+	WireGuardPubKey string `json:"WireGuardPubKey,omitempty"`
 }
 
 type DHCPRecord struct {
