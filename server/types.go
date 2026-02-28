@@ -245,6 +245,11 @@ type User struct {
 	Trial         bool        `json:"Trial" bson:"Trial"`
 	Key           *LicenseKey `json:"Key" bson:"Key"`
 	SubExpiration time.Time   `json:"SubExpiration" bson:"SubExpiration"`
+
+	// WireGuardKey is the user's Curve25519 public key (base64).
+	// Set automatically on first connect when no device key is provided.
+	// Allows UI-flow connections without requiring a registered device.
+	WireGuardKey string `json:"WireGuardKey,omitempty" bson:"WireGuardKey"`
 }
 
 func (u *User) ToMinifiedUser() MinifiedUser {
