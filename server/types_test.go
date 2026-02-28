@@ -196,7 +196,7 @@ func TestUser_RemoveSensitiveInformation(t *testing.T) {
 					Months:  6,
 				},
 			},
-			expectedKeyRedacted: "SINGLEPARTHARDKEY", // No dash means ks[len(ks)-1] is the full string
+			expectedKeyRedacted: "SINGLEPARTHARDKEY",
 		},
 		{
 			name: "user with empty key",
@@ -214,7 +214,7 @@ func TestUser_RemoveSensitiveInformation(t *testing.T) {
 					Months:  3,
 				},
 			},
-			expectedKeyRedacted: "", // Empty string split returns [""], so ks[len(ks)-1] is ""
+			expectedKeyRedacted: "",
 		},
 		{
 			name: "user without license key",
@@ -343,177 +343,4 @@ func TestUser_RemoveSensitiveInformation_PreservesNonSensitiveData(t *testing.T)
 	}
 
 	t.Log("RemoveSensitiveInformation() correctly preserves non-sensitive data ✓")
-}
-
-// Test UserCoreMapping.IsHostAllowed
-func TestUserCoreMapping_IsHostAllowed(t *testing.T) {
-	tests := []struct {
-		name        string
-		setup       func(ucm *UserCoreMapping)
-		checkHost   [4]byte
-		checkPort   [2]byte
-		expectFound bool
-		expectType  string // "auto" or "manual" when expectFound is true
-	}{
-		{
-			name: "manual host - should match regardless of port",
-			setup: func(ucm *UserCoreMapping) {
-				ucm.AddHost([4]byte{192, 168, 1, 1}, [2]byte{0, 80}, "manual")
-			},
-			checkHost:   [4]byte{192, 168, 1, 1},
-			checkPort:   [2]byte{1, 187},
-			expectFound: true,
-			expectType:  "manual",
-		},
-		{
-			name: "auto host - must match both IP and port",
-			setup: func(ucm *UserCoreMapping) {
-				ucm.AddHost([4]byte{10, 0, 0, 1}, [2]byte{0, 80}, "auto")
-			},
-			checkHost:   [4]byte{10, 0, 0, 1},
-			checkPort:   [2]byte{0, 80},
-			expectFound: true,
-			expectType:  "auto",
-		},
-		{
-			name: "auto host - wrong port should not match",
-			setup: func(ucm *UserCoreMapping) {
-				ucm.AddHost([4]byte{10, 0, 0, 1}, [2]byte{0, 80}, "auto")
-			},
-			checkHost:   [4]byte{10, 0, 0, 1},
-			checkPort:   [2]byte{1, 187},
-			expectFound: false,
-		},
-		{
-			name: "IP not in allowed list",
-			setup: func(ucm *UserCoreMapping) {
-				ucm.AddHost([4]byte{192, 168, 1, 1}, [2]byte{0, 80}, "manual")
-			},
-			checkHost:   [4]byte{192, 168, 1, 2},
-			checkPort:   [2]byte{0, 80},
-			expectFound: false,
-		},
-		{
-			name: "multiple hosts - find manual in middle",
-			setup: func(ucm *UserCoreMapping) {
-				ucm.AddHost([4]byte{192, 168, 1, 1}, [2]byte{0, 80}, "auto")
-				ucm.AddHost([4]byte{192, 168, 1, 2}, [2]byte{1, 187}, "manual")
-				ucm.AddHost([4]byte{192, 168, 1, 3}, [2]byte{0, 22}, "auto")
-			},
-			checkHost:   [4]byte{192, 168, 1, 2},
-			checkPort:   [2]byte{1, 1},
-			expectFound: true,
-			expectType:  "manual",
-		},
-		{
-			name: "multiple hosts - find auto with correct port",
-			setup: func(ucm *UserCoreMapping) {
-				ucm.AddHost([4]byte{192, 168, 1, 1}, [2]byte{0, 80}, "auto")
-				ucm.AddHost([4]byte{192, 168, 1, 2}, [2]byte{1, 187}, "auto")
-				ucm.AddHost([4]byte{192, 168, 1, 3}, [2]byte{0, 22}, "auto")
-			},
-			checkHost:   [4]byte{192, 168, 1, 2},
-			checkPort:   [2]byte{1, 187},
-			expectFound: true,
-			expectType:  "auto",
-		},
-		{
-			name:        "empty allowed hosts list",
-			setup:       func(ucm *UserCoreMapping) {},
-			checkHost:   [4]byte{192, 168, 1, 1},
-			checkPort:   [2]byte{0, 80},
-			expectFound: false,
-		},
-		{
-			name:        "nil (zero-value) mapping — no entries",
-			setup:       func(ucm *UserCoreMapping) {},
-			checkHost:   [4]byte{192, 168, 1, 1},
-			checkPort:   [2]byte{0, 80},
-			expectFound: false,
-		},
-		{
-			name: "manual type priority - manual returned over auto for same IP",
-			setup: func(ucm *UserCoreMapping) {
-				// Add auto first, then manual — both end up in their respective maps.
-				ucm.AddHost([4]byte{192, 168, 1, 1}, [2]byte{0, 80}, "auto")
-				ucm.AddHost([4]byte{192, 168, 1, 1}, [2]byte{1, 187}, "manual")
-			},
-			checkHost:   [4]byte{192, 168, 1, 1},
-			checkPort:   [2]byte{0, 22},
-			expectFound: true,
-			expectType:  "manual", // ManualHosts checked first
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			ucm := &UserCoreMapping{}
-			tc.setup(ucm)
-
-			result := ucm.IsHostAllowed(tc.checkHost, tc.checkPort)
-
-			if tc.expectFound {
-				if result == nil {
-					t.Errorf("IsHostAllowed(%v, %v) = nil, expected to find host", tc.checkHost, tc.checkPort)
-					return
-				}
-				if result.IP != tc.checkHost {
-					t.Errorf("IsHostAllowed returned wrong IP: got %v, expected %v", result.IP, tc.checkHost)
-				}
-				if tc.expectType != "" && result.Type != tc.expectType {
-					t.Errorf("IsHostAllowed returned type %q, expected %q", result.Type, tc.expectType)
-				}
-				t.Logf("IsHostAllowed(%v, %v) correctly found host (type=%s) ✓", tc.checkHost, tc.checkPort, result.Type)
-			} else {
-				if result != nil {
-					t.Errorf("IsHostAllowed(%v, %v) = %+v, expected nil", tc.checkHost, tc.checkPort, result)
-				}
-				t.Logf("IsHostAllowed(%v, %v) correctly returned nil ✓", tc.checkHost, tc.checkPort)
-			}
-		})
-	}
-}
-
-func TestUserCoreMapping_IsHostAllowed_PortEncoding(t *testing.T) {
-	// Test different port encodings (big-endian vs little-endian)
-	tests := []struct {
-		name      string
-		portBytes [2]byte
-		portNum   uint16
-	}{
-		{
-			name:      "port 80 - 0x0050",
-			portBytes: [2]byte{0x00, 0x50},
-			portNum:   80,
-		},
-		{
-			name:      "port 443 - 0x01BB",
-			portBytes: [2]byte{0x01, 0xBB},
-			portNum:   443,
-		},
-		{
-			name:      "port 8080 - 0x1F90",
-			portBytes: [2]byte{0x1F, 0x90},
-			portNum:   8080,
-		},
-		{
-			name:      "port 22 - 0x0016",
-			portBytes: [2]byte{0x00, 0x16},
-			portNum:   22,
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			ucm := &UserCoreMapping{}
-			ucm.AddHost([4]byte{192, 168, 1, 1}, tc.portBytes, "auto")
-
-			result := ucm.IsHostAllowed([4]byte{192, 168, 1, 1}, tc.portBytes)
-			if result == nil {
-				t.Errorf("IsHostAllowed failed to find host with port %d (%v)", tc.portNum, tc.portBytes)
-			} else {
-				t.Logf("IsHostAllowed correctly matched port %d (%v) ✓", tc.portNum, tc.portBytes)
-			}
-		})
-	}
 }

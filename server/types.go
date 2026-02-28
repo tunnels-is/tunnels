@@ -2,123 +2,14 @@ package main
 
 import (
 	"strings"
-	"sync"
-	"sync/atomic"
 	"time"
 
-	xsync "github.com/puzpuzpuz/xsync/v3"
 	"github.com/tunnels-is/tunnels/types"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-const (
-	ping byte = 0
-)
-
 type ErrorResponse struct {
 	Error string
-}
-type UserCoreMapping struct {
-	ID                 string
-	PingInt            atomic.Int64
-	DeviceToken        string
-	Version            int
-	LastPingFromClient time.Time
-	Uindex             []byte
-	Created            time.Time
-
-	APIToken        string
-	hostsInit       sync.Once
-	AutoHosts       *xsync.MapOf[[6]byte, *AllowedHost]
-	ManualHosts     *xsync.MapOf[[4]byte, *AllowedHost]
-	DHCP            *types.DHCPRecord
-	DisableFirewall atomic.Bool
-
-	CPU  byte
-	RAM  byte
-	Disk byte
-
-	Delete sync.Once
-}
-
-
-type AllowedHost struct {
-	IP   [4]byte
-	PORT [2]byte
-	Type string
-	FFIN atomic.Bool
-	TFIN atomic.Bool
-}
-
-func (u *UserCoreMapping) initHosts() {
-	u.hostsInit.Do(func() {
-		u.AutoHosts = xsync.NewMapOf[[6]byte, *AllowedHost]()
-		u.ManualHosts = xsync.NewMapOf[[4]byte, *AllowedHost]()
-	})
-}
-
-func (u *UserCoreMapping) IsHostAllowed(host [4]byte, port [2]byte) *AllowedHost {
-	u.initHosts()
-	if v, ok := u.ManualHosts.Load(host); ok {
-		return v
-	}
-	key := [6]byte{host[0], host[1], host[2], host[3], port[0], port[1]}
-	if v, ok := u.AutoHosts.Load(key); ok {
-		return v
-	}
-	return nil
-}
-
-func (u *UserCoreMapping) SetFin(host [4]byte, port [2]byte, fromUser bool) {
-	u.initHosts()
-	key := [6]byte{host[0], host[1], host[2], host[3], port[0], port[1]}
-	if v, ok := u.AutoHosts.Load(key); ok {
-		if fromUser {
-			v.FFIN.Store(true)
-		} else {
-			v.TFIN.Store(true)
-		}
-	}
-}
-
-func (u *UserCoreMapping) AddHost(host [4]byte, port [2]byte, t string) {
-	u.initHosts()
-	if t == "manual" {
-		u.ManualHosts.LoadOrStore(host, &AllowedHost{IP: host, PORT: port, Type: "manual"})
-		return
-	}
-	// Skip if a manual entry already covers this IP (manual matches any port)
-	if _, ok := u.ManualHosts.Load(host); ok {
-		return
-	}
-	key := [6]byte{host[0], host[1], host[2], host[3], port[0], port[1]}
-	u.AutoHosts.LoadOrStore(key, &AllowedHost{IP: host, PORT: port, Type: "auto"})
-}
-
-func (u *UserCoreMapping) ClearHost(host [4]byte) {
-	u.initHosts()
-	u.AutoHosts.Range(func(key [6]byte, _ *AllowedHost) bool {
-		if [4]byte{key[0], key[1], key[2], key[3]} == host {
-			u.AutoHosts.Delete(key)
-		}
-		return true
-	})
-	u.ManualHosts.Delete(host)
-}
-
-func (u *UserCoreMapping) DelHost(host [4]byte, port [2]byte, t string) {
-	u.initHosts()
-	if t == "manual" {
-		u.ManualHosts.Delete(host)
-		return
-	}
-	key := [6]byte{host[0], host[1], host[2], host[3], port[0], port[1]}
-	u.AutoHosts.Delete(key)
-}
-
-type USER_ENABLE_FORM struct {
-	Email string
-	Code  string
 }
 
 type USER_ENABLE_QUERY struct {
@@ -138,11 +29,6 @@ type REGISTER_FORM struct {
 	Password              string
 	Password2             string
 	AdditionalInformation string
-}
-
-type FORM_GET_ORG struct {
-	DeviceToken string             `json:"DeviceToken"`
-	UID         primitive.ObjectID `json:"UID"`
 }
 
 type FORM_GET_GROUP struct {
@@ -182,11 +68,6 @@ type FORM_LIST_USERS struct {
 	UID         primitive.ObjectID `json:"UID"`
 	Limit       int                `json:"Limit"`
 	Offset      int                `json:"Offset"`
-}
-
-type FORM_CONNECTED_DEVICES struct {
-	DeviceToken string             `json:"DeviceToken"`
-	UID         primitive.ObjectID `json:"UID"`
 }
 
 type FORM_LIST_DEVICE struct {

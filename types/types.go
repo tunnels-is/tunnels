@@ -1,9 +1,7 @@
 package types
 
 import (
-	"fmt"
 	"net"
-	"sync"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -12,8 +10,6 @@ import (
 type Feature string
 
 const (
-	VPN   Feature = "VPN"
-	LAN   Feature = "LAN"
 	AUTH  Feature = "AUTH"
 	DNS   Feature = "DNS"
 	BBOLT Feature = "BBOLT"
@@ -23,7 +19,6 @@ const (
 type TunnelType string
 
 const (
-	StrictTun  TunnelType = "strict" // not yet implemented
 	DefaultTun TunnelType = "default"
 	IoTTun     TunnelType = "iot"
 )
@@ -39,29 +34,22 @@ type HealthResponse struct {
 type ServerConfig struct {
 	Features           []Feature
 	PingTimeoutMinutes int
-	DHCPTimeoutHours   int
 	LogAPIHosts        bool
 
 	ClientVersion string
 
-	VPNIP   string
-	VPNPort string
+	VPNIP string
 
 	APIIP   string
 	APIPort string
 
 	NetAdmins []string
 
-	Hostname           string
-	DisableLanFirewall bool
-	Routes             []*Route
-	SubNets            []*Network
+	Hostname string
+	Routes   []*Route
+	SubNets  []*Network
 
-	UserMaxConnections  int
-	InternetAccess      bool
-	LocalNetworkAccess  bool
-	ServerBandwidthMbps int
-	UserBandwidthMbps   int
+	UserMaxConnections int
 
 	DNSRecords []*DNSRecord
 	DNSServers []string
@@ -79,15 +67,6 @@ type ServerConfig struct {
 	// Enables multiple key/pairs for API SNI rotation
 	CertPems []string
 	KeyPems  []string
-
-	// WireGuard
-	WireGuardSubnet string
-	// WGServerSyncURL is an optional HTTP URL for the wg-server local sync
-	// endpoint (e.g. "http://127.0.0.1:8181"). When set, the controller calls
-	// POST <WGServerSyncURL>/v3/wg/sync after registering a new WG peer so the
-	// wg-server picks up the key immediately instead of waiting for the next
-	// periodic poll.
-	WGServerSyncURL string
 }
 
 type SecretStore string
@@ -103,8 +82,9 @@ type Device struct {
 	Tag       string               `json:"Tag" bson:"Tag"`
 	Groups    []primitive.ObjectID `json:"Groups" bson:"Groups"`
 
+	// WireGuardKey is the client's Curve25519 public key (base64).
+	// IP assignment is owned by each wg-server; the controller only stores the key.
 	WireGuardKey string `json:"WireGuardKey,omitempty" bson:"WireGuardKey"`
-	WireGuardIP  string `json:"WireGuardIP,omitempty" bson:"WireGuardIP"`
 }
 
 type FORM_GET_SERVER struct {
@@ -115,24 +95,21 @@ type FORM_GET_SERVER struct {
 }
 
 type Server struct {
-	ID       primitive.ObjectID   `json:"_id" bson:"_id"`
-	Tag      string               `json:"Tag" bson:"Tag"`
-	Country  string               `json:"Country" bson:"Country"`
-	IP       string               `json:"IP" bson:"IP"`
-	Port     string               `json:"Port" bson:"Port"`
-	DataPort string               `json:"DataPort" bson:"DataPort"`
-	PubKey   string               `json:"PubKey,omitempty" bson:"PubKey"`
-	Groups   []primitive.ObjectID `json:"Groups,omitempty" bson:"Groups"`
+	ID      primitive.ObjectID   `json:"_id" bson:"_id"`
+	Tag     string               `json:"Tag" bson:"Tag"`
+	Country string               `json:"Country" bson:"Country"`
+	IP      string               `json:"IP" bson:"IP"`
+	Port    string               `json:"Port" bson:"Port"`
+	Groups  []primitive.ObjectID `json:"Groups,omitempty" bson:"Groups"`
 
 	WireGuardPort   string `json:"WireGuardPort,omitempty" bson:"WireGuardPort"`
 	WireGuardPubKey string `json:"WireGuardPubKey,omitempty" bson:"WireGuardPubKey"`
-}
 
-type TwoFAPending struct {
-	AuthID  string
-	UserID  string
-	Expires time.Time
-	Code    string
+	// WGBaseURL is the base HTTP URL of this wg-server's local management
+	// listener (e.g. "http://127.0.0.1:8181"). The controller uses it to call
+	// /v3/wg/assign (IP assignment) and /v3/wg/sync (instant peer pickup).
+	// Leave empty to skip WireGuard integration for this server.
+	WGBaseURL string `json:"WGBaseURL,omitempty" bson:"WGBaseURL"`
 }
 
 type Route struct {
@@ -157,45 +134,13 @@ type DNSRecord struct {
 	TXT      []string `json:"TXT" bson:"TXT"`
 }
 
-type DeviceListResponse struct {
-	Devices      []*ListDevice
-	DHCPAssigned int
-	DHCPFree     int
-}
-
-type ListDevice struct {
-	DHCP         DHCPRecord
-	AllowedIPs   []string
-	CPU          byte
-	RAM          byte
-	Disk         byte
-	IngressQueue int
-	EgressQueue  int
-	Created time.Time
-}
-
-type SignedConnectRequest struct {
-	Signature []byte
-	Payload   []byte
-}
-
 type ServerConnectResponse struct {
-	Index int `json:"Index"`
-	AvailableMbps            int `json:"AvailableMbps"`
-	AvailableUserMbps        int `json:"AvailableUserMbps"`
-
-	InternetAccess     bool `json:"InternetAccess"`
-	LocalNetworkAccess bool `json:"LocalNetworkAccess"`
-
 	InterfaceIP string `json:"InterfaceIP"`
 
 	DNSRecords []*DNSRecord `json:"DNSRecords"`
 	Networks   []*Network   `json:"Networks"`
 	Routes     []*Route     `json:"Routes"`
 	DNSServers []string     `json:"DNSServers"`
-
-	DHCP *DHCPRecord `json:"DHCP"`
-	LAN  *Network    `json:"LANNetwork"`
 
 	// WireGuard transport fields (populated when server has WG enabled)
 	WireGuardIP     string `json:"WireGuardIP,omitempty"`
@@ -205,17 +150,11 @@ type ServerConnectResponse struct {
 
 func CreateCRRFromServer(S *ServerConfig) (CRR *ServerConnectResponse) {
 	return &ServerConnectResponse{
-		Index:              0,
-		InterfaceIP:        S.VPNIP,
-		AvailableMbps:      S.ServerBandwidthMbps,
-		AvailableUserMbps:  S.UserBandwidthMbps,
-		InternetAccess:     S.InternetAccess,
-		LocalNetworkAccess: S.LocalNetworkAccess,
-		DNSRecords:         S.DNSRecords,
-		Networks:           S.SubNets,
-		Routes:             S.Routes,
-		DNSServers:         S.DNSServers,
-		LAN:                &Network{Network: "10.0.0.0/16"},
+		InterfaceIP: S.VPNIP,
+		DNSRecords:  S.DNSRecords,
+		Networks:    S.SubNets,
+		Routes:      S.Routes,
+		DNSServers:  S.DNSServers,
 	}
 }
 
@@ -234,56 +173,6 @@ type ControllerConnectRequest struct {
 	WireGuardPubKey string `json:"WireGuardPubKey,omitempty"`
 }
 
-type DHCPRecord struct {
-	m  sync.Mutex `json:"-"`
-	IP [4]byte
-
-	Hostname string
-	Token    string
-	Activity time.Time
-}
-type FirewallRequest struct {
-	DHCPToken       string
-	IP              string
-	Hosts           []string
-	DisableFirewall bool
-}
-
-func (d *DHCPRecord) AssignHostname(defaultHostname string) {
-	d.m.Lock()
-	defer d.m.Unlock()
-	d.Activity = time.Now()
-	host := fmt.Sprintf("%d-%d-%d-%d",
-		d.IP[0],
-		d.IP[1],
-		d.IP[2],
-		d.IP[3],
-	)
-
-	if defaultHostname != "" {
-		d.Hostname = host + "." + defaultHostname
-	} else {
-		d.Hostname = host
-	}
-}
-
-func (d *DHCPRecord) Assign(timeoutHours float64, token string) (ok bool) {
-	if !d.Activity.IsZero() {
-		if time.Since(d.Activity).Hours() < timeoutHours {
-			return
-		}
-	}
-	d.m.Lock()
-	defer d.m.Unlock()
-	if d.Token == "" {
-		d.Token = token
-		d.Activity = time.Now()
-		ok = true
-		return
-	}
-	return
-}
-
 type FORM_GET_DEVICE struct {
 	DeviceID primitive.ObjectID
 }
@@ -292,7 +181,6 @@ type FORM_GET_DEVICE struct {
 
 type WGPeer struct {
 	PublicKeyHex string `json:"PublicKeyHex"`
-	AllowedIP    string `json:"AllowedIP"`
 	DeviceID     string `json:"DeviceID"`
 }
 

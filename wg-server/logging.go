@@ -7,16 +7,12 @@ import (
 	"os"
 )
 
-var (
-	logger      *slog.Logger
-	disableLogs bool
-)
+var logger *slog.Logger
 
-func LOG(x ...any)   { logger.Info("INFO", "msg", buildOut(x)) }
-func INFO(x ...any)  { logger.Info("INFO", "msg", buildOut(x)) }
-func DEBUG(x ...any) { logger.Debug("DEBUG", "msg", buildOut(x)) }
-func WARN(x ...any)  { logger.Warn("WARN", "msg", buildOut(x)) }
-func ERR(x ...any)   { logger.Error("ERROR", "msg", buildOut(x)) }
+func LOG(x ...any)  { logger.Info("INFO", "msg", buildOut(x)) }
+func INFO(x ...any) { logger.Info("INFO", "msg", buildOut(x)) }
+func WARN(x ...any) { logger.Warn("WARN", "msg", buildOut(x)) }
+func ERR(x ...any)  { logger.Error("ERROR", "msg", buildOut(x)) }
 
 func buildOut(x ...any) (out string) {
 	for _, v := range x {
@@ -53,7 +49,6 @@ func initLogging(silent, jsonLogs, sourceInfo bool, logLevel string) {
 			logHandler = slog.NewJSONHandler(os.Stdout, slogConfig)
 		}
 	} else {
-		disableLogs = true
 		if !jsonLogs {
 			logHandler = slog.NewTextHandler(io.Discard, slogConfig)
 		} else {

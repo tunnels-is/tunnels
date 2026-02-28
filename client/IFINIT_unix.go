@@ -162,14 +162,6 @@ func (t *TInterface) Addr() (err error) {
 	return
 }
 
-func (t *TInterface) GetLink() (netlink.Link, error) {
-	link, err := netlink.LinkByName(t.Name)
-	if err != nil {
-		return nil, err
-	}
-	return link, nil
-}
-
 func (t *TInterface) AddrV6() (err error) {
 	link, err := netlink.LinkByName(t.Name)
 	if err != nil {
@@ -218,22 +210,6 @@ func (t *TInterface) Up() (err error) {
 	return
 }
 
-func (t *TInterface) Down() (err error) {
-	var ifr syscallSetFlags
-
-	copy(ifr.Name[:], []byte(t.Name))
-	ifr.Flags |= 0x0
-
-	if err = socketCtl(
-		syscall.SIOCSIFFLAGS,
-		uintptr(unsafe.Pointer(&ifr)),
-	); err != nil {
-		return
-	}
-
-	return
-}
-
 type syscallChangeMTU struct {
 	Name [16]byte
 	MTU  int32
@@ -266,24 +242,6 @@ func (t *TInterface) SetTXQueueLen() (err error) {
 
 	if err = socketCtl(
 		syscall.SIOCSIFTXQLEN,
-		uintptr(unsafe.Pointer(&ifr)),
-	); err != nil {
-		return
-	}
-
-	return
-}
-
-func (t *TInterface) Netmask() (err error) {
-	var ifr syscallAddAddrV4
-	ifr.Port = 0
-	ifr.Family = syscall.AF_INET
-
-	copy(ifr.Name[:], []byte(t.Name))
-	copy(ifr.Addr[:], net.ParseIP(t.NetMask).To4())
-
-	if err = socketCtl(
-		syscall.SIOCSIFNETMASK,
 		uintptr(unsafe.Pointer(&ifr)),
 	); err != nil {
 		return
@@ -357,13 +315,6 @@ func (t *TInterface) Connect(tun *TUN) (err error) {
 			if iperr != nil {
 				DEBUG("Unable to add IPv6 route, maybe IPv6 is turned off ?, err : ", err)
 			}
-		}
-	}
-
-	if tun.ServerResponse.LAN != nil && tun.ServerResponse.LAN.Nat != "" {
-		err = IP_AddRoute(tun.ServerResponse.LAN.Nat, "", t.IPv4Address, "0")
-		if err != nil {
-			return err
 		}
 	}
 
@@ -549,20 +500,6 @@ func IP_AddRouteV6(
 		" metric ",
 		metric,
 	)
-
-	return
-}
-
-func IP_DelRouteNoGW(network string, metric int) (err error) {
-	r := new(netlink.Route)
-	r.Dst = new(net.IPNet)
-	r.Dst.IP = net.ParseIP(network).To4()
-	r.Priority = metric
-	DEBUG("DEL ROUTE: ", r)
-	err = netlink.RouteDel(r)
-	if err != nil {
-		return err
-	}
 
 	return
 }

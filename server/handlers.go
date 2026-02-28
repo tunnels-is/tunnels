@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"log/slog"
 	"math/rand"
 	"net/http"
@@ -13,93 +12,12 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/tunnels-is/tunnels/crypt"
 	"github.com/tunnels-is/tunnels/types"
 	"github.com/xlzd/gotp"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"golang.org/x/crypto/bcrypt"
 )
 
-func API_AcceptUserConnections(w http.ResponseWriter, r *http.Request) {
-	SCR := new(types.SignedConnectRequest)
-	err := decodeBody(r, SCR)
-	if err != nil {
-		senderr(w, 400, err.Error())
-		return
-	}
-
-	err = crypt.VerifySignature(SCR.Payload, SCR.Signature, SignKey)
-	if err != nil {
-		senderr(w, 401, "Invalid signature", slog.Any("err", err))
-		return
-	}
-
-	CR := new(types.ControllerConnectRequest)
-	err = json.Unmarshal(SCR.Payload, CR)
-	if err != nil {
-		senderr(w, 400, "unable to decode Payload")
-		return
-	}
-
-	if time.Since(CR.Created).Seconds() > 240 {
-		senderr(w, 401, "request not valid")
-		return
-	}
-	if CR.UserID.IsZero() {
-		senderr(w, 401, "invalid user identifier")
-		return
-	}
-	totalC, totalUserC := countConnections(CR.UserID.Hex())
-	Config := Config.Load()
-
-	if totalUserC > Config.UserMaxConnections {
-		senderr(w, 400, "user has too many active connections")
-		return
-	}
-
-	if totalC >= slots {
-		senderr(w, 400, "server is full")
-		return
-	}
-
-	CRR := types.CreateCRRFromServer(Config)
-
-	// Populate WireGuard fields if this is a device connection with WG credentials
-	if CR.DeviceKey != "" {
-		if deviceID, devIDErr := primitive.ObjectIDFromHex(CR.DeviceKey); devIDErr == nil {
-			if dev, devErr := DB_FindDeviceByID(deviceID); devErr == nil && dev != nil {
-				if dev.WireGuardIP != "" {
-					CRR.WireGuardIP = dev.WireGuardIP
-					CRR.InterfaceIP = dev.WireGuardIP
-				}
-			}
-		}
-	}
-	if srv, srvErr := DB_FindServerByID(CR.ServerID); srvErr == nil && srv != nil {
-		CRR.WireGuardPubKey = srv.WireGuardPubKey
-		CRR.WireGuardPort = srv.WireGuardPort
-	}
-
-	_, err = CreateClientCoreMapping(CRR, CR)
-	if err != nil {
-		ERR("Port allocation failed", err)
-		senderr(w, 400, "unable to allocate ports")
-		return
-	}
-
-	CRRB, err := json.Marshal(CRR)
-	if err != nil {
-		ERR("Unable to marshal CCR", err)
-		senderr(w, 400, "unable to decode connection request")
-		return
-	}
-
-	_, err = w.Write(CRRB)
-	if err != nil {
-		ERR("Unable to marshal CCR", err)
-		return
-	}
-}
 
 func API_UserCreate(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
@@ -1127,13 +1045,14 @@ func API_SessionCreate(w http.ResponseWriter, r *http.Request) {
 	// }
 
 	allowed := false
+	var device *types.Device
 	if CR.DeviceKey != "" {
 		deviceID, err := primitive.ObjectIDFromHex(CR.DeviceKey)
 		if err != nil {
 			senderr(w, 400, "invalid device key")
 			return
 		}
-		device, err := DB_FindDeviceByID(deviceID)
+		device, err = DB_FindDeviceByID(deviceID)
 		if err != nil {
 			senderr(w, 500, err.Error())
 			return
@@ -1142,22 +1061,10 @@ func API_SessionCreate(w http.ResponseWriter, r *http.Request) {
 			senderr(w, 401, "Unauthorized")
 			return
 		}
-		if CR.WireGuardPubKey != "" {
-			if device.WireGuardIP == "" {
-				if ip, ipErr := assignNextWGIP(); ipErr == nil {
-					device.WireGuardIP = ip
-				}
-			}
+		// Store the client's WG public key so /v3/wg/peers can serve it to wg-servers.
+		if CR.WireGuardPubKey != "" && device.WireGuardKey != CR.WireGuardPubKey {
 			device.WireGuardKey = CR.WireGuardPubKey
 			_ = DB_UpdateDevice(device)
-			if syncURL := Config.Load().WGServerSyncURL; syncURL != "" {
-				go func() {
-					resp, postErr := http.Post(syncURL+"/v3/wg/sync", "application/json", nil)
-					if postErr == nil {
-						resp.Body.Close()
-					}
-				}()
-			}
 		}
 		for _, g := range server.Groups {
 			for _, ug := range device.Groups {
@@ -1186,20 +1093,30 @@ func API_SessionCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if allowed {
-		SCR := new(types.SignedConnectRequest)
-		CR.Created = time.Now()
-		SCR.Payload, err = json.Marshal(CR)
-		if err != nil {
-			senderr(w, 500, "Unable to decode payload")
-			return
-		}
-		SCR.Signature, err = crypt.SignData(SCR.Payload, PrivKey)
-		if err != nil {
-			senderr(w, 500, "Unable to sign payload", slog.Any("err", err))
-			return
+		CRR := types.CreateCRRFromServer(Config.Load())
+		CRR.WireGuardPubKey = server.WireGuardPubKey
+		CRR.WireGuardPort = server.WireGuardPort
+
+		// If a WireGuard public key was presented and this server has a local
+		// wg-server, ask it to assign/retrieve the device's IP for this server.
+		if device != nil && CR.WireGuardPubKey != "" && server.WGBaseURL != "" {
+			ip, assignErr := callWGAssign(server.WGBaseURL, device.ID.Hex(), CR.WireGuardPubKey)
+			if assignErr != nil {
+				logger.Warn("wg-server assign failed", slog.Any("err", assignErr))
+			} else if ip != "" {
+				CRR.WireGuardIP = ip
+				CRR.InterfaceIP = ip
+				// Trigger instant peer sync in the background.
+				go func() {
+					resp, postErr := http.Post(server.WGBaseURL+"/v3/wg/sync", "application/json", nil)
+					if postErr == nil {
+						resp.Body.Close()
+					}
+				}()
+			}
 		}
 
-		sendObject(w, SCR)
+		sendObject(w, CRR)
 		return
 	}
 
