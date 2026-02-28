@@ -42,6 +42,11 @@ type Config struct {
 	// registers, triggering an immediate SyncPeers() call. Defaults to
 	// "127.0.0.1:8181". Set to "" to disable.
 	SyncListenAddr string `json:"SyncListenAddr" yaml:"SyncListenAddr"`
+
+	// PacketInspection enables plaintext packet logging on the WireGuard
+	// interface. When true, every packet from or to a peer is logged at DEBUG
+	// level with proto, src/dst IPs and ports, and direction.
+	PacketInspection bool `json:"PacketInspection" yaml:"PacketInspection"`
 }
 
 func defaultConfig() *Config {

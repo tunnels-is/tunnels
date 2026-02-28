@@ -12,10 +12,11 @@ var (
 	disableLogs bool
 )
 
-func LOG(x ...any)  { logger.Info("INFO", "msg", buildOut(x)) }
-func INFO(x ...any) { logger.Info("INFO", "msg", buildOut(x)) }
-func WARN(x ...any) { logger.Warn("WARN", "msg", buildOut(x)) }
-func ERR(x ...any)  { logger.Error("ERROR", "msg", buildOut(x)) }
+func LOG(x ...any)   { logger.Info("INFO", "msg", buildOut(x)) }
+func INFO(x ...any)  { logger.Info("INFO", "msg", buildOut(x)) }
+func DEBUG(x ...any) { logger.Debug("DEBUG", "msg", buildOut(x)) }
+func WARN(x ...any)  { logger.Warn("WARN", "msg", buildOut(x)) }
+func ERR(x ...any)   { logger.Error("ERROR", "msg", buildOut(x)) }
 
 func buildOut(x ...any) (out string) {
 	for _, v := range x {
