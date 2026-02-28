@@ -90,27 +90,6 @@ func RenameFile(oldName, newName string) (err error) {
 	return nil
 }
 
-func RemoveFile(file string) (err error) {
-	_, err = os.Stat(file)
-	if err != nil {
-		if os.IsNotExist(err) {
-			DEBUG("File does not exist: ", file)
-			return nil
-		}
-		ERROR("Unable to check file: ", err)
-		return
-	}
-
-	err = os.Remove(file)
-	if err != nil {
-		ERROR("Unable to remove file: ", err)
-		return
-	}
-
-	DEBUG("File removed: ", file)
-	return nil
-}
-
 func CreateFile(file string) (f *os.File, err error) {
 	f, err = os.OpenFile(file, os.O_APPEND|os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0o777)
 	if err != nil {
@@ -164,52 +143,6 @@ func GetDomainAndSubDomain(domain string) (d, s string) {
 
 	return
 }
-
-// We don't want to use this yet, but I want to keep it around for now.
-// We don't want to use this yet, but I want to keep it around for now.
-// We don't want to use this yet, but I want to keep it around for now.
-// func isAppDNS(m *dns.Msg, w dns.ResponseWriter) bool {
-// 	domain, subdomain := GetDomainAndSubDomain(m.Question[0].Name)
-// 	if domain == "" {
-// 		return false
-// 	}
-//
-// 	start := time.Now()
-// 	rm := new(dns.Msg)
-// 	rm.SetReply(m)
-// 	rm.Authoritative = true
-// 	rm.Compress = true
-// 	var full string
-// 	if subdomain != "" {
-// 		full = subdomain + "." + domain
-// 	} else {
-// 		full = domain
-// 	}
-//
-// 	for _, v := range C.APICertDomains {
-// 		if full == v+"." {
-// 			rm.Answer = append(rm.Answer, &dns.A{
-// 				Hdr: dns.RR_Header{
-// 					Class:  dns.TypeA,
-// 					Rrtype: dns.ClassINET,
-// 					Name:   rm.Question[0].Name,
-// 					Ttl:    5,
-// 				},
-// 				A: net.ParseIP(C.APICertIPs[0]).To4(),
-// 			})
-// 			err := w.WriteMsg(rm)
-// 			if err != nil {
-// 				ERROR("Unable to write app dns reply:", err)
-// 			} else {
-// 				INFO("DNS: ", m.Question[0].Name, fmt.Sprintf("(%d)ms ", time.Since(start).Milliseconds()), " @ local")
-// 			}
-// 			w.Close()
-// 			return true
-// 		}
-// 	}
-//
-// 	return false
-// }
 
 func DNSAMapping(DNS []*types.DNSRecord, fullDomain string) *types.DNSRecord {
 	domain, subdomain := GetDomainAndSubDomain(fullDomain)

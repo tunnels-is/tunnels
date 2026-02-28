@@ -63,7 +63,7 @@ func (tun *TUN) ReadFromServeTunnel() {
 		}
 		meta := tun.meta.Load()
 		DEBUG("Server listener exiting:", meta.Tag, tun.ID)
-		if tun.GetState() == TUN_Connected {
+		if tun.GetState() >= TUN_Connected {
 			tunnelMonitor <- tun
 		} else if tun.wgDevice != nil {
 			tun.wgDevice.Close()

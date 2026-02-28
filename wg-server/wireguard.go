@@ -54,11 +54,6 @@ func setupWireGuard(cfg *Config) error {
 	return nil
 }
 
-// GetServerPubKeyB64 returns the server's WireGuard public key in base64 format.
-func GetServerPubKeyB64(cfg *Config) (string, error) {
-	return derivePubKey(cfg.WireGuardPrivKey)
-}
-
 // GetCurrentPeerKeys returns the set of hex-encoded public keys currently
 // configured on the WireGuard device.
 func GetCurrentPeerKeys() (map[string]struct{}, error) {

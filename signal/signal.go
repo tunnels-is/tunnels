@@ -4,13 +4,9 @@ import (
 	"context"
 	"fmt"
 	"runtime/debug"
-	"sync"
 	"sync/atomic"
 	"time"
 )
-
-// var Signals = make([]*Signal, 0)
-var Signals sync.Map
 
 func NewSignal(tag string, ctx context.Context, cancel context.CancelFunc, sleep time.Duration, logFunc func(string), method func()) *Signal {
 	newSignal := &Signal{
@@ -22,8 +18,6 @@ func NewSignal(tag string, ctx context.Context, cancel context.CancelFunc, sleep
 		Sleep:      sleep,
 		ShouldStop: atomic.Bool{},
 	}
-	Signals.Store(tag, newSignal)
-
 	go newSignal.Start()
 	return newSignal
 }

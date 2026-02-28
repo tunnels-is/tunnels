@@ -71,12 +71,7 @@ func (V *TUN) ProcessEgressPacket(p *[]byte) (sendRemote bool) {
 		return false
 	}
 
-	isVPL := V.IsEgressVPLIP(V.EP_DstIP)
-	if !isVPL {
-		V.EP_NAT_IP, V.EP_NAT_OK = V.TransLateIP(V.EP_DstIP)
-	} else {
-		V.EP_NAT_IP, V.EP_NAT_OK = V.TransLateVPLIP(V.EP_DstIP)
-	}
+	V.EP_NAT_IP, V.EP_NAT_OK = V.TransLateIP(V.EP_DstIP)
 
 	if V.EP_NAT_OK {
 		V.EP_IPv4Header[16] = V.EP_NAT_IP[0]
@@ -108,22 +103,13 @@ func (V *TUN) ProcessIngressPacket(packet []byte) bool {
 	V.IP_IPv4Header = packet[:V.IP_IPv4HeaderLength]
 	V.IP_TPHeader = packet[V.IP_IPv4HeaderLength:]
 
-	isVPL := V.IsIngressVPLIP(V.IP_SrcIP)
-	if isVPL {
-		// VPL packet: rewrite dst to our interface IP so the app sees it addressed to us
-		V.IP_IPv4Header[16] = V.localInterfaceIP4bytes[0]
-		V.IP_IPv4Header[17] = V.localInterfaceIP4bytes[1]
-		V.IP_IPv4Header[18] = V.localInterfaceIP4bytes[2]
-		V.IP_IPv4Header[19] = V.localInterfaceIP4bytes[3]
-	} else {
-		// Reverse IP translation (e.g. LocalhostNat: server interface IP → 127.0.0.1)
-		V.IP_NAT_IP, V.IP_NAT_OK = V.NATIngress[V.IP_SrcIP]
-		if V.IP_NAT_OK {
-			V.IP_IPv4Header[12] = V.IP_NAT_IP[0]
-			V.IP_IPv4Header[13] = V.IP_NAT_IP[1]
-			V.IP_IPv4Header[14] = V.IP_NAT_IP[2]
-			V.IP_IPv4Header[15] = V.IP_NAT_IP[3]
-		}
+	// Reverse IP translation (e.g. LocalhostNat: server interface IP → 127.0.0.1)
+	V.IP_NAT_IP, V.IP_NAT_OK = V.NATIngress[V.IP_SrcIP]
+	if V.IP_NAT_OK {
+		V.IP_IPv4Header[12] = V.IP_NAT_IP[0]
+		V.IP_IPv4Header[13] = V.IP_NAT_IP[1]
+		V.IP_IPv4Header[14] = V.IP_NAT_IP[2]
+		V.IP_IPv4Header[15] = V.IP_NAT_IP[3]
 	}
 
 	RecalculateIPv4HeaderChecksum(V.IP_IPv4Header)

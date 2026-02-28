@@ -23,15 +23,7 @@ func launchAPIServer() {
 	mux.HandleFunc("/health", healthCheckHandler)
 	mux.HandleFunc("/", healthCheckHandler)
 
-	if LANEnabled {
-		mux.HandleFunc("/v3/firewall", API_Firewall)
-		mux.HandleFunc("/v3/devices", API_ListDevices)
-	}
-
 	mux.HandleFunc("/v3/session", API_SessionCreate)
-	if VPNEnabled || LANEnabled {
-		mux.HandleFunc("/v3/connect", API_AcceptUserConnections)
-	}
 
 	if AUTHEnabled {
 		mux.HandleFunc("/v3/user/create", API_UserCreate)

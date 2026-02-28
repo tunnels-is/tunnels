@@ -7,7 +7,6 @@ import (
 	"flag"
 	"fmt"
 	"log/slog"
-	"net"
 	"os"
 	sig "os/signal"
 	"path/filepath"
@@ -24,8 +23,6 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/tunnels-is/tunnels/certs"
 	"github.com/tunnels-is/tunnels/crypt"
-	"github.com/tunnels-is/tunnels/iptables"
-	"github.com/tunnels-is/tunnels/setcap"
 	"github.com/tunnels-is/tunnels/signal"
 	"github.com/tunnels-is/tunnels/types"
 	"github.com/tunnels-is/tunnels/version"
@@ -40,29 +37,14 @@ var (
 	Config       atomic.Pointer[types.ServerConfig]
 	APITLSConfig atomic.Pointer[tls.Config]
 	KeyPair      atomic.Pointer[tls.Certificate]
-	PrivKey      any
-	SignKey      any
-	PubKey       any
 
-	slots     int
-	VPLNetwork *net.IPNet
-	sessionSentinel    = new(UserCoreMapping)
-	clientCoreMappings [65536]atomic.Pointer[UserCoreMapping]
-	DHCPMapping        [65536]*types.DHCPRecord
-	VPLIPToCore        [65536]atomic.Pointer[UserCoreMapping]
-
-	LANEnabled   bool
-	VPNEnabled   bool
 	AUTHEnabled  bool
-	DNSEnabled   bool
 	BBOLTEnabled bool
 
-	lanFirewallDisabled bool
-	disableLogs         bool
-	serverConfigPath    string
+	disableLogs      bool
+	serverConfigPath string
 
-	InterfaceIP net.IP
-	logger      *slog.Logger
+	logger *slog.Logger
 
 	// Tunnels public network only
 	lc atomic.Pointer[lemonsqueezy.Client]
@@ -135,12 +117,7 @@ func main() {
 	}
 
 	AUTHEnabled = slices.Contains(config.Features, types.AUTH)
-	LANEnabled = slices.Contains(config.Features, types.LAN)
-	VPNEnabled = slices.Contains(config.Features, types.VPN)
 	BBOLTEnabled = slices.Contains(config.Features, types.BBOLT)
-
-	// In development
-	// DNSEnabled = slices.Contains(config.Features, types.DNS)
 
 	err = loadCertificatesAndTLSSettings()
 	if err != nil {
@@ -186,22 +163,6 @@ func main() {
 		}
 	}
 
-	if LANEnabled || VPNEnabled {
-		if LANEnabled {
-			err = initializeLAN()
-			if err != nil {
-				ERR("unable to initialize VPL")
-				os.Exit(1)
-			}
-		}
-
-		if VPNEnabled {
-			initializeVPN()
-		}
-
-		go signal.NewSignal("PING", ctx, cancel, 10*time.Second, goroutineLogger, pingActiveUsers)
-	}
-
 	go signal.NewSignal("API", ctx, cancel, 1*time.Second, goroutineLogger, launchAPIServer)
 
 	go signal.NewSignal("CONFIG", ctx, cancel, 30*time.Second, goroutineLogger, func() {
@@ -227,9 +188,6 @@ func validateConfig(Config *types.ServerConfig) (err error) {
 	}
 	if Config.PingTimeoutMinutes < 2 {
 		Config.PingTimeoutMinutes = 2
-	}
-	if Config.DHCPTimeoutHours < 1 {
-		Config.DHCPTimeoutHours = 1
 	}
 
 	if len(Config.Features) == 0 {
@@ -344,24 +302,13 @@ func loadKeyPair(key, cert string) (c tls.Certificate, err error) {
 }
 
 func loadCertificatesAndTLSSettings() (err error) {
-	priv, privB, err := crypt.LoadPrivateKey(loadSecret("KeyPem"))
+	_, privB, err := crypt.LoadPrivateKey(loadSecret("KeyPem"))
 	if err != nil {
 		return err
 	}
-	pub, pubB, err := crypt.LoadPublicKey(loadSecret("CertPem"))
+	_, pubB, err := crypt.LoadPublicKey(loadSecret("CertPem"))
 	if err != nil {
 		return err
-	}
-	PrivKey = priv
-	PubKey = pub
-	if AUTHEnabled && VPNEnabled {
-		SignKey = pub
-	} else {
-		sign, _, err := crypt.LoadPublicKey(loadSecret("SignPem"))
-		if err != nil {
-			return err
-		}
-		SignKey = sign
 	}
 	tlscert, err := tls.X509KeyPair(pubB, privB)
 	if err != nil {
@@ -399,51 +346,12 @@ func loadCertificatesAndTLSSettings() (err error) {
 	return nil
 }
 
-func initializeVPN() {
-	err := setcap.CheckCapabilities()
+func hashIdentifier(identifier string) string {
+	h, err := bcrypt.GenerateFromPassword([]byte(identifier), bcrypt.MinCost)
 	if err != nil {
-		ERR("Tunnels server is missing capabilities, err:", err)
-		os.Exit(1)
+		return identifier
 	}
-	Config := Config.Load()
-
-	var existed bool
-	err, existed = iptables.SetIPTablesRSTDropFilter(Config.VPNIP)
-	if err != nil {
-		ERR("Error applying iptables rule: ", err)
-		os.Exit(1)
-	}
-	if !existed {
-		INFO("> added iptables rule")
-	}
-
-	InterfaceIP = net.ParseIP(Config.VPNIP)
-	if InterfaceIP == nil {
-		ERR("Interface IP not parsable")
-		os.Exit(1)
-	}
-	InterfaceIP = InterfaceIP.To4()
-
-	err = GeneratePortAllocation()
-	if err != nil {
-		panic(err)
-	}
-}
-
-func initializeLAN() (err error) {
-	err = generateDHCPMap()
-	if err != nil {
-		return err
-	}
-	Config := Config.Load()
-	lanFirewallDisabled = Config.DisableLanFirewall
-	return err
-}
-
-func GeneratePortAllocation() (err error) {
-	Config := Config.Load()
-	slots = Config.ServerBandwidthMbps / Config.UserBandwidthMbps
-	return nil
+	return string(h)
 }
 
 func makeConfigAndCerts() (err error) {
@@ -465,37 +373,27 @@ func makeConfigAndCerts() (err error) {
 	if err != nil {
 		newConfig := &types.ServerConfig{
 			Features: []types.Feature{
-				types.LAN,
-				types.VPN,
 				types.AUTH,
 				types.DNS,
 				types.BBOLT,
 			},
-			VPNIP:     interfaceIP,
-			VPNPort:   "444",
-			APIIP:     interfaceIP,
-			APIPort:   "443",
-			NetAdmins: []string{},
-			Hostname:  "tunnels.local",
-			Routes: []*types.Route{
-				{Address: "10.0.0.0/16", Metric: "0"},
-			},
+			VPNIP:              interfaceIP,
+			APIIP:              interfaceIP,
+			APIPort:            "443",
+			NetAdmins:          []string{},
+			Hostname:           "tunnels.local",
+			Routes:             []*types.Route{},
 			SubNets:            []*types.Network{},
-			DisableLanFirewall: false,
 			UserMaxConnections: 10,
-			InternetAccess:      true,
-			LocalNetworkAccess:  false,
-			ServerBandwidthMbps: 1000,
-			UserBandwidthMbps:   10,
-			DNSRecords:          []*types.DNSRecord{},
-			DNSServers:          []string{},
-			SecretStore:         "config",
-			DBurl:               "",
-			AdminAPIKey:         uuid.NewString(),
-			TwoFactorKey:        strings.ReplaceAll(uuid.NewString(), "-", ""),
-			CertPem:             "./cert.pem",
-			KeyPem:              "./key.pem",
-			SignPem:             "./sign.pem",
+			DNSRecords:         []*types.DNSRecord{},
+			DNSServers:         []string{},
+			SecretStore:        "config",
+			DBurl:              "",
+			AdminAPIKey:        uuid.NewString(),
+			TwoFactorKey:       strings.ReplaceAll(uuid.NewString(), "-", ""),
+			CertPem:            "./cert.pem",
+			KeyPem:             "./key.pem",
+			SignPem:            "./sign.pem",
 		}
 		Config.Store(newConfig)
 		if err := SaveServerConfig(serverConfigPath); err != nil {
@@ -574,18 +472,12 @@ func initializeNewServer() error {
 	logger.Info("ADMIN PASSWORD (change this!!)", "pass", pw)
 
 	c := Config.Load()
-	keyBytes, err := os.ReadFile(c.CertPem)
-	if err != nil {
-		return err
-	}
 	return DB_CreateServer(&types.Server{
-		ID:       primitive.NewObjectID(),
-		Tag:      "tunnels",
-		Country:  "tunnels",
-		IP:       c.VPNIP,
-		Port:     c.APIPort,
-		DataPort: c.VPNPort,
-		PubKey:   string(keyBytes),
-		Groups:   []primitive.ObjectID{},
+		ID:      primitive.NewObjectID(),
+		Tag:     "tunnels",
+		Country: "tunnels",
+		IP:      c.VPNIP,
+		Port:    c.APIPort,
+		Groups:  []primitive.ObjectID{},
 	})
 }

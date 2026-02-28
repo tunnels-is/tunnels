@@ -23,15 +23,13 @@ func Test_validateConfig(t *testing.T) {
 			config: &types.ServerConfig{
 				UserMaxConnections: 5,
 				PingTimeoutMinutes: 10,
-				DHCPTimeoutHours:   24,
-				Features:           []types.Feature{types.VPN, types.LAN},
+				Features:           []types.Feature{types.AUTH, types.DNS},
 				SecretStore:        types.EnvStore,
 			},
 			expectError: false,
 			expectedValues: map[string]any{
 				"UserMaxConnections": 5,
 				"PingTimeoutMinutes": 10,
-				"DHCPTimeoutHours":   24,
 			},
 		},
 		{
@@ -39,8 +37,7 @@ func Test_validateConfig(t *testing.T) {
 			config: &types.ServerConfig{
 				UserMaxConnections: 0,
 				PingTimeoutMinutes: 5,
-				DHCPTimeoutHours:   12,
-				Features:           []types.Feature{types.VPN},
+				Features:           []types.Feature{types.AUTH},
 				SecretStore:        types.EnvStore,
 			},
 			expectError: false,
@@ -53,8 +50,7 @@ func Test_validateConfig(t *testing.T) {
 			config: &types.ServerConfig{
 				UserMaxConnections: 3,
 				PingTimeoutMinutes: 1,
-				DHCPTimeoutHours:   12,
-				Features:           []types.Feature{types.VPN},
+				Features:           []types.Feature{types.AUTH},
 				SecretStore:        types.EnvStore,
 			},
 			expectError: false,
@@ -63,25 +59,10 @@ func Test_validateConfig(t *testing.T) {
 			},
 		},
 		{
-			name: "DHCPTimeoutHours < 1 - should default to 1",
-			config: &types.ServerConfig{
-				UserMaxConnections: 3,
-				PingTimeoutMinutes: 5,
-				DHCPTimeoutHours:   0,
-				Features:           []types.Feature{types.VPN},
-				SecretStore:        types.EnvStore,
-			},
-			expectError: false,
-			expectedValues: map[string]any{
-				"DHCPTimeoutHours": 1,
-			},
-		},
-		{
 			name: "no features - should error",
 			config: &types.ServerConfig{
 				UserMaxConnections: 3,
 				PingTimeoutMinutes: 5,
-				DHCPTimeoutHours:   12,
 				Features:           []types.Feature{},
 				SecretStore:        types.EnvStore,
 			},
@@ -92,7 +73,6 @@ func Test_validateConfig(t *testing.T) {
 			config: &types.ServerConfig{
 				UserMaxConnections: 3,
 				PingTimeoutMinutes: 5,
-				DHCPTimeoutHours:   12,
 				Features:           nil,
 				SecretStore:        types.EnvStore,
 			},
@@ -103,8 +83,7 @@ func Test_validateConfig(t *testing.T) {
 			config: &types.ServerConfig{
 				UserMaxConnections: 3,
 				PingTimeoutMinutes: 5,
-				DHCPTimeoutHours:   12,
-				Features:           []types.Feature{types.VPN},
+				Features:           []types.Feature{types.AUTH},
 				SecretStore:        "",
 			},
 			expectError: false,
@@ -117,15 +96,13 @@ func Test_validateConfig(t *testing.T) {
 			config: &types.ServerConfig{
 				UserMaxConnections: 0,
 				PingTimeoutMinutes: 0,
-				DHCPTimeoutHours:   0,
-				Features:           []types.Feature{types.VPN, types.LAN, types.AUTH},
+				Features:           []types.Feature{types.AUTH, types.DNS},
 				SecretStore:        "",
 			},
 			expectError: false,
 			expectedValues: map[string]any{
 				"UserMaxConnections": 2,
 				"PingTimeoutMinutes": 2,
-				"DHCPTimeoutHours":   1,
 				"SecretStore":        types.EnvStore,
 			},
 		},
@@ -134,15 +111,13 @@ func Test_validateConfig(t *testing.T) {
 			config: &types.ServerConfig{
 				UserMaxConnections: -5,
 				PingTimeoutMinutes: -10,
-				DHCPTimeoutHours:   -24,
-				Features:           []types.Feature{types.VPN},
+				Features:           []types.Feature{types.AUTH},
 				SecretStore:        types.EnvStore,
 			},
 			expectError: false,
 			expectedValues: map[string]any{
 				"UserMaxConnections": 2,
 				"PingTimeoutMinutes": 2,
-				"DHCPTimeoutHours":   1,
 			},
 		},
 	}
@@ -173,8 +148,6 @@ func Test_validateConfig(t *testing.T) {
 					actual = tc.config.UserMaxConnections
 				case "PingTimeoutMinutes":
 					actual = tc.config.PingTimeoutMinutes
-				case "DHCPTimeoutHours":
-					actual = tc.config.DHCPTimeoutHours
 				case "SecretStore":
 					actual = tc.config.SecretStore
 				}
@@ -206,11 +179,6 @@ func Test_validateConfig_BoundaryValues(t *testing.T) {
 			value: 2,
 		},
 		{
-			name:  "DHCPTimeoutHours = 1 (boundary)",
-			field: "DHCPTimeoutHours",
-			value: 1,
-		},
-		{
 			name:  "UserMaxConnections = 1000 (large)",
 			field: "UserMaxConnections",
 			value: 1000,
@@ -220,11 +188,6 @@ func Test_validateConfig_BoundaryValues(t *testing.T) {
 			field: "PingTimeoutMinutes",
 			value: 60,
 		},
-		{
-			name:  "DHCPTimeoutHours = 8760 (one year)",
-			field: "DHCPTimeoutHours",
-			value: 8760,
-		},
 	}
 
 	for _, tc := range tests {
@@ -232,8 +195,7 @@ func Test_validateConfig_BoundaryValues(t *testing.T) {
 			config := &types.ServerConfig{
 				UserMaxConnections: 10,
 				PingTimeoutMinutes: 10,
-				DHCPTimeoutHours:   10,
-				Features:           []types.Feature{types.VPN},
+				Features:           []types.Feature{types.AUTH},
 				SecretStore:        types.EnvStore,
 			}
 
@@ -243,8 +205,6 @@ func Test_validateConfig_BoundaryValues(t *testing.T) {
 				config.UserMaxConnections = tc.value
 			case "PingTimeoutMinutes":
 				config.PingTimeoutMinutes = tc.value
-			case "DHCPTimeoutHours":
-				config.DHCPTimeoutHours = tc.value
 			}
 
 			err := validateConfig(config)
@@ -259,8 +219,6 @@ func Test_validateConfig_BoundaryValues(t *testing.T) {
 				actual = config.UserMaxConnections
 			case "PingTimeoutMinutes":
 				actual = config.PingTimeoutMinutes
-			case "DHCPTimeoutHours":
-				actual = config.DHCPTimeoutHours
 			}
 
 			if actual != tc.value {
@@ -279,11 +237,9 @@ func Test_LoadServerConfig_JSON(t *testing.T) {
 	testConfig := &types.ServerConfig{
 		UserMaxConnections: 5,
 		PingTimeoutMinutes: 10,
-		DHCPTimeoutHours:   24,
-		Features:           []types.Feature{types.VPN, types.LAN, types.AUTH},
+		Features:           []types.Feature{types.AUTH, types.DNS},
 		SecretStore:        types.EnvStore,
 		VPNIP:              "192.168.1.1",
-		VPNPort:            "444",
 		APIPort:            "443",
 		Hostname:           "test.local",
 	}
@@ -341,9 +297,6 @@ func Test_LoadServerConfig_JSON(t *testing.T) {
 			if loaded.VPNIP != testConfig.VPNIP {
 				t.Errorf("VPNIP: got %s, expected %s", loaded.VPNIP, testConfig.VPNIP)
 			}
-			if loaded.VPNPort != testConfig.VPNPort {
-				t.Errorf("VPNPort: got %s, expected %s", loaded.VPNPort, testConfig.VPNPort)
-			}
 			if len(loaded.Features) != len(testConfig.Features) {
 				t.Errorf("Features length: got %d, expected %d", len(loaded.Features), len(testConfig.Features))
 			}
@@ -360,11 +313,9 @@ func Test_LoadServerConfig_YAML(t *testing.T) {
 	testConfig := &types.ServerConfig{
 		UserMaxConnections: 5,
 		PingTimeoutMinutes: 10,
-		DHCPTimeoutHours:   24,
-		Features:           []types.Feature{types.VPN, types.LAN, types.AUTH},
+		Features:           []types.Feature{types.AUTH, types.DNS},
 		SecretStore:        types.EnvStore,
 		VPNIP:              "192.168.1.1",
-		VPNPort:            "444",
 		APIPort:            "443",
 		Hostname:           "test.local",
 	}
@@ -421,9 +372,6 @@ func Test_LoadServerConfig_YAML(t *testing.T) {
 			loaded := Config.Load()
 			if loaded.VPNIP != testConfig.VPNIP {
 				t.Errorf("VPNIP: got %s, expected %s", loaded.VPNIP, testConfig.VPNIP)
-			}
-			if loaded.VPNPort != testConfig.VPNPort {
-				t.Errorf("VPNPort: got %s, expected %s", loaded.VPNPort, testConfig.VPNPort)
 			}
 			if len(loaded.Features) != len(testConfig.Features) {
 				t.Errorf("Features length: got %d, expected %d", len(loaded.Features), len(testConfig.Features))
@@ -487,7 +435,6 @@ func Test_LoadServerConfig_Errors(t *testing.T) {
 				cfg := &types.ServerConfig{
 					UserMaxConnections: 5,
 					PingTimeoutMinutes: 10,
-					DHCPTimeoutHours:   24,
 					Features:           []types.Feature{},
 					SecretStore:        types.EnvStore,
 				}
@@ -529,11 +476,9 @@ func Test_SaveServerConfig_JSON(t *testing.T) {
 	testConfig := &types.ServerConfig{
 		UserMaxConnections: 5,
 		PingTimeoutMinutes: 10,
-		DHCPTimeoutHours:   24,
-		Features:           []types.Feature{types.VPN, types.LAN, types.AUTH},
+		Features:           []types.Feature{types.AUTH, types.DNS},
 		SecretStore:        types.EnvStore,
 		VPNIP:              "192.168.1.1",
-		VPNPort:            "444",
 		APIPort:            "443",
 		Hostname:           "test.local",
 	}
@@ -611,11 +556,9 @@ func Test_SaveServerConfig_YAML(t *testing.T) {
 	testConfig := &types.ServerConfig{
 		UserMaxConnections: 5,
 		PingTimeoutMinutes: 10,
-		DHCPTimeoutHours:   24,
-		Features:           []types.Feature{types.VPN, types.LAN, types.AUTH},
+		Features:           []types.Feature{types.AUTH, types.DNS},
 		SecretStore:        types.EnvStore,
 		VPNIP:              "192.168.1.1",
-		VPNPort:            "444",
 		APIPort:            "443",
 		Hostname:           "test.local",
 	}
@@ -693,8 +636,7 @@ func Test_SaveServerConfig_Errors(t *testing.T) {
 	testConfig := &types.ServerConfig{
 		UserMaxConnections: 5,
 		PingTimeoutMinutes: 10,
-		DHCPTimeoutHours:   24,
-		Features:           []types.Feature{types.VPN, types.LAN},
+		Features:           []types.Feature{types.AUTH},
 		SecretStore:        types.EnvStore,
 	}
 
@@ -750,19 +692,13 @@ func Test_LoadAndSaveServerConfig_RoundTrip(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	originalConfig := &types.ServerConfig{
-		UserMaxConnections:  7,
-		PingTimeoutMinutes:  15,
-		DHCPTimeoutHours:    48,
-		Features:            []types.Feature{types.VPN, types.LAN, types.AUTH, types.DNS},
-		SecretStore:         types.EnvStore,
-		VPNIP:               "10.0.0.1",
-		VPNPort:             "8444",
-		APIPort:             "8443",
-		Hostname:            "roundtrip.test",
-		InternetAccess:      true,
-		LocalNetworkAccess:  false,
-		ServerBandwidthMbps: 1000,
-		UserBandwidthMbps:   100,
+		UserMaxConnections: 7,
+		PingTimeoutMinutes: 15,
+		Features:           []types.Feature{types.AUTH, types.DNS, types.BBOLT},
+		SecretStore:        types.EnvStore,
+		VPNIP:              "10.0.0.1",
+		APIPort:            "8443",
+		Hostname:           "roundtrip.test",
 	}
 
 	tests := []struct {
@@ -802,14 +738,8 @@ func Test_LoadAndSaveServerConfig_RoundTrip(t *testing.T) {
 			if loaded.PingTimeoutMinutes != originalConfig.PingTimeoutMinutes {
 				t.Errorf("PingTimeoutMinutes: got %d, expected %d", loaded.PingTimeoutMinutes, originalConfig.PingTimeoutMinutes)
 			}
-			if loaded.DHCPTimeoutHours != originalConfig.DHCPTimeoutHours {
-				t.Errorf("DHCPTimeoutHours: got %d, expected %d", loaded.DHCPTimeoutHours, originalConfig.DHCPTimeoutHours)
-			}
 			if loaded.VPNIP != originalConfig.VPNIP {
 				t.Errorf("VPNIP: got %s, expected %s", loaded.VPNIP, originalConfig.VPNIP)
-			}
-			if loaded.VPNPort != originalConfig.VPNPort {
-				t.Errorf("VPNPort: got %s, expected %s", loaded.VPNPort, originalConfig.VPNPort)
 			}
 			if loaded.Hostname != originalConfig.Hostname {
 				t.Errorf("Hostname: got %s, expected %s", loaded.Hostname, originalConfig.Hostname)
