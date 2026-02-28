@@ -88,7 +88,6 @@ func (tun *TUN) ReadFromTunnelInterface() {
 			continue
 		}
 
-		DEBUG("egress→wg: ", pktInfo(packet))
 		tun.wgTun.writeEgress(packet)
 		tun.egressBytes.Add(int64(len(packet)))
 	}
@@ -138,13 +137,11 @@ func (tun *TUN) ReadFromServeTunnel() {
 			return
 		}
 		tun.ingressBytes.Add(int64(len(packet)))
-		DEBUG("wg→ingress: ", pktInfo(packet))
 
 		if !tun.ProcessIngressPacket(packet) {
 			continue
 		}
 
-		DEBUG("ingress→tun: ", pktInfo(packet))
 		outb, allocErr := inf.AllocateSendPacket(len(packet))
 		if allocErr != nil {
 			ERROR("ingress packet allocation error: ", allocErr)

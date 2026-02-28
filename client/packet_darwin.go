@@ -51,7 +51,6 @@ func (tun *TUN) ReadFromTunnelInterface() {
 			continue
 		}
 
-		DEBUG("egress→wg: ", pktInfo(packet))
 		tun.wgTun.writeEgress(packet)
 		tun.egressBytes.Add(int64(len(packet)))
 	}
@@ -90,13 +89,11 @@ func (tun *TUN) ReadFromServeTunnel() {
 			return
 		}
 		tun.ingressBytes.Add(int64(len(packet)))
-		DEBUG("wg→ingress: ", pktInfo(packet))
 
 		if !tun.ProcessIngressPacket(packet) {
 			continue
 		}
 
-		DEBUG("ingress→tun: ", pktInfo(packet))
 		prePend = append(prePend[:4], packet...)
 		_, writeErr = osTunnel.RWC.Write(prePend[:len(packet)+4])
 		if writeErr != nil {

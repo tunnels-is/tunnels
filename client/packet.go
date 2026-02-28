@@ -32,41 +32,16 @@ func (t *TUN) RegisterPing(tag string, packet []byte) {
 	}
 }
 
-// pktInfo returns a compact "proto src:sport→dst:dport len=N" string for logging.
-func pktInfo(packet []byte) string {
-	if len(packet) < 20 {
-		return fmt.Sprintf("short len=%d", len(packet))
-	}
-	proto := packet[9]
-	src := fmt.Sprintf("%d.%d.%d.%d", packet[12], packet[13], packet[14], packet[15])
-	dst := fmt.Sprintf("%d.%d.%d.%d", packet[16], packet[17], packet[18], packet[19])
-	ihl := int(packet[0]&0x0F) * 4
-	protoName := "other"
-	var sport, dport uint16
-	if proto == 6 {
-		protoName = "TCP"
-	} else if proto == 17 {
-		protoName = "UDP"
-	}
-	if (proto == 6 || proto == 17) && len(packet) >= ihl+4 {
-		sport = uint16(packet[ihl])<<8 | uint16(packet[ihl+1])
-		dport = uint16(packet[ihl+2])<<8 | uint16(packet[ihl+3])
-		return fmt.Sprintf("%s %s:%d→%s:%d len=%d", protoName, src, sport, dst, dport, len(packet))
-	}
-	return fmt.Sprintf("%s %s→%s len=%d", protoName, src, dst, len(packet))
-}
 
 func (V *TUN) ProcessEgressPacket(p *[]byte) (sendRemote bool) {
 	packet := *p
 
 	if (packet[0] >> 4) != 4 {
-		DEBUG("egress drop: not IPv4")
 		return false
 	}
 
 	V.EP_Protocol = packet[9]
 	if V.EP_Protocol != 17 && V.EP_Protocol != 6 {
-		DEBUG("egress drop: proto=", V.EP_Protocol, " not TCP/UDP")
 		return false
 	}
 
@@ -75,10 +50,8 @@ func (V *TUN) ProcessEgressPacket(p *[]byte) (sendRemote bool) {
 	V.EP_TPHeader = packet[V.EP_IPv4HeaderLength:]
 
 	if V.EP_Protocol == 17 && len(V.EP_TPHeader) < 8 {
-		DEBUG("egress drop: UDP too short")
 		return false
 	} else if V.EP_Protocol == 6 && len(V.EP_TPHeader) < 20 {
-		DEBUG("egress drop: TCP too short")
 		return false
 	}
 
@@ -105,10 +78,6 @@ func (V *TUN) ProcessEgressPacket(p *[]byte) (sendRemote bool) {
 		V.EP_NAT_IP, V.EP_NAT_OK = V.TransLateVPLIP(V.EP_DstIP)
 	}
 
-	DEBUG(fmt.Sprintf("egress %s vpl=%v natOK=%v natDst=%d.%d.%d.%d",
-		pktInfo(packet), isVPL, V.EP_NAT_OK,
-		V.EP_NAT_IP[0], V.EP_NAT_IP[1], V.EP_NAT_IP[2], V.EP_NAT_IP[3]))
-
 	if V.EP_NAT_OK {
 		V.EP_IPv4Header[16] = V.EP_NAT_IP[0]
 		V.EP_IPv4Header[17] = V.EP_NAT_IP[1]
@@ -124,11 +93,9 @@ func (V *TUN) ProcessEgressPacket(p *[]byte) (sendRemote bool) {
 
 func (V *TUN) ProcessIngressPacket(packet []byte) bool {
 	if len(packet) < 20 {
-		DEBUG("ingress drop: packet too short len=", len(packet))
 		return false
 	}
 	if (packet[0]>>4) != 4 {
-		DEBUG("ingress drop: not IPv4")
 		return false
 	}
 
@@ -158,8 +125,6 @@ func (V *TUN) ProcessIngressPacket(packet []byte) bool {
 			V.IP_IPv4Header[15] = V.IP_NAT_IP[3]
 		}
 	}
-
-	DEBUG(fmt.Sprintf("ingress %s vpl=%v natOK=%v", pktInfo(packet), isVPL, V.IP_NAT_OK))
 
 	RecalculateIPv4HeaderChecksum(V.IP_IPv4Header)
 	RecalculateTransportChecksum(V.IP_IPv4Header, V.IP_TPHeader)
