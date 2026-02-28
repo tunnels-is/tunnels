@@ -2,16 +2,20 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"net/http"
 	"os"
 	ossig "os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
 	"github.com/tunnels-is/tunnels/signal"
 )
+
+var peerStore *PeerStore
 
 func main() {
 	genConfig  := flag.Bool("config", false, "generate a default config file and exit")
@@ -77,6 +81,15 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Initialise the peer store. The store file lives next to the config file.
+	storePath := filepath.Join(filepath.Dir(*configPath), "peers.json")
+	var storeErr error
+	peerStore, storeErr = NewPeerStore(storePath, cfg.WireGuardSubnet)
+	if storeErr != nil {
+		ERR("failed to initialise peer store: ", storeErr)
+		os.Exit(1)
+	}
+
 	initSyncClient(cfg)
 
 	if cfg.SyncListenAddr != "" {
@@ -89,6 +102,7 @@ func main() {
 			go SyncPeers()
 			w.WriteHeader(http.StatusOK)
 		})
+		mux.HandleFunc("/v3/wg/assign", handleAssign)
 		go func() {
 			if listenErr := http.ListenAndServe(cfg.SyncListenAddr, mux); listenErr != nil {
 				ERR("sync listener error: ", listenErr)
@@ -123,4 +137,40 @@ func main() {
 	}
 	cleanupNet(cfg)
 	INFO("shutdown complete")
+}
+
+// handleAssign handles POST /v3/wg/assign.
+// The controller calls this during /v3/session to get (or lazily assign) the
+// device's IP on this wg-server. The response is returned to the client so it
+// can configure its TUN interface address.
+func handleAssign(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		DeviceID  string `json:"DeviceID"`
+		PubKeyB64 string `json:"PubKeyB64"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+	if req.DeviceID == "" || req.PubKeyB64 == "" {
+		http.Error(w, "DeviceID and PubKeyB64 are required", http.StatusBadRequest)
+		return
+	}
+
+	ip, err := peerStore.GetOrAssign(req.DeviceID, req.PubKeyB64)
+	if err != nil {
+		ERR("assign IP failed: ", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(struct {
+		IP string `json:"IP"`
+	}{IP: ip})
 }

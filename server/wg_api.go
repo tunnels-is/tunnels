@@ -1,13 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"encoding/base64"
-	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"log/slog"
-	"net"
 	"net/http"
-	"sort"
 
 	"github.com/tunnels-is/tunnels/types"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -30,7 +29,8 @@ type FORM_WG_UNREGISTER struct {
 }
 
 // API_WGRegister handles POST /v3/wg/register.
-// It assigns a WireGuard IP to the device and stores its public key.
+// Stores the client's WireGuard public key against the device record.
+// IP assignment is delegated to the wg-server via callWGAssign.
 func API_WGRegister(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 	if r.Method != http.MethodPost {
@@ -79,34 +79,29 @@ func API_WGRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Assign an IP from the WireGuard subnet if not already assigned.
-	if device.WireGuardIP == "" {
-		ip, err := assignNextWGIP()
-		if err != nil {
-			senderr(w, 500, "Failed to assign WireGuard IP", slog.Any("err", err))
-			return
-		}
-		device.WireGuardIP = ip
-	}
 	device.WireGuardKey = F.PublicKeyB64
-
 	if err := DB_UpdateDevice(device); err != nil {
 		senderr(w, 500, "Failed to update device", slog.Any("err", err))
 		return
 	}
 
-	resp := &types.WGRegisterResponse{
-		AssignedIP: device.WireGuardIP,
-	}
+	resp := &types.WGRegisterResponse{}
 
-	// If a ServerID was provided, include the WireGuard server's connection details.
+	// If a ServerID was provided, ask that wg-server to assign an IP and
+	// include the server's connection details in the response.
 	if F.ServerID != primitive.NilObjectID {
 		server, err := DB_FindServerByID(F.ServerID)
-		if err == nil && server != nil && server.WireGuardPubKey != "" {
+		if err == nil && server != nil {
 			resp.ServerPubKey = server.WireGuardPubKey
 			resp.ServerIP = server.IP
 			resp.ServerPort = server.WireGuardPort
-			resp.Conf = buildWGConf(device.WireGuardIP, F.PublicKeyB64, server)
+			if server.WGBaseURL != "" {
+				ip, assignErr := callWGAssign(server.WGBaseURL, device.ID.Hex(), F.PublicKeyB64)
+				if assignErr == nil && ip != "" {
+					resp.AssignedIP = ip
+					resp.Conf = buildWGConf(ip, F.PublicKeyB64, server)
+				}
+			}
 		}
 	}
 
@@ -114,7 +109,7 @@ func API_WGRegister(w http.ResponseWriter, r *http.Request) {
 }
 
 // API_WGUnregister handles DELETE /v3/wg/register.
-// It clears the WireGuard key and IP from the device.
+// Clears the WireGuard key from the device record.
 func API_WGUnregister(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 	if r.Method != http.MethodDelete {
@@ -153,8 +148,6 @@ func API_WGUnregister(w http.ResponseWriter, r *http.Request) {
 	}
 
 	device.WireGuardKey = ""
-	device.WireGuardIP = ""
-
 	if err := DB_UpdateDevice(device); err != nil {
 		senderr(w, 500, "Failed to update device", slog.Any("err", err))
 		return
@@ -164,8 +157,8 @@ func API_WGUnregister(w http.ResponseWriter, r *http.Request) {
 }
 
 // API_WGPeers handles GET /v3/wg/peers.
-// Returns all devices with a WireGuard key registered, in hex-key format
-// for direct consumption by wg-server's UAPI IPC.
+// Returns all devices with a WireGuard key registered (DeviceID + hex public key).
+// IP assignment is owned by each wg-server; AllowedIPs are not included here.
 // Protected by AdminAPIKey.
 func API_WGPeers(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
@@ -179,8 +172,6 @@ func API_WGPeers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Fetch all devices; filter those with a WireGuard key.
-	// Use a large limit to get all; in practice device counts are modest.
 	devices, err := DB_GetDevices(100000, 0)
 	if err != nil {
 		senderr(w, 500, "Failed to fetch devices", slog.Any("err", err))
@@ -191,7 +182,7 @@ func API_WGPeers(w http.ResponseWriter, r *http.Request) {
 		Peers: make([]types.WGPeer, 0),
 	}
 	for _, d := range devices {
-		if d.WireGuardKey == "" || d.WireGuardIP == "" {
+		if d.WireGuardKey == "" {
 			continue
 		}
 		hexKey, err := b64KeyToHex(d.WireGuardKey)
@@ -202,7 +193,6 @@ func API_WGPeers(w http.ResponseWriter, r *http.Request) {
 		}
 		resp.Peers = append(resp.Peers, types.WGPeer{
 			PublicKeyHex: hexKey,
-			AllowedIP:    d.WireGuardIP + "/32",
 			DeviceID:     d.ID.Hex(),
 		})
 	}
@@ -243,66 +233,35 @@ func API_WGConfig(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// assignNextWGIP finds the highest WireGuard IP currently assigned across all
-// devices and returns the next sequential IP within the configured subnet.
-func assignNextWGIP() (string, error) {
-	cfg := Config.Load()
-	if cfg.WireGuardSubnet == "" {
-		return "", fmt.Errorf("WireGuardSubnet is not configured in server config")
-	}
-
-	_, ipNet, err := net.ParseCIDR(cfg.WireGuardSubnet)
-	if err != nil {
-		return "", fmt.Errorf("invalid WireGuardSubnet %q: %w", cfg.WireGuardSubnet, err)
-	}
-
-	devices, err := DB_GetDevices(100000, 0)
-	if err != nil {
-		return "", fmt.Errorf("fetch devices: %w", err)
-	}
-
-	// Collect all assigned IPs within the subnet.
-	assigned := make([]net.IP, 0)
-	for _, d := range devices {
-		if d.WireGuardIP == "" {
-			continue
-		}
-		ip := net.ParseIP(d.WireGuardIP).To4()
-		if ip != nil && ipNet.Contains(ip) {
-			assigned = append(assigned, ip)
-		}
-	}
-
-	// Sort IPs and find the max.
-	sort.Slice(assigned, func(i, j int) bool {
-		return ipToUint32(assigned[i]) < ipToUint32(assigned[j])
+// callWGAssign sends a POST to the wg-server's /v3/wg/assign endpoint and
+// returns the IP assigned to the device. It is called synchronously during
+// /v3/session so the client receives its IP in the same response.
+func callWGAssign(baseURL, deviceID, pubKeyB64 string) (string, error) {
+	body, err := json.Marshal(map[string]string{
+		"DeviceID":  deviceID,
+		"PubKeyB64": pubKeyB64,
 	})
-
-	// Start from the second host (.2) — .1 is reserved for the wg-server itself.
-	baseIP := ipToUint32(ipNet.IP.To4()) + 2
-	if len(assigned) > 0 {
-		max := ipToUint32(assigned[len(assigned)-1])
-		if max >= baseIP {
-			baseIP = max + 1
-		}
+	if err != nil {
+		return "", fmt.Errorf("marshal: %w", err)
 	}
 
-	// Verify the next IP is still within the subnet.
-	nextIP := uint32ToIP(baseIP)
-	if !ipNet.Contains(nextIP) {
-		return "", fmt.Errorf("WireGuard subnet %s is exhausted", cfg.WireGuardSubnet)
+	resp, err := http.Post(baseURL+"/v3/wg/assign", "application/json", bytes.NewReader(body))
+	if err != nil {
+		return "", fmt.Errorf("post: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("wg-server returned %d", resp.StatusCode)
 	}
 
-	return nextIP.String(), nil
-}
-
-func ipToUint32(ip net.IP) uint32 {
-	ip = ip.To4()
-	return uint32(ip[0])<<24 | uint32(ip[1])<<16 | uint32(ip[2])<<8 | uint32(ip[3])
-}
-
-func uint32ToIP(n uint32) net.IP {
-	return net.IP{byte(n >> 24), byte(n >> 16), byte(n >> 8), byte(n)}
+	var result struct {
+		IP string `json:"IP"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", fmt.Errorf("decode: %w", err)
+	}
+	return result.IP, nil
 }
 
 // b64KeyToHex converts a base64-encoded 32-byte key to a hex string for UAPI.
@@ -314,7 +273,7 @@ func b64KeyToHex(b64 string) (string, error) {
 	if len(b) != 32 {
 		return "", fmt.Errorf("expected 32 bytes, got %d", len(b))
 	}
-	return hex.EncodeToString(b), nil
+	return fmt.Sprintf("%x", b), nil
 }
 
 // buildWGConf generates a ready-to-use WireGuard .conf file for a device.

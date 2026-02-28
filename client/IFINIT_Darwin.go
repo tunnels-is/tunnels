@@ -273,13 +273,6 @@ func (t *TInterface) Connect(tun *TUN) (err error) {
 		}
 	}
 
-	if tun.ServerResponse.LAN != nil && tun.ServerResponse.LAN.Nat != "" {
-		err = IP_AddRoute(tun.ServerResponse.LAN.Nat, "", t.IPv4Address, "0")
-		if err != nil {
-			return err
-		}
-	}
-
 	for _, n := range tun.ServerResponse.Networks {
 		if n.Nat != "" {
 			err = IP_AddRoute(n.Nat, "", t.IPv4Address, "0")
@@ -327,13 +320,6 @@ func (t *TInterface) Disconnect(tun *TUN) (err error) {
 			if iperr != nil {
 				DEBUG("Unable to delete IPv6 default route, err : ", iperr)
 			}
-		}
-	}
-
-	if tun.ServerResponse.LAN != nil && tun.ServerResponse.LAN.Nat != "" {
-		err = IP_DelRoute(tun.ServerResponse.LAN.Nat, t.IPv4Address, "0")
-		if err != nil {
-			return err
 		}
 	}
 

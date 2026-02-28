@@ -32,8 +32,6 @@ const (
 )
 
 var (
-	PRODUCTION = true
-
 	// hardcoded public network controller IP
 	// This prevents DNS hijacking
 	DefaultControllerIP = "89.147.109.61"
@@ -60,7 +58,6 @@ var (
 	tunnelMonitor      = make(chan *TUN, 1000)
 	interfaceMonitor   = make(chan *TUN, 1000)
 
-	// NOT SURE YET
 	highPriorityChannel   = make(chan *event, 100)
 	mediumPriorityChannel = make(chan *event, 100)
 	lowPriorityChannel    = make(chan *event, 100)
@@ -91,8 +88,7 @@ type DNSStats struct {
 }
 
 type ConnectionRequest struct {
-	Server       *ControlServer
-	ServerPubKey string
+	Server *ControlServer
 
 	DeviceKey string `json:"DeviceKey"`
 
@@ -111,16 +107,6 @@ type ErrorResponse struct {
 	Error string `json:"Error"`
 }
 
-type SignedConnectRequest struct {
-	Signature []byte
-	Payload   []byte
-}
-
-// type DHCPRecord struct {
-// 	IP       [4]byte
-// 	Token    string
-// 	Hostname string
-// }
 
 var (
 	DIST_EMBED embed.FS
@@ -129,25 +115,15 @@ var (
 )
 
 var (
-	AppStartTime        = time.Now()
-	DEFAULT_TUNNEL      *TInterface
 	DEFAULT_DNS_SERVERS []string
 	DNSClient           = new(dns.Client)
 
 	// HTTP
 	API_SERVER http.Server
-	API_PORT   string
 
-	CURRENT_UBBS           = 0
-	CURRENT_DBBS           = 0
-	EGRESS_PACKETS  uint64 = 0
-	INGRESS_PACKETS uint64 = 0
-
-	TAG_ERROR   = "ERROR"
-	TAG_GENERAL = "GENERAL"
-	LogFile     *os.File
-	TraceFile   *os.File
-	// UDPDNSServer *dns.Server
+	TAG_ERROR    = "ERROR"
+	LogFile      *os.File
+	TraceFile    *os.File
 	UDPDNSServer atomic.Pointer[dns.Server]
 )
 
@@ -159,145 +135,9 @@ type DNSReply struct {
 
 var letterRunes = []rune("ABCDEFGHIJKLMNOPQRSTUVWXYZ234567")
 
-// var LastRouterPing = time.Now()
-var LastConnectionAttemp = time.Now()
-
-var (
-	BUFFER_ERROR             bool
-	IGNORE_NEXT_BUFFER_ERROR bool
-)
-
-var DNSWhitelist = make(map[string]bool)
-
-type IP struct {
-	LOCAL  map[uint16]*RemotePort
-	REMOTE map[uint16]*RemotePort
-}
-
-type RemotePort struct {
-	Local        uint16
-	Original     uint16
-	Mapped       uint16
-	LastActivity time.Time
-}
-
-type LogItem struct {
-	Type string
-	Line string
-}
-
-type LogoutForm struct {
-	Email       string
-	DeviceToken string
-}
-
-type State struct {
-	IsAdmin bool    `json:"IsAdmin"`
-	C       *Config `json:"C"`
-	User    User
-
-	UMbps           int    `json:"UMbps"`
-	DMbps           int    `json:"DMbps"`
-	UMbpsString     string `json:"UMbpsString"`
-	DMbpsString     string `json:"DMbpsString"`
-	IngressPackets  uint64 `json:"IngressPackets"`
-	EgressPackets   uint64 `json:"EgressPackets"`
-	ConnectionStats []TunnelSTATS
-
-	LastNodeUpdate         time.Time
-	SecondsUntilNodeUpdate int
-
-	AvailableCountries []string `json:"AvailableCountries"`
-
-	// FILE PATHS
-	BlockListPath string `json:"BlockListPath"`
-	TraceFileName string `json:"TraceFileName"`
-	TracePath     string `json:"TracePath"`
-	LogFileName   string `json:"LogFileName"`
-	LogPath       string `json:"LogPath"`
-	ConfigPath    string `json:"ConfigPath"`
-	BasePath      string `json:"BasePath"`
-	Version       string `json:"Version"`
-
-	ActiveConnections []*TunnelMETA `json:"ActiveConnections"`
-
-	// DNS stats
-	DNSBlocksMap   map[string]*DNSStats `json:"DNSBlocks"`
-	DNSResolvesMap map[string]*DNSStats `json:"DNSResolves"`
-}
-
-type List struct {
-	FullPath string
-	Tag      string
-	Enabled  bool
-	Domains  string
-}
 
 type DisconnectForm struct {
 	ID string `json:"ID"`
-}
-
-type CONFIG_FORM struct {
-	DNS1                      string   `json:"DNS1"`
-	DNS2                      string   `json:"DNS2"`
-	ManualRouter              bool     `json:"ManualRouter"`
-	Region                    string   `json:"Region"`
-	Version                   string   `json:"Version"`
-	RouterFilePath            string   `json:"RouterFilePath"`
-	DebugLogging              bool     `json:"DebugLogging"`
-	AutoReconnect             bool     `json:"AutoReconnect"`
-	KillSwitch                bool     `json:"KillSwitch"`
-	DisableIPv6OnConnect      bool     `json:"DisableIPv6OnConnect"`
-	CloseConnectionsOnConnect bool     `json:"CloseConnectionsOnConnect"`
-	CustomDNS                 bool     `json:"CustomDNS"`
-	EnabledBlockLists         []string `json:"EnabledBlockLists"`
-	LogBlockedDomains         bool     `json:"LogBlockedDomains"`
-}
-
-var (
-// TunList [1000]*Tunnel
-// ConLock = sync.Mutex{}
-// IFList [1000]*TunnelInterface
-// IFLock = sync.Mutex{}
-)
-
-type ConnectionOverwrite struct {
-	ServerID string `json:"ServerID"`
-	Network  string `json:"Network" bson:"Network"`
-	Nat      string `json:"Nat" bson:"Nat"`
-}
-
-type Route struct {
-	Address string
-	Metric  string
-}
-
-// type ServerDNS struct {
-// 	Domain   string   `json:"Domain"`
-// 	Wildcard bool     `json:"Wildcard" bson:"Wildcard"`
-// 	IP       []string `json:"IP" bson:"IP"`
-// 	TXT      []string `json:"TXT" bson:"TXT"`
-// 	CNAME    string   `json:"CNAME" bson:"CNAME"`
-// }
-// type ServerNetwork struct {
-// 	Tag     string   `json:"Tag" bson:"Tag"`
-// 	Network string   `json:"Network" bson:"Network"`
-// 	Nat     string   `json:"Nat" bson:"Nat"`
-// 	Routes  []*Route `json:"Routes" bson:"Routes"`
-
-// 	// Post Init
-// 	NatIPNet *net.IPNet `json:"-"`
-// 	NetIPNet *net.IPNet `json:"-"`
-// }
-
-type ActiveConnectionMeta struct {
-	Country        string
-	RouterIndex    int
-	NodeID         string
-	Tag            string
-	LocalInterface string
-	IPv4Address    string
-	IPv6Address    string
 }
 
 type TunnelMETA struct {
@@ -320,10 +160,6 @@ type TunnelMETA struct {
 	IPv6Address string
 	NetMask     string
 
-	// VPL Firewall
-	AllowedHosts    []string
-	DisableFirewall bool
-
 	// This overwrites or adds to settings
 	// that are applied to the Node
 	EnableDefaultRoute bool
@@ -339,96 +175,6 @@ type TunnelMETA struct {
 	WireGuardPrivKey string
 }
 
-type AllowedHost struct {
-	Host    string
-	Expires time.Time
-}
-
-type TunnelSTATS struct {
-	// Stats
-	StatsTag      string
-	EgressBytes   int
-	EgressString  string
-	IngressBytes  int
-	IngressString string
-
-	// FROM NODE
-	CPU                 byte
-	DISK                byte
-	MEM                 byte
-	ServerToClientMicro int64
-	PingTime            time.Time
-
-	DHCP *types.DNSRecord
-	LAN  *types.Network
-}
-
-type FirewallRequest struct {
-	DHCPToken       string
-	IP              string
-	Hosts           []string
-	DisableFirewall bool
-}
-
-type Config struct {
-	Connections []*TunnelMETA
-
-	DarkMode bool
-
-	// Security settings
-	IsolationMode bool
-
-	// API Setting
-	APIIP          string
-	APIPort        string
-	APICert        string
-	APIKey         string
-	APICertDomains []string
-	APICertIPs     []string
-	APICertType    certs.CertType
-
-	// Optional Debugging Settings
-	LogBlockedDomains bool
-	LogAllDomains     bool
-	DebugLogging      bool
-	DeepDebugLoggin   bool
-	ConsoleLogging    bool
-	InfoLogging       bool
-	ErrorLogging      bool
-	ConsoleLogOnly    bool
-	ConnectionTracer  bool
-
-	// DNS Settings
-	DNS1Default         string
-	DNS2Default         string
-	DNSOverHTTPS        bool
-	DNSstats            bool
-	DNSServerIP         string
-	DNSServerPort       string
-	DomainWhitelist     string
-	EnabledBlockLists   []string
-	AvailableBlockLists []*BlockList
-
-	DNSRecords []*types.DNSRecord
-}
-
-type LOADING_LOGS_RESPONSE struct {
-	Lines [100]string
-}
-type GENERAL_LOGS_RESPONSE struct {
-	Lines []string
-}
-type GeneralLogResponse struct {
-	Content  []string
-	Time     []string
-	Function []string
-	Color    []string
-}
-
-type DEBUG_OUT struct {
-	Lines []string
-	File  string
-}
 
 type FORWARD_REQUEST struct {
 	Server *ControlServer
@@ -450,7 +196,6 @@ type QR_CODE struct {
 	Value string
 }
 
-// Device token struct need for the login respons from user scruct
 type DEVICE_TOKEN struct {
 	DT      string    `bson:"DT"`
 	N       string    `bson:"N"`
@@ -461,7 +206,6 @@ type DelUserForm struct {
 	Hash string
 }
 
-// use struct you get from the login request
 type User struct {
 	ID                    string          `json:"_id,omitempty"`
 	APIKey                string          `json:"APIKey"`
@@ -498,16 +242,6 @@ type BlockList struct {
 	LastDownload time.Time
 }
 
-type CLIInfo struct {
-	AuthServer string
-	DeviceID   string
-	DeviceKey  string
-	ServerID   string
-	DNS        bool
-	Secure     bool
-	Enabled    bool
-	SendStats  bool
-}
 
 type ControlServer struct {
 	ID                  string
@@ -575,7 +309,6 @@ type configV2 struct {
 	LogBlockedPorts   bool
 	LogAllDomains     bool
 	DebugLogging      bool
-	DeepDebugLoggin   bool
 	ConsoleLogging    bool
 	InfoLogging       bool
 	ErrorLogging      bool
@@ -702,12 +435,6 @@ type TUN struct {
 	NATEgress  map[[4]byte][4]byte `json:"-"`
 	NATIngress map[[4]byte][4]byte `json:"-"`
 
-	serverVPLIP [4]byte
-	dhcp        *types.DHCPRecord
-	VPLNetwork  *types.Network
-	VPLEgress   map[[4]byte]struct{} `json:"-"`
-	VPLIngress  map[[4]byte]struct{} `json:"-"`
-
 	// Stats
 	egressBytes      atomic.Int64
 	ingressBytes     atomic.Int64
@@ -718,9 +445,6 @@ type TUN struct {
 	CPU     byte
 	DISK    byte
 	MEM     byte
-
-	// Random mappint stuff
-	// LOCAL_IF_IP [4]byte
 
 	// EGRESS PACKET STUFF
 	EP_Protocol         byte
@@ -851,8 +575,6 @@ func (t *TUN) MarshalJSON() ([]byte, error) {
 		CR               *ConnectionRequest
 		CRResponse       *types.ServerConnectResponse
 		Ping             time.Time
-		DHCP             *types.DHCPRecord
-		LAN              *types.Network
 		CPU              byte
 		DISK             byte
 		MEM              byte
@@ -864,8 +586,6 @@ func (t *TUN) MarshalJSON() ([]byte, error) {
 		t.CR,
 		t.ServerResponse,
 		pingTime,
-		t.dhcp,
-		t.VPLNetwork,
 		t.CPU,
 		t.DISK,
 		t.MEM,

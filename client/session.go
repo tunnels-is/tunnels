@@ -2,7 +2,6 @@ package client
 
 import (
 	"bufio"
-	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -124,7 +123,6 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 
 		ClientCR.ServerPort = server.Port
 		ClientCR.ServerIP = server.IP
-		ClientCR.ServerPubKey = server.PubKey
 	}
 
 	if ClientCR.ServerIP == "" {
@@ -256,51 +254,13 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	if err != nil {
 		return 500, errors.New("Unknown when contacting controller")
 	}
-	DEBUG("SignedPayload:", code, string(bytesFromController))
-
-	SignedResponse := new(types.SignedConnectRequest)
-	err = json.Unmarshal(bytesFromController, SignedResponse)
-	if err != nil {
-		ERROR("invalid signed response from controller", err)
-		return 502, errors.New("invalid response from controller")
-	}
-
-	tc := &tls.Config{
-		MinVersion:         tls.VersionTLS13,
-		CurvePreferences:   []tls.CurveID{tls.X25519MLKEM768},
-		InsecureSkipVerify: !ClientCR.Server.ValidateCertificate,
-	}
-	tc.RootCAs, errm = tunnel.LoadCertPEMBytes([]byte(ClientCR.ServerPubKey))
-	if errm != nil {
-		ERROR("Unable to load cert pem from controller: ", errm)
-		return 502, errors.New("Unable to load cert pem from controller")
-	}
-	bytesFromServer, code, err := SendRequestToURL(
-		tc,
-		"POST",
-		"https://"+ClientCR.ServerIP+":"+ClientCR.ServerPort+"/v3/connect",
-		SignedResponse,
-		10000,
-		ClientCR.Server.ValidateCertificate,
-	)
-	if code != 200 {
-		ERROR("ErrFromServer:", code, string(bytesFromServer))
-		ER := new(ErrorResponse)
-		err := json.Unmarshal(bytesFromServer, ER)
-		if err == nil {
-			return code, errors.New(ER.Error)
-		} else {
-			return code, errors.New("Error code from vpn server: " + strconv.Itoa(code))
-		}
-	}
-	if err != nil {
-		return 500, errors.New("Unknown when contacting controller")
-	}
+	DEBUG("SessionResponse:", code, string(bytesFromController))
 
 	ServerReponse := new(types.ServerConnectResponse)
-	err = json.Unmarshal(bytesFromServer, ServerReponse)
+	err = json.Unmarshal(bytesFromController, ServerReponse)
 	if err != nil {
-		return 500, errors.New("Unable to decode response from server")
+		ERROR("invalid response from controller", err)
+		return 502, errors.New("invalid response from controller")
 	}
 
 	// Update TUN interface IP to the WG-assigned IP so egress src IPs match the
@@ -389,30 +349,6 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	go tunnel.ReadFromServeTunnel()
 	go tunnel.ReadFromTunnelInterface()
 	go tunnel.RecordBandwidth()
-
-	if tunnel.ServerResponse.DHCP != nil {
-		FR := &FirewallRequest{
-			DHCPToken:       tunnel.dhcp.Token,
-			IP:              net.IP(tunnel.dhcp.IP[:]).String(),
-			Hosts:           meta.AllowedHosts,
-			DisableFirewall: meta.DisableFirewall,
-		}
-		_, code, err := SendRequestToURL(
-			tc,
-			"POST",
-			"https://"+ClientCR.ServerIP+":"+ClientCR.ServerPort+"/v3/firewall",
-			FR,
-			10000,
-			ClientCR.Server.ValidateCertificate,
-		)
-		if err != nil {
-			ERROR("unable to update firewall: ", err)
-		} else if code != 200 {
-			ERROR("unable to update firewall: ", code)
-		} else {
-			DEBUG("firewall updated")
-		}
-	}
 
 	if oldTunnel != nil {
 		Disconnect(oldTunnel.ID, true)
@@ -540,18 +476,6 @@ func InitializeTunnelFromCRR(TUN *TUN) (err error) {
 	TUN.serverInterfaceIP4bytes[2] = TUN.serverInterfaceNetIP[2]
 	TUN.serverInterfaceIP4bytes[3] = TUN.serverInterfaceNetIP[3]
 
-	if TUN.ServerResponse.DHCP != nil {
-		TUN.serverVPLIP[0] = TUN.ServerResponse.DHCP.IP[0]
-		TUN.serverVPLIP[1] = TUN.ServerResponse.DHCP.IP[1]
-		TUN.serverVPLIP[2] = TUN.ServerResponse.DHCP.IP[2]
-		TUN.serverVPLIP[3] = TUN.ServerResponse.DHCP.IP[3]
-		TUN.dhcp = TUN.ServerResponse.DHCP
-	}
-
-	if TUN.ServerResponse.LAN != nil {
-		TUN.VPLNetwork = TUN.ServerResponse.LAN
-	}
-
 	if meta.LocalhostNat {
 		NN := new(types.Network)
 		NN.Network = "127.0.0.1/32"
@@ -579,10 +503,6 @@ func InitializeTunnelFromCRR(TUN *TUN) (err error) {
 
 	TUN.InitBlockedPorts(TUN.meta.Load().BlockedPorts)
 
-	err = TUN.InitVPLMap()
-	if err != nil {
-		return err
-	}
 	err = TUN.InitNatMaps()
 	if err != nil {
 		return err
@@ -593,14 +513,6 @@ func InitializeTunnelFromCRR(TUN *TUN) (err error) {
 		meta.IPv4Address,
 		TUN.ServerResponse.InterfaceIP,
 	))
-
-	if TUN.ServerResponse.LAN != nil && TUN.ServerResponse.DHCP != nil {
-		DEBUG(fmt.Sprintf(
-			"DHCP/VPL info: Addr(%s) Network:(%s)",
-			TUN.ServerResponse.DHCP.IP,
-			TUN.ServerResponse.LAN.Network,
-		))
-	}
 
 	return nil
 }

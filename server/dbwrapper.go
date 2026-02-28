@@ -110,7 +110,6 @@ func DB_UpdateDevice(D *types.Device) (err error) {
 					Value: bson.D{
 						{Key: "Tag", Value: D.Tag},
 						{Key: "WireGuardKey", Value: D.WireGuardKey},
-						{Key: "WireGuardIP", Value: D.WireGuardIP},
 					},
 				},
 			},
@@ -783,8 +782,6 @@ func DB_UpdateServer(S *types.Server) (RS *types.Server, err error) {
 						{Key: "Country", Value: S.Country},
 						{Key: "IP", Value: S.IP},
 						{Key: "Port", Value: S.Port},
-						{Key: "DataPort", Value: S.DataPort},
-						{Key: "PubKey", Value: S.PubKey},
 					},
 				},
 			},
