@@ -3,7 +3,6 @@ package client
 import (
 	"bufio"
 	"crypto/tls"
-	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -18,7 +17,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/miekg/dns"
-	"github.com/tunnels-is/tunnels/crypt"
 	"github.com/tunnels-is/tunnels/types"
 	"github.com/tunnels-is/tunnels/version"
 	"github.com/xlzd/gotp"
@@ -210,9 +208,6 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	FinalCR.ServerID = SID
 	FinalCR.DeviceKey = ClientCR.DeviceKey
 	FinalCR.DeviceToken = ClientCR.DeviceToken
-	FinalCR.EncType = meta.EncryptionType
-	FinalCR.RequestingPorts = meta.RequestVPNPorts
-
 	// Load or generate a persistent WireGuard keypair for this device.
 	// The public key is sent to the controller which registers it against the device record.
 	var wgPrivKeyB64 string
@@ -270,15 +265,6 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		return 502, errors.New("invalid response from controller")
 	}
 
-	tunnel.encWrapper = crypt.NewEncryptionHandler(meta.EncryptionType)
-	err = tunnel.encWrapper.InitializeClient()
-	if err != nil {
-		ERROR("unable to create encryption handler: ", err)
-		return 502, errors.New("Unable to secure connection")
-	}
-	SignedResponse.X25519PeerPub = tunnel.encWrapper.SEAL.X25519Pub.Bytes()
-	SignedResponse.Mlkem1024Encap = tunnel.encWrapper.SEAL.Mlkem1024Encap.Bytes()
-
 	tc := &tls.Config{
 		MinVersion:         tls.VersionTLS13,
 		CurvePreferences:   []tls.CurveID{tls.X25519MLKEM768},
@@ -317,42 +303,9 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		return 500, errors.New("Unable to decode response from server")
 	}
 
-	pubKey, _, err := crypt.LoadPublicKeyBytes([]byte(ClientCR.ServerPubKey))
-	if err != nil {
-		return 500, errors.New("Unable to load server public key")
-	}
-
-	err = crypt.VerifySignature(ServerReponse.X25519Pub, ServerReponse.ServerHandshakeSignature, pubKey)
-	if err != nil {
-		return 500, errors.New("Unable to verify server signature")
-	}
-
-	// Detect WireGuard mode: server returns WG pubkey + port + assigned client IP
-	useWireGuard := ServerReponse.WireGuardPubKey != "" &&
-		ServerReponse.WireGuardPort != "" &&
-		ServerReponse.WireGuardIP != "" &&
-		wgPrivKeyB64 != ""
-
-	if !useWireGuard {
-		err = tunnel.encWrapper.FinalizeClient(ServerReponse.X25519Pub, ServerReponse.Mlkem1024Cipher)
-		if err != nil {
-			return 500, errors.New("Unable to create encryption wrapper seal")
-		}
-	}
-
-	// clear out handshake data
-	SignedResponse.X25519PeerPub = nil
-	SignedResponse.Mlkem1024Encap = nil
-	ServerReponse.X25519Pub = nil
-	ServerReponse.Mlkem1024Cipher = nil
-	ServerReponse.ServerHandshakeSignature = nil
-	if !useWireGuard {
-		tunnel.encWrapper.SEAL.CleanPostSecretGeneration()
-	}
-
-	// For WireGuard mode the client's TUN interface must use the WG-assigned IP
-	// so that egress packet src IPs match the peer's AllowedIP on the wg-server.
-	if useWireGuard {
+	// Update TUN interface IP to the WG-assigned IP so egress src IPs match the
+	// wg-server peer's AllowedIP entry.
+	if ServerReponse.WireGuardIP != "" {
 		meta.IPv4Address = ServerReponse.WireGuardIP
 		if writeErr := writeTunnelsToDisk(meta.Tag); writeErr != nil {
 			ERROR("unable to persist WireGuard IP: ", writeErr)
@@ -372,53 +325,34 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		return 502, errors.New("unable to initialize routes")
 	}
 
-	if useWireGuard {
-		// WireGuard transport: create userspace WG device backed by chanTUN.
-		ct := newChanTUN(wgdevice.DefaultMTU)
-		wgDev := wgdevice.NewDevice(ct, wgconn.NewDefaultBind(),
-			wgdevice.NewLogger(wgdevice.LogLevelVerbose, "[wg-client] "))
-		privHex, hexErr := wgB64ToHex(wgPrivKeyB64)
-		if hexErr != nil {
-			wgDev.Close()
-			return 502, errors.New("unable to encode WireGuard private key")
-		}
-		serverPubHex, hexErr := wgB64ToHex(ServerReponse.WireGuardPubKey)
-		if hexErr != nil {
-			wgDev.Close()
-			return 502, errors.New("unable to encode WireGuard server public key")
-		}
-		ipcConf := fmt.Sprintf(
-			"private_key=%s\npublic_key=%s\nendpoint=%s:%s\nallowed_ip=0.0.0.0/0\npersistent_keepalive_interval=25\n\n",
-			privHex, serverPubHex, ClientCR.ServerIP, ServerReponse.WireGuardPort,
-		)
-		if ipcErr := wgDev.IpcSetOperation(bufio.NewReader(strings.NewReader(ipcConf))); ipcErr != nil {
-			wgDev.Close()
-			return 502, fmt.Errorf("WireGuard IPC configuration failed: %w", ipcErr)
-		}
-		if upErr := wgDev.Up(); upErr != nil {
-			wgDev.Close()
-			return 502, fmt.Errorf("WireGuard device Up failed: %w", upErr)
-		}
-		tunnel.wgDevice = wgDev
-		tunnel.wgTun = ct
-	} else {
-		// Tunnels protocol: dial plain UDP socket to server.
-		raddr, err := net.ResolveUDPAddr("udp4", ServerReponse.InterfaceIP+":"+ServerReponse.DataPort)
-		if err != nil {
-			return 502, errors.New("unable to resolve data port upd route")
-		}
-		UDPConn, err := net.DialUDP("udp4", nil, raddr)
-		if err != nil {
-			DEBUG("Unable to open data tunnel: ", err)
-			return 502, errors.New("unable to open data tunnel")
-		}
-		// EXPERIMENTAL
-		// err = setDontFragment(UDPConn)
-		// if err != nil {
-		// 	DEBUG("unable to disable IP fragmentation", err)
-		// }
-		tunnel.connection = net.Conn(UDPConn)
+	// WireGuard transport: create userspace WG device backed by chanTUN.
+	ct := newChanTUN(wgdevice.DefaultMTU)
+	wgDev := wgdevice.NewDevice(ct, wgconn.NewDefaultBind(),
+		wgdevice.NewLogger(wgdevice.LogLevelError, "[wg-client] "))
+	privHex, hexErr := wgB64ToHex(wgPrivKeyB64)
+	if hexErr != nil {
+		wgDev.Close()
+		return 502, errors.New("unable to encode WireGuard private key")
 	}
+	serverPubHex, hexErr := wgB64ToHex(ServerReponse.WireGuardPubKey)
+	if hexErr != nil {
+		wgDev.Close()
+		return 502, errors.New("unable to encode WireGuard server public key")
+	}
+	ipcConf := fmt.Sprintf(
+		"private_key=%s\npublic_key=%s\nendpoint=%s:%s\nallowed_ip=0.0.0.0/0\npersistent_keepalive_interval=25\n\n",
+		privHex, serverPubHex, ClientCR.ServerIP, ServerReponse.WireGuardPort,
+	)
+	if ipcErr := wgDev.IpcSetOperation(bufio.NewReader(strings.NewReader(ipcConf))); ipcErr != nil {
+		wgDev.Close()
+		return 502, fmt.Errorf("WireGuard IPC configuration failed: %w", ipcErr)
+	}
+	if upErr := wgDev.Up(); upErr != nil {
+		wgDev.Close()
+		return 502, fmt.Errorf("WireGuard device Up failed: %w", upErr)
+	}
+	tunnel.wgDevice = wgDev
+	tunnel.wgTun = ct
 
 	var inter *TInterface
 	if oldTunnel != nil {
@@ -429,8 +363,6 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		oldTunnel.SetState(TUN_Disconnecting)
 		if oldTunnel.wgDevice != nil {
 			oldTunnel.wgDevice.Close()
-		} else if oldTunnel.connection != nil {
-			_ = oldTunnel.connection.Close()
 		}
 		inter.PrepareForSwitch()
 	} else {
@@ -453,15 +385,6 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	tunnel.registerPing(time.Now())
 	tunnel.ID = uuid.NewString()
 	TunnelMap.Store(tunnel.ID, tunnel)
-
-	if !useWireGuard {
-		_, err = tunnel.connection.Write(
-			tunnel.encWrapper.SEAL.Seal1(PingPongStatsBuffer, tunnel.Index),
-		)
-		if err != nil {
-			return 502, errors.New("unable to send ping to server")
-		}
-	}
 
 	go tunnel.ReadFromServeTunnel()
 	go tunnel.ReadFromTunnelInterface()
@@ -587,10 +510,6 @@ func InitializeTunnelFromCRR(TUN *TUN) (err error) {
 
 	meta := TUN.meta.Load()
 
-	// This index is used to identify packet streams between server and user.
-	TUN.Index = make([]byte, 2)
-	binary.BigEndian.PutUint16(TUN.Index, uint16(TUN.ServerResponse.Index))
-
 	TUN.localInterfaceNetIP = net.ParseIP(meta.IPv4Address).To4()
 	if TUN.localInterfaceNetIP == nil {
 		return fmt.Errorf("Interface ip (%s) was malformed", meta.IPv4Address)
@@ -658,9 +577,6 @@ func InitializeTunnelFromCRR(TUN *TUN) (err error) {
 		TUN.ServerResponse.DNSServers = []string{conf.DNS1Default, conf.DNS2Default}
 	}
 
-	TUN.startPort = TUN.ServerResponse.StartPort
-	TUN.endPort = TUN.ServerResponse.EndPort
-	TUN.InitPortMap()
 	TUN.InitBlockedPorts(TUN.meta.Load().BlockedPorts)
 
 	err = TUN.InitVPLMap()
@@ -673,10 +589,8 @@ func InitializeTunnelFromCRR(TUN *TUN) (err error) {
 	}
 
 	DEBUG(fmt.Sprintf(
-		"Connection info: Addr(%s) StartPort(%d) EndPort(%d) srcIP(%s) ",
+		"Connection info: Addr(%s) srcIP(%s)",
 		meta.IPv4Address,
-		TUN.ServerResponse.StartPort,
-		TUN.ServerResponse.EndPort,
 		TUN.ServerResponse.InterfaceIP,
 	))
 

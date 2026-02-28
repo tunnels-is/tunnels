@@ -778,8 +778,8 @@ exitLoop:
 func (t *TInterface) Disconnect(tun *TUN) (err error) {
 	defer RecoverAndLog()
 
-	if tun.connection != nil {
-		tun.connection.Close()
+	if tun.wgDevice != nil {
+		tun.wgDevice.Close()
 	}
 
 	t.CloseReadAndWriteLoop()

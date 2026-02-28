@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math/rand"
 
-	"github.com/tunnels-is/tunnels/crypt"
 	"github.com/tunnels-is/tunnels/types"
 )
 
@@ -30,20 +29,7 @@ func Disconnect(tunID string, switching bool) (err error) {
 			tunnel := tun.tunnel.Load()
 			if !switching {
 				_ = tunnel.Disconnect(tun)
-			} else {
-				if tun.connection != nil {
-					_ = tun.connection.Close()
-				}
 			}
-			if tun.encWrapper != nil {
-				if tun.encWrapper.HStream != nil {
-					_ = tun.encWrapper.HStream.Close()
-				}
-				if tun.encWrapper.HConn != nil {
-					_ = tun.encWrapper.HConn.Close()
-				}
-			}
-
 			TunnelMap.Delete(tun.ID)
 			m := tun.meta.Load()
 			tun.SetState(TUN_Disconnected)
@@ -85,7 +71,6 @@ func createTunnel() (T *TunnelMETA) {
 	randomPart2 := rand.Intn(0xFFFF)
 	T.IPv6Address = fmt.Sprintf("fd00:%04x:%04x::1", randomPart1, randomPart2)
 
-	T.EncryptionType = crypt.CHACHA20
 	T.DNSBlocking = true
 	T.TxQueueLen = 2000
 	T.MTU = 1420
@@ -103,7 +88,6 @@ func createTunnel() (T *TunnelMETA) {
 // createDefaultTunnelMeta creates default tunnel metadata based on tunnel type
 func createDefaultTunnelMeta(t types.TunnelType) (M *TunnelMETA) {
 	M = createTunnel()
-	M.RequestVPNPorts = true
 	M.IPv4Address = "172.22.22.1"
 	M.NetMask = "255.255.255.255"
 	M.ConfigFormat = tunnelFileSuffix
@@ -116,7 +100,6 @@ func createDefaultTunnelMeta(t types.TunnelType) (M *TunnelMETA) {
 		M.EnableDefaultRoute = true
 	case types.IoTTun:
 		M.EnableDefaultRoute = false
-		M.RequestVPNPorts = false
 		M.LocalhostNat = true
 		M.AutoConnect = true
 		M.AutoReconnect = true

@@ -3,7 +3,6 @@ package main
 import (
 	"testing"
 
-	"github.com/tunnels-is/tunnels/signal"
 	"github.com/tunnels-is/tunnels/types"
 )
 
@@ -785,22 +784,13 @@ func TestNukeClient_ClearsFirewallOnDisconnect(t *testing.T) {
 
 	// Client A — the one that will disconnect
 	cmA := &UserCoreMapping{
-		ToUser:     make(chan []byte, 1),
-		FromUser:   make(chan Packet, 1),
-		ToSignal:   &signal.Signal{},
-		FromSignal: &signal.Signal{},
-		DHCP:       &types.DHCPRecord{IP: disconnectingIP},
+		DHCP: &types.DHCPRecord{IP: disconnectingIP},
 	}
 	clientCoreMappings[0].Store(cmA)
 	VPLIPToCore[5].Store(cmA) // ip={10,0,0,5}: uint16(0)<<8|uint16(5) = 5
 
 	// Client B — has A's IP in its allowed-host list (both auto and manual)
-	cmB := &UserCoreMapping{
-		ToUser:     make(chan []byte, 1),
-		FromUser:   make(chan Packet, 1),
-		ToSignal:   &signal.Signal{},
-		FromSignal: &signal.Signal{},
-	}
+	cmB := &UserCoreMapping{}
 	cmB.AddHost(disconnectingIP, pt(0, 80), "auto")
 	cmB.AddHost(disconnectingIP, pt(0, 0), "manual")
 	clientCoreMappings[1].Store(cmB)

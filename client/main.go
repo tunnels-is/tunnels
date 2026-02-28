@@ -161,10 +161,6 @@ func LaunchTunnels() {
 		CleanUniqueLogMap()
 	})
 
-	newConcurrentSignal("CleanPortAllocs", CancelContext, func() {
-		CleanPortsForAllConnections()
-	})
-
 	newConcurrentSignal("DefaultGateway", CancelContext, func() {
 		GetDefaultGateway()
 	})

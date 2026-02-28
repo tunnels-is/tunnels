@@ -1,12 +1,7 @@
 package client
 
 import (
-	"encoding/binary"
 	"time"
-
-	"github.com/shirou/gopsutil/cpu"
-	"github.com/shirou/gopsutil/disk"
-	"github.com/shirou/gopsutil/mem"
 )
 
 func cliPublicConnect(metaTag string) (err error) {
@@ -91,46 +86,13 @@ func AutoConnect() {
 	})
 }
 
-var PingPongStatsBuffer = []byte{
-	0, 0, 0, 0, // stats
-	0, 0, 0, 0, 0, 0, 0, 0, // ping counter
-}
-
-func PopulatePingBufferWithStats() {
-	cpuPercent, err := cpu.Percent(0, false)
-	if err != nil {
-		ERROR("Unable to get cpu percent", err)
-		return
-	}
-	PingPongStatsBuffer[1] = byte(int(cpuPercent[0]))
-
-	memStats, err := mem.VirtualMemory()
-	if err != nil {
-		ERROR("Unable to get mem stats", err)
-		return
-
-	}
-	PingPongStatsBuffer[2] = byte(int(memStats.UsedPercent))
-
-	diskUsage, err := disk.Usage("/")
-	if err != nil {
-		ERROR("Unable to get disk usage", err)
-		return
-	}
-	PingPongStatsBuffer[3] = byte(int(diskUsage.UsedPercent))
-}
-
 func PingConnections() {
 	defer func() {
 		time.Sleep(10 * time.Second)
 	}()
 	defer RecoverAndLog()
 
-	// Only send statistics for minimal clients
 	conf := CONFIG.Load()
-	if conf.CLIConfig != nil && conf.CLIConfig.SendStats {
-		PopulatePingBufferWithStats()
-	}
 
 	tunnelMapRange(func(tun *TUN) bool {
 		meta := tun.meta.Load()
@@ -138,32 +100,15 @@ func PingConnections() {
 			return true
 		}
 
-		var err error
-		if tun.wgTun != nil {
-			// WireGuard tunnel: keepalive is handled by persistent_keepalive_interval.
-			// Reset ping timer so the 45s reconnect threshold doesn't fire.
-			tun.registerPing(time.Now())
-		} else if tun.encWrapper != nil {
-
-			tun.PingInt.Add(1)
-			binary.BigEndian.PutUint64(PingPongStatsBuffer[4:], uint64(tun.PingInt.Load()))
-			out := tun.encWrapper.SEAL.Seal1(PingPongStatsBuffer, tun.Index)
-			if len(out) > 0 {
-				DEEP("Ping: ", meta.Tag, " ", tun.PingInt.Load())
-				_, err = tun.connection.Write(CopySlice(out))
-				if err != nil {
-					tun.SetState(TUN_NotReady)
-					_ = tun.connection.Close()
-					ERROR("unable to ping tunnel: ", tun.ID, meta.Tag)
-				}
-			}
-
-		}
+		// WireGuard keepalive is handled by persistent_keepalive_interval.
+		// Reset ping timer so the 45s reconnect threshold doesn't fire.
+		tun.registerPing(time.Now())
 
 		ping := tun.pingTime.Load()
-		if time.Since(*ping).Seconds() > 45 || err != nil || tun.needsReconnect.Load() {
+		if time.Since(*ping).Seconds() > 45 || tun.needsReconnect.Load() {
 			if meta.AutoReconnect {
 				DEBUG("45+ Seconds since ping from ", meta.Tag, " attempting reconnection")
+				var err error
 				if conf.CLIConfig != nil {
 					err = cliPublicConnect(meta.Tag)
 				} else {
@@ -175,7 +120,6 @@ func PingConnections() {
 				} else {
 					tun.needsReconnect.Store(false)
 				}
-
 			} else {
 				DEBUG("30+ Seconds since ping from ", meta.Tag)
 				if !meta.KillSwitch {

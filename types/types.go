@@ -6,7 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/tunnels-is/tunnels/crypt"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -58,8 +57,6 @@ type ServerConfig struct {
 	Routes             []*Route
 	SubNets            []*Network
 
-	StartPort           int
-	EndPort             int
 	UserMaxConnections  int
 	InternetAccess      bool
 	LocalNetworkAccess  bool
@@ -174,24 +171,16 @@ type ListDevice struct {
 	Disk         byte
 	IngressQueue int
 	EgressQueue  int
-	Created      time.Time
-	StartPort    uint16
-	EndPort      uint16
+	Created time.Time
 }
 
 type SignedConnectRequest struct {
-	Signature      []byte
-	Payload        []byte
-	X25519PeerPub  []byte
-	Mlkem1024Encap []byte
+	Signature []byte
+	Payload   []byte
 }
 
 type ServerConnectResponse struct {
-	X25519Pub       []byte
-	Mlkem1024Cipher []byte
-	// ServerHandshake          []byte
-	ServerHandshakeSignature []byte
-	Index                    int `json:"Index"`
+	Index int `json:"Index"`
 	AvailableMbps            int `json:"AvailableMbps"`
 	AvailableUserMbps        int `json:"AvailableUserMbps"`
 
@@ -199,9 +188,6 @@ type ServerConnectResponse struct {
 	LocalNetworkAccess bool `json:"LocalNetworkAccess"`
 
 	InterfaceIP string `json:"InterfaceIP"`
-	DataPort    string `json:"DataPort"`
-	StartPort   uint16 `json:"StartPort"`
-	EndPort     uint16 `json:"EndPort"`
 
 	DNSRecords []*DNSRecord `json:"DNSRecords"`
 	Networks   []*Network   `json:"Networks"`
@@ -220,10 +206,7 @@ type ServerConnectResponse struct {
 func CreateCRRFromServer(S *ServerConfig) (CRR *ServerConnectResponse) {
 	return &ServerConnectResponse{
 		Index:              0,
-		StartPort:          0,
-		EndPort:            0,
 		InterfaceIP:        S.VPNIP,
-		DataPort:           S.VPNPort,
 		AvailableMbps:      S.ServerBandwidthMbps,
 		AvailableUserMbps:  S.UserBandwidthMbps,
 		InternetAccess:     S.InternetAccess,
@@ -241,15 +224,11 @@ type ControllerConnectRequest struct {
 	DeviceToken string             `json:"DeviceToken"`
 	UserID      primitive.ObjectID `json:"UserID"`
 
-	// General
-	EncType  crypt.EncType      `json:"EncType"`
 	ServerID primitive.ObjectID `json:"ServerID"`
 
 	// These are added by the golang client
 	Version int       `json:"Version"`
 	Created time.Time `json:"Created"`
-
-	RequestingPorts bool `json:"RequestingPorts"`
 
 	// WireGuard: client's base64 Curve25519 public key; triggers inline WG registration
 	WireGuardPubKey string `json:"WireGuardPubKey,omitempty"`

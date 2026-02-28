@@ -301,8 +301,8 @@ func (t *TInterface) Connect(tun *TUN) (err error) {
 
 func (t *TInterface) Disconnect(tun *TUN) (err error) {
 	defer RecoverAndLog()
-	if tun.connection != nil {
-		tun.connection.Close()
+	if tun.wgDevice != nil {
+		tun.wgDevice.Close()
 	}
 
 	err = t.Close()

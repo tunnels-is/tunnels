@@ -69,7 +69,7 @@ func doUpdate() {
 	if !conf.UpdateWhileConnected {
 		isConnected := false
 		tunnelMapRange(func(tun *TUN) bool {
-			if tun.connection != nil {
+			if tun.wgDevice != nil {
 				isConnected = true
 			}
 			return true

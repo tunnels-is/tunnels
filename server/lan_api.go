@@ -98,13 +98,9 @@ outerloop:
 			}
 		}
 
-		d.IngressQueue = len(cm.ToUser)
-		d.EgressQueue = len(cm.FromUser)
+		d.IngressQueue = 0
+		d.EgressQueue = 0
 		d.Created = cm.Created
-		if cm.PortEnd > 0 {
-			d.StartPort = cm.PortStart
-			d.EndPort = cm.PortEnd
-		}
 		response.Devices = append(response.Devices, d)
 	}
 

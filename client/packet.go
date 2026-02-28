@@ -32,15 +32,41 @@ func (t *TUN) RegisterPing(tag string, packet []byte) {
 	}
 }
 
+// pktInfo returns a compact "proto src:sport→dst:dport len=N" string for logging.
+func pktInfo(packet []byte) string {
+	if len(packet) < 20 {
+		return fmt.Sprintf("short len=%d", len(packet))
+	}
+	proto := packet[9]
+	src := fmt.Sprintf("%d.%d.%d.%d", packet[12], packet[13], packet[14], packet[15])
+	dst := fmt.Sprintf("%d.%d.%d.%d", packet[16], packet[17], packet[18], packet[19])
+	ihl := int(packet[0]&0x0F) * 4
+	protoName := "other"
+	var sport, dport uint16
+	if proto == 6 {
+		protoName = "TCP"
+	} else if proto == 17 {
+		protoName = "UDP"
+	}
+	if (proto == 6 || proto == 17) && len(packet) >= ihl+4 {
+		sport = uint16(packet[ihl])<<8 | uint16(packet[ihl+1])
+		dport = uint16(packet[ihl+2])<<8 | uint16(packet[ihl+3])
+		return fmt.Sprintf("%s %s:%d→%s:%d len=%d", protoName, src, sport, dst, dport, len(packet))
+	}
+	return fmt.Sprintf("%s %s→%s len=%d", protoName, src, dst, len(packet))
+}
+
 func (V *TUN) ProcessEgressPacket(p *[]byte) (sendRemote bool) {
 	packet := *p
 
 	if (packet[0] >> 4) != 4 {
+		DEBUG("egress drop: not IPv4")
 		return false
 	}
 
 	V.EP_Protocol = packet[9]
 	if V.EP_Protocol != 17 && V.EP_Protocol != 6 {
+		DEBUG("egress drop: proto=", V.EP_Protocol, " not TCP/UDP")
 		return false
 	}
 
@@ -49,8 +75,10 @@ func (V *TUN) ProcessEgressPacket(p *[]byte) (sendRemote bool) {
 	V.EP_TPHeader = packet[V.EP_IPv4HeaderLength:]
 
 	if V.EP_Protocol == 17 && len(V.EP_TPHeader) < 8 {
+		DEBUG("egress drop: UDP too short")
 		return false
 	} else if V.EP_Protocol == 6 && len(V.EP_TPHeader) < 20 {
+		DEBUG("egress drop: TCP too short")
 		return false
 	}
 
@@ -59,47 +87,27 @@ func (V *TUN) ProcessEgressPacket(p *[]byte) (sendRemote bool) {
 	V.EP_DstIP[2] = packet[18]
 	V.EP_DstIP[3] = packet[19]
 
-	V.EP_SrcPort[0] = V.EP_TPHeader[0]
-	V.EP_SrcPort[1] = V.EP_TPHeader[1]
 	V.EP_DstPort[0] = V.EP_TPHeader[2]
 	V.EP_DstPort[1] = V.EP_TPHeader[3]
 
-
 	// check if port is blocked
-	if (V.blockedPortsSet[V.EP_DstPort] != 0) {
-		if (CONFIG.Load().LogBlockedPorts) {
+	if V.blockedPortsSet[V.EP_DstPort] != 0 {
+		if CONFIG.Load().LogBlockedPorts {
 			INFO("PORT BLOCKED: ", V.blockedPortsSet[V.EP_DstPort])
 		}
 		return false
 	}
 
-	if !V.IsEgressVPLIP(V.EP_DstIP) {
-
-		V.EgressMapping = V.CreateNEWPortMapping(p)
-		if V.EgressMapping == nil {
-			return false
-		}
-		if V.EP_Protocol == 6 {
-			if V.EP_TPHeader[13]&0x1 > 0 {
-				V.EgressMapping.finCount.Add(1)
-			}
-
-			if V.EP_TPHeader[13]&0x4 == 4 {
-				V.EP_TPHeader[13] = 0b00010100
-				V.EgressMapping.rstFound.Store(true)
-			} else if V.EP_TPHeader[13]&0x4 > 0 {
-				V.EgressMapping.rstFound.Store(true)
-			}
-		}
-
+	isVPL := V.IsEgressVPLIP(V.EP_DstIP)
+	if !isVPL {
 		V.EP_NAT_IP, V.EP_NAT_OK = V.TransLateIP(V.EP_DstIP)
-
-		V.EP_TPHeader[0] = V.EgressMapping.MappedPort[0]
-		V.EP_TPHeader[1] = V.EgressMapping.MappedPort[1]
-
 	} else {
 		V.EP_NAT_IP, V.EP_NAT_OK = V.TransLateVPLIP(V.EP_DstIP)
 	}
+
+	DEBUG(fmt.Sprintf("egress %s vpl=%v natOK=%v natDst=%d.%d.%d.%d",
+		pktInfo(packet), isVPL, V.EP_NAT_OK,
+		V.EP_NAT_IP[0], V.EP_NAT_IP[1], V.EP_NAT_IP[2], V.EP_NAT_IP[3]))
 
 	if V.EP_NAT_OK {
 		V.EP_IPv4Header[16] = V.EP_NAT_IP[0]
@@ -115,71 +123,43 @@ func (V *TUN) ProcessEgressPacket(p *[]byte) (sendRemote bool) {
 }
 
 func (V *TUN) ProcessIngressPacket(packet []byte) bool {
+	if len(packet) < 20 {
+		DEBUG("ingress drop: packet too short len=", len(packet))
+		return false
+	}
+	if (packet[0]>>4) != 4 {
+		DEBUG("ingress drop: not IPv4")
+		return false
+	}
+
 	V.IP_SrcIP[0] = packet[12]
 	V.IP_SrcIP[1] = packet[13]
 	V.IP_SrcIP[2] = packet[14]
 	V.IP_SrcIP[3] = packet[15]
 
-	V.IP_Protocol = packet[9]
-
 	V.IP_IPv4HeaderLength = (packet[0] << 4 >> 4) * 4
 	V.IP_IPv4Header = packet[:V.IP_IPv4HeaderLength]
 	V.IP_TPHeader = packet[V.IP_IPv4HeaderLength:]
 
-	V.IP_SrcPort[0] = V.IP_TPHeader[0]
-	V.IP_SrcPort[1] = V.IP_TPHeader[1]
-	V.IP_DstPort[0] = V.IP_TPHeader[2]
-	V.IP_DstPort[1] = V.IP_TPHeader[3]
-
-	if !V.IsIngressVPLIP(V.IP_SrcIP) {
+	isVPL := V.IsIngressVPLIP(V.IP_SrcIP)
+	if isVPL {
+		// VPL packet: rewrite dst to our interface IP so the app sees it addressed to us
+		V.IP_IPv4Header[16] = V.localInterfaceIP4bytes[0]
+		V.IP_IPv4Header[17] = V.localInterfaceIP4bytes[1]
+		V.IP_IPv4Header[18] = V.localInterfaceIP4bytes[2]
+		V.IP_IPv4Header[19] = V.localInterfaceIP4bytes[3]
+	} else {
+		// Reverse IP translation (e.g. LocalhostNat: server interface IP → 127.0.0.1)
 		V.IP_NAT_IP, V.IP_NAT_OK = V.NATIngress[V.IP_SrcIP]
 		if V.IP_NAT_OK {
 			V.IP_IPv4Header[12] = V.IP_NAT_IP[0]
 			V.IP_IPv4Header[13] = V.IP_NAT_IP[1]
 			V.IP_IPv4Header[14] = V.IP_NAT_IP[2]
 			V.IP_IPv4Header[15] = V.IP_NAT_IP[3]
-
-			V.IP_SrcIP[0] = V.IP_NAT_IP[0]
-			V.IP_SrcIP[1] = V.IP_NAT_IP[1]
-			V.IP_SrcIP[2] = V.IP_NAT_IP[2]
-			V.IP_SrcIP[3] = V.IP_NAT_IP[3]
 		}
-
-		// x := time.Now()
-		V.IngressMapping = V.getIngressPortMapping()
-		if V.IngressMapping == nil {
-			return false
-		}
-
-		if V.IP_Protocol == 6 {
-			if V.IP_TPHeader[13]&0x4 > 0 {
-				V.IngressMapping.rstFound.Store(true)
-			}
-
-			if V.IP_TPHeader[13]&0x1 > 0 {
-				V.IngressMapping.finCount.Add(1)
-			}
-		}
-
-		V.IP_TPHeader[2] = V.IngressMapping.SrcPort[0]
-		V.IP_TPHeader[3] = V.IngressMapping.SrcPort[1]
-
-		V.IP_IPv4Header[16] = V.IngressMapping.OriginalSourceIP[0]
-		V.IP_IPv4Header[17] = V.IngressMapping.OriginalSourceIP[1]
-		V.IP_IPv4Header[18] = V.IngressMapping.OriginalSourceIP[2]
-		V.IP_IPv4Header[19] = V.IngressMapping.OriginalSourceIP[3]
-
-	} else {
-		// if DST == ME ON VPL .. then DST == 127.0.0.1
-		// V.IP_IPv4Header[16] = 127
-		// V.IP_IPv4Header[17] = 0
-		// V.IP_IPv4Header[18] = 0
-		// V.IP_IPv4Header[19] = 1
-		V.IP_IPv4Header[16] = V.localInterfaceIP4bytes[0]
-		V.IP_IPv4Header[17] = V.localInterfaceIP4bytes[1]
-		V.IP_IPv4Header[18] = V.localInterfaceIP4bytes[2]
-		V.IP_IPv4Header[19] = V.localInterfaceIP4bytes[3]
 	}
+
+	DEBUG(fmt.Sprintf("ingress %s vpl=%v natOK=%v", pktInfo(packet), isVPL, V.IP_NAT_OK))
 
 	RecalculateIPv4HeaderChecksum(V.IP_IPv4Header)
 	RecalculateTransportChecksum(V.IP_IPv4Header, V.IP_TPHeader)

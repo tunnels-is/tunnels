@@ -90,9 +90,15 @@ func denyWireGuardPort(port int) error {
 // internet interface. Without these, systems with a DROP FORWARD policy (e.g.
 // Ubuntu with ufw) will silently discard packets even with MASQUERADE in place.
 func addForwardRules(wgIface, netIface string) error {
+	// Allow peer-to-peer forwarding within the WireGuard subnet
+	if err := execIPTables("-A", "FORWARD", "-i", wgIface, "-o", wgIface, "-j", "ACCEPT"); err != nil {
+		return err
+	}
+	// Allow forwarding from WireGuard peers to the internet
 	if err := execIPTables("-A", "FORWARD", "-i", wgIface, "-o", netIface, "-j", "ACCEPT"); err != nil {
 		return err
 	}
+	// Allow return traffic from the internet back to WireGuard peers
 	return execIPTables(
 		"-A", "FORWARD",
 		"-i", netIface, "-o", wgIface,
@@ -102,6 +108,9 @@ func addForwardRules(wgIface, netIface string) error {
 }
 
 func removeForwardRules(wgIface, netIface string) error {
+	if err := execIPTables("-D", "FORWARD", "-i", wgIface, "-o", wgIface, "-j", "ACCEPT"); err != nil {
+		return err
+	}
 	if err := execIPTables("-D", "FORWARD", "-i", wgIface, "-o", netIface, "-j", "ACCEPT"); err != nil {
 		return err
 	}
