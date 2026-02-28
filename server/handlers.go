@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"log/slog"
 	"math/rand"
 	"net/http"
@@ -15,7 +14,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/tunnels-is/tunnels/crypt"
-	"github.com/tunnels-is/tunnels/signal"
 	"github.com/tunnels-is/tunnels/types"
 	"github.com/xlzd/gotp"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -59,25 +57,8 @@ func API_AcceptUserConnections(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if CR.RequestingPorts {
-		if totalC >= slots {
-			senderr(w, 400, "server is full")
-			return
-		}
-	}
-
-	EH := crypt.NewEncryptionHandler(CR.EncType)
-	err = EH.InitializeServer(SCR.X25519PeerPub, SCR.Mlkem1024Encap)
-	if err != nil {
-		ERR("unable to create encryption handler", err)
-		senderr(w, 400, "unable to initialize encryption handler")
-		return
-	}
-
-	err = EH.FinalizeServer()
-	if err != nil {
-		ERR("Unable to finalize server encryption", err)
-		senderr(w, 400, "unablie to finalize server encryption")
+	if totalC >= slots {
+		senderr(w, 400, "server is full")
 		return
 	}
 
@@ -99,21 +80,13 @@ func API_AcceptUserConnections(w http.ResponseWriter, r *http.Request) {
 		CRR.WireGuardPort = srv.WireGuardPort
 	}
 
-	index, err := CreateClientCoreMapping(CRR, CR, EH)
+	_, err = CreateClientCoreMapping(CRR, CR)
 	if err != nil {
 		ERR("Port allocation failed", err)
 		senderr(w, 400, "unable to allocate ports")
 		return
 	}
 
-	CRR.X25519Pub = EH.SEAL.X25519Pub.Bytes()
-	CRR.Mlkem1024Cipher = EH.SEAL.Mlkem1024Cipher
-	CRR.ServerHandshakeSignature, err = crypt.SignData(CRR.X25519Pub, PrivKey)
-	if err != nil {
-		ERR("Unable to sign server handshake", err)
-		senderr(w, 400, "unable to sign server handshake")
-		return
-	}
 	CRRB, err := json.Marshal(CRR)
 	if err != nil {
 		ERR("Unable to marshal CCR", err)
@@ -126,21 +99,6 @@ func API_AcceptUserConnections(w http.ResponseWriter, r *http.Request) {
 		ERR("Unable to marshal CCR", err)
 		return
 	}
-
-	SCR = nil
-	CRR.X25519Pub = nil
-	CRR.Mlkem1024Cipher = nil
-	CRR.ServerHandshakeSignature = nil
-	EH.SEAL.CleanPostSecretGeneration()
-
-	cm := clientCoreMappings[index].Load()
-	cm.ToSignal = signal.NewSignal(fmt.Sprintf("TO:%d", index), *CTX.Load(), *Cancel.Load(), time.Second, goroutineLogger, func() {
-		toUserChannel(index)
-	})
-
-	cm.FromSignal = signal.NewSignal(fmt.Sprintf("FROM:%d", index), *CTX.Load(), *Cancel.Load(), time.Second, goroutineLogger, func() {
-		fromUserChannel(index)
-	})
 }
 
 func API_UserCreate(w http.ResponseWriter, r *http.Request) {

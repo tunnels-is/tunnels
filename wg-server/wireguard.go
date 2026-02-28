@@ -24,7 +24,7 @@ func setupWireGuard(cfg *Config) error {
 		return fmt.Errorf("CreateTUN %q: %w", cfg.WireGuardIface, err)
 	}
 
-	wgDevice = device.NewDevice(tunDev, conn.NewDefaultBind(), wgLogger)
+	wgDevice = device.NewDevice(tunDev, NewLazyBind(conn.NewDefaultBind(), SyncPeers), wgLogger)
 
 	privKeyHex, err := b64ToHex(cfg.WireGuardPrivKey)
 	if err != nil {

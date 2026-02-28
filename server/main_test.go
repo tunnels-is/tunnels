@@ -759,8 +759,6 @@ func Test_LoadAndSaveServerConfig_RoundTrip(t *testing.T) {
 		VPNPort:             "8444",
 		APIPort:             "8443",
 		Hostname:            "roundtrip.test",
-		StartPort:           2000,
-		EndPort:             65530,
 		InternetAccess:      true,
 		LocalNetworkAccess:  false,
 		ServerBandwidthMbps: 1000,
