@@ -17,8 +17,8 @@ func (tun *TUN) ReadFromTunnelInterface() {
 		DEBUG("tun/tap listener exiting:")
 		if tun.GetState() >= TUN_Connected {
 			interfaceMonitor <- tun
-		} else {
-			_ = tun.connection.Close()
+		} else if tun.wgDevice != nil {
+			tun.wgDevice.Close()
 		}
 
 		tif := tun.tunnel.Load()
@@ -36,9 +36,7 @@ func (tun *TUN) ReadFromTunnelInterface() {
 		packet         []byte
 		packetSize     uint16
 
-		err          error
-		writtenBytes int
-		tunif        = tun.tunnel.Load()
+		tunif = tun.tunnel.Load()
 	)
 
 	if tunif == nil {
@@ -60,7 +58,6 @@ func (tun *TUN) ReadFromTunnelInterface() {
 				DEBUG("ADAPTER: no packets in buffer, waiting for packets")
 				waitForTimeout = time.Now()
 			}
-			// V.Tun.ReleaseReceivePacket(packet)
 			time.Sleep(100 * time.Millisecond)
 			continue
 
@@ -91,17 +88,9 @@ func (tun *TUN) ReadFromTunnelInterface() {
 			continue
 		}
 
-		if tun.wgTun != nil {
-			tun.wgTun.writeEgress(packet)
-			tun.egressBytes.Add(int64(len(packet)))
-		} else {
-			writtenBytes, err = tun.connection.Write(tun.encWrapper.SEAL.Seal1(packet, tun.Index))
-			if err != nil {
-				ERROR("router write error: ", err)
-				return
-			}
-			tun.egressBytes.Add(int64(writtenBytes))
-		}
+		DEBUG("egress→wg: ", pktInfo(packet))
+		tun.wgTun.writeEgress(packet)
+		tun.egressBytes.Add(int64(len(packet)))
 	}
 }
 
@@ -114,8 +103,8 @@ func (tun *TUN) ReadFromServeTunnel() {
 		DEBUG("Server listener exiting:", meta.Tag)
 		if tun.GetState() >= TUN_Connected {
 			tunnelMonitor <- tun
-		} else {
-			_ = tun.connection.Close()
+		} else if tun.wgDevice != nil {
+			tun.wgDevice.Close()
 		}
 
 		inf := tun.tunnel.Load()
@@ -129,16 +118,9 @@ func (tun *TUN) ReadFromServeTunnel() {
 
 	var (
 		writeError error
-		readErr    error
-
-		n       int
-		packet  []byte
-		buff    = make([]byte, 66000)
-		staging = make([]byte, 66000)
-		inf     = tun.tunnel.Load()
-		err     error
-		ok      bool
-		meta    = tun.meta.Load()
+		packet     []byte
+		ok         bool
+		inf        = tun.tunnel.Load()
 	)
 
 	if inf == nil {
@@ -151,42 +133,18 @@ func (tun *TUN) ReadFromServeTunnel() {
 			return
 		}
 
-		if tun.wgTun != nil {
-			packet, ok = tun.wgTun.readIngress()
-			if !ok {
-				return
-			}
-			tun.ingressBytes.Add(int64(len(packet)))
-		} else {
-			n, readErr = tun.connection.Read(buff)
-			if readErr != nil {
-				ERROR("error reading from server socket: ", readErr, n)
-				return
-			}
-
-			tun.Nonce2Bytes = buff[2:10]
-			packet, err = tun.encWrapper.SEAL.Open2(
-				buff[10:n],
-				buff[2:10],
-				staging[:0],
-				buff[0:2],
-			)
-			if err != nil {
-				ERROR("Packet authentication error: ", err)
-				return
-			}
-			tun.ingressBytes.Add(int64(n))
-
-			if len(packet) < 20 {
-				go tun.RegisterPing(meta.Tag, CopySlice(packet))
-				continue
-			}
+		packet, ok = tun.wgTun.readIngress()
+		if !ok {
+			return
 		}
+		tun.ingressBytes.Add(int64(len(packet)))
+		DEBUG("wg→ingress: ", pktInfo(packet))
 
 		if !tun.ProcessIngressPacket(packet) {
 			continue
 		}
 
+		DEBUG("ingress→tun: ", pktInfo(packet))
 		outb, allocErr := inf.AllocateSendPacket(len(packet))
 		if allocErr != nil {
 			ERROR("ingress packet allocation error: ", allocErr)

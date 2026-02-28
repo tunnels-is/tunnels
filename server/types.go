@@ -1,16 +1,12 @@
 package main
 
 import (
-	"io"
 	"strings"
 	"sync"
 	"sync/atomic"
-	"syscall"
 	"time"
 
 	xsync "github.com/puzpuzpuz/xsync/v3"
-	"github.com/tunnels-is/tunnels/crypt"
-	"github.com/tunnels-is/tunnels/signal"
 	"github.com/tunnels-is/tunnels/types"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -27,19 +23,9 @@ type UserCoreMapping struct {
 	PingInt            atomic.Int64
 	DeviceToken        string
 	Version            int
-	PortStart          uint16
-	PortEnd            uint16
 	LastPingFromClient time.Time
-	EH                 *crypt.SocketWrapper
 	Uindex             []byte
 	Created            time.Time
-
-	ToUser     chan []byte
-	ToSignal   *signal.Signal
-	FromUser   chan Packet
-	FromSignal *signal.Signal
-
-	Addr atomic.Value // always stores syscall.Sockaddr (*syscall.SockaddrInet4)
 
 	APIToken        string
 	hostsInit       sync.Once
@@ -55,23 +41,6 @@ type UserCoreMapping struct {
 	Delete sync.Once
 }
 
-type Packet struct {
-	addr syscall.Sockaddr
-	data []byte
-}
-type RawSocket struct {
-	Name          string
-	IPv4Address   string
-	IPv6Address   string
-	InterfaceName string
-	SocketBuffer  []byte
-
-	Domain int
-	Type   int
-	Proto  int
-
-	RWC io.ReadWriteCloser
-}
 
 type AllowedHost struct {
 	IP   [4]byte

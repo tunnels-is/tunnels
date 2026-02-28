@@ -15,7 +15,6 @@ import (
 	"github.com/miekg/dns"
 	"github.com/puzpuzpuz/xsync/v3"
 	"github.com/tunnels-is/tunnels/certs"
-	"github.com/tunnels-is/tunnels/crypt"
 	"github.com/tunnels-is/tunnels/types"
 	"golang.zx2c4.com/wireguard/device"
 )
@@ -299,22 +298,17 @@ type ActiveConnectionMeta struct {
 	LocalInterface string
 	IPv4Address    string
 	IPv6Address    string
-	StartPort      uint16
-	EndPort        uint16
 }
 
 type TunnelMETA struct {
 	WindowsGUID  string
 	ConfigFormat string
 
-	DNSBlocking     bool
-	LocalhostNat    bool
-	AutoReconnect   bool
-	AutoConnect     bool
-	RequestVPNPorts bool
-	KillSwitch      bool
-
-	EncryptionType crypt.EncType
+	DNSBlocking   bool
+	LocalhostNat  bool
+	AutoReconnect bool
+	AutoConnect   bool
+	KillSwitch    bool
 
 	TxQueueLen int32
 	MTU        int32
@@ -357,14 +351,6 @@ type TunnelSTATS struct {
 	EgressString  string
 	IngressBytes  int
 	IngressString string
-
-	// Port range on server
-	StartPort uint16
-	EndPort   uint16
-
-	// Security stuff
-	Nonce1 uint64
-	Nonce2 uint64
 
 	// FROM NODE
 	CPU                 byte
@@ -686,20 +672,6 @@ func (bh *BandwidthHistory) Snapshot() []BandwidthRecord {
 	return out
 }
 
-type Mapping struct {
-	Proto    byte
-	rstFound atomic.Bool
-	finCount atomic.Int32
-
-	// LastActivity     time.Time
-	SrcPort          [2]byte
-	DstPort          [2]byte
-	MappedPort       [2]byte
-	OriginalSourceIP [4]byte
-	DestinationIP    [4]byte
-	UnixTime         atomic.Int64
-}
-
 type TUN struct {
 	ID    string
 	state atomic.Pointer[TunnelState] `json:"-"`
@@ -708,11 +680,7 @@ type TUN struct {
 	// server atomic.Pointer[any]
 	tunnel atomic.Pointer[TInterface] `json:"-"`
 
-	// encWrapper wraps connection with encryption (tunnels protocol)
-	encWrapper *crypt.SocketWrapper
-	connection net.Conn
-
-	// WireGuard transport (non-nil when WG mode is active; encWrapper/connection unused)
+	// WireGuard transport
 	wgDevice *device.Device
 	wgTun    *chanTUN
 
@@ -730,34 +698,15 @@ type TUN struct {
 	localInterfaceIP4bytes  [4]byte
 	serverInterfaceNetIP    net.IP
 	serverInterfaceIP4bytes [4]byte
-	startPort               uint16
-	endPort                 uint16
 
 	NATEgress  map[[4]byte][4]byte `json:"-"`
 	NATIngress map[[4]byte][4]byte `json:"-"`
-
-	Nonce2Bytes []byte
 
 	serverVPLIP [4]byte
 	dhcp        *types.DHCPRecord
 	VPLNetwork  *types.Network
 	VPLEgress   map[[4]byte]struct{} `json:"-"`
 	VPLIngress  map[[4]byte]struct{} `json:"-"`
-
-	// TCP and UDP Natting
-	// ingress
-	// index == local port number
-	// lport/dip/dp
-	AvailableTCPPorts []*xsync.MapOf[any, *Mapping]
-	AvailableUDPPorts []*xsync.MapOf[any, *Mapping]
-
-	// egress
-	// sip/dip/sp/dp
-	// key == [12]byte
-	ActiveTCPMapping *xsync.MapOf[any, *Mapping]
-	ActiveUDPMapping *xsync.MapOf[any, *Mapping]
-
-	Index []byte
 
 	// Stats
 	egressBytes      atomic.Int64
@@ -779,26 +728,17 @@ type TUN struct {
 	EP_IPv4HeaderLength byte
 	EP_IPv4Header       []byte
 	EP_TPHeader         []byte
-	EP_SrcPort          [2]byte
 	EP_DstPort          [2]byte
 	EP_NAT_IP           [4]byte
 	EP_NAT_OK           bool
 
 	// INGRESS PACKET STUFF
-	IP_Protocol         byte
 	IP_SrcIP            [4]byte
 	IP_IPv4HeaderLength byte
 	IP_IPv4Header       []byte
 	IP_TPHeader         []byte
-	IP_DstPort          [2]byte
-	IP_SrcPort          [2]byte
 	IP_NAT_IP           [4]byte
 	IP_NAT_OK           bool
-
-	// NEW PORT MAPPING
-	EgressMapping  *Mapping
-	IngressMapping *Mapping
-	// EP_SYN         byte
 }
 
 type event struct {
@@ -911,8 +851,6 @@ func (t *TUN) MarshalJSON() ([]byte, error) {
 		CR               *ConnectionRequest
 		CRResponse       *types.ServerConnectResponse
 		Ping             time.Time
-		StartPort        int
-		EndPort          int
 		DHCP             *types.DHCPRecord
 		LAN              *types.Network
 		CPU              byte
@@ -926,8 +864,6 @@ func (t *TUN) MarshalJSON() ([]byte, error) {
 		t.CR,
 		t.ServerResponse,
 		pingTime,
-		int(t.startPort),
-		int(t.endPort),
 		t.dhcp,
 		t.VPLNetwork,
 		t.CPU,
@@ -955,18 +891,3 @@ func (t *TUN) InitBlockedPorts(ports []uint16) {
 	}
 }
 
-func (t *TUN) InitPortMap() {
-	t.AvailableTCPPorts = make([]*xsync.MapOf[any, *Mapping], t.endPort-t.startPort)
-	t.AvailableUDPPorts = make([]*xsync.MapOf[any, *Mapping], t.endPort-t.startPort)
-
-	// Initialize each map in the slice
-	for i := range t.AvailableTCPPorts {
-		t.AvailableTCPPorts[i] = xsync.NewMapOf[any, *Mapping]()
-	}
-	for i := range t.AvailableUDPPorts {
-		t.AvailableUDPPorts[i] = xsync.NewMapOf[any, *Mapping]()
-	}
-
-	t.ActiveTCPMapping = xsync.NewMapOf[any, *Mapping]()
-	t.ActiveUDPMapping = xsync.NewMapOf[any, *Mapping]()
-}

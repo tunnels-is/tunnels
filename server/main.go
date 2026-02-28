@@ -4,10 +4,8 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
-	"errors"
 	"flag"
 	"fmt"
-	"io"
 	"log/slog"
 	"net"
 	"os"
@@ -46,10 +44,8 @@ var (
 	SignKey      any
 	PubKey       any
 
-	slots              int
-	portPerUser        int
-	startPort          uint16
-	VPLNetwork         *net.IPNet
+	slots     int
+	VPLNetwork *net.IPNet
 	sessionSentinel    = new(UserCoreMapping)
 	clientCoreMappings [65536]atomic.Pointer[UserCoreMapping]
 	DHCPMapping        [65536]*types.DHCPRecord
@@ -65,13 +61,8 @@ var (
 	disableLogs         bool
 	serverConfigPath    string
 
-	dataSocketFD int
-	rawUDPSockFD int
-	rawTCPSockFD int
-	InterfaceIP  net.IP
-	TCPRWC       io.ReadWriteCloser
-	UDPRWC       io.ReadWriteCloser
-	logger       *slog.Logger
+	InterfaceIP net.IP
+	logger      *slog.Logger
 
 	// Tunnels public network only
 	lc atomic.Pointer[lemonsqueezy.Client]
@@ -208,9 +199,6 @@ func main() {
 			initializeVPN()
 		}
 
-		go signal.NewSignal("DATA", ctx, cancel, 1*time.Second, goroutineLogger, DataSocketListener)
-		go signal.NewSignal("TCP", ctx, cancel, 1*time.Second, goroutineLogger, ExternalTCPListener)
-		go signal.NewSignal("UDP", ctx, cancel, 1*time.Second, goroutineLogger, ExternalUDPListener)
 		go signal.NewSignal("PING", ctx, cancel, 10*time.Second, goroutineLogger, pingActiveUsers)
 	}
 
@@ -436,15 +424,6 @@ func initializeVPN() {
 	}
 	InterfaceIP = InterfaceIP.To4()
 
-	_, _, err = createRawTCPSocket()
-	if err != nil {
-		panic(err)
-	}
-	_, _, err = createRawUDPSocket()
-	if err != nil {
-		panic(err)
-	}
-
 	err = GeneratePortAllocation()
 	if err != nil {
 		panic(err)
@@ -464,13 +443,6 @@ func initializeLAN() (err error) {
 func GeneratePortAllocation() (err error) {
 	Config := Config.Load()
 	slots = Config.ServerBandwidthMbps / Config.UserBandwidthMbps
-	portPerUser = (Config.EndPort - Config.StartPort) / slots
-
-	if Config.StartPort+slots*portPerUser > Config.EndPort {
-		return errors.New("port range too small for configured number of slots")
-	}
-
-	startPort = uint16(Config.StartPort)
 	return nil
 }
 
@@ -508,11 +480,9 @@ func makeConfigAndCerts() (err error) {
 			Routes: []*types.Route{
 				{Address: "10.0.0.0/16", Metric: "0"},
 			},
-			SubNets:             []*types.Network{},
-			DisableLanFirewall:  false,
-			StartPort:           2000,
-			EndPort:             65530,
-			UserMaxConnections:  10,
+			SubNets:            []*types.Network{},
+			DisableLanFirewall: false,
+			UserMaxConnections: 10,
 			InternetAccess:      true,
 			LocalNetworkAccess:  false,
 			ServerBandwidthMbps: 1000,
