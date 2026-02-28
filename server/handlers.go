@@ -1046,6 +1046,7 @@ func API_SessionCreate(w http.ResponseWriter, r *http.Request) {
 
 	allowed := false
 	var device *types.Device
+	var user *User
 	if CR.DeviceKey != "" {
 		deviceID, err := primitive.ObjectIDFromHex(CR.DeviceKey)
 		if err != nil {
@@ -1074,10 +1075,16 @@ func API_SessionCreate(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	} else {
-		user, err := authenticateUserFromEmailOrIDAndToken("", CR.UserID, CR.DeviceToken)
-		if err != nil {
-			senderr(w, 401, err.Error())
+		var authErr error
+		user, authErr = authenticateUserFromEmailOrIDAndToken("", CR.UserID, CR.DeviceToken)
+		if authErr != nil {
+			senderr(w, 401, authErr.Error())
 			return
+		}
+		// Store/update the user's WG public key so the wg-server can assign an IP.
+		if CR.WireGuardPubKey != "" && user.WireGuardKey != CR.WireGuardPubKey {
+			user.WireGuardKey = CR.WireGuardPubKey
+			_ = DB_UpdateUserWGKey(user.ID, CR.WireGuardPubKey)
 		}
 		for _, g := range server.Groups {
 			for _, ug := range user.Groups {
@@ -1097,10 +1104,16 @@ func API_SessionCreate(w http.ResponseWriter, r *http.Request) {
 		CRR.WireGuardPubKey = server.WireGuardPubKey
 		CRR.WireGuardPort = server.WireGuardPort
 
-		// If a WireGuard public key was presented and this server has a local
-		// wg-server, ask it to assign/retrieve the device's IP for this server.
-		if device != nil && CR.WireGuardPubKey != "" && server.WGBaseURL != "" {
-			ip, assignErr := callWGAssign(server.WGBaseURL, device.ID.Hex(), CR.WireGuardPubKey)
+		// If a WireGuard public key was presented and this server has a wg-server,
+		// ask it to assign/retrieve an IP. Works for both device and user auth.
+		wgEntityID := ""
+		if device != nil {
+			wgEntityID = device.ID.Hex()
+		} else if user != nil {
+			wgEntityID = user.ID.Hex()
+		}
+		if wgEntityID != "" && CR.WireGuardPubKey != "" && server.WGBaseURL != "" {
+			ip, assignErr := callWGAssign(server.WGBaseURL, wgEntityID, CR.WireGuardPubKey)
 			if assignErr != nil {
 				logger.Warn("wg-server assign failed", slog.Any("err", assignErr))
 			} else if ip != "" {

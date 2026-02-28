@@ -206,29 +206,26 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	FinalCR.ServerID = SID
 	FinalCR.DeviceKey = ClientCR.DeviceKey
 	FinalCR.DeviceToken = ClientCR.DeviceToken
-	// Load or generate a persistent WireGuard keypair for this device.
-	// The public key is sent to the controller which registers it against the device record.
-	var wgPrivKeyB64 string
-	if ClientCR.DeviceKey != "" {
-		wgPrivKeyB64 = meta.WireGuardPrivKey
-		if wgPrivKeyB64 == "" {
-			wgPrivKeyB64, err = generateWGPrivKey()
-			if err != nil {
-				ERROR("unable to generate WireGuard private key: ", err)
-				return 502, errors.New("unable to generate WireGuard private key")
-			}
-			meta.WireGuardPrivKey = wgPrivKeyB64
-			if writeErr := writeTunnelsToDisk(meta.Tag); writeErr != nil {
-				ERROR("unable to persist WireGuard private key: ", writeErr)
-			}
+	// Load or generate a persistent WireGuard keypair.
+	// Always sent so both device-key and user-token auth paths support WireGuard.
+	wgPrivKeyB64 := meta.WireGuardPrivKey
+	if wgPrivKeyB64 == "" {
+		wgPrivKeyB64, err = generateWGPrivKey()
+		if err != nil {
+			ERROR("unable to generate WireGuard private key: ", err)
+			return 502, errors.New("unable to generate WireGuard private key")
 		}
-		wgPubKeyB64, pubErr := deriveWGPubKey(wgPrivKeyB64)
-		if pubErr != nil {
-			ERROR("unable to derive WireGuard public key: ", pubErr)
-			return 502, errors.New("unable to derive WireGuard public key")
+		meta.WireGuardPrivKey = wgPrivKeyB64
+		if writeErr := writeTunnelsToDisk(meta.Tag); writeErr != nil {
+			ERROR("unable to persist WireGuard private key: ", writeErr)
 		}
-		FinalCR.WireGuardPubKey = wgPubKeyB64
 	}
+	wgPubKeyB64, pubErr := deriveWGPubKey(wgPrivKeyB64)
+	if pubErr != nil {
+		ERROR("unable to derive WireGuard public key: ", pubErr)
+		return 502, errors.New("unable to derive WireGuard public key")
+	}
+	FinalCR.WireGuardPubKey = wgPubKeyB64
 
 	DEBUG("ConnectRequestFromClient", ClientCR)
 
