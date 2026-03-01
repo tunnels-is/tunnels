@@ -1,104 +1,118 @@
 package main
 
 import (
-	"crypto/rand"
+	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
-	"strings"
+	"net/http"
+	"time"
 
+	"github.com/tunnels-is/tunnels/types"
 	"golang.org/x/crypto/curve25519"
-	"gopkg.in/yaml.v3"
 )
 
-// Config holds all wg-server configuration.
+// Config holds all wg-server runtime configuration.
+// Bootstrap fields (ControllerURL, APIKey) come from CLI flags.
+// All operational fields are populated by FetchConfig from the controller.
 type Config struct {
-	ControllerURL string `json:"ControllerURL" yaml:"ControllerURL"`
-	AdminAPIKey   string `json:"AdminAPIKey" yaml:"AdminAPIKey"`
+	// Bootstrap fields (from CLI flags)
+	ControllerURL string
+	APIKey        string
 
-	WireGuardPort    int    `json:"WireGuardPort" yaml:"WireGuardPort"`
-	WireGuardPrivKey string `json:"WireGuardPrivKey" yaml:"WireGuardPrivKey"`
-	WireGuardSubnet  string `json:"WireGuardSubnet" yaml:"WireGuardSubnet"`
-	WireGuardIface   string `json:"WireGuardIface" yaml:"WireGuardIface"`
+	// ServerID is the hex ObjectID of this server's record in the controller DB.
+	ServerID string
 
-	// InternetIface is the outbound NIC for iptables MASQUERADE (e.g. "eth0").
-	InternetIface string `json:"InternetIface" yaml:"InternetIface"`
+	// AdminAPIKey is the controller's admin key used to call /v3/wg/peers etc.
+	AdminAPIKey string
 
-	// SyncIntervalSecs controls how often peers are fetched from the controller.
-	SyncIntervalSecs int `json:"SyncIntervalSecs" yaml:"SyncIntervalSecs"`
+	WireGuardPort    int
+	WireGuardPrivKey string
+	WireGuardSubnet  string
+	WireGuardIface   string
 
-	LogLevel string `json:"LogLevel" yaml:"LogLevel"`
-	LogJSON  bool   `json:"LogJSON" yaml:"LogJSON"`
-	Silent   bool   `json:"Silent" yaml:"Silent"`
+	InternetIface    string
+	SyncIntervalSecs int
+	SyncListenAddr   string
 
-	// InsecureSkipVerify disables TLS cert verification for the controller.
-	// Set to true only when using self-signed certificates in dev/test.
-	InsecureSkipVerify bool `json:"InsecureSkipVerify" yaml:"InsecureSkipVerify"`
+	LogLevel string
+	LogJSON  bool
+	Silent   bool
 
-	// SyncListenAddr is the local HTTP address for the instant-sync endpoint.
-	// The controller POSTs to <SyncListenAddr>/v3/wg/sync after a new peer
-	// registers, triggering an immediate SyncPeers() call. Defaults to
-	// "127.0.0.1:8181". Set to "" to disable.
-	SyncListenAddr string `json:"SyncListenAddr" yaml:"SyncListenAddr"`
-
-	// PacketInspection enables plaintext packet logging on the WireGuard
-	// interface. When true, every packet from or to a peer is logged at DEBUG
-	// level with proto, src/dst IPs and ports, and direction.
-	PacketInspection bool `json:"PacketInspection" yaml:"PacketInspection"`
+	InsecureSkipVerify bool
+	PacketInspection   bool
 }
 
-func defaultConfig() *Config {
-	return &Config{
-		WireGuardPort:    51820,
-		WireGuardSubnet:  "10.1.0.0/16",
-		WireGuardIface:   "wg0",
-		SyncIntervalSecs: 30,
-		LogLevel:         "debug",
-		SyncListenAddr:   "127.0.0.1:8181",
+// FetchConfig fetches the operational configuration from the controller using
+// the per-server APIKey. It calls GET /v3/wg/server-config/fetch with the
+// X-WG-KEY header and maps the response to a Config.
+func FetchConfig(controllerURL, apiKey string, insecureSkipVerify bool) (*Config, error) {
+	transport := &http.Transport{
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: insecureSkipVerify,
+		},
 	}
-}
+	client := &http.Client{
+		Transport: transport,
+		Timeout:   15 * time.Second,
+	}
 
-// LoadConfig reads a JSON or YAML config file.
-func LoadConfig(path string) (*Config, error) {
-	cfg := defaultConfig()
-	data, err := os.ReadFile(path)
+	url := controllerURL + "/v3/wg/server-config/fetch"
+	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("build request: %w", err)
 	}
-	ext := strings.ToLower(filepath.Ext(path))
-	switch ext {
-	case ".yaml", ".yml":
-		err = yaml.Unmarshal(data, cfg)
-	default:
-		err = json.Unmarshal(data, cfg)
-	}
+	req.Header.Set("X-WG-KEY", apiKey)
+
+	resp, err := client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("parse config: %w", err)
+		return nil, fmt.Errorf("fetch config: %w", err)
 	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("controller returned %d", resp.StatusCode)
+	}
+
+	var r types.WGServerConfigResponse
+	if err := json.NewDecoder(resp.Body).Decode(&r); err != nil {
+		return nil, fmt.Errorf("decode response: %w", err)
+	}
+
+	cfg := &Config{
+		ControllerURL:    controllerURL,
+		APIKey:           apiKey,
+		ServerID:         r.ServerID,
+		AdminAPIKey:      r.AdminAPIKey,
+		WireGuardPort:    r.WireGuardPort,
+		WireGuardPrivKey: r.WireGuardPrivKey,
+		WireGuardSubnet:  r.WireGuardSubnet,
+		WireGuardIface:   r.WireGuardIface,
+		InternetIface:    r.InternetIface,
+		SyncIntervalSecs: r.SyncIntervalSecs,
+		SyncListenAddr:   r.SyncListenAddr,
+		PacketInspection: r.PacketInspection,
+		InsecureSkipVerify: insecureSkipVerify,
+	}
+
+	// Apply defaults for any zero values
+	if cfg.WireGuardPort == 0 {
+		cfg.WireGuardPort = 51820
+	}
+	if cfg.WireGuardIface == "" {
+		cfg.WireGuardIface = "wg0"
+	}
+	if cfg.SyncIntervalSecs == 0 {
+		cfg.SyncIntervalSecs = 30
+	}
+	if cfg.SyncListenAddr == "" {
+		cfg.SyncListenAddr = "127.0.0.1:8181"
+	}
+	if cfg.WireGuardSubnet == "" {
+		cfg.WireGuardSubnet = "10.1.0.0/16"
+	}
+
 	return cfg, nil
-}
-
-// SaveConfig writes cfg to path as pretty JSON.
-func SaveConfig(path string, cfg *Config) error {
-	data, err := json.MarshalIndent(cfg, "", "  ")
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(path, data, 0600)
-}
-
-// generatePrivKey creates a new Curve25519 private key and returns it base64-encoded.
-func generatePrivKey() string {
-	privKey := make([]byte, 32)
-	if _, err := rand.Read(privKey); err != nil {
-		panic("rand.Read failed: " + err.Error())
-	}
-	// Clamp for Curve25519
-	privKey[0] &= 248
-	privKey[31] = (privKey[31] & 127) | 64
-	return base64.StdEncoding.EncodeToString(privKey)
 }
 
 // derivePubKey derives the Curve25519 public key from a base64-encoded private key.

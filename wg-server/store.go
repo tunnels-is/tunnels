@@ -93,6 +93,18 @@ func (ps *PeerStore) Get(deviceID string) (PeerRecord, bool) {
 	return rec, ok
 }
 
+// GetByPubKey returns the record whose PubKeyB64 matches the given key.
+func (ps *PeerStore) GetByPubKey(pubKeyB64 string) (PeerRecord, bool) {
+	ps.mu.RLock()
+	defer ps.mu.RUnlock()
+	for _, rec := range ps.records {
+		if rec.PubKeyB64 == pubKeyB64 {
+			return rec, true
+		}
+	}
+	return PeerRecord{}, false
+}
+
 // GetAll returns a snapshot of all records.
 func (ps *PeerStore) GetAll() map[string]PeerRecord {
 	ps.mu.RLock()

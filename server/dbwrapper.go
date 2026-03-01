@@ -28,6 +28,9 @@ const (
 
 	SERVER_DATABASE   = "servers"
 	SERVER_COLLECTION = "servers"
+
+	WG_SERVER_CONFIG_DATABASE   = "wg_server_configs"
+	WG_SERVER_CONFIG_COLLECTION = "wg_server_configs"
 )
 
 var DB *mongo.Client
@@ -874,6 +877,48 @@ func DB_CreateServer(S *types.Server) (err error) {
 	return err
 }
 
+// DB_SetServerWGSubnet updates only the WireGuardSubnet field of the given server.
+func DB_SetServerWGSubnet(id primitive.ObjectID, subnet string) error {
+	if BBOLTEnabled {
+		return BBolt_SetServerWGSubnet(objectIDToString(id), subnet)
+	}
+	defer BasicRecover()
+
+	_, err := DB.Database(SERVER_DATABASE).
+		Collection(SERVER_COLLECTION).
+		UpdateOne(
+			context.Background(),
+			bson.M{"_id": id},
+			bson.D{{Key: "$set", Value: bson.D{{Key: "WireGuardSubnet", Value: subnet}}}},
+		)
+	return err
+}
+
+// DB_FindAllServers returns every server record (up to 10 000).
+func DB_FindAllServers() ([]*types.Server, error) {
+	if BBOLTEnabled {
+		return BBolt_FindAllServers()
+	}
+	defer BasicRecover()
+
+	opt := options.Find()
+	opt.SetLimit(10000)
+
+	cursor, err := DB.Database(SERVER_DATABASE).
+		Collection(SERVER_COLLECTION).
+		Find(context.Background(), bson.D{}, opt)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(context.Background())
+
+	var out []*types.Server
+	if err := cursor.All(context.Background(), &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func DB_FindServerByID(ID primitive.ObjectID) (S *types.Server, err error) {
 	if BBOLTEnabled {
 		return BBolt_FindServerByID(objectIDToString(ID))
@@ -1201,4 +1246,98 @@ func DB_findGroups() (gl []*Group, err error) {
 	}
 
 	return gl, err
+}
+
+func DB_CreateWGServerConfig(cfg *types.WGServerConfig) error {
+	if BBOLTEnabled {
+		return BBolt_CreateWGServerConfig(cfg)
+	}
+	defer BasicRecover()
+	_, err := DB.Database(WG_SERVER_CONFIG_DATABASE).
+		Collection(WG_SERVER_CONFIG_COLLECTION).
+		InsertOne(context.Background(), cfg, options.InsertOne())
+	if err != nil {
+		ADMIN("Unable to create WGServerConfig: ", err)
+	}
+	return err
+}
+
+func DB_FindWGServerConfigByID(id primitive.ObjectID) (*types.WGServerConfig, error) {
+	if BBOLTEnabled {
+		return BBolt_FindWGServerConfigByID(objectIDToString(id))
+	}
+	defer BasicRecover()
+	cfg := new(types.WGServerConfig)
+	err := DB.Database(WG_SERVER_CONFIG_DATABASE).
+		Collection(WG_SERVER_CONFIG_COLLECTION).
+		FindOne(context.Background(), bson.M{"_id": id}, options.FindOne()).
+		Decode(cfg)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return nil, nil
+		}
+		ADMIN("Unable to find WGServerConfig by id: ", id, err)
+		return nil, err
+	}
+	return cfg, nil
+}
+
+func DB_FindWGServerConfigByAPIKey(apiKey string) (*types.WGServerConfig, error) {
+	if BBOLTEnabled {
+		return BBolt_FindWGServerConfigByAPIKey(apiKey)
+	}
+	defer BasicRecover()
+	cfg := new(types.WGServerConfig)
+	err := DB.Database(WG_SERVER_CONFIG_DATABASE).
+		Collection(WG_SERVER_CONFIG_COLLECTION).
+		FindOne(context.Background(), bson.M{"APIKey": apiKey}, options.FindOne()).
+		Decode(cfg)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return nil, nil
+		}
+		ADMIN("Unable to find WGServerConfig by APIKey: ", err)
+		return nil, err
+	}
+	return cfg, nil
+}
+
+func DB_UpdateWGServerConfig(cfg *types.WGServerConfig) error {
+	if BBOLTEnabled {
+		return BBolt_UpdateWGServerConfig(cfg)
+	}
+	defer BasicRecover()
+	_, err := DB.Database(WG_SERVER_CONFIG_DATABASE).
+		Collection(WG_SERVER_CONFIG_COLLECTION).
+		ReplaceOne(
+			context.Background(),
+			bson.M{"_id": cfg.ID},
+			cfg,
+			options.Replace().SetUpsert(false),
+		)
+	if err != nil {
+		ADMIN("Unable to update WGServerConfig: ", cfg.ID.Hex(), err)
+	}
+	return err
+}
+
+// DB_SetServerWGConfigID links a server to its WGServerConfig and caches the WG fields.
+func DB_SetServerWGConfigID(serverID primitive.ObjectID, wgCfg *types.WGServerConfig, pubKey string) error {
+	if BBOLTEnabled {
+		return BBolt_SetServerWGConfigID(objectIDToString(serverID), wgCfg, pubKey)
+	}
+	defer BasicRecover()
+	_, err := DB.Database(SERVER_DATABASE).
+		Collection(SERVER_COLLECTION).
+		UpdateOne(
+			context.Background(),
+			bson.M{"_id": serverID},
+			bson.D{{Key: "$set", Value: bson.D{
+				{Key: "WGConfigID", Value: wgCfg.ID},
+				{Key: "WireGuardSubnet", Value: wgCfg.WireGuardSubnet},
+				{Key: "WireGuardPubKey", Value: pubKey},
+				{Key: "WireGuardPort", Value: fmt.Sprintf("%d", wgCfg.WireGuardPort)},
+			}}},
+		)
+	return err
 }

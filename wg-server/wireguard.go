@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	"golang.org/x/crypto/curve25519"
 	"golang.zx2c4.com/wireguard/conn"
 	"golang.zx2c4.com/wireguard/device"
 	"golang.zx2c4.com/wireguard/tun"
@@ -30,12 +31,18 @@ func setupWireGuard(cfg *Config) error {
 		INFO("packet inspection enabled on ", cfg.WireGuardIface)
 	}
 
-	wgDevice = device.NewDevice(tunInterface, NewLazyBind(conn.NewDefaultBind(), SyncPeers), wgLogger)
-
-	privKeyHex, err := b64ToHex(cfg.WireGuardPrivKey)
-	if err != nil {
+	privBytes, err := base64.StdEncoding.DecodeString(cfg.WireGuardPrivKey)
+	if err != nil || len(privBytes) != 32 {
 		return fmt.Errorf("invalid WireGuardPrivKey: %w", err)
 	}
+	pubBytes, err := curve25519.X25519(privBytes, curve25519.Basepoint)
+	if err != nil {
+		return fmt.Errorf("derive pubkey for LazyBind: %w", err)
+	}
+
+	wgDevice = device.NewDevice(tunInterface, NewLazyBind(conn.NewDefaultBind(), privBytes, pubBytes, SyncPeers), wgLogger)
+
+	privKeyHex := hex.EncodeToString(privBytes)
 
 	conf := fmt.Sprintf("private_key=%s\nlisten_port=%d\n\n", privKeyHex, cfg.WireGuardPort)
 	if err := ipcSet(conf); err != nil {
@@ -74,6 +81,17 @@ func GetCurrentPeerKeys() (map[string]struct{}, error) {
 // their established session keys.
 func AddPeer(pubKeyHex, allowedIP string) error {
 	conf := fmt.Sprintf("public_key=%s\nallowed_ip=%s\n\n", pubKeyHex, allowedIP)
+	return ipcSet(conf)
+}
+
+// AddPeerWithEndpoint adds or updates a peer that has a known endpoint (used for
+// server-to-server peering). endpoint is "ip:port". A 25-second persistent
+// keepalive is set so the tunnel stays alive through NAT.
+func AddPeerWithEndpoint(pubKeyHex, allowedIP, endpoint string) error {
+	conf := fmt.Sprintf(
+		"public_key=%s\nallowed_ip=%s\nendpoint=%s\npersistent_keepalive_interval=25\n\n",
+		pubKeyHex, allowedIP, endpoint,
+	)
 	return ipcSet(conf)
 }
 

@@ -133,6 +133,27 @@ func removeMasquerade(subnet, iface string) error {
 	return execIPTables("-t", "nat", "-D", "POSTROUTING", "-s", subnet, "-o", iface, "-j", "MASQUERADE")
 }
 
+// addCrossServerMasqueradeExclusion inserts a RETURN rule in POSTROUTING so
+// that traffic destined for peerSubnet is never MASQUERADE'd. The rule is
+// inserted before any existing rules (-I) so it takes precedence.
+// Safe to call multiple times: iptables is idempotent with -C check.
+func addCrossServerMasqueradeExclusion(peerSubnet, iface string) error {
+	args := []string{"-t", "nat", "-C", "POSTROUTING",
+		"-s", peerSubnet, "-o", iface, "-j", "RETURN"}
+	out, err := exec.Command("iptables", args...).CombinedOutput()
+	if err == nil {
+		return nil // rule already exists
+	}
+	_ = out // non-zero exit just means the rule doesn't exist yet
+	return execIPTables("-t", "nat", "-I", "POSTROUTING", "1",
+		"-s", peerSubnet, "-o", iface, "-j", "RETURN")
+}
+
+func removeCrossServerMasqueradeExclusion(peerSubnet, iface string) error {
+	return execIPTables("-t", "nat", "-D", "POSTROUTING",
+		"-s", peerSubnet, "-o", iface, "-j", "RETURN")
+}
+
 func execIPTables(args ...string) error {
 	out, err := exec.Command("iptables", args...).CombinedOutput()
 	if err != nil {

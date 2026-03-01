@@ -13,7 +13,7 @@ const (
 	// msgInitiation is WireGuard message type 1 (handshake initiation).
 	msgInitiation byte = 1
 
-	// syncDebounce prevents redundant syncs for the same source IP within this window.
+	// syncDebounce prevents redundant work for the same source IP within this window.
 	syncDebounce = 30 * time.Second
 )
 
@@ -22,34 +22,47 @@ type bufferedPkt struct {
 	ep   conn.Endpoint
 }
 
-// LazyBind wraps conn.Bind and triggers an immediate SyncPeers() when a
-// WireGuard handshake initiation arrives from a source IP that hasn't been
-// seen recently. The triggering packet is buffered and re-injected into
-// wireguard-go after the sync completes, so the handshake succeeds on the
-// first attempt instead of waiting for the client's ~5s retry.
+// LazyBind wraps conn.Bind and intercepts WireGuard handshake initiation
+// packets. When an initiation arrives it:
+//  1. Decrypts the encrypted_static field (Noise Xk) to recover the
+//     initiator's static public key — no controller call needed.
+//  2. Looks up the pubkey in the local peer store.
+//  3. If found, calls AddPeer immediately so the handshake succeeds on the
+//     first attempt.
+//  4. Falls back to a full SyncPeers if the pubkey is not in the store
+//     (genuinely unknown peer).
+//
+// The triggering packet is always buffered and re-injected after the lookup
+// so wireguard-go sees it after the peer is configured.
 type LazyBind struct {
-	inner     conn.Bind
-	requeueCh chan *bufferedPkt
-	done      chan struct{}
-	closeOnce sync.Once
+	inner      conn.Bind
+	requeueCh  chan *bufferedPkt
+	done       chan struct{}
+	closeOnce  sync.Once
 
-	mu       sync.Mutex
-	seenIPs  map[netip.Addr]time.Time
-	syncFunc func()
+	serverPriv []byte // raw 32-byte Curve25519 private key
+	serverPub  []byte // raw 32-byte Curve25519 public key
+
+	mu      sync.Mutex
+	seenIPs map[netip.Addr]time.Time
+
+	fallbackSync func() // full SyncPeers, used when peer not in store
 }
 
-func NewLazyBind(inner conn.Bind, syncFunc func()) *LazyBind {
+func NewLazyBind(inner conn.Bind, serverPriv, serverPub []byte, fallbackSync func()) *LazyBind {
 	return &LazyBind{
-		inner:     inner,
-		requeueCh: make(chan *bufferedPkt, 64),
-		done:      make(chan struct{}),
-		seenIPs:   make(map[netip.Addr]time.Time),
-		syncFunc:  syncFunc,
+		inner:        inner,
+		requeueCh:    make(chan *bufferedPkt, 64),
+		done:         make(chan struct{}),
+		serverPriv:   serverPriv,
+		serverPub:    serverPub,
+		seenIPs:      make(map[netip.Addr]time.Time),
+		fallbackSync: fallbackSync,
 	}
 }
 
 // Open wraps the inner bind's receive functions and appends one extra
-// ReceiveFunc that delivers re-injected packets after a sync completes.
+// ReceiveFunc that delivers re-injected packets after a lookup completes.
 func (b *LazyBind) Open(port uint16) ([]conn.ReceiveFunc, uint16, error) {
 	fns, actualPort, err := b.inner.Open(port)
 	if err != nil {
@@ -76,8 +89,8 @@ func (b *LazyBind) ParseEndpoint(s string) (conn.Endpoint, error) { return b.inn
 func (b *LazyBind) BatchSize() int                                 { return b.inner.BatchSize() }
 
 // wrapReceive intercepts incoming packets. For handshake initiations from
-// new source IPs it triggers a sync, buffers the packet, and drops it from
-// the current batch (it will be re-delivered via reinjectReceive).
+// source IPs not seen recently it decrypts the initiator identity, adds the
+// peer if known, then re-injects the packet.
 func (b *LazyBind) wrapReceive(inner conn.ReceiveFunc) conn.ReceiveFunc {
 	return func(bufs [][]byte, sizes []int, eps []conn.Endpoint) (int, error) {
 		n, err := inner(bufs, sizes, eps)
@@ -96,8 +109,8 @@ func (b *LazyBind) wrapReceive(inner conn.ReceiveFunc) conn.ReceiveFunc {
 						ep:   eps[i],
 					}
 					copy(pkt.data, data)
-					go b.doSync(pkt)
-					continue // drop from batch; re-injected after sync
+					go b.handleInitiation(pkt)
+					continue // drop from batch; re-injected after peer is added
 				}
 			}
 			// Compact the output slice in-place.
@@ -113,7 +126,7 @@ func (b *LazyBind) wrapReceive(inner conn.ReceiveFunc) conn.ReceiveFunc {
 }
 
 // reinjectReceive is an extra ReceiveFunc goroutine that blocks on the requeue
-// channel and returns a buffered packet to wireguard-go after a sync completes.
+// channel and returns a buffered packet to wireguard-go after a peer is added.
 func (b *LazyBind) reinjectReceive() conn.ReceiveFunc {
 	return func(bufs [][]byte, sizes []int, eps []conn.Endpoint) (int, error) {
 		select {
@@ -128,17 +141,63 @@ func (b *LazyBind) reinjectReceive() conn.ReceiveFunc {
 	}
 }
 
-// doSync runs SyncPeers and then re-injects the buffered packet.
-func (b *LazyBind) doSync(pkt *bufferedPkt) {
-	b.syncFunc()
+// handleInitiation decrypts the initiator's pubkey from the handshake packet,
+// looks it up in the peer store, and calls AddPeer directly.
+// Falls back to a full SyncPeers if the peer is not found in the local store.
+func (b *LazyBind) handleInitiation(pkt *bufferedPkt) {
+	INFO("LazyBind: handshake initiation received, attempting identity decrypt")
+
+	pubKeyB64, ok := tryDecryptInitiator(pkt.data, b.serverPriv, b.serverPub)
+	if !ok {
+		INFO("LazyBind: decrypt failed (wrong server key?), falling back to full sync")
+		b.fallbackSync()
+		select {
+		case b.requeueCh <- pkt:
+		case <-b.done:
+		}
+		return
+	}
+
+	INFO("LazyBind: decrypted initiator pubkey=", pubKeyB64[:12], "…")
+
+	rec, found := peerStore.GetByPubKey(pubKeyB64)
+	if !found {
+		INFO("LazyBind: pubkey not in peer store, attempting targeted assign from controller")
+		if assignAndAdd(pubKeyB64) {
+			INFO("LazyBind: targeted assign succeeded, re-injecting handshake")
+			select {
+			case b.requeueCh <- pkt:
+			case <-b.done:
+			}
+			return
+		}
+		INFO("LazyBind: targeted assign failed, falling back to full sync")
+		b.fallbackSync()
+		select {
+		case b.requeueCh <- pkt:
+		case <-b.done:
+		}
+		return
+	}
+
+	INFO("LazyBind: peer found in store → ip=", rec.IP, " calling AddPeer")
+	hexKey, err := b64ToHex(pubKeyB64)
+	if err != nil {
+		WARN("LazyBind: b64ToHex failed: ", err)
+	} else if err := AddPeer(hexKey, rec.IP+"/32"); err != nil {
+		WARN("LazyBind: AddPeer failed: ", err)
+	} else {
+		INFO("LazyBind: AddPeer OK → peer=", pubKeyB64[:12], "… ip=", rec.IP, " re-injecting handshake")
+	}
+
 	select {
 	case b.requeueCh <- pkt:
 	case <-b.done:
 	}
 }
 
-// shouldSync returns true (and records the IP) if we haven't synced for this
-// source IP recently. It also prunes stale entries to bound map growth.
+// shouldSync returns true (and records the IP) if we haven't processed an
+// initiation from this source IP recently.
 func (b *LazyBind) shouldSync(ip netip.Addr) bool {
 	b.mu.Lock()
 	defer b.mu.Unlock()
