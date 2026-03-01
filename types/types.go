@@ -102,14 +102,88 @@ type Server struct {
 	Port    string               `json:"Port" bson:"Port"`
 	Groups  []primitive.ObjectID `json:"Groups,omitempty" bson:"Groups"`
 
+	// WGConfigID links this server to its WGServerConfig record.
+	WGConfigID primitive.ObjectID `json:"WGConfigID,omitempty" bson:"WGConfigID"`
+
+	// Cached fields — source of truth is WGServerConfig; refreshed on assign/fetch.
 	WireGuardPort   string `json:"WireGuardPort,omitempty" bson:"WireGuardPort"`
 	WireGuardPubKey string `json:"WireGuardPubKey,omitempty" bson:"WireGuardPubKey"`
+	WireGuardSubnet string `json:"WireGuardSubnet,omitempty" bson:"WireGuardSubnet"`
 
 	// WGBaseURL is the base HTTP URL of this wg-server's local management
 	// listener (e.g. "http://127.0.0.1:8181"). The controller uses it to call
 	// /v3/wg/assign (IP assignment) and /v3/wg/sync (instant peer pickup).
 	// Leave empty to skip WireGuard integration for this server.
 	WGBaseURL string `json:"WGBaseURL,omitempty" bson:"WGBaseURL"`
+}
+
+// WGServerConfig holds all operational configuration for a wg-server instance.
+// It is stored in the controller DB and fetched by the wg-server at boot using
+// its per-server APIKey.
+type WGServerConfig struct {
+	ID  primitive.ObjectID `json:"_id" bson:"_id"`
+	Tag string             `json:"Tag" bson:"Tag"`
+
+	// APIKey is the per-server secret; wg-server sends this in X-WG-KEY to
+	// authenticate its config fetch.
+	APIKey string `json:"APIKey" bson:"APIKey"`
+
+	// AdminAPIKey is the controller's admin key; wg-server needs this to call
+	// /v3/wg/peers and other admin endpoints.
+	AdminAPIKey string `json:"AdminAPIKey" bson:"AdminAPIKey"`
+
+	WireGuardPort    int    `json:"WireGuardPort" bson:"WireGuardPort"`
+	WireGuardPrivKey string `json:"WireGuardPrivKey" bson:"WireGuardPrivKey"`
+	WireGuardSubnet  string `json:"WireGuardSubnet" bson:"WireGuardSubnet"`
+	WireGuardIface   string `json:"WireGuardIface" bson:"WireGuardIface"`
+
+	InternetIface    string `json:"InternetIface" bson:"InternetIface"`
+	SyncIntervalSecs int    `json:"SyncIntervalSecs" bson:"SyncIntervalSecs"`
+	SyncListenAddr   string `json:"SyncListenAddr" bson:"SyncListenAddr"`
+
+	PacketInspection   bool `json:"PacketInspection" bson:"PacketInspection"`
+	InsecureSkipVerify bool `json:"InsecureSkipVerify" bson:"InsecureSkipVerify"`
+}
+
+// WGServerConfigResponse is returned by the /v3/wg/server-config/fetch endpoint
+// to the wg-server. It includes sensitive fields (PrivKey, AdminAPIKey) that are
+// only served on this per-server endpoint.
+type WGServerConfigResponse struct {
+	// ServerID is the hex ObjectID of the Server record linked to this config.
+	ServerID string `json:"ServerID"`
+
+	AdminAPIKey string `json:"AdminAPIKey"`
+
+	WireGuardPort    int    `json:"WireGuardPort"`
+	WireGuardPrivKey string `json:"WireGuardPrivKey"`
+	WireGuardSubnet  string `json:"WireGuardSubnet"`
+	WireGuardIface   string `json:"WireGuardIface"`
+
+	InternetIface    string `json:"InternetIface"`
+	SyncIntervalSecs int    `json:"SyncIntervalSecs"`
+	SyncListenAddr   string `json:"SyncListenAddr"`
+
+	PacketInspection   bool `json:"PacketInspection"`
+	InsecureSkipVerify bool `json:"InsecureSkipVerify"`
+}
+
+// WGAnnounceRequest is sent by a wg-server on boot to register its subnet.
+type WGAnnounceRequest struct {
+	ServerID        string `json:"ServerID"`
+	WireGuardSubnet string `json:"WireGuardSubnet"`
+}
+
+// WGServerInfo describes a peer wg-server for cross-server routing.
+type WGServerInfo struct {
+	WireGuardPubKey string `json:"WireGuardPubKey"`
+	WireGuardPort   string `json:"WireGuardPort"`
+	WireGuardSubnet string `json:"WireGuardSubnet"`
+	IP              string `json:"IP"`
+}
+
+// WGServersResponse is returned by GET /v3/wg/servers.
+type WGServersResponse struct {
+	Servers []WGServerInfo `json:"Servers"`
 }
 
 type Route struct {

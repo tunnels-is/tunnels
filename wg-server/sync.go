@@ -97,6 +97,134 @@ func SyncPeers() {
 	}
 
 	INFO(fmt.Sprintf("sync: %d peers active, +%d added, -%d removed", len(desiredMap), added, removed))
+
+	// Sync server-to-server peers for cross-server LAN routing.
+	SyncCrossServerPeers(cfg)
+}
+
+// assignAndAdd is called when LazyBind has decrypted an initiator's pubkey but
+// it has no IP in the local peer store yet. It fetches the authorized peer list
+// from the controller, finds the matching device, assigns an IP via the store,
+// and calls AddPeer — all without a full sync.
+// Returns true if the peer was successfully added to wg0.
+func assignAndAdd(pubKeyB64 string) bool {
+	cfg := activeConfig.Load()
+	if cfg == nil {
+		return false
+	}
+
+	hexKey, err := b64ToHex(pubKeyB64)
+	if err != nil {
+		WARN("assignAndAdd: invalid pubkey: ", err)
+		return false
+	}
+
+	authorized, err := fetchDesiredPeers(cfg)
+	if err != nil {
+		WARN("assignAndAdd: fetchDesiredPeers failed: ", err)
+		return false
+	}
+
+	for _, p := range authorized.Peers {
+		if p.PublicKeyHex != hexKey {
+			continue
+		}
+		INFO("assignAndAdd: peer authorized by controller, deviceID=", p.DeviceID)
+		ip, err := peerStore.GetOrAssign(p.DeviceID, pubKeyB64)
+		if err != nil {
+			WARN("assignAndAdd: GetOrAssign failed: ", err)
+			return false
+		}
+		INFO("assignAndAdd: assigned ip=", ip, " calling AddPeer")
+		if err := AddPeer(hexKey, ip+"/32"); err != nil {
+			WARN("assignAndAdd: AddPeer failed: ", err)
+			return false
+		}
+		INFO("assignAndAdd: peer added to wg0 → ", pubKeyB64[:12], "… ip=", ip)
+		return true
+	}
+
+	INFO("assignAndAdd: pubkey not authorized by controller → ", pubKeyB64[:12], "…")
+	return false
+}
+
+// fetchPeerServers calls GET /v3/wg/servers to discover other wg-servers for
+// cross-server routing. Returns an empty slice (not an error) when ServerID
+// is not configured, since cross-server peering is optional.
+func fetchPeerServers(cfg *Config) ([]peerServer, error) {
+	url := cfg.ControllerURL + "/v3/wg/servers"
+	if cfg.ServerID != "" {
+		url += "?excludeID=" + cfg.ServerID
+	}
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("build request: %w", err)
+	}
+	req.Header.Set("X-API-KEY", cfg.AdminAPIKey)
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("controller returned %d", resp.StatusCode)
+	}
+
+	var result struct {
+		Servers []peerServer `json:"Servers"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("decode response: %w", err)
+	}
+	return result.Servers, nil
+}
+
+// peerServer holds the WireGuard connection details for a remote wg-server.
+type peerServer struct {
+	WireGuardPubKey string `json:"WireGuardPubKey"`
+	WireGuardPort   string `json:"WireGuardPort"`
+	WireGuardSubnet string `json:"WireGuardSubnet"`
+	IP              string `json:"IP"`
+}
+
+// SyncCrossServerPeers fetches the list of peer wg-servers from the controller
+// and ensures each one is configured as a WireGuard peer on wg0 with an
+// endpoint (for server-initiated keepalive) and AllowedIPs = their subnet.
+// It also installs a MASQUERADE exclusion rule so traffic between server
+// subnets is never NAT'd.
+func SyncCrossServerPeers(cfg *Config) {
+	peers, err := fetchPeerServers(cfg)
+	if err != nil {
+		WARN("cross-server sync: fetchPeerServers failed: ", err)
+		return
+	}
+	if len(peers) == 0 {
+		return
+	}
+
+	for _, p := range peers {
+		if p.WireGuardPubKey == "" || p.WireGuardSubnet == "" || p.IP == "" || p.WireGuardPort == "" {
+			continue
+		}
+		hexKey, err := b64ToHex(p.WireGuardPubKey)
+		if err != nil {
+			WARN("cross-server sync: invalid pubkey: ", err)
+			continue
+		}
+		endpoint := p.IP + ":" + p.WireGuardPort
+		if err := AddPeerWithEndpoint(hexKey, p.WireGuardSubnet, endpoint); err != nil {
+			WARN("cross-server sync: AddPeerWithEndpoint failed for ", endpoint, ": ", err)
+			continue
+		}
+		INFO("cross-server sync: peered with ", endpoint, " subnet=", p.WireGuardSubnet)
+
+		// Ensure MASQUERADE doesn't apply to cross-server traffic (defense in depth).
+		if err := addCrossServerMasqueradeExclusion(p.WireGuardSubnet, cfg.InternetIface); err != nil {
+			WARN("cross-server sync: masquerade exclusion failed for ", p.WireGuardSubnet, ": ", err)
+		}
+	}
 }
 
 // fetchDesiredPeers calls GET /v3/wg/peers on the auth controller.
