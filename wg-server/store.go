@@ -105,6 +105,15 @@ func (ps *PeerStore) GetByPubKey(pubKeyB64 string) (PeerRecord, bool) {
 	return PeerRecord{}, false
 }
 
+// Set stores (or overwrites) the IP and pubkey for deviceID in the local cache.
+// Used to persist IPs that were assigned by the controller.
+func (ps *PeerStore) Set(deviceID, ip, pubKeyB64 string) {
+	ps.mu.Lock()
+	defer ps.mu.Unlock()
+	ps.records[deviceID] = PeerRecord{PubKeyB64: pubKeyB64, IP: ip}
+	_ = ps.save()
+}
+
 // GetAll returns a snapshot of all records.
 func (ps *PeerStore) GetAll() map[string]PeerRecord {
 	ps.mu.RLock()

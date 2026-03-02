@@ -346,26 +346,6 @@ func BBolt_userResetPassword(user *User) error {
 	})
 }
 
-func BBolt_UpdateUserWGKey(userID string, key string) error {
-	return BBoltDB.Update(func(tx *gobolt.Tx) error {
-		b := tx.Bucket([]byte(USERS_BUCKET))
-		v := b.Get([]byte(userID))
-		if v == nil {
-			return errors.New("user not found")
-		}
-		U := new(User)
-		if err := bboltUnmarshal(v, U); err != nil {
-			return err
-		}
-		U.WireGuardKey = key
-		data, err := bboltMarshal(U)
-		if err != nil {
-			return err
-		}
-		return b.Put([]byte(userID), data)
-	})
-}
-
 // Find servers without groups
 func BBolt_FindServersWithoutGroups(limit, offset int64) ([]*types.Server, error) {
 	DL := make([]*types.Server, 0)
@@ -549,7 +529,6 @@ func BBolt_UpdateServer(S *types.Server) (*types.Server, error) {
 		SS.Port = S.Port
 		SS.WireGuardPort = S.WireGuardPort
 		SS.WireGuardPubKey = S.WireGuardPubKey
-		SS.WGBaseURL = S.WGBaseURL
 		data, err := bboltMarshal(SS)
 		if err != nil {
 			return err

@@ -23,8 +23,6 @@ func launchAPIServer() {
 	mux.HandleFunc("/health", healthCheckHandler)
 	mux.HandleFunc("/", healthCheckHandler)
 
-	mux.HandleFunc("/v3/session", API_SessionCreate)
-
 	if AUTHEnabled {
 		mux.HandleFunc("/v3/user/create", API_UserCreate)
 		mux.HandleFunc("/v3/user/update", API_UserUpdate)

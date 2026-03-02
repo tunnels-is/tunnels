@@ -40,7 +40,7 @@ func setupWireGuard(cfg *Config) error {
 		return fmt.Errorf("derive pubkey for LazyBind: %w", err)
 	}
 
-	wgDevice = device.NewDevice(tunInterface, NewLazyBind(conn.NewDefaultBind(), privBytes, pubBytes, SyncPeers), wgLogger)
+	wgDevice = device.NewDevice(tunInterface, NewLazyBind(conn.NewDefaultBind(), privBytes, pubBytes, func() {}), wgLogger)
 
 	privKeyHex := hex.EncodeToString(privBytes)
 

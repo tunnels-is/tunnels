@@ -1,30 +1,29 @@
 package main
 
 import (
-	"context"
-	"encoding/json"
 	"flag"
 	"fmt"
-	"net/http"
 	"os"
 	ossig "os/signal"
+	"sync/atomic"
 	"syscall"
-	"time"
-
-	"github.com/tunnels-is/tunnels/signal"
 )
 
-var peerStore *PeerStore
+
+var (
+	peerStore    *PeerStore
+	activeConfig atomic.Pointer[Config]
+)
 
 func main() {
-	apiKey     := flag.String("key", "", "per-server API key (from POST /v3/wg/server-config)")
+	apiKey      := flag.String("key", "", "per-server API key (from POST /v3/wg/server-config)")
 	controllerIP := flag.String("ip", "", "controller IP address (e.g. 74.63.223.157)")
 	showVersion := flag.Bool("version", false, "show version and exit")
-	jsonLogs   := flag.Bool("json", false, "enable JSON-format logging")
-	sourceInfo := flag.Bool("source", false, "include source file/line in log output")
-	silent     := flag.Bool("silent", false, "disable all logging")
-	logLevel   := flag.String("logLevel", "debug", "log level: debug, info, warn, error")
-	insecure   := flag.Bool("insecure", false, "skip TLS certificate verification")
+	jsonLogs    := flag.Bool("json", false, "enable JSON-format logging")
+	sourceInfo  := flag.Bool("source", false, "include source file/line in log output")
+	silent      := flag.Bool("silent", false, "disable all logging")
+	logLevel    := flag.String("logLevel", "debug", "log level: debug, info, warn, error")
+	insecure    := flag.Bool("insecure", false, "skip TLS certificate verification")
 	flag.Parse()
 
 	initLogging(*silent, *jsonLogs, *sourceInfo, *logLevel)
@@ -76,38 +75,8 @@ func main() {
 		os.Exit(1)
 	}
 
+	activeConfig.Store(cfg)
 	initSyncClient(cfg)
-
-	if cfg.SyncListenAddr != "" {
-		mux := http.NewServeMux()
-		mux.HandleFunc("/v3/wg/sync", func(w http.ResponseWriter, r *http.Request) {
-			if r.Method != http.MethodPost {
-				w.WriteHeader(http.StatusMethodNotAllowed)
-				return
-			}
-			go SyncPeers()
-			w.WriteHeader(http.StatusOK)
-		})
-		mux.HandleFunc("/v3/wg/assign", handleAssign)
-		go func() {
-			if listenErr := http.ListenAndServe(cfg.SyncListenAddr, mux); listenErr != nil {
-				ERR("sync listener error: ", listenErr)
-			}
-		}()
-		INFO("sync listener started on ", cfg.SyncListenAddr)
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-
-	syncInterval := time.Duration(cfg.SyncIntervalSecs) * time.Second
-	signal.NewSignal(
-		"wg-sync",
-		ctx,
-		cancel,
-		syncInterval,
-		func(s string) { LOG(s) },
-		SyncPeers,
-	)
 
 	INFO("wg-server started")
 
@@ -116,47 +85,10 @@ func main() {
 	<-sigCh
 
 	INFO("shutting down...")
-	cancel()
 
 	if wgDevice != nil {
 		wgDevice.Close()
 	}
 	cleanupNet(cfg)
 	INFO("shutdown complete")
-}
-
-// handleAssign handles POST /v3/wg/assign.
-// The controller calls this during /v3/session to get (or lazily assign) the
-// device's IP on this wg-server. The response is returned to the client so it
-// can configure its TUN interface address.
-func handleAssign(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		return
-	}
-
-	var req struct {
-		DeviceID  string `json:"DeviceID"`
-		PubKeyB64 string `json:"PubKeyB64"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
-		return
-	}
-	if req.DeviceID == "" || req.PubKeyB64 == "" {
-		http.Error(w, "DeviceID and PubKeyB64 are required", http.StatusBadRequest)
-		return
-	}
-
-	ip, err := peerStore.GetOrAssign(req.DeviceID, req.PubKeyB64)
-	if err != nil {
-		ERR("assign IP failed: ", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(struct {
-		IP string `json:"IP"`
-	}{IP: ip})
 }
