@@ -204,12 +204,12 @@ type FORM_WG_SERVER_CONFIG_CREATE struct {
 	UID         primitive.ObjectID `json:"UID"`
 	DeviceToken string             `json:"DeviceToken"`
 
-	Tag             string `json:"Tag"`
-	AdminAPIKey     string `json:"AdminAPIKey"`
-	WireGuardPort   int    `json:"WireGuardPort"`
-	WireGuardSubnet string `json:"WireGuardSubnet"`
-	WireGuardIface  string `json:"WireGuardIface"`
-	InternetIface   string `json:"InternetIface"`
+	Tag           string             `json:"Tag"`
+	AdminAPIKey   string             `json:"AdminAPIKey"`
+	WireGuardPort int                `json:"WireGuardPort"`
+	NetworkID     primitive.ObjectID `json:"NetworkID"`
+	WireGuardIface  string           `json:"WireGuardIface"`
+	InternetIface   string           `json:"InternetIface"`
 
 	PacketInspection   bool `json:"PacketInspection"`
 	InsecureSkipVerify bool `json:"InsecureSkipVerify"`
@@ -249,6 +249,17 @@ func API_WGServerConfigCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Resolve NetworkID → WireGuardSubnet
+	var subnet string
+	if F.NetworkID != primitive.NilObjectID {
+		network, nerr := DB_FindNetworkByID(F.NetworkID)
+		if nerr != nil || network == nil {
+			senderr(w, 404, "Network not found")
+			return
+		}
+		subnet = network.CIDR
+	}
+
 	cfg := &types.WGServerConfig{
 		ID:               primitive.NewObjectID(),
 		Tag:              F.Tag,
@@ -256,7 +267,7 @@ func API_WGServerConfigCreate(w http.ResponseWriter, r *http.Request) {
 		AdminAPIKey:      F.AdminAPIKey,
 		WireGuardPort:    F.WireGuardPort,
 		WireGuardPrivKey: privKeyB64,
-		WireGuardSubnet:  F.WireGuardSubnet,
+		NetworkID:        F.NetworkID,
 		WireGuardIface:   F.WireGuardIface,
 		InternetIface:    F.InternetIface,
 		PacketInspection:   F.PacketInspection,
@@ -268,13 +279,18 @@ func API_WGServerConfigCreate(w http.ResponseWriter, r *http.Request) {
 	if cfg.WireGuardIface == "" {
 		cfg.WireGuardIface = "wg0"
 	}
-	if cfg.WireGuardSubnet == "" {
-		cfg.WireGuardSubnet = "10.1.0.0/16"
-	}
 
 	if err := DB_CreateWGServerConfig(cfg); err != nil {
 		senderr(w, 500, "Failed to create WGServerConfig", slog.Any("err", err))
 		return
+	}
+
+	// Mark the network as assigned to this config
+	if F.NetworkID != primitive.NilObjectID {
+		if network, _ := DB_FindNetworkByID(F.NetworkID); network != nil {
+			network.WGConfigID = cfg.ID
+			_ = DB_UpdateNetwork(network)
+		}
 	}
 
 	sendObject(w, map[string]any{
@@ -283,7 +299,7 @@ func API_WGServerConfigCreate(w http.ResponseWriter, r *http.Request) {
 		"WireGuardPubKey": pubKeyB64,
 		"Tag":             cfg.Tag,
 		"WireGuardPort":   cfg.WireGuardPort,
-		"WireGuardSubnet": cfg.WireGuardSubnet,
+		"WireGuardSubnet": subnet,
 		"WireGuardIface":  cfg.WireGuardIface,
 		"InternetIface":   cfg.InternetIface,
 	})
@@ -323,6 +339,13 @@ func API_WGServerConfigGet(w http.ResponseWriter, r *http.Request) {
 
 	pubKey, _ := deriveWGPubKey(cfg.WireGuardPrivKey)
 
+	var cfgSubnet string
+	if cfg.NetworkID != primitive.NilObjectID {
+		if net, _ := DB_FindNetworkByID(cfg.NetworkID); net != nil {
+			cfgSubnet = net.CIDR
+		}
+	}
+
 	// Return config with privkey redacted
 	sendObject(w, map[string]any{
 		"ID":                 cfg.ID.Hex(),
@@ -330,7 +353,7 @@ func API_WGServerConfigGet(w http.ResponseWriter, r *http.Request) {
 		"APIKey":             cfg.APIKey,
 		"WireGuardPubKey":    pubKey,
 		"WireGuardPort":      cfg.WireGuardPort,
-		"WireGuardSubnet":    cfg.WireGuardSubnet,
+		"WireGuardSubnet":    cfgSubnet,
 		"WireGuardIface":     cfg.WireGuardIface,
 		"InternetIface":      cfg.InternetIface,
 		"PacketInspection":   cfg.PacketInspection,
@@ -360,6 +383,14 @@ func API_WGServerConfigFetch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Resolve subnet from the linked network.
+	var fetchSubnet string
+	if wgCfg.NetworkID != primitive.NilObjectID {
+		if network, _ := DB_FindNetworkByID(wgCfg.NetworkID); network != nil {
+			fetchSubnet = network.CIDR
+		}
+	}
+
 	// Find the server linked to this config and refresh its cached WG fields.
 	var serverID string
 	servers, err := DB_FindAllServers()
@@ -367,7 +398,7 @@ func API_WGServerConfigFetch(w http.ResponseWriter, r *http.Request) {
 		for _, s := range servers {
 			if s.WGConfigID == wgCfg.ID {
 				serverID = s.ID.Hex()
-				_ = DB_SetServerWGConfigID(s.ID, wgCfg, pubKeyB64)
+				_ = DB_SetServerWGConfigID(s.ID, wgCfg, pubKeyB64, fetchSubnet)
 				break
 			}
 		}
@@ -378,7 +409,7 @@ func API_WGServerConfigFetch(w http.ResponseWriter, r *http.Request) {
 		AdminAPIKey:        wgCfg.AdminAPIKey,
 		WireGuardPort:      wgCfg.WireGuardPort,
 		WireGuardPrivKey:   wgCfg.WireGuardPrivKey,
-		WireGuardSubnet:    wgCfg.WireGuardSubnet,
+		WireGuardSubnet:    fetchSubnet,
 		WireGuardIface:     wgCfg.WireGuardIface,
 		InternetIface:      wgCfg.InternetIface,
 		PacketInspection:   wgCfg.PacketInspection,
@@ -386,6 +417,82 @@ func API_WGServerConfigFetch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	sendObject(w, resp)
+}
+
+// FORM_WG_SERVER_CONFIG_UPDATE is the body for POST /v3/wg/server-config/update.
+type FORM_WG_SERVER_CONFIG_UPDATE struct {
+	UID         primitive.ObjectID `json:"UID"`
+	DeviceToken string             `json:"DeviceToken"`
+
+	ID             primitive.ObjectID `json:"ID"`
+	Tag            string             `json:"Tag"`
+	AdminAPIKey    string             `json:"AdminAPIKey"`
+	WireGuardPort  int                `json:"WireGuardPort"`
+	NetworkID      primitive.ObjectID `json:"NetworkID"`
+	WireGuardIface string             `json:"WireGuardIface"`
+	InternetIface  string             `json:"InternetIface"`
+
+	PacketInspection   bool `json:"PacketInspection"`
+	InsecureSkipVerify bool `json:"InsecureSkipVerify"`
+}
+
+// API_WGServerConfigUpdate handles POST /v3/wg/server-config/update.
+func API_WGServerConfigUpdate(w http.ResponseWriter, r *http.Request) {
+	defer BasicRecover()
+
+	F := new(FORM_WG_SERVER_CONFIG_UPDATE)
+	if err := decodeBody(r, F); err != nil {
+		senderr(w, 400, "Invalid request body", slog.Any("error", err))
+		return
+	}
+
+	user, err := authenticateUserFromEmailOrIDAndToken("", F.UID, F.DeviceToken)
+	if err != nil {
+		senderr(w, 401, err.Error())
+		return
+	}
+	if !user.IsAdmin {
+		senderr(w, 401, "Admin required")
+		return
+	}
+
+	existing, err := DB_FindWGServerConfigByID(F.ID)
+	if err != nil || existing == nil {
+		senderr(w, 404, "WGServerConfig not found")
+		return
+	}
+
+	// If NetworkID changed, update the old and new network records
+	if existing.NetworkID != F.NetworkID {
+		if existing.NetworkID != primitive.NilObjectID {
+			if oldNet, _ := DB_FindNetworkByID(existing.NetworkID); oldNet != nil {
+				oldNet.WGConfigID = primitive.NilObjectID
+				_ = DB_UpdateNetwork(oldNet)
+			}
+		}
+		if F.NetworkID != primitive.NilObjectID {
+			if newNet, _ := DB_FindNetworkByID(F.NetworkID); newNet != nil {
+				newNet.WGConfigID = F.ID
+				_ = DB_UpdateNetwork(newNet)
+			}
+		}
+	}
+
+	existing.Tag = F.Tag
+	existing.AdminAPIKey = F.AdminAPIKey
+	existing.WireGuardPort = F.WireGuardPort
+	existing.NetworkID = F.NetworkID
+	existing.WireGuardIface = F.WireGuardIface
+	existing.InternetIface = F.InternetIface
+	existing.PacketInspection = F.PacketInspection
+	existing.InsecureSkipVerify = F.InsecureSkipVerify
+
+	if err := DB_UpdateWGServerConfig(existing); err != nil {
+		senderr(w, 500, "Failed to update WGServerConfig", slog.Any("err", err))
+		return
+	}
+
+	w.WriteHeader(200)
 }
 
 // FORM_WG_SERVER_CONFIG_ASSIGN is the body for POST /v3/wg/server-config/assign.
@@ -441,7 +548,14 @@ func API_WGServerConfigAssign(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := DB_SetServerWGConfigID(F.ServerID, wgCfg, pubKeyB64); err != nil {
+	var assignSubnet string
+	if wgCfg.NetworkID != primitive.NilObjectID {
+		if network, _ := DB_FindNetworkByID(wgCfg.NetworkID); network != nil {
+			assignSubnet = network.CIDR
+		}
+	}
+
+	if err := DB_SetServerWGConfigID(F.ServerID, wgCfg, pubKeyB64, assignSubnet); err != nil {
 		senderr(w, 500, "Failed to update server", slog.Any("err", err))
 		return
 	}
@@ -449,7 +563,7 @@ func API_WGServerConfigAssign(w http.ResponseWriter, r *http.Request) {
 	sendObject(w, map[string]any{
 		"WireGuardPubKey": pubKeyB64,
 		"WireGuardPort":   wgCfg.WireGuardPort,
-		"WireGuardSubnet": wgCfg.WireGuardSubnet,
+		"WireGuardSubnet": assignSubnet,
 	})
 }
 

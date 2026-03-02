@@ -143,6 +143,8 @@ func main() {
 			}
 		}
 
+		go seedNetworks()
+
 		// Tunnels public network specific
 		if loadSecret("PayKey") != "" {
 			lemonClient := lemonsqueezy.New(lemonsqueezy.WithAPIKey(loadSecret("PayKey")))
