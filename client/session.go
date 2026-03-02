@@ -9,7 +9,6 @@ import (
 	"math/rand"
 	"net"
 	"runtime"
-	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -17,7 +16,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/miekg/dns"
 	"github.com/tunnels-is/tunnels/types"
-	"github.com/tunnels-is/tunnels/version"
 	"github.com/xlzd/gotp"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	wgconn "golang.zx2c4.com/wireguard/conn"
@@ -108,45 +106,7 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	tunnel.meta.Store(meta)
 	tunnel.CR = ClientCR
 
-	if ClientCR.ServerIP == "" {
-		server, err := getServerByID(
-			ClientCR.Server,
-			ClientCR.DeviceKey,
-			ClientCR.DeviceToken,
-			ClientCR.UserID,
-			ClientCR.ServerID,
-		)
-		if err != nil {
-			ERROR("Error finding server", err)
-			return 400, err
-		}
-
-		ClientCR.ServerPort = server.Port
-		ClientCR.ServerIP = server.IP
-	}
-
-	if ClientCR.ServerIP == "" {
-		ERROR("No Server IPAddress found when connecting: ", ClientCR)
-		return 400, errors.New("no ip address found when connecting")
-	}
-	if ClientCR.ServerPort == "" {
-		ERROR("No Server Port found when connecting: ", ClientCR)
-		return 400, errors.New("no server port found when connecting")
-	}
-
-	if ClientCR.DeviceKey != "" {
-		ClientCR.UserID = ClientCR.DeviceKey
-	}
-	UID, err := primitive.ObjectIDFromHex(ClientCR.UserID)
-	if err != nil {
-		ERROR("Invalid user ID")
-		return 400, errors.New("Invalid user ID")
-	}
-	SID, err := primitive.ObjectIDFromHex(ClientCR.ServerID)
-	if err != nil {
-		ERROR("Invalid Server ID")
-		return 400, errors.New("Invalid Server ID")
-	}
+	var err error
 
 	if meta.ServerID != ClientCR.ServerID {
 		meta.ServerID = ClientCR.ServerID
@@ -199,15 +159,7 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		}
 	}
 
-	FinalCR := new(types.ControllerConnectRequest)
-	FinalCR.Created = time.Now() // The creation time will be over-written by server (we keep this to maintain compatibility with older clients)
-	FinalCR.Version = version.ApiVersion
-	FinalCR.UserID = UID
-	FinalCR.ServerID = SID
-	FinalCR.DeviceKey = ClientCR.DeviceKey
-	FinalCR.DeviceToken = ClientCR.DeviceToken
 	// Load or generate a persistent WireGuard keypair.
-	// Always sent so both device-key and user-token auth paths support WireGuard.
 	wgPrivKeyB64 := meta.WireGuardPrivKey
 	if wgPrivKeyB64 == "" {
 		wgPrivKeyB64, err = generateWGPrivKey()
@@ -220,56 +172,29 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 			ERROR("unable to persist WireGuard private key: ", writeErr)
 		}
 	}
-	wgPubKeyB64, pubErr := deriveWGPubKey(wgPrivKeyB64)
-	if pubErr != nil {
-		ERROR("unable to derive WireGuard public key: ", pubErr)
-		return 502, errors.New("unable to derive WireGuard public key")
-	}
-	FinalCR.WireGuardPubKey = wgPubKeyB64
 
-	DEBUG("ConnectRequestFromClient", ClientCR)
-
-	url := ClientCR.Server.GetURL("/v3/session")
-	bytesFromController, code, err := SendRequestToURL(
-		nil,
-		"POST",
-		url,
-		FinalCR,
-		10000,
-		ClientCR.Server.ValidateCertificate,
-	)
-	if code != 200 {
-		ERROR("ErrFromController:", err, string(bytesFromController))
-		ER := new(ErrorResponse)
-		err := json.Unmarshal(bytesFromController, ER)
-		if err == nil {
-			return code, errors.New(ER.Error)
-		} else {
-			return code, errors.New("Error code from controller:" + strconv.Itoa(code))
-		}
-	}
-	if err != nil {
-		return 500, errors.New("Unknown when contacting controller")
-	}
-	DEBUG("SessionResponse:", code, string(bytesFromController))
-
-	ServerReponse := new(types.ServerConnectResponse)
-	err = json.Unmarshal(bytesFromController, ServerReponse)
-	if err != nil {
-		ERROR("invalid response from controller", err)
-		return 502, errors.New("invalid response from controller")
+	// The device's WireGuard IP must be pre-assigned at device creation time.
+	if meta.IPv4Address == "" {
+		ERROR("no WireGuard IP assigned; create the device on the controller first")
+		return 400, errors.New("device has no WireGuard IP; create it on the controller")
 	}
 
-	// Update TUN interface IP to the WG-assigned IP so egress src IPs match the
-	// wg-server peer's AllowedIP entry.
-	if ServerReponse.WireGuardIP != "" {
-		meta.IPv4Address = ServerReponse.WireGuardIP
-		if writeErr := writeTunnelsToDisk(meta.Tag); writeErr != nil {
-			ERROR("unable to persist WireGuard IP: ", writeErr)
-		}
+	// Fetch WireGuard server config (public key, port, server IP).
+	wgCfg, wgErr := getServerWGConfig(ClientCR.Server, ClientCR.ServerID)
+	if wgErr != nil {
+		ERROR("unable to fetch server WireGuard config: ", wgErr)
+		return 502, fmt.Errorf("unable to fetch server WireGuard config: %w", wgErr)
+	}
+	if ClientCR.ServerIP == "" {
+		ClientCR.ServerIP = wgCfg.ServerIP
 	}
 
-	DEBUG("ConnectionRequestResponse:", ServerReponse)
+	ServerReponse := &types.ServerConnectResponse{
+		InterfaceIP:     wgCfg.ServerIP,
+		WireGuardIP:     meta.IPv4Address,
+		WireGuardPubKey: wgCfg.WireGuardPubKey,
+		WireGuardPort:   wgCfg.WireGuardPort,
+	}
 	tunnel.ServerResponse = ServerReponse
 
 	err = InitializeTunnelFromCRR(tunnel)
@@ -354,45 +279,29 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	return 200, nil
 }
 
-// getServerByID retrieves server information from the controller
-func getServerByID(server *ControlServer, deviceKey string, deviceToken string, UserID string, ServerID string) (s *types.Server, err error) {
-	SID, _ := primitive.ObjectIDFromHex(ServerID)
-	UID, _ := primitive.ObjectIDFromHex(UserID)
+// wgServerConfig holds the WireGuard connection details returned by /v3/wg/config.
+type wgServerConfig struct {
+	WireGuardPubKey string `json:"WireGuardPubKey"`
+	WireGuardPort   string `json:"WireGuardPort"`
+	ServerIP        string `json:"ServerIP"`
+}
 
-	FR := &FORWARD_REQUEST{
-		Server:  server,
-		Path:    "/v3/server",
-		Method:  "POST",
-		Timeout: 10000,
-		JSONData: &types.FORM_GET_SERVER{
-			DeviceToken: deviceToken,
-			DeviceKey:   deviceKey,
-			UID:         UID,
-			ServerID:    SID,
-		},
-	}
-	url := FR.Server.GetURL(FR.Path)
-	responseBytes, code, err := SendRequestToURL(
-		nil,
-		FR.Method,
-		url,
-		FR.JSONData,
-		FR.Timeout,
-		FR.Server.ValidateCertificate,
-	)
+// getServerWGConfig fetches the WireGuard public key, port, and IP for a server.
+// The endpoint is unauthenticated — it only returns public WireGuard parameters.
+func getServerWGConfig(server *ControlServer, serverID string) (*wgServerConfig, error) {
+	url := server.GetURL("/v3/wg/config") + "?serverID=" + serverID
+	responseBytes, code, err := SendRequestToURL(nil, "GET", url, nil, 10000, server.ValidateCertificate)
 	if err != nil {
-		return nil, fmt.Errorf("%s: %s", "error calling controller", err)
+		return nil, fmt.Errorf("get wg config: %w", err)
 	}
 	if code != 200 {
-		return nil, fmt.Errorf("%s: %d", "invalid code from controller", code)
+		return nil, fmt.Errorf("get wg config: code=%d", code)
 	}
-
-	s = new(types.Server)
-	err = json.Unmarshal(responseBytes, s)
-	if err != nil {
-		return nil, fmt.Errorf("%s: %s", "invalid response from controller", err)
+	cfg := new(wgServerConfig)
+	if err := json.Unmarshal(responseBytes, cfg); err != nil {
+		return nil, fmt.Errorf("decode wg config: %w", err)
 	}
-	return
+	return cfg, nil
 }
 
 // GetDeviceByID retrieves device information from the controller
