@@ -164,6 +164,7 @@ func main() {
 	}
 
 	go signal.NewSignal("API", ctx, cancel, 1*time.Second, goroutineLogger, launchAPIServer)
+	go signal.NewSignal("ADMIN", ctx, cancel, 1*time.Second, goroutineLogger, launchAdminServer)
 
 	go signal.NewSignal("CONFIG", ctx, cancel, 30*time.Second, goroutineLogger, func() {
 		_ = LoadServerConfig(serverConfigPath)
