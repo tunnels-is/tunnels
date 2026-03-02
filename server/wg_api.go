@@ -1,12 +1,11 @@
 package main
 
 import (
-	"bytes"
 	"crypto/rand"
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 
 	"github.com/google/uuid"
@@ -90,20 +89,15 @@ func API_WGRegister(w http.ResponseWriter, r *http.Request) {
 
 	resp := &types.WGRegisterResponse{}
 
-	// If a ServerID was provided, ask that wg-server to assign an IP and
-	// include the server's connection details in the response.
 	if F.ServerID != primitive.NilObjectID {
 		server, err := DB_FindServerByID(F.ServerID)
 		if err == nil && server != nil {
 			resp.ServerPubKey = server.WireGuardPubKey
 			resp.ServerIP = server.IP
 			resp.ServerPort = server.WireGuardPort
-			if server.WGBaseURL != "" {
-				ip, assignErr := callWGAssign(server.WGBaseURL, device.ID.Hex(), F.PublicKeyB64)
-				if assignErr == nil && ip != "" {
-					resp.AssignedIP = ip
-					resp.Conf = buildWGConf(ip, F.PublicKeyB64, server)
-				}
+			if device.WireGuardIP != "" {
+				resp.AssignedIP = device.WireGuardIP
+				resp.Conf = buildWGConf(device.WireGuardIP, F.PublicKeyB64, server)
 			}
 		}
 	}
@@ -197,6 +191,7 @@ func API_WGPeers(w http.ResponseWriter, r *http.Request) {
 		resp.Peers = append(resp.Peers, types.WGPeer{
 			PublicKeyHex: hexKey,
 			DeviceID:     d.ID.Hex(),
+			WireGuardIP:  d.WireGuardIP,
 		})
 	}
 
@@ -236,35 +231,58 @@ func API_WGConfig(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// callWGAssign sends a POST to the wg-server's /v3/wg/assign endpoint and
-// returns the IP assigned to the device. It is called synchronously during
-// /v3/session so the client receives its IP in the same response.
-func callWGAssign(baseURL, deviceID, pubKeyB64 string) (string, error) {
-	body, err := json.Marshal(map[string]string{
-		"DeviceID":  deviceID,
-		"PubKeyB64": pubKeyB64,
-	})
+// assignNextWireGuardIP finds the next available IP in the server's WireGuard subnet.
+// It scans all devices' WireGuardIP fields to find used IPs and returns the next
+// unallocated address. The server interface occupies .1; device IPs start at .2.
+func assignNextWireGuardIP(serverID primitive.ObjectID) (string, error) {
+	server, err := DB_FindServerByID(serverID)
+	if err != nil || server == nil {
+		return "", fmt.Errorf("server not found")
+	}
+	if server.WireGuardSubnet == "" {
+		return "", fmt.Errorf("server has no WireGuard subnet configured")
+	}
+	_, ipNet, err := net.ParseCIDR(server.WireGuardSubnet)
 	if err != nil {
-		return "", fmt.Errorf("marshal: %w", err)
+		return "", fmt.Errorf("invalid subnet %q: %w", server.WireGuardSubnet, err)
 	}
 
-	resp, err := http.Post(baseURL+"/v3/wg/assign", "application/json", bytes.NewReader(body))
+	devices, err := DB_GetDevices(100000, 0)
 	if err != nil {
-		return "", fmt.Errorf("post: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("wg-server returned %d", resp.StatusCode)
+		return "", fmt.Errorf("list devices: %w", err)
 	}
 
-	var result struct {
-		IP string `json:"IP"`
+	used := make(map[uint32]bool)
+	for _, d := range devices {
+		if d.WireGuardIP == "" {
+			continue
+		}
+		ip4 := net.ParseIP(d.WireGuardIP).To4()
+		if ip4 != nil && ipNet.Contains(ip4) {
+			used[wgIPToU32(ip4)] = true
+		}
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return "", fmt.Errorf("decode: %w", err)
+
+	base := wgIPToU32(ipNet.IP.To4()) + 2 // .1 is server, start at .2
+	for {
+		next := wgU32ToIP(base)
+		if !ipNet.Contains(next) {
+			return "", fmt.Errorf("WireGuard subnet %s is exhausted", server.WireGuardSubnet)
+		}
+		if !used[base] {
+			return next.String(), nil
+		}
+		base++
 	}
-	return result.IP, nil
+}
+
+func wgIPToU32(ip net.IP) uint32 {
+	ip = ip.To4()
+	return uint32(ip[0])<<24 | uint32(ip[1])<<16 | uint32(ip[2])<<8 | uint32(ip[3])
+}
+
+func wgU32ToIP(n uint32) net.IP {
+	return net.IP{byte(n >> 24), byte(n >> 16), byte(n >> 8), byte(n)}
 }
 
 // b64KeyToHex converts a base64-encoded 32-byte key to a hex string for UAPI.
@@ -325,14 +343,12 @@ type FORM_WG_SERVER_CONFIG_CREATE struct {
 	UID         primitive.ObjectID `json:"UID"`
 	DeviceToken string             `json:"DeviceToken"`
 
-	Tag              string `json:"Tag"`
-	AdminAPIKey      string `json:"AdminAPIKey"`
-	WireGuardPort    int    `json:"WireGuardPort"`
-	WireGuardSubnet  string `json:"WireGuardSubnet"`
-	WireGuardIface   string `json:"WireGuardIface"`
-	InternetIface    string `json:"InternetIface"`
-	SyncIntervalSecs int    `json:"SyncIntervalSecs"`
-	SyncListenAddr   string `json:"SyncListenAddr"`
+	Tag             string `json:"Tag"`
+	AdminAPIKey     string `json:"AdminAPIKey"`
+	WireGuardPort   int    `json:"WireGuardPort"`
+	WireGuardSubnet string `json:"WireGuardSubnet"`
+	WireGuardIface  string `json:"WireGuardIface"`
+	InternetIface   string `json:"InternetIface"`
 
 	PacketInspection   bool `json:"PacketInspection"`
 	InsecureSkipVerify bool `json:"InsecureSkipVerify"`
@@ -382,8 +398,6 @@ func API_WGServerConfigCreate(w http.ResponseWriter, r *http.Request) {
 		WireGuardSubnet:  F.WireGuardSubnet,
 		WireGuardIface:   F.WireGuardIface,
 		InternetIface:    F.InternetIface,
-		SyncIntervalSecs: F.SyncIntervalSecs,
-		SyncListenAddr:   F.SyncListenAddr,
 		PacketInspection:   F.PacketInspection,
 		InsecureSkipVerify: F.InsecureSkipVerify,
 	}
@@ -392,12 +406,6 @@ func API_WGServerConfigCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	if cfg.WireGuardIface == "" {
 		cfg.WireGuardIface = "wg0"
-	}
-	if cfg.SyncIntervalSecs == 0 {
-		cfg.SyncIntervalSecs = 30
-	}
-	if cfg.SyncListenAddr == "" {
-		cfg.SyncListenAddr = "127.0.0.1:8181"
 	}
 	if cfg.WireGuardSubnet == "" {
 		cfg.WireGuardSubnet = "10.1.0.0/16"
@@ -464,8 +472,6 @@ func API_WGServerConfigGet(w http.ResponseWriter, r *http.Request) {
 		"WireGuardSubnet":    cfg.WireGuardSubnet,
 		"WireGuardIface":     cfg.WireGuardIface,
 		"InternetIface":      cfg.InternetIface,
-		"SyncIntervalSecs":   cfg.SyncIntervalSecs,
-		"SyncListenAddr":     cfg.SyncListenAddr,
 		"PacketInspection":   cfg.PacketInspection,
 		"InsecureSkipVerify": cfg.InsecureSkipVerify,
 	})
@@ -514,8 +520,6 @@ func API_WGServerConfigFetch(w http.ResponseWriter, r *http.Request) {
 		WireGuardSubnet:    wgCfg.WireGuardSubnet,
 		WireGuardIface:     wgCfg.WireGuardIface,
 		InternetIface:      wgCfg.InternetIface,
-		SyncIntervalSecs:   wgCfg.SyncIntervalSecs,
-		SyncListenAddr:     wgCfg.SyncListenAddr,
 		PacketInspection:   wgCfg.PacketInspection,
 		InsecureSkipVerify: wgCfg.InsecureSkipVerify,
 	}

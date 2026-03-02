@@ -493,14 +493,41 @@ func API_DeviceCreate(w http.ResponseWriter, r *http.Request) {
 		F.Device.Groups = make([]primitive.ObjectID, 0)
 	}
 
+	// Assign a WireGuard IP from the server's subnet at creation time.
+	var wgServer *types.Server
+	if F.Device.ServerID != primitive.NilObjectID {
+		ip, assignErr := assignNextWireGuardIP(F.Device.ServerID)
+		if assignErr != nil {
+			senderr(w, 400, "WireGuard IP assignment failed", slog.Any("err", assignErr))
+			return
+		}
+		F.Device.WireGuardIP = ip
+
+		var srvErr error
+		wgServer, srvErr = DB_FindServerByID(F.Device.ServerID)
+		if srvErr != nil || wgServer == nil {
+			senderr(w, 404, "Server not found")
+			return
+		}
+	}
+
 	err = DB_CreateDevice(F.Device)
 	if err != nil {
 		ERR(err)
-		senderr(w, 500, "Unable to create group, please try again later")
+		senderr(w, 500, "Unable to create device, please try again later")
 		return
 	}
 
-	sendObject(w, F.Device)
+	if wgServer != nil {
+		sendObject(w, map[string]any{
+			"Device":       F.Device,
+			"ServerPubKey": wgServer.WireGuardPubKey,
+			"ServerPort":   wgServer.WireGuardPort,
+			"ServerIP":     wgServer.IP,
+		})
+	} else {
+		sendObject(w, F.Device)
+	}
 }
 
 func API_GroupCreate(w http.ResponseWriter, r *http.Request) {
@@ -1019,122 +1046,6 @@ func API_ServerGet(w http.ResponseWriter, r *http.Request) {
 	senderr(w, 401, "unauthorized")
 }
 
-func API_SessionCreate(w http.ResponseWriter, r *http.Request) {
-	defer BasicRecover()
-
-	CR := new(types.ControllerConnectRequest)
-	err := decodeBody(r, CR)
-	if err != nil {
-		senderr(w, 400, "Invalid request body", slog.Any("error", err))
-		return
-	}
-
-	server, err := DB_FindServerByID(CR.ServerID)
-	if err != nil {
-		senderr(w, 500, "Unknown error, please try again in a moment")
-		return
-	}
-	if server == nil {
-		senderr(w, 204, "Server not found")
-		return
-	}
-
-	// _, code, err := ValidateSubscription(c, CR)
-	// if err != nil {
-	// 	return WriteErrorResponse(c, code, err.Error())
-	// }
-
-	allowed := false
-	var device *types.Device
-	var user *User
-	if CR.DeviceKey != "" {
-		deviceID, err := primitive.ObjectIDFromHex(CR.DeviceKey)
-		if err != nil {
-			senderr(w, 400, "invalid device key")
-			return
-		}
-		device, err = DB_FindDeviceByID(deviceID)
-		if err != nil {
-			senderr(w, 500, err.Error())
-			return
-		}
-		if device == nil {
-			senderr(w, 401, "Unauthorized")
-			return
-		}
-		// Store the client's WG public key so /v3/wg/peers can serve it to wg-servers.
-		if CR.WireGuardPubKey != "" && device.WireGuardKey != CR.WireGuardPubKey {
-			device.WireGuardKey = CR.WireGuardPubKey
-			_ = DB_UpdateDevice(device)
-		}
-		for _, g := range server.Groups {
-			for _, ug := range device.Groups {
-				if g == ug {
-					allowed = true
-				}
-			}
-		}
-	} else {
-		var authErr error
-		user, authErr = authenticateUserFromEmailOrIDAndToken("", CR.UserID, CR.DeviceToken)
-		if authErr != nil {
-			senderr(w, 401, authErr.Error())
-			return
-		}
-		// Store/update the user's WG public key so the wg-server can assign an IP.
-		if CR.WireGuardPubKey != "" && user.WireGuardKey != CR.WireGuardPubKey {
-			user.WireGuardKey = CR.WireGuardPubKey
-			_ = DB_UpdateUserWGKey(user.ID, CR.WireGuardPubKey)
-		}
-		for _, g := range server.Groups {
-			for _, ug := range user.Groups {
-				if g == ug {
-					allowed = true
-				}
-			}
-		}
-	}
-
-	if len(server.Groups) == 0 {
-		allowed = true
-	}
-
-	if allowed {
-		CRR := types.CreateCRRFromServer(Config.Load())
-		CRR.WireGuardPubKey = server.WireGuardPubKey
-		CRR.WireGuardPort = server.WireGuardPort
-
-		// If a WireGuard public key was presented and this server has a wg-server,
-		// ask it to assign/retrieve an IP. Works for both device and user auth.
-		wgEntityID := ""
-		if device != nil {
-			wgEntityID = device.ID.Hex()
-		} else if user != nil {
-			wgEntityID = user.ID.Hex()
-		}
-		if wgEntityID != "" && CR.WireGuardPubKey != "" && server.WGBaseURL != "" {
-			ip, assignErr := callWGAssign(server.WGBaseURL, wgEntityID, CR.WireGuardPubKey)
-			if assignErr != nil {
-				logger.Warn("wg-server assign failed", slog.Any("err", assignErr))
-			} else if ip != "" {
-				CRR.WireGuardIP = ip
-				CRR.InterfaceIP = ip
-				// Trigger instant peer sync in the background.
-				go func() {
-					resp, postErr := http.Post(server.WGBaseURL+"/v3/wg/sync", "application/json", nil)
-					if postErr == nil {
-						resp.Body.Close()
-					}
-				}()
-			}
-		}
-
-		sendObject(w, CRR)
-		return
-	}
-
-	senderr(w, 400, "Unauthorized")
-}
 
 func API_UserResetPassword(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()

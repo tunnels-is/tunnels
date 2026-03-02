@@ -113,6 +113,7 @@ func DB_UpdateDevice(D *types.Device) (err error) {
 					Value: bson.D{
 						{Key: "Tag", Value: D.Tag},
 						{Key: "WireGuardKey", Value: D.WireGuardKey},
+						{Key: "WireGuardIP", Value: D.WireGuardIP},
 					},
 				},
 			},
@@ -558,22 +559,6 @@ func DB_userResetPassword(user *User) error {
 	}
 
 	return nil
-}
-
-func DB_UpdateUserWGKey(userID primitive.ObjectID, key string) error {
-	if BBOLTEnabled {
-		return BBolt_UpdateUserWGKey(objectIDToString(userID), key)
-	}
-	defer BasicRecover()
-
-	_, err := DB.Database(USERS_DATABASE).
-		Collection(USERS_COLLECTION).
-		UpdateOne(
-			context.Background(),
-			bson.M{"_id": userID},
-			bson.D{{Key: "$set", Value: bson.D{{Key: "WireGuardKey", Value: key}}}},
-		)
-	return err
 }
 
 func DB_FindServersWithoutGroups(limit, offset int64) (DL []*types.Server, err error) {

@@ -31,9 +31,7 @@ type Config struct {
 	WireGuardSubnet  string
 	WireGuardIface   string
 
-	InternetIface    string
-	SyncIntervalSecs int
-	SyncListenAddr   string
+	InternetIface string
 
 	LogLevel string
 	LogJSON  bool
@@ -89,8 +87,6 @@ func FetchConfig(controllerURL, apiKey string, insecureSkipVerify bool) (*Config
 		WireGuardSubnet:  r.WireGuardSubnet,
 		WireGuardIface:   r.WireGuardIface,
 		InternetIface:    r.InternetIface,
-		SyncIntervalSecs: r.SyncIntervalSecs,
-		SyncListenAddr:   r.SyncListenAddr,
 		PacketInspection: r.PacketInspection,
 		InsecureSkipVerify: insecureSkipVerify,
 	}
@@ -101,12 +97,6 @@ func FetchConfig(controllerURL, apiKey string, insecureSkipVerify bool) (*Config
 	}
 	if cfg.WireGuardIface == "" {
 		cfg.WireGuardIface = "wg0"
-	}
-	if cfg.SyncIntervalSecs == 0 {
-		cfg.SyncIntervalSecs = 30
-	}
-	if cfg.SyncListenAddr == "" {
-		cfg.SyncListenAddr = "127.0.0.1:8181"
 	}
 	if cfg.WireGuardSubnet == "" {
 		cfg.WireGuardSubnet = "10.1.0.0/16"

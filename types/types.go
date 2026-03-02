@@ -82,9 +82,15 @@ type Device struct {
 	Tag       string               `json:"Tag" bson:"Tag"`
 	Groups    []primitive.ObjectID `json:"Groups" bson:"Groups"`
 
+	// ServerID links the device to its WireGuard server for subnet-based IP assignment.
+	ServerID primitive.ObjectID `json:"ServerID,omitempty" bson:"ServerID"`
+
 	// WireGuardKey is the client's Curve25519 public key (base64).
-	// IP assignment is owned by each wg-server; the controller only stores the key.
 	WireGuardKey string `json:"WireGuardKey,omitempty" bson:"WireGuardKey"`
+
+	// WireGuardIP is the IP assigned to this device within the server's WireGuard subnet.
+	// Assigned at device creation time by the controller.
+	WireGuardIP string `json:"WireGuardIP,omitempty" bson:"WireGuardIP"`
 }
 
 type FORM_GET_SERVER struct {
@@ -109,12 +115,6 @@ type Server struct {
 	WireGuardPort   string `json:"WireGuardPort,omitempty" bson:"WireGuardPort"`
 	WireGuardPubKey string `json:"WireGuardPubKey,omitempty" bson:"WireGuardPubKey"`
 	WireGuardSubnet string `json:"WireGuardSubnet,omitempty" bson:"WireGuardSubnet"`
-
-	// WGBaseURL is the base HTTP URL of this wg-server's local management
-	// listener (e.g. "http://127.0.0.1:8181"). The controller uses it to call
-	// /v3/wg/assign (IP assignment) and /v3/wg/sync (instant peer pickup).
-	// Leave empty to skip WireGuard integration for this server.
-	WGBaseURL string `json:"WGBaseURL,omitempty" bson:"WGBaseURL"`
 }
 
 // WGServerConfig holds all operational configuration for a wg-server instance.
@@ -137,9 +137,7 @@ type WGServerConfig struct {
 	WireGuardSubnet  string `json:"WireGuardSubnet" bson:"WireGuardSubnet"`
 	WireGuardIface   string `json:"WireGuardIface" bson:"WireGuardIface"`
 
-	InternetIface    string `json:"InternetIface" bson:"InternetIface"`
-	SyncIntervalSecs int    `json:"SyncIntervalSecs" bson:"SyncIntervalSecs"`
-	SyncListenAddr   string `json:"SyncListenAddr" bson:"SyncListenAddr"`
+	InternetIface string `json:"InternetIface" bson:"InternetIface"`
 
 	PacketInspection   bool `json:"PacketInspection" bson:"PacketInspection"`
 	InsecureSkipVerify bool `json:"InsecureSkipVerify" bson:"InsecureSkipVerify"`
@@ -159,18 +157,10 @@ type WGServerConfigResponse struct {
 	WireGuardSubnet  string `json:"WireGuardSubnet"`
 	WireGuardIface   string `json:"WireGuardIface"`
 
-	InternetIface    string `json:"InternetIface"`
-	SyncIntervalSecs int    `json:"SyncIntervalSecs"`
-	SyncListenAddr   string `json:"SyncListenAddr"`
+	InternetIface string `json:"InternetIface"`
 
 	PacketInspection   bool `json:"PacketInspection"`
 	InsecureSkipVerify bool `json:"InsecureSkipVerify"`
-}
-
-// WGAnnounceRequest is sent by a wg-server on boot to register its subnet.
-type WGAnnounceRequest struct {
-	ServerID        string `json:"ServerID"`
-	WireGuardSubnet string `json:"WireGuardSubnet"`
 }
 
 // WGServerInfo describes a peer wg-server for cross-server routing.
@@ -222,30 +212,6 @@ type ServerConnectResponse struct {
 	WireGuardPort   string `json:"WireGuardPort,omitempty"`
 }
 
-func CreateCRRFromServer(S *ServerConfig) (CRR *ServerConnectResponse) {
-	return &ServerConnectResponse{
-		InterfaceIP: S.VPNIP,
-		DNSRecords:  S.DNSRecords,
-		Networks:    S.SubNets,
-		Routes:      S.Routes,
-		DNSServers:  S.DNSServers,
-	}
-}
-
-type ControllerConnectRequest struct {
-	DeviceKey   string             `json:"DeviceKey"`
-	DeviceToken string             `json:"DeviceToken"`
-	UserID      primitive.ObjectID `json:"UserID"`
-
-	ServerID primitive.ObjectID `json:"ServerID"`
-
-	// These are added by the golang client
-	Version int       `json:"Version"`
-	Created time.Time `json:"Created"`
-
-	// WireGuard: client's base64 Curve25519 public key; triggers inline WG registration
-	WireGuardPubKey string `json:"WireGuardPubKey,omitempty"`
-}
 
 type FORM_GET_DEVICE struct {
 	DeviceID primitive.ObjectID
@@ -256,6 +222,7 @@ type FORM_GET_DEVICE struct {
 type WGPeer struct {
 	PublicKeyHex string `json:"PublicKeyHex"`
 	DeviceID     string `json:"DeviceID"`
+	WireGuardIP  string `json:"WireGuardIP,omitempty"`
 }
 
 type WGPeersResponse struct {
