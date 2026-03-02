@@ -8,21 +8,16 @@ import "./assets/style/app.scss";
 import "@fontsource-variable/inter";
 
 import DNSAnswers from "./App/component/DNSAnswers";
-import ServerDevices from "./App/ServerDevices";
 import ScreenLoader from "./App/ScreenLoader";
-import InspectGroup from "./App/InspectGroup";
 import UserSelect from "./App/UserSelect";
 import Enable2FA from "./App/Enable2FA";
 import Settings from "./App/Settings";
-import Devices from "./App/Devices";
 import Account from "./App/Account";
 import Welcome from "./App/Welcome";
 import SideBar from "./App/SideBar";
 import GLOBAL_STATE from "./state";
-import Groups from "./App/Groups";
 import Login from "./App/Login";
 import { STATE } from "./state";
-import Users from "./App/Users";
 import Stats from "./App/Stats";
 import Logs from "./App/Logs";
 import STORE from "./store";
@@ -32,6 +27,7 @@ import ConfirmDialog from "./App/ConfirmDialog";
 import DNS from "./App/dns";
 import WS from "./ws";
 import Bandwidth from "./App/BandwidthHistory";
+import UserDevices from "./App/UserDevices";
 
 const appElement = document.getElementById("app");
 const root = createRoot(appElement);
@@ -84,18 +80,14 @@ const LaunchApp = () => {
                   <Route path="/" element={<Graph />} />
                   <Route path="*" element={<Graph />} />
 
-                  <Route path="groups" element={<Groups />} />
-                  <Route path="users" element={<Users />} />
-                  <Route path="devices" element={<Devices />} />
-                  <Route path="groups/:id" element={<InspectGroup />} />
-
                   <Route path="connections" element={<Stats />} />
                   <Route path="bandwidth" element={<Bandwidth />} />
 
                   <Route path="tunnels" element={<Graph />} />
                   <Route path="account" element={<Account />} />
+                  <Route path="devices" element={<UserDevices />} />
 
-                  <Route path="server/:id" element={<ServerDevices />} />
+
                 </>
               )}
               <Route path="accounts" element={<UserSelect />} />

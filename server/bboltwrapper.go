@@ -90,6 +90,22 @@ func BBolt_GetDevices(limit, offset int64) ([]*types.Device, error) {
 	return DL, err
 }
 
+func BBolt_GetDevicesByUserID(userID primitive.ObjectID) ([]*types.Device, error) {
+	DL := make([]*types.Device, 0)
+	err := BBoltDB.View(func(tx *gobolt.Tx) error {
+		b := tx.Bucket([]byte(DEVICES_BUCKET))
+		c := b.Cursor()
+		for k, v := c.First(); k != nil; k, v = c.Next() {
+			D := new(types.Device)
+			if err := bboltUnmarshal(v, D); err == nil && D.UserID == userID {
+				DL = append(DL, D)
+			}
+		}
+		return nil
+	})
+	return DL, err
+}
+
 // User struct must be defined somewhere, using same as dbwrapper.go
 // type User struct { ... }
 

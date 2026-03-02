@@ -2,17 +2,15 @@ import { useNavigate, useLocation } from "react-router-dom";
 import React from "react";
 import {
   GearIcon,
-  HomeIcon,
   InfoCircledIcon,
   LockOpen1Icon,
   PersonIcon,
   ContainerIcon,
-  DesktopIcon,
 } from "@radix-ui/react-icons";
 import { cn } from "@/lib/utils";
 import GLOBAL_STATE from "../state";
 import logoSvg from "../assets/images/fav/logo.svg";
-import { Logs, Network, Gauge, BarChart3 } from "lucide-react";
+import { Logs, Network, Gauge, BarChart3, Monitor } from "lucide-react";
 import { UsersIcon } from "lucide-react";
 
 const SideBar = () => {
@@ -26,20 +24,6 @@ const SideBar = () => {
     }
     return false;
   };
-  const isManager = () => {
-    if (state.User?.IsAdmin === true || state.User?.IsManager === true) {
-      return true;
-    }
-    return false;
-  }
-
-  const hasActiveTunnels = () => {
-    if (state.ActiveTunnels?.length > 0) {
-      return true
-    }
-    return false
-  }
-
   const menu = {
     groups: [
       {
@@ -54,7 +38,8 @@ const SideBar = () => {
             shouldRender: showLogin,
           },
           { icon: Network, label: "Tunnels", route: "tunnels", user: true },
-          { icon: Gauge, label: "Bandwidth History", route: "bandwidth", user: true },
+          { icon: Monitor, label: "Devices", route: "devices", user: true },
+          { icon: Gauge, label: "Bandwidth", route: "bandwidth", user: true },
           // { icon: MixerHorizontalIcon, label: "Connections", route: "connections", user: true, shouldRender: hasActiveTunnels },
         ],
       },
@@ -66,16 +51,7 @@ const SideBar = () => {
         ],
       },
       {
-        title: "Admin",
-        isManager: true,
-        items: [
-          { icon: PersonIcon, label: "Users", route: "users", user: true, shouldRender: isManager },
-          { icon: DesktopIcon, label: "Devices", route: "devices", user: true, shouldRender: isManager },
-          { icon: HomeIcon, label: "Groups", route: "groups", user: true, shouldRender: isManager },
-        ],
-      },
-      {
-        title: "Settings",
+        title: "App",
         items: [
           {
             icon: GearIcon,
@@ -123,9 +99,6 @@ const SideBar = () => {
             }
             if (g.shouldRender && !g.shouldRender()) {
               return false;
-            }
-            if (g.isManager && !isManager()) {
-              return null
             }
             return (
               <div key={g.title}>

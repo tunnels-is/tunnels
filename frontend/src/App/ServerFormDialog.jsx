@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Save } from "lucide-react";
 import GLOBAL_STATE from "../state";
 
-const ServerFormDialog = ({ open, onOpenChange, server, onSave }) => {
+const ServerFormDialog = ({ open, onOpenChange, onSave }) => {
   const state = GLOBAL_STATE("server-form");
   const [form, setForm] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -22,12 +22,8 @@ const ServerFormDialog = ({ open, onOpenChange, server, onSave }) => {
       setForm(null);
       return;
     }
-    if (server) {
-      setForm({ ...server });
-    } else {
-      setForm({ Tag: "", Country: "", IP: "", Port: "", DataPort: "", PubKey: "" });
-    }
-  }, [open, server]);
+    setForm({ Tag: "", Country: "", IP: "", Port: "", DataPort: "", PubKey: "" });
+  }, [open]);
 
   const set = (key, val) => setForm((f) => ({ ...f, [key]: val }));
 
@@ -35,33 +31,16 @@ const ServerFormDialog = ({ open, onOpenChange, server, onSave }) => {
     if (!form) return;
     setSaving(true);
 
-    let ok = false;
-    if (form._id) {
-      const resp = await state.callController(null, "POST", "/v3/server/update", { Server: form }, false, false);
-      if (resp?.status === 200) {
-        state.PrivateServers?.forEach((s, i) => {
-          if (s._id === form._id) {
-            state.PrivateServers[i] = form;
-          }
-        });
-        state.updatePrivateServers();
-        ok = true;
-      }
-    } else {
-      const resp = await state.callController(null, "POST", "/v3/server/create", { Server: form }, false, false);
-      if (resp?.status === 200) {
-        if (!state.PrivateServers) state.PrivateServers = [];
-        state.PrivateServers.push(resp.data);
-        state.updatePrivateServers();
-        ok = true;
-      }
-    }
-
-    setSaving(false);
-    if (ok) {
+    const resp = await state.callController(null, "POST", "/v3/server/create", { Server: form }, false, false);
+    if (resp?.status === 200) {
+      if (!state.PrivateServers) state.PrivateServers = [];
+      state.PrivateServers.push(resp.data);
+      state.updatePrivateServers();
       onSave?.();
       onOpenChange(false);
     }
+
+    setSaving(false);
   };
 
   if (!form) return null;
@@ -71,19 +50,11 @@ const ServerFormDialog = ({ open, onOpenChange, server, onSave }) => {
       <DialogContent className="sm:max-w-[480px] text-white bg-[#0a0d14] border-[#1e2433]">
         <DialogHeader>
           <DialogTitle className="text-lg font-bold text-white">
-            {server ? `Edit Server: ${server.Tag}` : "New Server"}
+            New Server
           </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-1">
-          {/* Read-only ID */}
-          {form._id && (
-            <div className="flex items-baseline gap-3 py-1.5 pl-3 border-l-2 border-white/[0.06]">
-              <span className="text-[11px] text-white/45 shrink-0 w-[50px]">ID</span>
-              <code className="text-[13px] text-white/50 font-mono truncate">{form._id}</code>
-            </div>
-          )}
-
           {/* Editable fields */}
           <div className="pt-3 grid grid-cols-2 gap-x-3 gap-y-3">
             <div>

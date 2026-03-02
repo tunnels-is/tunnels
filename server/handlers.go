@@ -457,6 +457,30 @@ func API_DeviceList(w http.ResponseWriter, r *http.Request) {
 	sendObject(w, devices)
 }
 
+func API_DeviceListUser(w http.ResponseWriter, r *http.Request) {
+	defer BasicRecover()
+	F := new(FORM_LIST_DEVICE)
+	err := decodeBody(r, F)
+	if err != nil {
+		senderr(w, 400, "Invalid request body", slog.Any("error", err))
+		return
+	}
+
+	user, err := authenticateUserFromEmailOrIDAndToken("", F.UID, F.DeviceToken)
+	if err != nil {
+		senderr(w, 401, err.Error())
+		return
+	}
+
+	devices, err := DB_GetDevicesByUserID(user.ID)
+	if err != nil {
+		senderr(w, 500, "Unknown error, please try again in a moment")
+		return
+	}
+
+	sendObject(w, devices)
+}
+
 func API_DeviceCreate(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 	hasAPIKey := HTTP_validateKey(r)
@@ -474,12 +498,7 @@ func API_DeviceCreate(w http.ResponseWriter, r *http.Request) {
 			senderr(w, 500, err.Error())
 			return
 		}
-		if !user.IsAdmin {
-			if !user.IsManager {
-				senderr(w, 401, "You are not allowed to create devices")
-				return
-			}
-		}
+		F.Device.UserID = user.ID
 	}
 
 	if F.Device == nil || F.Device.Tag == "" {
