@@ -23,6 +23,12 @@ func launchAPIServer() {
 	mux.HandleFunc("/health", healthCheckHandler)
 	mux.HandleFunc("/", healthCheckHandler)
 
+	adminHandler := adminUIHandler()
+	mux.Handle("/admin/", http.StripPrefix("/admin", adminHandler))
+	mux.HandleFunc("/admin", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/admin/", http.StatusMovedPermanently)
+	})
+
 	if AUTHEnabled {
 		mux.HandleFunc("/v3/user/create", API_UserCreate)
 		mux.HandleFunc("/v3/user/update", API_UserUpdate)
