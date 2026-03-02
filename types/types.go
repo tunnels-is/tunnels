@@ -229,15 +229,3 @@ type WGPeersResponse struct {
 	Peers []WGPeer `json:"Peers"`
 }
 
-type WGRegisterRequest struct {
-	DeviceID     string `json:"DeviceID"`
-	PublicKeyB64 string `json:"PublicKeyB64"`
-}
-
-type WGRegisterResponse struct {
-	AssignedIP   string `json:"AssignedIP"`
-	ServerPubKey string `json:"ServerPubKey"`
-	ServerIP     string `json:"ServerIP"`
-	ServerPort   string `json:"ServerPort"`
-	Conf         string `json:"Conf"`
-}
