@@ -82,6 +82,9 @@ type Device struct {
 	Tag       string               `json:"Tag" bson:"Tag"`
 	Groups    []primitive.ObjectID `json:"Groups" bson:"Groups"`
 
+	// UserID is the ID of the user who owns this device.
+	UserID primitive.ObjectID `json:"UserID,omitempty" bson:"UserID"`
+
 	// ServerID links the device to its WireGuard server for subnet-based IP assignment.
 	ServerID primitive.ObjectID `json:"ServerID,omitempty" bson:"ServerID"`
 
