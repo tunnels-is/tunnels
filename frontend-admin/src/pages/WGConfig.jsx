@@ -1,217 +1,94 @@
 import { useState, useEffect } from 'react';
-import { Plus, Link } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Plus, RefreshCw } from 'lucide-react';
 import { apiPost } from '../api';
 
-const inputClass = "w-full bg-[#060810] border border-[#1e2433] rounded px-3 py-1.5 text-[13px] text-white placeholder-white/30 focus:outline-none focus:border-[#4B7BF5]/50";
-
-function Section({ title, children }) {
-  return (
-    <div className="border border-[#1e2433] rounded-lg p-5 mb-5">
-      <h2 className="text-[14px] font-semibold text-white mb-4">{title}</h2>
-      {children}
-    </div>
-  );
-}
-
-function Field({ label, children, hint }) {
-  return (
-    <div className="mb-3">
-      <label className="block text-[11px] text-white/40 uppercase tracking-wider mb-1">{label}</label>
-      {children}
-      {hint && <p className="text-[11px] text-white/30 mt-1">{hint}</p>}
-    </div>
-  );
-}
-
 export default function WGConfig() {
-  const [servers, setServers] = useState([]);
-  const [createForm, setCreateForm] = useState({
-    Tag: '',
-    WireGuardPort: 51820,
-    WireGuardSubnet: '10.1.0.0/16',
-    WireGuardIface: 'wg0',
-    InternetIface: 'eth0',
-    AdminAPIKey: '',
-    PacketInspection: false,
-    InsecureSkipVerify: false,
-  });
-  const [createResult, setCreateResult] = useState(null);
-  const [creating, setCreating] = useState(false);
-  const [createError, setCreateError] = useState('');
+  const navigate = useNavigate();
+  const [configs, setConfigs] = useState([]);
+  const [networks, setNetworks] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const [assignForm, setAssignForm] = useState({ ServerID: '', ConfigID: '' });
-  const [assigning, setAssigning] = useState(false);
-  const [assignResult, setAssignResult] = useState(null);
-  const [assignError, setAssignError] = useState('');
-
-  useEffect(() => {
-    apiPost('/v3/servers', { StartIndex: 0 }).then(async (resp) => {
-      if (resp.status === 200) {
-        const data = await resp.json();
-        setServers(Array.isArray(data) ? data : []);
-      }
-    }).catch(() => {});
-  }, []);
-
-  const handleCreate = async (e) => {
-    e.preventDefault();
-    setCreateError('');
-    setCreateResult(null);
-    setCreating(true);
+  const load = async () => {
+    setLoading(true);
+    setError('');
     try {
-      const resp = await apiPost('/v3/wg/server-config', createForm);
-      if (resp.status === 200) {
-        const data = await resp.json();
-        setCreateResult(data);
-      } else {
-        const data = await resp.json().catch(() => ({}));
-        setCreateError(data.Error || 'Failed to create WG config');
+      const [cfgResp, netResp] = await Promise.all([
+        apiPost('/v3/wg/server-config/list', {}),
+        apiPost('/v3/network/list', { Limit: 50000, Offset: 0 }),
+      ]);
+      if (cfgResp.status === 200) {
+        const data = await cfgResp.json();
+        setConfigs(Array.isArray(data) ? data : []);
+      } else if (cfgResp.status !== 204) {
+        const data = await cfgResp.json().catch(() => ({}));
+        setError(data.Error || 'Failed to load configs');
+      }
+      if (netResp.status === 200) {
+        const data = await netResp.json();
+        setNetworks(Array.isArray(data) ? data : []);
       }
     } catch (err) {
-      setCreateError(err.message);
+      setError(err.message);
     } finally {
-      setCreating(false);
+      setLoading(false);
     }
   };
 
-  const handleAssign = async (e) => {
-    e.preventDefault();
-    setAssignError('');
-    setAssignResult(null);
-    setAssigning(true);
-    try {
-      const resp = await apiPost('/v3/wg/server-config/assign', {
-        ServerID: assignForm.ServerID,
-        ConfigID: assignForm.ConfigID,
-      });
-      if (resp.status === 200) {
-        const data = await resp.json();
-        setAssignResult(data);
-      } else {
-        const data = await resp.json().catch(() => ({}));
-        setAssignError(data.Error || 'Failed to assign config');
-      }
-    } catch (err) {
-      setAssignError(err.message);
-    } finally {
-      setAssigning(false);
-    }
-  };
+  useEffect(() => { load(); }, []);
 
-  const setC = (k) => (e) => {
-    const val = e.target.type === 'checkbox' ? e.target.checked : (e.target.type === 'number' ? Number(e.target.value) : e.target.value);
-    setCreateForm((f) => ({ ...f, [k]: val }));
+  const networkCIDR = (nid) => {
+    if (!nid || nid === '000000000000000000000000') return '—';
+    const n = networks.find((n) => n._id === nid);
+    return n ? n.CIDR : nid.slice(0, 8) + '…';
   };
 
   return (
     <div>
-      <h1 className="text-[16px] font-semibold text-white mb-5">WireGuard Config</h1>
-
-      <Section title="Create WG Server Config">
-        <p className="text-[12px] text-white/40 mb-4">
-          Creates a new WireGuard server config with an auto-generated key pair and API key.
-          The generated APIKey is used by the wg-server to authenticate and fetch its config.
-        </p>
-        <form onSubmit={handleCreate}>
-          <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-            <Field label="Tag"><input type="text" className={inputClass} value={createForm.Tag} onChange={setC('Tag')} required /></Field>
-            <Field label="Admin API Key" hint="Optional: used by wg-server for admin ops">
-              <input type="text" className={inputClass} value={createForm.AdminAPIKey} onChange={setC('AdminAPIKey')} placeholder="leave blank to auto-skip" />
-            </Field>
-            <Field label="WireGuard Port">
-              <input type="number" className={inputClass} value={createForm.WireGuardPort} onChange={setC('WireGuardPort')} />
-            </Field>
-            <Field label="WireGuard Subnet">
-              <input type="text" className={inputClass} value={createForm.WireGuardSubnet} onChange={setC('WireGuardSubnet')} />
-            </Field>
-            <Field label="WireGuard Interface">
-              <input type="text" className={inputClass} value={createForm.WireGuardIface} onChange={setC('WireGuardIface')} />
-            </Field>
-            <Field label="Internet Interface">
-              <input type="text" className={inputClass} value={createForm.InternetIface} onChange={setC('InternetIface')} />
-            </Field>
-          </div>
-          <div className="flex gap-6 mb-4">
-            <label className="flex items-center gap-2 text-[12px] text-white/60 cursor-pointer">
-              <input type="checkbox" checked={createForm.PacketInspection} onChange={setC('PacketInspection')} className="accent-[#4B7BF5]" />
-              Packet Inspection
-            </label>
-            <label className="flex items-center gap-2 text-[12px] text-white/60 cursor-pointer">
-              <input type="checkbox" checked={createForm.InsecureSkipVerify} onChange={setC('InsecureSkipVerify')} className="accent-[#4B7BF5]" />
-              Insecure Skip Verify
-            </label>
-          </div>
-          {createError && <p className="text-[12px] text-red-400 mb-3">{createError}</p>}
-          <button type="submit" disabled={creating} className="flex items-center gap-2 px-4 py-2 bg-[#4B7BF5]/10 text-[#4B7BF5] hover:bg-[#4B7BF5]/20 rounded text-[13px] disabled:opacity-50">
-            <Plus className="w-4 h-4" />
-            {creating ? 'Creating...' : 'Create Config'}
+      <div className="flex items-center justify-between mb-5">
+        <h1 className="text-[16px] font-semibold text-white">WireGuard Configs</h1>
+        <div className="flex gap-2">
+          <button onClick={load} disabled={loading} className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[12px] text-white/60 hover:text-white/80 hover:bg-white/[0.04] transition-colors">
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
           </button>
-        </form>
-
-        {createResult && (
-          <div className="mt-4 p-4 bg-emerald-500/5 border border-emerald-500/20 rounded">
-            <p className="text-[12px] text-emerald-400 mb-2 font-medium">Config created — save this APIKey, it won't be shown again:</p>
-            <div className="space-y-1.5">
-              {Object.entries(createResult).map(([k, v]) => (
-                <div key={k} className="flex gap-3">
-                  <span className="text-[11px] text-white/40 w-36 shrink-0">{k}</span>
-                  <span className="text-[11px] text-white/80 font-mono break-all">{String(v)}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </Section>
-
-      <Section title="Assign Config to Server">
-        <p className="text-[12px] text-white/40 mb-4">
-          Links a WGServerConfig to a Server entry so the server shows the correct WireGuard public key and port.
-        </p>
-        <form onSubmit={handleAssign} className="space-y-3">
-          <Field label="Server">
-            <select
-              className={inputClass}
-              value={assignForm.ServerID}
-              onChange={(e) => setAssignForm((f) => ({ ...f, ServerID: e.target.value }))}
-              required
-            >
-              <option value="">— Select server —</option>
-              {servers.map((s) => (
-                <option key={s._id} value={s._id}>{s.Tag} ({s.IP})</option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Config ID" hint="The ID returned when creating the config">
-            <input
-              type="text"
-              className={inputClass}
-              placeholder="hex object ID"
-              value={assignForm.ConfigID}
-              onChange={(e) => setAssignForm((f) => ({ ...f, ConfigID: e.target.value }))}
-              required
-            />
-          </Field>
-          {assignError && <p className="text-[12px] text-red-400">{assignError}</p>}
-          <button type="submit" disabled={assigning} className="flex items-center gap-2 px-4 py-2 bg-[#4B7BF5]/10 text-[#4B7BF5] hover:bg-[#4B7BF5]/20 rounded text-[13px] disabled:opacity-50">
-            <Link className="w-4 h-4" />
-            {assigning ? 'Assigning...' : 'Assign'}
+          <button
+            onClick={() => navigate('/wgconfig/create', { state: { networks } })}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[12px] bg-[#4B7BF5]/10 text-[#4B7BF5] hover:bg-[#4B7BF5]/20 transition-colors"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Add Config
           </button>
-        </form>
+        </div>
+      </div>
 
-        {assignResult && (
-          <div className="mt-4 p-4 bg-emerald-500/5 border border-emerald-500/20 rounded">
-            <p className="text-[12px] text-emerald-400 mb-2 font-medium">Config assigned successfully:</p>
-            <div className="space-y-1.5">
-              {Object.entries(assignResult).map(([k, v]) => (
-                <div key={k} className="flex gap-3">
-                  <span className="text-[11px] text-white/40 w-36 shrink-0">{k}</span>
-                  <span className="text-[11px] text-white/80 font-mono">{String(v)}</span>
-                </div>
-              ))}
-            </div>
-          </div>
+      {error && <p className="text-[12px] text-red-400 mb-3">{error}</p>}
+
+      <div className="border border-[#1e2433] rounded-lg overflow-hidden">
+        <div className="grid grid-cols-[1fr_160px_80px_160px] gap-4 px-4 py-2 border-b border-[#1e2433] bg-[#0a0d14]">
+          {['Tag', 'Network (CIDR)', 'WG Port', 'Interfaces'].map((h) => (
+            <span key={h} className="text-[10px] text-white/40 uppercase tracking-wider">{h}</span>
+          ))}
+        </div>
+
+        {configs.length === 0 && !loading && (
+          <div className="px-4 py-6 text-[12px] text-white/40">No configs found</div>
         )}
-      </Section>
+
+        {configs.map((c) => (
+          <div
+            key={c._id}
+            onClick={() => navigate(`/wgconfig/${c._id}`, { state: { config: c, networks } })}
+            className="grid grid-cols-[1fr_160px_80px_160px] gap-4 px-4 py-2.5 border-b border-[#1e2433]/50 hover:bg-white/[0.03] cursor-pointer items-center"
+          >
+            <span className="text-[13px] text-white/80 truncate">{c.Tag}</span>
+            <span className="text-[12px] text-white/60 font-mono truncate">{networkCIDR(c.NetworkID)}</span>
+            <span className="text-[12px] text-white/50">{c.WireGuardPort || '—'}</span>
+            <span className="text-[11px] text-white/40 truncate">{c.WireGuardIface || '—'} / {c.InternetIface || '—'}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

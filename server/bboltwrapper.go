@@ -15,12 +15,13 @@ import (
 var BBoltDB *gobolt.DB
 
 const (
-	USERS_BUCKET          = "users"
-	DEVICES_BUCKET        = "devices"
-	ORGS_BUCKET           = "orgs"
-	GROUPS_BUCKET         = "groups"
-	SERVERS_BUCKET        = "servers"
+	USERS_BUCKET             = "users"
+	DEVICES_BUCKET           = "devices"
+	ORGS_BUCKET              = "orgs"
+	GROUPS_BUCKET            = "groups"
+	SERVERS_BUCKET           = "servers"
 	WG_SERVER_CONFIGS_BUCKET = "wg_server_configs"
+	NETWORKS_BUCKET          = "networks"
 )
 
 func ConnectToBBoltDB(path string) (err error) {
@@ -29,7 +30,7 @@ func ConnectToBBoltDB(path string) (err error) {
 		return err
 	}
 	return BBoltDB.Update(func(tx *gobolt.Tx) error {
-		buckets := []string{USERS_BUCKET, DEVICES_BUCKET, ORGS_BUCKET, GROUPS_BUCKET, SERVERS_BUCKET, WG_SERVER_CONFIGS_BUCKET}
+		buckets := []string{USERS_BUCKET, DEVICES_BUCKET, ORGS_BUCKET, GROUPS_BUCKET, SERVERS_BUCKET, WG_SERVER_CONFIGS_BUCKET, NETWORKS_BUCKET}
 		for _, b := range buckets {
 			_, err := tx.CreateBucketIfNotExists([]byte(b))
 			if err != nil {
@@ -970,7 +971,7 @@ func BBolt_UpdateWGServerConfig(cfg *types.WGServerConfig) error {
 }
 
 // BBolt_SetServerWGConfigID updates the WGConfigID and cached WG fields on a server record.
-func BBolt_SetServerWGConfigID(serverID string, wgCfg *types.WGServerConfig, pubKey string) error {
+func BBolt_SetServerWGConfigID(serverID string, wgCfg *types.WGServerConfig, pubKey, subnet string) error {
 	return BBoltDB.Update(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(SERVERS_BUCKET))
 		v := b.Get([]byte(serverID))
@@ -982,7 +983,7 @@ func BBolt_SetServerWGConfigID(serverID string, wgCfg *types.WGServerConfig, pub
 			return err
 		}
 		S.WGConfigID = wgCfg.ID
-		S.WireGuardSubnet = wgCfg.WireGuardSubnet
+		S.WireGuardSubnet = subnet
 		S.WireGuardPubKey = pubKey
 		S.WireGuardPort = fmt.Sprintf("%d", wgCfg.WireGuardPort)
 		data, err := bboltMarshal(S)
@@ -991,4 +992,100 @@ func BBolt_SetServerWGConfigID(serverID string, wgCfg *types.WGServerConfig, pub
 		}
 		return b.Put([]byte(serverID), data)
 	})
+}
+
+// ── Networks ─────────────────────────────────────────────────────────────────
+
+func BBolt_CountNetworks() (int64, error) {
+	var count int64
+	err := BBoltDB.View(func(tx *gobolt.Tx) error {
+		b := tx.Bucket([]byte(NETWORKS_BUCKET))
+		if b == nil {
+			return nil
+		}
+		count = int64(b.Stats().KeyN)
+		return nil
+	})
+	return count, err
+}
+
+func BBolt_CreateNetworksBatch(networks []*Network) error {
+	return BBoltDB.Update(func(tx *gobolt.Tx) error {
+		b := tx.Bucket([]byte(NETWORKS_BUCKET))
+		for _, n := range networks {
+			data, err := bboltMarshal(n)
+			if err != nil {
+				return err
+			}
+			if err := b.Put([]byte(objectIDToString(n.ID)), data); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+func BBolt_GetNetworks(limit, offset int64) ([]*Network, error) {
+	NL := make([]*Network, 0)
+	err := BBoltDB.View(func(tx *gobolt.Tx) error {
+		b := tx.Bucket([]byte(NETWORKS_BUCKET))
+		c := b.Cursor()
+		var skipped int64
+		for k, v := c.First(); k != nil; k, v = c.Next() {
+			if skipped < offset {
+				skipped++
+				continue
+			}
+			if int64(len(NL)) >= limit {
+				break
+			}
+			n := new(Network)
+			if err := bboltUnmarshal(v, n); err == nil {
+				NL = append(NL, n)
+			}
+		}
+		return nil
+	})
+	return NL, err
+}
+
+func BBolt_FindNetworkByID(id primitive.ObjectID) (*Network, error) {
+	var n *Network
+	err := BBoltDB.View(func(tx *gobolt.Tx) error {
+		b := tx.Bucket([]byte(NETWORKS_BUCKET))
+		v := b.Get([]byte(objectIDToString(id)))
+		if v == nil {
+			return nil
+		}
+		n = new(Network)
+		return bboltUnmarshal(v, n)
+	})
+	return n, err
+}
+
+func BBolt_UpdateNetwork(n *Network) error {
+	return BBoltDB.Update(func(tx *gobolt.Tx) error {
+		b := tx.Bucket([]byte(NETWORKS_BUCKET))
+		data, err := bboltMarshal(n)
+		if err != nil {
+			return err
+		}
+		return b.Put([]byte(objectIDToString(n.ID)), data)
+	})
+}
+
+func BBolt_ListWGServerConfigs() ([]*types.WGServerConfig, error) {
+	configs := make([]*types.WGServerConfig, 0)
+	err := BBoltDB.View(func(tx *gobolt.Tx) error {
+		b := tx.Bucket([]byte(WG_SERVER_CONFIGS_BUCKET))
+		c := b.Cursor()
+		for k, v := c.First(); k != nil; k, v = c.Next() {
+			cfg := new(types.WGServerConfig)
+			if err := bboltUnmarshal(v, cfg); err == nil {
+				configs = append(configs, cfg)
+			}
+		}
+		return nil
+	})
+	return configs, err
 }

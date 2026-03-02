@@ -1,5 +1,5 @@
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { Users, Monitor, Layers, Server, Shield, LogOut } from 'lucide-react';
+import { Users, Monitor, Layers, Server, Shield, Network, LogOut } from 'lucide-react';
 import { getAuth, clearAuth } from '../auth';
 import { apiPost } from '../api';
 
@@ -9,6 +9,7 @@ const navItems = [
   { icon: Layers, label: 'Groups', route: 'groups' },
   { icon: Server, label: 'Servers', route: 'servers' },
   { icon: Shield, label: 'WG Config', route: 'wgconfig' },
+  { icon: Network, label: 'Networks', route: 'networks' },
 ];
 
 export default function Layout() {

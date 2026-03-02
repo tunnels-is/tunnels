@@ -31,6 +31,9 @@ const (
 
 	WG_SERVER_CONFIG_DATABASE   = "wg_server_configs"
 	WG_SERVER_CONFIG_COLLECTION = "wg_server_configs"
+
+	NETWORK_DATABASE   = "networks"
+	NETWORK_COLLECTION = "networks"
 )
 
 var DB *mongo.Client
@@ -1332,10 +1335,122 @@ func DB_UpdateWGServerConfig(cfg *types.WGServerConfig) error {
 	return err
 }
 
-// DB_SetServerWGConfigID links a server to its WGServerConfig and caches the WG fields.
-func DB_SetServerWGConfigID(serverID primitive.ObjectID, wgCfg *types.WGServerConfig, pubKey string) error {
+// ── Networks ─────────────────────────────────────────────────────────────────
+
+func DB_CountNetworks() (int64, error) {
 	if BBOLTEnabled {
-		return BBolt_SetServerWGConfigID(objectIDToString(serverID), wgCfg, pubKey)
+		return BBolt_CountNetworks()
+	}
+	defer BasicRecover()
+	count, err := DB.Database(NETWORK_DATABASE).
+		Collection(NETWORK_COLLECTION).
+		CountDocuments(context.Background(), bson.M{})
+	return count, err
+}
+
+func DB_CreateNetworksBatch(networks []*Network) error {
+	if BBOLTEnabled {
+		return BBolt_CreateNetworksBatch(networks)
+	}
+	defer BasicRecover()
+	docs := make([]interface{}, len(networks))
+	for i, n := range networks {
+		docs[i] = n
+	}
+	_, err := DB.Database(NETWORK_DATABASE).
+		Collection(NETWORK_COLLECTION).
+		InsertMany(context.Background(), docs)
+	return err
+}
+
+func DB_GetNetworks(limit, offset int64) ([]*Network, error) {
+	if BBOLTEnabled {
+		return BBolt_GetNetworks(limit, offset)
+	}
+	defer BasicRecover()
+	opt := options.Find()
+	opt.SetLimit(limit)
+	opt.SetSkip(offset)
+	cursor, err := DB.Database(NETWORK_DATABASE).
+		Collection(NETWORK_COLLECTION).
+		Find(context.Background(), bson.M{}, opt)
+	if err != nil {
+		return nil, err
+	}
+	NL := make([]*Network, 0)
+	for cursor.Next(context.TODO()) {
+		n := new(Network)
+		if err := cursor.Decode(n); err == nil {
+			NL = append(NL, n)
+		}
+	}
+	return NL, nil
+}
+
+func DB_FindNetworkByID(id primitive.ObjectID) (*Network, error) {
+	if BBOLTEnabled {
+		return BBolt_FindNetworkByID(id)
+	}
+	defer BasicRecover()
+	n := new(Network)
+	err := DB.Database(NETWORK_DATABASE).
+		Collection(NETWORK_COLLECTION).
+		FindOne(context.Background(), bson.M{"_id": id}).
+		Decode(n)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return n, nil
+}
+
+func DB_UpdateNetwork(n *Network) error {
+	if BBOLTEnabled {
+		return BBolt_UpdateNetwork(n)
+	}
+	defer BasicRecover()
+	_, err := DB.Database(NETWORK_DATABASE).
+		Collection(NETWORK_COLLECTION).
+		UpdateOne(
+			context.Background(),
+			bson.M{"_id": n.ID},
+			bson.D{{Key: "$set", Value: bson.D{
+				{Key: "Tag", Value: n.Tag},
+				{Key: "Description", Value: n.Description},
+				{Key: "WGConfigID", Value: n.WGConfigID},
+			}}},
+			options.Update(),
+		)
+	return err
+}
+
+func DB_ListWGServerConfigs() ([]*types.WGServerConfig, error) {
+	if BBOLTEnabled {
+		return BBolt_ListWGServerConfigs()
+	}
+	defer BasicRecover()
+	cursor, err := DB.Database(WG_SERVER_CONFIG_DATABASE).
+		Collection(WG_SERVER_CONFIG_COLLECTION).
+		Find(context.Background(), bson.M{}, options.Find())
+	if err != nil {
+		return nil, err
+	}
+	configs := make([]*types.WGServerConfig, 0)
+	for cursor.Next(context.TODO()) {
+		cfg := new(types.WGServerConfig)
+		if err := cursor.Decode(cfg); err == nil {
+			configs = append(configs, cfg)
+		}
+	}
+	return configs, nil
+}
+
+// DB_SetServerWGConfigID links a server to its WGServerConfig and caches the WG fields.
+func DB_SetServerWGConfigID(serverID primitive.ObjectID, wgCfg *types.WGServerConfig, pubKey, subnet string) error {
+	if BBOLTEnabled {
+		return BBolt_SetServerWGConfigID(objectIDToString(serverID), wgCfg, pubKey, subnet)
 	}
 	defer BasicRecover()
 	_, err := DB.Database(SERVER_DATABASE).
@@ -1345,7 +1460,7 @@ func DB_SetServerWGConfigID(serverID primitive.ObjectID, wgCfg *types.WGServerCo
 			bson.M{"_id": serverID},
 			bson.D{{Key: "$set", Value: bson.D{
 				{Key: "WGConfigID", Value: wgCfg.ID},
-				{Key: "WireGuardSubnet", Value: wgCfg.WireGuardSubnet},
+				{Key: "WireGuardSubnet", Value: subnet},
 				{Key: "WireGuardPubKey", Value: pubKey},
 				{Key: "WireGuardPort", Value: fmt.Sprintf("%d", wgCfg.WireGuardPort)},
 			}}},

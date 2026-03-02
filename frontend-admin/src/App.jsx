@@ -11,6 +11,10 @@ import GroupDetail from './pages/GroupDetail';
 import Servers from './pages/Servers';
 import ServerDetail from './pages/ServerDetail';
 import WGConfig from './pages/WGConfig';
+import WGConfigCreate from './pages/WGConfigCreate';
+import WGConfigDetail from './pages/WGConfigDetail';
+import Networks from './pages/Networks';
+import NetworkDetail from './pages/NetworkDetail';
 
 function RequireAuth({ children }) {
   if (!isLoggedIn()) {
@@ -42,6 +46,10 @@ export default function App() {
           <Route path="servers" element={<Servers />} />
           <Route path="servers/:id" element={<ServerDetail />} />
           <Route path="wgconfig" element={<WGConfig />} />
+          <Route path="wgconfig/create" element={<WGConfigCreate />} />
+          <Route path="wgconfig/:id" element={<WGConfigDetail />} />
+          <Route path="networks" element={<Networks />} />
+          <Route path="networks/:id" element={<NetworkDetail />} />
           <Route path="*" element={<Navigate to="/users" replace />} />
         </Route>
       </Routes>
