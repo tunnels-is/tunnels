@@ -250,7 +250,7 @@ const TunnelNode = React.forwardRef(({ tunnel, active, state, selected, linking,
 });
 TunnelNode.displayName = "TunnelNode";
 
-const ServerNode = React.forwardRef(({ server, hasActive, hasLinked, activeStats, state, linking, hovered, expanded, onClick, onMouseEnter, onMouseLeave, onEdit, onConnect, onDisconnect }, ref) => {
+const ServerNode = React.forwardRef(({ server, hasActive, hasLinked, activeStats, state, linking, hovered, expanded, onClick, onMouseEnter, onMouseLeave, onConnect, onDisconnect }, ref) => {
   return (
     <div
       ref={ref}
@@ -296,13 +296,6 @@ const ServerNode = React.forwardRef(({ server, hasActive, hasLinked, activeStats
           title="Copy ID"
         >
           <Copy className="w-3 h-3" />
-        </button>
-        <button
-          onClick={(e) => { e.stopPropagation(); onEdit?.(server); }}
-          className="p-1 rounded text-white/50 hover:text-white/70 hover:bg-white/5"
-          title="Edit"
-        >
-          <Pencil className="w-3 h-3" />
         </button>
       </div>
 
@@ -385,7 +378,6 @@ const Graph = () => {
   const [tunnelDialogOpen, setTunnelDialogOpen] = useState(false);
   const [editTunnel, setEditTunnel] = useState(null);
   const [serverDialogOpen, setServerDialogOpen] = useState(false);
-  const [editServer, setEditServer] = useState(null);
 
   useEffect(() => {
     state.GetServers();
@@ -600,13 +592,7 @@ const Graph = () => {
     setVersion(v => v + 1);
   };
 
-  const handleEditServer = (server) => {
-    setEditServer(server);
-    setServerDialogOpen(true);
-  };
-
   const handleNewServer = () => {
-    setEditServer(null);
     setServerDialogOpen(true);
   };
 
@@ -870,7 +856,6 @@ const Graph = () => {
                   if (conns?.length) setHoveredConn({ tunnelTag: conns[0].tunnel.Tag, serverId: server._id });
                 }}
                 onMouseLeave={() => setHoveredConn(null)}
-                onEdit={handleEditServer}
                 onConnect={handleConnectServer}
                 onDisconnect={handleDisconnectServer}
               />
@@ -893,7 +878,6 @@ const Graph = () => {
       <ServerFormDialog
         open={serverDialogOpen}
         onOpenChange={setServerDialogOpen}
-        server={editServer}
         onSave={handleServerSaved}
       />
     </div>

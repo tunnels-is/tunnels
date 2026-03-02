@@ -776,7 +776,7 @@ export var STATE = {
       return "http://127.0.0.1:7777";
     }
     let host = window.location.origin;
-    host = host.replace("https://", "http://");
+    host = host.replace("http://", "https://");
     host = host.replace("5173", "7777");
     host = host.replace("5174", "7777");
     host = host.replace("5175", "7777");

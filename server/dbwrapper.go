@@ -172,6 +172,32 @@ func DB_GetDevices(limit, offset int64) (DL []*types.Device, err error) {
 	return DL, err
 }
 
+func DB_GetDevicesByUserID(userID primitive.ObjectID) (DL []*types.Device, err error) {
+	if BBOLTEnabled {
+		return BBolt_GetDevicesByUserID(userID)
+	}
+	defer BasicRecover()
+
+	cursor, err := DB.Database(DEVICE_DATABASE).
+		Collection(DEVICE_COLLECTION).
+		Find(context.Background(), bson.M{"UserID": userID})
+	if err != nil {
+		ADMIN("Unable to find devices by user: ", err)
+		return nil, err
+	}
+
+	DL = make([]*types.Device, 0)
+	for cursor.Next(context.TODO()) {
+		D := new(types.Device)
+		if err = cursor.Decode(D); err != nil {
+			ADMIN("Unable to decode device: ", err)
+			continue
+		}
+		DL = append(DL, D)
+	}
+	return DL, err
+}
+
 func DB_getUsers(limit, offset int64) (UL []*User, err error) {
 	if BBOLTEnabled {
 		return BBolt_getUsers(limit, offset)

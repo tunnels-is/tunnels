@@ -35,7 +35,7 @@ const Account = () => {
 
   const tabs = [
     { key: "account", label: "Account" },
-    { key: "loggedin", label: "Devices" },
+    { key: "loggedin", label: "Logins" },
     { key: "license", label: "License Key" },
   ];
 
@@ -126,7 +126,7 @@ const Account = () => {
       {tab === "loggedin" && (
         <div>
           <div className="flex items-center gap-4 pl-3 border-l-2 border-transparent mb-1">
-            <span className="text-[10px] text-white/40 uppercase tracking-wider flex-1 min-w-0">Device</span>
+            <span className="text-[10px] text-white/40 uppercase tracking-wider flex-1 min-w-0">Name</span>
             <span className="text-[10px] text-white/40 uppercase tracking-wider shrink-0 w-36 text-right">Created</span>
             <span className="shrink-0 w-16" />
           </div>
