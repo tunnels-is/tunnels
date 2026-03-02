@@ -67,9 +67,15 @@ func launchAPIServer() {
 
 		// WireGuard server config management
 		mux.HandleFunc("/v3/wg/server-config", API_WGServerConfigCreate)
+		mux.HandleFunc("/v3/wg/server-config/list", API_WGServerConfigList)
+		mux.HandleFunc("/v3/wg/server-config/update", API_WGServerConfigUpdate)
 		mux.HandleFunc("/v3/wg/server-config/get", API_WGServerConfigGet)
 		mux.HandleFunc("/v3/wg/server-config/fetch", API_WGServerConfigFetch)
 		mux.HandleFunc("/v3/wg/server-config/assign", API_WGServerConfigAssign)
+
+		// Network management
+		mux.HandleFunc("/v3/network/list", API_NetworkList)
+		mux.HandleFunc("/v3/network/update", API_NetworkUpdate)
 
 		// Tunnels public network specific
 		if loadSecret("PayKey") != "" {

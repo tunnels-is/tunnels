@@ -137,8 +137,11 @@ type WGServerConfig struct {
 
 	WireGuardPort    int    `json:"WireGuardPort" bson:"WireGuardPort"`
 	WireGuardPrivKey string `json:"WireGuardPrivKey" bson:"WireGuardPrivKey"`
-	WireGuardSubnet  string `json:"WireGuardSubnet" bson:"WireGuardSubnet"`
 	WireGuardIface   string `json:"WireGuardIface" bson:"WireGuardIface"`
+
+	// NetworkID references the Network record whose CIDR is the WireGuard subnet.
+	// The subnet is resolved at runtime — it is not stored on this struct.
+	NetworkID primitive.ObjectID `json:"NetworkID,omitempty" bson:"NetworkID,omitempty"`
 
 	InternetIface string `json:"InternetIface" bson:"InternetIface"`
 
