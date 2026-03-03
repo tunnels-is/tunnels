@@ -82,7 +82,7 @@ export var STATE = {
   },
 
   GetServers: async () => {
-    let resp = await STATE.callController(null, "POST", "/v3/servers", { StartIndex: 0 }, false, false)
+    let resp = await STATE.callController(null, "POST", "/client/servers", { StartIndex: 0 }, false, false)
     if (resp?.status === 200) {
       if (resp.data?.length > 0) {
         STORE.Cache.SetObject("servers", resp.data);
@@ -535,7 +535,7 @@ export var STATE = {
     try {
       let newUser = STATE.User
 
-      let x = await STATE.callController(null, "POST", "/v3/user/update",
+      let x = await STATE.callController(null, "POST", "/client/user/update",
         { APIKey: newUser.APIKey },
         false, true)
       if (x === true) {
@@ -689,7 +689,7 @@ export var STATE = {
       logoutUser = true;
     }
 
-    let resp = await STATE.callController(null, "POST", "/v3/user/logout",
+    let resp = await STATE.callController(null, "POST", "/client/user/logout",
       { DeviceToken: token.DT, UserID: user._id, All: all },
       false, false)
     if (resp && resp.status === 200) {
@@ -739,7 +739,7 @@ export var STATE = {
       return;
     }
 
-    let ok = await STATE.callController(null, "POST", "/v3/key/activate",
+    let ok = await STATE.callController(null, "POST", "/client/key/activate",
       { Key: STATE.LicenseKey },
       false, true)
     if (ok) {

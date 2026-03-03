@@ -8,7 +8,7 @@ const UserDevices = () => {
   const [devices, setDevices] = useState([]);
 
   const loadDevices = async () => {
-    const resp = await state.callController(null, "POST", "/v3/device/list/user", {}, false, false);
+    const resp = await state.callController(null, "POST", "/client/device/list/user", {}, false, false);
     if (resp?.status === 200 && Array.isArray(resp.data)) {
       setDevices(resp.data);
     }

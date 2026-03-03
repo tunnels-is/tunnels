@@ -131,7 +131,7 @@ const useForm = () => {
     }
 
 
-    let x = await state.callController(authServer, "POST", "/v3/user/create", inputs, true, false)
+    let x = await state.callController(authServer, "POST", "/client/user/create", inputs, true, false)
     if (x.status === 200) {
       state.v2_SetUser(x.data, remember, authServer);
       navigate("/")
@@ -185,7 +185,7 @@ const useForm = () => {
       return;
     }
 
-    let x = await state.callController(authServer, "POST", "/v3/user/login", inputs, true, false)
+    let x = await state.callController(authServer, "POST", "/client/user/login", inputs, true, false)
     if (x && x.status === 200) {
       STORE.Cache.Set("default-device-name", inputs["devicename"]);
       STORE.Cache.Set("default-email", inputs["email"]);
@@ -231,7 +231,7 @@ const useForm = () => {
       ConfirmCode: inputs["code"],
     };
 
-    let x = await state.callController(authServer, "POST", "/v3/user/enable", request, true, false)
+    let x = await state.callController(authServer, "POST", "/client/user/enable", request, true, false)
     if (x.status === 200) {
       inputs["code"] = "";
       setInputs({ ...inputs });
@@ -292,7 +292,7 @@ const useForm = () => {
       UseTwoFactor: inputs["usetwofactor"] ? inputs["usetwofactor"] : false
     };
 
-    let x = await state.callController(authServer, "POST", "/v3/user/reset/password", request, true, false)
+    let x = await state.callController(authServer, "POST", "/client/user/reset/password", request, true, false)
     if (x.status === 200) {
       inputs["password"] = "";
       inputs["password2"] = "";
@@ -328,7 +328,7 @@ const useForm = () => {
       Email: inputs["email"],
     };
 
-    let x = await state.callController(authServer, "POST", "/v3/user/reset/code", request, true, false)
+    let x = await state.callController(authServer, "POST", "/client/user/reset/code", request, true, false)
     if (x.status === 200) {
       state.successNotification("reset code sent")
     }
