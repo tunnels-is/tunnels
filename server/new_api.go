@@ -29,8 +29,10 @@ func launchAPIServer() {
 		http.Redirect(w, r, "/admin/", http.StatusMovedPermanently)
 	})
 
-	// WireGuard server config fetch — authenticated via X-WG-KEY in the handler itself
+	// WireGuard server endpoints — authenticated via X-WG-KEY in each handler itself
 	mux.HandleFunc("/wg/server-config/fetch", API_WGServerConfigFetch)
+	mux.HandleFunc("/wg/peers", API_WGPeers)
+	mux.HandleFunc("/wg/servers", API_WGServers)
 
 	if AUTHEnabled {
 		// ----------------------------------------------------------------
@@ -102,10 +104,8 @@ func launchAPIServer() {
 		mux.Handle("/ui/server/update", adminMW(API_ServerUpdate))
 		mux.Handle("/ui/servers", adminMW(API_ServersForUser))
 
-		// WireGuard peer/server info
-		mux.Handle("/ui/wg/peers", adminMW(API_WGPeers))
+		// WireGuard config viewer (admin UI only)
 		mux.Handle("/ui/wg/config", adminMW(API_WGConfig))
-		mux.Handle("/ui/wg/servers", adminMW(API_WGServers))
 
 		// WireGuard server config management
 		mux.Handle("/ui/wg/server-config", adminMW(API_WGServerConfigCreate))

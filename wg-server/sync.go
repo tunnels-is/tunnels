@@ -83,15 +83,15 @@ func assignAndAdd(pubKeyB64 string) bool {
 	return false
 }
 
-// fetchDesiredPeers calls GET /v3/wg/peers on the auth controller.
-// The controller returns hex-encoded public keys and pre-assigned IPs.
+// fetchDesiredPeers calls GET /wg/peers on the controller.
+// Authenticated with X-WG-KEY (same per-server APIKey used for config fetch).
 func fetchDesiredPeers(cfg *Config) (*types.WGPeersResponse, error) {
-	url := cfg.ControllerURL + "/v3/wg/peers"
+	url := cfg.ControllerURL + "/wg/peers"
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("build request: %w", err)
 	}
-	req.Header.Set("X-API-KEY", cfg.AdminAPIKey)
+	req.Header.Set("X-WG-KEY", cfg.APIKey)
 
 	resp, err := httpClient.Do(req)
 	if err != nil {

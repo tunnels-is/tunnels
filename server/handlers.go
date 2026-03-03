@@ -197,6 +197,17 @@ func API_UserUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Enforce that a regular authenticated user can only update their own record.
+	// X-API-KEY callers may supply an arbitrary UID in the body.
+	user := getUserFromContext(r.Context())
+	if user == nil && !isAdminAPIKeyFromContext(r.Context()) {
+		senderr(w, 401, "Unauthorized")
+		return
+	}
+	if user != nil {
+		UF.UID = user.ID
+	}
+
 	err = DB_updateUser(UF)
 	if err != nil {
 		senderr(w, 500, "Unable to update users, please try again in a moment")
@@ -568,7 +579,11 @@ func API_DeviceCreate(w http.ResponseWriter, r *http.Request) {
 			senderr(w, 401, "Unauthorized")
 			return
 		}
-		F.Device.UserID = user.ID
+		// Regular (non-admin) users can only create devices for themselves.
+		// Admins/managers may specify an arbitrary UserID in the request body.
+		if !user.IsAdmin && !user.IsManager {
+			F.Device.UserID = user.ID
+		}
 	}
 
 	if F.Device == nil || F.Device.Tag == "" {
@@ -1210,12 +1225,16 @@ func API_UserToggleSubStatus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	user := getUserFromContext(r.Context())
-	if user == nil {
+	if user == nil && !isAdminAPIKeyFromContext(r.Context()) {
 		senderr(w, 401, "Unauthorized")
 		return
 	}
 
-	UF.Email = user.Email
+	// Regular (non-admin) users can only toggle their own subscription.
+	// Admins, managers, and X-API-KEY callers may specify an arbitrary email in the body.
+	if user != nil && !user.IsAdmin && !user.IsManager {
+		UF.Email = user.Email
+	}
 
 	err = DB_toggleUserSubscriptionStatus(UF)
 	if err != nil {
