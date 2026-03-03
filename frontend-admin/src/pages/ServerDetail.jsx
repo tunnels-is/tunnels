@@ -145,6 +145,18 @@ export default function ServerDetail() {
             <span className="text-[12px]">{server.Country || '—'}</span>
           )}
         </Row>
+        <Row label="WG Config">
+          {server.WGConfigID ? (
+            <button
+              onClick={() => navigate(`/wgconfig/${server.WGConfigID}`)}
+              className="font-mono text-[12px] text-[#4B7BF5] hover:underline"
+            >
+              {server.WGConfigID}
+            </button>
+          ) : (
+            <span className="text-[12px] text-white/30">—</span>
+          )}
+        </Row>
         <Row label="WG Subnet">
           {editing ? (
             <input className={inputClass} value={form.WireGuardSubnet} onChange={set('WireGuardSubnet')} placeholder="10.1.0.0/16" />

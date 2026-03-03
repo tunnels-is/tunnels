@@ -275,7 +275,7 @@ type wgServerConfig struct {
 }
 
 func getServerWGConfig(server *ControlServer, serverID string) (*wgServerConfig, error) {
-	url := server.GetURL("/v3/wg/config") + "?serverID=" + serverID
+	url := server.GetURL("/client/wg/config") + "?serverID=" + serverID
 	responseBytes, code, err := SendRequestToURL(nil, "GET", url, nil, 10000, server.ValidateCertificate)
 	if err != nil {
 		return nil, fmt.Errorf("get wg config: %w", err)
@@ -295,7 +295,7 @@ func GetDeviceByID(server *ControlServer, deviceID string) (d *types.Device, err
 
 	FR := &FORWARD_REQUEST{
 		Server:  server,
-		Path:    "/v3/device",
+		Path:    "/client/device",
 		Method:  "POST",
 		Timeout: 10000,
 		JSONData: &types.FORM_GET_DEVICE{
