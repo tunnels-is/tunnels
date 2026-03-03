@@ -23,9 +23,6 @@ type Config struct {
 	// ServerID is the hex ObjectID of this server's record in the controller DB.
 	ServerID string
 
-	// AdminAPIKey is the controller's admin key used to call /v3/wg/peers etc.
-	AdminAPIKey string
-
 	WireGuardPort    int
 	WireGuardPrivKey string
 	WireGuardSubnet  string
@@ -42,7 +39,7 @@ type Config struct {
 }
 
 // FetchConfig fetches the operational configuration from the controller using
-// the per-server APIKey. It calls GET /v3/wg/server-config/fetch with the
+// the per-server APIKey. It calls GET /wg/server-config/fetch with the
 // X-WG-KEY header and maps the response to a Config.
 func FetchConfig(controllerURL, apiKey string, insecureSkipVerify bool) (*Config, error) {
 	transport := &http.Transport{
@@ -55,7 +52,7 @@ func FetchConfig(controllerURL, apiKey string, insecureSkipVerify bool) (*Config
 		Timeout:   15 * time.Second,
 	}
 
-	url := controllerURL + "/v3/wg/server-config/fetch"
+	url := controllerURL + "/wg/server-config/fetch"
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("build request: %w", err)
@@ -81,7 +78,6 @@ func FetchConfig(controllerURL, apiKey string, insecureSkipVerify bool) (*Config
 		ControllerURL:    controllerURL,
 		APIKey:           apiKey,
 		ServerID:         r.ServerID,
-		AdminAPIKey:      r.AdminAPIKey,
 		WireGuardPort:    r.WireGuardPort,
 		WireGuardPrivKey: r.WireGuardPrivKey,
 		WireGuardSubnet:  r.WireGuardSubnet,

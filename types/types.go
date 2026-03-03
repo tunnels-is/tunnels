@@ -128,12 +128,8 @@ type WGServerConfig struct {
 	Tag string             `json:"Tag" bson:"Tag"`
 
 	// APIKey is the per-server secret; wg-server sends this in X-WG-KEY to
-	// authenticate its config fetch.
+	// authenticate /wg/server-config/fetch, /wg/peers, and /wg/servers.
 	APIKey string `json:"APIKey" bson:"APIKey"`
-
-	// AdminAPIKey is the controller's admin key; wg-server needs this to call
-	// /v3/wg/peers and other admin endpoints.
-	AdminAPIKey string `json:"AdminAPIKey" bson:"AdminAPIKey"`
 
 	WireGuardPort    int    `json:"WireGuardPort" bson:"WireGuardPort"`
 	WireGuardPrivKey string `json:"WireGuardPrivKey" bson:"WireGuardPrivKey"`
@@ -149,14 +145,12 @@ type WGServerConfig struct {
 	InsecureSkipVerify bool `json:"InsecureSkipVerify" bson:"InsecureSkipVerify"`
 }
 
-// WGServerConfigResponse is returned by the /v3/wg/server-config/fetch endpoint
-// to the wg-server. It includes sensitive fields (PrivKey, AdminAPIKey) that are
-// only served on this per-server endpoint.
+// WGServerConfigResponse is returned by GET /wg/server-config/fetch to the
+// wg-server. It includes the private key and all operational parameters needed
+// to bring up the WireGuard interface.
 type WGServerConfigResponse struct {
 	// ServerID is the hex ObjectID of the Server record linked to this config.
 	ServerID string `json:"ServerID"`
-
-	AdminAPIKey string `json:"AdminAPIKey"`
 
 	WireGuardPort    int    `json:"WireGuardPort"`
 	WireGuardPrivKey string `json:"WireGuardPrivKey"`

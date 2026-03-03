@@ -14,14 +14,18 @@ import (
 	"golang.org/x/crypto/curve25519"
 )
 
-// API_WGPeers handles GET /ui/wg/peers.
-// Returns all devices with a WireGuard key registered (DeviceID + hex public key).
-// IP assignment is owned by each wg-server; AllowedIPs are not included here.
-// Protected by adminUIMiddleware or X-API-KEY.
+// API_WGPeers handles GET /wg/peers.
+// Authenticated via X-WG-KEY header (per-config APIKey), same as /wg/server-config/fetch.
+// Returns all devices that have a WireGuard key registered (DeviceID + hex public key).
 func API_WGPeers(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 	if r.Method != http.MethodGet {
 		senderr(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+
+	if _, ok := HTTP_validateWGKey(r); !ok {
+		senderr(w, 401, "Unauthorized")
 		return
 	}
 
@@ -197,7 +201,6 @@ func deriveWGPubKey(privKeyB64 string) (string, error) {
 // FORM_WG_SERVER_CONFIG_CREATE is the body for POST /ui/wg/server-config.
 type FORM_WG_SERVER_CONFIG_CREATE struct {
 	Tag           string             `json:"Tag"`
-	AdminAPIKey   string             `json:"AdminAPIKey"`
 	WireGuardPort int                `json:"WireGuardPort"`
 	NetworkID     primitive.ObjectID `json:"NetworkID"`
 	WireGuardIface  string           `json:"WireGuardIface"`
@@ -249,11 +252,10 @@ func API_WGServerConfigCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	cfg := &types.WGServerConfig{
-		ID:               primitive.NewObjectID(),
-		Tag:              F.Tag,
-		APIKey:           uuid.NewString(),
-		AdminAPIKey:      F.AdminAPIKey,
-		WireGuardPort:    F.WireGuardPort,
+		ID:            primitive.NewObjectID(),
+		Tag:           F.Tag,
+		APIKey:        uuid.NewString(),
+		WireGuardPort: F.WireGuardPort,
 		WireGuardPrivKey: privKeyB64,
 		NetworkID:        F.NetworkID,
 		WireGuardIface:   F.WireGuardIface,
@@ -388,9 +390,8 @@ func API_WGServerConfigFetch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := &types.WGServerConfigResponse{
-		ServerID:           serverID,
-		AdminAPIKey:        wgCfg.AdminAPIKey,
-		WireGuardPort:      wgCfg.WireGuardPort,
+		ServerID:         serverID,
+		WireGuardPort:    wgCfg.WireGuardPort,
 		WireGuardPrivKey:   wgCfg.WireGuardPrivKey,
 		WireGuardSubnet:    fetchSubnet,
 		WireGuardIface:     wgCfg.WireGuardIface,
@@ -406,7 +407,6 @@ func API_WGServerConfigFetch(w http.ResponseWriter, r *http.Request) {
 type FORM_WG_SERVER_CONFIG_UPDATE struct {
 	ID             primitive.ObjectID `json:"ID"`
 	Tag            string             `json:"Tag"`
-	AdminAPIKey    string             `json:"AdminAPIKey"`
 	WireGuardPort  int                `json:"WireGuardPort"`
 	NetworkID      primitive.ObjectID `json:"NetworkID"`
 	WireGuardIface string             `json:"WireGuardIface"`
@@ -458,7 +458,6 @@ func API_WGServerConfigUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	existing.Tag = F.Tag
-	existing.AdminAPIKey = F.AdminAPIKey
 	existing.WireGuardPort = F.WireGuardPort
 	existing.NetworkID = F.NetworkID
 	existing.WireGuardIface = F.WireGuardIface
@@ -540,15 +539,20 @@ func API_WGServerConfigAssign(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// API_WGServers handles GET /ui/wg/servers.
+// API_WGServers handles GET /wg/servers.
+// Authenticated via X-WG-KEY header (per-config APIKey), same as /wg/server-config/fetch.
 // Returns all wg-servers (excluding the caller) that have a WireGuardSubnet,
 // so a wg-server can discover peers for cross-server routing.
-// Auth handled by adminUIMiddleware or X-API-KEY.
 // Optional query param: excludeID=<serverID hex>
 func API_WGServers(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 	if r.Method != http.MethodGet {
 		senderr(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+
+	if _, ok := HTTP_validateWGKey(r); !ok {
+		senderr(w, 401, "Unauthorized")
 		return
 	}
 
