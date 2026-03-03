@@ -14,9 +14,6 @@ import (
 	"golang.org/x/crypto/curve25519"
 )
 
-// API_WGPeers handles GET /wg/peers.
-// Authenticated via X-WG-KEY header (per-config APIKey), same as /wg/server-config/fetch.
-// Returns all devices that have a WireGuard key registered (DeviceID + hex public key).
 func API_WGPeers(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 	if r.Method != http.MethodGet {
@@ -58,8 +55,6 @@ func API_WGPeers(w http.ResponseWriter, r *http.Request) {
 	sendObject(w, resp)
 }
 
-// API_WGConfig handles GET /ui/wg/config or GET /client/wg/config.
-// Returns the WireGuard server's public key and connection details for a given server.
 func API_WGConfig(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 	if r.Method != http.MethodGet {
@@ -91,9 +86,6 @@ func API_WGConfig(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// assignNextWireGuardIP finds the next available IP in the server's WireGuard subnet.
-// It scans all devices' WireGuardIP fields to find used IPs and returns the next
-// unallocated address. The server interface occupies .1; device IPs start at .2.
 func assignNextWireGuardIP(serverID primitive.ObjectID) (string, error) {
 	server, err := DB_FindServerByID(serverID)
 	if err != nil || server == nil {
@@ -123,7 +115,7 @@ func assignNextWireGuardIP(serverID primitive.ObjectID) (string, error) {
 		}
 	}
 
-	base := wgIPToU32(ipNet.IP.To4()) + 2 // .1 is server, start at .2
+	base := wgIPToU32(ipNet.IP.To4()) + 2
 	for {
 		next := wgU32ToIP(base)
 		if !ipNet.Contains(next) {
@@ -145,7 +137,6 @@ func wgU32ToIP(n uint32) net.IP {
 	return net.IP{byte(n >> 24), byte(n >> 16), byte(n >> 8), byte(n)}
 }
 
-// b64KeyToHex converts a base64-encoded 32-byte key to a hex string for UAPI.
 func b64KeyToHex(b64 string) (string, error) {
 	b, err := base64.StdEncoding.DecodeString(b64)
 	if err != nil {
@@ -157,8 +148,6 @@ func b64KeyToHex(b64 string) (string, error) {
 	return fmt.Sprintf("%x", b), nil
 }
 
-// HTTP_validateWGKey authenticates a request using the X-WG-KEY header.
-// Returns the matching WGServerConfig and true, or nil and false on failure.
 func HTTP_validateWGKey(r *http.Request) (*types.WGServerConfig, bool) {
 	key := r.Header.Get("X-WG-KEY")
 	if key == "" {
@@ -171,7 +160,6 @@ func HTTP_validateWGKey(r *http.Request) (*types.WGServerConfig, bool) {
 	return cfg, true
 }
 
-// generateWGPrivKey creates a new clamped Curve25519 private key, base64-encoded.
 func generateWGPrivKey() string {
 	privKey := make([]byte, 32)
 	if _, err := rand.Read(privKey); err != nil {
@@ -182,7 +170,6 @@ func generateWGPrivKey() string {
 	return base64.StdEncoding.EncodeToString(privKey)
 }
 
-// deriveWGPubKey computes the Curve25519 public key from a base64-encoded private key.
 func deriveWGPubKey(privKeyB64 string) (string, error) {
 	privBytes, err := base64.StdEncoding.DecodeString(privKeyB64)
 	if err != nil {
@@ -198,20 +185,17 @@ func deriveWGPubKey(privKeyB64 string) (string, error) {
 	return base64.StdEncoding.EncodeToString(pubBytes), nil
 }
 
-// FORM_WG_SERVER_CONFIG_CREATE is the body for POST /ui/wg/server-config.
 type FORM_WG_SERVER_CONFIG_CREATE struct {
-	Tag           string             `json:"Tag"`
-	WireGuardPort int                `json:"WireGuardPort"`
-	NetworkID     primitive.ObjectID `json:"NetworkID"`
-	WireGuardIface  string           `json:"WireGuardIface"`
-	InternetIface   string           `json:"InternetIface"`
+	Tag            string             `json:"Tag"`
+	WireGuardPort  int                `json:"WireGuardPort"`
+	NetworkID      primitive.ObjectID `json:"NetworkID"`
+	WireGuardIface string             `json:"WireGuardIface"`
+	InternetIface  string             `json:"InternetIface"`
 
 	PacketInspection   bool `json:"PacketInspection"`
 	InsecureSkipVerify bool `json:"InsecureSkipVerify"`
 }
 
-// API_WGServerConfigCreate handles POST /ui/wg/server-config.
-// Auth handled by adminUIMiddleware or X-API-KEY.
 func API_WGServerConfigCreate(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 	if r.Method != http.MethodPost {
@@ -240,7 +224,6 @@ func API_WGServerConfigCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Resolve NetworkID → WireGuardSubnet
 	var subnet string
 	if F.NetworkID != primitive.NilObjectID {
 		network, nerr := DB_FindNetworkByID(F.NetworkID)
@@ -252,14 +235,14 @@ func API_WGServerConfigCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	cfg := &types.WGServerConfig{
-		ID:            primitive.NewObjectID(),
-		Tag:           F.Tag,
-		APIKey:        uuid.NewString(),
-		WireGuardPort: F.WireGuardPort,
-		WireGuardPrivKey: privKeyB64,
-		NetworkID:        F.NetworkID,
-		WireGuardIface:   F.WireGuardIface,
-		InternetIface:    F.InternetIface,
+		ID:                 primitive.NewObjectID(),
+		Tag:                F.Tag,
+		APIKey:             uuid.NewString(),
+		WireGuardPort:      F.WireGuardPort,
+		WireGuardPrivKey:   privKeyB64,
+		NetworkID:          F.NetworkID,
+		WireGuardIface:     F.WireGuardIface,
+		InternetIface:      F.InternetIface,
 		PacketInspection:   F.PacketInspection,
 		InsecureSkipVerify: F.InsecureSkipVerify,
 	}
@@ -275,7 +258,6 @@ func API_WGServerConfigCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Mark the network as assigned to this config
 	if F.NetworkID != primitive.NilObjectID {
 		if network, _ := DB_FindNetworkByID(F.NetworkID); network != nil {
 			network.WGConfigID = cfg.ID
@@ -295,9 +277,6 @@ func API_WGServerConfigCreate(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// API_WGServerConfigGet handles GET /ui/wg/server-config/get?id=<hex>.
-// Returns the config without the private key (redacted for UI display).
-// Auth handled by adminUIMiddleware or X-API-KEY.
 func API_WGServerConfigGet(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 	if r.Method != http.MethodGet {
@@ -331,7 +310,6 @@ func API_WGServerConfigGet(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Return config with privkey redacted
 	sendObject(w, map[string]any{
 		"ID":                 cfg.ID.Hex(),
 		"Tag":                cfg.Tag,
@@ -346,9 +324,6 @@ func API_WGServerConfigGet(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// API_WGServerConfigFetch handles GET /wg/server-config/fetch.
-// Authenticated via X-WG-KEY header. Returns the full WGServerConfigResponse
-// (including privkey and AdminAPIKey) and refreshes the Server's cached WG fields.
 func API_WGServerConfigFetch(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 	if r.Method != http.MethodGet {
@@ -368,7 +343,6 @@ func API_WGServerConfigFetch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Resolve subnet from the linked network.
 	var fetchSubnet string
 	if wgCfg.NetworkID != primitive.NilObjectID {
 		if network, _ := DB_FindNetworkByID(wgCfg.NetworkID); network != nil {
@@ -376,7 +350,6 @@ func API_WGServerConfigFetch(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Find the server linked to this config and refresh its cached WG fields.
 	var serverID string
 	servers, err := DB_FindAllServers()
 	if err == nil {
@@ -390,8 +363,8 @@ func API_WGServerConfigFetch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := &types.WGServerConfigResponse{
-		ServerID:         serverID,
-		WireGuardPort:    wgCfg.WireGuardPort,
+		ServerID:           serverID,
+		WireGuardPort:      wgCfg.WireGuardPort,
 		WireGuardPrivKey:   wgCfg.WireGuardPrivKey,
 		WireGuardSubnet:    fetchSubnet,
 		WireGuardIface:     wgCfg.WireGuardIface,
@@ -403,7 +376,6 @@ func API_WGServerConfigFetch(w http.ResponseWriter, r *http.Request) {
 	sendObject(w, resp)
 }
 
-// FORM_WG_SERVER_CONFIG_UPDATE is the body for POST /ui/wg/server-config/update.
 type FORM_WG_SERVER_CONFIG_UPDATE struct {
 	ID             primitive.ObjectID `json:"ID"`
 	Tag            string             `json:"Tag"`
@@ -416,8 +388,6 @@ type FORM_WG_SERVER_CONFIG_UPDATE struct {
 	InsecureSkipVerify bool `json:"InsecureSkipVerify"`
 }
 
-// API_WGServerConfigUpdate handles POST /ui/wg/server-config/update.
-// Auth handled by adminUIMiddleware or X-API-KEY.
 func API_WGServerConfigUpdate(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 
@@ -441,7 +411,6 @@ func API_WGServerConfigUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// If NetworkID changed, update the old and new network records
 	if existing.NetworkID != F.NetworkID {
 		if existing.NetworkID != primitive.NilObjectID {
 			if oldNet, _ := DB_FindNetworkByID(existing.NetworkID); oldNet != nil {
@@ -473,15 +442,11 @@ func API_WGServerConfigUpdate(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(200)
 }
 
-// FORM_WG_SERVER_CONFIG_ASSIGN is the body for POST /ui/wg/server-config/assign.
 type FORM_WG_SERVER_CONFIG_ASSIGN struct {
 	ServerID primitive.ObjectID `json:"ServerID"`
 	ConfigID primitive.ObjectID `json:"ConfigID"`
 }
 
-// API_WGServerConfigAssign handles POST /ui/wg/server-config/assign.
-// Links a Server to a WGServerConfig and caches the WG fields on the Server.
-// Auth handled by adminUIMiddleware or X-API-KEY.
 func API_WGServerConfigAssign(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 	if r.Method != http.MethodPost {
@@ -539,11 +504,6 @@ func API_WGServerConfigAssign(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// API_WGServers handles GET /wg/servers.
-// Authenticated via X-WG-KEY header (per-config APIKey), same as /wg/server-config/fetch.
-// Returns all wg-servers (excluding the caller) that have a WireGuardSubnet,
-// so a wg-server can discover peers for cross-server routing.
-// Optional query param: excludeID=<serverID hex>
 func API_WGServers(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 	if r.Method != http.MethodGet {
@@ -583,7 +543,6 @@ func API_WGServers(w http.ResponseWriter, r *http.Request) {
 	sendObject(w, resp)
 }
 
-// buildWGConf generates a ready-to-use WireGuard .conf file for a device.
 func buildWGConf(assignedIP, clientPubKeyB64 string, server *types.Server) string {
 	return fmt.Sprintf(`[Interface]
 Address = %s/32

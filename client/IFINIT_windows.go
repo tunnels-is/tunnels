@@ -46,9 +46,7 @@ type TInterface struct {
 }
 
 func (t *TInterface) VerifyOrLoadPointer(method string) {
-	// if atomic.LoadPointer(unsafe.Pointer(&t.WDLL.module)) == nil {
-	// WINTUN IS GONE
-	// }
+
 }
 
 func CreateNewTunnelInterface(
@@ -75,12 +73,10 @@ func CreateNewTunnelInterface(
 		MTU:         meta.MTU,
 
 		GatewayMetric: "2000",
-		// Gateway:       DEFAULT_GATEWAY.To4().String(),
-		// Gateway: "127.0.0.1",
+
 		Gateway: meta.IPv4Address,
 		GUID:    GUID,
 		RingCap: 0x4000000,
-		// RingCap: 0x8000000,
 	}
 	DEBUG(fmt.Sprintf("New tunnel interface/adapter: %v", IF))
 
@@ -104,9 +100,6 @@ func (t *TInterface) CreateOrOpen() (err error) {
 	}
 	t.UTypePtr = uintptr(unsafe.Pointer(t.TypePtr))
 
-	// https://github.com/microsoft/go-winio/blob/main/pkg/guid/guid.go
-	// https://github.com/WireGuard/wintun/pull/7
-	// https://github.com/WireGuard/wintun/blob/master/README.md#wintuncreateadapter
 	t.UGUIDPtr = uintptr(unsafe.Pointer(&t.GUID))
 
 	var msg error
@@ -116,7 +109,7 @@ func (t *TInterface) CreateOrOpen() (err error) {
 	}
 	t.Handle, _, msg = syscall.SyscallN(
 		add.UPTR,
-		// t.WDLL.PTR_OpenAdapter,
+
 		t.UNamePtr,
 	)
 
@@ -128,8 +121,7 @@ func (t *TInterface) CreateOrOpen() (err error) {
 			return
 		}
 		t.Handle, _, msg = syscall.SyscallN(
-			// WCreateAdapter.Addr(),
-			// t.WDLL.PTR_CreateAdapter,
+
 			add.UPTR,
 			t.UNamePtr,
 			t.UTypePtr,
@@ -143,7 +135,6 @@ func (t *TInterface) CreateOrOpen() (err error) {
 		DEBUG(fmt.Sprintf("Created adapter (%s)", t.Name))
 	}
 
-	// runtime.SetFinalizer(IF.Handle, AdapterCleanup)
 	return
 }
 
@@ -154,8 +145,7 @@ func (t *TInterface) Up() (err error) {
 		return
 	}
 	t.SessionHandle, _, msg = syscall.SyscallN(
-		// WStartSession.Addr(),
-		// t.WDLL.PTR_StartSession,
+
 		add.UPTR,
 		t.Handle,
 		uintptr(t.RingCap))
@@ -169,48 +159,6 @@ func (t *TInterface) Up() (err error) {
 }
 
 func (t *TInterface) Down() (err error) {
-	// cmd := exec.Command(
-	// 	"netsh",
-	// 	"interface",
-	// 	"ipv4",
-	// 	"delete",
-	// 	"address",
-	// 	`name="`+t.Name+`"`,
-	// 	"addr=",
-	// 	t.IPv4Address,
-	// 	"gateway=",
-	// 	"All",
-	// )
-	//
-	// DEBUG(
-	// 	"netsh",
-	// 	"interface",
-	// 	"ipv4",
-	// 	"delete",
-	// 	"address",
-	// 	`name="`+t.Name+`"`,
-	// 	"addr=",
-	// 	t.IPv4Address,
-	// 	"gateway=",
-	// 	"All",
-	// )
-	//
-	// cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
-	// ob, cerr := cmd.Output()
-	// if cerr != nil {
-	// 	ERROR(fmt.Sprintf("%s - out: %s ", ob, cerr))
-	// 	return cerr
-	// }
-
-	// r1, _, msg := syscall.SyscallN(
-	// 	t.WDLL.PTR_EndSession,
-	// 	t.Handle)
-	// if r1 == 0 {
-	// 	err = msg
-	// 	ERROR(fmt.Sprintf("Interface/Adapter (%s) state (close) error(%s)", t.Name, err))
-	// } else {
-	// 	DEBUG(fmt.Sprintf("Interface/Adapter (%s) state (close)", t.Name))
-	// }
 
 	return nil
 }
@@ -222,7 +170,7 @@ func (t *TInterface) Addr() (err error) {
 		"ipv4",
 		"set",
 		"address",
-		`name="`+t.Name+`"`, // Corrected quoting
+		`name="`+t.Name+`"`,
 		"static",
 		t.IPv4Address,
 		t.NetMask,
@@ -237,7 +185,7 @@ func (t *TInterface) Addr() (err error) {
 		"ipv4",
 		"set",
 		"address",
-		`name="`+t.Name+`"`, // Corrected quoting
+		`name="`+t.Name+`"`,
 		"static",
 		t.IPv4Address,
 		t.NetMask,
@@ -257,13 +205,12 @@ func (t *TInterface) Addr() (err error) {
 }
 
 func (t *TInterface) AddrV6() (err error) {
-	// Configure IPv6 address using netsh
+
 	ipv6Addr := t.IPv6Address
 	if ipv6Addr == "" {
 		return nil
 	}
 
-	// Add /64 prefix if not specified
 	if !strings.Contains(ipv6Addr, "/") {
 		ipv6Addr = ipv6Addr + "/64"
 	}
@@ -293,7 +240,7 @@ func (t *TInterface) AddrV6() (err error) {
 	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
 	ob, err := cmd.Output()
 	if err != nil {
-		// Check if the error is because the address already exists
+
 		if strings.Contains(string(ob), "already exists") || strings.Contains(err.Error(), "already exists") {
 			DEBUG("IPv6 address already exists on interface: ", t.Name)
 			return nil
@@ -450,7 +397,7 @@ func IP_AddRouteV6(
 
 	var cmd *exec.Cmd
 	if network == "default" {
-		// Add default IPv6 route
+
 		cmd = exec.Command(
 			"netsh",
 			"interface",
@@ -474,7 +421,7 @@ func IP_AddRouteV6(
 			"store=active",
 		)
 	} else {
-		// Add specific IPv6 route
+
 		cmd = exec.Command(
 			"netsh",
 			"interface",
@@ -503,7 +450,7 @@ func IP_AddRouteV6(
 	ob, cerr := cmd.Output()
 
 	if cerr != nil {
-		// Check if the error is because the route already exists
+
 		if strings.Contains(string(ob), "already exists") || strings.Contains(cerr.Error(), "already exists") {
 			DEBUG("IPv6 route already exists: ", network)
 			return nil
@@ -677,27 +624,19 @@ func (t *TInterface) Connect(tun *TUN) (err error) {
 		return
 	}
 
-	// err = t.SetTXQueueLen()
-	// if err != nil {
-	// 	return
-	// }
-
 	closeAllOpenTCPconnections()
 
 	t.exitChannel = make(chan byte, 10)
 	meta := tun.meta.Load()
 
 	if meta.EnableDefaultRoute {
-		// Gateway metric is what determines default
-		// routing on windows. The interface will always
-		// have a default route on creation.
+
 		t.GatewayMetric = "1"
 		err = IP_RouteMetric("0.0.0.0/0", t.Name, "1")
 		if err != nil {
 			return
 		}
 
-		// Add default IPv6 route if IPv6 address is configured
 		if t.IPv6Address != "" {
 			iperr := IP_AddRouteV6("default", t.Name, t.IPv6Address, "0")
 			if iperr != nil {
@@ -705,10 +644,6 @@ func (t *TInterface) Connect(tun *TUN) (err error) {
 			}
 		}
 	}
-
-	// experimental
-	// _ = DNS_Del(strconv.Itoa(DEFAULT_INTERFACE_ID))
-	// err = DNS_Set(strconv.Itoa(DEFAULT_INTERFACE_ID), "127.0.0.1", "1")
 
 	for _, n := range tun.ServerResponse.Networks {
 		if n.Nat != "" {
@@ -781,12 +716,11 @@ func (t *TInterface) Disconnect(tun *TUN) (err error) {
 	if err != nil {
 		ERROR("unable to delete the interface", err)
 	}
-	// TODO .. might not be needed ?????
+
 	meta := tun.meta.Load()
 	if IsDefaultConnection(meta.IFName) || meta.EnableDefaultRoute {
 		err = IP_DelRoute("default", t.IPv4Address, "0")
 
-		// Clean up IPv6 default route if IPv6 was configured
 		if t.IPv6Address != "" {
 			iperr := IP_DelRouteV6("default", t.IPv6Address, "0")
 			if iperr != nil {
@@ -815,7 +749,6 @@ func (t *TInterface) Disconnect(tun *TUN) (err error) {
 var (
 	GUID *windows.GUID
 
-	// WINDOWS DLL
 	IPHLPApi = syscall.NewLazyDLL("iphlpapi.dll")
 	GetTCP   = IPHLPApi.NewProc("GetExtendedTcpTable")
 	GetUDP   = IPHLPApi.NewProc("GetExtendedUdpTable")
@@ -823,9 +756,9 @@ var (
 )
 
 const (
-	PacketSizeMax                       = 0xffff    // Maximum packet size
-	RingCapacityMin                     = 0x20000   // Minimum ring capacity (128 kiB)
-	RingCapacityMax                     = 0x4000000 // Maximum ring capacity (64 MiB)
+	PacketSizeMax                       = 0xffff
+	RingCapacityMin                     = 0x20000
+	RingCapacityMax                     = 0x4000000
 	AdapterNameMax                      = 128
 	LOAD_LIBRARY_SEARCH_APPLICATION_DIR = 0x00000200
 	LOAD_LIBRARY_SEARCH_SYSTEM32        = 0x00000800
@@ -843,7 +776,7 @@ func (t *TInterface) ReceivePacket() (packet []byte, size uint16, err error) {
 	}
 	r0, _, msg := syscall.SyscallN(
 		add.UPTR,
-		// t.WDLL.PTR_ReceivePacket,
+
 		t.SessionHandle,
 		uintptr(unsafe.Pointer(&size)),
 	)
@@ -868,7 +801,7 @@ func (t *TInterface) ReleaseReceivePacket(packet []byte) (err error) {
 	}
 	r0, _, msg := syscall.SyscallN(
 		add.UPTR,
-		// t.WDLL.PTR_ReleaseReceivedPacket,
+
 		t.SessionHandle,
 		uintptr(unsafe.Pointer(&packet[0])),
 	)
@@ -906,7 +839,7 @@ func (t *TInterface) SendPacket(packet []byte) (err error) {
 		return
 	}
 	_, _, _ = syscall.SyscallN(
-		// t.WDLL.PTR_SendPacket,
+
 		add.UPTR,
 		t.SessionHandle,
 		uintptr(unsafe.Pointer(&packet[0])),
@@ -918,17 +851,6 @@ type DLL struct {
 	module          uintptr
 	moduleHandle    windows.Handle
 	moduleUnsafePTR *unsafe.Pointer
-
-	// PTR_OpenAdapter           uintptr
-	// PTR_CloseAdapter          uintptr
-	// PTR_CreateAdapter         uintptr
-	// PTR_StartSession          uintptr
-	// PTR_EndSession            uintptr
-	// PTR_ReceivePacket         uintptr
-	// PTR_AllocateSendPacket    uintptr
-	// PTR_ReleaseReceivedPacket uintptr
-	// PTR_SendPacket            uintptr
-	// PTR_SetLogger uintptr
 
 	// NEW
 	AddressMap [100]*DLLAddress

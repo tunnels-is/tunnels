@@ -29,7 +29,7 @@ func CleanUniqueLogMap() {
 }
 
 func GET_FUNC(skip int) string {
-	pc := make([]uintptr, 10) // at least 1 entry needed
+	pc := make([]uintptr, 10)
 	runtime.Callers(skip, pc)
 	f := runtime.FuncForPC(pc[0])
 	name := f.Name()

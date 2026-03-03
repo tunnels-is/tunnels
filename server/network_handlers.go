@@ -9,8 +9,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-// seedNetworks generates all /22 subnets from 10.0.0.0/8 on first startup.
-// 256 * 64 = 16,384 networks total.
 func seedNetworks() {
 	count, err := DB_CountNetworks()
 	if err != nil {
@@ -100,7 +98,7 @@ func API_WGServerConfigList(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(204)
 		return
 	}
-	// Redact sensitive fields before sending
+
 	for _, cfg := range configs {
 		cfg.APIKey = ""
 		cfg.WireGuardPrivKey = ""

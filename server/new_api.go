@@ -29,22 +29,16 @@ func launchAPIServer() {
 		http.Redirect(w, r, "/admin/", http.StatusMovedPermanently)
 	})
 
-	// WireGuard server endpoints — authenticated via X-WG-KEY in each handler itself
 	mux.HandleFunc("/wg/server-config/fetch", API_WGServerConfigFetch)
 	mux.HandleFunc("/wg/peers", API_WGPeers)
 	mux.HandleFunc("/wg/servers", API_WGServers)
 
 	if AUTHEnabled {
-		// ----------------------------------------------------------------
-		// Public client endpoints (no auth required)
-		// ----------------------------------------------------------------
+
 		mux.HandleFunc("/client/user/login", API_UserLogin)
 		mux.HandleFunc("/client/user/create", API_UserCreate)
 		mux.HandleFunc("/client/user/reset/password", API_UserResetPassword)
 
-		// ----------------------------------------------------------------
-		// Protected client endpoints (clientAuthMiddleware)
-		// ----------------------------------------------------------------
 		clientMW := func(h http.HandlerFunc) http.Handler {
 			return applyMiddleware(h, xAPIKeyMiddleware, clientAuthMiddleware)
 		}
@@ -64,31 +58,22 @@ func launchAPIServer() {
 			mux.Handle("/client/user/toggle/substatus", clientMW(API_UserToggleSubStatus))
 		}
 
-		// ----------------------------------------------------------------
-		// Admin UI login (public — sets the admin_session cookie)
-		// ----------------------------------------------------------------
 		mux.HandleFunc("/ui/user/login", API_AdminUILogin)
 
-		// ----------------------------------------------------------------
-		// Protected admin UI endpoints (adminUIMiddleware)
-		// ----------------------------------------------------------------
 		adminMW := func(h http.HandlerFunc) http.Handler {
 			return applyMiddleware(h, xAPIKeyMiddleware, adminUIMiddleware)
 		}
 
-		// User management
 		mux.Handle("/ui/user/logout", adminMW(API_AdminUILogout))
 		mux.Handle("/ui/user/list", adminMW(API_UserList))
 		mux.Handle("/ui/user/adminupdate", adminMW(API_UserAdminUpdate))
 
-		// Device management
 		mux.Handle("/ui/device/list", adminMW(API_DeviceList))
 		mux.Handle("/ui/device/create", adminMW(API_DeviceCreate))
 		mux.Handle("/ui/device/delete", adminMW(API_DeviceDelete))
 		mux.Handle("/ui/device/update", adminMW(API_DeviceUpdate))
 		mux.Handle("/ui/device", adminMW(API_DeviceGet))
 
-		// Group management
 		mux.Handle("/ui/group/create", adminMW(API_GroupCreate))
 		mux.Handle("/ui/group/delete", adminMW(API_GroupDelete))
 		mux.Handle("/ui/group/update", adminMW(API_GroupUpdate))
@@ -98,23 +83,19 @@ func launchAPIServer() {
 		mux.Handle("/ui/group/entities", adminMW(API_GroupGetEntities))
 		mux.Handle("/ui/group", adminMW(API_GroupGet))
 
-		// Server management
 		mux.Handle("/ui/server", adminMW(API_ServerGet))
 		mux.Handle("/ui/server/create", adminMW(API_ServerCreate))
 		mux.Handle("/ui/server/update", adminMW(API_ServerUpdate))
 		mux.Handle("/ui/servers", adminMW(API_ServersForUser))
 
-		// WireGuard config viewer (admin UI only)
 		mux.Handle("/ui/wg/config", adminMW(API_WGConfig))
 
-		// WireGuard server config management
 		mux.Handle("/ui/wg/server-config", adminMW(API_WGServerConfigCreate))
 		mux.Handle("/ui/wg/server-config/list", adminMW(API_WGServerConfigList))
 		mux.Handle("/ui/wg/server-config/update", adminMW(API_WGServerConfigUpdate))
 		mux.Handle("/ui/wg/server-config/get", adminMW(API_WGServerConfigGet))
 		mux.Handle("/ui/wg/server-config/assign", adminMW(API_WGServerConfigAssign))
 
-		// Network management
 		mux.Handle("/ui/network/list", adminMW(API_NetworkList))
 		mux.Handle("/ui/network/update", adminMW(API_NetworkUpdate))
 

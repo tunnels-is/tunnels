@@ -110,13 +110,12 @@ func getUsers() (ul []*User, err error) {
 }
 
 func getSTREAM(key []byte, iv []byte) (cipher.Stream, []byte, error) {
-	// Create a new AES cipher block
+
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	// Generate a random IV (same size as block size, 16 bytes for AES)
 	if iv == nil {
 		iv = make([]byte, aes.BlockSize)
 		if _, err := io.ReadFull(rand.Reader, iv); err != nil {
@@ -124,7 +123,6 @@ func getSTREAM(key []byte, iv []byte) (cipher.Stream, []byte, error) {
 		}
 	}
 
-	// Create GCM mode
 	ctr := cipher.NewCTR(block, iv)
 	if ctr == nil {
 		return nil, nil, errors.New("unable to create ctr")

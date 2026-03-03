@@ -77,4 +77,3 @@ func (t *TUN) InitNatMaps() (err error) {
 	t.NATIngress = make(map[[4]byte][4]byte)
 	return nil
 }
-

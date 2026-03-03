@@ -22,7 +22,6 @@ import (
 	wgdevice "golang.zx2c4.com/wireguard/device"
 )
 
-// PreConnectCheck validates system state before connecting
 func PreConnectCheck(meta *TunnelMETA) (int, error) {
 	s := STATE.Load()
 	if !s.adminState {
@@ -33,7 +32,6 @@ func PreConnectCheck(meta *TunnelMETA) (int, error) {
 
 var IsConnecting = atomic.Bool{}
 
-// PublicConnect establishes a VPN connection to a server
 func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	if ClientCR.ServerID == "" {
 		ERROR("No Server id found when connecting: ", ClientCR)
@@ -57,7 +55,6 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	loadDefaultGateway()
 	loadDefaultInterface()
 
-	// Fallback on the default tunnel if non is given
 	if ClientCR.Tag == "" {
 		ClientCR.Tag = DefaultTunnelName
 	}
@@ -85,7 +82,6 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		return code, errm
 	}
 
-	// isConnected := false
 	var oldTunnel *TUN
 	tunnelMapRange(func(tun *TUN) bool {
 		m := tun.meta.Load()
@@ -117,7 +113,6 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		}
 	}
 
-	// ensure gateway is not incorrect
 	gateway := state.DefaultGateway.Load()
 	if gateway != nil {
 		if isInterfaceATunnel(*gateway) {
@@ -159,7 +154,6 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		}
 	}
 
-	// Load or generate a persistent WireGuard keypair.
 	wgPrivKeyB64 := meta.WireGuardPrivKey
 	if wgPrivKeyB64 == "" {
 		wgPrivKeyB64, err = generateWGPrivKey()
@@ -173,13 +167,11 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		}
 	}
 
-	// The device's WireGuard IP must be pre-assigned at device creation time.
 	if meta.IPv4Address == "" {
 		ERROR("no WireGuard IP assigned; create the device on the controller first")
 		return 400, errors.New("device has no WireGuard IP; create it on the controller")
 	}
 
-	// Fetch WireGuard server config (public key, port, server IP).
 	wgCfg, wgErr := getServerWGConfig(ClientCR.Server, ClientCR.ServerID)
 	if wgErr != nil {
 		ERROR("unable to fetch server WireGuard config: ", wgErr)
@@ -207,7 +199,6 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		return 502, errors.New("unable to initialize routes")
 	}
 
-	// WireGuard transport: create userspace WG device backed by chanTUN.
 	ct := newChanTUN(wgdevice.DefaultMTU)
 	wgDev := wgdevice.NewDevice(ct, wgconn.NewDefaultBind(),
 		wgdevice.NewLogger(wgdevice.LogLevelError, "[wg-client] "))
@@ -239,9 +230,7 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	var inter *TInterface
 	if oldTunnel != nil {
 		inter = oldTunnel.tunnel.Load()
-		// Stop old goroutines before reconfiguring the interface.
-		// On Windows, the wintun session must be ended before a new
-		// one can be started on the same adapter.
+
 		oldTunnel.SetState(TUN_Disconnecting)
 		if oldTunnel.wgDevice != nil {
 			oldTunnel.wgDevice.Close()
@@ -279,15 +268,12 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	return 200, nil
 }
 
-// wgServerConfig holds the WireGuard connection details returned by /v3/wg/config.
 type wgServerConfig struct {
 	WireGuardPubKey string `json:"WireGuardPubKey"`
 	WireGuardPort   string `json:"WireGuardPort"`
 	ServerIP        string `json:"ServerIP"`
 }
 
-// getServerWGConfig fetches the WireGuard public key, port, and IP for a server.
-// The endpoint is unauthenticated — it only returns public WireGuard parameters.
 func getServerWGConfig(server *ControlServer, serverID string) (*wgServerConfig, error) {
 	url := server.GetURL("/v3/wg/config") + "?serverID=" + serverID
 	responseBytes, code, err := SendRequestToURL(nil, "GET", url, nil, 10000, server.ValidateCertificate)
@@ -304,7 +290,6 @@ func getServerWGConfig(server *ControlServer, serverID string) (*wgServerConfig,
 	return cfg, nil
 }
 
-// GetDeviceByID retrieves device information from the controller
 func GetDeviceByID(server *ControlServer, deviceID string) (d *types.Device, err error) {
 	DID, _ := primitive.ObjectIDFromHex(deviceID)
 
@@ -341,7 +326,6 @@ func GetDeviceByID(server *ControlServer, deviceID string) (d *types.Device, err
 	return
 }
 
-// InitializeTunnelFromCRR initializes tunnel state from connection response
 func InitializeTunnelFromCRR(TUN *TUN) (err error) {
 	DNSGlobalBlock.Store(true)
 	defer func() {
@@ -423,7 +407,6 @@ func InitializeTunnelFromCRR(TUN *TUN) (err error) {
 	return nil
 }
 
-// GetQRCode generates a TOTP QR code for 2FA
 func GetQRCode(LF *TWO_FACTOR_CONFIRM) (QR *QR_CODE, err error) {
 	if LF.Email == "" {
 		return nil, errors.New("email missing")

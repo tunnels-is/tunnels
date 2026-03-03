@@ -8,7 +8,6 @@ import (
 	"github.com/tunnels-is/tunnels/types"
 )
 
-// CreateAndConnectToInterface creates a new tunnel interface
 func CreateAndConnectToInterface(t *TUN) (inter *TInterface, err error) {
 	meta := t.meta.Load()
 	inter, err = CreateNewTunnelInterface(meta)
@@ -20,7 +19,6 @@ func CreateAndConnectToInterface(t *TUN) (inter *TInterface, err error) {
 	return
 }
 
-// Disconnect disconnects a tunnel by ID
 func Disconnect(tunID string, switching bool) (err error) {
 	DEBUG("disconnecting from", tunID, switching)
 	tunnelMapRange(func(tun *TUN) bool {
@@ -46,7 +44,6 @@ func Disconnect(tunID string, switching bool) (err error) {
 	return
 }
 
-// createRandomTunnel creates a tunnel with random parameters
 func createRandomTunnel() (m *TunnelMETA, err error) {
 	m = createTunnel()
 	TunnelMetaMap.Store(m.Tag, m)
@@ -54,7 +51,6 @@ func createRandomTunnel() (m *TunnelMETA, err error) {
 	return
 }
 
-// createTunnel creates a new tunnel metadata object with default values
 func createTunnel() (T *TunnelMETA) {
 	T = new(TunnelMETA)
 	b := make([]rune, 8)
@@ -85,7 +81,6 @@ func createTunnel() (T *TunnelMETA) {
 	return
 }
 
-// createDefaultTunnelMeta creates default tunnel metadata based on tunnel type
 func createDefaultTunnelMeta(t types.TunnelType) (M *TunnelMETA) {
 	M = createTunnel()
 	M.IPv4Address = "172.22.22.1"
@@ -103,13 +98,12 @@ func createDefaultTunnelMeta(t types.TunnelType) (M *TunnelMETA) {
 		M.LocalhostNat = true
 		M.AutoConnect = true
 		M.AutoReconnect = true
-		M.MTU = 1320 // MTU is set low here due to mobile networks
+		M.MTU = 1320
 	}
 
 	return
 }
 
-// CleanupOnClose disconnects all tunnels and closes files on application exit
 func CleanupOnClose() {
 	defer RecoverAndLog()
 	tunnelMapRange(func(tun *TUN) bool {

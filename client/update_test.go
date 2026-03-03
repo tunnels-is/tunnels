@@ -32,12 +32,12 @@ func Test_formatBytes(t *testing.T) {
 		},
 		{
 			name:     "middle KB range",
-			bytes:    512 * 1024, // 512 KB
+			bytes:    512 * 1024,
 			expected: "512.0 KB",
 		},
 		{
 			name:     "fractional KB",
-			bytes:    1536, // 1.5 KB
+			bytes:    1536,
 			expected: "1.5 KB",
 		},
 		{
@@ -47,12 +47,12 @@ func Test_formatBytes(t *testing.T) {
 		},
 		{
 			name:     "middle MB range",
-			bytes:    50 * 1024 * 1024, // 50 MB
+			bytes:    50 * 1024 * 1024,
 			expected: "50.0 MB",
 		},
 		{
 			name:     "fractional MB",
-			bytes:    1536 * 1024, // 1.5 MB
+			bytes:    1536 * 1024,
 			expected: "1.5 MB",
 		},
 		{
@@ -62,12 +62,12 @@ func Test_formatBytes(t *testing.T) {
 		},
 		{
 			name:     "middle GB range",
-			bytes:    50 * 1024 * 1024 * 1024, // 50 GB
+			bytes:    50 * 1024 * 1024 * 1024,
 			expected: "50.0 GB",
 		},
 		{
 			name:     "fractional GB",
-			bytes:    1536 * 1024 * 1024, // 1.5 GB
+			bytes:    1536 * 1024 * 1024,
 			expected: "1.5 GB",
 		},
 		{
@@ -77,12 +77,12 @@ func Test_formatBytes(t *testing.T) {
 		},
 		{
 			name:     "middle TB range",
-			bytes:    5 * 1024 * 1024 * 1024 * 1024, // 5 TB
+			bytes:    5 * 1024 * 1024 * 1024 * 1024,
 			expected: "5.0 TB",
 		},
 		{
 			name:     "fractional TB",
-			bytes:    1536 * 1024 * 1024 * 1024, // 1.5 TB
+			bytes:    1536 * 1024 * 1024 * 1024,
 			expected: "1.5 TB",
 		},
 		{
@@ -92,7 +92,7 @@ func Test_formatBytes(t *testing.T) {
 		},
 		{
 			name:     "middle PB range",
-			bytes:    5 * 1024 * 1024 * 1024 * 1024 * 1024, // 5 PB
+			bytes:    5 * 1024 * 1024 * 1024 * 1024 * 1024,
 			expected: "5.0 PB",
 		},
 		{
@@ -102,7 +102,7 @@ func Test_formatBytes(t *testing.T) {
 		},
 		{
 			name:     "2 EB value",
-			bytes:    2 * 1024 * 1024 * 1024 * 1024 * 1024 * 1024, // 2 EB
+			bytes:    2 * 1024 * 1024 * 1024 * 1024 * 1024 * 1024,
 			expected: "2.0 EB",
 		},
 	}
@@ -122,24 +122,24 @@ func Test_formatBytesEdgeCases(t *testing.T) {
 	tests := []struct {
 		name     string
 		bytes    int64
-		minCheck string // Minimum prefix expected
+		minCheck string
 	}{
 		{
 			name:     "negative bytes (edge case)",
 			bytes:    -1024,
-			minCheck: "B", // Should still format something
+			minCheck: "B",
 		},
 		{
 			name:     "very large number",
-			bytes:    9223372036854775807, // max int64
-			minCheck: "EB",                // Should reach exabyte range
+			bytes:    9223372036854775807,
+			minCheck: "EB",
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			result := formatBytes(tc.bytes)
-			// Just ensure it doesn't panic and returns something
+
 			if result == "" {
 				t.Errorf("formatBytes(%d) returned empty string", tc.bytes)
 			}

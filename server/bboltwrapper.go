@@ -41,11 +41,9 @@ func ConnectToBBoltDB(path string) (err error) {
 	})
 }
 
-// Helper: marshal/unmarshal
 func bboltMarshal(v any) ([]byte, error)      { return json.Marshal(v) }
 func bboltUnmarshal(data []byte, v any) error { return json.Unmarshal(data, v) }
 
-// Delete a device by string ID
 func BBolt_DeleteDeviceByID(id string) error {
 	return BBoltDB.Update(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(DEVICES_BUCKET))
@@ -53,7 +51,6 @@ func BBolt_DeleteDeviceByID(id string) error {
 	})
 }
 
-// Update a device (by ID in D.ID)
 func BBolt_UpdateDevice(D *types.Device) error {
 	return BBoltDB.Update(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(DEVICES_BUCKET))
@@ -66,7 +63,6 @@ func BBolt_UpdateDevice(D *types.Device) error {
 	})
 }
 
-// Get devices with limit/offset (inefficient scan)
 func BBolt_GetDevices(limit, offset int64) ([]*types.Device, error) {
 	DL := make([]*types.Device, 0)
 	err := BBoltDB.View(func(tx *gobolt.Tx) error {
@@ -107,10 +103,6 @@ func BBolt_GetDevicesByUserID(userID primitive.ObjectID) ([]*types.Device, error
 	return DL, err
 }
 
-// User struct must be defined somewhere, using same as dbwrapper.go
-// type User struct { ... }
-
-// Get users with limit/offset
 func BBolt_getUsers(limit, offset int64) ([]*User, error) {
 	UL := make([]*User, 0)
 	err := BBoltDB.View(func(tx *gobolt.Tx) error {
@@ -135,7 +127,6 @@ func BBolt_getUsers(limit, offset int64) ([]*User, error) {
 	return UL, err
 }
 
-// Find user by APIKey
 func BBolt_findUserByAPIKey(Key string) (*User, error) {
 	var found *User
 	err := BBoltDB.View(func(tx *gobolt.Tx) error {
@@ -153,7 +144,6 @@ func BBolt_findUserByAPIKey(Key string) (*User, error) {
 	return found, err
 }
 
-// Find user by ID (string)
 func BBolt_findUserByID(UID string) (*User, error) {
 	var U *User
 	err := BBoltDB.View(func(tx *gobolt.Tx) error {
@@ -168,7 +158,6 @@ func BBolt_findUserByID(UID string) (*User, error) {
 	return U, err
 }
 
-// Create user
 func BBolt_CreateUser(U *User) error {
 	return BBoltDB.Update(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(USERS_BUCKET))
@@ -181,7 +170,6 @@ func BBolt_CreateUser(U *User) error {
 	})
 }
 
-// Find user by email
 func BBolt_findUserByEmail(Email string) (*User, error) {
 	var found *User
 	err := BBoltDB.View(func(tx *gobolt.Tx) error {
@@ -199,7 +187,6 @@ func BBolt_findUserByEmail(Email string) (*User, error) {
 	return found, err
 }
 
-// Update user device tokens
 func BBolt_updateUserDeviceTokens(TU *UPDATE_USER_TOKENS) error {
 	return BBoltDB.Update(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(USERS_BUCKET))
@@ -221,7 +208,6 @@ func BBolt_updateUserDeviceTokens(TU *UPDATE_USER_TOKENS) error {
 	})
 }
 
-// Update user subscription expiration time
 func BBolt_updateUserSubTime(u *User) error {
 	return BBoltDB.Update(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(USERS_BUCKET))
@@ -241,7 +227,6 @@ func BBolt_updateUserSubTime(u *User) error {
 	})
 }
 
-// Update user (APIKey, AdditionalInformation)
 func BBolt_updateUser(UF *USER_UPDATE_FORM) error {
 	return BBoltDB.Update(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(USERS_BUCKET))
@@ -264,7 +249,6 @@ func BBolt_updateUser(UF *USER_UPDATE_FORM) error {
 	})
 }
 
-// Admin update user (full update capabilities)
 func BBolt_updateUserAdmin(UF *USER_ADMIN_UPDATE_FORM) error {
 	return BBoltDB.Update(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(USERS_BUCKET))
@@ -298,7 +282,6 @@ func BBolt_updateUserAdmin(UF *USER_ADMIN_UPDATE_FORM) error {
 	})
 }
 
-// Toggle user subscription status
 func BBolt_toggleUserSubscriptionStatus(UF *USER_UPDATE_SUB_FORM) error {
 	return BBoltDB.Update(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(USERS_BUCKET))
@@ -306,7 +289,7 @@ func BBolt_toggleUserSubscriptionStatus(UF *USER_UPDATE_SUB_FORM) error {
 		for k, v := c.First(); k != nil; k, v = c.Next() {
 			U := new(User)
 			if err := bboltUnmarshal(v, U); err == nil && U.Email == UF.Email {
-				// U.CancelSub = UF.Disable
+
 				data, err := bboltMarshal(U)
 				if err != nil {
 					return err
@@ -318,7 +301,6 @@ func BBolt_toggleUserSubscriptionStatus(UF *USER_UPDATE_SUB_FORM) error {
 	})
 }
 
-// Update two-factor codes for user
 func BBolt_userUpdateTwoFactorCodes(TFP *TWO_FACTOR_DB_PACKAGE) error {
 	return BBoltDB.Update(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(USERS_BUCKET))
@@ -341,7 +323,6 @@ func BBolt_userUpdateTwoFactorCodes(TFP *TWO_FACTOR_DB_PACKAGE) error {
 	})
 }
 
-// Reset user password
 func BBolt_userResetPassword(user *User) error {
 	return BBoltDB.Update(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(USERS_BUCKET))
@@ -363,7 +344,6 @@ func BBolt_userResetPassword(user *User) error {
 	})
 }
 
-// Find servers without groups
 func BBolt_FindServersWithoutGroups(limit, offset int64) ([]*types.Server, error) {
 	DL := make([]*types.Server, 0)
 	err := BBoltDB.View(func(tx *gobolt.Tx) error {
@@ -390,7 +370,6 @@ func BBolt_FindServersWithoutGroups(limit, offset int64) ([]*types.Server, error
 	return DL, err
 }
 
-// Find servers by group IDs
 func BBolt_FindServersByGroups(groups []string, limit, offset int64) ([]*types.Server, error) {
 	DL := make([]*types.Server, 0)
 	groupSet := make(map[string]struct{})
@@ -424,7 +403,6 @@ func BBolt_FindServersByGroups(groups []string, limit, offset int64) ([]*types.S
 	return DL, err
 }
 
-// Find entities by group ID and type
 func BBolt_FindEntitiesByGroupID(id string, objType string, limit, offset int64) ([]any, error) {
 	IL := make([]any, 0)
 	bucket := ""
@@ -503,7 +481,6 @@ func BBolt_FindEntitiesByGroupID(id string, objType string, limit, offset int64)
 	return IL, err
 }
 
-// Update group
 func BBolt_UpdateGroup(G *Group) error {
 	return BBoltDB.Update(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(GROUPS_BUCKET))
@@ -526,7 +503,6 @@ func BBolt_UpdateGroup(G *Group) error {
 	})
 }
 
-// Update server
 func BBolt_UpdateServer(S *types.Server) (*types.Server, error) {
 	var RS *types.Server
 	err := BBoltDB.Update(func(tx *gobolt.Tx) error {
@@ -559,7 +535,6 @@ func BBolt_UpdateServer(S *types.Server) (*types.Server, error) {
 	return RS, err
 }
 
-// Create device
 func BBolt_CreateDevice(D *types.Device) error {
 	return BBoltDB.Update(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(DEVICES_BUCKET))
@@ -572,7 +547,6 @@ func BBolt_CreateDevice(D *types.Device) error {
 	})
 }
 
-// Create group
 func BBolt_CreateGroup(G *Group) error {
 	return BBoltDB.Update(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(GROUPS_BUCKET))
@@ -585,7 +559,6 @@ func BBolt_CreateGroup(G *Group) error {
 	})
 }
 
-// Create server
 func BBolt_CreateServer(S *types.Server) error {
 	return BBoltDB.Update(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(SERVERS_BUCKET))
@@ -598,7 +571,6 @@ func BBolt_CreateServer(S *types.Server) error {
 	})
 }
 
-// Find server by ID
 func BBolt_SetServerWGSubnet(id, subnet string) error {
 	return BBoltDB.Update(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(SERVERS_BUCKET))
@@ -649,7 +621,6 @@ func BBolt_FindServerByID(ID string) (*types.Server, error) {
 	return S, err
 }
 
-// Find device by ID
 func BBolt_FindDeviceByID(id string) (*types.Device, error) {
 	var dev *types.Device
 	err := BBoltDB.View(func(tx *gobolt.Tx) error {
@@ -664,7 +635,6 @@ func BBolt_FindDeviceByID(id string) (*types.Device, error) {
 	return dev, err
 }
 
-// Find group by ID
 func BBolt_findGroupByID(id string) (*Group, error) {
 	var G *Group
 	err := BBoltDB.View(func(tx *gobolt.Tx) error {
@@ -679,7 +649,6 @@ func BBolt_findGroupByID(id string) (*Group, error) {
 	return G, err
 }
 
-// Delete group by ID
 func BBolt_DeleteGroupByID(id string) error {
 	return BBoltDB.Update(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(GROUPS_BUCKET))
@@ -687,7 +656,6 @@ func BBolt_DeleteGroupByID(id string) error {
 	})
 }
 
-// Wipe user confirm code
 func BBolt_WipeUserConfirmCode(UF *USER_ENABLE_QUERY) error {
 	return BBoltDB.Update(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(USERS_BUCKET))
@@ -707,7 +675,6 @@ func BBolt_WipeUserConfirmCode(UF *USER_ENABLE_QUERY) error {
 	})
 }
 
-// User activate key (update sub expiration, key, etc)
 func BBolt_UserActivateKey(SubExpiration time.Time, Key *LicenseKey, userID string) error {
 	return BBoltDB.Update(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(USERS_BUCKET))
@@ -732,7 +699,6 @@ func BBolt_UserActivateKey(SubExpiration time.Time, Key *LicenseKey, userID stri
 	})
 }
 
-// Add to group
 func BBolt_AddToGroup(groupID, typeID, objType string) error {
 	bucket := ""
 	switch objType {
@@ -792,7 +758,6 @@ func BBolt_AddToGroup(groupID, typeID, objType string) error {
 	})
 }
 
-// Remove from group
 func BBolt_RemoveFromGroup(groupID, typeID, objType string) error {
 	bucket := ""
 	switch objType {
@@ -842,7 +807,6 @@ func BBolt_RemoveFromGroup(groupID, typeID, objType string) error {
 	})
 }
 
-// Find all groups
 func BBolt_findGroups() ([]*Group, error) {
 	gl := make([]*Group, 0)
 	err := BBoltDB.View(func(tx *gobolt.Tx) error {
@@ -859,7 +823,6 @@ func BBolt_findGroups() ([]*Group, error) {
 	return gl, err
 }
 
-// Helper functions
 func contains(slice []string, s string) bool {
 	return slices.Contains(slice, s)
 }
@@ -874,7 +837,6 @@ func removeString(slice []string, s string) []string {
 	return res
 }
 
-// Helper: convert primitive.ObjectID to string and vice versa
 func objectIDToString(id any) string {
 	switch v := id.(type) {
 	case string:
@@ -888,7 +850,6 @@ func objectIDToString(id any) string {
 	}
 }
 
-// Helper: convert []primitive.ObjectID <-> []string
 func objectIDSliceToString(slice any) []string {
 	var out []string
 	switch v := slice.(type) {
@@ -912,8 +873,6 @@ func stringSliceToObjectID(slice []string) []primitive.ObjectID {
 	}
 	return out
 }
-
-// WGServerConfig CRUD
 
 func BBolt_CreateWGServerConfig(cfg *types.WGServerConfig) error {
 	return BBoltDB.Update(func(tx *gobolt.Tx) error {
@@ -970,7 +929,6 @@ func BBolt_UpdateWGServerConfig(cfg *types.WGServerConfig) error {
 	})
 }
 
-// BBolt_SetServerWGConfigID updates the WGConfigID and cached WG fields on a server record.
 func BBolt_SetServerWGConfigID(serverID string, wgCfg *types.WGServerConfig, pubKey, subnet string) error {
 	return BBoltDB.Update(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(SERVERS_BUCKET))
@@ -993,8 +951,6 @@ func BBolt_SetServerWGConfigID(serverID string, wgCfg *types.WGServerConfig, pub
 		return b.Put([]byte(serverID), data)
 	})
 }
-
-// ── Networks ─────────────────────────────────────────────────────────────────
 
 func BBolt_CountNetworks() (int64, error) {
 	var count int64

@@ -140,7 +140,6 @@ func Test_validateConfig(t *testing.T) {
 				return
 			}
 
-			// Check expected values
 			for key, expected := range tc.expectedValues {
 				var actual any
 				switch key {
@@ -199,7 +198,6 @@ func Test_validateConfig_BoundaryValues(t *testing.T) {
 				SecretStore:        types.EnvStore,
 			}
 
-			// Set the specific field to test
 			switch tc.field {
 			case "UserMaxConnections":
 				config.UserMaxConnections = tc.value
@@ -212,7 +210,6 @@ func Test_validateConfig_BoundaryValues(t *testing.T) {
 				t.Errorf("Unexpected error for %s=%d: %v", tc.field, tc.value, err)
 			}
 
-			// Verify value wasn't changed
 			var actual int
 			switch tc.field {
 			case "UserMaxConnections":
@@ -231,7 +228,7 @@ func Test_validateConfig_BoundaryValues(t *testing.T) {
 }
 
 func Test_LoadServerConfig_JSON(t *testing.T) {
-	// Create a temporary directory for test files
+
 	tmpDir := t.TempDir()
 
 	testConfig := &types.ServerConfig{
@@ -265,7 +262,6 @@ func Test_LoadServerConfig_JSON(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			configPath := filepath.Join(tmpDir, tc.filename)
 
-			// Write test config to file
 			data, err := json.MarshalIndent(testConfig, "", "    ")
 			if err != nil {
 				t.Fatalf("Failed to marshal test config: %v", err)
@@ -275,7 +271,6 @@ func Test_LoadServerConfig_JSON(t *testing.T) {
 				t.Fatalf("Failed to write test config: %v", err)
 			}
 
-			// Test loading
 			err = LoadServerConfig(configPath)
 
 			if tc.expectError {
@@ -292,7 +287,6 @@ func Test_LoadServerConfig_JSON(t *testing.T) {
 				return
 			}
 
-			// Verify loaded config
 			loaded := Config.Load()
 			if loaded.VPNIP != testConfig.VPNIP {
 				t.Errorf("VPNIP: got %s, expected %s", loaded.VPNIP, testConfig.VPNIP)
@@ -307,7 +301,7 @@ func Test_LoadServerConfig_JSON(t *testing.T) {
 }
 
 func Test_LoadServerConfig_YAML(t *testing.T) {
-	// Create a temporary directory for test files
+
 	tmpDir := t.TempDir()
 
 	testConfig := &types.ServerConfig{
@@ -341,7 +335,6 @@ func Test_LoadServerConfig_YAML(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			configPath := filepath.Join(tmpDir, tc.filename)
 
-			// Write test config to file
 			data, err := yaml.Marshal(testConfig)
 			if err != nil {
 				t.Fatalf("Failed to marshal test config: %v", err)
@@ -351,7 +344,6 @@ func Test_LoadServerConfig_YAML(t *testing.T) {
 				t.Fatalf("Failed to write test config: %v", err)
 			}
 
-			// Test loading
 			err = LoadServerConfig(configPath)
 
 			if tc.expectError {
@@ -368,7 +360,6 @@ func Test_LoadServerConfig_YAML(t *testing.T) {
 				return
 			}
 
-			// Verify loaded config
 			loaded := Config.Load()
 			if loaded.VPNIP != testConfig.VPNIP {
 				t.Errorf("VPNIP: got %s, expected %s", loaded.VPNIP, testConfig.VPNIP)
@@ -502,12 +493,11 @@ func Test_SaveServerConfig_JSON(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			// Store test config
+
 			Config.Store(testConfig)
 
 			configPath := filepath.Join(tmpDir, tc.filename)
 
-			// Test saving
 			err := SaveServerConfig(configPath)
 
 			if tc.expectError {
@@ -522,13 +512,11 @@ func Test_SaveServerConfig_JSON(t *testing.T) {
 				return
 			}
 
-			// Verify file was created
 			if _, err := os.Stat(configPath); os.IsNotExist(err) {
 				t.Error("Config file was not created")
 				return
 			}
 
-			// Load and verify content
 			data, err := os.ReadFile(configPath)
 			if err != nil {
 				t.Errorf("Failed to read saved config: %v", err)
@@ -582,12 +570,11 @@ func Test_SaveServerConfig_YAML(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			// Store test config
+
 			Config.Store(testConfig)
 
 			configPath := filepath.Join(tmpDir, tc.filename)
 
-			// Test saving
 			err := SaveServerConfig(configPath)
 
 			if tc.expectError {
@@ -602,13 +589,11 @@ func Test_SaveServerConfig_YAML(t *testing.T) {
 				return
 			}
 
-			// Verify file was created
 			if _, err := os.Stat(configPath); os.IsNotExist(err) {
 				t.Error("Config file was not created")
 				return
 			}
 
-			// Load and verify content
 			data, err := os.ReadFile(configPath)
 			if err != nil {
 				t.Errorf("Failed to read saved config: %v", err)
@@ -719,18 +704,15 @@ func Test_LoadAndSaveServerConfig_RoundTrip(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			configPath := filepath.Join(tmpDir, tc.filename)
 
-			// Store and save original config
 			Config.Store(originalConfig)
 			if err := SaveServerConfig(configPath); err != nil {
 				t.Fatalf("Failed to save config: %v", err)
 			}
 
-			// Load the config back
 			if err := LoadServerConfig(configPath); err != nil {
 				t.Fatalf("Failed to load config: %v", err)
 			}
 
-			// Verify all fields match
 			loaded := Config.Load()
 			if loaded.UserMaxConnections != originalConfig.UserMaxConnections {
 				t.Errorf("UserMaxConnections: got %d, expected %d", loaded.UserMaxConnections, originalConfig.UserMaxConnections)

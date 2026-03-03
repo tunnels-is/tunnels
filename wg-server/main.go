@@ -9,21 +9,20 @@ import (
 	"syscall"
 )
 
-
 var (
 	peerStore    *PeerStore
 	activeConfig atomic.Pointer[Config]
 )
 
 func main() {
-	apiKey      := flag.String("key", "", "per-server API key (from POST /ui/wg/server-config)")
+	apiKey := flag.String("key", "", "per-server API key (from POST /ui/wg/server-config)")
 	controllerIP := flag.String("ip", "", "controller IP address (e.g. 74.63.223.157)")
 	showVersion := flag.Bool("version", false, "show version and exit")
-	jsonLogs    := flag.Bool("json", false, "enable JSON-format logging")
-	sourceInfo  := flag.Bool("source", false, "include source file/line in log output")
-	silent      := flag.Bool("silent", false, "disable all logging")
-	logLevel    := flag.String("logLevel", "debug", "log level: debug, info, warn, error")
-	insecure    := flag.Bool("insecure", false, "skip TLS certificate verification")
+	jsonLogs := flag.Bool("json", false, "enable JSON-format logging")
+	sourceInfo := flag.Bool("source", false, "include source file/line in log output")
+	silent := flag.Bool("silent", false, "disable all logging")
+	logLevel := flag.String("logLevel", "debug", "log level: debug, info, warn, error")
+	insecure := flag.Bool("insecure", false, "skip TLS certificate verification")
 	flag.Parse()
 
 	initLogging(*silent, *jsonLogs, *sourceInfo, *logLevel)
@@ -67,7 +66,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Peer store lives in the current working directory.
 	var storeErr error
 	peerStore, storeErr = NewPeerStore("peers.json", cfg.WireGuardSubnet)
 	if storeErr != nil {

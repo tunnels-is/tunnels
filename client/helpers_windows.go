@@ -70,28 +70,6 @@ func RestoreSaneDNSDefaults() {
 	}
 }
 
-// func RestoreDNSOnClose() {
-// 	INFO("restoring dns: ", DEFAULT_DNS_SERVERS)
-// 	_ = DNS_Del(strconv.Itoa(DEFAULT_INTERFACE_ID))
-// 	if len(DEFAULT_DNS_SERVERS) == 1 {
-// 		_ = DNS_Set(strconv.Itoa(DEFAULT_INTERFACE_ID), DEFAULT_DNS_SERVERS[0], "1")
-// 	} else if len(DEFAULT_DNS_SERVERS) > 1 {
-// 		_ = DNS_Set(strconv.Itoa(DEFAULT_INTERFACE_ID), DEFAULT_DNS_SERVERS[0], "1")
-// 		_ = DNS_Set(strconv.Itoa(DEFAULT_INTERFACE_ID), DEFAULT_DNS_SERVERS[1], "2")
-// 	}
-// }
-
-// func RestoreDNSOnDisconnect() {
-// 	INFO("restoring dns: ", DEFAULT_DNS_SERVERS)
-// 	_ = DNS_Del(strconv.Itoa(DEFAULT_INTERFACE_ID))
-// 	if len(DEFAULT_DNS_SERVERS) == 1 {
-// 		_ = DNS_Set(strconv.Itoa(DEFAULT_INTERFACE_ID), DEFAULT_DNS_SERVERS[0], "1")
-// 	} else if len(DEFAULT_DNS_SERVERS) > 1 {
-// 		_ = DNS_Set(strconv.Itoa(DEFAULT_INTERFACE_ID), DEFAULT_DNS_SERVERS[0], "1")
-// 		_ = DNS_Set(strconv.Itoa(DEFAULT_INTERFACE_ID), DEFAULT_DNS_SERVERS[1], "2")
-// 	}
-// }
-
 func GetDNSServers(intf string) (err error) {
 	var out []byte
 	cmd := exec.Command("netsh", "interface", "ipv4", "show", "dnsservers", intf)
@@ -114,7 +92,6 @@ func GetDNSServers(intf string) (err error) {
 	return
 }
 
-// https://coolaj86.com/articles/golang-and-windows-and-admins-oh-my/
 func AdminCheck() {
 	defer RecoverAndLog()
 

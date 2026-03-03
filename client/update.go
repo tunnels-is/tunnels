@@ -30,8 +30,6 @@ const (
 	owner             = "tunnels-is"
 )
 
-// Used to wrap Println to avoid false detection
-// during build process
 func updatePrint(s ...any) {
 	fmt.Println(s...)
 }
@@ -459,15 +457,13 @@ type Release struct {
 	Body       string `json:"body"`
 }
 
-// ProgressWriter is a custom writer to track download progress.
 type ProgressWriter struct {
 	Total    int64
 	Written  int64
-	full     bool // To ensure the 100% line is printed only once
+	full     bool
 	barWidth int
 }
 
-// Write implements the io.Writer interface.
 func (pw *ProgressWriter) Write(p []byte) (int, error) {
 	n := len(p)
 	pw.Written += int64(n)
@@ -475,15 +471,13 @@ func (pw *ProgressWriter) Write(p []byte) (int, error) {
 	return n, nil
 }
 
-// printProgress displays the progress bar.
 func (pw *ProgressWriter) printProgress() {
-	if pw.Total <= 0 { // Don't display if total size is unknown
+	if pw.Total <= 0 {
 		return
 	}
 
 	percentage := float64(pw.Written) / float64(pw.Total) * 100
 
-	// Prevent printing 100% until it's actually done
 	if percentage >= 100 && !pw.full {
 		percentage = 99.9
 	}
@@ -492,7 +486,6 @@ func (pw *ProgressWriter) printProgress() {
 
 	bar := strings.Repeat("=", filledWidth) + ">" + strings.Repeat(" ", pw.barWidth-filledWidth)
 
-	// Use carriage return '\r' to stay on the same line
 	fmt.Printf("\rDownloading [%s] %.2f%% (%s / %s)", bar, percentage, formatBytes(pw.Written), formatBytes(pw.Total))
 
 	if pw.Written >= pw.Total && !pw.full {
@@ -502,7 +495,6 @@ func (pw *ProgressWriter) printProgress() {
 	}
 }
 
-// formatBytes is a helper to format bytes into KB, MB, etc.
 func formatBytes(b int64) string {
 	const unit = 1024
 	if b < unit {
@@ -607,7 +599,7 @@ func yesNoPrompt(label string) bool {
 	fmt.Printf("%s [y/n]: ", label)
 	_, err := fmt.Scanln(&s)
 	if err != nil {
-		// If nothing is entered, it's considered a "no"
+
 		if err.Error() == "unexpected newline" {
 			return false
 		}

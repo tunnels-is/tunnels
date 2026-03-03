@@ -48,9 +48,6 @@ func CreateNewTunnelInterface(
 ) (IF *TInterface, err error) {
 	defer RecoverAndLog()
 
-	// Some kernels seem to not be compiled with
-	// /dev/net/tun ... we need to create it.
-	// Even after creating the user might need to reboot.
 	_, err = os.Stat("/dev/net/tun")
 	if err != nil {
 		createDevNetTun()
@@ -101,7 +98,7 @@ func (t *TInterface) Create() (err error) {
 	var flags uint16 = 0x1000
 	flags |= 0x0001
 	if t.Multiqueue {
-		flags |= 0x0100 // MULTIQUEUE FLAG
+		flags |= 0x0100
 	}
 
 	var req syscallCreateIF
@@ -125,11 +122,6 @@ func (t *TInterface) Create() (err error) {
 	}
 
 	t.RWC = os.NewFile(t.FD, "tun_"+t.Name)
-	// if t.Persistent {
-	// 	if err = tunnelCtl(t.FD, syscall.TUNSETPERSIST, uintptr(1)); err != nil {
-	// 		return err
-	// 	}
-	// }
 
 	return
 }
@@ -271,8 +263,7 @@ func (t *TInterface) Delete() (err error) {
 }
 
 func (t *TInterface) PrepareForSwitch() {
-	// On Linux, goroutines exit when the connection is closed.
-	// No session cleanup needed.
+
 }
 
 func (t *TInterface) Connect(tun *TUN) (err error) {
@@ -309,7 +300,6 @@ func (t *TInterface) Connect(tun *TUN) (err error) {
 			return err
 		}
 
-		// Add default IPv6 route if IPv6 address is configured
 		if t.IPv6Address != "" {
 			iperr := IP_AddRouteV6("default", t.Name, t.IPv6Address, "0")
 			if iperr != nil {
@@ -473,7 +463,7 @@ func IP_AddRouteV6(
 		if err != nil {
 			return err
 		}
-		// r.Gw = net.ParseIP(gateway).To16()
+
 	}
 
 	err = netlink.RouteAdd(r)
@@ -561,11 +551,11 @@ func IP_DelRouteV6(network string, gateway string, metric string) (err error) {
 }
 
 func RestoreDNSOnClose() {
-	// not implemented for unix
+
 }
 
 func RestoreSaneDNSDefaults() {
-	// not implemented for unix
+
 }
 
 func AdjustRoutersForTunneling() (err error) {

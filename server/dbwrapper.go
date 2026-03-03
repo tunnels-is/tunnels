@@ -891,7 +891,6 @@ func DB_CreateServer(S *types.Server) (err error) {
 	return err
 }
 
-// DB_SetServerWGSubnet updates only the WireGuardSubnet field of the given server.
 func DB_SetServerWGSubnet(id primitive.ObjectID, subnet string) error {
 	if BBOLTEnabled {
 		return BBolt_SetServerWGSubnet(objectIDToString(id), subnet)
@@ -908,7 +907,6 @@ func DB_SetServerWGSubnet(id primitive.ObjectID, subnet string) error {
 	return err
 }
 
-// DB_FindAllServers returns every server record (up to 10 000).
 func DB_FindAllServers() ([]*types.Server, error) {
 	if BBOLTEnabled {
 		return BBolt_FindAllServers()
@@ -989,7 +987,6 @@ func DB_WipeUserConfirmCode(UF *USER_ENABLE_QUERY) (err error) {
 		return err
 	}
 
-	// INFO( "COUNTS:", res.MatchedCount, res.ModifiedCount)
 	if res.MatchedCount == 0 {
 		ADMIN("Could not enable user, user no found: ", err)
 		return errors.New("unable to modify document")
@@ -1335,8 +1332,6 @@ func DB_UpdateWGServerConfig(cfg *types.WGServerConfig) error {
 	return err
 }
 
-// ── Networks ─────────────────────────────────────────────────────────────────
-
 func DB_CountNetworks() (int64, error) {
 	if BBOLTEnabled {
 		return BBolt_CountNetworks()
@@ -1447,7 +1442,6 @@ func DB_ListWGServerConfigs() ([]*types.WGServerConfig, error) {
 	return configs, nil
 }
 
-// DB_SetServerWGConfigID links a server to its WGServerConfig and caches the WG fields.
 func DB_SetServerWGConfigID(serverID primitive.ObjectID, wgCfg *types.WGServerConfig, pubKey, subnet string) error {
 	if BBOLTEnabled {
 		return BBolt_SetServerWGConfigID(objectIDToString(serverID), wgCfg, pubKey, subnet)

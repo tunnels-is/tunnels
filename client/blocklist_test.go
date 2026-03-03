@@ -80,7 +80,6 @@ func TestGetDefaultBlockLists(t *testing.T) {
 		t.Error("Default block lists should not be empty")
 	}
 
-	// Check that all lists have required fields
 	for i, bl := range lists {
 		if bl == nil {
 			t.Errorf("Block list at index %d is nil", i)
@@ -95,12 +94,10 @@ func TestGetDefaultBlockLists(t *testing.T) {
 			t.Errorf("Block list at index %d (%s) has empty URL", i, bl.Tag)
 		}
 
-		// Check that URL is valid
 		if !CheckIfURL(bl.URL) {
 			t.Errorf("Block list %s has invalid URL: %s", bl.Tag, bl.URL)
 		}
 
-		// Check that LastDownload is set to 2 years ago
 		yearsDiff := time.Since(bl.LastDownload).Hours() / 24 / 365
 		if yearsDiff < 1.9 || yearsDiff > 2.1 {
 			t.Errorf("Block list %s LastDownload should be ~2 years ago, got %.2f years", bl.Tag, yearsDiff)
@@ -109,7 +106,6 @@ func TestGetDefaultBlockLists(t *testing.T) {
 		t.Logf("Block list: Tag=%s, URL=%s", bl.Tag, bl.URL)
 	}
 
-	// Check for expected default lists
 	expectedTags := []string{"Ads", "AdultContent", "CryptoCurrency", "Drugs", "FakeNews",
 		"Fraud", "Gambling", "Malware", "SocialMedia", "Surveillance"}
 
@@ -132,12 +128,10 @@ func TestGetDefaultBlockLists(t *testing.T) {
 func TestGetDefaultWhiteLists(t *testing.T) {
 	lists := GetDefaultWhiteLists()
 
-	// Currently returns empty list, but should be valid
 	if lists == nil {
 		t.Error("Default white lists should not be nil")
 	}
 
-	// Check that all lists have required fields if any exist
 	for i, wl := range lists {
 		if wl == nil {
 			t.Errorf("White list at index %d is nil", i)
@@ -148,12 +142,10 @@ func TestGetDefaultWhiteLists(t *testing.T) {
 			t.Errorf("White list at index %d has both empty Tag and URL", i)
 		}
 
-		// If URL is provided, check that it's valid
 		if wl.URL != "" && !CheckIfURL(wl.URL) {
 			t.Errorf("White list %s has invalid URL: %s", wl.Tag, wl.URL)
 		}
 
-		// Check that LastDownload is set to 2 years ago
 		yearsDiff := time.Since(wl.LastDownload).Hours() / 24 / 365
 		if yearsDiff < 1.9 || yearsDiff > 2.1 {
 			t.Errorf("White list %s LastDownload should be ~2 years ago, got %.2f years", wl.Tag, yearsDiff)
