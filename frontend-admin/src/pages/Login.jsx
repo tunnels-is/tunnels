@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { setAuth, isLoggedIn } from '../auth';
+import { setUserMeta, isLoggedIn } from '../auth';
 import { apiPostRaw } from '../api';
 
 export default function Login() {
@@ -20,7 +20,7 @@ export default function Login() {
     setError('');
     setLoading(true);
     try {
-      const resp = await apiPostRaw('/v3/user/login', {
+      const resp = await apiPostRaw('/ui/user/login', {
         Email: email,
         Password: password,
         DeviceName: 'admin-ui',
@@ -34,16 +34,15 @@ export default function Login() {
 
       const user = await resp.json();
 
-      if (!user.IsAdmin) {
-        setError('Admin access required');
+      if (!user.IsAdmin && !user.IsManager) {
+        setError('Admin or Manager access required');
         return;
       }
 
-      setAuth({
-        _id: user._id,
-        DeviceToken: user.DeviceToken?.DT || '',
+      setUserMeta({
         Email: user.Email,
         IsAdmin: user.IsAdmin,
+        IsManager: user.IsManager,
       });
 
       navigate('/users', { replace: true });

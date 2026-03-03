@@ -48,15 +48,7 @@ func API_NetworkList(w http.ResponseWriter, r *http.Request) {
 		senderr(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
-	user, err := authenticateUserFromEmailOrIDAndToken("", F.UID, F.DeviceToken)
-	if err != nil {
-		senderr(w, 500, err.Error())
-		return
-	}
-	if !user.IsAdmin && !user.IsManager {
-		senderr(w, 401, "Unauthorized")
-		return
-	}
+
 	if F.Limit == 0 {
 		F.Limit = 200
 	}
@@ -79,15 +71,7 @@ func API_NetworkUpdate(w http.ResponseWriter, r *http.Request) {
 		senderr(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
-	user, err := authenticateUserFromEmailOrIDAndToken("", F.UID, F.DeviceToken)
-	if err != nil {
-		senderr(w, 500, err.Error())
-		return
-	}
-	if !user.IsAdmin && !user.IsManager {
-		senderr(w, 401, "Unauthorized")
-		return
-	}
+
 	if F.Network == nil {
 		senderr(w, 400, "Missing network")
 		return
@@ -106,15 +90,7 @@ func API_WGServerConfigList(w http.ResponseWriter, r *http.Request) {
 		senderr(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
-	user, err := authenticateUserFromEmailOrIDAndToken("", F.UID, F.DeviceToken)
-	if err != nil {
-		senderr(w, 500, err.Error())
-		return
-	}
-	if !user.IsAdmin && !user.IsManager {
-		senderr(w, 401, "Unauthorized")
-		return
-	}
+
 	configs, err := DB_ListWGServerConfigs()
 	if err != nil {
 		senderr(w, 500, "Unknown error, please try again in a moment")

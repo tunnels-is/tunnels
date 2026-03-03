@@ -15,8 +15,8 @@ export default function WGConfig() {
     setError('');
     try {
       const [cfgResp, netResp] = await Promise.all([
-        apiPost('/v3/wg/server-config/list', {}),
-        apiPost('/v3/network/list', { Limit: 50000, Offset: 0 }),
+        apiPost('/ui/wg/server-config/list', {}),
+        apiPost('/ui/network/list', { Limit: 50000, Offset: 0 }),
       ]);
       if (cfgResp.status === 200) {
         const data = await cfgResp.json();

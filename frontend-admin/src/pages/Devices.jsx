@@ -36,8 +36,8 @@ export default function Devices() {
     setError('');
     try {
       const [devResp, srvResp] = await Promise.all([
-        apiPost('/v3/device/list', { Limit: 500, Offset: 0 }),
-        apiPost('/v3/servers', { StartIndex: 0 }),
+        apiPost('/ui/device/list', { Limit: 500, Offset: 0 }),
+        apiPost('/ui/servers', { StartIndex: 0 }),
       ]);
       if (devResp.status === 200) {
         const data = await devResp.json();
@@ -66,7 +66,7 @@ export default function Devices() {
       const device = { Tag: createForm.Tag };
       if (createForm.ServerID) device.ServerID = createForm.ServerID;
       if (createForm.WireGuardKey) device.WireGuardKey = createForm.WireGuardKey;
-      const resp = await apiPost('/v3/device/create', { Device: device });
+      const resp = await apiPost('/ui/device/create', { Device: device });
       if (resp.status === 200) {
         setShowCreate(false);
         setCreateForm({ Tag: '', ServerID: '', WireGuardKey: '' });

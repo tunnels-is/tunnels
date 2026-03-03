@@ -34,7 +34,7 @@ export default function Users() {
     setLoading(true);
     setError('');
     try {
-      const resp = await apiPost('/v3/user/list', { Limit: 200, Offset: 0 });
+      const resp = await apiPost('/ui/user/list', { Limit: 200, Offset: 0 });
       if (resp.status === 200) {
         const data = await resp.json();
         setUsers(Array.isArray(data) ? data : []);
@@ -56,7 +56,7 @@ export default function Users() {
     setCreateError('');
     setCreating(true);
     try {
-      const resp = await fetch('/v3/user/create', {
+      const resp = await fetch('/client/user/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ Email: createForm.Email, Password: createForm.Password }),

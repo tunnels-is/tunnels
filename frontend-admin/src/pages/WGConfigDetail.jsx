@@ -37,9 +37,9 @@ export default function WGConfigDetail() {
 
   const load = async () => {
     const [cfgResp, srvResp, netResp] = await Promise.all([
-      apiPost('/v3/wg/server-config/list', {}),
-      apiPost('/v3/servers', { StartIndex: 0 }),
-      networks.length === 0 ? apiPost('/v3/network/list', { Limit: 50000, Offset: 0 }) : Promise.resolve(null),
+      apiPost('/ui/wg/server-config/list', {}),
+      apiPost('/ui/servers', { StartIndex: 0 }),
+      networks.length === 0 ? apiPost('/ui/network/list', { Limit: 50000, Offset: 0 }) : Promise.resolve(null),
     ]);
     if (cfgResp.status === 200) {
       const list = await cfgResp.json();
@@ -82,7 +82,7 @@ export default function WGConfigDetail() {
     setSaving(true);
     setSaveError('');
     try {
-      const resp = await apiPost('/v3/wg/server-config/update', {
+      const resp = await apiPost('/ui/wg/server-config/update', {
         ID: id,
         Tag: form.Tag,
         AdminAPIKey: form.AdminAPIKey,
@@ -120,7 +120,7 @@ export default function WGConfigDetail() {
     setAssignResult(null);
     setAssigning(true);
     try {
-      const resp = await apiPost('/v3/wg/server-config/assign', {
+      const resp = await apiPost('/ui/wg/server-config/assign', {
         ServerID: assignForm.ServerID,
         ConfigID: id,
       });

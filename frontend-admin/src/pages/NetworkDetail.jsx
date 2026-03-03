@@ -31,8 +31,8 @@ export default function NetworkDetail() {
 
   const load = async () => {
     const [netResp, cfgResp] = await Promise.all([
-      apiPost('/v3/network/list', { Limit: 50000, Offset: 0 }),
-      wgConfigs.length === 0 ? apiPost('/v3/wg/server-config/list', {}) : Promise.resolve(null),
+      apiPost('/ui/network/list', { Limit: 50000, Offset: 0 }),
+      wgConfigs.length === 0 ? apiPost('/ui/wg/server-config/list', {}) : Promise.resolve(null),
     ]);
     if (netResp.status === 200) {
       const list = await netResp.json();
@@ -48,7 +48,7 @@ export default function NetworkDetail() {
   useEffect(() => {
     if (!network) load();
     else if (wgConfigs.length === 0) {
-      apiPost('/v3/wg/server-config/list', {}).then(async (r) => {
+      apiPost('/ui/wg/server-config/list', {}).then(async (r) => {
         if (r.status === 200) {
           const data = await r.json();
           setWgConfigs(Array.isArray(data) ? data : []);
@@ -82,7 +82,7 @@ export default function NetworkDetail() {
         Description: form.Description,
         WGConfigID: form.WGConfigID || EMPTY_ID,
       };
-      const resp = await apiPost('/v3/network/update', { Network: updated });
+      const resp = await apiPost('/ui/network/update', { Network: updated });
       if (resp.status === 200) {
         setEditing(false);
         await load();

@@ -29,12 +29,8 @@ export default function DeviceDetail() {
 
   const load = async () => {
     const [devResp, srvResp] = await Promise.all([
-      fetch('/v3/device', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ DeviceID: id }),
-      }),
-      apiPost('/v3/servers', { StartIndex: 0 }),
+      apiPost('/ui/device', { DeviceID: id }),
+      apiPost('/ui/servers', { StartIndex: 0 }),
     ]);
     if (devResp.status === 200) {
       setDevice(await devResp.json());
@@ -67,7 +63,7 @@ export default function DeviceDetail() {
     setSaving(true);
     setError('');
     try {
-      const resp = await apiPost('/v3/device/update', {
+      const resp = await apiPost('/ui/device/update', {
         Device: {
           ...device,
           Tag: form.Tag,

@@ -37,7 +37,7 @@ export default function WGConfigCreate() {
 
   useEffect(() => {
     if (networks.length === 0) {
-      apiPost('/v3/network/list', { Limit: 50000, Offset: 0 }).then(async (r) => {
+      apiPost('/ui/network/list', { Limit: 50000, Offset: 0 }).then(async (r) => {
         if (r.status === 200) {
           const data = await r.json();
           setNetworks(Array.isArray(data) ? data : []);
@@ -62,7 +62,7 @@ export default function WGConfigCreate() {
     setError('');
     setCreating(true);
     try {
-      const resp = await apiPost('/v3/wg/server-config', {
+      const resp = await apiPost('/ui/wg/server-config', {
         ...form,
         NetworkID: form.NetworkID,
       });

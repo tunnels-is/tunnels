@@ -26,7 +26,7 @@ export default function UserDetail() {
   const [error, setError] = useState('');
 
   const load = async () => {
-    const resp = await apiPost('/v3/user/list', { Limit: 500, Offset: 0 });
+    const resp = await apiPost('/ui/user/list', { Limit: 500, Offset: 0 });
     if (resp.status === 200) {
       const list = await resp.json();
       const found = (list || []).find((u) => u._id === id);
@@ -55,7 +55,7 @@ export default function UserDetail() {
     setSaving(true);
     setError('');
     try {
-      const resp = await apiPost('/v3/user/adminupdate', {
+      const resp = await apiPost('/ui/user/adminupdate', {
         TargetUserID: id,
         Disabled: form.Disabled,
         IsManager: form.IsManager,

@@ -14,19 +14,14 @@ import (
 	"golang.org/x/crypto/curve25519"
 )
 
-// API_WGPeers handles GET /v3/wg/peers.
+// API_WGPeers handles GET /ui/wg/peers.
 // Returns all devices with a WireGuard key registered (DeviceID + hex public key).
 // IP assignment is owned by each wg-server; AllowedIPs are not included here.
-// Protected by AdminAPIKey.
+// Protected by adminUIMiddleware or X-API-KEY.
 func API_WGPeers(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 	if r.Method != http.MethodGet {
 		senderr(w, http.StatusMethodNotAllowed, "method not allowed")
-		return
-	}
-
-	if !HTTP_validateKey(r) {
-		senderr(w, 401, "Unauthorized")
 		return
 	}
 
@@ -59,7 +54,7 @@ func API_WGPeers(w http.ResponseWriter, r *http.Request) {
 	sendObject(w, resp)
 }
 
-// API_WGConfig handles GET /v3/wg/config.
+// API_WGConfig handles GET /ui/wg/config or GET /client/wg/config.
 // Returns the WireGuard server's public key and connection details for a given server.
 func API_WGConfig(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
@@ -199,11 +194,8 @@ func deriveWGPubKey(privKeyB64 string) (string, error) {
 	return base64.StdEncoding.EncodeToString(pubBytes), nil
 }
 
-// FORM_WG_SERVER_CONFIG_CREATE is the body for POST /v3/wg/server-config.
+// FORM_WG_SERVER_CONFIG_CREATE is the body for POST /ui/wg/server-config.
 type FORM_WG_SERVER_CONFIG_CREATE struct {
-	UID         primitive.ObjectID `json:"UID"`
-	DeviceToken string             `json:"DeviceToken"`
-
 	Tag           string             `json:"Tag"`
 	AdminAPIKey   string             `json:"AdminAPIKey"`
 	WireGuardPort int                `json:"WireGuardPort"`
@@ -215,8 +207,8 @@ type FORM_WG_SERVER_CONFIG_CREATE struct {
 	InsecureSkipVerify bool `json:"InsecureSkipVerify"`
 }
 
-// API_WGServerConfigCreate handles POST /v3/wg/server-config.
-// Requires admin user auth. Generates APIKey (UUID) and WireGuardPrivKey (Curve25519).
+// API_WGServerConfigCreate handles POST /ui/wg/server-config.
+// Auth handled by adminUIMiddleware or X-API-KEY.
 func API_WGServerConfigCreate(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 	if r.Method != http.MethodPost {
@@ -230,13 +222,9 @@ func API_WGServerConfigCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !HTTP_validateKey(r) {
-		user, err := authenticateUserFromEmailOrIDAndToken("", F.UID, F.DeviceToken)
-		if err != nil {
-			senderr(w, 401, err.Error())
-			return
-		}
-		if !user.IsAdmin {
+	if !isAdminAPIKeyFromContext(r.Context()) {
+		user := getUserFromContext(r.Context())
+		if user == nil || !user.IsAdmin {
 			senderr(w, 401, "Admin required")
 			return
 		}
@@ -305,18 +293,13 @@ func API_WGServerConfigCreate(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// API_WGServerConfigGet handles GET /v3/wg/server-config/get?id=<hex>.
+// API_WGServerConfigGet handles GET /ui/wg/server-config/get?id=<hex>.
 // Returns the config without the private key (redacted for UI display).
-// Requires admin user auth via X-API-KEY or UID+DeviceToken query params.
+// Auth handled by adminUIMiddleware or X-API-KEY.
 func API_WGServerConfigGet(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 	if r.Method != http.MethodGet {
 		senderr(w, http.StatusMethodNotAllowed, "method not allowed")
-		return
-	}
-
-	if !HTTP_validateKey(r) {
-		senderr(w, 401, "Unauthorized")
 		return
 	}
 
@@ -361,7 +344,7 @@ func API_WGServerConfigGet(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// API_WGServerConfigFetch handles GET /v3/wg/server-config/fetch.
+// API_WGServerConfigFetch handles GET /wg/server-config/fetch.
 // Authenticated via X-WG-KEY header. Returns the full WGServerConfigResponse
 // (including privkey and AdminAPIKey) and refreshes the Server's cached WG fields.
 func API_WGServerConfigFetch(w http.ResponseWriter, r *http.Request) {
@@ -419,11 +402,8 @@ func API_WGServerConfigFetch(w http.ResponseWriter, r *http.Request) {
 	sendObject(w, resp)
 }
 
-// FORM_WG_SERVER_CONFIG_UPDATE is the body for POST /v3/wg/server-config/update.
+// FORM_WG_SERVER_CONFIG_UPDATE is the body for POST /ui/wg/server-config/update.
 type FORM_WG_SERVER_CONFIG_UPDATE struct {
-	UID         primitive.ObjectID `json:"UID"`
-	DeviceToken string             `json:"DeviceToken"`
-
 	ID             primitive.ObjectID `json:"ID"`
 	Tag            string             `json:"Tag"`
 	AdminAPIKey    string             `json:"AdminAPIKey"`
@@ -436,7 +416,8 @@ type FORM_WG_SERVER_CONFIG_UPDATE struct {
 	InsecureSkipVerify bool `json:"InsecureSkipVerify"`
 }
 
-// API_WGServerConfigUpdate handles POST /v3/wg/server-config/update.
+// API_WGServerConfigUpdate handles POST /ui/wg/server-config/update.
+// Auth handled by adminUIMiddleware or X-API-KEY.
 func API_WGServerConfigUpdate(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 
@@ -446,14 +427,12 @@ func API_WGServerConfigUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := authenticateUserFromEmailOrIDAndToken("", F.UID, F.DeviceToken)
-	if err != nil {
-		senderr(w, 401, err.Error())
-		return
-	}
-	if !user.IsAdmin {
-		senderr(w, 401, "Admin required")
-		return
+	if !isAdminAPIKeyFromContext(r.Context()) {
+		user := getUserFromContext(r.Context())
+		if user == nil || !user.IsAdmin {
+			senderr(w, 401, "Admin required")
+			return
+		}
 	}
 
 	existing, err := DB_FindWGServerConfigByID(F.ID)
@@ -495,17 +474,15 @@ func API_WGServerConfigUpdate(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(200)
 }
 
-// FORM_WG_SERVER_CONFIG_ASSIGN is the body for POST /v3/wg/server-config/assign.
+// FORM_WG_SERVER_CONFIG_ASSIGN is the body for POST /ui/wg/server-config/assign.
 type FORM_WG_SERVER_CONFIG_ASSIGN struct {
-	UID         primitive.ObjectID `json:"UID"`
-	DeviceToken string             `json:"DeviceToken"`
-
 	ServerID primitive.ObjectID `json:"ServerID"`
 	ConfigID primitive.ObjectID `json:"ConfigID"`
 }
 
-// API_WGServerConfigAssign handles POST /v3/wg/server-config/assign.
+// API_WGServerConfigAssign handles POST /ui/wg/server-config/assign.
 // Links a Server to a WGServerConfig and caches the WG fields on the Server.
+// Auth handled by adminUIMiddleware or X-API-KEY.
 func API_WGServerConfigAssign(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 	if r.Method != http.MethodPost {
@@ -519,13 +496,9 @@ func API_WGServerConfigAssign(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !HTTP_validateKey(r) {
-		user, err := authenticateUserFromEmailOrIDAndToken("", F.UID, F.DeviceToken)
-		if err != nil {
-			senderr(w, 401, err.Error())
-			return
-		}
-		if !user.IsAdmin {
+	if !isAdminAPIKeyFromContext(r.Context()) {
+		user := getUserFromContext(r.Context())
+		if user == nil || !user.IsAdmin {
 			senderr(w, 401, "Admin required")
 			return
 		}
@@ -567,19 +540,15 @@ func API_WGServerConfigAssign(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// API_WGServers handles GET /v3/wg/servers.
+// API_WGServers handles GET /ui/wg/servers.
 // Returns all wg-servers (excluding the caller) that have a WireGuardSubnet,
 // so a wg-server can discover peers for cross-server routing.
-// Protected by AdminAPIKey.
+// Auth handled by adminUIMiddleware or X-API-KEY.
 // Optional query param: excludeID=<serverID hex>
 func API_WGServers(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 	if r.Method != http.MethodGet {
 		senderr(w, http.StatusMethodNotAllowed, "method not allowed")
-		return
-	}
-	if !HTTP_validateKey(r) {
-		senderr(w, 401, "Unauthorized")
 		return
 	}
 
