@@ -35,7 +35,7 @@ export default function Servers() {
     setLoading(true);
     setError('');
     try {
-      const resp = await apiPost('/v3/servers', { StartIndex: 0 });
+      const resp = await apiPost('/ui/servers', { StartIndex: 0 });
       if (resp.status === 200) {
         const data = await resp.json();
         setServers(Array.isArray(data) ? data : []);
@@ -57,7 +57,7 @@ export default function Servers() {
     setCreateError('');
     setCreating(true);
     try {
-      const resp = await apiPost('/v3/server/create', { Server: createForm });
+      const resp = await apiPost('/ui/server/create', { Server: createForm });
       if (resp.status === 200) {
         setShowCreate(false);
         setCreateForm(emptyForm());

@@ -29,58 +29,97 @@ func launchAPIServer() {
 		http.Redirect(w, r, "/admin/", http.StatusMovedPermanently)
 	})
 
+	// WireGuard server config fetch — authenticated via X-WG-KEY in the handler itself
+	mux.HandleFunc("/wg/server-config/fetch", API_WGServerConfigFetch)
+
 	if AUTHEnabled {
-		mux.HandleFunc("/v3/user/create", API_UserCreate)
-		mux.HandleFunc("/v3/user/update", API_UserUpdate)
-		mux.HandleFunc("/v3/user/adminupdate", API_UserAdminUpdate)
-		mux.HandleFunc("/v3/user/login", API_UserLogin)
-		mux.HandleFunc("/v3/user/logout", API_UserLogout)
-		mux.HandleFunc("/v3/user/reset/password", API_UserResetPassword)
-		mux.HandleFunc("/v3/user/2fa/confirm", API_UserTwoFactorConfirm)
-		mux.HandleFunc("/v3/user/list", API_UserList)
+		// ----------------------------------------------------------------
+		// Public client endpoints (no auth required)
+		// ----------------------------------------------------------------
+		mux.HandleFunc("/client/user/login", API_UserLogin)
+		mux.HandleFunc("/client/user/create", API_UserCreate)
+		mux.HandleFunc("/client/user/reset/password", API_UserResetPassword)
 
-		mux.HandleFunc("/v3/device/list", API_DeviceList)
-		mux.HandleFunc("/v3/device/list/user", API_DeviceListUser)
-		mux.HandleFunc("/v3/device/create", API_DeviceCreate)
-		mux.HandleFunc("/v3/device/delete", API_DeviceDelete)
-		mux.HandleFunc("/v3/device/update", API_DeviceUpdate)
-		mux.HandleFunc("/v3/device", API_DeviceGet)
+		// ----------------------------------------------------------------
+		// Protected client endpoints (clientAuthMiddleware)
+		// ----------------------------------------------------------------
+		clientMW := func(h http.HandlerFunc) http.Handler {
+			return applyMiddleware(h, xAPIKeyMiddleware, clientAuthMiddleware)
+		}
 
-		mux.HandleFunc("/v3/group/create", API_GroupCreate)
-		mux.HandleFunc("/v3/group/delete", API_GroupDelete)
-		mux.HandleFunc("/v3/group/update", API_GroupUpdate)
-		mux.HandleFunc("/v3/group/add", API_GroupAdd)
-		mux.HandleFunc("/v3/group/remove", API_GroupRemove)
-		mux.HandleFunc("/v3/group/list", API_GroupList)
-		mux.HandleFunc("/v3/group", API_GroupGet)
-		mux.HandleFunc("/v3/group/entities", API_GroupGetEntities)
+		mux.Handle("/client/user/logout", clientMW(API_UserLogout))
+		mux.Handle("/client/user/update", clientMW(API_UserUpdate))
+		mux.Handle("/client/user/2fa/confirm", clientMW(API_UserTwoFactorConfirm))
+		mux.Handle("/client/device/list/user", clientMW(API_DeviceListUser))
+		mux.Handle("/client/device/create", clientMW(API_DeviceCreate))
+		mux.Handle("/client/device", clientMW(API_DeviceGet))
+		mux.Handle("/client/servers", clientMW(API_ServersForUser))
+		mux.Handle("/client/server", clientMW(API_ServerGet))
+		mux.Handle("/client/wg/config", clientMW(API_WGConfig))
 
-		mux.HandleFunc("/v3/server", API_ServerGet)
-		mux.HandleFunc("/v3/server/create", API_ServerCreate)
-		mux.HandleFunc("/v3/server/update", API_ServerUpdate)
-		mux.HandleFunc("/v3/servers", API_ServersForUser)
+		if loadSecret("PayKey") != "" {
+			mux.Handle("/client/key/activate", clientMW(API_ActivateLicenseKey))
+			mux.Handle("/client/user/toggle/substatus", clientMW(API_UserToggleSubStatus))
+		}
 
-		// WireGuard peer management
-		mux.HandleFunc("/v3/wg/peers", API_WGPeers)
-		mux.HandleFunc("/v3/wg/config", API_WGConfig)
-		mux.HandleFunc("/v3/wg/servers", API_WGServers)
+		// ----------------------------------------------------------------
+		// Admin UI login (public — sets the admin_session cookie)
+		// ----------------------------------------------------------------
+		mux.HandleFunc("/ui/user/login", API_AdminUILogin)
+
+		// ----------------------------------------------------------------
+		// Protected admin UI endpoints (adminUIMiddleware)
+		// ----------------------------------------------------------------
+		adminMW := func(h http.HandlerFunc) http.Handler {
+			return applyMiddleware(h, xAPIKeyMiddleware, adminUIMiddleware)
+		}
+
+		// User management
+		mux.Handle("/ui/user/logout", adminMW(API_AdminUILogout))
+		mux.Handle("/ui/user/list", adminMW(API_UserList))
+		mux.Handle("/ui/user/adminupdate", adminMW(API_UserAdminUpdate))
+
+		// Device management
+		mux.Handle("/ui/device/list", adminMW(API_DeviceList))
+		mux.Handle("/ui/device/create", adminMW(API_DeviceCreate))
+		mux.Handle("/ui/device/delete", adminMW(API_DeviceDelete))
+		mux.Handle("/ui/device/update", adminMW(API_DeviceUpdate))
+		mux.Handle("/ui/device", adminMW(API_DeviceGet))
+
+		// Group management
+		mux.Handle("/ui/group/create", adminMW(API_GroupCreate))
+		mux.Handle("/ui/group/delete", adminMW(API_GroupDelete))
+		mux.Handle("/ui/group/update", adminMW(API_GroupUpdate))
+		mux.Handle("/ui/group/add", adminMW(API_GroupAdd))
+		mux.Handle("/ui/group/remove", adminMW(API_GroupRemove))
+		mux.Handle("/ui/group/list", adminMW(API_GroupList))
+		mux.Handle("/ui/group/entities", adminMW(API_GroupGetEntities))
+		mux.Handle("/ui/group", adminMW(API_GroupGet))
+
+		// Server management
+		mux.Handle("/ui/server", adminMW(API_ServerGet))
+		mux.Handle("/ui/server/create", adminMW(API_ServerCreate))
+		mux.Handle("/ui/server/update", adminMW(API_ServerUpdate))
+		mux.Handle("/ui/servers", adminMW(API_ServersForUser))
+
+		// WireGuard peer/server info
+		mux.Handle("/ui/wg/peers", adminMW(API_WGPeers))
+		mux.Handle("/ui/wg/config", adminMW(API_WGConfig))
+		mux.Handle("/ui/wg/servers", adminMW(API_WGServers))
 
 		// WireGuard server config management
-		mux.HandleFunc("/v3/wg/server-config", API_WGServerConfigCreate)
-		mux.HandleFunc("/v3/wg/server-config/list", API_WGServerConfigList)
-		mux.HandleFunc("/v3/wg/server-config/update", API_WGServerConfigUpdate)
-		mux.HandleFunc("/v3/wg/server-config/get", API_WGServerConfigGet)
-		mux.HandleFunc("/v3/wg/server-config/fetch", API_WGServerConfigFetch)
-		mux.HandleFunc("/v3/wg/server-config/assign", API_WGServerConfigAssign)
+		mux.Handle("/ui/wg/server-config", adminMW(API_WGServerConfigCreate))
+		mux.Handle("/ui/wg/server-config/list", adminMW(API_WGServerConfigList))
+		mux.Handle("/ui/wg/server-config/update", adminMW(API_WGServerConfigUpdate))
+		mux.Handle("/ui/wg/server-config/get", adminMW(API_WGServerConfigGet))
+		mux.Handle("/ui/wg/server-config/assign", adminMW(API_WGServerConfigAssign))
 
 		// Network management
-		mux.HandleFunc("/v3/network/list", API_NetworkList)
-		mux.HandleFunc("/v3/network/update", API_NetworkUpdate)
+		mux.Handle("/ui/network/list", adminMW(API_NetworkList))
+		mux.Handle("/ui/network/update", adminMW(API_NetworkUpdate))
 
-		// Tunnels public network specific
 		if loadSecret("PayKey") != "" {
-			mux.HandleFunc("/v3/key/activate", API_ActivateLicenseKey)
-			mux.HandleFunc("/v3/user/toggle/substatus", API_UserToggleSubStatus)
+			mux.Handle("/ui/user/toggle/substatus", adminMW(API_UserToggleSubStatus))
 		}
 	}
 
@@ -151,7 +190,7 @@ func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, X-API-KEY, X-Device-Token, X-UID, X-Email")
 
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusOK)

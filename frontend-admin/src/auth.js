@@ -1,22 +1,22 @@
-const KEY = 'admin_auth';
+const USER_META_KEY = 'admin_meta';
 
-export function getAuth() {
+export function getUserMeta() {
   try {
-    return JSON.parse(localStorage.getItem(KEY) || 'null');
+    return JSON.parse(localStorage.getItem(USER_META_KEY) || 'null');
   } catch {
     return null;
   }
 }
 
-export function setAuth(auth) {
-  localStorage.setItem(KEY, JSON.stringify(auth));
+export function setUserMeta(meta) {
+  localStorage.setItem(USER_META_KEY, JSON.stringify(meta));
 }
 
-export function clearAuth() {
-  localStorage.removeItem(KEY);
+export function clearUserMeta() {
+  localStorage.removeItem(USER_META_KEY);
 }
 
 export function isLoggedIn() {
-  const auth = getAuth();
-  return !!(auth && auth._id && auth.DeviceToken && auth.IsAdmin);
+  const meta = getUserMeta();
+  return !!(meta && (meta.IsAdmin || meta.IsManager));
 }

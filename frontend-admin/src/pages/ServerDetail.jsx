@@ -27,7 +27,7 @@ export default function ServerDetail() {
   const [error, setError] = useState('');
 
   const load = async () => {
-    const resp = await apiPost('/v3/servers', { StartIndex: 0 });
+    const resp = await apiPost('/ui/servers', { StartIndex: 0 });
     if (resp.status === 200) {
       const list = await resp.json();
       const found = (Array.isArray(list) ? list : []).find((s) => s._id === id);
@@ -56,7 +56,7 @@ export default function ServerDetail() {
     setSaving(true);
     setError('');
     try {
-      const resp = await apiPost('/v3/server/update', {
+      const resp = await apiPost('/ui/server/update', {
         Server: { ...server, ...form },
       });
       if (resp.status === 200) {

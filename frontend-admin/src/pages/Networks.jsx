@@ -18,8 +18,8 @@ export default function Networks() {
     setError('');
     try {
       const [netResp, cfgResp] = await Promise.all([
-        apiPost('/v3/network/list', { Limit: PAGE_SIZE, Offset: 0 }),
-        apiPost('/v3/wg/server-config/list', {}),
+        apiPost('/ui/network/list', { Limit: PAGE_SIZE, Offset: 0 }),
+        apiPost('/ui/wg/server-config/list', {}),
       ]);
       if (netResp.status === 200) {
         const data = await netResp.json();
