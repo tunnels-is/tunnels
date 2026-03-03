@@ -59,7 +59,7 @@ const useForm = () => {
 
     inputs.Code = secret;
 
-    let x = await state.callController(null, "POST", "/v3/user/2fa/confirm", inputs, false, false);
+    let x = await state.callController(null, "POST", "/client/user/2fa/confirm", inputs, false, false);
     if (x.status === 200) {
       let c = { ...code };
       c.Recovery = x.data.Data;

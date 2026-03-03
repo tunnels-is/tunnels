@@ -31,7 +31,7 @@ const ServerFormDialog = ({ open, onOpenChange, onSave }) => {
     if (!form) return;
     setSaving(true);
 
-    const resp = await state.callController(null, "POST", "/v3/server/create", { Server: form }, false, false);
+    const resp = await state.callController(null, "POST", "/client/server/create", { Server: form }, false, false);
     if (resp?.status === 200) {
       if (!state.PrivateServers) state.PrivateServers = [];
       state.PrivateServers.push(resp.data);
