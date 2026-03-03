@@ -16,7 +16,7 @@ var (
 )
 
 func main() {
-	apiKey      := flag.String("key", "", "per-server API key (from POST /v3/wg/server-config)")
+	apiKey      := flag.String("key", "", "per-server API key (from POST /ui/wg/server-config)")
 	controllerIP := flag.String("ip", "", "controller IP address (e.g. 74.63.223.157)")
 	showVersion := flag.Bool("version", false, "show version and exit")
 	jsonLogs    := flag.Bool("json", false, "enable JSON-format logging")
