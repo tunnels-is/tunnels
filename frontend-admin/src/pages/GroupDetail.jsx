@@ -30,7 +30,7 @@ export default function GroupDetail() {
   const [addError, setAddError] = useState('');
 
   const loadGroup = async () => {
-    const resp = await apiPost('/v3/group', { GID: id });
+    const resp = await apiPost('/ui/group', { GID: id });
     if (resp.status === 200) {
       setGroup(await resp.json());
     }
@@ -39,7 +39,7 @@ export default function GroupDetail() {
   const loadMembers = async () => {
     const results = { users: [], devices: [], servers: [] };
     for (const type of ['user', 'device', 'server']) {
-      const resp = await apiPost('/v3/group/entities', { GID: id, Type: type, Limit: 500, Offset: 0 });
+      const resp = await apiPost('/ui/group/entities', { GID: id, Type: type, Limit: 500, Offset: 0 });
       if (resp.status === 200) {
         const data = await resp.json();
         results[`${type}s`] = Array.isArray(data) ? data : [];
@@ -63,7 +63,7 @@ export default function GroupDetail() {
     setSaving(true);
     setError('');
     try {
-      const resp = await apiPost('/v3/group/update', {
+      const resp = await apiPost('/ui/group/update', {
         Group: { ...group, Tag: form.Tag, Description: form.Description },
       });
       if (resp.status === 200) {
@@ -85,7 +85,7 @@ export default function GroupDetail() {
     setAddError('');
     if (!addForm.value) return;
     try {
-      const resp = await apiPost('/v3/group/add', {
+      const resp = await apiPost('/ui/group/add', {
         GroupID: id,
         Type: addForm.type,
         TypeID: addForm.value,
@@ -104,7 +104,7 @@ export default function GroupDetail() {
 
   const handleRemove = async (type, typeID) => {
     try {
-      const resp = await apiPost('/v3/group/remove', { GroupID: id, Type: type, TypeID: typeID });
+      const resp = await apiPost('/ui/group/remove', { GroupID: id, Type: type, TypeID: typeID });
       if (resp.status === 200) loadMembers();
     } catch {
       // ignore

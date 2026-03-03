@@ -1,6 +1,6 @@
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { Users, Monitor, Layers, Server, Shield, Network, LogOut } from 'lucide-react';
-import { getAuth, clearAuth } from '../auth';
+import { getUserMeta, clearUserMeta } from '../auth';
 import { apiPost } from '../api';
 
 const navItems = [
@@ -15,15 +15,15 @@ const navItems = [
 export default function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
-  const auth = getAuth();
+  const meta = getUserMeta();
 
   const handleLogout = async () => {
     try {
-      await apiPost('/v3/user/logout', { LogoutToken: auth?.DeviceToken, All: false });
+      await apiPost('/ui/user/logout', {});
     } catch {
       // ignore
     }
-    clearAuth();
+    clearUserMeta();
     navigate('/login', { replace: true });
   };
 
@@ -61,9 +61,9 @@ export default function Layout() {
         </nav>
 
         <div className="border-t border-[#1e2433] p-2">
-          {auth && (
+          {meta && (
             <div className="px-3 py-1 mb-1">
-              <div className="text-[11px] text-white/40 truncate">{auth.Email}</div>
+              <div className="text-[11px] text-white/40 truncate">{meta.Email}</div>
             </div>
           )}
           <button

@@ -34,7 +34,7 @@ export default function Groups() {
     setLoading(true);
     setError('');
     try {
-      const resp = await apiPost('/v3/group/list', {});
+      const resp = await apiPost('/ui/group/list', {});
       if (resp.status === 200) {
         const data = await resp.json();
         setGroups(Array.isArray(data) ? data : []);
@@ -58,7 +58,7 @@ export default function Groups() {
     setCreateError('');
     setCreating(true);
     try {
-      const resp = await apiPost('/v3/group/create', { Group: { Tag: tag } });
+      const resp = await apiPost('/ui/group/create', { Group: { Tag: tag } });
       if (resp.status === 200) {
         setShowCreate(false);
         setTag('');

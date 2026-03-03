@@ -18,6 +18,103 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+// API_AdminUILogin handles POST /ui/user/login.
+// Public endpoint: validates credentials, checks admin/manager, sets admin_session cookie.
+func API_AdminUILogin(w http.ResponseWriter, r *http.Request) {
+	defer BasicRecover()
+
+	LF := new(LOGIN_FORM)
+	err := decodeBody(r, LF)
+	if err != nil {
+		senderr(w, 400, "Invalid request body", slog.Any("error", err))
+		return
+	}
+
+	user, err := DB_findUserByEmail(LF.Email)
+	if err != nil {
+		senderr(w, 500, "Unknown error, please try again in a moment")
+		return
+	}
+	if user == nil {
+		senderr(w, 401, "Invalid login credentials")
+		return
+	}
+
+	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(LF.Password))
+	if err != nil {
+		senderr(w, 401, "Invalid login credentials")
+		return
+	}
+
+	err = validateUserTwoFactor(user, LF)
+	if err != nil {
+		senderr(w, 401, err.Error())
+		return
+	}
+
+	if !user.IsAdmin && !user.IsManager {
+		senderr(w, 401, "Admin or Manager access required")
+		return
+	}
+
+	userLoginUpdate := handleUserDeviceToken(user, LF)
+	err = DB_updateUserDeviceTokens(userLoginUpdate)
+	if err != nil {
+		senderr(w, 500, "Database error, please try again in a moment")
+		return
+	}
+
+	cookieValue := user.ID.Hex() + ":" + user.DeviceToken.DT
+	http.SetCookie(w, &http.Cookie{
+		Name:     "admin_session",
+		Value:    cookieValue,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteStrictMode,
+		MaxAge:   86400 * 7,
+	})
+
+	user.RemoveSensitiveInformation()
+	sendObject(w, user)
+}
+
+// API_AdminUILogout handles POST /ui/user/logout.
+// Clears the admin_session cookie and removes the device token.
+func API_AdminUILogout(w http.ResponseWriter, r *http.Request) {
+	defer BasicRecover()
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     "admin_session",
+		Value:    "",
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteStrictMode,
+		MaxAge:   -1,
+	})
+
+	user := getUserFromContext(r.Context())
+	if user != nil {
+		LF := new(LOGOUT_FORM)
+		_ = decodeBody(r, LF)
+
+		if LF.All {
+			user.Tokens = make([]*DeviceToken, 0)
+		} else if LF.LogoutToken != "" {
+			user.Tokens = slices.DeleteFunc(user.Tokens, func(dt *DeviceToken) bool {
+				return dt.DT == LF.LogoutToken
+			})
+		}
+
+		update := new(UPDATE_USER_TOKENS)
+		update.ID = user.ID
+		update.Tokens = user.Tokens
+		_ = DB_updateUserDeviceTokens(update)
+	}
+
+	w.WriteHeader(200)
+}
 
 func API_UserCreate(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
@@ -100,12 +197,6 @@ func API_UserUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err = authenticateUserFromEmailOrIDAndToken("", UF.UID, UF.DeviceToken)
-	if err != nil {
-		senderr(w, 401, err.Error())
-		return
-	}
-
 	err = DB_updateUser(UF)
 	if err != nil {
 		senderr(w, 500, "Unable to update users, please try again in a moment")
@@ -125,16 +216,17 @@ func API_UserAdminUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := authenticateUserFromEmailOrIDAndToken("", UF.UID, UF.DeviceToken)
-	if err != nil {
-		senderr(w, 401, err.Error())
-		return
-	}
-
-	if !user.IsAdmin {
-		if !user.IsManager {
-			senderr(w, 401, "You are not allowed to admin update users")
+	user := getUserFromContext(r.Context())
+	if !isAdminAPIKeyFromContext(r.Context()) {
+		if user == nil {
+			senderr(w, 401, "Unauthorized")
 			return
+		}
+		if !user.IsAdmin {
+			if !user.IsManager {
+				senderr(w, 401, "You are not allowed to admin update users")
+				return
+			}
 		}
 	}
 
@@ -199,11 +291,7 @@ func API_UserLogout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := authenticateUserFromEmailOrIDAndToken("", LF.UID, LF.DeviceToken)
-	if err != nil {
-		senderr(w, 500, err.Error())
-		return
-	}
+	user := getUserFromContext(r.Context())
 	if user == nil {
 		senderr(w, 204, "User not found")
 		return
@@ -240,11 +328,7 @@ func API_UserTwoFactorConfirm(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := authenticateUserFromEmailOrIDAndToken("", LF.UID, LF.DeviceToken)
-	if err != nil {
-		senderr(w, 500, err.Error())
-		return
-	}
+	user := getUserFromContext(r.Context())
 	if user == nil {
 		senderr(w, 400, "User not found")
 		return
@@ -330,19 +414,6 @@ func API_UserList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := authenticateUserFromEmailOrIDAndToken("", F.UID, F.DeviceToken)
-	if err != nil {
-		senderr(w, 500, err.Error())
-		return
-	}
-
-	if !user.IsAdmin {
-		if !user.IsManager {
-			senderr(w, 401, "You are not allowed to view groups")
-			return
-		}
-	}
-
 	users, err := DB_getUsers(int64(F.Limit), int64(F.Offset))
 	if err != nil {
 		senderr(w, 500, "Unknown error, please try again in a moment")
@@ -369,16 +440,17 @@ func API_DeviceUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := authenticateUserFromEmailOrIDAndToken("", F.UID, F.DeviceToken)
-	if err != nil {
-		senderr(w, 500, err.Error())
-		return
-	}
-
-	if !user.IsAdmin {
-		if !user.IsManager {
-			senderr(w, 401, "You are not allowed to update devices")
+	if !isAdminAPIKeyFromContext(r.Context()) {
+		user := getUserFromContext(r.Context())
+		if user == nil {
+			senderr(w, 401, "Unauthorized")
 			return
+		}
+		if !user.IsAdmin {
+			if !user.IsManager {
+				senderr(w, 401, "You are not allowed to update devices")
+				return
+			}
 		}
 	}
 
@@ -401,16 +473,17 @@ func API_DeviceDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := authenticateUserFromEmailOrIDAndToken("", F.UID, F.DeviceToken)
-	if err != nil {
-		senderr(w, 500, err.Error())
-		return
-	}
-
-	if !user.IsAdmin {
-		if !user.IsManager {
-			senderr(w, 401, "You are not allowed to delete device")
+	if !isAdminAPIKeyFromContext(r.Context()) {
+		user := getUserFromContext(r.Context())
+		if user == nil {
+			senderr(w, 401, "Unauthorized")
 			return
+		}
+		if !user.IsAdmin {
+			if !user.IsManager {
+				senderr(w, 401, "You are not allowed to delete device")
+				return
+			}
 		}
 	}
 
@@ -432,17 +505,15 @@ func API_DeviceList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	hasAPIKey := HTTP_validateKey(r)
-	if !hasAPIKey {
-		user, err := authenticateUserFromEmailOrIDAndToken("", F.UID, F.DeviceToken)
-		if err != nil {
-			senderr(w, 500, err.Error())
+	if !isAdminAPIKeyFromContext(r.Context()) {
+		user := getUserFromContext(r.Context())
+		if user == nil {
+			senderr(w, 401, "Unauthorized")
 			return
 		}
-
 		if !user.IsAdmin {
 			if !user.IsManager {
-				senderr(w, 401, "You are not allowed to view groups")
+				senderr(w, 401, "You are not allowed to view devices")
 				return
 			}
 		}
@@ -466,9 +537,9 @@ func API_DeviceListUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := authenticateUserFromEmailOrIDAndToken("", F.UID, F.DeviceToken)
-	if err != nil {
-		senderr(w, 401, err.Error())
+	user := getUserFromContext(r.Context())
+	if user == nil {
+		senderr(w, 401, "Unauthorized")
 		return
 	}
 
@@ -483,7 +554,6 @@ func API_DeviceListUser(w http.ResponseWriter, r *http.Request) {
 
 func API_DeviceCreate(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
-	hasAPIKey := HTTP_validateKey(r)
 
 	F := new(FORM_CREATE_DEVICE)
 	err := decodeBody(r, F)
@@ -492,10 +562,10 @@ func API_DeviceCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !hasAPIKey {
-		user, err := authenticateUserFromEmailOrIDAndToken("", F.UID, F.DeviceToken)
-		if err != nil {
-			senderr(w, 500, err.Error())
+	if !isAdminAPIKeyFromContext(r.Context()) {
+		user := getUserFromContext(r.Context())
+		if user == nil {
+			senderr(w, 401, "Unauthorized")
 			return
 		}
 		F.Device.UserID = user.ID
@@ -563,16 +633,17 @@ func API_GroupCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := authenticateUserFromEmailOrIDAndToken("", F.UID, F.DeviceToken)
-	if err != nil {
-		senderr(w, 500, err.Error())
-		return
-	}
-
-	if !user.IsAdmin {
-		if !user.IsManager {
-			senderr(w, 401, "You are not allowed to create groups")
+	if !isAdminAPIKeyFromContext(r.Context()) {
+		user := getUserFromContext(r.Context())
+		if user == nil {
+			senderr(w, 401, "Unauthorized")
 			return
+		}
+		if !user.IsAdmin {
+			if !user.IsManager {
+				senderr(w, 401, "You are not allowed to create groups")
+				return
+			}
 		}
 	}
 
@@ -598,16 +669,17 @@ func API_GroupAdd(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := authenticateUserFromEmailOrIDAndToken("", F.UID, F.DeviceToken)
-	if err != nil {
-		senderr(w, 500, err.Error())
-		return
-	}
-
-	if !user.IsAdmin {
-		if !user.IsManager {
-			senderr(w, 401, "You are not allowed to update groups")
+	if !isAdminAPIKeyFromContext(r.Context()) {
+		user := getUserFromContext(r.Context())
+		if user == nil {
+			senderr(w, 401, "Unauthorized")
 			return
+		}
+		if !user.IsAdmin {
+			if !user.IsManager {
+				senderr(w, 401, "You are not allowed to update groups")
+				return
+			}
 		}
 	}
 
@@ -672,16 +744,17 @@ func API_GroupRemove(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := authenticateUserFromEmailOrIDAndToken("", F.UID, F.DeviceToken)
-	if err != nil {
-		senderr(w, 500, err.Error())
-		return
-	}
-
-	if !user.IsAdmin {
-		if !user.IsManager {
-			senderr(w, 401, "You are not allowed to update this entity")
+	if !isAdminAPIKeyFromContext(r.Context()) {
+		user := getUserFromContext(r.Context())
+		if user == nil {
+			senderr(w, 401, "Unauthorized")
 			return
+		}
+		if !user.IsAdmin {
+			if !user.IsManager {
+				senderr(w, 401, "You are not allowed to update this entity")
+				return
+			}
 		}
 	}
 
@@ -703,16 +776,17 @@ func API_GroupUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := authenticateUserFromEmailOrIDAndToken("", F.UID, F.DeviceToken)
-	if err != nil {
-		senderr(w, 500, err.Error())
-		return
-	}
-
-	if !user.IsAdmin {
-		if !user.IsManager {
-			senderr(w, 401, "You are not allowed to update groups")
+	if !isAdminAPIKeyFromContext(r.Context()) {
+		user := getUserFromContext(r.Context())
+		if user == nil {
+			senderr(w, 401, "Unauthorized")
 			return
+		}
+		if !user.IsAdmin {
+			if !user.IsManager {
+				senderr(w, 401, "You are not allowed to update groups")
+				return
+			}
 		}
 	}
 
@@ -735,16 +809,17 @@ func API_GroupDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := authenticateUserFromEmailOrIDAndToken("", F.UID, F.DeviceToken)
-	if err != nil {
-		senderr(w, 500, err.Error())
-		return
-	}
-
-	if !user.IsAdmin {
-		if !user.IsManager {
-			senderr(w, 401, "You are not allowed to view groups")
+	if !isAdminAPIKeyFromContext(r.Context()) {
+		user := getUserFromContext(r.Context())
+		if user == nil {
+			senderr(w, 401, "Unauthorized")
 			return
+		}
+		if !user.IsAdmin {
+			if !user.IsManager {
+				senderr(w, 401, "You are not allowed to delete groups")
+				return
+			}
 		}
 	}
 
@@ -790,16 +865,17 @@ func API_GroupGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := authenticateUserFromEmailOrIDAndToken("", F.UID, F.DeviceToken)
-	if err != nil {
-		senderr(w, 500, err.Error())
-		return
-	}
-
-	if !user.IsAdmin {
-		if !user.IsManager {
-			senderr(w, 401, "You are not allowed to view groups")
+	if !isAdminAPIKeyFromContext(r.Context()) {
+		user := getUserFromContext(r.Context())
+		if user == nil {
+			senderr(w, 401, "Unauthorized")
 			return
+		}
+		if !user.IsAdmin {
+			if !user.IsManager {
+				senderr(w, 401, "You are not allowed to view groups")
+				return
+			}
 		}
 	}
 
@@ -826,16 +902,17 @@ func API_GroupGetEntities(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := authenticateUserFromEmailOrIDAndToken("", F.UID, F.DeviceToken)
-	if err != nil {
-		senderr(w, 500, err.Error())
-		return
-	}
-
-	if !user.IsAdmin {
-		if !user.IsManager {
-			senderr(w, 401, "You are not allowed to view groups")
+	if !isAdminAPIKeyFromContext(r.Context()) {
+		user := getUserFromContext(r.Context())
+		if user == nil {
+			senderr(w, 401, "Unauthorized")
 			return
+		}
+		if !user.IsAdmin {
+			if !user.IsManager {
+				senderr(w, 401, "You are not allowed to view groups")
+				return
+			}
 		}
 	}
 
@@ -870,16 +947,17 @@ func API_GroupList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := authenticateUserFromEmailOrIDAndToken("", F.UID, F.DeviceToken)
-	if err != nil {
-		senderr(w, 500, err.Error())
-		return
-	}
-
-	if !user.IsAdmin {
-		if !user.IsManager {
-			senderr(w, 401, "You are not allowed to view groups")
+	if !isAdminAPIKeyFromContext(r.Context()) {
+		user := getUserFromContext(r.Context())
+		if user == nil {
+			senderr(w, 401, "Unauthorized")
 			return
+		}
+		if !user.IsAdmin {
+			if !user.IsManager {
+				senderr(w, 401, "You are not allowed to view groups")
+				return
+			}
 		}
 	}
 
@@ -906,9 +984,9 @@ func API_ServersForUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := authenticateUserFromEmailOrIDAndToken("", F.UID, F.DeviceToken)
-	if err != nil {
-		senderr(w, 500, err.Error())
+	user := getUserFromContext(r.Context())
+	if user == nil && !isAdminAPIKeyFromContext(r.Context()) {
+		senderr(w, 401, "Unauthorized")
 		return
 	}
 
@@ -920,7 +998,7 @@ func API_ServersForUser(w http.ResponseWriter, r *http.Request) {
 	}
 	servers = append(servers, pservers...)
 
-	if len(user.Groups) > 0 {
+	if user != nil && len(user.Groups) > 0 {
 		puservers, err := DB_FindServersByGroups(user.Groups, 100, int64(F.StartIndex))
 		if err != nil {
 			senderr(w, 500, "Unknown error, please try again in a moment")
@@ -942,16 +1020,17 @@ func API_ServerUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := authenticateUserFromEmailOrIDAndToken("", F.UID, F.DeviceToken)
-	if err != nil {
-		senderr(w, 401, err.Error())
-		return
-	}
-
-	if !user.IsAdmin {
-		if !user.IsManager {
-			senderr(w, 401, "You are not allowed to create servers")
+	if !isAdminAPIKeyFromContext(r.Context()) {
+		user := getUserFromContext(r.Context())
+		if user == nil {
+			senderr(w, 401, "Unauthorized")
 			return
+		}
+		if !user.IsAdmin {
+			if !user.IsManager {
+				senderr(w, 401, "You are not allowed to create servers")
+				return
+			}
 		}
 	}
 
@@ -973,16 +1052,17 @@ func API_ServerCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := authenticateUserFromEmailOrIDAndToken("", F.UID, F.DeviceToken)
-	if err != nil {
-		senderr(w, 401, err.Error())
-		return
-	}
-
-	if !user.IsAdmin {
-		if !user.IsManager {
-			senderr(w, 401, "You are not allowed to create servers")
+	if !isAdminAPIKeyFromContext(r.Context()) {
+		user := getUserFromContext(r.Context())
+		if user == nil {
+			senderr(w, 401, "Unauthorized")
 			return
+		}
+		if !user.IsAdmin {
+			if !user.IsManager {
+				senderr(w, 401, "You are not allowed to create servers")
+				return
+			}
 		}
 	}
 
@@ -1038,10 +1118,12 @@ func API_ServerGet(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		}
+	} else if isAdminAPIKeyFromContext(r.Context()) {
+		allowed = true
 	} else {
-		user, err := authenticateUserFromEmailOrIDAndToken("", F.UID, F.DeviceToken)
-		if err != nil {
-			senderr(w, 401, err.Error())
+		user := getUserFromContext(r.Context())
+		if user == nil {
+			senderr(w, 401, "Unauthorized")
 			return
 		}
 		for _, ug := range user.Groups {
@@ -1064,7 +1146,6 @@ func API_ServerGet(w http.ResponseWriter, r *http.Request) {
 
 	senderr(w, 401, "unauthorized")
 }
-
 
 func API_UserResetPassword(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
@@ -1128,11 +1209,13 @@ func API_UserToggleSubStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := authenticateUserFromEmailOrIDAndToken(UF.Email, primitive.NilObjectID, UF.DeviceToken)
-	if err != nil || user == nil {
-		senderr(w, 401, err.Error())
+	user := getUserFromContext(r.Context())
+	if user == nil {
+		senderr(w, 401, "Unauthorized")
 		return
 	}
+
+	UF.Email = user.Email
 
 	err = DB_toggleUserSubscriptionStatus(UF)
 	if err != nil {
@@ -1153,9 +1236,9 @@ func API_ActivateLicenseKey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := authenticateUserFromEmailOrIDAndToken("", AF.UID, AF.DeviceToken)
-	if err != nil {
-		senderr(w, 401, err.Error())
+	user := getUserFromContext(r.Context())
+	if user == nil {
+		senderr(w, 401, "Unauthorized")
 		return
 	}
 
