@@ -9,7 +9,6 @@ import (
 	"github.com/jackpal/gateway"
 )
 
-// isInterfaceATunnel checks if the given IP is a tunnel interface
 func isInterfaceATunnel(interf net.IP) (isTunnel bool) {
 	tunnelMapRange(func(tun *TUN) bool {
 		tunnel := tun.tunnel.Load()
@@ -27,7 +26,6 @@ func isInterfaceATunnel(interf net.IP) (isTunnel bool) {
 	return
 }
 
-// isInterfaceATunnel checks if the given IP is a tunnel interface
 func isDefaultRouteOnTunnel() (foundRoute bool) {
 	tunnelMapRange(func(tun *TUN) bool {
 		tunnel := tun.meta.Load()
@@ -45,7 +43,6 @@ func isDefaultRouteOnTunnel() (foundRoute bool) {
 	return
 }
 
-// loadDefaultInterface discovers and loads the default network interface
 func loadDefaultInterface() {
 	defer RecoverAndLog()
 	s := STATE.Load()
@@ -100,7 +97,6 @@ LOOP:
 	)
 }
 
-// loadDefaultGateway discovers and loads the default network gateway
 func loadDefaultGateway() {
 	defer RecoverAndLog()
 	s := STATE.Load()
@@ -139,7 +135,6 @@ func loadDefaultGateway() {
 	)
 }
 
-// GetDefaultGateway is a background task that continuously monitors network gateway
 func GetDefaultGateway() {
 	s := STATE.Load()
 	defer func() {

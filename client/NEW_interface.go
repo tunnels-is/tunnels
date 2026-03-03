@@ -59,24 +59,13 @@ func AutoConnect() {
 
 		var code int
 		var err error
-		// var user *User
+
 		conf := CONFIG.Load()
 		cliConf := conf.CLIConfig
 		if cliConf != nil {
 			err = cliPublicConnect(meta.Tag)
 		} else {
-			// TODO
-			// user, err = getUser()
-			// if err != nil {
-			// 	return true
-			// }
-			// code, err = PublicConnect(&ConnectionRequest{
-			// 	Tag:         meta.Tag,
-			// 	ServerID:    meta.ServerID,
-			// 	DeviceToken: user.DeviceToken.DT,
-			// 	// URL:         user.AuthServer,
-			// 	// Secure: user.Secure,
-			// })
+
 		}
 
 		if err != nil || code != 200 {
@@ -100,8 +89,6 @@ func PingConnections() {
 			return true
 		}
 
-		// WireGuard keepalive is handled by persistent_keepalive_interval.
-		// Reset ping timer so the 45s reconnect threshold doesn't fire.
 		tun.registerPing(time.Now())
 
 		ping := tun.pingTime.Load()

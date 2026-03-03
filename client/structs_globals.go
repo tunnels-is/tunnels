@@ -32,28 +32,22 @@ const (
 )
 
 var (
-	// hardcoded public network controller IP
-	// This prevents DNS hijacking
 	DefaultControllerIP = "89.147.109.61"
 
 	DefaultTunnelName = "tunnels"
 
-	// New global state and config
 	STATE  atomic.Pointer[stateV2]
 	CONFIG atomic.Pointer[configV2]
 
-	// Tunnels, Servers, Meta
 	TunnelMetaMap *xsync.MapOf[string, *TunnelMETA]
 	TunnelMap     *xsync.MapOf[string, *TUN]
 
-	// Logs stuff
 	LogQueue      = make(chan string, 1000)
 	APILogQueue   = make(chan string, 1000)
 	logRecordHash *xsync.MapOf[string, bool]
 	PollLogMu     sync.Mutex
 	PollLogBuf    []string
 
-	// Go Routine monitors
 	concurrencyMonitor = make(chan *goSignal, 1000)
 	tunnelMonitor      = make(chan *TUN, 1000)
 	interfaceMonitor   = make(chan *TUN, 1000)
@@ -62,13 +56,11 @@ var (
 	mediumPriorityChannel = make(chan *event, 100)
 	lowPriorityChannel    = make(chan *event, 100)
 
-	// Context
 	quit          = make(chan os.Signal, 10)
 	GlobalContext = context.Background()
 	CancelContext context.Context
 	CancelFunc    context.CancelFunc
 
-	// DNS
 	DNSGlobalBlock atomic.Bool
 	DNSBlockList   atomic.Pointer[*xsync.MapOf[string, bool]]
 	DNSWhiteList   atomic.Pointer[*xsync.MapOf[string, bool]]
@@ -107,7 +99,6 @@ type ErrorResponse struct {
 	Error string `json:"Error"`
 }
 
-
 var (
 	DIST_EMBED embed.FS
 	DLL_EMBED  embed.FS
@@ -118,7 +109,6 @@ var (
 	DEFAULT_DNS_SERVERS []string
 	DNSClient           = new(dns.Client)
 
-	// HTTP
 	API_SERVER http.Server
 
 	TAG_ERROR    = "ERROR"
@@ -134,7 +124,6 @@ type DNSReply struct {
 }
 
 var letterRunes = []rune("ABCDEFGHIJKLMNOPQRSTUVWXYZ234567")
-
 
 type DisconnectForm struct {
 	ID string `json:"ID"`
@@ -174,7 +163,6 @@ type TunnelMETA struct {
 	// keep a stable peer entry (Device.WireGuardKey).
 	WireGuardPrivKey string
 }
-
 
 type FORWARD_REQUEST struct {
 	Server *ControlServer
@@ -242,15 +230,12 @@ type BlockList struct {
 	LastDownload time.Time
 }
 
-
 type ControlServer struct {
 	ID                  string
 	Host                string
 	Port                string
 	CertificatePath     string
 	ValidateCertificate bool
-	// STUNHost string
-	// STUNKey  string
 }
 
 func (c *ControlServer) GetHostAndPort() string {
@@ -314,7 +299,7 @@ type configV2 struct {
 	ErrorLogging      bool
 	ConsoleLogOnly    bool
 	ConnectionTracer  bool
-	BandwidthGraphs  bool
+	BandwidthGraphs   bool
 
 	// DNS
 	DNS1Default   string
@@ -330,8 +315,6 @@ type configV2 struct {
 
 type stateV2 struct {
 	adminState bool
-
-	// user atomic.Pointer[User]
 
 	// Networking parameters
 	DefaultGateway       atomic.Pointer[net.IP] `json:"-"`
@@ -368,14 +351,13 @@ const (
 )
 
 const (
-	// 1 day worth of seconds
-	MaxBandwidthRecords = 24 * 60 * 60 // 86 400
+	MaxBandwidthRecords = 24 * 60 * 60
 )
 
 type BandwidthRecord struct {
 	Timestamp    time.Time `json:"ts"`
-	EgressBytes  int64     `json:"eg"` // bytes uploaded this second
-	IngressBytes int64     `json:"ig"` // bytes downloaded this second
+	EgressBytes  int64     `json:"eg"`
+	IngressBytes int64     `json:"ig"`
 }
 
 type BandwidthHistory struct {
@@ -383,7 +365,6 @@ type BandwidthHistory struct {
 	records []BandwidthRecord
 }
 
-// appends record and deletes older than 1 day (if any)
 func (bh *BandwidthHistory) Append(r BandwidthRecord) {
 	bh.mu.Lock()
 	defer bh.mu.Unlock()
@@ -396,7 +377,6 @@ func (bh *BandwidthHistory) Append(r BandwidthRecord) {
 	}
 }
 
-// returns a copy of all records
 func (bh *BandwidthHistory) Snapshot() []BandwidthRecord {
 	bh.mu.RLock()
 	defer bh.mu.RUnlock()
@@ -410,10 +390,9 @@ type TUN struct {
 	state atomic.Pointer[TunnelState] `json:"-"`
 
 	meta atomic.Pointer[TunnelMETA] `json:"-"`
-	// server atomic.Pointer[any]
+
 	tunnel atomic.Pointer[TInterface] `json:"-"`
 
-	// WireGuard transport
 	wgDevice *device.Device
 	wgTun    *chanTUN
 
@@ -421,7 +400,6 @@ type TUN struct {
 	CR             *ConnectionRequest
 	ServerResponse *types.ServerConnectResponse
 
-	// blocked port ([2]byte) to uint16 version for quick lookup
 	blockedPortsSet map[[2]byte]uint16 `json:"-"`
 
 	pingTime                atomic.Pointer[time.Time]
@@ -435,7 +413,6 @@ type TUN struct {
 	NATEgress  map[[4]byte][4]byte `json:"-"`
 	NATIngress map[[4]byte][4]byte `json:"-"`
 
-	// Stats
 	egressBytes      atomic.Int64
 	ingressBytes     atomic.Int64
 	BandwidthHistory *BandwidthHistory
@@ -466,16 +443,15 @@ type TUN struct {
 }
 
 type event struct {
-	// method is executed inside priority channels
 	method func()
-	// done is executed on method completion
+
 	done chan any
 }
 
 type goSignal struct {
 	monitor chan *goSignal
 	ctx     context.Context
-	// cancel context.CancelFunc
+
 	method func()
 	tag    string
 }
@@ -484,7 +460,6 @@ func init() {
 	STATE.Store(&stateV2{})
 	CONFIG.Store(&configV2{})
 
-	// Initialize xsync maps
 	TunnelMetaMap = xsync.NewMapOf[string, *TunnelMETA]()
 	TunnelMap = xsync.NewMapOf[string, *TUN]()
 	logRecordHash = xsync.NewMapOf[string, bool]()
@@ -509,14 +484,11 @@ func (t *TUN) registerPing(ping time.Time) {
 	t.pingTime.Store(&ping)
 }
 
-// RecordBandwidth runs as a goroutine and samples egress/ingress byte counters
-// once per second, storing the delta in BandwidthHistory. It stops when the
-// tunnel is no longer in the Connected state.
 func (t *TUN) RecordBandwidth() {
 	defer RecoverAndLog()
 
 	t.BandwidthHistory = &BandwidthHistory{
-		records: make([]BandwidthRecord, 0, MaxBandwidthRecords), // pre alloc 1 day
+		records: make([]BandwidthRecord, 0, MaxBandwidthRecords),
 	}
 
 	ticker := time.NewTicker(1 * time.Second)
@@ -553,9 +525,7 @@ func (t *TUN) RecordBandwidth() {
 	}
 }
 
-// Implement MarshalJSON method
 func (t *TUN) MarshalJSON() ([]byte, error) {
-	// Create a type alias to avoid recursion
 
 	var pingTime time.Time
 	if t.pingTime.Load() != nil {
@@ -569,7 +539,6 @@ func (t *TUN) MarshalJSON() ([]byte, error) {
 		bwHistory = t.BandwidthHistory.Snapshot()
 	}
 
-	// Define the structure we want in JSON
 	return json.Marshal(struct {
 		ID               string
 		CR               *ConnectionRequest
@@ -610,4 +579,3 @@ func (t *TUN) InitBlockedPorts(ports []uint16) {
 		t.blockedPortsSet[portBytes] = port
 	}
 }
-

@@ -96,7 +96,6 @@ func SendRequestToURL(tc *tls.Config, method string, url string, data any, timeo
 func ForwardToController(FR *FORWARD_REQUEST) (any, int) {
 	defer RecoverAndLog()
 
-	// make sure api.tunnels.is is always secure
 	if strings.Contains(FR.Server.Host, "api.tunnels.is") {
 		FR.Server.ValidateCertificate = true
 	}
@@ -167,7 +166,6 @@ func validateTunnelMeta(tun *TunnelMETA, oldTag string) (err []string) {
 		err = append(err, fmt.Sprintf("tunnel name should not be less then 3 characters (%s)", tun.IFName))
 	}
 
-	// this is windows only
 	errx := ValidateAdapterID(tun)
 	if errx != nil {
 		err = append(err, errx.Error())

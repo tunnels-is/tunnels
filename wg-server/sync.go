@@ -24,12 +24,6 @@ func initSyncClient(cfg *Config) {
 	}
 }
 
-// assignAndAdd is called by LazyBind when a new initiator's pubkey is
-// not yet in the local peer store. It fetches the authorized peer list
-// from the controller, finds the matching device, uses the controller-assigned
-// IP (or falls back to local peerStore allocation), caches the result, and
-// calls AddPeer so the handshake can complete.
-// Returns true if the peer was successfully added to wg0.
 func assignAndAdd(pubKeyB64 string) bool {
 	cfg := activeConfig.Load()
 	if cfg == nil {
@@ -56,12 +50,11 @@ func assignAndAdd(pubKeyB64 string) bool {
 
 		var ip string
 		if p.WireGuardIP != "" {
-			// Use controller-assigned IP; cache it locally.
+
 			ip = p.WireGuardIP
 			peerStore.Set(p.DeviceID, ip, pubKeyB64)
 		} else {
-			// Fallback: assign locally (backward compatibility for devices
-			// that haven't had a controller-side IP assigned yet).
+
 			var assignErr error
 			ip, assignErr = peerStore.GetOrAssign(p.DeviceID, pubKeyB64)
 			if assignErr != nil {
@@ -83,8 +76,6 @@ func assignAndAdd(pubKeyB64 string) bool {
 	return false
 }
 
-// fetchDesiredPeers calls GET /wg/peers on the controller.
-// Authenticated with X-WG-KEY (same per-server APIKey used for config fetch).
 func fetchDesiredPeers(cfg *Config) (*types.WGPeersResponse, error) {
 	url := cfg.ControllerURL + "/wg/peers"
 	req, err := http.NewRequest(http.MethodGet, url, nil)

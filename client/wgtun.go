@@ -11,12 +11,9 @@ import (
 	"golang.zx2c4.com/wireguard/tun"
 )
 
-// chanTUN is a channel-based tun.Device that bridges the tunnels packet
-// processing loops with the wireguard-go device. No kernel TUN is created;
-// wireguard-go uses it purely as a read/write seam for plaintext packets.
 type chanTUN struct {
-	in     chan []byte   // egress: ReadFromTunnelInterface → WG Read()
-	out    chan []byte   // ingress: WG Write() → ReadFromServeTunnel
+	in     chan []byte
+	out    chan []byte
 	events chan tun.Event
 	mtu    int
 	done   chan struct{}
@@ -34,8 +31,6 @@ func newChanTUN(mtu int) *chanTUN {
 	return ct
 }
 
-// Read is called by the wireguard-go device to retrieve plaintext egress
-// packets that should be encrypted and sent to the peer.
 func (t *chanTUN) Read(bufs [][]byte, sizes []int, offset int) (int, error) {
 	select {
 	case pkt, ok := <-t.in:
@@ -53,8 +48,6 @@ func (t *chanTUN) Read(bufs [][]byte, sizes []int, offset int) (int, error) {
 	}
 }
 
-// Write is called by the wireguard-go device to deliver plaintext ingress
-// packets that have been received from the peer and decrypted.
 func (t *chanTUN) Write(bufs [][]byte, offset int) (int, error) {
 	for _, buf := range bufs {
 		if len(buf) <= offset {
@@ -80,16 +73,13 @@ func (t *chanTUN) Events() <-chan tun.Event { return t.events }
 func (t *chanTUN) Close() error {
 	select {
 	case <-t.done:
-		// already closed
+
 	default:
 		close(t.done)
 	}
 	return nil
 }
 
-// writeEgress is called by ReadFromTunnelInterface after ProcessEgressPacket.
-// The packet is copied so the caller's buffer can be reused immediately.
-// Drops silently if the channel is full (congestion drop).
 func (t *chanTUN) writeEgress(pkt []byte) {
 	cp := make([]byte, len(pkt))
 	copy(cp, pkt)
@@ -100,8 +90,6 @@ func (t *chanTUN) writeEgress(pkt []byte) {
 	}
 }
 
-// readIngress is called by ReadFromServeTunnel to receive a decrypted packet
-// delivered by wireguard-go. Returns (nil, false) when the TUN is closed.
 func (t *chanTUN) readIngress() ([]byte, bool) {
 	select {
 	case pkt, ok := <-t.out:
@@ -111,22 +99,18 @@ func (t *chanTUN) readIngress() ([]byte, bool) {
 	}
 }
 
-// generateWGPrivKey generates a random Curve25519 private key and returns it
-// base64-encoded (standard encoding, 44 chars).
 func generateWGPrivKey() (string, error) {
 	var priv [32]byte
 	if _, err := rand.Read(priv[:]); err != nil {
 		return "", fmt.Errorf("generateWGPrivKey: %w", err)
 	}
-	// Clamp per RFC 7748
+
 	priv[0] &= 248
 	priv[31] &= 127
 	priv[31] |= 64
 	return base64.StdEncoding.EncodeToString(priv[:]), nil
 }
 
-// deriveWGPubKey derives the Curve25519 public key from a base64-encoded
-// private key and returns it base64-encoded.
 func deriveWGPubKey(privB64 string) (string, error) {
 	privBytes, err := base64.StdEncoding.DecodeString(privB64)
 	if err != nil {
@@ -142,8 +126,6 @@ func deriveWGPubKey(privB64 string) (string, error) {
 	return base64.StdEncoding.EncodeToString(pub), nil
 }
 
-// wgB64ToHex converts a base64-encoded 32-byte WireGuard key to lowercase hex,
-// as required by the wireguard-go UAPI IPC protocol.
 func wgB64ToHex(b64 string) (string, error) {
 	b, err := base64.StdEncoding.DecodeString(b64)
 	if err != nil {

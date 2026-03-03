@@ -9,23 +9,18 @@ import (
 	"sync"
 )
 
-// PeerRecord holds the WireGuard public key and assigned IP for a single device.
 type PeerRecord struct {
 	PubKeyB64 string `json:"PubKeyB64"`
 	IP        string `json:"IP"`
 }
 
-// PeerStore is the wg-server's authoritative source for device→IP mappings.
-// It persists to a JSON file so assignments survive restarts.
 type PeerStore struct {
 	mu      sync.RWMutex
-	records map[string]PeerRecord // key = deviceID (hex ObjectID string)
+	records map[string]PeerRecord
 	path    string
 	subnet  string
 }
 
-// NewPeerStore loads an existing store from path (or starts empty) and
-// validates it against the given subnet.
 func NewPeerStore(path, subnet string) (*PeerStore, error) {
 	ps := &PeerStore{
 		records: make(map[string]PeerRecord),
@@ -48,7 +43,6 @@ func (ps *PeerStore) load() error {
 	return json.Unmarshal(data, &ps.records)
 }
 
-// save writes records to disk. Must be called with ps.mu held (any lock level).
 func (ps *PeerStore) save() error {
 	data, err := json.MarshalIndent(ps.records, "", "  ")
 	if err != nil {
@@ -57,15 +51,12 @@ func (ps *PeerStore) save() error {
 	return os.WriteFile(ps.path, data, 0600)
 }
 
-// GetOrAssign returns the IP already assigned to deviceID, or allocates the
-// next available IP from the subnet and persists it. If the device reconnects
-// with a new public key the key is updated but the IP stays stable.
 func (ps *PeerStore) GetOrAssign(deviceID, pubKeyB64 string) (string, error) {
 	ps.mu.Lock()
 	defer ps.mu.Unlock()
 
 	if rec, ok := ps.records[deviceID]; ok {
-		// Update pubkey if it changed (e.g. key rotation).
+
 		if rec.PubKeyB64 != pubKeyB64 {
 			rec.PubKeyB64 = pubKeyB64
 			ps.records[deviceID] = rec
@@ -85,7 +76,6 @@ func (ps *PeerStore) GetOrAssign(deviceID, pubKeyB64 string) (string, error) {
 	return ip, nil
 }
 
-// Get returns the stored record for deviceID without allocating.
 func (ps *PeerStore) Get(deviceID string) (PeerRecord, bool) {
 	ps.mu.RLock()
 	defer ps.mu.RUnlock()
@@ -93,7 +83,6 @@ func (ps *PeerStore) Get(deviceID string) (PeerRecord, bool) {
 	return rec, ok
 }
 
-// GetByPubKey returns the record whose PubKeyB64 matches the given key.
 func (ps *PeerStore) GetByPubKey(pubKeyB64 string) (PeerRecord, bool) {
 	ps.mu.RLock()
 	defer ps.mu.RUnlock()
@@ -105,8 +94,6 @@ func (ps *PeerStore) GetByPubKey(pubKeyB64 string) (PeerRecord, bool) {
 	return PeerRecord{}, false
 }
 
-// Set stores (or overwrites) the IP and pubkey for deviceID in the local cache.
-// Used to persist IPs that were assigned by the controller.
 func (ps *PeerStore) Set(deviceID, ip, pubKeyB64 string) {
 	ps.mu.Lock()
 	defer ps.mu.Unlock()
@@ -114,7 +101,6 @@ func (ps *PeerStore) Set(deviceID, ip, pubKeyB64 string) {
 	_ = ps.save()
 }
 
-// GetAll returns a snapshot of all records.
 func (ps *PeerStore) GetAll() map[string]PeerRecord {
 	ps.mu.RLock()
 	defer ps.mu.RUnlock()
@@ -125,8 +111,6 @@ func (ps *PeerStore) GetAll() map[string]PeerRecord {
 	return out
 }
 
-// nextIP finds the next unallocated IP in the subnet.
-// Must be called with ps.mu held (write lock).
 func (ps *PeerStore) nextIP() (string, error) {
 	_, ipNet, err := net.ParseCIDR(ps.subnet)
 	if err != nil {
@@ -141,7 +125,6 @@ func (ps *PeerStore) nextIP() (string, error) {
 	}
 	sort.Slice(used, func(i, j int) bool { return used[i] < used[j] })
 
-	// .1 is reserved for the wg-server interface; start allocation at .2
 	base := storeIPToUint32(ipNet.IP.To4()) + 2
 	if len(used) > 0 && used[len(used)-1] >= base {
 		base = used[len(used)-1] + 1

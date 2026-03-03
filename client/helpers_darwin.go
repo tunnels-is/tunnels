@@ -46,19 +46,16 @@ func AdminCheck() {
 	DEBUG("Admin check")
 	s := STATE.Load()
 
-	// Check if running as root by checking effective user ID
 	if os.Geteuid() == 0 {
 		s.adminState = true
 		return
 	}
 
-	// If not root, check sudo access by attempting a test command without prompting for password
 	cmd := exec.Command("sudo", "-n", "true")
 	if err := cmd.Run(); err == nil {
 		s.adminState = true
 		return
 	}
 
-	// Neither root nor sudo
 	s.adminState = false
 }

@@ -19,7 +19,6 @@ func TestDefaultConfig(t *testing.T) {
 		t.Fatal("DefaultConfig should not return nil")
 	}
 
-	// Test boolean defaults
 	if !conf.DebugLogging {
 		t.Error("DebugLogging should be true by default")
 	}
@@ -33,7 +32,6 @@ func TestDefaultConfig(t *testing.T) {
 		t.Error("ConnectionTracer should be false by default")
 	}
 
-	// Test DNS defaults
 	if conf.DNSServerIP != "127.0.0.1" {
 		t.Errorf("DNSServerIP should be 127.0.0.1, got %s", conf.DNSServerIP)
 	}
@@ -47,7 +45,6 @@ func TestDefaultConfig(t *testing.T) {
 		t.Errorf("DNS2Default should be 8.8.8.8, got %s", conf.DNS2Default)
 	}
 
-	// Test API defaults
 	if conf.APIIP != "127.0.0.1" {
 		t.Errorf("APIIP should be 127.0.0.1, got %s", conf.APIIP)
 	}
@@ -55,7 +52,6 @@ func TestDefaultConfig(t *testing.T) {
 		t.Errorf("APIPort should be 7777, got %s", conf.APIPort)
 	}
 
-	// Test update defaults
 	if conf.RestartPostUpdate {
 		t.Error("RestartPostUpdate should be false by default")
 	}
@@ -72,7 +68,6 @@ func TestDefaultConfig(t *testing.T) {
 		t.Error("DisableUpdates should be true by default")
 	}
 
-	// Test logging defaults
 	if !conf.LogBlockedDomains {
 		t.Error("LogBlockedDomains should be true by default")
 	}
@@ -83,7 +78,6 @@ func TestDefaultConfig(t *testing.T) {
 		t.Error("DNSstats should be true by default")
 	}
 
-	// Test that block/white lists are initialized
 	if conf.DNSBlockLists == nil {
 		t.Error("DNSBlockLists should not be nil")
 	}
@@ -91,7 +85,6 @@ func TestDefaultConfig(t *testing.T) {
 		t.Error("DNSWhiteLists should not be nil")
 	}
 
-	// Test control servers
 	if len(conf.ControlServers) != 1 {
 		t.Errorf("Should have 1 default control server, got %d", len(conf.ControlServers))
 	} else {
@@ -110,7 +103,6 @@ func TestDefaultConfig(t *testing.T) {
 		}
 	}
 
-	// Test certificate defaults
 	if conf.APIKey != "./api.key" {
 		t.Errorf("APIKey should be './api.key', got %s", conf.APIKey)
 	}
@@ -121,7 +113,6 @@ func TestDefaultConfig(t *testing.T) {
 		t.Errorf("APICertType should be RSA, got %v", conf.APICertType)
 	}
 
-	// Test certificate IPs
 	if len(conf.APICertIPs) != 2 {
 		t.Errorf("Should have 2 default cert IPs, got %d", len(conf.APICertIPs))
 	} else {
@@ -133,7 +124,6 @@ func TestDefaultConfig(t *testing.T) {
 		}
 	}
 
-	// Test certificate domains
 	if len(conf.APICertDomains) != 2 {
 		t.Errorf("Should have 2 default cert domains, got %d", len(conf.APICertDomains))
 	} else {
@@ -149,7 +139,7 @@ func TestDefaultConfig(t *testing.T) {
 }
 
 func TestApplyCertificateDefaultsToConfig(t *testing.T) {
-	// Test with empty config
+
 	cfg := &configV2{}
 	applyCertificateDefaultsToConfig(cfg)
 
@@ -169,7 +159,6 @@ func TestApplyCertificateDefaultsToConfig(t *testing.T) {
 		t.Errorf("Should have 2 cert domains, got %d", len(cfg.APICertDomains))
 	}
 
-	// Test with existing values (should not override)
 	cfg2 := &configV2{
 		APIKey:  "/custom/key.pem",
 		APICert: "/custom/cert.pem",
@@ -183,7 +172,6 @@ func TestApplyCertificateDefaultsToConfig(t *testing.T) {
 		t.Errorf("APICert should not be overridden, got %s", cfg2.APICert)
 	}
 
-	// Test with existing cert IPs (should not override)
 	cfg3 := &configV2{
 		APICertIPs: []string{"192.168.1.1"},
 	}
@@ -196,7 +184,6 @@ func TestApplyCertificateDefaultsToConfig(t *testing.T) {
 		t.Errorf("APICertIPs should not be overridden, got %s", cfg3.APICertIPs[0])
 	}
 
-	// Test with existing cert domains (should not override)
 	cfg4 := &configV2{
 		APICertDomains: []string{"custom.domain.com"},
 	}
@@ -213,7 +200,7 @@ func TestApplyCertificateDefaultsToConfig(t *testing.T) {
 }
 
 func TestWriteConfigToDisk_JSON(t *testing.T) {
-	// Save original state and config
+
 	originalState := STATE.Load()
 	originalConfig := CONFIG.Load()
 	defer func() {
@@ -247,14 +234,12 @@ func TestWriteConfigToDisk_JSON(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			configPath := filepath.Join(tmpDir, tc.filename)
 
-			// Setup state with test config path
 			testState := &stateV2{
 				ConfigFileName: configPath,
 			}
 			STATE.Store(testState)
 			CONFIG.Store(testConfig)
 
-			// Test writing
 			err := writeConfigToDisk()
 
 			if tc.expectError {
@@ -269,13 +254,11 @@ func TestWriteConfigToDisk_JSON(t *testing.T) {
 				return
 			}
 
-			// Verify file was created
 			if _, err := os.Stat(configPath); os.IsNotExist(err) {
 				t.Error("Config file was not created")
 				return
 			}
 
-			// Load and verify content
 			data, err := os.ReadFile(configPath)
 			if err != nil {
 				t.Errorf("Failed to read saved config: %v", err)
@@ -301,7 +284,7 @@ func TestWriteConfigToDisk_JSON(t *testing.T) {
 }
 
 func TestWriteConfigToDisk_YAML(t *testing.T) {
-	// Save original state and config
+
 	originalState := STATE.Load()
 	originalConfig := CONFIG.Load()
 	defer func() {
@@ -335,14 +318,12 @@ func TestWriteConfigToDisk_YAML(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			configPath := filepath.Join(tmpDir, tc.filename)
 
-			// Setup state with test config path
 			testState := &stateV2{
 				ConfigFileName: configPath,
 			}
 			STATE.Store(testState)
 			CONFIG.Store(testConfig)
 
-			// Test writing
 			err := writeConfigToDisk()
 
 			if tc.expectError {
@@ -357,13 +338,11 @@ func TestWriteConfigToDisk_YAML(t *testing.T) {
 				return
 			}
 
-			// Verify file was created
 			if _, err := os.Stat(configPath); os.IsNotExist(err) {
 				t.Error("Config file was not created")
 				return
 			}
 
-			// Load and verify content
 			data, err := os.ReadFile(configPath)
 			if err != nil {
 				t.Errorf("Failed to read saved config: %v", err)
@@ -389,7 +368,7 @@ func TestWriteConfigToDisk_YAML(t *testing.T) {
 }
 
 func TestReadConfigFileFromDisk_JSON(t *testing.T) {
-	// Save original state and config
+
 	originalState := STATE.Load()
 	originalConfig := CONFIG.Load()
 	defer func() {
@@ -423,7 +402,6 @@ func TestReadConfigFileFromDisk_JSON(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			configPath := filepath.Join(tmpDir, tc.filename)
 
-			// Write test config to file
 			data, err := json.MarshalIndent(testConfig, "", "    ")
 			if err != nil {
 				t.Fatalf("Failed to marshal test config: %v", err)
@@ -433,13 +411,11 @@ func TestReadConfigFileFromDisk_JSON(t *testing.T) {
 				t.Fatalf("Failed to write test config: %v", err)
 			}
 
-			// Setup state with test config path
 			testState := &stateV2{
 				ConfigFileName: configPath,
 			}
 			STATE.Store(testState)
 
-			// Test loading
 			err = ReadConfigFileFromDisk()
 
 			if tc.expectError {
@@ -454,7 +430,6 @@ func TestReadConfigFileFromDisk_JSON(t *testing.T) {
 				return
 			}
 
-			// Verify loaded config
 			loaded := CONFIG.Load()
 			if loaded.APIIP != testConfig.APIIP {
 				t.Errorf("APIIP: got %s, expected %s", loaded.APIIP, testConfig.APIIP)
@@ -469,7 +444,7 @@ func TestReadConfigFileFromDisk_JSON(t *testing.T) {
 }
 
 func TestReadConfigFileFromDisk_YAML(t *testing.T) {
-	// Save original state and config
+
 	originalState := STATE.Load()
 	originalConfig := CONFIG.Load()
 	defer func() {
@@ -503,7 +478,6 @@ func TestReadConfigFileFromDisk_YAML(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			configPath := filepath.Join(tmpDir, tc.filename)
 
-			// Write test config to file
 			data, err := yaml.Marshal(testConfig)
 			if err != nil {
 				t.Fatalf("Failed to marshal test config: %v", err)
@@ -513,13 +487,11 @@ func TestReadConfigFileFromDisk_YAML(t *testing.T) {
 				t.Fatalf("Failed to write test config: %v", err)
 			}
 
-			// Setup state with test config path
 			testState := &stateV2{
 				ConfigFileName: configPath,
 			}
 			STATE.Store(testState)
 
-			// Test loading
 			err = ReadConfigFileFromDisk()
 
 			if tc.expectError {
@@ -534,7 +506,6 @@ func TestReadConfigFileFromDisk_YAML(t *testing.T) {
 				return
 			}
 
-			// Verify loaded config
 			loaded := CONFIG.Load()
 			if loaded.APIIP != testConfig.APIIP {
 				t.Errorf("APIIP: got %s, expected %s", loaded.APIIP, testConfig.APIIP)
@@ -549,7 +520,7 @@ func TestReadConfigFileFromDisk_YAML(t *testing.T) {
 }
 
 func TestConfigFileErrors(t *testing.T) {
-	// Save original state
+
 	originalState := STATE.Load()
 	defer STATE.Store(originalState)
 
@@ -983,7 +954,7 @@ func clearTunnelMap() {
 }
 
 func TestConfigRoundTrip(t *testing.T) {
-	// Save original state and config
+
 	originalState := STATE.Load()
 	originalConfig := CONFIG.Load()
 	defer func() {
@@ -1016,7 +987,6 @@ func TestConfigRoundTrip(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			configPath := filepath.Join(tmpDir, tc.filename)
 
-			// Setup and save
 			testState := &stateV2{
 				ConfigFileName: configPath,
 			}
@@ -1027,12 +997,10 @@ func TestConfigRoundTrip(t *testing.T) {
 				t.Fatalf("Failed to write config: %v", err)
 			}
 
-			// Load back
 			if err := ReadConfigFileFromDisk(); err != nil {
 				t.Fatalf("Failed to load config: %v", err)
 			}
 
-			// Verify all fields match
 			loaded := CONFIG.Load()
 			if loaded.APIIP != testConfig.APIIP {
 				t.Errorf("APIIP: got %s, expected %s", loaded.APIIP, testConfig.APIIP)

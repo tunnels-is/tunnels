@@ -172,14 +172,7 @@ retry:
 }
 
 func GetDefaultWhiteLists() []*BlockList {
-	wl := []*BlockList{
-		// Add default whitelists here if needed
-		// Example:
-		// {
-		// 	Tag: "CommonServices",
-		// 	URL: "https://example.com/whitelist.txt",
-		// },
-	}
+	wl := []*BlockList{}
 
 	dlt := time.Now().AddDate(-2, 0, 0)
 	for i := range wl {

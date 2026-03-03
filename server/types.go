@@ -245,7 +245,6 @@ type User struct {
 	Trial         bool        `json:"Trial" bson:"Trial"`
 	Key           *LicenseKey `json:"Key" bson:"Key"`
 	SubExpiration time.Time   `json:"SubExpiration" bson:"SubExpiration"`
-
 }
 
 func (u *User) ToMinifiedUser() MinifiedUser {

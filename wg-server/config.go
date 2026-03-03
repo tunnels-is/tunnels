@@ -12,9 +12,6 @@ import (
 	"golang.org/x/crypto/curve25519"
 )
 
-// Config holds all wg-server runtime configuration.
-// Bootstrap fields (ControllerURL, APIKey) come from CLI flags.
-// All operational fields are populated by FetchConfig from the controller.
 type Config struct {
 	// Bootstrap fields (from CLI flags)
 	ControllerURL string
@@ -38,9 +35,6 @@ type Config struct {
 	PacketInspection   bool
 }
 
-// FetchConfig fetches the operational configuration from the controller using
-// the per-server APIKey. It calls GET /wg/server-config/fetch with the
-// X-WG-KEY header and maps the response to a Config.
 func FetchConfig(controllerURL, apiKey string, insecureSkipVerify bool) (*Config, error) {
 	transport := &http.Transport{
 		TLSClientConfig: &tls.Config{
@@ -75,19 +69,18 @@ func FetchConfig(controllerURL, apiKey string, insecureSkipVerify bool) (*Config
 	}
 
 	cfg := &Config{
-		ControllerURL:    controllerURL,
-		APIKey:           apiKey,
-		ServerID:         r.ServerID,
-		WireGuardPort:    r.WireGuardPort,
-		WireGuardPrivKey: r.WireGuardPrivKey,
-		WireGuardSubnet:  r.WireGuardSubnet,
-		WireGuardIface:   r.WireGuardIface,
-		InternetIface:    r.InternetIface,
-		PacketInspection: r.PacketInspection,
+		ControllerURL:      controllerURL,
+		APIKey:             apiKey,
+		ServerID:           r.ServerID,
+		WireGuardPort:      r.WireGuardPort,
+		WireGuardPrivKey:   r.WireGuardPrivKey,
+		WireGuardSubnet:    r.WireGuardSubnet,
+		WireGuardIface:     r.WireGuardIface,
+		InternetIface:      r.InternetIface,
+		PacketInspection:   r.PacketInspection,
 		InsecureSkipVerify: insecureSkipVerify,
 	}
 
-	// Apply defaults for any zero values
 	if cfg.WireGuardPort == 0 {
 		cfg.WireGuardPort = 51820
 	}
@@ -101,7 +94,6 @@ func FetchConfig(controllerURL, apiKey string, insecureSkipVerify bool) (*Config
 	return cfg, nil
 }
 
-// derivePubKey derives the Curve25519 public key from a base64-encoded private key.
 func derivePubKey(privKeyB64 string) (string, error) {
 	privBytes, err := base64.StdEncoding.DecodeString(privKeyB64)
 	if err != nil {

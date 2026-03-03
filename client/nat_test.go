@@ -40,7 +40,7 @@ func TestInc(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			// Make a copy since inc modifies in place
+
 			ip := make(net.IP, len(tc.input))
 			copy(ip, tc.input)
 
@@ -56,7 +56,7 @@ func TestInc(t *testing.T) {
 }
 
 func TestIncIPv6(t *testing.T) {
-	// Test with IPv6 addresses
+
 	tests := []struct {
 		name     string
 		input    net.IP
@@ -76,7 +76,7 @@ func TestIncIPv6(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			// Make a copy since inc modifies in place
+
 			ip := make(net.IP, len(tc.input))
 			copy(ip, tc.input)
 
@@ -92,7 +92,7 @@ func TestIncIPv6(t *testing.T) {
 }
 
 func TestIncSequence(t *testing.T) {
-	// Test incrementing multiple times
+
 	ip := net.IPv4(192, 168, 1, 250)
 
 	expected := []string{

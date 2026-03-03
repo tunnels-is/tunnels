@@ -15,7 +15,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// writeConfigToDisk writes the current configuration to disk
 func writeConfigToDisk() (err error) {
 	defer RecoverAndLog()
 	conf := CONFIG.Load()
@@ -64,7 +63,6 @@ func writeConfigToDisk() (err error) {
 	return
 }
 
-// ReadConfigFileFromDisk reads the configuration file from disk
 func ReadConfigFileFromDisk() (err error) {
 	state := STATE.Load()
 	config, err := os.ReadFile(state.ConfigFileName)
@@ -113,7 +111,6 @@ func ReadConfigFileFromDisk() (err error) {
 	return
 }
 
-// loadConfigFromDisk loads configuration from disk or creates default if not found
 func loadConfigFromDisk(newConfig bool) error {
 	defer RecoverAndLog()
 	DEBUG("Loading configurations from file")
@@ -131,7 +128,6 @@ func loadConfigFromDisk(newConfig bool) error {
 	return writeConfigToDisk()
 }
 
-// DefaultConfig returns a new configV2 with default values
 func DefaultConfig() *configV2 {
 	conf := &configV2{
 		DebugLogging:         true,
@@ -144,7 +140,7 @@ func DefaultConfig() *configV2 {
 		DNS2Default:          "8.8.8.8",
 		LogBlockedDomains:    true,
 		LogAllDomains:        true,
-		BandwidthGraphs:     true,
+		BandwidthGraphs:      true,
 		DNSstats:             true,
 		DNSBlockLists:        GetDefaultBlockLists(),
 		DNSWhiteLists:        GetDefaultWhiteLists(),
@@ -167,7 +163,6 @@ func DefaultConfig() *configV2 {
 	return conf
 }
 
-// applyCertificateDefaultsToConfig sets default certificate configuration
 func applyCertificateDefaultsToConfig(cfg *configV2) {
 	if cfg.APIKey == "" {
 		cfg.APIKey = "./api.key"
@@ -254,7 +249,6 @@ func writeTunnelsToDisk(tag string) (outErr error) {
 	return
 }
 
-// loadTunnelsFromDisk loads tunnel configurations from disk
 func loadTunnelsFromDisk() (err error) {
 	s := STATE.Load()
 	foundDefault := false
@@ -269,7 +263,6 @@ func loadTunnelsFromDisk() (err error) {
 			return nil
 		}
 
-		// Support both .conf (default), .json, .yaml, and .yml files
 		ext := strings.ToLower(filepath.Ext(path))
 		isSupportedFormat := ext == ".conf" || ext == ".json" || ext == ".yaml" || ext == ".yml"
 
@@ -332,7 +325,6 @@ func loadTunnelsFromDisk() (err error) {
 	return nil
 }
 
-// SetConfig updates and persists the configuration
 func SetConfig(config *configV2) (err error) {
 	defer RecoverAndLog()
 

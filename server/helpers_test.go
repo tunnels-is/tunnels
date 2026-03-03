@@ -46,25 +46,22 @@ func TestCopySlice(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			// Copy the slice
+
 			result := CopySlice(tc.input)
 
-			// Verify the copy matches the original
 			if !bytes.Equal(result, tc.input) {
 				t.Errorf("CopySlice result does not match input\nInput:  %v\nResult: %v", tc.input, result)
 			}
 
-			// Verify length matches
 			if len(result) != len(tc.input) {
 				t.Errorf("CopySlice length mismatch: got %d, expected %d", len(result), len(tc.input))
 			}
 
-			// Verify it's a true copy by modifying the result and checking original is unchanged
 			if len(result) > 0 {
 				original := make([]byte, len(tc.input))
 				copy(original, tc.input)
 
-				result[0] = 99 // Modify the copy
+				result[0] = 99
 
 				if !bytes.Equal(tc.input, original) {
 					t.Error("CopySlice did not create an independent copy - modifying copy affected original")
@@ -77,7 +74,7 @@ func TestCopySlice(t *testing.T) {
 }
 
 func TestCopySliceNil(t *testing.T) {
-	// Test nil input
+
 	var input []byte = nil
 	result := CopySlice(input)
 
@@ -93,19 +90,17 @@ func TestCopySliceNil(t *testing.T) {
 }
 
 func TestGENERATE_CODE(t *testing.T) {
-	// Generate multiple codes
+
 	codes := make(map[string]bool)
 	numCodes := 1000
 
 	for i := 0; i < numCodes; i++ {
 		code := GENERATE_CODE()
 
-		// Test 1: Code length should be 16
 		if len(code) != 16 {
 			t.Errorf("GENERATE_CODE produced code of length %d, expected 16", len(code))
 		}
 
-		// Test 2: Code should only contain valid characters (A-Z, 2-7)
 		for _, c := range code {
 			valid := (c >= 'A' && c <= 'Z') || (c >= '2' && c <= '7')
 			if !valid {
@@ -113,13 +108,11 @@ func TestGENERATE_CODE(t *testing.T) {
 			}
 		}
 
-		// Store for uniqueness test
 		codes[code] = true
 	}
 
-	// Test 4: Codes should be unique (with high probability)
 	uniqueRatio := float64(len(codes)) / float64(numCodes)
-	if uniqueRatio < 0.99 { // Allow for tiny collision probability
+	if uniqueRatio < 0.99 {
 		t.Errorf("GENERATE_CODE produced too many duplicates: %d unique out of %d (%.2f%%)",
 			len(codes), numCodes, uniqueRatio*100)
 	}
@@ -128,11 +121,10 @@ func TestGENERATE_CODE(t *testing.T) {
 }
 
 func TestGENERATE_CODE_CharacterDistribution(t *testing.T) {
-	// Test that all valid characters can appear
+
 	validChars := "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"
 	charCount := make(map[rune]int)
 
-	// Generate many codes to get statistical distribution
 	for i := 0; i < 10000; i++ {
 		code := GENERATE_CODE()
 		for _, c := range code {
@@ -140,16 +132,14 @@ func TestGENERATE_CODE_CharacterDistribution(t *testing.T) {
 		}
 	}
 
-	// Check that all valid characters appear at least once
 	for _, c := range validChars {
 		if charCount[c] == 0 {
 			t.Errorf("Character %c never appeared in generated codes", c)
 		}
 	}
 
-	// Each character should appear roughly equally (within reason)
 	expectedCount := (10000 * 16) / len(validChars)
-	tolerance := float64(expectedCount) * 0.3 // 30% tolerance
+	tolerance := float64(expectedCount) * 0.3
 
 	for _, c := range validChars {
 		count := charCount[c]

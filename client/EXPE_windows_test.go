@@ -14,7 +14,7 @@ func Test_ipString(t *testing.T) {
 	}{
 		{
 			name:     "localhost 127.0.0.1",
-			ip:       0x7F000001, // 127.0.0.1 in big-endian
+			ip:       0x7F000001,
 			expected: "127.0.0.1",
 		},
 		{
@@ -29,27 +29,27 @@ func Test_ipString(t *testing.T) {
 		},
 		{
 			name:     "private network 192.168.1.1",
-			ip:       0xC0A80101, // 192.168.1.1 in big-endian
+			ip:       0xC0A80101,
 			expected: "192.168.1.1",
 		},
 		{
 			name:     "private network 10.0.0.1",
-			ip:       0x0A000001, // 10.0.0.1 in big-endian
+			ip:       0x0A000001,
 			expected: "10.0.0.1",
 		},
 		{
 			name:     "private network 172.16.0.1",
-			ip:       0xAC100001, // 172.16.0.1 in big-endian
+			ip:       0xAC100001,
 			expected: "172.16.0.1",
 		},
 		{
 			name:     "Google DNS 8.8.8.8",
-			ip:       0x08080808, // 8.8.8.8 in big-endian
+			ip:       0x08080808,
 			expected: "8.8.8.8",
 		},
 		{
 			name:     "Cloudflare DNS 1.1.1.1",
-			ip:       0x01010101, // 1.1.1.1 in big-endian
+			ip:       0x01010101,
 			expected: "1.1.1.1",
 		},
 	}
@@ -73,42 +73,42 @@ func Test_portString(t *testing.T) {
 	}{
 		{
 			name:     "HTTP port 80",
-			port:     0x00005000, // Port 80 in network byte order (big-endian in last 2 bytes)
+			port:     0x00005000,
 			expected: "80",
 		},
 		{
 			name:     "HTTPS port 443",
-			port:     0x0000BB01, // Port 443 in network byte order
+			port:     0x0000BB01,
 			expected: "443",
 		},
 		{
 			name:     "SSH port 22",
-			port:     0x00001600, // Port 22 in network byte order
+			port:     0x00001600,
 			expected: "22",
 		},
 		{
 			name:     "DNS port 53",
-			port:     0x00003500, // Port 53 in network byte order
+			port:     0x00003500,
 			expected: "53",
 		},
 		{
 			name:     "high port 8080",
-			port:     0x0000901F, // Port 8080 in network byte order
+			port:     0x0000901F,
 			expected: "8080",
 		},
 		{
 			name:     "port 1",
-			port:     0x00000100, // Port 1 in network byte order
+			port:     0x00000100,
 			expected: "1",
 		},
 		{
 			name:     "max port 65535",
-			port:     0x0000FFFF, // Port 65535 in network byte order
+			port:     0x0000FFFF,
 			expected: "65535",
 		},
 		{
 			name:     "port 0",
-			port:     0x00000000, // Port 0
+			port:     0x00000000,
 			expected: "0",
 		},
 	}
@@ -125,7 +125,7 @@ func Test_portString(t *testing.T) {
 }
 
 func Test_ipString_RoundTrip(t *testing.T) {
-	// Test that we can convert known IP addresses correctly
+
 	knownIPs := []struct {
 		ipString string
 		ipUint32 uint32
@@ -146,17 +146,17 @@ func Test_ipString_RoundTrip(t *testing.T) {
 }
 
 func Test_portString_CommonPorts(t *testing.T) {
-	// Test common well-known ports
+
 	commonPorts := map[string]uint32{
-		"21":   0x00001500, // FTP
-		"22":   0x00001600, // SSH
-		"23":   0x00001700, // Telnet
-		"25":   0x00001900, // SMTP
-		"80":   0x00005000, // HTTP
-		"110":  0x00006E00, // POP3
-		"143":  0x00008F00, // IMAP
-		"443":  0x0000BB01, // HTTPS
-		"3389": 0x00003D0D, // RDP
+		"21":   0x00001500,
+		"22":   0x00001600,
+		"23":   0x00001700,
+		"25":   0x00001900,
+		"80":   0x00005000,
+		"110":  0x00006E00,
+		"143":  0x00008F00,
+		"443":  0x0000BB01,
+		"3389": 0x00003D0D,
 	}
 
 	for expectedPort, portValue := range commonPorts {

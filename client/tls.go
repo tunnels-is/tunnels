@@ -6,14 +6,12 @@ import (
 	"os"
 )
 
-// LoadPrivateCertFromBytes loads a certificate pool from byte data
 func LoadPrivateCertFromBytes(data []byte) (pool *x509.CertPool, err error) {
 	certPool := x509.NewCertPool()
 	certPool.AppendCertsFromPEM(data)
 	return certPool, nil
 }
 
-// LoadPrivateCert loads a certificate pool from a file path
 func LoadPrivateCert(path string) (pool *x509.CertPool, err error) {
 	certPool := x509.NewCertPool()
 	certData, err := os.ReadFile(path)
@@ -24,7 +22,6 @@ func LoadPrivateCert(path string) (pool *x509.CertPool, err error) {
 	return certPool, nil
 }
 
-// LoadCertPEMBytes loads certificate PEM bytes into a cert pool
 func (m *TUN) LoadCertPEMBytes(cert []byte) (pool *x509.CertPool, err error) {
 	certPool := x509.NewCertPool()
 	ok := certPool.AppendCertsFromPEM(cert)

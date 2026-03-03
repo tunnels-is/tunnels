@@ -135,8 +135,8 @@ func (t *TInterface) Create() (err error) {
 	ifNameSize := uintptr(16)
 
 	_, _, errno := syscall.Syscall6(syscall.SYS_GETSOCKOPT, uintptr(fd),
-		2, /* #define SYSPROTO_CONTROL 2 */
-		2, /* #define UTUN_OPT_IFNAME 2 */
+		2,
+		2,
 		uintptr(unsafe.Pointer(&ifName)),
 		uintptr(unsafe.Pointer(&ifNameSize)), 0)
 	if errno != 0 {
@@ -193,22 +193,16 @@ func (t *TInterface) Netmask() (err error) {
 }
 
 func (t *TInterface) SetTXQueueLen() (err error) {
-	//DEBUG("ifconfig", t.SystemName, "txqueuelen", strconv.FormatInt(int64(t.TxQueuelen), 10))
-	//out, err := exec.Command("ifconfig", t.SystemName, "txqueuelen", strconv.FormatInt(int64(t.TxQueuelen), 10)).CombinedOutput()
-	//if err != nil {
-	//	ERROR("Unable to change txqueuelen out: ", string(out), " err: ", err)
-	//	return err
-	//}
+
 	return nil
 }
 
 func (t *TInterface) AddrV6() (err error) {
-	// Configure IPv6 address using ifconfig
+
 	if t.IPv6Address == "" {
 		return nil
 	}
 
-	// Add /64 prefix if not specified
 	ipv6Addr := t.IPv6Address
 	if !strings.Contains(ipv6Addr, "/") {
 		ipv6Addr = ipv6Addr + "/64"
@@ -217,7 +211,7 @@ func (t *TInterface) AddrV6() (err error) {
 	DEBUG("ifconfig", t.SystemName, "inet6", ipv6Addr)
 	out, err := exec.Command("ifconfig", t.SystemName, "inet6", ipv6Addr).CombinedOutput()
 	if err != nil {
-		// Check if the error is because the address already exists
+
 		if strings.Contains(string(out), "File exists") || strings.Contains(err.Error(), "exists") {
 			DEBUG("IPv6 address already exists on interface: ", t.SystemName)
 			return nil
@@ -231,8 +225,7 @@ func (t *TInterface) AddrV6() (err error) {
 }
 
 func (t *TInterface) PrepareForSwitch() {
-	// On Darwin, goroutines exit when the connection is closed.
-	// No session cleanup needed.
+
 }
 
 func (t *TInterface) Connect(tun *TUN) (err error) {
@@ -264,7 +257,6 @@ func (t *TInterface) Connect(tun *TUN) (err error) {
 			return
 		}
 
-		// Add default IPv6 route if IPv6 address is configured
 		if t.IPv6Address != "" {
 			iperr := IP_AddRouteV6("default", t.SystemName, t.IPv6Address, "0")
 			if iperr != nil {
@@ -314,7 +306,6 @@ func (t *TInterface) Disconnect(tun *TUN) (err error) {
 			ERROR("default gateway not found in STATE")
 		}
 
-		// Clean up IPv6 default route if IPv6 was configured
 		if t.IPv6Address != "" {
 			iperr := IP_DelRouteV6("default", t.IPv6Address, "0")
 			if iperr != nil {
@@ -405,17 +396,17 @@ func IP_AddRouteV6(
 
 	var cmd *exec.Cmd
 	if network == "default" {
-		// Add default IPv6 route
+
 		DEBUG("route", "-n", "add", "-inet6", "default", "-interface", ifName)
 		cmd = exec.Command("route", "-n", "add", "-inet6", "default", "-interface", ifName)
 	} else {
-		// Add specific IPv6 route
+
 		DEBUG("route", "-n", "add", "-inet6", "-net", network, "-interface", ifName)
 		cmd = exec.Command("route", "-n", "add", "-inet6", "-net", network, "-interface", ifName)
 	}
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		// Check if the error is because the route already exists
+
 		if strings.Contains(string(out), "File exists") || strings.Contains(err.Error(), "exists") {
 			DEBUG("IPv6 route already exists: ", network)
 			return nil
@@ -439,7 +430,7 @@ func IP_DelRouteV6(network string, _ string, _ string) (err error) {
 
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		// Check if the route doesn't exist (common on cleanup)
+
 		if strings.Contains(string(out), "not in table") || strings.Contains(string(out), "No such process") {
 			DEBUG("IPv6 route doesn't exist (already deleted): ", network)
 			return nil
@@ -452,11 +443,11 @@ func IP_DelRouteV6(network string, _ string, _ string) (err error) {
 }
 
 func RestoreDNSOnClose() {
-	// not implemented for Darwin
+
 }
 
 func RestoreSaneDNSDefaults() {
-	// not implemented for Darwin
+
 }
 
 func GetDNSServers(id string) error {
@@ -465,7 +456,6 @@ func GetDNSServers(id string) error {
 }
 
 func AdjustRoutersForTunneling() (err error) {
-	// Implementation specific to Darwin
-	// Since Darwin uses a different routing mechanism, this is a no-op
+
 	return nil
 }

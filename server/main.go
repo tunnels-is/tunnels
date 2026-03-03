@@ -46,7 +46,6 @@ var (
 
 	logger *slog.Logger
 
-	// Tunnels public network only
 	lc atomic.Pointer[lemonsqueezy.Client]
 )
 
@@ -145,7 +144,6 @@ func main() {
 
 		go seedNetworks()
 
-		// Tunnels public network specific
 		if loadSecret("PayKey") != "" {
 			lemonClient := lemonsqueezy.New(lemonsqueezy.WithAPIKey(loadSecret("PayKey")))
 			if lemonClient == nil {
@@ -166,7 +164,6 @@ func main() {
 	}
 
 	go signal.NewSignal("API", ctx, cancel, 1*time.Second, goroutineLogger, launchAPIServer)
-	go signal.NewSignal("ADMIN", ctx, cancel, 1*time.Second, goroutineLogger, launchAdminServer)
 
 	go signal.NewSignal("CONFIG", ctx, cancel, 30*time.Second, goroutineLogger, func() {
 		_ = LoadServerConfig(serverConfigPath)
@@ -212,7 +209,6 @@ func LoadServerConfig(path string) (err error) {
 	}
 	C := new(types.ServerConfig)
 
-	// Determine format based on file extension
 	ext := strings.ToLower(filepath.Ext(path))
 	switch ext {
 	case ".yaml", ".yml":
@@ -244,7 +240,6 @@ func SaveServerConfig(path string) (err error) {
 		_ = f.Close()
 	}()
 
-	// Determine format based on file extension
 	ext := strings.ToLower(filepath.Ext(path))
 	switch ext {
 	case ".yaml", ".yml":
@@ -335,15 +330,8 @@ func loadCertificatesAndTLSSettings() (err error) {
 
 	APITLSConfig.Store(&tls.Config{
 		MinVersion:       tls.VersionTLS13,
-		MaxVersion:       tls.VersionTLS13,
 		CurvePreferences: []tls.CurveID{tls.X25519MLKEM768},
 		Certificates:     apiCerts,
-		CipherSuites: []uint16{
-			tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
-			tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
-			tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,
-			tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,
-		},
 	})
 
 	return nil

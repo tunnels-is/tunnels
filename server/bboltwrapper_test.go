@@ -170,7 +170,7 @@ func Test_removeString(t *testing.T) {
 }
 
 func Test_objectIDToString(t *testing.T) {
-	// Create a test ObjectID
+
 	testOID := primitive.NewObjectID()
 
 	tests := []struct {
@@ -222,7 +222,7 @@ func Test_objectIDToString(t *testing.T) {
 }
 
 func Test_objectIDSliceToString(t *testing.T) {
-	// Create test ObjectIDs
+
 	oid1 := primitive.NewObjectID()
 	oid2 := primitive.NewObjectID()
 	oid3 := primitive.NewObjectID()
@@ -285,7 +285,7 @@ func Test_objectIDSliceToString(t *testing.T) {
 }
 
 func Test_stringSliceToObjectID(t *testing.T) {
-	// Create valid hex strings
+
 	oid1 := primitive.NewObjectID()
 	oid2 := primitive.NewObjectID()
 	oid3 := primitive.NewObjectID()
@@ -364,7 +364,7 @@ func Test_stringSliceToObjectID(t *testing.T) {
 }
 
 func Test_stringSliceToObjectID_HexFormats(t *testing.T) {
-	// Test different hex string formats
+
 	oid := primitive.NewObjectID()
 	validHex := oid.Hex()
 
