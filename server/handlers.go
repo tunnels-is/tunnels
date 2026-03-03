@@ -18,8 +18,6 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// API_AdminUILogin handles POST /ui/user/login.
-// Public endpoint: validates credentials, checks admin/manager, sets admin_session cookie.
 func API_AdminUILogin(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 
@@ -79,8 +77,6 @@ func API_AdminUILogin(w http.ResponseWriter, r *http.Request) {
 	sendObject(w, user)
 }
 
-// API_AdminUILogout handles POST /ui/user/logout.
-// Clears the admin_session cookie and removes the device token.
 func API_AdminUILogout(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 
@@ -197,8 +193,6 @@ func API_UserUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Enforce that a regular authenticated user can only update their own record.
-	// X-API-KEY callers may supply an arbitrary UID in the body.
 	user := getUserFromContext(r.Context())
 	if user == nil && !isAdminAPIKeyFromContext(r.Context()) {
 		senderr(w, 401, "Unauthorized")
@@ -579,8 +573,7 @@ func API_DeviceCreate(w http.ResponseWriter, r *http.Request) {
 			senderr(w, 401, "Unauthorized")
 			return
 		}
-		// Regular (non-admin) users can only create devices for themselves.
-		// Admins/managers may specify an arbitrary UserID in the request body.
+
 		if !user.IsAdmin && !user.IsManager {
 			F.Device.UserID = user.ID
 		}
@@ -597,7 +590,6 @@ func API_DeviceCreate(w http.ResponseWriter, r *http.Request) {
 		F.Device.Groups = make([]primitive.ObjectID, 0)
 	}
 
-	// Assign a WireGuard IP from the server's subnet at creation time.
 	var wgServer *types.Server
 	if F.Device.ServerID != primitive.NilObjectID {
 		ip, assignErr := assignNextWireGuardIP(F.Device.ServerID)
@@ -843,8 +835,6 @@ func API_GroupDelete(w http.ResponseWriter, r *http.Request) {
 		senderr(w, 500, "Unknown error, please try again in a moment")
 		return
 	}
-
-	// TODO .. remove group from all users and servers
 
 	w.WriteHeader(200)
 }
@@ -1230,8 +1220,6 @@ func API_UserToggleSubStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Regular (non-admin) users can only toggle their own subscription.
-	// Admins, managers, and X-API-KEY callers may specify an arbitrary email in the body.
 	if user != nil && !user.IsAdmin && !user.IsManager {
 		UF.Email = user.Email
 	}

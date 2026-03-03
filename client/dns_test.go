@@ -7,7 +7,7 @@ import (
 )
 
 func TestDNSAMapping(t *testing.T) {
-	// Create test DNS records
+
 	dnsRecords := []*types.DNSRecord{
 		{
 			Domain:   "example.com",
@@ -115,14 +115,14 @@ func TestDNSAMapping(t *testing.T) {
 }
 
 func TestDNSAMappingWithNilRecords(t *testing.T) {
-	// Test with nil records in the array
+
 	dnsRecords := []*types.DNSRecord{
 		{
 			Domain:   "valid.com",
 			Wildcard: false,
 			IP:       []string{"192.168.1.1"},
 		},
-		nil, // nil record should be handled gracefully
+		nil,
 		{
 			Domain:   "another.com",
 			Wildcard: false,
@@ -176,15 +176,13 @@ func TestDNSAMappingWildcardBehavior(t *testing.T) {
 			fullDomain:     "anything.api.example.com",
 			expectedDomain: "api.example.com",
 			expectedIP:     "192.168.1.100",
-			// GetDomainAndSubDomain("anything.api.example.com") with 4 parts -> domain="api.example.com", subdomain="anything"
-			// record.Domain="api.example.com" matches, subdomain!="", record.Wildcard=true -> MATCH
+
 			shouldFind: true,
 		},
 		{
 			name:       "3-part domain doesn't extract subdomain",
 			fullDomain: "api.example.com",
-			// GetDomainAndSubDomain("api.example.com") with 3 parts -> domain="api.example.com", subdomain=""
-			// record.Domain="api.example.com" matches, subdomain=="", no wildcard needed -> MATCH
+
 			expectedDomain: "api.example.com",
 			expectedIP:     "192.168.1.100",
 			shouldFind:     true,
@@ -192,9 +190,7 @@ func TestDNSAMappingWildcardBehavior(t *testing.T) {
 		{
 			name:       "5-part domain with deeper subdomain",
 			fullDomain: "very.deep.api.example.com",
-			// GetDomainAndSubDomain splits "very.deep.api.example.com" with 5 parts
-			// Takes last 3: domain="api.example.com", subdomain="very.deep"
-			// record.Domain="api.example.com" matches, subdomain!="", record.Wildcard=true -> MATCH
+
 			expectedDomain: "api.example.com",
 			expectedIP:     "192.168.1.100",
 			shouldFind:     true,
@@ -229,7 +225,7 @@ func TestDNSAMappingWildcardBehavior(t *testing.T) {
 }
 
 func TestDNSAMappingEmptyArray(t *testing.T) {
-	// Test with empty DNS records array
+
 	emptyRecords := []*types.DNSRecord{}
 
 	result := DNSAMapping(emptyRecords, "example.com")
@@ -276,10 +272,9 @@ func TestDNSAMappingComplexDomains(t *testing.T) {
 			shouldFind:     true,
 		},
 		{
-			name:           "wildcard matches multi-level subdomain",
-			fullDomain:     "b.c.d.example.com",
-			// GetDomainAndSubDomain("b.c.d.example.com") with 5 parts -> domain="d.example.com", subdomain="b.c"
-			// record.Domain="d.example.com" matches, subdomain!="", record.Wildcard=true -> MATCH
+			name:       "wildcard matches multi-level subdomain",
+			fullDomain: "b.c.d.example.com",
+
 			expectedDomain: "d.example.com",
 			expectedIP:     "192.168.1.2",
 			shouldFind:     true,

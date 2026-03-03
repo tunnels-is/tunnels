@@ -25,8 +25,6 @@ func isAdminAPIKeyFromContext(ctx context.Context) bool {
 	return v
 }
 
-// xAPIKeyMiddleware checks the X-API-KEY header. If valid, sets isAdminAPIKey=true
-// in the request context, allowing subsequent middleware to be bypassed.
 func xAPIKeyMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if HTTP_validateKey(r) {
@@ -38,9 +36,6 @@ func xAPIKeyMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// adminUIMiddleware validates the admin_session cookie and injects the authenticated
-// user into the request context. Only admins and managers are allowed through.
-// Bypassed when isAdminAPIKey is set in context.
 func adminUIMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if isAdminAPIKeyFromContext(r.Context()) {
@@ -82,9 +77,6 @@ func adminUIMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// clientAuthMiddleware validates the X-Device-Token header along with X-UID or X-Email,
-// and injects the authenticated user into the request context.
-// Bypassed when isAdminAPIKey is set in context.
 func clientAuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if isAdminAPIKeyFromContext(r.Context()) {
@@ -122,8 +114,6 @@ func clientAuthMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// applyMiddleware wraps a handler with the given middlewares.
-// The first middleware in the list is the outermost (runs first).
 func applyMiddleware(h http.Handler, middlewares ...func(http.Handler) http.Handler) http.Handler {
 	for i := len(middlewares) - 1; i >= 0; i-- {
 		h = middlewares[i](h)

@@ -28,7 +28,6 @@ func CopySlice(in []byte) (out []byte) {
 	return out
 }
 
-
 var letterRunes = []rune("ABCDEFGHIJKLMNOPQRSTUVWXYZ234567")
 
 func GENERATE_CODE() string {

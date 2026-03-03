@@ -41,18 +41,6 @@ func CleanDNSCache() {
 	})
 }
 
-// func updateDNSHandlerInterface(dnsInterface net.IP) {
-// 	if DNSClient != nil && DNSClient.Dialer != nil {
-// 		if dnsInterface == nil {
-// 			DNSClient.Dialer.LocalAddr = nil
-// 		} else {
-// 			DNSClient.Dialer.LocalAddr = &net.UDPAddr{
-// 				IP: dnsInterface,
-// 			}
-// 		}
-// 	}
-// }
-
 func InitDNSHandler() {
 	DEBUG("Starting DNS Handler")
 	DNSClient.Dialer = new(net.Dialer)
@@ -243,10 +231,6 @@ func GlobalBlockEnabled(m *dns.Msg, w dns.ResponseWriter) bool {
 func DNSQuery(w dns.ResponseWriter, m *dns.Msg) {
 	defer RecoverAndLog()
 
-	// if isAppDNS(m, w) {
-	// 	return
-	// }
-
 	if !isValidDomain(m, w) {
 		return
 	}
@@ -255,7 +239,6 @@ func DNSQuery(w dns.ResponseWriter, m *dns.Msg) {
 		return
 	}
 
-	// Check if domain is whitelisted first - whitelisted domains bypass blocklists
 	whitelisted := isWhitelisted(m)
 	var blocked bool
 	var tag string
@@ -324,8 +307,7 @@ func DNSQuery(w dns.ResponseWriter, m *dns.Msg) {
 
 		if !hasInfo {
 			DEBUG("Redirect DNS to VPN: ", m.Question[0].Name)
-			// Redirect DNS query to local VPN network if we
-			// have the domain on record but no records.
+
 			ResolveDomainLocal(DNSTunnel, m, w)
 			return
 		}
@@ -379,13 +361,6 @@ func DNSQuery(w dns.ResponseWriter, m *dns.Msg) {
 
 func isValidDomain(m *dns.Msg, w dns.ResponseWriter) bool {
 	shouldDrop := false
-	// TODO
-	// this is problematic on some domains
-	// _, err := idna.Lookup.ToASCII(m.Question[0].Name)
-	// if err != nil {
-	// 	shouldDrop = true
-	// 	goto DONE
-	// }
 
 	if strings.HasSuffix(m.Question[0].Name, ".arpa.") {
 		shouldDrop = true

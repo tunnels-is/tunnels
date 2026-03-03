@@ -15,8 +15,6 @@ import (
 
 var wgDevice *device.Device
 
-// setupWireGuard creates the WireGuard TUN interface and device, then configures
-// the private key and listen port via the UAPI IPC protocol.
 func setupWireGuard(cfg *Config) error {
 	wgLogger := device.NewLogger(device.LogLevelVerbose, "[wg] ")
 
@@ -61,8 +59,6 @@ func setupWireGuard(cfg *Config) error {
 	return nil
 }
 
-// GetCurrentPeerKeys returns the set of hex-encoded public keys currently
-// configured on the WireGuard device.
 func GetCurrentPeerKeys() (map[string]struct{}, error) {
 	data, err := ipcGet()
 	if err != nil {
@@ -77,16 +73,11 @@ func GetCurrentPeerKeys() (map[string]struct{}, error) {
 	return result, nil
 }
 
-// AddPeer adds or updates a single peer without disturbing existing peers or
-// their established session keys.
 func AddPeer(pubKeyHex, allowedIP string) error {
 	conf := fmt.Sprintf("public_key=%s\nallowed_ip=%s\n\n", pubKeyHex, allowedIP)
 	return ipcSet(conf)
 }
 
-// AddPeerWithEndpoint adds or updates a peer that has a known endpoint (used for
-// server-to-server peering). endpoint is "ip:port". A 25-second persistent
-// keepalive is set so the tunnel stays alive through NAT.
 func AddPeerWithEndpoint(pubKeyHex, allowedIP, endpoint string) error {
 	conf := fmt.Sprintf(
 		"public_key=%s\nallowed_ip=%s\nendpoint=%s\npersistent_keepalive_interval=25\n\n",
@@ -95,15 +86,11 @@ func AddPeerWithEndpoint(pubKeyHex, allowedIP, endpoint string) error {
 	return ipcSet(conf)
 }
 
-// RemovePeer removes a single peer by its hex public key.
 func RemovePeer(pubKeyHex string) error {
 	conf := fmt.Sprintf("public_key=%s\nremove=true\n\n", pubKeyHex)
 	return ipcSet(conf)
 }
 
-// ipcSet sends a UAPI configuration string to the WireGuard device.
-// The conf string must NOT include the "set=1" prefix line; it starts
-// directly with key=value pairs and ends with a blank line.
 func ipcSet(conf string) error {
 	if wgDevice == nil {
 		return fmt.Errorf("wireguard device not initialized")
@@ -111,7 +98,6 @@ func ipcSet(conf string) error {
 	return wgDevice.IpcSetOperation(bufio.NewReader(strings.NewReader(conf)))
 }
 
-// ipcGet retrieves the current UAPI configuration from the WireGuard device.
 func ipcGet() (string, error) {
 	if wgDevice == nil {
 		return "", fmt.Errorf("wireguard device not initialized")
@@ -123,8 +109,6 @@ func ipcGet() (string, error) {
 	return sb.String(), nil
 }
 
-// b64ToHex converts a base64-encoded 32-byte key to a lowercase hex string
-// suitable for the WireGuard UAPI protocol.
 func b64ToHex(b64 string) (string, error) {
 	b, err := base64.StdEncoding.DecodeString(b64)
 	if err != nil {

@@ -131,7 +131,7 @@ func CopySlice(in []byte) (out []byte) {
 
 func GetDomainAndSubDomain(domain string) (d, s string) {
 	parts := strings.Split(domain, ".")
-	// parts = parts[:len(parts)-1]
+
 	if len(parts) == 2 {
 		d = strings.Join(parts[len(parts)-2:], ".")
 	} else if len(parts) > 2 {
@@ -152,9 +152,7 @@ func DNSAMapping(DNS []*types.DNSRecord, fullDomain string) *types.DNSRecord {
 	domain = strings.TrimSuffix(domain, ".")
 
 	for i, record := range DNS {
-		// There is a slight chance someone might
-		// saves something like "null" into the array.
-		// the record == nil will make sure we do not crash on it.
+
 		if record == nil {
 			continue
 		}

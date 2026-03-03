@@ -9,22 +9,18 @@ func TestCreateConnectionUUID(t *testing.T) {
 	uuid1 := CreateConnectionUUID()
 	uuid2 := CreateConnectionUUID()
 
-	// Test format: should be {XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX}
 	if !strings.HasPrefix(uuid1, "{") || !strings.HasSuffix(uuid1, "}") {
 		t.Errorf("UUID should be wrapped in braces, got: %s", uuid1)
 	}
 
-	// Test length: {8-4-4-4-12} + braces = 38 characters
 	if len(uuid1) != 38 {
 		t.Errorf("UUID length should be 38, got: %d", len(uuid1))
 	}
 
-	// Test uniqueness
 	if uuid1 == uuid2 {
 		t.Errorf("Two UUIDs should not be the same: %s == %s", uuid1, uuid2)
 	}
 
-	// Test uppercase
 	inner := strings.Trim(uuid1, "{}")
 	if inner != strings.ToUpper(inner) {
 		t.Errorf("UUID should be uppercase, got: %s", uuid1)
@@ -101,7 +97,6 @@ func TestCopySlice(t *testing.T) {
 	original := []byte{1, 2, 3, 4, 5}
 	copied := CopySlice(original)
 
-	// Test that contents are the same
 	if len(copied) != len(original) {
 		t.Errorf("Copied slice length %d != original length %d", len(copied), len(original))
 	}
@@ -112,7 +107,6 @@ func TestCopySlice(t *testing.T) {
 		}
 	}
 
-	// Test that they are different slices (not same reference)
 	original[0] = 99
 	if copied[0] == 99 {
 		t.Error("Modifying original should not affect the copy")
@@ -124,45 +118,45 @@ func TestCopySlice(t *testing.T) {
 
 func TestGetDomainAndSubDomain(t *testing.T) {
 	tests := []struct {
-		name             string
-		input            string
-		expectedDomain   string
+		name              string
+		input             string
+		expectedDomain    string
 		expectedSubdomain string
 	}{
 		{
-			name:             "simple domain",
-			input:            "example.com",
-			expectedDomain:   "example.com",
+			name:              "simple domain",
+			input:             "example.com",
+			expectedDomain:    "example.com",
 			expectedSubdomain: "",
 		},
 		{
-			name:             "domain with subdomain",
-			input:            "www.example.com",
-			expectedDomain:   "www.example.com",
+			name:              "domain with subdomain",
+			input:             "www.example.com",
+			expectedDomain:    "www.example.com",
 			expectedSubdomain: "",
 		},
 		{
-			name:             "domain with multiple subdomains",
-			input:            "api.v2.example.com",
-			expectedDomain:   "v2.example.com",
+			name:              "domain with multiple subdomains",
+			input:             "api.v2.example.com",
+			expectedDomain:    "v2.example.com",
 			expectedSubdomain: "api",
 		},
 		{
-			name:             "domain with many subdomains",
-			input:            "a.b.c.d.example.com",
-			expectedDomain:   "d.example.com",
+			name:              "domain with many subdomains",
+			input:             "a.b.c.d.example.com",
+			expectedDomain:    "d.example.com",
 			expectedSubdomain: "a.b.c",
 		},
 		{
-			name:             "single word (invalid)",
-			input:            "localhost",
-			expectedDomain:   "",
+			name:              "single word (invalid)",
+			input:             "localhost",
+			expectedDomain:    "",
 			expectedSubdomain: "",
 		},
 		{
-			name:             "empty string",
-			input:            "",
-			expectedDomain:   "",
+			name:              "empty string",
+			input:             "",
+			expectedDomain:    "",
 			expectedSubdomain: "",
 		},
 	}

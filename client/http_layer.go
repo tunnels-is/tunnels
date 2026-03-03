@@ -64,13 +64,6 @@ func LaunchAPI() {
 		return
 	}
 
-	// addr := strings.Split(ln.Addr().String(), ":")
-	// API_PORT = addr[len(addr)-1]
-	// C.APIPort = API_PORT
-	// if C.APIIP != "0.0.0.0" {
-	// 	C.APIIP = addr[0]
-	// }
-
 	INFO("====== API SERVER =========")
 	INFO("ADDR: ", ln.Addr())
 	INFO("IP: ", ip)
@@ -103,14 +96,7 @@ func makeTLSConfig() (tc *tls.Config) {
 	conf := CONFIG.Load()
 	tc = new(tls.Config)
 	tc.InsecureSkipVerify = true
-	// tc.MinVersion = tls.VersionTLS12
-	// tc.MaxVersion = tls.VersionTLS13
-	// tc.CipherSuites = []uint16{
-	// 	tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
-	// 	tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
-	// 	tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
-	// 	tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
-	// }
+
 	certsExist := true
 	_, err := os.Stat(conf.APICert)
 	if err != nil {
@@ -222,8 +208,7 @@ func handleWebSocket(ws *websocket.Conn) {
 	for event := range APILogQueue {
 		err := websocket.Message.Send(ws, event)
 		if err != nil {
-			// Make an attempt to delive this log line to the new LogSocket.
-			// if delivery fails, the event will be found in the log file.
+
 			gws := LogSocket.Load()
 			if gws != nil {
 				_ = websocket.Message.Send(gws, event)
@@ -562,4 +547,3 @@ func HTTP_ForwardToController(w http.ResponseWriter, r *http.Request) {
 	data, code := ForwardToController(form)
 	JSON(w, r, code, data)
 }
-

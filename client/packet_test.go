@@ -5,21 +5,6 @@ import (
 	"testing"
 )
 
-// func BenchmarkOriginalIPChecksum(b *testing.B) {
-// 	header := []byte{69, 32, 0, 40, 0, 0, 64, 0, 54, 6, 106, 16, 89, 147, 109, 61, 172, 22, 22, 22}
-// 	for i := 0; i < b.N; i++ {
-// 		RecalculateAndReplaceIPv4HeaderChecksum_old_donotremoveyet(header)
-// 	}
-// }
-
-// LLMS still kind of suck
-// func BenchmarkOriginalIPChecksumGrok(b *testing.B) {
-// 	header := []byte{69, 32, 0, 40, 0, 0, 64, 0, 54, 6, 106, 16, 89, 147, 109, 61, 172, 22, 22, 22}
-// 	for i := 0; i < b.N; i++ {
-// 		RecalculateAndReplaceIPv4HeaderChecksumv2(header)
-// 	}
-// }
-
 func BenchmarkOriginalIPChecksum(b *testing.B) {
 	header := []byte{69, 32, 0, 40, 0, 0, 64, 0, 54, 6, 106, 16, 89, 147, 109, 61, 172, 22, 22, 22}
 	for i := 0; i < b.N; i++ {
@@ -40,32 +25,26 @@ func recalcGemini2(header []byte) {
 	header[10] = 0
 	header[11] = 0
 
-	// Handle 16-bit words directly
 	for i := 0; i < n-1; i += 2 {
 		sum += uint32(header[i])<<8 | uint32(header[i+1])
 	}
 
-	// Handle odd byte
 	if n%2 == 1 {
 		sum += uint32(header[n-1]) << 8
 	}
 
-	// Optimized folding.  Crucial for performance.
 	sum = (sum >> 16) + (sum & 0xFFFF)
-	sum += (sum >> 16) // Add carry-over from the previous fold
+	sum += (sum >> 16)
 
-	// One's complement
-	// return uint16(^sum)
 	header[10] = byte(^sum >> 8)
 	header[11] = byte(^sum & 0xFF)
 }
 
 func RecalculateAndReplaceIPv4HeaderChecksumv2(bytes []byte) {
-	// Reset checksum to zero
+
 	bytes[10] = 0
 	bytes[11] = 0
 
-	// Calculate checksum
 	var csum uint32
 	for i := 0; i < len(bytes); i += 2 {
 		csum += uint32(bytes[i]) << 8
@@ -74,42 +53,31 @@ func RecalculateAndReplaceIPv4HeaderChecksumv2(bytes []byte) {
 		}
 	}
 
-	// Fold 32-bit sum into 16 bits with one pass
 	csum = (csum >> 16) + (csum & 0xFFFF)
 	csum += csum >> 16
 
-	// One's complement
 	csum = ^csum & 0xFFFF
 
-	// Store the checksum in big endian
 	bytes[10] = byte(csum >> 8)
 	bytes[11] = byte(csum)
 }
 
 func RecalculateIPv4HeaderChecksumCopilot(bytes []byte) {
-	// Reset checksum fields
+
 	bytes[10], bytes[11] = 0, 0
 
 	var csum uint32
 	length := len(bytes)
 
-	// Unroll the loop for better performance
 	for i := 0; i < length-1; i += 2 {
 		csum += uint32(bytes[i])<<8 | uint32(bytes[i+1])
 	}
 
-	// Add potential trailing byte if length is odd
-	// if length%2 != 0 {
-	// 	csum += uint32(bytes[length-1]) << 8
-	// }
-
-	// Fold 32-bit sum to 16 bits
 	for csum > 0xFFFF {
 		csum = (csum >> 16) + (csum & 0xFFFF)
 	}
 	csum = ^csum
 
-	// Set checksum fields
 	bytes[10], bytes[11] = byte(csum>>8), byte(csum&0xFF)
 }
 
@@ -132,9 +100,8 @@ func BenchmarkTCPHeaderGemini(b *testing.B) {
 	}
 }
 
-// CalculateTransportChecksum computes the checksum for the transport layer (TCP/UDP)
 func CalculateTransportChecksumv2(ipv4Header []byte, transportPacket []byte) {
-	// wipe the old checksum before calculating
+
 	switch ipv4Header[9] {
 	case 6:
 		transportPacket[16] = 0
@@ -143,39 +110,33 @@ func CalculateTransportChecksumv2(ipv4Header []byte, transportPacket []byte) {
 		transportPacket[6] = 0
 		transportPacket[7] = 0
 	}
-	// Extract protocol type (6 for TCP, 17 for UDP)
+
 	protocol := ipv4Header[9]
 	var checksum uint32
 
-	// Add IPv4 header fields to checksum
-	checksum += uint32(ipv4Header[12])<<8 + uint32(ipv4Header[13]) // Source IP
-	checksum += uint32(ipv4Header[14])<<8 + uint32(ipv4Header[15]) // Destination IP
-	checksum += uint32(ipv4Header[16])<<8 + uint32(ipv4Header[17]) // Source Port (for transport layer)
-	checksum += uint32(ipv4Header[18])<<8 + uint32(ipv4Header[19]) // Destination Port (for transport layer)
-	checksum += uint32(protocol)                                   // Protocol (6 for TCP, 17 for UDP)
+	checksum += uint32(ipv4Header[12])<<8 + uint32(ipv4Header[13])
+	checksum += uint32(ipv4Header[14])<<8 + uint32(ipv4Header[15])
+	checksum += uint32(ipv4Header[16])<<8 + uint32(ipv4Header[17])
+	checksum += uint32(ipv4Header[18])<<8 + uint32(ipv4Header[19])
+	checksum += uint32(protocol)
 
-	// Add TCP/UDP length to checksum
 	packetLength := len(transportPacket)
 	checksum += uint32(packetLength) & 0xffff
 	checksum += uint32(packetLength) >> 16
 
-	// Process the transport packet in 16-bit chunks
 	for i := 0; i < packetLength-1; i += 2 {
 		checksum += uint32(transportPacket[i]) << 8
 		checksum += uint32(transportPacket[i+1])
 	}
 
-	// Handle odd byte (if the packet length is odd)
 	if packetLength%2 == 1 {
 		checksum += uint32(transportPacket[packetLength-1]) << 8
 	}
 
-	// Fold the checksum (carry over) to 16 bits
 	for checksum > 0xffff {
 		checksum = (checksum >> 16) + (checksum & 0xffff)
 	}
 
-	// Return the complement of the checksum
 	switch ipv4Header[9] {
 	case 6:
 		binary.BigEndian.PutUint16(transportPacket[16:18], ^uint16(checksum))
@@ -185,41 +146,35 @@ func CalculateTransportChecksumv2(ipv4Header []byte, transportPacket []byte) {
 }
 
 func RecalculateTransportChecksumv3(IPv4Header, TPPacket []byte) {
-	// Zero out the checksum field directly based on protocol
+
 	switch IPv4Header[9] {
-	case 6: // TCP
+	case 6:
 		TPPacket[16], TPPacket[17] = 0, 0
-	case 17: // UDP
+	case 17:
 		TPPacket[6], TPPacket[7] = 0, 0
 	}
 
 	var csum uint32
 
-	// Combine source and destination IP addresses in one go
 	csum += uint32(binary.BigEndian.Uint16(IPv4Header[12:])) + uint32(binary.BigEndian.Uint16(IPv4Header[14:]))
 	csum += uint32(binary.BigEndian.Uint16(IPv4Header[16:])) + uint32(binary.BigEndian.Uint16(IPv4Header[18:]))
 
-	// Add protocol and packet length
 	csum += uint32(IPv4Header[9])
 	tcpLength := uint32(len(TPPacket))
 	csum += tcpLength + (tcpLength >> 16)
 
-	// Use BigEndian for loop to leverage CPU's natural byte order handling
 	for i := 0; i+1 < len(TPPacket); i += 2 {
 		csum += uint32(binary.BigEndian.Uint16(TPPacket[i:]))
 	}
 
-	// Handle odd length
 	if len(TPPacket)&1 == 1 {
 		csum += uint32(TPPacket[len(TPPacket)-1]) << 8
 	}
 
-	// Fold sum to 16 bits
 	for csum > 0xffff {
 		csum = (csum >> 16) + (csum & 0xffff)
 	}
 
-	// Store checksum back in packet
 	switch IPv4Header[9] {
 	case 6:
 		binary.BigEndian.PutUint16(TPPacket[16:], ^uint16(csum))
@@ -229,46 +184,40 @@ func RecalculateTransportChecksumv3(IPv4Header, TPPacket []byte) {
 }
 
 func RecalculateTransportChecksumv4(IPv4Header, TPPacket []byte) {
-	// Zero out checksum
+
 	checksumOffset := map[byte]int{6: 16, 17: 6}[IPv4Header[9]]
 	binary.BigEndian.PutUint16(TPPacket[checksumOffset:], 0)
 
 	var csum uint32
 
-	// Source and Destination IP aggregation
 	for i := 12; i < 20; i += 2 {
 		csum += uint32(binary.BigEndian.Uint16(IPv4Header[i:]))
 	}
 
-	// Protocol and packet length
 	csum += uint32(IPv4Header[9])
 	length := uint32(len(TPPacket))
 	csum += length + (length >> 16)
 
-	// Calculate checksum for TPPacket
 	for i := 0; i < len(TPPacket); i += 2 {
 		if i == checksumOffset {
-			continue // Skip checksum field
+			continue
 		}
 		csum += uint32(binary.BigEndian.Uint16(TPPacket[i:]))
 	}
 
-	// Handle odd length packet
 	if len(TPPacket)&1 == 1 {
 		csum += uint32(TPPacket[len(TPPacket)-1]) << 8
 	}
 
-	// Fold sum to 16 bits
 	for csum > 0xffff {
 		csum = (csum >> 16) + (csum & 0xffff)
 	}
 
-	// Set checksum
 	binary.BigEndian.PutUint16(TPPacket[checksumOffset:], ^uint16(csum))
 }
 
 func RecalculateTransportChecksumTest(IPv4Header []byte, TPPacket []byte) {
-	// wipe the old checksum before calculating
+
 	switch IPv4Header[9] {
 	case 6:
 		TPPacket[16] = 0

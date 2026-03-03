@@ -7,7 +7,6 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-// Test User.ToMinifiedUser
 func TestUser_ToMinifiedUser(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -100,12 +99,10 @@ func TestUser_ToMinifiedUser(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			result := tc.user.ToMinifiedUser()
 
-			// Check that ID is converted to hex string
 			if result.ID != tc.user.ID.Hex() {
 				t.Errorf("ToMinifiedUser().ID = %q, expected %q", result.ID, tc.user.ID.Hex())
 			}
 
-			// Check other fields
 			if result.Email != tc.expected.Email {
 				t.Errorf("ToMinifiedUser().Email = %q, expected %q", result.Email, tc.expected.Email)
 			}
@@ -125,7 +122,7 @@ func TestUser_ToMinifiedUser(t *testing.T) {
 }
 
 func TestUser_ToMinifiedUser_DoesNotIncludeSensitiveData(t *testing.T) {
-	// Create a user with sensitive data
+
 	user := &User{
 		ID:            primitive.NewObjectID(),
 		Email:         "test@example.com",
@@ -141,9 +138,6 @@ func TestUser_ToMinifiedUser_DoesNotIncludeSensitiveData(t *testing.T) {
 
 	minified := user.ToMinifiedUser()
 
-	// Verify that MinifiedUser type doesn't have these fields by checking the struct
-	// The conversion should only include: ID, Email, Disabled, IsAdmin, IsManager
-
 	if minified.Email != "test@example.com" {
 		t.Errorf("Email should be included in minified user")
 	}
@@ -155,7 +149,6 @@ func TestUser_ToMinifiedUser_DoesNotIncludeSensitiveData(t *testing.T) {
 	t.Log("ToMinifiedUser() correctly excludes sensitive data ✓")
 }
 
-// Test User.RemoveSensitiveInformation
 func TestUser_RemoveSensitiveInformation(t *testing.T) {
 	tests := []struct {
 		name                string
@@ -272,7 +265,6 @@ func TestUser_RemoveSensitiveInformation(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			tc.user.RemoveSensitiveInformation()
 
-			// Check that sensitive fields are cleared
 			if tc.user.Password != "" {
 				t.Errorf("Password should be empty, got %q", tc.user.Password)
 			}
@@ -289,7 +281,6 @@ func TestUser_RemoveSensitiveInformation(t *testing.T) {
 				t.Errorf("TwoFactorCode should be nil, got %v", tc.user.TwoFactorCode)
 			}
 
-			// Check key redaction
 			if tc.user.Key != nil {
 				if tc.user.Key.Key != tc.expectedKeyRedacted {
 					t.Errorf("Key.Key = %q, expected %q", tc.user.Key.Key, tc.expectedKeyRedacted)
@@ -325,7 +316,6 @@ func TestUser_RemoveSensitiveInformation_PreservesNonSensitiveData(t *testing.T)
 
 	user.RemoveSensitiveInformation()
 
-	// Verify non-sensitive data is preserved
 	if user.ID != originalID {
 		t.Errorf("ID changed: got %v, expected %v", user.ID, originalID)
 	}

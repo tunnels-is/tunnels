@@ -67,7 +67,7 @@ func MakeCert(ct CertType, certPath string, keyPath string, ips []string, domain
 		}
 
 	case ECDSA:
-		pk, err := ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
+		pk, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 		if err != nil {
 			return c, err
 		}
@@ -168,7 +168,7 @@ func MakeCertV2(ct CertType, certPath string, keyPath string, ips []string, doma
 		CR.Pub = &pk.PublicKey
 	case ECDSA:
 		var pk *ecdsa.PrivateKey
-		pk, err = ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
+		pk, err = ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 		if err != nil {
 			return
 		}

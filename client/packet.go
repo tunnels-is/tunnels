@@ -32,7 +32,6 @@ func (t *TUN) RegisterPing(tag string, packet []byte) {
 	}
 }
 
-
 func (V *TUN) ProcessEgressPacket(p *[]byte) (sendRemote bool) {
 	packet := *p
 
@@ -63,7 +62,6 @@ func (V *TUN) ProcessEgressPacket(p *[]byte) (sendRemote bool) {
 	V.EP_DstPort[0] = V.EP_TPHeader[2]
 	V.EP_DstPort[1] = V.EP_TPHeader[3]
 
-	// check if port is blocked
 	if V.blockedPortsSet[V.EP_DstPort] != 0 {
 		if CONFIG.Load().LogBlockedPorts {
 			INFO("PORT BLOCKED: ", V.blockedPortsSet[V.EP_DstPort])
@@ -90,7 +88,7 @@ func (V *TUN) ProcessIngressPacket(packet []byte) bool {
 	if len(packet) < 20 {
 		return false
 	}
-	if (packet[0]>>4) != 4 {
+	if (packet[0] >> 4) != 4 {
 		return false
 	}
 
@@ -103,7 +101,6 @@ func (V *TUN) ProcessIngressPacket(packet []byte) bool {
 	V.IP_IPv4Header = packet[:V.IP_IPv4HeaderLength]
 	V.IP_TPHeader = packet[V.IP_IPv4HeaderLength:]
 
-	// Reverse IP translation (e.g. LocalhostNat: server interface IP → 127.0.0.1)
 	V.IP_NAT_IP, V.IP_NAT_OK = V.NATIngress[V.IP_SrcIP]
 	if V.IP_NAT_OK {
 		V.IP_IPv4Header[12] = V.IP_NAT_IP[0]
@@ -137,7 +134,7 @@ func RecalculateIPv4HeaderChecksum(bytes []byte) {
 }
 
 func RecalculateTransportChecksum(IPv4Header []byte, TPPacket []byte) {
-	// wipe the old checksum before calculating
+
 	switch IPv4Header[9] {
 	case 6:
 		TPPacket[16] = 0
