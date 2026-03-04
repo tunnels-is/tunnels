@@ -187,6 +187,9 @@ func HTTPhandler(w http.ResponseWriter, r *http.Request) {
 	case "getLogs":
 		HTTP_GetLogs(w, r)
 		return
+	case "createDeviceWithKeys":
+		HTTP_CreateDeviceWithKeys(w, r)
+		return
 	default:
 	}
 
@@ -307,7 +310,7 @@ func HTTP_SetUser(w http.ResponseWriter, r *http.Request) {
 		JSON(w, r, 400, err)
 		return
 	}
-	JSON(w, r, 200, nil)
+	JSON(w, r, 200, u)
 }
 
 func HTTP_DelUser(w http.ResponseWriter, r *http.Request) {
@@ -545,5 +548,15 @@ func HTTP_ForwardToController(w http.ResponseWriter, r *http.Request) {
 		JSON(w, r, 400, err)
 	}
 	data, code := ForwardToController(form)
+	JSON(w, r, code, data)
+}
+
+func HTTP_CreateDeviceWithKeys(w http.ResponseWriter, r *http.Request) {
+	form := new(CreateDeviceWithKeysForm)
+	if err := Bind(form, r); err != nil {
+		JSON(w, r, 400, err)
+		return
+	}
+	data, code := CreateDeviceWithKeys(form)
 	JSON(w, r, code, data)
 }

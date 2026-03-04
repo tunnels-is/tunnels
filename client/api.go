@@ -27,7 +27,7 @@ func ResetEverything() {
 	RestoreSaneDNSDefaults()
 }
 
-func SendRequestToURL(tc *tls.Config, method string, url string, data any, timeoutMS int, skipVerify bool) ([]byte, int, error) {
+func SendRequestToURL(tc *tls.Config, method string, url string, data any, timeoutMS int, skipVerify bool, extraHeaders ...map[string]string) ([]byte, int, error) {
 	defer RecoverAndLog()
 
 	var body []byte
@@ -54,6 +54,11 @@ func SendRequestToURL(tc *tls.Config, method string, url string, data any, timeo
 	}
 
 	req.Header.Add("Content-Type", "application/json")
+	if len(extraHeaders) > 0 {
+		for k, v := range extraHeaders[0] {
+			req.Header.Set(k, v)
+		}
+	}
 
 	client := http.Client{Timeout: time.Duration(timeoutMS) * time.Millisecond}
 	if tc != nil {
@@ -108,6 +113,7 @@ func ForwardToController(FR *FORWARD_REQUEST) (any, int) {
 		FR.JSONData,
 		FR.Timeout,
 		FR.Server.ValidateCertificate,
+		FR.Headers,
 	)
 
 	er := new(ErrorResponse)

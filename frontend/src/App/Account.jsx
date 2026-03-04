@@ -113,7 +113,7 @@ const Account = () => {
               className="h-7 px-2.5 text-[11px] text-red-400/60 hover:text-red-400 hover:bg-red-500/[0.04] border border-red-500/10"
               onClick={() => {
                 let t = state.User?.DeviceToken;
-                if (t !== "") state.LogoutToken(t, false);
+                if (t?.DT) state.LogoutToken(t, false);
               }}
             >
               <LogOut className="h-3 w-3 mr-1" /> Logout

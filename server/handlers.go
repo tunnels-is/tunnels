@@ -574,9 +574,7 @@ func API_DeviceCreate(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		if !user.IsAdmin && !user.IsManager {
-			F.Device.UserID = user.ID
-		}
+		F.Device.UserID = user.ID
 	}
 
 	if F.Device == nil || F.Device.Tag == "" {
