@@ -172,6 +172,15 @@ type FORWARD_REQUEST struct {
 	Method   string
 	Timeout  int
 	JSONData any
+	Headers  map[string]string
+}
+
+type CreateDeviceWithKeysForm struct {
+	Server      *ControlServer
+	Tag         string
+	ServerID    string
+	DeviceToken string
+	UID         string
 }
 
 type TWO_FACTOR_CONFIRM struct {
