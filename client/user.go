@@ -23,11 +23,6 @@ func delUser(hash string) (err error) {
 }
 
 func saveUser(u *User) (err error) {
-	ub, err := json.Marshal(u)
-	if err != nil {
-		return err
-	}
-
 	key, err := argon.GetKeyFromLocalInfo()
 	if err != nil {
 		return err
@@ -37,6 +32,11 @@ func saveUser(u *User) (err error) {
 		return err
 	}
 	u.SaveFileHash = fmt.Sprintf("%x", userFile)
+
+	ub, err := json.Marshal(u)
+	if err != nil {
+		return err
+	}
 
 	encryptged, err := Encrypt(ub, key)
 	if err != nil {

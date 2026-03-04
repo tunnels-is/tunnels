@@ -407,6 +407,92 @@ func InitializeTunnelFromCRR(TUN *TUN) (err error) {
 	return nil
 }
 
+type createDeviceRequest struct {
+	DeviceToken string        `json:"DeviceToken"`
+	UID         string        `json:"UID"`
+	Device      *types.Device `json:"Device"`
+}
+
+type createDeviceControllerResponse struct {
+	Device       *types.Device `json:"Device"`
+	ServerPubKey string        `json:"ServerPubKey"`
+	ServerPort   string        `json:"ServerPort"`
+	ServerIP     string        `json:"ServerIP"`
+}
+
+type createDeviceWithKeysResult struct {
+	WGConfig string        `json:"WGConfig"`
+	Device   *types.Device `json:"Device"`
+}
+
+func CreateDeviceWithKeys(form *CreateDeviceWithKeysForm) (any, int) {
+	privKey, err := generateWGPrivKey()
+	if err != nil {
+		return &ErrorResponse{Error: "failed to generate WireGuard private key: " + err.Error()}, 500
+	}
+
+	pubKey, err := deriveWGPubKey(privKey)
+	if err != nil {
+		return &ErrorResponse{Error: "failed to derive WireGuard public key: " + err.Error()}, 500
+	}
+
+	serverOID, err := primitive.ObjectIDFromHex(form.ServerID)
+	if err != nil {
+		return &ErrorResponse{Error: "invalid ServerID: " + err.Error()}, 400
+	}
+
+	url := form.Server.GetURL("/client/device/create")
+	reqBody := &createDeviceRequest{
+		DeviceToken: form.DeviceToken,
+		UID:         form.UID,
+		Device: &types.Device{
+			Tag:          form.Tag,
+			WireGuardKey: pubKey,
+			ServerID:     serverOID,
+		},
+	}
+
+	authHeaders := map[string]string{
+		"X-Device-Token": form.DeviceToken,
+		"X-UID":          form.UID,
+	}
+	responseBytes, code, reqErr := SendRequestToURL(nil, "POST", url, reqBody, 15000, form.Server.ValidateCertificate, authHeaders)
+	if reqErr != nil {
+		return &ErrorResponse{Error: "controller request failed: " + reqErr.Error()}, 500
+	}
+	if code != 200 {
+		var er ErrorResponse
+		_ = json.Unmarshal(responseBytes, &er)
+		if er.Error == "" {
+			er.Error = fmt.Sprintf("controller returned status %d", code)
+		}
+		return &er, code
+	}
+
+	var resp createDeviceControllerResponse
+	if err := json.Unmarshal(responseBytes, &resp); err != nil {
+		return &ErrorResponse{Error: "failed to parse controller response: " + err.Error()}, 500
+	}
+
+	if resp.Device == nil {
+		return &ErrorResponse{Error: "controller returned no device"}, 500
+	}
+
+	wgConfig := fmt.Sprintf(
+		"[Interface]\nPrivateKey = %s\nAddress = %s/32\nDNS = 1.1.1.1\n\n[Peer]\nPublicKey = %s\nEndpoint = %s:%s\nAllowedIPs = 0.0.0.0/0\nPersistentKeepalive = 25\n",
+		privKey,
+		resp.Device.WireGuardIP,
+		resp.ServerPubKey,
+		resp.ServerIP,
+		resp.ServerPort,
+	)
+
+	return &createDeviceWithKeysResult{
+		WGConfig: wgConfig,
+		Device:   resp.Device,
+	}, 200
+}
+
 func GetQRCode(LF *TWO_FACTOR_CONFIRM) (QR *QR_CODE, err error) {
 	if LF.Email == "" {
 		return nil, errors.New("email missing")

@@ -145,6 +145,10 @@ export var STATE = {
         Method: method,
         JSONData: data,
         Timeout: 20000,
+        Headers: (!skipAuth || skipAuth === false) ? {
+          "X-Device-Token": data.DeviceToken || "",
+          "X-UID": data.UID || "",
+        } : undefined,
       };
 
       let body = undefined;
@@ -242,7 +246,12 @@ export var STATE = {
   },
   SaveUser: async (user) => {
     try {
-      await STATE.API.method("setUser", user, true, 10000, false);
+      let resp = await STATE.API.method("setUser", user, true, 10000, false);
+      if (resp?.status === 200 && resp.data?.SaveFileHash) {
+        user.SaveFileHash = resp.data.SaveFileHash;
+        if (STATE.User) STATE.User.SaveFileHash = resp.data.SaveFileHash;
+        STORE.Cache.SetObject("user", STATE.User || user);
+      }
     } catch (error) {
       STATE.toggleError("unable to save encrypted user to disk");
     }
@@ -662,19 +671,19 @@ export var STATE = {
     STATE.GetBackendState();
   },
   FinalizeLogout: async () => {
+    STATE.User = null;
     STORE.Cache.Clear();
-    STATE.GetBackendState();
     window.location.replace("/#/login");
     window.location.reload();
   },
   LogoutAllTokens: async () => {
     if (STATE.User) {
-      STATE.LogoutToken(STATE.User.DeviceToken?.DT, true);
+      STATE.LogoutToken(STATE.User.DeviceToken, true);
     }
   },
   LogoutCurrentToken: async () => {
     if (STATE.User) {
-      STATE.LogoutToken(STATE.User.DeviceToken?.DT, false);
+      STATE.LogoutToken(STATE.User.DeviceToken, false);
     }
   },
   LogoutToken: async (token, all) => {
@@ -684,33 +693,33 @@ export var STATE = {
       return;
     }
 
-    let logoutUser = false;
-    if (user.DeviceToken?.DT === token.DT) {
-      logoutUser = true;
-    }
+    const logoutUser = user.DeviceToken?.DT === token?.DT;
 
     let resp = await STATE.callController(null, "POST", "/client/user/logout",
-      { DeviceToken: token.DT, UserID: user._id, All: all },
+      { LogoutToken: token?.DT, All: all },
       false, false)
     if (resp && resp.status === 200) {
-
       STATE.successNotification("device logged out", undefined);
       if (logoutUser === true || all === true) {
-        STATE.DelUser(user);
+        await STATE.DelUser(user.SaveFileHash);
         STATE.FinalizeLogout();
-        return
+        return;
       } else {
         let toks = [];
         user.Tokens?.forEach((t) => {
-          if (t.DT !== token.DT) {
+          if (t.DT !== token?.DT) {
             toks.push(t);
           }
         });
         user.Tokens = toks;
+        STORE.Cache.SetObject("user", user);
+        STATE.User = user;
       }
-
-      STORE.Cache.SetObject("user", user);
-      STATE.User = user;
+    } else if (resp?.status === 401) {
+      // Token already invalid server-side — clean up locally regardless.
+      await STATE.DelUser(user.SaveFileHash);
+      STATE.FinalizeLogout();
+      return;
     } else {
       STATE.toggleError("Unable to log out device", undefined);
       if (logoutUser === true || all === true) {
