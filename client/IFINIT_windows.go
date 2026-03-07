@@ -49,42 +49,6 @@ func (t *TInterface) VerifyOrLoadPointer(method string) {
 
 }
 
-func CreateNewTunnelInterface(
-	meta *TunnelMETA,
-) (IF *TInterface, err error) {
-	defer RecoverAndLog()
-
-	var GUID windows.GUID
-	if meta.WindowsGUID != "" {
-		GUID, err = windows.GUIDFromString(meta.WindowsGUID)
-		if err != nil {
-			ERROR("Unable to create Windows UID from string: ", meta.WindowsGUID)
-			return
-		}
-	} else {
-		GUID = *new(windows.GUID)
-	}
-	IF = &TInterface{
-		Name:        meta.IFName,
-		IPv4Address: meta.IPv4Address,
-		IPv6Address: meta.IPv6Address,
-		NetMask:     meta.NetMask,
-		TxQueuelen:  meta.TxQueueLen,
-		MTU:         meta.MTU,
-
-		GatewayMetric: "2000",
-
-		Gateway: meta.IPv4Address,
-		GUID:    GUID,
-		RingCap: 0x4000000,
-	}
-	DEBUG(fmt.Sprintf("New tunnel interface/adapter: %v", IF))
-
-	IF.WDLL = new(DLL)
-	_ = IF.WDLL.Init("./wintun.dll")
-	return IF, err
-}
-
 func (t *TInterface) CreateOrOpen() (err error) {
 	t.NamePtr, err = windows.UTF16PtrFromString(t.Name)
 	if err != nil {
@@ -600,9 +564,11 @@ func (t *TInterface) SetMTU() error {
 }
 
 func (t *TInterface) Connect(tun *TUN) (err error) {
-	err = t.CreateOrOpen()
-	if err != nil {
-		return
+	if t.WDLL != nil {
+		err = t.CreateOrOpen()
+		if err != nil {
+			return
+		}
 	}
 	t.GatewayMetric = "2000"
 	if err = t.Addr(); err != nil {
@@ -616,8 +582,10 @@ func (t *TInterface) Connect(tun *TUN) (err error) {
 		}
 	}
 
-	if err = t.Up(); err != nil {
-		return
+	if t.WDLL != nil {
+		if err = t.Up(); err != nil {
+			return
+		}
 	}
 	err = t.SetMTU()
 	if err != nil {
@@ -626,7 +594,9 @@ func (t *TInterface) Connect(tun *TUN) (err error) {
 
 	closeAllOpenTCPconnections()
 
-	t.exitChannel = make(chan byte, 10)
+	if t.WDLL != nil {
+		t.exitChannel = make(chan byte, 10)
+	}
 	meta := tun.meta.Load()
 
 	if meta.EnableDefaultRoute {
@@ -710,11 +680,13 @@ func (t *TInterface) Disconnect(tun *TUN) (err error) {
 		tun.wgDevice.Close()
 	}
 
-	t.CloseReadAndWriteLoop()
+	if t.WDLL != nil {
+		t.CloseReadAndWriteLoop()
 
-	err = t.Close()
-	if err != nil {
-		ERROR("unable to delete the interface", err)
+		err = t.Close()
+		if err != nil {
+			ERROR("unable to delete the interface", err)
+		}
 	}
 
 	meta := tun.meta.Load()

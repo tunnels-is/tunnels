@@ -130,7 +130,6 @@ type DisconnectForm struct {
 }
 
 type TunnelMETA struct {
-	WindowsGUID  string
 	ConfigFormat string
 
 	DNSBlocking   bool
@@ -143,11 +142,8 @@ type TunnelMETA struct {
 	MTU        int32
 	IFName     string
 
-	Tag         string
-	ServerID    string
-	IPv4Address string
-	IPv6Address string
-	NetMask     string
+	Tag      string
+	ServerID string
 
 	// This overwrites or adds to settings
 	// that are applied to the Node
@@ -403,7 +399,6 @@ type TUN struct {
 	tunnel atomic.Pointer[TInterface] `json:"-"`
 
 	wgDevice *device.Device
-	wgTun    *chanTUN
 
 	// Connection Requests + Response
 	CR             *ConnectionRequest

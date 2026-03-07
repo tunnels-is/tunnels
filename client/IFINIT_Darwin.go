@@ -37,28 +37,6 @@ type TInterface struct {
 	FD         uintptr
 }
 
-func CreateNewTunnelInterface(
-	meta *TunnelMETA,
-) (IF *TInterface, err error) {
-	defer RecoverAndLog()
-	IF = &TInterface{
-		Name:        meta.IFName,
-		IPv4Address: meta.IPv4Address,
-		IPv6Address: meta.IPv6Address,
-		Gateway:     meta.IPv4Address,
-		NetMask:     meta.NetMask,
-		TxQueuelen:  meta.TxQueueLen,
-		MTU:         meta.MTU,
-	}
-
-	err = IF.Create()
-	if err != nil {
-		return
-	}
-
-	return
-}
-
 func (t *TInterface) Close() error {
 	if t.RWC != nil {
 		return t.RWC.Close()
@@ -154,10 +132,18 @@ func (t *TInterface) Create() (err error) {
 	return nil
 }
 
-func (t *TInterface) Up() (err error) {
-	DEBUG("ifconfig", t.SystemName, t.IPv4Address, t.Gateway, "up")
+func (t *TInterface) sysName() string {
+	if t.SystemName != "" {
+		return t.SystemName
+	}
+	return t.Name
+}
 
-	out, err := exec.Command("ifconfig", t.SystemName, t.IPv4Address, t.Gateway, "up").CombinedOutput()
+func (t *TInterface) Up() (err error) {
+	name := t.sysName()
+	DEBUG("ifconfig", name, t.IPv4Address, t.Gateway, "up")
+
+	out, err := exec.Command("ifconfig", name, t.IPv4Address, t.Gateway, "up").CombinedOutput()
 	if err != nil {
 		ERROR("unable to bring up tunnel adapter: ", string(out), " err: ", err)
 		return err
@@ -167,9 +153,10 @@ func (t *TInterface) Up() (err error) {
 }
 
 func (t *TInterface) Down() (err error) {
-	DEBUG("ifconfig", t.SystemName, "down")
+	name := t.sysName()
+	DEBUG("ifconfig", name, "down")
 
-	out, err := exec.Command("ifconfig", t.SystemName, "down").CombinedOutput()
+	out, err := exec.Command("ifconfig", name, "down").CombinedOutput()
 	if err != nil {
 		ERROR("unable to bring down tunnel adapter: ", string(out), " err: ", err)
 		return err
@@ -179,8 +166,9 @@ func (t *TInterface) Down() (err error) {
 }
 
 func (t *TInterface) SetMTU() (err error) {
-	DEBUG("ifconfig", t.SystemName, "mtu", strconv.FormatInt(int64(t.MTU), 10))
-	out, err := exec.Command("ifconfig", t.SystemName, "mtu", strconv.FormatInt(int64(t.MTU), 10)).CombinedOutput()
+	name := t.sysName()
+	DEBUG("ifconfig", name, "mtu", strconv.FormatInt(int64(t.MTU), 10))
+	out, err := exec.Command("ifconfig", name, "mtu", strconv.FormatInt(int64(t.MTU), 10)).CombinedOutput()
 	if err != nil {
 		ERROR("Unable to change mtu out: ", string(out), " err: ", err)
 		return err
@@ -203,24 +191,25 @@ func (t *TInterface) AddrV6() (err error) {
 		return nil
 	}
 
+	name := t.sysName()
 	ipv6Addr := t.IPv6Address
 	if !strings.Contains(ipv6Addr, "/") {
 		ipv6Addr = ipv6Addr + "/64"
 	}
 
-	DEBUG("ifconfig", t.SystemName, "inet6", ipv6Addr)
-	out, err := exec.Command("ifconfig", t.SystemName, "inet6", ipv6Addr).CombinedOutput()
+	DEBUG("ifconfig", name, "inet6", ipv6Addr)
+	out, err := exec.Command("ifconfig", name, "inet6", ipv6Addr).CombinedOutput()
 	if err != nil {
 
 		if strings.Contains(string(out), "File exists") || strings.Contains(err.Error(), "exists") {
-			DEBUG("IPv6 address already exists on interface: ", t.SystemName)
+			DEBUG("IPv6 address already exists on interface: ", name)
 			return nil
 		}
 		ERROR("IPv6 address configuration failed: ", err, " out: ", string(out))
 		return err
 	}
 
-	DEBUG("Added IPv6 address ", t.IPv6Address, " to interface ", t.SystemName)
+	DEBUG("Added IPv6 address ", t.IPv6Address, " to interface ", name)
 	return nil
 }
 
