@@ -200,10 +200,8 @@ mainLoop:
 			CleanupOnClose()
 			os.Exit(1)
 
-		case Tun := <-interfaceMonitor:
-			go Tun.ReadFromTunnelInterface()
 		case Tun := <-tunnelMonitor:
-			go Tun.ReadFromServeTunnel()
+			Tun.needsReconnect.Store(true)
 
 		case signal := <-concurrencyMonitor:
 			ROUTINE(signal.tag)

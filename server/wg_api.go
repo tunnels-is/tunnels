@@ -79,10 +79,24 @@ func API_WGConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var clientWireGuardIP string
+	if pubKey := r.URL.Query().Get("pubKey"); pubKey != "" {
+		devices, devErr := DB_GetDevices(100000, 0)
+		if devErr == nil {
+			for _, d := range devices {
+				if d.WireGuardKey == pubKey {
+					clientWireGuardIP = d.WireGuardIP
+					break
+				}
+			}
+		}
+	}
+
 	sendObject(w, map[string]string{
 		"WireGuardPubKey": server.WireGuardPubKey,
 		"WireGuardPort":   server.WireGuardPort,
 		"ServerIP":        server.IP,
+		"WireGuardIP":     clientWireGuardIP,
 	})
 }
 

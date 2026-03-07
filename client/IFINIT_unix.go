@@ -43,37 +43,6 @@ func (t *TInterface) Close() error {
 	return nil
 }
 
-func CreateNewTunnelInterface(
-	meta *TunnelMETA,
-) (IF *TInterface, err error) {
-	defer RecoverAndLog()
-
-	_, err = os.Stat("/dev/net/tun")
-	if err != nil {
-		createDevNetTun()
-	}
-
-	IF = &TInterface{
-		Name:        meta.IFName,
-		IPv4Address: meta.IPv4Address,
-		IPv6Address: meta.IPv6Address,
-		NetMask:     meta.NetMask,
-		Gateway:     meta.IPv4Address,
-		TxQueuelen:  meta.TxQueueLen,
-		MTU:         meta.MTU,
-	}
-
-	err = IF.Create()
-	if err != nil {
-		return IF, err
-	}
-
-	if IF.RWC == nil {
-		return IF, errors.New("unable to create tunnel read write closer")
-	}
-
-	return IF, err
-}
 
 type syscallCreateIF struct {
 	Name  [0x10]byte

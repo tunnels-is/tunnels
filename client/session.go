@@ -20,6 +20,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	wgconn "golang.zx2c4.com/wireguard/conn"
 	wgdevice "golang.zx2c4.com/wireguard/device"
+	wgtun "golang.zx2c4.com/wireguard/tun"
 )
 
 func PreConnectCheck(meta *TunnelMETA) (int, error) {
@@ -167,15 +168,18 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		}
 	}
 
-	if meta.IPv4Address == "" {
-		ERROR("no WireGuard IP assigned; create the device on the controller first")
-		return 400, errors.New("device has no WireGuard IP; create it on the controller")
+	pubKey, pubErr := deriveWGPubKey(wgPrivKeyB64)
+	if pubErr != nil {
+		return 502, errors.New("unable to derive WireGuard public key")
 	}
 
-	wgCfg, wgErr := getServerWGConfig(ClientCR.Server, ClientCR.ServerID)
+	wgCfg, wgErr := getServerWGConfig(ClientCR, ClientCR.ServerID, pubKey)
 	if wgErr != nil {
 		ERROR("unable to fetch server WireGuard config: ", wgErr)
 		return 502, fmt.Errorf("unable to fetch server WireGuard config: %w", wgErr)
+	}
+	if wgCfg.WireGuardIP == "" {
+		return 400, errors.New("no WireGuard IP assigned; create the device on the controller first")
 	}
 	if ClientCR.ServerIP == "" {
 		ClientCR.ServerIP = wgCfg.ServerIP
@@ -183,7 +187,7 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 
 	ServerReponse := &types.ServerConnectResponse{
 		InterfaceIP:     wgCfg.ServerIP,
-		WireGuardIP:     meta.IPv4Address,
+		WireGuardIP:     wgCfg.WireGuardIP,
 		WireGuardPubKey: wgCfg.WireGuardPubKey,
 		WireGuardPort:   wgCfg.WireGuardPort,
 	}
@@ -199,8 +203,30 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		return 502, errors.New("unable to initialize routes")
 	}
 
-	ct := newChanTUN(wgdevice.DefaultMTU)
-	wgDev := wgdevice.NewDevice(ct, wgconn.NewDefaultBind(),
+	if oldTunnel != nil {
+		oldTunnel.SetState(TUN_Disconnecting)
+		if oldTunnel.wgDevice != nil {
+			oldTunnel.wgDevice.Close()
+		}
+	}
+
+	osTun, tunErr := wgtun.CreateTUN(meta.IFName, int(meta.MTU))
+	if tunErr != nil {
+		return 502, fmt.Errorf("unable to create TUN interface: %w", tunErr)
+	}
+	tunIfName, _ := osTun.Name()
+
+	inter := &TInterface{
+		Name:        tunIfName,
+		IPv4Address: wgCfg.WireGuardIP,
+		NetMask:     "255.255.255.255",
+		MTU:         meta.MTU,
+		TxQueuelen:  meta.TxQueueLen,
+		Gateway:     wgCfg.WireGuardIP,
+	}
+
+	pt := newProcessingTUN(osTun, tunnel)
+	wgDev := wgdevice.NewDevice(pt, wgconn.NewDefaultBind(),
 		wgdevice.NewLogger(wgdevice.LogLevelError, "[wg-client] "))
 	privHex, hexErr := wgB64ToHex(wgPrivKeyB64)
 	if hexErr != nil {
@@ -225,31 +251,14 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		return 502, fmt.Errorf("WireGuard device Up failed: %w", upErr)
 	}
 	tunnel.wgDevice = wgDev
-	tunnel.wgTun = ct
-
-	var inter *TInterface
-	if oldTunnel != nil {
-		inter = oldTunnel.tunnel.Load()
-
-		oldTunnel.SetState(TUN_Disconnecting)
-		if oldTunnel.wgDevice != nil {
-			oldTunnel.wgDevice.Close()
-		}
-		inter.PrepareForSwitch()
-	} else {
-		inter, err = CreateAndConnectToInterface(tunnel)
-	}
-	if err != nil {
-		ERROR("Unable to initialize interface: ", err)
-		return 502, err
-	}
 
 	tunnel.tunnel.Store(inter)
 	inter.tunnel.Store(&tunnel)
 	err = inter.Connect(tunnel)
 	if err != nil {
 		ERROR("unable to configure tunnel interface: ", err)
-		return 502, errors.New("Unable to connect to tunnel interface")
+		wgDev.Close()
+		return 502, errors.New("unable to connect to tunnel interface")
 	}
 
 	tunnel.SetState(TUN_Connected)
@@ -257,9 +266,16 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	tunnel.ID = uuid.NewString()
 	TunnelMap.Store(tunnel.ID, tunnel)
 
-	go tunnel.ReadFromServeTunnel()
-	go tunnel.ReadFromTunnelInterface()
 	go tunnel.RecordBandwidth()
+	go func() {
+		defer RecoverAndLog()
+		tunnel.wgDevice.Wait()
+		m := tunnel.meta.Load()
+		DEBUG("WireGuard device closed:", m.Tag, tunnel.ID)
+		if tunnel.GetState() >= TUN_Connected {
+			tunnelMonitor <- tunnel
+		}
+	}()
 
 	if oldTunnel != nil {
 		Disconnect(oldTunnel.ID, true)
@@ -272,11 +288,16 @@ type wgServerConfig struct {
 	WireGuardPubKey string `json:"WireGuardPubKey"`
 	WireGuardPort   string `json:"WireGuardPort"`
 	ServerIP        string `json:"ServerIP"`
+	WireGuardIP     string `json:"WireGuardIP"`
 }
 
-func getServerWGConfig(server *ControlServer, serverID string) (*wgServerConfig, error) {
-	url := server.GetURL("/client/wg/config") + "?serverID=" + serverID
-	responseBytes, code, err := SendRequestToURL(nil, "GET", url, nil, 10000, server.ValidateCertificate)
+func getServerWGConfig(cr *ConnectionRequest, serverID string, pubKey string) (*wgServerConfig, error) {
+	url := cr.Server.GetURL("/client/wg/config") + "?serverID=" + serverID + "&pubKey=" + pubKey
+	authHeaders := map[string]string{
+		"X-Device-Token": cr.DeviceToken,
+		"X-UID":          cr.UserID,
+	}
+	responseBytes, code, err := SendRequestToURL(nil, "GET", url, nil, 10000, cr.Server.ValidateCertificate, authHeaders)
 	if err != nil {
 		return nil, fmt.Errorf("get wg config: %w", err)
 	}
@@ -336,9 +357,9 @@ func InitializeTunnelFromCRR(TUN *TUN) (err error) {
 
 	meta := TUN.meta.Load()
 
-	TUN.localInterfaceNetIP = net.ParseIP(meta.IPv4Address).To4()
+	TUN.localInterfaceNetIP = net.ParseIP(TUN.ServerResponse.WireGuardIP).To4()
 	if TUN.localInterfaceNetIP == nil {
-		return fmt.Errorf("Interface ip (%s) was malformed", meta.IPv4Address)
+		return fmt.Errorf("Interface ip (%s) was malformed", TUN.ServerResponse.WireGuardIP)
 	}
 	TUN.localInterfaceIP4bytes[0] = TUN.localInterfaceNetIP[0]
 	TUN.localInterfaceIP4bytes[1] = TUN.localInterfaceNetIP[1]
@@ -400,7 +421,7 @@ func InitializeTunnelFromCRR(TUN *TUN) (err error) {
 
 	DEBUG(fmt.Sprintf(
 		"Connection info: Addr(%s) srcIP(%s)",
-		meta.IPv4Address,
+		TUN.ServerResponse.WireGuardIP,
 		TUN.ServerResponse.InterfaceIP,
 	))
 

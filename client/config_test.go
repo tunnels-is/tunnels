@@ -631,7 +631,6 @@ func TestTunnelConfigFormats(t *testing.T) {
 
 			testTunnel := &TunnelMETA{
 				Tag:           "test-tunnel-" + fmt.name,
-				IPv4Address:   "10.0.0.1",
 				DNSBlocking:   true,
 				AutoConnect:   false,
 				AutoReconnect: true,
@@ -659,9 +658,6 @@ func TestTunnelConfigFormats(t *testing.T) {
 				t.Fatalf("Tunnel %s was not loaded from %s file", testTunnel.Tag, fmt.extension)
 			}
 
-			if loaded.IPv4Address != testTunnel.IPv4Address {
-				t.Errorf("IPv4Address: got %s, expected %s", loaded.IPv4Address, testTunnel.IPv4Address)
-			}
 			if loaded.DNSBlocking != testTunnel.DNSBlocking {
 				t.Errorf("DNSBlocking: got %v, expected %v", loaded.DNSBlocking, testTunnel.DNSBlocking)
 			}
@@ -699,7 +695,6 @@ func TestTunnelConfigFormatPreservation(t *testing.T) {
 
 			testTunnel := &TunnelMETA{
 				Tag:          "format-test",
-				IPv4Address:  "192.168.1.1",
 				ConfigFormat: ext,
 			}
 
@@ -780,7 +775,7 @@ func TestTunnelSkipsInvalidExtensions(t *testing.T) {
 		}
 	}
 
-	validTunnel := &TunnelMETA{Tag: "valid-tunnel", IPv4Address: "10.0.0.100"}
+	validTunnel := &TunnelMETA{Tag: "valid-tunnel"}
 	data, _ := json.Marshal(validTunnel)
 	if err := os.WriteFile(filepath.Join(tunnelsPath, "valid-tunnel.json"), data, 0o644); err != nil {
 		t.Fatalf("Failed to write valid tunnel: %v", err)
@@ -821,13 +816,13 @@ func TestTunnelSkipsEmptyTag(t *testing.T) {
 	}
 	STATE.Store(testState)
 
-	emptyTagTunnel := &TunnelMETA{Tag: "", IPv4Address: "10.0.0.1"}
+	emptyTagTunnel := &TunnelMETA{Tag: ""}
 	data, _ := json.Marshal(emptyTagTunnel)
 	if err := os.WriteFile(filepath.Join(tunnelsPath, "empty-tag.json"), data, 0o644); err != nil {
 		t.Fatalf("Failed to write file: %v", err)
 	}
 
-	validTunnel := &TunnelMETA{Tag: "valid-tag", IPv4Address: "10.0.0.2"}
+	validTunnel := &TunnelMETA{Tag: "valid-tag"}
 	data, _ = json.Marshal(validTunnel)
 	if err := os.WriteFile(filepath.Join(tunnelsPath, "valid-tag.json"), data, 0o644); err != nil {
 		t.Fatalf("Failed to write file: %v", err)
@@ -928,7 +923,7 @@ func TestTunnelDirectoriesAreSkipped(t *testing.T) {
 	}
 	STATE.Store(testState)
 
-	validTunnel := &TunnelMETA{Tag: "valid", IPv4Address: "10.0.0.1"}
+	validTunnel := &TunnelMETA{Tag: "valid"}
 	data, _ := json.Marshal(validTunnel)
 	if err := os.WriteFile(filepath.Join(tunnelsPath, "valid.json"), data, 0o644); err != nil {
 		t.Fatalf("Failed to write file: %v", err)
