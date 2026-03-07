@@ -5,98 +5,90 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
-	"os"
+	"sync"
 
 	"golang.org/x/crypto/curve25519"
 	"golang.zx2c4.com/wireguard/tun"
 )
 
-type chanTUN struct {
-	in     chan []byte
-	out    chan []byte
-	events chan tun.Event
-	mtu    int
-	done   chan struct{}
+// processingTUN wraps a real OS tun.Device and intercepts Read/Write to apply
+// packet processing (NAT, port blocking, checksum recalculation) and track
+// bandwidth. It replaces the old chanTUN + bridge goroutine architecture.
+type processingTUN struct {
+	tun.Device
+	tunnel    *TUN
+	egressMu  sync.Mutex
+	ingressMu sync.Mutex
 }
 
-func newChanTUN(mtu int) *chanTUN {
-	ct := &chanTUN{
-		in:     make(chan []byte, 64),
-		out:    make(chan []byte, 64),
-		events: make(chan tun.Event, 1),
-		mtu:    mtu,
-		done:   make(chan struct{}),
+func newProcessingTUN(d tun.Device, t *TUN) *processingTUN {
+	return &processingTUN{Device: d, tunnel: t}
+}
+
+// Read is called by WireGuard to get plaintext packets to encrypt and send
+// (egress: OS → WireGuard). We apply egress packet processing here.
+func (p *processingTUN) Read(bufs [][]byte, sizes []int, offset int) (int, error) {
+	n, err := p.Device.Read(bufs, sizes, offset)
+	if err != nil || n == 0 {
+		return n, err
 	}
-	ct.events <- tun.EventUp
-	return ct
-}
 
-func (t *chanTUN) Read(bufs [][]byte, sizes []int, offset int) (int, error) {
-	select {
-	case pkt, ok := <-t.in:
-		if !ok {
-			return 0, os.ErrClosed
+	p.egressMu.Lock()
+	defer p.egressMu.Unlock()
+
+	kept := 0
+	for i := 0; i < n; i++ {
+		packet := bufs[i][offset : offset+sizes[i]]
+		if !p.tunnel.ProcessEgressPacket(&packet) {
+			continue
 		}
-		if len(bufs) == 0 || len(bufs[0]) < offset+len(pkt) {
-			return 0, fmt.Errorf("wgtun: buffer too small (%d < %d)", len(bufs[0]), offset+len(pkt))
+		if kept != i {
+			copy(bufs[kept][offset:], packet)
 		}
-		copy(bufs[0][offset:], pkt)
-		sizes[0] = len(pkt)
-		return 1, nil
-	case <-t.done:
-		return 0, os.ErrClosed
+		sizes[kept] = len(packet)
+		kept++
 	}
+
+	if kept > 0 {
+		var total int64
+		for i := 0; i < kept; i++ {
+			total += int64(sizes[i])
+		}
+		p.tunnel.egressBytes.Add(total)
+	}
+
+	return kept, nil
 }
 
-func (t *chanTUN) Write(bufs [][]byte, offset int) (int, error) {
+// Write is called by WireGuard to deliver decrypted packets to the OS
+// (ingress: WireGuard → OS). We apply ingress packet processing here.
+func (p *processingTUN) Write(bufs [][]byte, offset int) (int, error) {
+	p.ingressMu.Lock()
+	defer p.ingressMu.Unlock()
+
+	var passthrough [][]byte
+	var totalBytes int64
 	for _, buf := range bufs {
 		if len(buf) <= offset {
 			continue
 		}
-		pkt := make([]byte, len(buf)-offset)
-		copy(pkt, buf[offset:])
-		select {
-		case t.out <- pkt:
-		case <-t.done:
-			return 0, os.ErrClosed
+		packet := buf[offset:]
+		if !p.tunnel.ProcessIngressPacket(packet) {
+			continue
 		}
+		passthrough = append(passthrough, buf)
+		totalBytes += int64(len(packet))
 	}
-	return len(bufs), nil
-}
 
-func (t *chanTUN) BatchSize() int           { return 1 }
-func (t *chanTUN) File() *os.File           { return nil }
-func (t *chanTUN) MTU() (int, error)        { return t.mtu, nil }
-func (t *chanTUN) Name() (string, error)    { return "wgtun", nil }
-func (t *chanTUN) Events() <-chan tun.Event { return t.events }
-
-func (t *chanTUN) Close() error {
-	select {
-	case <-t.done:
-
-	default:
-		close(t.done)
+	if len(passthrough) == 0 {
+		return len(bufs), nil
 	}
-	return nil
-}
 
-func (t *chanTUN) writeEgress(pkt []byte) {
-	cp := make([]byte, len(pkt))
-	copy(cp, pkt)
-	select {
-	case t.in <- cp:
-	case <-t.done:
-	default:
+	n, err := p.Device.Write(passthrough, offset)
+	if err == nil {
+		p.tunnel.ingressBytes.Add(totalBytes)
 	}
-}
-
-func (t *chanTUN) readIngress() ([]byte, bool) {
-	select {
-	case pkt, ok := <-t.out:
-		return pkt, ok
-	case <-t.done:
-		return nil, false
-	}
+	return n + (len(bufs) - len(passthrough)), err
 }
 
 func generateWGPrivKey() (string, error) {

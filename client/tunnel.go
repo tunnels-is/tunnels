@@ -1,23 +1,10 @@
 package client
 
 import (
-	"errors"
-	"fmt"
 	"math/rand"
 
 	"github.com/tunnels-is/tunnels/types"
 )
-
-func CreateAndConnectToInterface(t *TUN) (inter *TInterface, err error) {
-	meta := t.meta.Load()
-	inter, err = CreateNewTunnelInterface(meta)
-	if err != nil {
-		ERROR("unable to create tunnel interface: ", err)
-		return nil, errors.New("Unable to create tunnel interface")
-	}
-
-	return
-}
 
 func Disconnect(tunID string, switching bool) (err error) {
 	DEBUG("disconnecting from", tunID, switching)
@@ -61,11 +48,6 @@ func createTunnel() (T *TunnelMETA) {
 	T.Tag = ifAndTag
 	T.IFName = ifAndTag
 	T.EnableDefaultRoute = false
-	T.IPv4Address = "777.777.777.777"
-	T.NetMask = "255.255.255.255"
-	randomPart1 := rand.Intn(0xFFFF)
-	randomPart2 := rand.Intn(0xFFFF)
-	T.IPv6Address = fmt.Sprintf("fd00:%04x:%04x::1", randomPart1, randomPart2)
 
 	T.DNSBlocking = true
 	T.TxQueueLen = 2000
@@ -76,15 +58,12 @@ func createTunnel() (T *TunnelMETA) {
 	T.DNSServers = make([]string, 0)
 	T.DNSRecords = make([]*types.DNSRecord, 0)
 	T.Routes = make([]*types.Route, 0)
-	T.WindowsGUID = CreateConnectionUUID()
 	T.KillSwitch = true
 	return
 }
 
 func createDefaultTunnelMeta(t types.TunnelType) (M *TunnelMETA) {
 	M = createTunnel()
-	M.IPv4Address = "172.22.22.1"
-	M.NetMask = "255.255.255.255"
 	M.ConfigFormat = tunnelFileSuffix
 
 	M.Tag = DefaultTunnelName
@@ -110,7 +89,7 @@ func CleanupOnClose() {
 		tunnel := tun.tunnel.Load()
 		err := tunnel.Disconnect(tun)
 		if err != nil {
-			ERROR("unable to disconnect tunnel", tun.ID, tunnel.IPv4Address, "error:", err)
+			ERROR("unable to disconnect tunnel", tun.ID, "error:", err)
 		}
 		return true
 	})
