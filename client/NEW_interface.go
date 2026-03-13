@@ -19,10 +19,11 @@ func cliPublicConnect(metaTag string) (err error) {
 		DEBUG("No control server found")
 	}
 	code, err := PublicConnect(&ConnectionRequest{
-		Server:    cs,
-		Tag:       metaTag,
-		ServerID:  conf.CLIConfig.ServerID,
-		DeviceKey: conf.CLIConfig.DeviceID,
+		Server:      cs,
+		Tag:         metaTag,
+		ServerID:    conf.CLIConfig.ServerID,
+		DeviceToken: conf.CLIConfig.DeviceToken,
+		UserID:      conf.CLIConfig.UserID,
 	})
 	if err != nil {
 		ERROR("Connecting using cli config failed, code:", code, "err:", err)

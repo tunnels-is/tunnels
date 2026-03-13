@@ -567,6 +567,11 @@ func API_DeviceCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if F.Device == nil || F.Device.Tag == "" {
+		senderr(w, 400, "Invalid device format")
+		return
+	}
+
 	if !isAdminAPIKeyFromContext(r.Context()) {
 		user := getUserFromContext(r.Context())
 		if user == nil {
@@ -575,11 +580,6 @@ func API_DeviceCreate(w http.ResponseWriter, r *http.Request) {
 		}
 
 		F.Device.UserID = user.ID
-	}
-
-	if F.Device == nil || F.Device.Tag == "" {
-		senderr(w, 400, "Invalid device format")
-		return
 	}
 
 	F.Device.ID = primitive.NewObjectID()

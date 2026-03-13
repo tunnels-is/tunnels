@@ -8,6 +8,7 @@ import (
 	"math"
 	"math/rand"
 	"net"
+	neturl "net/url"
 	"runtime"
 	"strings"
 	"sync/atomic"
@@ -269,7 +270,7 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	go tunnel.RecordBandwidth()
 	go func() {
 		defer RecoverAndLog()
-		tunnel.wgDevice.Wait()
+		<-tunnel.wgDevice.Wait()
 		m := tunnel.meta.Load()
 		DEBUG("WireGuard device closed:", m.Tag, tunnel.ID)
 		if tunnel.GetState() >= TUN_Connected {
@@ -292,7 +293,7 @@ type wgServerConfig struct {
 }
 
 func getServerWGConfig(cr *ConnectionRequest, serverID string, pubKey string) (*wgServerConfig, error) {
-	url := cr.Server.GetURL("/client/wg/config") + "?serverID=" + serverID + "&pubKey=" + pubKey
+	url := cr.Server.GetURL("/client/wg/config") + "?serverID=" + serverID + "&pubKey=" + neturl.QueryEscape(pubKey)
 	authHeaders := map[string]string{
 		"X-Device-Token": cr.DeviceToken,
 		"X-UID":          cr.UserID,
