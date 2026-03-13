@@ -262,7 +262,8 @@ func (c *ControlServer) GetURL(path string) string {
 type CLIConfig struct {
 	// Cli specific settings
 	ControlServerID  string
-	DeviceID         string
+	DeviceToken      string
+	UserID           string
 	ServerID         string
 	SendStats        bool
 	PinVersion       bool
