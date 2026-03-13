@@ -1,54 +1,28 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"net"
-	"os"
 	"sort"
 	"sync"
 )
 
 type PeerRecord struct {
-	PubKeyB64 string `json:"PubKeyB64"`
-	IP        string `json:"IP"`
+	PubKeyB64 string
+	IP        string
 }
 
 type PeerStore struct {
 	mu      sync.RWMutex
 	records map[string]PeerRecord
-	path    string
 	subnet  string
 }
 
-func NewPeerStore(path, subnet string) (*PeerStore, error) {
-	ps := &PeerStore{
+func NewPeerStore(subnet string) *PeerStore {
+	return &PeerStore{
 		records: make(map[string]PeerRecord),
-		path:    path,
 		subnet:  subnet,
 	}
-	if err := ps.load(); err != nil && !os.IsNotExist(err) {
-		return nil, fmt.Errorf("load peer store: %w", err)
-	}
-	return ps, nil
-}
-
-func (ps *PeerStore) load() error {
-	data, err := os.ReadFile(ps.path)
-	if err != nil {
-		return err
-	}
-	ps.mu.Lock()
-	defer ps.mu.Unlock()
-	return json.Unmarshal(data, &ps.records)
-}
-
-func (ps *PeerStore) save() error {
-	data, err := json.MarshalIndent(ps.records, "", "  ")
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(ps.path, data, 0600)
 }
 
 func (ps *PeerStore) GetOrAssign(deviceID, pubKeyB64 string) (string, error) {
@@ -56,11 +30,9 @@ func (ps *PeerStore) GetOrAssign(deviceID, pubKeyB64 string) (string, error) {
 	defer ps.mu.Unlock()
 
 	if rec, ok := ps.records[deviceID]; ok {
-
 		if rec.PubKeyB64 != pubKeyB64 {
 			rec.PubKeyB64 = pubKeyB64
 			ps.records[deviceID] = rec
-			_ = ps.save()
 		}
 		return rec.IP, nil
 	}
@@ -70,9 +42,6 @@ func (ps *PeerStore) GetOrAssign(deviceID, pubKeyB64 string) (string, error) {
 		return "", err
 	}
 	ps.records[deviceID] = PeerRecord{PubKeyB64: pubKeyB64, IP: ip}
-	if err := ps.save(); err != nil {
-		return "", fmt.Errorf("persist store: %w", err)
-	}
 	return ip, nil
 }
 
@@ -98,7 +67,6 @@ func (ps *PeerStore) Set(deviceID, ip, pubKeyB64 string) {
 	ps.mu.Lock()
 	defer ps.mu.Unlock()
 	ps.records[deviceID] = PeerRecord{PubKeyB64: pubKeyB64, IP: ip}
-	_ = ps.save()
 }
 
 func (ps *PeerStore) GetAll() map[string]PeerRecord {
