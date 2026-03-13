@@ -66,12 +66,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	var storeErr error
-	peerStore, storeErr = NewPeerStore("peers.json", cfg.WireGuardSubnet)
-	if storeErr != nil {
-		ERR("failed to initialise peer store: ", storeErr)
-		os.Exit(1)
-	}
+	peerStore = NewPeerStore(cfg.WireGuardSubnet)
 
 	activeConfig.Store(cfg)
 	initSyncClient(cfg)
