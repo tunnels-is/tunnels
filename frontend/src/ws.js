@@ -24,11 +24,12 @@ var WS = {
       return "ws://127.0.0.1:7777/" + route;
     }
     let host = window.location.origin;
-    host = host.replace("https://", "http://");
-    host = host.replace("http://", "ws://");
-    host = host.replace("5173", "7777");
-    host = host.replace("5174", "7777");
-    host = host.replace("5175", "7777");
+    // replace dev ports
+    if (STATE.dev) {
+      host = host.replace("5173", "7777");
+      host = host.replace("5174", "7777");
+      host = host.replace("5175", "7777");
+    }
     return host + "/" + route;
   },
   NewSocket: (url, tag, messageHandler) => {

@@ -335,6 +335,7 @@ func API_WGServerConfigGet(w http.ResponseWriter, r *http.Request) {
 		"InternetIface":      cfg.InternetIface,
 		"PacketInspection":   cfg.PacketInspection,
 		"InsecureSkipVerify": cfg.InsecureSkipVerify,
+		"NetworkID":          cfg.NetworkID.Hex(),
 	})
 }
 

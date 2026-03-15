@@ -24,10 +24,14 @@ func printInfo2() {
 	s := STATE.Load()
 	log.Println("")
 	log.Println("=======================================================================")
-	log.Println("======================= HELPFUL INFORMATION ===========================")
+	log.Println("======================= INFORMATION ===================================")
 	log.Println("=======================================================================")
 	log.Println("")
-	log.Printf("APP: https://%s:%s\n", conf.APIIP, conf.APIPort)
+	if EnableTLS {
+		log.Printf("APP: https://%s:%s\n", conf.APIIP, conf.APIPort)
+	} else {
+		log.Printf("APP: http://%s:%s\n", conf.APIIP, conf.APIPort)
+	}
 	log.Println("")
 	log.Println("BASE PATH:", s.BasePath)
 	log.Println("")

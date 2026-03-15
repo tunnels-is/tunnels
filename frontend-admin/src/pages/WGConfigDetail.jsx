@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, Pencil, Save, X, Link } from 'lucide-react';
-import { apiPost } from '../api';
+import { apiPost, apiGet } from '../api';
+import { Copy } from 'lucide-react';
 
 const inputClass = "w-full bg-[#060810] border border-[#1e2433] rounded px-3 py-1.5 text-[13px] text-white placeholder-white/30 focus:outline-none focus:border-[#4B7BF5]/50";
 
@@ -37,14 +38,15 @@ export default function WGConfigDetail() {
 
   const load = async () => {
     const [cfgResp, srvResp, netResp] = await Promise.all([
-      apiPost('/ui/wg/server-config/list', {}),
+      apiGet(`/ui/wg/server-config/get?id=${id}`),
       apiPost('/ui/servers', { StartIndex: 0 }),
       networks.length === 0 ? apiPost('/ui/network/list', { Limit: 50000, Offset: 0 }) : Promise.resolve(null),
     ]);
     if (cfgResp.status === 200) {
-      const list = await cfgResp.json();
-      const found = (Array.isArray(list) ? list : []).find((c) => c._id === id);
-      if (found) setConfig(found);
+      const data = await cfgResp.json();
+      // GET returns ID (not _id); normalize so the rest of the component works
+      if (data.ID) data._id = data.ID;
+      setConfig(data);
     }
     if (srvResp.status === 200) {
       const data = await srvResp.json();
@@ -63,10 +65,13 @@ export default function WGConfigDetail() {
     return networks.find((n) => n._id === nid) || null;
   };
 
+  const copyToClipboard = (text) => {
+    navigator.clipboard.writeText(text).catch(() => {});
+  };
+
   const startEdit = () => {
     setForm({
       Tag: config.Tag || '',
-      AdminAPIKey: config.AdminAPIKey || '',
       WireGuardPort: config.WireGuardPort || 51820,
       NetworkID: config.NetworkID && config.NetworkID !== EMPTY_ID ? config.NetworkID : '',
       WireGuardIface: config.WireGuardIface || '',
@@ -85,7 +90,6 @@ export default function WGConfigDetail() {
       const resp = await apiPost('/ui/wg/server-config/update', {
         ID: id,
         Tag: form.Tag,
-        AdminAPIKey: form.AdminAPIKey,
         WireGuardPort: Number(form.WireGuardPort),
         NetworkID: form.NetworkID || EMPTY_ID,
         WireGuardIface: form.WireGuardIface,
@@ -199,14 +203,37 @@ export default function WGConfigDetail() {
             <span>{config.Tag}</span>
           )}
         </Row>
-        <Row label="Admin API Key">
-          {editing ? (
-            <input className={inputClass} value={form.AdminAPIKey} onChange={set('AdminAPIKey')} placeholder="optional" />
-          ) : (
-            <span className={config.AdminAPIKey ? 'font-mono text-[12px]' : 'text-white/30'}>
-              {config.AdminAPIKey ? '••••••••' : '—'}
+        <Row label="API Key (--key)">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="font-mono text-[12px] text-white/70 truncate flex-1">
+              {config.APIKey || '—'}
             </span>
-          )}
+            {config.APIKey && (
+              <button
+                onClick={() => copyToClipboard(config.APIKey)}
+                className="flex items-center gap-1 px-2 py-0.5 rounded text-[11px] text-white/40 hover:text-white/70 hover:bg-white/[0.05] shrink-0"
+                title="Copy API key"
+              >
+                <Copy className="w-3 h-3" /> Copy
+              </button>
+            )}
+          </div>
+        </Row>
+        <Row label="WG Pub Key">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="font-mono text-[12px] text-white/50 truncate flex-1">
+              {config.WireGuardPubKey || '—'}
+            </span>
+            {config.WireGuardPubKey && (
+              <button
+                onClick={() => copyToClipboard(config.WireGuardPubKey)}
+                className="flex items-center gap-1 px-2 py-0.5 rounded text-[11px] text-white/40 hover:text-white/70 hover:bg-white/[0.05] shrink-0"
+                title="Copy public key"
+              >
+                <Copy className="w-3 h-3" /> Copy
+              </button>
+            )}
+          </div>
         </Row>
         <Row label="Network">
           {editing ? (
