@@ -80,7 +80,7 @@ func AddPeer(pubKeyHex, allowedIP string) error {
 
 func AddPeerWithEndpoint(pubKeyHex, allowedIP, endpoint string) error {
 	conf := fmt.Sprintf(
-		"public_key=%s\nallowed_ip=%s\nendpoint=%s\npersistent_keepalive_interval=25\n\n",
+		"public_key=%s\nallowed_ip=%s\nendpoint=%s\npersistent_keepalive_interval=15\n\n",
 		pubKeyHex, allowedIP, endpoint,
 	)
 	return ipcSet(conf)

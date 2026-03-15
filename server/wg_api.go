@@ -568,6 +568,6 @@ DNS = 1.1.1.1
 PublicKey = %s
 Endpoint = %s:%s
 AllowedIPs = 0.0.0.0/0
-PersistentKeepalive = 25
+PersistentKeepalive = 15
 `, assignedIP, server.WireGuardPubKey, server.IP, server.WireGuardPort)
 }
