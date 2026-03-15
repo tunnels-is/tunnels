@@ -156,13 +156,17 @@ func main() {
 		}
 
 		if *configFlag {
-			seedNetworks()
+			firstNetwork, err := seedNetworks()
+			if err != nil {
+				logger.Error("unable to seed networks", slog.Any("err", err))
+				os.Exit(1)
+			}
 			err = initializeNewServer()
 			if err != nil {
 				logger.Error("unable to create admin user", slog.Any("err", err))
 				os.Exit(1)
 			}
-			err = initializeWGServer()
+			err = initializeWGServer(firstNetwork)
 			if err != nil {
 				logger.Error("unable to initialize WG server", slog.Any("err", err))
 				os.Exit(1)
@@ -496,23 +500,13 @@ func initializeNewServer() error {
 	})
 }
 
-func initializeWGServer() error {
+func initializeWGServer(network *Network) error {
 	cfg := Config.Load()
 	if cfg.WG != nil && cfg.WG.APIKey != "" {
 		return nil
 	}
 
 	internetIface := discoverInternetIface()
-
-	network := &Network{
-		ID:        primitive.NewObjectID(),
-		CIDR:      "10.0.0.0/22",
-		Tag:       "wg-default",
-		CreatedAt: time.Now(),
-	}
-	if err := DB_CreateNetworksBatch([]*Network{network}); err != nil {
-		return fmt.Errorf("create wg network: %w", err)
-	}
 
 	privKey := generateWGPrivKey()
 	pubKey, err := deriveWGPubKey(privKey)

@@ -9,14 +9,20 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-func seedNetworks() {
+func seedNetworks() (*Network, error) {
 	count, err := DB_CountNetworks()
 	if err != nil {
-		ERR(err)
-		return
+		return nil, err
 	}
 	if count > 0 {
-		return
+		existing, err := DB_GetNetworks(1, 0)
+		if err != nil {
+			return nil, err
+		}
+		if len(existing) == 0 {
+			return nil, fmt.Errorf("network count > 0 but no networks found")
+		}
+		return existing[0], nil
 	}
 
 	INFO("Seeding networks: generating /22 subnets from 10.0.0.0/8")
@@ -33,10 +39,10 @@ func seedNetworks() {
 	}
 
 	if err := DB_CreateNetworksBatch(networks); err != nil {
-		ERR(err)
-		return
+		return nil, err
 	}
 	INFO(fmt.Sprintf("Seeded %d networks", len(networks)))
+	return networks[0], nil
 }
 
 func API_NetworkList(w http.ResponseWriter, r *http.Request) {
