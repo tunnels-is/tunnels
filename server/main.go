@@ -26,6 +26,7 @@ import (
 	"github.com/tunnels-is/tunnels/signal"
 	"github.com/tunnels-is/tunnels/types"
 	"github.com/tunnels-is/tunnels/version"
+	wgserver "github.com/tunnels-is/tunnels/wg-server"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"golang.org/x/crypto/bcrypt"
 	"gopkg.in/yaml.v3"
@@ -117,6 +118,7 @@ func main() {
 
 	AUTHEnabled = slices.Contains(config.Features, types.AUTH)
 	BBOLTEnabled = slices.Contains(config.Features, types.BBOLT)
+	WGEnabled := slices.Contains(config.Features, types.WG)
 
 	err = loadCertificatesAndTLSSettings()
 	if err != nil {
@@ -161,6 +163,19 @@ func main() {
 				os.Exit(1)
 			}
 		}
+	}
+
+	if WGEnabled {
+		wgCfg := config.WG
+		if wgCfg == nil {
+			logger.Error("WG feature enabled but no WG config found in config file")
+			os.Exit(1)
+		}
+		ctrlURL := wgCfg.ControllerURL
+		if ctrlURL == "" {
+			ctrlURL = "https://" + config.APIIP + ":" + config.APIPort
+		}
+		go wgserver.Init(ctx, ctrlURL, wgCfg.APIKey, wgCfg.InsecureSkipVerify)
 	}
 
 	go signal.NewSignal("API", ctx, cancel, 1*time.Second, goroutineLogger, launchAPIServer)

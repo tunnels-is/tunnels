@@ -67,6 +67,25 @@ type ServerConfig struct {
 	// Enables multiple key/pairs for API SNI rotation
 	CertPems []string
 	KeyPems  []string
+
+	// WG holds bootstrap config for the wg-server feature.
+	// Only required when the WG feature is enabled.
+	WG *WGBootstrap
+}
+
+// WGBootstrap holds the configuration needed to start the wg-server feature
+// inside the server binary. The wg-server uses these values to fetch its full
+// config from the controller over HTTP, preserving the same auth layer as the
+// standalone wg-server binary.
+type WGBootstrap struct {
+	// APIKey is the per-server API key (from POST /ui/wg/server-config).
+	APIKey string
+	// ControllerURL is the base URL of the controller (e.g. "https://1.2.3.4").
+	// When empty it defaults to https://APIIP:APIPort (i.e. self).
+	ControllerURL string
+	// InsecureSkipVerify disables TLS certificate verification when calling
+	// the controller. Only use this for testing.
+	InsecureSkipVerify bool
 }
 
 type SecretStore string
