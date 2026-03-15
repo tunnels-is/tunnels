@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"log/slog"
+	"net"
 	"os"
 	sig "os/signal"
 	"path/filepath"
@@ -144,8 +145,6 @@ func main() {
 			}
 		}
 
-		go seedNetworks()
-
 		if loadSecret("PayKey") != "" {
 			lemonClient := lemonsqueezy.New(lemonsqueezy.WithAPIKey(loadSecret("PayKey")))
 			if lemonClient == nil {
@@ -157,23 +156,30 @@ func main() {
 		}
 
 		if *configFlag {
+			seedNetworks()
 			err = initializeNewServer()
 			if err != nil {
 				logger.Error("unable to create admin user", slog.Any("err", err))
+				os.Exit(1)
+			}
+			err = initializeWGServer()
+			if err != nil {
+				logger.Error("unable to initialize WG server", slog.Any("err", err))
 				os.Exit(1)
 			}
 		}
 	}
 
 	if WGEnabled {
-		wgCfg := config.WG
-		if wgCfg == nil {
+		latestCfg := Config.Load()
+		wgCfg := latestCfg.WG
+		if wgCfg == nil || wgCfg.APIKey == "" {
 			logger.Error("WG feature enabled but no WG config found in config file")
 			os.Exit(1)
 		}
 		ctrlURL := wgCfg.ControllerURL
 		if ctrlURL == "" {
-			ctrlURL = "https://" + config.APIIP + ":" + config.APIPort
+			ctrlURL = "https://" + latestCfg.APIIP + ":" + latestCfg.APIPort
 		}
 		go wgserver.Init(ctx, ctrlURL, wgCfg.APIKey, wgCfg.InsecureSkipVerify)
 	}
@@ -382,6 +388,7 @@ func makeConfigAndCerts() (err error) {
 				types.AUTH,
 				types.DNS,
 				types.BBOLT,
+				types.WG,
 			},
 			VPNIP:              interfaceIP,
 			APIIP:              interfaceIP,
@@ -400,6 +407,7 @@ func makeConfigAndCerts() (err error) {
 			CertPem:            "./cert.pem",
 			KeyPem:             "./key.pem",
 			SignPem:            "./sign.pem",
+			WG:                 &types.WGBootstrap{InsecureSkipVerify: true},
 		}
 		Config.Store(newConfig)
 		if err := SaveServerConfig(serverConfigPath); err != nil {
@@ -486,4 +494,115 @@ func initializeNewServer() error {
 		Port:    c.APIPort,
 		Groups:  []primitive.ObjectID{},
 	})
+}
+
+func initializeWGServer() error {
+	cfg := Config.Load()
+	if cfg.WG != nil && cfg.WG.APIKey != "" {
+		return nil
+	}
+
+	internetIface := discoverInternetIface()
+
+	network := &Network{
+		ID:        primitive.NewObjectID(),
+		CIDR:      "10.0.0.0/22",
+		Tag:       "wg-default",
+		CreatedAt: time.Now(),
+	}
+	if err := DB_CreateNetworksBatch([]*Network{network}); err != nil {
+		return fmt.Errorf("create wg network: %w", err)
+	}
+
+	privKey := generateWGPrivKey()
+	pubKey, err := deriveWGPubKey(privKey)
+	if err != nil {
+		return fmt.Errorf("derive wg public key: %w", err)
+	}
+
+	wgCfg := &types.WGServerConfig{
+		ID:                 primitive.NewObjectID(),
+		Tag:                "tunnels",
+		APIKey:             uuid.NewString(),
+		WireGuardPort:      51820,
+		WireGuardPrivKey:   privKey,
+		NetworkID:          network.ID,
+		WireGuardIface:     "wg0",
+		InternetIface:      internetIface,
+		InsecureSkipVerify: true,
+	}
+	if err := DB_CreateWGServerConfig(wgCfg); err != nil {
+		return fmt.Errorf("create wg server config: %w", err)
+	}
+
+	network.WGConfigID = wgCfg.ID
+	if err := DB_UpdateNetwork(network); err != nil {
+		return fmt.Errorf("update network: %w", err)
+	}
+
+	servers, err := DB_FindAllServers()
+	if err != nil {
+		return fmt.Errorf("find servers: %w", err)
+	}
+	var defaultServer *types.Server
+	for _, s := range servers {
+		if s.Tag == "tunnels" {
+			defaultServer = s
+			break
+		}
+	}
+	if defaultServer == nil {
+		return fmt.Errorf("default server not found")
+	}
+	if err := DB_SetServerWGConfigID(defaultServer.ID, wgCfg, pubKey, network.CIDR); err != nil {
+		return fmt.Errorf("assign wg config to server: %w", err)
+	}
+
+	cfg.WG = &types.WGBootstrap{
+		APIKey:             wgCfg.APIKey,
+		InsecureSkipVerify: true,
+	}
+	Config.Store(cfg)
+	if err := SaveServerConfig(serverConfigPath); err != nil {
+		return fmt.Errorf("save config: %w", err)
+	}
+
+	logger.Info("WG server initialized",
+		"pubKey", pubKey,
+		"subnet", network.CIDR,
+		"port", wgCfg.WireGuardPort,
+		"iface", wgCfg.WireGuardIface,
+		"internetIface", internetIface,
+	)
+	return nil
+}
+
+func discoverInternetIface() string {
+	ip, err := gateway.DiscoverInterface()
+	if err != nil {
+		return ""
+	}
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		return ""
+	}
+	for _, iface := range ifaces {
+		addrs, err := iface.Addrs()
+		if err != nil {
+			continue
+		}
+		for _, addr := range addrs {
+			var ifaceIP net.IP
+			switch v := addr.(type) {
+			case *net.IPNet:
+				ifaceIP = v.IP
+			case *net.IPAddr:
+				ifaceIP = v.IP
+			}
+			if ifaceIP != nil && ifaceIP.Equal(ip) {
+				return iface.Name
+			}
+		}
+	}
+	return ""
 }
