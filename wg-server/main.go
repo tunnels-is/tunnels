@@ -22,7 +22,7 @@ func main() {
 	sourceInfo := flag.Bool("source", false, "include source file/line in log output")
 	silent := flag.Bool("silent", false, "disable all logging")
 	logLevel := flag.String("logLevel", "debug", "log level: debug, info, warn, error")
-	insecure := flag.Bool("insecure", false, "skip TLS certificate verification")
+	insecure := flag.Bool("insecure", false, "skip TLS certificate verification on the controller unit (ONLY USE THIS FOR TESTING)")
 	flag.Parse()
 
 	initLogging(*silent, *jsonLogs, *sourceInfo, *logLevel)
