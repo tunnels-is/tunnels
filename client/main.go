@@ -2,7 +2,7 @@ package client
 
 import (
 	"context"
-	"log"
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
@@ -10,38 +10,40 @@ import (
 )
 
 func printInfo() {
-	log.Println("")
-	log.Println("")
-	log.Println("==============================================================")
-	log.Println("======================= TUNNELS.IS ===========================")
-	log.Println("==============================================================")
-	log.Println("NOTE: If the app closes without any logs/errors you might need to delete your config and try again")
-	log.Println("")
-}
-
-func printInfo2() {
 	conf := CONFIG.Load()
 	s := STATE.Load()
-	log.Println("")
-	log.Println("=======================================================================")
-	log.Println("======================= INFORMATION ===================================")
-	log.Println("=======================================================================")
-	log.Println("")
+
+	scheme := "http"
 	if EnableTLS {
-		log.Printf("APP: https://%s:%s\n", conf.APIIP, conf.APIPort)
-	} else {
-		log.Printf("APP: http://%s:%s\n", conf.APIIP, conf.APIPort)
+		scheme = "https"
 	}
-	log.Println("")
-	log.Println("BASE PATH:", s.BasePath)
-	log.Println("")
-	log.Println("- Tunnels request network admin permissions to run.")
-	log.Println("- Remember to configure your DNS servers if you want to prevent DNS leaks.")
-	log.Println("- Remember to turn all logging off if you are concerned about privacy.")
-	log.Println("- There is a --basePath flag that can let you reconfigure the base directory for logs and configs, the default location is where you placed tunnels.")
-	log.Println("")
-	log.Println("=======================================================================")
-	log.Println("=======================================================================")
+
+	fmt.Printf(
+		"\n"+
+			"\033[1;34m  █████████ ███   ███ ███    ███ ███    ███ ████████ ███      ████████\n"+
+			"     ███    ███   ███ ████   ███ ████   ███ ███      ███      ███     \n"+
+			"     ███    ███   ███ ███ █  ███ ███ █  ███ ██████   ███      ████████\n"+
+			"     ███    ███   ███ ███  █ ███ ███  █ ███ ███      ███           ███\n"+
+			"     ███    ███   ███ ███   ████ ███   ████ ███      ███           ███\n"+
+			"     ███     ███████  ███    ███ ███    ███ ████████ ████████ ████████\033[0m\n"+
+			"                                                            tunnels.is\n"+
+			"\n"+
+			"\033[34m  ──────────────────────────────────────────────────────────────\033[0m\n"+
+			"\n"+
+			"  \033[1m🌐\033[0m  APP        %s://%s:%s\n"+
+			"  \033[1m📁\033[0m  BASE PATH  %s\n"+
+			"\n"+
+			"\033[34m  ──────────────────────────────────────────────────────────────\033[0m\n"+
+			"\n"+
+			"  ·  requires network admin permissions\n"+
+			"  ·  configure dns servers to prevent leaks\n"+
+			"  ·  turn logging off for improved privacy\n"+
+			"  ·  use --basePath to change the config directory\n"+
+			"\n"+
+			"  \033[33m⚠\033[0m  if the app closes without logs, delete your config and retry\n"+
+			"\n",
+		scheme, conf.APIIP, conf.APIPort, s.BasePath,
+	)
 }
 
 func InitService() error {
@@ -104,7 +106,6 @@ func InitService() error {
 	AdminCheck()
 
 	printInfo()
-	printInfo2()
 
 	if !conf.DisableDNS {
 		InitDNSHandler()

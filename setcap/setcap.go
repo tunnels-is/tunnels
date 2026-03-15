@@ -40,8 +40,13 @@ func CheckCapabilities() (err error) {
 		return
 	}
 
-	fmt.Println("Tunnels needs access to manage network capabilities, this access does NOT include root/sudo access to the system")
-	fmt.Println("Enter Password: ")
+	fmt.Print("\n" +
+		"\033[1;34m╔══════════════════════════════════════════════════════════╗\n" +
+		"║              Network Permissions Required                ║\n" +
+		"╚══════════════════════════════════════════════════════════╝\033[0m\n" +
+		"\n  Tunnels needs capabilities to manage network interfaces.\n" +
+		"  This does NOT grant root/sudo access to the system.\n\n" +
+		"  🔑 Password: ")
 
 	bytePassword, err := term.ReadPassword(syscall.Stdin)
 	if err == nil {
@@ -52,11 +57,9 @@ func CheckCapabilities() (err error) {
 		err = cmd.Run()
 		_ = exec.Command("sudo", "-kK")
 		if err != nil {
-			fmt.Println("")
-			fmt.Println("Unable to setcap: ", err)
-			fmt.Println("")
-			fmt.Println("RUN: `sudo setcap 'cap_net_raw,cap_net_bind_service,cap_net_admin+eip' [BINARY]` in order to give it permissions to change and manage networks")
-			fmt.Println("")
+			fmt.Printf("\n\033[1;31m  ✗  Unable to set capabilities: %s\033[0m\n\n"+
+				"  To grant permissions manually, run:\n"+
+				"  \033[1;34m→\033[0m  sudo setcap 'cap_net_raw,cap_net_bind_service,cap_net_admin+eip' [BINARY]\n\n", err)
 		} else {
 			// Reload binary after applying set cap
 			argv0, _ := exec.LookPath(os.Args[0])
