@@ -3,8 +3,8 @@ package wgserver
 import (
 	"context"
 	"log/slog"
-	"os"
 	"sync/atomic"
+	"time"
 )
 
 var (
@@ -21,11 +21,18 @@ func Init(ctx context.Context, controllerURL, apiKey string, insecureSkipVerify 
 	INFO("fetching config from controller at ", controllerURL)
 
 	var cfg *Config
-	var err error
-	cfg, err = FetchConfig(controllerURL, apiKey, insecureSkipVerify)
-	if err != nil {
+	for {
+		var err error
+		cfg, err = FetchConfig(controllerURL, apiKey, insecureSkipVerify)
+		if err == nil {
+			break
+		}
 		INFO("failed to fetch config from controller: ", err, " (retrying in 5s)")
-		os.Exit(1)
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(5 * time.Second):
+		}
 	}
 
 	INFO("config fetched, serverID=", cfg.ServerID,
