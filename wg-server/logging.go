@@ -1,4 +1,4 @@
-package main
+package wgserver
 
 import (
 	"fmt"
@@ -8,6 +8,10 @@ import (
 )
 
 var logger *slog.Logger
+
+func init() {
+	logger = slog.Default()
+}
 
 func LOG(x ...any)  { logger.Info("INFO", "msg", buildOut(x)) }
 func INFO(x ...any) { logger.Info("INFO", "msg", buildOut(x)) }
