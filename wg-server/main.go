@@ -1,12 +1,10 @@
-package main
+package wgserver
 
 import (
-	"flag"
-	"fmt"
+	"context"
+	"log/slog"
 	"os"
-	ossig "os/signal"
 	"sync/atomic"
-	"syscall"
 )
 
 var (
@@ -14,74 +12,47 @@ var (
 	activeConfig atomic.Pointer[Config]
 )
 
-func main() {
-	apiKey := flag.String("key", "", "per-server API key (from POST /ui/wg/server-config)")
-	controllerIP := flag.String("ip", "", "controller IP address (e.g. 74.63.223.157)")
-	showVersion := flag.Bool("version", false, "show version and exit")
-	jsonLogs := flag.Bool("json", false, "enable JSON-format logging")
-	sourceInfo := flag.Bool("source", false, "include source file/line in log output")
-	silent := flag.Bool("silent", false, "disable all logging")
-	logLevel := flag.String("logLevel", "debug", "log level: debug, info, warn, error")
-	insecure := flag.Bool("insecure", false, "skip TLS certificate verification on the controller unit (ONLY USE THIS FOR TESTING)")
-	flag.Parse()
-
-	initLogging(*silent, *jsonLogs, *sourceInfo, *logLevel)
-
-	if *showVersion {
-		fmt.Println("wg-server v0.1.0")
-		os.Exit(0)
-	}
-
-	if *apiKey == "" {
-		ERR("--key is required (per-server API key from the controller)")
-		os.Exit(1)
-	}
-	if *controllerIP == "" {
-		ERR("--ip is required (controller IP address)")
-		os.Exit(1)
-	}
-
-	controllerURL := "https://" + *controllerIP
+// Init starts the wg-server feature. It fetches config from the controller
+// (retrying until successful or ctx is cancelled), sets up WireGuard and
+// networking, then blocks until ctx is done before cleaning up.
+func Init(ctx context.Context, controllerURL, apiKey string, insecureSkipVerify bool) {
+	logger = slog.Default()
 
 	INFO("fetching config from controller at ", controllerURL)
-	cfg, err := FetchConfig(controllerURL, *apiKey, *insecure)
+
+	var cfg *Config
+	var err error
+	cfg, err = FetchConfig(controllerURL, apiKey, insecureSkipVerify)
 	if err != nil {
-		ERR("failed to fetch config from controller: ", err)
+		INFO("failed to fetch config from controller: ", err, " (retrying in 5s)")
 		os.Exit(1)
 	}
-	cfg.LogJSON = *jsonLogs
-	cfg.Silent = *silent
-	cfg.LogLevel = *logLevel
 
-	INFO("config fetched from controller, serverID=", cfg.ServerID,
+	INFO("config fetched, serverID=", cfg.ServerID,
 		" subnet=", cfg.WireGuardSubnet, " iface=", cfg.WireGuardIface)
 
 	if err := setupWireGuard(cfg); err != nil {
 		ERR("wireguard setup failed: ", err)
-		os.Exit(1)
+		return
 	}
 
 	if err := setupNet(cfg); err != nil {
 		ERR("network setup failed: ", err)
-		os.Exit(1)
+		return
 	}
 
 	peerStore = NewPeerStore(cfg.WireGuardSubnet)
-
 	activeConfig.Store(cfg)
 	initSyncClient(cfg)
 
 	INFO("wg-server started")
 
-	sigCh := make(chan os.Signal, 1)
-	ossig.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
-	<-sigCh
+	<-ctx.Done()
 
-	INFO("shutting down...")
-
+	INFO("wg-server shutting down...")
 	if wgDevice != nil {
 		wgDevice.Close()
 	}
 	cleanupNet(cfg)
-	INFO("shutdown complete")
+	INFO("wg-server shutdown complete")
 }
