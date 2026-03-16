@@ -501,6 +501,39 @@ func API_DeviceDelete(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(200)
 }
 
+func API_ClientDeviceDelete(w http.ResponseWriter, r *http.Request) {
+	defer BasicRecover()
+	F := new(types.FORM_GET_DEVICE)
+	if err := decodeBody(r, F); err != nil {
+		senderr(w, 400, "Invalid request body", slog.Any("error", err))
+		return
+	}
+
+	user := getUserFromContext(r.Context())
+	if user == nil {
+		senderr(w, 401, "Unauthorized")
+		return
+	}
+
+	device, err := DB_FindDeviceByID(F.DeviceID)
+	if err != nil || device == nil {
+		senderr(w, 404, "Device not found")
+		return
+	}
+
+	if device.UserID != user.ID {
+		senderr(w, 401, "You are not allowed to delete this device")
+		return
+	}
+
+	if err := DB_DeleteDeviceByID(F.DeviceID); err != nil {
+		senderr(w, 500, "Unknown error, please try again in a moment")
+		return
+	}
+
+	w.WriteHeader(200)
+}
+
 func API_DeviceList(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 	F := new(FORM_LIST_DEVICE)

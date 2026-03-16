@@ -48,6 +48,7 @@ func launchAPIServer() {
 		mux.Handle("/client/user/2fa/confirm", clientMW(API_UserTwoFactorConfirm))
 		mux.Handle("/client/device/list/user", clientMW(API_DeviceListUser))
 		mux.Handle("/client/device/create", clientMW(API_DeviceCreate))
+		mux.Handle("/client/device/delete", clientMW(API_ClientDeviceDelete))
 		mux.Handle("/client/device", clientMW(API_DeviceGet))
 		mux.Handle("/client/servers", clientMW(API_ServersForUser))
 		mux.Handle("/client/server", clientMW(API_ServerGet))

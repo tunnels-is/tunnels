@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import GLOBAL_STATE from "../state";
 import dayjs from "dayjs";
-import { Monitor, Plus, X } from "lucide-react";
+import { Monitor, Network, Plus, Trash2, X } from "lucide-react";
 import QRCode from "react-qr-code";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -88,6 +88,15 @@ const UserDevices = () => {
     setTag("");
     setSelectedServerID("");
     loadDevices();
+  };
+
+  const handleDelete = (device) => {
+    state.ConfirmAndExecute("error", null, null, "Delete Device", `Delete "${device.Tag}"? This cannot be undone.`, async () => {
+      const result = await state.callController(null, "POST", "/client/device/delete", { DeviceID: device._id }, false, true);
+      if (result === true) {
+        setDevices((prev) => prev.filter((d) => d._id !== device._id));
+      }
+    });
   };
 
   // Build a set of WireGuard IPs from local tunnel configs to identify this machine's device.
@@ -185,45 +194,65 @@ const UserDevices = () => {
         </div>
       )}
 
-      <div className="flex items-center gap-4 pl-3 border-l-2 border-transparent mb-1">
-        <span className="text-[10px] text-white/40 uppercase tracking-wider w-40 shrink-0">Tag</span>
-        <span className="text-[10px] text-white/40 uppercase tracking-wider flex-1 min-w-0">WireGuard IP</span>
-        <span className="text-[10px] text-white/40 uppercase tracking-wider shrink-0 w-40 text-right">Created</span>
-      </div>
+      {devices.length > 0 ? (
+        <div className="grid gap-3" style={{gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))"}}>
 
-      <div className="space-y-px">
-        {devices.length > 0 ? devices.map((d) => {
-          const isCurrent = d.WireGuardIP && localIPs.has(d.WireGuardIP);
-          return (
-            <div
-              key={d._id}
-              className={`flex items-center gap-4 py-1.5 pl-3 border-l-2 transition-colors ${
-                isCurrent
-                  ? "border-emerald-500/50 hover:border-emerald-500/80"
-                  : "border-[#4B7BF5]/20 hover:border-[#4B7BF5]/50"
-              }`}
-            >
-              <div className="flex items-center gap-2 w-40 shrink-0">
-                <Monitor className={`w-3.5 h-3.5 shrink-0 ${isCurrent ? "text-emerald-500/70" : "text-[#4B7BF5]/60"}`} />
-                <span className="text-[13px] text-white/80 font-medium truncate">{d.Tag}</span>
-                {isCurrent && (
-                  <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded shrink-0">this device</span>
-                )}
+          {devices.map((d) => {
+            const isCurrent = d.WireGuardIP && localIPs.has(d.WireGuardIP);
+            return (
+              <div
+                key={d._id}
+                className={`relative flex flex-col gap-3 rounded-lg bg-[#0a0d14]/80 border p-4 transition-colors ${
+                  isCurrent
+                    ? "border-emerald-500/30 hover:border-emerald-500/60"
+                    : "border-[#1e2433] hover:border-[#4B7BF5]/40"
+                }`}
+              >
+                {/* delete button — top-right corner */}
+                <button
+                  className="absolute top-3 right-3 p-1 text-red-500/30 hover:text-red-400 transition-colors"
+                  onClick={() => handleDelete(d)}
+                  aria-label={`Delete device ${d.Tag}`}
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+
+                {/* top row: icon + tag + badge */}
+                <div className="flex items-center gap-2 pr-6 min-w-0">
+                  <Monitor
+                    className={`w-4 h-4 shrink-0 ${isCurrent ? "text-emerald-500/70" : "text-[#4B7BF5]/60"}`}
+                  />
+                  <span className="text-[13px] text-white/80 font-medium truncate flex-1 min-w-0">
+                    {d.Tag}
+                  </span>
+                  {isCurrent && (
+                    <span className="shrink-0 text-[10px] text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
+                      this device
+                    </span>
+                  )}
+                </div>
+
+                {/* middle row: WireGuard IP */}
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <Network className="w-3 h-3 shrink-0 text-white/20" />
+                  <span className="text-[12px] text-white/50 font-mono truncate">
+                    {d.WireGuardIP || "—"}
+                  </span>
+                </div>
+
+                {/* bottom row: created date */}
+                <div className="text-[11px] text-white/30 tabular-nums">
+                  {d.CreatedAt ? dayjs(d.CreatedAt).format("HH:mm:ss DD-MM-YYYY") : "—"}
+                </div>
               </div>
-              <span className="text-[12px] text-white/50 font-mono flex-1 min-w-0 truncate">
-                {d.WireGuardIP || "—"}
-              </span>
-              <span className="text-[11px] text-white/40 tabular-nums shrink-0 w-40 text-right">
-                {d.CreatedAt ? dayjs(d.CreatedAt).format("HH:mm:ss DD-MM-YYYY") : "—"}
-              </span>
-            </div>
-          );
-        }) : (
-          <div className="py-6 pl-3 border-l-2 border-white/[0.04] text-[12px] text-white/40">
-            No devices found
-          </div>
-        )}
-      </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="rounded-lg bg-[#0a0d14]/80 border border-[#1e2433] p-8 flex items-center justify-center">
+          <span className="text-[12px] text-white/30">No devices found</span>
+        </div>
+      )}
     </div>
   );
 };
