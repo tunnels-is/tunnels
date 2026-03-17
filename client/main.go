@@ -18,29 +18,37 @@ func printInfo() {
 		scheme = "https"
 	}
 
-	fmt.Printf(
+	blue := "\033[1;34m"
+	dim := "\033[34m"
+	bold := "\033[1m"
+	warn := "\033[33m"
+	reset := "\033[0m"
+	divider := dim + "  ────────────────────────────────────────────" + reset + "\n"
+
+	fmt.Printf("\n"+
+		blue+
+		"   _____ _____ _____ _____ _____ __    _____\n"+
+		"  |_   _|  |  |   | |   | |   __|  |  |   __|\n"+
+		"    | | |  |  | | | | | | |   __|  |__|__   |\n"+
+		"    |_| |_____|_|___|_|___|_____|_____|_____|\n"+
+		reset+
+		"                                    tunnels.is\n"+
 		"\n"+
-			"\033[1;34m  ________                         ______       \n"+
-			"  ___  __/___  _______________________  /_______\n"+
-			"  __  /  _  / / /_  __ \\_  __ \\  _ \\_  /__  ___/\n"+
-			"  _  /   / /_/ /_  / / /  / / /  __/  / _(__  ) \n"+
-			"  /_/    \\__,_/ /_/ /_//_/ /_/\\___//_/  /____/\033[0m  \n"+
-			"                                       tunnels.is\n"+
-			"\n"+
-			"\033[34m  ──────────────────────────────────────────────────────────────\033[0m\n"+
-			"\n"+
-			"  \033[1m🌐\033[0m  APP        %s://%s:%s\n"+
-			"  \033[1m📁\033[0m  BASE PATH  %s\n"+
-			"\n"+
-			"\033[34m  ──────────────────────────────────────────────────────────────\033[0m\n"+
-			"\n"+
-			"  ·  requires network admin permissions\n"+
-			"  ·  configure dns servers to prevent leaks\n"+
-			"  ·  turn logging off for improved privacy\n"+
-			"  ·  use --basePath to change the config directory\n"+
-			"\n"+
-			"  \033[33m⚠\033[0m  if the app closes without logs, delete your config and retry\n"+
-			"\n",
+		divider+
+		"\n"+
+		"  "+bold+"🌐"+reset+"  APP        %s://%s:%s\n"+
+		"  "+bold+"📁"+reset+"  BASE PATH  %s\n"+
+		"\n"+
+		divider+
+		"\n"+
+		"  ·  requires network admin permissions\n"+
+		"  ·  configure dns servers to prevent leaks\n"+
+		"  ·  turn logging off for improved privacy\n"+
+		"  ·  use --basePath to change the config directory\n"+
+		"\n"+
+		"  "+warn+"⚠"+reset+"  if the app closes without logs,\n"+
+		"     delete your config and retry\n"+
+		"\n",
 		scheme, conf.APIIP, conf.APIPort, s.BasePath,
 	)
 }
