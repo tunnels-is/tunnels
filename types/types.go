@@ -4,7 +4,7 @@ import (
 	"net"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"github.com/google/uuid"
 )
 
 type Feature string
@@ -95,79 +95,79 @@ const (
 )
 
 type Device struct {
-	ID        primitive.ObjectID   `json:"_id" bson:"_id"`
-	CreatedAt time.Time            `json:"CreatedAt" bson:"CreatedAt"`
-	Tag       string               `json:"Tag" bson:"Tag"`
-	Groups    []primitive.ObjectID `json:"Groups" bson:"Groups"`
+	ID        uuid.UUID   `json:"_id"`
+	CreatedAt time.Time   `json:"CreatedAt"`
+	Tag       string      `json:"Tag"`
+	Groups    []uuid.UUID `json:"Groups"`
 
 	// UserID is the ID of the user who owns this device.
-	UserID primitive.ObjectID `json:"UserID,omitempty" bson:"UserID"`
+	UserID uuid.UUID `json:"UserID,omitempty"`
 
 	// ServerID links the device to its WireGuard server for subnet-based IP assignment.
-	ServerID primitive.ObjectID `json:"ServerID,omitempty" bson:"ServerID"`
+	ServerID uuid.UUID `json:"ServerID,omitempty"`
 
 	// WireGuardKey is the client's Curve25519 public key (base64).
-	WireGuardKey string `json:"WireGuardKey,omitempty" bson:"WireGuardKey"`
+	WireGuardKey string `json:"WireGuardKey,omitempty"`
 
 	// WireGuardIP is the IP assigned to this device within the server's WireGuard subnet.
 	// Assigned at device creation time by the controller.
-	WireGuardIP string `json:"WireGuardIP,omitempty" bson:"WireGuardIP"`
+	WireGuardIP string `json:"WireGuardIP,omitempty"`
 }
 
 type FORM_GET_SERVER struct {
-	DeviceToken string             `json:"DeviceToken"`
-	DeviceKey   string             `json:"DeviceKey"`
-	UID         primitive.ObjectID `json:"UID"`
-	ServerID    primitive.ObjectID `json:"ServerID"`
+	DeviceToken string    `json:"DeviceToken"`
+	DeviceKey   string    `json:"DeviceKey"`
+	UID         uuid.UUID `json:"UID"`
+	ServerID    uuid.UUID `json:"ServerID"`
 }
 
 type Server struct {
-	ID      primitive.ObjectID   `json:"_id" bson:"_id"`
-	Tag     string               `json:"Tag" bson:"Tag"`
-	Country string               `json:"Country" bson:"Country"`
-	IP      string               `json:"IP" bson:"IP"`
-	Port    string               `json:"Port" bson:"Port"`
-	Groups  []primitive.ObjectID `json:"Groups,omitempty" bson:"Groups"`
+	ID      uuid.UUID   `json:"_id"`
+	Tag     string      `json:"Tag"`
+	Country string      `json:"Country"`
+	IP      string      `json:"IP"`
+	Port    string      `json:"Port"`
+	Groups  []uuid.UUID `json:"Groups,omitempty"`
 
 	// WGConfigID links this server to its WGServerConfig record.
-	WGConfigID primitive.ObjectID `json:"WGConfigID,omitempty" bson:"WGConfigID"`
+	WGConfigID uuid.UUID `json:"WGConfigID,omitempty"`
 
 	// Cached fields — source of truth is WGServerConfig; refreshed on assign/fetch.
-	WireGuardPort   string `json:"WireGuardPort,omitempty" bson:"WireGuardPort"`
-	WireGuardPubKey string `json:"WireGuardPubKey,omitempty" bson:"WireGuardPubKey"`
-	WireGuardSubnet string `json:"WireGuardSubnet,omitempty" bson:"WireGuardSubnet"`
+	WireGuardPort   string `json:"WireGuardPort,omitempty"`
+	WireGuardPubKey string `json:"WireGuardPubKey,omitempty"`
+	WireGuardSubnet string `json:"WireGuardSubnet,omitempty"`
 }
 
 // WGServerConfig holds all operational configuration for a wg-server instance.
 // It is stored in the controller DB and fetched by the wg-server at boot using
 // its per-server APIKey.
 type WGServerConfig struct {
-	ID  primitive.ObjectID `json:"_id" bson:"_id"`
-	Tag string             `json:"Tag" bson:"Tag"`
+	ID  uuid.UUID `json:"_id"`
+	Tag string    `json:"Tag"`
 
 	// APIKey is the per-server secret; wg-server sends this in X-WG-KEY to
 	// authenticate /wg/server-config/fetch, /wg/peers, and /wg/servers.
-	APIKey string `json:"APIKey" bson:"APIKey"`
+	APIKey string `json:"APIKey"`
 
-	WireGuardPort    int    `json:"WireGuardPort" bson:"WireGuardPort"`
-	WireGuardPrivKey string `json:"WireGuardPrivKey" bson:"WireGuardPrivKey"`
-	WireGuardIface   string `json:"WireGuardIface" bson:"WireGuardIface"`
+	WireGuardPort    int    `json:"WireGuardPort"`
+	WireGuardPrivKey string `json:"WireGuardPrivKey"`
+	WireGuardIface   string `json:"WireGuardIface"`
 
 	// NetworkID references the Network record whose CIDR is the WireGuard subnet.
 	// The subnet is resolved at runtime — it is not stored on this struct.
-	NetworkID primitive.ObjectID `json:"NetworkID,omitempty" bson:"NetworkID,omitempty"`
+	NetworkID uuid.UUID `json:"NetworkID,omitempty"`
 
-	InternetIface string `json:"InternetIface" bson:"InternetIface"`
+	InternetIface string `json:"InternetIface"`
 
-	PacketInspection   bool `json:"PacketInspection" bson:"PacketInspection"`
-	InsecureSkipVerify bool `json:"InsecureSkipVerify" bson:"InsecureSkipVerify"`
+	PacketInspection   bool `json:"PacketInspection"`
+	InsecureSkipVerify bool `json:"InsecureSkipVerify"`
 }
 
 // WGServerConfigResponse is returned by GET /wg/server-config/fetch to the
 // wg-server. It includes the private key and all operational parameters needed
 // to bring up the WireGuard interface.
 type WGServerConfigResponse struct {
-	// ServerID is the hex ObjectID of the Server record linked to this config.
+	// ServerID is the UUID of the Server record linked to this config.
 	ServerID string `json:"ServerID"`
 
 	WireGuardPort    int    `json:"WireGuardPort"`
@@ -201,19 +201,19 @@ type Route struct {
 }
 
 type Network struct {
-	Tag     string `json:"Tag" bson:"Tag"`
-	Network string `json:"Network" bson:"Network"`
-	Nat     string `json:"Nat" bson:"Nat"`
+	Tag     string `json:"Tag"`
+	Network string `json:"Network"`
+	Nat     string `json:"Nat"`
 
 	NetIPNet *net.IPNet `json:"-"`
 	NatIPNet *net.IPNet `json:"-"`
 }
 
 type DNSRecord struct {
-	Domain   string   `json:"Domain" bson:"Domain"`
-	Wildcard bool     `json:"Wildcard" bson:"Wildcard"`
-	IP       []string `json:"IP" bson:"IP"`
-	TXT      []string `json:"TXT" bson:"TXT"`
+	Domain   string   `json:"Domain"`
+	Wildcard bool     `json:"Wildcard"`
+	IP       []string `json:"IP"`
+	TXT      []string `json:"TXT"`
 }
 
 type ServerConnectResponse struct {
@@ -230,9 +230,8 @@ type ServerConnectResponse struct {
 	WireGuardPort   string `json:"WireGuardPort,omitempty"`
 }
 
-
 type FORM_GET_DEVICE struct {
-	DeviceID primitive.ObjectID
+	DeviceID uuid.UUID
 }
 
 // WireGuard types
@@ -246,4 +245,3 @@ type WGPeer struct {
 type WGPeersResponse struct {
 	Peers []WGPeer `json:"Peers"`
 }
-

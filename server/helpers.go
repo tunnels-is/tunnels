@@ -13,7 +13,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/xlzd/gotp"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 func BasicRecover() {
@@ -147,10 +146,10 @@ func validateUserTwoFactor(user *User, LF *LOGIN_FORM) (err error) {
 	return nil
 }
 
-func authenticateUserFromEmailOrIDAndToken(email string, id primitive.ObjectID, token string) (user *User, err error) {
+func authenticateUserFromEmailOrIDAndToken(email string, id uuid.UUID, token string) (user *User, err error) {
 	if email != "" {
 		user, err = DB_findUserByEmail(email)
-	} else if id != primitive.NilObjectID {
+	} else if id != uuid.Nil {
 		user, err = DB_findUserByID(id)
 	} else {
 		return nil, errors.New("user identifier missing")

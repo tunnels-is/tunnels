@@ -12,18 +12,18 @@ import (
 	"time"
 
 	gobolt "go.etcd.io/bbolt"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"github.com/google/uuid"
 	"golang.org/x/crypto/curve25519"
 )
 
 // Minimal server shape — matches types.Server JSON tags exactly.
 type serverRecord struct {
-	ID              primitive.ObjectID   `json:"_id"`
-	Tag             string               `json:"Tag"`
-	Country         string               `json:"Country"`
-	IP              string               `json:"IP"`
-	Port            string               `json:"Port"`
-	Groups          []primitive.ObjectID `json:"Groups"`
+	ID              uuid.UUID   `json:"_id"`
+	Tag             string      `json:"Tag"`
+	Country         string      `json:"Country"`
+	IP              string      `json:"IP"`
+	Port            string      `json:"Port"`
+	Groups          []uuid.UUID `json:"Groups"`
 	WireGuardPort   string               `json:"WireGuardPort,omitempty"`
 	WireGuardPubKey string               `json:"WireGuardPubKey,omitempty"`
 	WGBaseURL       string               `json:"WGBaseURL,omitempty"`

@@ -18,7 +18,6 @@ import (
 	"github.com/miekg/dns"
 	"github.com/tunnels-is/tunnels/types"
 	"github.com/xlzd/gotp"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	wgconn "golang.zx2c4.com/wireguard/conn"
 	wgdevice "golang.zx2c4.com/wireguard/device"
 	wgtun "golang.zx2c4.com/wireguard/tun"
@@ -313,7 +312,7 @@ func getServerWGConfig(cr *ConnectionRequest, serverID string, pubKey string) (*
 }
 
 func GetDeviceByID(server *ControlServer, deviceID string) (d *types.Device, err error) {
-	DID, _ := primitive.ObjectIDFromHex(deviceID)
+	DID, _ := uuid.Parse(deviceID)
 
 	FR := &FORWARD_REQUEST{
 		Server:  server,
@@ -458,7 +457,7 @@ func CreateDeviceWithKeys(form *CreateDeviceWithKeysForm) (any, int) {
 		return &ErrorResponse{Error: "failed to derive WireGuard public key: " + err.Error()}, 500
 	}
 
-	serverOID, err := primitive.ObjectIDFromHex(form.ServerID)
+	serverOID, err := uuid.Parse(form.ServerID)
 	if err != nil {
 		return &ErrorResponse{Error: "invalid ServerID: " + err.Error()}, 400
 	}

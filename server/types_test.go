@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"github.com/google/uuid"
 )
 
 func TestUser_ToMinifiedUser(t *testing.T) {
@@ -16,7 +16,7 @@ func TestUser_ToMinifiedUser(t *testing.T) {
 		{
 			name: "standard user with all fields",
 			user: &User{
-				ID:        primitive.NewObjectID(),
+				ID:        uuid.New(),
 				Email:     "test@example.com",
 				Disabled:  false,
 				IsAdmin:   true,
@@ -32,7 +32,7 @@ func TestUser_ToMinifiedUser(t *testing.T) {
 		{
 			name: "disabled user",
 			user: &User{
-				ID:        primitive.NewObjectID(),
+				ID:        uuid.New(),
 				Email:     "disabled@example.com",
 				Disabled:  true,
 				IsAdmin:   false,
@@ -48,7 +48,7 @@ func TestUser_ToMinifiedUser(t *testing.T) {
 		{
 			name: "manager user",
 			user: &User{
-				ID:        primitive.NewObjectID(),
+				ID:        uuid.New(),
 				Email:     "manager@example.com",
 				Disabled:  false,
 				IsAdmin:   false,
@@ -64,7 +64,7 @@ func TestUser_ToMinifiedUser(t *testing.T) {
 		{
 			name: "admin and manager",
 			user: &User{
-				ID:        primitive.NewObjectID(),
+				ID:        uuid.New(),
 				Email:     "superuser@example.com",
 				Disabled:  false,
 				IsAdmin:   true,
@@ -80,7 +80,7 @@ func TestUser_ToMinifiedUser(t *testing.T) {
 		{
 			name: "user with empty email",
 			user: &User{
-				ID:        primitive.NewObjectID(),
+				ID:        uuid.New(),
 				Email:     "",
 				Disabled:  false,
 				IsAdmin:   false,
@@ -99,8 +99,8 @@ func TestUser_ToMinifiedUser(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			result := tc.user.ToMinifiedUser()
 
-			if result.ID != tc.user.ID.Hex() {
-				t.Errorf("ToMinifiedUser().ID = %q, expected %q", result.ID, tc.user.ID.Hex())
+			if result.ID != tc.user.ID.String() {
+				t.Errorf("ToMinifiedUser().ID = %q, expected %q", result.ID, tc.user.ID.String())
 			}
 
 			if result.Email != tc.expected.Email {
@@ -124,7 +124,7 @@ func TestUser_ToMinifiedUser(t *testing.T) {
 func TestUser_ToMinifiedUser_DoesNotIncludeSensitiveData(t *testing.T) {
 
 	user := &User{
-		ID:            primitive.NewObjectID(),
+		ID:            uuid.New(),
 		Email:         "test@example.com",
 		Password:      "hashed-password-should-not-be-in-minified",
 		ConfirmCode:   "secret-confirm-code",
@@ -142,7 +142,7 @@ func TestUser_ToMinifiedUser_DoesNotIncludeSensitiveData(t *testing.T) {
 		t.Errorf("Email should be included in minified user")
 	}
 
-	if minified.ID != user.ID.Hex() {
+	if minified.ID != user.ID.String() {
 		t.Errorf("ID should be included in minified user")
 	}
 
@@ -158,7 +158,7 @@ func TestUser_RemoveSensitiveInformation(t *testing.T) {
 		{
 			name: "user with key containing dashes",
 			user: &User{
-				ID:            primitive.NewObjectID(),
+				ID:            uuid.New(),
 				Email:         "test@example.com",
 				Password:      "hashed-password",
 				Password2:     "password2",
@@ -176,7 +176,7 @@ func TestUser_RemoveSensitiveInformation(t *testing.T) {
 		{
 			name: "user with key without dashes",
 			user: &User{
-				ID:            primitive.NewObjectID(),
+				ID:            uuid.New(),
 				Email:         "test2@example.com",
 				Password:      "password",
 				Password2:     "password2",
@@ -194,7 +194,7 @@ func TestUser_RemoveSensitiveInformation(t *testing.T) {
 		{
 			name: "user with empty key",
 			user: &User{
-				ID:            primitive.NewObjectID(),
+				ID:            uuid.New(),
 				Email:         "test3@example.com",
 				Password:      "password",
 				Password2:     "password2",
@@ -212,7 +212,7 @@ func TestUser_RemoveSensitiveInformation(t *testing.T) {
 		{
 			name: "user without license key",
 			user: &User{
-				ID:            primitive.NewObjectID(),
+				ID:            uuid.New(),
 				Email:         "test4@example.com",
 				Password:      "password",
 				Password2:     "password2",
@@ -226,7 +226,7 @@ func TestUser_RemoveSensitiveInformation(t *testing.T) {
 		{
 			name: "user with key containing single dash",
 			user: &User{
-				ID:            primitive.NewObjectID(),
+				ID:            uuid.New(),
 				Email:         "test5@example.com",
 				Password:      "password",
 				Password2:     "password2",
@@ -244,7 +244,7 @@ func TestUser_RemoveSensitiveInformation(t *testing.T) {
 		{
 			name: "user with key containing multiple dashes",
 			user: &User{
-				ID:            primitive.NewObjectID(),
+				ID:            uuid.New(),
 				Email:         "test6@example.com",
 				Password:      "password",
 				Password2:     "password2",
@@ -295,7 +295,7 @@ func TestUser_RemoveSensitiveInformation(t *testing.T) {
 }
 
 func TestUser_RemoveSensitiveInformation_PreservesNonSensitiveData(t *testing.T) {
-	originalID := primitive.NewObjectID()
+	originalID := uuid.New()
 	originalEmail := "preserve@example.com"
 	originalDisabled := true
 	originalIsAdmin := true

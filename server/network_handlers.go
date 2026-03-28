@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"github.com/google/uuid"
 )
 
 func seedNetworks() (*Network, error) {
@@ -31,7 +31,7 @@ func seedNetworks() (*Network, error) {
 	for x := 0; x < 256; x++ {
 		for y := 0; y < 256; y += 4 {
 			networks = append(networks, &Network{
-				ID:        primitive.NewObjectID(),
+				ID:        uuid.New(),
 				CIDR:      fmt.Sprintf("10.%d.%d.0/22", x, y),
 				CreatedAt: now,
 			})

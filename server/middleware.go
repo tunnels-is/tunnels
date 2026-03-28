@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"github.com/google/uuid"
 )
 
 type contextKey string
@@ -55,7 +55,7 @@ func adminUIMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		uid, err := primitive.ObjectIDFromHex(parts[0])
+		uid, err := uuid.Parse(parts[0])
 		if err != nil {
 			senderr(w, 401, "Invalid session")
 			return
@@ -93,10 +93,10 @@ func clientAuthMiddleware(next http.Handler) http.Handler {
 		email := r.Header.Get("X-Email")
 		uidStr := r.Header.Get("X-UID")
 
-		var parsedUID primitive.ObjectID
+		var parsedUID uuid.UUID
 		if uidStr != "" {
 			var err error
-			parsedUID, err = primitive.ObjectIDFromHex(uidStr)
+			parsedUID, err = uuid.Parse(uidStr)
 			if err != nil {
 				senderr(w, 401, "Invalid X-UID header")
 				return

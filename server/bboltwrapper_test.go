@@ -3,7 +3,7 @@ package main
 import (
 	"testing"
 
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"github.com/google/uuid"
 )
 
 func Test_contains(t *testing.T) {
@@ -169,204 +169,169 @@ func Test_removeString(t *testing.T) {
 	}
 }
 
-func Test_objectIDToString(t *testing.T) {
-
-	testOID := primitive.NewObjectID()
+func Test_uuidToString(t *testing.T) {
+	id := uuid.New()
 
 	tests := []struct {
 		name     string
-		input    interface{}
+		input    uuid.UUID
 		expected string
 	}{
 		{
-			name:     "ObjectID type",
-			input:    testOID,
-			expected: testOID.Hex(),
+			name:     "standard UUID",
+			input:    id,
+			expected: id.String(),
 		},
 		{
-			name:     "string type",
-			input:    "already-a-string",
-			expected: "already-a-string",
-		},
-		{
-			name:     "byte array [12]byte",
-			input:    testOID,
-			expected: testOID.Hex(),
-		},
-		{
-			name:     "empty string",
-			input:    "",
-			expected: "",
-		},
-		{
-			name:     "number falls back to fmt.Sprintf",
-			input:    12345,
-			expected: "12345",
-		},
-		{
-			name:     "nil value",
-			input:    nil,
-			expected: "<nil>",
+			name:     "nil UUID",
+			input:    uuid.Nil,
+			expected: "00000000-0000-0000-0000-000000000000",
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			result := objectIDToString(tc.input)
+			result := tc.input.String()
 			if result != tc.expected {
-				t.Errorf("objectIDToString(%v) = %q, expected %q", tc.input, result, tc.expected)
+				t.Errorf("uuid.UUID.String() = %q, expected %q", result, tc.expected)
 			}
-			t.Logf("objectIDToString(%T) = %q ✓", tc.input, result)
+			t.Logf("uuid.UUID.String() = %q ✓", result)
 		})
 	}
 }
 
-func Test_objectIDSliceToString(t *testing.T) {
-
-	oid1 := primitive.NewObjectID()
-	oid2 := primitive.NewObjectID()
-	oid3 := primitive.NewObjectID()
+func Test_uuidSliceToString(t *testing.T) {
+	id1 := uuid.New()
+	id2 := uuid.New()
+	id3 := uuid.New()
 
 	tests := []struct {
 		name     string
-		input    interface{}
+		input    []uuid.UUID
 		expected []string
 	}{
 		{
-			name:     "ObjectID slice",
-			input:    []primitive.ObjectID{oid1, oid2, oid3},
-			expected: []string{oid1.Hex(), oid2.Hex(), oid3.Hex()},
+			name:     "three UUIDs",
+			input:    []uuid.UUID{id1, id2, id3},
+			expected: []string{id1.String(), id2.String(), id3.String()},
 		},
 		{
-			name:     "string slice - passthrough",
-			input:    []string{"str1", "str2", "str3"},
-			expected: []string{"str1", "str2", "str3"},
-		},
-		{
-			name:     "empty ObjectID slice",
-			input:    []primitive.ObjectID{},
-			expected: nil,
-		},
-		{
-			name:     "empty string slice",
-			input:    []string{},
+			name:     "empty slice",
+			input:    []uuid.UUID{},
 			expected: []string{},
 		},
 		{
-			name:     "single ObjectID",
-			input:    []primitive.ObjectID{oid1},
-			expected: []string{oid1.Hex()},
+			name:     "single UUID",
+			input:    []uuid.UUID{id1},
+			expected: []string{id1.String()},
 		},
 		{
-			name:     "single string",
-			input:    []string{"single"},
-			expected: []string{"single"},
+			name:     "nil UUID in slice",
+			input:    []uuid.UUID{uuid.Nil},
+			expected: []string{"00000000-0000-0000-0000-000000000000"},
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			result := objectIDSliceToString(tc.input)
+			result := uuidSliceToString(tc.input)
 
 			if len(result) != len(tc.expected) {
-				t.Errorf("objectIDSliceToString length mismatch: got %d, expected %d", len(result), len(tc.expected))
+				t.Errorf("uuidSliceToString length mismatch: got %d, expected %d", len(result), len(tc.expected))
 			}
 
 			for i := range result {
 				if i >= len(tc.expected) || result[i] != tc.expected[i] {
-					t.Errorf("objectIDSliceToString(%T) mismatch at index %d: got %q, expected %q",
-						tc.input, i, result[i], tc.expected[i])
+					t.Errorf("uuidSliceToString mismatch at index %d: got %q, expected %q",
+						i, result[i], tc.expected[i])
 				}
 			}
 
-			t.Logf("objectIDSliceToString(%T) -> %d strings ✓", tc.input, len(result))
+			t.Logf("uuidSliceToString(%d UUIDs) -> %d strings ✓", len(tc.input), len(result))
 		})
 	}
 }
 
-func Test_stringSliceToObjectID(t *testing.T) {
-
-	oid1 := primitive.NewObjectID()
-	oid2 := primitive.NewObjectID()
-	oid3 := primitive.NewObjectID()
+func Test_stringSliceToUUID(t *testing.T) {
+	id1 := uuid.New()
+	id2 := uuid.New()
+	id3 := uuid.New()
 
 	tests := []struct {
 		name          string
 		input         []string
 		expectedCount int
-		validate      func([]primitive.ObjectID) bool
+		validate      func([]uuid.UUID) bool
 	}{
 		{
-			name:          "valid hex strings",
-			input:         []string{oid1.Hex(), oid2.Hex(), oid3.Hex()},
+			name:          "valid UUID strings",
+			input:         []string{id1.String(), id2.String(), id3.String()},
 			expectedCount: 3,
-			validate: func(result []primitive.ObjectID) bool {
-				return result[0] == oid1 && result[1] == oid2 && result[2] == oid3
+			validate: func(result []uuid.UUID) bool {
+				return result[0] == id1 && result[1] == id2 && result[2] == id3
 			},
 		},
 		{
-			name:          "single valid hex string",
-			input:         []string{oid1.Hex()},
+			name:          "single valid UUID string",
+			input:         []string{id1.String()},
 			expectedCount: 1,
-			validate: func(result []primitive.ObjectID) bool {
-				return result[0] == oid1
+			validate: func(result []uuid.UUID) bool {
+				return result[0] == id1
 			},
 		},
 		{
-			name:          "invalid hex string - skipped",
-			input:         []string{"invalid-hex"},
+			name:          "invalid string - skipped",
+			input:         []string{"not-a-uuid"},
 			expectedCount: 0,
-			validate:      func(result []primitive.ObjectID) bool { return len(result) == 0 },
+			validate:      func(result []uuid.UUID) bool { return len(result) == 0 },
 		},
 		{
 			name:          "mixed valid and invalid",
-			input:         []string{oid1.Hex(), "invalid", oid2.Hex()},
+			input:         []string{id1.String(), "invalid", id2.String()},
 			expectedCount: 2,
-			validate: func(result []primitive.ObjectID) bool {
-				return len(result) == 2 && result[0] == oid1 && result[1] == oid2
+			validate: func(result []uuid.UUID) bool {
+				return len(result) == 2 && result[0] == id1 && result[1] == id2
 			},
 		},
 		{
 			name:          "empty slice",
 			input:         []string{},
 			expectedCount: 0,
-			validate:      func(result []primitive.ObjectID) bool { return len(result) == 0 },
+			validate:      func(result []uuid.UUID) bool { return len(result) == 0 },
 		},
 		{
 			name:          "empty strings - skipped",
 			input:         []string{"", "", ""},
 			expectedCount: 0,
-			validate:      func(result []primitive.ObjectID) bool { return len(result) == 0 },
+			validate:      func(result []uuid.UUID) bool { return len(result) == 0 },
 		},
 		{
-			name:          "wrong length hex string - skipped",
+			name:          "short hex string - skipped",
 			input:         []string{"abc123"},
 			expectedCount: 0,
-			validate:      func(result []primitive.ObjectID) bool { return len(result) == 0 },
+			validate:      func(result []uuid.UUID) bool { return len(result) == 0 },
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			result := stringSliceToObjectID(tc.input)
+			result := stringSliceToUUID(tc.input)
 
 			if len(result) != tc.expectedCount {
-				t.Errorf("stringSliceToObjectID length mismatch: got %d, expected %d", len(result), tc.expectedCount)
+				t.Errorf("stringSliceToUUID length mismatch: got %d, expected %d", len(result), tc.expectedCount)
 			}
 
 			if tc.validate != nil && !tc.validate(result) {
-				t.Errorf("stringSliceToObjectID validation failed for input %v", tc.input)
+				t.Errorf("stringSliceToUUID validation failed for input %v", tc.input)
 			}
 
-			t.Logf("stringSliceToObjectID(%d strings) -> %d ObjectIDs ✓", len(tc.input), len(result))
+			t.Logf("stringSliceToUUID(%d strings) -> %d UUIDs ✓", len(tc.input), len(result))
 		})
 	}
 }
 
-func Test_stringSliceToObjectID_HexFormats(t *testing.T) {
-
-	oid := primitive.NewObjectID()
-	validHex := oid.Hex()
+func Test_stringSliceToUUID_Formats(t *testing.T) {
+	validUUID := uuid.New().String()
 
 	tests := []struct {
 		name          string
@@ -374,45 +339,50 @@ func Test_stringSliceToObjectID_HexFormats(t *testing.T) {
 		shouldConvert bool
 	}{
 		{
-			name:          "valid 24 char hex",
-			input:         validHex,
+			name:          "valid UUID with hyphens",
+			input:         validUUID,
 			shouldConvert: true,
 		},
 		{
-			name:          "uppercase hex",
-			input:         "507F1F77BCFB6A8D69098765",
+			name:          "valid UUID uppercase",
+			input:         "550E8400-E29B-41D4-A716-446655440000",
 			shouldConvert: true,
 		},
 		{
-			name:          "lowercase hex",
-			input:         "507f1f77bcfb6a8d69098765",
+			name:          "valid UUID lowercase",
+			input:         "550e8400-e29b-41d4-a716-446655440000",
 			shouldConvert: true,
 		},
 		{
-			name:          "mixed case hex",
-			input:         "507F1f77BcFb6A8d69098765",
+			name:          "valid - missing hyphens (raw hex accepted by uuid.Parse)",
+			input:         "550e8400e29b41d4a716446655440000",
 			shouldConvert: true,
 		},
 		{
-			name:          "invalid char 'G'",
-			input:         "507G1F77BCFB6A8D69098765",
+			name:          "invalid - too short",
+			input:         "550e8400-e29b-41d4-a716",
 			shouldConvert: false,
 		},
 		{
-			name:          "too short",
-			input:         "507F1F77BCFB6A8D6909876",
+			name:          "invalid - too long",
+			input:         "550e8400-e29b-41d4-a716-4466554400001",
 			shouldConvert: false,
 		},
 		{
-			name:          "too long",
-			input:         "507F1F77BCFB6A8D690987650",
+			name:          "invalid - random string",
+			input:         "not-a-uuid-at-all",
+			shouldConvert: false,
+		},
+		{
+			name:          "invalid - empty string",
+			input:         "",
 			shouldConvert: false,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			result := stringSliceToObjectID([]string{tc.input})
+			result := stringSliceToUUID([]string{tc.input})
 
 			if tc.shouldConvert {
 				if len(result) != 1 {
@@ -424,7 +394,7 @@ func Test_stringSliceToObjectID_HexFormats(t *testing.T) {
 				}
 			}
 
-			t.Logf("Hex format %q: shouldConvert=%v, got %d results ✓", tc.input, tc.shouldConvert, len(result))
+			t.Logf("UUID format %q: shouldConvert=%v, got %d results ✓", tc.input, tc.shouldConvert, len(result))
 		})
 	}
 }

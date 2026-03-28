@@ -190,9 +190,9 @@ type QR_CODE struct {
 }
 
 type DEVICE_TOKEN struct {
-	DT      string    `bson:"DT"`
-	N       string    `bson:"N"`
-	Created time.Time `bson:"C"`
+	DT      string    `json:"DT"`
+	N       string    `json:"N"`
+	Created time.Time `json:"C"`
 }
 
 type DelUserForm struct {
