@@ -3,12 +3,12 @@ package main
 import (
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/tunnels-is/tunnels/types"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-func DB_DeleteDeviceByID(id primitive.ObjectID) (err error) {
-	return BBolt_DeleteDeviceByID(objectIDToString(id))
+func DB_DeleteDeviceByID(id uuid.UUID) (err error) {
+	return BBolt_DeleteDeviceByID(id.String())
 }
 
 func DB_UpdateDevice(D *types.Device) (err error) {
@@ -19,7 +19,7 @@ func DB_GetDevices(limit, offset int64) (DL []*types.Device, err error) {
 	return BBolt_GetDevices(limit, offset)
 }
 
-func DB_GetDevicesByUserID(userID primitive.ObjectID) (DL []*types.Device, err error) {
+func DB_GetDevicesByUserID(userID uuid.UUID) (DL []*types.Device, err error) {
 	return BBolt_GetDevicesByUserID(userID)
 }
 
@@ -31,8 +31,8 @@ func DB_findUserByAPIKey(Key string) (USER *User, err error) {
 	return BBolt_findUserByAPIKey(Key)
 }
 
-func DB_findUserByID(UID primitive.ObjectID) (USER *User, err error) {
-	return BBolt_findUserByID(objectIDToString(UID))
+func DB_findUserByID(UID uuid.UUID) (USER *User, err error) {
+	return BBolt_findUserByID(UID.String())
 }
 
 func DB_CreateUser(U *User) (err error) {
@@ -75,12 +75,12 @@ func DB_FindServersWithoutGroups(limit, offset int64) (DL []*types.Server, err e
 	return BBolt_FindServersWithoutGroups(limit, offset)
 }
 
-func DB_FindServersByGroups(groups []primitive.ObjectID, limit, offset int64) (DL []*types.Server, err error) {
-	return BBolt_FindServersByGroups(objectIDSliceToString(groups), limit, offset)
+func DB_FindServersByGroups(groups []uuid.UUID, limit, offset int64) (DL []*types.Server, err error) {
+	return BBolt_FindServersByGroups(uuidSliceToString(groups), limit, offset)
 }
 
-func DB_FindEntitiesByGroupID(id primitive.ObjectID, objType string, limit, offset int64) (IL []any, err error) {
-	return BBolt_FindEntitiesByGroupID(objectIDToString(id), objType, limit, offset)
+func DB_FindEntitiesByGroupID(id uuid.UUID, objType string, limit, offset int64) (IL []any, err error) {
+	return BBolt_FindEntitiesByGroupID(id.String(), objType, limit, offset)
 }
 
 func DB_UpdateGroup(G *Group) (err error) {
@@ -103,44 +103,44 @@ func DB_CreateServer(S *types.Server) (err error) {
 	return BBolt_CreateServer(S)
 }
 
-func DB_SetServerWGSubnet(id primitive.ObjectID, subnet string) error {
-	return BBolt_SetServerWGSubnet(objectIDToString(id), subnet)
+func DB_SetServerWGSubnet(id uuid.UUID, subnet string) error {
+	return BBolt_SetServerWGSubnet(id.String(), subnet)
 }
 
 func DB_FindAllServers() ([]*types.Server, error) {
 	return BBolt_FindAllServers()
 }
 
-func DB_FindServerByID(ID primitive.ObjectID) (S *types.Server, err error) {
-	return BBolt_FindServerByID(objectIDToString(ID))
+func DB_FindServerByID(ID uuid.UUID) (S *types.Server, err error) {
+	return BBolt_FindServerByID(ID.String())
 }
 
 func DB_WipeUserConfirmCode(UF *USER_ENABLE_QUERY) (err error) {
 	return BBolt_WipeUserConfirmCode(UF)
 }
 
-func DB_UserActivateKey(SubExpiration time.Time, Key *LicenseKey, userID primitive.ObjectID) (err error) {
-	return BBolt_UserActivateKey(SubExpiration, Key, objectIDToString(userID))
+func DB_UserActivateKey(SubExpiration time.Time, Key *LicenseKey, userID uuid.UUID) (err error) {
+	return BBolt_UserActivateKey(SubExpiration, Key, userID.String())
 }
 
-func DB_AddToGroup(groupID primitive.ObjectID, typeID primitive.ObjectID, objType string) (err error) {
-	return BBolt_AddToGroup(objectIDToString(groupID), objectIDToString(typeID), objType)
+func DB_AddToGroup(groupID uuid.UUID, typeID uuid.UUID, objType string) (err error) {
+	return BBolt_AddToGroup(groupID.String(), typeID.String(), objType)
 }
 
-func DB_RemoveFromGroup(groupID primitive.ObjectID, typeID primitive.ObjectID, objType string) (err error) {
-	return BBolt_RemoveFromGroup(objectIDToString(groupID), objectIDToString(typeID), objType)
+func DB_RemoveFromGroup(groupID uuid.UUID, typeID uuid.UUID, objType string) (err error) {
+	return BBolt_RemoveFromGroup(groupID.String(), typeID.String(), objType)
 }
 
-func DB_FindDeviceByID(id primitive.ObjectID) (dev *types.Device, err error) {
-	return BBolt_FindDeviceByID(objectIDToString(id))
+func DB_FindDeviceByID(id uuid.UUID) (dev *types.Device, err error) {
+	return BBolt_FindDeviceByID(id.String())
 }
 
-func DB_findGroupByID(id primitive.ObjectID) (G *Group, err error) {
-	return BBolt_findGroupByID(objectIDToString(id))
+func DB_findGroupByID(id uuid.UUID) (G *Group, err error) {
+	return BBolt_findGroupByID(id.String())
 }
 
-func DB_DeleteGroupByID(id primitive.ObjectID) (err error) {
-	return BBolt_DeleteGroupByID(objectIDToString(id))
+func DB_DeleteGroupByID(id uuid.UUID) (err error) {
+	return BBolt_DeleteGroupByID(id.String())
 }
 
 func DB_findGroups() (gl []*Group, err error) {
@@ -151,8 +151,8 @@ func DB_CreateWGServerConfig(cfg *types.WGServerConfig) error {
 	return BBolt_CreateWGServerConfig(cfg)
 }
 
-func DB_FindWGServerConfigByID(id primitive.ObjectID) (*types.WGServerConfig, error) {
-	return BBolt_FindWGServerConfigByID(objectIDToString(id))
+func DB_FindWGServerConfigByID(id uuid.UUID) (*types.WGServerConfig, error) {
+	return BBolt_FindWGServerConfigByID(id.String())
 }
 
 func DB_FindWGServerConfigByAPIKey(apiKey string) (*types.WGServerConfig, error) {
@@ -175,7 +175,7 @@ func DB_GetNetworks(limit, offset int64) ([]*Network, error) {
 	return BBolt_GetNetworks(limit, offset)
 }
 
-func DB_FindNetworkByID(id primitive.ObjectID) (*Network, error) {
+func DB_FindNetworkByID(id uuid.UUID) (*Network, error) {
 	return BBolt_FindNetworkByID(id)
 }
 
@@ -187,6 +187,6 @@ func DB_ListWGServerConfigs() ([]*types.WGServerConfig, error) {
 	return BBolt_ListWGServerConfigs()
 }
 
-func DB_SetServerWGConfigID(serverID primitive.ObjectID, wgCfg *types.WGServerConfig, pubKey, subnet string) error {
-	return BBolt_SetServerWGConfigID(objectIDToString(serverID), wgCfg, pubKey, subnet)
+func DB_SetServerWGConfigID(serverID uuid.UUID, wgCfg *types.WGServerConfig, pubKey, subnet string) error {
+	return BBolt_SetServerWGConfigID(serverID.String(), wgCfg, pubKey, subnet)
 }

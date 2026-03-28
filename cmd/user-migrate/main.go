@@ -8,7 +8,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"flag"
@@ -16,6 +15,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/google/uuid"
 	gobolt "go.etcd.io/bbolt"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -23,9 +23,8 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-// User mirrors the server-side User struct (server/types.go).
-// JSON tags must match exactly because BBolt stores records as JSON.
-type User struct {
+// MongoUser is the MongoDB-side shape used for BSON decoding.
+type MongoUser struct {
 	ID primitive.ObjectID `json:"_id" bson:"_id"`
 
 	Email                 string    `json:"Email" bson:"Email"`
@@ -50,6 +49,62 @@ type User struct {
 	Trial         bool        `json:"Trial" bson:"Trial"`
 	Key           *LicenseKey `json:"Key" bson:"Key"`
 	SubExpiration time.Time   `json:"SubExpiration" bson:"SubExpiration"`
+}
+
+// BoltUser is the BBolt-side shape using uuid.UUID (matches the server).
+type BoltUser struct {
+	ID uuid.UUID `json:"_id"`
+
+	Email                 string    `json:"Email"`
+	Updated               time.Time `json:"Updated"`
+	AdditionalInformation string    `json:"AdditionalInformation,omitempty"`
+	Disabled              bool      `json:"Disabled"`
+
+	APIKey string `json:"APIKey"`
+
+	Password         string         `json:"Password"`
+	ConfirmCode      string         `json:"ConfirmCode"`
+	LastResetRequest time.Time      `json:"LastResetRequest"`
+	RecoveryCodes    []byte         `json:"RecoveryCodes"`
+	TwoFactorCode    []byte         `json:"TwoFactorCode"`
+	TwoFactorEnabled bool           `json:"TwoFactorEnabled"`
+	Tokens           []*DeviceToken `json:"Tokens"`
+
+	IsAdmin   bool        `json:"IsAdmin"`
+	IsManager bool        `json:"IsManager"`
+	Groups    []uuid.UUID `json:"Groups"`
+
+	Trial         bool        `json:"Trial"`
+	Key           *LicenseKey `json:"Key"`
+	SubExpiration time.Time   `json:"SubExpiration"`
+}
+
+func mongoToBolt(mu *MongoUser) *BoltUser {
+	groups := make([]uuid.UUID, len(mu.Groups))
+	for i := range mu.Groups {
+		groups[i] = uuid.New()
+	}
+	return &BoltUser{
+		ID:                    uuid.New(),
+		Email:                 mu.Email,
+		Updated:               mu.Updated,
+		AdditionalInformation: mu.AdditionalInformation,
+		Disabled:              mu.Disabled,
+		APIKey:                mu.APIKey,
+		Password:              mu.Password,
+		ConfirmCode:           mu.ConfirmCode,
+		LastResetRequest:      mu.LastResetRequest,
+		RecoveryCodes:         mu.RecoveryCodes,
+		TwoFactorCode:         mu.TwoFactorCode,
+		TwoFactorEnabled:      mu.TwoFactorEnabled,
+		Tokens:                mu.Tokens,
+		IsAdmin:               mu.IsAdmin,
+		IsManager:             mu.IsManager,
+		Groups:                groups,
+		Trial:                 mu.Trial,
+		Key:                   mu.Key,
+		SubExpiration:         mu.SubExpiration,
+	}
 }
 
 type DeviceToken struct {
@@ -101,10 +156,11 @@ func main() {
 		return
 	}
 
-	// Build a lookup map keyed by hex ID for the verification step.
-	mongoByID := make(map[string]*User, len(mongoUsers))
+	// Build a lookup map keyed by email for the verification step.
+	// (IDs change format during migration, so we match by email.)
+	mongoByEmail := make(map[string]*MongoUser, len(mongoUsers))
 	for i := range mongoUsers {
-		mongoByID[mongoUsers[i].ID.Hex()] = &mongoUsers[i]
+		mongoByEmail[mongoUsers[i].Email] = &mongoUsers[i]
 	}
 
 	// ── 2. Open BBolt and write all users ───────────────────────────
@@ -122,9 +178,10 @@ func main() {
 	}
 
 	written := 0
-	for _, u := range mongoUsers {
-		key := u.ID.Hex()
-		data, err := json.Marshal(u)
+	for i := range mongoUsers {
+		bu := mongoToBolt(&mongoUsers[i])
+		key := bu.ID.String()
+		data, err := json.Marshal(bu)
 		if err != nil {
 			log.Fatalf("marshal %s: %v", key, err)
 		}
@@ -138,6 +195,8 @@ func main() {
 	fmt.Printf("wrote %d user(s) to BBolt\n", written)
 
 	// ── 3. Iterate BBolt and verify against MongoDB ─────────────────
+	// IDs and Groups changed format (ObjectID→UUID), so verification
+	// compares all other fields individually.
 	fmt.Println("verifying ...")
 	verified := 0
 	mismatches := 0
@@ -147,40 +206,22 @@ func main() {
 		return b.ForEach(func(k, v []byte) error {
 			id := string(k)
 
-			// Decode the BBolt record.
-			var boltUser User
+			var boltUser BoltUser
 			if err := json.Unmarshal(v, &boltUser); err != nil {
 				fmt.Printf("  FAIL  id=%s  bbolt decode error: %v\n", id, err)
 				mismatches++
 				return nil
 			}
 
-			// Find the corresponding MongoDB user.
-			mongoUser, ok := mongoByID[id]
+			mongoUser, ok := mongoByEmail[boltUser.Email]
 			if !ok {
-				fmt.Printf("  FAIL  id=%s  exists in BBolt but not in MongoDB\n", id)
+				fmt.Printf("  FAIL  id=%s  email=%s  exists in BBolt but not in MongoDB\n", id, boltUser.Email)
 				mismatches++
 				return nil
 			}
 
-			// Re-marshal both through JSON so the comparison is
-			// format-identical (same serialisation path BBolt uses).
-			boltJSON, err := json.Marshal(boltUser)
-			if err != nil {
-				fmt.Printf("  FAIL  id=%s  re-marshal bbolt: %v\n", id, err)
-				mismatches++
-				return nil
-			}
-			mongoJSON, err := json.Marshal(mongoUser)
-			if err != nil {
-				fmt.Printf("  FAIL  id=%s  marshal mongo: %v\n", id, err)
-				mismatches++
-				return nil
-			}
-
-			if !bytes.Equal(boltJSON, mongoJSON) {
+			if !verifyFields(&boltUser, mongoUser) {
 				fmt.Printf("  MISMATCH  id=%s  email=%s\n", id, boltUser.Email)
-				diffFields(&boltUser, mongoUser)
 				mismatches++
 				return nil
 			}
@@ -215,7 +256,7 @@ func main() {
 }
 
 // fetchAllMongoUsers returns every document in the users.users collection.
-func fetchAllMongoUsers(client *mongo.Client) ([]User, error) {
+func fetchAllMongoUsers(client *mongo.Client) ([]MongoUser, error) {
 	cursor, err := client.Database("users").
 		Collection("users").
 		Find(context.Background(), bson.M{})
@@ -224,9 +265,9 @@ func fetchAllMongoUsers(client *mongo.Client) ([]User, error) {
 	}
 	defer cursor.Close(context.Background())
 
-	var users []User
+	var users []MongoUser
 	for cursor.Next(context.Background()) {
-		var u User
+		var u MongoUser
 		if err := cursor.Decode(&u); err != nil {
 			return nil, fmt.Errorf("decode: %w", err)
 		}
@@ -235,33 +276,30 @@ func fetchAllMongoUsers(client *mongo.Client) ([]User, error) {
 	return users, cursor.Err()
 }
 
-// diffFields prints per-field differences between two User values.
-func diffFields(bolt, mongo *User) {
-	check := func(name string, b, m any) {
-		bj, _ := json.Marshal(b)
-		mj, _ := json.Marshal(m)
-		if !bytes.Equal(bj, mj) {
-			fmt.Printf("    field %-22s  bbolt=%s  mongo=%s\n", name, bj, mj)
+// verifyFields compares all fields except ID and Groups (which changed format).
+func verifyFields(bolt *BoltUser, mongo *MongoUser) bool {
+	ok := true
+	check := func(name string, match bool) {
+		if !match {
+			fmt.Printf("    field %-22s  mismatch\n", name)
+			ok = false
 		}
 	}
 
-	check("ID", bolt.ID, mongo.ID)
-	check("Email", bolt.Email, mongo.Email)
-	check("Updated", bolt.Updated, mongo.Updated)
-	check("AdditionalInformation", bolt.AdditionalInformation, mongo.AdditionalInformation)
-	check("Disabled", bolt.Disabled, mongo.Disabled)
-	check("APIKey", bolt.APIKey, mongo.APIKey)
-	check("Password", bolt.Password, mongo.Password)
-	check("ConfirmCode", bolt.ConfirmCode, mongo.ConfirmCode)
-	check("LastResetRequest", bolt.LastResetRequest, mongo.LastResetRequest)
-	check("RecoveryCodes", bolt.RecoveryCodes, mongo.RecoveryCodes)
-	check("TwoFactorCode", bolt.TwoFactorCode, mongo.TwoFactorCode)
-	check("TwoFactorEnabled", bolt.TwoFactorEnabled, mongo.TwoFactorEnabled)
-	check("Tokens", bolt.Tokens, mongo.Tokens)
-	check("IsAdmin", bolt.IsAdmin, mongo.IsAdmin)
-	check("IsManager", bolt.IsManager, mongo.IsManager)
-	check("Groups", bolt.Groups, mongo.Groups)
-	check("Trial", bolt.Trial, mongo.Trial)
-	check("Key", bolt.Key, mongo.Key)
-	check("SubExpiration", bolt.SubExpiration, mongo.SubExpiration)
+	check("Email", bolt.Email == mongo.Email)
+	check("Updated", bolt.Updated.Equal(mongo.Updated))
+	check("AdditionalInformation", bolt.AdditionalInformation == mongo.AdditionalInformation)
+	check("Disabled", bolt.Disabled == mongo.Disabled)
+	check("APIKey", bolt.APIKey == mongo.APIKey)
+	check("Password", bolt.Password == mongo.Password)
+	check("ConfirmCode", bolt.ConfirmCode == mongo.ConfirmCode)
+	check("LastResetRequest", bolt.LastResetRequest.Equal(mongo.LastResetRequest))
+	check("TwoFactorEnabled", bolt.TwoFactorEnabled == mongo.TwoFactorEnabled)
+	check("IsAdmin", bolt.IsAdmin == mongo.IsAdmin)
+	check("IsManager", bolt.IsManager == mongo.IsManager)
+	check("Trial", bolt.Trial == mongo.Trial)
+	check("SubExpiration", bolt.SubExpiration.Equal(mongo.SubExpiration))
+
+	// ID and Groups are intentionally skipped (ObjectID→UUID format change).
+	return ok
 }

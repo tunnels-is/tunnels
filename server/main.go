@@ -28,7 +28,6 @@ import (
 	"github.com/tunnels-is/tunnels/types"
 	"github.com/tunnels-is/tunnels/version"
 	wgserver "github.com/tunnels-is/tunnels/wg-server"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"golang.org/x/crypto/bcrypt"
 	"gopkg.in/yaml.v3"
 )
@@ -458,7 +457,7 @@ func initializeNewServer() error {
 	}
 
 	newUser := new(User)
-	newUser.ID = primitive.NewObjectID()
+	newUser.ID = uuid.New()
 	newUser.Password = string(hash)
 	newUser.IsAdmin = true
 	newUser.IsManager = true
@@ -469,7 +468,7 @@ func initializeNewServer() error {
 	newUser.APIKey = uuid.NewString()
 	newUser.Updated = time.Now()
 	newUser.SubExpiration = time.Now().AddDate(100, 0, 0)
-	newUser.Groups = make([]primitive.ObjectID, 0)
+	newUser.Groups = make([]uuid.UUID, 0)
 	newUser.Tokens = make([]*DeviceToken, 0)
 	err = DB_CreateUser(newUser)
 	if err != nil {
@@ -480,12 +479,12 @@ func initializeNewServer() error {
 
 	c := Config.Load()
 	return DB_CreateServer(&types.Server{
-		ID:      primitive.NewObjectID(),
+		ID:      uuid.New(),
 		Tag:     "tunnels",
 		Country: "tunnels",
 		IP:      c.VPNIP,
 		Port:    c.APIPort,
-		Groups:  []primitive.ObjectID{},
+		Groups:  []uuid.UUID{},
 	})
 }
 
@@ -504,7 +503,7 @@ func initializeWGServer(network *Network) error {
 	}
 
 	wgCfg := &types.WGServerConfig{
-		ID:                 primitive.NewObjectID(),
+		ID:                 uuid.New(),
 		Tag:                "tunnels",
 		APIKey:             uuid.NewString(),
 		WireGuardPort:      51820,

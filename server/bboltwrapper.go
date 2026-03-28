@@ -7,9 +7,9 @@ import (
 	"slices"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/tunnels-is/tunnels/types"
 	gobolt "go.etcd.io/bbolt"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 var BBoltDB *gobolt.DB
@@ -54,7 +54,7 @@ func BBolt_DeleteDeviceByID(id string) error {
 func BBolt_UpdateDevice(D *types.Device) error {
 	return BBoltDB.Update(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(DEVICES_BUCKET))
-		id := objectIDToString(D.ID)
+		id := D.ID.String()
 		data, err := bboltMarshal(D)
 		if err != nil {
 			return err
@@ -87,7 +87,7 @@ func BBolt_GetDevices(limit, offset int64) ([]*types.Device, error) {
 	return DL, err
 }
 
-func BBolt_GetDevicesByUserID(userID primitive.ObjectID) ([]*types.Device, error) {
+func BBolt_GetDevicesByUserID(userID uuid.UUID) ([]*types.Device, error) {
 	DL := make([]*types.Device, 0)
 	err := BBoltDB.View(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(DEVICES_BUCKET))
@@ -161,7 +161,7 @@ func BBolt_findUserByID(UID string) (*User, error) {
 func BBolt_CreateUser(U *User) error {
 	return BBoltDB.Update(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(USERS_BUCKET))
-		id := objectIDToString(U.ID)
+		id := U.ID.String()
 		data, err := bboltMarshal(U)
 		if err != nil {
 			return err
@@ -190,7 +190,7 @@ func BBolt_findUserByEmail(Email string) (*User, error) {
 func BBolt_updateUserDeviceTokens(TU *UPDATE_USER_TOKENS) error {
 	return BBoltDB.Update(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(USERS_BUCKET))
-		id := objectIDToString(TU.ID)
+		id := TU.ID.String()
 		v := b.Get([]byte(id))
 		if v == nil {
 			return errors.New("user not found")
@@ -230,7 +230,7 @@ func BBolt_updateUserSubTime(u *User) error {
 func BBolt_updateUser(UF *USER_UPDATE_FORM) error {
 	return BBoltDB.Update(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(USERS_BUCKET))
-		id := objectIDToString(UF.UID)
+		id := UF.UID.String()
 		v := b.Get([]byte(id))
 		if v == nil {
 			return errors.New("user not found")
@@ -252,7 +252,7 @@ func BBolt_updateUser(UF *USER_UPDATE_FORM) error {
 func BBolt_updateUserAdmin(UF *USER_ADMIN_UPDATE_FORM) error {
 	return BBoltDB.Update(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(USERS_BUCKET))
-		id := objectIDToString(UF.TargetUserID)
+		id := UF.TargetUserID.String()
 		v := b.Get([]byte(id))
 		if v == nil {
 			return errors.New("user not found")
@@ -304,7 +304,7 @@ func BBolt_toggleUserSubscriptionStatus(UF *USER_UPDATE_SUB_FORM) error {
 func BBolt_userUpdateTwoFactorCodes(TFP *TWO_FACTOR_DB_PACKAGE) error {
 	return BBoltDB.Update(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(USERS_BUCKET))
-		v := b.Get([]byte(objectIDToString(TFP.UID)))
+		v := b.Get([]byte(TFP.UID.String()))
 		if v == nil {
 			return errors.New("user not found")
 		}
@@ -319,14 +319,14 @@ func BBolt_userUpdateTwoFactorCodes(TFP *TWO_FACTOR_DB_PACKAGE) error {
 		if err != nil {
 			return err
 		}
-		return b.Put([]byte(objectIDToString(U.ID)), data)
+		return b.Put([]byte(U.ID.String()), data)
 	})
 }
 
 func BBolt_userResetPassword(user *User) error {
 	return BBoltDB.Update(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(USERS_BUCKET))
-		v := b.Get([]byte(objectIDToString(user.ID)))
+		v := b.Get([]byte(user.ID.String()))
 		if v == nil {
 			return errors.New("user not found")
 		}
@@ -340,7 +340,7 @@ func BBolt_userResetPassword(user *User) error {
 		if err != nil {
 			return err
 		}
-		return b.Put([]byte(objectIDToString(U.ID)), data)
+		return b.Put([]byte(U.ID.String()), data)
 	})
 }
 
@@ -383,7 +383,7 @@ func BBolt_FindServersByGroups(groups []string, limit, offset int64) ([]*types.S
 		for k, v := c.First(); k != nil; k, v = c.Next() {
 			S := new(types.Server)
 			if err := bboltUnmarshal(v, S); err == nil {
-				for _, gid := range objectIDSliceToString(S.Groups) {
+				for _, gid := range uuidSliceToString(S.Groups) {
 					if _, ok := groupSet[gid]; ok {
 						if skipped < offset {
 							skipped++
@@ -426,7 +426,7 @@ func BBolt_FindEntitiesByGroupID(id string, objType string, limit, offset int64)
 			case "server":
 				E := new(types.Server)
 				if err := bboltUnmarshal(v, E); err == nil {
-					if slices.Contains(objectIDSliceToString(E.Groups), id) {
+					if slices.Contains(uuidSliceToString(E.Groups), id) {
 						match = true
 					}
 					if match {
@@ -443,7 +443,7 @@ func BBolt_FindEntitiesByGroupID(id string, objType string, limit, offset int64)
 			case "user":
 				E := new(User)
 				if err := bboltUnmarshal(v, E); err == nil {
-					if slices.Contains(objectIDSliceToString(E.Groups), id) {
+					if slices.Contains(uuidSliceToString(E.Groups), id) {
 						match = true
 					}
 					if match {
@@ -460,7 +460,7 @@ func BBolt_FindEntitiesByGroupID(id string, objType string, limit, offset int64)
 			case "device":
 				E := new(types.Device)
 				if err := bboltUnmarshal(v, E); err == nil {
-					if slices.Contains(objectIDSliceToString(E.Groups), id) {
+					if slices.Contains(uuidSliceToString(E.Groups), id) {
 						match = true
 					}
 					if match {
@@ -484,7 +484,7 @@ func BBolt_FindEntitiesByGroupID(id string, objType string, limit, offset int64)
 func BBolt_UpdateGroup(G *Group) error {
 	return BBoltDB.Update(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(GROUPS_BUCKET))
-		id := objectIDToString(G.ID)
+		id := G.ID.String()
 		v := b.Get([]byte(id))
 		if v == nil {
 			return errors.New("group not found")
@@ -507,7 +507,7 @@ func BBolt_UpdateServer(S *types.Server) (*types.Server, error) {
 	var RS *types.Server
 	err := BBoltDB.Update(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(SERVERS_BUCKET))
-		id := objectIDToString(S.ID)
+		id := S.ID.String()
 		v := b.Get([]byte(id))
 		if v == nil {
 			return errors.New("server not found")
@@ -538,7 +538,7 @@ func BBolt_UpdateServer(S *types.Server) (*types.Server, error) {
 func BBolt_CreateDevice(D *types.Device) error {
 	return BBoltDB.Update(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(DEVICES_BUCKET))
-		id := objectIDToString(D.ID)
+		id := D.ID.String()
 		data, err := bboltMarshal(D)
 		if err != nil {
 			return err
@@ -550,7 +550,7 @@ func BBolt_CreateDevice(D *types.Device) error {
 func BBolt_CreateGroup(G *Group) error {
 	return BBoltDB.Update(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(GROUPS_BUCKET))
-		id := objectIDToString(G.ID)
+		id := G.ID.String()
 		data, err := bboltMarshal(G)
 		if err != nil {
 			return err
@@ -562,7 +562,7 @@ func BBolt_CreateGroup(G *Group) error {
 func BBolt_CreateServer(S *types.Server) error {
 	return BBoltDB.Update(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(SERVERS_BUCKET))
-		id := objectIDToString(S.ID)
+		id := S.ID.String()
 		data, err := bboltMarshal(S)
 		if err != nil {
 			return err
@@ -694,7 +694,7 @@ func BBolt_UserActivateKey(SubExpiration time.Time, Key *LicenseKey, userID stri
 		if err != nil {
 			return err
 		}
-		id := objectIDToString(U.ID)
+		id := U.ID.String()
 		return b.Put([]byte(id), data)
 	})
 }
@@ -722,10 +722,10 @@ func BBolt_AddToGroup(groupID, typeID, objType string) error {
 		case "device":
 			D := new(types.Device)
 			_ = bboltUnmarshal(v, D)
-			groups := objectIDSliceToString(D.Groups)
+			groups := uuidSliceToString(D.Groups)
 			if !contains(groups, groupID) {
 				groups = append(groups, groupID)
-				D.Groups = stringSliceToObjectID(groups)
+				D.Groups = stringSliceToUUID(groups)
 			}
 			v, err = bboltMarshal(D)
 			if err != nil {
@@ -735,19 +735,19 @@ func BBolt_AddToGroup(groupID, typeID, objType string) error {
 		case "user":
 			U := new(User)
 			_ = bboltUnmarshal(v, U)
-			groups := objectIDSliceToString(U.Groups)
+			groups := uuidSliceToString(U.Groups)
 			if !contains(groups, groupID) {
 				groups = append(groups, groupID)
-				U.Groups = stringSliceToObjectID(groups)
+				U.Groups = stringSliceToUUID(groups)
 			}
 			v, err = bboltMarshal(U)
 		case "server":
 			S := new(types.Server)
 			_ = bboltUnmarshal(v, S)
-			groups := objectIDSliceToString(S.Groups)
+			groups := uuidSliceToString(S.Groups)
 			if !contains(groups, groupID) {
 				groups = append(groups, groupID)
-				S.Groups = stringSliceToObjectID(groups)
+				S.Groups = stringSliceToUUID(groups)
 			}
 			v, err = bboltMarshal(S)
 		}
@@ -781,23 +781,23 @@ func BBolt_RemoveFromGroup(groupID, typeID, objType string) error {
 		case "user":
 			U := new(User)
 			_ = bboltUnmarshal(v, U)
-			groups := objectIDSliceToString(U.Groups)
+			groups := uuidSliceToString(U.Groups)
 			groups = removeString(groups, groupID)
-			U.Groups = stringSliceToObjectID(groups)
+			U.Groups = stringSliceToUUID(groups)
 			v, err = bboltMarshal(U)
 		case "server":
 			S := new(types.Server)
 			_ = bboltUnmarshal(v, S)
-			groups := objectIDSliceToString(S.Groups)
+			groups := uuidSliceToString(S.Groups)
 			groups = removeString(groups, groupID)
-			S.Groups = stringSliceToObjectID(groups)
+			S.Groups = stringSliceToUUID(groups)
 			v, err = bboltMarshal(S)
 		case "device":
 			D := new(types.Device)
 			_ = bboltUnmarshal(v, D)
-			groups := objectIDSliceToString(D.Groups)
+			groups := uuidSliceToString(D.Groups)
 			groups = removeString(groups, groupID)
-			D.Groups = stringSliceToObjectID(groups)
+			D.Groups = stringSliceToUUID(groups)
 			v, err = bboltMarshal(D)
 		}
 		if err != nil {
@@ -837,36 +837,22 @@ func removeString(slice []string, s string) []string {
 	return res
 }
 
-func objectIDToString(id any) string {
-	switch v := id.(type) {
-	case string:
-		return v
-	case [12]byte:
-		return primitive.ObjectID(v).Hex()
-	case primitive.ObjectID:
-		return v.Hex()
-	default:
-		return fmt.Sprintf("%v", v)
-	}
+func uuidToString(id uuid.UUID) string {
+	return id.String()
 }
 
-func objectIDSliceToString(slice any) []string {
-	var out []string
-	switch v := slice.(type) {
-	case []string:
-		return v
-	case []primitive.ObjectID:
-		for _, id := range v {
-			out = append(out, id.Hex())
-		}
+func uuidSliceToString(ids []uuid.UUID) []string {
+	out := make([]string, len(ids))
+	for i, id := range ids {
+		out[i] = id.String()
 	}
 	return out
 }
 
-func stringSliceToObjectID(slice []string) []primitive.ObjectID {
-	var out []primitive.ObjectID
+func stringSliceToUUID(slice []string) []uuid.UUID {
+	var out []uuid.UUID
 	for _, s := range slice {
-		id, err := primitive.ObjectIDFromHex(s)
+		id, err := uuid.Parse(s)
 		if err == nil {
 			out = append(out, id)
 		}
@@ -877,7 +863,7 @@ func stringSliceToObjectID(slice []string) []primitive.ObjectID {
 func BBolt_CreateWGServerConfig(cfg *types.WGServerConfig) error {
 	return BBoltDB.Update(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(WG_SERVER_CONFIGS_BUCKET))
-		id := objectIDToString(cfg.ID)
+		id := cfg.ID.String()
 		data, err := bboltMarshal(cfg)
 		if err != nil {
 			return err
@@ -920,7 +906,7 @@ func BBolt_FindWGServerConfigByAPIKey(apiKey string) (*types.WGServerConfig, err
 func BBolt_UpdateWGServerConfig(cfg *types.WGServerConfig) error {
 	return BBoltDB.Update(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(WG_SERVER_CONFIGS_BUCKET))
-		id := objectIDToString(cfg.ID)
+		id := cfg.ID.String()
 		data, err := bboltMarshal(cfg)
 		if err != nil {
 			return err
@@ -973,7 +959,7 @@ func BBolt_CreateNetworksBatch(networks []*Network) error {
 			if err != nil {
 				return err
 			}
-			if err := b.Put([]byte(objectIDToString(n.ID)), data); err != nil {
+			if err := b.Put([]byte(n.ID.String()), data); err != nil {
 				return err
 			}
 		}
@@ -1005,11 +991,11 @@ func BBolt_GetNetworks(limit, offset int64) ([]*Network, error) {
 	return NL, err
 }
 
-func BBolt_FindNetworkByID(id primitive.ObjectID) (*Network, error) {
+func BBolt_FindNetworkByID(id uuid.UUID) (*Network, error) {
 	var n *Network
 	err := BBoltDB.View(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(NETWORKS_BUCKET))
-		v := b.Get([]byte(objectIDToString(id)))
+		v := b.Get([]byte(id.String()))
 		if v == nil {
 			return nil
 		}
@@ -1026,7 +1012,7 @@ func BBolt_UpdateNetwork(n *Network) error {
 		if err != nil {
 			return err
 		}
-		return b.Put([]byte(objectIDToString(n.ID)), data)
+		return b.Put([]byte(n.ID.String()), data)
 	})
 }
 
