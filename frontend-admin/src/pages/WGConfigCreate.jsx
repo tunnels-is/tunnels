@@ -40,7 +40,8 @@ export default function WGConfigCreate() {
       apiPost('/ui/network/list', { Limit: 50000, Offset: 0 }).then(async (r) => {
         if (r.status === 200) {
           const data = await r.json();
-          setNetworks(Array.isArray(data) ? data : []);
+          const list = Array.isArray(data.Networks) ? data.Networks : Array.isArray(data) ? data : [];
+          setNetworks(list);
         }
       }).catch(() => {});
     }
@@ -130,10 +131,10 @@ export default function WGConfigCreate() {
   }
 
   const unassignedNetworks = networks.filter(
-    (n) => !n.WGConfigID || n.WGConfigID === '000000000000000000000000'
+    (n) => !n.WGConfigID || n.WGConfigID === '00000000-0000-0000-0000-000000000000'
   );
   const assignedNetworks = networks.filter(
-    (n) => n.WGConfigID && n.WGConfigID !== '000000000000000000000000'
+    (n) => n.WGConfigID && n.WGConfigID !== '00000000-0000-0000-0000-000000000000'
   );
 
   return (
