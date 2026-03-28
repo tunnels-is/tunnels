@@ -45,6 +45,11 @@ func seedNetworks() (*Network, error) {
 	return networks[0], nil
 }
 
+type NetworkListResponse struct {
+	Networks []*Network `json:"Networks"`
+	Total    int64      `json:"Total"`
+}
+
 func API_NetworkList(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 	F := new(FORM_LIST_NETWORKS)
@@ -56,16 +61,23 @@ func API_NetworkList(w http.ResponseWriter, r *http.Request) {
 	if F.Limit == 0 {
 		F.Limit = 200
 	}
+
+	total, err := DB_CountNetworks()
+	if err != nil {
+		senderr(w, 500, "Unknown error, please try again in a moment")
+		return
+	}
+
 	networks, err := DB_GetNetworks(int64(F.Limit), int64(F.Offset))
 	if err != nil {
 		senderr(w, 500, "Unknown error, please try again in a moment")
 		return
 	}
-	if len(networks) == 0 {
-		w.WriteHeader(204)
-		return
-	}
-	sendObject(w, networks)
+
+	sendObject(w, &NetworkListResponse{
+		Networks: networks,
+		Total:    total,
+	})
 }
 
 func API_NetworkUpdate(w http.ResponseWriter, r *http.Request) {

@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
 import { apiPost } from '../api';
 
 const PAGE_SIZE = 200;
+const EMPTY_ID = '00000000-0000-0000-0000-000000000000';
 
 export default function Networks() {
   const navigate = useNavigate();
@@ -12,18 +13,21 @@ export default function Networks() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
+  const [offset, setOffset] = useState(0);
+  const [total, setTotal] = useState(0);
 
-  const load = async () => {
+  const load = useCallback(async (newOffset = offset) => {
     setLoading(true);
     setError('');
     try {
       const [netResp, cfgResp] = await Promise.all([
-        apiPost('/ui/network/list', { Limit: PAGE_SIZE, Offset: 0 }),
+        apiPost('/ui/network/list', { Limit: PAGE_SIZE, Offset: newOffset }),
         apiPost('/ui/wg/server-config/list', {}),
       ]);
       if (netResp.status === 200) {
         const data = await netResp.json();
-        setNetworks(Array.isArray(data) ? data : []);
+        setNetworks(Array.isArray(data.Networks) ? data.Networks : []);
+        setTotal(data.Total || 0);
       } else if (netResp.status !== 204) {
         const data = await netResp.json().catch(() => ({}));
         setError(data.Error || 'Failed to load networks');
@@ -37,12 +41,17 @@ export default function Networks() {
     } finally {
       setLoading(false);
     }
+  }, [offset]);
+
+  useEffect(() => { load(0); }, []);
+
+  const goPage = (newOffset) => {
+    setOffset(newOffset);
+    load(newOffset);
   };
 
-  useEffect(() => { load(); }, []);
-
   const configTag = (id) => {
-    if (!id || id === '000000000000000000000000') return null;
+    if (!id || id === EMPTY_ID) return null;
     return wgConfigs.find((c) => c._id === id)?.Tag || id.slice(0, 8) + '…';
   };
 
@@ -53,6 +62,9 @@ export default function Networks() {
         (n.Description || '').toLowerCase().includes(search.toLowerCase())
       )
     : networks;
+
+  const currentPage = Math.floor(offset / PAGE_SIZE) + 1;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return (
     <div>
@@ -66,7 +78,7 @@ export default function Networks() {
             placeholder="Search CIDR, tag…"
             className="bg-[#060810] border border-[#1e2433] rounded px-3 py-1.5 text-[12px] text-white placeholder-white/30 focus:outline-none focus:border-[#4B7BF5]/50 w-48"
           />
-          <button onClick={load} disabled={loading} className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[12px] text-white/60 hover:text-white/80 hover:bg-white/[0.04] transition-colors">
+          <button onClick={() => load(offset)} disabled={loading} className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[12px] text-white/60 hover:text-white/80 hover:bg-white/[0.04] transition-colors">
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </button>
@@ -107,11 +119,34 @@ export default function Networks() {
         })}
       </div>
 
-      {networks.length > 0 && (
-        <p className="text-[11px] text-white/25 mt-2">
-          Showing {filtered.length} of {networks.length} networks
+      <div className="flex items-center justify-between mt-3">
+        <p className="text-[11px] text-white/25">
+          {total > 0
+            ? `Showing ${offset + 1}–${Math.min(offset + filtered.length, total)} of ${total} networks`
+            : 'No networks'}
         </p>
-      )}
+        {totalPages > 1 && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => goPage(offset - PAGE_SIZE)}
+              disabled={offset === 0 || loading}
+              className="flex items-center gap-1 px-2 py-1 rounded text-[11px] text-white/50 hover:text-white/80 hover:bg-white/[0.04] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronLeft className="w-3.5 h-3.5" /> Prev
+            </button>
+            <span className="text-[11px] text-white/40">
+              Page {currentPage} of {totalPages}
+            </span>
+            <button
+              onClick={() => goPage(offset + PAGE_SIZE)}
+              disabled={offset + PAGE_SIZE >= total || loading}
+              className="flex items-center gap-1 px-2 py-1 rounded text-[11px] text-white/50 hover:text-white/80 hover:bg-white/[0.04] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            >
+              Next <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -27,7 +27,8 @@ export default function WGConfig() {
       }
       if (netResp.status === 200) {
         const data = await netResp.json();
-        setNetworks(Array.isArray(data) ? data : []);
+        const list = Array.isArray(data.Networks) ? data.Networks : Array.isArray(data) ? data : [];
+        setNetworks(list);
       }
     } catch (err) {
       setError(err.message);
@@ -39,7 +40,7 @@ export default function WGConfig() {
   useEffect(() => { load(); }, []);
 
   const networkCIDR = (nid) => {
-    if (!nid || nid === '000000000000000000000000') return '—';
+    if (!nid || nid === '00000000-0000-0000-0000-000000000000') return '—';
     const n = networks.find((n) => n._id === nid);
     return n ? n.CIDR : nid.slice(0, 8) + '…';
   };
