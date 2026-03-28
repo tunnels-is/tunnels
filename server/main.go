@@ -40,8 +40,7 @@ var (
 	APITLSConfig atomic.Pointer[tls.Config]
 	KeyPair      atomic.Pointer[tls.Certificate]
 
-	AUTHEnabled  bool
-	BBOLTEnabled bool
+	AUTHEnabled bool
 
 	disableLogs      bool
 	serverConfigPath string
@@ -118,7 +117,6 @@ func main() {
 	}
 
 	AUTHEnabled = slices.Contains(config.Features, types.AUTH)
-	BBOLTEnabled = slices.Contains(config.Features, types.BBOLT)
 	WGEnabled := slices.Contains(config.Features, types.WG)
 
 	err = loadCertificatesAndTLSSettings()
@@ -131,18 +129,10 @@ func main() {
 	Cancel.Store(&cancel)
 
 	if AUTHEnabled {
-		if BBOLTEnabled {
-			err = ConnectToBBoltDB("tunnels.db")
-			if err != nil {
-				logger.Error("unable to connect to bbolt", slog.Any("err", err))
-				os.Exit(1)
-			}
-		} else {
-			err = ConnectToDB(loadSecret("DBurl"))
-			if err != nil {
-				logger.Error("unable to connect to mongodb", slog.Any("err", err))
-				os.Exit(1)
-			}
+		err = ConnectToBBoltDB("tunnels.db")
+		if err != nil {
+			logger.Error("unable to connect to bbolt", slog.Any("err", err))
+			os.Exit(1)
 		}
 
 		if loadSecret("PayKey") != "" {
@@ -391,7 +381,6 @@ func makeConfigAndCerts() (err error) {
 			Features: []types.Feature{
 				types.AUTH,
 				types.DNS,
-				types.BBOLT,
 				types.WG,
 			},
 			VPNIP:              interfaceIP,
