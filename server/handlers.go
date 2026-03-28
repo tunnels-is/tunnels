@@ -14,7 +14,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/tunnels-is/tunnels/types"
 	"github.com/xlzd/gotp"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -62,7 +61,7 @@ func API_AdminUILogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cookieValue := user.ID.Hex() + ":" + user.DeviceToken.DT
+	cookieValue := user.ID.String() + ":" + user.DeviceToken.DT
 	http.SetCookie(w, &http.Cookie{
 		Name:     "admin_session",
 		Value:    cookieValue,
@@ -158,13 +157,13 @@ func API_UserCreate(w http.ResponseWriter, r *http.Request) {
 
 	newUser = new(User)
 	newUser.Password = string(hash)
-	newUser.ID = primitive.NewObjectID()
+	newUser.ID = uuid.New()
 	newUser.AdditionalInformation = RF.AdditionalInformation
 	newUser.Email = RF.Email
 	newUser.Updated = time.Now()
 	newUser.Trial = true
 	newUser.SubExpiration = time.Now().AddDate(0, 0, 1)
-	newUser.Groups = make([]primitive.ObjectID, 0)
+	newUser.Groups = make([]uuid.UUID, 0)
 	newUser.Tokens = make([]*DeviceToken, 0)
 
 	T := new(DeviceToken)
@@ -615,14 +614,14 @@ func API_DeviceCreate(w http.ResponseWriter, r *http.Request) {
 		F.Device.UserID = user.ID
 	}
 
-	F.Device.ID = primitive.NewObjectID()
+	F.Device.ID = uuid.New()
 	F.Device.CreatedAt = time.Now()
 	if F.Device.Groups == nil {
-		F.Device.Groups = make([]primitive.ObjectID, 0)
+		F.Device.Groups = make([]uuid.UUID, 0)
 	}
 
 	var wgServer *types.Server
-	if F.Device.ServerID != primitive.NilObjectID {
+	if F.Device.ServerID != uuid.Nil {
 		ip, assignErr := assignNextWireGuardIP(F.Device.ServerID)
 		if assignErr != nil {
 			senderr(w, 400, "WireGuard IP assignment failed", slog.Any("err", assignErr))
@@ -685,7 +684,7 @@ func API_GroupCreate(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	F.Group.ID = primitive.NewObjectID()
+	F.Group.ID = uuid.New()
 	F.Group.CreatedAt = time.Now()
 
 	err = DB_CreateGroup(F.Group)
@@ -1102,8 +1101,8 @@ func API_ServerCreate(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	F.Server.ID = primitive.NewObjectID()
-	F.Server.Groups = make([]primitive.ObjectID, 0)
+	F.Server.ID = uuid.New()
+	F.Server.Groups = make([]uuid.UUID, 0)
 	err = DB_CreateServer(F.Server)
 	if err != nil {
 		senderr(w, 500, "Uknown error, please try again in a moment", slog.Any("err", err))
@@ -1133,7 +1132,7 @@ func API_ServerGet(w http.ResponseWriter, r *http.Request) {
 
 	allowed := false
 	if F.DeviceKey != "" {
-		deviceID, err := primitive.ObjectIDFromHex(F.DeviceKey)
+		deviceID, err := uuid.Parse(F.DeviceKey)
 		if err != nil {
 			senderr(w, 400, "invalid device key")
 			return

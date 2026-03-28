@@ -10,7 +10,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/tunnels-is/tunnels/types"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"golang.org/x/crypto/curve25519"
 )
 
@@ -42,12 +41,12 @@ func API_WGPeers(w http.ResponseWriter, r *http.Request) {
 		hexKey, err := b64KeyToHex(d.WireGuardKey)
 		if err != nil {
 			logger.Warn("skipping device with invalid WireGuard key",
-				slog.String("device", d.ID.Hex()), slog.Any("err", err))
+				slog.String("device", d.ID.String()), slog.Any("err", err))
 			continue
 		}
 		resp.Peers = append(resp.Peers, types.WGPeer{
 			PublicKeyHex: hexKey,
-			DeviceID:     d.ID.Hex(),
+			DeviceID:     d.ID.String(),
 			WireGuardIP:  d.WireGuardIP,
 		})
 	}
@@ -67,7 +66,7 @@ func API_WGConfig(w http.ResponseWriter, r *http.Request) {
 		senderr(w, 400, "serverID query parameter is required")
 		return
 	}
-	serverID, err := primitive.ObjectIDFromHex(serverIDStr)
+	serverID, err := uuid.Parse(serverIDStr)
 	if err != nil {
 		senderr(w, 400, "Invalid serverID")
 		return
@@ -100,7 +99,7 @@ func API_WGConfig(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func assignNextWireGuardIP(serverID primitive.ObjectID) (string, error) {
+func assignNextWireGuardIP(serverID uuid.UUID) (string, error) {
 	server, err := DB_FindServerByID(serverID)
 	if err != nil || server == nil {
 		return "", fmt.Errorf("server not found")
@@ -202,9 +201,9 @@ func deriveWGPubKey(privKeyB64 string) (string, error) {
 type FORM_WG_SERVER_CONFIG_CREATE struct {
 	Tag            string             `json:"Tag"`
 	WireGuardPort  int                `json:"WireGuardPort"`
-	NetworkID      primitive.ObjectID `json:"NetworkID"`
-	WireGuardIface string             `json:"WireGuardIface"`
-	InternetIface  string             `json:"InternetIface"`
+	NetworkID      uuid.UUID `json:"NetworkID"`
+	WireGuardIface string    `json:"WireGuardIface"`
+	InternetIface  string    `json:"InternetIface"`
 
 	PacketInspection   bool `json:"PacketInspection"`
 	InsecureSkipVerify bool `json:"InsecureSkipVerify"`
@@ -239,7 +238,7 @@ func API_WGServerConfigCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var subnet string
-	if F.NetworkID != primitive.NilObjectID {
+	if F.NetworkID != uuid.Nil {
 		network, nerr := DB_FindNetworkByID(F.NetworkID)
 		if nerr != nil || network == nil {
 			senderr(w, 404, "Network not found")
@@ -249,7 +248,7 @@ func API_WGServerConfigCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	cfg := &types.WGServerConfig{
-		ID:                 primitive.NewObjectID(),
+		ID:                 uuid.New(),
 		Tag:                F.Tag,
 		APIKey:             uuid.NewString(),
 		WireGuardPort:      F.WireGuardPort,
@@ -272,7 +271,7 @@ func API_WGServerConfigCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if F.NetworkID != primitive.NilObjectID {
+	if F.NetworkID != uuid.Nil {
 		if network, _ := DB_FindNetworkByID(F.NetworkID); network != nil {
 			network.WGConfigID = cfg.ID
 			_ = DB_UpdateNetwork(network)
@@ -280,7 +279,7 @@ func API_WGServerConfigCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	sendObject(w, map[string]any{
-		"ID":              cfg.ID.Hex(),
+		"ID":              cfg.ID.String(),
 		"APIKey":          cfg.APIKey,
 		"WireGuardPubKey": pubKeyB64,
 		"Tag":             cfg.Tag,
@@ -303,7 +302,7 @@ func API_WGServerConfigGet(w http.ResponseWriter, r *http.Request) {
 		senderr(w, 400, "id query parameter is required")
 		return
 	}
-	id, err := primitive.ObjectIDFromHex(idStr)
+	id, err := uuid.Parse(idStr)
 	if err != nil {
 		senderr(w, 400, "Invalid id")
 		return
@@ -318,14 +317,14 @@ func API_WGServerConfigGet(w http.ResponseWriter, r *http.Request) {
 	pubKey, _ := deriveWGPubKey(cfg.WireGuardPrivKey)
 
 	var cfgSubnet string
-	if cfg.NetworkID != primitive.NilObjectID {
+	if cfg.NetworkID != uuid.Nil {
 		if net, _ := DB_FindNetworkByID(cfg.NetworkID); net != nil {
 			cfgSubnet = net.CIDR
 		}
 	}
 
 	sendObject(w, map[string]any{
-		"ID":                 cfg.ID.Hex(),
+		"ID":                 cfg.ID.String(),
 		"Tag":                cfg.Tag,
 		"APIKey":             cfg.APIKey,
 		"WireGuardPubKey":    pubKey,
@@ -335,7 +334,7 @@ func API_WGServerConfigGet(w http.ResponseWriter, r *http.Request) {
 		"InternetIface":      cfg.InternetIface,
 		"PacketInspection":   cfg.PacketInspection,
 		"InsecureSkipVerify": cfg.InsecureSkipVerify,
-		"NetworkID":          cfg.NetworkID.Hex(),
+		"NetworkID":          cfg.NetworkID.String(),
 	})
 }
 
@@ -359,7 +358,7 @@ func API_WGServerConfigFetch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var fetchSubnet string
-	if wgCfg.NetworkID != primitive.NilObjectID {
+	if wgCfg.NetworkID != uuid.Nil {
 		if network, _ := DB_FindNetworkByID(wgCfg.NetworkID); network != nil {
 			fetchSubnet = network.CIDR
 		}
@@ -370,7 +369,7 @@ func API_WGServerConfigFetch(w http.ResponseWriter, r *http.Request) {
 	if err == nil {
 		for _, s := range servers {
 			if s.WGConfigID == wgCfg.ID {
-				serverID = s.ID.Hex()
+				serverID = s.ID.String()
 				_ = DB_SetServerWGConfigID(s.ID, wgCfg, pubKeyB64, fetchSubnet)
 				break
 			}
@@ -392,12 +391,12 @@ func API_WGServerConfigFetch(w http.ResponseWriter, r *http.Request) {
 }
 
 type FORM_WG_SERVER_CONFIG_UPDATE struct {
-	ID             primitive.ObjectID `json:"ID"`
-	Tag            string             `json:"Tag"`
-	WireGuardPort  int                `json:"WireGuardPort"`
-	NetworkID      primitive.ObjectID `json:"NetworkID"`
-	WireGuardIface string             `json:"WireGuardIface"`
-	InternetIface  string             `json:"InternetIface"`
+	ID             uuid.UUID `json:"ID"`
+	Tag            string    `json:"Tag"`
+	WireGuardPort  int       `json:"WireGuardPort"`
+	NetworkID      uuid.UUID `json:"NetworkID"`
+	WireGuardIface string    `json:"WireGuardIface"`
+	InternetIface  string    `json:"InternetIface"`
 
 	PacketInspection   bool `json:"PacketInspection"`
 	InsecureSkipVerify bool `json:"InsecureSkipVerify"`
@@ -427,13 +426,13 @@ func API_WGServerConfigUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if existing.NetworkID != F.NetworkID {
-		if existing.NetworkID != primitive.NilObjectID {
+		if existing.NetworkID != uuid.Nil {
 			if oldNet, _ := DB_FindNetworkByID(existing.NetworkID); oldNet != nil {
-				oldNet.WGConfigID = primitive.NilObjectID
+				oldNet.WGConfigID = uuid.Nil
 				_ = DB_UpdateNetwork(oldNet)
 			}
 		}
-		if F.NetworkID != primitive.NilObjectID {
+		if F.NetworkID != uuid.Nil {
 			if newNet, _ := DB_FindNetworkByID(F.NetworkID); newNet != nil {
 				newNet.WGConfigID = F.ID
 				_ = DB_UpdateNetwork(newNet)
@@ -458,8 +457,8 @@ func API_WGServerConfigUpdate(w http.ResponseWriter, r *http.Request) {
 }
 
 type FORM_WG_SERVER_CONFIG_ASSIGN struct {
-	ServerID primitive.ObjectID `json:"ServerID"`
-	ConfigID primitive.ObjectID `json:"ConfigID"`
+	ServerID uuid.UUID `json:"ServerID"`
+	ConfigID uuid.UUID `json:"ConfigID"`
 }
 
 func API_WGServerConfigAssign(w http.ResponseWriter, r *http.Request) {
@@ -483,7 +482,7 @@ func API_WGServerConfigAssign(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if F.ServerID == primitive.NilObjectID || F.ConfigID == primitive.NilObjectID {
+	if F.ServerID == uuid.Nil || F.ConfigID == uuid.Nil {
 		senderr(w, 400, "ServerID and ConfigID are required")
 		return
 	}
@@ -501,7 +500,7 @@ func API_WGServerConfigAssign(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var assignSubnet string
-	if wgCfg.NetworkID != primitive.NilObjectID {
+	if wgCfg.NetworkID != uuid.Nil {
 		if network, _ := DB_FindNetworkByID(wgCfg.NetworkID); network != nil {
 			assignSubnet = network.CIDR
 		}
@@ -544,7 +543,7 @@ func API_WGServers(w http.ResponseWriter, r *http.Request) {
 		if s.WireGuardSubnet == "" || s.WireGuardPubKey == "" {
 			continue
 		}
-		if excludeID != "" && s.ID.Hex() == excludeID {
+		if excludeID != "" && s.ID.String() == excludeID {
 			continue
 		}
 		resp.Servers = append(resp.Servers, types.WGServerInfo{

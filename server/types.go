@@ -4,8 +4,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/tunnels-is/tunnels/types"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type ErrorResponse struct {
@@ -15,12 +15,12 @@ type ErrorResponse struct {
 type USER_ENABLE_QUERY struct {
 	Email string
 	Code  string
-	OrgID primitive.ObjectID
+	OrgID uuid.UUID
 }
 
 type KEY_ACTIVATE_FORM struct {
-	UID         primitive.ObjectID `json:"UID"`
-	DeviceToken string             `json:"DeviceToken"`
+	UID         uuid.UUID `json:"UID"`
+	DeviceToken string    `json:"DeviceToken"`
 	Key         string
 }
 
@@ -32,112 +32,112 @@ type REGISTER_FORM struct {
 }
 
 type FORM_GET_GROUP struct {
-	DeviceToken string             `json:"DeviceToken"`
-	UID         primitive.ObjectID `json:"UID"`
-	GID         primitive.ObjectID `json:"GID"`
+	DeviceToken string    `json:"DeviceToken"`
+	UID         uuid.UUID `json:"UID"`
+	GID         uuid.UUID `json:"GID"`
 }
 
 type FORM_GET_GROUP_ENTITIES struct {
-	DeviceToken string             `json:"DeviceToken"`
-	UID         primitive.ObjectID `json:"UID"`
-	GID         primitive.ObjectID `json:"GID"`
-	Type        string             `json:"Type"`
-	Limit       int                `json:"Limit"`
-	Offset      int                `json:"Offset"`
+	DeviceToken string    `json:"DeviceToken"`
+	UID         uuid.UUID `json:"UID"`
+	GID         uuid.UUID `json:"GID"`
+	Type        string    `json:"Type"`
+	Limit       int       `json:"Limit"`
+	Offset      int       `json:"Offset"`
 }
 
 type FORM_DELETE_GROUP struct {
-	DeviceToken string             `json:"DeviceToken"`
-	UID         primitive.ObjectID `json:"UID"`
-	GID         primitive.ObjectID `json:"GID"`
+	DeviceToken string    `json:"DeviceToken"`
+	UID         uuid.UUID `json:"UID"`
+	GID         uuid.UUID `json:"GID"`
 }
 
 type FORM_DELETE_DEVICE struct {
-	DeviceToken string             `json:"DeviceToken"`
-	UID         primitive.ObjectID `json:"UID"`
-	DID         primitive.ObjectID `json:"DID"`
+	DeviceToken string    `json:"DeviceToken"`
+	UID         uuid.UUID `json:"UID"`
+	DID         uuid.UUID `json:"DID"`
 }
 
 type FORM_LIST_GROUP struct {
-	DeviceToken string             `json:"DeviceToken"`
-	UID         primitive.ObjectID `json:"UID"`
+	DeviceToken string    `json:"DeviceToken"`
+	UID         uuid.UUID `json:"UID"`
 }
 
 type FORM_LIST_USERS struct {
-	DeviceToken string             `json:"DeviceToken"`
-	UID         primitive.ObjectID `json:"UID"`
-	Limit       int                `json:"Limit"`
-	Offset      int                `json:"Offset"`
+	DeviceToken string    `json:"DeviceToken"`
+	UID         uuid.UUID `json:"UID"`
+	Limit       int       `json:"Limit"`
+	Offset      int       `json:"Offset"`
 }
 
 type FORM_LIST_DEVICE struct {
-	DeviceToken string             `json:"DeviceToken"`
-	UID         primitive.ObjectID `json:"UID"`
-	Limit       int                `json:"Limit"`
-	Offset      int                `json:"Offset"`
+	DeviceToken string    `json:"DeviceToken"`
+	UID         uuid.UUID `json:"UID"`
+	Limit       int       `json:"Limit"`
+	Offset      int       `json:"Offset"`
 }
 
 type FORM_CREATE_GROUP struct {
-	DeviceToken string             `json:"DeviceToken"`
-	UID         primitive.ObjectID `json:"UID"`
-	Group       *Group             `json:"Group"`
+	DeviceToken string    `json:"DeviceToken"`
+	UID         uuid.UUID `json:"UID"`
+	Group       *Group    `json:"Group"`
 }
 
 type FORM_CREATE_DEVICE struct {
-	DeviceToken string             `json:"DeviceToken"`
-	UID         primitive.ObjectID `json:"UID"`
-	Device      *types.Device      `json:"Device"`
+	DeviceToken string        `json:"DeviceToken"`
+	UID         uuid.UUID     `json:"UID"`
+	Device      *types.Device `json:"Device"`
 }
 
 type FORM_UPDATE_SERVER struct {
-	DeviceToken string             `json:"DeviceToken"`
-	UID         primitive.ObjectID `json:"UID"`
-	Server      *types.Server      `json:"Server"`
+	DeviceToken string        `json:"DeviceToken"`
+	UID         uuid.UUID     `json:"UID"`
+	Server      *types.Server `json:"Server"`
 }
 
 type FORM_CREATE_SERVER struct {
-	DeviceToken string             `json:"DeviceToken"`
-	UID         primitive.ObjectID `json:"UID"`
-	Server      *types.Server      `json:"Server"`
+	DeviceToken string        `json:"DeviceToken"`
+	UID         uuid.UUID     `json:"UID"`
+	Server      *types.Server `json:"Server"`
 }
 
 type FORM_UPDATE_GROUP struct {
-	DeviceToken string             `json:"DeviceToken"`
-	UID         primitive.ObjectID `json:"UID"`
-	Group       *Group             `json:"Group"`
+	DeviceToken string    `json:"DeviceToken"`
+	UID         uuid.UUID `json:"UID"`
+	Group       *Group    `json:"Group"`
 }
 
 type FORM_UPDATE_DEVICE struct {
-	DeviceToken string             `json:"DeviceToken"`
-	UID         primitive.ObjectID `json:"UID"`
-	Device      *types.Device      `json:"Device"`
+	DeviceToken string        `json:"DeviceToken"`
+	UID         uuid.UUID     `json:"UID"`
+	Device      *types.Device `json:"Device"`
 }
 
 type FORM_GROUP_ADD struct {
-	DeviceToken string             `json:"DeviceToken"`
-	UID         primitive.ObjectID `json:"UID"`
-	GroupID     primitive.ObjectID `json:"GroupID"`
-	Type        string             `json:"Type"`
-	TypeID      primitive.ObjectID `json:"TypeID"`
-	TypeTag     string             `json:"TypeTag"`
+	DeviceToken string    `json:"DeviceToken"`
+	UID         uuid.UUID `json:"UID"`
+	GroupID     uuid.UUID `json:"GroupID"`
+	Type        string    `json:"Type"`
+	TypeID      uuid.UUID `json:"TypeID"`
+	TypeTag     string    `json:"TypeTag"`
 }
 
 type FORM_GROUP_REMOVE struct {
-	DeviceToken string             `json:"DeviceToken"`
-	UID         primitive.ObjectID `json:"UID"`
-	GroupID     primitive.ObjectID `json:"GroupID"`
-	Type        string             `json:"Type"`
-	TypeID      primitive.ObjectID `json:"TypeID"`
+	DeviceToken string    `json:"DeviceToken"`
+	UID         uuid.UUID `json:"UID"`
+	GroupID     uuid.UUID `json:"GroupID"`
+	Type        string    `json:"Type"`
+	TypeID      uuid.UUID `json:"TypeID"`
 }
 
 type TWO_FACTOR_CREATE struct {
-	DeviceToken string             `json:"DeviceToken"`
-	UID         primitive.ObjectID `json:"UID"`
+	DeviceToken string    `json:"DeviceToken"`
+	UID         uuid.UUID `json:"UID"`
 }
 
 type TWO_FACTOR_FORM struct {
-	DeviceToken string             `json:"DeviceToken"`
-	UID         primitive.ObjectID `json:"UID"`
+	DeviceToken string    `json:"DeviceToken"`
+	UID         uuid.UUID `json:"UID"`
 	Code        string
 	Digits      string
 	Password    string
@@ -145,25 +145,25 @@ type TWO_FACTOR_FORM struct {
 }
 
 type USER_UPDATE_FORM struct {
-	UID                   primitive.ObjectID
+	UID                   uuid.UUID
 	DeviceToken           string
 	APIKey                string
 	AdditionalInformation string
 }
 
 type USER_ADMIN_UPDATE_FORM struct {
-	DeviceToken   string             `json:"DeviceToken"`
-	UID           primitive.ObjectID `json:"UID"`
-	TargetUserID  primitive.ObjectID `json:"TargetUserID"`
-	Email         string             `json:"Email,omitempty"`
-	Disabled      bool               `json:"Disabled"`
-	IsManager     bool               `json:"IsManager"`
-	Trial         bool               `json:"Trial"`
-	SubExpiration time.Time          `json:"SubExpiration,omitempty"`
+	DeviceToken   string    `json:"DeviceToken"`
+	UID           uuid.UUID `json:"UID"`
+	TargetUserID  uuid.UUID `json:"TargetUserID"`
+	Email         string    `json:"Email,omitempty"`
+	Disabled      bool      `json:"Disabled"`
+	IsManager     bool      `json:"IsManager"`
+	Trial         bool      `json:"Trial"`
+	SubExpiration time.Time `json:"SubExpiration,omitempty"`
 }
 
 type TWO_FACTOR_DB_PACKAGE struct {
-	UID      primitive.ObjectID
+	UID      uuid.UUID
 	Code     []byte
 	Recovery []byte
 }
@@ -176,8 +176,8 @@ type PASSWORD_RESET_FORM struct {
 }
 
 type FORM_GET_SERVERS struct {
-	DeviceToken string             `json:"DeviceToken"`
-	UID         primitive.ObjectID `json:"UID"`
+	DeviceToken string    `json:"DeviceToken"`
+	UID         uuid.UUID `json:"UID"`
 	StartIndex  int
 }
 
@@ -198,16 +198,16 @@ type LOGIN_FORM struct {
 }
 
 type LOGOUT_FORM struct {
-	UID         primitive.ObjectID
+	UID         uuid.UUID
 	DeviceToken string
 	LogoutToken string
 	All         bool
 }
 
 type UPDATE_USER_TOKENS struct {
-	ID      primitive.ObjectID `json:"_id" bson:"_id"`
-	Tokens  []*DeviceToken     `json:"Tokens" bson:"T"`
-	Version string             `json:"version" bson:"V"`
+	ID      uuid.UUID      `json:"_id"`
+	Tokens  []*DeviceToken `json:"Tokens"`
+	Version string         `json:"version"`
 }
 
 type LicenseKey struct {
@@ -217,39 +217,39 @@ type LicenseKey struct {
 }
 
 type User struct {
-	ID primitive.ObjectID `json:"_id" bson:"_id"`
+	ID uuid.UUID `json:"_id"`
 
-	Email                 string    `json:"Email" bson:"Email"`
-	Updated               time.Time `json:"Updated" bson:"Updated"`
-	AdditionalInformation string    `json:"AdditionalInformation,omitempty" bson:"AdditionalInformation"`
-	Disabled              bool      `json:"Disabled" bson:"Disabled"`
+	Email                 string    `json:"Email"`
+	Updated               time.Time `json:"Updated"`
+	AdditionalInformation string    `json:"AdditionalInformation,omitempty"`
+	Disabled              bool      `json:"Disabled"`
 
-	DeviceToken *DeviceToken `json:"DeviceToken,omitempty" bson:"-"`
-	APIKey      string       `json:"APIKey" bson:"APIKey"`
+	DeviceToken *DeviceToken `json:"DeviceToken,omitempty"`
+	APIKey      string       `json:"APIKey"`
 
 	// these do not get sent over the network for security reasons
-	Password         string         `json:"Password" bson:"Password" `
-	Password2        string         `json:"-" bson:"-"`
-	ConfirmCode      string         `json:"ConfirmCode" bson:"ConfirmCode"`
-	LastResetRequest time.Time      `json:"-" bson:"LastResetRequest"`
-	RecoveryCodes    []byte         `json:"RecoveryCodes" bson:"RecoveryCodes"`
-	TwoFactorCode    []byte         `json:"TwoFactorCode" bson:"TwoFactorCode"`
-	TwoFactorEnabled bool           `json:"TwoFactorEnabled" bson:"TwoFactorEnabled"`
-	Tokens           []*DeviceToken `json:"Tokens" bson:"Tokens"`
+	Password         string         `json:"Password"`
+	Password2        string         `json:"-"`
+	ConfirmCode      string         `json:"ConfirmCode"`
+	LastResetRequest time.Time      `json:"-"`
+	RecoveryCodes    []byte         `json:"RecoveryCodes"`
+	TwoFactorCode    []byte         `json:"TwoFactorCode"`
+	TwoFactorEnabled bool           `json:"TwoFactorEnabled"`
+	Tokens           []*DeviceToken `json:"Tokens"`
 
-	IsAdmin   bool                 `json:"IsAdmin" bson:"IsAdmin"`
-	IsManager bool                 `json:"IsManager" bson:"IsManager"`
-	Groups    []primitive.ObjectID `json:"Groups" bson:"Groups"`
+	IsAdmin   bool        `json:"IsAdmin"`
+	IsManager bool        `json:"IsManager"`
+	Groups    []uuid.UUID `json:"Groups"`
 
 	// tunnels public network
-	Trial         bool        `json:"Trial" bson:"Trial"`
-	Key           *LicenseKey `json:"Key" bson:"Key"`
-	SubExpiration time.Time   `json:"SubExpiration" bson:"SubExpiration"`
+	Trial         bool        `json:"Trial"`
+	Key           *LicenseKey `json:"Key"`
+	SubExpiration time.Time   `json:"SubExpiration"`
 }
 
 func (u *User) ToMinifiedUser() MinifiedUser {
 	return MinifiedUser{
-		ID:        u.ID.Hex(),
+		ID:        u.ID.String(),
 		Email:     u.Email,
 		Disabled:  u.Disabled,
 		IsAdmin:   u.IsAdmin,
@@ -261,8 +261,8 @@ type MinifiedUser struct {
 	ID        string `json:"_id,omitempty"`
 	Email     string `json:"Email"`
 	Disabled  bool   `json:"Disabled"`
-	IsAdmin   bool   `json:"IsAdmin" bson:"IsAdmin"`
-	IsManager bool   `json:"IsManager" bson:"IsManager"`
+	IsAdmin   bool   `json:"IsAdmin"`
+	IsManager bool   `json:"IsManager"`
 }
 
 func (u *User) RemoveSensitiveInformation() {
@@ -283,41 +283,41 @@ func (u *User) RemoveSensitiveInformation() {
 }
 
 type DeviceToken struct {
-	DT      string    `bson:"DT"`
-	N       string    `bson:"N"`
-	Created time.Time `bson:"C"`
+	DT      string
+	N       string
+	Created time.Time
 }
 
 type Group struct {
-	ID          primitive.ObjectID `json:"_id" bson:"_id"`
-	Tag         string             `json:"Tag" bson:"Tag"`
-	Description string             `json:"Description" bson:"Description"`
-	CreatedAt   time.Time          `json:"CreatedAt" bson:"CreatedAt"`
+	ID          uuid.UUID `json:"_id"`
+	Tag         string    `json:"Tag"`
+	Description string    `json:"Description"`
+	CreatedAt   time.Time `json:"CreatedAt"`
 }
 
 type Network struct {
-	ID          primitive.ObjectID `json:"_id" bson:"_id"`
-	CIDR        string             `json:"CIDR" bson:"CIDR"`
-	Tag         string             `json:"Tag" bson:"Tag"`
-	Description string             `json:"Description" bson:"Description"`
-	WGConfigID  primitive.ObjectID `json:"WGConfigID,omitempty" bson:"WGConfigID,omitempty"`
-	CreatedAt   time.Time          `json:"CreatedAt" bson:"CreatedAt"`
+	ID          uuid.UUID `json:"_id"`
+	CIDR        string    `json:"CIDR"`
+	Tag         string    `json:"Tag"`
+	Description string    `json:"Description"`
+	WGConfigID  uuid.UUID `json:"WGConfigID,omitempty"`
+	CreatedAt   time.Time `json:"CreatedAt"`
 }
 
 type FORM_LIST_NETWORKS struct {
-	DeviceToken string             `json:"DeviceToken"`
-	UID         primitive.ObjectID `json:"UID"`
-	Limit       int                `json:"Limit"`
-	Offset      int                `json:"Offset"`
+	DeviceToken string    `json:"DeviceToken"`
+	UID         uuid.UUID `json:"UID"`
+	Limit       int       `json:"Limit"`
+	Offset      int       `json:"Offset"`
 }
 
 type FORM_UPDATE_NETWORK struct {
-	DeviceToken string             `json:"DeviceToken"`
-	UID         primitive.ObjectID `json:"UID"`
-	Network     *Network           `json:"Network"`
+	DeviceToken string   `json:"DeviceToken"`
+	UID         uuid.UUID `json:"UID"`
+	Network     *Network  `json:"Network"`
 }
 
 type FORM_LIST_WG_SERVER_CONFIGS struct {
-	DeviceToken string             `json:"DeviceToken"`
-	UID         primitive.ObjectID `json:"UID"`
+	DeviceToken string    `json:"DeviceToken"`
+	UID         uuid.UUID `json:"UID"`
 }

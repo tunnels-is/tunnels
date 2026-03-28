@@ -3,11 +3,11 @@ package main
 import (
 	"fmt"
 
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"github.com/google/uuid"
 )
 
 func main() {
-	x := primitive.NewObjectID()
+	x := uuid.New()
 	fmt.Println(x)
 
 }
