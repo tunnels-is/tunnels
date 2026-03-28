@@ -679,7 +679,7 @@ func Test_LoadAndSaveServerConfig_RoundTrip(t *testing.T) {
 	originalConfig := &types.ServerConfig{
 		UserMaxConnections: 7,
 		PingTimeoutMinutes: 15,
-		Features:           []types.Feature{types.AUTH, types.DNS, types.BBOLT},
+		Features:           []types.Feature{types.AUTH, types.DNS},
 		SecretStore:        types.EnvStore,
 		VPNIP:              "10.0.0.1",
 		APIPort:            "8443",

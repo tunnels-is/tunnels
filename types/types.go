@@ -10,10 +10,9 @@ import (
 type Feature string
 
 const (
-	AUTH  Feature = "AUTH"
-	DNS   Feature = "DNS"
-	BBOLT Feature = "BBOLT"
-	WG    Feature = "WG"
+	AUTH Feature = "AUTH"
+	DNS  Feature = "DNS"
+	WG   Feature = "WG"
 )
 
 type TunnelType string
