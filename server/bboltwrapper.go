@@ -1,9 +1,11 @@
 package main
 
 import (
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"slices"
 	"time"
 
@@ -951,15 +953,35 @@ func BBolt_CountNetworks() (int64, error) {
 	return count, err
 }
 
+// networkKey converts a CIDR string to a 4-byte big-endian IP key.
+// BBolt sorts keys byte-by-byte, so this gives perfect numerical IP order.
+func networkKey(cidr string) ([]byte, error) {
+	ip, _, err := net.ParseCIDR(cidr)
+	if err != nil {
+		return nil, err
+	}
+	v4 := ip.To4()
+	if v4 == nil {
+		return nil, fmt.Errorf("not an IPv4 address: %s", cidr)
+	}
+	key := make([]byte, 4)
+	binary.BigEndian.PutUint32(key, binary.BigEndian.Uint32(v4))
+	return key, nil
+}
+
 func BBolt_CreateNetworksBatch(networks []*Network) error {
 	return BBoltDB.Update(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(NETWORKS_BUCKET))
 		for _, n := range networks {
+			key, err := networkKey(n.CIDR)
+			if err != nil {
+				return err
+			}
 			data, err := bboltMarshal(n)
 			if err != nil {
 				return err
 			}
-			if err := b.Put([]byte(n.ID.String()), data); err != nil {
+			if err := b.Put(key, data); err != nil {
 				return err
 			}
 		}
@@ -995,12 +1017,18 @@ func BBolt_FindNetworkByID(id uuid.UUID) (*Network, error) {
 	var n *Network
 	err := BBoltDB.View(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(NETWORKS_BUCKET))
-		v := b.Get([]byte(id.String()))
-		if v == nil {
-			return nil
+		c := b.Cursor()
+		for k, v := c.First(); k != nil; k, v = c.Next() {
+			candidate := new(Network)
+			if err := bboltUnmarshal(v, candidate); err != nil {
+				continue
+			}
+			if candidate.ID == id {
+				n = candidate
+				return nil
+			}
 		}
-		n = new(Network)
-		return bboltUnmarshal(v, n)
+		return nil
 	})
 	return n, err
 }
@@ -1008,11 +1036,15 @@ func BBolt_FindNetworkByID(id uuid.UUID) (*Network, error) {
 func BBolt_UpdateNetwork(n *Network) error {
 	return BBoltDB.Update(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(NETWORKS_BUCKET))
+		key, err := networkKey(n.CIDR)
+		if err != nil {
+			return err
+		}
 		data, err := bboltMarshal(n)
 		if err != nil {
 			return err
 		}
-		return b.Put([]byte(n.ID.String()), data)
+		return b.Put(key, data)
 	})
 }
 

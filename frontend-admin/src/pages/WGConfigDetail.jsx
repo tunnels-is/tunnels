@@ -15,7 +15,7 @@ function Row({ label, children }) {
   );
 }
 
-const EMPTY_ID = '000000000000000000000000';
+const EMPTY_ID = '00000000-0000-0000-0000-000000000000';
 
 export default function WGConfigDetail() {
   const { id } = useParams();
@@ -54,7 +54,8 @@ export default function WGConfigDetail() {
     }
     if (netResp && netResp.status === 200) {
       const data = await netResp.json();
-      setNetworks(Array.isArray(data) ? data : []);
+      const list = Array.isArray(data.Networks) ? data.Networks : Array.isArray(data) ? data : [];
+      setNetworks(list);
     }
   };
 

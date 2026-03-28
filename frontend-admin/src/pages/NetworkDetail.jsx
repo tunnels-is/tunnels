@@ -15,7 +15,7 @@ function Row({ label, children }) {
   );
 }
 
-const EMPTY_ID = '000000000000000000000000';
+const EMPTY_ID = '00000000-0000-0000-0000-000000000000';
 
 export default function NetworkDetail() {
   const { id } = useParams();
@@ -35,8 +35,9 @@ export default function NetworkDetail() {
       wgConfigs.length === 0 ? apiPost('/ui/wg/server-config/list', {}) : Promise.resolve(null),
     ]);
     if (netResp.status === 200) {
-      const list = await netResp.json();
-      const found = (Array.isArray(list) ? list : []).find((n) => n._id === id);
+      const data = await netResp.json();
+      const list = Array.isArray(data.Networks) ? data.Networks : Array.isArray(data) ? data : [];
+      const found = list.find((n) => n._id === id);
       if (found) setNetwork(found);
     }
     if (cfgResp && cfgResp.status === 200) {
