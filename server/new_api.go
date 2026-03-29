@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/subtle"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -209,7 +210,7 @@ func HTTP_validateKey(r *http.Request) (ok bool) {
 	key := r.Header.Get("X-API-KEY")
 	Config := Config.Load()
 	if Config.AdminAPIKey != "" {
-		if key == Config.AdminAPIKey {
+		if subtle.ConstantTimeCompare([]byte(key), []byte(Config.AdminAPIKey)) == 1 {
 			return true
 		}
 	}

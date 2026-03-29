@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"crypto/rand"
+	"crypto/subtle"
 	"math/big"
 	"net/http"
 	"runtime/debug"
@@ -171,13 +172,13 @@ func authenticateUserFromEmailOrIDAndToken(email string, id uuid.UUID, token str
 
 	allowed := false
 	for _, d := range user.Tokens {
-		if d.DT == token {
+		if subtle.ConstantTimeCompare([]byte(d.DT), []byte(token)) == 1 {
 			allowed = true
 		}
 	}
 
 	if !allowed {
-		if user.APIKey == token {
+		if subtle.ConstantTimeCompare([]byte(user.APIKey), []byte(token)) == 1 {
 			allowed = true
 		}
 	}
