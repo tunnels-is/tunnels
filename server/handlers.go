@@ -895,6 +895,18 @@ func API_DeviceGet(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
+	user := getUserFromContext(r.Context())
+	if user == nil {
+		senderr(w, 400, "user not found")
+		return
+	}
+
+	if !user.IsAdmin && !user.IsManager {
+		if device.UserID != user.ID {
+			senderr(w, 400, "unauthorized")
+			return
+		}
+	}
 
 	sendObject(w, device)
 }
