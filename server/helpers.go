@@ -1,14 +1,16 @@
 package main
 
 import (
-	"crypto/hmac"
+	"crypto/aes"
+	"crypto/cipher"
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/subtle"
-	"encoding/hex"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"math/big"
 	"net"
@@ -203,43 +205,66 @@ func clientIP(r *http.Request) string {
 	return host
 }
 
-// signAdminCookie produces a signed cookie value in the format:
-//
-//	userID:deviceToken:ip:hmac
-//
-// The HMAC covers userID, deviceToken, and ip so that the cookie cannot
-// be forged or replayed from a different source address.
-func signAdminCookie(userID, deviceToken, ip string) string {
-	key := loadSecret("CookieSigningKey")
-	payload := userID + ":" + deviceToken + ":" + ip
-	mac := hmac.New(sha256.New, []byte(key))
-	mac.Write([]byte(payload))
-	sig := hex.EncodeToString(mac.Sum(nil))
-	return payload + ":" + sig
+// cookieCipher returns an AES-256-GCM cipher derived from CookieSigningKey.
+func cookieCipher() (cipher.AEAD, error) {
+	key := sha256.Sum256([]byte(loadSecret("CookieSigningKey")))
+	block, err := aes.NewCipher(key[:])
+	if err != nil {
+		return nil, err
+	}
+	return cipher.NewGCM(block)
 }
 
-// verifyAdminCookie verifies the HMAC signature and source IP embedded in the
-// cookie. It returns the parsed userID and deviceToken on success.
-func verifyAdminCookie(cookieValue, remoteIP string) (uid uuid.UUID, deviceToken string, err error) {
-	parts := strings.SplitN(cookieValue, ":", 4)
-	if len(parts) != 4 {
+// encryptAdminCookie encrypts userID, deviceToken and the client IP into an
+// opaque base64 cookie value. AES-256-GCM provides both confidentiality and
+// authenticity, so a separate HMAC is not needed.
+func encryptAdminCookie(userID, deviceToken, ip string) (string, error) {
+	gcm, err := cookieCipher()
+	if err != nil {
+		return "", err
+	}
+
+	plaintext := []byte(userID + ":" + deviceToken + ":" + ip)
+
+	nonce := make([]byte, gcm.NonceSize())
+	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+		return "", err
+	}
+
+	ciphertext := gcm.Seal(nonce, nonce, plaintext, nil)
+	return base64.RawURLEncoding.EncodeToString(ciphertext), nil
+}
+
+// decryptAdminCookie decrypts and authenticates the cookie, then verifies
+// that the embedded IP matches the current request's remote IP.
+func decryptAdminCookie(cookieValue, remoteIP string) (uid uuid.UUID, deviceToken string, err error) {
+	gcm, err := cookieCipher()
+	if err != nil {
+		return uuid.Nil, "", errors.New("internal encryption error")
+	}
+
+	data, err := base64.RawURLEncoding.DecodeString(cookieValue)
+	if err != nil {
+		return uuid.Nil, "", errors.New("invalid session")
+	}
+
+	nonceSize := gcm.NonceSize()
+	if len(data) < nonceSize {
+		return uuid.Nil, "", errors.New("invalid session")
+	}
+
+	plaintext, err := gcm.Open(nil, data[:nonceSize], data[nonceSize:], nil)
+	if err != nil {
+		return uuid.Nil, "", errors.New("invalid session")
+	}
+
+	parts := strings.SplitN(string(plaintext), ":", 3)
+	if len(parts) != 3 {
 		return uuid.Nil, "", errors.New("invalid session format")
 	}
 
-	userIDStr, deviceToken, cookieIP, sig := parts[0], parts[1], parts[2], parts[3]
+	userIDStr, deviceToken, cookieIP := parts[0], parts[1], parts[2]
 
-	// Verify HMAC
-	key := loadSecret("CookieSigningKey")
-	payload := userIDStr + ":" + deviceToken + ":" + cookieIP
-	mac := hmac.New(sha256.New, []byte(key))
-	mac.Write([]byte(payload))
-	expectedSig := hex.EncodeToString(mac.Sum(nil))
-
-	if subtle.ConstantTimeCompare([]byte(sig), []byte(expectedSig)) != 1 {
-		return uuid.Nil, "", errors.New("invalid session signature")
-	}
-
-	// Verify source IP matches what was embedded at login
 	if subtle.ConstantTimeCompare([]byte(remoteIP), []byte(cookieIP)) != 1 {
 		return uuid.Nil, "", errors.New("session IP mismatch")
 	}

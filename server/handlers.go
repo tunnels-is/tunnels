@@ -61,7 +61,11 @@ func API_AdminUILogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cookieValue := signAdminCookie(user.ID.String(), user.DeviceToken.DT, clientIP(r))
+	cookieValue, err := encryptAdminCookie(user.ID.String(), user.DeviceToken.DT, clientIP(r))
+	if err != nil {
+		senderr(w, 500, "Failed to create session")
+		return
+	}
 	http.SetCookie(w, &http.Cookie{
 		Name:     "admin_session",
 		Value:    cookieValue,
