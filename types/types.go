@@ -57,8 +57,9 @@ type ServerConfig struct {
 	// If SecretStore set to "config"
 	AdminAPIKey  string
 	DBurl        string
-	TwoFactorKey string
-	PayKey       string
+	TwoFactorKey     string
+	CookieSigningKey string
+	PayKey           string
 	CertPem      string
 	SignPem      string
 	KeyPem       string

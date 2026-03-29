@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"net/http"
-	"strings"
 
 	"github.com/google/uuid"
 )
@@ -49,19 +48,13 @@ func adminUIMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		parts := strings.SplitN(cookie.Value, ":", 2)
-		if len(parts) != 2 {
-			senderr(w, 401, "Invalid session")
-			return
-		}
-
-		uid, err := uuid.Parse(parts[0])
+		uid, deviceToken, err := verifyAdminCookie(cookie.Value, clientIP(r))
 		if err != nil {
-			senderr(w, 401, "Invalid session")
+			senderr(w, 401, err.Error())
 			return
 		}
 
-		user, err := authenticateUserFromEmailOrIDAndToken("", uid, parts[1])
+		user, err := authenticateUserFromEmailOrIDAndToken("", uid, deviceToken)
 		if err != nil {
 			senderr(w, 401, err.Error())
 			return
