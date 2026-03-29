@@ -31,7 +31,7 @@ func OSSpecificInit() error {
 			return err
 		}
 
-		f, err := os.Create("wintun.dll")
+		f, err := os.OpenFile("wintun.dll", os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
 		if err != nil {
 			ERROR("unable to create wintun: ", err)
 			return err
