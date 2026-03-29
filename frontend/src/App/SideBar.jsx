@@ -39,7 +39,7 @@ const SideBar = () => {
           },
           { icon: Network, label: "Tunnels", route: "tunnels", user: true },
           { icon: Monitor, label: "Devices", route: "devices", user: true },
-          { icon: Gauge, label: "Bandwidth", route: "bandwidth", user: true },
+          { icon: Gauge, label: "Bandwidth", route: "bandwidth", user: true, shouldRender: () => state.Config?.BandwidthGraphs },
           // { icon: MixerHorizontalIcon, label: "Connections", route: "connections", user: true, shouldRender: hasActiveTunnels },
         ],
       },
