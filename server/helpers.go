@@ -52,6 +52,7 @@ func GENERATE_CODE() string {
 }
 
 func decodeBody(r *http.Request, target any) (err error) {
+	r.Body = http.MaxBytesReader(nil, r.Body, 2<<20) // 2MB
 	dec := json.NewDecoder(r.Body)
 	err = dec.Decode(target)
 	if err != nil {

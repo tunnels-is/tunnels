@@ -222,6 +222,7 @@ func handleWebSocket(ws *websocket.Conn) {
 }
 
 func Bind[I any](form I, r *http.Request) (err error) {
+	r.Body = http.MaxBytesReader(nil, r.Body, 2<<20) // 2MB
 	decoder := json.NewDecoder(r.Body)
 	err = decoder.Decode(form)
 	return
