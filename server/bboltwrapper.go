@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/subtle"
 	"encoding/binary"
 	"encoding/json"
 	"errors"
@@ -895,7 +896,7 @@ func BBolt_FindWGServerConfigByAPIKey(apiKey string) (*types.WGServerConfig, err
 		c := b.Cursor()
 		for _, v := c.First(); v != nil; _, v = c.Next() {
 			cfg := new(types.WGServerConfig)
-			if err := bboltUnmarshal(v, cfg); err == nil && cfg.APIKey == apiKey {
+			if err := bboltUnmarshal(v, cfg); err == nil && subtle.ConstantTimeCompare([]byte(cfg.APIKey), []byte(apiKey)) == 1 {
 				found = cfg
 				break
 			}
