@@ -91,7 +91,7 @@ func RenameFile(oldName, newName string) (err error) {
 }
 
 func CreateFile(file string) (f *os.File, err error) {
-	f, err = os.OpenFile(file, os.O_APPEND|os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0o777)
+	f, err = os.OpenFile(file, os.O_APPEND|os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0o600)
 	if err != nil {
 		ERROR("Unable to open file: ", err)
 		return
@@ -104,7 +104,7 @@ func CreateFile(file string) (f *os.File, err error) {
 func CreateFolder(path string) {
 	_, err := os.Stat(path)
 	if err != nil {
-		err = os.Mkdir(path, 0o777)
+		err = os.Mkdir(path, 0o700)
 		if err != nil {
 			ERROR("Unable to create base folder: ", err)
 			return

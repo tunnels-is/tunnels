@@ -101,7 +101,7 @@ func processWhiteList(index int, wg *sync.WaitGroup, nm *xsync.MapOf[string, boo
 		return
 	}
 
-	err = os.WriteFile(state.WhiteListPath+lowerTag, listBytes, 0o666)
+	err = os.WriteFile(state.WhiteListPath+lowerTag, listBytes, 0o600)
 	if err != nil {
 		ERROR("Could not save", wl.URL, err)
 		return

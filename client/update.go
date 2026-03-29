@@ -210,7 +210,7 @@ func checkForAndDownloadUpdate(targetTag string) (shouldUpdate bool, err error) 
 
 		state := STATE.Load()
 		_ = os.Remove(state.BasePath + archive)
-		out, err := os.Create(state.BasePath + archive)
+		out, err := os.OpenFile(state.BasePath+archive, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
 		if err != nil {
 			return false, fmt.Errorf("failed to create output file: %w", err)
 		}
