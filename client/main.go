@@ -41,13 +41,11 @@ func printInfo() {
 		"\n"+
 		divider+
 		"\n"+
-		"  ·  requires network admin permissions\n"+
-		"  ·  configure dns servers to prevent leaks\n"+
-		"  ·  turn logging off for improved privacy\n"+
-		"  ·  use --basePath to change the config directory\n"+
+		"  ·  configure system dns servers to prevent leaks\n"+
+		"  ·  --basePath to change the config directory\n"+
 		"\n"+
 		"  "+warn+"⚠"+reset+"  if the app closes without logs,\n"+
-		"     delete your config and retry\n"+
+		"     delete your config and restart\n"+
 		"\n",
 		scheme, conf.APIIP, conf.APIPort, s.BasePath,
 	)
