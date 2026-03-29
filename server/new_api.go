@@ -7,6 +7,7 @@ import (
 	"log"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/tunnels-is/tunnels/types"
@@ -19,6 +20,7 @@ func launchAPIServer() {
 	var handler http.Handler = mux
 	handler = bodyCloseMiddleware(handler)
 	handler = corsMiddleware(handler)
+	handler = securityHeadersMiddleware(handler)
 	handler = loggingTimingMiddleware(handler)
 
 	mux.HandleFunc("/health", healthCheckHandler)
@@ -178,6 +180,27 @@ func corsMiddleware(next http.Handler) http.Handler {
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusOK)
 			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+func securityHeadersMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("Strict-Transport-Security", "max-age=63072000; includeSubDomains")
+
+		path := r.URL.Path
+		if strings.HasPrefix(path, "/admin") || strings.HasPrefix(path, "/ui/") {
+			w.Header().Set("X-Frame-Options", "DENY")
+		}
+
+		if strings.HasPrefix(path, "/admin") {
+			w.Header().Set("Content-Security-Policy",
+				"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "+
+					"img-src 'self' data:; font-src 'self'; form-action 'self'; "+
+					"frame-ancestors 'none'; base-uri 'self'; object-src 'none'")
 		}
 
 		next.ServeHTTP(w, r)
