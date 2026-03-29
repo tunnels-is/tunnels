@@ -72,6 +72,7 @@ const DNS = () => {
     { key: "LogBlockedDomains", label: "Log Blocked", checked: state?.Config?.LogBlockedDomains },
     { key: "LogAllDomains", label: "Log All", checked: state?.Config?.LogAllDomains },
     { key: "DNSstats", label: "Stats", checked: state?.Config?.DNSstats },
+    { key: "DNSHTTPSAutomatic", label: "Dynamic Encryption", checked: state?.Config?.DNSHTTPSAutomatic },
   ];
 
   return (
