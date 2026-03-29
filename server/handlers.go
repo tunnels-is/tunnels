@@ -1230,12 +1230,14 @@ func API_UserResetPassword(w http.ResponseWriter, r *http.Request) {
 
 	code, err := Decrypt(user.TwoFactorCode, []byte(loadSecret("TwoFactorKey")))
 	if err != nil {
+		senderr(w, 401, "unauthorized")
 		ADMIN(err)
 		return
 	}
 
 	otp := gotp.NewDefaultTOTP(code).Now()
 	if otp != RF.ResetCode {
+		senderr(w, 401, "unauthorized")
 		return
 	}
 
