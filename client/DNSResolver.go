@@ -248,6 +248,7 @@ func DNSQuery(w dns.ResponseWriter, m *dns.Msg) {
 
 	var DNSTunnel *TUN
 	var ServerDNS *types.DNSRecord
+	var defaultRouteConnected bool
 	tunnelMapRange(func(tun *TUN) bool {
 		if tun.GetState() != TUN_Connected {
 			return true
@@ -256,6 +257,10 @@ func DNSQuery(w dns.ResponseWriter, m *dns.Msg) {
 		meta := tun.meta.Load()
 		if meta == nil {
 			return true
+		}
+
+		if meta.EnableDefaultRoute {
+			defaultRouteConnected = true
 		}
 
 		if meta.DNSBlocking && blocked {
@@ -307,7 +312,6 @@ func DNSQuery(w dns.ResponseWriter, m *dns.Msg) {
 
 		if !hasInfo {
 			DEBUG("Redirect DNS to VPN: ", m.Question[0].Name)
-
 			ResolveDomainLocal(DNSTunnel, m, w)
 			return
 		}
@@ -351,11 +355,20 @@ func DNSQuery(w dns.ResponseWriter, m *dns.Msg) {
 		if err != nil {
 			_ = w.WriteMsg(m)
 		}
-	} else {
-		err := ResolveDomain(m, w)
+		return
+	}
+
+	if conf.DNSHTTPSAutomatic && !defaultRouteConnected {
+		err := ResolveDNSAsHTTPS(m, w)
 		if err != nil {
 			_ = w.WriteMsg(m)
 		}
+		return
+	}
+
+	err := ResolveDomain(m, w)
+	if err != nil {
+		_ = w.WriteMsg(m)
 	}
 }
 

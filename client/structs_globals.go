@@ -295,28 +295,29 @@ type configV2 struct {
 	APICertType    certs.CertType
 
 	// Generic
-	DisableDNS        bool
-	LogBlockedDomains bool
-	LogBlockedPorts   bool
-	LogAllDomains     bool
-	DebugLogging      bool
-	ConsoleLogging    bool
-	InfoLogging       bool
-	ErrorLogging      bool
-	ConsoleLogOnly    bool
-	ConnectionTracer  bool
-	BandwidthGraphs   bool
+	LogBlockedPorts  bool
+	DebugLogging     bool
+	ConsoleLogging   bool
+	InfoLogging      bool
+	ErrorLogging     bool
+	ConsoleLogOnly   bool
+	ConnectionTracer bool
+	BandwidthGraphs  bool
 
 	// DNS
-	DNS1Default   string
-	DNS2Default   string
-	DNSOverHTTPS  bool
-	DNSstats      bool
-	DNSServerIP   string
-	DNSServerPort string
-	DNSBlockLists []*BlockList
-	DNSWhiteLists []*BlockList
-	DNSRecords    []*types.DNSRecord
+	DisableDNS        bool
+	LogBlockedDomains bool
+	LogAllDomains     bool
+	DNS1Default       string
+	DNS2Default       string
+	DNSOverHTTPS      bool
+	DNSHTTPSAutomatic bool
+	DNSstats          bool
+	DNSServerIP       string
+	DNSServerPort     string
+	DNSBlockLists     []*BlockList
+	DNSWhiteLists     []*BlockList
+	DNSRecords        []*types.DNSRecord
 }
 
 type stateV2 struct {
@@ -531,7 +532,6 @@ func (t *TUN) RecordBandwidth() {
 }
 
 func (t *TUN) MarshalJSON() ([]byte, error) {
-
 	var pingTime time.Time
 	if t.pingTime.Load() != nil {
 		pingTime = *t.pingTime.Load()
