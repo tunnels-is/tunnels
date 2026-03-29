@@ -498,6 +498,11 @@ func initializeWGServer(network *Network) error {
 		return nil
 	}
 
+	insecureSkipVerify := false
+	if cfg.WG != nil {
+		insecureSkipVerify = cfg.WG.InsecureSkipVerify
+	}
+
 	internetIface := discoverInternetIface()
 
 	privKey := generateWGPrivKey()
@@ -515,7 +520,7 @@ func initializeWGServer(network *Network) error {
 		NetworkID:          network.ID,
 		WireGuardIface:     "wg0",
 		InternetIface:      internetIface,
-		InsecureSkipVerify: true,
+		InsecureSkipVerify: insecureSkipVerify,
 	}
 	if err := DB_CreateWGServerConfig(wgCfg); err != nil {
 		return fmt.Errorf("create wg server config: %w", err)
@@ -546,7 +551,7 @@ func initializeWGServer(network *Network) error {
 
 	cfg.WG = &types.WGBootstrap{
 		APIKey:             wgCfg.APIKey,
-		InsecureSkipVerify: true,
+		InsecureSkipVerify: insecureSkipVerify,
 	}
 	Config.Store(cfg)
 	if err := SaveServerConfig(serverConfigPath); err != nil {
