@@ -282,7 +282,10 @@ func addAdminToConfig(identifier string) error {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
 
-	hashedIdentifier := hashIdentifier(identifier)
+	hashedIdentifier, err := hashIdentifier(identifier)
+	if err != nil {
+		return fmt.Errorf("failed to hash indetifier: %w", err)
+	}
 
 	C := Config.Load()
 	C.NetAdmins = append(C.NetAdmins, hashedIdentifier)
@@ -351,12 +354,12 @@ func loadCertificatesAndTLSSettings() (err error) {
 	return nil
 }
 
-func hashIdentifier(identifier string) string {
+func hashIdentifier(identifier string) (string, error) {
 	h, err := bcrypt.GenerateFromPassword([]byte(identifier), bcrypt.MinCost)
 	if err != nil {
-		return identifier
+		return "", err
 	}
-	return string(h)
+	return string(h), nil
 }
 
 func makeConfigAndCerts() (err error) {
