@@ -41,6 +41,8 @@ func loadSecret(key string) (v string) {
 			return config.AdminAPIKey
 		case "TwoFactorKey":
 			return config.TwoFactorKey
+		case "CookieSigningKey":
+			return config.CookieSigningKey
 		case "DBurl":
 			return config.DBurl
 		default:
