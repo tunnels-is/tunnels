@@ -48,7 +48,7 @@ func adminUIMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		uid, deviceToken, err := verifyAdminCookie(cookie.Value, clientIP(r))
+		uid, deviceToken, err := decryptAdminCookie(cookie.Value, clientIP(r))
 		if err != nil {
 			senderr(w, 401, err.Error())
 			return
