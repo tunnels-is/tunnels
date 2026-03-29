@@ -61,7 +61,7 @@ func API_AdminUILogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cookieValue := user.ID.String() + ":" + user.DeviceToken.DT
+	cookieValue := signAdminCookie(user.ID.String(), user.DeviceToken.DT, clientIP(r))
 	http.SetCookie(w, &http.Cookie{
 		Name:     "admin_session",
 		Value:    cookieValue,

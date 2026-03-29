@@ -1,13 +1,17 @@
 package main
 
 import (
+	"crypto/hmac"
+	"crypto/rand"
+	"crypto/sha256"
+	"crypto/subtle"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
-	"crypto/rand"
-	"crypto/subtle"
 	"math/big"
+	"net"
 	"net/http"
 	"runtime/debug"
 	"strings"
@@ -188,4 +192,62 @@ func authenticateUserFromEmailOrIDAndToken(email string, id uuid.UUID, token str
 	}
 
 	return nil, errors.New("unauthorized")
+}
+
+// clientIP extracts the remote IP address from the request, stripping the port.
+func clientIP(r *http.Request) string {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return host
+}
+
+// signAdminCookie produces a signed cookie value in the format:
+//
+//	userID:deviceToken:ip:hmac
+//
+// The HMAC covers userID, deviceToken, and ip so that the cookie cannot
+// be forged or replayed from a different source address.
+func signAdminCookie(userID, deviceToken, ip string) string {
+	key := loadSecret("CookieSigningKey")
+	payload := userID + ":" + deviceToken + ":" + ip
+	mac := hmac.New(sha256.New, []byte(key))
+	mac.Write([]byte(payload))
+	sig := hex.EncodeToString(mac.Sum(nil))
+	return payload + ":" + sig
+}
+
+// verifyAdminCookie verifies the HMAC signature and source IP embedded in the
+// cookie. It returns the parsed userID and deviceToken on success.
+func verifyAdminCookie(cookieValue, remoteIP string) (uid uuid.UUID, deviceToken string, err error) {
+	parts := strings.SplitN(cookieValue, ":", 4)
+	if len(parts) != 4 {
+		return uuid.Nil, "", errors.New("invalid session format")
+	}
+
+	userIDStr, deviceToken, cookieIP, sig := parts[0], parts[1], parts[2], parts[3]
+
+	// Verify HMAC
+	key := loadSecret("CookieSigningKey")
+	payload := userIDStr + ":" + deviceToken + ":" + cookieIP
+	mac := hmac.New(sha256.New, []byte(key))
+	mac.Write([]byte(payload))
+	expectedSig := hex.EncodeToString(mac.Sum(nil))
+
+	if subtle.ConstantTimeCompare([]byte(sig), []byte(expectedSig)) != 1 {
+		return uuid.Nil, "", errors.New("invalid session signature")
+	}
+
+	// Verify source IP matches what was embedded at login
+	if subtle.ConstantTimeCompare([]byte(remoteIP), []byte(cookieIP)) != 1 {
+		return uuid.Nil, "", errors.New("session IP mismatch")
+	}
+
+	uid, err = uuid.Parse(userIDStr)
+	if err != nil {
+		return uuid.Nil, "", errors.New("invalid session")
+	}
+
+	return uid, deviceToken, nil
 }
