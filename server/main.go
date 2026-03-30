@@ -505,18 +505,11 @@ func initializeWGServer(network *Network) error {
 
 	internetIface := discoverInternetIface()
 
-	privKey := generateWGPrivKey()
-	pubKey, err := deriveWGPubKey(privKey)
-	if err != nil {
-		return fmt.Errorf("derive wg public key: %w", err)
-	}
-
 	wgCfg := &types.WGServerConfig{
 		ID:                 uuid.New(),
 		Tag:                "tunnels",
 		APIKey:             uuid.NewString(),
 		WireGuardPort:      51820,
-		WireGuardPrivKey:   privKey,
 		NetworkID:          network.ID,
 		WireGuardIface:     "wg0",
 		InternetIface:      internetIface,
@@ -545,7 +538,7 @@ func initializeWGServer(network *Network) error {
 	if defaultServer == nil {
 		return fmt.Errorf("default server not found")
 	}
-	if err := DB_SetServerWGConfigID(defaultServer.ID, wgCfg, pubKey, network.CIDR); err != nil {
+	if err := DB_SetServerWGConfigID(defaultServer.ID, wgCfg, "", network.CIDR); err != nil {
 		return fmt.Errorf("assign wg config to server: %w", err)
 	}
 
@@ -559,7 +552,6 @@ func initializeWGServer(network *Network) error {
 	}
 
 	logger.Info("WG server initialized",
-		"pubKey", pubKey,
 		"subnet", network.CIDR,
 		"port", wgCfg.WireGuardPort,
 		"iface", wgCfg.WireGuardIface,

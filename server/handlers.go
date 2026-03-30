@@ -18,6 +18,11 @@ import (
 )
 
 func API_AdminUILogin(w http.ResponseWriter, r *http.Request) {
+	defer func() {
+		// brute force timing-attack prevention
+		time.Sleep(50 * time.Millisecond)
+	}()
+
 	defer BasicRecover()
 
 	LF := new(LOGIN_FORM)

@@ -119,7 +119,6 @@ func API_WGServerConfigList(w http.ResponseWriter, r *http.Request) {
 
 	for _, cfg := range configs {
 		cfg.APIKey = ""
-		cfg.WireGuardPrivKey = ""
 	}
 	sendObject(w, configs)
 }
