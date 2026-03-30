@@ -1,6 +1,7 @@
 package wgserver
 
 import (
+	"crypto/rand"
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
@@ -35,7 +36,44 @@ type Config struct {
 	PacketInspection   bool
 }
 
+// generateWGPrivKey generates a new Curve25519 private key with proper clamping.
+func generateWGPrivKey() (string, error) {
+	var priv [32]byte
+	if _, err := rand.Read(priv[:]); err != nil {
+		return "", fmt.Errorf("rand.Read failed: %w", err)
+	}
+	priv[0] &= 248
+	priv[31] &= 127
+	priv[31] |= 64
+	return base64.StdEncoding.EncodeToString(priv[:]), nil
+}
+
+func derivePubKey(privKeyB64 string) (string, error) {
+	privBytes, err := base64.StdEncoding.DecodeString(privKeyB64)
+	if err != nil {
+		return "", fmt.Errorf("decode private key: %w", err)
+	}
+	if len(privBytes) != 32 {
+		return "", fmt.Errorf("private key must be 32 bytes, got %d", len(privBytes))
+	}
+	pubBytes, err := curve25519.X25519(privBytes, curve25519.Basepoint)
+	if err != nil {
+		return "", fmt.Errorf("derive public key: %w", err)
+	}
+	return base64.StdEncoding.EncodeToString(pubBytes), nil
+}
+
 func FetchConfig(controllerURL, apiKey string, insecureSkipVerify bool) (*Config, error) {
+	// Generate a fresh key pair locally.
+	privKeyB64, err := generateWGPrivKey()
+	if err != nil {
+		return nil, fmt.Errorf("generate wg private key: %w", err)
+	}
+	pubKeyB64, err := derivePubKey(privKeyB64)
+	if err != nil {
+		return nil, fmt.Errorf("derive wg public key: %w", err)
+	}
+
 	transport := &http.Transport{
 		TLSClientConfig: &tls.Config{
 			InsecureSkipVerify: insecureSkipVerify,
@@ -52,6 +90,7 @@ func FetchConfig(controllerURL, apiKey string, insecureSkipVerify bool) (*Config
 		return nil, fmt.Errorf("build request: %w", err)
 	}
 	req.Header.Set("X-WG-KEY", apiKey)
+	req.Header.Set("X-WG-PubKey", pubKeyB64)
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -73,7 +112,7 @@ func FetchConfig(controllerURL, apiKey string, insecureSkipVerify bool) (*Config
 		APIKey:             apiKey,
 		ServerID:           r.ServerID,
 		WireGuardPort:      r.WireGuardPort,
-		WireGuardPrivKey:   r.WireGuardPrivKey,
+		WireGuardPrivKey:   privKeyB64,
 		WireGuardSubnet:    r.WireGuardSubnet,
 		WireGuardIface:     r.WireGuardIface,
 		InternetIface:      r.InternetIface,
@@ -92,19 +131,4 @@ func FetchConfig(controllerURL, apiKey string, insecureSkipVerify bool) (*Config
 	}
 
 	return cfg, nil
-}
-
-func derivePubKey(privKeyB64 string) (string, error) {
-	privBytes, err := base64.StdEncoding.DecodeString(privKeyB64)
-	if err != nil {
-		return "", fmt.Errorf("decode private key: %w", err)
-	}
-	if len(privBytes) != 32 {
-		return "", fmt.Errorf("private key must be 32 bytes, got %d", len(privBytes))
-	}
-	pubBytes, err := curve25519.X25519(privBytes, curve25519.Basepoint)
-	if err != nil {
-		return "", fmt.Errorf("derive public key: %w", err)
-	}
-	return base64.StdEncoding.EncodeToString(pubBytes), nil
 }

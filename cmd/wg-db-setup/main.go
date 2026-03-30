@@ -1,10 +1,9 @@
 // wg-db-setup patches the WireGuard fields on a server record in the BoltDB.
 // Usage: wg-db-setup -db /opt/tunnels/tunnels.db -ip 74.63.223.157 \
-//                    -privkey <b64> -port 442 -base http://127.0.0.1:8181
+//                    -pubkey <b64> -port 442 -base http://127.0.0.1:8181
 package main
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -13,7 +12,6 @@ import (
 
 	gobolt "go.etcd.io/bbolt"
 	"github.com/google/uuid"
-	"golang.org/x/crypto/curve25519"
 )
 
 // Minimal server shape — matches types.Server JSON tags exactly.
@@ -32,7 +30,7 @@ type serverRecord struct {
 func main() {
 	dbPath  := flag.String("db",      "/opt/tunnels/tunnels.db",  "path to BoltDB file")
 	targetIP := flag.String("ip",     "",                          "server IP to update")
-	privKeyB64 := flag.String("privkey", "",                       "wg-server base64 private key (to derive pubkey)")
+	pubKeyB64 := flag.String("pubkey", "",                         "wg-server base64 public key")
 	port    := flag.String("port",    "",                          "WireGuard port (e.g. 442)")
 	baseURL := flag.String("base",    "http://127.0.0.1:8181",    "wg-server management base URL")
 	listOnly := flag.Bool("list",     false,                       "list server records and exit")
@@ -65,21 +63,9 @@ func main() {
 		return
 	}
 
-	if *targetIP == "" || *privKeyB64 == "" || *port == "" {
-		log.Fatal("flags -ip, -privkey, and -port are required (or use -list)")
+	if *targetIP == "" || *pubKeyB64 == "" || *port == "" {
+		log.Fatal("flags -ip, -pubkey, and -port are required (or use -list)")
 	}
-
-	// Derive public key from private key.
-	privBytes, err := base64.StdEncoding.DecodeString(*privKeyB64)
-	if err != nil || len(privBytes) != 32 {
-		log.Fatalf("invalid privkey: %v", err)
-	}
-	pubBytes, err := curve25519.X25519(privBytes, curve25519.Basepoint)
-	if err != nil {
-		log.Fatalf("derive pubkey: %v", err)
-	}
-	pubKeyB64 := base64.StdEncoding.EncodeToString(pubBytes)
-	fmt.Printf("derived pubkey: %s\n", pubKeyB64)
 
 	err = db.Update(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte("servers"))
@@ -94,7 +80,7 @@ func main() {
 			if s.IP != *targetIP {
 				return nil
 			}
-			s.WireGuardPubKey = pubKeyB64
+			s.WireGuardPubKey = *pubKeyB64
 			s.WireGuardPort   = *port
 			s.WGBaseURL       = *baseURL
 			data, err := json.Marshal(s)

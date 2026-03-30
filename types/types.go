@@ -150,9 +150,9 @@ type WGServerConfig struct {
 	// authenticate /wg/server-config/fetch, /wg/peers, and /wg/servers.
 	APIKey string `json:"APIKey"`
 
-	WireGuardPort    int    `json:"WireGuardPort"`
-	WireGuardPrivKey string `json:"WireGuardPrivKey"`
-	WireGuardIface   string `json:"WireGuardIface"`
+	WireGuardPort   int    `json:"WireGuardPort"`
+	WireGuardPubKey string `json:"WireGuardPubKey"`
+	WireGuardIface  string `json:"WireGuardIface"`
 
 	// NetworkID references the Network record whose CIDR is the WireGuard subnet.
 	// The subnet is resolved at runtime — it is not stored on this struct.
@@ -165,16 +165,15 @@ type WGServerConfig struct {
 }
 
 // WGServerConfigResponse is returned by GET /wg/server-config/fetch to the
-// wg-server. It includes the private key and all operational parameters needed
-// to bring up the WireGuard interface.
+// wg-server. It includes all operational parameters needed to bring up the
+// WireGuard interface. The private key is generated locally by the wg-server.
 type WGServerConfigResponse struct {
 	// ServerID is the UUID of the Server record linked to this config.
 	ServerID string `json:"ServerID"`
 
-	WireGuardPort    int    `json:"WireGuardPort"`
-	WireGuardPrivKey string `json:"WireGuardPrivKey"`
-	WireGuardSubnet  string `json:"WireGuardSubnet"`
-	WireGuardIface   string `json:"WireGuardIface"`
+	WireGuardPort   int    `json:"WireGuardPort"`
+	WireGuardSubnet string `json:"WireGuardSubnet"`
+	WireGuardIface  string `json:"WireGuardIface"`
 
 	InternetIface string `json:"InternetIface"`
 
