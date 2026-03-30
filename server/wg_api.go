@@ -1,7 +1,6 @@
 package main
 
 import (
-	"crypto/rand"
 	"encoding/base64"
 	"fmt"
 	"log/slog"
@@ -10,7 +9,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/tunnels-is/tunnels/types"
-	"golang.org/x/crypto/curve25519"
 )
 
 func API_WGPeers(w http.ResponseWriter, r *http.Request) {
@@ -173,31 +171,6 @@ func HTTP_validateWGKey(r *http.Request) (*types.WGServerConfig, bool) {
 	return cfg, true
 }
 
-func generateWGPrivKey() string {
-	privKey := make([]byte, 32)
-	if _, err := rand.Read(privKey); err != nil {
-		panic("rand.Read failed: " + err.Error())
-	}
-	privKey[0] &= 248
-	privKey[31] = (privKey[31] & 127) | 64
-	return base64.StdEncoding.EncodeToString(privKey)
-}
-
-func deriveWGPubKey(privKeyB64 string) (string, error) {
-	privBytes, err := base64.StdEncoding.DecodeString(privKeyB64)
-	if err != nil {
-		return "", fmt.Errorf("decode private key: %w", err)
-	}
-	if len(privBytes) != 32 {
-		return "", fmt.Errorf("private key must be 32 bytes, got %d", len(privBytes))
-	}
-	pubBytes, err := curve25519.X25519(privBytes, curve25519.Basepoint)
-	if err != nil {
-		return "", fmt.Errorf("derive public key: %w", err)
-	}
-	return base64.StdEncoding.EncodeToString(pubBytes), nil
-}
-
 type FORM_WG_SERVER_CONFIG_CREATE struct {
 	Tag            string             `json:"Tag"`
 	WireGuardPort  int                `json:"WireGuardPort"`
@@ -230,13 +203,6 @@ func API_WGServerConfigCreate(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	privKeyB64 := generateWGPrivKey()
-	pubKeyB64, err := deriveWGPubKey(privKeyB64)
-	if err != nil {
-		senderr(w, 500, "Failed to derive WireGuard public key", slog.Any("err", err))
-		return
-	}
-
 	var subnet string
 	if F.NetworkID != uuid.Nil {
 		network, nerr := DB_FindNetworkByID(F.NetworkID)
@@ -252,7 +218,6 @@ func API_WGServerConfigCreate(w http.ResponseWriter, r *http.Request) {
 		Tag:                F.Tag,
 		APIKey:             uuid.NewString(),
 		WireGuardPort:      F.WireGuardPort,
-		WireGuardPrivKey:   privKeyB64,
 		NetworkID:          F.NetworkID,
 		WireGuardIface:     F.WireGuardIface,
 		InternetIface:      F.InternetIface,
@@ -279,14 +244,13 @@ func API_WGServerConfigCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	sendObject(w, map[string]any{
-		"ID":              cfg.ID.String(),
-		"APIKey":          cfg.APIKey,
-		"WireGuardPubKey": pubKeyB64,
-		"Tag":             cfg.Tag,
-		"WireGuardPort":   cfg.WireGuardPort,
+		"ID":             cfg.ID.String(),
+		"APIKey":         cfg.APIKey,
+		"Tag":            cfg.Tag,
+		"WireGuardPort":  cfg.WireGuardPort,
 		"WireGuardSubnet": subnet,
-		"WireGuardIface":  cfg.WireGuardIface,
-		"InternetIface":   cfg.InternetIface,
+		"WireGuardIface": cfg.WireGuardIface,
+		"InternetIface":  cfg.InternetIface,
 	})
 }
 
@@ -314,8 +278,6 @@ func API_WGServerConfigGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	pubKey, _ := deriveWGPubKey(cfg.WireGuardPrivKey)
-
 	var cfgSubnet string
 	if cfg.NetworkID != uuid.Nil {
 		if net, _ := DB_FindNetworkByID(cfg.NetworkID); net != nil {
@@ -327,7 +289,7 @@ func API_WGServerConfigGet(w http.ResponseWriter, r *http.Request) {
 		"ID":                 cfg.ID.String(),
 		"Tag":                cfg.Tag,
 		"APIKey":             cfg.APIKey,
-		"WireGuardPubKey":    pubKey,
+		"WireGuardPubKey":    cfg.WireGuardPubKey,
 		"WireGuardPort":      cfg.WireGuardPort,
 		"WireGuardSubnet":    cfgSubnet,
 		"WireGuardIface":     cfg.WireGuardIface,
@@ -351,10 +313,11 @@ func API_WGServerConfigFetch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	pubKeyB64, err := deriveWGPubKey(wgCfg.WireGuardPrivKey)
-	if err != nil {
-		senderr(w, 500, "Failed to derive public key", slog.Any("err", err))
-		return
+	// Accept the wg-server's public key from the request header.
+	pubKeyB64 := r.Header.Get("X-WG-PubKey")
+	if pubKeyB64 != "" {
+		wgCfg.WireGuardPubKey = pubKeyB64
+		_ = DB_UpdateWGServerConfig(wgCfg)
 	}
 
 	var fetchSubnet string
@@ -370,7 +333,7 @@ func API_WGServerConfigFetch(w http.ResponseWriter, r *http.Request) {
 		for _, s := range servers {
 			if s.WGConfigID == wgCfg.ID {
 				serverID = s.ID.String()
-				_ = DB_SetServerWGConfigID(s.ID, wgCfg, pubKeyB64, fetchSubnet)
+				_ = DB_SetServerWGConfigID(s.ID, wgCfg, wgCfg.WireGuardPubKey, fetchSubnet)
 				break
 			}
 		}
@@ -379,7 +342,6 @@ func API_WGServerConfigFetch(w http.ResponseWriter, r *http.Request) {
 	resp := &types.WGServerConfigResponse{
 		ServerID:           serverID,
 		WireGuardPort:      wgCfg.WireGuardPort,
-		WireGuardPrivKey:   wgCfg.WireGuardPrivKey,
 		WireGuardSubnet:    fetchSubnet,
 		WireGuardIface:     wgCfg.WireGuardIface,
 		InternetIface:      wgCfg.InternetIface,
@@ -493,12 +455,6 @@ func API_WGServerConfigAssign(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	pubKeyB64, err := deriveWGPubKey(wgCfg.WireGuardPrivKey)
-	if err != nil {
-		senderr(w, 500, "Failed to derive WireGuard public key", slog.Any("err", err))
-		return
-	}
-
 	var assignSubnet string
 	if wgCfg.NetworkID != uuid.Nil {
 		if network, _ := DB_FindNetworkByID(wgCfg.NetworkID); network != nil {
@@ -506,13 +462,13 @@ func API_WGServerConfigAssign(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if err := DB_SetServerWGConfigID(F.ServerID, wgCfg, pubKeyB64, assignSubnet); err != nil {
+	if err := DB_SetServerWGConfigID(F.ServerID, wgCfg, wgCfg.WireGuardPubKey, assignSubnet); err != nil {
 		senderr(w, 500, "Failed to update server", slog.Any("err", err))
 		return
 	}
 
 	sendObject(w, map[string]any{
-		"WireGuardPubKey": pubKeyB64,
+		"WireGuardPubKey": wgCfg.WireGuardPubKey,
 		"WireGuardPort":   wgCfg.WireGuardPort,
 		"WireGuardSubnet": assignSubnet,
 	})
