@@ -80,10 +80,7 @@ func getUsers() (ul []*User, err error) {
 		if er != nil {
 			ERROR("unable to read user file:", er)
 		}
-		data := fb[aes.BlockSize:]
-		iv := fb[:aes.BlockSize]
-
-		decrypted, er := Decrypt(data, iv, key)
+		decrypted, er := Decrypt(fb, key)
 		if er != nil {
 			return er
 		}
@@ -109,47 +106,43 @@ func getUsers() (ul []*User, err error) {
 	return ul, err
 }
 
-func getSTREAM(key []byte, iv []byte) (cipher.Stream, []byte, error) {
-
+func Decrypt(data, key []byte) ([]byte, error) {
 	block, err := aes.NewCipher(key)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	if iv == nil {
-		iv = make([]byte, aes.BlockSize)
-		if _, err := io.ReadFull(rand.Reader, iv); err != nil {
-			return nil, nil, err
-		}
-	}
-
-	ctr := cipher.NewCTR(block, iv)
-	if ctr == nil {
-		return nil, nil, errors.New("unable to create ctr")
-	}
-
-	return ctr, iv, err
-}
-
-func Decrypt(text, iv []byte, key []byte) ([]byte, error) {
-	stream, _, err := getSTREAM(key, iv)
 	if err != nil {
 		return nil, err
 	}
 
-	out := make([]byte, len(text))
-	stream.XORKeyStream(out, text)
-	return out, nil
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, err
+	}
+
+	nonceSize := gcm.NonceSize()
+	if len(data) < nonceSize+gcm.Overhead() {
+		return nil, errors.New("ciphertext too short")
+	}
+
+	nonce := data[:nonceSize]
+	ciphertext := data[nonceSize:]
+
+	return gcm.Open(nil, nonce, ciphertext, nil)
 }
 
 func Encrypt(text, key []byte) ([]byte, error) {
-	stream, iv, err := getSTREAM(key, nil)
+	block, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, err
 	}
 
-	out := make([]byte, len(text))
-	stream.XORKeyStream(out, text)
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, err
+	}
 
-	return append(iv, out...), nil
+	nonce := make([]byte, gcm.NonceSize())
+	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+		return nil, err
+	}
+
+	return gcm.Seal(nonce, nonce, text, nil), nil
 }
