@@ -112,6 +112,7 @@ These are the real MVPs:
     - keyb1nd_'s twitch chat for the backseat debugging and support!
     - comahacks for security reviews
     - klauspost for development advice
+    - olexsmir for *please don't add your name to readme.md for no reason*
 
 [forks-shield]: https://img.shields.io/github/forks/tunnels-is/tunnels?style=for-the-badge&logo=github
 [forks-url]: https://github.com/tunnels-is/tunnels/network/members
