@@ -63,7 +63,11 @@ func (b *LazyBind) Open(port uint16) ([]conn.ReceiveFunc, uint16, error) {
 
 func (b *LazyBind) Close() error {
 	err := b.inner.Close()
-	b.closeOnce.Do(func() { close(b.done) })
+	b.closeOnce.Do(func() {
+		close(b.done)
+		zeroBytes(b.serverPriv)
+		zeroBytes(b.serverPub)
+	})
 	return err
 }
 
