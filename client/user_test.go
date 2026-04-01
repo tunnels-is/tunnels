@@ -2,7 +2,6 @@ package client
 
 import (
 	"bytes"
-	"crypto/aes"
 	"testing"
 )
 
@@ -68,14 +67,7 @@ func TestEncryptDecryptRoundTrip(t *testing.T) {
 				t.Fatalf("Encrypt failed: %v", err)
 			}
 
-			if len(ciphertext) < aes.BlockSize {
-				t.Errorf("Ciphertext too short: got %d bytes, expected at least %d", len(ciphertext), aes.BlockSize)
-			}
-
-			iv := ciphertext[:aes.BlockSize]
-			encryptedData := ciphertext[aes.BlockSize:]
-
-			decrypted, err := Decrypt(encryptedData, iv, key)
+			decrypted, err := Decrypt(ciphertext, key)
 			if err != nil {
 				t.Fatalf("Decrypt failed: %v", err)
 			}
@@ -84,7 +76,7 @@ func TestEncryptDecryptRoundTrip(t *testing.T) {
 				t.Errorf("Decrypted data does not match original\nOriginal:  %q\nDecrypted: %q", tc.plaintext, decrypted)
 			}
 
-			t.Logf("Successfully encrypted and decrypted %d bytes ✓", len(tc.plaintext))
+			t.Logf("Successfully encrypted and decrypted %d bytes", len(tc.plaintext))
 		})
 	}
 }
@@ -107,19 +99,15 @@ func TestEncryptProducesUniqueOutputs(t *testing.T) {
 	}
 
 	if bytes.Equal(ciphertext1, ciphertext2) {
-		t.Error("Two encryptions of the same plaintext produced identical ciphertext (IV should be random)")
+		t.Error("Two encryptions of the same plaintext produced identical ciphertext (nonce should be random)")
 	}
 
-	iv1 := ciphertext1[:aes.BlockSize]
-	encrypted1 := ciphertext1[aes.BlockSize:]
-	decrypted1, err := Decrypt(encrypted1, iv1, key)
+	decrypted1, err := Decrypt(ciphertext1, key)
 	if err != nil {
 		t.Fatalf("First decryption failed: %v", err)
 	}
 
-	iv2 := ciphertext2[:aes.BlockSize]
-	encrypted2 := ciphertext2[aes.BlockSize:]
-	decrypted2, err := Decrypt(encrypted2, iv2, key)
+	decrypted2, err := Decrypt(ciphertext2, key)
 	if err != nil {
 		t.Fatalf("Second decryption failed: %v", err)
 	}
@@ -127,8 +115,6 @@ func TestEncryptProducesUniqueOutputs(t *testing.T) {
 	if !bytes.Equal(decrypted1, plaintext) || !bytes.Equal(decrypted2, plaintext) {
 		t.Error("Decrypted data does not match original plaintext")
 	}
-
-	t.Log("Encrypt produces unique outputs with random IVs ✓")
 }
 
 func TestDecryptWithWrongKey(t *testing.T) {
@@ -146,21 +132,13 @@ func TestDecryptWithWrongKey(t *testing.T) {
 		t.Fatalf("Encryption failed: %v", err)
 	}
 
-	iv := ciphertext[:aes.BlockSize]
-	encrypted := ciphertext[aes.BlockSize:]
-	decrypted, err := Decrypt(encrypted, iv, wrongKey)
-	if err != nil {
-		t.Fatalf("Decryption with wrong key failed: %v", err)
+	_, err = Decrypt(ciphertext, wrongKey)
+	if err == nil {
+		t.Error("Decrypt with wrong key should return an error (GCM authentication failure)")
 	}
-
-	if bytes.Equal(decrypted, plaintext) {
-		t.Error("Decryption with wrong key produced correct plaintext (should be garbage)")
-	}
-
-	t.Log("Decryption with wrong key produces garbage as expected ✓")
 }
 
-func TestDecryptWithWrongIV(t *testing.T) {
+func TestDecryptTamperedCiphertext(t *testing.T) {
 	plaintext := []byte("Another secret message")
 	key := make([]byte, 32)
 	for i := range key {
@@ -172,22 +150,27 @@ func TestDecryptWithWrongIV(t *testing.T) {
 		t.Fatalf("Encryption failed: %v", err)
 	}
 
-	wrongIV := make([]byte, aes.BlockSize)
-	for i := range wrongIV {
-		wrongIV[i] = 0xFF
-	}
-	encrypted := ciphertext[aes.BlockSize:]
+	// Flip a byte in the ciphertext portion (after the nonce)
+	tampered := make([]byte, len(ciphertext))
+	copy(tampered, ciphertext)
+	tampered[len(tampered)-1] ^= 0xFF
 
-	decrypted, err := Decrypt(encrypted, wrongIV, key)
-	if err != nil {
-		t.Fatalf("Decryption with wrong IV failed: %v", err)
+	_, err = Decrypt(tampered, key)
+	if err == nil {
+		t.Error("Decrypt of tampered ciphertext should return an error (GCM authentication failure)")
+	}
+}
+
+func TestDecryptTooShort(t *testing.T) {
+	key := make([]byte, 32)
+	for i := range key {
+		key[i] = byte(i)
 	}
 
-	if bytes.Equal(decrypted, plaintext) {
-		t.Error("Decryption with wrong IV produced correct plaintext (should be garbage)")
+	_, err := Decrypt([]byte("short"), key)
+	if err == nil {
+		t.Error("Decrypt should fail on data shorter than nonce + tag")
 	}
-
-	t.Log("Decryption with wrong IV produces garbage as expected ✓")
 }
 
 func TestEncryptWithInvalidKeySize(t *testing.T) {
@@ -199,18 +182,18 @@ func TestEncryptWithInvalidKeySize(t *testing.T) {
 		t.Error("Encrypt should fail with invalid key size, but succeeded")
 	}
 
-	t.Logf("Encrypt correctly rejected invalid key size: %v ✓", err)
+	t.Logf("Encrypt correctly rejected invalid key size: %v", err)
 }
 
 func TestDecryptWithInvalidKeySize(t *testing.T) {
-	encrypted := []byte("fake encrypted data")
-	iv := make([]byte, aes.BlockSize)
+	// Need valid-looking data: at least nonce (12) + tag (16) = 28 bytes
+	encrypted := make([]byte, 28)
 	invalidKey := []byte{0x01, 0x02, 0x03}
 
-	_, err := Decrypt(encrypted, iv, invalidKey)
+	_, err := Decrypt(encrypted, invalidKey)
 	if err == nil {
 		t.Error("Decrypt should fail with invalid key size, but succeeded")
 	}
 
-	t.Logf("Decrypt correctly rejected invalid key size: %v ✓", err)
+	t.Logf("Decrypt correctly rejected invalid key size: %v", err)
 }
