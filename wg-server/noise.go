@@ -35,11 +35,13 @@ func noiseHash(inputs ...[]byte) []byte {
 
 func noiseKDF1(key, input []byte) []byte {
 	extract := noiseHMAC(key, input)
+	defer zeroBytes(extract)
 	return noiseHMAC(extract, []byte{0x1})
 }
 
 func noiseKDF2(key, input []byte) (t1, t2 []byte) {
 	extract := noiseHMAC(key, input)
+	defer zeroBytes(extract)
 	t1 = noiseHMAC(extract, []byte{0x1})
 	t2 = noiseHMAC(extract, append(t1, 0x2))
 	return
@@ -62,8 +64,11 @@ func tryDecryptInitiator(pkt []byte, serverPriv, serverPub []byte) (pubKeyB64 st
 	if err != nil {
 		return "", false
 	}
+	defer zeroBytes(shared)
 
-	_, k := noiseKDF2(Ci, shared)
+	chainingKey, k := noiseKDF2(Ci, shared)
+	defer zeroBytes(chainingKey)
+	defer zeroBytes(k)
 
 	aead, err := chacha20poly1305.New(k)
 	if err != nil {
@@ -72,7 +77,6 @@ func tryDecryptInitiator(pkt []byte, serverPriv, serverPub []byte) (pubKeyB64 st
 	nonce := make([]byte, aead.NonceSize())
 	plaintext, err := aead.Open(nil, nonce, pkt[40:88], Hi)
 	if err != nil {
-
 		return "", false
 	}
 

@@ -2,6 +2,7 @@ package wgserver
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
@@ -29,23 +30,32 @@ func setupWireGuard(cfg *Config) error {
 		INFO("packet inspection enabled on ", cfg.WireGuardIface)
 	}
 
-	privBytes, err := base64.StdEncoding.DecodeString(cfg.WireGuardPrivKey)
-	if err != nil || len(privBytes) != 32 {
-		return fmt.Errorf("invalid WireGuardPrivKey: %w", err)
+	if len(cfg.WireGuardPrivKey) != 32 {
+		return fmt.Errorf("invalid WireGuardPrivKey: expected 32 bytes, got %d", len(cfg.WireGuardPrivKey))
 	}
-	pubBytes, err := curve25519.X25519(privBytes, curve25519.Basepoint)
+	pubBytes, err := curve25519.X25519(cfg.WireGuardPrivKey, curve25519.Basepoint)
 	if err != nil {
 		return fmt.Errorf("derive pubkey for LazyBind: %w", err)
 	}
 
-	wgDevice = device.NewDevice(tunInterface, NewLazyBind(conn.NewDefaultBind(), privBytes, pubBytes, func() {}), wgLogger)
+	// Copy private key for LazyBind — it must retain this for handshake decryption.
+	// The original in cfg.WireGuardPrivKey is zeroed at the end of this function.
+	privCopy := make([]byte, 32)
+	copy(privCopy, cfg.WireGuardPrivKey)
 
-	privKeyHex := hex.EncodeToString(privBytes)
+	wgDevice = device.NewDevice(tunInterface, NewLazyBind(conn.NewDefaultBind(), privCopy, pubBytes, func() {}), wgLogger)
 
-	conf := fmt.Sprintf("private_key=%s\nlisten_port=%d\n\n", privKeyHex, cfg.WireGuardPort)
-	if err := ipcSet(conf); err != nil {
+	// Build IPC config using []byte so key material can be zeroed after use.
+	privKeyHex := make([]byte, hex.EncodedLen(32))
+	hex.Encode(privKeyHex, cfg.WireGuardPrivKey)
+	conf := fmt.Appendf(nil, "private_key=%s\nlisten_port=%d\n\n", privKeyHex, cfg.WireGuardPort)
+	zeroBytes(privKeyHex)
+
+	if err := ipcSetBytes(conf); err != nil {
+		zeroBytes(conf)
 		return fmt.Errorf("IpcSet device config: %w", err)
 	}
+	zeroBytes(conf)
 
 	if err := wgDevice.Up(); err != nil {
 		return fmt.Errorf("device Up: %w", err)
@@ -55,6 +65,10 @@ func setupWireGuard(cfg *Config) error {
 	if err != nil {
 		return fmt.Errorf("derive pubkey: %w", err)
 	}
+
+	// Zero the config's copy — LazyBind has its own independent copy.
+	zeroBytes(cfg.WireGuardPrivKey)
+
 	INFO("wireguard device started, pubkey=", pubKeyB64, " port=", cfg.WireGuardPort)
 	return nil
 }
@@ -96,6 +110,13 @@ func ipcSet(conf string) error {
 		return fmt.Errorf("wireguard device not initialized")
 	}
 	return wgDevice.IpcSetOperation(bufio.NewReader(strings.NewReader(conf)))
+}
+
+func ipcSetBytes(conf []byte) error {
+	if wgDevice == nil {
+		return fmt.Errorf("wireguard device not initialized")
+	}
+	return wgDevice.IpcSetOperation(bufio.NewReader(bytes.NewReader(conf)))
 }
 
 func ipcGet() (string, error) {
