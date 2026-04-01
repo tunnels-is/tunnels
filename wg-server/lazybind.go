@@ -13,6 +13,7 @@ const (
 	msgInitiation byte = 1
 
 	syncDebounce = 30 * time.Second
+	maxSeenIPs   = 200_000
 )
 
 type bufferedPkt struct {
@@ -190,6 +191,10 @@ func (b *LazyBind) shouldSync(ip netip.Addr) bool {
 				delete(b.seenIPs, k)
 			}
 		}
+	}
+
+	if len(b.seenIPs) >= maxSeenIPs {
+		return false
 	}
 
 	b.seenIPs[ip] = time.Now()
