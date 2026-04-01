@@ -16,8 +16,21 @@ import (
 
 var wgDevice *device.Device
 
-func setupWireGuard(cfg *Config) error {
-	wgLogger := device.NewLogger(device.LogLevelVerbose, "[wg] ")
+func wgDeviceLogLevel(level string) int {
+	switch level {
+	case "silent":
+		return device.LogLevelSilent
+	case "error", "warn":
+		return device.LogLevelError
+	case "info", "debug":
+		return device.LogLevelVerbose
+	default:
+		return device.LogLevelVerbose
+	}
+}
+
+func setupWireGuard(cfg *Config, logLevel string) error {
+	wgLogger := device.NewLogger(wgDeviceLogLevel(logLevel), "[wg] ")
 
 	tunDev, err := tun.CreateTUN(cfg.WireGuardIface, device.DefaultMTU)
 	if err != nil {

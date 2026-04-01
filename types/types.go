@@ -30,6 +30,13 @@ type HealthResponse struct {
 	Uptime        time.Time
 }
 
+type LogConfig struct {
+	Level  string `json:"Level,omitempty"`
+	JSON   bool   `json:"JSON,omitempty"`
+	Silent bool   `json:"Silent,omitempty"`
+	Source bool   `json:"Source,omitempty"`
+}
+
 type ServerConfig struct {
 	Features           []Feature
 	PingTimeoutMinutes int
@@ -67,6 +74,8 @@ type ServerConfig struct {
 	// Enables multiple key/pairs for API SNI rotation
 	CertPems []string
 	KeyPems  []string
+
+	Log *LogConfig `json:"Log,omitempty"`
 
 	// WG holds bootstrap config for the wg-server feature.
 	// Only required when the WG feature is enabled.

@@ -15,7 +15,7 @@ var (
 // Init starts the wg-server feature. It fetches config from the controller
 // (retrying until successful or ctx is cancelled), sets up WireGuard and
 // networking, then blocks until ctx is done before cleaning up.
-func Init(ctx context.Context, controllerURL, apiKey string, insecureSkipVerify bool) {
+func Init(ctx context.Context, controllerURL, apiKey string, insecureSkipVerify bool, logLevel string) {
 	logger = slog.Default()
 
 	INFO("fetching config from controller at ", controllerURL)
@@ -38,7 +38,7 @@ func Init(ctx context.Context, controllerURL, apiKey string, insecureSkipVerify 
 	INFO("config fetched, serverID=", cfg.ServerID,
 		" subnet=", cfg.WireGuardSubnet, " iface=", cfg.WireGuardIface)
 
-	if err := setupWireGuard(cfg); err != nil {
+	if err := setupWireGuard(cfg, logLevel); err != nil {
 		ERR("wireguard setup failed: ", err)
 		return
 	}
