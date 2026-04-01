@@ -63,6 +63,9 @@ func main() {
 	adminFlag := flag.String("admin", "", "Add an admin identifier (DeviceToken/DeviceKey/UserID) to NetAdmins")
 	flag.Parse()
 
+	explicitFlags := make(map[string]bool)
+	flag.Visit(func(f *flag.Flag) { explicitFlags[f.Name] = true })
+
 	serverConfigPath = *configPath
 	initLogging(*silent, *jsonLogs, *sourceInfo, *logLevel)
 
@@ -104,6 +107,22 @@ func main() {
 	err := LoadServerConfig(serverConfigPath)
 	if err != nil {
 		panic(err)
+	}
+
+	if lc := Config.Load().Log; lc != nil {
+		if !explicitFlags["logLevel"] && lc.Level != "" {
+			*logLevel = lc.Level
+		}
+		if !explicitFlags["json"] {
+			*jsonLogs = lc.JSON
+		}
+		if !explicitFlags["silent"] {
+			*silent = lc.Silent
+		}
+		if !explicitFlags["source"] {
+			*sourceInfo = lc.Source
+		}
+		initLogging(*silent, *jsonLogs, *sourceInfo, *logLevel)
 	}
 
 	config := Config.Load()
@@ -174,7 +193,7 @@ func main() {
 		if ctrlURL == "" {
 			ctrlURL = "https://" + latestCfg.APIIP + ":" + latestCfg.APIPort
 		}
-		go wgserver.Init(ctx, ctrlURL, wgCfg.APIKey, wgCfg.InsecureSkipVerify)
+		go wgserver.Init(ctx, ctrlURL, wgCfg.APIKey, wgCfg.InsecureSkipVerify, *logLevel)
 	}
 
 	go signal.NewSignal("API", ctx, cancel, 1*time.Second, goroutineLogger, launchAPIServer)
@@ -403,7 +422,8 @@ func makeConfigAndCerts() (err error) {
 			CertPem:            "./cert.pem",
 			KeyPem:             "./key.pem",
 			SignPem:            "./sign.pem",
-			WG:                 &types.WGBootstrap{InsecureSkipVerify: true},
+			Log:                &types.LogConfig{Level: "debug", JSON: true},
+		WG:                 &types.WGBootstrap{InsecureSkipVerify: true},
 		}
 		Config.Store(newConfig)
 		if err := SaveServerConfig(serverConfigPath); err != nil {
