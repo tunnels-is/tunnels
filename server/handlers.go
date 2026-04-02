@@ -3,7 +3,8 @@ package main
 import (
 	"context"
 	"log/slog"
-	"math/rand"
+	"crypto/rand"
+	"math/big"
 	"net/http"
 	"reflect"
 	"slices"
@@ -1331,7 +1332,8 @@ func API_ActivateLicenseKey(w http.ResponseWriter, r *http.Request) {
 		if time.Until(user.SubExpiration).Seconds() > 1 {
 			user.SubExpiration = time.Now()
 		}
-		user.SubExpiration = user.SubExpiration.AddDate(0, 1, 0).Add(time.Duration(rand.Intn(60)+60) * time.Minute)
+		jitter, _ := rand.Int(rand.Reader, big.NewInt(60))
+		user.SubExpiration = user.SubExpiration.AddDate(0, 1, 0).Add(time.Duration(jitter.Int64()+60) * time.Minute)
 		INFO("KEY +1:", key.LicenseKey.Key, " - check activation in lemon")
 
 		user.Key = &LicenseKey{
@@ -1349,7 +1351,8 @@ func API_ActivateLicenseKey(w http.ResponseWriter, r *http.Request) {
 		if user.SubExpiration.IsZero() {
 			user.SubExpiration = time.Now()
 		}
-		user.SubExpiration = time.Now().AddDate(0, months, 0).Add(time.Duration(rand.Intn(600)+60) * time.Minute)
+		jitter2, _ := rand.Int(rand.Reader, big.NewInt(600))
+		user.SubExpiration = time.Now().AddDate(0, months, 0).Add(time.Duration(jitter2.Int64()+60) * time.Minute)
 		INFO("KEY +", months, ":", key.LicenseKey.Key, " - check activate in lemon")
 
 		user.Key = &LicenseKey{
