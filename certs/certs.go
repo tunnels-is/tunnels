@@ -111,7 +111,7 @@ func MakeCert(ct CertType, certPath string, keyPath string, ips []string, domain
 		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
 		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 		BasicConstraintsValid: true,
-		IsCA:                  true,
+		IsCA:                  false,
 		IPAddresses:           parsedIPs,
 		DNSNames:              domains,
 	}
@@ -206,7 +206,7 @@ func MakeCertV2(ct CertType, certPath string, keyPath string, ips []string, doma
 		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
 		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 		BasicConstraintsValid: true,
-		IsCA:                  true,
+		IsCA:                  false,
 		IPAddresses:           parsedIPs,
 		DNSNames:              domains,
 	}
