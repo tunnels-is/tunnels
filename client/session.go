@@ -6,7 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"math/rand"
+	"crypto/rand"
+	"math/big"
 	"net"
 	neturl "net/url"
 	"runtime"
@@ -521,7 +522,11 @@ func GetQRCode(LF *TWO_FACTOR_CONFIRM) (QR *QR_CODE, err error) {
 
 	b := make([]rune, 16)
 	for i := range b {
-		b[i] = letterRunes[rand.Intn(len(letterRunes))]
+		n, cerr := rand.Int(rand.Reader, big.NewInt(int64(len(letterRunes))))
+		if cerr != nil {
+			return nil, cerr
+		}
+		b[i] = letterRunes[n.Int64()]
 	}
 
 	TOTP := strings.ToUpper(string(b))

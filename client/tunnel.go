@@ -1,7 +1,8 @@
 package client
 
 import (
-	"math/rand"
+	"crypto/rand"
+	"math/big"
 
 	"github.com/tunnels-is/tunnels/types"
 )
@@ -42,7 +43,11 @@ func createTunnel() (T *TunnelMETA) {
 	T = new(TunnelMETA)
 	b := make([]rune, 8)
 	for i := range b {
-		b[i] = letterRunes[rand.Intn(len(letterRunes))]
+		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(letterRunes))))
+		if err != nil {
+			return nil
+		}
+		b[i] = letterRunes[n.Int64()]
 	}
 	ifAndTag := string(b)
 	T.Tag = ifAndTag
