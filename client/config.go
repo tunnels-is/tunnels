@@ -355,7 +355,6 @@ func SetConfig(config *configV2) (err error) {
 	reloadWhiteLists(false)
 	err = writeConfigToDisk()
 	INFO("Config saved")
-	DEBUG(fmt.Sprintf("%+v", *config))
 
 	return err
 }
