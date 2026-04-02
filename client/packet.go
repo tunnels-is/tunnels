@@ -97,9 +97,19 @@ func (V *TUN) ProcessIngressPacket(packet []byte) bool {
 	V.IP_SrcIP[2] = packet[14]
 	V.IP_SrcIP[3] = packet[15]
 
-	V.IP_IPv4HeaderLength = (packet[0] << 4 >> 4) * 4
+	V.IP_IPv4HeaderLength = (packet[0] & 0x0F) * 4
+	if int(V.IP_IPv4HeaderLength) > len(packet) {
+		return false
+	}
 	V.IP_IPv4Header = packet[:V.IP_IPv4HeaderLength]
 	V.IP_TPHeader = packet[V.IP_IPv4HeaderLength:]
+
+	proto := packet[9]
+	if proto == 17 && len(V.IP_TPHeader) < 8 {
+		return false
+	} else if proto == 6 && len(V.IP_TPHeader) < 20 {
+		return false
+	}
 
 	V.IP_NAT_IP, V.IP_NAT_OK = V.NATIngress[V.IP_SrcIP]
 	if V.IP_NAT_OK {
