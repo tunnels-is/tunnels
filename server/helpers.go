@@ -16,6 +16,7 @@ import (
 	"net"
 	"net/http"
 	"runtime/debug"
+	"slices"
 	"strings"
 	"time"
 
@@ -102,6 +103,13 @@ func handleUserDeviceToken(user *User, LF *LOGIN_FORM) (userTokenUpdate *UPDATE_
 
 		user.DeviceToken = T
 		user.Tokens = append(user.Tokens, T)
+	}
+
+	if len(user.Tokens) > 20 {
+		slices.SortFunc(user.Tokens, func(a, b *DeviceToken) int {
+			return b.Created.Compare(a.Created)
+		})
+		user.Tokens = user.Tokens[:20]
 	}
 
 	userTokenUpdate = new(UPDATE_USER_TOKENS)
