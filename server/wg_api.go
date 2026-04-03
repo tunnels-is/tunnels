@@ -13,10 +13,6 @@ import (
 
 func API_WGPeers(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
-	if r.Method != http.MethodGet {
-		senderr(w, http.StatusMethodNotAllowed, "method not allowed")
-		return
-	}
 
 	if _, ok := HTTP_validateWGKey(r); !ok {
 		senderr(w, 401, "Unauthorized")
@@ -54,10 +50,6 @@ func API_WGPeers(w http.ResponseWriter, r *http.Request) {
 
 func API_WGConfig(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
-	if r.Method != http.MethodGet {
-		senderr(w, http.StatusMethodNotAllowed, "method not allowed")
-		return
-	}
 
 	serverIDStr := r.URL.Query().Get("serverID")
 	if serverIDStr == "" {
@@ -184,10 +176,6 @@ type FORM_WG_SERVER_CONFIG_CREATE struct {
 
 func API_WGServerConfigCreate(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
-	if r.Method != http.MethodPost {
-		senderr(w, http.StatusMethodNotAllowed, "method not allowed")
-		return
-	}
 
 	F := new(FORM_WG_SERVER_CONFIG_CREATE)
 	if err := decodeBody(r, F); err != nil {
@@ -256,10 +244,6 @@ func API_WGServerConfigCreate(w http.ResponseWriter, r *http.Request) {
 
 func API_WGServerConfigGet(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
-	if r.Method != http.MethodGet {
-		senderr(w, http.StatusMethodNotAllowed, "method not allowed")
-		return
-	}
 
 	idStr := r.URL.Query().Get("id")
 	if idStr == "" {
@@ -302,10 +286,6 @@ func API_WGServerConfigGet(w http.ResponseWriter, r *http.Request) {
 
 func API_WGServerConfigFetch(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
-	if r.Method != http.MethodGet {
-		senderr(w, http.StatusMethodNotAllowed, "method not allowed")
-		return
-	}
 
 	wgCfg, ok := HTTP_validateWGKey(r)
 	if !ok {
@@ -425,10 +405,6 @@ type FORM_WG_SERVER_CONFIG_ASSIGN struct {
 
 func API_WGServerConfigAssign(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
-	if r.Method != http.MethodPost {
-		senderr(w, http.StatusMethodNotAllowed, "method not allowed")
-		return
-	}
 
 	F := new(FORM_WG_SERVER_CONFIG_ASSIGN)
 	if err := decodeBody(r, F); err != nil {
@@ -476,10 +452,6 @@ func API_WGServerConfigAssign(w http.ResponseWriter, r *http.Request) {
 
 func API_WGServers(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
-	if r.Method != http.MethodGet {
-		senderr(w, http.StatusMethodNotAllowed, "method not allowed")
-		return
-	}
 
 	if _, ok := HTTP_validateWGKey(r); !ok {
 		senderr(w, 401, "Unauthorized")
