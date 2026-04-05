@@ -1,6 +1,8 @@
 package client
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -268,5 +270,218 @@ func TestIsDefaultConnection(t *testing.T) {
 				t.Errorf("IsDefaultConnection(%q) = %v, expected %v", tc.input, result, tc.expected)
 			}
 		})
+	}
+}
+
+// --- createFolder tests ---
+
+func TestCreateFolder_NewDirectory(t *testing.T) {
+	dir := t.TempDir()
+	target := filepath.Join(dir, "newdir")
+
+	err := createFolder(target)
+	if err != nil {
+		t.Fatalf("createFolder failed: %v", err)
+	}
+
+	info, err := os.Stat(target)
+	if err != nil {
+		t.Fatalf("directory not created: %v", err)
+	}
+	if !info.IsDir() {
+		t.Fatal("path is not a directory")
+	}
+	if info.Mode().Perm() != 0o700 {
+		t.Errorf("permissions = %o, expected 700", info.Mode().Perm())
+	}
+}
+
+func TestCreateFolder_AlreadyExists(t *testing.T) {
+	dir := t.TempDir()
+	target := filepath.Join(dir, "existing")
+
+	if err := os.Mkdir(target, 0o755); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+
+	err := createFolder(target)
+	if err != nil {
+		t.Errorf("createFolder should succeed when directory exists, got: %v", err)
+	}
+}
+
+func TestCreateFolder_ParentMissing(t *testing.T) {
+	dir := t.TempDir()
+	target := filepath.Join(dir, "no", "such", "parent")
+
+	err := createFolder(target)
+	if err == nil {
+		t.Fatal("createFolder should fail when parent directory does not exist")
+	}
+}
+
+// --- InitBaseFoldersAndPaths tests ---
+
+func TestInitBaseFoldersAndPaths_CreatesAllSubdirs(t *testing.T) {
+	dir := t.TempDir()
+
+	s := &stateV2{BasePath: dir}
+	STATE.Store(s)
+
+	InitBaseFoldersAndPaths()
+
+	s = STATE.Load()
+
+	expected := []struct {
+		name string
+		path string
+	}{
+		{"BasePath", s.BasePath},
+		{"TunnelsPath", s.TunnelsPath},
+		{"UserPath", s.UserPath},
+		{"LogPath", s.LogPath},
+		{"BlockListPath", s.BlockListPath},
+		{"WhiteListPath", s.WhiteListPath},
+	}
+
+	for _, e := range expected {
+		info, err := os.Stat(e.path)
+		if err != nil {
+			t.Errorf("%s (%s) does not exist: %v", e.name, e.path, err)
+			continue
+		}
+		if !info.IsDir() {
+			t.Errorf("%s (%s) is not a directory", e.name, e.path)
+		}
+	}
+}
+
+func TestInitBaseFoldersAndPaths_TrailingSeparator(t *testing.T) {
+	dir := t.TempDir()
+	withTrailing := dir + string(os.PathSeparator)
+
+	s := &stateV2{BasePath: withTrailing}
+	STATE.Store(s)
+
+	InitBaseFoldersAndPaths()
+
+	s = STATE.Load()
+
+	// BasePath should end with exactly one separator, not two
+	if strings.HasSuffix(s.BasePath, string(os.PathSeparator)+string(os.PathSeparator)) {
+		t.Errorf("BasePath has double separator: %q", s.BasePath)
+	}
+}
+
+func TestInitBaseFoldersAndPaths_SetsConfigFileName(t *testing.T) {
+	dir := t.TempDir()
+
+	s := &stateV2{BasePath: dir}
+	STATE.Store(s)
+
+	InitBaseFoldersAndPaths()
+
+	s = STATE.Load()
+
+	if s.ConfigFileName == "" {
+		t.Fatal("ConfigFileName should be set")
+	}
+	if !strings.HasSuffix(s.ConfigFileName, ".conf") {
+		t.Errorf("ConfigFileName should end with .conf, got: %q", s.ConfigFileName)
+	}
+}
+
+// --- verifyAndWriteFile tests ---
+
+func TestVerifyAndWriteFile_CreatesNewFile(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "testfile")
+	content := []byte("hello world")
+
+	written, err := verifyAndWriteFile(path, content)
+	if err != nil {
+		t.Fatalf("verifyAndWriteFile failed: %v", err)
+	}
+	if !written {
+		t.Error("expected file to be written")
+	}
+
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile failed: %v", err)
+	}
+	if string(got) != string(content) {
+		t.Errorf("file content = %q, expected %q", got, content)
+	}
+}
+
+func TestVerifyAndWriteFile_SkipsMatchingFile(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "testfile")
+	content := []byte("hello world")
+
+	if err := os.WriteFile(path, content, 0o600); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+
+	written, err := verifyAndWriteFile(path, content)
+	if err != nil {
+		t.Fatalf("verifyAndWriteFile failed: %v", err)
+	}
+	if written {
+		t.Error("file should not be rewritten when hash matches")
+	}
+}
+
+func TestVerifyAndWriteFile_ReplaceTamperedFile(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "testfile")
+	expected := []byte("correct content")
+	tampered := []byte("tampered content")
+
+	if err := os.WriteFile(path, tampered, 0o600); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+
+	written, err := verifyAndWriteFile(path, expected)
+	if err != nil {
+		t.Fatalf("verifyAndWriteFile failed: %v", err)
+	}
+	if !written {
+		t.Error("expected file to be rewritten when hash differs")
+	}
+
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile failed: %v", err)
+	}
+	if string(got) != string(expected) {
+		t.Errorf("file content = %q, expected %q", got, expected)
+	}
+}
+
+func TestVerifyAndWriteFile_ReplaceTruncatedFile(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "testfile")
+	expected := []byte("full content here")
+
+	if err := os.WriteFile(path, expected[:5], 0o600); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+
+	written, err := verifyAndWriteFile(path, expected)
+	if err != nil {
+		t.Fatalf("verifyAndWriteFile failed: %v", err)
+	}
+	if !written {
+		t.Error("expected file to be rewritten for truncated content")
+	}
+
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile failed: %v", err)
+	}
+	if string(got) != string(expected) {
+		t.Errorf("file content = %q, expected %q", got, expected)
 	}
 }
