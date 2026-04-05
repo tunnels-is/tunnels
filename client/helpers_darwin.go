@@ -26,22 +26,6 @@ func ValidateAdapterID(meta *TunnelMETA) error {
 	return nil
 }
 
-func GetHOME() string {
-	HOMEPATH := os.Getenv("HOME")
-	if HOMEPATH == "" {
-		HOMEPATH = "/tmp"
-	}
-	return HOMEPATH
-}
-
-func GetPWD() string {
-	HOMEPATH := os.Getenv("HOME")
-	if HOMEPATH == "" {
-		HOMEPATH = "/tmp"
-	}
-	return HOMEPATH
-}
-
 func AdminCheck() {
 	DEBUG("Admin check")
 	s := STATE.Load()
