@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"net/netip"
 
 	"github.com/google/uuid"
 	"github.com/tunnels-is/tunnels/types"
@@ -39,9 +40,10 @@ func API_WGPeers(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		resp.Peers = append(resp.Peers, types.WGPeer{
-			PublicKeyHex: hexKey,
-			DeviceID:     d.ID.String(),
-			WireGuardIP:  d.WireGuardIP,
+			PublicKeyHex:  hexKey,
+			DeviceID:      d.ID.String(),
+			WireGuardIP:   d.WireGuardIP,
+			WireGuardIPv6: d.WireGuardIPv6,
 		})
 	}
 
@@ -69,12 +71,14 @@ func API_WGConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var clientWireGuardIP string
+	var clientWireGuardIPv6 string
 	if pubKey := r.URL.Query().Get("pubKey"); pubKey != "" {
 		devices, devErr := DB_GetDevices(100000, 0)
 		if devErr == nil {
 			for _, d := range devices {
 				if d.WireGuardKey == pubKey {
 					clientWireGuardIP = d.WireGuardIP
+					clientWireGuardIPv6 = d.WireGuardIPv6
 					break
 				}
 			}
@@ -86,6 +90,7 @@ func API_WGConfig(w http.ResponseWriter, r *http.Request) {
 		"WireGuardPort":   server.WireGuardPort,
 		"ServerIP":        server.IP,
 		"WireGuardIP":     clientWireGuardIP,
+		"WireGuardIPv6":   clientWireGuardIPv6,
 	})
 }
 
@@ -140,6 +145,48 @@ func wgU32ToIP(n uint32) net.IP {
 	return net.IP{byte(n >> 24), byte(n >> 16), byte(n >> 8), byte(n)}
 }
 
+// assignNextWireGuardIPv6 allocates the next free IPv6 address from the
+// server's WireGuardSubnet6. Returns "" (no error) if no IPv6 subnet is
+// configured on the server.
+func assignNextWireGuardIPv6(serverID uuid.UUID) (string, error) {
+	server, err := DB_FindServerByID(serverID)
+	if err != nil || server == nil {
+		return "", fmt.Errorf("server not found")
+	}
+	if server.WireGuardSubnet6 == "" {
+		return "", nil
+	}
+	prefix, err := netip.ParsePrefix(server.WireGuardSubnet6)
+	if err != nil {
+		return "", fmt.Errorf("invalid IPv6 subnet %q: %w", server.WireGuardSubnet6, err)
+	}
+
+	devices, err := DB_GetDevices(100000, 0)
+	if err != nil {
+		return "", fmt.Errorf("list devices: %w", err)
+	}
+
+	used := make(map[netip.Addr]bool)
+	for _, d := range devices {
+		if d.WireGuardIPv6 == "" {
+			continue
+		}
+		if addr, parseErr := netip.ParseAddr(d.WireGuardIPv6); parseErr == nil && prefix.Contains(addr) {
+			used[addr] = true
+		}
+	}
+
+	// Start at base+2 (skip network address and server address).
+	candidate := prefix.Addr().Next().Next()
+	for prefix.Contains(candidate) {
+		if !used[candidate] {
+			return candidate.String(), nil
+		}
+		candidate = candidate.Next()
+	}
+	return "", fmt.Errorf("WireGuard IPv6 subnet %s is exhausted", server.WireGuardSubnet6)
+}
+
 func b64KeyToHex(b64 string) (string, error) {
 	b, err := base64.StdEncoding.DecodeString(b64)
 	if err != nil {
@@ -164,9 +211,10 @@ func HTTP_validateWGKey(r *http.Request) (*types.WGServerConfig, bool) {
 }
 
 type FORM_WG_SERVER_CONFIG_CREATE struct {
-	Tag            string             `json:"Tag"`
-	WireGuardPort  int                `json:"WireGuardPort"`
+	Tag            string    `json:"Tag"`
+	WireGuardPort  int       `json:"WireGuardPort"`
 	NetworkID      uuid.UUID `json:"NetworkID"`
+	NetworkID6     uuid.UUID `json:"NetworkID6"`
 	WireGuardIface string    `json:"WireGuardIface"`
 	InternetIface  string    `json:"InternetIface"`
 
@@ -201,12 +249,23 @@ func API_WGServerConfigCreate(w http.ResponseWriter, r *http.Request) {
 		subnet = network.CIDR
 	}
 
+	var subnet6 string
+	if F.NetworkID6 != uuid.Nil {
+		network6, nerr := DB_FindNetworkByID(F.NetworkID6)
+		if nerr != nil || network6 == nil {
+			senderr(w, 404, "IPv6 network not found")
+			return
+		}
+		subnet6 = network6.CIDR
+	}
+
 	cfg := &types.WGServerConfig{
 		ID:                 uuid.New(),
 		Tag:                F.Tag,
 		APIKey:             uuid.NewString(),
 		WireGuardPort:      F.WireGuardPort,
 		NetworkID:          F.NetworkID,
+		NetworkID6:         F.NetworkID6,
 		WireGuardIface:     F.WireGuardIface,
 		InternetIface:      F.InternetIface,
 		PacketInspection:   F.PacketInspection,
@@ -230,15 +289,22 @@ func API_WGServerConfigCreate(w http.ResponseWriter, r *http.Request) {
 			_ = DB_UpdateNetwork(network)
 		}
 	}
+	if F.NetworkID6 != uuid.Nil {
+		if network6, _ := DB_FindNetworkByID(F.NetworkID6); network6 != nil {
+			network6.WGConfigID = cfg.ID
+			_ = DB_UpdateNetwork(network6)
+		}
+	}
 
 	sendObject(w, map[string]any{
-		"ID":             cfg.ID.String(),
-		"APIKey":         cfg.APIKey,
-		"Tag":            cfg.Tag,
-		"WireGuardPort":  cfg.WireGuardPort,
-		"WireGuardSubnet": subnet,
-		"WireGuardIface": cfg.WireGuardIface,
-		"InternetIface":  cfg.InternetIface,
+		"ID":               cfg.ID.String(),
+		"APIKey":           cfg.APIKey,
+		"Tag":              cfg.Tag,
+		"WireGuardPort":    cfg.WireGuardPort,
+		"WireGuardSubnet":  subnet,
+		"WireGuardSubnet6": subnet6,
+		"WireGuardIface":   cfg.WireGuardIface,
+		"InternetIface":    cfg.InternetIface,
 	})
 }
 
@@ -268,6 +334,12 @@ func API_WGServerConfigGet(w http.ResponseWriter, r *http.Request) {
 			cfgSubnet = net.CIDR
 		}
 	}
+	var cfgSubnet6 string
+	if cfg.NetworkID6 != uuid.Nil {
+		if net6, _ := DB_FindNetworkByID(cfg.NetworkID6); net6 != nil {
+			cfgSubnet6 = net6.CIDR
+		}
+	}
 
 	sendObject(w, map[string]any{
 		"ID":                 cfg.ID.String(),
@@ -276,11 +348,13 @@ func API_WGServerConfigGet(w http.ResponseWriter, r *http.Request) {
 		"WireGuardPubKey":    cfg.WireGuardPubKey,
 		"WireGuardPort":      cfg.WireGuardPort,
 		"WireGuardSubnet":    cfgSubnet,
+		"WireGuardSubnet6":   cfgSubnet6,
 		"WireGuardIface":     cfg.WireGuardIface,
 		"InternetIface":      cfg.InternetIface,
 		"PacketInspection":   cfg.PacketInspection,
 		"InsecureSkipVerify": cfg.InsecureSkipVerify,
 		"NetworkID":          cfg.NetworkID.String(),
+		"NetworkID6":         cfg.NetworkID6.String(),
 	})
 }
 
@@ -306,6 +380,12 @@ func API_WGServerConfigFetch(w http.ResponseWriter, r *http.Request) {
 			fetchSubnet = network.CIDR
 		}
 	}
+	var fetchSubnet6 string
+	if wgCfg.NetworkID6 != uuid.Nil {
+		if network6, _ := DB_FindNetworkByID(wgCfg.NetworkID6); network6 != nil {
+			fetchSubnet6 = network6.CIDR
+		}
+	}
 
 	var serverID string
 	servers, err := DB_FindAllServers()
@@ -313,7 +393,7 @@ func API_WGServerConfigFetch(w http.ResponseWriter, r *http.Request) {
 		for _, s := range servers {
 			if s.WGConfigID == wgCfg.ID {
 				serverID = s.ID.String()
-				_ = DB_SetServerWGConfigID(s.ID, wgCfg, wgCfg.WireGuardPubKey, fetchSubnet)
+				_ = DB_SetServerWGConfigID(s.ID, wgCfg, wgCfg.WireGuardPubKey, fetchSubnet, fetchSubnet6)
 				break
 			}
 		}
@@ -323,6 +403,7 @@ func API_WGServerConfigFetch(w http.ResponseWriter, r *http.Request) {
 		ServerID:           serverID,
 		WireGuardPort:      wgCfg.WireGuardPort,
 		WireGuardSubnet:    fetchSubnet,
+		WireGuardSubnet6:   fetchSubnet6,
 		WireGuardIface:     wgCfg.WireGuardIface,
 		InternetIface:      wgCfg.InternetIface,
 		PacketInspection:   wgCfg.PacketInspection,
@@ -337,6 +418,7 @@ type FORM_WG_SERVER_CONFIG_UPDATE struct {
 	Tag            string    `json:"Tag"`
 	WireGuardPort  int       `json:"WireGuardPort"`
 	NetworkID      uuid.UUID `json:"NetworkID"`
+	NetworkID6     uuid.UUID `json:"NetworkID6"`
 	WireGuardIface string    `json:"WireGuardIface"`
 	InternetIface  string    `json:"InternetIface"`
 
@@ -382,9 +464,25 @@ func API_WGServerConfigUpdate(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	if existing.NetworkID6 != F.NetworkID6 {
+		if existing.NetworkID6 != uuid.Nil {
+			if oldNet6, _ := DB_FindNetworkByID(existing.NetworkID6); oldNet6 != nil {
+				oldNet6.WGConfigID = uuid.Nil
+				_ = DB_UpdateNetwork(oldNet6)
+			}
+		}
+		if F.NetworkID6 != uuid.Nil {
+			if newNet6, _ := DB_FindNetworkByID(F.NetworkID6); newNet6 != nil {
+				newNet6.WGConfigID = F.ID
+				_ = DB_UpdateNetwork(newNet6)
+			}
+		}
+	}
+
 	existing.Tag = F.Tag
 	existing.WireGuardPort = F.WireGuardPort
 	existing.NetworkID = F.NetworkID
+	existing.NetworkID6 = F.NetworkID6
 	existing.WireGuardIface = F.WireGuardIface
 	existing.InternetIface = F.InternetIface
 	existing.PacketInspection = F.PacketInspection
@@ -437,16 +535,23 @@ func API_WGServerConfigAssign(w http.ResponseWriter, r *http.Request) {
 			assignSubnet = network.CIDR
 		}
 	}
+	var assignSubnet6 string
+	if wgCfg.NetworkID6 != uuid.Nil {
+		if network6, _ := DB_FindNetworkByID(wgCfg.NetworkID6); network6 != nil {
+			assignSubnet6 = network6.CIDR
+		}
+	}
 
-	if err := DB_SetServerWGConfigID(F.ServerID, wgCfg, wgCfg.WireGuardPubKey, assignSubnet); err != nil {
+	if err := DB_SetServerWGConfigID(F.ServerID, wgCfg, wgCfg.WireGuardPubKey, assignSubnet, assignSubnet6); err != nil {
 		senderr(w, 500, "Failed to update server", slog.Any("err", err))
 		return
 	}
 
 	sendObject(w, map[string]any{
-		"WireGuardPubKey": wgCfg.WireGuardPubKey,
-		"WireGuardPort":   wgCfg.WireGuardPort,
-		"WireGuardSubnet": assignSubnet,
+		"WireGuardPubKey":  wgCfg.WireGuardPubKey,
+		"WireGuardPort":    wgCfg.WireGuardPort,
+		"WireGuardSubnet":  assignSubnet,
+		"WireGuardSubnet6": assignSubnet6,
 	})
 }
 
@@ -475,26 +580,42 @@ func API_WGServers(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		resp.Servers = append(resp.Servers, types.WGServerInfo{
-			WireGuardPubKey: s.WireGuardPubKey,
-			WireGuardPort:   s.WireGuardPort,
-			WireGuardSubnet: s.WireGuardSubnet,
-			IP:              s.IP,
+			WireGuardPubKey:  s.WireGuardPubKey,
+			WireGuardPort:    s.WireGuardPort,
+			WireGuardSubnet:  s.WireGuardSubnet,
+			WireGuardSubnet6: s.WireGuardSubnet6,
+			IP:               s.IP,
 		})
 	}
 
 	sendObject(w, resp)
 }
 
-func buildWGConf(assignedIP, clientPubKeyB64 string, server *types.Server) string {
+func buildWGConf(assignedIP, assignedIPv6, clientPubKeyB64 string, server *types.Server) string {
+	address := assignedIP + "/32"
+	if assignedIPv6 != "" {
+		address += ", " + assignedIPv6 + "/128"
+	}
+
+	allowedIPs := "0.0.0.0/0"
+	if assignedIPv6 != "" {
+		allowedIPs += ", ::/0"
+	}
+
+	dns := "1.1.1.1"
+	if assignedIPv6 != "" {
+		dns += ", 2606:4700:4700::1111"
+	}
+
 	return fmt.Sprintf(`[Interface]
-Address = %s/32
+Address = %s
 # PrivateKey = <paste your private key here>
-DNS = 1.1.1.1
+DNS = %s
 
 [Peer]
 PublicKey = %s
 Endpoint = %s:%s
-AllowedIPs = 0.0.0.0/0
+AllowedIPs = %s
 PersistentKeepalive = 15
-`, assignedIP, server.WireGuardPubKey, server.IP, server.WireGuardPort)
+`, address, dns, server.WireGuardPubKey, server.IP, server.WireGuardPort, allowedIPs)
 }

@@ -100,16 +100,21 @@ func GetCurrentPeerKeys() (map[string]struct{}, error) {
 	return result, nil
 }
 
-func AddPeer(pubKeyHex, allowedIP string) error {
-	conf := fmt.Sprintf("public_key=%s\nallowed_ip=%s\n\n", pubKeyHex, allowedIP)
+func AddPeer(pubKeyHex string, allowedIPs ...string) error {
+	conf := fmt.Sprintf("public_key=%s\n", pubKeyHex)
+	for _, aip := range allowedIPs {
+		conf += fmt.Sprintf("allowed_ip=%s\n", aip)
+	}
+	conf += "\n"
 	return ipcSet(conf)
 }
 
-func AddPeerWithEndpoint(pubKeyHex, allowedIP, endpoint string) error {
-	conf := fmt.Sprintf(
-		"public_key=%s\nallowed_ip=%s\nendpoint=%s\npersistent_keepalive_interval=15\n\n",
-		pubKeyHex, allowedIP, endpoint,
-	)
+func AddPeerWithEndpoint(pubKeyHex, endpoint string, allowedIPs ...string) error {
+	conf := fmt.Sprintf("public_key=%s\n", pubKeyHex)
+	for _, aip := range allowedIPs {
+		conf += fmt.Sprintf("allowed_ip=%s\n", aip)
+	}
+	conf += fmt.Sprintf("endpoint=%s\npersistent_keepalive_interval=15\n\n", endpoint)
 	return ipcSet(conf)
 }
 

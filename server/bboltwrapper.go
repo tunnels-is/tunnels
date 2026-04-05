@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/subtle"
 	"encoding/binary"
 	"encoding/json"
@@ -18,13 +19,18 @@ import (
 var BBoltDB *gobolt.DB
 
 const (
-	USERS_BUCKET             = "users"
-	DEVICES_BUCKET           = "devices"
-	ORGS_BUCKET              = "orgs"
-	GROUPS_BUCKET            = "groups"
-	SERVERS_BUCKET           = "servers"
-	WG_SERVER_CONFIGS_BUCKET = "wg_server_configs"
-	NETWORKS_BUCKET          = "networks"
+	USERS_BUCKET              = "users"
+	USERS_EMAIL_INDEX         = "users_by_email"
+	USERS_APIKEY_INDEX        = "users_by_apikey"
+	DEVICES_BUCKET            = "devices"
+	DEVICES_USERID_INDEX      = "devices_by_user_id"
+	ORGS_BUCKET               = "orgs"
+	GROUPS_BUCKET             = "groups"
+	SERVERS_BUCKET            = "servers"
+	WG_SERVER_CONFIGS_BUCKET  = "wg_server_configs"
+	WGCONFIGS_APIKEY_INDEX    = "wg_configs_by_apikey"
+	NETWORKS_BUCKET           = "networks"
+	NETWORKS_ID_INDEX         = "networks_by_id"
 )
 
 func ConnectToBBoltDB(path string) (err error) {
@@ -33,13 +39,93 @@ func ConnectToBBoltDB(path string) (err error) {
 		return err
 	}
 	return BBoltDB.Update(func(tx *gobolt.Tx) error {
-		buckets := []string{USERS_BUCKET, DEVICES_BUCKET, ORGS_BUCKET, GROUPS_BUCKET, SERVERS_BUCKET, WG_SERVER_CONFIGS_BUCKET, NETWORKS_BUCKET}
+		buckets := []string{
+			USERS_BUCKET, USERS_EMAIL_INDEX, USERS_APIKEY_INDEX,
+			DEVICES_BUCKET, DEVICES_USERID_INDEX,
+			ORGS_BUCKET, GROUPS_BUCKET, SERVERS_BUCKET,
+			WG_SERVER_CONFIGS_BUCKET, WGCONFIGS_APIKEY_INDEX,
+			NETWORKS_BUCKET, NETWORKS_ID_INDEX,
+		}
 		for _, b := range buckets {
 			_, err := tx.CreateBucketIfNotExists([]byte(b))
 			if err != nil {
 				return err
 			}
 		}
+
+		// Backfill secondary indexes from existing users.
+		users := tx.Bucket([]byte(USERS_BUCKET))
+		emailIdx := tx.Bucket([]byte(USERS_EMAIL_INDEX))
+		apikeyIdx := tx.Bucket([]byte(USERS_APIKEY_INDEX))
+		uc := users.Cursor()
+		for k, v := uc.First(); k != nil; k, v = uc.Next() {
+			U := new(User)
+			if err := bboltUnmarshal(v, U); err != nil {
+				continue
+			}
+			if U.Email != "" {
+				if err := emailIdx.Put([]byte(U.Email), k); err != nil {
+					return err
+				}
+			}
+			if U.APIKey != "" {
+				if err := apikeyIdx.Put([]byte(U.APIKey), k); err != nil {
+					return err
+				}
+			}
+		}
+
+		// Backfill devices_by_user_id index.
+		devices := tx.Bucket([]byte(DEVICES_BUCKET))
+		devUserIdx := tx.Bucket([]byte(DEVICES_USERID_INDEX))
+		dc := devices.Cursor()
+		for k, v := dc.First(); k != nil; k, v = dc.Next() {
+			D := new(types.Device)
+			if err := bboltUnmarshal(v, D); err != nil {
+				continue
+			}
+			uid := D.UserID.String()
+			if uid != "00000000-0000-0000-0000-000000000000" {
+				compositeKey := []byte(uid + "/" + string(k))
+				if err := devUserIdx.Put(compositeKey, nil); err != nil {
+					return err
+				}
+			}
+		}
+
+		// Backfill wg_configs_by_apikey index.
+		wgConfigs := tx.Bucket([]byte(WG_SERVER_CONFIGS_BUCKET))
+		wgApikeyIdx := tx.Bucket([]byte(WGCONFIGS_APIKEY_INDEX))
+		wc := wgConfigs.Cursor()
+		for k, v := wc.First(); k != nil; k, v = wc.Next() {
+			cfg := new(types.WGServerConfig)
+			if err := bboltUnmarshal(v, cfg); err != nil {
+				continue
+			}
+			if cfg.APIKey != "" {
+				if err := wgApikeyIdx.Put([]byte(cfg.APIKey), k); err != nil {
+					return err
+				}
+			}
+		}
+
+		// Backfill networks_by_id index.
+		networks := tx.Bucket([]byte(NETWORKS_BUCKET))
+		netIdIdx := tx.Bucket([]byte(NETWORKS_ID_INDEX))
+		nc := networks.Cursor()
+		for k, v := nc.First(); k != nil; k, v = nc.Next() {
+			n := new(Network)
+			if err := bboltUnmarshal(v, n); err != nil {
+				continue
+			}
+			idStr := n.ID.String()
+			if idStr != "00000000-0000-0000-0000-000000000000" {
+				if err := netIdIdx.Put([]byte(idStr), k); err != nil {
+					return err
+				}
+			}
+		}
+
 		return nil
 	})
 }
@@ -50,6 +136,16 @@ func bboltUnmarshal(data []byte, v any) error { return json.Unmarshal(data, v) }
 func BBolt_DeleteDeviceByID(id string) error {
 	return BBoltDB.Update(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(DEVICES_BUCKET))
+		v := b.Get([]byte(id))
+		if v != nil {
+			D := new(types.Device)
+			if err := bboltUnmarshal(v, D); err == nil {
+				uid := D.UserID.String()
+				if uid != "00000000-0000-0000-0000-000000000000" {
+					_ = tx.Bucket([]byte(DEVICES_USERID_INDEX)).Delete([]byte(uid + "/" + id))
+				}
+			}
+		}
 		return b.Delete([]byte(id))
 	})
 }
@@ -58,11 +154,34 @@ func BBolt_UpdateDevice(D *types.Device) error {
 	return BBoltDB.Update(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(DEVICES_BUCKET))
 		id := D.ID.String()
+		devUserIdx := tx.Bucket([]byte(DEVICES_USERID_INDEX))
+
+		// Remove old index entry if UserID changed.
+		if old := b.Get([]byte(id)); old != nil {
+			oldD := new(types.Device)
+			if err := bboltUnmarshal(old, oldD); err == nil && oldD.UserID != D.UserID {
+				oldUID := oldD.UserID.String()
+				if oldUID != "00000000-0000-0000-0000-000000000000" {
+					_ = devUserIdx.Delete([]byte(oldUID + "/" + id))
+				}
+			}
+		}
+
 		data, err := bboltMarshal(D)
 		if err != nil {
 			return err
 		}
-		return b.Put([]byte(id), data)
+		if err := b.Put([]byte(id), data); err != nil {
+			return err
+		}
+
+		uid := D.UserID.String()
+		if uid != "00000000-0000-0000-0000-000000000000" {
+			if err := devUserIdx.Put([]byte(uid+"/"+id), nil); err != nil {
+				return err
+			}
+		}
+		return nil
 	})
 }
 
@@ -93,11 +212,18 @@ func BBolt_GetDevices(limit, offset int64) ([]*types.Device, error) {
 func BBolt_GetDevicesByUserID(userID uuid.UUID) ([]*types.Device, error) {
 	DL := make([]*types.Device, 0)
 	err := BBoltDB.View(func(tx *gobolt.Tx) error {
-		b := tx.Bucket([]byte(DEVICES_BUCKET))
-		c := b.Cursor()
-		for k, v := c.First(); k != nil; k, v = c.Next() {
+		devices := tx.Bucket([]byte(DEVICES_BUCKET))
+		idx := tx.Bucket([]byte(DEVICES_USERID_INDEX))
+		prefix := []byte(userID.String() + "/")
+		c := idx.Cursor()
+		for k, _ := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, _ = c.Next() {
+			devID := k[len(prefix):]
+			v := devices.Get(devID)
+			if v == nil {
+				continue
+			}
 			D := new(types.Device)
-			if err := bboltUnmarshal(v, D); err == nil && D.UserID == userID {
+			if err := bboltUnmarshal(v, D); err == nil {
 				DL = append(DL, D)
 			}
 		}
@@ -133,16 +259,16 @@ func BBolt_getUsers(limit, offset int64) ([]*User, error) {
 func BBolt_findUserByAPIKey(Key string) (*User, error) {
 	var found *User
 	err := BBoltDB.View(func(tx *gobolt.Tx) error {
-		b := tx.Bucket([]byte(USERS_BUCKET))
-		c := b.Cursor()
-		for _, v := c.First(); v != nil; _, v = c.Next() {
-			U := new(User)
-			if err := bboltUnmarshal(v, U); err == nil && U.APIKey == Key {
-				found = U
-				break
-			}
+		uid := tx.Bucket([]byte(USERS_APIKEY_INDEX)).Get([]byte(Key))
+		if uid == nil {
+			return nil
 		}
-		return nil
+		v := tx.Bucket([]byte(USERS_BUCKET)).Get(uid)
+		if v == nil {
+			return nil
+		}
+		found = new(User)
+		return bboltUnmarshal(v, found)
 	})
 	return found, err
 }
@@ -169,23 +295,34 @@ func BBolt_CreateUser(U *User) error {
 		if err != nil {
 			return err
 		}
-		return b.Put([]byte(id), data)
+		if err := b.Put([]byte(id), data); err != nil {
+			return err
+		}
+		if err := tx.Bucket([]byte(USERS_EMAIL_INDEX)).Put([]byte(U.Email), []byte(id)); err != nil {
+			return err
+		}
+		if U.APIKey != "" {
+			if err := tx.Bucket([]byte(USERS_APIKEY_INDEX)).Put([]byte(U.APIKey), []byte(id)); err != nil {
+				return err
+			}
+		}
+		return nil
 	})
 }
 
 func BBolt_findUserByEmail(Email string) (*User, error) {
 	var found *User
 	err := BBoltDB.View(func(tx *gobolt.Tx) error {
-		b := tx.Bucket([]byte(USERS_BUCKET))
-		c := b.Cursor()
-		for _, v := c.First(); v != nil; _, v = c.Next() {
-			U := new(User)
-			if err := bboltUnmarshal(v, U); err == nil && U.Email == Email {
-				found = U
-				break
-			}
+		uid := tx.Bucket([]byte(USERS_EMAIL_INDEX)).Get([]byte(Email))
+		if uid == nil {
+			return nil
 		}
-		return nil
+		v := tx.Bucket([]byte(USERS_BUCKET)).Get(uid)
+		if v == nil {
+			return nil
+		}
+		found = new(User)
+		return bboltUnmarshal(v, found)
 	})
 	return found, err
 }
@@ -213,20 +350,25 @@ func BBolt_updateUserDeviceTokens(TU *UPDATE_USER_TOKENS) error {
 
 func BBolt_updateUserSubTime(u *User) error {
 	return BBoltDB.Update(func(tx *gobolt.Tx) error {
-		b := tx.Bucket([]byte(USERS_BUCKET))
-		c := b.Cursor()
-		for k, v := c.First(); k != nil; k, v = c.Next() {
-			U := new(User)
-			if err := bboltUnmarshal(v, U); err == nil && U.Email == u.Email {
-				U.SubExpiration = u.SubExpiration
-				data, err := bboltMarshal(U)
-				if err != nil {
-					return err
-				}
-				return b.Put(k, data)
-			}
+		uid := tx.Bucket([]byte(USERS_EMAIL_INDEX)).Get([]byte(u.Email))
+		if uid == nil {
+			return errors.New("user not found")
 		}
-		return errors.New("user not found")
+		b := tx.Bucket([]byte(USERS_BUCKET))
+		v := b.Get(uid)
+		if v == nil {
+			return errors.New("user not found")
+		}
+		U := new(User)
+		if err := bboltUnmarshal(v, U); err != nil {
+			return err
+		}
+		U.SubExpiration = u.SubExpiration
+		data, err := bboltMarshal(U)
+		if err != nil {
+			return err
+		}
+		return b.Put(uid, data)
 	})
 }
 
@@ -242,13 +384,28 @@ func BBolt_updateUser(UF *USER_UPDATE_FORM) error {
 		if err := bboltUnmarshal(v, U); err != nil {
 			return err
 		}
+		oldAPIKey := U.APIKey
 		U.APIKey = UF.APIKey
 		U.AdditionalInformation = UF.AdditionalInformation
 		data, err := bboltMarshal(U)
 		if err != nil {
 			return err
 		}
-		return b.Put([]byte(id), data)
+		if err := b.Put([]byte(id), data); err != nil {
+			return err
+		}
+		apikeyIdx := tx.Bucket([]byte(USERS_APIKEY_INDEX))
+		if oldAPIKey != "" {
+			if err := apikeyIdx.Delete([]byte(oldAPIKey)); err != nil {
+				return err
+			}
+		}
+		if UF.APIKey != "" {
+			if err := apikeyIdx.Put([]byte(UF.APIKey), []byte(id)); err != nil {
+				return err
+			}
+		}
+		return nil
 	})
 }
 
@@ -264,6 +421,8 @@ func BBolt_updateUserAdmin(UF *USER_ADMIN_UPDATE_FORM) error {
 		if err := bboltUnmarshal(v, U); err != nil {
 			return err
 		}
+
+		oldEmail := U.Email
 
 		if UF.Email != "" {
 			U.Email = UF.Email
@@ -281,26 +440,44 @@ func BBolt_updateUserAdmin(UF *USER_ADMIN_UPDATE_FORM) error {
 		if err != nil {
 			return err
 		}
-		return b.Put([]byte(id), data)
+		if err := b.Put([]byte(id), data); err != nil {
+			return err
+		}
+
+		if UF.Email != "" && UF.Email != oldEmail {
+			emailIdx := tx.Bucket([]byte(USERS_EMAIL_INDEX))
+			if err := emailIdx.Delete([]byte(oldEmail)); err != nil {
+				return err
+			}
+			if err := emailIdx.Put([]byte(UF.Email), []byte(id)); err != nil {
+				return err
+			}
+		}
+
+		return nil
 	})
 }
 
 func BBolt_toggleUserSubscriptionStatus(UF *USER_UPDATE_SUB_FORM) error {
 	return BBoltDB.Update(func(tx *gobolt.Tx) error {
-		b := tx.Bucket([]byte(USERS_BUCKET))
-		c := b.Cursor()
-		for k, v := c.First(); k != nil; k, v = c.Next() {
-			U := new(User)
-			if err := bboltUnmarshal(v, U); err == nil && U.Email == UF.Email {
-
-				data, err := bboltMarshal(U)
-				if err != nil {
-					return err
-				}
-				return b.Put(k, data)
-			}
+		uid := tx.Bucket([]byte(USERS_EMAIL_INDEX)).Get([]byte(UF.Email))
+		if uid == nil {
+			return errors.New("user not found")
 		}
-		return errors.New("user not found")
+		b := tx.Bucket([]byte(USERS_BUCKET))
+		v := b.Get(uid)
+		if v == nil {
+			return errors.New("user not found")
+		}
+		U := new(User)
+		if err := bboltUnmarshal(v, U); err != nil {
+			return err
+		}
+		data, err := bboltMarshal(U)
+		if err != nil {
+			return err
+		}
+		return b.Put(uid, data)
 	})
 }
 
@@ -546,7 +723,16 @@ func BBolt_CreateDevice(D *types.Device) error {
 		if err != nil {
 			return err
 		}
-		return b.Put([]byte(id), data)
+		if err := b.Put([]byte(id), data); err != nil {
+			return err
+		}
+		uid := D.UserID.String()
+		if uid != "00000000-0000-0000-0000-000000000000" {
+			if err := tx.Bucket([]byte(DEVICES_USERID_INDEX)).Put([]byte(uid+"/"+id), nil); err != nil {
+				return err
+			}
+		}
+		return nil
 	})
 }
 
@@ -661,20 +847,25 @@ func BBolt_DeleteGroupByID(id string) error {
 
 func BBolt_WipeUserConfirmCode(UF *USER_ENABLE_QUERY) error {
 	return BBoltDB.Update(func(tx *gobolt.Tx) error {
-		b := tx.Bucket([]byte(USERS_BUCKET))
-		c := b.Cursor()
-		for k, v := c.First(); k != nil; k, v = c.Next() {
-			U := new(User)
-			if err := bboltUnmarshal(v, U); err == nil && U.Email == UF.Email {
-				U.ConfirmCode = ""
-				data, err := bboltMarshal(U)
-				if err != nil {
-					return err
-				}
-				return b.Put(k, data)
-			}
+		uid := tx.Bucket([]byte(USERS_EMAIL_INDEX)).Get([]byte(UF.Email))
+		if uid == nil {
+			return errors.New("user not found")
 		}
-		return errors.New("user not found")
+		b := tx.Bucket([]byte(USERS_BUCKET))
+		v := b.Get(uid)
+		if v == nil {
+			return errors.New("user not found")
+		}
+		U := new(User)
+		if err := bboltUnmarshal(v, U); err != nil {
+			return err
+		}
+		U.ConfirmCode = ""
+		data, err := bboltMarshal(U)
+		if err != nil {
+			return err
+		}
+		return b.Put(uid, data)
 	})
 }
 
@@ -871,7 +1062,15 @@ func BBolt_CreateWGServerConfig(cfg *types.WGServerConfig) error {
 		if err != nil {
 			return err
 		}
-		return b.Put([]byte(id), data)
+		if err := b.Put([]byte(id), data); err != nil {
+			return err
+		}
+		if cfg.APIKey != "" {
+			if err := tx.Bucket([]byte(WGCONFIGS_APIKEY_INDEX)).Put([]byte(cfg.APIKey), []byte(id)); err != nil {
+				return err
+			}
+		}
+		return nil
 	})
 }
 
@@ -892,15 +1091,22 @@ func BBolt_FindWGServerConfigByID(id string) (*types.WGServerConfig, error) {
 func BBolt_FindWGServerConfigByAPIKey(apiKey string) (*types.WGServerConfig, error) {
 	var found *types.WGServerConfig
 	err := BBoltDB.View(func(tx *gobolt.Tx) error {
-		b := tx.Bucket([]byte(WG_SERVER_CONFIGS_BUCKET))
-		c := b.Cursor()
-		for _, v := c.First(); v != nil; _, v = c.Next() {
-			cfg := new(types.WGServerConfig)
-			if err := bboltUnmarshal(v, cfg); err == nil && subtle.ConstantTimeCompare([]byte(cfg.APIKey), []byte(apiKey)) == 1 {
-				found = cfg
-				break
-			}
+		cfgID := tx.Bucket([]byte(WGCONFIGS_APIKEY_INDEX)).Get([]byte(apiKey))
+		if cfgID == nil {
+			return nil
 		}
+		v := tx.Bucket([]byte(WG_SERVER_CONFIGS_BUCKET)).Get(cfgID)
+		if v == nil {
+			return nil
+		}
+		cfg := new(types.WGServerConfig)
+		if err := bboltUnmarshal(v, cfg); err != nil {
+			return nil
+		}
+		if subtle.ConstantTimeCompare([]byte(cfg.APIKey), []byte(apiKey)) != 1 {
+			return nil
+		}
+		found = cfg
 		return nil
 	})
 	return found, err
@@ -910,15 +1116,33 @@ func BBolt_UpdateWGServerConfig(cfg *types.WGServerConfig) error {
 	return BBoltDB.Update(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(WG_SERVER_CONFIGS_BUCKET))
 		id := cfg.ID.String()
+		wgApikeyIdx := tx.Bucket([]byte(WGCONFIGS_APIKEY_INDEX))
+
+		// Remove old apikey index entry if key changed.
+		if old := b.Get([]byte(id)); old != nil {
+			oldCfg := new(types.WGServerConfig)
+			if err := bboltUnmarshal(old, oldCfg); err == nil && oldCfg.APIKey != cfg.APIKey && oldCfg.APIKey != "" {
+				_ = wgApikeyIdx.Delete([]byte(oldCfg.APIKey))
+			}
+		}
+
 		data, err := bboltMarshal(cfg)
 		if err != nil {
 			return err
 		}
-		return b.Put([]byte(id), data)
+		if err := b.Put([]byte(id), data); err != nil {
+			return err
+		}
+		if cfg.APIKey != "" {
+			if err := wgApikeyIdx.Put([]byte(cfg.APIKey), []byte(id)); err != nil {
+				return err
+			}
+		}
+		return nil
 	})
 }
 
-func BBolt_SetServerWGConfigID(serverID string, wgCfg *types.WGServerConfig, pubKey, subnet string) error {
+func BBolt_SetServerWGConfigID(serverID string, wgCfg *types.WGServerConfig, pubKey, subnet, subnet6 string) error {
 	return BBoltDB.Update(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(SERVERS_BUCKET))
 		v := b.Get([]byte(serverID))
@@ -931,6 +1155,7 @@ func BBolt_SetServerWGConfigID(serverID string, wgCfg *types.WGServerConfig, pub
 		}
 		S.WGConfigID = wgCfg.ID
 		S.WireGuardSubnet = subnet
+		S.WireGuardSubnet6 = subnet6
 		S.WireGuardPubKey = pubKey
 		S.WireGuardPort = fmt.Sprintf("%d", wgCfg.WireGuardPort)
 		data, err := bboltMarshal(S)
@@ -954,25 +1179,31 @@ func BBolt_CountNetworks() (int64, error) {
 	return count, err
 }
 
-// networkKey converts a CIDR string to a 4-byte big-endian IP key.
-// BBolt sorts keys byte-by-byte, so this gives perfect numerical IP order.
+// networkKey converts a CIDR string to a big-endian IP key for bbolt storage.
+// Returns a 4-byte key for IPv4 or a 16-byte key for IPv6.
 func networkKey(cidr string) ([]byte, error) {
 	ip, _, err := net.ParseCIDR(cidr)
 	if err != nil {
 		return nil, err
 	}
-	v4 := ip.To4()
-	if v4 == nil {
-		return nil, fmt.Errorf("not an IPv4 address: %s", cidr)
+	if v4 := ip.To4(); v4 != nil {
+		key := make([]byte, 4)
+		binary.BigEndian.PutUint32(key, binary.BigEndian.Uint32(v4))
+		return key, nil
 	}
-	key := make([]byte, 4)
-	binary.BigEndian.PutUint32(key, binary.BigEndian.Uint32(v4))
+	v6 := ip.To16()
+	if v6 == nil {
+		return nil, fmt.Errorf("invalid IP address: %s", cidr)
+	}
+	key := make([]byte, 16)
+	copy(key, v6)
 	return key, nil
 }
 
 func BBolt_CreateNetworksBatch(networks []*Network) error {
 	return BBoltDB.Update(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(NETWORKS_BUCKET))
+		netIdIdx := tx.Bucket([]byte(NETWORKS_ID_INDEX))
 		for _, n := range networks {
 			key, err := networkKey(n.CIDR)
 			if err != nil {
@@ -984,6 +1215,12 @@ func BBolt_CreateNetworksBatch(networks []*Network) error {
 			}
 			if err := b.Put(key, data); err != nil {
 				return err
+			}
+			idStr := n.ID.String()
+			if idStr != "00000000-0000-0000-0000-000000000000" {
+				if err := netIdIdx.Put([]byte(idStr), key); err != nil {
+					return err
+				}
 			}
 		}
 		return nil
@@ -1017,19 +1254,16 @@ func BBolt_GetNetworks(limit, offset int64) ([]*Network, error) {
 func BBolt_FindNetworkByID(id uuid.UUID) (*Network, error) {
 	var n *Network
 	err := BBoltDB.View(func(tx *gobolt.Tx) error {
-		b := tx.Bucket([]byte(NETWORKS_BUCKET))
-		c := b.Cursor()
-		for k, v := c.First(); k != nil; k, v = c.Next() {
-			candidate := new(Network)
-			if err := bboltUnmarshal(v, candidate); err != nil {
-				continue
-			}
-			if candidate.ID == id {
-				n = candidate
-				return nil
-			}
+		netKey := tx.Bucket([]byte(NETWORKS_ID_INDEX)).Get([]byte(id.String()))
+		if netKey == nil {
+			return nil
 		}
-		return nil
+		v := tx.Bucket([]byte(NETWORKS_BUCKET)).Get(netKey)
+		if v == nil {
+			return nil
+		}
+		n = new(Network)
+		return bboltUnmarshal(v, n)
 	})
 	return n, err
 }
@@ -1045,7 +1279,16 @@ func BBolt_UpdateNetwork(n *Network) error {
 		if err != nil {
 			return err
 		}
-		return b.Put(key, data)
+		if err := b.Put(key, data); err != nil {
+			return err
+		}
+		idStr := n.ID.String()
+		if idStr != "00000000-0000-0000-0000-000000000000" {
+			if err := tx.Bucket([]byte(NETWORKS_ID_INDEX)).Put([]byte(idStr), key); err != nil {
+				return err
+			}
+		}
+		return nil
 	})
 }
 
