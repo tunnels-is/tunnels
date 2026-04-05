@@ -32,7 +32,7 @@ func InitBaseFoldersAndPaths() {
 	basePath, _ = strings.CutSuffix(basePath, string(os.PathSeparator))
 
 	if basePath != "" {
-		basePath = s.BasePath + string(os.PathSeparator)
+		basePath = basePath + string(os.PathSeparator)
 	} else {
 		ex, err := os.Executable()
 		if err != nil {
@@ -47,14 +47,14 @@ func InitBaseFoldersAndPaths() {
 	}
 
 	s.BasePath = basePath
+	CreateFolder(s.BasePath)
+	s.ConfigFileName = s.BasePath + "tunnels" + configFileSuffix
+
 	s.TunnelsPath = s.BasePath + "tunnel" + string(os.PathSeparator)
 	CreateFolder(s.TunnelsPath)
 
 	s.UserPath = s.BasePath + "users" + string(os.PathSeparator)
 	CreateFolder(s.UserPath)
-
-	CreateFolder(s.BasePath)
-	s.ConfigFileName = s.BasePath + "tunnels" + configFileSuffix
 
 	s.LogPath = s.BasePath + "logs" + string(os.PathSeparator)
 	CreateFolder(s.LogPath)
@@ -102,13 +102,13 @@ func CreateFile(file string) (f *os.File, err error) {
 }
 
 func CreateFolder(path string) {
-	_, err := os.Stat(path)
+	err := os.Mkdir(path, 0o700)
 	if err != nil {
-		err = os.Mkdir(path, 0o700)
-		if err != nil {
-			ERROR("Unable to create base folder: ", err)
+		if os.IsExist(err) {
 			return
 		}
+		ERROR("Unable to create folder: ", path, " ", err)
+		os.Exit(1)
 	}
 	DEBUG("New directory:", path)
 }
