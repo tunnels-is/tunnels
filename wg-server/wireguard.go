@@ -100,26 +100,33 @@ func GetCurrentPeerKeys() (map[string]struct{}, error) {
 	return result, nil
 }
 
+// sanitizeIPC strips newlines and carriage returns to prevent IPC directive injection.
+func sanitizeIPC(s string) string {
+	s = strings.ReplaceAll(s, "\n", "")
+	s = strings.ReplaceAll(s, "\r", "")
+	return s
+}
+
 func AddPeer(pubKeyHex string, allowedIPs ...string) error {
-	conf := fmt.Sprintf("public_key=%s\n", pubKeyHex)
+	conf := fmt.Sprintf("public_key=%s\n", sanitizeIPC(pubKeyHex))
 	for _, aip := range allowedIPs {
-		conf += fmt.Sprintf("allowed_ip=%s\n", aip)
+		conf += fmt.Sprintf("allowed_ip=%s\n", sanitizeIPC(aip))
 	}
 	conf += "\n"
 	return ipcSet(conf)
 }
 
 func AddPeerWithEndpoint(pubKeyHex, endpoint string, allowedIPs ...string) error {
-	conf := fmt.Sprintf("public_key=%s\n", pubKeyHex)
+	conf := fmt.Sprintf("public_key=%s\n", sanitizeIPC(pubKeyHex))
 	for _, aip := range allowedIPs {
-		conf += fmt.Sprintf("allowed_ip=%s\n", aip)
+		conf += fmt.Sprintf("allowed_ip=%s\n", sanitizeIPC(aip))
 	}
-	conf += fmt.Sprintf("endpoint=%s\npersistent_keepalive_interval=15\n\n", endpoint)
+	conf += fmt.Sprintf("endpoint=%s\npersistent_keepalive_interval=15\n\n", sanitizeIPC(endpoint))
 	return ipcSet(conf)
 }
 
 func RemovePeer(pubKeyHex string) error {
-	conf := fmt.Sprintf("public_key=%s\nremove=true\n\n", pubKeyHex)
+	conf := fmt.Sprintf("public_key=%s\nremove=true\n\n", sanitizeIPC(pubKeyHex))
 	return ipcSet(conf)
 }
 
