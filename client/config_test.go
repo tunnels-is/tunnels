@@ -19,14 +19,14 @@ func TestDefaultConfig(t *testing.T) {
 		t.Fatal("DefaultConfig should not return nil")
 	}
 
-	if !conf.DebugLogging {
-		t.Error("DebugLogging should be true by default")
+	if conf.DebugLogging {
+		t.Error("DebugLogging should be false by default")
 	}
-	if !conf.InfoLogging {
-		t.Error("InfoLogging should be true by default")
+	if conf.InfoLogging {
+		t.Error("InfoLogging should be false by default")
 	}
-	if !conf.ErrorLogging {
-		t.Error("ErrorLogging should be true by default")
+	if conf.ErrorLogging {
+		t.Error("ErrorLogging should be false by default")
 	}
 	if conf.ConnectionTracer {
 		t.Error("ConnectionTracer should be false by default")
@@ -58,8 +58,8 @@ func TestDefaultConfig(t *testing.T) {
 	if conf.ExitPostUpdate {
 		t.Error("ExitPostUpdate should be false by default")
 	}
-	if !conf.AutoDownloadUpdate {
-		t.Error("AutoDownloadUpdate should be true by default")
+	if conf.AutoDownloadUpdate {
+		t.Error("AutoDownloadUpdate should be false by default")
 	}
 	if conf.UpdateWhileConnected {
 		t.Error("UpdateWhileConnected should be false by default")
@@ -68,14 +68,14 @@ func TestDefaultConfig(t *testing.T) {
 		t.Error("DisableUpdates should be true by default")
 	}
 
-	if !conf.LogBlockedDomains {
-		t.Error("LogBlockedDomains should be true by default")
+	if conf.LogBlockedDomains {
+		t.Error("LogBlockedDomains should be false by default")
 	}
-	if !conf.LogAllDomains {
-		t.Error("LogAllDomains should be true by default")
+	if conf.LogAllDomains {
+		t.Error("LogAllDomains should be false by default")
 	}
-	if !conf.DNSstats {
-		t.Error("DNSstats should be true by default")
+	if conf.DNSstats {
+		t.Error("DNSstats should be false by default")
 	}
 
 	if conf.DNSBlockLists == nil {

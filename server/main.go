@@ -558,7 +558,7 @@ func initializeWGServer(network *Network) error {
 	if defaultServer == nil {
 		return fmt.Errorf("default server not found")
 	}
-	if err := DB_SetServerWGConfigID(defaultServer.ID, wgCfg, "", network.CIDR); err != nil {
+	if err := DB_SetServerWGConfigID(defaultServer.ID, wgCfg, "", network.CIDR, ""); err != nil {
 		return fmt.Errorf("assign wg config to server: %w", err)
 	}
 

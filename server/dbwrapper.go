@@ -187,6 +187,6 @@ func DB_ListWGServerConfigs() ([]*types.WGServerConfig, error) {
 	return BBolt_ListWGServerConfigs()
 }
 
-func DB_SetServerWGConfigID(serverID uuid.UUID, wgCfg *types.WGServerConfig, pubKey, subnet string) error {
-	return BBolt_SetServerWGConfigID(serverID.String(), wgCfg, pubKey, subnet)
+func DB_SetServerWGConfigID(serverID uuid.UUID, wgCfg *types.WGServerConfig, pubKey, subnet, subnet6 string) error {
+	return BBolt_SetServerWGConfigID(serverID.String(), wgCfg, pubKey, subnet, subnet6)
 }

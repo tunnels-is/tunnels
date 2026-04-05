@@ -122,6 +122,10 @@ type Device struct {
 	// WireGuardIP is the IP assigned to this device within the server's WireGuard subnet.
 	// Assigned at device creation time by the controller.
 	WireGuardIP string `json:"WireGuardIP,omitempty"`
+
+	// WireGuardIPv6 is the IPv6 address assigned within the server's v6 subnet.
+	// Empty when IPv6 is not configured on the server.
+	WireGuardIPv6 string `json:"WireGuardIPv6,omitempty"`
 }
 
 type FORM_GET_SERVER struct {
@@ -143,9 +147,10 @@ type Server struct {
 	WGConfigID uuid.UUID `json:"WGConfigID,omitempty"`
 
 	// Cached fields — source of truth is WGServerConfig; refreshed on assign/fetch.
-	WireGuardPort   string `json:"WireGuardPort,omitempty"`
-	WireGuardPubKey string `json:"WireGuardPubKey,omitempty"`
-	WireGuardSubnet string `json:"WireGuardSubnet,omitempty"`
+	WireGuardPort    string `json:"WireGuardPort,omitempty"`
+	WireGuardPubKey  string `json:"WireGuardPubKey,omitempty"`
+	WireGuardSubnet  string `json:"WireGuardSubnet,omitempty"`
+	WireGuardSubnet6 string `json:"WireGuardSubnet6,omitempty"`
 }
 
 // WGServerConfig holds all operational configuration for a wg-server instance.
@@ -167,6 +172,10 @@ type WGServerConfig struct {
 	// The subnet is resolved at runtime — it is not stored on this struct.
 	NetworkID uuid.UUID `json:"NetworkID,omitempty"`
 
+	// NetworkID6 references the Network record whose CIDR is the IPv6 WireGuard subnet.
+	// Optional — when empty, IPv6 is not served.
+	NetworkID6 uuid.UUID `json:"NetworkID6,omitempty"`
+
 	InternetIface string `json:"InternetIface"`
 
 	PacketInspection   bool `json:"PacketInspection"`
@@ -180,9 +189,10 @@ type WGServerConfigResponse struct {
 	// ServerID is the UUID of the Server record linked to this config.
 	ServerID string `json:"ServerID"`
 
-	WireGuardPort   int    `json:"WireGuardPort"`
-	WireGuardSubnet string `json:"WireGuardSubnet"`
-	WireGuardIface  string `json:"WireGuardIface"`
+	WireGuardPort    int    `json:"WireGuardPort"`
+	WireGuardSubnet  string `json:"WireGuardSubnet"`
+	WireGuardSubnet6 string `json:"WireGuardSubnet6,omitempty"`
+	WireGuardIface   string `json:"WireGuardIface"`
 
 	InternetIface string `json:"InternetIface"`
 
@@ -192,10 +202,11 @@ type WGServerConfigResponse struct {
 
 // WGServerInfo describes a peer wg-server for cross-server routing.
 type WGServerInfo struct {
-	WireGuardPubKey string `json:"WireGuardPubKey"`
-	WireGuardPort   string `json:"WireGuardPort"`
-	WireGuardSubnet string `json:"WireGuardSubnet"`
-	IP              string `json:"IP"`
+	WireGuardPubKey  string `json:"WireGuardPubKey"`
+	WireGuardPort    string `json:"WireGuardPort"`
+	WireGuardSubnet  string `json:"WireGuardSubnet"`
+	WireGuardSubnet6 string `json:"WireGuardSubnet6,omitempty"`
+	IP               string `json:"IP"`
 }
 
 // WGServersResponse is returned by GET /v3/wg/servers.
@@ -235,6 +246,7 @@ type ServerConnectResponse struct {
 
 	// WireGuard transport fields (populated when server has WG enabled)
 	WireGuardIP     string `json:"WireGuardIP,omitempty"`
+	WireGuardIPv6   string `json:"WireGuardIPv6,omitempty"`
 	WireGuardPubKey string `json:"WireGuardPubKey,omitempty"`
 	WireGuardPort   string `json:"WireGuardPort,omitempty"`
 }
@@ -246,9 +258,10 @@ type FORM_GET_DEVICE struct {
 // WireGuard types
 
 type WGPeer struct {
-	PublicKeyHex string `json:"PublicKeyHex"`
-	DeviceID     string `json:"DeviceID"`
-	WireGuardIP  string `json:"WireGuardIP,omitempty"`
+	PublicKeyHex  string `json:"PublicKeyHex"`
+	DeviceID      string `json:"DeviceID"`
+	WireGuardIP   string `json:"WireGuardIP,omitempty"`
+	WireGuardIPv6 string `json:"WireGuardIPv6,omitempty"`
 }
 
 type WGPeersResponse struct {

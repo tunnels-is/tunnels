@@ -643,6 +643,13 @@ func API_DeviceCreate(w http.ResponseWriter, r *http.Request) {
 		}
 		F.Device.WireGuardIP = ip
 
+		ipv6, assign6Err := assignNextWireGuardIPv6(F.Device.ServerID)
+		if assign6Err != nil {
+			senderr(w, 400, "WireGuard IPv6 assignment failed", slog.Any("err", assign6Err))
+			return
+		}
+		F.Device.WireGuardIPv6 = ipv6
+
 		var srvErr error
 		wgServer, srvErr = DB_FindServerByID(F.Device.ServerID)
 		if srvErr != nil || wgServer == nil {

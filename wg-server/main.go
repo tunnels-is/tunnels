@@ -35,8 +35,12 @@ func Init(ctx context.Context, controllerURL, apiKey string, insecureSkipVerify 
 		}
 	}
 
+	subnet6Log := ""
+	if cfg.WireGuardSubnet6 != "" {
+		subnet6Log = " subnet6=" + cfg.WireGuardSubnet6
+	}
 	INFO("config fetched, serverID=", cfg.ServerID,
-		" subnet=", cfg.WireGuardSubnet, " iface=", cfg.WireGuardIface)
+		" subnet=", cfg.WireGuardSubnet, subnet6Log, " iface=", cfg.WireGuardIface)
 
 	if err := setupWireGuard(cfg, logLevel); err != nil {
 		ERR("wireguard setup failed: ", err)
@@ -48,7 +52,7 @@ func Init(ctx context.Context, controllerURL, apiKey string, insecureSkipVerify 
 		return
 	}
 
-	peerStore = NewPeerStore(cfg.WireGuardSubnet)
+	peerStore = NewPeerStore(cfg.WireGuardSubnet, cfg.WireGuardSubnet6)
 	activeConfig.Store(cfg)
 	initSyncClient(cfg)
 

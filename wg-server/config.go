@@ -24,6 +24,7 @@ type Config struct {
 	WireGuardPort    int
 	WireGuardPrivKey []byte // raw 32-byte Curve25519 private key; zeroed after setup
 	WireGuardSubnet  string
+	WireGuardSubnet6 string
 	WireGuardIface   string
 
 	InternetIface string
@@ -118,6 +119,7 @@ func FetchConfig(controllerURL, apiKey string, insecureSkipVerify bool) (*Config
 		WireGuardPort:      r.WireGuardPort,
 		WireGuardPrivKey:   privKey,
 		WireGuardSubnet:    r.WireGuardSubnet,
+		WireGuardSubnet6:   r.WireGuardSubnet6,
 		WireGuardIface:     r.WireGuardIface,
 		InternetIface:      r.InternetIface,
 		PacketInspection:   r.PacketInspection,
