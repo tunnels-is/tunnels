@@ -2,7 +2,9 @@ package client
 
 import (
 	"context"
+	"crypto/sha256"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -101,16 +103,58 @@ func CreateFile(file string) (f *os.File, err error) {
 	return
 }
 
-func CreateFolder(path string) {
+func createFolder(path string) error {
 	err := os.Mkdir(path, 0o700)
 	if err != nil {
 		if os.IsExist(err) {
-			return
+			return nil
 		}
+		return err
+	}
+	return nil
+}
+
+func CreateFolder(path string) {
+	if err := createFolder(path); err != nil {
 		ERROR("Unable to create folder: ", path, " ", err)
 		os.Exit(1)
 	}
 	DEBUG("New directory:", path)
+}
+
+// verifyAndWriteFile checks whether the file at diskPath matches the expected
+// content. If the file is missing or its SHA-256 differs, it is replaced with
+// the expected content. Returns true if the file was written.
+func verifyAndWriteFile(diskPath string, expected []byte) (bool, error) {
+	expectedHash := sha256.Sum256(expected)
+
+	diskBytes, err := os.ReadFile(diskPath)
+	if err == nil {
+		diskHash := sha256.Sum256(diskBytes)
+		if diskHash == expectedHash {
+			return false, nil
+		}
+	}
+
+	_ = os.Remove(diskPath)
+
+	f, err := os.OpenFile(diskPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
+	if err != nil {
+		return false, fmt.Errorf("create %s: %w", diskPath, err)
+	}
+
+	n, err := f.Write(expected)
+	if err != nil {
+		f.Close()
+		return false, fmt.Errorf("write %s: %w", diskPath, err)
+	}
+	f.Close()
+
+	if n != len(expected) {
+		return false, fmt.Errorf("short write for %s: %d/%d", diskPath, n, len(expected))
+	}
+
+	return true, nil
 }
 
 func IsDefaultConnection(IFName string) bool {

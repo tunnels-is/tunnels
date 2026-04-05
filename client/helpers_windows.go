@@ -3,7 +3,6 @@
 package client
 
 import (
-	"errors"
 	"os"
 	"os/exec"
 	"regexp"
@@ -21,33 +20,19 @@ func ValidateAdapterID(meta *TunnelMETA) error {
 }
 
 func OSSpecificInit() error {
-	_, err := os.Stat("wintun.dll")
+	fb, err := DLL_EMBED.ReadFile("wintun.dll")
 	if err != nil {
-		_ = os.Remove("wintun.dll")
+		ERROR("unable to load embedded wintun: ", err)
+		return err
+	}
 
-		fb, err := DLL_EMBED.ReadFile("wintun.dll")
-		if err != nil {
-			ERROR("unable to load wintun: ", err)
-			return err
-		}
-
-		f, err := os.OpenFile("wintun.dll", os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
-		if err != nil {
-			ERROR("unable to create wintun: ", err)
-			return err
-		}
-
-		n, err := f.Write(fb)
-		if err != nil {
-			ERROR("unable to write new wintun: ", err)
-			return err
-		}
-
-		f.Close()
-		if n != len(fb) {
-			ERROR("did not write all bytes to wintun.dll: ", n, len(fb))
-			return errors.New("")
-		}
+	written, err := verifyAndWriteFile("wintun.dll", fb)
+	if err != nil {
+		ERROR("unable to verify/write wintun.dll: ", err)
+		return err
+	}
+	if written {
+		DEBUG("wintun.dll extracted (hash verified)")
 	}
 
 	return nil
