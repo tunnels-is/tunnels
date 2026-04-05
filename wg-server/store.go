@@ -3,6 +3,7 @@ package wgserver
 import (
 	"fmt"
 	"net"
+	"net/netip"
 	"sort"
 	"sync"
 )
@@ -10,22 +11,25 @@ import (
 type PeerRecord struct {
 	PubKeyB64 string
 	IP        string
+	IPv6      string
 }
 
 type PeerStore struct {
 	mu      sync.RWMutex
 	records map[string]PeerRecord
 	subnet  string
+	subnet6 string
 }
 
-func NewPeerStore(subnet string) *PeerStore {
+func NewPeerStore(subnet, subnet6 string) *PeerStore {
 	return &PeerStore{
 		records: make(map[string]PeerRecord),
 		subnet:  subnet,
+		subnet6: subnet6,
 	}
 }
 
-func (ps *PeerStore) GetOrAssign(deviceID, pubKeyB64 string) (string, error) {
+func (ps *PeerStore) GetOrAssign(deviceID, pubKeyB64 string) (string, string, error) {
 	ps.mu.Lock()
 	defer ps.mu.Unlock()
 
@@ -34,15 +38,24 @@ func (ps *PeerStore) GetOrAssign(deviceID, pubKeyB64 string) (string, error) {
 			rec.PubKeyB64 = pubKeyB64
 			ps.records[deviceID] = rec
 		}
-		return rec.IP, nil
+		return rec.IP, rec.IPv6, nil
 	}
 
 	ip, err := ps.nextIP()
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
-	ps.records[deviceID] = PeerRecord{PubKeyB64: pubKeyB64, IP: ip}
-	return ip, nil
+
+	var ipv6 string
+	if ps.subnet6 != "" {
+		ipv6, err = ps.nextIPv6()
+		if err != nil {
+			return "", "", err
+		}
+	}
+
+	ps.records[deviceID] = PeerRecord{PubKeyB64: pubKeyB64, IP: ip, IPv6: ipv6}
+	return ip, ipv6, nil
 }
 
 func (ps *PeerStore) Get(deviceID string) (PeerRecord, bool) {
@@ -63,10 +76,10 @@ func (ps *PeerStore) GetByPubKey(pubKeyB64 string) (PeerRecord, bool) {
 	return PeerRecord{}, false
 }
 
-func (ps *PeerStore) Set(deviceID, ip, pubKeyB64 string) {
+func (ps *PeerStore) Set(deviceID, ip, ipv6, pubKeyB64 string) {
 	ps.mu.Lock()
 	defer ps.mu.Unlock()
-	ps.records[deviceID] = PeerRecord{PubKeyB64: pubKeyB64, IP: ip}
+	ps.records[deviceID] = PeerRecord{PubKeyB64: pubKeyB64, IP: ip, IPv6: ipv6}
 }
 
 func (ps *PeerStore) GetAll() map[string]PeerRecord {
@@ -103,6 +116,33 @@ func (ps *PeerStore) nextIP() (string, error) {
 		return "", fmt.Errorf("WireGuard subnet %s is exhausted", ps.subnet)
 	}
 	return next.String(), nil
+}
+
+func (ps *PeerStore) nextIPv6() (string, error) {
+	prefix, err := netip.ParsePrefix(ps.subnet6)
+	if err != nil {
+		return "", fmt.Errorf("invalid IPv6 subnet %q: %w", ps.subnet6, err)
+	}
+
+	used := make(map[netip.Addr]bool, len(ps.records))
+	for _, rec := range ps.records {
+		if rec.IPv6 == "" {
+			continue
+		}
+		if addr, parseErr := netip.ParseAddr(rec.IPv6); parseErr == nil && prefix.Contains(addr) {
+			used[addr] = true
+		}
+	}
+
+	// Start at base+2 (skip network address and server address).
+	candidate := prefix.Addr().Next().Next()
+	for prefix.Contains(candidate) {
+		if !used[candidate] {
+			return candidate.String(), nil
+		}
+		candidate = candidate.Next()
+	}
+	return "", fmt.Errorf("WireGuard IPv6 subnet %s is exhausted", ps.subnet6)
 }
 
 func storeIPToUint32(ip net.IP) uint32 {

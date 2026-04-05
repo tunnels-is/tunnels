@@ -48,23 +48,23 @@ func assignAndAdd(pubKeyB64 string) bool {
 		}
 		INFO("assignAndAdd: peer authorized by controller, deviceID=", p.DeviceID)
 
-		var ip string
+		var ip, ipv6 string
 		if p.WireGuardIP != "" {
-
 			ip = p.WireGuardIP
-			peerStore.Set(p.DeviceID, ip, pubKeyB64)
+			ipv6 = p.WireGuardIPv6
+			peerStore.Set(p.DeviceID, ip, ipv6, pubKeyB64)
 		} else {
-
 			var assignErr error
-			ip, assignErr = peerStore.GetOrAssign(p.DeviceID, pubKeyB64)
+			ip, ipv6, assignErr = peerStore.GetOrAssign(p.DeviceID, pubKeyB64)
 			if assignErr != nil {
 				WARN("assignAndAdd: GetOrAssign failed: ", assignErr)
 				return false
 			}
 		}
 
-		INFO("assignAndAdd: ip=", ip, " calling AddPeer")
-		if err := AddPeer(hexKey, ip+"/32"); err != nil {
+		allowedIPs := peerAllowedIPs(ip, ipv6)
+		INFO("assignAndAdd: ip=", ip, " ipv6=", ipv6, " calling AddPeer")
+		if err := AddPeer(hexKey, allowedIPs...); err != nil {
 			WARN("assignAndAdd: AddPeer failed: ", err)
 			return false
 		}
@@ -74,6 +74,16 @@ func assignAndAdd(pubKeyB64 string) bool {
 
 	INFO("assignAndAdd: pubkey not authorized by controller → ", pubKeyB64[:12], "…")
 	return false
+}
+
+// peerAllowedIPs builds the list of allowed IPs for a peer.
+// Always includes the IPv4 /32; adds the IPv6 /128 if non-empty.
+func peerAllowedIPs(ip, ipv6 string) []string {
+	ips := []string{ip + "/32"}
+	if ipv6 != "" {
+		ips = append(ips, ipv6+"/128")
+	}
+	return ips
 }
 
 func fetchDesiredPeers(cfg *Config) (*types.WGPeersResponse, error) {

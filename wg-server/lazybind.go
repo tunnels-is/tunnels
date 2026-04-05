@@ -161,11 +161,11 @@ func (b *LazyBind) handleInitiation(pkt *bufferedPkt) {
 		return
 	}
 
-	INFO("LazyBind: peer found in store → ip=", rec.IP, " calling AddPeer")
+	INFO("LazyBind: peer found in store → ip=", rec.IP, " ipv6=", rec.IPv6, " calling AddPeer")
 	hexKey, err := b64ToHex(pubKeyB64)
 	if err != nil {
 		WARN("LazyBind: b64ToHex failed: ", err)
-	} else if err := AddPeer(hexKey, rec.IP+"/32"); err != nil {
+	} else if err := AddPeer(hexKey, peerAllowedIPs(rec.IP, rec.IPv6)...); err != nil {
 		WARN("LazyBind: AddPeer failed: ", err)
 	} else {
 		INFO("LazyBind: AddPeer OK → peer=", pubKeyB64[:12], "… ip=", rec.IP, " re-injecting handshake")
