@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"time"
 
@@ -52,6 +53,14 @@ func assignAndAdd(pubKeyB64 string) bool {
 		if p.WireGuardIP != "" {
 			ip = p.WireGuardIP
 			ipv6 = p.WireGuardIPv6
+			if !subnetContains(cfg.WireGuardSubnet, ip) {
+				WARN("assignAndAdd: controller-assigned IP outside subnet: ", ip)
+				return false
+			}
+			if ipv6 != "" && cfg.WireGuardSubnet6 != "" && !subnetContains(cfg.WireGuardSubnet6, ipv6) {
+				WARN("assignAndAdd: controller-assigned IPv6 outside subnet: ", ipv6)
+				return false
+			}
 			peerStore.Set(p.DeviceID, ip, ipv6, pubKeyB64)
 		} else {
 			var assignErr error
@@ -84,6 +93,18 @@ func peerAllowedIPs(ip, ipv6 string) []string {
 		ips = append(ips, ipv6+"/128")
 	}
 	return ips
+}
+
+func subnetContains(cidr, ipStr string) bool {
+	_, subnet, err := net.ParseCIDR(cidr)
+	if err != nil {
+		return false
+	}
+	ip := net.ParseIP(ipStr)
+	if ip == nil {
+		return false
+	}
+	return subnet.Contains(ip)
 }
 
 func fetchDesiredPeers(cfg *Config) (*types.WGPeersResponse, error) {
