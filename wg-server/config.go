@@ -35,6 +35,9 @@ type Config struct {
 
 	InsecureSkipVerify bool
 	PacketInspection   bool
+
+	HandshakeBufferSize int
+	HandshakeRatePerIP  int
 }
 
 // generateWGPrivKey generates a new Curve25519 private key with proper clamping.
@@ -134,6 +137,12 @@ func FetchConfig(controllerURL, apiKey string, insecureSkipVerify bool) (*Config
 	}
 	if cfg.WireGuardSubnet == "" {
 		cfg.WireGuardSubnet = "10.1.0.0/16"
+	}
+	if cfg.HandshakeBufferSize <= 0 {
+		cfg.HandshakeBufferSize = 1000
+	}
+	if cfg.HandshakeRatePerIP <= 0 {
+		cfg.HandshakeRatePerIP = 100
 	}
 
 	return cfg, nil
