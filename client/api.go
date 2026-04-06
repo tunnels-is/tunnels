@@ -101,6 +101,20 @@ func SendRequestToURL(tc *tls.Config, method string, url string, data any, timeo
 func ForwardToController(FR *FORWARD_REQUEST) (any, int) {
 	defer RecoverAndLog()
 
+	conf := CONFIG.Load()
+	allowed := false
+	for _, cs := range conf.ControlServers {
+		if cs.Host == FR.Server.Host {
+			allowed = true
+			break
+		}
+	}
+	if !allowed {
+		er := new(ErrorResponse)
+		er.Error = "host not in configured control servers"
+		return er, 403
+	}
+
 	if strings.Contains(FR.Server.Host, "api.tunnels.is") {
 		FR.Server.ValidateCertificate = true
 	}

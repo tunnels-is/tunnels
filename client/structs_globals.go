@@ -103,6 +103,7 @@ var (
 	DIST_EMBED embed.FS
 	DLL_EMBED  embed.FS
 	EnableTLS  bool
+	DevMode    bool
 )
 
 var (

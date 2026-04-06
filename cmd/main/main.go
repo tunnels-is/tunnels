@@ -27,6 +27,7 @@ func main() {
 	flag.BoolVar(&s.Debug, "debug", false, "manually enable debug")
 	flag.BoolVar(&s.RequireConfig, "requireConfig", false, "Force tunnels to require disk config to start")
 	flag.BoolVar(&client.EnableTLS, "tls", false, "enable TLS for the local API server")
+	flag.BoolVar(&client.DevMode, "dev", false, "disable API auth and enable CORS for local UI development")
 	flag.Parse()
 	client.STATE.Store(s)
 
