@@ -1,7 +1,10 @@
 package client
 
 import (
+	"crypto/rand"
+	"crypto/subtle"
 	"crypto/tls"
+	"encoding/hex"
 	"encoding/json"
 	"io"
 	"io/fs"
@@ -20,17 +23,26 @@ import (
 var (
 	discardLogger   = log.New(io.Discard, "", 0)
 	httpErrorLogger = log.New(os.Stdout, "", 0)
+	sessionToken    string
 )
 
 func LaunchAPI() {
 	defer RecoverAndLog()
 
+	tokenBytes := make([]byte, 32)
+	_, err := rand.Read(tokenBytes)
+	if err != nil {
+		ERROR("failed to generate session token: ", err)
+		return
+	}
+	sessionToken = hex.EncodeToString(tokenBytes)
+
 	assetHandler := http.FileServer(getFileSystem())
 
 	mux := http.NewServeMux()
-	mux.Handle("/logs", websocket.Handler(handleWebSocket))
-	mux.Handle("/", assetHandler)
-	mux.Handle("/assets/", assetHandler)
+	mux.HandleFunc("/logs", handleWebSocketAuth)
+	mux.Handle("/", withSessionCookie(assetHandler))
+	mux.Handle("/assets/", withSessionCookie(assetHandler))
 	mux.HandleFunc("/v1/method/{method}", HTTPhandler)
 	API_SERVER = http.Server{
 		Handler: mux,
@@ -70,6 +82,10 @@ func LaunchAPI() {
 	INFO("PORT: ", port)
 	INFO("Key: ", conf.APIKey)
 	INFO("Cert: ", conf.APICert)
+	INFO("Session Token: ", sessionToken)
+	if DevMode {
+		INFO("DEV MODE: API auth disabled, CORS enabled")
+	}
 	INFO("===========================")
 
 	if EnableTLS {
@@ -126,16 +142,46 @@ func makeTLSConfig() (tc *tls.Config) {
 	return
 }
 
-func setupCORS(w *http.ResponseWriter, _ *http.Request) {
-	(*w).Header().Set("Access-Control-Allow-Origin", "*")
-	(*w).Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
-	(*w).Header().Set("Access-Control-Allow-Headers", "*")
+func setSessionCookie(w http.ResponseWriter) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     "X-Session-Token",
+		Value:    sessionToken,
+		Path:     "/",
+		HttpOnly: true,
+		SameSite: http.SameSiteStrictMode,
+		Secure:   EnableTLS,
+	})
+}
+
+func withSessionCookie(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		setSessionCookie(w)
+		next.ServeHTTP(w, r)
+	})
+}
+
+func checkSessionToken(r *http.Request) bool {
+	cookie, err := r.Cookie("X-Session-Token")
+	if err != nil {
+		return false
+	}
+	return subtle.ConstantTimeCompare([]byte(cookie.Value), []byte(sessionToken)) == 1
 }
 
 func HTTPhandler(w http.ResponseWriter, r *http.Request) {
-	setupCORS(&w, r)
-	if (*r).Method == "OPTIONS" {
-		w.WriteHeader(204)
+	if DevMode {
+		w.Header().Set("Access-Control-Allow-Origin", r.Header.Get("Origin"))
+		w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "*")
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(204)
+			r.Body.Close()
+			return
+		}
+	} else if !checkSessionToken(r) {
+		w.WriteHeader(403)
+		_, _ = w.Write([]byte(`{"error":"forbidden"}`))
 		r.Body.Close()
 		return
 	}
@@ -198,6 +244,16 @@ func HTTPhandler(w http.ResponseWriter, r *http.Request) {
 }
 
 var LogSocket atomic.Pointer[websocket.Conn]
+
+func handleWebSocketAuth(w http.ResponseWriter, r *http.Request) {
+	if !DevMode && !checkSessionToken(r) {
+		w.WriteHeader(403)
+		_, _ = w.Write([]byte(`{"error":"forbidden"}`))
+		return
+	}
+	s := websocket.Server{Handler: handleWebSocket}
+	s.ServeHTTP(w, r)
+}
 
 func handleWebSocket(ws *websocket.Conn) {
 	defer func() {
