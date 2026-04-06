@@ -475,11 +475,10 @@ const Login = (props) => {
                   ].map((opt) => (
                     <button
                       key={opt.key}
-                      className={`text-[11px] px-3 py-1 rounded-full border transition-all cursor-pointer ${
-                        newAuth[opt.key]
+                      className={`text-[11px] px-3 py-1 rounded-full border transition-all cursor-pointer ${newAuth[opt.key]
                           ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.12)]"
                           : "border-white/[0.06] bg-white/[0.02] text-white/50 hover:text-white/70 hover:border-white/25 hover:bg-white/[0.04]"
-                      }`}
+                        }`}
                       onClick={() => setNewAuth({ ...newAuth, [opt.key]: !newAuth[opt.key] })}
                     >
                       {opt.label}
@@ -523,7 +522,7 @@ const Login = (props) => {
         {showDevice && <Field label="Device Name" name="devicename" placeholder="Device Name" value={inputs["devicename"]} error={errors["devicename"]} onChange={HandleInputChange} />}
         {showPassword && <Field label="Password" name="password" type="password" placeholder="Password" value={inputs["password"]} error={errors["password"]} onChange={HandleInputChange} />}
         {showConfirmPassword && <Field label="Confirm Password" name="password2" type="password" placeholder="Confirm Password" value={inputs["password2"]} error={errors["password2"]} onChange={HandleInputChange} />}
-        {showTwoFactor && <Field label="2FA Code" name="digits" placeholder="Authenticator Code (optional)" value={inputs["digits"]} error={errors["digits"]} onChange={HandleInputChange} />}
+        {showTwoFactor && <Field label="2FA Code" name="digits" placeholder="Authenticator Code (if enabled)" value={inputs["digits"]} error={errors["digits"]} onChange={HandleInputChange} />}
         {showRecovery && <Field label="Recovery Code" name="recovery" placeholder="Two Factor Recovery Code" value={inputs["recovery"]} error={errors["recovery"]} onChange={HandleInputChange} />}
         {showCode && <Field label="Code" name="code" placeholder="Confirmation Code" value={inputs["code"]} error={errors["code"]} onChange={HandleInputChange} />}
         {showResetCode && <Field label="Reset Code" name="code" placeholder="Reset Code" value={inputs["code"]} error={errors["code"]} onChange={HandleInputChange} />}
@@ -548,11 +547,10 @@ const Login = (props) => {
 
           {mode === 1 && (
             <button
-              className={`text-[11px] px-3 py-1 rounded-full border transition-all cursor-pointer ${
-                remember
+              className={`text-[11px] px-3 py-1 rounded-full border transition-all cursor-pointer ${remember
                   ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.12)]"
                   : "border-white/[0.06] bg-white/[0.02] text-white/50 hover:text-white/70 hover:border-white/25 hover:bg-white/[0.04]"
-              }`}
+                }`}
               onClick={() => setRememeber(!remember)}
             >
               Remember
@@ -593,11 +591,10 @@ const Login = (props) => {
         {modes.map(m => (
           <button
             key={m.value}
-            className={`text-[11px] px-3 py-1 rounded-full border transition-all cursor-pointer ${
-              mode === m.value
+            className={`text-[11px] px-3 py-1 rounded-full border transition-all cursor-pointer ${mode === m.value
                 ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.12)]"
                 : "border-white/[0.06] bg-white/[0.02] text-white/50 hover:text-white/70 hover:border-white/25 hover:bg-white/[0.04]"
-            }`}
+              }`}
             onClick={() => {
               if (m.value === 5) GenerateToken();
               else if (tokenLogin) RemoveToken();
