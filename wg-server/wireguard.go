@@ -56,7 +56,7 @@ func setupWireGuard(cfg *Config, logLevel string) error {
 	privCopy := make([]byte, 32)
 	copy(privCopy, cfg.WireGuardPrivKey)
 
-	wgDevice = device.NewDevice(tunInterface, NewLazyBind(conn.NewDefaultBind(), privCopy, pubBytes, func() {}), wgLogger)
+	wgDevice = device.NewDevice(tunInterface, NewLazyBind(conn.NewDefaultBind(), privCopy, pubBytes, cfg.HandshakeBufferSize, cfg.HandshakeRatePerIP, func() {}), wgLogger)
 
 	// Build IPC config using []byte so key material can be zeroed after use.
 	privKeyHex := make([]byte, hex.EncodedLen(32))

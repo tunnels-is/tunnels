@@ -21,6 +21,11 @@ type bufferedPkt struct {
 	ep   conn.Endpoint
 }
 
+type ipRate struct {
+	count int
+	start time.Time
+}
+
 type LazyBind struct {
 	inner     conn.Bind
 	requeueCh chan *bufferedPkt
@@ -33,17 +38,23 @@ type LazyBind struct {
 	mu      sync.Mutex
 	seenIPs map[netip.Addr]time.Time
 
+	rateMu     sync.Mutex
+	ratePerIP  int
+	rateWindow map[netip.Addr]*ipRate
+
 	fallbackSync func()
 }
 
-func NewLazyBind(inner conn.Bind, serverPriv, serverPub []byte, fallbackSync func()) *LazyBind {
+func NewLazyBind(inner conn.Bind, serverPriv, serverPub []byte, bufferSize, ratePerIP int, fallbackSync func()) *LazyBind {
 	return &LazyBind{
 		inner:        inner,
-		requeueCh:    make(chan *bufferedPkt, 64),
+		requeueCh:    make(chan *bufferedPkt, bufferSize),
 		done:         make(chan struct{}),
 		serverPriv:   serverPriv,
 		serverPub:    serverPub,
 		seenIPs:      make(map[netip.Addr]time.Time),
+		ratePerIP:    ratePerIP,
+		rateWindow:   make(map[netip.Addr]*ipRate),
 		fallbackSync: fallbackSync,
 	}
 }
@@ -77,6 +88,20 @@ func (b *LazyBind) Send(bufs [][]byte, ep conn.Endpoint) error    { return b.inn
 func (b *LazyBind) ParseEndpoint(s string) (conn.Endpoint, error) { return b.inner.ParseEndpoint(s) }
 func (b *LazyBind) BatchSize() int                                { return b.inner.BatchSize() }
 
+func (b *LazyBind) handshakeRateAllowed(ip netip.Addr) bool {
+	b.rateMu.Lock()
+	defer b.rateMu.Unlock()
+
+	now := time.Now()
+	r, ok := b.rateWindow[ip]
+	if !ok || now.Sub(r.start) >= time.Second {
+		b.rateWindow[ip] = &ipRate{count: 1, start: now}
+		return true
+	}
+	r.count++
+	return r.count <= b.ratePerIP
+}
+
 func (b *LazyBind) wrapReceive(inner conn.ReceiveFunc) conn.ReceiveFunc {
 	return func(bufs [][]byte, sizes []int, eps []conn.Endpoint) (int, error) {
 		n, err := inner(bufs, sizes, eps)
@@ -89,6 +114,10 @@ func (b *LazyBind) wrapReceive(inner conn.ReceiveFunc) conn.ReceiveFunc {
 			data := bufs[i][:sizes[i]]
 			if isHandshakeInit(data) {
 				srcIP := eps[i].DstIP()
+				if !b.handshakeRateAllowed(srcIP) {
+					WARN("LazyBind: handshake rate limit exceeded for ", srcIP)
+					continue
+				}
 				if b.shouldSync(srcIP) {
 					pkt := &bufferedPkt{
 						data: make([]byte, len(data)),
@@ -125,6 +154,15 @@ func (b *LazyBind) reinjectReceive() conn.ReceiveFunc {
 	}
 }
 
+func (b *LazyBind) requeue(pkt *bufferedPkt) {
+	select {
+	case b.requeueCh <- pkt:
+	case <-b.done:
+	default:
+		WARN("LazyBind: requeue buffer full, dropping handshake packet")
+	}
+}
+
 func (b *LazyBind) handleInitiation(pkt *bufferedPkt) {
 	INFO("LazyBind: handshake initiation received, attempting identity decrypt")
 
@@ -132,10 +170,7 @@ func (b *LazyBind) handleInitiation(pkt *bufferedPkt) {
 	if !ok {
 		INFO("LazyBind: decrypt failed (wrong server key?), falling back to full sync")
 		b.fallbackSync()
-		select {
-		case b.requeueCh <- pkt:
-		case <-b.done:
-		}
+		b.requeue(pkt)
 		return
 	}
 
@@ -146,18 +181,12 @@ func (b *LazyBind) handleInitiation(pkt *bufferedPkt) {
 		INFO("LazyBind: pubkey not in peer store, attempting targeted assign from controller")
 		if assignAndAdd(pubKeyB64) {
 			INFO("LazyBind: targeted assign succeeded, re-injecting handshake")
-			select {
-			case b.requeueCh <- pkt:
-			case <-b.done:
-			}
+			b.requeue(pkt)
 			return
 		}
 		INFO("LazyBind: targeted assign failed, falling back to full sync")
 		b.fallbackSync()
-		select {
-		case b.requeueCh <- pkt:
-		case <-b.done:
-		}
+		b.requeue(pkt)
 		return
 	}
 
@@ -171,10 +200,7 @@ func (b *LazyBind) handleInitiation(pkt *bufferedPkt) {
 		INFO("LazyBind: AddPeer OK → peer=", pubKeyB64[:12], "… ip=", rec.IP, " re-injecting handshake")
 	}
 
-	select {
-	case b.requeueCh <- pkt:
-	case <-b.done:
-	}
+	b.requeue(pkt)
 }
 
 func (b *LazyBind) shouldSync(ip netip.Addr) bool {
