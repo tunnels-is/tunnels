@@ -64,6 +64,9 @@ func Init(ctx context.Context, controllerURL, apiKey string, insecureSkipVerify 
 	if wgDevice != nil {
 		wgDevice.Close()
 	}
+	if wgLazyBind != nil {
+		wgLazyBind.Shutdown()
+	}
 	cleanupNet(cfg)
 	INFO("wg-server shutdown complete")
 }

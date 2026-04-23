@@ -195,10 +195,12 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	}
 
 	ServerReponse := &types.ServerConnectResponse{
-		InterfaceIP:     wgCfg.ServerIP,
-		WireGuardIP:     wgCfg.WireGuardIP,
-		WireGuardPubKey: wgCfg.WireGuardPubKey,
-		WireGuardPort:   wgCfg.WireGuardPort,
+		InterfaceIP:      wgCfg.ServerIP,
+		WireGuardIP:      wgCfg.WireGuardIP,
+		WireGuardPubKey:  wgCfg.WireGuardPubKey,
+		WireGuardPort:    wgCfg.WireGuardPort,
+		WireGuardSubnet:  wgCfg.WireGuardSubnet,
+		WireGuardSubnet6: wgCfg.WireGuardSubnet6,
 	}
 	tunnel.ServerResponse = ServerReponse
 
@@ -294,10 +296,12 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 }
 
 type wgServerConfig struct {
-	WireGuardPubKey string `json:"WireGuardPubKey"`
-	WireGuardPort   string `json:"WireGuardPort"`
-	ServerIP        string `json:"ServerIP"`
-	WireGuardIP     string `json:"WireGuardIP"`
+	WireGuardPubKey  string `json:"WireGuardPubKey"`
+	WireGuardPort    string `json:"WireGuardPort"`
+	ServerIP         string `json:"ServerIP"`
+	WireGuardIP      string `json:"WireGuardIP"`
+	WireGuardSubnet  string `json:"WireGuardSubnet"`
+	WireGuardSubnet6 string `json:"WireGuardSubnet6"`
 }
 
 func getServerWGConfig(cr *ConnectionRequest, serverID string, pubKey string) (*wgServerConfig, error) {
@@ -365,10 +369,12 @@ func createServerDevice(cr *ConnectionRequest, serverID string, pubKey string, t
 	}
 
 	return &wgServerConfig{
-		WireGuardPubKey: resp.ServerPubKey,
-		WireGuardPort:   resp.ServerPort,
-		ServerIP:        resp.ServerIP,
-		WireGuardIP:     resp.Device.WireGuardIP,
+		WireGuardPubKey:  resp.ServerPubKey,
+		WireGuardPort:    resp.ServerPort,
+		ServerIP:         resp.ServerIP,
+		WireGuardIP:      resp.Device.WireGuardIP,
+		WireGuardSubnet:  resp.ServerSubnet,
+		WireGuardSubnet6: resp.ServerSubnet6,
 	}, nil
 }
 
@@ -496,10 +502,12 @@ type createDeviceRequest struct {
 }
 
 type createDeviceControllerResponse struct {
-	Device       *types.Device `json:"Device"`
-	ServerPubKey string        `json:"ServerPubKey"`
-	ServerPort   string        `json:"ServerPort"`
-	ServerIP     string        `json:"ServerIP"`
+	Device        *types.Device `json:"Device"`
+	ServerPubKey  string        `json:"ServerPubKey"`
+	ServerPort    string        `json:"ServerPort"`
+	ServerIP      string        `json:"ServerIP"`
+	ServerSubnet  string        `json:"ServerSubnet"`
+	ServerSubnet6 string        `json:"ServerSubnet6"`
 }
 
 type createDeviceWithKeysResult struct {

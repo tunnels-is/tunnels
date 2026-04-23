@@ -73,14 +73,23 @@ func (b *LazyBind) Open(port uint16) ([]conn.ReceiveFunc, uint16, error) {
 	return wrapped, actualPort, nil
 }
 
+// Close closes the underlying UDP bind. It is called by wireguard-go as part of
+// normal BindUpdate cycles (e.g. when listen_port is set), not only at final
+// shutdown — so it MUST NOT wipe identity material or signal permanent shutdown.
+// Use Shutdown() for that.
 func (b *LazyBind) Close() error {
-	err := b.inner.Close()
+	return b.inner.Close()
+}
+
+// Shutdown performs the final teardown: signals the reinject goroutine to exit
+// and wipes key material from memory. Call this exactly once when the wg-server
+// process is exiting.
+func (b *LazyBind) Shutdown() {
 	b.closeOnce.Do(func() {
 		close(b.done)
 		zeroBytes(b.serverPriv)
 		zeroBytes(b.serverPub)
 	})
-	return err
 }
 
 func (b *LazyBind) SetMark(mark uint32) error                     { return b.inner.SetMark(mark) }

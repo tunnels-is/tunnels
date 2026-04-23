@@ -277,6 +277,19 @@ func (t *TInterface) Connect(tun *TUN) (err error) {
 		}
 	}
 
+	if sub := tun.ServerResponse.WireGuardSubnet; sub != "" {
+		err = IP_AddRoute(sub, "", t.IPv4Address, "0")
+		if err != nil {
+			return err
+		}
+	}
+	if sub6 := tun.ServerResponse.WireGuardSubnet6; sub6 != "" && t.IPv6Address != "" {
+		iperr := IP_AddRouteV6(sub6, t.Name, t.IPv6Address, "0")
+		if iperr != nil {
+			DEBUG("Unable to add IPv6 WireGuard subnet route, err : ", iperr)
+		}
+	}
+
 	for _, n := range tun.ServerResponse.Networks {
 		if n.Nat != "" {
 			err = IP_AddRoute(n.Nat, "", t.IPv4Address, "0")
