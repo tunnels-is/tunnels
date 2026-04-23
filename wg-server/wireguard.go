@@ -14,7 +14,10 @@ import (
 	"golang.zx2c4.com/wireguard/tun"
 )
 
-var wgDevice *device.Device
+var (
+	wgDevice   *device.Device
+	wgLazyBind *LazyBind
+)
 
 func wgDeviceLogLevel(level string) int {
 	switch level {
@@ -56,7 +59,8 @@ func setupWireGuard(cfg *Config, logLevel string) error {
 	privCopy := make([]byte, 32)
 	copy(privCopy, cfg.WireGuardPrivKey)
 
-	wgDevice = device.NewDevice(tunInterface, NewLazyBind(conn.NewDefaultBind(), privCopy, pubBytes, cfg.HandshakeBufferSize, cfg.HandshakeRatePerIP, func() {}), wgLogger)
+	wgLazyBind = NewLazyBind(conn.NewDefaultBind(), privCopy, pubBytes, cfg.HandshakeBufferSize, cfg.HandshakeRatePerIP, func() {})
+	wgDevice = device.NewDevice(tunInterface, wgLazyBind, wgLogger)
 
 	// Build IPC config using []byte so key material can be zeroed after use.
 	privKeyHex := make([]byte, hex.EncodedLen(32))

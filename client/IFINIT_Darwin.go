@@ -254,6 +254,19 @@ func (t *TInterface) Connect(tun *TUN) (err error) {
 		}
 	}
 
+	if sub := tun.ServerResponse.WireGuardSubnet; sub != "" {
+		err = IP_AddRoute(sub, "", t.IPv4Address, "0")
+		if err != nil {
+			return err
+		}
+	}
+	if sub6 := tun.ServerResponse.WireGuardSubnet6; sub6 != "" && t.IPv6Address != "" {
+		iperr := IP_AddRouteV6(sub6, t.SystemName, t.IPv6Address, "0")
+		if iperr != nil {
+			DEBUG("Unable to add IPv6 WireGuard subnet route, err : ", iperr)
+		}
+	}
+
 	for _, n := range tun.ServerResponse.Networks {
 		if n.Nat != "" {
 			err = IP_AddRoute(n.Nat, "", t.IPv4Address, "0")
@@ -300,6 +313,17 @@ func (t *TInterface) Disconnect(tun *TUN) (err error) {
 			if iperr != nil {
 				DEBUG("Unable to delete IPv6 default route, err : ", iperr)
 			}
+		}
+	}
+
+	if sub := tun.ServerResponse.WireGuardSubnet; sub != "" {
+		if delErr := IP_DelRoute(sub, t.IPv4Address, "0"); delErr != nil {
+			DEBUG("Unable to delete WireGuard subnet route, err : ", delErr)
+		}
+	}
+	if sub6 := tun.ServerResponse.WireGuardSubnet6; sub6 != "" && t.IPv6Address != "" {
+		if delErr := IP_DelRouteV6(sub6, t.IPv6Address, "0"); delErr != nil {
+			DEBUG("Unable to delete IPv6 WireGuard subnet route, err : ", delErr)
 		}
 	}
 

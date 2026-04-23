@@ -61,6 +61,7 @@ func main() {
 	silent := flag.Bool("silent", false, "This command disables logging")
 	logLevel := flag.String("logLevel", "debug", "set the log level. Available levels: debug, info, warn, error")
 	adminFlag := flag.String("admin", "", "Add an admin identifier (DeviceToken/DeviceKey/UserID) to NetAdmins")
+	ipOverride := flag.String("ip", "", "Override the IP used for -config and -certs (defaults to auto-discovered default-route interface IP)")
 	flag.Parse()
 
 	explicitFlags := make(map[string]bool)
@@ -76,7 +77,7 @@ func main() {
 
 	if *configFlag {
 		logger.Info("generating config")
-		err := makeConfigAndCerts()
+		err := makeConfigAndCerts(*ipOverride)
 		if err != nil {
 			logger.Error("unable to create certificates or config", "error", err)
 			os.Exit(1)
@@ -85,7 +86,7 @@ func main() {
 
 	if *certsOnly {
 		logger.Info("generating certs")
-		err := makeCertsOnly()
+		err := makeCertsOnly(*ipOverride)
 		if err != nil {
 			logger.Error("unable to create certificates", "error", err)
 			os.Exit(1)
@@ -381,7 +382,7 @@ func hashIdentifier(identifier string) (string, error) {
 	return string(h), nil
 }
 
-func makeConfigAndCerts() (err error) {
+func makeConfigAndCerts(ipOverride string) (err error) {
 	ep, err := os.Executable()
 	if err != nil {
 		return err
@@ -390,11 +391,16 @@ func makeConfigAndCerts() (err error) {
 	ep = strings.Join(eps[:len(eps)-1], "/")
 	ep += "/"
 
-	IFIP, err := gateway.DiscoverInterface()
-	if err != nil {
-		return err
+	var interfaceIP string
+	if ipOverride != "" {
+		interfaceIP = ipOverride
+	} else {
+		IFIP, derr := gateway.DiscoverInterface()
+		if derr != nil {
+			return derr
+		}
+		interfaceIP = IFIP.String()
 	}
-	interfaceIP := IFIP.String()
 
 	err = LoadServerConfig(serverConfigPath)
 	if err != nil {
@@ -448,7 +454,7 @@ func makeCerts(execPath string, IP string) (err error) {
 	return err
 }
 
-func makeCertsOnly() (err error) {
+func makeCertsOnly(ipOverride string) (err error) {
 	ep, err := os.Executable()
 	if err != nil {
 		return err
@@ -457,11 +463,16 @@ func makeCertsOnly() (err error) {
 	ep = strings.Join(eps[:len(eps)-1], "/")
 	ep += "/"
 
-	IFIP, err := gateway.DiscoverInterface()
-	if err != nil {
-		return err
+	var interfaceIP string
+	if ipOverride != "" {
+		interfaceIP = ipOverride
+	} else {
+		IFIP, derr := gateway.DiscoverInterface()
+		if derr != nil {
+			return derr
+		}
+		interfaceIP = IFIP.String()
 	}
-	interfaceIP := IFIP.String()
 	return makeCerts(ep, interfaceIP)
 }
 

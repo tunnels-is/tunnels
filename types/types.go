@@ -245,10 +245,12 @@ type ServerConnectResponse struct {
 	DNSServers []string     `json:"DNSServers"`
 
 	// WireGuard transport fields (populated when server has WG enabled)
-	WireGuardIP     string `json:"WireGuardIP,omitempty"`
-	WireGuardIPv6   string `json:"WireGuardIPv6,omitempty"`
-	WireGuardPubKey string `json:"WireGuardPubKey,omitempty"`
-	WireGuardPort   string `json:"WireGuardPort,omitempty"`
+	WireGuardIP      string `json:"WireGuardIP,omitempty"`
+	WireGuardIPv6    string `json:"WireGuardIPv6,omitempty"`
+	WireGuardPubKey  string `json:"WireGuardPubKey,omitempty"`
+	WireGuardPort    string `json:"WireGuardPort,omitempty"`
+	WireGuardSubnet  string `json:"WireGuardSubnet,omitempty"`
+	WireGuardSubnet6 string `json:"WireGuardSubnet6,omitempty"`
 }
 
 type FORM_GET_DEVICE struct {
