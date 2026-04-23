@@ -24,7 +24,7 @@ func launchAPIServer() {
 	handler = loggingTimingMiddleware(handler)
 
 	mux.HandleFunc("GET /health", healthCheckHandler)
-	mux.HandleFunc("GET /", healthCheckHandler)
+	mux.HandleFunc("GET /{$}", healthCheckHandler)
 
 	adminHandler := adminUIHandler()
 	mux.Handle("/admin/", http.StripPrefix("/admin", adminHandler))
