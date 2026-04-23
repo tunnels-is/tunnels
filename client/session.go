@@ -180,7 +180,15 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		return 502, fmt.Errorf("unable to fetch server WireGuard config: %w", wgErr)
 	}
 	if wgCfg.WireGuardIP == "" {
-		return 400, errors.New("no WireGuard IP assigned; create the device on the controller first")
+		DEBUG("no device found on controller, auto-creating for tag: ", ClientCR.Tag)
+		wgCfg, wgErr = createServerDevice(ClientCR, ClientCR.ServerID, pubKey, ClientCR.Tag)
+		if wgErr != nil {
+			ERROR("unable to auto-create device on controller: ", wgErr)
+			return 502, fmt.Errorf("unable to auto-create device on controller: %w", wgErr)
+		}
+		if wgCfg.WireGuardIP == "" {
+			return 502, errors.New("controller did not assign a WireGuard IP to the new device")
+		}
 	}
 	if ClientCR.ServerIP == "" {
 		ClientCR.ServerIP = wgCfg.ServerIP
@@ -310,6 +318,58 @@ func getServerWGConfig(cr *ConnectionRequest, serverID string, pubKey string) (*
 		return nil, fmt.Errorf("decode wg config: %w", err)
 	}
 	return cfg, nil
+}
+
+func createServerDevice(cr *ConnectionRequest, serverID string, pubKey string, tag string) (*wgServerConfig, error) {
+	serverOID, err := uuid.Parse(serverID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid ServerID: %w", err)
+	}
+	if tag == "" {
+		tag = DefaultTunnelName
+	}
+
+	url := cr.Server.GetURL("/client/device/create")
+	reqBody := &createDeviceRequest{
+		DeviceToken: cr.DeviceToken,
+		UID:         cr.UserID,
+		Device: &types.Device{
+			Tag:          tag,
+			WireGuardKey: pubKey,
+			ServerID:     serverOID,
+		},
+	}
+	authHeaders := map[string]string{
+		"X-Device-Token": cr.DeviceToken,
+		"X-UID":          cr.UserID,
+	}
+	responseBytes, code, reqErr := SendRequestToURL(nil, "POST", url, reqBody, 15000, cr.Server.ValidateCertificate, authHeaders)
+	if reqErr != nil {
+		return nil, fmt.Errorf("create device: %w", reqErr)
+	}
+	if code != 200 {
+		var er ErrorResponse
+		_ = json.Unmarshal(responseBytes, &er)
+		if er.Error != "" {
+			return nil, fmt.Errorf("create device: code=%d: %s", code, er.Error)
+		}
+		return nil, fmt.Errorf("create device: code=%d", code)
+	}
+
+	var resp createDeviceControllerResponse
+	if err := json.Unmarshal(responseBytes, &resp); err != nil {
+		return nil, fmt.Errorf("decode create device response: %w", err)
+	}
+	if resp.Device == nil {
+		return nil, errors.New("controller returned no device")
+	}
+
+	return &wgServerConfig{
+		WireGuardPubKey: resp.ServerPubKey,
+		WireGuardPort:   resp.ServerPort,
+		ServerIP:        resp.ServerIP,
+		WireGuardIP:     resp.Device.WireGuardIP,
+	}, nil
 }
 
 func GetDeviceByID(server *ControlServer, deviceID string) (d *types.Device, err error) {
