@@ -671,6 +671,8 @@ func API_DeviceCreate(w http.ResponseWriter, r *http.Request) {
 			"ServerPubKey": wgServer.WireGuardPubKey,
 			"ServerPort":   wgServer.WireGuardPort,
 			"ServerIP":     wgServer.IP,
+			"ServerSubnet":  wgServer.WireGuardSubnet,
+			"ServerSubnet6": wgServer.WireGuardSubnet6,
 		})
 	} else {
 		sendObject(w, F.Device)

@@ -86,11 +86,13 @@ func API_WGConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	sendObject(w, map[string]string{
-		"WireGuardPubKey": server.WireGuardPubKey,
-		"WireGuardPort":   server.WireGuardPort,
-		"ServerIP":        server.IP,
-		"WireGuardIP":     clientWireGuardIP,
-		"WireGuardIPv6":   clientWireGuardIPv6,
+		"WireGuardPubKey":  server.WireGuardPubKey,
+		"WireGuardPort":    server.WireGuardPort,
+		"ServerIP":         server.IP,
+		"WireGuardIP":      clientWireGuardIP,
+		"WireGuardIPv6":    clientWireGuardIPv6,
+		"WireGuardSubnet":  server.WireGuardSubnet,
+		"WireGuardSubnet6": server.WireGuardSubnet6,
 	})
 }
 
