@@ -194,7 +194,7 @@ func main() {
 		if ctrlURL == "" {
 			ctrlURL = "https://" + latestCfg.APIIP + ":" + latestCfg.APIPort
 		}
-		go wgserver.Init(ctx, ctrlURL, wgCfg.APIKey, wgCfg.InsecureSkipVerify, *logLevel)
+		go wgserver.Init(ctx, ctrlURL, wgCfg.APIKey, serverConfigPath, wgCfg.InsecureSkipVerify, *logLevel)
 	}
 
 	go signal.NewSignal("API", ctx, cancel, 1*time.Second, goroutineLogger, launchAPIServer)
