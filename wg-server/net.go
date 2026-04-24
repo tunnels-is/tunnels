@@ -58,6 +58,11 @@ func setupNet(cfg *Config) error {
 		}
 	}
 
+	// Phase 1: drain any rules left over from a previous (possibly unclean) run.
+	// Phase 2 (below) then installs a single fresh copy of each. This guarantees
+	// exactly one instance of every rule regardless of prior state.
+	flushWGRules(cfg)
+
 	if err := allowWireGuardPort(cfg.WireGuardPort); err != nil {
 		return fmt.Errorf("allow WireGuard INPUT port: %w", err)
 	}
@@ -98,23 +103,61 @@ func cleanupNet(cfg *Config) {
 		}
 	}
 
-	if err := denyWireGuardPort(cfg.WireGuardPort); err != nil {
-		WARN("failed to remove WireGuard INPUT rule: ", err)
-	}
-	if err := removeForwardRules(cfg.WireGuardIface, cfg.InternetIface); err != nil {
-		WARN("failed to remove FORWARD rules: ", err)
-	}
-	if err := removeMasquerade(cfg.WireGuardSubnet, cfg.InternetIface); err != nil {
-		WARN("failed to remove MASQUERADE rule: ", err)
+	// Drain every rule wg-server installs. Safe if rules are already absent.
+	flushWGRules(cfg)
+}
+
+// flushWGRules drain-deletes every iptables/ip6tables rule that wg-server
+// owns, repeating -D until no matching rule remains in each chain. Used both
+// at startup (to clear any leftover state from a crash or ungraceful restart)
+// and at shutdown (to leave the host with a clean table).
+//
+// Errors are intentionally ignored: iptables returns non-zero when no matching
+// rule is found, which is the expected stop condition for the drain loop and
+// the normal case when the rule was never installed.
+func flushWGRules(cfg *Config) {
+	portStr := fmt.Sprintf("%d", cfg.WireGuardPort)
+	wg := cfg.WireGuardIface
+	net := cfg.InternetIface
+
+	for _, bin := range []string{"iptables", "ip6tables"} {
+		// INPUT udp:<port> ACCEPT
+		drainRule(bin, "-D", "INPUT", "-p", "udp", "--dport", portStr, "-j", "ACCEPT")
+		// FORWARD wg -> wg
+		drainRule(bin, "-D", "FORWARD", "-i", wg, "-o", wg, "-j", "ACCEPT")
+		// FORWARD wg -> net
+		drainRule(bin, "-D", "FORWARD", "-i", wg, "-o", net, "-j", "ACCEPT")
+		// FORWARD net -> wg (RELATED,ESTABLISHED)
+		drainRule(bin, "-D", "FORWARD",
+			"-i", net, "-o", wg,
+			"-m", "state", "--state", "RELATED,ESTABLISHED",
+			"-j", "ACCEPT")
 	}
 
+	// IPv4 MASQUERADE
+	if cfg.WireGuardSubnet != "" {
+		drainRule("iptables",
+			"-t", "nat", "-D", "POSTROUTING",
+			"-s", cfg.WireGuardSubnet, "-o", net, "-j", "MASQUERADE")
+	}
+	// IPv6 MASQUERADE
 	if cfg.WireGuardSubnet6 != "" {
-		if err := removeMasquerade6(cfg.WireGuardSubnet6, cfg.InternetIface); err != nil {
-			WARN("failed to remove IPv6 MASQUERADE rule: ", err)
-		}
-	} else {
-		if err := removeIPv6Drop(cfg.WireGuardIface); err != nil {
-			WARN("failed to remove IPv6 DROP rules: ", err)
+		drainRule("ip6tables",
+			"-t", "nat", "-D", "POSTROUTING",
+			"-s", cfg.WireGuardSubnet6, "-o", net, "-j", "MASQUERADE")
+	}
+	// IPv6 DROP (installed when no v6 subnet is configured)
+	drainRule("ip6tables", "-D", "FORWARD", "-i", wg, "-j", "DROP")
+	drainRule("ip6tables", "-D", "FORWARD", "-o", wg, "-j", "DROP")
+}
+
+// drainRule runs `bin args...` (with args[0] = "-D ...") repeatedly until it
+// fails. iptables returns a non-zero exit when no matching rule is found, so
+// this cleanly removes 0..N duplicates in a single call.
+func drainRule(bin string, args ...string) {
+	for {
+		if err := exec.Command(bin, args...).Run(); err != nil {
+			return
 		}
 	}
 }
@@ -164,14 +207,6 @@ func allowWireGuardPort(port int) error {
 	return execIP6Tables("-A", "INPUT", "-p", "udp", "--dport", portStr, "-j", "ACCEPT")
 }
 
-func denyWireGuardPort(port int) error {
-	portStr := fmt.Sprintf("%d", port)
-	if err := execIPTables("-D", "INPUT", "-p", "udp", "--dport", portStr, "-j", "ACCEPT"); err != nil {
-		return err
-	}
-	return execIP6Tables("-D", "INPUT", "-p", "udp", "--dport", portStr, "-j", "ACCEPT")
-}
-
 // ---------------------------------------------------------------------------
 // FORWARD rules (applied to both iptables and ip6tables)
 // ---------------------------------------------------------------------------
@@ -196,26 +231,6 @@ func addForwardRules(wgIface, netIface string) error {
 	return nil
 }
 
-func removeForwardRules(wgIface, netIface string) error {
-	for _, bin := range []func(...string) error{execIPTables, execIP6Tables} {
-		if err := bin("-D", "FORWARD", "-i", wgIface, "-o", wgIface, "-j", "ACCEPT"); err != nil {
-			return err
-		}
-		if err := bin("-D", "FORWARD", "-i", wgIface, "-o", netIface, "-j", "ACCEPT"); err != nil {
-			return err
-		}
-		if err := bin(
-			"-D", "FORWARD",
-			"-i", netIface, "-o", wgIface,
-			"-m", "state", "--state", "RELATED,ESTABLISHED",
-			"-j", "ACCEPT",
-		); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 // ---------------------------------------------------------------------------
 // MASQUERADE (IPv4 uses iptables, IPv6 uses ip6tables)
 // ---------------------------------------------------------------------------
@@ -224,16 +239,8 @@ func addMasquerade(subnet, iface string) error {
 	return execIPTables("-t", "nat", "-A", "POSTROUTING", "-s", subnet, "-o", iface, "-j", "MASQUERADE")
 }
 
-func removeMasquerade(subnet, iface string) error {
-	return execIPTables("-t", "nat", "-D", "POSTROUTING", "-s", subnet, "-o", iface, "-j", "MASQUERADE")
-}
-
 func addMasquerade6(subnet6, iface string) error {
 	return execIP6Tables("-t", "nat", "-A", "POSTROUTING", "-s", subnet6, "-o", iface, "-j", "MASQUERADE")
-}
-
-func removeMasquerade6(subnet6, iface string) error {
-	return execIP6Tables("-t", "nat", "-D", "POSTROUTING", "-s", subnet6, "-o", iface, "-j", "MASQUERADE")
 }
 
 // ---------------------------------------------------------------------------
@@ -283,13 +290,6 @@ func addIPv6Drop(wgIface string) error {
 		return err
 	}
 	return execIP6Tables("-A", "FORWARD", "-o", wgIface, "-j", "DROP")
-}
-
-func removeIPv6Drop(wgIface string) error {
-	if err := execIP6Tables("-D", "FORWARD", "-i", wgIface, "-j", "DROP"); err != nil {
-		return err
-	}
-	return execIP6Tables("-D", "FORWARD", "-o", wgIface, "-j", "DROP")
 }
 
 // ---------------------------------------------------------------------------

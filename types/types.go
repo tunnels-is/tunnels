@@ -95,6 +95,10 @@ type WGBootstrap struct {
 	// InsecureSkipVerify disables TLS certificate verification when calling
 	// the controller. Only use this for testing.
 	InsecureSkipVerify bool
+	// PrivateKey is the wg-server's Curve25519 private key, base64-encoded.
+	// Owned by wg-server (not the controller). Persisted across restarts so
+	// existing clients stay valid. Generated on first boot when empty.
+	PrivateKey string `json:"PrivateKey,omitempty"`
 }
 
 type SecretStore string
