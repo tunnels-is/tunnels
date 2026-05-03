@@ -237,8 +237,7 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	}
 
 	pt := newProcessingTUN(osTun, tunnel)
-	wgDev := wgdevice.NewDevice(pt, wgconn.NewDefaultBind(),
-		wgdevice.NewLogger(wgdevice.LogLevelError, "[wg-client] "))
+	wgDev := wgdevice.NewDevice(pt, wgconn.NewDefaultBind(), NewWGLogger())
 	privHex, hexErr := wgB64ToHex(wgPrivKeyB64)
 	if hexErr != nil {
 		wgDev.Close()
