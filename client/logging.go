@@ -7,6 +7,8 @@ import (
 	"runtime"
 	"strings"
 	"time"
+
+	wgdevice "golang.zx2c4.com/wireguard/device"
 )
 
 func checkLogUniqueness(log *string) (shouldLog bool) {
@@ -218,4 +220,71 @@ func StartLogQueueProcessor() {
 
 func ErrorLog(err any, msgs ...any) {
 	log.Println(TAG_ERROR+" || ", fmt.Sprint(msgs...), " >> system error: ", err)
+}
+
+// wgInfoPatterns are substrings of wireguard-go Verbosef format strings that
+// represent meaningful state-change events worth surfacing at INFO level.
+// Anything not matched is treated as DEBUG (per-packet, per-routine noise).
+var wgInfoPatterns = []string{
+	"Interface up requested",
+	"Interface down requested",
+	"Interface state was",
+	"Device closing",
+	"Device closed",
+	"MTU updated",
+	"UDP bind has been updated",
+	"- Starting",
+	"- Stopping",
+	"Handshake did not complete after %d attempts, giving up",
+	"Removing all keys, since we haven't received a new one",
+	"Retrying handshake because we stopped hearing back",
+}
+
+func isWGInfoFormat(format string) bool {
+	for _, p := range wgInfoPatterns {
+		if strings.Contains(format, p) {
+			return true
+		}
+	}
+	return false
+}
+
+func wgLog(level, format string, args ...any) {
+	conf := CONFIG.Load()
+	state := STATE.Load()
+	if !state.Debug && !conf.DebugLogging {
+		return
+	}
+
+	msg := fmt.Sprintf(format, args...)
+	select {
+	case LogQueue <- fmt.Sprintf(
+		"%s || %s || wg-client || %s",
+		time.Now().Format("01-02 15:04:05"),
+		level,
+		msg,
+	):
+	default:
+		ErrorLog(false, "COULD NOT PLACE LOG IN THE LOG QUEUE")
+	}
+}
+
+// NewWGLogger returns a wireguard-go *device.Logger that routes through the
+// app's LogQueue, inheriting the app's debug gating, console/API/file
+// fan-out, and timestamp formatting. Errorf maps to ERROR; Verbosef is
+// classified into INFO (state changes) or DEBUG (per-packet/routine noise)
+// via isWGInfoFormat.
+func NewWGLogger() *wgdevice.Logger {
+	return &wgdevice.Logger{
+		Verbosef: func(format string, args ...any) {
+			if isWGInfoFormat(format) {
+				wgLog("INFO ", format, args...)
+			} else {
+				wgLog("DEBUG", format, args...)
+			}
+		},
+		Errorf: func(format string, args ...any) {
+			wgLog("ERROR", format, args...)
+		},
+	}
 }
