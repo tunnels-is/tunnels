@@ -193,13 +193,13 @@ func FetchConfig(controllerURL, apiKey, configPath string, insecureSkipVerify bo
 	}
 
 	if cfg.WireGuardPort == 0 {
-		cfg.WireGuardPort = 51820
+		return nil, fmt.Errorf("no port set in config during fetch")
 	}
 	if cfg.WireGuardIface == "" {
-		cfg.WireGuardIface = "wg0"
+		return nil, fmt.Errorf("no wg interface set in config during fetch")
 	}
 	if cfg.WireGuardSubnet == "" {
-		cfg.WireGuardSubnet = "10.1.0.0/16"
+		return nil, fmt.Errorf("no subnet set in config during fetch")
 	}
 	if cfg.HandshakeBufferSize <= 0 {
 		cfg.HandshakeBufferSize = 1000

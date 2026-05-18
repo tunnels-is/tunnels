@@ -47,7 +47,7 @@
 		"zod": "3.24.2"
 	},
 	"devDependencies": {
-		"@tailwindcss/postcss": "^4.1.18",
+		"@tailwindcss/postcss": "4.1.18",
 		"@types/react": "18.0.17",
 		"@types/react-dom": "18.0.6",
 		"@vitejs/plugin-react": "4.3.4",

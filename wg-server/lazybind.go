@@ -209,6 +209,12 @@ func (b *LazyBind) handleInitiation(pkt *bufferedPkt) {
 		INFO("LazyBind: AddPeer OK → peer=", pubKeyB64[:12], "… ip=", rec.IP, " re-injecting handshake")
 	}
 
+	ipc, err := wgDevice.IpcGet()
+	if err != nil {
+		ERR(err)
+	}
+	INFO(ipc)
+
 	b.requeue(pkt)
 }
 

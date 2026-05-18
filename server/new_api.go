@@ -36,76 +36,73 @@ func launchAPIServer() {
 	mux.HandleFunc("GET /wg/peers", API_WGPeers)
 	mux.HandleFunc("GET /wg/servers", API_WGServers)
 
-	if AUTHEnabled {
+	mux.HandleFunc("POST /client/user/login", API_UserLogin)
+	mux.HandleFunc("POST /client/user/create", API_UserCreate)
+	mux.HandleFunc("POST /client/user/reset/password", API_UserResetPassword)
 
-		mux.HandleFunc("POST /client/user/login", API_UserLogin)
-		mux.HandleFunc("POST /client/user/create", API_UserCreate)
-		mux.HandleFunc("POST /client/user/reset/password", API_UserResetPassword)
+	clientMW := func(h http.HandlerFunc) http.Handler {
+		return applyMiddleware(h, xAPIKeyMiddleware, clientAuthMiddleware)
+	}
 
-		clientMW := func(h http.HandlerFunc) http.Handler {
-			return applyMiddleware(h, xAPIKeyMiddleware, clientAuthMiddleware)
-		}
+	mux.Handle("POST /client/user/logout", clientMW(API_UserLogout))
+	mux.Handle("POST /client/user/update", clientMW(API_UserUpdate))
+	mux.Handle("POST /client/user/2fa/confirm", clientMW(API_UserTwoFactorConfirm))
+	mux.Handle("POST /client/device/list/user", clientMW(API_DeviceListUser))
+	mux.Handle("POST /client/device/create", clientMW(API_DeviceCreate))
+	mux.Handle("POST /client/device/delete", clientMW(API_ClientDeviceDelete))
+	mux.Handle("POST /client/device", clientMW(API_DeviceGet))
+	mux.Handle("POST /client/servers", clientMW(API_ServersForUser))
+	mux.Handle("POST /client/server", clientMW(API_ServerGet))
+	mux.Handle("GET /client/wg/config", clientMW(API_WGConfig))
 
-		mux.Handle("POST /client/user/logout", clientMW(API_UserLogout))
-		mux.Handle("POST /client/user/update", clientMW(API_UserUpdate))
-		mux.Handle("POST /client/user/2fa/confirm", clientMW(API_UserTwoFactorConfirm))
-		mux.Handle("POST /client/device/list/user", clientMW(API_DeviceListUser))
-		mux.Handle("POST /client/device/create", clientMW(API_DeviceCreate))
-		mux.Handle("POST /client/device/delete", clientMW(API_ClientDeviceDelete))
-		mux.Handle("POST /client/device", clientMW(API_DeviceGet))
-		mux.Handle("POST /client/servers", clientMW(API_ServersForUser))
-		mux.Handle("POST /client/server", clientMW(API_ServerGet))
-		mux.Handle("GET /client/wg/config", clientMW(API_WGConfig))
+	if loadSecret("PayKey") != "" {
+		mux.Handle("POST /client/key/activate", clientMW(API_ActivateLicenseKey))
+		mux.Handle("POST /client/user/toggle/substatus", clientMW(API_UserToggleSubStatus))
+	}
 
-		if loadSecret("PayKey") != "" {
-			mux.Handle("POST /client/key/activate", clientMW(API_ActivateLicenseKey))
-			mux.Handle("POST /client/user/toggle/substatus", clientMW(API_UserToggleSubStatus))
-		}
+	mux.HandleFunc("POST /ui/user/login", API_AdminUILogin)
 
-		mux.HandleFunc("POST /ui/user/login", API_AdminUILogin)
+	adminMW := func(h http.HandlerFunc) http.Handler {
+		return applyMiddleware(h, xAPIKeyMiddleware, adminUIMiddleware)
+	}
 
-		adminMW := func(h http.HandlerFunc) http.Handler {
-			return applyMiddleware(h, xAPIKeyMiddleware, adminUIMiddleware)
-		}
+	mux.Handle("POST /ui/user/logout", adminMW(API_AdminUILogout))
+	mux.Handle("POST /ui/user/list", adminMW(API_UserList))
+	mux.Handle("POST /ui/user/adminupdate", adminMW(API_UserAdminUpdate))
 
-		mux.Handle("POST /ui/user/logout", adminMW(API_AdminUILogout))
-		mux.Handle("POST /ui/user/list", adminMW(API_UserList))
-		mux.Handle("POST /ui/user/adminupdate", adminMW(API_UserAdminUpdate))
+	mux.Handle("POST /ui/device/list", adminMW(API_DeviceList))
+	mux.Handle("POST /ui/device/create", adminMW(API_DeviceCreate))
+	mux.Handle("POST /ui/device/delete", adminMW(API_DeviceDelete))
+	mux.Handle("POST /ui/device/update", adminMW(API_DeviceUpdate))
+	mux.Handle("POST /ui/device", adminMW(API_DeviceGet))
 
-		mux.Handle("POST /ui/device/list", adminMW(API_DeviceList))
-		mux.Handle("POST /ui/device/create", adminMW(API_DeviceCreate))
-		mux.Handle("POST /ui/device/delete", adminMW(API_DeviceDelete))
-		mux.Handle("POST /ui/device/update", adminMW(API_DeviceUpdate))
-		mux.Handle("POST /ui/device", adminMW(API_DeviceGet))
+	mux.Handle("POST /ui/group/create", adminMW(API_GroupCreate))
+	mux.Handle("POST /ui/group/delete", adminMW(API_GroupDelete))
+	mux.Handle("POST /ui/group/update", adminMW(API_GroupUpdate))
+	mux.Handle("POST /ui/group/add", adminMW(API_GroupAdd))
+	mux.Handle("POST /ui/group/remove", adminMW(API_GroupRemove))
+	mux.Handle("POST /ui/group/list", adminMW(API_GroupList))
+	mux.Handle("POST /ui/group/entities", adminMW(API_GroupGetEntities))
+	mux.Handle("POST /ui/group", adminMW(API_GroupGet))
 
-		mux.Handle("POST /ui/group/create", adminMW(API_GroupCreate))
-		mux.Handle("POST /ui/group/delete", adminMW(API_GroupDelete))
-		mux.Handle("POST /ui/group/update", adminMW(API_GroupUpdate))
-		mux.Handle("POST /ui/group/add", adminMW(API_GroupAdd))
-		mux.Handle("POST /ui/group/remove", adminMW(API_GroupRemove))
-		mux.Handle("POST /ui/group/list", adminMW(API_GroupList))
-		mux.Handle("POST /ui/group/entities", adminMW(API_GroupGetEntities))
-		mux.Handle("POST /ui/group", adminMW(API_GroupGet))
+	mux.Handle("POST /ui/server", adminMW(API_ServerGet))
+	mux.Handle("POST /ui/server/create", adminMW(API_ServerCreate))
+	mux.Handle("POST /ui/server/update", adminMW(API_ServerUpdate))
+	mux.Handle("POST /ui/servers", adminMW(API_ServersForUser))
 
-		mux.Handle("POST /ui/server", adminMW(API_ServerGet))
-		mux.Handle("POST /ui/server/create", adminMW(API_ServerCreate))
-		mux.Handle("POST /ui/server/update", adminMW(API_ServerUpdate))
-		mux.Handle("POST /ui/servers", adminMW(API_ServersForUser))
+	mux.Handle("GET /ui/wg/config", adminMW(API_WGConfig))
 
-		mux.Handle("GET /ui/wg/config", adminMW(API_WGConfig))
+	mux.Handle("POST /ui/wg/server-config", adminMW(API_WGServerConfigCreate))
+	mux.Handle("POST /ui/wg/server-config/list", adminMW(API_WGServerConfigList))
+	mux.Handle("POST /ui/wg/server-config/update", adminMW(API_WGServerConfigUpdate))
+	mux.Handle("GET /ui/wg/server-config/get", adminMW(API_WGServerConfigGet))
+	mux.Handle("POST /ui/wg/server-config/assign", adminMW(API_WGServerConfigAssign))
 
-		mux.Handle("POST /ui/wg/server-config", adminMW(API_WGServerConfigCreate))
-		mux.Handle("POST /ui/wg/server-config/list", adminMW(API_WGServerConfigList))
-		mux.Handle("POST /ui/wg/server-config/update", adminMW(API_WGServerConfigUpdate))
-		mux.Handle("GET /ui/wg/server-config/get", adminMW(API_WGServerConfigGet))
-		mux.Handle("POST /ui/wg/server-config/assign", adminMW(API_WGServerConfigAssign))
+	mux.Handle("POST /ui/network/list", adminMW(API_NetworkList))
+	mux.Handle("POST /ui/network/update", adminMW(API_NetworkUpdate))
 
-		mux.Handle("POST /ui/network/list", adminMW(API_NetworkList))
-		mux.Handle("POST /ui/network/update", adminMW(API_NetworkUpdate))
-
-		if loadSecret("PayKey") != "" {
-			mux.Handle("POST /ui/user/toggle/substatus", adminMW(API_UserToggleSubStatus))
-		}
+	if loadSecret("PayKey") != "" {
+		mux.Handle("POST /ui/user/toggle/substatus", adminMW(API_UserToggleSubStatus))
 	}
 
 	tlsConfig := APITLSConfig.Load()

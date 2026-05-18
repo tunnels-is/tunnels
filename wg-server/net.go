@@ -176,11 +176,11 @@ func enableIPForward() error {
 	if err == nil && len(cur) > 0 && cur[0] == '1' {
 		ipForwardWasEnabled = true
 	}
-	return os.WriteFile("/proc/sys/net/ipv4/ip_forward", []byte("1"), 0644)
+	return os.WriteFile("/proc/sys/net/ipv4/ip_forward", []byte("1"), 0o644)
 }
 
 func disableIPForward() error {
-	return os.WriteFile("/proc/sys/net/ipv4/ip_forward", []byte("0"), 0644)
+	return os.WriteFile("/proc/sys/net/ipv4/ip_forward", []byte("0"), 0o644)
 }
 
 func enableIPv6Forward() error {
@@ -188,11 +188,11 @@ func enableIPv6Forward() error {
 	if err == nil && len(cur) > 0 && cur[0] == '1' {
 		ipv6ForwardWasEnabled = true
 	}
-	return os.WriteFile("/proc/sys/net/ipv6/conf/all/forwarding", []byte("1"), 0644)
+	return os.WriteFile("/proc/sys/net/ipv6/conf/all/forwarding", []byte("1"), 0o644)
 }
 
 func disableIPv6Forward() error {
-	return os.WriteFile("/proc/sys/net/ipv6/conf/all/forwarding", []byte("0"), 0644)
+	return os.WriteFile("/proc/sys/net/ipv6/conf/all/forwarding", []byte("0"), 0o644)
 }
 
 // ---------------------------------------------------------------------------
@@ -248,8 +248,10 @@ func addMasquerade6(subnet6, iface string) error {
 // ---------------------------------------------------------------------------
 
 func addCrossServerMasqueradeExclusion(peerSubnet, iface string) error {
-	args := []string{"-t", "nat", "-C", "POSTROUTING",
-		"-s", peerSubnet, "-o", iface, "-j", "RETURN"}
+	args := []string{
+		"-t", "nat", "-C", "POSTROUTING",
+		"-s", peerSubnet, "-o", iface, "-j", "RETURN",
+	}
 	out, err := exec.Command("iptables", args...).CombinedOutput()
 	if err == nil {
 		return nil
@@ -265,8 +267,10 @@ func removeCrossServerMasqueradeExclusion(peerSubnet, iface string) error {
 }
 
 func addCrossServerMasqueradeExclusion6(peerSubnet6, iface string) error {
-	args := []string{"-t", "nat", "-C", "POSTROUTING",
-		"-s", peerSubnet6, "-o", iface, "-j", "RETURN"}
+	args := []string{
+		"-t", "nat", "-C", "POSTROUTING",
+		"-s", peerSubnet6, "-o", iface, "-j", "RETURN",
+	}
 	out, err := exec.Command("ip6tables", args...).CombinedOutput()
 	if err == nil {
 		return nil

@@ -127,9 +127,9 @@ func main() {
 	}
 
 	config := Config.Load()
-	err = godotenv.Load(".env")
-	if err != nil {
-		if config.SecretStore == types.EnvStore {
+	if config.SecretStore == types.EnvStore {
+		err = godotenv.Load(".env")
+		if err != nil {
 			logger.Error("no .env file found")
 			os.Exit(1)
 		}
@@ -138,16 +138,15 @@ func main() {
 	AUTHEnabled = slices.Contains(config.Features, types.AUTH)
 	WGEnabled := slices.Contains(config.Features, types.WG)
 
-	err = loadCertificatesAndTLSSettings()
-	if err != nil {
-		panic(err)
-	}
-
 	ctx, cancel := context.WithCancel(context.Background())
 	CTX.Store(&ctx)
 	Cancel.Store(&cancel)
 
 	if AUTHEnabled {
+		err = loadCertificatesAndTLSSettings()
+		if err != nil {
+			panic(err)
+		}
 		err = ConnectToBBoltDB("tunnels.db")
 		if err != nil {
 			logger.Error("unable to connect to bbolt", slog.Any("err", err))
@@ -181,6 +180,7 @@ func main() {
 				os.Exit(1)
 			}
 		}
+		go signal.NewSignal("API", ctx, cancel, 1*time.Second, goroutineLogger, launchAPIServer)
 	}
 
 	if WGEnabled {
@@ -196,8 +196,6 @@ func main() {
 		}
 		go wgserver.Init(ctx, ctrlURL, wgCfg.APIKey, serverConfigPath, wgCfg.InsecureSkipVerify, *logLevel)
 	}
-
-	go signal.NewSignal("API", ctx, cancel, 1*time.Second, goroutineLogger, launchAPIServer)
 
 	go signal.NewSignal("CONFIG", ctx, cancel, 30*time.Second, goroutineLogger, func() {
 		_ = LoadServerConfig(serverConfigPath)
@@ -429,7 +427,7 @@ func makeConfigAndCerts(ipOverride string) (err error) {
 			KeyPem:             "./key.pem",
 			SignPem:            "./sign.pem",
 			Log:                &types.LogConfig{Level: "debug", JSON: true},
-		WG:                 &types.WGBootstrap{InsecureSkipVerify: true},
+			WG:                 &types.WGBootstrap{InsecureSkipVerify: true},
 		}
 		Config.Store(newConfig)
 		if err := SaveServerConfig(serverConfigPath); err != nil {
