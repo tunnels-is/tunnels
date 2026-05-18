@@ -271,5 +271,8 @@ type WGPeer struct {
 }
 
 type WGPeersResponse struct {
-	Peers []WGPeer `json:"Peers"`
+	Peers      []WGPeer `json:"Peers"`
+	Limit      int      `json:"Limit"`
+	Offset     int      `json:"Offset"`
+	NextOffset int      `json:"NextOffset"` // -1 when there are no more pages
 }

@@ -135,6 +135,11 @@ func DB_FindDeviceByID(id uuid.UUID) (dev *types.Device, err error) {
 	return BBolt_FindDeviceByID(id.String())
 }
 
+func DB_FindDeviceByWGKey(wgKey string) (dev *types.Device, err error) {
+	return BBolt_FindDeviceByWGKey(wgKey)
+}
+
+
 func DB_findGroupByID(id uuid.UUID) (G *Group, err error) {
 	return BBolt_findGroupByID(id.String())
 }

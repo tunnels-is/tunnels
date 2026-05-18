@@ -7,9 +7,15 @@ import (
 	"net"
 	"net/http"
 	"net/netip"
+	"strconv"
 
 	"github.com/google/uuid"
 	"github.com/tunnels-is/tunnels/types"
+)
+
+const (
+	wgPeersDefaultLimit = 500
+	wgPeersMaxLimit     = 5000
 )
 
 func API_WGPeers(w http.ResponseWriter, r *http.Request) {
@@ -20,14 +26,39 @@ func API_WGPeers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	devices, err := DB_GetDevices(100000, 0)
+	limit := wgPeersDefaultLimit
+	if v := r.URL.Query().Get("limit"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n <= 0 {
+			senderr(w, 400, "limit must be a positive integer")
+			return
+		}
+		if n > wgPeersMaxLimit {
+			n = wgPeersMaxLimit
+		}
+		limit = n
+	}
+
+	offset := 0
+	if v := r.URL.Query().Get("offset"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 0 {
+			senderr(w, 400, "offset must be a non-negative integer")
+			return
+		}
+		offset = n
+	}
+
+	devices, err := DB_GetDevices(int64(limit), int64(offset))
 	if err != nil {
 		senderr(w, 500, "Failed to fetch devices", slog.Any("err", err))
 		return
 	}
 
 	resp := types.WGPeersResponse{
-		Peers: make([]types.WGPeer, 0),
+		Peers:  make([]types.WGPeer, 0, len(devices)),
+		Limit:  limit,
+		Offset: offset,
 	}
 	for _, d := range devices {
 		if d.WireGuardKey == "" {
@@ -35,8 +66,6 @@ func API_WGPeers(w http.ResponseWriter, r *http.Request) {
 		}
 		hexKey, err := b64KeyToHex(d.WireGuardKey)
 		if err != nil {
-			logger.Warn("skipping device with invalid WireGuard key",
-				slog.String("device", d.ID.String()), slog.Any("err", err))
 			continue
 		}
 		resp.Peers = append(resp.Peers, types.WGPeer{
@@ -47,7 +76,56 @@ func API_WGPeers(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
+	if len(devices) < limit {
+		resp.NextOffset = -1
+	} else {
+		resp.NextOffset = offset + limit
+	}
+
 	sendObject(w, resp)
+}
+
+func API_WGPeer(w http.ResponseWriter, r *http.Request) {
+	defer BasicRecover()
+
+	if _, ok := HTTP_validateWGKey(r); !ok {
+		senderr(w, 401, "Unauthorized")
+		return
+	}
+
+	pubKeyB64 := r.URL.Query().Get("pubkey")
+	if pubKeyB64 == "" {
+		senderr(w, 400, "pubkey query parameter is required")
+		return
+	}
+	raw, err := base64.StdEncoding.DecodeString(pubKeyB64)
+	if err != nil || len(raw) != 32 {
+		senderr(w, 400, "pubkey must be a base64-encoded 32-byte key")
+		return
+	}
+
+	dev, err := DB_FindDeviceByWGKey(pubKeyB64)
+	if err != nil {
+		senderr(w, 500, "Failed to look up device", slog.Any("err", err))
+		return
+	}
+	if dev == nil {
+		senderr(w, 404, "peer not found")
+		return
+	}
+
+	hexKey, err := b64KeyToHex(dev.WireGuardKey)
+	if err != nil {
+		senderr(w, 500, "Failed to encode device key", slog.Any("err", err))
+		return
+	}
+
+	sendObject(w, types.WGPeer{
+		PublicKeyHex:  hexKey,
+		DeviceID:      dev.ID.String(),
+		WireGuardIP:   dev.WireGuardIP,
+		WireGuardIPv6: dev.WireGuardIPv6,
+	})
 }
 
 func API_WGConfig(w http.ResponseWriter, r *http.Request) {

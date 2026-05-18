@@ -24,6 +24,7 @@ const (
 	USERS_APIKEY_INDEX        = "users_by_apikey"
 	DEVICES_BUCKET            = "devices"
 	DEVICES_USERID_INDEX      = "devices_by_user_id"
+	DEVICES_WGKEY_INDEX       = "devices_by_wg_key"
 	ORGS_BUCKET               = "orgs"
 	GROUPS_BUCKET             = "groups"
 	SERVERS_BUCKET            = "servers"
@@ -41,7 +42,7 @@ func ConnectToBBoltDB(path string) (err error) {
 	return BBoltDB.Update(func(tx *gobolt.Tx) error {
 		buckets := []string{
 			USERS_BUCKET, USERS_EMAIL_INDEX, USERS_APIKEY_INDEX,
-			DEVICES_BUCKET, DEVICES_USERID_INDEX,
+			DEVICES_BUCKET, DEVICES_USERID_INDEX, DEVICES_WGKEY_INDEX,
 			ORGS_BUCKET, GROUPS_BUCKET, SERVERS_BUCKET,
 			WG_SERVER_CONFIGS_BUCKET, WGCONFIGS_APIKEY_INDEX,
 			NETWORKS_BUCKET, NETWORKS_ID_INDEX,
@@ -144,6 +145,9 @@ func BBolt_DeleteDeviceByID(id string) error {
 				if uid != "00000000-0000-0000-0000-000000000000" {
 					_ = tx.Bucket([]byte(DEVICES_USERID_INDEX)).Delete([]byte(uid + "/" + id))
 				}
+				if D.WireGuardKey != "" {
+					_ = tx.Bucket([]byte(DEVICES_WGKEY_INDEX)).Delete([]byte(D.WireGuardKey))
+				}
 			}
 		}
 		return b.Delete([]byte(id))
@@ -155,15 +159,25 @@ func BBolt_UpdateDevice(D *types.Device) error {
 		b := tx.Bucket([]byte(DEVICES_BUCKET))
 		id := D.ID.String()
 		devUserIdx := tx.Bucket([]byte(DEVICES_USERID_INDEX))
+		wgIdx := tx.Bucket([]byte(DEVICES_WGKEY_INDEX))
 
-		// Remove old index entry if UserID changed.
+		var oldWGKey string
 		if old := b.Get([]byte(id)); old != nil {
 			oldD := new(types.Device)
-			if err := bboltUnmarshal(old, oldD); err == nil && oldD.UserID != D.UserID {
-				oldUID := oldD.UserID.String()
-				if oldUID != "00000000-0000-0000-0000-000000000000" {
-					_ = devUserIdx.Delete([]byte(oldUID + "/" + id))
+			if err := bboltUnmarshal(old, oldD); err == nil {
+				if oldD.UserID != D.UserID {
+					oldUID := oldD.UserID.String()
+					if oldUID != "00000000-0000-0000-0000-000000000000" {
+						_ = devUserIdx.Delete([]byte(oldUID + "/" + id))
+					}
 				}
+				oldWGKey = oldD.WireGuardKey
+			}
+		}
+
+		if D.WireGuardKey != "" && D.WireGuardKey != oldWGKey {
+			if existing := wgIdx.Get([]byte(D.WireGuardKey)); existing != nil && string(existing) != id {
+				return errors.New("WireGuard key already in use")
 			}
 		}
 
@@ -178,6 +192,15 @@ func BBolt_UpdateDevice(D *types.Device) error {
 		uid := D.UserID.String()
 		if uid != "00000000-0000-0000-0000-000000000000" {
 			if err := devUserIdx.Put([]byte(uid+"/"+id), nil); err != nil {
+				return err
+			}
+		}
+
+		if oldWGKey != "" && oldWGKey != D.WireGuardKey {
+			_ = wgIdx.Delete([]byte(oldWGKey))
+		}
+		if D.WireGuardKey != "" {
+			if err := wgIdx.Put([]byte(D.WireGuardKey), []byte(id)); err != nil {
 				return err
 			}
 		}
@@ -719,6 +742,14 @@ func BBolt_CreateDevice(D *types.Device) error {
 	return BBoltDB.Update(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(DEVICES_BUCKET))
 		id := D.ID.String()
+
+		if D.WireGuardKey != "" {
+			wgIdx := tx.Bucket([]byte(DEVICES_WGKEY_INDEX))
+			if existing := wgIdx.Get([]byte(D.WireGuardKey)); existing != nil && string(existing) != id {
+				return errors.New("WireGuard key already in use")
+			}
+		}
+
 		data, err := bboltMarshal(D)
 		if err != nil {
 			return err
@@ -729,6 +760,11 @@ func BBolt_CreateDevice(D *types.Device) error {
 		uid := D.UserID.String()
 		if uid != "00000000-0000-0000-0000-000000000000" {
 			if err := tx.Bucket([]byte(DEVICES_USERID_INDEX)).Put([]byte(uid+"/"+id), nil); err != nil {
+				return err
+			}
+		}
+		if D.WireGuardKey != "" {
+			if err := tx.Bucket([]byte(DEVICES_WGKEY_INDEX)).Put([]byte(D.WireGuardKey), []byte(id)); err != nil {
 				return err
 			}
 		}
@@ -815,6 +851,23 @@ func BBolt_FindDeviceByID(id string) (*types.Device, error) {
 	err := BBoltDB.View(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(DEVICES_BUCKET))
 		v := b.Get([]byte(id))
+		if v == nil {
+			return nil
+		}
+		dev = new(types.Device)
+		return bboltUnmarshal(v, dev)
+	})
+	return dev, err
+}
+
+func BBolt_FindDeviceByWGKey(wgKey string) (*types.Device, error) {
+	var dev *types.Device
+	err := BBoltDB.View(func(tx *gobolt.Tx) error {
+		devID := tx.Bucket([]byte(DEVICES_WGKEY_INDEX)).Get([]byte(wgKey))
+		if devID == nil {
+			return nil
+		}
+		v := tx.Bucket([]byte(DEVICES_BUCKET)).Get(devID)
 		if v == nil {
 			return nil
 		}

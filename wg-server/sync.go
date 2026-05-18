@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/tunnels-is/tunnels/types"
@@ -37,52 +38,48 @@ func assignAndAdd(pubKeyB64 string) bool {
 		return false
 	}
 
-	authorized, err := fetchDesiredPeers(cfg)
+	p, err := fetchPeerByPubKey(cfg, pubKeyB64)
 	if err != nil {
-		WARN("assignAndAdd: fetchDesiredPeers failed: ", err)
+		WARN("assignAndAdd: fetchPeerByPubKey failed: ", err)
+		return false
+	}
+	if p == nil {
+		INFO("assignAndAdd: pubkey not authorized by controller → ", pubKeyB64[:12], "…")
 		return false
 	}
 
-	for _, p := range authorized.Peers {
-		if p.PublicKeyHex != hexKey {
-			continue
-		}
-		INFO("assignAndAdd: peer authorized by controller, deviceID=", p.DeviceID)
+	INFO("assignAndAdd: peer authorized by controller, deviceID=", p.DeviceID)
 
-		var ip, ipv6 string
-		if p.WireGuardIP != "" {
-			ip = p.WireGuardIP
-			ipv6 = p.WireGuardIPv6
-			if !subnetContains(cfg.WireGuardSubnet, ip) {
-				WARN("assignAndAdd: controller-assigned IP outside subnet: ", ip)
-				return false
-			}
-			if ipv6 != "" && cfg.WireGuardSubnet6 != "" && !subnetContains(cfg.WireGuardSubnet6, ipv6) {
-				WARN("assignAndAdd: controller-assigned IPv6 outside subnet: ", ipv6)
-				return false
-			}
-			peerStore.Set(p.DeviceID, ip, ipv6, pubKeyB64)
-		} else {
-			var assignErr error
-			ip, ipv6, assignErr = peerStore.GetOrAssign(p.DeviceID, pubKeyB64)
-			if assignErr != nil {
-				WARN("assignAndAdd: GetOrAssign failed: ", assignErr)
-				return false
-			}
-		}
-
-		allowedIPs := peerAllowedIPs(ip, ipv6)
-		INFO("assignAndAdd: ip=", ip, " ipv6=", ipv6, " calling AddPeer")
-		if err := AddPeer(hexKey, allowedIPs...); err != nil {
-			WARN("assignAndAdd: AddPeer failed: ", err)
+	var ip, ipv6 string
+	if p.WireGuardIP != "" {
+		ip = p.WireGuardIP
+		ipv6 = p.WireGuardIPv6
+		if !subnetContains(cfg.WireGuardSubnet, ip) {
+			WARN("assignAndAdd: controller-assigned IP outside subnet: ", ip)
 			return false
 		}
-		INFO("assignAndAdd: peer added to wg0 → ", pubKeyB64[:12], "… ip=", ip)
-		return true
+		if ipv6 != "" && cfg.WireGuardSubnet6 != "" && !subnetContains(cfg.WireGuardSubnet6, ipv6) {
+			WARN("assignAndAdd: controller-assigned IPv6 outside subnet: ", ipv6)
+			return false
+		}
+		peerStore.Set(p.DeviceID, ip, ipv6, pubKeyB64)
+	} else {
+		var assignErr error
+		ip, ipv6, assignErr = peerStore.GetOrAssign(p.DeviceID, pubKeyB64)
+		if assignErr != nil {
+			WARN("assignAndAdd: GetOrAssign failed: ", assignErr)
+			return false
+		}
 	}
 
-	INFO("assignAndAdd: pubkey not authorized by controller → ", pubKeyB64[:12], "…")
-	return false
+	allowedIPs := peerAllowedIPs(ip, ipv6)
+	INFO("assignAndAdd: ip=", ip, " ipv6=", ipv6, " calling AddPeer")
+	if err := AddPeer(hexKey, allowedIPs...); err != nil {
+		WARN("assignAndAdd: AddPeer failed: ", err)
+		return false
+	}
+	INFO("assignAndAdd: peer added to wg0 → ", pubKeyB64[:12], "… ip=", ip)
+	return true
 }
 
 // peerAllowedIPs builds the list of allowed IPs for a peer.
@@ -107,9 +104,12 @@ func subnetContains(cidr, ipStr string) bool {
 	return subnet.Contains(ip)
 }
 
-func fetchDesiredPeers(cfg *Config) (*types.WGPeersResponse, error) {
-	url := cfg.ControllerURL + "/wg/peers"
-	req, err := http.NewRequest(http.MethodGet, url, nil)
+// fetchPeerByPubKey asks the controller for the single peer record matching
+// pubKeyB64. Returns (nil, nil) when the controller reports 404 (not
+// authorized). Any other non-2xx or transport failure returns an error.
+func fetchPeerByPubKey(cfg *Config, pubKeyB64 string) (*types.WGPeer, error) {
+	endpoint := cfg.ControllerURL + "/wg/peer?pubkey=" + url.QueryEscape(pubKeyB64)
+	req, err := http.NewRequest(http.MethodGet, endpoint, nil)
 	if err != nil {
 		return nil, fmt.Errorf("build request: %w", err)
 	}
@@ -121,13 +121,16 @@ func fetchDesiredPeers(cfg *Config) (*types.WGPeersResponse, error) {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
+	switch resp.StatusCode {
+	case http.StatusOK:
+		var peer types.WGPeer
+		if err := json.NewDecoder(resp.Body).Decode(&peer); err != nil {
+			return nil, fmt.Errorf("decode response: %w", err)
+		}
+		return &peer, nil
+	case http.StatusNotFound:
+		return nil, nil
+	default:
 		return nil, fmt.Errorf("controller returned %d", resp.StatusCode)
 	}
-
-	var result types.WGPeersResponse
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, fmt.Errorf("decode response: %w", err)
-	}
-	return &result, nil
 }

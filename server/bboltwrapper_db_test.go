@@ -643,6 +643,124 @@ func TestBBolt_DeleteDeviceByID_NonExistent(t *testing.T) {
 	}
 }
 
+func TestBBolt_FindDeviceByWGKey(t *testing.T) {
+	setupTestDB(t)
+	d := &types.Device{ID: uuid.New(), UserID: uuid.New(), WireGuardKey: "wgkey-a"}
+	if err := BBolt_CreateDevice(d); err != nil {
+		t.Fatal(err)
+	}
+
+	found, err := BBolt_FindDeviceByWGKey("wgkey-a")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if found == nil || found.ID != d.ID {
+		t.Fatal("expected device, got nil or wrong ID")
+	}
+
+	missing, err := BBolt_FindDeviceByWGKey("wgkey-does-not-exist")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if missing != nil {
+		t.Fatal("expected nil for missing key")
+	}
+}
+
+func TestBBolt_CreateDevice_DuplicateWGKey(t *testing.T) {
+	setupTestDB(t)
+	first := &types.Device{ID: uuid.New(), UserID: uuid.New(), WireGuardKey: "shared"}
+	if err := BBolt_CreateDevice(first); err != nil {
+		t.Fatal(err)
+	}
+
+	second := &types.Device{ID: uuid.New(), UserID: uuid.New(), WireGuardKey: "shared"}
+	if err := BBolt_CreateDevice(second); err == nil {
+		t.Fatal("expected uniqueness error, got nil")
+	}
+
+	found, _ := BBolt_FindDeviceByWGKey("shared")
+	if found == nil || found.ID != first.ID {
+		t.Fatal("first device should still own the wg key")
+	}
+
+	if got, _ := BBolt_FindDeviceByID(second.ID.String()); got != nil {
+		t.Fatal("second device should not have been written")
+	}
+}
+
+func TestBBolt_CreateDevice_EmptyWGKeyAllowsMany(t *testing.T) {
+	setupTestDB(t)
+	for i := 0; i < 3; i++ {
+		if err := BBolt_CreateDevice(&types.Device{ID: uuid.New(), UserID: uuid.New()}); err != nil {
+			t.Fatalf("create %d: %v", i, err)
+		}
+	}
+	if found, _ := BBolt_FindDeviceByWGKey(""); found != nil {
+		t.Fatal("empty wg key should not be indexed")
+	}
+}
+
+func TestBBolt_UpdateDevice_ChangeWGKey(t *testing.T) {
+	setupTestDB(t)
+	d := &types.Device{ID: uuid.New(), UserID: uuid.New(), WireGuardKey: "old"}
+	if err := BBolt_CreateDevice(d); err != nil {
+		t.Fatal(err)
+	}
+
+	d.WireGuardKey = "new"
+	if err := BBolt_UpdateDevice(d); err != nil {
+		t.Fatal(err)
+	}
+
+	if old, _ := BBolt_FindDeviceByWGKey("old"); old != nil {
+		t.Fatal("stale old-key index entry should be removed")
+	}
+	found, _ := BBolt_FindDeviceByWGKey("new")
+	if found == nil || found.ID != d.ID {
+		t.Fatal("new-key index entry missing")
+	}
+}
+
+func TestBBolt_UpdateDevice_DuplicateWGKey(t *testing.T) {
+	setupTestDB(t)
+	a := &types.Device{ID: uuid.New(), UserID: uuid.New(), WireGuardKey: "key-a"}
+	b := &types.Device{ID: uuid.New(), UserID: uuid.New(), WireGuardKey: "key-b"}
+	if err := BBolt_CreateDevice(a); err != nil {
+		t.Fatal(err)
+	}
+	if err := BBolt_CreateDevice(b); err != nil {
+		t.Fatal(err)
+	}
+
+	b.WireGuardKey = "key-a"
+	if err := BBolt_UpdateDevice(b); err == nil {
+		t.Fatal("expected uniqueness error on update")
+	}
+
+	// "key-a" still resolves to device a.
+	found, _ := BBolt_FindDeviceByWGKey("key-a")
+	if found == nil || found.ID != a.ID {
+		t.Fatal("key-a should still belong to device a")
+	}
+}
+
+func TestBBolt_DeleteDeviceByID_RemovesWGKeyIndex(t *testing.T) {
+	setupTestDB(t)
+	d := &types.Device{ID: uuid.New(), UserID: uuid.New(), WireGuardKey: "gone"}
+	if err := BBolt_CreateDevice(d); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := BBolt_DeleteDeviceByID(d.ID.String()); err != nil {
+		t.Fatal(err)
+	}
+
+	if found, _ := BBolt_FindDeviceByWGKey("gone"); found != nil {
+		t.Fatal("wg key index entry should be removed on delete")
+	}
+}
+
 func TestBBolt_GetDevices(t *testing.T) {
 	setupTestDB(t)
 	for i := 0; i < 5; i++ {
@@ -662,6 +780,107 @@ func TestBBolt_GetDevices(t *testing.T) {
 	dl, _ = BBolt_GetDevices(10, 3)
 	if len(dl) != 2 {
 		t.Fatalf("expected 2, got %d", len(dl))
+	}
+}
+
+func TestBBolt_GetDevices_PaginationWalksAllOnce(t *testing.T) {
+	setupTestDB(t)
+	const total = 13
+	created := make(map[string]struct{}, total)
+	for i := 0; i < total; i++ {
+		d := &types.Device{ID: uuid.New(), UserID: uuid.New()}
+		if err := BBolt_CreateDevice(d); err != nil {
+			t.Fatal(err)
+		}
+		created[d.ID.String()] = struct{}{}
+	}
+
+	const pageSize = int64(4)
+	seen := make(map[string]int, total)
+	var offset int64
+	pages := 0
+	for {
+		pages++
+		if pages > 10 {
+			t.Fatal("pagination did not terminate")
+		}
+		page, err := BBolt_GetDevices(pageSize, offset)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, d := range page {
+			id := d.ID.String()
+			if _, dup := seen[id]; dup {
+				t.Fatalf("device %s returned on multiple pages", id)
+			}
+			seen[id] = pages
+		}
+		if int64(len(page)) < pageSize {
+			break
+		}
+		offset += pageSize
+	}
+
+	if len(seen) != total {
+		t.Fatalf("walk visited %d devices, expected %d", len(seen), total)
+	}
+	for id := range created {
+		if _, ok := seen[id]; !ok {
+			t.Fatalf("device %s was never returned by pagination", id)
+		}
+	}
+}
+
+func TestBBolt_GetDevices_OffsetBeyondEnd(t *testing.T) {
+	setupTestDB(t)
+	for i := 0; i < 3; i++ {
+		BBolt_CreateDevice(&types.Device{ID: uuid.New(), UserID: uuid.New()})
+	}
+
+	dl, err := BBolt_GetDevices(10, 99)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(dl) != 0 {
+		t.Fatalf("offset past end should return empty, got %d", len(dl))
+	}
+}
+
+func TestBBolt_GetDevices_StableOrder(t *testing.T) {
+	setupTestDB(t)
+	for i := 0; i < 8; i++ {
+		BBolt_CreateDevice(&types.Device{ID: uuid.New(), UserID: uuid.New()})
+	}
+
+	first, _ := BBolt_GetDevices(8, 0)
+	second, _ := BBolt_GetDevices(8, 0)
+	if len(first) != len(second) {
+		t.Fatalf("length mismatch: %d vs %d", len(first), len(second))
+	}
+	for i := range first {
+		if first[i].ID != second[i].ID {
+			t.Fatalf("order differs at index %d: %s vs %s", i, first[i].ID, second[i].ID)
+		}
+	}
+
+	// Cursor order must match boundary-respecting pagination: walking by
+	// page size N must yield the same sequence as a single full read.
+	full, _ := BBolt_GetDevices(8, 0)
+	var walked []*types.Device
+	for off := int64(0); ; off += 3 {
+		page, _ := BBolt_GetDevices(3, off)
+		walked = append(walked, page...)
+		if int64(len(page)) < 3 {
+			break
+		}
+	}
+	if len(walked) != len(full) {
+		t.Fatalf("walked %d, full %d", len(walked), len(full))
+	}
+	for i := range full {
+		if full[i].ID != walked[i].ID {
+			t.Fatalf("paginated order differs from full read at %d", i)
+		}
 	}
 }
 
