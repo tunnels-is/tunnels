@@ -132,6 +132,8 @@ func flushWGRules(cfg *Config) {
 			"-i", net, "-o", wg,
 			"-m", "state", "--state", "RELATED,ESTABLISHED",
 			"-j", "ACCEPT")
+		// FORWARD net -> wg DROP (unsolicited inbound)
+		drainRule(bin, "-D", "FORWARD", "-i", net, "-o", wg, "-j", "DROP")
 	}
 
 	// IPv4 MASQUERADE
@@ -225,6 +227,13 @@ func addForwardRules(wgIface, netIface string) error {
 			"-m", "state", "--state", "RELATED,ESTABLISHED",
 			"-j", "ACCEPT",
 		); err != nil {
+			return err
+		}
+		// Anything from the internet to a WG peer that didn't match the
+		// ESTABLISHED/RELATED rule above is unsolicited inbound — drop it.
+		// Must be appended after the stateful ACCEPT so legitimate replies
+		// match first.
+		if err := bin("-A", "FORWARD", "-i", netIface, "-o", wgIface, "-j", "DROP"); err != nil {
 			return err
 		}
 	}
