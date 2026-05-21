@@ -17,6 +17,7 @@ import (
 var (
 	wgDevice   *device.Device
 	wgLazyBind *LazyBind
+	aclStore   *ACLStore
 )
 
 func wgDeviceLogLevel(level string) int {
@@ -40,10 +41,17 @@ func setupWireGuard(cfg *Config, logLevel string) error {
 		return fmt.Errorf("CreateTUN %q: %w", cfg.WireGuardIface, err)
 	}
 
+	aclStore = NewACLStore()
+
 	var tunInterface tun.Device = tunDev
 	if cfg.PacketInspection {
-		tunInterface = &inspectingTUN{tunDev}
-		INFO("packet inspection enabled on ", cfg.WireGuardIface)
+		insp, err := newInspectingTUN(tunDev, aclStore, cfg)
+		if err != nil {
+			return fmt.Errorf("inspector setup: %w", err)
+		}
+		tunInterface = insp
+		INFO("packet inspection enabled on ", cfg.WireGuardIface,
+			" — peer ACLs active, control port udp/", aclControlPort)
 	}
 
 	if len(cfg.WireGuardPrivKey) != 32 {
