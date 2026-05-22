@@ -22,6 +22,12 @@ type Config struct {
 	// ServerID is the hex ObjectID of this server's record in the controller DB.
 	ServerID string
 
+	// PublicIP is this server's public IP as recorded on the controller's
+	// Server record. When non-empty, peer egress is SNAT'd to this address
+	// instead of relying on MASQUERADE auto-selection. Lets multi-homed hosts
+	// pin the source address.
+	PublicIP string
+
 	WireGuardPort    int
 	WireGuardPrivKey []byte // raw 32-byte Curve25519 private key; zeroed after setup
 	WireGuardSubnet  string
@@ -182,6 +188,7 @@ func FetchConfig(controllerURL, apiKey, configPath string, insecureSkipVerify bo
 		ControllerURL:      controllerURL,
 		APIKey:             apiKey,
 		ServerID:           r.ServerID,
+		PublicIP:           r.ServerIP,
 		WireGuardPort:      r.WireGuardPort,
 		WireGuardPrivKey:   privKey,
 		WireGuardSubnet:    r.WireGuardSubnet,
