@@ -168,21 +168,19 @@ const DNS = () => {
             Local DNS resolver — records, block lists and upstream servers.
           </p>
         </div>
-        <div className="flex items-center gap-3 text-[11px] text-[#a3a3a3]">
-          <div className="flex items-baseline gap-1.5">
-            <span className="uppercase tracking-[0.1em] text-[9px] font-semibold">Records</span>
-            <code className="font-mono tabular-nums text-[#525252]">{records.length}</code>
-          </div>
-          <span className="w-px h-3 bg-[#e7e3d7]" />
-          <div className="flex items-baseline gap-1.5">
-            <span className="uppercase tracking-[0.1em] text-[9px] font-semibold">Block</span>
-            <code className="font-mono tabular-nums text-[#525252]">{blockLists.length}</code>
-          </div>
-          <span className="w-px h-3 bg-[#e7e3d7]" />
-          <div className="flex items-baseline gap-1.5">
-            <span className="uppercase tracking-[0.1em] text-[9px] font-semibold">White</span>
-            <code className="font-mono tabular-nums text-[#525252]">{whiteLists.length}</code>
-          </div>
+        <div className="flex items-center gap-2 text-[11px]">
+          <span className={"tag tag-sm " + (records.length > 0 ? "tag-success" : "tag-muted")}>
+            <span className="uppercase tracking-[0.08em] text-[9px] font-semibold">Records</span>
+            <span className="font-mono tabular-nums">{records.length}</span>
+          </span>
+          <span className={"tag tag-sm " + (blockLists.length > 0 ? "tag-danger" : "tag-muted")}>
+            <span className="uppercase tracking-[0.08em] text-[9px] font-semibold">Block</span>
+            <span className="font-mono tabular-nums">{blockLists.length}</span>
+          </span>
+          <span className={"tag tag-sm " + (whiteLists.length > 0 ? "tag-success" : "tag-muted")}>
+            <span className="uppercase tracking-[0.08em] text-[9px] font-semibold">White</span>
+            <span className="font-mono tabular-nums">{whiteLists.length}</span>
+          </span>
         </div>
       </header>
 
@@ -192,6 +190,7 @@ const DNS = () => {
         {/* ── DNS server ── */}
         <SettingsCard
           className="lg:col-span-2"
+          tone="info"
           title="DNS server"
           description="Address the resolver listens on and upstream fallback resolvers."
           actions={
@@ -265,6 +264,7 @@ const DNS = () => {
         {/* ── Behaviour ── */}
         <SettingsCard
           className="lg:col-span-2"
+          tone="warning"
           title="Behaviour"
           description="Encryption, logging and statistics for the resolver."
         >
@@ -283,6 +283,7 @@ const DNS = () => {
 
         {/* ── Records ── */}
         <SettingsCard
+          tone="success"
           title="Records"
           description="Locally resolved A and TXT records."
           actions={
@@ -308,6 +309,7 @@ const DNS = () => {
 
         {/* ── Block Lists ── */}
         <SettingsCard
+          tone="danger"
           title="Block lists"
           description="External lists of domains that will be blocked."
           actions={
@@ -335,6 +337,7 @@ const DNS = () => {
         {/* ── White Lists ── */}
         <SettingsCard
           className="lg:col-span-2"
+          tone="success"
           title="White lists"
           description="Domains here always resolve, even if they appear on a block list."
           actions={

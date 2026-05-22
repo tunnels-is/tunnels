@@ -158,6 +158,7 @@ const Settings = () => {
         {/* ── API ── */}
         <SettingsCard
           className="lg:col-span-2"
+          tone="info"
           title="API server"
           description="Address the desktop client listens on, plus optional TLS certificate."
           actions={
@@ -248,6 +249,7 @@ const Settings = () => {
 
         {/* ── Logging ── */}
         <SettingsCard
+          tone="warning"
           title="Logging"
           description="Select which event types are captured to disk and console."
         >
@@ -272,6 +274,7 @@ const Settings = () => {
 
         {/* ── Updates ── */}
         <SettingsCard
+          tone="success"
           title="Updates"
           description="Behaviour when a new build of Tunnels is available."
         >
@@ -290,6 +293,7 @@ const Settings = () => {
 
         {/* ── DNS ── */}
         <SettingsCard
+          tone="danger"
           title="DNS"
           description="The local DNS resolver is enabled by default."
         >
@@ -305,6 +309,7 @@ const Settings = () => {
 
         {/* ── Network ── */}
         <SettingsCard
+          tone="info"
           title="Network"
           description="Detected default network interface (read-only)."
         >
@@ -322,6 +327,7 @@ const Settings = () => {
 
         {/* ── System ── */}
         <SettingsCard
+          tone="neutral"
           title="System"
           description="Paths, files and privileges this app is running with."
           className="lg:col-span-2"
