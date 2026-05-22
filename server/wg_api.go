@@ -467,12 +467,13 @@ func API_WGServerConfigFetch(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	var serverID string
+	var serverID, serverIP string
 	servers, err := DB_FindAllServers()
 	if err == nil {
 		for _, s := range servers {
 			if s.WGConfigID == wgCfg.ID {
 				serverID = s.ID.String()
+				serverIP = s.IP
 				_ = DB_SetServerWGConfigID(s.ID, wgCfg, wgCfg.WireGuardPubKey, fetchSubnet, fetchSubnet6)
 				break
 			}
@@ -481,6 +482,7 @@ func API_WGServerConfigFetch(w http.ResponseWriter, r *http.Request) {
 
 	resp := &types.WGServerConfigResponse{
 		ServerID:           serverID,
+		ServerIP:           serverIP,
 		WireGuardPort:      wgCfg.WireGuardPort,
 		WireGuardSubnet:    fetchSubnet,
 		WireGuardSubnet6:   fetchSubnet6,

@@ -3,7 +3,6 @@ package wgserver
 import (
 	"fmt"
 	"net"
-	"os"
 	"os/exec"
 
 	"github.com/vishvananda/netlink"
@@ -48,15 +47,10 @@ func setupNet(cfg *Config) error {
 		return fmt.Errorf("LinkSetUp: %w", err)
 	}
 
-	if err := enableIPForward(); err != nil {
-		return fmt.Errorf("enable ip_forward: %w", err)
-	}
-
-	if cfg.WireGuardSubnet6 != "" {
-		if err := enableIPv6Forward(); err != nil {
-			return fmt.Errorf("enable ipv6 forwarding: %w", err)
-		}
-	}
+	// ip_forward / ipv6 forwarding is the operator's responsibility — must be
+	// enabled before wg-server starts (e.g. via sysctl.d). The wg-server no
+	// longer flips these sysctls, since the shared-state bookkeeping breaks
+	// down when multiple instances run on one host.
 
 	// Phase 1: drain any rules left over from a previous (possibly unclean) run.
 	// Phase 2 (below) then installs a single fresh copy of each. This guarantees
@@ -71,8 +65,11 @@ func setupNet(cfg *Config) error {
 		return fmt.Errorf("add FORWARD rules: %w", err)
 	}
 
-	if err := addMasquerade(cfg.WireGuardSubnet, cfg.InternetIface); err != nil {
-		return fmt.Errorf("add MASQUERADE: %w", err)
+	if err := addMasquerade(cfg.WireGuardSubnet, cfg.InternetIface, cfg.PublicIP); err != nil {
+		return fmt.Errorf("add egress NAT: %w", err)
+	}
+	if cfg.PublicIP != "" {
+		INFO("egress SNAT pinned to ", cfg.PublicIP, " for ", cfg.WireGuardSubnet)
 	}
 
 	// IPv6-specific rules.
@@ -92,18 +89,9 @@ func setupNet(cfg *Config) error {
 }
 
 func cleanupNet(cfg *Config) {
-	if !ipForwardWasEnabled {
-		if err := disableIPForward(); err != nil {
-			WARN("failed to disable ip_forward: ", err)
-		}
-	}
-	if cfg.WireGuardSubnet6 != "" && !ipv6ForwardWasEnabled {
-		if err := disableIPv6Forward(); err != nil {
-			WARN("failed to disable ipv6 forwarding: ", err)
-		}
-	}
-
 	// Drain every rule wg-server installs. Safe if rules are already absent.
+	// We deliberately leave ip_forward and ipv6 forwarding alone — they're
+	// managed by the operator (sysctl.d or similar).
 	flushWGRules(cfg)
 }
 
@@ -136,11 +124,13 @@ func flushWGRules(cfg *Config) {
 		drainRule(bin, "-D", "FORWARD", "-i", net, "-o", wg, "-j", "DROP")
 	}
 
-	// IPv4 MASQUERADE
+	// IPv4 egress NAT — drain both shapes (MASQUERADE and the pinned SNAT)
+	// so a config change in PublicIP cleans up across restarts.
 	if cfg.WireGuardSubnet != "" {
-		drainRule("iptables",
-			"-t", "nat", "-D", "POSTROUTING",
-			"-s", cfg.WireGuardSubnet, "-o", net, "-j", "MASQUERADE")
+		drainRule("iptables", masqueradeArgs("-D", cfg.WireGuardSubnet, net, "")...)
+		if cfg.PublicIP != "" {
+			drainRule("iptables", masqueradeArgs("-D", cfg.WireGuardSubnet, net, cfg.PublicIP)...)
+		}
 	}
 	// IPv6 MASQUERADE
 	if cfg.WireGuardSubnet6 != "" {
@@ -162,39 +152,6 @@ func drainRule(bin string, args ...string) {
 			return
 		}
 	}
-}
-
-// ---------------------------------------------------------------------------
-// IP forwarding
-// ---------------------------------------------------------------------------
-
-var (
-	ipForwardWasEnabled   bool
-	ipv6ForwardWasEnabled bool
-)
-
-func enableIPForward() error {
-	cur, err := os.ReadFile("/proc/sys/net/ipv4/ip_forward")
-	if err == nil && len(cur) > 0 && cur[0] == '1' {
-		ipForwardWasEnabled = true
-	}
-	return os.WriteFile("/proc/sys/net/ipv4/ip_forward", []byte("1"), 0o644)
-}
-
-func disableIPForward() error {
-	return os.WriteFile("/proc/sys/net/ipv4/ip_forward", []byte("0"), 0o644)
-}
-
-func enableIPv6Forward() error {
-	cur, err := os.ReadFile("/proc/sys/net/ipv6/conf/all/forwarding")
-	if err == nil && len(cur) > 0 && cur[0] == '1' {
-		ipv6ForwardWasEnabled = true
-	}
-	return os.WriteFile("/proc/sys/net/ipv6/conf/all/forwarding", []byte("1"), 0o644)
-}
-
-func disableIPv6Forward() error {
-	return os.WriteFile("/proc/sys/net/ipv6/conf/all/forwarding", []byte("0"), 0o644)
 }
 
 // ---------------------------------------------------------------------------
@@ -244,8 +201,23 @@ func addForwardRules(wgIface, netIface string) error {
 // MASQUERADE (IPv4 uses iptables, IPv6 uses ip6tables)
 // ---------------------------------------------------------------------------
 
-func addMasquerade(subnet, iface string) error {
-	return execIPTables("-t", "nat", "-A", "POSTROUTING", "-s", subnet, "-o", iface, "-j", "MASQUERADE")
+// addMasquerade installs the POSTROUTING NAT rule for WG egress.
+// When publicIP is set, the rule pins the SNAT source to that address. This
+// matters on multi-homed hosts where MASQUERADE would otherwise auto-select
+// the interface's primary IP — which is rarely the desired public IP.
+// When publicIP is empty, fall back to MASQUERADE for single-homed setups.
+func addMasquerade(subnet, iface, publicIP string) error {
+	return execIPTables(masqueradeArgs("-A", subnet, iface, publicIP)...)
+}
+
+// masqueradeArgs builds the iptables argument list for the POSTROUTING NAT
+// rule. Action is "-A" to install or "-D" to drain.
+func masqueradeArgs(action, subnet, iface, publicIP string) []string {
+	args := []string{"-t", "nat", action, "POSTROUTING", "-s", subnet, "-o", iface, "-j"}
+	if publicIP != "" {
+		return append(args, "SNAT", "--to-source", publicIP)
+	}
+	return append(args, "MASQUERADE")
 }
 
 func addMasquerade6(subnet6, iface string) error {
