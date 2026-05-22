@@ -4,13 +4,13 @@ import dayjs from 'dayjs';
 import { ArrowLeft, Pencil, Save, X } from 'lucide-react';
 import { apiPost } from '../api';
 
-const inputClass = "w-full bg-[#060810] border border-[#1e2433] rounded px-3 py-1.5 text-[13px] text-white placeholder-white/30 focus:outline-none focus:border-[#4B7BF5]/50";
+const inputClass = "w-full bg-[#fdfcf8] border border-[#e7e3d7] rounded px-3 py-1.5 text-[13px] text-[#0a0a0a] placeholder-[#a3a3a3] focus:outline-none focus:border-[#0a0a0a]";
 
 function Row({ label, children }) {
   return (
-    <div className="flex items-start gap-4 px-4 py-2.5 border-b border-[#1e2433]/50">
-      <span className="text-[11px] text-white/40 uppercase tracking-wider w-36 shrink-0 pt-0.5">{label}</span>
-      <div className="flex-1 text-[13px] text-white/80 min-w-0">{children}</div>
+    <div className="flex items-start gap-4 px-4 py-2.5 border-b border-[#e7e3d7]/50">
+      <span className="text-[11px] text-[#a3a3a3] uppercase tracking-wider w-36 shrink-0 pt-0.5">{label}</span>
+      <div className="flex-1 text-[13px] text-[#0a0a0a] min-w-0">{children}</div>
     </div>
   );
 }
@@ -103,10 +103,10 @@ export default function NetworkDetail() {
   if (!network) {
     return (
       <div>
-        <button onClick={() => navigate('/networks')} className="flex items-center gap-2 text-[12px] text-white/40 hover:text-white/70 mb-5">
+        <button onClick={() => navigate('/networks')} className="flex items-center gap-2 text-[12px] text-[#a3a3a3] hover:text-[#262626] mb-5">
           <ArrowLeft className="w-3.5 h-3.5" /> Back to Networks
         </button>
-        <p className="text-[13px] text-white/40">Loading...</p>
+        <p className="text-[13px] text-[#a3a3a3]">Loading...</p>
       </div>
     );
   }
@@ -116,33 +116,33 @@ export default function NetworkDetail() {
   return (
     <div className="max-w-2xl">
       <div className="flex items-center justify-between mb-6">
-        <button onClick={() => navigate('/networks')} className="flex items-center gap-2 text-[12px] text-white/40 hover:text-white/70">
+        <button onClick={() => navigate('/networks')} className="flex items-center gap-2 text-[12px] text-[#a3a3a3] hover:text-[#262626]">
           <ArrowLeft className="w-3.5 h-3.5" /> Back to Networks
         </button>
         <div className="flex gap-2">
           {editing ? (
             <>
-              {error && <span className="text-[12px] text-red-400 self-center">{error}</span>}
-              <button onClick={() => setEditing(false)} className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[12px] text-white/50 hover:text-white/80">
+              {error && <span className="text-[12px] text-[#dc2626] self-center">{error}</span>}
+              <button onClick={() => setEditing(false)} className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[12px] text-[#525252] hover:text-[#0a0a0a]">
                 <X className="w-3.5 h-3.5" /> Cancel
               </button>
-              <button onClick={handleSave} disabled={saving} className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[12px] bg-[#4B7BF5]/10 text-[#4B7BF5] hover:bg-[#4B7BF5]/20 disabled:opacity-50">
+              <button onClick={handleSave} disabled={saving} className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[12px] bg-black/[0.05] text-[#0a0a0a] hover:bg-black/[0.08] disabled:opacity-50">
                 <Save className="w-3.5 h-3.5" /> {saving ? 'Saving…' : 'Save'}
               </button>
             </>
           ) : (
-            <button onClick={startEdit} className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[12px] text-white/50 hover:text-white/80 hover:bg-white/[0.04]">
+            <button onClick={startEdit} className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[12px] text-[#525252] hover:text-[#0a0a0a] hover:bg-black/[0.04]">
               <Pencil className="w-3.5 h-3.5" /> Edit
             </button>
           )}
         </div>
       </div>
 
-      <h1 className="text-[16px] font-semibold text-white font-mono mb-4">{network.CIDR}</h1>
+      <h1 className="text-[16px] font-semibold text-[#0a0a0a] font-mono mb-4">{network.CIDR}</h1>
 
-      <div className="border border-[#1e2433] rounded-lg overflow-hidden">
+      <div className="border border-[#e7e3d7] rounded-lg overflow-hidden">
         <Row label="ID">
-          <span className="font-mono text-[12px] text-white/50">{network._id}</span>
+          <span className="font-mono text-[12px] text-[#525252]">{network._id}</span>
         </Row>
         <Row label="CIDR">
           <span className="font-mono text-[12px]">{network.CIDR}</span>
@@ -151,14 +151,14 @@ export default function NetworkDetail() {
           {editing ? (
             <input className={inputClass} value={form.Tag} onChange={set('Tag')} placeholder="optional label" />
           ) : (
-            <span className={network.Tag ? '' : 'text-white/30'}>{network.Tag || '—'}</span>
+            <span className={network.Tag ? '' : 'text-[#a3a3a3]'}>{network.Tag || '—'}</span>
           )}
         </Row>
         <Row label="Description">
           {editing ? (
             <input className={inputClass} value={form.Description} onChange={set('Description')} placeholder="optional description" />
           ) : (
-            <span className={network.Description ? '' : 'text-white/30'}>{network.Description || '—'}</span>
+            <span className={network.Description ? '' : 'text-[#a3a3a3]'}>{network.Description || '—'}</span>
           )}
         </Row>
         <Row label="WG Config">
@@ -170,13 +170,13 @@ export default function NetworkDetail() {
               ))}
             </select>
           ) : (
-            <span className={assignedTag ? 'text-[#4B7BF5]' : 'text-white/30'}>
+            <span className={assignedTag ? 'text-[#1d4ed8]' : 'text-[#a3a3a3]'}>
               {assignedTag || 'Unassigned'}
             </span>
           )}
         </Row>
         <Row label="Created">
-          <span className="font-mono text-[12px] text-white/50">
+          <span className="font-mono text-[12px] text-[#525252]">
             {network.CreatedAt ? dayjs(network.CreatedAt).format('DD-MM-YYYY HH:mm') : '—'}
           </span>
         </Row>

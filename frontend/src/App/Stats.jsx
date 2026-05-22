@@ -9,10 +9,10 @@ const Stats = () => {
   const renderKeyValue = (key, value) => {
     return (
       <div className="flex flex-row justify-between py-1">
-        <p className="text-[13px] font-medium text-white/60">
+        <p className="text-[13px] font-medium text-[#525252]">
           {key}
         </p>
-        <p className="text-[13px] text-white/80">
+        <p className="text-[13px] text-[#0a0a0a]">
           {value}
         </p>
       </div>
@@ -20,8 +20,8 @@ const Stats = () => {
   }
 
   const SectionTitle = ({ children }) => (
-    <div className="pt-4 pb-1 mt-2 border-t border-[#1e2433]">
-      <h3 className="text-[11px] uppercase tracking-widest text-white/50">{children}</h3>
+    <div className="pt-4 pb-1 mt-2 border-t border-[#e7e3d7]">
+      <h3 className="label-section">{children}</h3>
     </div>
   )
 
@@ -33,7 +33,7 @@ const Stats = () => {
       }
     })
     return (
-      <Card className="bg-[#0a0d14] border-[#1e2433] p-4" key={ac.CR?.Tag}>
+      <Card className="bg-[#ffffff] border-[#e7e3d7] p-4" key={ac.CR?.Tag}>
         <CardContent>
           <SectionTitle>Tunnel Interface</SectionTitle>
           {renderKeyValue("Tag", tunnel?.Tag)}
@@ -74,9 +74,9 @@ const Stats = () => {
           {(tunnel?.EnableDefaultRoute === true) &&
             <div className="flex flex-row gap-1 text-[13px]">
               <div>default</div>
-              <div className="text-white/40">via</div>
+              <div className="text-[#a3a3a3]">via</div>
               <div>{tunnel?.IPv4Address}</div>
-              <div className="text-white/40">metric</div>
+              <div className="text-[#a3a3a3]">metric</div>
               <div>0</div>
             </div>
           }
@@ -84,9 +84,9 @@ const Stats = () => {
           {ac.CRResponse?.Routes?.map((r, idx) => {
             return <div className="flex flex-row gap-1 text-[13px]" key={idx}>
               <div>{r.Address}</div>
-              <div className="text-white/40">via</div>
+              <div className="text-[#a3a3a3]">via</div>
               <div>{tunnel?.IPv4Address}</div>
-              <div className="text-white/40">metric</div>
+              <div className="text-[#a3a3a3]">metric</div>
               <div>{r.Metric}</div>
             </div>
           })}

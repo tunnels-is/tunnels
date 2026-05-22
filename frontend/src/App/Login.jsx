@@ -372,14 +372,14 @@ const useForm = () => {
 
 const Field = ({ label, name, type = "text", placeholder, value, error, onChange }) => (
   <div>
-    <label className="text-[10px] text-white/50 uppercase block mb-1">{label}</label>
+    <label className="label">{label}</label>
     <Input
-      className="h-7 text-[12px] border-[#1e2433] bg-transparent"
+      className="h-9 text-[13px] border-[#e7e3d7] bg-white"
       type={type} placeholder={placeholder}
       value={value || ""} name={name}
       onChange={onChange}
     />
-    {error && <p className="text-[11px] text-red-400/80 mt-1">{error}</p>}
+    {error && <p className="text-[11px] text-[#dc2626] mt-1">{error}</p>}
   </div>
 );
 
@@ -442,31 +442,39 @@ const Login = (props) => {
   });
 
   return (
-    <div className="w-full max-w-md mx-auto mt-[100px]">
+    <div className="w-full max-w-md mx-auto mt-[80px]">
+
+      <div className="mb-8">
+        <div className="flex items-center gap-1 mb-2">
+          <span className="text-[15px] font-semibold tracking-tight text-[#0a0a0a]">Tunnels</span>
+          <span className="w-1 h-1 rounded-full bg-[#0a0a0a]" />
+        </div>
+        <p className="text-[13px] text-[#525252]">Sign in to your account</p>
+      </div>
 
       {/* ── Auth server dialog ── */}
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-        <DialogContent className="sm:max-w-[480px] text-white bg-[#0a0d14] border-[#1e2433]">
+        <DialogContent className="sm:max-w-[480px] text-[#0a0a0a] bg-white border-[#e7e3d7]">
           {newAuth && (
             <>
               <DialogHeader>
-                <DialogTitle className="text-lg font-bold text-white">Auth Server</DialogTitle>
+                <DialogTitle className="text-lg font-semibold tracking-tight text-[#0a0a0a]">Auth Server</DialogTitle>
               </DialogHeader>
 
               <div className="space-y-3">
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-[10px] text-white/50 uppercase block mb-1">Host</label>
-                    <Input className="h-7 text-[12px] border-[#1e2433] bg-transparent" value={newAuth.Host || ""} onChange={(e) => setNewAuth({ ...newAuth, Host: e.target.value })} />
+                    <label className="label">Host</label>
+                    <Input className="h-9 text-[13px] border-[#e7e3d7] bg-white" value={newAuth.Host || ""} onChange={(e) => setNewAuth({ ...newAuth, Host: e.target.value })} />
                   </div>
                   <div>
-                    <label className="text-[10px] text-white/50 uppercase block mb-1">Port</label>
-                    <Input className="h-7 text-[12px] border-[#1e2433] bg-transparent" value={newAuth.Port || ""} onChange={(e) => setNewAuth({ ...newAuth, Port: e.target.value })} />
+                    <label className="label">Port</label>
+                    <Input className="h-9 text-[13px] border-[#e7e3d7] bg-white" value={newAuth.Port || ""} onChange={(e) => setNewAuth({ ...newAuth, Port: e.target.value })} />
                   </div>
                 </div>
                 <div>
-                  <label className="text-[10px] text-white/50 uppercase block mb-1">Certificate Path</label>
-                  <Input className="h-7 text-[12px] border-[#1e2433] bg-transparent" value={newAuth.CertificatePath || ""} onChange={(e) => setNewAuth({ ...newAuth, CertificatePath: e.target.value })} />
+                  <label className="label">Certificate Path</label>
+                  <Input className="h-9 text-[13px] border-[#e7e3d7] bg-white" value={newAuth.CertificatePath || ""} onChange={(e) => setNewAuth({ ...newAuth, CertificatePath: e.target.value })} />
                 </div>
                 <div className="flex items-center gap-2">
                   {[
@@ -475,9 +483,9 @@ const Login = (props) => {
                   ].map((opt) => (
                     <button
                       key={opt.key}
-                      className={`text-[11px] px-3 py-1 rounded-full border transition-all cursor-pointer ${newAuth[opt.key]
-                          ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.12)]"
-                          : "border-white/[0.06] bg-white/[0.02] text-white/50 hover:text-white/70 hover:border-white/25 hover:bg-white/[0.04]"
+                      className={`${newAuth[opt.key]
+                          ? "pill pill-active"
+                          : "pill"
                         }`}
                       onClick={() => setNewAuth({ ...newAuth, [opt.key]: !newAuth[opt.key] })}
                     >
@@ -488,10 +496,10 @@ const Login = (props) => {
               </div>
 
               <DialogFooter className="flex gap-2 mt-2">
-                <Button className="text-white bg-emerald-600 hover:bg-emerald-500 h-6 text-[11px] px-2.5" onClick={() => { saveNewAuth(); setModalOpen(false); }}>
+                <Button className="btn btn-primary btn-md" onClick={() => { saveNewAuth(); setModalOpen(false); }}>
                   <Save className="h-3 w-3 mr-1" /> Save
                 </Button>
-                <button className="text-[11px] text-white/50 hover:text-white/70 px-2" onClick={() => setModalOpen(false)}>Cancel</button>
+                <button className="btn btn-ghost btn-sm" onClick={() => setModalOpen(false)}>Cancel</button>
               </DialogFooter>
             </>
           )}
@@ -502,7 +510,7 @@ const Login = (props) => {
       <div className="space-y-3 mb-6">
 
         {mode === 5 && (
-          <div className="py-2 px-3 rounded border border-red-500/30 bg-red-500/5 text-[11px] text-red-400/80 leading-relaxed">
+          <div className="alert alert-danger">
             Save your login token in a secure place. It is the only form of authentication for your account. If you lose the token your account is lost forever.
           </div>
         )}
@@ -511,7 +519,7 @@ const Login = (props) => {
           <>
             <Field label="Token" name="email" placeholder="Token" value={inputs["email"]} error={errors["email"]} onChange={HandleInputChange} />
             {inputs["email"] && (
-              <div className="py-2 px-3 rounded border border-amber-500/30 bg-amber-500/5 text-[11px] text-amber-400/80 font-medium">
+              <div className="alert alert-warning">
                 Save this token!
               </div>
             )}
@@ -528,9 +536,9 @@ const Login = (props) => {
         {showResetCode && <Field label="Reset Code" name="code" placeholder="Reset Code" value={inputs["code"]} error={errors["code"]} onChange={HandleInputChange} />}
 
         {/* ── Actions ── */}
-        <div className="flex items-center gap-3 pt-1">
+        <div className="flex items-center gap-3 pt-2">
           <Button
-            className="text-white bg-emerald-600 hover:bg-emerald-500 h-7 text-[11px] px-3"
+            className="btn btn-primary btn-lg"
             onClick={handleSubmit}
           >
             {submitLabel}
@@ -538,7 +546,7 @@ const Login = (props) => {
 
           {mode === 4 && (
             <button
-              className="text-[11px] text-cyan-400/60 hover:text-cyan-400 transition-colors"
+              className="btn btn-link"
               onClick={GetCode}
             >
               Send Reset Code
@@ -547,9 +555,9 @@ const Login = (props) => {
 
           {mode === 1 && (
             <button
-              className={`text-[11px] px-3 py-1 rounded-full border transition-all cursor-pointer ${remember
-                  ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.12)]"
-                  : "border-white/[0.06] bg-white/[0.02] text-white/50 hover:text-white/70 hover:border-white/25 hover:bg-white/[0.04]"
+              className={`${remember
+                  ? "pill pill-active"
+                  : "pill"
                 }`}
               onClick={() => setRememeber(!remember)}
             >
@@ -560,26 +568,26 @@ const Login = (props) => {
       </div>
 
       {/* ── Server banner ── */}
-      <div className="flex items-center gap-3 py-3 px-4 rounded-lg bg-[#0a0d14]/80 border border-[#1e2433] mb-4">
-        <span className="text-[10px] text-white/45 uppercase tracking-wider shrink-0">Server</span>
+      <div className="flex items-center gap-3 py-3 px-4 rounded-lg bg-[#f4f1e8] border border-[#e7e3d7] mb-5 card-shadow">
+        <span className="label shrink-0 !mb-0">Server</span>
         <Select value={authServer ? authServer.ID : tunID} onValueChange={changeAuthServer}>
-          <SelectTrigger className="h-7 text-[12px] border-[#1e2433] bg-transparent flex-1">
+          <SelectTrigger className="h-8 text-[12px] border-[#e7e3d7] bg-white flex-1">
             <SelectValue placeholder="Select Auth Server" />
           </SelectTrigger>
-          <SelectContent className="bg-[#0a0d14] border-[#1e2433]">
+          <SelectContent className="bg-white border-[#e7e3d7]">
             {serverOpts.map(t => (
               <SelectItem key={t.value} value={t.value} className="text-[12px]">{t.label}</SelectItem>
             ))}
           </SelectContent>
         </Select>
         <button
-          className="p-1.5 rounded text-white/40 hover:text-white/60 hover:bg-white/[0.04] transition-colors"
+          className="btn-icon btn-icon-md"
           onClick={() => setModalOpen(true)}
         >
           <CopyPlusIcon className="h-3.5 w-3.5" />
         </button>
         <button
-          className="p-1.5 rounded text-white/40 hover:text-white/60 hover:bg-white/[0.04] transition-colors"
+          className="btn-icon btn-icon-md"
           onClick={() => { setNewAuth(authServer); setModalOpen(true); }}
         >
           <Edit2Icon className="h-3.5 w-3.5" />
@@ -591,9 +599,9 @@ const Login = (props) => {
         {modes.map(m => (
           <button
             key={m.value}
-            className={`text-[11px] px-3 py-1 rounded-full border transition-all cursor-pointer ${mode === m.value
-                ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.12)]"
-                : "border-white/[0.06] bg-white/[0.02] text-white/50 hover:text-white/70 hover:border-white/25 hover:bg-white/[0.04]"
+            className={`${mode === m.value
+                ? "pill pill-active"
+                : "pill"
               }`}
             onClick={() => {
               if (m.value === 5) GenerateToken();

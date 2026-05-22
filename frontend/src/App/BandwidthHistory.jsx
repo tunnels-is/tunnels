@@ -12,7 +12,7 @@ const TIME_RANGES = [
 
 // Rotating palette for multiple tunnels
 const TUNNEL_COLORS = [
-  "#4B7BF5", // blue (site accent)
+  "#1d4ed8", // blue (site accent)
   "#f59e0b", // amber
   "#10b981", // emerald
   "#f43f5e", // rose
@@ -122,7 +122,7 @@ function MultiGraph({ series, dataKey, rangeSeconds, height = 180 }) {
     const graphHeight = height - paddingTop - paddingBottom
 
     ctx.clearRect(0, 0, width, height)
-    ctx.fillStyle = "#060810"
+    ctx.fillStyle = "#fdfcf8"
     ctx.fillRect(0, 0, width, height)
 
     const textColor = "rgba(255,255,255,0.30)"
@@ -227,24 +227,24 @@ function MultiStatsRow({ series, dataKey }) {
           <div key={s.id} className="flex items-center gap-4 px-1">
             <div className="flex items-center gap-1.5 shrink-0 w-28">
               <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
-              <span className="text-[10px] font-mono text-white/50 truncate">{s.label}</span>
+              <span className="text-[10px] font-mono text-[#525252] truncate">{s.label}</span>
             </div>
             <div className="flex items-center gap-5">
               <div className="flex items-center gap-1">
-                <span className="text-[10px] uppercase tracking-wider text-white/35">Cur</span>
-                <span className="text-[11px] font-mono text-white/60">{formatBytesPerSec(current)}</span>
+                <span className="label !mb-0">Cur</span>
+                <span className="text-[11px] font-mono text-[#525252]">{formatBytesPerSec(current)}</span>
               </div>
               <div className="flex items-center gap-1">
-                <span className="text-[10px] uppercase tracking-wider text-white/35">Avg</span>
-                <span className="text-[11px] font-mono text-white/60">{formatBytesPerSec(avg)}</span>
+                <span className="label !mb-0">Avg</span>
+                <span className="text-[11px] font-mono text-[#525252]">{formatBytesPerSec(avg)}</span>
               </div>
               <div className="flex items-center gap-1">
-                <span className="text-[10px] uppercase tracking-wider text-white/35">Peak</span>
-                <span className="text-[11px] font-mono text-white/60">{formatBytesPerSec(max)}</span>
+                <span className="label !mb-0">Peak</span>
+                <span className="text-[11px] font-mono text-[#525252]">{formatBytesPerSec(max)}</span>
               </div>
               <div className="flex items-center gap-1">
-                <span className="text-[10px] uppercase tracking-wider text-white/35">Total</span>
-                <span className="text-[11px] font-mono text-white/60">{formatBytes(total)}</span>
+                <span className="label !mb-0">Total</span>
+                <span className="text-[11px] font-mono text-[#525252]">{formatBytes(total)}</span>
               </div>
             </div>
           </div>
@@ -301,14 +301,14 @@ export default function Bandwidth() {
 
   if (!state.Config.BandwidthGraphs) { 
     return (
-      <div className="flex items-center justify-center h-40 text-white/40 text-[13px]">
+      <div className="flex items-center justify-center h-40 text-[#a3a3a3] text-[13px]">
         Bandwidth history is disabled
       </div>
     )
   }
   if (tunnels.length === 0) {
     return (
-      <div className="flex items-center justify-center h-40 text-white/40 text-[13px]">
+      <div className="flex items-center justify-center h-40 text-[#a3a3a3] text-[13px]">
         No active tunnels
       </div>
     )
@@ -317,7 +317,7 @@ export default function Bandwidth() {
   return (
     <div>
       {/* Header bar */}
-      <div className="flex items-center gap-5 py-3 px-4 rounded-lg bg-[#0a0d14]/80 border border-[#1e2433] mb-6">
+      <div className="flex items-center gap-5 py-3 px-4 rounded-lg bg-[#ffffff]/80 border border-[#e7e3d7] mb-6 card-shadow">
         {/* Time range tabs */}
         <div className="flex gap-1">
           {TIME_RANGES.map((r) => (
@@ -326,8 +326,8 @@ export default function Bandwidth() {
               onClick={() => setRange(r)}
               className={`text-[11px] px-2.5 py-0.5 rounded transition-colors ${
                 range_.label === r.label
-                  ? "bg-white/[0.07] text-white/70"
-                  : "text-white/40 hover:text-white/60"
+                  ? "bg-black/[0.05] text-[#0a0a0a]"
+                  : "text-[#a3a3a3] hover:text-[#525252]"
               }`}
             >
               {r.label}
@@ -336,7 +336,7 @@ export default function Bandwidth() {
         </div>
 
         {/* Separator */}
-        {tunnels.length > 1 && <div className="w-px h-5 bg-white/[0.06]" />}
+        {tunnels.length > 1 && <div className="w-px h-5 bg-black/[0.06]" />}
 
         {/* Tunnel toggles */}
         {tunnels.length > 1 && (
@@ -351,8 +351,8 @@ export default function Bandwidth() {
                   onClick={() => toggleTunnel(tun.ID)}
                   className={`flex items-center gap-1.5 text-[11px] px-2 py-0.5 rounded transition-colors ${
                     disabled
-                      ? "text-white/20 hover:text-white/35"
-                      : "text-white/60 hover:text-white/75 bg-white/[0.04]"
+                      ? "text-[#d5d0c0] hover:text-[#a3a3a3]"
+                      : "text-[#525252] hover:text-[#0a0a0a] bg-black/[0.04]"
                   }`}
                 >
                   <div
@@ -370,7 +370,7 @@ export default function Bandwidth() {
         )}
 
         <div className="ml-auto flex items-center gap-3">
-          <span className="text-[10px] text-white/35 tabular-nums">
+          <span className="text-[10px] text-[#a3a3a3] tabular-nums">
             {totalSamples} sample{totalSamples !== 1 ? "s" : ""}
           </span>
         </div>
@@ -379,17 +379,17 @@ export default function Bandwidth() {
       {/* Egress */}
       <div className="mb-5">
         <div className="flex items-center gap-2 mb-2 pl-1">
-          <div className="w-1.5 h-1.5 rounded-full bg-amber-500/80" />
-          <span className="text-[11px] uppercase tracking-widest text-white/45">Upload</span>
+          <div className="w-1.5 h-1.5 rounded-full bg-[#b45309]" />
+          <span className="label-section">Upload</span>
         </div>
-        <div className="rounded-lg bg-[#0a0d14] border border-[#1e2433] p-3">
+        <div className="rounded-lg bg-[#ffffff] border border-[#e7e3d7] p-3 card-shadow">
           <MultiGraph
             series={egressSeries}
             dataKey="eg"
             rangeSeconds={range_.seconds}
             height={170}
           />
-          <div className="mt-2.5 pt-2 border-t border-[#1e2433]">
+          <div className="mt-2.5 pt-2 border-t border-[#e7e3d7]">
             <MultiStatsRow series={egressSeries} dataKey="eg" />
           </div>
         </div>
@@ -398,17 +398,17 @@ export default function Bandwidth() {
       {/* Ingress */}
       <div>
         <div className="flex items-center gap-2 mb-2 pl-1">
-          <div className="w-1.5 h-1.5 rounded-full bg-[#4B7BF5]/80" />
-          <span className="text-[11px] uppercase tracking-widest text-white/45">Download</span>
+          <div className="w-1.5 h-1.5 rounded-full bg-[#1d4ed8]/80" />
+          <span className="label-section">Download</span>
         </div>
-        <div className="rounded-lg bg-[#0a0d14] border border-[#1e2433] p-3">
+        <div className="rounded-lg bg-[#ffffff] border border-[#e7e3d7] p-3 card-shadow">
           <MultiGraph
             series={ingressSeries}
             dataKey="ig"
             rangeSeconds={range_.seconds}
             height={170}
           />
-          <div className="mt-2.5 pt-2 border-t border-[#1e2433]">
+          <div className="mt-2.5 pt-2 border-t border-[#e7e3d7]">
             <MultiStatsRow series={ingressSeries} dataKey="ig" />
           </div>
         </div>

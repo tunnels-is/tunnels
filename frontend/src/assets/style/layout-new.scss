@@ -1,37 +1,19 @@
-.light {
-  --c-white: white;
-  --c-shade1: #f5f6f8;
-  --c-shade2: #e8eaef;
-  --c-shade3: #c0c4d0;
-  --c-shade4: #6a7088;
-  --c-shade5: #2a2e3a;
-  --c-shade6: #0f1118;
-  --c-dark-blue: #4B7BF5;
-  --c-blue: #5d8af7;
-  --c-green: #28ad85;
-  --c-dark-green: #1c916e;
-  --c-orange: #e8912a;
-  --c-red-hover: #ef5555;
-  --c-red: #dc3545;
-  --line-border: #e0e2e8;
-}
-
-.dark {
-  --c-white: #060810;
-  --c-shade1: #0a0d14;
-  --c-shade2: #1e2433;
-  --c-shade3: #4a5068;
-  --c-shade4: #8a90a0;
-  --c-shade5: #c0c4d0;
-  --c-shade6: #e8eaf0;
-  --c-dark-blue: #4B7BF5;
-  --c-blue: #5d8af7;
-  --c-dark-green: #1a8a5a;
-  --c-orange: #e8912a;
-  --c-red-hover: #ef5555;
-  --c-red: #cc4646;
-  --c-green: #2a9a4a;
-  --line-border: #1e2433;
+.light, .dark {
+  --c-white: #ffffff;
+  --c-shade1: #fdfcf8;
+  --c-shade2: #f4f1e8;
+  --c-shade3: #e7e3d7;
+  --c-shade4: #a3a3a3;
+  --c-shade5: #525252;
+  --c-shade6: #0a0a0a;
+  --c-dark-blue: #1d4ed8;
+  --c-blue: #1d4ed8;
+  --c-green: #15803d;
+  --c-dark-green: #166534;
+  --c-orange: #b45309;
+  --c-red-hover: #b91c1c;
+  --c-red: #dc2626;
+  --line-border: #e7e3d7;
 }
 
 .cursor {
@@ -51,7 +33,7 @@ html {
 }
 
 body {
-  font-family: "Inter Variable", sans-serif !important;
+  font-family: "Inter Variable", "Inter", system-ui, sans-serif !important;
   font-size: 14px;
   * {
     outline: none !important;
@@ -61,18 +43,19 @@ body {
 }
 
 .title {
-  background: var(--c-shade1);
+  background: var(--c-shade2);
   padding: 8px 10px;
   font-size: 18px;
-  font-weight: 700;
-  color: var(--c-shade5);
+  font-weight: 600;
+  color: var(--c-shade6);
   margin-bottom: 12px;
+  border-radius: 6px;
 }
 
 :global(.toast) {
   margin-left: 12px;
   border-radius: 6px;
-  box-shadow: 0 0 2px rgb(0 0 0 / 66%);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
   min-width: 200px !important;
   padding: 8px !important;
   z-index: 1999;
@@ -99,11 +82,11 @@ body {
     text-align: left;
     margin-left: 170px;
     background: none;
-    color: white;
+    color: #0a0a0a;
     padding: 4px 0;
   }
   .bar-loader {
-    color: green;
-    background: green;
+    color: #15803d;
+    background: #15803d;
   }
 }

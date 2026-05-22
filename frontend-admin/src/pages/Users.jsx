@@ -7,10 +7,10 @@ import { apiPost } from '../api';
 function Modal({ title, onClose, children }) {
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-      <div className="bg-[#0a0d14] border border-[#1e2433] rounded-lg w-full max-w-md p-5">
+      <div className="bg-[#ffffff] border border-[#e7e3d7] rounded-lg w-full max-w-md p-5">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-[14px] font-semibold text-white">{title}</h3>
-          <button onClick={onClose} className="text-white/40 hover:text-white/70 text-lg leading-none">×</button>
+          <h3 className="text-[14px] font-semibold text-[#0a0a0a]">{title}</h3>
+          <button onClick={onClose} className="text-[#a3a3a3] hover:text-[#262626] text-lg leading-none">×</button>
         </div>
         {children}
       </div>
@@ -18,7 +18,7 @@ function Modal({ title, onClose, children }) {
   );
 }
 
-const inputClass = "w-full bg-[#060810] border border-[#1e2433] rounded px-3 py-1.5 text-[13px] text-white placeholder-white/30 focus:outline-none focus:border-[#4B7BF5]/50";
+const inputClass = "w-full bg-[#fdfcf8] border border-[#e7e3d7] rounded px-3 py-1.5 text-[13px] text-[#0a0a0a] placeholder-[#a3a3a3] focus:outline-none focus:border-[#0a0a0a]";
 
 export default function Users() {
   const navigate = useNavigate();
@@ -79,43 +79,43 @@ export default function Users() {
   return (
     <div>
       <div className="flex items-center justify-between mb-5">
-        <h1 className="text-[16px] font-semibold text-white">Users</h1>
+        <h1 className="text-[16px] font-semibold text-[#0a0a0a]">Users</h1>
         <div className="flex gap-2">
-          <button onClick={load} disabled={loading} className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[12px] text-white/60 hover:text-white/80 hover:bg-white/[0.04] transition-colors">
+          <button onClick={load} disabled={loading} className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[12px] text-[#525252] hover:text-[#0a0a0a] hover:bg-black/[0.04] transition-colors">
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </button>
-          <button onClick={() => setShowCreate(true)} className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[12px] bg-[#4B7BF5]/10 text-[#4B7BF5] hover:bg-[#4B7BF5]/20 transition-colors">
+          <button onClick={() => setShowCreate(true)} className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[12px] bg-black/[0.05] text-[#0a0a0a] hover:bg-black/[0.08] transition-colors">
             <Plus className="w-3.5 h-3.5" />
             New User
           </button>
         </div>
       </div>
 
-      {error && <p className="text-[12px] text-red-400 mb-3">{error}</p>}
+      {error && <p className="text-[12px] text-[#dc2626] mb-3">{error}</p>}
 
-      <div className="border border-[#1e2433] rounded-lg overflow-hidden">
-        <div className="grid grid-cols-[1fr_80px_80px_80px_160px] gap-4 px-4 py-2 border-b border-[#1e2433] bg-[#0a0d14]">
+      <div className="border border-[#e7e3d7] rounded-lg overflow-hidden">
+        <div className="grid grid-cols-[1fr_80px_80px_80px_160px] gap-4 px-4 py-2 border-b border-[#e7e3d7] bg-[#ffffff]">
           {['Email', 'Admin', 'Manager', 'Disabled', 'Sub Expiry'].map((h) => (
-            <span key={h} className="text-[10px] text-white/40 uppercase tracking-wider">{h}</span>
+            <span key={h} className="text-[10px] text-[#a3a3a3] uppercase tracking-wider">{h}</span>
           ))}
         </div>
 
         {users.length === 0 && !loading && (
-          <div className="px-4 py-6 text-[12px] text-white/40">No users found</div>
+          <div className="px-4 py-6 text-[12px] text-[#a3a3a3]">No users found</div>
         )}
 
         {users.map((u) => (
           <div
             key={u._id}
             onClick={() => navigate(`/users/${u._id}`, { state: { user: u } })}
-            className="grid grid-cols-[1fr_80px_80px_80px_160px] gap-4 px-4 py-2.5 border-b border-[#1e2433]/50 hover:bg-white/[0.03] cursor-pointer items-center"
+            className="grid grid-cols-[1fr_80px_80px_80px_160px] gap-4 px-4 py-2.5 border-b border-[#e7e3d7]/50 hover:bg-black/[0.03] cursor-pointer items-center"
           >
-            <span className="text-[13px] text-white/80 truncate">{u.Email}</span>
-            <span className={`text-[11px] ${u.IsAdmin ? 'text-emerald-400' : 'text-white/30'}`}>{u.IsAdmin ? 'Yes' : 'No'}</span>
-            <span className={`text-[11px] ${u.IsManager ? 'text-blue-400' : 'text-white/30'}`}>{u.IsManager ? 'Yes' : 'No'}</span>
-            <span className={`text-[11px] ${u.Disabled ? 'text-red-400' : 'text-white/30'}`}>{u.Disabled ? 'Yes' : 'No'}</span>
-            <span className="text-[11px] text-white/40 font-mono">
+            <span className="text-[13px] text-[#0a0a0a] truncate">{u.Email}</span>
+            <span className={`text-[11px] ${u.IsAdmin ? 'text-[#15803d]' : 'text-[#a3a3a3]'}`}>{u.IsAdmin ? 'Yes' : 'No'}</span>
+            <span className={`text-[11px] ${u.IsManager ? 'text-[#1d4ed8]' : 'text-[#a3a3a3]'}`}>{u.IsManager ? 'Yes' : 'No'}</span>
+            <span className={`text-[11px] ${u.Disabled ? 'text-[#dc2626]' : 'text-[#a3a3a3]'}`}>{u.Disabled ? 'Yes' : 'No'}</span>
+            <span className="text-[11px] text-[#a3a3a3] font-mono">
               {u.SubExpiration ? dayjs(u.SubExpiration).format('DD-MM-YYYY') : '—'}
             </span>
           </div>
@@ -126,17 +126,17 @@ export default function Users() {
         <Modal title="New User" onClose={() => setShowCreate(false)}>
           <form onSubmit={handleCreate} className="space-y-3">
             <div>
-              <label className="block text-[11px] text-white/40 uppercase tracking-wider mb-1">Email</label>
+              <label className="block text-[11px] text-[#a3a3a3] uppercase tracking-wider mb-1">Email</label>
               <input type="text" className={inputClass} value={createForm.Email} onChange={(e) => setCreateForm({ ...createForm, Email: e.target.value })} required />
             </div>
             <div>
-              <label className="block text-[11px] text-white/40 uppercase tracking-wider mb-1">Password</label>
+              <label className="block text-[11px] text-[#a3a3a3] uppercase tracking-wider mb-1">Password</label>
               <input type="password" className={inputClass} value={createForm.Password} onChange={(e) => setCreateForm({ ...createForm, Password: e.target.value })} minLength={10} required />
             </div>
-            {createError && <p className="text-[12px] text-red-400">{createError}</p>}
+            {createError && <p className="text-[12px] text-[#dc2626]">{createError}</p>}
             <div className="flex justify-end gap-2 pt-2">
-              <button type="button" onClick={() => setShowCreate(false)} className="px-3 py-1.5 text-[12px] text-white/50 hover:text-white/80">Cancel</button>
-              <button type="submit" disabled={creating} className="px-4 py-1.5 text-[12px] bg-[#4B7BF5] hover:bg-[#3d6de0] text-white rounded disabled:opacity-50">
+              <button type="button" onClick={() => setShowCreate(false)} className="px-3 py-1.5 text-[12px] text-[#525252] hover:text-[#0a0a0a]">Cancel</button>
+              <button type="submit" disabled={creating} className="px-4 py-1.5 text-[12px] bg-[#0a0a0a] hover:bg-[#262626] text-white rounded disabled:opacity-50">
                 {creating ? 'Creating...' : 'Create'}
               </button>
             </div>

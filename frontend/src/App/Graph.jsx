@@ -1,20 +1,91 @@
 import React, { useEffect, useLayoutEffect, useRef, useState, useMemo, useCallback } from "react";
 import GLOBAL_STATE from "../state";
-import { Badge } from "@/components/ui/badge";
-import { Server, Network, Pencil, Trash2, Plus, Copy, Zap, ZapOff } from "lucide-react";
+import { Server, Network, Pencil, Trash2, Copy, Zap, ZapOff, Activity } from "lucide-react";
 import { cn } from "@/lib/utils";
 import TunnelFormDialog from "./TunnelFormDialog";
 import ServerFormDialog from "./ServerFormDialog";
 
 const StatPill = ({ label, value, warn }) => (
-  <div className="flex items-center gap-1">
-    <span className="text-[10px] uppercase tracking-wider text-white/45">{label}</span>
+  <div className={cn(
+    "inline-flex items-baseline gap-1.5 px-2 py-0.5 rounded",
+    warn
+      ? "bg-[#b45309]/[0.06] ring-1 ring-inset ring-[#b45309]/20"
+      : "bg-black/[0.03] ring-1 ring-inset ring-black/[0.06]"
+  )}>
     <span className={cn(
-      "text-[11px] font-mono",
-      warn ? "text-amber-400" : "text-white/60"
+      "text-[9px] font-semibold uppercase tracking-[0.1em]",
+      warn ? "text-[#b45309]" : "text-[#a3a3a3]"
+    )}>{label}</span>
+    <span className={cn(
+      "text-[11px] font-mono tabular-nums",
+      warn ? "text-[#b45309]" : "text-[#0a0a0a]"
     )}>{value}</span>
   </div>
 );
+
+// Stat tile — top-of-page counter (icon + value + uppercase label) with paper-raised depth
+const StatTile = ({ icon: Icon, label, value, tone = "neutral" }) => {
+  const toneClasses = {
+    neutral: {
+      tile: "bg-white ring-black/[0.08] hover:ring-black/[0.16] shadow-[0_1px_2px_rgba(10,10,10,0.04)] hover:shadow-[0_3px_8px_rgba(10,10,10,0.06)]",
+      icon: "text-[#a3a3a3]",
+      value: "text-[#0a0a0a]",
+      label: "text-[#737373]",
+    },
+    muted: {
+      tile: "bg-white ring-black/[0.08] hover:ring-black/[0.14] shadow-[0_1px_2px_rgba(10,10,10,0.04)]",
+      icon: "text-[#c4c4c4]",
+      value: "text-[#a3a3a3]",
+      label: "text-[#a3a3a3]",
+    },
+    success: {
+      tile: "bg-gradient-to-b from-[#15803d]/[0.06] to-white ring-[#15803d]/25 hover:ring-[#15803d]/40 shadow-[0_1px_2px_rgba(21,128,61,0.06),0_2px_4px_rgba(21,128,61,0.04)] hover:shadow-[0_4px_10px_rgba(21,128,61,0.10)]",
+      icon: "text-[#15803d]",
+      value: "text-[#15803d]",
+      label: "text-[#15803d]/80",
+    },
+  }[tone];
+
+  return (
+    <div className={cn(
+      "inline-flex items-center gap-2.5 pl-2.5 pr-3.5 py-1.5 rounded-md ring-1 ring-inset transition-all",
+      toneClasses.tile,
+    )}>
+      <div className={cn(
+        "w-7 h-7 flex items-center justify-center rounded-md bg-white shadow-[0_1px_1px_rgba(10,10,10,0.05),inset_0_0_0_1px_rgba(10,10,10,0.05)]",
+      )}>
+        <Icon className={cn("w-3.5 h-3.5", toneClasses.icon)} strokeWidth={2} />
+      </div>
+      <div className="flex flex-col items-start leading-none">
+        <span className={cn("text-[15px] font-semibold tabular-nums tracking-tight", toneClasses.value)}>
+          {value}
+        </span>
+        <span className={cn(
+          "mt-1 text-[9px] font-semibold uppercase tracking-[0.12em]",
+          toneClasses.label,
+        )}>
+          {label}
+        </span>
+      </div>
+    </div>
+  );
+};
+
+// Compact key/value row used inside the hover-expand details on tunnel/server cards
+const MetaRow = ({ label, value, mono = true }) => (
+  <div className="flex items-baseline gap-3 py-[3px]">
+    <span className="w-[58px] shrink-0 text-[9px] font-semibold uppercase tracking-[0.08em] text-[#a3a3a3]">
+      {label}
+    </span>
+    <span className={cn(
+      "min-w-0 flex-1 text-[11px] truncate",
+      mono ? "font-mono text-[#525252]" : "text-[#525252]"
+    )}>
+      {value}
+    </span>
+  </div>
+);
+
 
 const ConnectionLine = ({ line, hovered, onHover }) => {
   const { x1, y1, x2, y2, active } = line;
@@ -22,7 +93,7 @@ const ConnectionLine = ({ line, hovered, onHover }) => {
   const d = `M ${x1} ${y1} C ${midX} ${y1}, ${midX} ${y2}, ${x2} ${y2}`;
 
   if (active) {
-    const color = hovered ? "#2dd4bf" : "#4B7BF5";
+    const color = hovered ? "#2dd4bf" : "#1d4ed8";
     return (
       <g>
         <path
@@ -64,7 +135,7 @@ const ConnectionLine = ({ line, hovered, onHover }) => {
       <path
         d={d}
         fill="none"
-        stroke="#4B7BF5"
+        stroke="#1d4ed8"
         strokeWidth="1.5"
         strokeDasharray="6 4"
         strokeOpacity="0.3"
@@ -90,12 +161,12 @@ const DragLine = ({ x1, y1, x2, y2 }) => {
       <path
         d={d}
         fill="none"
-        stroke="#4B7BF5"
+        stroke="#1d4ed8"
         strokeWidth="2"
         strokeOpacity="0.5"
         strokeDasharray="8 4"
       />
-      <circle cx={x2} cy={y2} r="4" fill="#4B7BF5" opacity="0.6" />
+      <circle cx={x2} cy={y2} r="4" fill="#1d4ed8" opacity="0.6" />
     </g>
   );
 };
@@ -129,18 +200,18 @@ const TunnelNode = React.forwardRef(({ tunnel, active, state, selected, linking,
       onMouseLeave={onMouseLeave}
       className={cn(
         "group/node relative p-3 rounded-lg border transition-all duration-300 cursor-pointer",
-        "bg-[#0a0d14]",
+        "bg-[#ffffff] card-shadow card-shadow-hover",
         hovered
-          ? "border-teal-400/60 shadow-[0_0_15px_rgba(45,212,191,0.15)]"
+          ? "border-[#0a0a0a]/40 "
           : selected
-            ? "border-amber-400/60 shadow-[0_0_15px_rgba(251,191,36,0.15)]"
+            ? "border-[#b45309]/50 "
             : isActive
-              ? "border-emerald-500/50 shadow-[0_0_15px_rgba(16,185,129,0.12)]"
+              ? "border-[#15803d]/50 "
               : linking
-                ? "border-[#1e2433] opacity-40"
+                ? "border-[#e7e3d7] opacity-40"
                 : linked
-                  ? "border-[#4B7BF5]/25 hover:border-[#4B7BF5]/40"
-                  : "border-[#1e2433] hover:border-[#2e3443]"
+                  ? "border-[#1d4ed8]/25 hover:border-[#1d4ed8]/40"
+                  : "border-[#e7e3d7] hover:border-[#d5d0c0]"
       )}
     >
       {/* Action buttons */}
@@ -148,7 +219,7 @@ const TunnelNode = React.forwardRef(({ tunnel, active, state, selected, linking,
         {isActive ? (
           <button
             onClick={(e) => { e.stopPropagation(); onDisconnect?.(active); }}
-            className="p-1 rounded text-emerald-400/70 hover:text-red-400 hover:bg-white/5"
+            className="btn-icon btn-icon-state-success btn-icon-danger"
             title="Disconnect"
           >
             <ZapOff className="w-3 h-3" />
@@ -156,7 +227,7 @@ const TunnelNode = React.forwardRef(({ tunnel, active, state, selected, linking,
         ) : (
           <button
             onClick={(e) => { e.stopPropagation(); onConnect?.(tunnel); }}
-            className="p-1 rounded text-white/50 hover:text-emerald-400 hover:bg-white/5"
+            className="btn-icon btn-icon-success"
             title="Connect"
           >
             <Zap className="w-3 h-3" />
@@ -164,71 +235,73 @@ const TunnelNode = React.forwardRef(({ tunnel, active, state, selected, linking,
         )}
         <button
           onClick={(e) => { e.stopPropagation(); copyToClipboard(tunnel.Tag, state); }}
-          className="p-1 rounded text-white/50 hover:text-white/70 hover:bg-white/5"
+          className="btn-icon"
           title="Copy Tag"
         >
           <Copy className="w-3 h-3" />
         </button>
         <button
           onClick={(e) => { e.stopPropagation(); onEdit?.(tunnel); }}
-          className="p-1 rounded text-white/50 hover:text-white/70 hover:bg-white/5"
+          className="btn-icon"
           title="Edit"
         >
           <Pencil className="w-3 h-3" />
         </button>
         <button
           onClick={(e) => { e.stopPropagation(); onDelete?.(tunnel); }}
-          className="p-1 rounded text-white/50 hover:text-red-400 hover:bg-white/5"
+          className="btn-icon btn-icon-danger"
           title="Delete"
         >
           <Trash2 className="w-3 h-3" />
         </button>
       </div>
 
-      <div className="flex items-center gap-2 mb-1">
+      <div className="flex items-center gap-2 mb-1.5">
         <div className={cn(
           "w-2 h-2 rounded-full shrink-0",
-          isActive ? "bg-emerald-500 animate-pulse" : "bg-white/20"
+          isActive ? "bg-[#15803d] animate-pulse" : "bg-black/20"
         )} />
-        <span className="text-[13px] font-semibold text-white truncate">
+        <span className="text-[13px] font-semibold tracking-tight text-[#0a0a0a] truncate">
           {tunnel.Tag}
         </span>
       </div>
 
-      <div className="space-y-0.5 ml-4">
-        <div className="text-[11px] text-white/40 font-mono">
-          {tunnel.IPv4Address || "no address"}
+      <div className="ml-4 space-y-1">
+        <div className="text-[11px] font-mono text-[#525252]">
+          {tunnel.IPv4Address || (
+            <span className="font-sans italic text-[#a3a3a3]">no address</span>
+          )}
         </div>
-        <div className="text-[11px] text-white/50">
-          {tunnel.IFName || "no interface"} &middot; {state.GetEncType(tunnel.EncryptionType)}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="text-[10px] text-[#525252]">
+            {tunnel.IFName || (
+              <span className="italic text-[#a3a3a3]">no interface</span>
+            )}
+          </span>
+          <span className="text-[9px] font-semibold uppercase tracking-[0.1em] text-[#a3a3a3] px-1.5 py-[1px] rounded bg-black/[0.04] ring-1 ring-inset ring-black/[0.05]">
+            {state.GetEncType(tunnel.EncryptionType)}
+          </span>
         </div>
       </div>
 
       {/* Expanded details on hover */}
       <div className={cn(
         "overflow-hidden transition-all duration-300 ease-in-out",
-        expanded ? "max-h-40 opacity-100" : "max-h-0 opacity-0 group-hover/node:max-h-40 group-hover/node:opacity-100"
+        expanded ? "max-h-44 opacity-100" : "max-h-0 opacity-0 group-hover/node:max-h-44 group-hover/node:opacity-100"
       )}>
-        <div className="mt-2 pt-2 border-t border-[#1e2433] space-y-0.5 ml-4">
-          {tunnel.ServerID && (
-            <div className="text-[10px]">
-              <span className="text-white/45 uppercase tracking-wider">Server ID </span>
-              <span className="text-white/40 font-mono">{tunnel.ServerID}</span>
-            </div>
-          )}
-          <div className="text-[10px]">
-            <span className="text-white/45 uppercase tracking-wider">IPv6 </span>
-            <span className="text-white/40 font-mono">{tunnel.IPv6Address || "none"}</span>
-          </div>
-          <div className="text-[10px]">
-            <span className="text-white/45 uppercase tracking-wider">Mask </span>
-            <span className="text-white/40 font-mono">{tunnel.NetMask || "none"}</span>
-          </div>
-          <div className="text-[10px]">
-            <span className="text-white/45 uppercase tracking-wider">MTU </span>
-            <span className="text-white/40 font-mono">{tunnel.MTU}</span>
-            <span className="text-white/45 uppercase tracking-wider ml-2">TxQ </span>
-            <span className="text-white/40 font-mono">{tunnel.TxQueueLen}</span>
+        <div className="mt-2.5 pt-2.5 border-t border-[#e7e3d7] ml-4">
+          {tunnel.ServerID && <MetaRow label="Server ID" value={tunnel.ServerID} />}
+          <MetaRow label="IPv6" value={tunnel.IPv6Address || "none"} />
+          <MetaRow label="Mask" value={tunnel.NetMask || "none"} />
+          <div className="flex items-baseline gap-3 py-[3px]">
+            <span className="w-[58px] shrink-0 text-[9px] font-semibold uppercase tracking-[0.08em] text-[#a3a3a3]">
+              MTU
+            </span>
+            <span className="text-[11px] font-mono text-[#525252]">{tunnel.MTU}</span>
+            <span className="ml-3 text-[9px] font-semibold uppercase tracking-[0.08em] text-[#a3a3a3]">
+              TxQ
+            </span>
+            <span className="text-[11px] font-mono text-[#525252]">{tunnel.TxQueueLen}</span>
           </div>
         </div>
       </div>
@@ -236,14 +309,14 @@ const TunnelNode = React.forwardRef(({ tunnel, active, state, selected, linking,
       <div className={cn(
         "absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-2.5 h-2.5 rounded-full border-2 z-10",
         hovered
-          ? "bg-teal-400 border-[#0a0d14]"
+          ? "bg-[#0a0a0a] border-[#ffffff]"
           : selected
-            ? "bg-amber-400 border-[#0a0d14]"
+            ? "bg-[#b45309] border-[#ffffff]"
             : isActive
-              ? "bg-emerald-500 border-[#0a0d14]"
+              ? "bg-[#15803d] border-[#ffffff]"
               : linked
-                ? "bg-[#4B7BF5]/50 border-[#0a0d14]"
-                : "bg-[#1e2433] border-[#0a0d14]"
+                ? "bg-[#1d4ed8]/50 border-[#ffffff]"
+                : "bg-[#e7e3d7] border-[#ffffff]"
       )} />
     </div>
   );
@@ -259,16 +332,16 @@ const ServerNode = React.forwardRef(({ server, hasActive, hasLinked, activeStats
       onMouseLeave={onMouseLeave}
       className={cn(
         "group/node relative p-3 rounded-lg border transition-all duration-300",
-        "bg-[#0a0d14]",
+        "bg-[#ffffff] card-shadow card-shadow-hover",
         hovered
-          ? "border-teal-400/60 shadow-[0_0_15px_rgba(45,212,191,0.15)]"
+          ? "border-[#0a0a0a]/40 "
           : linking
-            ? "border-emerald-500/40 hover:border-emerald-400/70 hover:shadow-[0_0_15px_rgba(52,211,153,0.15)] cursor-pointer"
+            ? "border-[#15803d]/40 hover:border-[#15803d]/70 cursor-pointer"
             : hasActive
-              ? "border-[#4B7BF5]/40 shadow-[0_0_15px_rgba(75,123,245,0.1)]"
+              ? "border-[#1d4ed8]/40 "
               : hasLinked
-                ? "border-[#4B7BF5]/25"
-                : "border-[#1e2433]"
+                ? "border-[#1d4ed8]/25"
+                : "border-[#e7e3d7]"
       )}
     >
       {/* Action buttons */}
@@ -276,7 +349,7 @@ const ServerNode = React.forwardRef(({ server, hasActive, hasLinked, activeStats
         {hasActive ? (
           <button
             onClick={(e) => { e.stopPropagation(); onDisconnect?.(server); }}
-            className="p-1 rounded text-emerald-400/70 hover:text-red-400 hover:bg-white/5"
+            className="btn-icon btn-icon-state-success btn-icon-danger"
             title="Disconnect"
           >
             <ZapOff className="w-3 h-3" />
@@ -284,7 +357,7 @@ const ServerNode = React.forwardRef(({ server, hasActive, hasLinked, activeStats
         ) : (
           <button
             onClick={(e) => { e.stopPropagation(); onConnect?.(server); }}
-            className="p-1 rounded text-white/50 hover:text-emerald-400 hover:bg-white/5"
+            className="btn-icon btn-icon-success"
             title="Connect"
           >
             <Zap className="w-3 h-3" />
@@ -292,7 +365,7 @@ const ServerNode = React.forwardRef(({ server, hasActive, hasLinked, activeStats
         )}
         <button
           onClick={(e) => { e.stopPropagation(); copyToClipboard(server._id, state); }}
-          className="p-1 rounded text-white/50 hover:text-white/70 hover:bg-white/5"
+          className="btn-icon"
           title="Copy ID"
         >
           <Copy className="w-3 h-3" />
@@ -302,58 +375,46 @@ const ServerNode = React.forwardRef(({ server, hasActive, hasLinked, activeStats
       <div className={cn(
         "absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1/2 w-2.5 h-2.5 rounded-full border-2 z-10 transition-colors",
         hovered
-          ? "bg-teal-400 border-[#0a0d14]"
+          ? "bg-[#0a0a0a] border-[#ffffff]"
           : linking
-            ? "bg-emerald-500 border-[#0a0d14]"
+            ? "bg-[#15803d] border-[#ffffff]"
             : hasActive
-              ? "bg-[#4B7BF5] border-[#0a0d14]"
+              ? "bg-[#1d4ed8] border-[#ffffff]"
               : hasLinked
-                ? "bg-[#4B7BF5]/50 border-[#0a0d14]"
-                : "bg-[#1e2433] border-[#0a0d14]"
+                ? "bg-[#1d4ed8]/50 border-[#ffffff]"
+                : "bg-[#e7e3d7] border-[#ffffff]"
       )} />
 
-      <div className="flex items-center gap-2 mb-1">
-        <Server className="w-3.5 h-3.5 text-[#4B7BF5]/70 shrink-0" />
-        <span className="text-[13px] font-semibold text-white truncate">
+      <div className="flex items-center gap-2 mb-1.5">
+        <Server className="w-3.5 h-3.5 text-[#1d4ed8]/70 shrink-0" />
+        <span className="text-[13px] font-semibold tracking-tight text-[#0a0a0a] truncate">
           {server.Tag}
         </span>
       </div>
 
-      <div className="space-y-0.5 ml-[22px]">
-        <div className="text-[11px] text-white/40 font-mono">
-          {server.IP}:{server.Port}
-          <span className="text-white/45 ml-2">&middot;</span>
-          <span className="text-white/50 ml-2">{state.GetCountryName(server.Country)}</span>
+      <div className="ml-[22px] space-y-1">
+        <div className="text-[11px] font-mono text-[#525252]">
+          {server.IP}<span className="text-[#a3a3a3]">:</span>{server.Port}
         </div>
+        {state.GetCountryName(server.Country) && (
+          <div className="text-[10px] text-[#737373]">{state.GetCountryName(server.Country)}</div>
+        )}
       </div>
 
       {/* Expanded details on hover */}
       <div className={cn(
         "overflow-hidden transition-all duration-300 ease-in-out",
-        expanded ? "max-h-40 opacity-100" : "max-h-0 opacity-0 group-hover/node:max-h-40 group-hover/node:opacity-100"
+        expanded ? "max-h-44 opacity-100" : "max-h-0 opacity-0 group-hover/node:max-h-44 group-hover/node:opacity-100"
       )}>
-        <div className="mt-2 pt-2 border-t border-[#1e2433] space-y-0.5 ml-[22px]">
-          <div className="text-[10px]">
-            <span className="text-white/45 uppercase tracking-wider">ID </span>
-            <span className="text-white/40 font-mono">{server._id}</span>
-          </div>
-          {server.DataPort && (
-            <div className="text-[10px]">
-              <span className="text-white/45 uppercase tracking-wider">Data Port </span>
-              <span className="text-white/40 font-mono">{server.DataPort}</span>
-            </div>
-          )}
-          {server.Groups?.length > 0 && (
-            <div className="text-[10px]">
-              <span className="text-white/45 uppercase tracking-wider">Groups </span>
-              <span className="text-white/40 font-mono">{server.Groups.join(", ")}</span>
-            </div>
-          )}
+        <div className="mt-2.5 pt-2.5 border-t border-[#e7e3d7] ml-[22px]">
+          <MetaRow label="ID" value={server._id} />
+          {server.DataPort && <MetaRow label="Data Port" value={server.DataPort} />}
+          {server.Groups?.length > 0 && <MetaRow label="Groups" value={server.Groups.join(", ")} mono={false} />}
         </div>
       </div>
 
       {activeStats && (
-        <div className="mt-2 pt-2 border-t border-[#1e2433] flex gap-3 ml-[22px]">
+        <div className="mt-2.5 pt-2.5 border-t border-[#e7e3d7] flex gap-1.5 ml-[22px]">
           <StatPill label="CPU" value={activeStats.CPU + "%"} warn={activeStats.CPU > 80} />
           <StatPill label="MEM" value={activeStats.MEM + "%"} warn={activeStats.MEM > 80} />
         </div>
@@ -706,30 +767,27 @@ const Graph = () => {
 
   return (
     <div>
-      <div className="flex gap-2 mb-5 items-center">
-        <Badge className="bg-[#4B7BF5]/10 text-[#6d9aff] border-0">
-          {tunnelCount} {tunnelCount === 1 ? "tunnel" : "tunnels"}
-        </Badge>
-        <Badge className="bg-[#4B7BF5]/10 text-[#6d9aff] border-0">
-          {serverCount} {serverCount === 1 ? "server" : "servers"}
-        </Badge>
-        <Badge className="bg-emerald-500/10 text-emerald-400 border-0">
-          {activeCount} active
-        </Badge>
+      <div className="flex gap-2.5 mb-6 items-center">
+        <StatTile icon={Network}  label="Tunnels" value={tunnelCount} />
+        <StatTile icon={Server}   label="Servers" value={serverCount} />
+        <StatTile icon={Activity} label="Active"  value={activeCount} tone={activeCount > 0 ? "success" : "muted"} />
 
         {selectedTunnel && (
-          <div className="flex items-center gap-2 ml-3 text-[12px] text-amber-400 animate-pulse">
-            <span>Click a server to assign <strong>{selectedTunnel.Tag}</strong></span>
-            <span className="text-white/50 text-[11px]">(Esc to cancel)</span>
+          <div className="ml-3 inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-[#b45309]/[0.06] ring-1 ring-inset ring-[#b45309]/25">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#b45309] animate-pulse" />
+            <span className="text-[11px] text-[#b45309]">
+              Click a server to assign <span className="font-semibold">{selectedTunnel.Tag}</span>
+            </span>
+            <span className="text-[10px] text-[#a3a3a3] tracking-wide">ESC to cancel</span>
           </div>
         )}
       </div>
 
       {isEmpty && (
-        <div className="flex flex-col items-center justify-center py-20 text-white/50 border border-dashed border-[#1e2433] rounded-lg">
-          <Network className="w-10 h-10 mb-3 text-white/40" />
+        <div className="flex flex-col items-center justify-center py-20 text-[#525252] border border-dashed border-[#e7e3d7] rounded-lg">
+          <Network className="w-10 h-10 mb-3 text-[#a3a3a3]" />
           <div className="text-[13px]">No tunnels or servers configured</div>
-          <div className="text-[11px] mt-1 text-white/40">Add servers and tunnels to see the network graph</div>
+          <div className="text-[11px] mt-1 text-[#a3a3a3]">Add servers and tunnels to see the network graph</div>
         </div>
       )}
 
@@ -746,16 +804,17 @@ const Graph = () => {
         >
           {/* Tunnels — left column */}
           <div className="absolute left-0 top-0 w-[260px] space-y-3" style={{ zIndex: 2 }}>
-            <div className="flex items-center justify-between mb-1 pl-1 pr-1">
-              <span className="text-[11px] uppercase tracking-widest text-white/45">
-                Tunnels
-              </span>
+            <div className="flex items-center gap-3 mb-2 px-1">
               <button
                 onClick={handleNewTunnel}
-                className="flex items-center gap-1 text-[11px] text-emerald-400/60 hover:text-emerald-400 transition-colors"
+                className="btn btn-primary btn-xs"
               >
-                <Plus className="w-3 h-3" /> New
+                Create
               </button>
+              <div className="flex items-baseline gap-2">
+                <span className="label-section !mb-0">Tunnels</span>
+                <span className="text-[10px] font-mono tabular-nums text-[#a3a3a3]">{tunnelCount}</span>
+              </div>
             </div>
             {state.Tunnels?.map(tunnel => {
               const conn = connByTunnel[tunnel.Tag];
@@ -825,18 +884,19 @@ const Graph = () => {
 
           {/* Servers — right column */}
           <div className="absolute right-0 top-0 w-[260px] space-y-3" style={{ zIndex: 2 }}>
-            <div className="flex items-center justify-between mb-1 pl-4 pr-1">
-              <span className="text-[11px] uppercase tracking-widest text-white/45">
-                Servers
-              </span>
+            <div className="flex items-center gap-3 mb-2 px-1">
               {(state.User?.IsAdmin || state.User?.IsManager) && (
                 <button
                   onClick={handleNewServer}
-                  className="flex items-center gap-1 text-[11px] text-emerald-400/60 hover:text-emerald-400 transition-colors"
+                  className="btn btn-primary btn-xs"
                 >
-                  <Plus className="w-3 h-3" /> New
+                  Create
                 </button>
               )}
+              <div className="flex items-baseline gap-2">
+                <span className="label-section !mb-0">Servers</span>
+                <span className="text-[10px] font-mono tabular-nums text-[#a3a3a3]">{serverCount}</span>
+              </div>
             </div>
             {uniqueServers.map(server => (
               <ServerNode

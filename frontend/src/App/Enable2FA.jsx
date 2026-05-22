@@ -102,7 +102,7 @@ const Enable2FA = () => {
   return (
     <div className="w-full flex flex-col items-center justify-center p-4">
       <div className="w-full max-w-md space-y-6">
-        <div className="rounded-lg bg-[#0a0d14]/80 border border-[#1e2433] p-6">
+        <div className="rounded-lg bg-[#ffffff]/80 border border-[#e7e3d7] p-6 card-shadow">
           {code.Value && !code.Recovery && (
             <>
               <div className="qr-code p-4 bg-white w-[260px] m-auto rounded">
@@ -116,11 +116,11 @@ const Enable2FA = () => {
 
               <div className="space-y-3 mt-6">
                 <div>
-                  <label className="text-[10px] text-white/50 uppercase block mb-1">Password</label>
+                  <label className="label">Password</label>
                   <div className="relative">
-                    <Lock className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/40" />
+                    <Lock className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#a3a3a3]" />
                     <Input
-                      className="h-7 pl-8 text-[12px] border-[#1e2433] bg-transparent"
+                      className="h-7 pl-8 text-[12px] border-[#e7e3d7] bg-transparent"
                       type="password"
                       placeholder="Your account password"
                       value={inputs["password"]}
@@ -128,15 +128,15 @@ const Enable2FA = () => {
                       onChange={HandleInputChange}
                     />
                   </div>
-                  {errors["password"] && <p className="text-[11px] text-red-400 mt-1">{errors["password"]}</p>}
+                  {errors["password"] && <p className="text-[11px] text-[#dc2626] mt-1">{errors["password"]}</p>}
                 </div>
 
                 <div>
-                  <label className="text-[10px] text-white/50 uppercase block mb-1">Authenticator Code</label>
+                  <label className="label">Authenticator Code</label>
                   <div className="relative">
-                    <KeyRound className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/40" />
+                    <KeyRound className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#a3a3a3]" />
                     <Input
-                      className="h-7 pl-8 text-[12px] border-[#1e2433] bg-transparent"
+                      className="h-7 pl-8 text-[12px] border-[#e7e3d7] bg-transparent"
                       type="text"
                       placeholder="6-digit code"
                       value={inputs["digits"]}
@@ -144,26 +144,26 @@ const Enable2FA = () => {
                       onChange={HandleInputChange}
                     />
                   </div>
-                  {errors["digits"] && <p className="text-[11px] text-red-400 mt-1">{errors["digits"]}</p>}
+                  {errors["digits"] && <p className="text-[11px] text-[#dc2626] mt-1">{errors["digits"]}</p>}
                 </div>
 
                 <Button
-                  className="w-full text-white bg-emerald-600 hover:bg-emerald-500 h-7 text-[11px]"
+                  className="btn btn-primary btn-sm btn-block"
                   onClick={HandleSubmit}
                 >
                   Confirm
                 </Button>
 
-                <div className="pt-3 border-t border-[#1e2433]">
-                  <p className="text-[11px] text-white/50 mb-2">
+                <div className="pt-3 border-t border-[#e7e3d7]">
+                  <p className="text-[11px] text-[#525252] mb-2">
                     Have a recovery code? Enter it below to replace existing 2FA.
                   </p>
                   <div>
-                    <label className="text-[10px] text-white/50 uppercase block mb-1">Recovery Code</label>
+                    <label className="label">Recovery Code</label>
                     <div className="relative">
-                      <KeyRound className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/40" />
+                      <KeyRound className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#a3a3a3]" />
                       <Input
-                        className="h-7 pl-8 text-[12px] border-[#1e2433] bg-transparent"
+                        className="h-7 pl-8 text-[12px] border-[#e7e3d7] bg-transparent"
                         type="text"
                         placeholder="Recovery Code"
                         value={inputs["recovery"]}
@@ -179,11 +179,11 @@ const Enable2FA = () => {
 
           {code.Recovery && (
             <div className="flex flex-col w-full">
-              <span className="text-[11px] text-white/50 font-medium uppercase tracking-wider mb-3">Recovery Codes</span>
-              <div className="py-3 px-4 rounded bg-red-500/5 border border-red-500/15 mb-3">
-                <p className="text-[11px] text-red-400/80">DO NOT STORE THESE CODES WITH YOUR PASSWORD</p>
+              <span className="label-section">Recovery Codes</span>
+              <div className="alert alert-danger mb-3">
+                <p className="text-[11px] text-[#dc2626]">DO NOT STORE THESE CODES WITH YOUR PASSWORD</p>
               </div>
-              <code className="text-[13px] text-white/80 font-mono break-all">{code.Recovery}</code>
+              <code className="text-[13px] text-[#0a0a0a] font-mono break-all">{code.Recovery}</code>
             </div>
           )}
         </div>

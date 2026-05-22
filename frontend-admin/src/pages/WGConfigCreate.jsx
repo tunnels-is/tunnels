@@ -3,14 +3,14 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, Plus, Copy, Check } from 'lucide-react';
 import { apiPost } from '../api';
 
-const inputClass = "w-full bg-[#060810] border border-[#1e2433] rounded px-3 py-1.5 text-[13px] text-white placeholder-white/30 focus:outline-none focus:border-[#4B7BF5]/50";
+const inputClass = "w-full bg-[#fdfcf8] border border-[#e7e3d7] rounded px-3 py-1.5 text-[13px] text-[#0a0a0a] placeholder-[#a3a3a3] focus:outline-none focus:border-[#0a0a0a]";
 
 function Field({ label, hint, children }) {
   return (
     <div>
-      <label className="block text-[11px] text-white/40 uppercase tracking-wider mb-1">{label}</label>
+      <label className="block text-[11px] text-[#a3a3a3] uppercase tracking-wider mb-1">{label}</label>
       {children}
-      {hint && <p className="text-[11px] text-white/30 mt-1">{hint}</p>}
+      {hint && <p className="text-[11px] text-[#a3a3a3] mt-1">{hint}</p>}
     </div>
   );
 }
@@ -92,27 +92,27 @@ export default function WGConfigCreate() {
     return (
       <div className="max-w-2xl">
         <div className="flex items-center justify-between mb-6">
-          <button onClick={() => navigate('/wgconfig')} className="flex items-center gap-2 text-[12px] text-white/40 hover:text-white/70">
+          <button onClick={() => navigate('/wgconfig')} className="flex items-center gap-2 text-[12px] text-[#a3a3a3] hover:text-[#262626]">
             <ArrowLeft className="w-3.5 h-3.5" /> Back to WG Configs
           </button>
         </div>
 
-        <h1 className="text-[16px] font-semibold text-white mb-1">Config Created</h1>
-        <p className="text-[12px] text-amber-400 mb-4">Save the APIKey now — it will not be shown again.</p>
+        <h1 className="text-[16px] font-semibold text-[#0a0a0a] mb-1">Config Created</h1>
+        <p className="text-[12px] text-[#b45309] mb-4">Save the APIKey now — it will not be shown again.</p>
 
-        <div className="border border-[#1e2433] rounded-lg overflow-hidden mb-5">
+        <div className="border border-[#e7e3d7] rounded-lg overflow-hidden mb-5">
           {Object.entries(result).map(([k, v]) => (
-            <div key={k} className="flex items-start gap-4 px-4 py-2.5 border-b border-[#1e2433]/50">
-              <span className="text-[11px] text-white/40 uppercase tracking-wider w-36 shrink-0 pt-0.5">{k}</span>
-              <span className={`flex-1 font-mono text-[12px] break-all ${k === 'APIKey' ? 'text-amber-300' : 'text-white/70'}`}>
+            <div key={k} className="flex items-start gap-4 px-4 py-2.5 border-b border-[#e7e3d7]/50">
+              <span className="text-[11px] text-[#a3a3a3] uppercase tracking-wider w-36 shrink-0 pt-0.5">{k}</span>
+              <span className={`flex-1 font-mono text-[12px] break-all ${k === 'APIKey' ? 'text-[#b45309]' : 'text-[#262626]'}`}>
                 {String(v)}
               </span>
               {k === 'APIKey' && (
                 <button
                   onClick={copyAPIKey}
-                  className="flex items-center gap-1 px-2 py-1 text-[11px] rounded bg-white/[0.04] text-white/50 hover:text-white/80 shrink-0"
+                  className="flex items-center gap-1 px-2 py-1 text-[11px] rounded bg-black/[0.04] text-[#525252] hover:text-[#0a0a0a] shrink-0"
                 >
-                  {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                  {copied ? <Check className="w-3 h-3 text-[#15803d]" /> : <Copy className="w-3 h-3" />}
                   {copied ? 'Copied' : 'Copy'}
                 </button>
               )}
@@ -122,7 +122,7 @@ export default function WGConfigCreate() {
 
         <button
           onClick={() => navigate('/wgconfig')}
-          className="px-4 py-2 text-[13px] bg-[#4B7BF5]/10 text-[#4B7BF5] hover:bg-[#4B7BF5]/20 rounded"
+          className="px-4 py-2 text-[13px] bg-black/[0.05] text-[#0a0a0a] hover:bg-black/[0.08] rounded"
         >
           Done
         </button>
@@ -140,15 +140,15 @@ export default function WGConfigCreate() {
   return (
     <div className="max-w-2xl">
       <div className="flex items-center justify-between mb-6">
-        <button onClick={() => navigate('/wgconfig')} className="flex items-center gap-2 text-[12px] text-white/40 hover:text-white/70">
+        <button onClick={() => navigate('/wgconfig')} className="flex items-center gap-2 text-[12px] text-[#a3a3a3] hover:text-[#262626]">
           <ArrowLeft className="w-3.5 h-3.5" /> Back to WG Configs
         </button>
       </div>
 
-      <h1 className="text-[16px] font-semibold text-white mb-5">New WG Config</h1>
+      <h1 className="text-[16px] font-semibold text-[#0a0a0a] mb-5">New WG Config</h1>
 
       <form onSubmit={handleCreate} className="space-y-4">
-        <div className="border border-[#1e2433] rounded-lg p-5 space-y-4">
+        <div className="border border-[#e7e3d7] rounded-lg p-5 space-y-4">
           <div className="grid grid-cols-2 gap-x-5 gap-y-4">
             <Field label="Tag">
               <input type="text" className={inputClass} value={form.Tag} onChange={set('Tag')} required />
@@ -192,24 +192,24 @@ export default function WGConfigCreate() {
           </Field>
 
           <div className="flex gap-6 pt-1">
-            <label className="flex items-center gap-2 text-[12px] text-white/60 cursor-pointer">
-              <input type="checkbox" checked={form.PacketInspection} onChange={set('PacketInspection')} className="accent-[#4B7BF5]" />
+            <label className="flex items-center gap-2 text-[12px] text-[#525252] cursor-pointer">
+              <input type="checkbox" checked={form.PacketInspection} onChange={set('PacketInspection')} className="accent-[#1d4ed8]" />
               Packet Inspection
             </label>
-            <label className="flex items-center gap-2 text-[12px] text-white/60 cursor-pointer">
-              <input type="checkbox" checked={form.InsecureSkipVerify} onChange={set('InsecureSkipVerify')} className="accent-[#4B7BF5]" />
+            <label className="flex items-center gap-2 text-[12px] text-[#525252] cursor-pointer">
+              <input type="checkbox" checked={form.InsecureSkipVerify} onChange={set('InsecureSkipVerify')} className="accent-[#1d4ed8]" />
               Insecure Skip Verify
             </label>
           </div>
         </div>
 
-        {error && <p className="text-[12px] text-red-400">{error}</p>}
+        {error && <p className="text-[12px] text-[#dc2626]">{error}</p>}
 
         <div className="flex gap-2">
-          <button type="button" onClick={() => navigate('/wgconfig')} className="px-3 py-1.5 text-[12px] text-white/50 hover:text-white/80">
+          <button type="button" onClick={() => navigate('/wgconfig')} className="px-3 py-1.5 text-[12px] text-[#525252] hover:text-[#0a0a0a]">
             Cancel
           </button>
-          <button type="submit" disabled={creating} className="flex items-center gap-2 px-4 py-1.5 text-[12px] bg-[#4B7BF5] hover:bg-[#3d6de0] text-white rounded disabled:opacity-50">
+          <button type="submit" disabled={creating} className="flex items-center gap-2 px-4 py-1.5 text-[12px] bg-[#0a0a0a] hover:bg-[#262626] text-white rounded disabled:opacity-50">
             <Plus className="w-3.5 h-3.5" />
             {creating ? 'Creating…' : 'Create Config'}
           </button>

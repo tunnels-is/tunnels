@@ -48,15 +48,15 @@ export default function WGConfig() {
   return (
     <div>
       <div className="flex items-center justify-between mb-5">
-        <h1 className="text-[16px] font-semibold text-white">WireGuard Configs</h1>
+        <h1 className="text-[16px] font-semibold text-[#0a0a0a]">WireGuard Configs</h1>
         <div className="flex gap-2">
-          <button onClick={load} disabled={loading} className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[12px] text-white/60 hover:text-white/80 hover:bg-white/[0.04] transition-colors">
+          <button onClick={load} disabled={loading} className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[12px] text-[#525252] hover:text-[#0a0a0a] hover:bg-black/[0.04] transition-colors">
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </button>
           <button
             onClick={() => navigate('/wgconfig/create', { state: { networks } })}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[12px] bg-[#4B7BF5]/10 text-[#4B7BF5] hover:bg-[#4B7BF5]/20 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[12px] bg-black/[0.05] text-[#0a0a0a] hover:bg-black/[0.08] transition-colors"
           >
             <Plus className="w-3.5 h-3.5" />
             Add Config
@@ -64,29 +64,29 @@ export default function WGConfig() {
         </div>
       </div>
 
-      {error && <p className="text-[12px] text-red-400 mb-3">{error}</p>}
+      {error && <p className="text-[12px] text-[#dc2626] mb-3">{error}</p>}
 
-      <div className="border border-[#1e2433] rounded-lg overflow-hidden">
-        <div className="grid grid-cols-[1fr_160px_80px_160px] gap-4 px-4 py-2 border-b border-[#1e2433] bg-[#0a0d14]">
+      <div className="border border-[#e7e3d7] rounded-lg overflow-hidden">
+        <div className="grid grid-cols-[1fr_160px_80px_160px] gap-4 px-4 py-2 border-b border-[#e7e3d7] bg-[#ffffff]">
           {['Tag', 'Network (CIDR)', 'WG Port', 'Interfaces'].map((h) => (
-            <span key={h} className="text-[10px] text-white/40 uppercase tracking-wider">{h}</span>
+            <span key={h} className="text-[10px] text-[#a3a3a3] uppercase tracking-wider">{h}</span>
           ))}
         </div>
 
         {configs.length === 0 && !loading && (
-          <div className="px-4 py-6 text-[12px] text-white/40">No configs found</div>
+          <div className="px-4 py-6 text-[12px] text-[#a3a3a3]">No configs found</div>
         )}
 
         {configs.map((c) => (
           <div
             key={c._id}
             onClick={() => navigate(`/wgconfig/${c._id}`, { state: { config: c, networks } })}
-            className="grid grid-cols-[1fr_160px_80px_160px] gap-4 px-4 py-2.5 border-b border-[#1e2433]/50 hover:bg-white/[0.03] cursor-pointer items-center"
+            className="grid grid-cols-[1fr_160px_80px_160px] gap-4 px-4 py-2.5 border-b border-[#e7e3d7]/50 hover:bg-black/[0.03] cursor-pointer items-center"
           >
-            <span className="text-[13px] text-white/80 truncate">{c.Tag}</span>
-            <span className="text-[12px] text-white/60 font-mono truncate">{networkCIDR(c.NetworkID)}</span>
-            <span className="text-[12px] text-white/50">{c.WireGuardPort || '—'}</span>
-            <span className="text-[11px] text-white/40 truncate">{c.WireGuardIface || '—'} / {c.InternetIface || '—'}</span>
+            <span className="text-[13px] text-[#0a0a0a] truncate">{c.Tag}</span>
+            <span className="text-[12px] text-[#525252] font-mono truncate">{networkCIDR(c.NetworkID)}</span>
+            <span className="text-[12px] text-[#525252]">{c.WireGuardPort || '—'}</span>
+            <span className="text-[11px] text-[#a3a3a3] truncate">{c.WireGuardIface || '—'} / {c.InternetIface || '—'}</span>
           </div>
         ))}
       </div>

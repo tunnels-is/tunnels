@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import GLOBAL_STATE from "../state";
 import dayjs from "dayjs";
-import { Monitor, Network, Plus, Trash2, X } from "lucide-react";
+import { Monitor, Network, Trash2, X } from "lucide-react";
 import QRCode from "react-qr-code";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -106,33 +106,36 @@ const UserDevices = () => {
 
   return (
     <div>
-      <div className="flex justify-end mb-3">
+      <div className="flex items-center gap-3 mb-3">
         {!showCreate && (
           <Button
-            className="h-7 text-[11px] text-white bg-[#4B7BF5] hover:bg-[#5d8af7] flex items-center gap-1.5"
+            className="btn btn-primary btn-xs"
             onClick={handleOpenCreate}
           >
-            <Plus className="w-3.5 h-3.5" />
-            New Device
+            Create
           </Button>
         )}
+        <div className="flex items-baseline gap-2">
+          <span className="label-section !mb-0">Devices</span>
+          <span className="text-[10px] font-mono tabular-nums text-[#a3a3a3]">{devices.length}</span>
+        </div>
       </div>
 
       {showCreate && (
-        <div className="mb-4 rounded-lg bg-[#0a0d14]/80 border border-[#1e2433] p-4">
+        <div className="mb-4 rounded-lg bg-[#ffffff]/80 border border-[#e7e3d7] p-4 card-shadow">
           {!wgConfig ? (
             <>
               <div className="flex items-center justify-between mb-3">
-                <span className="text-[11px] text-white/50 uppercase tracking-wider">New Device</span>
-                <button onClick={() => setShowCreate(false)} className="text-white/30 hover:text-white/60">
+                <span className="label-section">New Device</span>
+                <button onClick={() => setShowCreate(false)} className="text-[#a3a3a3] hover:text-[#525252]">
                   <X className="w-4 h-4" />
                 </button>
               </div>
               <div className="space-y-3">
                 <div>
-                  <label className="text-[10px] text-white/50 uppercase block mb-1">Tag</label>
+                  <label className="label">Tag</label>
                   <Input
-                    className="h-7 text-[12px] border-[#1e2433] bg-transparent"
+                    className="h-7 text-[12px] border-[#e7e3d7] bg-transparent"
                     type="text"
                     placeholder="e.g. my-laptop"
                     value={tag}
@@ -140,9 +143,9 @@ const UserDevices = () => {
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] text-white/50 uppercase block mb-1">Server</label>
+                  <label className="label">Server</label>
                   <select
-                    className="w-full h-7 text-[12px] bg-[#0a0d14] border border-[#1e2433] rounded-md px-2 text-white/80"
+                    className="w-full h-7 text-[12px] bg-[#ffffff] border border-[#e7e3d7] rounded-md px-2 text-[#0a0a0a]"
                     value={selectedServerID}
                     onChange={(e) => setSelectedServerID(e.target.value)}
                   >
@@ -153,7 +156,7 @@ const UserDevices = () => {
                   </select>
                 </div>
                 <Button
-                  className="w-full h-7 text-[11px] text-white bg-emerald-600 hover:bg-emerald-500"
+                  className="btn btn-primary btn-sm btn-block"
                   onClick={handleSubmit}
                   disabled={submitting}
                 >
@@ -163,8 +166,8 @@ const UserDevices = () => {
             </>
           ) : (
             <>
-              <div className="py-2 px-3 rounded bg-amber-500/5 border border-amber-500/20 mb-3">
-                <p className="text-[11px] text-amber-400/80">Save this config — it cannot be shown again</p>
+              <div className="alert alert-warning mb-3">
+                <p className="text-[11px] text-[#b45309]">Save this config — it cannot be shown again</p>
               </div>
               <div className="flex justify-center mb-3">
                 <div className="p-4 bg-white rounded w-[220px]">
@@ -177,13 +180,13 @@ const UserDevices = () => {
               </div>
               <div className="flex gap-2">
                 <Button
-                  className="flex-1 h-7 text-[11px] text-white bg-[#4B7BF5] hover:bg-[#5d8af7]"
+                  className="btn btn-primary btn-sm flex-1"
                   onClick={handleDownload}
                 >
                   Download .conf
                 </Button>
                 <Button
-                  className="flex-1 h-7 text-[11px] text-white bg-emerald-600 hover:bg-emerald-500"
+                  className="btn btn-primary btn-sm flex-1"
                   onClick={handleDone}
                 >
                   Done
@@ -202,15 +205,15 @@ const UserDevices = () => {
             return (
               <div
                 key={d._id}
-                className={`relative flex flex-col gap-3 rounded-lg bg-[#0a0d14]/80 border p-4 transition-colors ${
+                className={`relative flex flex-col gap-3 rounded-lg bg-[#ffffff]/80 border p-4 card-shadow card-shadow-hover ${
                   isCurrent
-                    ? "border-emerald-500/30 hover:border-emerald-500/60"
-                    : "border-[#1e2433] hover:border-[#4B7BF5]/40"
+                    ? "border-[#15803d]/30 hover:border-[#15803d]/60"
+                    : "border-[#e7e3d7] hover:border-[#1d4ed8]/40"
                 }`}
               >
                 {/* delete button — top-right corner */}
                 <button
-                  className="absolute top-3 right-3 p-1 text-red-500/30 hover:text-red-400 transition-colors"
+                  className="absolute top-3 right-3 btn-icon btn-icon-danger"
                   onClick={() => handleDelete(d)}
                   aria-label={`Delete device ${d.Tag}`}
                 >
@@ -220,13 +223,13 @@ const UserDevices = () => {
                 {/* top row: icon + tag + badge */}
                 <div className="flex items-center gap-2 pr-6 min-w-0">
                   <Monitor
-                    className={`w-4 h-4 shrink-0 ${isCurrent ? "text-emerald-500/70" : "text-[#4B7BF5]/60"}`}
+                    className={`w-4 h-4 shrink-0 ${isCurrent ? "text-[#15803d]/70" : "text-[#1d4ed8]/60"}`}
                   />
-                  <span className="text-[13px] text-white/80 font-medium truncate flex-1 min-w-0">
+                  <span className="text-[13px] text-[#0a0a0a] font-medium truncate flex-1 min-w-0">
                     {d.Tag}
                   </span>
                   {isCurrent && (
-                    <span className="shrink-0 text-[10px] text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded">
+                    <span className="tag tag-sm tag-success shrink-0">
                       this device
                     </span>
                   )}
@@ -234,14 +237,14 @@ const UserDevices = () => {
 
                 {/* middle row: WireGuard IP */}
                 <div className="flex items-center gap-1.5 min-w-0">
-                  <Network className="w-3 h-3 shrink-0 text-white/20" />
-                  <span className="text-[12px] text-white/50 font-mono truncate">
+                  <Network className="w-3 h-3 shrink-0 text-[#d5d0c0]" />
+                  <span className="text-[12px] text-[#525252] font-mono truncate">
                     {d.WireGuardIP || "—"}
                   </span>
                 </div>
 
                 {/* bottom row: created date */}
-                <div className="text-[11px] text-white/30 tabular-nums">
+                <div className="text-[11px] text-[#a3a3a3] tabular-nums">
                   {d.CreatedAt ? dayjs(d.CreatedAt).format("HH:mm:ss DD-MM-YYYY") : "—"}
                 </div>
               </div>
@@ -249,8 +252,8 @@ const UserDevices = () => {
           })}
         </div>
       ) : (
-        <div className="rounded-lg bg-[#0a0d14]/80 border border-[#1e2433] p-8 flex items-center justify-center">
-          <span className="text-[12px] text-white/30">No devices found</span>
+        <div className="rounded-lg bg-[#ffffff]/80 border border-[#e7e3d7] p-8 flex items-center justify-center card-shadow">
+          <span className="text-[12px] text-[#a3a3a3]">No devices found</span>
         </div>
       )}
     </div>

@@ -54,45 +54,52 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-[#060810] flex items-center justify-center">
+    <div className="min-h-screen bg-[#fdfcf8] flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
-        <div className="mb-8 text-center">
-          <h1 className="text-xl font-semibold text-white">Tunnels Admin</h1>
-          <p className="text-[13px] text-white/40 mt-1">Sign in with an admin account</p>
+        <div className="mb-10 text-center">
+          <div className="inline-flex items-center gap-1 mb-2">
+            <span className="text-[18px] font-semibold tracking-tight text-[#0a0a0a]">Tunnels Admin</span>
+            <span className="w-1 h-1 rounded-full bg-[#0a0a0a]" />
+          </div>
+          <p className="text-[13px] text-[#525252]">Sign in with an admin account</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-3">
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div>
+            <label className="text-[10px] text-[#737373] uppercase tracking-[0.12em] block mb-1.5">Email</label>
             <input
               type="text"
-              placeholder="Email"
+              placeholder="you@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full bg-[#0a0d14] border border-[#1e2433] rounded-md px-3 py-2 text-[13px] text-white placeholder-white/30 focus:outline-none focus:border-[#4B7BF5]/60"
+              className="w-full bg-white border border-[#e7e3d7] rounded-md px-3 py-2 text-[13px] text-[#0a0a0a] placeholder-[#a3a3a3] focus:outline-none focus:border-[#0a0a0a] transition-colors"
               autoComplete="username"
               required
             />
           </div>
           <div>
+            <label className="text-[10px] text-[#737373] uppercase tracking-[0.12em] block mb-1.5">Password</label>
             <input
               type="password"
-              placeholder="Password"
+              placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-[#0a0d14] border border-[#1e2433] rounded-md px-3 py-2 text-[13px] text-white placeholder-white/30 focus:outline-none focus:border-[#4B7BF5]/60"
+              className="w-full bg-white border border-[#e7e3d7] rounded-md px-3 py-2 text-[13px] text-[#0a0a0a] placeholder-[#a3a3a3] focus:outline-none focus:border-[#0a0a0a] transition-colors"
               autoComplete="current-password"
               required
             />
           </div>
 
           {error && (
-            <p className="text-[12px] text-red-400">{error}</p>
+            <div className="py-2 px-3 rounded-md border border-[#dc2626]/25 bg-[#dc2626]/[0.04] text-[12px] text-[#b91c1c]">
+              {error}
+            </div>
           )}
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-[#4B7BF5] hover:bg-[#3d6de0] disabled:opacity-50 text-white text-[13px] font-medium rounded-md py-2 transition-colors"
+            className="w-full bg-[#0a0a0a] hover:bg-[#262626] disabled:opacity-50 text-white text-[13px] font-medium rounded-md py-2.5 transition-colors"
           >
             {loading ? 'Signing in...' : 'Sign in'}
           </button>

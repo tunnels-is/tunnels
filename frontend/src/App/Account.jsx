@@ -42,13 +42,13 @@ const Account = () => {
   return (
     <div>
       {/* ── Tab bar ── */}
-      <div className="flex items-center gap-5 py-3 px-4 rounded-lg bg-[#0a0d14]/80 border border-[#1e2433] mb-6">
+      <div className="flex items-center gap-5 py-3 px-4 rounded-lg bg-[#ffffff]/80 border border-[#e7e3d7] mb-6 card-shadow">
         <div className="flex gap-1">
           {tabs.map((t) => (
             <button
               key={t.key}
               className={`text-[11px] px-2.5 py-0.5 rounded transition-colors ${
-                tab === t.key ? "bg-white/[0.07] text-white/70" : "text-white/40 hover:text-white/60"
+                tab === t.key ? "bg-black/[0.05] text-[#0a0a0a]" : "text-[#a3a3a3] hover:text-[#525252]"
               }`}
               onClick={() => setTab(t.key)}
             >
@@ -72,9 +72,9 @@ const Account = () => {
             ]
               .filter(Boolean)
               .map((item, i) => (
-                <div key={i} className="flex items-baseline gap-3 py-1.5 pl-3 border-l-2 border-blue-500/20 hover:border-blue-500/50 transition-colors">
-                  <span className="text-[11px] text-white/45 shrink-0 w-[100px]">{item.label}</span>
-                  <code className="text-[13px] text-white/60 font-mono truncate">{item.value ?? "—"}</code>
+                <div key={i} className="flex items-baseline gap-3 py-1.5 pl-3 border-l-2 border-[#1d4ed8]/30 hover:border-[#1d4ed8]/60 transition-colors">
+                  <span className="label-caption shrink-0 w-[100px]">{item.label}</span>
+                  <code className="text-[13px] text-[#525252] font-mono truncate">{item.value ?? "—"}</code>
                 </div>
               ))}
           </div>
@@ -82,35 +82,35 @@ const Account = () => {
           <div className="flex flex-wrap gap-2">
             <Button
               variant="ghost"
-              className="h-7 px-2.5 text-[11px] text-white/40 hover:text-white/70 hover:bg-white/[0.04] border border-white/[0.06]"
+              className="btn btn-outline btn-sm"
               onClick={() => gotoAccountSelect()}
             >
               Switch Account
             </Button>
             <Button
               variant="ghost"
-              className="h-7 px-2.5 text-[11px] text-white/40 hover:text-white/70 hover:bg-white/[0.04] border border-white/[0.06]"
+              className="btn btn-outline btn-sm"
               onClick={() => state.refreshApiKey()}
             >
               <RefreshCw className="h-3 w-3 mr-1" /> Re-Generate API Key
             </Button>
             <Button
               variant="ghost"
-              className="h-7 px-2.5 text-[11px] text-white/40 hover:text-white/70 hover:bg-white/[0.04] border border-white/[0.06]"
+              className="btn btn-outline btn-sm"
               onClick={() => navigate("/twofactor/create")}
             >
               <Shield className="h-3 w-3 mr-1" /> Two-Factor Auth
             </Button>
             <Button
               variant="ghost"
-              className="h-7 px-2.5 text-[11px] text-red-400/60 hover:text-red-400 hover:bg-red-500/[0.04] border border-red-500/10"
+              className="btn btn-outline-danger btn-sm"
               onClick={() => state.LogoutAllTokens()}
             >
               <LogOut className="h-3 w-3 mr-1" /> Log Out All Devices
             </Button>
             <Button
               variant="ghost"
-              className="h-7 px-2.5 text-[11px] text-red-400/60 hover:text-red-400 hover:bg-red-500/[0.04] border border-red-500/10"
+              className="btn btn-outline-danger btn-sm"
               onClick={() => {
                 let t = state.User?.DeviceToken;
                 if (t?.DT) state.LogoutToken(t, false);
@@ -126,28 +126,28 @@ const Account = () => {
       {tab === "loggedin" && (
         <div>
           <div className="flex items-center gap-4 pl-3 border-l-2 border-transparent mb-1">
-            <span className="text-[10px] text-white/40 uppercase tracking-wider flex-1 min-w-0">Name</span>
-            <span className="text-[10px] text-white/40 uppercase tracking-wider shrink-0 w-36 text-right">Created</span>
+            <span className="label flex-1 min-w-0">Name</span>
+            <span className="label shrink-0 w-36 text-right">Created</span>
             <span className="shrink-0 w-16" />
           </div>
           <div className="space-y-px">
             {state.User?.Tokens?.length > 0 ? state.User.Tokens.map((t, i) => {
               const isCurrent = t.DT === state?.User?.DeviceToken?.DT;
               return (
-                <div key={i} className="group flex items-center gap-4 py-1.5 pl-3 border-l-2 border-cyan-500/20 hover:border-cyan-500/50 transition-colors">
+                <div key={i} className="group flex items-center gap-4 py-1.5 pl-3 border-l-2 border-[#1d4ed8]/30 hover:border-[#1d4ed8]/60 transition-colors">
                   <div className="flex-1 min-w-0">
-                    <span className="text-[13px] text-white/80 font-medium truncate block">
+                    <span className="text-[13px] text-[#0a0a0a] font-medium truncate block">
                       {t.N}{isCurrent ? " (current)" : ""}
                     </span>
                   </div>
-                  <span className="text-[11px] text-white/40 tabular-nums shrink-0 w-36 text-right">
+                  <span className="text-[11px] text-[#a3a3a3] tabular-nums shrink-0 w-36 text-right">
                     {t.Created ? dayjs(t.Created).format("HH:mm:ss DD-MM-YYYY") : "—"}
                   </span>
                   <div className="shrink-0 w-16 flex justify-end opacity-0 group-hover:opacity-100 transition-opacity">
                     <Button
                       variant="ghost"
                       onClick={() => state.LogoutToken(t, false)}
-                      className="h-6 px-2 text-red-500/60 hover:text-red-400 text-[11px] gap-1"
+                      className="btn btn-ghost-danger btn-xs"
                     >
                       <ExitIcon className="w-3 h-3" /> Logout
                     </Button>
@@ -155,7 +155,7 @@ const Account = () => {
                 </div>
               );
             }) : (
-              <div className="py-6 pl-3 border-l-2 border-white/[0.04] text-[12px] text-white/40">No active sessions</div>
+              <div className="py-6 pl-3 border-l-2 border-black/[0.04] text-[12px] text-[#a3a3a3]">No active sessions</div>
             )}
           </div>
         </div>
@@ -165,23 +165,23 @@ const Account = () => {
       {tab === "license" && (
         <div className="max-w-lg space-y-4">
           {state.User.Key?.Key && (
-            <div className="flex items-baseline gap-3 py-1.5 pl-3 border-l-2 border-amber-500/20">
-              <span className="text-[11px] text-white/45 shrink-0 w-[60px]">Current</span>
-              <code className="text-[13px] text-white/60 font-mono truncate">{state.User.Key.Key}</code>
+            <div className="flex items-baseline gap-3 py-1.5 pl-3 border-l-2 border-[#b45309]/30">
+              <span className="label-caption shrink-0 w-[60px]">Current</span>
+              <code className="text-[13px] text-[#525252] font-mono truncate">{state.User.Key.Key}</code>
             </div>
           )}
 
           <div className="space-y-2">
-            <label className="text-[10px] text-white/50 uppercase block">Activate License Key</label>
+            <label className="label !mb-0">Activate License Key</label>
             <div className="flex items-center gap-2">
               <Input
-                className="h-7 text-[12px] border-[#1e2433] bg-transparent flex-1"
+                className="h-7 text-[12px] border-[#e7e3d7] bg-transparent flex-1"
                 onChange={(e) => state.UpdateLicenseInput(e.target.value)}
                 placeholder="Insert License Key"
                 value={state.LicenseKey}
               />
               <Button
-                className="text-white bg-emerald-600 hover:bg-emerald-500 h-7 text-[11px] px-3"
+                className="btn btn-primary btn-sm"
                 onClick={() => state.ActivateLicense()}
               >
                 <Key className="h-3 w-3 mr-1" /> Activate

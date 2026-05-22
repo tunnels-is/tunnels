@@ -47,37 +47,37 @@ const Logs = () => {
   ];
 
   const getBorderClass = (line) => {
-    if (line.includes("| ERROR |")) return "border-red-500/30";
-    if (line.includes("| DEBUG |")) return "border-amber-500/20";
-    if (line.includes("| INFO  |")) return "border-blue-500/20";
-    if (line.includes("| ROUTINE |")) return "border-cyan-500/20";
-    return "border-white/[0.06]";
+    if (line.includes("| ERROR |")) return "border-[#dc2626]/30";
+    if (line.includes("| DEBUG |")) return "border-[#b45309]/30";
+    if (line.includes("| INFO  |")) return "border-[#1d4ed8]/20";
+    if (line.includes("| ROUTINE |")) return "border-[#1d4ed8]/20";
+    return "border-black/[0.06]";
   };
 
   const getTagClass = (line) => {
-    if (line.includes("| ERROR |")) return "text-red-400/80";
-    if (line.includes("| DEBUG |")) return "text-amber-400/60";
-    if (line.includes("| INFO  |")) return "text-blue-400/60";
-    if (line.includes("| ROUTINE |")) return "text-cyan-400/60";
-    return "text-white/50";
+    if (line.includes("| ERROR |")) return "text-[#dc2626]";
+    if (line.includes("| DEBUG |")) return "text-[#b45309]/60";
+    if (line.includes("| INFO  |")) return "text-[#1d4ed8]/60";
+    if (line.includes("| ROUTINE |")) return "text-[#1d4ed8]/70";
+    return "text-[#525252]";
   };
 
   return (
     <div className="flex flex-col h-[calc(100vh-60px)]">
       {/* Header bar */}
-      <div className="flex items-center gap-5 py-3 px-4 rounded-lg bg-[#0a0d14]/80 border border-[#1e2433] mb-4 shrink-0">
+      <div className="flex items-center gap-5 py-3 px-4 rounded-lg bg-[#ffffff]/80 border border-[#e7e3d7] mb-4 shrink-0 card-shadow">
         <div className="flex items-center gap-1.5">
           <div className="relative">
-            <Search className="h-3 w-3 absolute left-2 top-1/2 -translate-y-1/2 text-white/40" />
+            <Search className="h-3 w-3 absolute left-2 top-1/2 -translate-y-1/2 text-[#a3a3a3]" />
             <input
-              className="h-6 w-48 pl-7 pr-2 text-[11px] rounded bg-white/[0.03] border border-white/[0.06] text-white/60 placeholder:text-white/50 outline-none focus:border-white/25 transition-colors"
+              className="h-6 w-48 pl-7 pr-2 text-[11px] rounded bg-black/[0.03] border border-black/[0.06] text-[#525252] placeholder:text-[#a3a3a3] outline-none focus:border-black/25 transition-colors"
               placeholder="Filter logs..."
               value={filter}
               onChange={(e) => { setFilter(e.target.value); setPage(0); }}
             />
           </div>
           <button
-            className="p-1 text-white/40 hover:text-red-400/60 transition-colors"
+            className="btn-icon btn-icon-danger"
             onClick={() => { STORE.Cache.SetObject("logs", []); state.renderPage("logs"); }}
             title="Clear logs"
           >
@@ -86,17 +86,17 @@ const Logs = () => {
           {filteredLogs.length > PAGE_SIZE && (
             <div className="flex items-center gap-1">
               <button
-                className="p-0.5 text-white/40 hover:text-white/60 disabled:opacity-30 disabled:cursor-default transition-colors"
+                className="btn-icon btn-icon-xs"
                 disabled={safePage === 0}
                 onClick={() => setPage(safePage - 1)}
               >
                 <ChevronLeft className="h-3.5 w-3.5" />
               </button>
-              <span className="text-[10px] text-white/40 tabular-nums">
+              <span className="text-[10px] text-[#a3a3a3] tabular-nums">
                 {safePage + 1}/{totalPages}
               </span>
               <button
-                className="p-0.5 text-white/40 hover:text-white/60 disabled:opacity-30 disabled:cursor-default transition-colors"
+                className="btn-icon btn-icon-xs"
                 disabled={safePage >= totalPages - 1}
                 onClick={() => setPage(safePage + 1)}
               >
@@ -105,7 +105,7 @@ const Logs = () => {
             </div>
           )}
           {filteredLogs.length > 0 && (
-            <span className="text-[10px] text-white/40 tabular-nums">{filteredLogs.length}</span>
+            <span className="text-[10px] text-[#a3a3a3] tabular-nums">{filteredLogs.length}</span>
           )}
         </div>
 
@@ -115,8 +115,8 @@ const Logs = () => {
               key={t.key}
               className={`text-[11px] px-2.5 py-0.5 rounded transition-colors ${
                 tagFilter === t.key
-                  ? "bg-white/[0.07] text-white/70"
-                  : "text-white/40 hover:text-white/60"
+                  ? "bg-black/[0.05] text-[#0a0a0a]"
+                  : "text-[#a3a3a3] hover:text-[#525252]"
               }`}
               onClick={() => { setTagFilter(t.key); setPage(0); }}
             >
@@ -138,24 +138,24 @@ const Logs = () => {
           return (
             <div
               key={i}
-              className={`flex items-baseline gap-1.5 py-0 pl-3 border-l-2 ${getBorderClass(line)} hover:bg-white/[0.01] transition-colors`}
+              className={`flex items-baseline gap-1.5 py-0 pl-3 border-l-2 ${getBorderClass(line)} hover:bg-black/[0.01] transition-colors`}
             >
-              <span className="text-[10px] text-white/40 font-mono tabular-nums shrink-0">
+              <span className="text-[10px] text-[#a3a3a3] font-mono tabular-nums shrink-0">
                 {timestamp}
               </span>
               <span className={`text-[10px] font-medium uppercase shrink-0 w-[40px] ${getTagClass(line)}`}>
                 {tag?.trim()}
               </span>
-              <span className="text-[11px] text-emerald-400/40 font-mono shrink-0 max-w-[180px] truncate hidden lg:block">
+              <span className="text-[11px] text-[#15803d]/40 font-mono shrink-0 max-w-[180px] truncate hidden lg:block">
                 {func}
               </span>
-              <span className="text-[11px] text-white/80 font-mono min-w-0 truncate">
+              <span className="text-[11px] text-[#0a0a0a] font-mono min-w-0 truncate">
                 {message}
               </span>
             </div>
           );
         }) : (
-          <div className="py-6 pl-3 border-l-2 border-white/[0.04] text-[12px] text-white/40">
+          <div className="py-6 pl-3 border-l-2 border-black/[0.04] text-[12px] text-[#a3a3a3]">
             {filter || tagFilter ? "No matching logs" : "No logs"}
           </div>
         )}
