@@ -47,9 +47,9 @@ const ServerFormDialog = ({ open, onOpenChange, onSave }) => {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[480px] text-white bg-[#0a0d14] border-[#1e2433]">
+      <DialogContent className="sm:max-w-[480px] text-[#0a0a0a] bg-[#ffffff] border-[#e7e3d7]">
         <DialogHeader>
-          <DialogTitle className="text-lg font-bold text-white">
+          <DialogTitle className="text-lg font-bold text-[#0a0a0a]">
             New Server
           </DialogTitle>
         </DialogHeader>
@@ -58,31 +58,31 @@ const ServerFormDialog = ({ open, onOpenChange, onSave }) => {
           {/* Editable fields */}
           <div className="pt-3 grid grid-cols-2 gap-x-3 gap-y-3">
             <div>
-              <label className="text-[10px] text-white/50 uppercase block mb-1">Tag</label>
-              <Input className="h-7 text-[12px] border-[#1e2433] bg-transparent" value={form.Tag || ""} onChange={(e) => set("Tag", e.target.value)} />
+              <label className="label">Tag</label>
+              <Input className="h-7 text-[12px] border-[#e7e3d7] bg-transparent" value={form.Tag || ""} onChange={(e) => set("Tag", e.target.value)} />
             </div>
             <div>
-              <label className="text-[10px] text-white/50 uppercase block mb-1">Country</label>
-              <Input className="h-7 text-[12px] border-[#1e2433] bg-transparent" value={form.Country || ""} onChange={(e) => set("Country", e.target.value)} />
+              <label className="label">Country</label>
+              <Input className="h-7 text-[12px] border-[#e7e3d7] bg-transparent" value={form.Country || ""} onChange={(e) => set("Country", e.target.value)} />
             </div>
             <div>
-              <label className="text-[10px] text-white/50 uppercase block mb-1">IP</label>
-              <Input className="h-7 text-[12px] border-[#1e2433] bg-transparent" value={form.IP || ""} onChange={(e) => set("IP", e.target.value)} />
+              <label className="label">IP</label>
+              <Input className="h-7 text-[12px] border-[#e7e3d7] bg-transparent" value={form.IP || ""} onChange={(e) => set("IP", e.target.value)} />
             </div>
             <div>
-              <label className="text-[10px] text-white/50 uppercase block mb-1">Port</label>
-              <Input className="h-7 text-[12px] border-[#1e2433] bg-transparent" value={form.Port || ""} onChange={(e) => set("Port", e.target.value)} />
+              <label className="label">Port</label>
+              <Input className="h-7 text-[12px] border-[#e7e3d7] bg-transparent" value={form.Port || ""} onChange={(e) => set("Port", e.target.value)} />
             </div>
             <div>
-              <label className="text-[10px] text-white/50 uppercase block mb-1">Data Port</label>
-              <Input className="h-7 text-[12px] border-[#1e2433] bg-transparent" value={form.DataPort || ""} onChange={(e) => set("DataPort", e.target.value)} />
+              <label className="label">Data Port</label>
+              <Input className="h-7 text-[12px] border-[#e7e3d7] bg-transparent" value={form.DataPort || ""} onChange={(e) => set("DataPort", e.target.value)} />
             </div>
           </div>
 
           <div className="pt-3">
-            <label className="text-[10px] text-white/50 uppercase block mb-1">Public Key</label>
+            <label className="label">Public Key</label>
             <Textarea
-              className="text-[12px] border-[#1e2433] bg-transparent min-h-[60px] font-mono"
+              className="text-[12px] border-[#e7e3d7] bg-transparent min-h-[60px] font-mono"
               value={form.PubKey || ""}
               onChange={(e) => set("PubKey", e.target.value)}
             />
@@ -91,7 +91,7 @@ const ServerFormDialog = ({ open, onOpenChange, onSave }) => {
 
         <DialogFooter className="flex gap-2 mt-2">
           <Button
-            className="text-white bg-emerald-600 hover:bg-emerald-500 h-6 text-[11px] px-2.5"
+            className="btn btn-primary btn-xs"
             onClick={handleSave}
             disabled={saving}
           >
@@ -99,7 +99,7 @@ const ServerFormDialog = ({ open, onOpenChange, onSave }) => {
             {saving ? "Saving..." : "Save"}
           </Button>
           <button
-            className="text-[11px] text-white/50 hover:text-white/70 px-2"
+            className="text-[11px] text-[#525252] hover:text-[#0a0a0a] px-2"
             onClick={() => onOpenChange(false)}
           >
             Cancel

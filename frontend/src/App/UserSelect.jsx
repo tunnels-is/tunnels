@@ -50,13 +50,13 @@ const UserSelect = () => {
           <Card
             onClick={() => selectUser(u)}
             key={u._id}
-            className="hover:!border-emerald-500 rounded">
+            className="hover:!border-[#0a0a0a] rounded">
             <div className="flex items-center -mt-1 -mr-1">
               <SquareX
                 onClick={() => state.DelUser(u.SaveFileHash)}
                 className={'ml-auto' + state.Theme?.redIcon} />
             </div>
-            <CardContent className=" -mt-3 cursor-pointer flex flex-col p-4">
+            <CardContent className="-mt-3 cursor-pointer flex flex-col p-4">
               <InfoItem
                 label="Email"
                 value={u.Email}

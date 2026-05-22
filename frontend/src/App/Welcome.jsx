@@ -19,17 +19,17 @@ const Welcome = () => {
 
         {/* Resources */}
         <div>
-          <span className="text-[11px] text-white/50 font-medium uppercase tracking-wider block mb-3">Resources</span>
+          <span className="label-section">Resources</span>
           <div className="space-y-1">
             {resources.map((row, i) => (
               <div
                 key={i}
-                className="flex items-baseline gap-3 py-1.5 pl-3 border-l-2 border-cyan-500/20 hover:border-cyan-500/50 cursor-pointer transition-colors"
+                className="flex items-baseline gap-3 py-1.5 pl-3 border-l-2 border-[#1d4ed8]/30 hover:border-[#1d4ed8]/60 cursor-pointer transition-colors"
                 onClick={() => open(row.link)}
               >
-                <span className="text-[11px] text-white/45 shrink-0 w-[110px]">{row.label}</span>
-                <code className="text-[13px] text-white/60 font-mono truncate flex items-center gap-1.5">
-                  {row.value} <ExternalLink className="h-3 w-3 text-white/40" />
+                <span className="label-caption shrink-0 w-[110px]">{row.label}</span>
+                <code className="text-[13px] text-[#525252] font-mono truncate flex items-center gap-1.5">
+                  {row.value} <ExternalLink className="h-3 w-3 text-[#a3a3a3]" />
                 </code>
               </div>
             ))}
@@ -38,17 +38,17 @@ const Welcome = () => {
 
         {/* Community */}
         <div>
-          <span className="text-[11px] text-white/50 font-medium uppercase tracking-wider block mb-3">Community</span>
+          <span className="label-section">Community</span>
           <div className="space-y-1">
             {community.map((s, i) => (
               <div
                 key={i}
-                className="flex items-baseline gap-3 py-1.5 pl-3 border-l-2 border-violet-500/20 hover:border-violet-500/50 cursor-pointer transition-colors"
+                className="flex items-baseline gap-3 py-1.5 pl-3 border-l-2 border-[#525252]/30 hover:border-[#0a0a0a]/50 cursor-pointer transition-colors"
                 onClick={() => open(s.link)}
               >
-                <span className="text-[11px] text-white/45 shrink-0 w-[110px]">{s.name}</span>
-                <code className="text-[13px] text-white/60 font-mono truncate flex items-center gap-1.5">
-                  {s.link.replace(/^https?:\/\/(www\.)?/, "")} <ExternalLink className="h-3 w-3 text-white/40" />
+                <span className="label-caption shrink-0 w-[110px]">{s.name}</span>
+                <code className="text-[13px] text-[#525252] font-mono truncate flex items-center gap-1.5">
+                  {s.link.replace(/^https?:\/\/(www\.)?/, "")} <ExternalLink className="h-3 w-3 text-[#a3a3a3]" />
                 </code>
               </div>
             ))}
@@ -57,16 +57,16 @@ const Welcome = () => {
 
         {/* Contact */}
         <div>
-          <span className="text-[11px] text-white/50 font-medium uppercase tracking-wider block mb-3">Contact</span>
+          <span className="label-section">Contact</span>
           <div className="space-y-1">
             {contact.map((s, i) => (
               <div
                 key={i}
-                className="flex items-baseline gap-3 py-1.5 pl-3 border-l-2 border-emerald-500/20 hover:border-emerald-500/50 cursor-pointer transition-colors"
+                className="flex items-baseline gap-3 py-1.5 pl-3 border-l-2 border-[#15803d]/30 hover:border-[#15803d]/50 cursor-pointer transition-colors"
                 onClick={() => { window.location.href = `mailto:${s.link}`; }}
               >
-                <span className="text-[11px] text-white/45 shrink-0 w-[110px]">{s.name}</span>
-                <code className="text-[13px] text-white/60 font-mono truncate">{s.link}</code>
+                <span className="label-caption shrink-0 w-[110px]">{s.name}</span>
+                <code className="text-[13px] text-[#525252] font-mono truncate">{s.link}</code>
               </div>
             ))}
           </div>
