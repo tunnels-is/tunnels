@@ -53,7 +53,7 @@ func main() {
 	showVersion := false
 	flag.BoolVar(&showVersion, "version", false, "show version and exit")
 
-	configFlag := flag.Bool("config", false, "This command runs the server and creates a config + certificates")
+	configFlag := flag.String("config", "", "Generate a config + certificates. Empty value creates a full config (AUTH + WG), 'auth' enables only the AUTH feature, 'wg' enables only the VPN feature")
 	configPath := flag.String("configPath", "./config.json", "path to config file (supports .json, .yaml, .yml)")
 	jsonLogs := flag.Bool("json", true, "enable/disable json logging")
 	sourceInfo := flag.Bool("source", false, "disable source line information in logs")
@@ -75,9 +75,17 @@ func main() {
 		os.Exit(1)
 	}
 
-	if *configFlag {
-		logger.Info("generating config")
-		err := makeConfigAndCerts(*ipOverride)
+	configRequested := explicitFlags["config"]
+	configMode := strings.ToLower(strings.TrimSpace(*configFlag))
+	if configRequested {
+		switch configMode {
+		case "", "auth", "wg":
+		default:
+			logger.Error("invalid -config value (allowed: '', 'auth', 'wg')", "value", *configFlag)
+			os.Exit(1)
+		}
+		logger.Info("generating config", "mode", configMode)
+		err := makeConfigAndCerts(*ipOverride, configMode)
 		if err != nil {
 			logger.Error("unable to create certificates or config", "error", err)
 			os.Exit(1)
@@ -163,7 +171,7 @@ func main() {
 			go signal.NewSignal("SUBSCANNER", ctx, cancel, 12*time.Hour, goroutineLogger, scanSubs)
 		}
 
-		if *configFlag {
+		if configRequested {
 			firstNetwork, err := seedNetworks()
 			if err != nil {
 				logger.Error("unable to seed networks", slog.Any("err", err))
@@ -174,10 +182,12 @@ func main() {
 				logger.Error("unable to create admin user", slog.Any("err", err))
 				os.Exit(1)
 			}
-			err = initializeWGServer(firstNetwork)
-			if err != nil {
-				logger.Error("unable to initialize WG server", slog.Any("err", err))
-				os.Exit(1)
+			if configMode != "auth" {
+				err = initializeWGServer(firstNetwork)
+				if err != nil {
+					logger.Error("unable to initialize WG server", slog.Any("err", err))
+					os.Exit(1)
+				}
 			}
 		}
 		go signal.NewSignal("API", ctx, cancel, 1*time.Second, goroutineLogger, launchAPIServer)
@@ -380,7 +390,7 @@ func hashIdentifier(identifier string) (string, error) {
 	return string(h), nil
 }
 
-func makeConfigAndCerts(ipOverride string) (err error) {
+func makeConfigAndCerts(ipOverride string, mode string) (err error) {
 	ep, err := os.Executable()
 	if err != nil {
 		return err
@@ -400,14 +410,20 @@ func makeConfigAndCerts(ipOverride string) (err error) {
 		interfaceIP = IFIP.String()
 	}
 
+	var features []types.Feature
+	switch mode {
+	case "auth":
+		features = []types.Feature{types.AUTH, types.DNS}
+	case "wg":
+		features = []types.Feature{types.WG}
+	default:
+		features = []types.Feature{types.AUTH, types.DNS, types.WG}
+	}
+
 	err = LoadServerConfig(serverConfigPath)
 	if err != nil {
 		newConfig := &types.ServerConfig{
-			Features: []types.Feature{
-				types.AUTH,
-				types.DNS,
-				types.WG,
-			},
+			Features: features,
 			VPNIP:              interfaceIP,
 			APIIP:              interfaceIP,
 			APIPort:            "443",

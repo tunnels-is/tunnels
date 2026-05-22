@@ -193,6 +193,11 @@ type WGServerConfigResponse struct {
 	// ServerID is the UUID of the Server record linked to this config.
 	ServerID string `json:"ServerID"`
 
+	// ServerIP is the public IP of this wg-server, as recorded on the Server
+	// record. The wg-server uses it as the SNAT source for outbound traffic so
+	// peer egress shows up with the correct public address on multi-homed hosts.
+	ServerIP string `json:"ServerIP,omitempty"`
+
 	WireGuardPort    int    `json:"WireGuardPort"`
 	WireGuardSubnet  string `json:"WireGuardSubnet"`
 	WireGuardSubnet6 string `json:"WireGuardSubnet6,omitempty"`
