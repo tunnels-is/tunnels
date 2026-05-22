@@ -39,12 +39,20 @@ const Logs = () => {
   const paged = filteredLogs.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE);
 
   const tags = [
-    { key: "", label: "All" },
-    { key: "INFO", label: "Info" },
-    { key: "ERROR", label: "Error" },
-    { key: "DEBUG", label: "Debug" },
-    { key: "ROUTINE", label: "Routine" },
+    { key: "",        label: "All",     tone: "neutral" },
+    { key: "INFO",    label: "Info",    tone: "info" },
+    { key: "ERROR",   label: "Error",   tone: "danger" },
+    { key: "DEBUG",   label: "Debug",   tone: "warning" },
+    { key: "ROUTINE", label: "Routine", tone: "info" },
   ];
+
+  const activeTagClass = (tone) => ({
+    neutral: "bg-black/[0.05] text-[#0a0a0a]",
+    info:    "bg-[#1d4ed8]/10 text-[#1d4ed8] ring-1 ring-inset ring-[#1d4ed8]/25",
+    danger:  "bg-[#dc2626]/10 text-[#dc2626] ring-1 ring-inset ring-[#dc2626]/25",
+    warning: "bg-[#b45309]/10 text-[#b45309] ring-1 ring-inset ring-[#b45309]/25",
+    success: "bg-[#15803d]/10 text-[#15803d] ring-1 ring-inset ring-[#15803d]/25",
+  }[tone] || "bg-black/[0.05] text-[#0a0a0a]");
 
   const getBorderClass = (line) => {
     if (line.includes("| ERROR |")) return "border-[#dc2626]/30";
@@ -115,7 +123,7 @@ const Logs = () => {
               key={t.key}
               className={`text-[11px] px-2.5 py-0.5 rounded transition-colors ${
                 tagFilter === t.key
-                  ? "bg-black/[0.05] text-[#0a0a0a]"
+                  ? activeTagClass(t.tone)
                   : "text-[#a3a3a3] hover:text-[#525252]"
               }`}
               onClick={() => { setTagFilter(t.key); setPage(0); }}
