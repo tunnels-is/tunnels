@@ -4,13 +4,13 @@ import dayjs from 'dayjs';
 import { ArrowLeft, Pencil, Save, X, Trash2, Plus } from 'lucide-react';
 import { apiPost } from '../api';
 
-const inputClass = "w-full bg-[#060810] border border-[#1e2433] rounded px-3 py-1.5 text-[13px] text-white focus:outline-none focus:border-[#4B7BF5]/50";
+const inputClass = "w-full bg-[#fdfcf8] border border-[#e7e3d7] rounded px-3 py-1.5 text-[13px] text-[#0a0a0a] focus:outline-none focus:border-[#0a0a0a]";
 
 function Row({ label, children }) {
   return (
-    <div className="flex items-start gap-4 px-4 py-2.5 border-b border-[#1e2433]/50">
-      <span className="text-[11px] text-white/40 uppercase tracking-wider w-36 shrink-0 pt-0.5">{label}</span>
-      <div className="flex-1 text-[13px] text-white/80">{children}</div>
+    <div className="flex items-start gap-4 px-4 py-2.5 border-b border-[#e7e3d7]/50">
+      <span className="text-[11px] text-[#a3a3a3] uppercase tracking-wider w-36 shrink-0 pt-0.5">{label}</span>
+      <div className="flex-1 text-[13px] text-[#0a0a0a]">{children}</div>
     </div>
   );
 }
@@ -117,10 +117,10 @@ export default function GroupDetail() {
   if (!group) {
     return (
       <div>
-        <button onClick={() => navigate('/groups')} className="flex items-center gap-2 text-[12px] text-white/40 hover:text-white/70 mb-5">
+        <button onClick={() => navigate('/groups')} className="flex items-center gap-2 text-[12px] text-[#a3a3a3] hover:text-[#262626] mb-5">
           <ArrowLeft className="w-3.5 h-3.5" /> Back to Groups
         </button>
-        <p className="text-[13px] text-white/40">Loading...</p>
+        <p className="text-[13px] text-[#a3a3a3]">Loading...</p>
       </div>
     );
   }
@@ -129,34 +129,34 @@ export default function GroupDetail() {
     <div className="max-w-2xl">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
-        <button onClick={() => navigate('/groups')} className="flex items-center gap-2 text-[12px] text-white/40 hover:text-white/70">
+        <button onClick={() => navigate('/groups')} className="flex items-center gap-2 text-[12px] text-[#a3a3a3] hover:text-[#262626]">
           <ArrowLeft className="w-3.5 h-3.5" /> Back to Groups
         </button>
         <div className="flex gap-2">
           {editing ? (
             <>
-              {error && <span className="text-[12px] text-red-400 self-center">{error}</span>}
-              <button onClick={() => setEditing(false)} className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[12px] text-white/50 hover:text-white/80">
+              {error && <span className="text-[12px] text-[#dc2626] self-center">{error}</span>}
+              <button onClick={() => setEditing(false)} className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[12px] text-[#525252] hover:text-[#0a0a0a]">
                 <X className="w-3.5 h-3.5" /> Cancel
               </button>
-              <button onClick={handleSave} disabled={saving} className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[12px] bg-[#4B7BF5]/10 text-[#4B7BF5] hover:bg-[#4B7BF5]/20 disabled:opacity-50">
+              <button onClick={handleSave} disabled={saving} className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[12px] bg-black/[0.05] text-[#0a0a0a] hover:bg-black/[0.08] disabled:opacity-50">
                 <Save className="w-3.5 h-3.5" /> {saving ? 'Saving...' : 'Save'}
               </button>
             </>
           ) : (
-            <button onClick={startEdit} className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[12px] text-white/50 hover:text-white/80 hover:bg-white/[0.04]">
+            <button onClick={startEdit} className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[12px] text-[#525252] hover:text-[#0a0a0a] hover:bg-black/[0.04]">
               <Pencil className="w-3.5 h-3.5" /> Edit
             </button>
           )}
         </div>
       </div>
 
-      <h1 className="text-[16px] font-semibold text-white mb-4">{group.Tag}</h1>
+      <h1 className="text-[16px] font-semibold text-[#0a0a0a] mb-4">{group.Tag}</h1>
 
       {/* Info */}
-      <div className="border border-[#1e2433] rounded-lg overflow-hidden mb-6">
+      <div className="border border-[#e7e3d7] rounded-lg overflow-hidden mb-6">
         <Row label="ID">
-          <span className="font-mono text-[12px] text-white/50">{group._id}</span>
+          <span className="font-mono text-[12px] text-[#525252]">{group._id}</span>
         </Row>
         <Row label="Tag">
           {editing ? (
@@ -169,18 +169,18 @@ export default function GroupDetail() {
           {editing ? (
             <input className={inputClass} value={form.Description} onChange={set('Description')} />
           ) : (
-            <span className="text-white/50">{group.Description || '—'}</span>
+            <span className="text-[#525252]">{group.Description || '—'}</span>
           )}
         </Row>
         <Row label="Created">
-          <span className="font-mono text-[12px] text-white/50">
+          <span className="font-mono text-[12px] text-[#525252]">
             {group.CreatedAt ? dayjs(group.CreatedAt).format('DD-MM-YYYY HH:mm') : '—'}
           </span>
         </Row>
       </div>
 
       {/* Members */}
-      <h2 className="text-[14px] font-semibold text-white mb-3">Members</h2>
+      <h2 className="text-[14px] font-semibold text-[#0a0a0a] mb-3">Members</h2>
 
       {/* Tabs */}
       {(() => {
@@ -193,56 +193,56 @@ export default function GroupDetail() {
         const items = members[current.key];
 
         return (
-          <div className="border border-[#1e2433] rounded-lg overflow-hidden">
+          <div className="border border-[#e7e3d7] rounded-lg overflow-hidden">
             {/* Tab bar */}
-            <div className="flex border-b border-[#1e2433] bg-[#0a0d14]">
+            <div className="flex border-b border-[#e7e3d7] bg-[#ffffff]">
               {tabs.map((t) => (
                 <button
                   key={t.type}
                   onClick={() => setActiveTab(t.type)}
                   className={`px-4 py-2 text-[12px] transition-colors ${
                     activeTab === t.type
-                      ? 'text-[#4B7BF5] border-b-2 border-[#4B7BF5] -mb-px'
-                      : 'text-white/40 hover:text-white/60'
+                      ? 'text-[#1d4ed8] border-b-2 border-[#1d4ed8] -mb-px'
+                      : 'text-[#a3a3a3] hover:text-[#525252]'
                   }`}
                 >
                   {t.label}
-                  <span className="ml-1.5 text-[10px] text-white/25">{members[t.key].length}</span>
+                  <span className="ml-1.5 text-[10px] text-[#c4c4c4]">{members[t.key].length}</span>
                 </button>
               ))}
             </div>
 
             {/* Add member */}
-            <div className="px-4 py-3 border-b border-[#1e2433]/50 bg-[#080b12]">
+            <div className="px-4 py-3 border-b border-[#e7e3d7]/50 bg-[#f4f1e8]">
               <form onSubmit={handleAdd} className="flex gap-2">
                 <input
-                  className="flex-1 bg-[#060810] border border-[#1e2433] rounded px-3 py-1.5 text-[12px] text-white placeholder-white/30 focus:outline-none focus:border-[#4B7BF5]/50"
+                  className="flex-1 bg-white border border-[#e7e3d7] rounded px-3 py-1.5 text-[12px] text-[#0a0a0a] placeholder-[#a3a3a3] focus:outline-none focus:border-[#0a0a0a]"
                   placeholder={`Add ${current.label.toLowerCase().slice(0, -1)} by ID`}
                   value={addForm.value}
                   onChange={(e) => setAddForm({ value: e.target.value })}
                 />
-                <button type="submit" className="flex items-center gap-1.5 px-3 py-1.5 bg-[#4B7BF5]/10 text-[#4B7BF5] rounded text-[12px] hover:bg-[#4B7BF5]/20">
+                <button type="submit" className="flex items-center gap-1.5 px-3 py-1.5 bg-[#0a0a0a] hover:bg-[#262626] text-white rounded text-[12px]">
                   <Plus className="w-3.5 h-3.5" /> Add
                 </button>
               </form>
-              {addError && <p className="text-[11px] text-red-400 mt-1.5">{addError}</p>}
+              {addError && <p className="text-[11px] text-[#dc2626] mt-1.5">{addError}</p>}
             </div>
 
             {/* List */}
             {items.length === 0 ? (
-              <div className="px-4 py-6 text-[12px] text-white/30 text-center">
+              <div className="px-4 py-6 text-[12px] text-[#a3a3a3] text-center">
                 No {current.label.toLowerCase()} in this group
               </div>
             ) : (
               items.map((m) => (
-                <div key={m._id} className="flex items-center justify-between px-4 py-2 border-b border-[#1e2433]/50 hover:bg-white/[0.02]">
+                <div key={m._id} className="flex items-center justify-between px-4 py-2 border-b border-[#e7e3d7]/50 hover:bg-black/[0.02]">
                   <div className="min-w-0">
-                    <span className="text-[13px] text-white/80">{m[current.nameKey] || m._id}</span>
-                    <span className="ml-3 font-mono text-[11px] text-white/30">{m._id}</span>
+                    <span className="text-[13px] text-[#0a0a0a]">{m[current.nameKey] || m._id}</span>
+                    <span className="ml-3 font-mono text-[11px] text-[#a3a3a3]">{m._id}</span>
                   </div>
                   <button
                     onClick={() => handleRemove(current.type, m._id)}
-                    className="p-1 rounded text-white/30 hover:text-red-400 hover:bg-red-400/10 transition-colors shrink-0"
+                    className="p-1 rounded text-[#a3a3a3] hover:text-[#dc2626] hover:bg-[#dc2626]/10 transition-colors shrink-0"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>

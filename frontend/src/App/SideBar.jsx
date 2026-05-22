@@ -9,7 +9,6 @@ import {
 } from "@radix-ui/react-icons";
 import { cn } from "@/lib/utils";
 import GLOBAL_STATE from "../state";
-import logoSvg from "../assets/images/fav/logo.svg";
 import { Logs, Network, Gauge, BarChart3, Monitor } from "lucide-react";
 import { UsersIcon } from "lucide-react";
 
@@ -80,15 +79,17 @@ const SideBar = () => {
 
   return (
     <div
-      className="group/sidebar fixed top-0 left-0 w-14 hover:w-[200px] h-screen bg-[#0a0d14] border-r border-[#1e2433] flex flex-col z-[2000] transition-all duration-200 overflow-hidden"
+      className="group/sidebar fixed top-0 left-0 w-14 hover:w-[200px] h-screen bg-[#ffffff] border-r border-[#e7e3d7] flex flex-col z-[2000] transition-all duration-200 overflow-hidden"
       id="sidebar"
     >
       {/* Brand */}
-      <div className="h-12 flex items-center px-[16px] border-b border-[#1e2433] shrink-0">
-        <img src={logoSvg} alt="Tunnels" className="w-6 h-6 shrink-0" />
-        <span className="ml-3 text-[13px] font-semibold text-white opacity-0 group-hover/sidebar:opacity-100 transition-opacity duration-200 whitespace-nowrap">
-          Tunnels
-        </span>
+      <div className="h-12 flex items-center px-[20px] border-b border-[#e7e3d7] shrink-0">
+        <div className="flex items-center gap-1 overflow-hidden">
+          <span className="text-[13px] font-semibold tracking-tight text-[#0a0a0a] opacity-0 group-hover/sidebar:opacity-100 transition-opacity duration-200 whitespace-nowrap">
+            Tunnels
+          </span>
+          <span className="w-1 h-1 rounded-full bg-[#0a0a0a] opacity-0 group-hover/sidebar:opacity-100 transition-opacity duration-200 shrink-0" />
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto py-3 space-y-3">
@@ -104,7 +105,7 @@ const SideBar = () => {
               <div key={g.title}>
                 {g.title && (
                   <div className="px-[20px] mb-1 overflow-hidden">
-                    <h2 className="text-[11px] font-semibold text-white/45 uppercase tracking-widest whitespace-nowrap opacity-0 group-hover/sidebar:opacity-100 transition-opacity duration-200">
+                    <h2 className="label-section whitespace-nowrap opacity-0 group-hover/sidebar:opacity-100 transition-opacity duration-200">
                       {g.title}
                     </h2>
                   </div>
@@ -132,16 +133,16 @@ const SideBar = () => {
                           }
                         }}
                         className={cn(
-                          "flex items-center w-full gap-3 px-[20px] py-1.5 rounded-md text-[13px] font-medium transition-colors overflow-hidden",
+                          "flex items-center w-full gap-3 px-[20px] py-1.5 text-[13px] font-medium transition-all overflow-hidden relative",
                           isActive
-                            ? "bg-[#4B7BF5]/10 text-[#4B7BF5]"
-                            : "text-white/50 hover:text-white/80 hover:bg-white/[0.03]"
+                            ? "bg-white text-[#0a0a0a] shadow-[inset_2px_0_0_#0a0a0a,0_1px_2px_rgba(10,10,10,0.04)]"
+                            : "text-[#525252] hover:text-[#0a0a0a] hover:bg-black/[0.03]"
                         )}
                       >
                         <i.icon
                           className={cn(
                             "shrink-0",
-                            isActive ? "text-[#4B7BF5]" : "text-white/40"
+                            isActive ? "text-[#0a0a0a]" : "text-[#a3a3a3]"
                           )}
                           width={16}
                           height={16}
@@ -161,13 +162,13 @@ const SideBar = () => {
 
       {
         user && user.Email && (
-          <div className="pb-2 pt-3 cursor-pointer shrink-0 border-t border-[#1e2433]" onClick={() => navigate("/account")}>
-            <div className="flex items-center px-[14px] py-1.5 rounded-md hover:bg-white/[0.03] transition-colors overflow-hidden">
-              <div className="w-7 h-7 rounded-full bg-[#4B7BF5]/15 flex items-center justify-center shrink-0">
-                <PersonIcon className="w-3.5 h-3.5 text-[#4B7BF5]" />
+          <div className="pb-2 pt-3 cursor-pointer shrink-0 border-t border-[#e7e3d7]" onClick={() => navigate("/account")}>
+            <div className="flex items-center px-[14px] py-1.5 rounded-md hover:bg-black/[0.03] transition-colors overflow-hidden">
+              <div className="w-7 h-7 rounded-full bg-black/[0.06] flex items-center justify-center shrink-0">
+                <PersonIcon className="w-3.5 h-3.5 text-[#0a0a0a]" />
               </div>
               <div className="flex-1 min-w-0 ml-2 opacity-0 group-hover/sidebar:opacity-100 transition-opacity duration-200">
-                <div className="text-xs font-medium text-white/70 truncate">
+                <div className="text-xs font-medium text-[#262626] truncate">
                   {user.Email}
                 </div>
               </div>
