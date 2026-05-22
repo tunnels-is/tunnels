@@ -1,9 +1,75 @@
 import React, { useEffect, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Save, Plus, Pencil, Trash2, Settings, Minus } from "lucide-react";
+import { Save, Plus, Pencil, Trash2, Minus, X } from "lucide-react";
 import GLOBAL_STATE from "../state";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+
+/* ─── Reusable building blocks ─────────────────────────────────────── */
+
+const SettingsCard = ({ title, description, actions, children, className = "" }) => (
+  <section
+    className={
+      "rounded-lg bg-white border border-[#e7e3d7] card-shadow p-5 " + className
+    }
+  >
+    <header className="flex items-start justify-between gap-3 mb-4">
+      <div>
+        <h3 className="text-[13px] font-semibold tracking-tight text-[#0a0a0a]">{title}</h3>
+        {description && (
+          <p className="mt-1 text-[11px] text-[#737373] leading-relaxed">{description}</p>
+        )}
+      </div>
+      {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
+    </header>
+    {children}
+  </section>
+);
+
+const TogglePill = ({ checked, label, onClick, tone = "active" }) => {
+  const activeClass = {
+    active: "pill pill-active",
+    warning: "pill pill-active-warning",
+    danger: "pill pill-active-danger",
+    success: "pill pill-active-success",
+  }[tone] || "pill pill-active";
+  return (
+    <button onClick={onClick} className={checked ? activeClass : "pill"}>
+      {label}
+    </button>
+  );
+};
+
+const ListRow = ({ enabled, onToggle, name, meta, onEdit, onDelete, last }) => (
+  <div
+    className={
+      "group flex items-center gap-3 px-3 py-2 " +
+      (last ? "" : "border-b border-[#e7e3d7]/70")
+    }
+  >
+    <button
+      onClick={(e) => { e.stopPropagation(); onToggle?.(); }}
+      className={(enabled ? "pill pill-active-success" : "pill") + " pill-sm shrink-0 min-w-[44px]"}
+      title={enabled ? "Click to disable" : "Click to enable"}
+    >
+      {enabled ? "ON" : "OFF"}
+    </button>
+    <div className="flex-1 min-w-0">
+      <div className="text-[13px] font-medium tracking-tight text-[#0a0a0a] truncate">{name}</div>
+      {meta && <div className="text-[11px] text-[#a3a3a3] font-mono truncate">{meta}</div>}
+    </div>
+    <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+      {onEdit && <button className="btn-icon" onClick={onEdit}><Pencil className="h-3 w-3" /></button>}
+      {onDelete && <button className="btn-icon btn-icon-danger" onClick={onDelete}><Trash2 className="h-3 w-3" /></button>}
+    </div>
+  </div>
+);
+
+const EmptyRow = ({ children }) => (
+  <div className="px-3 py-5 text-center text-[11px] italic text-[#a3a3a3]">{children}</div>
+);
+
+/* ─── DNS page ─────────────────────────────────────────────────────── */
 
 const DNS = () => {
   const state = GLOBAL_STATE("dns");
@@ -28,6 +94,17 @@ const DNS = () => {
   useEffect(() => {
     state.GetBackendState();
   }, []);
+
+  const saveServer = async () => {
+    state.Config = cfg;
+    let ok = await state.v2_ConfigSave();
+    if (ok) { setMod(false); setEditing(false); }
+  };
+  const cancelServer = () => {
+    setCfg({ ...state.Config });
+    setMod(false);
+    setEditing(false);
+  };
 
   let blockLists = state.Config?.DNSBlockLists;
   state.modifiedLists?.forEach((l) => {
@@ -67,260 +144,276 @@ const DNS = () => {
     setWhitelistModal(true);
   };
 
+  const toggleOpt = (key) => {
+    state.toggleConfigKeyAndSave("Config", key);
+    state.rerender();
+  };
+
   const options = [
-    { key: "DNSOverHTTPS", label: "Secure DNS", checked: state?.Config?.DNSOverHTTPS },
-    { key: "LogBlockedDomains", label: "Log Blocked", checked: state?.Config?.LogBlockedDomains },
-    { key: "LogAllDomains", label: "Log All", checked: state?.Config?.LogAllDomains },
-    { key: "DNSstats", label: "Stats", checked: state?.Config?.DNSstats },
-    { key: "DNSHTTPSAutomatic", label: "Dynamic Encryption", checked: state?.Config?.DNSHTTPSAutomatic },
+    { key: "DNSOverHTTPS",       label: "Secure DNS",         tone: "active" },
+    { key: "LogBlockedDomains",  label: "Log Blocked",        tone: "active" },
+    { key: "LogAllDomains",      label: "Log All",            tone: "warning" },
+    { key: "DNSstats",           label: "Stats",              tone: "active" },
+    { key: "DNSHTTPSAutomatic",  label: "Dynamic Encryption", tone: "active" },
   ];
 
   return (
-    <div>
+    <div className="max-w-5xl">
 
-      {/* ── Config banner ── */}
-      <div className="flex items-center gap-5 py-3 px-4 rounded-lg bg-[#0a0d14]/80 border border-[#1e2433] mb-6">
-        {!editing ? (
-          <>
-            <div>
-              <span className="text-[9px] text-white/35 uppercase tracking-widest block mb-0.5">Server</span>
-              <code className="text-[13px] text-white/80 font-mono">
-                {cfg.DNSServerIP || "0.0.0.0"}:{cfg.DNSServerPort || "53"}
-              </code>
-            </div>
-            <div className="w-px h-8 bg-white/[0.06]" />
-            <div>
-              <span className="text-[9px] text-white/35 uppercase tracking-widest block mb-0.5">Resolvers</span>
-              <div className="flex items-center gap-2">
-                <code className="text-[13px] text-white/80 font-mono">{cfg.DNS1Default || "—"}</code>
-                <span className="text-[11px] text-white/30">|</span>
-                <code className="text-[13px] text-white/80 font-mono">{cfg.DNS2Default || "—"}</code>
-              </div>
-            </div>
-            <button
-              className="ml-auto p-1.5 rounded text-white/40 hover:text-white/60 hover:bg-white/[0.04] transition-colors"
-              onClick={() => setEditing(true)}
-            >
-              <Settings className="h-3.5 w-3.5" />
-            </button>
-          </>
-        ) : (
-          <div className="flex-1">
-            <div className="grid grid-cols-4 gap-3">
-              <div>
-                <label className="text-[10px] text-white/50 uppercase block mb-1">Server IP</label>
-                <Input className="h-7 text-[12px] border-[#1e2433] bg-transparent" value={cfg.DNSServerIP || ""} onChange={(e) => updatecfg("DNSServerIP", e.target.value)} />
-              </div>
-              <div>
-                <label className="text-[10px] text-white/50 uppercase block mb-1">Port</label>
-                <Input className="h-7 text-[12px] border-[#1e2433] bg-transparent" value={cfg.DNSServerPort || ""} onChange={(e) => updatecfg("DNSServerPort", e.target.value)} />
-              </div>
-              <div>
-                <label className="text-[10px] text-white/50 uppercase block mb-1">Primary DNS</label>
-                <Input className="h-7 text-[12px] border-[#1e2433] bg-transparent" value={cfg.DNS1Default || ""} onChange={(e) => updatecfg("DNS1Default", e.target.value)} />
-              </div>
-              <div>
-                <label className="text-[10px] text-white/50 uppercase block mb-1">Backup DNS</label>
-                <Input className="h-7 text-[12px] border-[#1e2433] bg-transparent" value={cfg.DNS2Default || ""} onChange={(e) => updatecfg("DNS2Default", e.target.value)} />
-              </div>
-            </div>
-            <div className="flex gap-2 mt-2">
-              {mod && (
-                <Button
-                  className="text-white bg-emerald-600 hover:bg-emerald-500 h-6 text-[11px] px-2.5"
-                  onClick={async () => {
-                    state.Config = cfg;
-                    let ok = await state.v2_ConfigSave();
-                    if (ok) { setMod(false); setEditing(false); }
-                  }}
-                >
-                  <Save className="h-3 w-3 mr-1" /> Save
-                </Button>
-              )}
-              <button className="text-[11px] text-white/50 hover:text-white/70 px-2" onClick={() => { setCfg({ ...state.Config }); setMod(false); setEditing(false); }}>
-                Cancel
+      {/* Page header */}
+      <header className="mb-6 flex items-baseline justify-between gap-4">
+        <div>
+          <h1 className="text-[20px] font-semibold tracking-tight text-[#0a0a0a]">DNS</h1>
+          <p className="mt-1 text-[12px] text-[#737373]">
+            Local DNS resolver — records, block lists and upstream servers.
+          </p>
+        </div>
+        <div className="flex items-center gap-3 text-[11px] text-[#a3a3a3]">
+          <div className="flex items-baseline gap-1.5">
+            <span className="uppercase tracking-[0.1em] text-[9px] font-semibold">Records</span>
+            <code className="font-mono tabular-nums text-[#525252]">{records.length}</code>
+          </div>
+          <span className="w-px h-3 bg-[#e7e3d7]" />
+          <div className="flex items-baseline gap-1.5">
+            <span className="uppercase tracking-[0.1em] text-[9px] font-semibold">Block</span>
+            <code className="font-mono tabular-nums text-[#525252]">{blockLists.length}</code>
+          </div>
+          <span className="w-px h-3 bg-[#e7e3d7]" />
+          <div className="flex items-baseline gap-1.5">
+            <span className="uppercase tracking-[0.1em] text-[9px] font-semibold">White</span>
+            <code className="font-mono tabular-nums text-[#525252]">{whiteLists.length}</code>
+          </div>
+        </div>
+      </header>
+
+      {/* Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+        {/* ── DNS server ── */}
+        <SettingsCard
+          className="lg:col-span-2"
+          title="DNS server"
+          description="Address the resolver listens on and upstream fallback resolvers."
+          actions={
+            editing ? (
+              <>
+                {mod && (
+                  <Button onClick={saveServer} className="btn btn-primary btn-xs">
+                    <Save className="h-3 w-3" /> Save
+                  </Button>
+                )}
+                <button onClick={cancelServer} className="btn btn-ghost btn-xs">
+                  <X className="h-3 w-3" /> Cancel
+                </button>
+              </>
+            ) : (
+              <button onClick={() => setEditing(true)} className="btn btn-outline btn-xs">
+                <Pencil className="h-3 w-3" /> Edit
               </button>
+            )
+          }
+        >
+          {!editing ? (
+            <div className="flex flex-wrap items-start gap-x-8 gap-y-3">
+              <div>
+                <span className="block text-[10px] font-semibold uppercase tracking-[0.1em] text-[#a3a3a3] mb-1">
+                  Listening on
+                </span>
+                <code className="text-[13px] text-[#0a0a0a] font-mono">
+                  {cfg.DNSServerIP || "0.0.0.0"}<span className="text-[#a3a3a3]">:</span>{cfg.DNSServerPort || "53"}
+                </code>
+              </div>
+              <div>
+                <span className="block text-[10px] font-semibold uppercase tracking-[0.1em] text-[#a3a3a3] mb-1">
+                  Primary resolver
+                </span>
+                <code className="text-[13px] text-[#0a0a0a] font-mono">
+                  {cfg.DNS1Default || <span className="font-sans italic text-[#a3a3a3]">none</span>}
+                </code>
+              </div>
+              <div>
+                <span className="block text-[10px] font-semibold uppercase tracking-[0.1em] text-[#a3a3a3] mb-1">
+                  Backup resolver
+                </span>
+                <code className="text-[13px] text-[#0a0a0a] font-mono">
+                  {cfg.DNS2Default || <span className="font-sans italic text-[#a3a3a3]">none</span>}
+                </code>
+              </div>
             </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+              <div>
+                <label className="label">Server IP</label>
+                <Input className="h-8 text-[12px] border-[#e7e3d7] bg-white" value={cfg.DNSServerIP || ""} onChange={(e) => updatecfg("DNSServerIP", e.target.value)} />
+              </div>
+              <div>
+                <label className="label">Port</label>
+                <Input className="h-8 text-[12px] border-[#e7e3d7] bg-white" value={cfg.DNSServerPort || ""} onChange={(e) => updatecfg("DNSServerPort", e.target.value)} />
+              </div>
+              <div>
+                <label className="label">Primary DNS</label>
+                <Input className="h-8 text-[12px] border-[#e7e3d7] bg-white" value={cfg.DNS1Default || ""} onChange={(e) => updatecfg("DNS1Default", e.target.value)} />
+              </div>
+              <div>
+                <label className="label">Backup DNS</label>
+                <Input className="h-8 text-[12px] border-[#e7e3d7] bg-white" value={cfg.DNS2Default || ""} onChange={(e) => updatecfg("DNS2Default", e.target.value)} />
+              </div>
+            </div>
+          )}
+        </SettingsCard>
+
+        {/* ── Behaviour ── */}
+        <SettingsCard
+          className="lg:col-span-2"
+          title="Behaviour"
+          description="Encryption, logging and statistics for the resolver."
+        >
+          <div className="flex flex-wrap items-center gap-2">
+            {options.map((opt) => (
+              <TogglePill
+                key={opt.key}
+                checked={!!state?.Config?.[opt.key]}
+                tone={opt.tone}
+                label={opt.label}
+                onClick={() => toggleOpt(opt.key)}
+              />
+            ))}
           </div>
-        )}
-      </div>
+        </SettingsCard>
 
-      {/* ── Option pills ── */}
-      <div className="flex items-center gap-2 mb-8">
-        {options.map((opt) => (
-          <button
-            key={opt.key}
-            className={`text-[11px] px-3 py-1 rounded-full border transition-all cursor-pointer ${
-              opt.checked
-                ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.12)]"
-                : "border-white/[0.06] bg-white/[0.02] text-white/50 hover:text-white/70 hover:border-white/25 hover:bg-white/[0.04]"
-            }`}
-            onClick={() => { state.toggleConfigKeyAndSave("Config", opt.key); state.rerender(); }}
-          >
-            {opt.label}
-          </button>
-        ))}
-      </div>
-
-      {/* ── Sections ── */}
-      <div className="flex flex-wrap gap-8 mb-8">
-        {/* Records */}
-        <div className="min-w-[280px] flex-1">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-[11px] text-white/50 font-medium uppercase tracking-wider">Records</span>
-            <button className="flex items-center gap-1 text-[11px] text-emerald-400/60 hover:text-emerald-400 transition-colors" onClick={() => openRecord(null, false)}>
-              <Plus className="h-3 w-3" /> New
+        {/* ── Records ── */}
+        <SettingsCard
+          title="Records"
+          description="Locally resolved A and TXT records."
+          actions={
+            <button className="btn btn-primary btn-xs" onClick={() => openRecord(null, false)}>
+              Create
             </button>
-          </div>
-          <div className="space-y-1">
+          }
+        >
+          <div className="-mx-2">
             {records.length > 0 ? records.map((r, i) => (
-              <div key={i} className="group flex items-center gap-3 py-1.5 pl-3 border-l-2 border-cyan-500/20 hover:border-cyan-500/50 transition-colors">
-                <div className="flex-1 min-w-0">
-                  <div className="text-[13px] text-white/80 font-medium truncate">{r.Domain}</div>
-                  <div className="text-[11px] text-white/45 font-mono truncate">
-                    {r.IP?.join(", ")}{r.Wildcard ? " *" : ""}
-                  </div>
-                </div>
-                <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button className="p-1 text-white/40 hover:text-white/60" onClick={() => openRecord(r, true)}><Pencil className="h-3 w-3" /></button>
-                  <button className="p-1 text-red-500/25 hover:text-red-400" onClick={() => deleteRecord(r)}><Trash2 className="h-3 w-3" /></button>
-                </div>
-              </div>
-            )) : (
-              <div className="py-4 pl-3 border-l-2 border-white/[0.04] text-[12px] text-white/40">No records</div>
-            )}
+              <ListRow
+                key={i}
+                enabled
+                name={r.Domain + (r.Wildcard ? " *" : "")}
+                meta={r.IP?.join(", ")}
+                onEdit={() => openRecord(r, true)}
+                onDelete={() => deleteRecord(r)}
+                last={i === records.length - 1}
+              />
+            )) : <EmptyRow>No records configured</EmptyRow>}
           </div>
-        </div>
+        </SettingsCard>
 
-        {/* Block Lists */}
-        <div className="min-w-[280px] flex-1">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-[11px] text-white/50 font-medium uppercase tracking-wider">Block Lists</span>
-            <button className="flex items-center gap-1 text-[11px] text-emerald-400/60 hover:text-emerald-400 transition-colors" onClick={() => openBlocklist(null, false)}>
-              <Plus className="h-3 w-3" /> New
+        {/* ── Block Lists ── */}
+        <SettingsCard
+          title="Block lists"
+          description="External lists of domains that will be blocked."
+          actions={
+            <button className="btn btn-primary btn-xs" onClick={() => openBlocklist(null, false)}>
+              Create
             </button>
-          </div>
-          <div className="space-y-1">
+          }
+        >
+          <div className="-mx-2">
             {blockLists.length > 0 ? blockLists.map((bl, i) => (
-              <div key={i} className="group flex items-center gap-3 py-1.5 pl-3 border-l-2 border-amber-500/20 hover:border-amber-500/50 transition-colors">
-                <button
-                  className={`text-[10px] px-2 py-0.5 rounded-full border transition-all cursor-pointer shrink-0 ${
-                    bl.Enabled
-                      ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.12)]"
-                      : "border-white/[0.06] bg-white/[0.02] text-white/50 hover:text-white/70 hover:border-white/25 hover:bg-white/[0.04]"
-                  }`}
-                  onClick={(e) => { e.stopPropagation(); state.toggleBlocklist(bl); state.v2_ConfigSave(); }}
-                >{bl.Enabled ? "On" : "Off"}</button>
-                <div className="flex-1 min-w-0">
-                  <span className="text-[13px] text-white/80 font-medium">{bl.Tag}</span>
-                  <span className="text-[11px] text-white/40 ml-2">{bl.Count}</span>
-                </div>
-                <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button className="p-1 text-white/40 hover:text-white/60" onClick={() => openBlocklist(bl, true)}><Pencil className="h-3 w-3" /></button>
-                  <button className="p-1 text-red-500/25 hover:text-red-400" onClick={() => state.deleteBlocklist(bl)}><Trash2 className="h-3 w-3" /></button>
-                </div>
-              </div>
-            )) : (
-              <div className="py-4 pl-3 border-l-2 border-white/[0.04] text-[12px] text-white/40">No block lists</div>
-            )}
+              <ListRow
+                key={i}
+                enabled={bl.Enabled}
+                onToggle={() => { state.toggleBlocklist(bl); state.v2_ConfigSave(); }}
+                name={bl.Tag}
+                meta={`${bl.Count?.toLocaleString?.() ?? bl.Count} domains`}
+                onEdit={() => openBlocklist(bl, true)}
+                onDelete={() => state.deleteBlocklist(bl)}
+                last={i === blockLists.length - 1}
+              />
+            )) : <EmptyRow>No block lists configured</EmptyRow>}
           </div>
-        </div>
+        </SettingsCard>
 
-        {/* White Lists */}
-        <div className="min-w-[280px] flex-1">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-[11px] text-white/50 font-medium uppercase tracking-wider">White Lists</span>
-            <button className="flex items-center gap-1 text-[11px] text-emerald-400/60 hover:text-emerald-400 transition-colors" onClick={() => openWhitelist(null, false)}>
-              <Plus className="h-3 w-3" /> New
+        {/* ── White Lists ── */}
+        <SettingsCard
+          className="lg:col-span-2"
+          title="White lists"
+          description="Domains here always resolve, even if they appear on a block list."
+          actions={
+            <button className="btn btn-primary btn-xs" onClick={() => openWhitelist(null, false)}>
+              Create
             </button>
-          </div>
-          <div className="space-y-1">
+          }
+        >
+          <div className="-mx-2">
             {whiteLists.length > 0 ? whiteLists.map((wl, i) => (
-              <div key={i} className="group flex items-center gap-3 py-1.5 pl-3 border-l-2 border-emerald-500/20 hover:border-emerald-500/50 transition-colors">
-                <button
-                  className={`text-[10px] px-2 py-0.5 rounded-full border transition-all cursor-pointer shrink-0 ${
-                    wl.Enabled
-                      ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.12)]"
-                      : "border-white/[0.06] bg-white/[0.02] text-white/50 hover:text-white/70 hover:border-white/25 hover:bg-white/[0.04]"
-                  }`}
-                  onClick={(e) => { e.stopPropagation(); state.toggleWhitelist(wl); state.v2_ConfigSave(); }}
-                >{wl.Enabled ? "On" : "Off"}</button>
-                <div className="flex-1 min-w-0">
-                  <span className="text-[13px] text-white/80 font-medium">{wl.Tag}</span>
-                  <span className="text-[11px] text-white/40 ml-2">{wl.Count}</span>
-                </div>
-                <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button className="p-1 text-white/40 hover:text-white/60" onClick={() => openWhitelist(wl, true)}><Pencil className="h-3 w-3" /></button>
-                  <button className="p-1 text-red-500/25 hover:text-red-400" onClick={() => state.deleteWhitelist(wl)}><Trash2 className="h-3 w-3" /></button>
-                </div>
-              </div>
-            )) : (
-              <div className="py-4 pl-3 border-l-2 border-white/[0.04] text-[12px] text-white/40">No white lists</div>
-            )}
+              <ListRow
+                key={i}
+                enabled={wl.Enabled}
+                onToggle={() => { state.toggleWhitelist(wl); state.v2_ConfigSave(); }}
+                name={wl.Tag}
+                meta={`${wl.Count?.toLocaleString?.() ?? wl.Count} domains`}
+                onEdit={() => openWhitelist(wl, true)}
+                onDelete={() => state.deleteWhitelist(wl)}
+                last={i === whiteLists.length - 1}
+              />
+            )) : <EmptyRow>No white lists configured</EmptyRow>}
           </div>
-        </div>
+        </SettingsCard>
+
       </div>
 
       {/* ── DNS Record dialog ── */}
       <Dialog open={recordModal} onOpenChange={setRecordModal}>
-        <DialogContent className="sm:max-w-[480px] text-white bg-[#0a0d14] border-[#1e2433]">
+        <DialogContent className="sm:max-w-[480px] text-[#0a0a0a] bg-white border-[#e7e3d7]">
           {record && (
             <>
               <DialogHeader>
-                <DialogTitle className="text-lg font-bold text-white">
-                  {isRecordEdit ? "Edit DNS Record" : "New DNS Record"}
+                <DialogTitle className="text-lg font-semibold tracking-tight text-[#0a0a0a]">
+                  {isRecordEdit ? "Edit DNS record" : "New DNS record"}
                 </DialogTitle>
               </DialogHeader>
 
               <div className="space-y-3">
-                <div className="flex items-center gap-3">
+                <div className="flex items-end gap-3">
                   <div className="flex-1">
-                    <label className="text-[10px] text-white/50 uppercase block mb-1">Domain</label>
-                    <Input className="h-7 text-[12px] border-[#1e2433] bg-transparent" value={record.Domain || ""} onChange={(e) => { record.Domain = e.target.value; setRecord({ ...record }); }} />
+                    <label className="label">Domain</label>
+                    <Input className="h-9 text-[13px] border-[#e7e3d7] bg-white" value={record.Domain || ""} onChange={(e) => { record.Domain = e.target.value; setRecord({ ...record }); }} />
                   </div>
-                  <div className="pt-4">
-                    <button
-                      className={`text-[11px] px-3 py-1 rounded-full border transition-all cursor-pointer ${
-                        record.Wildcard
-                          ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.12)]"
-                          : "border-white/[0.06] bg-white/[0.02] text-white/50 hover:text-white/70 hover:border-white/25 hover:bg-white/[0.04]"
-                      }`}
-                      onClick={() => { record.Wildcard = !record.Wildcard; setRecord({ ...record }); }}
-                    >
-                      Wildcard
-                    </button>
-                  </div>
+                  <TogglePill
+                    checked={record.Wildcard}
+                    label="Wildcard"
+                    onClick={() => { record.Wildcard = !record.Wildcard; setRecord({ ...record }); }}
+                  />
                 </div>
 
                 <div>
-                  <label className="text-[10px] text-white/50 uppercase block mb-1">IP Addresses</label>
+                  <label className="label">IP addresses</label>
                   <div className="space-y-1">
                     {(record.IP || []).map((ip, i) => (
                       <div key={i} className="flex items-center gap-1">
-                        <Input className="flex-1 h-7 text-[12px] border-[#1e2433] bg-transparent" value={ip} onChange={(e) => { record.IP[i] = e.target.value; setRecord({ ...record }); }} />
-                        <button className="p-1 text-red-400/60 hover:text-red-400" onClick={() => { record.IP.splice(i, 1); setRecord({ ...record }); }}>
+                        <Input className="flex-1 h-8 text-[12px] border-[#e7e3d7] bg-white" value={ip} onChange={(e) => { record.IP[i] = e.target.value; setRecord({ ...record }); }} />
+                        <button className="btn-icon btn-icon-danger" onClick={() => { record.IP.splice(i, 1); setRecord({ ...record }); }}>
                           <Minus className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     ))}
-                    <button className="flex items-center gap-1 text-[11px] text-emerald-400/60 hover:text-emerald-400 mt-1" onClick={() => { record.IP = [...(record.IP || []), ""]; setRecord({ ...record }); }}>
+                    <button className="btn btn-ghost-success btn-xs" onClick={() => { record.IP = [...(record.IP || []), ""]; setRecord({ ...record }); }}>
                       <Plus className="w-3 h-3" /> Add IP
                     </button>
                   </div>
                 </div>
 
                 <div>
-                  <label className="text-[10px] text-white/50 uppercase block mb-1">TXT Records</label>
+                  <label className="label">TXT records</label>
                   <div className="space-y-1">
                     {(record.TXT || []).map((txt, i) => (
                       <div key={i} className="flex items-center gap-1">
-                        <Input className="flex-1 h-7 text-[12px] border-[#1e2433] bg-transparent" value={txt} onChange={(e) => { record.TXT[i] = e.target.value; setRecord({ ...record }); }} />
-                        <button className="p-1 text-red-400/60 hover:text-red-400" onClick={() => { record.TXT.splice(i, 1); setRecord({ ...record }); }}>
+                        <Input className="flex-1 h-8 text-[12px] border-[#e7e3d7] bg-white" value={txt} onChange={(e) => { record.TXT[i] = e.target.value; setRecord({ ...record }); }} />
+                        <button className="btn-icon btn-icon-danger" onClick={() => { record.TXT.splice(i, 1); setRecord({ ...record }); }}>
                           <Minus className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     ))}
-                    <button className="flex items-center gap-1 text-[11px] text-emerald-400/60 hover:text-emerald-400 mt-1" onClick={() => { record.TXT = [...(record.TXT || []), ""]; setRecord({ ...record }); }}>
+                    <button className="btn btn-ghost-success btn-xs" onClick={() => { record.TXT = [...(record.TXT || []), ""]; setRecord({ ...record }); }}>
                       <Plus className="w-3 h-3" /> Add TXT
                     </button>
                   </div>
@@ -328,14 +421,14 @@ const DNS = () => {
               </div>
 
               <DialogFooter className="flex gap-2 mt-2">
-                <Button className="text-white bg-emerald-600 hover:bg-emerald-500 h-6 text-[11px] px-2.5" onClick={async () => {
+                <Button className="btn btn-primary btn-sm" onClick={async () => {
                   if (!isRecordEdit) { if (!state.Config?.DNSRecords) state.Config.DNSRecords = []; state.Config.DNSRecords.push(record); }
                   let ok = await state.v2_ConfigSave();
                   if (ok) { setRecordModal(false); setIsRecordEdit(false); }
                 }}>
-                  <Save className="h-3 w-3 mr-1" /> Save
+                  <Save className="h-3 w-3" /> Save
                 </Button>
-                <button className="text-[11px] text-white/50 hover:text-white/70 px-2" onClick={() => setRecordModal(false)}>Cancel</button>
+                <button className="btn btn-ghost btn-sm" onClick={() => setRecordModal(false)}>Cancel</button>
               </DialogFooter>
             </>
           )}
@@ -344,47 +437,43 @@ const DNS = () => {
 
       {/* ── Blocklist dialog ── */}
       <Dialog open={blocklistModal} onOpenChange={setBlocklistModal}>
-        <DialogContent className="sm:max-w-[480px] text-white bg-[#0a0d14] border-[#1e2433]">
+        <DialogContent className="sm:max-w-[480px] text-[#0a0a0a] bg-white border-[#e7e3d7]">
           {blocklist && (
             <>
               <DialogHeader>
-                <DialogTitle className="text-lg font-bold text-white">
-                  {isBlocklistEdit ? "Edit Block List" : "New Block List"}
+                <DialogTitle className="text-lg font-semibold tracking-tight text-[#0a0a0a]">
+                  {isBlocklistEdit ? "Edit block list" : "New block list"}
                 </DialogTitle>
               </DialogHeader>
 
               <div className="space-y-3">
                 <div>
-                  <label className="text-[10px] text-white/50 uppercase block mb-1">Tag</label>
-                  <Input className="h-7 text-[12px] border-[#1e2433] bg-transparent" value={blocklist.Tag || ""} onChange={(e) => { blocklist.Tag = e.target.value; setBlocklist({ ...blocklist }); }} />
+                  <label className="label">Tag</label>
+                  <Input className="h-9 text-[13px] border-[#e7e3d7] bg-white" value={blocklist.Tag || ""} onChange={(e) => { blocklist.Tag = e.target.value; setBlocklist({ ...blocklist }); }} />
                 </div>
                 <div>
-                  <label className="text-[10px] text-white/50 uppercase block mb-1">URL</label>
-                  <Input className="h-7 text-[12px] border-[#1e2433] bg-transparent" value={blocklist.URL || ""} onChange={(e) => { blocklist.URL = e.target.value; setBlocklist({ ...blocklist }); }} />
+                  <label className="label">URL</label>
+                  <Input className="h-9 text-[13px] border-[#e7e3d7] bg-white" value={blocklist.URL || ""} onChange={(e) => { blocklist.URL = e.target.value; setBlocklist({ ...blocklist }); }} />
                 </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    className={`text-[11px] px-3 py-1 rounded-full border transition-all cursor-pointer ${
-                      blocklist.Enabled
-                        ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.12)]"
-                        : "border-white/[0.06] bg-white/[0.02] text-white/50 hover:text-white/70 hover:border-white/25 hover:bg-white/[0.04]"
-                    }`}
+                <div>
+                  <TogglePill
+                    checked={blocklist.Enabled}
+                    label="Enabled"
+                    tone="success"
                     onClick={() => { blocklist.Enabled = !blocklist.Enabled; setBlocklist({ ...blocklist }); }}
-                  >
-                    Enabled
-                  </button>
+                  />
                 </div>
               </div>
 
               <DialogFooter className="flex gap-2 mt-2">
-                <Button className="text-white bg-emerald-600 hover:bg-emerald-500 h-6 text-[11px] px-2.5" onClick={async () => {
+                <Button className="btn btn-primary btn-sm" onClick={async () => {
                   if (!isBlocklistEdit) { if (!state.Config?.DNSBlockLists) state.Config.DNSBlockLists = []; state.Config.DNSBlockLists.push(blocklist); }
                   let ok = await state.v2_ConfigSave();
                   if (ok) { setBlocklistModal(false); setIsBlocklistEdit(false); }
                 }}>
-                  <Save className="h-3 w-3 mr-1" /> Save
+                  <Save className="h-3 w-3" /> Save
                 </Button>
-                <button className="text-[11px] text-white/50 hover:text-white/70 px-2" onClick={() => setBlocklistModal(false)}>Cancel</button>
+                <button className="btn btn-ghost btn-sm" onClick={() => setBlocklistModal(false)}>Cancel</button>
               </DialogFooter>
             </>
           )}
@@ -393,52 +482,49 @@ const DNS = () => {
 
       {/* ── Whitelist dialog ── */}
       <Dialog open={whitelistModal} onOpenChange={setWhitelistModal}>
-        <DialogContent className="sm:max-w-[480px] text-white bg-[#0a0d14] border-[#1e2433]">
+        <DialogContent className="sm:max-w-[480px] text-[#0a0a0a] bg-white border-[#e7e3d7]">
           {whitelist && (
             <>
               <DialogHeader>
-                <DialogTitle className="text-lg font-bold text-white">
-                  {isWhitelistEdit ? "Edit White List" : "New White List"}
+                <DialogTitle className="text-lg font-semibold tracking-tight text-[#0a0a0a]">
+                  {isWhitelistEdit ? "Edit white list" : "New white list"}
                 </DialogTitle>
               </DialogHeader>
 
               <div className="space-y-3">
                 <div>
-                  <label className="text-[10px] text-white/50 uppercase block mb-1">Tag</label>
-                  <Input className="h-7 text-[12px] border-[#1e2433] bg-transparent" value={whitelist.Tag || ""} onChange={(e) => { whitelist.Tag = e.target.value; setWhitelist({ ...whitelist }); }} />
+                  <label className="label">Tag</label>
+                  <Input className="h-9 text-[13px] border-[#e7e3d7] bg-white" value={whitelist.Tag || ""} onChange={(e) => { whitelist.Tag = e.target.value; setWhitelist({ ...whitelist }); }} />
                 </div>
                 <div>
-                  <label className="text-[10px] text-white/50 uppercase block mb-1">URL</label>
-                  <Input className="h-7 text-[12px] border-[#1e2433] bg-transparent" value={whitelist.URL || ""} onChange={(e) => { whitelist.URL = e.target.value; setWhitelist({ ...whitelist }); }} />
+                  <label className="label">URL</label>
+                  <Input className="h-9 text-[13px] border-[#e7e3d7] bg-white" value={whitelist.URL || ""} onChange={(e) => { whitelist.URL = e.target.value; setWhitelist({ ...whitelist }); }} />
                 </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    className={`text-[11px] px-3 py-1 rounded-full border transition-all cursor-pointer ${
-                      whitelist.Enabled
-                        ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.12)]"
-                        : "border-white/[0.06] bg-white/[0.02] text-white/50 hover:text-white/70 hover:border-white/25 hover:bg-white/[0.04]"
-                    }`}
+                <div>
+                  <TogglePill
+                    checked={whitelist.Enabled}
+                    label="Enabled"
+                    tone="success"
                     onClick={() => { whitelist.Enabled = !whitelist.Enabled; setWhitelist({ ...whitelist }); }}
-                  >
-                    Enabled
-                  </button>
+                  />
                 </div>
               </div>
 
               <DialogFooter className="flex gap-2 mt-2">
-                <Button className="text-white bg-emerald-600 hover:bg-emerald-500 h-6 text-[11px] px-2.5" onClick={async () => {
+                <Button className="btn btn-primary btn-sm" onClick={async () => {
                   if (!isWhitelistEdit) { if (!state.Config?.DNSWhiteLists) state.Config.DNSWhiteLists = []; state.Config.DNSWhiteLists.push(whitelist); }
                   let ok = await state.v2_ConfigSave();
                   if (ok) { setWhitelistModal(false); setIsWhitelistEdit(false); }
                 }}>
-                  <Save className="h-3 w-3 mr-1" /> Save
+                  <Save className="h-3 w-3" /> Save
                 </Button>
-                <button className="text-[11px] text-white/50 hover:text-white/70 px-2" onClick={() => setWhitelistModal(false)}>Cancel</button>
+                <button className="btn btn-ghost btn-sm" onClick={() => setWhitelistModal(false)}>Cancel</button>
               </DialogFooter>
             </>
           )}
         </DialogContent>
       </Dialog>
+
     </div>
   );
 };

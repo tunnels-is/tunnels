@@ -46,7 +46,7 @@ const LaunchApp = () => {
       {createPortal(
         <Toaster
           toastOptions={{
-            className: "toast border !text-white !bg-[#0a0d14] !border-[#1e2433]",
+            className: "toast border !text-[#0a0a0a] !bg-[#ffffff] !border-[#e7e3d7]",
             position: "top-right",
             success: {
               duration: 2000,
@@ -61,7 +61,7 @@ const LaunchApp = () => {
         />,
         document.body,
       )}
-      <div className="bg-[#060810] w-full min-h-screen">
+      <div className="bg-[#fdfcf8] w-full min-h-screen">
         <ScreenLoader />
         <SideBar />
 

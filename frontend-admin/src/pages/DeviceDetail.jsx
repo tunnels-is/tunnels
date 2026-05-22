@@ -4,13 +4,13 @@ import dayjs from 'dayjs';
 import { ArrowLeft, Pencil, Save, X } from 'lucide-react';
 import { apiPost } from '../api';
 
-const inputClass = "w-full bg-[#060810] border border-[#1e2433] rounded px-3 py-1.5 text-[13px] text-white focus:outline-none focus:border-[#4B7BF5]/50";
+const inputClass = "w-full bg-[#fdfcf8] border border-[#e7e3d7] rounded px-3 py-1.5 text-[13px] text-[#0a0a0a] focus:outline-none focus:border-[#0a0a0a]";
 
 function Row({ label, children }) {
   return (
-    <div className="flex items-start gap-4 px-4 py-2.5 border-b border-[#1e2433]/50">
-      <span className="text-[11px] text-white/40 uppercase tracking-wider w-36 shrink-0 pt-0.5">{label}</span>
-      <div className="flex-1 text-[13px] text-white/80 min-w-0">{children}</div>
+    <div className="flex items-start gap-4 px-4 py-2.5 border-b border-[#e7e3d7]/50">
+      <span className="text-[11px] text-[#a3a3a3] uppercase tracking-wider w-36 shrink-0 pt-0.5">{label}</span>
+      <div className="flex-1 text-[13px] text-[#0a0a0a] min-w-0">{children}</div>
     </div>
   );
 }
@@ -89,10 +89,10 @@ export default function DeviceDetail() {
   if (!device) {
     return (
       <div>
-        <button onClick={() => navigate('/devices')} className="flex items-center gap-2 text-[12px] text-white/40 hover:text-white/70 mb-5">
+        <button onClick={() => navigate('/devices')} className="flex items-center gap-2 text-[12px] text-[#a3a3a3] hover:text-[#262626] mb-5">
           <ArrowLeft className="w-3.5 h-3.5" /> Back to Devices
         </button>
-        <p className="text-[13px] text-white/40">Loading...</p>
+        <p className="text-[13px] text-[#a3a3a3]">Loading...</p>
       </div>
     );
   }
@@ -101,33 +101,33 @@ export default function DeviceDetail() {
     <div className="max-w-2xl">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
-        <button onClick={() => navigate('/devices')} className="flex items-center gap-2 text-[12px] text-white/40 hover:text-white/70">
+        <button onClick={() => navigate('/devices')} className="flex items-center gap-2 text-[12px] text-[#a3a3a3] hover:text-[#262626]">
           <ArrowLeft className="w-3.5 h-3.5" /> Back to Devices
         </button>
         <div className="flex gap-2">
           {editing ? (
             <>
-              {error && <span className="text-[12px] text-red-400 self-center">{error}</span>}
-              <button onClick={() => setEditing(false)} className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[12px] text-white/50 hover:text-white/80">
+              {error && <span className="text-[12px] text-[#dc2626] self-center">{error}</span>}
+              <button onClick={() => setEditing(false)} className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[12px] text-[#525252] hover:text-[#0a0a0a]">
                 <X className="w-3.5 h-3.5" /> Cancel
               </button>
-              <button onClick={handleSave} disabled={saving} className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[12px] bg-[#4B7BF5]/10 text-[#4B7BF5] hover:bg-[#4B7BF5]/20 disabled:opacity-50">
+              <button onClick={handleSave} disabled={saving} className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[12px] bg-black/[0.05] text-[#0a0a0a] hover:bg-black/[0.08] disabled:opacity-50">
                 <Save className="w-3.5 h-3.5" /> {saving ? 'Saving...' : 'Save'}
               </button>
             </>
           ) : (
-            <button onClick={startEdit} className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[12px] text-white/50 hover:text-white/80 hover:bg-white/[0.04]">
+            <button onClick={startEdit} className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[12px] text-[#525252] hover:text-[#0a0a0a] hover:bg-black/[0.04]">
               <Pencil className="w-3.5 h-3.5" /> Edit
             </button>
           )}
         </div>
       </div>
 
-      <h1 className="text-[16px] font-semibold text-white mb-4">{device.Tag}</h1>
+      <h1 className="text-[16px] font-semibold text-[#0a0a0a] mb-4">{device.Tag}</h1>
 
-      <div className="border border-[#1e2433] rounded-lg overflow-hidden">
+      <div className="border border-[#e7e3d7] rounded-lg overflow-hidden">
         <Row label="ID">
-          <span className="font-mono text-[12px] text-white/50">{device._id}</span>
+          <span className="font-mono text-[12px] text-[#525252]">{device._id}</span>
         </Row>
         <Row label="Tag">
           {editing ? (
@@ -143,22 +143,22 @@ export default function DeviceDetail() {
           {editing ? (
             <input className={`${inputClass} w-full font-mono text-[12px]`} value={form.WireGuardKey} onChange={set('WireGuardKey')} placeholder="base64 public key" />
           ) : (
-            <span className="font-mono text-[12px] break-all text-white/50">{device.WireGuardKey || '—'}</span>
+            <span className="font-mono text-[12px] break-all text-[#525252]">{device.WireGuardKey || '—'}</span>
           )}
         </Row>
         <Row label="Server">
           <span className="text-[12px]">{serverTag(device.ServerID)}</span>
         </Row>
         <Row label="User ID">
-          <span className="font-mono text-[12px] text-white/50">{device.UserID || '—'}</span>
+          <span className="font-mono text-[12px] text-[#525252]">{device.UserID || '—'}</span>
         </Row>
         <Row label="Groups">
-          <span className="text-[12px] text-white/50">
+          <span className="text-[12px] text-[#525252]">
             {device.Groups?.length ? device.Groups.join(', ') : '—'}
           </span>
         </Row>
         <Row label="Created">
-          <span className="font-mono text-[12px] text-white/50">
+          <span className="font-mono text-[12px] text-[#525252]">
             {device.CreatedAt ? dayjs(device.CreatedAt).format('DD-MM-YYYY HH:mm') : '—'}
           </span>
         </Row>

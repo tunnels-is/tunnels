@@ -6,22 +6,51 @@
 @import "./layout-new";
 
 html, body {
-  background-color: #060810;
+  background-color: #fdfcf8;
+  color: #0a0a0a;
+  font-family: 'Inter Variable', 'Inter', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: "kern" 1, "liga" 1, "calt" 1, "ss01" 1;
+  letter-spacing: -0.005em;
 }
 
-/* Custom scrollbar */
+/* Headings — match website style */
+h1, h2, h3, h4, h5, h6 {
+  color: #0a0a0a;
+  letter-spacing: -0.025em;
+  line-height: 1.1;
+  font-family: 'Inter Variable', 'Inter', system-ui, sans-serif;
+}
+
+/* Code/mono — match website */
+code, pre, .font-mono {
+  font-family: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Monaco, Consolas, monospace;
+  font-feature-settings: "calt" 1, "liga" 0;
+}
+
+/* Selection */
+::selection {
+  background: #0a0a0a;
+  color: #ffffff;
+}
+
+:focus-visible {
+  outline: 2px solid #1d4ed8;
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* Minimal scrollbar */
 * {
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.08) transparent;
-}
-
-*:hover {
-  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+  scrollbar-color: #d5d0c0 transparent;
 }
 
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track {
@@ -29,12 +58,12 @@ html, body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 3px;
+  background: #d5d0c0;
+  border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: #a3a3a3;
 }
 
 ::-webkit-scrollbar-corner {
@@ -74,57 +103,54 @@ html, body {
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 224 71.4% 4.1%;
-    --card: 0 0% 100%;
-    --card-foreground: 224 71.4% 4.1%;
+    /* Paper-light palette (matches website) */
+    --background: 44 50% 98%;          /* #fdfcf8 */
+    --foreground: 0 0% 4%;             /* #0a0a0a */
+    --card: 0 0% 100%;                  /* #ffffff */
+    --card-foreground: 0 0% 4%;
     --popover: 0 0% 100%;
-    --popover-foreground: 224 71.4% 4.1%;
-    --primary: 220.9 39.3% 11%;
-    --primary-foreground: 210 20% 98%;
-    --secondary: 220 14.3% 95.9%;
-    --secondary-foreground: 220.9 39.3% 11%;
-    --muted: 220 14.3% 95.9%;
-    --muted-foreground: 220 8.9% 46.1%;
-    --accent: 220 14.3% 95.9%;
-    --accent-foreground: 220.9 39.3% 11%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 20% 98%;
-    --border: 220 13% 91%;
-    --input: 220 13% 91%;
-    --ring: 224 71.4% 4.1%;
-    --chart-1: 12 76% 61%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
+    --popover-foreground: 0 0% 4%;
+    --primary: 0 0% 4%;                 /* black buttons */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 40 31% 93%;            /* #f4f1e8 surface */
+    --secondary-foreground: 0 0% 4%;
+    --muted: 40 31% 93%;
+    --muted-foreground: 0 0% 32%;       /* #525252 */
+    --accent: 40 31% 93%;
+    --accent-foreground: 0 0% 4%;
+    --destructive: 0 60% 50%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 41 25% 88%;               /* #e7e3d7 */
+    --input: 41 25% 88%;
+    --ring: 222 75% 48%;                /* #1d4ed8 */
+    --chart-1: 222 75% 48%;
+    --chart-2: 142 70% 30%;
+    --chart-3: 30 80% 45%;
+    --chart-4: 280 50% 50%;
+    --chart-5: 340 70% 50%;
     --radius: 0.5rem
   }
+  /* Keep .dark class working (the html has class="dark") but map to light values */
   .dark {
-    --background: 225 50% 3.5%;
-    --foreground: 210 20% 93%;
-    --card: 225 40% 5%;
-    --card-foreground: 210 20% 93%;
-    --popover: 225 40% 5%;
-    --popover-foreground: 210 20% 93%;
-    --primary: 222 90% 63%;
+    --background: 44 50% 98%;
+    --foreground: 0 0% 4%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 4%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 4%;
+    --primary: 0 0% 4%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 220 25% 12%;
-    --secondary-foreground: 210 20% 93%;
-    --muted: 220 25% 12%;
-    --muted-foreground: 218 10% 55%;
-    --accent: 220 25% 14%;
-    --accent-foreground: 210 20% 93%;
-    --destructive: 0 70% 45%;
-    --destructive-foreground: 210 20% 98%;
-    --border: 220 25% 14%;
-    --input: 220 25% 14%;
-    --ring: 222 90% 63%;
-    --chart-1: 222 80% 63%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%
+    --secondary: 40 31% 93%;
+    --secondary-foreground: 0 0% 4%;
+    --muted: 40 31% 93%;
+    --muted-foreground: 0 0% 32%;
+    --accent: 40 31% 93%;
+    --accent-foreground: 0 0% 4%;
+    --destructive: 0 60% 50%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 41 25% 88%;
+    --input: 41 25% 88%;
+    --ring: 222 75% 48%;
   }
 }
 
@@ -139,4 +165,672 @@ html, body {
     color: hsl(var(--foreground));
     background-color: hsl(var(--background));
   }
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   Component layer — buttons, pills, tags, labels.
+
+   Everything app-wide should compose from these semantic classes. The
+   .depth-* utilities further below are kept for backwards compatibility
+   but new UI should prefer the .btn / .pill / .tag / .label families.
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* ─── Buttons ────────────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  font-family: inherit;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  line-height: 1;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  transition:
+    background-color 0.12s ease,
+    border-color 0.12s ease,
+    color 0.12s ease,
+    box-shadow 0.12s ease,
+    transform 0.06s ease;
+}
+.btn:disabled,
+.btn[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+.btn:focus-visible {
+  outline: 2px solid #1d4ed8;
+  outline-offset: 2px;
+}
+.btn svg { flex-shrink: 0; }
+
+/* Button sizes */
+.btn-xs { height: 22px; padding: 0 8px;  font-size: 11px; }
+.btn-sm { height: 26px; padding: 0 10px; font-size: 12px; }
+.btn-md { height: 30px; padding: 0 12px; font-size: 12px; }
+.btn-lg { height: 36px; padding: 0 16px; font-size: 13px; font-weight: 500; }
+.btn-xl { height: 40px; padding: 0 20px; font-size: 14px; font-weight: 500; }
+.btn-block { width: 100%; }
+
+/* Variant — primary (solid black) */
+.btn-primary {
+  background: #0a0a0a;
+  color: #ffffff;
+  border-color: #0a0a0a;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.08) inset,
+    0 1px 2px rgba(10, 10, 10, 0.18),
+    0 0 0 1px rgba(10, 10, 10, 0.05);
+}
+.btn-primary:hover {
+  background: #262626;
+  border-color: #262626;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.1) inset,
+    0 2px 4px rgba(10, 10, 10, 0.22),
+    0 0 0 1px rgba(10, 10, 10, 0.05);
+}
+.btn-primary:active {
+  background: #0a0a0a;
+  transform: translateY(0.5px);
+  box-shadow:
+    0 0 0 1px rgba(10, 10, 10, 0.1),
+    0 1px 1px rgba(10, 10, 10, 0.12) inset;
+}
+
+/* Variant — danger (solid red) */
+.btn-danger {
+  background: #dc2626;
+  color: #ffffff;
+  border-color: #dc2626;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.1) inset,
+    0 1px 2px rgba(220, 38, 38, 0.25),
+    0 0 0 1px rgba(185, 28, 28, 0.4);
+}
+.btn-danger:hover {
+  background: #b91c1c;
+  border-color: #b91c1c;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.12) inset,
+    0 2px 4px rgba(220, 38, 38, 0.3),
+    0 0 0 1px rgba(185, 28, 28, 0.5);
+}
+.btn-danger:active { transform: translateY(0.5px); }
+
+/* Variant — success (solid green) */
+.btn-success {
+  background: #15803d;
+  color: #ffffff;
+  border-color: #15803d;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.1) inset,
+    0 1px 2px rgba(21, 128, 61, 0.25),
+    0 0 0 1px rgba(22, 101, 52, 0.4);
+}
+.btn-success:hover {
+  background: #166534;
+  border-color: #166534;
+}
+.btn-success:active { transform: translateY(0.5px); }
+
+/* Variant — outline (paper-raised neutral) */
+.btn-outline {
+  background: #ffffff;
+  color: #525252;
+  border-color: rgba(10, 10, 10, 0.08);
+  box-shadow: 0 1px 1px rgba(10, 10, 10, 0.04);
+}
+.btn-outline:hover {
+  color: #0a0a0a;
+  border-color: rgba(10, 10, 10, 0.2);
+  box-shadow: 0 2px 4px rgba(10, 10, 10, 0.06);
+}
+.btn-outline:active { transform: translateY(0.5px); }
+
+/* Variant — outline-danger */
+.btn-outline-danger {
+  background: #ffffff;
+  color: #dc2626;
+  border-color: rgba(220, 38, 38, 0.18);
+  box-shadow: 0 1px 1px rgba(10, 10, 10, 0.04);
+}
+.btn-outline-danger:hover {
+  color: #b91c1c;
+  border-color: rgba(220, 38, 38, 0.45);
+  box-shadow: 0 2px 4px rgba(220, 38, 38, 0.08);
+}
+.btn-outline-danger:active { transform: translateY(0.5px); }
+
+/* Variant — ghost (text only, no border, soft hover bg) */
+.btn-ghost {
+  background: transparent;
+  color: #525252;
+  border-color: transparent;
+}
+.btn-ghost:hover {
+  color: #0a0a0a;
+  background: rgba(10, 10, 10, 0.04);
+}
+.btn-ghost:active { transform: translateY(0.5px); }
+
+.btn-ghost-danger {
+  background: transparent;
+  color: #dc2626;
+  border-color: transparent;
+}
+.btn-ghost-danger:hover {
+  color: #b91c1c;
+  background: rgba(220, 38, 38, 0.05);
+}
+.btn-ghost-danger:active { transform: translateY(0.5px); }
+
+.btn-ghost-success {
+  background: transparent;
+  color: #15803d;
+  border-color: transparent;
+}
+.btn-ghost-success:hover {
+  color: #166534;
+  background: rgba(21, 128, 61, 0.05);
+}
+.btn-ghost-success:active { transform: translateY(0.5px); }
+
+/* Variant — link (inline text action) */
+.btn-link {
+  background: transparent;
+  color: #1d4ed8;
+  border-color: transparent;
+  padding: 0;
+  height: auto;
+  font-weight: 500;
+}
+.btn-link:hover { color: #1e40af; text-decoration: underline; }
+
+/* ─── Icon buttons (square, ghost) ───────────────────────────────────── */
+.btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  background: transparent;
+  color: #a3a3a3;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition:
+    background-color 0.12s ease,
+    color 0.12s ease,
+    box-shadow 0.12s ease,
+    transform 0.06s ease;
+}
+.btn-icon:focus-visible { outline: 2px solid #1d4ed8; outline-offset: 1px; }
+.btn-icon:hover {
+  color: #0a0a0a;
+  background: rgba(10, 10, 10, 0.05);
+  box-shadow: inset 0 0 0 1px rgba(10, 10, 10, 0.08);
+}
+.btn-icon:active { transform: translateY(0.5px); }
+.btn-icon:disabled,
+.btn-icon[disabled] {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.btn-icon-xs { width: 18px; height: 18px; border-radius: 3px; }
+.btn-icon-sm { width: 20px; height: 20px; }
+.btn-icon-md { width: 28px; height: 28px; }
+.btn-icon-lg { width: 32px; height: 32px; }
+
+/* Tone modifiers for icon buttons */
+.btn-icon-danger:hover  { color: #dc2626; background: rgba(220, 38, 38, 0.06); box-shadow: inset 0 0 0 1px rgba(220, 38, 38, 0.18); }
+.btn-icon-success:hover { color: #15803d; background: rgba(21, 128, 61, 0.06); box-shadow: inset 0 0 0 1px rgba(21, 128, 61, 0.18); }
+.btn-icon-info:hover    { color: #1d4ed8; background: rgba(29, 78, 216, 0.06); box-shadow: inset 0 0 0 1px rgba(29, 78, 216, 0.18); }
+
+/* Resting tones (when the icon is itself a state indicator, e.g. "connected") */
+.btn-icon-state-success { color: #15803d; }
+.btn-icon-state-warning { color: #b45309; }
+.btn-icon-state-danger  { color: #dc2626; }
+.btn-icon-state-info    { color: #1d4ed8; }
+
+/* ─── Pills (toggles) ────────────────────────────────────────────────── */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  height: 24px;
+  padding: 0 12px;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  line-height: 1;
+  border-radius: 9999px;
+  border: 1px solid #d5d0c0;
+  background: #ffffff;
+  color: #525252;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  box-shadow: 0 1px 1px rgba(10, 10, 10, 0.03);
+  transition:
+    background-color 0.12s ease,
+    border-color 0.12s ease,
+    color 0.12s ease,
+    box-shadow 0.12s ease,
+    transform 0.06s ease;
+}
+.pill:hover {
+  color: #0a0a0a;
+  border-color: #0a0a0a;
+  box-shadow: 0 2px 4px rgba(10, 10, 10, 0.05);
+}
+.pill:active { transform: translateY(0.5px); }
+.pill:focus-visible { outline: 2px solid #1d4ed8; outline-offset: 2px; }
+
+.pill-sm { height: 22px; padding: 0 10px; font-size: 10px; }
+.pill-md { height: 28px; padding: 0 14px; font-size: 12px; }
+
+/* Active pill — solid black */
+.pill-active {
+  background: #0a0a0a;
+  color: #ffffff;
+  border-color: #0a0a0a;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.08) inset,
+    0 1px 2px rgba(10, 10, 10, 0.2),
+    0 0 0 1px rgba(10, 10, 10, 0.4);
+}
+.pill-active:hover {
+  background: #262626;
+  border-color: #262626;
+  color: #ffffff;
+}
+
+/* Active pill — warning amber */
+.pill-active-warning {
+  background: #b45309;
+  color: #ffffff;
+  border-color: #b45309;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.12) inset,
+    0 1px 2px rgba(180, 83, 9, 0.25),
+    0 0 0 1px rgba(146, 64, 14, 0.5);
+}
+.pill-active-warning:hover {
+  background: #92400e;
+  border-color: #92400e;
+  color: #ffffff;
+}
+
+/* Active pill — danger red */
+.pill-active-danger {
+  background: #dc2626;
+  color: #ffffff;
+  border-color: #dc2626;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.12) inset,
+    0 1px 2px rgba(220, 38, 38, 0.25),
+    0 0 0 1px rgba(185, 28, 28, 0.5);
+}
+.pill-active-danger:hover {
+  background: #b91c1c;
+  border-color: #b91c1c;
+  color: #ffffff;
+}
+
+/* Active pill — success green */
+.pill-active-success {
+  background: #15803d;
+  color: #ffffff;
+  border-color: #15803d;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.12) inset,
+    0 1px 2px rgba(21, 128, 61, 0.25),
+    0 0 0 1px rgba(22, 101, 52, 0.5);
+}
+.pill-active-success:hover {
+  background: #166534;
+  border-color: #166534;
+  color: #ffffff;
+}
+
+/* ─── Tags (non-clickable status indicators) ──────────────────────────── */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  height: 20px;
+  padding: 0 8px;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0;
+  line-height: 1;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+.tag-sm { height: 16px; padding: 0 6px; font-size: 10px; }
+.tag-lg { height: 24px; padding: 0 10px; font-size: 12px; }
+
+.tag-neutral {
+  background: #ffffff;
+  color: #0a0a0a;
+  box-shadow:
+    inset 0 0 0 1px rgba(10, 10, 10, 0.08),
+    0 1px 1px rgba(10, 10, 10, 0.02);
+}
+.tag-muted {
+  background: rgba(10, 10, 10, 0.04);
+  color: #525252;
+  box-shadow: inset 0 0 0 1px rgba(10, 10, 10, 0.04);
+}
+.tag-success {
+  background: rgba(21, 128, 61, 0.08);
+  color: #15803d;
+  box-shadow:
+    inset 0 0 0 1px rgba(21, 128, 61, 0.22),
+    0 1px 1px rgba(21, 128, 61, 0.04);
+}
+.tag-warning {
+  background: rgba(180, 83, 9, 0.08);
+  color: #b45309;
+  box-shadow:
+    inset 0 0 0 1px rgba(180, 83, 9, 0.22),
+    0 1px 1px rgba(180, 83, 9, 0.04);
+}
+.tag-danger {
+  background: rgba(220, 38, 38, 0.08);
+  color: #dc2626;
+  box-shadow:
+    inset 0 0 0 1px rgba(220, 38, 38, 0.22),
+    0 1px 1px rgba(220, 38, 38, 0.04);
+}
+.tag-info {
+  background: rgba(29, 78, 216, 0.08);
+  color: #1d4ed8;
+  box-shadow:
+    inset 0 0 0 1px rgba(29, 78, 216, 0.22),
+    0 1px 1px rgba(29, 78, 216, 0.04);
+}
+
+/* Status dot — paired with .tag or used alone */
+.tag-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: currentColor;
+}
+
+/* ─── Labels ─────────────────────────────────────────────────────────── */
+/* Form field label — small uppercase, above an input */
+.label {
+  display: block;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #737373;
+  margin-bottom: 6px;
+}
+/* Section label — heads a content group */
+.label-section {
+  display: block;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #525252;
+  margin-bottom: 12px;
+}
+/* Caption — inline body label / metadata */
+.label-caption {
+  font-size: 11px;
+  font-weight: 400;
+  color: #737373;
+  letter-spacing: 0;
+}
+/* Mono caption — code-aligned label (used for IDs, paths, etc.) */
+.label-mono {
+  font-family: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 11px;
+  color: #525252;
+  letter-spacing: 0;
+}
+
+/* ─── Card depth ─────────────────────────────────────────────────────── */
+/* Subtle paper-raised shadow for any rounded card container. Pair with the
+   usual `bg-white border border-[#e7e3d7] rounded-lg` utilities or apply
+   on its own to give a flat container some lift.                          */
+.card-shadow {
+  box-shadow:
+    0 1px 2px rgba(10, 10, 10, 0.06),
+    0 2px 6px rgba(10, 10, 10, 0.05);
+}
+.card-shadow-hover {
+  transition: box-shadow 0.15s ease, transform 0.06s ease;
+}
+.card-shadow-hover:hover {
+  box-shadow:
+    0 2px 4px rgba(10, 10, 10, 0.07),
+    0 6px 14px rgba(10, 10, 10, 0.06);
+}
+
+/* ─── Alert banners ──────────────────────────────────────────────────── */
+.alert {
+  display: block;
+  padding: 8px 12px;
+  font-size: 11px;
+  line-height: 1.5;
+  font-weight: 500;
+  border-radius: 6px;
+  border: 1px solid transparent;
+}
+.alert-danger {
+  background: rgba(220, 38, 38, 0.05);
+  border-color: rgba(220, 38, 38, 0.3);
+  color: #b91c1c;
+}
+.alert-warning {
+  background: rgba(180, 83, 9, 0.05);
+  border-color: rgba(180, 83, 9, 0.3);
+  color: #b45309;
+}
+.alert-info {
+  background: rgba(29, 78, 216, 0.05);
+  border-color: rgba(29, 78, 216, 0.3);
+  color: #1d4ed8;
+}
+.alert-success {
+  background: rgba(21, 128, 61, 0.05);
+  border-color: rgba(21, 128, 61, 0.3);
+  color: #15803d;
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   Legacy depth-* utilities (kept for backwards compatibility — prefer the
+   semantic component classes above for any new UI).
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* ─── Depth utilities ─────────────────────────────────────────────────── */
+/* Apply alongside existing tailwind utilities to add subtle, paper-light
+   depth to buttons, pills, tags and badges.                                */
+
+/* Primary solid (black) buttons — subtle drop shadow + press effect */
+.depth-btn {
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.08) inset,
+    0 1px 2px rgba(10, 10, 10, 0.18),
+    0 0 0 1px rgba(10, 10, 10, 0.05);
+  transition: box-shadow 0.12s ease, transform 0.06s ease, background-color 0.15s ease;
+}
+.depth-btn:hover {
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.1) inset,
+    0 2px 4px rgba(10, 10, 10, 0.22),
+    0 0 0 1px rgba(10, 10, 10, 0.05);
+}
+.depth-btn:active {
+  box-shadow:
+    0 0 0 1px rgba(10, 10, 10, 0.1),
+    0 1px 1px rgba(10, 10, 10, 0.12) inset;
+  transform: translateY(0.5px);
+}
+
+/* Outline / secondary buttons — paper-style raised card */
+.depth-btn-outline {
+  background: #ffffff;
+  box-shadow:
+    0 1px 1px rgba(10, 10, 10, 0.04),
+    0 0 0 1px rgba(10, 10, 10, 0.06);
+  transition: box-shadow 0.12s ease, transform 0.06s ease, background-color 0.15s ease;
+}
+.depth-btn-outline:hover {
+  background: #ffffff;
+  box-shadow:
+    0 2px 4px rgba(10, 10, 10, 0.06),
+    0 0 0 1px rgba(10, 10, 10, 0.12);
+}
+.depth-btn-outline:active {
+  box-shadow: 0 0 0 1px rgba(10, 10, 10, 0.12);
+  transform: translateY(0.5px);
+}
+
+/* Pills / toggle inactive — raised paper feel */
+.depth-pill {
+  background: #ffffff;
+  box-shadow:
+    0 1px 1px rgba(10, 10, 10, 0.03),
+    inset 0 0 0 1px rgba(10, 10, 10, 0.08);
+  transition: box-shadow 0.12s ease, transform 0.06s ease, background-color 0.15s ease, color 0.15s ease;
+}
+.depth-pill:hover {
+  box-shadow:
+    0 2px 4px rgba(10, 10, 10, 0.05),
+    inset 0 0 0 1px rgba(10, 10, 10, 0.2);
+}
+.depth-pill:active {
+  transform: translateY(0.5px);
+}
+
+/* Pills / toggle active — solid black, inset highlight */
+.depth-pill-active {
+  background: #0a0a0a;
+  color: #ffffff;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.08) inset,
+    0 1px 2px rgba(10, 10, 10, 0.2),
+    0 0 0 1px rgba(10, 10, 10, 0.6);
+  transition: box-shadow 0.12s ease, transform 0.06s ease, background-color 0.15s ease;
+}
+.depth-pill-active:hover {
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.1) inset,
+    0 2px 4px rgba(10, 10, 10, 0.24),
+    0 0 0 1px rgba(10, 10, 10, 0.7);
+}
+.depth-pill-active:active {
+  transform: translateY(0.5px);
+}
+
+/* Pill — amber warning active (e.g. "Debug Mode" / "Disable Updates") */
+.depth-pill-warning {
+  background: #b45309;
+  color: #ffffff;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.12) inset,
+    0 1px 2px rgba(180, 83, 9, 0.25),
+    0 0 0 1px rgba(146, 64, 14, 0.7);
+  transition: box-shadow 0.12s ease, transform 0.06s ease, background-color 0.15s ease;
+}
+.depth-pill-warning:hover {
+  background: #92400e;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.14) inset,
+    0 2px 4px rgba(180, 83, 9, 0.3),
+    0 0 0 1px rgba(146, 64, 14, 0.8);
+}
+.depth-pill-warning:active {
+  transform: translateY(0.5px);
+}
+
+/* Pill — red danger active */
+.depth-pill-danger {
+  background: #dc2626;
+  color: #ffffff;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.12) inset,
+    0 1px 2px rgba(220, 38, 38, 0.25),
+    0 0 0 1px rgba(185, 28, 28, 0.7);
+  transition: box-shadow 0.12s ease, transform 0.06s ease, background-color 0.15s ease;
+}
+.depth-pill-danger:hover {
+  background: #b91c1c;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.14) inset,
+    0 2px 4px rgba(220, 38, 38, 0.3),
+    0 0 0 1px rgba(185, 28, 28, 0.8);
+}
+.depth-pill-danger:active {
+  transform: translateY(0.5px);
+}
+
+/* Tags / badges — soft inset look, no press behaviour */
+.depth-tag {
+  box-shadow:
+    inset 0 0 0 1px rgba(10, 10, 10, 0.07),
+    0 1px 1px rgba(10, 10, 10, 0.02);
+}
+.depth-tag-active {
+  box-shadow:
+    inset 0 0 0 1px rgba(10, 10, 10, 0.6),
+    0 1px 2px rgba(10, 10, 10, 0.16);
+}
+
+/* Status-tinted tags (green / amber / red / blue) — subtle ring + drop */
+.depth-tag-success {
+  background: rgba(21, 128, 61, 0.08);
+  color: #15803d;
+  box-shadow:
+    inset 0 0 0 1px rgba(21, 128, 61, 0.22),
+    0 1px 1px rgba(21, 128, 61, 0.04);
+}
+.depth-tag-warning {
+  background: rgba(180, 83, 9, 0.08);
+  color: #b45309;
+  box-shadow:
+    inset 0 0 0 1px rgba(180, 83, 9, 0.22),
+    0 1px 1px rgba(180, 83, 9, 0.04);
+}
+.depth-tag-danger {
+  background: rgba(220, 38, 38, 0.08);
+  color: #dc2626;
+  box-shadow:
+    inset 0 0 0 1px rgba(220, 38, 38, 0.22),
+    0 1px 1px rgba(220, 38, 38, 0.04);
+}
+.depth-tag-info {
+  background: rgba(29, 78, 216, 0.08);
+  color: #1d4ed8;
+  box-shadow:
+    inset 0 0 0 1px rgba(29, 78, 216, 0.22),
+    0 1px 1px rgba(29, 78, 216, 0.04);
+}
+
+/* Icon-only ghost buttons — soft hover lift */
+.depth-icon-btn {
+  transition: background-color 0.12s ease, color 0.12s ease, box-shadow 0.12s ease;
+}
+.depth-icon-btn:hover {
+  background: rgba(10, 10, 10, 0.05);
+  box-shadow: inset 0 0 0 1px rgba(10, 10, 10, 0.06);
 }

@@ -4,13 +4,13 @@ import { ArrowLeft, Pencil, Save, X, Link } from 'lucide-react';
 import { apiPost, apiGet } from '../api';
 import { Copy } from 'lucide-react';
 
-const inputClass = "w-full bg-[#060810] border border-[#1e2433] rounded px-3 py-1.5 text-[13px] text-white placeholder-white/30 focus:outline-none focus:border-[#4B7BF5]/50";
+const inputClass = "w-full bg-[#fdfcf8] border border-[#e7e3d7] rounded px-3 py-1.5 text-[13px] text-[#0a0a0a] placeholder-[#a3a3a3] focus:outline-none focus:border-[#0a0a0a]";
 
 function Row({ label, children }) {
   return (
-    <div className="flex items-start gap-4 px-4 py-2.5 border-b border-[#1e2433]/50">
-      <span className="text-[11px] text-white/40 uppercase tracking-wider w-36 shrink-0 pt-0.5">{label}</span>
-      <div className="flex-1 text-[13px] text-white/80 min-w-0">{children}</div>
+    <div className="flex items-start gap-4 px-4 py-2.5 border-b border-[#e7e3d7]/50">
+      <span className="text-[11px] text-[#a3a3a3] uppercase tracking-wider w-36 shrink-0 pt-0.5">{label}</span>
+      <div className="flex-1 text-[13px] text-[#0a0a0a] min-w-0">{children}</div>
     </div>
   );
 }
@@ -146,10 +146,10 @@ export default function WGConfigDetail() {
   if (!config) {
     return (
       <div>
-        <button onClick={() => navigate('/wgconfig')} className="flex items-center gap-2 text-[12px] text-white/40 hover:text-white/70 mb-5">
+        <button onClick={() => navigate('/wgconfig')} className="flex items-center gap-2 text-[12px] text-[#a3a3a3] hover:text-[#262626] mb-5">
           <ArrowLeft className="w-3.5 h-3.5" /> Back to WG Configs
         </button>
-        <p className="text-[13px] text-white/40">Loading…</p>
+        <p className="text-[13px] text-[#a3a3a3]">Loading…</p>
       </div>
     );
   }
@@ -168,34 +168,34 @@ export default function WGConfigDetail() {
     <div className="max-w-2xl">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
-        <button onClick={() => navigate('/wgconfig')} className="flex items-center gap-2 text-[12px] text-white/40 hover:text-white/70">
+        <button onClick={() => navigate('/wgconfig')} className="flex items-center gap-2 text-[12px] text-[#a3a3a3] hover:text-[#262626]">
           <ArrowLeft className="w-3.5 h-3.5" /> Back to WG Configs
         </button>
         <div className="flex gap-2">
           {editing ? (
             <>
-              {saveError && <span className="text-[12px] text-red-400 self-center">{saveError}</span>}
-              <button onClick={() => setEditing(false)} className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[12px] text-white/50 hover:text-white/80">
+              {saveError && <span className="text-[12px] text-[#dc2626] self-center">{saveError}</span>}
+              <button onClick={() => setEditing(false)} className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[12px] text-[#525252] hover:text-[#0a0a0a]">
                 <X className="w-3.5 h-3.5" /> Cancel
               </button>
-              <button onClick={handleSave} disabled={saving} className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[12px] bg-[#4B7BF5]/10 text-[#4B7BF5] hover:bg-[#4B7BF5]/20 disabled:opacity-50">
+              <button onClick={handleSave} disabled={saving} className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[12px] bg-black/[0.05] text-[#0a0a0a] hover:bg-black/[0.08] disabled:opacity-50">
                 <Save className="w-3.5 h-3.5" /> {saving ? 'Saving…' : 'Save'}
               </button>
             </>
           ) : (
-            <button onClick={startEdit} className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[12px] text-white/50 hover:text-white/80 hover:bg-white/[0.04]">
+            <button onClick={startEdit} className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[12px] text-[#525252] hover:text-[#0a0a0a] hover:bg-black/[0.04]">
               <Pencil className="w-3.5 h-3.5" /> Edit
             </button>
           )}
         </div>
       </div>
 
-      <h1 className="text-[16px] font-semibold text-white mb-4">{config.Tag}</h1>
+      <h1 className="text-[16px] font-semibold text-[#0a0a0a] mb-4">{config.Tag}</h1>
 
       {/* Config fields */}
-      <div className="border border-[#1e2433] rounded-lg overflow-hidden mb-6">
+      <div className="border border-[#e7e3d7] rounded-lg overflow-hidden mb-6">
         <Row label="ID">
-          <span className="font-mono text-[12px] text-white/50">{config._id}</span>
+          <span className="font-mono text-[12px] text-[#525252]">{config._id}</span>
         </Row>
         <Row label="Tag">
           {editing ? (
@@ -206,13 +206,13 @@ export default function WGConfigDetail() {
         </Row>
         <Row label="API Key (--key)">
           <div className="flex items-center gap-2 min-w-0">
-            <span className="font-mono text-[12px] text-white/70 truncate flex-1">
+            <span className="font-mono text-[12px] text-[#262626] truncate flex-1">
               {config.APIKey || '—'}
             </span>
             {config.APIKey && (
               <button
                 onClick={() => copyToClipboard(config.APIKey)}
-                className="flex items-center gap-1 px-2 py-0.5 rounded text-[11px] text-white/40 hover:text-white/70 hover:bg-white/[0.05] shrink-0"
+                className="flex items-center gap-1 px-2 py-0.5 rounded text-[11px] text-[#a3a3a3] hover:text-[#262626] hover:bg-black/[0.05] shrink-0"
                 title="Copy API key"
               >
                 <Copy className="w-3 h-3" /> Copy
@@ -222,13 +222,13 @@ export default function WGConfigDetail() {
         </Row>
         <Row label="WG Pub Key">
           <div className="flex items-center gap-2 min-w-0">
-            <span className="font-mono text-[12px] text-white/50 truncate flex-1">
+            <span className="font-mono text-[12px] text-[#525252] truncate flex-1">
               {config.WireGuardPubKey || '—'}
             </span>
             {config.WireGuardPubKey && (
               <button
                 onClick={() => copyToClipboard(config.WireGuardPubKey)}
-                className="flex items-center gap-1 px-2 py-0.5 rounded text-[11px] text-white/40 hover:text-white/70 hover:bg-white/[0.05] shrink-0"
+                className="flex items-center gap-1 px-2 py-0.5 rounded text-[11px] text-[#a3a3a3] hover:text-[#262626] hover:bg-black/[0.05] shrink-0"
                 title="Copy public key"
               >
                 <Copy className="w-3 h-3" /> Copy
@@ -262,10 +262,10 @@ export default function WGConfigDetail() {
           ) : net ? (
             <span className="font-mono text-[12px]">
               {net.CIDR}
-              {net.Tag && <span className="text-white/40 ml-2">— {net.Tag}</span>}
+              {net.Tag && <span className="text-[#a3a3a3] ml-2">— {net.Tag}</span>}
             </span>
           ) : (
-            <span className="text-white/30">—</span>
+            <span className="text-[#a3a3a3]">—</span>
           )}
         </Row>
         <Row label="WG Port">
@@ -292,11 +292,11 @@ export default function WGConfigDetail() {
         <Row label="Packet Inspect">
           {editing ? (
             <label className="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" checked={form.PacketInspection} onChange={set('PacketInspection')} className="accent-[#4B7BF5]" />
-              <span className="text-[12px] text-white/60">{form.PacketInspection ? 'Yes' : 'No'}</span>
+              <input type="checkbox" checked={form.PacketInspection} onChange={set('PacketInspection')} className="accent-[#1d4ed8]" />
+              <span className="text-[12px] text-[#525252]">{form.PacketInspection ? 'Yes' : 'No'}</span>
             </label>
           ) : (
-            <span className={config.PacketInspection ? 'text-emerald-400' : 'text-white/30'}>
+            <span className={config.PacketInspection ? 'text-[#15803d]' : 'text-[#a3a3a3]'}>
               {config.PacketInspection ? 'Yes' : 'No'}
             </span>
           )}
@@ -304,11 +304,11 @@ export default function WGConfigDetail() {
         <Row label="Skip Verify">
           {editing ? (
             <label className="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" checked={form.InsecureSkipVerify} onChange={set('InsecureSkipVerify')} className="accent-[#4B7BF5]" />
-              <span className="text-[12px] text-white/60">{form.InsecureSkipVerify ? 'Yes' : 'No'}</span>
+              <input type="checkbox" checked={form.InsecureSkipVerify} onChange={set('InsecureSkipVerify')} className="accent-[#1d4ed8]" />
+              <span className="text-[12px] text-[#525252]">{form.InsecureSkipVerify ? 'Yes' : 'No'}</span>
             </label>
           ) : (
-            <span className={config.InsecureSkipVerify ? 'text-amber-400' : 'text-white/30'}>
+            <span className={config.InsecureSkipVerify ? 'text-[#b45309]' : 'text-[#a3a3a3]'}>
               {config.InsecureSkipVerify ? 'Yes' : 'No'}
             </span>
           )}
@@ -316,14 +316,14 @@ export default function WGConfigDetail() {
       </div>
 
       {/* Assign to Server */}
-      <div className="border border-[#1e2433] rounded-lg p-5">
-        <h2 className="text-[14px] font-semibold text-white mb-1">Assign to Server</h2>
-        <p className="text-[12px] text-white/40 mb-4">
+      <div className="border border-[#e7e3d7] rounded-lg p-5">
+        <h2 className="text-[14px] font-semibold text-[#0a0a0a] mb-1">Assign to Server</h2>
+        <p className="text-[12px] text-[#a3a3a3] mb-4">
           Links this config to a server so it uses the correct WireGuard public key and subnet.
         </p>
         <form onSubmit={handleAssign} className="space-y-3">
           <div>
-            <label className="block text-[11px] text-white/40 uppercase tracking-wider mb-1">Server</label>
+            <label className="block text-[11px] text-[#a3a3a3] uppercase tracking-wider mb-1">Server</label>
             <select
               className={inputClass}
               value={assignForm.ServerID}
@@ -336,11 +336,11 @@ export default function WGConfigDetail() {
               ))}
             </select>
           </div>
-          {assignError && <p className="text-[12px] text-red-400">{assignError}</p>}
+          {assignError && <p className="text-[12px] text-[#dc2626]">{assignError}</p>}
           <button
             type="submit"
             disabled={assigning}
-            className="flex items-center gap-2 px-4 py-1.5 text-[12px] bg-[#4B7BF5]/10 text-[#4B7BF5] hover:bg-[#4B7BF5]/20 rounded disabled:opacity-50"
+            className="flex items-center gap-2 px-4 py-1.5 text-[12px] bg-black/[0.05] text-[#0a0a0a] hover:bg-black/[0.08] rounded disabled:opacity-50"
           >
             <Link className="w-3.5 h-3.5" />
             {assigning ? 'Assigning…' : 'Assign'}
@@ -348,12 +348,12 @@ export default function WGConfigDetail() {
         </form>
 
         {assignResult && (
-          <div className="mt-4 p-4 bg-emerald-500/5 border border-emerald-500/20 rounded space-y-1.5">
-            <p className="text-[12px] text-emerald-400 font-medium mb-2">Assigned successfully</p>
+          <div className="mt-4 p-4 bg-[#15803d]/[0.05] border border-[#15803d]/25 rounded space-y-1.5">
+            <p className="text-[12px] text-[#15803d] font-medium mb-2">Assigned successfully</p>
             {Object.entries(assignResult).map(([k, v]) => (
               <div key={k} className="flex gap-3">
-                <span className="text-[11px] text-white/40 w-36 shrink-0">{k}</span>
-                <span className="text-[11px] text-white/70 font-mono break-all">{String(v)}</span>
+                <span className="text-[11px] text-[#a3a3a3] w-36 shrink-0">{k}</span>
+                <span className="text-[11px] text-[#262626] font-mono break-all">{String(v)}</span>
               </div>
             ))}
           </div>
