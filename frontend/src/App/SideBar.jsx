@@ -82,16 +82,6 @@ const SideBar = () => {
       className="group/sidebar fixed top-0 left-0 w-14 hover:w-[200px] h-screen bg-[#ffffff] border-r border-[#e7e3d7] flex flex-col z-[2000] transition-all duration-200 overflow-hidden"
       id="sidebar"
     >
-      {/* Brand */}
-      <div className="h-12 flex items-center px-[20px] border-b border-[#e7e3d7] shrink-0">
-        <div className="flex items-center gap-1 overflow-hidden">
-          <span className="text-[13px] font-semibold tracking-tight text-[#0a0a0a] opacity-0 group-hover/sidebar:opacity-100 transition-opacity duration-200 whitespace-nowrap">
-            Tunnels
-          </span>
-          <span className="w-1 h-1 rounded-full bg-[#0a0a0a] opacity-0 group-hover/sidebar:opacity-100 transition-opacity duration-200 shrink-0" />
-        </div>
-      </div>
-
       <div className="flex-1 overflow-y-auto py-3 space-y-3">
         {
           menu.groups.map((g) => {
