@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
+	"net/netip"
 	"strings"
 
 	"golang.org/x/crypto/curve25519"
@@ -67,7 +68,11 @@ func setupWireGuard(cfg *Config, logLevel string) error {
 	privCopy := make([]byte, 32)
 	copy(privCopy, cfg.WireGuardPrivKey)
 
-	wgLazyBind = NewLazyBind(conn.NewDefaultBind(), privCopy, pubBytes, cfg.HandshakeBufferSize, cfg.HandshakeRatePerIP, func() {})
+	innerBind, err := buildInnerBind(cfg)
+	if err != nil {
+		return fmt.Errorf("build bind: %w", err)
+	}
+	wgLazyBind = NewLazyBind(innerBind, privCopy, pubBytes, cfg.HandshakeBufferSize, cfg.HandshakeRatePerIP, func() {})
 	wgDevice = device.NewDevice(tunInterface, wgLazyBind, wgLogger)
 
 	// Build IPC config using []byte so key material can be zeroed after use.
@@ -165,6 +170,23 @@ func ipcGet() (string, error) {
 		return "", err
 	}
 	return sb.String(), nil
+}
+
+// buildInnerBind returns the underlying conn.Bind for wireguard-go.
+// When cfg.PublicIP is set we pin the listening socket to that address; this
+// lets multiple wg-server instances coexist on the same UDP port across
+// different public IPs on the same host. Empty PublicIP falls back to
+// wireguard-go's default wildcard bind.
+func buildInnerBind(cfg *Config) (conn.Bind, error) {
+	if cfg.PublicIP == "" {
+		return conn.NewDefaultBind(), nil
+	}
+	addr, err := netip.ParseAddr(cfg.PublicIP)
+	if err != nil {
+		return nil, fmt.Errorf("parse PublicIP %q: %w", cfg.PublicIP, err)
+	}
+	INFO("WireGuard bind pinned to ", addr, ":", cfg.WireGuardPort)
+	return newPinnedBind(addr), nil
 }
 
 func b64ToHex(b64 string) (string, error) {
