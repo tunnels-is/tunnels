@@ -19,7 +19,7 @@ function Modal({ title, onClose, children }) {
 
 const inputClass = "w-full bg-[#fdfcf8] border border-[#e7e3d7] rounded px-3 py-1.5 text-[13px] text-[#0a0a0a] placeholder-[#a3a3a3] focus:outline-none focus:border-[#0a0a0a]";
 
-const emptyForm = () => ({ Tag: '', IP: '', Port: '443', Country: '', WireGuardSubnet: '', WireGuardPort: '51820' });
+const emptyForm = () => ({ Tag: '', IP: '', Port: '443', Country: '', WireGuardSubnet: '', WireGuardSubnet6: '', WireGuardPort: 51820 });
 
 export default function Servers() {
   const navigate = useNavigate();
@@ -57,7 +57,9 @@ export default function Servers() {
     setCreateError('');
     setCreating(true);
     try {
-      const resp = await apiPost('/ui/server/create', { Server: createForm });
+      const resp = await apiPost('/ui/server/create', {
+        Server: { ...createForm, WireGuardPort: Number(createForm.WireGuardPort) || 0 },
+      });
       if (resp.status === 200) {
         setShowCreate(false);
         setCreateForm(emptyForm());
@@ -145,11 +147,15 @@ export default function Servers() {
             </div>
             <div>
               <label className="block text-[11px] text-[#a3a3a3] uppercase tracking-wider mb-1">WireGuard Subnet</label>
-              <input type="text" className={inputClass} value={createForm.WireGuardSubnet} onChange={set('WireGuardSubnet')} placeholder="10.1.0.0/16" />
+              <input type="text" className={inputClass} value={createForm.WireGuardSubnet} onChange={set('WireGuardSubnet')} placeholder="10.42.0.0/22" />
+            </div>
+            <div>
+              <label className="block text-[11px] text-[#a3a3a3] uppercase tracking-wider mb-1">WireGuard Subnet (IPv6)</label>
+              <input type="text" className={inputClass} value={createForm.WireGuardSubnet6} onChange={set('WireGuardSubnet6')} placeholder="fd00::/64" />
             </div>
             <div>
               <label className="block text-[11px] text-[#a3a3a3] uppercase tracking-wider mb-1">WireGuard Port</label>
-              <input type="text" className={inputClass} value={createForm.WireGuardPort} onChange={set('WireGuardPort')} />
+              <input type="number" className={inputClass} value={createForm.WireGuardPort} onChange={set('WireGuardPort')} />
             </div>
             {createError && <p className="text-[12px] text-[#dc2626]">{createError}</p>}
             <div className="flex justify-end gap-2 pt-2">

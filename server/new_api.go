@@ -91,17 +91,6 @@ func launchAPIServer() {
 	mux.Handle("POST /ui/server/update", adminMW(API_ServerUpdate))
 	mux.Handle("POST /ui/servers", adminMW(API_ServersForUser))
 
-	mux.Handle("GET /ui/wg/config", adminMW(API_WGConfig))
-
-	mux.Handle("POST /ui/wg/server-config", adminMW(API_WGServerConfigCreate))
-	mux.Handle("POST /ui/wg/server-config/list", adminMW(API_WGServerConfigList))
-	mux.Handle("POST /ui/wg/server-config/update", adminMW(API_WGServerConfigUpdate))
-	mux.Handle("GET /ui/wg/server-config/get", adminMW(API_WGServerConfigGet))
-	mux.Handle("POST /ui/wg/server-config/assign", adminMW(API_WGServerConfigAssign))
-
-	mux.Handle("POST /ui/network/list", adminMW(API_NetworkList))
-	mux.Handle("POST /ui/network/update", adminMW(API_NetworkUpdate))
-
 	if loadSecret("PayKey") != "" {
 		mux.Handle("POST /ui/user/toggle/substatus", adminMW(API_UserToggleSubStatus))
 	}

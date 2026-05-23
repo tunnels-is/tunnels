@@ -147,43 +147,26 @@ type Server struct {
 	Port    string      `json:"Port"`
 	Groups  []uuid.UUID `json:"Groups,omitempty"`
 
-	// WGConfigID links this server to its WGServerConfig record.
-	WGConfigID uuid.UUID `json:"WGConfigID,omitempty"`
+	// APIKey is the per-server secret; the wg-server running on this host sends
+	// it in X-WG-KEY to authenticate /wg/server-config/fetch, /wg/peers, and
+	// /wg/servers. Empty when WG is not enabled on this server.
+	APIKey string `json:"APIKey,omitempty"`
 
-	// Cached fields — source of truth is WGServerConfig; refreshed on assign/fetch.
-	WireGuardPort    string `json:"WireGuardPort,omitempty"`
-	WireGuardPubKey  string `json:"WireGuardPubKey,omitempty"`
-	WireGuardSubnet  string `json:"WireGuardSubnet,omitempty"`
+	WireGuardPort   int    `json:"WireGuardPort,omitempty"`
+	WireGuardPubKey string `json:"WireGuardPubKey,omitempty"`
+	WireGuardIface  string `json:"WireGuardIface,omitempty"`
+
+	// WireGuardSubnet is the IPv4 CIDR the wg-server hands out to peers.
+	WireGuardSubnet string `json:"WireGuardSubnet,omitempty"`
+
+	// WireGuardSubnet6 is the IPv6 CIDR for peers. Optional — when empty, IPv6
+	// is not served.
 	WireGuardSubnet6 string `json:"WireGuardSubnet6,omitempty"`
-}
 
-// WGServerConfig holds all operational configuration for a wg-server instance.
-// It is stored in the controller DB and fetched by the wg-server at boot using
-// its per-server APIKey.
-type WGServerConfig struct {
-	ID  uuid.UUID `json:"_id"`
-	Tag string    `json:"Tag"`
+	InternetIface string `json:"InternetIface,omitempty"`
 
-	// APIKey is the per-server secret; wg-server sends this in X-WG-KEY to
-	// authenticate /wg/server-config/fetch, /wg/peers, and /wg/servers.
-	APIKey string `json:"APIKey"`
-
-	WireGuardPort   int    `json:"WireGuardPort"`
-	WireGuardPubKey string `json:"WireGuardPubKey"`
-	WireGuardIface  string `json:"WireGuardIface"`
-
-	// NetworkID references the Network record whose CIDR is the WireGuard subnet.
-	// The subnet is resolved at runtime — it is not stored on this struct.
-	NetworkID uuid.UUID `json:"NetworkID,omitempty"`
-
-	// NetworkID6 references the Network record whose CIDR is the IPv6 WireGuard subnet.
-	// Optional — when empty, IPv6 is not served.
-	NetworkID6 uuid.UUID `json:"NetworkID6,omitempty"`
-
-	InternetIface string `json:"InternetIface"`
-
-	PacketInspection   bool `json:"PacketInspection"`
-	InsecureSkipVerify bool `json:"InsecureSkipVerify"`
+	PacketInspection   bool `json:"PacketInspection,omitempty"`
+	InsecureSkipVerify bool `json:"InsecureSkipVerify,omitempty"`
 }
 
 // WGServerConfigResponse is returned by GET /wg/server-config/fetch to the
@@ -212,7 +195,7 @@ type WGServerConfigResponse struct {
 // WGServerInfo describes a peer wg-server for cross-server routing.
 type WGServerInfo struct {
 	WireGuardPubKey  string `json:"WireGuardPubKey"`
-	WireGuardPort    string `json:"WireGuardPort"`
+	WireGuardPort    int    `json:"WireGuardPort"`
 	WireGuardSubnet  string `json:"WireGuardSubnet"`
 	WireGuardSubnet6 string `json:"WireGuardSubnet6,omitempty"`
 	IP               string `json:"IP"`
