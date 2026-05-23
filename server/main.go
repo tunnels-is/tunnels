@@ -22,7 +22,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackpal/gateway"
 	"github.com/joho/godotenv"
-	"github.com/tunnels-is/tunnels/certs"
 	"github.com/tunnels-is/tunnels/crypt"
 	"github.com/tunnels-is/tunnels/signal"
 	"github.com/tunnels-is/tunnels/types"
@@ -53,11 +52,11 @@ func main() {
 	showVersion := false
 	flag.BoolVar(&showVersion, "version", false, "show version and exit")
 
-	configFlag := flag.String("config", "", "Generate a config + certificates. Empty value creates a full config (AUTH + WG), 'auth' enables only the AUTH feature, 'wg' enables only the VPN feature")
+	configFlag := flag.String("config", "", "Generate a config. Empty value creates a full config (AUTH + WG), 'auth' enables only the AUTH feature, 'wg' enables only the VPN feature")
 	configPath := flag.String("configPath", "./config.json", "path to config file (supports .json, .yaml, .yml)")
 	jsonLogs := flag.Bool("json", true, "enable/disable json logging")
 	sourceInfo := flag.Bool("source", false, "disable source line information in logs")
-	certsOnly := flag.Bool("certs", false, "This command generates certificates and exits")
+	certFlag := flag.String("cert", "", "Generate API certificates. Use 'selfsign' for a self-signed cert or a domain name (e.g. 'example.com') to obtain a Let's Encrypt certificate via ACME HTTP-01")
 	silent := flag.Bool("silent", false, "This command disables logging")
 	logLevel := flag.String("logLevel", "debug", "set the log level. Available levels: debug, info, warn, error")
 	adminFlag := flag.String("admin", "", "Add an admin identifier (DeviceToken/DeviceKey/UserID) to NetAdmins")
@@ -85,19 +84,28 @@ func main() {
 			os.Exit(1)
 		}
 		logger.Info("generating config", "mode", configMode)
-		err := makeConfigAndCerts(*ipOverride, configMode)
-		if err != nil {
-			logger.Error("unable to create certificates or config", "error", err)
+		if err := makeConfig(*ipOverride, configMode); err != nil {
+			logger.Error("unable to create config", "error", err)
 			os.Exit(1)
 		}
 	}
 
-	if *certsOnly {
-		logger.Info("generating certs")
-		err := makeCertsOnly(*ipOverride)
-		if err != nil {
-			logger.Error("unable to create certificates", "error", err)
-			os.Exit(1)
+	if certValue := strings.TrimSpace(*certFlag); certValue != "" {
+		if strings.EqualFold(certValue, "selfsign") {
+			logger.Info("generating self-signed certificates")
+			if err := generateSelfSignedCerts(*ipOverride); err != nil {
+				logger.Error("unable to create self-signed certificates", "error", err)
+				os.Exit(1)
+			}
+		} else {
+			logger.Info("requesting Let's Encrypt certificate", "domain", certValue)
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+			err := generateLetsEncryptCerts(ctx, certValue)
+			cancel()
+			if err != nil {
+				logger.Error("unable to obtain Let's Encrypt certificate", "error", err)
+				os.Exit(1)
+			}
 		}
 	}
 
@@ -384,24 +392,10 @@ func hashIdentifier(identifier string) (string, error) {
 	return string(h), nil
 }
 
-func makeConfigAndCerts(ipOverride string, mode string) (err error) {
-	ep, err := os.Executable()
+func makeConfig(ipOverride string, mode string) error {
+	interfaceIP, err := resolveInterfaceIP(ipOverride)
 	if err != nil {
 		return err
-	}
-	eps := strings.Split(ep, "/")
-	ep = strings.Join(eps[:len(eps)-1], "/")
-	ep += "/"
-
-	var interfaceIP string
-	if ipOverride != "" {
-		interfaceIP = ipOverride
-	} else {
-		IFIP, derr := gateway.DiscoverInterface()
-		if derr != nil {
-			return derr
-		}
-		interfaceIP = IFIP.String()
 	}
 
 	var features []types.Feature
@@ -414,74 +408,35 @@ func makeConfigAndCerts(ipOverride string, mode string) (err error) {
 		features = []types.Feature{types.AUTH, types.DNS, types.WG}
 	}
 
-	err = LoadServerConfig(serverConfigPath)
-	if err != nil {
-		newConfig := &types.ServerConfig{
-			Features:           features,
-			VPNIP:              interfaceIP,
-			APIIP:              interfaceIP,
-			APIPort:            "443",
-			NetAdmins:          []string{},
-			Hostname:           "tunnels.local",
-			Routes:             []*types.Route{},
-			SubNets:            []*types.Network{},
-			UserMaxConnections: 10,
-			DNSRecords:         []*types.DNSRecord{},
-			DNSServers:         []string{},
-			SecretStore:        "config",
-			DBurl:              "",
-			AdminAPIKey:        uuid.NewString(),
-			TwoFactorKey:       strings.ReplaceAll(uuid.NewString(), "-", ""),
-			CookieSigningKey:   strings.ReplaceAll(uuid.NewString(), "-", ""),
-			CertPem:            "./cert.pem",
-			KeyPem:             "./key.pem",
-			SignPem:            "./sign.pem",
-			Log:                &types.LogConfig{Level: "debug", JSON: true},
-			WG:                 &types.WGBootstrap{InsecureSkipVerify: true},
-		}
-		Config.Store(newConfig)
-		if err := SaveServerConfig(serverConfigPath); err != nil {
-			return err
-		}
+	if err := LoadServerConfig(serverConfigPath); err == nil {
+		return nil
 	}
 
-	return makeCerts(ep, interfaceIP)
-}
-
-func makeCerts(execPath string, IP string) (err error) {
-	_, err = certs.MakeCertV2(
-		certs.ECDSA,
-		filepath.Join(execPath, "cert.pem"),
-		filepath.Join(execPath, "key.pem"),
-		[]string{IP},
-		[]string{""},
-		"",
-		time.Time{},
-		true,
-	)
-	return err
-}
-
-func makeCertsOnly(ipOverride string) (err error) {
-	ep, err := os.Executable()
-	if err != nil {
-		return err
+	newConfig := &types.ServerConfig{
+		Features:           features,
+		VPNIP:              interfaceIP,
+		APIIP:              interfaceIP,
+		APIPort:            "443",
+		NetAdmins:          []string{},
+		Hostname:           "tunnels.local",
+		Routes:             []*types.Route{},
+		SubNets:            []*types.Network{},
+		UserMaxConnections: 10,
+		DNSRecords:         []*types.DNSRecord{},
+		DNSServers:         []string{},
+		SecretStore:        "config",
+		DBurl:              "",
+		AdminAPIKey:        uuid.NewString(),
+		TwoFactorKey:       strings.ReplaceAll(uuid.NewString(), "-", ""),
+		CookieSigningKey:   strings.ReplaceAll(uuid.NewString(), "-", ""),
+		CertPem:            "./cert.pem",
+		KeyPem:             "./key.pem",
+		SignPem:            "./sign.pem",
+		Log:                &types.LogConfig{Level: "debug", JSON: true},
+		WG:                 &types.WGBootstrap{InsecureSkipVerify: true},
 	}
-	eps := strings.Split(ep, "/")
-	ep = strings.Join(eps[:len(eps)-1], "/")
-	ep += "/"
-
-	var interfaceIP string
-	if ipOverride != "" {
-		interfaceIP = ipOverride
-	} else {
-		IFIP, derr := gateway.DiscoverInterface()
-		if derr != nil {
-			return derr
-		}
-		interfaceIP = IFIP.String()
-	}
-	return makeCerts(ep, interfaceIP)
+	Config.Store(newConfig)
+	return SaveServerConfig(serverConfigPath)
 }
 
 func initializeNewServer() error {
