@@ -2,7 +2,8 @@ import React, { useEffect, useState } from "react";
 import GLOBAL_STATE from "../state";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Save, X, Pencil } from "lucide-react";
+import { Save, X, Pencil, Sun, Moon } from "lucide-react";
+import { getTheme, setTheme as applyAppTheme } from "../theme";
 
 /* ─── Reusable building blocks ─────────────────────────────────────── */
 
@@ -70,6 +71,12 @@ const Settings = () => {
   const [editing, setEditing] = useState(false);
   const [cfg, setCfg] = useState({ ...state.Config });
   const [mod, setMod] = useState(false);
+  const [theme, setTheme] = useState(() => getTheme());
+
+  const changeTheme = (next) => {
+    setTheme(next);
+    applyAppTheme(next);
+  };
 
   const updatecfg = (key, value) => {
     if (key === "APICertDomains" || key === "APICertIPs") {
@@ -154,6 +161,47 @@ const Settings = () => {
 
       {/* Grid layout */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+        {/* ── Appearance ── */}
+        <SettingsCard
+          className="lg:col-span-2"
+          title="Appearance"
+          description="Switch between the paper-light or dark theme."
+          actions={
+            <div className="theme-toggle inline-flex items-center rounded-md border border-[#e7e3d7] bg-white card-shadow p-0.5">
+              <button
+                onClick={() => changeTheme("light")}
+                className={
+                  "flex items-center gap-1.5 px-2.5 h-7 text-[11px] font-medium rounded transition-colors " +
+                  (theme === "light"
+                    ? "theme-toggle-active"
+                    : "theme-toggle-inactive")
+                }
+                aria-pressed={theme === "light"}
+              >
+                <Sun className="w-3 h-3" strokeWidth={2} />
+                Light
+              </button>
+              <button
+                onClick={() => changeTheme("dark")}
+                className={
+                  "flex items-center gap-1.5 px-2.5 h-7 text-[11px] font-medium rounded transition-colors " +
+                  (theme === "dark"
+                    ? "theme-toggle-active"
+                    : "theme-toggle-inactive")
+                }
+                aria-pressed={theme === "dark"}
+              >
+                <Moon className="w-3 h-3" strokeWidth={2} />
+                Dark
+              </button>
+            </div>
+          }
+        >
+          <p className="text-[12px] text-[#525252]">
+            Current theme: <span className="font-mono text-[#0a0a0a]">{theme}</span>
+          </p>
+        </SettingsCard>
 
         {/* ── API ── */}
         <SettingsCard

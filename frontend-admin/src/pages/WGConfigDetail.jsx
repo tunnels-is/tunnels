@@ -193,7 +193,7 @@ export default function WGConfigDetail() {
       <h1 className="text-[16px] font-semibold text-[#0a0a0a] mb-4">{config.Tag}</h1>
 
       {/* Config fields */}
-      <div className="border border-[#e7e3d7] rounded-lg overflow-hidden mb-6">
+      <div className="bg-white border border-[#e7e3d7] rounded-lg overflow-hidden card-shadow mb-6">
         <Row label="ID">
           <span className="font-mono text-[12px] text-[#525252]">{config._id}</span>
         </Row>

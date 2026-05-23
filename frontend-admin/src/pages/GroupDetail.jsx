@@ -154,7 +154,7 @@ export default function GroupDetail() {
       <h1 className="text-[16px] font-semibold text-[#0a0a0a] mb-4">{group.Tag}</h1>
 
       {/* Info */}
-      <div className="border border-[#e7e3d7] rounded-lg overflow-hidden mb-6">
+      <div className="bg-white border border-[#e7e3d7] rounded-lg overflow-hidden card-shadow mb-6">
         <Row label="ID">
           <span className="font-mono text-[12px] text-[#525252]">{group._id}</span>
         </Row>
@@ -193,7 +193,7 @@ export default function GroupDetail() {
         const items = members[current.key];
 
         return (
-          <div className="border border-[#e7e3d7] rounded-lg overflow-hidden">
+          <div className="bg-white border border-[#e7e3d7] rounded-lg overflow-hidden card-shadow">
             {/* Tab bar */}
             <div className="flex border-b border-[#e7e3d7] bg-[#ffffff]">
               {tabs.map((t) => (

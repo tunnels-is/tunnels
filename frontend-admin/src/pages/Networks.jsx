@@ -68,16 +68,50 @@ export default function Networks() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-5">
-        <h1 className="text-[16px] font-semibold text-[#0a0a0a]">Networks</h1>
-        <div className="flex gap-2">
+      <div className="flex items-center justify-between gap-4 mb-5">
+        {/* Left: title + count */}
+        <div className="flex items-baseline gap-2.5">
+          <h1 className="text-[16px] font-semibold tracking-tight text-[#0a0a0a]">Networks</h1>
+          <span className="text-[11px] font-mono tabular-nums text-[#a3a3a3]">{total}</span>
+          {total > 0 && (
+            <span className="text-[10px] text-[#a3a3a3] tabular-nums">
+              · {offset + 1}–{Math.min(offset + filtered.length, total)}
+            </span>
+          )}
+        </div>
+
+        {/* Right: search + pagination + refresh */}
+        <div className="flex items-center gap-2">
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search CIDR, tag…"
-            className="bg-[#fdfcf8] border border-[#e7e3d7] rounded px-3 py-1.5 text-[12px] text-[#0a0a0a] placeholder-[#a3a3a3] focus:outline-none focus:border-[#0a0a0a] w-48"
+            className="bg-white border border-[#e7e3d7] rounded px-3 py-1.5 text-[12px] text-[#0a0a0a] placeholder-[#a3a3a3] focus:outline-none focus:border-[#0a0a0a] w-48"
           />
+          {totalPages > 1 && (
+            <div className="inline-flex items-center rounded border border-[#e7e3d7] bg-white card-shadow">
+              <button
+                onClick={() => goPage(offset - PAGE_SIZE)}
+                disabled={offset === 0 || loading}
+                className="flex items-center justify-center w-7 h-7 text-[#525252] hover:text-[#0a0a0a] hover:bg-black/[0.04] disabled:opacity-30 disabled:cursor-not-allowed transition-colors rounded-l"
+                title="Previous page"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+              </button>
+              <span className="px-2 text-[11px] tabular-nums text-[#525252] border-x border-[#e7e3d7] h-7 flex items-center">
+                {currentPage} / {totalPages}
+              </span>
+              <button
+                onClick={() => goPage(offset + PAGE_SIZE)}
+                disabled={offset + PAGE_SIZE >= total || loading}
+                className="flex items-center justify-center w-7 h-7 text-[#525252] hover:text-[#0a0a0a] hover:bg-black/[0.04] disabled:opacity-30 disabled:cursor-not-allowed transition-colors rounded-r"
+                title="Next page"
+              >
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
           <button onClick={() => load(offset)} disabled={loading} className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[12px] text-[#525252] hover:text-[#0a0a0a] hover:bg-black/[0.04] transition-colors">
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
             Refresh
@@ -87,7 +121,7 @@ export default function Networks() {
 
       {error && <p className="text-[12px] text-[#dc2626] mb-3">{error}</p>}
 
-      <div className="border border-[#e7e3d7] rounded-lg overflow-hidden">
+      <div className="bg-white border border-[#e7e3d7] rounded-lg overflow-hidden card-shadow">
         <div className="grid grid-cols-[140px_1fr_1fr_160px] gap-4 px-4 py-2 border-b border-[#e7e3d7] bg-[#ffffff]">
           {['CIDR', 'Tag', 'Description', 'WG Config'].map((h) => (
             <span key={h} className="text-[10px] text-[#a3a3a3] uppercase tracking-wider">{h}</span>
@@ -119,34 +153,6 @@ export default function Networks() {
         })}
       </div>
 
-      <div className="flex items-center justify-between mt-3">
-        <p className="text-[11px] text-[#c4c4c4]">
-          {total > 0
-            ? `Showing ${offset + 1}–${Math.min(offset + filtered.length, total)} of ${total} networks`
-            : 'No networks'}
-        </p>
-        {totalPages > 1 && (
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => goPage(offset - PAGE_SIZE)}
-              disabled={offset === 0 || loading}
-              className="flex items-center gap-1 px-2 py-1 rounded text-[11px] text-[#525252] hover:text-[#0a0a0a] hover:bg-black/[0.04] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-            >
-              <ChevronLeft className="w-3.5 h-3.5" /> Prev
-            </button>
-            <span className="text-[11px] text-[#a3a3a3]">
-              Page {currentPage} of {totalPages}
-            </span>
-            <button
-              onClick={() => goPage(offset + PAGE_SIZE)}
-              disabled={offset + PAGE_SIZE >= total || loading}
-              className="flex items-center gap-1 px-2 py-1 rounded text-[11px] text-[#525252] hover:text-[#0a0a0a] hover:bg-black/[0.04] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-            >
-              Next <ChevronRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        )}
-      </div>
     </div>
   );
 }

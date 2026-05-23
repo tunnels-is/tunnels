@@ -123,10 +123,8 @@ const SideBar = () => {
                           }
                         }}
                         className={cn(
-                          "flex items-center w-full gap-3 px-[20px] py-1.5 text-[13px] font-medium transition-all overflow-hidden relative",
-                          isActive
-                            ? "bg-white text-[#0a0a0a] shadow-[inset_2px_0_0_#0a0a0a,0_1px_2px_rgba(10,10,10,0.04)]"
-                            : "text-[#525252] hover:text-[#0a0a0a] hover:bg-black/[0.03]"
+                          "flex items-center w-full gap-3 px-[20px] py-1.5 text-[13px] font-medium transition-all overflow-hidden relative sidebar-item",
+                          isActive ? "sidebar-item-active" : "sidebar-item-inactive"
                         )}
                       >
                         <i.icon

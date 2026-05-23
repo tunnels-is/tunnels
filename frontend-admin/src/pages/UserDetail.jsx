@@ -121,7 +121,7 @@ export default function UserDetail() {
       <h1 className="text-[16px] font-semibold text-[#0a0a0a] mb-4">{user.Email}</h1>
 
       {/* Info / Edit fields */}
-      <div className="border border-[#e7e3d7] rounded-lg overflow-hidden mb-5">
+      <div className="bg-white border border-[#e7e3d7] rounded-lg overflow-hidden card-shadow mb-5">
         <Row label="ID">
           <span className="font-mono text-[12px] text-[#525252]">{user._id}</span>
         </Row>
@@ -193,7 +193,7 @@ export default function UserDetail() {
           <h2 className="text-[13px] font-semibold text-[#0a0a0a] mb-2">
             Active Sessions <span className="text-[#a3a3a3] font-normal">({user.Tokens.length})</span>
           </h2>
-          <div className="border border-[#e7e3d7] rounded-lg overflow-hidden">
+          <div className="bg-white border border-[#e7e3d7] rounded-lg overflow-hidden card-shadow">
             <div className="grid grid-cols-[1fr_160px] gap-4 px-4 py-2 border-b border-[#e7e3d7] bg-[#ffffff]">
               {['Device Name', 'Created'].map((h) => (
                 <span key={h} className="text-[10px] text-[#a3a3a3] uppercase tracking-wider">{h}</span>

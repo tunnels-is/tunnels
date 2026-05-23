@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { Users, Monitor, Layers, Server, Shield, Network, LogOut } from 'lucide-react';
+import { Users, Monitor, Layers, Server, Shield, Network, LogOut, Sun, Moon } from 'lucide-react';
 import { getUserMeta, clearUserMeta } from '../auth';
 import { apiPost } from '../api';
+import { getTheme, setTheme as applyAppTheme } from '../theme';
 
 const navItems = [
   { icon: Users, label: 'Users', route: 'users' },
@@ -16,6 +18,13 @@ export default function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
   const meta = getUserMeta();
+  const [theme, setTheme] = useState(() => getTheme());
+
+  const toggleTheme = () => {
+    const next = theme === 'dark' ? 'light' : 'dark';
+    setTheme(next);
+    applyAppTheme(next);
+  };
 
   const handleLogout = async () => {
     try {
@@ -76,6 +85,18 @@ export default function Layout() {
           >
             <LogOut className="w-4 h-4 text-[#a3a3a3]" />
             Logout
+          </button>
+          <button
+            onClick={toggleTheme}
+            className="flex items-center w-full gap-3 px-3 py-2 rounded-md text-[13px] text-[#525252] hover:text-[#0a0a0a] hover:bg-black/[0.03] transition-colors"
+            title={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+          >
+            {theme === 'dark' ? (
+              <Sun className="w-4 h-4 text-[#a3a3a3]" />
+            ) : (
+              <Moon className="w-4 h-4 text-[#a3a3a3]" />
+            )}
+            {theme === 'dark' ? 'Light theme' : 'Dark theme'}
           </button>
         </div>
       </div>
