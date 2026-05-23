@@ -76,9 +76,12 @@ export default function Groups() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-5">
-        <h1 className="text-[16px] font-semibold text-[#0a0a0a]">Groups</h1>
-        <div className="flex gap-2">
+      <div className="flex items-center justify-between gap-4 mb-5">
+        <div className="flex items-baseline gap-2.5">
+          <h1 className="text-[16px] font-semibold tracking-tight text-[#0a0a0a]">Groups</h1>
+          <span className="text-[11px] font-mono tabular-nums text-[#a3a3a3]">{groups.length}</span>
+        </div>
+        <div className="flex items-center gap-2">
           <button onClick={load} disabled={loading} className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[12px] text-[#525252] hover:text-[#0a0a0a] hover:bg-black/[0.04] transition-colors">
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
             Refresh
@@ -92,7 +95,7 @@ export default function Groups() {
 
       {error && <p className="text-[12px] text-[#dc2626] mb-3">{error}</p>}
 
-      <div className="border border-[#e7e3d7] rounded-lg overflow-hidden">
+      <div className="bg-white border border-[#e7e3d7] rounded-lg overflow-hidden card-shadow">
         <div className="grid grid-cols-[1fr_200px] gap-4 px-4 py-2 border-b border-[#e7e3d7] bg-[#ffffff]">
           {['Tag', 'Created'].map((h) => (
             <span key={h} className="text-[10px] text-[#a3a3a3] uppercase tracking-wider">{h}</span>

@@ -1,6 +1,21 @@
 @import "tailwindcss";
 @import "react-datepicker/dist/react-datepicker.css";
 
+/* ─── Card depth ─────────────────────────────────────────────────── */
+.card-shadow {
+  box-shadow:
+    0 1px 2px rgba(10, 10, 10, 0.06),
+    0 2px 6px rgba(10, 10, 10, 0.05);
+}
+.card-shadow-hover {
+  transition: box-shadow 0.15s ease, transform 0.06s ease;
+}
+.card-shadow-hover:hover {
+  box-shadow:
+    0 2px 4px rgba(10, 10, 10, 0.07),
+    0 6px 14px rgba(10, 10, 10, 0.06);
+}
+
 /* Paper-light palette — matches the marketing website */
 :root {
   --bg: #fdfcf8;
@@ -142,3 +157,133 @@ code, pre, .font-mono {
 .react-datepicker__input-container input:focus {
   border-color: #0a0a0a;
 }
+
+/* ════════════════════════════════════════════════════════════════════════
+   Dark theme — applies when <html class="dark"> is set
+   ════════════════════════════════════════════════════════════════════════ */
+
+.dark html, .dark body { background-color: #0e1116; color: #ebebeb; }
+
+/* ─── Backgrounds ─────────────────────────────────────────────────────── */
+.dark .bg-white,
+.dark .bg-\[\#ffffff\]           { background-color: #1a1d23; }
+.dark .bg-\[\#fdfcf8\]           { background-color: #0e1116; }
+.dark .bg-\[\#f4f1e8\]           { background-color: #15181f; }
+.dark .bg-\[\#ffffff\]\/80       { background-color: rgb(26 29 35 / 0.92); }
+
+/* ─── Text ────────────────────────────────────────────────────────────── */
+.dark .text-\[\#0a0a0a\]         { color: #ebebeb; }
+.dark .text-\[\#262626\]         { color: #d6d6d6; }
+.dark .text-\[\#525252\]         { color: #a3a3a3; }
+.dark .text-\[\#737373\]         { color: #8a8a8a; }
+.dark .text-\[\#a3a3a3\]         { color: #707070; }
+.dark .text-\[\#c4c4c4\]         { color: #5a5a5a; }
+.dark .text-\[\#d5d0c0\]         { color: #404040; }
+.dark .hover\:text-\[\#0a0a0a\]:hover { color: #ffffff; }
+.dark .hover\:text-\[\#262626\]:hover { color: #ffffff; }
+.dark .placeholder-\[\#a3a3a3\]::placeholder { color: #5a5a5a; }
+
+/* ─── Borders ─────────────────────────────────────────────────────────── */
+.dark .border-\[\#e7e3d7\]                 { border-color: #2c3038; }
+.dark .border-\[\#e7e3d7\]\/50             { border-color: rgb(44 48 56 / 0.5); }
+.dark .border-\[\#e7e3d7\]\/70             { border-color: rgb(44 48 56 / 0.7); }
+.dark .border-\[\#d5d0c0\]                 { border-color: #3a3e47; }
+.dark .hover\:border-\[\#0a0a0a\]:hover    { border-color: #ffffff; }
+
+/* ─── Inverted overlays (black -> white on dark) ──────────────────────── */
+.dark .bg-black\/\[0\.03\]    { background-color: rgb(255 255 255 / 0.03); }
+.dark .bg-black\/\[0\.04\]    { background-color: rgb(255 255 255 / 0.04); }
+.dark .bg-black\/\[0\.05\]    { background-color: rgb(255 255 255 / 0.05); }
+.dark .bg-black\/\[0\.06\]    { background-color: rgb(255 255 255 / 0.06); }
+.dark .bg-black\/\[0\.07\]    { background-color: rgb(255 255 255 / 0.07); }
+.dark .bg-black\/\[0\.08\]    { background-color: rgb(255 255 255 / 0.08); }
+.dark .hover\:bg-black\/\[0\.03\]:hover { background-color: rgb(255 255 255 / 0.035); }
+.dark .hover\:bg-black\/\[0\.04\]:hover { background-color: rgb(255 255 255 / 0.045); }
+.dark .hover\:bg-black\/\[0\.05\]:hover { background-color: rgb(255 255 255 / 0.06); }
+.dark .hover\:bg-black\/\[0\.06\]:hover { background-color: rgb(255 255 255 / 0.07); }
+.dark .hover\:bg-black\/\[0\.08\]:hover { background-color: rgb(255 255 255 / 0.09); }
+
+/* ─── Card shadow — deeper on dark ────────────────────────────────────── */
+.dark .card-shadow {
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.35),
+    0 4px 10px rgba(0, 0, 0, 0.30);
+}
+.dark .card-shadow-hover:hover {
+  box-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.4),
+    0 8px 18px rgba(0, 0, 0, 0.32);
+}
+
+/* ─── Accent color shifts ─────────────────────────────────────────────── */
+.dark .text-\[\#1d4ed8\]   { color: #60a5fa; }
+.dark .text-\[\#15803d\]   { color: #4ade80; }
+.dark .text-\[\#b45309\]   { color: #fbbf24; }
+.dark .text-\[\#b91c1c\]   { color: #fca5a5; }
+.dark .text-\[\#dc2626\]   { color: #f87171; }
+/* Raw bg-[#0a0a0a] — used for buttons, brand dots, etc. Use a muted dark
+   gray so decorative uses look subdued, not bright-white in dark mode. */
+.dark .bg-\[\#0a0a0a\]     { background-color: #3a3e47; }
+.dark .bg-\[\#0a0a0a\].text-white,
+.dark .bg-\[\#0a0a0a\] .text-white { color: #ebebeb; }
+.dark .bg-\[\#dc2626\]     { background-color: #ef4444; color: #ffffff; }
+.dark .hover\:bg-\[\#262626\]:hover { background-color: #4a4e57; }
+.dark .hover\:bg-\[\#b91c1c\]:hover { background-color: #dc2626; }
+
+/* Buttons styled inline with bg-[#0a0a0a] hover:bg-[#262626] text-white
+   (admin pages don't use the .btn-primary class). Make them visible and
+   clearly CTAs in dark mode by inverting to a light pill. */
+.dark .bg-\[\#0a0a0a\].hover\:bg-\[\#262626\] {
+  background-color: #ebebeb;
+  color: #0a0a0a;
+}
+.dark .bg-\[\#0a0a0a\].hover\:bg-\[\#262626\]:hover {
+  background-color: #ffffff;
+  color: #0a0a0a;
+}
+.dark .bg-\[\#dc2626\]\/\[0\.05\] { background-color: rgb(248 113 113 / 0.07); }
+.dark .border-\[\#dc2626\]\/25 { border-color: rgb(248 113 113 / 0.35); }
+.dark .bg-\[\#15803d\]\/\[0\.05\] { background-color: rgb(74 222 128 / 0.07); }
+.dark .border-\[\#15803d\]\/25 { border-color: rgb(74 222 128 / 0.35); }
+
+/* ─── Sidebar / Layout specifics ──────────────────────────────────────── */
+/* Sidebar uses bg-white (already remapped) and bg-[#fdfcf8] on the main area */
+
+/* ─── react-datepicker dark overrides ─────────────────────────────────── */
+.dark .react-datepicker {
+  background-color: #1a1d23;
+  border-color: #2c3038;
+  color: #ebebeb;
+}
+.dark .react-datepicker__header {
+  background-color: #15181f;
+  border-bottom-color: #2c3038;
+}
+.dark .react-datepicker__current-month,
+.dark .react-datepicker__day-name,
+.dark .react-datepicker-time__header {
+  color: #a3a3a3;
+}
+.dark .react-datepicker__day-name { color: #707070; }
+.dark .react-datepicker__day { color: #ebebeb; }
+.dark .react-datepicker__day:hover { background-color: rgba(255, 255, 255, 0.08); color: #ffffff; }
+.dark .react-datepicker__day--selected,
+.dark .react-datepicker__day--keyboard-selected {
+  background-color: #ebebeb;
+  color: #0a0a0a;
+}
+.dark .react-datepicker__time-container { border-left-color: #2c3038; }
+.dark .react-datepicker__time-container .react-datepicker__time { background-color: #1a1d23; }
+.dark .react-datepicker__time-list-item { color: #a3a3a3; }
+.dark .react-datepicker__time-list-item:hover { background-color: rgba(255, 255, 255, 0.08) !important; color: #ffffff; }
+.dark .react-datepicker__input-container input {
+  background-color: #1a1d23;
+  border-color: #2c3038;
+  color: #ebebeb;
+}
+
+/* ─── Scrollbar in dark ───────────────────────────────────────────────── */
+.dark * { scrollbar-color: #3a3e47 transparent; }
+.dark ::-webkit-scrollbar-thumb { background: #3a3e47; }
+.dark ::-webkit-scrollbar-thumb:hover { background: #4a4e57; }
+.dark ::selection { background: #ebebeb; color: #0a0a0a; }

@@ -315,7 +315,7 @@ const TunnelNode = React.forwardRef(({ tunnel, active, state, selected, linking,
             : isActive
               ? "bg-[#15803d] border-[#ffffff]"
               : linked
-                ? "bg-[#1d4ed8]/50 border-[#ffffff]"
+                ? "bg-[#1d4ed8] border-[#1d4ed8]"
                 : "bg-[#e7e3d7] border-[#ffffff]"
       )} />
     </div>
@@ -381,7 +381,7 @@ const ServerNode = React.forwardRef(({ server, hasActive, hasLinked, activeStats
             : hasActive
               ? "bg-[#1d4ed8] border-[#ffffff]"
               : hasLinked
-                ? "bg-[#1d4ed8]/50 border-[#ffffff]"
+                ? "bg-[#1d4ed8] border-[#1d4ed8]"
                 : "bg-[#e7e3d7] border-[#ffffff]"
       )} />
 

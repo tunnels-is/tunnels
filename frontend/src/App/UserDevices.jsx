@@ -170,7 +170,7 @@ const UserDevices = () => {
                 <p className="text-[11px] text-[#b45309]">Save this config — it cannot be shown again</p>
               </div>
               <div className="flex justify-center mb-3">
-                <div className="p-4 bg-white rounded w-[220px]">
+                <div className="qr-code p-4 bg-white rounded w-[220px]">
                   <QRCode
                     style={{ height: "auto", maxWidth: "188px", width: "188px" }}
                     value={wgConfig}
