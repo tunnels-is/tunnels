@@ -100,7 +100,7 @@ export default function WGConfigCreate() {
         <h1 className="text-[16px] font-semibold text-[#0a0a0a] mb-1">Config Created</h1>
         <p className="text-[12px] text-[#b45309] mb-4">Save the APIKey now — it will not be shown again.</p>
 
-        <div className="border border-[#e7e3d7] rounded-lg overflow-hidden mb-5">
+        <div className="bg-white border border-[#e7e3d7] rounded-lg overflow-hidden card-shadow mb-5">
           {Object.entries(result).map(([k, v]) => (
             <div key={k} className="flex items-start gap-4 px-4 py-2.5 border-b border-[#e7e3d7]/50">
               <span className="text-[11px] text-[#a3a3a3] uppercase tracking-wider w-36 shrink-0 pt-0.5">{k}</span>
