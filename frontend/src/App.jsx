@@ -6,6 +6,7 @@ import { Toaster } from "react-hot-toast";
 
 import "./assets/style/app.scss";
 import "@fontsource-variable/inter";
+import "./theme";
 
 import DNSAnswers from "./App/component/DNSAnswers";
 import ScreenLoader from "./App/ScreenLoader";

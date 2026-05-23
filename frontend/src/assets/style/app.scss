@@ -130,27 +130,27 @@ code, pre, .font-mono {
     --chart-5: 340 70% 50%;
     --radius: 0.5rem
   }
-  /* Keep .dark class working (the html has class="dark") but map to light values */
+  /* Dark theme palette — applied when <html class="dark"> is set */
   .dark {
-    --background: 44 50% 98%;
-    --foreground: 0 0% 4%;
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 4%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 4%;
-    --primary: 0 0% 4%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 40 31% 93%;
-    --secondary-foreground: 0 0% 4%;
-    --muted: 40 31% 93%;
-    --muted-foreground: 0 0% 32%;
-    --accent: 40 31% 93%;
-    --accent-foreground: 0 0% 4%;
-    --destructive: 0 60% 50%;
+    --background: 220 17% 7%;           /* #0e1116 */
+    --foreground: 0 0% 92%;             /* #ebebeb */
+    --card: 220 14% 12%;                /* #1a1d23 */
+    --card-foreground: 0 0% 92%;
+    --popover: 220 14% 12%;
+    --popover-foreground: 0 0% 92%;
+    --primary: 0 0% 95%;                /* near white — inverts in dark */
+    --primary-foreground: 0 0% 8%;
+    --secondary: 220 12% 16%;
+    --secondary-foreground: 0 0% 92%;
+    --muted: 220 12% 16%;
+    --muted-foreground: 0 0% 64%;
+    --accent: 220 12% 18%;
+    --accent-foreground: 0 0% 92%;
+    --destructive: 0 75% 60%;
     --destructive-foreground: 0 0% 100%;
-    --border: 41 25% 88%;
-    --input: 41 25% 88%;
-    --ring: 222 75% 48%;
+    --border: 220 10% 20%;              /* #2c3038 */
+    --input: 220 10% 22%;
+    --ring: 217 90% 65%;
   }
 }
 
@@ -160,10 +160,6 @@ code, pre, .font-mono {
   }
   body {
     @apply bg-background text-foreground;
-  }
-  .dark {
-    color: hsl(var(--foreground));
-    background-color: hsl(var(--background));
   }
 }
 
@@ -834,3 +830,380 @@ code, pre, .font-mono {
   background: rgba(10, 10, 10, 0.05);
   box-shadow: inset 0 0 0 1px rgba(10, 10, 10, 0.06);
 }
+
+/* ════════════════════════════════════════════════════════════════════════
+   Dark theme — overrides for hard-coded hex literals and component classes
+   ════════════════════════════════════════════════════════════════════════ */
+
+/* Page background */
+.dark html, .dark body { background-color: #0e1116; color: #ebebeb; }
+.dark #app { background-color: #0e1116 !important; }
+
+/* ─── Backgrounds ─────────────────────────────────────────────────────── */
+.dark .bg-white,
+.dark .bg-\[\#ffffff\]           { background-color: #1a1d23; }
+.dark .bg-\[\#fdfcf8\]           { background-color: #0e1116; }
+.dark .bg-\[#f4f1e8\]            { background-color: #15181f; }
+.dark .bg-\[\#f4f1e8\]           { background-color: #15181f; }
+
+/* Translucent white-ish variants used on banner-style cards */
+.dark .bg-\[\#ffffff\]\/80       { background-color: rgb(26 29 35 / 0.92); }
+
+/* ─── Text colors ─────────────────────────────────────────────────────── */
+.dark .text-\[\#0a0a0a\]         { color: #ebebeb; }
+.dark .text-\[\#262626\]         { color: #d6d6d6; }
+.dark .text-\[\#404040\]         { color: #c4c4c4; }
+.dark .text-\[\#525252\]         { color: #a3a3a3; }
+.dark .text-\[\#737373\]         { color: #8a8a8a; }
+.dark .text-\[\#a3a3a3\]         { color: #707070; }
+.dark .text-\[\#c4c4c4\]         { color: #5a5a5a; }
+.dark .text-\[\#d5d0c0\]         { color: #404040; }
+
+/* Hover text variants */
+.dark .hover\:text-\[\#0a0a0a\]:hover { color: #ffffff; }
+.dark .hover\:text-\[\#262626\]:hover { color: #ffffff; }
+
+/* Placeholders */
+.dark .placeholder-\[\#a3a3a3\]::placeholder { color: #5a5a5a; }
+.dark .placeholder\:text-\[\#a3a3a3\]::placeholder { color: #5a5a5a; }
+
+/* ─── Borders ─────────────────────────────────────────────────────────── */
+.dark .border-\[\#e7e3d7\]                 { border-color: #2c3038; }
+.dark .border-\[\#e7e3d7\]\/50             { border-color: rgb(44 48 56 / 0.5); }
+.dark .border-\[\#e7e3d7\]\/70             { border-color: rgb(44 48 56 / 0.7); }
+.dark .border-\[\#d5d0c0\]                 { border-color: #3a3e47; }
+
+.dark .hover\:border-\[\#0a0a0a\]:hover     { border-color: #ffffff; }
+.dark .hover\:border-\[\#d5d0c0\]:hover     { border-color: #3a3e47; }
+
+/* black/[0.06] etc overlays — flip to white on dark */
+.dark .bg-black\/\[0\.02\]     { background-color: rgb(255 255 255 / 0.02); }
+.dark .bg-black\/\[0\.03\]     { background-color: rgb(255 255 255 / 0.03); }
+.dark .bg-black\/\[0\.04\]     { background-color: rgb(255 255 255 / 0.04); }
+.dark .bg-black\/\[0\.05\]     { background-color: rgb(255 255 255 / 0.05); }
+.dark .bg-black\/\[0\.06\]     { background-color: rgb(255 255 255 / 0.06); }
+.dark .bg-black\/\[0\.07\]     { background-color: rgb(255 255 255 / 0.07); }
+.dark .bg-black\/\[0\.08\]     { background-color: rgb(255 255 255 / 0.08); }
+.dark .bg-black\/20            { background-color: rgb(255 255 255 / 0.18); }
+.dark .hover\:bg-black\/\[0\.01\]:hover  { background-color: rgb(255 255 255 / 0.02); }
+.dark .hover\:bg-black\/\[0\.02\]:hover  { background-color: rgb(255 255 255 / 0.025); }
+.dark .hover\:bg-black\/\[0\.03\]:hover  { background-color: rgb(255 255 255 / 0.035); }
+.dark .hover\:bg-black\/\[0\.04\]:hover  { background-color: rgb(255 255 255 / 0.045); }
+.dark .hover\:bg-black\/\[0\.05\]:hover  { background-color: rgb(255 255 255 / 0.06); }
+.dark .hover\:bg-black\/\[0\.06\]:hover  { background-color: rgb(255 255 255 / 0.07); }
+.dark .hover\:bg-black\/\[0\.08\]:hover  { background-color: rgb(255 255 255 / 0.09); }
+.dark .bg-black\/5             { background-color: rgb(255 255 255 / 0.05); }
+.dark .hover\:bg-black\/5:hover { background-color: rgb(255 255 255 / 0.06); }
+
+/* ─── Card shadow — deeper on dark ───────────────────────────────────── */
+.dark .card-shadow {
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.35),
+    0 4px 10px rgba(0, 0, 0, 0.30);
+}
+.dark .card-shadow-hover:hover {
+  box-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.4),
+    0 8px 18px rgba(0, 0, 0, 0.32);
+}
+
+/* ─── Component classes: btn / pill / tag / label / alert ────────────── */
+
+/* Primary button — inverts to light bg / dark text on dark theme */
+.dark .btn-primary {
+  background: #ebebeb;
+  color: #0a0a0a;
+  border-color: #ebebeb;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.12) inset,
+    0 1px 2px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(0, 0, 0, 0.25);
+}
+.dark .btn-primary:hover {
+  background: #ffffff;
+  border-color: #ffffff;
+  color: #0a0a0a;
+}
+
+.dark .btn-outline {
+  background: #1a1d23;
+  color: #a3a3a3;
+  border-color: #2c3038;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.25);
+}
+.dark .btn-outline:hover {
+  color: #ffffff;
+  border-color: #4a4e57;
+  background: #1f2228;
+}
+
+.dark .btn-outline-danger {
+  background: #1a1d23;
+  color: #f87171;
+  border-color: rgba(248, 113, 113, 0.3);
+}
+.dark .btn-outline-danger:hover {
+  color: #fca5a5;
+  border-color: rgba(248, 113, 113, 0.6);
+  background: rgba(248, 113, 113, 0.08);
+}
+
+.dark .btn-ghost { color: #a3a3a3; }
+.dark .btn-ghost:hover { color: #ffffff; background: rgba(255, 255, 255, 0.05); }
+
+.dark .btn-ghost-danger { color: #f87171; }
+.dark .btn-ghost-danger:hover { color: #fca5a5; background: rgba(248, 113, 113, 0.1); }
+
+.dark .btn-ghost-success { color: #4ade80; }
+.dark .btn-ghost-success:hover { color: #86efac; background: rgba(74, 222, 128, 0.1); }
+
+.dark .btn-link { color: #60a5fa; }
+.dark .btn-link:hover { color: #93c5fd; }
+
+/* Icon buttons */
+.dark .btn-icon { color: #707070; }
+.dark .btn-icon:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.07);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+}
+.dark .btn-icon-danger:hover  { color: #f87171; background: rgba(248,113,113,0.08); box-shadow: inset 0 0 0 1px rgba(248,113,113,0.2); }
+.dark .btn-icon-success:hover { color: #4ade80; background: rgba(74,222,128,0.08); box-shadow: inset 0 0 0 1px rgba(74,222,128,0.2); }
+.dark .btn-icon-info:hover    { color: #60a5fa; background: rgba(96,165,250,0.08); box-shadow: inset 0 0 0 1px rgba(96,165,250,0.2); }
+
+.dark .btn-icon-state-success { color: #4ade80; }
+.dark .btn-icon-state-warning { color: #fbbf24; }
+.dark .btn-icon-state-danger  { color: #f87171; }
+.dark .btn-icon-state-info    { color: #60a5fa; }
+
+/* Pills */
+.dark .pill {
+  background: #1a1d23;
+  color: #a3a3a3;
+  border-color: #2c3038;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.25);
+}
+.dark .pill:hover {
+  color: #ffffff;
+  border-color: #4a4e57;
+}
+.dark .pill-active {
+  background: #ebebeb;
+  color: #0a0a0a;
+  border-color: #ebebeb;
+}
+.dark .pill-active:hover {
+  background: #ffffff;
+  border-color: #ffffff;
+  color: #0a0a0a;
+}
+.dark .pill-active-warning {
+  background: #b45309;
+  color: #ffffff;
+  border-color: #b45309;
+}
+.dark .pill-active-warning:hover { background: #c2680e; border-color: #c2680e; }
+.dark .pill-active-danger {
+  background: #dc2626;
+  color: #ffffff;
+  border-color: #dc2626;
+}
+.dark .pill-active-danger:hover { background: #e63a3a; border-color: #e63a3a; }
+.dark .pill-active-success {
+  background: #15803d;
+  color: #ffffff;
+  border-color: #15803d;
+}
+.dark .pill-active-success:hover { background: #1a994a; border-color: #1a994a; }
+
+/* Tags */
+.dark .tag-neutral {
+  background: #1a1d23;
+  color: #ebebeb;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 1px 1px rgba(0, 0, 0, 0.2);
+}
+.dark .tag-muted {
+  background: rgba(255, 255, 255, 0.04);
+  color: #a3a3a3;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+.dark .tag-success { background: rgba(74,222,128,0.10);  color: #4ade80; box-shadow: inset 0 0 0 1px rgba(74,222,128,0.25); }
+.dark .tag-warning { background: rgba(251,191,36,0.10);  color: #fbbf24; box-shadow: inset 0 0 0 1px rgba(251,191,36,0.25); }
+.dark .tag-danger  { background: rgba(248,113,113,0.10); color: #f87171; box-shadow: inset 0 0 0 1px rgba(248,113,113,0.25); }
+.dark .tag-info    { background: rgba(96,165,250,0.10);  color: #60a5fa; box-shadow: inset 0 0 0 1px rgba(96,165,250,0.25); }
+
+/* Labels */
+.dark .label, .dark .label-caption { color: #8a8a8a; }
+.dark .label-section { color: #a3a3a3; }
+.dark .label-mono    { color: #a3a3a3; }
+
+/* Alerts */
+.dark .alert-danger  { background: rgba(248, 113, 113, 0.08); border-color: rgba(248, 113, 113, 0.35); color: #fca5a5; }
+.dark .alert-warning { background: rgba(251, 191, 36, 0.08); border-color: rgba(251, 191, 36, 0.35); color: #fcd34d; }
+.dark .alert-info    { background: rgba(96, 165, 250, 0.08); border-color: rgba(96, 165, 250, 0.35); color: #93c5fd; }
+.dark .alert-success { background: rgba(74, 222, 128, 0.08); border-color: rgba(74, 222, 128, 0.35); color: #86efac; }
+
+/* ─── Accent color shifts (blue/green/amber/red brighter on dark) ────── */
+.dark .text-\[\#1d4ed8\]      { color: #60a5fa; }
+.dark .text-\[\#1e40af\]      { color: #93c5fd; }
+.dark .text-\[\#15803d\]      { color: #4ade80; }
+.dark .text-\[\#166534\]      { color: #86efac; }
+.dark .text-\[\#b45309\]      { color: #fbbf24; }
+.dark .text-\[\#92400e\]      { color: #fcd34d; }
+.dark .text-\[\#dc2626\]      { color: #f87171; }
+.dark .text-\[\#b91c1c\]      { color: #fca5a5; }
+.dark .bg-\[\#1d4ed8\]        { background-color: #2563eb; }
+.dark .bg-\[\#15803d\]        { background-color: #16a34a; }
+.dark .bg-\[\#b45309\]        { background-color: #d97706; }
+.dark .bg-\[\#dc2626\]        { background-color: #ef4444; }
+/* Raw bg-[#0a0a0a] is used for both primary buttons AND decorative dots/chips.
+   Use a muted dark gray (lighter than card bg, darker than text) so decorative
+   uses look subdued, not bright-white. Primary buttons that need a strong CTA
+   look use the .btn-primary class which has its own brighter override. */
+.dark .bg-\[\#0a0a0a\]        { background-color: #3a3e47; }
+.dark .bg-\[\#0a0a0a\].text-white,
+.dark .bg-\[\#0a0a0a\] .text-white { color: #ebebeb; }
+
+/* White borders used as a contrast ring around the Graph connector dots.
+   Match the card surface in dark mode so the dot has a card-colored cut-out
+   rather than a glaring white ring. */
+.dark .border-\[\#ffffff\] { border-color: #1a1d23; }
+
+/* Gradient stops (StatTile etc.) — flip the white target to the dark card bg
+   so green→white gradient becomes green→dark in dark mode. */
+.dark .to-white { --tw-gradient-to: #1a1d23; }
+.dark .from-white { --tw-gradient-from: #1a1d23; }
+.dark .via-white { --tw-gradient-via: #1a1d23; }
+
+/* Tinted bg/borders with opacity — keep readable on dark */
+.dark .bg-\[\#1d4ed8\]\/10    { background-color: rgb(96 165 250 / 0.10); }
+.dark .bg-\[\#1d4ed8\]\/15    { background-color: rgb(96 165 250 / 0.15); }
+.dark .bg-\[\#1d4ed8\]\/25    { background-color: rgb(96 165 250 / 0.25); }
+.dark .bg-\[\#15803d\]\/10    { background-color: rgb(74 222 128 / 0.10); }
+.dark .bg-\[\#15803d\]\/15    { background-color: rgb(74 222 128 / 0.15); }
+.dark .bg-\[\#15803d\]\/\[0\.05\] { background-color: rgb(74 222 128 / 0.07); }
+.dark .bg-\[\#b45309\]\/10    { background-color: rgb(251 191 36 / 0.10); }
+.dark .bg-\[\#b45309\]\/15    { background-color: rgb(251 191 36 / 0.15); }
+.dark .bg-\[\#b45309\]\/\[0\.05\] { background-color: rgb(251 191 36 / 0.07); }
+.dark .bg-\[\#b45309\]\/\[0\.06\] { background-color: rgb(251 191 36 / 0.08); }
+.dark .bg-\[\#dc2626\]\/10    { background-color: rgb(248 113 113 / 0.10); }
+.dark .bg-\[\#dc2626\]\/15    { background-color: rgb(248 113 113 / 0.15); }
+.dark .bg-\[\#dc2626\]\/\[0\.04\] { background-color: rgb(248 113 113 / 0.06); }
+.dark .bg-\[\#dc2626\]\/\[0\.05\] { background-color: rgb(248 113 113 / 0.07); }
+
+.dark .border-\[\#1d4ed8\]\/15   { border-color: rgb(96 165 250 / 0.25); }
+.dark .border-\[\#1d4ed8\]\/20   { border-color: rgb(96 165 250 / 0.3); }
+.dark .border-\[\#1d4ed8\]\/25   { border-color: rgb(96 165 250 / 0.35); }
+.dark .border-\[\#1d4ed8\]\/30   { border-color: rgb(96 165 250 / 0.4); }
+.dark .border-\[\#1d4ed8\]\/40   { border-color: rgb(96 165 250 / 0.5); }
+.dark .border-\[\#1d4ed8\]\/50   { border-color: rgb(96 165 250 / 0.6); }
+.dark .border-\[\#1d4ed8\]\/60   { border-color: rgb(96 165 250 / 0.7); }
+.dark .border-\[\#15803d\]\/30   { border-color: rgb(74 222 128 / 0.4); }
+.dark .border-\[\#15803d\]\/40   { border-color: rgb(74 222 128 / 0.5); }
+.dark .border-\[\#15803d\]\/50   { border-color: rgb(74 222 128 / 0.6); }
+.dark .border-\[\#15803d\]\/60   { border-color: rgb(74 222 128 / 0.7); }
+.dark .border-\[\#b45309\]\/30   { border-color: rgb(251 191 36 / 0.4); }
+.dark .border-\[\#b45309\]\/50   { border-color: rgb(251 191 36 / 0.6); }
+.dark .border-\[\#dc2626\]\/25   { border-color: rgb(248 113 113 / 0.35); }
+.dark .border-\[\#dc2626\]\/30   { border-color: rgb(248 113 113 / 0.4); }
+
+/* ring-* variants used in tags/StatTile */
+.dark .ring-\[\#1d4ed8\]\/15     { --tw-ring-color: rgb(96 165 250 / 0.25); }
+.dark .ring-\[\#15803d\]\/15     { --tw-ring-color: rgb(74 222 128 / 0.25); }
+.dark .ring-\[\#15803d\]\/25     { --tw-ring-color: rgb(74 222 128 / 0.35); }
+.dark .ring-\[\#15803d\]\/40     { --tw-ring-color: rgb(74 222 128 / 0.5); }
+.dark .ring-\[\#b45309\]\/15     { --tw-ring-color: rgb(251 191 36 / 0.25); }
+.dark .ring-\[\#b45309\]\/20     { --tw-ring-color: rgb(251 191 36 / 0.3); }
+.dark .ring-\[\#dc2626\]\/15     { --tw-ring-color: rgb(248 113 113 / 0.25); }
+.dark .ring-black\/\[0\.06\]     { --tw-ring-color: rgb(255 255 255 / 0.08); }
+.dark .ring-black\/\[0\.08\]     { --tw-ring-color: rgb(255 255 255 / 0.10); }
+.dark .ring-black\/\[0\.14\]     { --tw-ring-color: rgb(255 255 255 / 0.16); }
+.dark .ring-black\/\[0\.16\]     { --tw-ring-color: rgb(255 255 255 / 0.18); }
+.dark .hover\:ring-black\/\[0\.14\]:hover { --tw-ring-color: rgb(255 255 255 / 0.16); }
+.dark .hover\:ring-black\/\[0\.16\]:hover { --tw-ring-color: rgb(255 255 255 / 0.18); }
+
+/* Scrollbar in dark */
+.dark *,
+.dark ::-webkit-scrollbar-thumb {
+  scrollbar-color: #3a3e47 transparent;
+}
+.dark ::-webkit-scrollbar-thumb { background: #3a3e47; }
+.dark ::-webkit-scrollbar-thumb:hover { background: #4a4e57; }
+
+/* Selection */
+.dark ::selection { background: #ebebeb; color: #0a0a0a; }
+
+/* ─── Theme toggle (Settings page) ─────────────────────────────────────
+   Explicit classes that don't rely on the global bg-[#0a0a0a] override so
+   the active pill stays readable in both light and dark themes.            */
+.theme-toggle-active {
+  background: #0a0a0a;
+  color: #ffffff;
+}
+.theme-toggle-inactive {
+  background: transparent;
+  color: #525252;
+}
+.theme-toggle-inactive:hover {
+  color: #0a0a0a;
+}
+.dark .theme-toggle-active {
+  background: #ebebeb;
+  color: #0a0a0a;
+}
+.dark .theme-toggle-inactive {
+  color: #a3a3a3;
+}
+.dark .theme-toggle-inactive:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* Hover for raw bg-[#262626] (paired with bg-[#0a0a0a] on inline buttons) */
+.dark .hover\:bg-\[\#262626\]:hover { background-color: #4a4e57; }
+
+/* ─── Sidebar items ────────────────────────────────────────────────────
+   Active state uses a 2px inset bar that needs to flip color in dark mode. */
+.sidebar-item-active {
+  background: #ffffff;
+  color: #0a0a0a;
+  box-shadow:
+    inset 2px 0 0 #0a0a0a,
+    0 1px 2px rgba(10, 10, 10, 0.04);
+}
+.sidebar-item-inactive {
+  color: #525252;
+}
+.sidebar-item-inactive:hover {
+  color: #0a0a0a;
+  background: rgba(10, 10, 10, 0.03);
+}
+
+.dark .sidebar-item-active {
+  background: #15181f;
+  color: #ffffff;
+  box-shadow:
+    inset 2px 0 0 #ebebeb,
+    0 1px 2px rgba(0, 0, 0, 0.3);
+}
+.dark .sidebar-item-inactive {
+  color: #a3a3a3;
+}
+.dark .sidebar-item-inactive:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* QR code containers must stay white so the code remains scannable. */
+.dark .qr-code,
+.dark .qr-code.bg-white {
+  background-color: #ffffff !important;
+}
+
+/* Border color shifts (no opacity variants) for accent colors in dark mode */
+.dark .border-\[\#1d4ed8\] { border-color: #2563eb; }
+.dark .border-\[\#15803d\] { border-color: #16a34a; }
+.dark .border-\[\#b45309\] { border-color: #d97706; }
+.dark .border-\[\#dc2626\] { border-color: #ef4444; }

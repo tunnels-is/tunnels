@@ -125,7 +125,7 @@ export default function DeviceDetail() {
 
       <h1 className="text-[16px] font-semibold text-[#0a0a0a] mb-4">{device.Tag}</h1>
 
-      <div className="border border-[#e7e3d7] rounded-lg overflow-hidden">
+      <div className="bg-white border border-[#e7e3d7] rounded-lg overflow-hidden card-shadow">
         <Row label="ID">
           <span className="font-mono text-[12px] text-[#525252]">{device._id}</span>
         </Row>
