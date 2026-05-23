@@ -29,44 +29,6 @@ func testUser(email, apiKey string) *User {
 }
 
 // ---------------------------------------------------------------------------
-// networkKey
-// ---------------------------------------------------------------------------
-
-func TestNetworkKey(t *testing.T) {
-	key, err := networkKey("10.0.0.0/24")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(key) != 4 {
-		t.Fatalf("expected 4-byte key, got %d", len(key))
-	}
-	if key[0] != 10 || key[1] != 0 || key[2] != 0 || key[3] != 0 {
-		t.Fatalf("unexpected key bytes: %v", key)
-	}
-
-	key2, err := networkKey("192.168.1.0/24")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if key2[0] != 192 || key2[1] != 168 || key2[2] != 1 || key2[3] != 0 {
-		t.Fatalf("unexpected key bytes: %v", key2)
-	}
-
-	_, err = networkKey("not-a-cidr")
-	if err == nil {
-		t.Fatal("expected error for invalid CIDR")
-	}
-
-	key6, err := networkKey("fd00::/64")
-	if err != nil {
-		t.Fatal("IPv6 should be supported:", err)
-	}
-	if len(key6) != 16 {
-		t.Fatalf("expected 16-byte key for IPv6, got %d", len(key6))
-	}
-}
-
-// ---------------------------------------------------------------------------
 // ConnectToBBoltDB
 // ---------------------------------------------------------------------------
 
@@ -923,7 +885,7 @@ func TestBBolt_UpdateServer(t *testing.T) {
 		Country:         "UK",
 		IP:              "5.6.7.8",
 		Port:            "8443",
-		WireGuardPort:   "51820",
+		WireGuardPort:   51820,
 		WireGuardPubKey: "pubkey-abc",
 	})
 	if err != nil {
@@ -932,13 +894,13 @@ func TestBBolt_UpdateServer(t *testing.T) {
 	if updated.Tag != "new" || updated.Country != "UK" || updated.IP != "5.6.7.8" || updated.Port != "8443" {
 		t.Fatal("basic field update mismatch")
 	}
-	if updated.WireGuardPort != "51820" || updated.WireGuardPubKey != "pubkey-abc" {
-		t.Fatalf("wireguard fields mismatch: port=%s pubkey=%s", updated.WireGuardPort, updated.WireGuardPubKey)
+	if updated.WireGuardPort != 51820 || updated.WireGuardPubKey != "pubkey-abc" {
+		t.Fatalf("wireguard fields mismatch: port=%d pubkey=%s", updated.WireGuardPort, updated.WireGuardPubKey)
 	}
 
 	// Verify persisted.
 	found, _ := BBolt_FindServerByID(s.ID.String())
-	if found.WireGuardPort != "51820" || found.WireGuardPubKey != "pubkey-abc" {
+	if found.WireGuardPort != 51820 || found.WireGuardPubKey != "pubkey-abc" {
 		t.Fatal("wireguard fields not persisted")
 	}
 }
@@ -1027,63 +989,53 @@ func TestBBolt_FindServersByGroups(t *testing.T) {
 	}
 }
 
-func TestBBolt_SetServerWGSubnet(t *testing.T) {
+func TestBBolt_FindServerByAPIKey(t *testing.T) {
 	setupTestDB(t)
-	s := &types.Server{ID: uuid.New(), Tag: "wg"}
-	BBolt_CreateServer(s)
-
-	if err := BBolt_SetServerWGSubnet(s.ID.String(), "10.0.0.0/24"); err != nil {
+	s := &types.Server{ID: uuid.New(), Tag: "wg", APIKey: "wg-key", WireGuardPort: 51820}
+	if err := BBolt_CreateServer(s); err != nil {
 		t.Fatal(err)
 	}
 
-	found, _ := BBolt_FindServerByID(s.ID.String())
-	if found.WireGuardSubnet != "10.0.0.0/24" {
-		t.Fatalf("expected '10.0.0.0/24', got '%s'", found.WireGuardSubnet)
+	found, err := BBolt_FindServerByAPIKey("wg-key")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if found == nil || found.ID != s.ID {
+		t.Fatal("server not found by apikey index")
+	}
+	if found.WireGuardPort != 51820 {
+		t.Fatalf("expected port 51820, got %d", found.WireGuardPort)
 	}
 }
 
-func TestBBolt_SetServerWGSubnet_NotFound(t *testing.T) {
+func TestBBolt_FindServerByAPIKey_NotFound(t *testing.T) {
 	setupTestDB(t)
-	err := BBolt_SetServerWGSubnet(uuid.New().String(), "10.0.0.0/24")
-	if err == nil {
-		t.Fatal("expected error")
+	found, err := BBolt_FindServerByAPIKey("nope")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if found != nil {
+		t.Fatal("expected nil")
 	}
 }
 
-func TestBBolt_SetServerWGConfigID(t *testing.T) {
+func TestBBolt_UpdateServer_RotateAPIKey(t *testing.T) {
 	setupTestDB(t)
-	s := &types.Server{ID: uuid.New(), Tag: "link"}
-	BBolt_CreateServer(s)
-
-	wgCfg := &types.WGServerConfig{ID: uuid.New(), WireGuardPort: 51820}
-	if err := BBolt_SetServerWGConfigID(s.ID.String(), wgCfg, "pub123", "10.0.0.0/24", "fd00::/64"); err != nil {
+	s := &types.Server{ID: uuid.New(), APIKey: "old"}
+	if err := BBolt_CreateServer(s); err != nil {
 		t.Fatal(err)
 	}
 
-	found, _ := BBolt_FindServerByID(s.ID.String())
-	if found.WGConfigID != wgCfg.ID {
-		t.Fatal("WGConfigID mismatch")
+	s.APIKey = "fresh"
+	if _, err := BBolt_UpdateServer(s); err != nil {
+		t.Fatal(err)
 	}
-	if found.WireGuardPubKey != "pub123" {
-		t.Fatal("pub key mismatch")
-	}
-	if found.WireGuardSubnet != "10.0.0.0/24" {
-		t.Fatal("subnet mismatch")
-	}
-	if found.WireGuardSubnet6 != "fd00::/64" {
-		t.Fatalf("expected subnet6 'fd00::/64', got '%s'", found.WireGuardSubnet6)
-	}
-	if found.WireGuardPort != "51820" {
-		t.Fatalf("expected port '51820', got '%s'", found.WireGuardPort)
-	}
-}
 
-func TestBBolt_SetServerWGConfigID_NotFound(t *testing.T) {
-	setupTestDB(t)
-	wgCfg := &types.WGServerConfig{ID: uuid.New(), WireGuardPort: 51820}
-	err := BBolt_SetServerWGConfigID(uuid.New().String(), wgCfg, "pk", "10.0.0.0/24", "")
-	if err == nil {
-		t.Fatal("expected error")
+	if found, _ := BBolt_FindServerByAPIKey("old"); found != nil {
+		t.Fatal("old key should not resolve")
+	}
+	if found, _ := BBolt_FindServerByAPIKey("fresh"); found == nil {
+		t.Fatal("new key should resolve")
 	}
 }
 
@@ -1365,216 +1317,63 @@ func TestBBolt_FindEntitiesByGroupID(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
-// WGServerConfig CRUD
+// Server-with-APIKey (merged WG config)
 // ---------------------------------------------------------------------------
 
-func TestBBolt_CreateWGServerConfig(t *testing.T) {
+func TestBBolt_CreateServer_WithAPIKey(t *testing.T) {
 	setupTestDB(t)
-	cfg := &types.WGServerConfig{
+	s := &types.Server{
 		ID:            uuid.New(),
 		Tag:           "wg",
 		APIKey:        "wg-key",
 		WireGuardPort: 51820,
 	}
-	if err := BBolt_CreateWGServerConfig(cfg); err != nil {
+	if err := BBolt_CreateServer(s); err != nil {
 		t.Fatal(err)
 	}
 
-	found, _ := BBolt_FindWGServerConfigByID(cfg.ID.String())
+	found, _ := BBolt_FindServerByID(s.ID.String())
 	if found == nil || found.Tag != "wg" {
-		t.Fatal("config not found or tag mismatch")
+		t.Fatal("server not found or tag mismatch")
 	}
 
-	found, _ = BBolt_FindWGServerConfigByAPIKey("wg-key")
-	if found == nil || found.ID != cfg.ID {
-		t.Fatal("config not found by apikey index")
+	found, _ = BBolt_FindServerByAPIKey("wg-key")
+	if found == nil || found.ID != s.ID {
+		t.Fatal("server not found by apikey index")
 	}
 }
 
-func TestBBolt_CreateWGServerConfig_NoAPIKey(t *testing.T) {
+func TestBBolt_CreateServer_NoAPIKey(t *testing.T) {
 	setupTestDB(t)
-	cfg := &types.WGServerConfig{ID: uuid.New(), Tag: "no-key", WireGuardPort: 51820}
-	if err := BBolt_CreateWGServerConfig(cfg); err != nil {
+	s := &types.Server{ID: uuid.New(), Tag: "no-key", WireGuardPort: 51820}
+	if err := BBolt_CreateServer(s); err != nil {
 		t.Fatal(err)
 	}
 
-	// Findable by ID.
-	found, _ := BBolt_FindWGServerConfigByID(cfg.ID.String())
+	found, _ := BBolt_FindServerByID(s.ID.String())
 	if found == nil {
-		t.Fatal("config should be findable by ID")
+		t.Fatal("server should be findable by ID")
 	}
 
-	// Empty key should not match.
-	found, _ = BBolt_FindWGServerConfigByAPIKey("")
-	if found != nil {
+	if found, _ := BBolt_FindServerByAPIKey(""); found != nil {
 		t.Fatal("empty apikey should not match")
 	}
 }
 
-func TestBBolt_FindWGServerConfigByID_NotFound(t *testing.T) {
+func TestBBolt_UpdateServer_ClearAPIKey(t *testing.T) {
 	setupTestDB(t)
-	found, err := BBolt_FindWGServerConfigByID(uuid.New().String())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if found != nil {
-		t.Fatal("expected nil")
-	}
-}
-
-func TestBBolt_FindWGServerConfigByAPIKey_NotFound(t *testing.T) {
-	setupTestDB(t)
-	found, err := BBolt_FindWGServerConfigByAPIKey("nope")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if found != nil {
-		t.Fatal("expected nil")
-	}
-}
-
-func TestBBolt_UpdateWGServerConfig(t *testing.T) {
-	setupTestDB(t)
-	cfg := &types.WGServerConfig{ID: uuid.New(), Tag: "orig", APIKey: "old", WireGuardPort: 51820}
-	BBolt_CreateWGServerConfig(cfg)
-
-	cfg.Tag = "new"
-	cfg.APIKey = "fresh"
-	if err := BBolt_UpdateWGServerConfig(cfg); err != nil {
+	s := &types.Server{ID: uuid.New(), APIKey: "clear"}
+	if err := BBolt_CreateServer(s); err != nil {
 		t.Fatal(err)
 	}
 
-	found, _ := BBolt_FindWGServerConfigByAPIKey("old")
-	if found != nil {
-		t.Fatal("old key should not resolve")
+	s.APIKey = ""
+	if _, err := BBolt_UpdateServer(s); err != nil {
+		t.Fatal(err)
 	}
 
-	found, _ = BBolt_FindWGServerConfigByAPIKey("fresh")
-	if found == nil || found.Tag != "new" {
-		t.Fatal("new key should resolve with updated tag")
-	}
-}
-
-func TestBBolt_UpdateWGServerConfig_ClearAPIKey(t *testing.T) {
-	setupTestDB(t)
-	cfg := &types.WGServerConfig{ID: uuid.New(), APIKey: "clear"}
-	BBolt_CreateWGServerConfig(cfg)
-
-	cfg.APIKey = ""
-	BBolt_UpdateWGServerConfig(cfg)
-
-	found, _ := BBolt_FindWGServerConfigByAPIKey("clear")
-	if found != nil {
+	if found, _ := BBolt_FindServerByAPIKey("clear"); found != nil {
 		t.Fatal("cleared key should not resolve")
-	}
-}
-
-func TestBBolt_ListWGServerConfigs(t *testing.T) {
-	setupTestDB(t)
-	for i := 0; i < 3; i++ {
-		BBolt_CreateWGServerConfig(&types.WGServerConfig{ID: uuid.New(), Tag: fmt.Sprintf("c%d", i)})
-	}
-
-	configs, err := BBolt_ListWGServerConfigs()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(configs) != 3 {
-		t.Fatalf("expected 3, got %d", len(configs))
-	}
-}
-
-// ---------------------------------------------------------------------------
-// Network CRUD
-// ---------------------------------------------------------------------------
-
-func TestBBolt_CreateNetworksBatch(t *testing.T) {
-	setupTestDB(t)
-	nets := []*Network{
-		{ID: uuid.New(), CIDR: "10.0.0.0/24", Tag: "n1"},
-		{ID: uuid.New(), CIDR: "10.0.1.0/24", Tag: "n2"},
-		{ID: uuid.New(), CIDR: "10.0.2.0/24", Tag: "n3"},
-	}
-	if err := BBolt_CreateNetworksBatch(nets); err != nil {
-		t.Fatal(err)
-	}
-
-	for _, n := range nets {
-		found, err := BBolt_FindNetworkByID(n.ID)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if found == nil || found.Tag != n.Tag {
-			t.Fatalf("network %s not found or tag mismatch", n.Tag)
-		}
-	}
-
-	count, _ := BBolt_CountNetworks()
-	if count != 3 {
-		t.Fatalf("expected 3, got %d", count)
-	}
-}
-
-func TestBBolt_FindNetworkByID_NotFound(t *testing.T) {
-	setupTestDB(t)
-	found, err := BBolt_FindNetworkByID(uuid.New())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if found != nil {
-		t.Fatal("expected nil")
-	}
-}
-
-func TestBBolt_GetNetworks(t *testing.T) {
-	setupTestDB(t)
-	nets := make([]*Network, 5)
-	for i := range nets {
-		nets[i] = &Network{ID: uuid.New(), CIDR: fmt.Sprintf("10.0.%d.0/24", i)}
-	}
-	BBolt_CreateNetworksBatch(nets)
-
-	nl, _ := BBolt_GetNetworks(10, 0)
-	if len(nl) != 5 {
-		t.Fatalf("expected 5, got %d", len(nl))
-	}
-
-	nl, _ = BBolt_GetNetworks(3, 0)
-	if len(nl) != 3 {
-		t.Fatalf("expected 3, got %d", len(nl))
-	}
-
-	nl, _ = BBolt_GetNetworks(10, 3)
-	if len(nl) != 2 {
-		t.Fatalf("expected 2, got %d", len(nl))
-	}
-}
-
-func TestBBolt_UpdateNetwork(t *testing.T) {
-	setupTestDB(t)
-	n := &Network{ID: uuid.New(), CIDR: "10.0.0.0/24", Tag: "orig"}
-	BBolt_CreateNetworksBatch([]*Network{n})
-
-	n.Tag = "updated"
-	n.Description = "new desc"
-	if err := BBolt_UpdateNetwork(n); err != nil {
-		t.Fatal(err)
-	}
-
-	found, _ := BBolt_FindNetworkByID(n.ID)
-	if found.Tag != "updated" || found.Description != "new desc" {
-		t.Fatal("update mismatch")
-	}
-}
-
-func TestBBolt_CountNetworks_Empty(t *testing.T) {
-	setupTestDB(t)
-	count, err := BBolt_CountNetworks()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if count != 0 {
-		t.Fatalf("expected 0, got %d", count)
 	}
 }
 
@@ -1626,17 +1425,6 @@ func TestBBolt_findGroups_Empty(t *testing.T) {
 	}
 }
 
-func TestBBolt_ListWGServerConfigs_Empty(t *testing.T) {
-	setupTestDB(t)
-	configs, err := BBolt_ListWGServerConfigs()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(configs) != 0 {
-		t.Fatalf("expected 0, got %d", len(configs))
-	}
-}
-
 // ---------------------------------------------------------------------------
 // Index backfill on reopen
 // ---------------------------------------------------------------------------
@@ -1655,11 +1443,8 @@ func TestConnectToBBoltDB_BackfillIndexes(t *testing.T) {
 	d := &types.Device{ID: uuid.New(), UserID: uuid.New(), Tag: "bf-dev"}
 	BBolt_CreateDevice(d)
 
-	cfg := &types.WGServerConfig{ID: uuid.New(), APIKey: "bf-wgkey"}
-	BBolt_CreateWGServerConfig(cfg)
-
-	n := &Network{ID: uuid.New(), CIDR: "172.16.0.0/24", Tag: "bf-net"}
-	BBolt_CreateNetworksBatch([]*Network{n})
+	bfServer := &types.Server{ID: uuid.New(), Tag: "bf-srv", APIKey: "bf-wgkey"}
+	BBolt_CreateServer(bfServer)
 
 	BBoltDB.Close()
 
@@ -1678,10 +1463,7 @@ func TestConnectToBBoltDB_BackfillIndexes(t *testing.T) {
 	if devs, _ := BBolt_GetDevicesByUserID(d.UserID); len(devs) != 1 {
 		t.Fatal("device userid index not backfilled")
 	}
-	if found, _ := BBolt_FindWGServerConfigByAPIKey("bf-wgkey"); found == nil {
-		t.Fatal("wg apikey index not backfilled")
-	}
-	if found, _ := BBolt_FindNetworkByID(n.ID); found == nil {
-		t.Fatal("network id index not backfilled")
+	if found, _ := BBolt_FindServerByAPIKey("bf-wgkey"); found == nil {
+		t.Fatal("server apikey index not backfilled")
 	}
 }

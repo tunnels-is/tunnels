@@ -172,19 +172,13 @@ func main() {
 		}
 
 		if configRequested {
-			firstNetwork, err := seedNetworks()
-			if err != nil {
-				logger.Error("unable to seed networks", slog.Any("err", err))
-				os.Exit(1)
-			}
-			err = initializeNewServer()
+			err := initializeNewServer()
 			if err != nil {
 				logger.Error("unable to create admin user", slog.Any("err", err))
 				os.Exit(1)
 			}
 			if configMode != "auth" {
-				err = initializeWGServer(firstNetwork)
-				if err != nil {
+				if err := initializeWGServer(); err != nil {
 					logger.Error("unable to initialize WG server", slog.Any("err", err))
 					os.Exit(1)
 				}
@@ -423,7 +417,7 @@ func makeConfigAndCerts(ipOverride string, mode string) (err error) {
 	err = LoadServerConfig(serverConfigPath)
 	if err != nil {
 		newConfig := &types.ServerConfig{
-			Features: features,
+			Features:           features,
 			VPNIP:              interfaceIP,
 			APIIP:              interfaceIP,
 			APIPort:            "443",
@@ -537,7 +531,12 @@ func initializeNewServer() error {
 	})
 }
 
-func initializeWGServer(network *Network) error {
+// defaultWGSubnet is the IPv4 CIDR assigned to the default "tunnels" server on
+// first boot. Override via /ui/wg/server-config/update if the network conflicts
+// with the host's LAN.
+const defaultWGSubnet = "10.0.0.0/22"
+
+func initializeWGServer() error {
 	cfg := Config.Load()
 	if cfg.WG != nil && cfg.WG.APIKey != "" {
 		return nil
@@ -549,25 +548,6 @@ func initializeWGServer(network *Network) error {
 	}
 
 	internetIface := discoverInternetIface()
-
-	wgCfg := &types.WGServerConfig{
-		ID:                 uuid.New(),
-		Tag:                "tunnels",
-		APIKey:             uuid.NewString(),
-		WireGuardPort:      51820,
-		NetworkID:          network.ID,
-		WireGuardIface:     "wg0",
-		InternetIface:      internetIface,
-		InsecureSkipVerify: insecureSkipVerify,
-	}
-	if err := DB_CreateWGServerConfig(wgCfg); err != nil {
-		return fmt.Errorf("create wg server config: %w", err)
-	}
-
-	network.WGConfigID = wgCfg.ID
-	if err := DB_UpdateNetwork(network); err != nil {
-		return fmt.Errorf("update network: %w", err)
-	}
 
 	servers, err := DB_FindAllServers()
 	if err != nil {
@@ -583,12 +563,20 @@ func initializeWGServer(network *Network) error {
 	if defaultServer == nil {
 		return fmt.Errorf("default server not found")
 	}
-	if err := DB_SetServerWGConfigID(defaultServer.ID, wgCfg, "", network.CIDR, ""); err != nil {
-		return fmt.Errorf("assign wg config to server: %w", err)
+
+	defaultServer.APIKey = uuid.NewString()
+	defaultServer.WireGuardPort = 51820
+	defaultServer.WireGuardIface = "wg0"
+	defaultServer.WireGuardSubnet = defaultWGSubnet
+	defaultServer.InternetIface = internetIface
+	defaultServer.InsecureSkipVerify = insecureSkipVerify
+
+	if _, err := DB_UpdateServer(defaultServer); err != nil {
+		return fmt.Errorf("configure wg on default server: %w", err)
 	}
 
 	cfg.WG = &types.WGBootstrap{
-		APIKey:             wgCfg.APIKey,
+		APIKey:             defaultServer.APIKey,
 		InsecureSkipVerify: insecureSkipVerify,
 	}
 	Config.Store(cfg)
@@ -597,9 +585,9 @@ func initializeWGServer(network *Network) error {
 	}
 
 	logger.Info("WG server initialized",
-		"subnet", network.CIDR,
-		"port", wgCfg.WireGuardPort,
-		"iface", wgCfg.WireGuardIface,
+		"subnet", defaultServer.WireGuardSubnet,
+		"port", defaultServer.WireGuardPort,
+		"iface", defaultServer.WireGuardIface,
 		"internetIface", internetIface,
 	)
 	return nil
