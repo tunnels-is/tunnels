@@ -157,7 +157,6 @@ type USER_ADMIN_UPDATE_FORM struct {
 	TargetUserID  uuid.UUID `json:"TargetUserID"`
 	Email         string    `json:"Email,omitempty"`
 	Disabled      bool      `json:"Disabled"`
-	IsManager     bool      `json:"IsManager"`
 	Trial         bool      `json:"Trial"`
 	SubExpiration time.Time `json:"SubExpiration,omitempty"`
 }
@@ -237,9 +236,8 @@ type User struct {
 	TwoFactorEnabled bool           `json:"TwoFactorEnabled"`
 	Tokens           []*DeviceToken `json:"Tokens"`
 
-	IsAdmin   bool        `json:"IsAdmin"`
-	IsManager bool        `json:"IsManager"`
-	Groups    []uuid.UUID `json:"Groups"`
+	IsAdmin bool        `json:"IsAdmin"`
+	Groups  []uuid.UUID `json:"Groups"`
 
 	// tunnels public network
 	Trial         bool        `json:"Trial"`
@@ -249,11 +247,10 @@ type User struct {
 
 func (u *User) ToMinifiedUser() MinifiedUser {
 	return MinifiedUser{
-		ID:        u.ID.String(),
-		Email:     u.Email,
-		Disabled:  u.Disabled,
-		IsAdmin:   u.IsAdmin,
-		IsManager: u.IsManager,
+		ID:       u.ID.String(),
+		Email:    u.Email,
+		Disabled: u.Disabled,
+		IsAdmin:  u.IsAdmin,
 	}
 }
 
@@ -294,4 +291,3 @@ type Group struct {
 	Description string    `json:"Description"`
 	CreatedAt   time.Time `json:"CreatedAt"`
 }
-

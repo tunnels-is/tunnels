@@ -60,8 +60,8 @@ func adminUIMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		if !user.IsAdmin && !user.IsManager {
-			senderr(w, 401, "Admin or Manager access required")
+		if !user.IsAdmin {
+			senderr(w, 401, "Admin access required")
 			return
 		}
 
@@ -72,11 +72,6 @@ func adminUIMiddleware(next http.Handler) http.Handler {
 
 func clientAuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if isAdminAPIKeyFromContext(r.Context()) {
-			next.ServeHTTP(w, r)
-			return
-		}
-
 		deviceToken := r.Header.Get("X-Device-Token")
 		if deviceToken == "" {
 			senderr(w, 401, "Unauthorized")

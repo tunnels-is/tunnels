@@ -262,7 +262,6 @@ func TestBBolt_updateUserAdmin(t *testing.T) {
 		TargetUserID:  u.ID,
 		Email:         "new@example.com",
 		Disabled:      true,
-		IsManager:     true,
 		Trial:         true,
 		SubExpiration: exp,
 	}); err != nil {
@@ -280,7 +279,7 @@ func TestBBolt_updateUserAdmin(t *testing.T) {
 	if found == nil {
 		t.Fatal("new email should resolve")
 	}
-	if !found.Disabled || !found.IsManager || !found.Trial {
+	if !found.Disabled || !found.Trial {
 		t.Fatal("flags not set")
 	}
 	if !found.SubExpiration.Truncate(time.Second).Equal(exp) {

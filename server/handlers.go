@@ -56,7 +56,7 @@ func API_AdminUILogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !user.IsAdmin && !user.IsManager {
+	if !user.IsAdmin {
 		senderr(w, 401, "Admin or Manager access required")
 		return
 	}
@@ -232,17 +232,13 @@ func API_UserAdminUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	user := getUserFromContext(r.Context())
-	if !isAdminAPIKeyFromContext(r.Context()) {
-		if user == nil {
-			senderr(w, 401, "Unauthorized")
-			return
-		}
-		if !user.IsAdmin {
-			if !user.IsManager {
-				senderr(w, 401, "You are not allowed to admin update users")
-				return
-			}
-		}
+	if user == nil {
+		senderr(w, 401, "Unauthorized")
+		return
+	}
+	if !user.IsAdmin {
+		senderr(w, 401, "You are not allowed to admin update users")
+		return
 	}
 
 	err = DB_updateUserAdmin(UF)
@@ -424,7 +420,7 @@ func API_UserTwoFactorConfirm(w http.ResponseWriter, r *http.Request) {
 	sendObject(w, out)
 }
 
-func API_UserList(w http.ResponseWriter, r *http.Request) {
+func API_AdminUserList(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 	F := new(FORM_LIST_USERS)
 	err := decodeBody(r, F)
@@ -450,7 +446,7 @@ func API_UserList(w http.ResponseWriter, r *http.Request) {
 	sendObject(w, users)
 }
 
-func API_DeviceUpdate(w http.ResponseWriter, r *http.Request) {
+func API_AdminDeviceUpdate(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 	F := new(FORM_UPDATE_DEVICE)
 	err := decodeBody(r, F)
@@ -466,10 +462,8 @@ func API_DeviceUpdate(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if !user.IsAdmin {
-			if !user.IsManager {
-				senderr(w, 401, "You are not allowed to update devices")
-				return
-			}
+			senderr(w, 401, "You are not allowed to update devices")
+			return
 		}
 	}
 
@@ -483,7 +477,7 @@ func API_DeviceUpdate(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(200)
 }
 
-func API_DeviceDelete(w http.ResponseWriter, r *http.Request) {
+func API_AdminDeviceDelete(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 	F := new(FORM_DELETE_DEVICE)
 	err := decodeBody(r, F)
@@ -499,10 +493,8 @@ func API_DeviceDelete(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if !user.IsAdmin {
-			if !user.IsManager {
-				senderr(w, 401, "You are not allowed to delete device")
-				return
-			}
+			senderr(w, 401, "You are not allowed to delete device")
+			return
 		}
 	}
 
@@ -548,7 +540,7 @@ func API_ClientDeviceDelete(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(200)
 }
 
-func API_DeviceList(w http.ResponseWriter, r *http.Request) {
+func API_AdminDeviceList(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 	F := new(FORM_LIST_DEVICE)
 	err := decodeBody(r, F)
@@ -564,10 +556,8 @@ func API_DeviceList(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if !user.IsAdmin {
-			if !user.IsManager {
-				senderr(w, 401, "You are not allowed to view devices")
-				return
-			}
+			senderr(w, 401, "You are not allowed to view devices")
+			return
 		}
 	}
 
@@ -680,7 +670,7 @@ func API_DeviceCreate(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func API_GroupCreate(w http.ResponseWriter, r *http.Request) {
+func API_AdminGroupCreate(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 	F := new(FORM_CREATE_GROUP)
 	err := decodeBody(r, F)
@@ -701,10 +691,8 @@ func API_GroupCreate(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if !user.IsAdmin {
-			if !user.IsManager {
-				senderr(w, 401, "You are not allowed to create groups")
-				return
-			}
+			senderr(w, 401, "You are not allowed to create groups")
+			return
 		}
 	}
 
@@ -721,7 +709,7 @@ func API_GroupCreate(w http.ResponseWriter, r *http.Request) {
 	sendObject(w, F.Group)
 }
 
-func API_GroupAdd(w http.ResponseWriter, r *http.Request) {
+func API_AdminGroupAdd(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 	F := new(FORM_GROUP_ADD)
 	err := decodeBody(r, F)
@@ -737,10 +725,8 @@ func API_GroupAdd(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if !user.IsAdmin {
-			if !user.IsManager {
-				senderr(w, 401, "You are not allowed to update groups")
-				return
-			}
+			senderr(w, 401, "You are not allowed to update groups")
+			return
 		}
 	}
 
@@ -796,7 +782,7 @@ func API_GroupAdd(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func API_GroupRemove(w http.ResponseWriter, r *http.Request) {
+func API_AdminGroupRemove(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 	F := new(FORM_GROUP_REMOVE)
 	err := decodeBody(r, F)
@@ -812,10 +798,8 @@ func API_GroupRemove(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if !user.IsAdmin {
-			if !user.IsManager {
-				senderr(w, 401, "You are not allowed to update this entity")
-				return
-			}
+			senderr(w, 401, "You are not allowed to update this entity")
+			return
 		}
 	}
 
@@ -828,7 +812,7 @@ func API_GroupRemove(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(200)
 }
 
-func API_GroupUpdate(w http.ResponseWriter, r *http.Request) {
+func API_AdminGroupUpdate(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 	F := new(FORM_UPDATE_GROUP)
 	err := decodeBody(r, F)
@@ -844,10 +828,8 @@ func API_GroupUpdate(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if !user.IsAdmin {
-			if !user.IsManager {
-				senderr(w, 401, "You are not allowed to update groups")
-				return
-			}
+			senderr(w, 401, "You are not allowed to update groups")
+			return
 		}
 	}
 
@@ -861,7 +843,7 @@ func API_GroupUpdate(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(200)
 }
 
-func API_GroupDelete(w http.ResponseWriter, r *http.Request) {
+func API_AdminGroupDelete(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 	F := new(FORM_DELETE_GROUP)
 	err := decodeBody(r, F)
@@ -877,10 +859,8 @@ func API_GroupDelete(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if !user.IsAdmin {
-			if !user.IsManager {
-				senderr(w, 401, "You are not allowed to delete groups")
-				return
-			}
+			senderr(w, 401, "You are not allowed to delete groups")
+			return
 		}
 	}
 
@@ -917,7 +897,7 @@ func API_DeviceGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !user.IsAdmin && !user.IsManager {
+	if !user.IsAdmin {
 		if device.UserID != user.ID {
 			senderr(w, 400, "unauthorized")
 			return
@@ -927,7 +907,7 @@ func API_DeviceGet(w http.ResponseWriter, r *http.Request) {
 	sendObject(w, device)
 }
 
-func API_GroupGet(w http.ResponseWriter, r *http.Request) {
+func API_AdminGroupGet(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 	F := new(FORM_GET_GROUP)
 	err := decodeBody(r, F)
@@ -943,10 +923,8 @@ func API_GroupGet(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if !user.IsAdmin {
-			if !user.IsManager {
-				senderr(w, 401, "You are not allowed to view groups")
-				return
-			}
+			senderr(w, 401, "You are not allowed to view groups")
+			return
 		}
 	}
 
@@ -964,7 +942,7 @@ func API_GroupGet(w http.ResponseWriter, r *http.Request) {
 	sendObject(w, group)
 }
 
-func API_GroupGetEntities(w http.ResponseWriter, r *http.Request) {
+func API_AdminGroupGetEntities(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 	F := new(FORM_GET_GROUP_ENTITIES)
 	err := decodeBody(r, F)
@@ -980,10 +958,8 @@ func API_GroupGetEntities(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if !user.IsAdmin {
-			if !user.IsManager {
-				senderr(w, 401, "You are not allowed to view groups")
-				return
-			}
+			senderr(w, 401, "You are not allowed to view groups")
+			return
 		}
 	}
 
@@ -1009,7 +985,7 @@ func API_GroupGetEntities(w http.ResponseWriter, r *http.Request) {
 	sendObject(w, entities)
 }
 
-func API_GroupList(w http.ResponseWriter, r *http.Request) {
+func API_AdminGroupList(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 	F := new(FORM_LIST_GROUP)
 	err := decodeBody(r, F)
@@ -1025,10 +1001,8 @@ func API_GroupList(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if !user.IsAdmin {
-			if !user.IsManager {
-				senderr(w, 401, "You are not allowed to view groups")
-				return
-			}
+			senderr(w, 401, "You are not allowed to view groups")
+			return
 		}
 	}
 
@@ -1105,7 +1079,7 @@ func validateServerWGFields(s *types.Server) error {
 	return nil
 }
 
-func API_ServerUpdate(w http.ResponseWriter, r *http.Request) {
+func API_AdminServerUpdate(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 
 	F := new(FORM_UPDATE_SERVER)
@@ -1122,10 +1096,8 @@ func API_ServerUpdate(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if !user.IsAdmin {
-			if !user.IsManager {
-				senderr(w, 401, "You are not allowed to create servers")
-				return
-			}
+			senderr(w, 401, "You are not allowed to create servers")
+			return
 		}
 	}
 
@@ -1148,7 +1120,7 @@ func API_ServerUpdate(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(200)
 }
 
-func API_ServerCreate(w http.ResponseWriter, r *http.Request) {
+func API_AdminServerCreate(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 	F := new(FORM_CREATE_SERVER)
 	err := decodeBody(r, F)
@@ -1164,10 +1136,8 @@ func API_ServerCreate(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if !user.IsAdmin {
-			if !user.IsManager {
-				senderr(w, 401, "You are not allowed to create servers")
-				return
-			}
+			senderr(w, 401, "You are not allowed to create servers")
+			return
 		}
 	}
 
@@ -1332,7 +1302,7 @@ func API_UserToggleSubStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if user != nil && !user.IsAdmin && !user.IsManager {
+	if user != nil && !user.IsAdmin {
 		UF.Email = user.Email
 	}
 
