@@ -21,10 +21,7 @@ func Test_validateConfig(t *testing.T) {
 		{
 			name: "valid config with all fields set",
 			config: &types.ServerConfig{
-				UserMaxConnections: 5,
-				PingTimeoutMinutes: 10,
-				Features:           []types.Feature{types.AUTH, types.DNS},
-				SecretStore:        types.EnvStore,
+				SecretStore: types.EnvStore,
 			},
 			expectError: false,
 			expectedValues: map[string]any{
@@ -35,10 +32,7 @@ func Test_validateConfig(t *testing.T) {
 		{
 			name: "UserMaxConnections < 1 - should default to 2",
 			config: &types.ServerConfig{
-				UserMaxConnections: 0,
-				PingTimeoutMinutes: 5,
-				Features:           []types.Feature{types.AUTH},
-				SecretStore:        types.EnvStore,
+				SecretStore: types.EnvStore,
 			},
 			expectError: false,
 			expectedValues: map[string]any{
@@ -48,10 +42,7 @@ func Test_validateConfig(t *testing.T) {
 		{
 			name: "PingTimeoutMinutes < 2 - should default to 2",
 			config: &types.ServerConfig{
-				UserMaxConnections: 3,
-				PingTimeoutMinutes: 1,
-				Features:           []types.Feature{types.AUTH},
-				SecretStore:        types.EnvStore,
+				SecretStore: types.EnvStore,
 			},
 			expectError: false,
 			expectedValues: map[string]any{
@@ -61,30 +52,21 @@ func Test_validateConfig(t *testing.T) {
 		{
 			name: "no features - should error",
 			config: &types.ServerConfig{
-				UserMaxConnections: 3,
-				PingTimeoutMinutes: 5,
-				Features:           []types.Feature{},
-				SecretStore:        types.EnvStore,
+				SecretStore: types.EnvStore,
 			},
 			expectError: true,
 		},
 		{
 			name: "nil features - should error",
 			config: &types.ServerConfig{
-				UserMaxConnections: 3,
-				PingTimeoutMinutes: 5,
-				Features:           nil,
-				SecretStore:        types.EnvStore,
+				SecretStore: types.EnvStore,
 			},
 			expectError: true,
 		},
 		{
 			name: "empty SecretStore - should default to EnvStore",
 			config: &types.ServerConfig{
-				UserMaxConnections: 3,
-				PingTimeoutMinutes: 5,
-				Features:           []types.Feature{types.AUTH},
-				SecretStore:        "",
+				SecretStore: "",
 			},
 			expectError: false,
 			expectedValues: map[string]any{
@@ -94,10 +76,7 @@ func Test_validateConfig(t *testing.T) {
 		{
 			name: "multiple defaults triggered",
 			config: &types.ServerConfig{
-				UserMaxConnections: 0,
-				PingTimeoutMinutes: 0,
-				Features:           []types.Feature{types.AUTH, types.DNS},
-				SecretStore:        "",
+				SecretStore: "",
 			},
 			expectError: false,
 			expectedValues: map[string]any{
@@ -109,10 +88,7 @@ func Test_validateConfig(t *testing.T) {
 		{
 			name: "negative values should trigger defaults",
 			config: &types.ServerConfig{
-				UserMaxConnections: -5,
-				PingTimeoutMinutes: -10,
-				Features:           []types.Feature{types.AUTH},
-				SecretStore:        types.EnvStore,
+				SecretStore: types.EnvStore,
 			},
 			expectError: false,
 			expectedValues: map[string]any{
@@ -143,10 +119,6 @@ func Test_validateConfig(t *testing.T) {
 			for key, expected := range tc.expectedValues {
 				var actual any
 				switch key {
-				case "UserMaxConnections":
-					actual = tc.config.UserMaxConnections
-				case "PingTimeoutMinutes":
-					actual = tc.config.PingTimeoutMinutes
 				case "SecretStore":
 					actual = tc.config.SecretStore
 				}
@@ -161,84 +133,13 @@ func Test_validateConfig(t *testing.T) {
 	}
 }
 
-func Test_validateConfig_BoundaryValues(t *testing.T) {
-	tests := []struct {
-		name  string
-		field string
-		value int
-	}{
-		{
-			name:  "UserMaxConnections = 1 (boundary)",
-			field: "UserMaxConnections",
-			value: 1,
-		},
-		{
-			name:  "PingTimeoutMinutes = 2 (boundary)",
-			field: "PingTimeoutMinutes",
-			value: 2,
-		},
-		{
-			name:  "UserMaxConnections = 1000 (large)",
-			field: "UserMaxConnections",
-			value: 1000,
-		},
-		{
-			name:  "PingTimeoutMinutes = 60 (large)",
-			field: "PingTimeoutMinutes",
-			value: 60,
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			config := &types.ServerConfig{
-				UserMaxConnections: 10,
-				PingTimeoutMinutes: 10,
-				Features:           []types.Feature{types.AUTH},
-				SecretStore:        types.EnvStore,
-			}
-
-			switch tc.field {
-			case "UserMaxConnections":
-				config.UserMaxConnections = tc.value
-			case "PingTimeoutMinutes":
-				config.PingTimeoutMinutes = tc.value
-			}
-
-			err := validateConfig(config)
-			if err != nil {
-				t.Errorf("Unexpected error for %s=%d: %v", tc.field, tc.value, err)
-			}
-
-			var actual int
-			switch tc.field {
-			case "UserMaxConnections":
-				actual = config.UserMaxConnections
-			case "PingTimeoutMinutes":
-				actual = config.PingTimeoutMinutes
-			}
-
-			if actual != tc.value {
-				t.Errorf("%s changed from %d to %d", tc.field, tc.value, actual)
-			}
-
-			t.Logf("%s=%d validated correctly ✓", tc.field, tc.value)
-		})
-	}
-}
-
 func Test_LoadServerConfig_JSON(t *testing.T) {
-
 	tmpDir := t.TempDir()
 
 	testConfig := &types.ServerConfig{
-		UserMaxConnections: 5,
-		PingTimeoutMinutes: 10,
-		Features:           []types.Feature{types.AUTH, types.DNS},
-		SecretStore:        types.EnvStore,
-		VPNIP:              "192.168.1.1",
-		APIPort:            "443",
-		Hostname:           "test.local",
+		SecretStore: types.EnvStore,
+		APIPort:     "443",
+		Hostname:    "test.local",
 	}
 
 	tests := []struct {
@@ -287,31 +188,18 @@ func Test_LoadServerConfig_JSON(t *testing.T) {
 				return
 			}
 
-			loaded := Config.Load()
-			if loaded.VPNIP != testConfig.VPNIP {
-				t.Errorf("VPNIP: got %s, expected %s", loaded.VPNIP, testConfig.VPNIP)
-			}
-			if len(loaded.Features) != len(testConfig.Features) {
-				t.Errorf("Features length: got %d, expected %d", len(loaded.Features), len(testConfig.Features))
-			}
-
 			t.Log("JSON config loaded successfully ✓")
 		})
 	}
 }
 
 func Test_LoadServerConfig_YAML(t *testing.T) {
-
 	tmpDir := t.TempDir()
 
 	testConfig := &types.ServerConfig{
-		UserMaxConnections: 5,
-		PingTimeoutMinutes: 10,
-		Features:           []types.Feature{types.AUTH, types.DNS},
-		SecretStore:        types.EnvStore,
-		VPNIP:              "192.168.1.1",
-		APIPort:            "443",
-		Hostname:           "test.local",
+		SecretStore: types.EnvStore,
+		APIPort:     "443",
+		Hostname:    "test.local",
 	}
 
 	tests := []struct {
@@ -358,14 +246,6 @@ func Test_LoadServerConfig_YAML(t *testing.T) {
 			if err != nil {
 				t.Errorf("Unexpected error: %v", err)
 				return
-			}
-
-			loaded := Config.Load()
-			if loaded.VPNIP != testConfig.VPNIP {
-				t.Errorf("VPNIP: got %s, expected %s", loaded.VPNIP, testConfig.VPNIP)
-			}
-			if len(loaded.Features) != len(testConfig.Features) {
-				t.Errorf("Features length: got %d, expected %d", len(loaded.Features), len(testConfig.Features))
 			}
 
 			t.Logf("YAML config (%s) loaded successfully ✓", tc.filename)
@@ -424,10 +304,7 @@ func Test_LoadServerConfig_Errors(t *testing.T) {
 			setupFunc: func() string {
 				path := filepath.Join(tmpDir, "nofeatures.json")
 				cfg := &types.ServerConfig{
-					UserMaxConnections: 5,
-					PingTimeoutMinutes: 10,
-					Features:           []types.Feature{},
-					SecretStore:        types.EnvStore,
+					SecretStore: types.EnvStore,
 				}
 				data, _ := json.Marshal(cfg)
 				_ = os.WriteFile(path, data, 0o644)
@@ -465,13 +342,9 @@ func Test_SaveServerConfig_JSON(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	testConfig := &types.ServerConfig{
-		UserMaxConnections: 5,
-		PingTimeoutMinutes: 10,
-		Features:           []types.Feature{types.AUTH, types.DNS},
-		SecretStore:        types.EnvStore,
-		VPNIP:              "192.168.1.1",
-		APIPort:            "443",
-		Hostname:           "test.local",
+		SecretStore: types.EnvStore,
+		APIPort:     "443",
+		Hostname:    "test.local",
 	}
 
 	tests := []struct {
@@ -493,7 +366,6 @@ func Test_SaveServerConfig_JSON(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-
 			Config.Store(testConfig)
 
 			configPath := filepath.Join(tmpDir, tc.filename)
@@ -529,10 +401,6 @@ func Test_SaveServerConfig_JSON(t *testing.T) {
 				return
 			}
 
-			if loaded.VPNIP != testConfig.VPNIP {
-				t.Errorf("VPNIP: got %s, expected %s", loaded.VPNIP, testConfig.VPNIP)
-			}
-
 			t.Log("JSON config saved successfully ✓")
 		})
 	}
@@ -542,13 +410,9 @@ func Test_SaveServerConfig_YAML(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	testConfig := &types.ServerConfig{
-		UserMaxConnections: 5,
-		PingTimeoutMinutes: 10,
-		Features:           []types.Feature{types.AUTH, types.DNS},
-		SecretStore:        types.EnvStore,
-		VPNIP:              "192.168.1.1",
-		APIPort:            "443",
-		Hostname:           "test.local",
+		SecretStore: types.EnvStore,
+		APIPort:     "443",
+		Hostname:    "test.local",
 	}
 
 	tests := []struct {
@@ -570,7 +434,6 @@ func Test_SaveServerConfig_YAML(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-
 			Config.Store(testConfig)
 
 			configPath := filepath.Join(tmpDir, tc.filename)
@@ -606,10 +469,6 @@ func Test_SaveServerConfig_YAML(t *testing.T) {
 				return
 			}
 
-			if loaded.VPNIP != testConfig.VPNIP {
-				t.Errorf("VPNIP: got %s, expected %s", loaded.VPNIP, testConfig.VPNIP)
-			}
-
 			t.Logf("YAML config (%s) saved successfully ✓", tc.filename)
 		})
 	}
@@ -619,10 +478,7 @@ func Test_SaveServerConfig_Errors(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	testConfig := &types.ServerConfig{
-		UserMaxConnections: 5,
-		PingTimeoutMinutes: 10,
-		Features:           []types.Feature{types.AUTH},
-		SecretStore:        types.EnvStore,
+		SecretStore: types.EnvStore,
 	}
 
 	tests := []struct {
@@ -677,13 +533,9 @@ func Test_LoadAndSaveServerConfig_RoundTrip(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	originalConfig := &types.ServerConfig{
-		UserMaxConnections: 7,
-		PingTimeoutMinutes: 15,
-		Features:           []types.Feature{types.AUTH, types.DNS},
-		SecretStore:        types.EnvStore,
-		VPNIP:              "10.0.0.1",
-		APIPort:            "8443",
-		Hostname:           "roundtrip.test",
+		SecretStore: types.EnvStore,
+		APIPort:     "8443",
+		Hostname:    "roundtrip.test",
 	}
 
 	tests := []struct {
@@ -714,20 +566,8 @@ func Test_LoadAndSaveServerConfig_RoundTrip(t *testing.T) {
 			}
 
 			loaded := Config.Load()
-			if loaded.UserMaxConnections != originalConfig.UserMaxConnections {
-				t.Errorf("UserMaxConnections: got %d, expected %d", loaded.UserMaxConnections, originalConfig.UserMaxConnections)
-			}
-			if loaded.PingTimeoutMinutes != originalConfig.PingTimeoutMinutes {
-				t.Errorf("PingTimeoutMinutes: got %d, expected %d", loaded.PingTimeoutMinutes, originalConfig.PingTimeoutMinutes)
-			}
-			if loaded.VPNIP != originalConfig.VPNIP {
-				t.Errorf("VPNIP: got %s, expected %s", loaded.VPNIP, originalConfig.VPNIP)
-			}
 			if loaded.Hostname != originalConfig.Hostname {
 				t.Errorf("Hostname: got %s, expected %s", loaded.Hostname, originalConfig.Hostname)
-			}
-			if len(loaded.Features) != len(originalConfig.Features) {
-				t.Errorf("Features length: got %d, expected %d", len(loaded.Features), len(originalConfig.Features))
 			}
 
 			t.Logf("Round trip test passed for %s ✓", tc.filename)

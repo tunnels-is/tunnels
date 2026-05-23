@@ -432,7 +432,6 @@ func BBolt_updateUserAdmin(UF *USER_ADMIN_UPDATE_FORM) error {
 		}
 
 		U.Disabled = UF.Disabled
-		U.IsManager = UF.IsManager
 		U.Trial = UF.Trial
 
 		data, err := bboltMarshal(U)
@@ -1102,10 +1101,6 @@ func removeString(slice []string, s string) []string {
 	return res
 }
 
-func uuidToString(id uuid.UUID) string {
-	return id.String()
-}
-
 func uuidSliceToString(ids []uuid.UUID) []string {
 	out := make([]string, len(ids))
 	for i, id := range ids {
@@ -1124,4 +1119,3 @@ func stringSliceToUUID(slice []string) []uuid.UUID {
 	}
 	return out
 }
-

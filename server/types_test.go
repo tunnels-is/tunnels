@@ -16,11 +16,10 @@ func TestUser_ToMinifiedUser(t *testing.T) {
 		{
 			name: "standard user with all fields",
 			user: &User{
-				ID:        uuid.New(),
-				Email:     "test@example.com",
-				Disabled:  false,
-				IsAdmin:   true,
-				IsManager: false,
+				ID:       uuid.New(),
+				Email:    "test@example.com",
+				Disabled: false,
+				IsAdmin:  true,
 			},
 			expected: MinifiedUser{
 				Email:     "test@example.com",
@@ -32,11 +31,10 @@ func TestUser_ToMinifiedUser(t *testing.T) {
 		{
 			name: "disabled user",
 			user: &User{
-				ID:        uuid.New(),
-				Email:     "disabled@example.com",
-				Disabled:  true,
-				IsAdmin:   false,
-				IsManager: false,
+				ID:       uuid.New(),
+				Email:    "disabled@example.com",
+				Disabled: true,
+				IsAdmin:  false,
 			},
 			expected: MinifiedUser{
 				Email:     "disabled@example.com",
@@ -48,11 +46,10 @@ func TestUser_ToMinifiedUser(t *testing.T) {
 		{
 			name: "manager user",
 			user: &User{
-				ID:        uuid.New(),
-				Email:     "manager@example.com",
-				Disabled:  false,
-				IsAdmin:   false,
-				IsManager: true,
+				ID:       uuid.New(),
+				Email:    "manager@example.com",
+				Disabled: false,
+				IsAdmin:  false,
 			},
 			expected: MinifiedUser{
 				Email:     "manager@example.com",
@@ -64,11 +61,10 @@ func TestUser_ToMinifiedUser(t *testing.T) {
 		{
 			name: "admin and manager",
 			user: &User{
-				ID:        uuid.New(),
-				Email:     "superuser@example.com",
-				Disabled:  false,
-				IsAdmin:   true,
-				IsManager: true,
+				ID:       uuid.New(),
+				Email:    "superuser@example.com",
+				Disabled: false,
+				IsAdmin:  true,
 			},
 			expected: MinifiedUser{
 				Email:     "superuser@example.com",
@@ -80,11 +76,10 @@ func TestUser_ToMinifiedUser(t *testing.T) {
 		{
 			name: "user with empty email",
 			user: &User{
-				ID:        uuid.New(),
-				Email:     "",
-				Disabled:  false,
-				IsAdmin:   false,
-				IsManager: false,
+				ID:       uuid.New(),
+				Email:    "",
+				Disabled: false,
+				IsAdmin:  false,
 			},
 			expected: MinifiedUser{
 				Email:     "",
@@ -122,7 +117,6 @@ func TestUser_ToMinifiedUser(t *testing.T) {
 }
 
 func TestUser_ToMinifiedUser_DoesNotIncludeSensitiveData(t *testing.T) {
-
 	user := &User{
 		ID:            uuid.New(),
 		Email:         "test@example.com",
@@ -133,7 +127,6 @@ func TestUser_ToMinifiedUser_DoesNotIncludeSensitiveData(t *testing.T) {
 		APIKey:        "api-key-secret",
 		Disabled:      false,
 		IsAdmin:       true,
-		IsManager:     false,
 	}
 
 	minified := user.ToMinifiedUser()
@@ -299,14 +292,12 @@ func TestUser_RemoveSensitiveInformation_PreservesNonSensitiveData(t *testing.T)
 	originalEmail := "preserve@example.com"
 	originalDisabled := true
 	originalIsAdmin := true
-	originalIsManager := false
 
 	user := &User{
 		ID:            originalID,
 		Email:         originalEmail,
 		Disabled:      originalDisabled,
 		IsAdmin:       originalIsAdmin,
-		IsManager:     originalIsManager,
 		Password:      "should-be-removed",
 		Password2:     "should-be-removed",
 		ConfirmCode:   "should-be-removed",
@@ -327,9 +318,6 @@ func TestUser_RemoveSensitiveInformation_PreservesNonSensitiveData(t *testing.T)
 	}
 	if user.IsAdmin != originalIsAdmin {
 		t.Errorf("IsAdmin changed: got %v, expected %v", user.IsAdmin, originalIsAdmin)
-	}
-	if user.IsManager != originalIsManager {
-		t.Errorf("IsManager changed: got %v, expected %v", user.IsManager, originalIsManager)
 	}
 
 	t.Log("RemoveSensitiveInformation() correctly preserves non-sensitive data ✓")

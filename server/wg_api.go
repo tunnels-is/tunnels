@@ -148,27 +148,24 @@ func API_WGConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var clientWireGuardIP string
-	var clientWireGuardIPv6 string
-	if pubKey := r.URL.Query().Get("pubKey"); pubKey != "" {
-		devices, devErr := DB_GetDevices(100000, 0)
-		if devErr == nil {
-			for _, d := range devices {
-				if d.WireGuardKey == pubKey {
-					clientWireGuardIP = d.WireGuardIP
-					clientWireGuardIPv6 = d.WireGuardIPv6
-					break
-				}
-			}
-		}
+	pubKey := r.URL.Query().Get("pubKey")
+	if pubKey == "" {
+		senderr(w, 401, "No pubkey given")
+		return
+	}
+
+	d, err := DB_FindDeviceByWGKey(pubKey)
+	if err != nil {
+		senderr(w, 401, "Pubkey not on record")
+		return
 	}
 
 	sendObject(w, map[string]string{
 		"WireGuardPubKey":  server.WireGuardPubKey,
 		"WireGuardPort":    strconv.Itoa(server.WireGuardPort),
 		"ServerIP":         server.IP,
-		"WireGuardIP":      clientWireGuardIP,
-		"WireGuardIPv6":    clientWireGuardIPv6,
+		"WireGuardIP":      d.WireGuardIP,
+		"WireGuardIPv6":    d.WireGuardIPv6,
 		"WireGuardSubnet":  server.WireGuardSubnet,
 		"WireGuardSubnet6": server.WireGuardSubnet6,
 	})
