@@ -295,29 +295,3 @@ type Group struct {
 	CreatedAt   time.Time `json:"CreatedAt"`
 }
 
-type Network struct {
-	ID          uuid.UUID `json:"_id"`
-	CIDR        string    `json:"CIDR"`
-	Tag         string    `json:"Tag"`
-	Description string    `json:"Description"`
-	WGConfigID  uuid.UUID `json:"WGConfigID,omitempty"`
-	CreatedAt   time.Time `json:"CreatedAt"`
-}
-
-type FORM_LIST_NETWORKS struct {
-	DeviceToken string    `json:"DeviceToken"`
-	UID         uuid.UUID `json:"UID"`
-	Limit       int       `json:"Limit"`
-	Offset      int       `json:"Offset"`
-}
-
-type FORM_UPDATE_NETWORK struct {
-	DeviceToken string   `json:"DeviceToken"`
-	UID         uuid.UUID `json:"UID"`
-	Network     *Network  `json:"Network"`
-}
-
-type FORM_LIST_WG_SERVER_CONFIGS struct {
-	DeviceToken string    `json:"DeviceToken"`
-	UID         uuid.UUID `json:"UID"`
-}

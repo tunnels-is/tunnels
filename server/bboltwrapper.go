@@ -3,11 +3,9 @@ package main
 import (
 	"bytes"
 	"crypto/subtle"
-	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net"
 	"slices"
 	"time"
 
@@ -19,19 +17,16 @@ import (
 var BBoltDB *gobolt.DB
 
 const (
-	USERS_BUCKET              = "users"
-	USERS_EMAIL_INDEX         = "users_by_email"
-	USERS_APIKEY_INDEX        = "users_by_apikey"
-	DEVICES_BUCKET            = "devices"
-	DEVICES_USERID_INDEX      = "devices_by_user_id"
-	DEVICES_WGKEY_INDEX       = "devices_by_wg_key"
-	ORGS_BUCKET               = "orgs"
-	GROUPS_BUCKET             = "groups"
-	SERVERS_BUCKET            = "servers"
-	WG_SERVER_CONFIGS_BUCKET  = "wg_server_configs"
-	WGCONFIGS_APIKEY_INDEX    = "wg_configs_by_apikey"
-	NETWORKS_BUCKET           = "networks"
-	NETWORKS_ID_INDEX         = "networks_by_id"
+	USERS_BUCKET         = "users"
+	USERS_EMAIL_INDEX    = "users_by_email"
+	USERS_APIKEY_INDEX   = "users_by_apikey"
+	DEVICES_BUCKET       = "devices"
+	DEVICES_USERID_INDEX = "devices_by_user_id"
+	DEVICES_WGKEY_INDEX  = "devices_by_wg_key"
+	ORGS_BUCKET          = "orgs"
+	GROUPS_BUCKET        = "groups"
+	SERVERS_BUCKET       = "servers"
+	SERVERS_APIKEY_INDEX = "servers_by_apikey"
 )
 
 func ConnectToBBoltDB(path string) (err error) {
@@ -43,9 +38,7 @@ func ConnectToBBoltDB(path string) (err error) {
 		buckets := []string{
 			USERS_BUCKET, USERS_EMAIL_INDEX, USERS_APIKEY_INDEX,
 			DEVICES_BUCKET, DEVICES_USERID_INDEX, DEVICES_WGKEY_INDEX,
-			ORGS_BUCKET, GROUPS_BUCKET, SERVERS_BUCKET,
-			WG_SERVER_CONFIGS_BUCKET, WGCONFIGS_APIKEY_INDEX,
-			NETWORKS_BUCKET, NETWORKS_ID_INDEX,
+			ORGS_BUCKET, GROUPS_BUCKET, SERVERS_BUCKET, SERVERS_APIKEY_INDEX,
 		}
 		for _, b := range buckets {
 			_, err := tx.CreateBucketIfNotExists([]byte(b))
@@ -94,34 +87,17 @@ func ConnectToBBoltDB(path string) (err error) {
 			}
 		}
 
-		// Backfill wg_configs_by_apikey index.
-		wgConfigs := tx.Bucket([]byte(WG_SERVER_CONFIGS_BUCKET))
-		wgApikeyIdx := tx.Bucket([]byte(WGCONFIGS_APIKEY_INDEX))
-		wc := wgConfigs.Cursor()
-		for k, v := wc.First(); k != nil; k, v = wc.Next() {
-			cfg := new(types.WGServerConfig)
-			if err := bboltUnmarshal(v, cfg); err != nil {
+		// Backfill servers_by_apikey index.
+		servers := tx.Bucket([]byte(SERVERS_BUCKET))
+		srvApikeyIdx := tx.Bucket([]byte(SERVERS_APIKEY_INDEX))
+		sc := servers.Cursor()
+		for k, v := sc.First(); k != nil; k, v = sc.Next() {
+			S := new(types.Server)
+			if err := bboltUnmarshal(v, S); err != nil {
 				continue
 			}
-			if cfg.APIKey != "" {
-				if err := wgApikeyIdx.Put([]byte(cfg.APIKey), k); err != nil {
-					return err
-				}
-			}
-		}
-
-		// Backfill networks_by_id index.
-		networks := tx.Bucket([]byte(NETWORKS_BUCKET))
-		netIdIdx := tx.Bucket([]byte(NETWORKS_ID_INDEX))
-		nc := networks.Cursor()
-		for k, v := nc.First(); k != nil; k, v = nc.Next() {
-			n := new(Network)
-			if err := bboltUnmarshal(v, n); err != nil {
-				continue
-			}
-			idStr := n.ID.String()
-			if idStr != "00000000-0000-0000-0000-000000000000" {
-				if err := netIdIdx.Put([]byte(idStr), k); err != nil {
+			if S.APIKey != "" {
+				if err := srvApikeyIdx.Put([]byte(S.APIKey), k); err != nil {
 					return err
 				}
 			}
@@ -710,6 +686,7 @@ func BBolt_UpdateServer(S *types.Server) (*types.Server, error) {
 	var RS *types.Server
 	err := BBoltDB.Update(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(SERVERS_BUCKET))
+		apikeyIdx := tx.Bucket([]byte(SERVERS_APIKEY_INDEX))
 		id := S.ID.String()
 		v := b.Get([]byte(id))
 		if v == nil {
@@ -719,18 +696,41 @@ func BBolt_UpdateServer(S *types.Server) (*types.Server, error) {
 		if err := bboltUnmarshal(v, SS); err != nil {
 			return err
 		}
+		oldAPIKey := SS.APIKey
 		SS.Tag = S.Tag
 		SS.Country = S.Country
 		SS.IP = S.IP
 		SS.Port = S.Port
+		SS.APIKey = S.APIKey
 		SS.WireGuardPort = S.WireGuardPort
 		SS.WireGuardPubKey = S.WireGuardPubKey
+		SS.WireGuardIface = S.WireGuardIface
+		SS.WireGuardSubnet = S.WireGuardSubnet
+		SS.WireGuardSubnet6 = S.WireGuardSubnet6
+		SS.InternetIface = S.InternetIface
+		SS.PacketInspection = S.PacketInspection
+		SS.InsecureSkipVerify = S.InsecureSkipVerify
+
+		if S.APIKey != "" && S.APIKey != oldAPIKey {
+			if existing := apikeyIdx.Get([]byte(S.APIKey)); existing != nil && string(existing) != id {
+				return errors.New("APIKey already in use")
+			}
+		}
+
 		data, err := bboltMarshal(SS)
 		if err != nil {
 			return err
 		}
 		if err := b.Put([]byte(id), data); err != nil {
 			return err
+		}
+		if oldAPIKey != "" && oldAPIKey != S.APIKey {
+			_ = apikeyIdx.Delete([]byte(oldAPIKey))
+		}
+		if S.APIKey != "" {
+			if err := apikeyIdx.Put([]byte(S.APIKey), []byte(id)); err != nil {
+				return err
+			}
 		}
 		RS = SS
 		return nil
@@ -788,32 +788,50 @@ func BBolt_CreateServer(S *types.Server) error {
 	return BBoltDB.Update(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(SERVERS_BUCKET))
 		id := S.ID.String()
+		if S.APIKey != "" {
+			apikeyIdx := tx.Bucket([]byte(SERVERS_APIKEY_INDEX))
+			if existing := apikeyIdx.Get([]byte(S.APIKey)); existing != nil && string(existing) != id {
+				return errors.New("APIKey already in use")
+			}
+		}
 		data, err := bboltMarshal(S)
 		if err != nil {
 			return err
 		}
-		return b.Put([]byte(id), data)
+		if err := b.Put([]byte(id), data); err != nil {
+			return err
+		}
+		if S.APIKey != "" {
+			if err := tx.Bucket([]byte(SERVERS_APIKEY_INDEX)).Put([]byte(S.APIKey), []byte(id)); err != nil {
+				return err
+			}
+		}
+		return nil
 	})
 }
 
-func BBolt_SetServerWGSubnet(id, subnet string) error {
-	return BBoltDB.Update(func(tx *gobolt.Tx) error {
-		b := tx.Bucket([]byte(SERVERS_BUCKET))
-		v := b.Get([]byte(id))
+func BBolt_FindServerByAPIKey(apiKey string) (*types.Server, error) {
+	var found *types.Server
+	err := BBoltDB.View(func(tx *gobolt.Tx) error {
+		id := tx.Bucket([]byte(SERVERS_APIKEY_INDEX)).Get([]byte(apiKey))
+		if id == nil {
+			return nil
+		}
+		v := tx.Bucket([]byte(SERVERS_BUCKET)).Get(id)
 		if v == nil {
-			return errors.New("server not found")
+			return nil
 		}
 		S := new(types.Server)
 		if err := bboltUnmarshal(v, S); err != nil {
-			return err
+			return nil
 		}
-		S.WireGuardSubnet = subnet
-		data, err := bboltMarshal(S)
-		if err != nil {
-			return err
+		if subtle.ConstantTimeCompare([]byte(S.APIKey), []byte(apiKey)) != 1 {
+			return nil
 		}
-		return b.Put([]byte(id), data)
+		found = S
+		return nil
 	})
+	return found, err
 }
 
 func BBolt_FindAllServers() ([]*types.Server, error) {
@@ -1107,256 +1125,3 @@ func stringSliceToUUID(slice []string) []uuid.UUID {
 	return out
 }
 
-func BBolt_CreateWGServerConfig(cfg *types.WGServerConfig) error {
-	return BBoltDB.Update(func(tx *gobolt.Tx) error {
-		b := tx.Bucket([]byte(WG_SERVER_CONFIGS_BUCKET))
-		id := cfg.ID.String()
-		data, err := bboltMarshal(cfg)
-		if err != nil {
-			return err
-		}
-		if err := b.Put([]byte(id), data); err != nil {
-			return err
-		}
-		if cfg.APIKey != "" {
-			if err := tx.Bucket([]byte(WGCONFIGS_APIKEY_INDEX)).Put([]byte(cfg.APIKey), []byte(id)); err != nil {
-				return err
-			}
-		}
-		return nil
-	})
-}
-
-func BBolt_FindWGServerConfigByID(id string) (*types.WGServerConfig, error) {
-	var cfg *types.WGServerConfig
-	err := BBoltDB.View(func(tx *gobolt.Tx) error {
-		b := tx.Bucket([]byte(WG_SERVER_CONFIGS_BUCKET))
-		v := b.Get([]byte(id))
-		if v == nil {
-			return nil
-		}
-		cfg = new(types.WGServerConfig)
-		return bboltUnmarshal(v, cfg)
-	})
-	return cfg, err
-}
-
-func BBolt_FindWGServerConfigByAPIKey(apiKey string) (*types.WGServerConfig, error) {
-	var found *types.WGServerConfig
-	err := BBoltDB.View(func(tx *gobolt.Tx) error {
-		cfgID := tx.Bucket([]byte(WGCONFIGS_APIKEY_INDEX)).Get([]byte(apiKey))
-		if cfgID == nil {
-			return nil
-		}
-		v := tx.Bucket([]byte(WG_SERVER_CONFIGS_BUCKET)).Get(cfgID)
-		if v == nil {
-			return nil
-		}
-		cfg := new(types.WGServerConfig)
-		if err := bboltUnmarshal(v, cfg); err != nil {
-			return nil
-		}
-		if subtle.ConstantTimeCompare([]byte(cfg.APIKey), []byte(apiKey)) != 1 {
-			return nil
-		}
-		found = cfg
-		return nil
-	})
-	return found, err
-}
-
-func BBolt_UpdateWGServerConfig(cfg *types.WGServerConfig) error {
-	return BBoltDB.Update(func(tx *gobolt.Tx) error {
-		b := tx.Bucket([]byte(WG_SERVER_CONFIGS_BUCKET))
-		id := cfg.ID.String()
-		wgApikeyIdx := tx.Bucket([]byte(WGCONFIGS_APIKEY_INDEX))
-
-		// Remove old apikey index entry if key changed.
-		if old := b.Get([]byte(id)); old != nil {
-			oldCfg := new(types.WGServerConfig)
-			if err := bboltUnmarshal(old, oldCfg); err == nil && oldCfg.APIKey != cfg.APIKey && oldCfg.APIKey != "" {
-				_ = wgApikeyIdx.Delete([]byte(oldCfg.APIKey))
-			}
-		}
-
-		data, err := bboltMarshal(cfg)
-		if err != nil {
-			return err
-		}
-		if err := b.Put([]byte(id), data); err != nil {
-			return err
-		}
-		if cfg.APIKey != "" {
-			if err := wgApikeyIdx.Put([]byte(cfg.APIKey), []byte(id)); err != nil {
-				return err
-			}
-		}
-		return nil
-	})
-}
-
-func BBolt_SetServerWGConfigID(serverID string, wgCfg *types.WGServerConfig, pubKey, subnet, subnet6 string) error {
-	return BBoltDB.Update(func(tx *gobolt.Tx) error {
-		b := tx.Bucket([]byte(SERVERS_BUCKET))
-		v := b.Get([]byte(serverID))
-		if v == nil {
-			return errors.New("server not found")
-		}
-		S := new(types.Server)
-		if err := bboltUnmarshal(v, S); err != nil {
-			return err
-		}
-		S.WGConfigID = wgCfg.ID
-		S.WireGuardSubnet = subnet
-		S.WireGuardSubnet6 = subnet6
-		S.WireGuardPubKey = pubKey
-		S.WireGuardPort = fmt.Sprintf("%d", wgCfg.WireGuardPort)
-		data, err := bboltMarshal(S)
-		if err != nil {
-			return err
-		}
-		return b.Put([]byte(serverID), data)
-	})
-}
-
-func BBolt_CountNetworks() (int64, error) {
-	var count int64
-	err := BBoltDB.View(func(tx *gobolt.Tx) error {
-		b := tx.Bucket([]byte(NETWORKS_BUCKET))
-		if b == nil {
-			return nil
-		}
-		count = int64(b.Stats().KeyN)
-		return nil
-	})
-	return count, err
-}
-
-// networkKey converts a CIDR string to a big-endian IP key for bbolt storage.
-// Returns a 4-byte key for IPv4 or a 16-byte key for IPv6.
-func networkKey(cidr string) ([]byte, error) {
-	ip, _, err := net.ParseCIDR(cidr)
-	if err != nil {
-		return nil, err
-	}
-	if v4 := ip.To4(); v4 != nil {
-		key := make([]byte, 4)
-		binary.BigEndian.PutUint32(key, binary.BigEndian.Uint32(v4))
-		return key, nil
-	}
-	v6 := ip.To16()
-	if v6 == nil {
-		return nil, fmt.Errorf("invalid IP address: %s", cidr)
-	}
-	key := make([]byte, 16)
-	copy(key, v6)
-	return key, nil
-}
-
-func BBolt_CreateNetworksBatch(networks []*Network) error {
-	return BBoltDB.Update(func(tx *gobolt.Tx) error {
-		b := tx.Bucket([]byte(NETWORKS_BUCKET))
-		netIdIdx := tx.Bucket([]byte(NETWORKS_ID_INDEX))
-		for _, n := range networks {
-			key, err := networkKey(n.CIDR)
-			if err != nil {
-				return err
-			}
-			data, err := bboltMarshal(n)
-			if err != nil {
-				return err
-			}
-			if err := b.Put(key, data); err != nil {
-				return err
-			}
-			idStr := n.ID.String()
-			if idStr != "00000000-0000-0000-0000-000000000000" {
-				if err := netIdIdx.Put([]byte(idStr), key); err != nil {
-					return err
-				}
-			}
-		}
-		return nil
-	})
-}
-
-func BBolt_GetNetworks(limit, offset int64) ([]*Network, error) {
-	NL := make([]*Network, 0)
-	err := BBoltDB.View(func(tx *gobolt.Tx) error {
-		b := tx.Bucket([]byte(NETWORKS_BUCKET))
-		c := b.Cursor()
-		var skipped int64
-		for k, v := c.First(); k != nil; k, v = c.Next() {
-			if skipped < offset {
-				skipped++
-				continue
-			}
-			if int64(len(NL)) >= limit {
-				break
-			}
-			n := new(Network)
-			if err := bboltUnmarshal(v, n); err == nil {
-				NL = append(NL, n)
-			}
-		}
-		return nil
-	})
-	return NL, err
-}
-
-func BBolt_FindNetworkByID(id uuid.UUID) (*Network, error) {
-	var n *Network
-	err := BBoltDB.View(func(tx *gobolt.Tx) error {
-		netKey := tx.Bucket([]byte(NETWORKS_ID_INDEX)).Get([]byte(id.String()))
-		if netKey == nil {
-			return nil
-		}
-		v := tx.Bucket([]byte(NETWORKS_BUCKET)).Get(netKey)
-		if v == nil {
-			return nil
-		}
-		n = new(Network)
-		return bboltUnmarshal(v, n)
-	})
-	return n, err
-}
-
-func BBolt_UpdateNetwork(n *Network) error {
-	return BBoltDB.Update(func(tx *gobolt.Tx) error {
-		b := tx.Bucket([]byte(NETWORKS_BUCKET))
-		key, err := networkKey(n.CIDR)
-		if err != nil {
-			return err
-		}
-		data, err := bboltMarshal(n)
-		if err != nil {
-			return err
-		}
-		if err := b.Put(key, data); err != nil {
-			return err
-		}
-		idStr := n.ID.String()
-		if idStr != "00000000-0000-0000-0000-000000000000" {
-			if err := tx.Bucket([]byte(NETWORKS_ID_INDEX)).Put([]byte(idStr), key); err != nil {
-				return err
-			}
-		}
-		return nil
-	})
-}
-
-func BBolt_ListWGServerConfigs() ([]*types.WGServerConfig, error) {
-	configs := make([]*types.WGServerConfig, 0)
-	err := BBoltDB.View(func(tx *gobolt.Tx) error {
-		b := tx.Bucket([]byte(WG_SERVER_CONFIGS_BUCKET))
-		c := b.Cursor()
-		for k, v := c.First(); k != nil; k, v = c.Next() {
-			cfg := new(types.WGServerConfig)
-			if err := bboltUnmarshal(v, cfg); err == nil {
-				configs = append(configs, cfg)
-			}
-		}
-		return nil
-	})
-	return configs, err
-}
