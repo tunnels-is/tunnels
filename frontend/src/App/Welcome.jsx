@@ -108,7 +108,7 @@ const Welcome = () => {
       </header>
 
       {/* Hero panel */}
-      <div className="mb-4 rounded-lg border border-[#e7e3d7] card-shadow overflow-hidden bg-gradient-to-br from-[#f4f1e8] via-white to-[#fdfcf8]">
+      <div className="mb-4 rounded-lg border border-[#e7e3d7] card-shadow overflow-hidden bg-white">
         <div className="flex items-center gap-4 p-5">
           <div className="w-11 h-11 rounded-md bg-[#0a0a0a] text-white shadow-[0_2px_4px_rgba(10,10,10,0.18)] flex items-center justify-center shrink-0">
             <LifeBuoy className="w-5 h-5" strokeWidth={2} />

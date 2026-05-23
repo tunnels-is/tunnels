@@ -103,8 +103,8 @@ func DB_CreateServer(S *types.Server) (err error) {
 	return BBolt_CreateServer(S)
 }
 
-func DB_SetServerWGSubnet(id uuid.UUID, subnet string) error {
-	return BBolt_SetServerWGSubnet(id.String(), subnet)
+func DB_FindServerByAPIKey(apiKey string) (*types.Server, error) {
+	return BBolt_FindServerByAPIKey(apiKey)
 }
 
 func DB_FindAllServers() ([]*types.Server, error) {
@@ -152,46 +152,3 @@ func DB_findGroups() (gl []*Group, err error) {
 	return BBolt_findGroups()
 }
 
-func DB_CreateWGServerConfig(cfg *types.WGServerConfig) error {
-	return BBolt_CreateWGServerConfig(cfg)
-}
-
-func DB_FindWGServerConfigByID(id uuid.UUID) (*types.WGServerConfig, error) {
-	return BBolt_FindWGServerConfigByID(id.String())
-}
-
-func DB_FindWGServerConfigByAPIKey(apiKey string) (*types.WGServerConfig, error) {
-	return BBolt_FindWGServerConfigByAPIKey(apiKey)
-}
-
-func DB_UpdateWGServerConfig(cfg *types.WGServerConfig) error {
-	return BBolt_UpdateWGServerConfig(cfg)
-}
-
-func DB_CountNetworks() (int64, error) {
-	return BBolt_CountNetworks()
-}
-
-func DB_CreateNetworksBatch(networks []*Network) error {
-	return BBolt_CreateNetworksBatch(networks)
-}
-
-func DB_GetNetworks(limit, offset int64) ([]*Network, error) {
-	return BBolt_GetNetworks(limit, offset)
-}
-
-func DB_FindNetworkByID(id uuid.UUID) (*Network, error) {
-	return BBolt_FindNetworkByID(id)
-}
-
-func DB_UpdateNetwork(n *Network) error {
-	return BBolt_UpdateNetwork(n)
-}
-
-func DB_ListWGServerConfigs() ([]*types.WGServerConfig, error) {
-	return BBolt_ListWGServerConfigs()
-}
-
-func DB_SetServerWGConfigID(serverID uuid.UUID, wgCfg *types.WGServerConfig, pubKey, subnet, subnet6 string) error {
-	return BBolt_SetServerWGConfigID(serverID.String(), wgCfg, pubKey, subnet, subnet6)
-}

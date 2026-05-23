@@ -20,11 +20,12 @@ func setupWGTest(t *testing.T) string {
 		logger = slog.New(slog.NewTextHandler(io.Discard, nil))
 	}
 	apiKey := "test-wg-key"
-	cfg := &types.WGServerConfig{
+	s := &types.Server{
 		ID:     uuid.New(),
+		Tag:    "wg-test",
 		APIKey: apiKey,
 	}
-	if err := DB_CreateWGServerConfig(cfg); err != nil {
+	if err := BBolt_CreateServer(s); err != nil {
 		t.Fatal(err)
 	}
 	return apiKey

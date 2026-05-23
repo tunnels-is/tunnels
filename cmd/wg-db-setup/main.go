@@ -8,6 +8,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"strconv"
 	"time"
 
 	gobolt "go.etcd.io/bbolt"
@@ -22,9 +23,9 @@ type serverRecord struct {
 	IP              string      `json:"IP"`
 	Port            string      `json:"Port"`
 	Groups          []uuid.UUID `json:"Groups"`
-	WireGuardPort   string               `json:"WireGuardPort,omitempty"`
-	WireGuardPubKey string               `json:"WireGuardPubKey,omitempty"`
-	WGBaseURL       string               `json:"WGBaseURL,omitempty"`
+	WireGuardPort   int         `json:"WireGuardPort,omitempty"`
+	WireGuardPubKey string      `json:"WireGuardPubKey,omitempty"`
+	WGBaseURL       string      `json:"WGBaseURL,omitempty"`
 }
 
 func main() {
@@ -55,8 +56,8 @@ func main() {
 					fmt.Printf("key=%s  parse_err=%v\n", k, err)
 					return nil
 				}
-				fmt.Printf("id=%-26s  ip=%-18s  port=%-6s  wgkey=%s  wgbase=%s\n",
-					string(k), s.IP, s.Port, s.WireGuardPubKey, s.WGBaseURL)
+				fmt.Printf("id=%-26s  ip=%-18s  port=%-6s  wgport=%-6d  wgkey=%s  wgbase=%s\n",
+					string(k), s.IP, s.Port, s.WireGuardPort, s.WireGuardPubKey, s.WGBaseURL)
 				return nil
 			})
 		})
@@ -81,8 +82,12 @@ func main() {
 				return nil
 			}
 			s.WireGuardPubKey = *pubKeyB64
-			s.WireGuardPort   = *port
-			s.WGBaseURL       = *baseURL
+			portN, perr := strconv.Atoi(*port)
+			if perr != nil {
+				return fmt.Errorf("invalid -port %q: %w", *port, perr)
+			}
+			s.WireGuardPort = portN
+			s.WGBaseURL = *baseURL
 			data, err := json.Marshal(s)
 			if err != nil {
 				return err
@@ -90,7 +95,7 @@ func main() {
 			if err := b.Put(k, data); err != nil {
 				return err
 			}
-			fmt.Printf("updated server: id=%s ip=%s wgport=%s wgbase=%s\n",
+			fmt.Printf("updated server: id=%s ip=%s wgport=%d wgbase=%s\n",
 				string(k), s.IP, s.WireGuardPort, s.WGBaseURL)
 			return nil
 		})

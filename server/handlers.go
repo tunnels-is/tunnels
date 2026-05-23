@@ -2,8 +2,9 @@ package main
 
 import (
 	"context"
-	"log/slog"
 	"crypto/rand"
+	"fmt"
+	"log/slog"
 	"math/big"
 	"net/http"
 	"reflect"
@@ -667,10 +668,10 @@ func API_DeviceCreate(w http.ResponseWriter, r *http.Request) {
 
 	if wgServer != nil {
 		sendObject(w, map[string]any{
-			"Device":       F.Device,
-			"ServerPubKey": wgServer.WireGuardPubKey,
-			"ServerPort":   wgServer.WireGuardPort,
-			"ServerIP":     wgServer.IP,
+			"Device":        F.Device,
+			"ServerPubKey":  wgServer.WireGuardPubKey,
+			"ServerPort":    strconv.Itoa(wgServer.WireGuardPort),
+			"ServerIP":      wgServer.IP,
 			"ServerSubnet":  wgServer.WireGuardSubnet,
 			"ServerSubnet6": wgServer.WireGuardSubnet6,
 		})
@@ -1080,6 +1081,30 @@ func API_ServersForUser(w http.ResponseWriter, r *http.Request) {
 	sendObject(w, servers)
 }
 
+// applyWGDefaults stamps sensible WG defaults on a server that has just had
+// its APIKey set. No-op when APIKey is empty (WG not enabled on this server).
+func applyWGDefaults(s *types.Server) {
+	if s.APIKey == "" {
+		return
+	}
+	if s.WireGuardPort == 0 {
+		s.WireGuardPort = 51820
+	}
+	if s.WireGuardIface == "" {
+		s.WireGuardIface = "wg0"
+	}
+}
+
+func validateServerWGFields(s *types.Server) error {
+	if err := validateCIDR(s.WireGuardSubnet); err != nil {
+		return fmt.Errorf("invalid WireGuardSubnet: %w", err)
+	}
+	if err := validateCIDR(s.WireGuardSubnet6); err != nil {
+		return fmt.Errorf("invalid WireGuardSubnet6: %w", err)
+	}
+	return nil
+}
+
 func API_ServerUpdate(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 
@@ -1103,6 +1128,16 @@ func API_ServerUpdate(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+
+	if F.Server == nil {
+		senderr(w, 400, "Server is required")
+		return
+	}
+	if err := validateServerWGFields(F.Server); err != nil {
+		senderr(w, 400, err.Error())
+		return
+	}
+	applyWGDefaults(F.Server)
 
 	_, err = DB_UpdateServer(F.Server)
 	if err != nil {
@@ -1135,6 +1170,16 @@ func API_ServerCreate(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+
+	if F.Server == nil {
+		senderr(w, 400, "Server is required")
+		return
+	}
+	if err := validateServerWGFields(F.Server); err != nil {
+		senderr(w, 400, err.Error())
+		return
+	}
+	applyWGDefaults(F.Server)
 
 	F.Server.ID = uuid.New()
 	F.Server.Groups = make([]uuid.UUID, 0)

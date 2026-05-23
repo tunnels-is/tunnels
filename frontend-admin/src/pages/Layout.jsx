@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { Users, Monitor, Layers, Server, Shield, Network, LogOut, Sun, Moon } from 'lucide-react';
+import { Users, Monitor, Layers, Server, LogOut, Sun, Moon } from 'lucide-react';
 import { getUserMeta, clearUserMeta } from '../auth';
 import { apiPost } from '../api';
 import { getTheme, setTheme as applyAppTheme } from '../theme';
@@ -10,8 +10,6 @@ const navItems = [
   { icon: Monitor, label: 'Devices', route: 'devices' },
   { icon: Layers, label: 'Groups', route: 'groups' },
   { icon: Server, label: 'Servers', route: 'servers' },
-  { icon: Shield, label: 'WG Config', route: 'wgconfig' },
-  { icon: Network, label: 'Networks', route: 'networks' },
 ];
 
 export default function Layout() {

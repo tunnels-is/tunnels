@@ -165,7 +165,7 @@ func API_WGConfig(w http.ResponseWriter, r *http.Request) {
 
 	sendObject(w, map[string]string{
 		"WireGuardPubKey":  server.WireGuardPubKey,
-		"WireGuardPort":    server.WireGuardPort,
+		"WireGuardPort":    strconv.Itoa(server.WireGuardPort),
 		"ServerIP":         server.IP,
 		"WireGuardIP":      clientWireGuardIP,
 		"WireGuardIPv6":    clientWireGuardIPv6,
@@ -256,7 +256,6 @@ func assignNextWireGuardIPv6(serverID uuid.UUID) (string, error) {
 		}
 	}
 
-	// Start at base+2 (skip network address and server address).
 	candidate := prefix.Addr().Next().Next()
 	for prefix.Contains(candidate) {
 		if !used[candidate] {
@@ -278,170 +277,32 @@ func b64KeyToHex(b64 string) (string, error) {
 	return fmt.Sprintf("%x", b), nil
 }
 
-func HTTP_validateWGKey(r *http.Request) (*types.WGServerConfig, bool) {
+func HTTP_validateWGKey(r *http.Request) (*types.Server, bool) {
 	key := r.Header.Get("X-WG-KEY")
 	if key == "" {
 		return nil, false
 	}
-	cfg, err := DB_FindWGServerConfigByAPIKey(key)
-	if err != nil || cfg == nil {
+	s, err := DB_FindServerByAPIKey(key)
+	if err != nil || s == nil {
 		return nil, false
 	}
-	return cfg, true
+	return s, true
 }
 
-type FORM_WG_SERVER_CONFIG_CREATE struct {
-	Tag            string    `json:"Tag"`
-	WireGuardPort  int       `json:"WireGuardPort"`
-	NetworkID      uuid.UUID `json:"NetworkID"`
-	NetworkID6     uuid.UUID `json:"NetworkID6"`
-	WireGuardIface string    `json:"WireGuardIface"`
-	InternetIface  string    `json:"InternetIface"`
-
-	PacketInspection   bool `json:"PacketInspection"`
-	InsecureSkipVerify bool `json:"InsecureSkipVerify"`
-}
-
-func API_WGServerConfigCreate(w http.ResponseWriter, r *http.Request) {
-	defer BasicRecover()
-
-	F := new(FORM_WG_SERVER_CONFIG_CREATE)
-	if err := decodeBody(r, F); err != nil {
-		senderr(w, 400, "Invalid request body", slog.Any("error", err))
-		return
+// validateCIDR returns an error if s is set but not a parseable CIDR. Empty
+// strings are allowed (caller decides whether they're required).
+func validateCIDR(s string) error {
+	if s == "" {
+		return nil
 	}
-
-	if !isAdminAPIKeyFromContext(r.Context()) {
-		user := getUserFromContext(r.Context())
-		if user == nil || !user.IsAdmin {
-			senderr(w, 401, "Admin required")
-			return
-		}
-	}
-
-	var subnet string
-	if F.NetworkID != uuid.Nil {
-		network, nerr := DB_FindNetworkByID(F.NetworkID)
-		if nerr != nil || network == nil {
-			senderr(w, 404, "Network not found")
-			return
-		}
-		subnet = network.CIDR
-	}
-
-	var subnet6 string
-	if F.NetworkID6 != uuid.Nil {
-		network6, nerr := DB_FindNetworkByID(F.NetworkID6)
-		if nerr != nil || network6 == nil {
-			senderr(w, 404, "IPv6 network not found")
-			return
-		}
-		subnet6 = network6.CIDR
-	}
-
-	cfg := &types.WGServerConfig{
-		ID:                 uuid.New(),
-		Tag:                F.Tag,
-		APIKey:             uuid.NewString(),
-		WireGuardPort:      F.WireGuardPort,
-		NetworkID:          F.NetworkID,
-		NetworkID6:         F.NetworkID6,
-		WireGuardIface:     F.WireGuardIface,
-		InternetIface:      F.InternetIface,
-		PacketInspection:   F.PacketInspection,
-		InsecureSkipVerify: F.InsecureSkipVerify,
-	}
-	if cfg.WireGuardPort == 0 {
-		cfg.WireGuardPort = 51820
-	}
-	if cfg.WireGuardIface == "" {
-		cfg.WireGuardIface = "wg0"
-	}
-
-	if err := DB_CreateWGServerConfig(cfg); err != nil {
-		senderr(w, 500, "Failed to create WGServerConfig", slog.Any("err", err))
-		return
-	}
-
-	if F.NetworkID != uuid.Nil {
-		if network, _ := DB_FindNetworkByID(F.NetworkID); network != nil {
-			network.WGConfigID = cfg.ID
-			_ = DB_UpdateNetwork(network)
-		}
-	}
-	if F.NetworkID6 != uuid.Nil {
-		if network6, _ := DB_FindNetworkByID(F.NetworkID6); network6 != nil {
-			network6.WGConfigID = cfg.ID
-			_ = DB_UpdateNetwork(network6)
-		}
-	}
-
-	sendObject(w, map[string]any{
-		"ID":               cfg.ID.String(),
-		"APIKey":           cfg.APIKey,
-		"Tag":              cfg.Tag,
-		"WireGuardPort":    cfg.WireGuardPort,
-		"WireGuardSubnet":  subnet,
-		"WireGuardSubnet6": subnet6,
-		"WireGuardIface":   cfg.WireGuardIface,
-		"InternetIface":    cfg.InternetIface,
-	})
-}
-
-func API_WGServerConfigGet(w http.ResponseWriter, r *http.Request) {
-	defer BasicRecover()
-
-	idStr := r.URL.Query().Get("id")
-	if idStr == "" {
-		senderr(w, 400, "id query parameter is required")
-		return
-	}
-	id, err := uuid.Parse(idStr)
-	if err != nil {
-		senderr(w, 400, "Invalid id")
-		return
-	}
-
-	cfg, err := DB_FindWGServerConfigByID(id)
-	if err != nil || cfg == nil {
-		senderr(w, 404, "WGServerConfig not found")
-		return
-	}
-
-	var cfgSubnet string
-	if cfg.NetworkID != uuid.Nil {
-		if net, _ := DB_FindNetworkByID(cfg.NetworkID); net != nil {
-			cfgSubnet = net.CIDR
-		}
-	}
-	var cfgSubnet6 string
-	if cfg.NetworkID6 != uuid.Nil {
-		if net6, _ := DB_FindNetworkByID(cfg.NetworkID6); net6 != nil {
-			cfgSubnet6 = net6.CIDR
-		}
-	}
-
-	sendObject(w, map[string]any{
-		"ID":                 cfg.ID.String(),
-		"Tag":                cfg.Tag,
-		"APIKey":             cfg.APIKey,
-		"WireGuardPubKey":    cfg.WireGuardPubKey,
-		"WireGuardPort":      cfg.WireGuardPort,
-		"WireGuardSubnet":    cfgSubnet,
-		"WireGuardSubnet6":   cfgSubnet6,
-		"WireGuardIface":     cfg.WireGuardIface,
-		"InternetIface":      cfg.InternetIface,
-		"PacketInspection":   cfg.PacketInspection,
-		"InsecureSkipVerify": cfg.InsecureSkipVerify,
-		"NetworkID":          cfg.NetworkID.String(),
-		"NetworkID6":         cfg.NetworkID6.String(),
-	})
+	_, _, err := net.ParseCIDR(s)
+	return err
 }
 
 func API_WGServerConfigFetch(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 
-	wgCfg, ok := HTTP_validateWGKey(r)
+	server, ok := HTTP_validateWGKey(r)
 	if !ok {
 		senderr(w, 401, "Unauthorized")
 		return
@@ -449,192 +310,24 @@ func API_WGServerConfigFetch(w http.ResponseWriter, r *http.Request) {
 
 	// Accept the wg-server's public key from the request header.
 	pubKeyB64 := r.Header.Get("X-WG-PubKey")
-	if pubKeyB64 != "" {
-		wgCfg.WireGuardPubKey = pubKeyB64
-		_ = DB_UpdateWGServerConfig(wgCfg)
-	}
-
-	var fetchSubnet string
-	if wgCfg.NetworkID != uuid.Nil {
-		if network, _ := DB_FindNetworkByID(wgCfg.NetworkID); network != nil {
-			fetchSubnet = network.CIDR
-		}
-	}
-	var fetchSubnet6 string
-	if wgCfg.NetworkID6 != uuid.Nil {
-		if network6, _ := DB_FindNetworkByID(wgCfg.NetworkID6); network6 != nil {
-			fetchSubnet6 = network6.CIDR
-		}
-	}
-
-	var serverID, serverIP string
-	servers, err := DB_FindAllServers()
-	if err == nil {
-		for _, s := range servers {
-			if s.WGConfigID == wgCfg.ID {
-				serverID = s.ID.String()
-				serverIP = s.IP
-				_ = DB_SetServerWGConfigID(s.ID, wgCfg, wgCfg.WireGuardPubKey, fetchSubnet, fetchSubnet6)
-				break
-			}
-		}
+	if pubKeyB64 != "" && pubKeyB64 != server.WireGuardPubKey {
+		server.WireGuardPubKey = pubKeyB64
+		_, _ = DB_UpdateServer(server)
 	}
 
 	resp := &types.WGServerConfigResponse{
-		ServerID:           serverID,
-		ServerIP:           serverIP,
-		WireGuardPort:      wgCfg.WireGuardPort,
-		WireGuardSubnet:    fetchSubnet,
-		WireGuardSubnet6:   fetchSubnet6,
-		WireGuardIface:     wgCfg.WireGuardIface,
-		InternetIface:      wgCfg.InternetIface,
-		PacketInspection:   wgCfg.PacketInspection,
-		InsecureSkipVerify: wgCfg.InsecureSkipVerify,
+		ServerID:           server.ID.String(),
+		ServerIP:           server.IP,
+		WireGuardPort:      server.WireGuardPort,
+		WireGuardSubnet:    server.WireGuardSubnet,
+		WireGuardSubnet6:   server.WireGuardSubnet6,
+		WireGuardIface:     server.WireGuardIface,
+		InternetIface:      server.InternetIface,
+		PacketInspection:   server.PacketInspection,
+		InsecureSkipVerify: server.InsecureSkipVerify,
 	}
 
 	sendObject(w, resp)
-}
-
-type FORM_WG_SERVER_CONFIG_UPDATE struct {
-	ID             uuid.UUID `json:"ID"`
-	Tag            string    `json:"Tag"`
-	WireGuardPort  int       `json:"WireGuardPort"`
-	NetworkID      uuid.UUID `json:"NetworkID"`
-	NetworkID6     uuid.UUID `json:"NetworkID6"`
-	WireGuardIface string    `json:"WireGuardIface"`
-	InternetIface  string    `json:"InternetIface"`
-
-	PacketInspection   bool `json:"PacketInspection"`
-	InsecureSkipVerify bool `json:"InsecureSkipVerify"`
-}
-
-func API_WGServerConfigUpdate(w http.ResponseWriter, r *http.Request) {
-	defer BasicRecover()
-
-	F := new(FORM_WG_SERVER_CONFIG_UPDATE)
-	if err := decodeBody(r, F); err != nil {
-		senderr(w, 400, "Invalid request body", slog.Any("error", err))
-		return
-	}
-
-	if !isAdminAPIKeyFromContext(r.Context()) {
-		user := getUserFromContext(r.Context())
-		if user == nil || !user.IsAdmin {
-			senderr(w, 401, "Admin required")
-			return
-		}
-	}
-
-	existing, err := DB_FindWGServerConfigByID(F.ID)
-	if err != nil || existing == nil {
-		senderr(w, 404, "WGServerConfig not found")
-		return
-	}
-
-	if existing.NetworkID != F.NetworkID {
-		if existing.NetworkID != uuid.Nil {
-			if oldNet, _ := DB_FindNetworkByID(existing.NetworkID); oldNet != nil {
-				oldNet.WGConfigID = uuid.Nil
-				_ = DB_UpdateNetwork(oldNet)
-			}
-		}
-		if F.NetworkID != uuid.Nil {
-			if newNet, _ := DB_FindNetworkByID(F.NetworkID); newNet != nil {
-				newNet.WGConfigID = F.ID
-				_ = DB_UpdateNetwork(newNet)
-			}
-		}
-	}
-
-	if existing.NetworkID6 != F.NetworkID6 {
-		if existing.NetworkID6 != uuid.Nil {
-			if oldNet6, _ := DB_FindNetworkByID(existing.NetworkID6); oldNet6 != nil {
-				oldNet6.WGConfigID = uuid.Nil
-				_ = DB_UpdateNetwork(oldNet6)
-			}
-		}
-		if F.NetworkID6 != uuid.Nil {
-			if newNet6, _ := DB_FindNetworkByID(F.NetworkID6); newNet6 != nil {
-				newNet6.WGConfigID = F.ID
-				_ = DB_UpdateNetwork(newNet6)
-			}
-		}
-	}
-
-	existing.Tag = F.Tag
-	existing.WireGuardPort = F.WireGuardPort
-	existing.NetworkID = F.NetworkID
-	existing.NetworkID6 = F.NetworkID6
-	existing.WireGuardIface = F.WireGuardIface
-	existing.InternetIface = F.InternetIface
-	existing.PacketInspection = F.PacketInspection
-	existing.InsecureSkipVerify = F.InsecureSkipVerify
-
-	if err := DB_UpdateWGServerConfig(existing); err != nil {
-		senderr(w, 500, "Failed to update WGServerConfig", slog.Any("err", err))
-		return
-	}
-
-	w.WriteHeader(200)
-}
-
-type FORM_WG_SERVER_CONFIG_ASSIGN struct {
-	ServerID uuid.UUID `json:"ServerID"`
-	ConfigID uuid.UUID `json:"ConfigID"`
-}
-
-func API_WGServerConfigAssign(w http.ResponseWriter, r *http.Request) {
-	defer BasicRecover()
-
-	F := new(FORM_WG_SERVER_CONFIG_ASSIGN)
-	if err := decodeBody(r, F); err != nil {
-		senderr(w, 400, "Invalid request body", slog.Any("error", err))
-		return
-	}
-
-	if !isAdminAPIKeyFromContext(r.Context()) {
-		user := getUserFromContext(r.Context())
-		if user == nil || !user.IsAdmin {
-			senderr(w, 401, "Admin required")
-			return
-		}
-	}
-
-	if F.ServerID == uuid.Nil || F.ConfigID == uuid.Nil {
-		senderr(w, 400, "ServerID and ConfigID are required")
-		return
-	}
-
-	wgCfg, err := DB_FindWGServerConfigByID(F.ConfigID)
-	if err != nil || wgCfg == nil {
-		senderr(w, 404, "WGServerConfig not found")
-		return
-	}
-
-	var assignSubnet string
-	if wgCfg.NetworkID != uuid.Nil {
-		if network, _ := DB_FindNetworkByID(wgCfg.NetworkID); network != nil {
-			assignSubnet = network.CIDR
-		}
-	}
-	var assignSubnet6 string
-	if wgCfg.NetworkID6 != uuid.Nil {
-		if network6, _ := DB_FindNetworkByID(wgCfg.NetworkID6); network6 != nil {
-			assignSubnet6 = network6.CIDR
-		}
-	}
-
-	if err := DB_SetServerWGConfigID(F.ServerID, wgCfg, wgCfg.WireGuardPubKey, assignSubnet, assignSubnet6); err != nil {
-		senderr(w, 500, "Failed to update server", slog.Any("err", err))
-		return
-	}
-
-	sendObject(w, map[string]any{
-		"WireGuardPubKey":  wgCfg.WireGuardPubKey,
-		"WireGuardPort":    wgCfg.WireGuardPort,
-		"WireGuardSubnet":  assignSubnet,
-		"WireGuardSubnet6": assignSubnet6,
-	})
 }
 
 func API_WGServers(w http.ResponseWriter, r *http.Request) {
@@ -655,7 +348,7 @@ func API_WGServers(w http.ResponseWriter, r *http.Request) {
 
 	resp := types.WGServersResponse{Servers: make([]types.WGServerInfo, 0)}
 	for _, s := range servers {
-		if s.WireGuardSubnet == "" || s.WireGuardPubKey == "" {
+		if s.WireGuardPubKey == "" || s.WireGuardSubnet == "" {
 			continue
 		}
 		if excludeID != "" && s.ID.String() == excludeID {
@@ -696,7 +389,7 @@ DNS = %s
 
 [Peer]
 PublicKey = %s
-Endpoint = %s:%s
+Endpoint = %s:%d
 AllowedIPs = %s
 PersistentKeepalive = 15
 `, address, dns, server.WireGuardPubKey, server.IP, server.WireGuardPort, allowedIPs)
