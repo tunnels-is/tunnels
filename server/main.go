@@ -12,7 +12,6 @@ import (
 	sig "os/signal"
 	"path/filepath"
 	"runtime"
-	"slices"
 	"strings"
 	"sync/atomic"
 	"syscall"
@@ -35,13 +34,13 @@ var (
 	CTX          atomic.Pointer[context.Context]
 	Cancel       atomic.Pointer[context.CancelFunc]
 	Config       atomic.Pointer[types.ServerConfig]
+	WGConfig     atomic.Pointer[types.WGBootstrap]
 	APITLSConfig atomic.Pointer[tls.Config]
 	KeyPair      atomic.Pointer[tls.Certificate]
 
-	AUTHEnabled bool
-
 	disableLogs      bool
 	serverConfigPath string
+	wgConfigPath     string
 
 	logger *slog.Logger
 
@@ -49,24 +48,32 @@ var (
 )
 
 func main() {
+	runtime.GOMAXPROCS(runtime.NumCPU())
+
 	showVersion := false
 	flag.BoolVar(&showVersion, "version", false, "show version and exit")
 
-	configFlag := flag.String("config", "", "Generate a config. Empty value creates a full config (AUTH + WG), 'auth' enables only the AUTH feature, 'wg' enables only the VPN feature")
-	configPath := flag.String("configPath", "./config.json", "path to config file (supports .json, .yaml, .yml)")
+	allTheThings := flag.Bool("allinone", true, "full setup of an all-in-one vpn server + auth controller. This will create configs, generate certs and create a wrieguard server + admin user in the database. Essentially a (configure everything and run) flag")
+	wgServerEnabled := flag.Bool("wg", true, "enable/disable the wireguard vpn server module")
+	authServerEnabled := flag.Bool("auth", true, "enable/disable the auth server module")
+	createConfig := flag.String("createConfig", "", "Generate a config. '' or 'all' creates both config.json and wg-config.json; 'auth' creates config.json only; 'wg' creates wg-config.json only")
+	configPath := flag.String("configPath", "./config.json", "path to controller config file (supports .json, .yaml, .yml)")
+	wgConfigPathFlag := flag.String("wgConfigPath", "./wg-config.json", "path to wg-server config file")
 	jsonLogs := flag.Bool("json", true, "enable/disable json logging")
-	sourceInfo := flag.Bool("source", false, "disable source line information in logs")
-	certFlag := flag.String("cert", "", "Generate API certificates. Use 'selfsign' for a self-signed cert or a domain name (e.g. 'example.com') to obtain a Let's Encrypt certificate via ACME HTTP-01")
-	silent := flag.Bool("silent", false, "This command disables logging")
+	sourceInfo := flag.Bool("source", true, "disable source line information in logs")
+	createCert := flag.String("createCert", "", "Generate API certificates. Use 'selfsign' for a self-signed cert or a domain name (e.g. 'example.com') to obtain a Let's Encrypt certificate via ACME HTTP-01")
+	silent := flag.Bool("silent", true, "This command disables logging")
 	logLevel := flag.String("logLevel", "debug", "set the log level. Available levels: debug, info, warn, error")
-	adminFlag := flag.String("admin", "", "Add an admin identifier (DeviceToken/DeviceKey/UserID) to NetAdmins")
-	ipOverride := flag.String("ip", "", "Override the IP used for -config and -certs (defaults to auto-discovered default-route interface IP)")
+	createAdmin := flag.Bool("createAdmin", false, "Create the default admin user in the auth DB on startup")
+	createServer := flag.Bool("createServer", false, "Create the default 'tunnels' server (with WG bootstrap) in the auth DB on startup")
+	ipOverride := flag.String("ip", "", "Override the IP used for -createConfig and -createCert (defaults to auto-discovered default-route interface IP)")
 	flag.Parse()
 
 	explicitFlags := make(map[string]bool)
 	flag.Visit(func(f *flag.Flag) { explicitFlags[f.Name] = true })
 
 	serverConfigPath = *configPath
+	wgConfigPath = *wgConfigPathFlag
 	initLogging(*silent, *jsonLogs, *sourceInfo, *logLevel)
 
 	if showVersion {
@@ -74,13 +81,13 @@ func main() {
 		os.Exit(1)
 	}
 
-	configRequested := explicitFlags["config"]
-	configMode := strings.ToLower(strings.TrimSpace(*configFlag))
-	if configRequested {
+	configRequested := explicitFlags["createConfig"]
+	configMode := strings.ToLower(strings.TrimSpace(*createConfig))
+	if configRequested || *allTheThings {
 		switch configMode {
-		case "", "auth", "wg":
+		case "", "all", "auth", "wg":
 		default:
-			logger.Error("invalid -config value (allowed: '', 'auth', 'wg')", "value", *configFlag)
+			logger.Error("invalid -createConfig value (allowed: '', 'all', 'auth', 'wg')", "value", *createConfig)
 			os.Exit(1)
 		}
 		logger.Info("generating config", "mode", configMode)
@@ -90,8 +97,35 @@ func main() {
 		}
 	}
 
-	if certValue := strings.TrimSpace(*certFlag); certValue != "" {
-		if strings.EqualFold(certValue, "selfsign") {
+	if *createAdmin || *allTheThings {
+		err := ConnectToBBoltDB("tunnels.db")
+		if err != nil {
+			logger.Error("unable to connect to bbolt", slog.Any("err", err))
+			os.Exit(1)
+		}
+		if err := initializeAdminUser(); err != nil {
+			logger.Error("unable to create admin user", slog.Any("err", err))
+			os.Exit(1)
+		}
+		BBoltDB.Close()
+	}
+
+	if *createServer || *allTheThings {
+		err := ConnectToBBoltDB("tunnels.db")
+		if err != nil {
+			logger.Error("unable to connect to bbolt", slog.Any("err", err))
+			os.Exit(1)
+		}
+		if err := initializeDefaultServer(); err != nil {
+			logger.Error("unable to create default server", slog.Any("err", err))
+			os.Exit(1)
+		}
+		BBoltDB.Close()
+	}
+
+	if *createCert != "" || *allTheThings {
+		certValue := strings.TrimSpace(*createCert)
+		if certValue == "" || certValue == "selfsign" {
 			logger.Info("generating self-signed certificates")
 			if err := generateSelfSignedCerts(*ipOverride); err != nil {
 				logger.Error("unable to create self-signed certificates", "error", err)
@@ -109,66 +143,37 @@ func main() {
 		}
 	}
 
-	if *adminFlag != "" {
-		err := addAdminToConfig(*adminFlag)
-		if err != nil {
-			logger.Error("failed to add admin to config", slog.Any("err", err))
-			os.Exit(1)
-		}
-		logger.Info("successfully added admin to NetAdmins")
-		os.Exit(0)
-	}
-
-	runtime.GOMAXPROCS(runtime.NumCPU())
-
-	err := LoadServerConfig(serverConfigPath)
-	if err != nil {
-		panic(err)
-	}
-
-	if lc := Config.Load().Log; lc != nil {
-		if !explicitFlags["logLevel"] && lc.Level != "" {
-			*logLevel = lc.Level
-		}
-		if !explicitFlags["json"] {
-			*jsonLogs = lc.JSON
-		}
-		if !explicitFlags["silent"] {
-			*silent = lc.Silent
-		}
-		if !explicitFlags["source"] {
-			*sourceInfo = lc.Source
-		}
-		initLogging(*silent, *jsonLogs, *sourceInfo, *logLevel)
-	}
-
-	config := Config.Load()
-	if config.SecretStore == types.EnvStore {
-		err = godotenv.Load(".env")
-		if err != nil {
-			logger.Error("no .env file found")
-			os.Exit(1)
-		}
-	}
-
-	AUTHEnabled = slices.Contains(config.Features, types.AUTH)
-	WGEnabled := slices.Contains(config.Features, types.WG)
-
 	ctx, cancel := context.WithCancel(context.Background())
 	CTX.Store(&ctx)
 	Cancel.Store(&cancel)
 
-	if AUTHEnabled {
-		err = loadCertificatesAndTLSSettings()
-		if err != nil {
-			panic(err)
-		}
-		err = ConnectToBBoltDB("tunnels.db")
+	if *authServerEnabled || *allTheThings {
+		err := ConnectToBBoltDB("tunnels.db")
 		if err != nil {
 			logger.Error("unable to connect to bbolt", slog.Any("err", err))
 			os.Exit(1)
 		}
+		err = LoadServerConfig(serverConfigPath)
+		if err != nil {
+			panic(err)
+		}
 
+		config := Config.Load()
+		if config.SecretStore == types.EnvStore {
+			err = godotenv.Load(".env")
+			if err != nil {
+				logger.Error("no .env file found")
+				os.Exit(1)
+			}
+		}
+
+		err = loadCertificatesAndTLSSettings()
+		if err != nil {
+			panic(err)
+		}
+
+		// this is only used for production environments (tunnels.is)
+		// ======================================
 		if loadSecret("PayKey") != "" {
 			lemonClient := lemonsqueezy.New(lemonsqueezy.WithAPIKey(loadSecret("PayKey")))
 			if lemonClient == nil {
@@ -178,40 +183,42 @@ func main() {
 			lc.Store(lemonClient)
 			go signal.NewSignal("SUBSCANNER", ctx, cancel, 12*time.Hour, goroutineLogger, scanSubs)
 		}
+		// ======================================
 
-		if configRequested {
-			err := initializeNewServer()
-			if err != nil {
-				logger.Error("unable to create admin user", slog.Any("err", err))
-				os.Exit(1)
-			}
-			if configMode != "auth" {
-				if err := initializeWGServer(); err != nil {
-					logger.Error("unable to initialize WG server", slog.Any("err", err))
-					os.Exit(1)
-				}
-			}
-		}
 		go signal.NewSignal("API", ctx, cancel, 1*time.Second, goroutineLogger, launchAPIServer)
+
+		go signal.NewSignal("CONFIG", ctx, cancel, 30*time.Second, goroutineLogger, func() {
+			err := LoadServerConfig(serverConfigPath)
+			if err != nil {
+				logger.Error("config could not be loaded", "path", serverConfigPath, slog.Any("err", err))
+			}
+		})
 	}
 
-	if WGEnabled {
-		latestCfg := Config.Load()
-		wgCfg := latestCfg.WG
-		if wgCfg == nil || wgCfg.APIKey == "" {
-			logger.Error("WG feature enabled but no WG config found in config file")
+	if *wgServerEnabled || *allTheThings {
+		if err := LoadWGConfig(wgConfigPath); err != nil {
+			logger.Error("WG feature enabled but wg config could not be loaded", "path", wgConfigPath, slog.Any("err", err))
+			os.Exit(1)
+		}
+		wgCfg := WGConfig.Load()
+		if wgCfg.APIKey == "" {
+			logger.Error("WG feature enabled but wg config has no APIKey", "path", wgConfigPath)
 			os.Exit(1)
 		}
 		ctrlURL := wgCfg.ControllerURL
 		if ctrlURL == "" {
+			latestCfg := Config.Load()
 			ctrlURL = "https://" + latestCfg.APIIP + ":" + latestCfg.APIPort
 		}
-		go wgserver.Init(ctx, ctrlURL, wgCfg.APIKey, serverConfigPath, wgCfg.InsecureSkipVerify, *logLevel)
-	}
 
-	go signal.NewSignal("CONFIG", ctx, cancel, 30*time.Second, goroutineLogger, func() {
-		_ = LoadServerConfig(serverConfigPath)
-	})
+		go wgserver.Init(ctx, ctrlURL, wgCfg.APIKey, wgConfigPath, wgCfg.InsecureSkipVerify, *logLevel)
+
+		go signal.NewSignal("WG-CONFIG", ctx, cancel, 30*time.Second, goroutineLogger, func() {
+			if err := LoadWGConfig(wgConfigPath); err != nil {
+				logger.Error("WG feature enabled but wg config could not be loaded", "path", wgConfigPath, slog.Any("err", err))
+			}
+		})
+	}
 
 	logger.Info("Tunnels ready")
 	quit := make(chan os.Signal, 1)
@@ -227,17 +234,6 @@ func goroutineLogger(msg string) {
 }
 
 func validateConfig(Config *types.ServerConfig) (err error) {
-	if Config.UserMaxConnections < 1 {
-		Config.UserMaxConnections = 2
-	}
-	if Config.PingTimeoutMinutes < 2 {
-		Config.PingTimeoutMinutes = 2
-	}
-
-	if len(Config.Features) == 0 {
-		return fmt.Errorf("no features enbaled")
-	}
-
 	if Config.SecretStore == "" {
 		Config.SecretStore = types.EnvStore
 	}
@@ -306,26 +302,57 @@ func SaveServerConfig(path string) (err error) {
 	return nil
 }
 
-func addAdminToConfig(identifier string) error {
-	err := LoadServerConfig(serverConfigPath)
+func LoadWGConfig(path string) error {
+	nb, err := os.ReadFile(path)
 	if err != nil {
-		return fmt.Errorf("failed to load config: %w", err)
+		return err
 	}
-
-	hashedIdentifier, err := hashIdentifier(identifier)
+	W := new(types.WGBootstrap)
+	ext := strings.ToLower(filepath.Ext(path))
+	switch ext {
+	case ".yaml", ".yml":
+		err = yaml.Unmarshal(nb, W)
+	case ".json", "":
+		err = json.Unmarshal(nb, W)
+	default:
+		return fmt.Errorf("unsupported wg config file format: %s (supported: .json, .yaml, .yml)", ext)
+	}
 	if err != nil {
-		return fmt.Errorf("failed to hash indetifier: %w", err)
+		return err
 	}
+	WGConfig.Store(W)
+	return nil
+}
 
-	C := Config.Load()
-	C.NetAdmins = append(C.NetAdmins, hashedIdentifier)
-	Config.Store(C)
-
-	err = SaveServerConfig(serverConfigPath)
+func SaveWGConfig(path string) error {
+	W := WGConfig.Load()
+	if W == nil {
+		return fmt.Errorf("no wg config loaded")
+	}
+	f, err := os.Create(path)
 	if err != nil {
-		return fmt.Errorf("failed to save config: %w", err)
+		return err
 	}
+	defer func() { _ = f.Close() }()
 
+	ext := strings.ToLower(filepath.Ext(path))
+	switch ext {
+	case ".yaml", ".yml":
+		encoder := yaml.NewEncoder(f)
+		encoder.SetIndent(2)
+		if err := encoder.Encode(W); err != nil {
+			return err
+		}
+		_ = encoder.Close()
+	case ".json", "":
+		encoder := json.NewEncoder(f)
+		encoder.SetIndent("", "    ")
+		if err := encoder.Encode(W); err != nil {
+			return err
+		}
+	default:
+		return fmt.Errorf("unsupported wg config file format: %s (supported: .json, .yaml, .yml)", ext)
+	}
 	return nil
 }
 
@@ -384,62 +411,59 @@ func loadCertificatesAndTLSSettings() (err error) {
 	return nil
 }
 
-func hashIdentifier(identifier string) (string, error) {
-	h, err := bcrypt.GenerateFromPassword([]byte(identifier), bcrypt.MinCost)
-	if err != nil {
-		return "", err
+func makeConfig(ipOverride string, mode string) error {
+	writeServer := mode == "" || mode == "all" || mode == "auth"
+	writeWG := mode == "" || mode == "all" || mode == "wg"
+
+	if writeServer {
+		if err := writeServerConfig(ipOverride, mode); err != nil {
+			return err
+		}
 	}
-	return string(h), nil
+	if writeWG {
+		if err := writeWGConfig(); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
-func makeConfig(ipOverride string, mode string) error {
+func writeServerConfig(ipOverride, mode string) error {
+	if err := LoadServerConfig(serverConfigPath); err == nil {
+		return nil
+	}
+
 	interfaceIP, err := resolveInterfaceIP(ipOverride)
 	if err != nil {
 		return err
 	}
 
-	var features []types.Feature
-	switch mode {
-	case "auth":
-		features = []types.Feature{types.AUTH, types.DNS}
-	case "wg":
-		features = []types.Feature{types.WG}
-	default:
-		features = []types.Feature{types.AUTH, types.DNS, types.WG}
-	}
-
-	if err := LoadServerConfig(serverConfigPath); err == nil {
-		return nil
-	}
-
 	newConfig := &types.ServerConfig{
-		Features:           features,
-		VPNIP:              interfaceIP,
-		APIIP:              interfaceIP,
-		APIPort:            "443",
-		NetAdmins:          []string{},
-		Hostname:           "tunnels.local",
-		Routes:             []*types.Route{},
-		SubNets:            []*types.Network{},
-		UserMaxConnections: 10,
-		DNSRecords:         []*types.DNSRecord{},
-		DNSServers:         []string{},
-		SecretStore:        "config",
-		DBurl:              "",
-		AdminAPIKey:        uuid.NewString(),
-		TwoFactorKey:       strings.ReplaceAll(uuid.NewString(), "-", ""),
-		CookieSigningKey:   strings.ReplaceAll(uuid.NewString(), "-", ""),
-		CertPem:            "./cert.pem",
-		KeyPem:             "./key.pem",
-		SignPem:            "./sign.pem",
-		Log:                &types.LogConfig{Level: "debug", JSON: true},
-		WG:                 &types.WGBootstrap{InsecureSkipVerify: true},
+		APIIP:            interfaceIP,
+		APIPort:          "443",
+		Hostname:         "tunnels.local",
+		SecretStore:      "config",
+		DBurl:            "",
+		AdminAPIKey:      uuid.NewString(),
+		TwoFactorKey:     strings.ReplaceAll(uuid.NewString(), "-", ""),
+		CookieSigningKey: strings.ReplaceAll(uuid.NewString(), "-", ""),
+		CertPem:          "./cert.pem",
+		KeyPem:           "./key.pem",
+		SignPem:          "./sign.pem",
 	}
 	Config.Store(newConfig)
 	return SaveServerConfig(serverConfigPath)
 }
 
-func initializeNewServer() error {
+func writeWGConfig() error {
+	if err := LoadWGConfig(wgConfigPath); err == nil {
+		return nil
+	}
+	WGConfig.Store(&types.WGBootstrap{InsecureSkipVerify: true})
+	return SaveWGConfig(wgConfigPath)
+}
+
+func initializeAdminUser() error {
 	user, err := DB_findUserByEmail("admin")
 	if err != nil {
 		return err
@@ -458,7 +482,6 @@ func initializeNewServer() error {
 	newUser.ID = uuid.New()
 	newUser.Password = string(hash)
 	newUser.IsAdmin = true
-	newUser.IsManager = true
 	newUser.AdditionalInformation = ""
 	newUser.Email = "admin"
 	newUser.Updated = time.Now()
@@ -468,22 +491,12 @@ func initializeNewServer() error {
 	newUser.SubExpiration = time.Now().AddDate(100, 0, 0)
 	newUser.Groups = make([]uuid.UUID, 0)
 	newUser.Tokens = make([]*DeviceToken, 0)
-	err = DB_CreateUser(newUser)
-	if err != nil {
+	if err := DB_CreateUser(newUser); err != nil {
 		return err
 	}
 
 	logger.Info("ADMIN PASSWORD (change this!!)", "pass", pw)
-
-	c := Config.Load()
-	return DB_CreateServer(&types.Server{
-		ID:      uuid.New(),
-		Tag:     "tunnels",
-		Country: "tunnels",
-		IP:      c.VPNIP,
-		Port:    c.APIPort,
-		Groups:  []uuid.UUID{},
-	})
+	return nil
 }
 
 // defaultWGSubnet is the IPv4 CIDR assigned to the default "tunnels" server on
@@ -491,58 +504,55 @@ func initializeNewServer() error {
 // with the host's LAN.
 const defaultWGSubnet = "10.0.0.0/22"
 
-func initializeWGServer() error {
+func initializeDefaultServer() error {
 	cfg := Config.Load()
-	if cfg.WG != nil && cfg.WG.APIKey != "" {
-		return nil
-	}
-
-	insecureSkipVerify := false
-	if cfg.WG != nil {
-		insecureSkipVerify = cfg.WG.InsecureSkipVerify
-	}
-
-	internetIface := discoverInternetIface()
 
 	servers, err := DB_FindAllServers()
 	if err != nil {
 		return fmt.Errorf("find servers: %w", err)
 	}
-	var defaultServer *types.Server
 	for _, s := range servers {
 		if s.Tag == "tunnels" {
-			defaultServer = s
-			break
+			return nil
 		}
 	}
-	if defaultServer == nil {
-		return fmt.Errorf("default server not found")
+
+	if err := LoadWGConfig(wgConfigPath); err != nil {
+		return fmt.Errorf("load wg config %q: %w", wgConfigPath, err)
+	}
+	wgCfg := WGConfig.Load()
+
+	apiKey := uuid.NewString()
+	internetIface := discoverInternetIface()
+
+	server := &types.Server{
+		ID:                 uuid.New(),
+		Tag:                "tunnels",
+		Country:            "tunnels",
+		IP:                 cfg.APIIP,
+		Port:               cfg.APIPort,
+		Groups:             []uuid.UUID{},
+		APIKey:             apiKey,
+		WireGuardPort:      51820,
+		WireGuardIface:     "wg0",
+		WireGuardSubnet:    defaultWGSubnet,
+		InternetIface:      internetIface,
+		InsecureSkipVerify: wgCfg.InsecureSkipVerify,
+	}
+	if err := DB_CreateServer(server); err != nil {
+		return fmt.Errorf("create default server: %w", err)
 	}
 
-	defaultServer.APIKey = uuid.NewString()
-	defaultServer.WireGuardPort = 51820
-	defaultServer.WireGuardIface = "wg0"
-	defaultServer.WireGuardSubnet = defaultWGSubnet
-	defaultServer.InternetIface = internetIface
-	defaultServer.InsecureSkipVerify = insecureSkipVerify
-
-	if _, err := DB_UpdateServer(defaultServer); err != nil {
-		return fmt.Errorf("configure wg on default server: %w", err)
+	wgCfg.APIKey = apiKey
+	WGConfig.Store(wgCfg)
+	if err := SaveWGConfig(wgConfigPath); err != nil {
+		return fmt.Errorf("save wg config: %w", err)
 	}
 
-	cfg.WG = &types.WGBootstrap{
-		APIKey:             defaultServer.APIKey,
-		InsecureSkipVerify: insecureSkipVerify,
-	}
-	Config.Store(cfg)
-	if err := SaveServerConfig(serverConfigPath); err != nil {
-		return fmt.Errorf("save config: %w", err)
-	}
-
-	logger.Info("WG server initialized",
-		"subnet", defaultServer.WireGuardSubnet,
-		"port", defaultServer.WireGuardPort,
-		"iface", defaultServer.WireGuardIface,
+	logger.Info("default server initialized",
+		"subnet", server.WireGuardSubnet,
+		"port", server.WireGuardPort,
+		"iface", server.WireGuardIface,
 		"internetIface", internetIface,
 	)
 	return nil
