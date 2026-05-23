@@ -38,54 +38,34 @@ type LogConfig struct {
 }
 
 type ServerConfig struct {
-	Features           []Feature
-	PingTimeoutMinutes int
-	LogAPIHosts        bool
+	LogAPIHosts bool
 
 	ClientVersion string
-
-	VPNIP string
 
 	APIIP   string
 	APIPort string
 
-	NetAdmins []string
-
 	Hostname string
-	Routes   []*Route
-	SubNets  []*Network
-
-	UserMaxConnections int
-
-	DNSRecords []*DNSRecord
-	DNSServers []string
 
 	SecretStore SecretStore
 	// If SecretStore set to "config"
-	AdminAPIKey  string
-	DBurl        string
+	AdminAPIKey      string
+	DBurl            string
 	TwoFactorKey     string
 	CookieSigningKey string
 	PayKey           string
-	CertPem      string
-	SignPem      string
-	KeyPem       string
+	CertPem          string
+	SignPem          string
+	KeyPem           string
 
 	// Enables multiple key/pairs for API SNI rotation
 	CertPems []string
 	KeyPems  []string
-
-	Log *LogConfig `json:"Log,omitempty"`
-
-	// WG holds bootstrap config for the wg-server feature.
-	// Only required when the WG feature is enabled.
-	WG *WGBootstrap
 }
 
-// WGBootstrap holds the configuration needed to start the wg-server feature
-// inside the server binary. The wg-server uses these values to fetch its full
-// config from the controller over HTTP, preserving the same auth layer as the
-// standalone wg-server binary.
+// WGBootstrap is the standalone wg-config.json content. The wg-server uses
+// these values to fetch its full config from the controller over HTTP,
+// preserving the same auth layer as the standalone wg-server binary.
 type WGBootstrap struct {
 	// APIKey is the per-server API key (from POST /ui/wg/server-config).
 	APIKey string
