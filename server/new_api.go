@@ -76,9 +76,9 @@ func launchAPIServer() {
 
 	// todo.. needs pagination
 	mux.Handle("POST /ui/servers", adminMW(API_AdminServersList))
+	mux.Handle("POST /ui/server", adminMW(API_AdminServerGet))
 
 	mux.Handle("POST /ui/device", adminMW(API_AdminDeviceGet))
-	mux.Handle("POST /ui/server", adminMW(API_AdminServerGet))
 
 	mux.Handle("POST /ui/user/logout", adminMW(API_AdminUILogout))
 	mux.Handle("POST /ui/user/list", adminMW(API_AdminUserList))

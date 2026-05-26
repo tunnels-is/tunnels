@@ -41,11 +41,9 @@ export default function ServerDetail() {
   const [newAPIKey, setNewAPIKey] = useState('');
 
   const load = async () => {
-    const resp = await apiPost('/ui/servers', { StartIndex: 0 });
+    const resp = await apiPost('/ui/server', { ServerID: id });
     if (resp.status === 200) {
-      const list = await resp.json();
-      const found = (Array.isArray(list) ? list : []).find((s) => s._id === id);
-      if (found) setServer(found);
+      setServer(await resp.json());
     }
   };
 
