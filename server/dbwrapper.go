@@ -103,8 +103,8 @@ func DB_FindServerByAPIKey(apiKey string) (*types.Server, error) {
 	return BBolt_FindServerByAPIKey(apiKey)
 }
 
-func DB_FindAllServers() ([]*types.Server, error) {
-	return BBolt_FindAllServers()
+func DB_FindAllServers(limit, offset int64) ([]*types.Server, error) {
+	return BBolt_FindAllServers(limit, offset)
 }
 
 func DB_FindServerByID(ID uuid.UUID) (S *types.Server, err error) {

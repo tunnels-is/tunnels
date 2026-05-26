@@ -797,16 +797,11 @@ func API_AdminServersList(w http.ResponseWriter, r *http.Request) {
 		senderr(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
-	_ = F
 
-	servers, err := DB_FindAllServers()
+	servers, err := DB_FindAllServers(100, int64(F.StartIndex))
 	if err != nil {
 		senderr(w, 500, "Unknown error, please try again in a moment")
 		return
-	}
-
-	if servers == nil {
-		servers = make([]*types.Server, 0)
 	}
 
 	sendObject(w, servers)
