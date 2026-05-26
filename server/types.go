@@ -61,6 +61,8 @@ type FORM_DELETE_DEVICE struct {
 type FORM_LIST_GROUP struct {
 	DeviceToken string    `json:"DeviceToken"`
 	UID         uuid.UUID `json:"UID"`
+	Limit       int       `json:"Limit"`
+	Offset      int       `json:"Offset"`
 }
 
 type FORM_LIST_USERS struct {
