@@ -32,11 +32,18 @@ func launchAPIServer() {
 		http.Redirect(w, r, "/admin/", http.StatusMovedPermanently)
 	})
 
-	// todo.. WG key auth middleware ??
-	mux.HandleFunc("GET /wg/server-config/fetch", API_WGServerConfigFetch)
-	mux.HandleFunc("GET /wg/peers", API_WGPeers)
-	mux.HandleFunc("GET /wg/peer", API_WGPeer)
-	mux.HandleFunc("GET /wg/servers", API_WGServers)
+	adminAPIKeyMW := func(h http.HandlerFunc) http.Handler {
+		return applyMiddleware(h, xAdminAPIKeyMiddleware)
+	}
+	mux.Handle("POST /ui/device/create", adminAPIKeyMW(API_AdminDeviceCreate))
+
+	wgServerMW := func(h http.HandlerFunc) http.Handler {
+		return applyMiddleware(h, wireGuardServerKeyCheck)
+	}
+	mux.Handle("GET /wg/server-config/fetch", wgServerMW(API_WGServerConfigFetch))
+	mux.Handle("GET /wg/peers", wgServerMW(API_WGPeers))
+	mux.Handle("GET /wg/peer", wgServerMW(API_WGPeer))
+	mux.Handle("GET /wg/servers", wgServerMW(API_WGServers))
 
 	mux.HandleFunc("POST /client/user/login", API_UserLogin)
 	mux.HandleFunc("POST /client/user/create", API_UserCreate)
@@ -48,7 +55,7 @@ func launchAPIServer() {
 	mux.Handle("POST /client/user/logout", clientMW(API_UserLogout))
 	mux.Handle("POST /client/user/update", clientMW(API_UserUpdate))
 	mux.Handle("POST /client/user/2fa/confirm", clientMW(API_UserTwoFactorConfirm))
-	mux.Handle("POST /client/device/list/user", clientMW(API_DeviceListUser))
+	mux.Handle("POST /client/device/list/user", clientMW(API_ListDevicesByUser))
 	mux.Handle("POST /client/device/create", clientMW(API_DeviceCreate))
 	mux.Handle("POST /client/device/delete", clientMW(API_ClientDeviceDelete))
 	mux.Handle("POST /client/device", clientMW(API_DeviceGet))
@@ -60,7 +67,6 @@ func launchAPIServer() {
 	// ======================================
 	if loadSecret("PayKey") != "" {
 		mux.Handle("POST /client/key/activate", clientMW(API_ActivateLicenseKey))
-		mux.Handle("POST /client/user/toggle/substatus", clientMW(API_UserToggleSubStatus))
 	}
 	// ======================================
 
@@ -69,14 +75,12 @@ func launchAPIServer() {
 		return applyMiddleware(h, adminUIMiddleware)
 	}
 
-	// shared
-	mux.Handle("POST /ui/device/create", adminMW(API_DeviceCreate))
-	mux.Handle("POST /ui/device", adminMW(API_DeviceGet))
-	mux.Handle("POST /ui/server", adminMW(API_ServerGet))
-	mux.Handle("POST /ui/servers", adminMW(API_ServersForUser))
-	mux.Handle("POST /ui/user/toggle/substatus", adminMW(API_UserToggleSubStatus))
+	// todo.. needs pagination
+	mux.Handle("POST /ui/servers", adminMW(API_AdminServersList))
 
-	// unique
+	mux.Handle("POST /ui/device", adminMW(API_AdminDeviceGet))
+	mux.Handle("POST /ui/server", adminMW(API_AdminServerGet))
+
 	mux.Handle("POST /ui/user/logout", adminMW(API_AdminUILogout))
 	mux.Handle("POST /ui/user/list", adminMW(API_AdminUserList))
 	mux.Handle("POST /ui/user/adminupdate", adminMW(API_UserAdminUpdate))

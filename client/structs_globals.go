@@ -50,7 +50,6 @@ var (
 
 	concurrencyMonitor = make(chan *goSignal, 1000)
 	tunnelMonitor      = make(chan *TUN, 1000)
-	interfaceMonitor   = make(chan *TUN, 1000)
 
 	highPriorityChannel   = make(chan *event, 100)
 	mediumPriorityChannel = make(chan *event, 100)
@@ -409,7 +408,6 @@ type TUN struct {
 
 	blockedPortsSet map[[2]byte]uint16 `json:"-"`
 
-	pingTime                atomic.Pointer[time.Time]
 	needsReconnect          atomic.Bool
 	localInterfaceNetIP     net.IP
 	localDNSClient          *dns.Client
@@ -487,10 +485,6 @@ func (t *TUN) SetState(state TunnelState) {
 	t.state.Store(&state)
 }
 
-func (t *TUN) registerPing(ping time.Time) {
-	t.pingTime.Store(&ping)
-}
-
 func (t *TUN) RecordBandwidth() {
 	defer RecoverAndLog()
 
@@ -533,10 +527,6 @@ func (t *TUN) RecordBandwidth() {
 }
 
 func (t *TUN) MarshalJSON() ([]byte, error) {
-	var pingTime time.Time
-	if t.pingTime.Load() != nil {
-		pingTime = *t.pingTime.Load()
-	}
 	eb := BandwidthBytesToString(t.egressBytes.Load())
 	ib := BandwidthBytesToString(t.ingressBytes.Load())
 
@@ -549,7 +539,6 @@ func (t *TUN) MarshalJSON() ([]byte, error) {
 		ID               string
 		CR               *ConnectionRequest
 		CRResponse       *types.ServerConnectResponse
-		Ping             time.Time
 		CPU              byte
 		DISK             byte
 		MEM              byte
@@ -560,7 +549,6 @@ func (t *TUN) MarshalJSON() ([]byte, error) {
 		t.ID,
 		t.CR,
 		t.ServerResponse,
-		pingTime,
 		t.CPU,
 		t.DISK,
 		t.MEM,

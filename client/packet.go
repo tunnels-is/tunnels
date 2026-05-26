@@ -1,36 +1,8 @@
 package client
 
 import (
-	"bytes"
 	"encoding/binary"
-	"fmt"
-	"time"
 )
-
-func (t *TUN) RegisterPing(tag string, packet []byte) {
-	defer RecoverAndLog()
-	if len(packet) > 18 {
-		if !bytes.Equal(packet[3:11], []byte{255, 1, 255, 2, 255, 3, 255, 4}) {
-			DEEP("Short packet received, not a ping packet")
-			return
-		}
-
-		t.CPU = packet[0]
-		t.MEM = packet[1]
-		t.DISK = packet[2]
-		count := int64(binary.BigEndian.Uint64(packet[11:]))
-
-		DEEP(fmt.Sprintf("ping from server (%s) cpu(%d) mem(%d) disk(%d)  count(%d)", tag, t.CPU, t.MEM, t.DISK, t.PingInt.Load()))
-
-		localCount := t.PingInt.Load()
-		if localCount > (count + 10) {
-			ERROR("Ping count of of balance local:", localCount, "server:", count, "server_max:", count+10)
-			t.needsReconnect.Store(true)
-		} else {
-			t.registerPing(time.Now())
-		}
-	}
-}
 
 func (V *TUN) ProcessEgressPacket(p *[]byte) (sendRemote bool) {
 	packet := *p
@@ -144,7 +116,6 @@ func RecalculateIPv4HeaderChecksum(bytes []byte) {
 }
 
 func RecalculateTransportChecksum(IPv4Header []byte, TPPacket []byte) {
-
 	switch IPv4Header[9] {
 	case 6:
 		TPPacket[16] = 0

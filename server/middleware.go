@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/google/uuid"
+	"github.com/tunnels-is/tunnels/types"
 )
 
 type contextKey string
@@ -12,6 +13,7 @@ type contextKey string
 const (
 	contextKeyUser          contextKey = "user"
 	contextKeyIsAdminAPIKey contextKey = "isAdminAPIKey"
+	contextKeyServer        contextKey = "server"
 )
 
 func getUserFromContext(ctx context.Context) *User {
@@ -24,14 +26,32 @@ func isAdminAPIKeyFromContext(ctx context.Context) bool {
 	return v
 }
 
-func xAPIKeyMiddleware(next http.Handler) http.Handler {
+func getServerFromContext(ctx context.Context) *types.Server {
+	user, _ := ctx.Value(contextKeyServer).(*types.Server)
+	return user
+}
+
+func xAdminAPIKeyMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if HTTP_validateKey(r) {
-			ctx := context.WithValue(r.Context(), contextKeyIsAdminAPIKey, true)
-			next.ServeHTTP(w, r.WithContext(ctx))
+		if !HTTP_validateKey(r) {
+			senderr(w, 401, "Unauthorized")
 			return
 		}
-		next.ServeHTTP(w, r)
+		ctx := context.WithValue(r.Context(), contextKeyIsAdminAPIKey, true)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+func wireGuardServerKeyCheck(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		server, ok := HTTP_validateWGKey(r)
+		if !ok {
+			senderr(w, 401, "Unauthorized")
+			return
+		}
+
+		ctx := context.WithValue(r.Context(), contextKeyServer, server)
+		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
 

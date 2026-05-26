@@ -218,10 +218,9 @@ type LicenseKey struct {
 type User struct {
 	ID uuid.UUID `json:"_id"`
 
-	Email                 string    `json:"Email"`
-	Updated               time.Time `json:"Updated"`
-	AdditionalInformation string    `json:"AdditionalInformation,omitempty"`
-	Disabled              bool      `json:"Disabled"`
+	Email    string    `json:"Email"`
+	Updated  time.Time `json:"Updated"`
+	Disabled bool      `json:"Disabled"`
 
 	DeviceToken *DeviceToken `json:"DeviceToken,omitempty"`
 	APIKey      string       `json:"APIKey"`
@@ -277,6 +276,7 @@ func (u *User) RemoveSensitiveInformation() {
 	u.ConfirmCode = ""
 	u.RecoveryCodes = nil
 	u.TwoFactorCode = nil
+	u.APIKey = ""
 }
 
 type DeviceToken struct {

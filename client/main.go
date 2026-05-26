@@ -179,10 +179,6 @@ func LaunchTunnels() {
 		AutoConnect()
 	})
 
-	newConcurrentSignal("Pinger", CancelContext, func() {
-		PingConnections()
-	})
-
 	newConcurrentSignal("Updater", CancelContext, func() {
 		doUpdate()
 	})

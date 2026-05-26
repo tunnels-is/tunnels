@@ -169,7 +169,6 @@ func API_UserCreate(w http.ResponseWriter, r *http.Request) {
 	newUser = new(User)
 	newUser.Password = string(hash)
 	newUser.ID = uuid.New()
-	newUser.AdditionalInformation = RF.AdditionalInformation
 	newUser.Email = RF.Email
 	newUser.Updated = time.Now()
 	newUser.Trial = true
@@ -204,14 +203,12 @@ func API_UserUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	user := getUserFromContext(r.Context())
-	if user == nil && !isAdminAPIKeyFromContext(r.Context()) {
+	if user == nil {
 		senderr(w, 401, "Unauthorized")
 		return
 	}
-	if user != nil {
-		UF.UID = user.ID
-	}
 
+	UF.UID = user.ID
 	err = DB_updateUser(UF)
 	if err != nil {
 		senderr(w, 500, "Unable to update users, please try again in a moment")
@@ -345,7 +342,7 @@ func API_UserTwoFactorConfirm(w http.ResponseWriter, r *http.Request) {
 
 	user := getUserFromContext(r.Context())
 	if user == nil {
-		senderr(w, 400, "User not found")
+		senderr(w, 401, "Unauthorized")
 		return
 	}
 
@@ -570,7 +567,7 @@ func API_AdminDeviceList(w http.ResponseWriter, r *http.Request) {
 	sendObject(w, devices)
 }
 
-func API_DeviceListUser(w http.ResponseWriter, r *http.Request) {
+func API_ListDevicesByUser(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 	F := new(FORM_LIST_DEVICE)
 	err := decodeBody(r, F)
@@ -609,14 +606,92 @@ func API_DeviceCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !isAdminAPIKeyFromContext(r.Context()) {
-		user := getUserFromContext(r.Context())
-		if user == nil {
-			senderr(w, 401, "Unauthorized")
+	user := getUserFromContext(r.Context())
+	if user == nil {
+		senderr(w, 401, "Unauthorized")
+		return
+	}
+
+	F.Device.UserID = user.ID
+	F.Device.ID = uuid.New()
+	F.Device.CreatedAt = time.Now()
+
+	wgServer, srvErr := DB_FindServerByID(F.Device.ServerID)
+	if srvErr != nil || wgServer == nil {
+		senderr(w, 404, "Server not found")
+		return
+	}
+
+	if !hasSharedOrNoGroup(user.Groups, wgServer.Groups) {
+		senderr(w, 401, "Unauthorized")
+		return
+	}
+
+	if F.Device.Groups == nil {
+		F.Device.Groups = make([]uuid.UUID, 0)
+	}
+
+	if F.Device.ServerID != uuid.Nil {
+		ip, assignErr := assignNextWireGuardIP(F.Device.ServerID)
+		if assignErr != nil {
+			senderr(w, 400, "WireGuard IP assignment failed", slog.Any("err", assignErr))
 			return
 		}
+		F.Device.WireGuardIP = ip
 
-		F.Device.UserID = user.ID
+		ipv6, assign6Err := assignNextWireGuardIPv6(F.Device.ServerID)
+		if assign6Err != nil {
+			senderr(w, 400, "WireGuard IPv6 assignment failed", slog.Any("err", assign6Err))
+			return
+		}
+		F.Device.WireGuardIPv6 = ipv6
+
+	}
+
+	err = DB_CreateDevice(F.Device)
+	if err != nil {
+		ERR(err)
+		senderr(w, 500, "Unable to create device, please try again later")
+		return
+	}
+
+	if wgServer != nil {
+		sendObject(w, map[string]any{
+			"Device":        F.Device,
+			"ServerPubKey":  wgServer.WireGuardPubKey,
+			"ServerPort":    strconv.Itoa(wgServer.WireGuardPort),
+			"ServerIP":      wgServer.IP,
+			"ServerSubnet":  wgServer.WireGuardSubnet,
+			"ServerSubnet6": wgServer.WireGuardSubnet6,
+		})
+	} else {
+		sendObject(w, F.Device)
+	}
+}
+
+func API_AdminDeviceCreate(w http.ResponseWriter, r *http.Request) {
+	defer BasicRecover()
+
+	F := new(FORM_CREATE_DEVICE)
+	err := decodeBody(r, F)
+	if err != nil {
+		senderr(w, 400, "Invalid request body", slog.Any("error", err))
+		return
+	}
+
+	if F.Device == nil {
+		senderr(w, 400, "No device given")
+		return
+	}
+
+	if F.Device.Tag == "" {
+		senderr(w, 400, "Missing device tag")
+		return
+	}
+
+	if F.Device.UserID == uuid.Nil {
+		senderr(w, 400, "Device UserID is required")
+		return
 	}
 
 	F.Device.ID = uuid.New()
@@ -668,6 +743,73 @@ func API_DeviceCreate(w http.ResponseWriter, r *http.Request) {
 	} else {
 		sendObject(w, F.Device)
 	}
+}
+
+func API_AdminDeviceGet(w http.ResponseWriter, r *http.Request) {
+	defer BasicRecover()
+	F := new(types.FORM_GET_DEVICE)
+	err := decodeBody(r, F)
+	if err != nil {
+		senderr(w, 400, "Invalid request body", slog.Any("error", err))
+		return
+	}
+
+	device, err := DB_FindDeviceByID(F.DeviceID)
+	if err != nil {
+		senderr(w, 400, "device not found", slog.Any("err", err))
+		return
+	}
+	if device == nil {
+		senderr(w, 400, "device not found")
+		return
+	}
+
+	sendObject(w, device)
+}
+
+func API_AdminServerGet(w http.ResponseWriter, r *http.Request) {
+	defer BasicRecover()
+	F := new(types.FORM_GET_SERVER)
+	err := decodeBody(r, F)
+	if err != nil {
+		senderr(w, 400, "Invalid request body", slog.Any("error", err))
+		return
+	}
+
+	server, err := DB_FindServerByID(F.ServerID)
+	if err != nil {
+		senderr(w, 500, err.Error())
+		return
+	}
+	if server == nil {
+		senderr(w, 404, "server not found")
+		return
+	}
+
+	sendObject(w, server)
+}
+
+func API_AdminServersList(w http.ResponseWriter, r *http.Request) {
+	defer BasicRecover()
+	F := new(FORM_GET_SERVERS)
+	err := decodeBody(r, F)
+	if err != nil {
+		senderr(w, 400, "Invalid request body", slog.Any("error", err))
+		return
+	}
+	_ = F
+
+	servers, err := DB_FindAllServers()
+	if err != nil {
+		senderr(w, 500, "Unknown error, please try again in a moment")
+		return
+	}
+
+	if servers == nil {
+		servers = make([]*types.Server, 0)
+	}
+
+	sendObject(w, servers)
 }
 
 func API_AdminGroupCreate(w http.ResponseWriter, r *http.Request) {
@@ -882,6 +1024,12 @@ func API_DeviceGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	user := getUserFromContext(r.Context())
+	if user == nil {
+		senderr(w, 400, "user not found")
+		return
+	}
+
 	device, err := DB_FindDeviceByID(F.DeviceID)
 	if err != nil || device == nil {
 		if err != nil {
@@ -891,17 +1039,10 @@ func API_DeviceGet(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	user := getUserFromContext(r.Context())
-	if user == nil {
-		senderr(w, 400, "user not found")
-		return
-	}
 
-	if !user.IsAdmin {
-		if device.UserID != user.ID {
-			senderr(w, 400, "unauthorized")
-			return
-		}
+	if device.UserID != user.ID {
+		senderr(w, 400, "unauthorized")
+		return
 	}
 
 	sendObject(w, device)
@@ -1030,7 +1171,7 @@ func API_ServersForUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	user := getUserFromContext(r.Context())
-	if user == nil && !isAdminAPIKeyFromContext(r.Context()) {
+	if user == nil {
 		senderr(w, 401, "Unauthorized")
 		return
 	}
@@ -1043,7 +1184,7 @@ func API_ServersForUser(w http.ResponseWriter, r *http.Request) {
 	}
 	servers = append(servers, pservers...)
 
-	if user != nil && len(user.Groups) > 0 {
+	if len(user.Groups) > 0 {
 		puservers, err := DB_FindServersByGroups(user.Groups, 100, int64(F.StartIndex))
 		if err != nil {
 			senderr(w, 500, "Unknown error, please try again in a moment")
@@ -1176,60 +1317,22 @@ func API_ServerGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if server == nil {
-		senderr(w, 404, "unauthorized")
+		senderr(w, 404, "Server not found")
 		return
 	}
 
-	allowed := false
-	if F.DeviceKey != "" {
-		deviceID, err := uuid.Parse(F.DeviceKey)
-		if err != nil {
-			senderr(w, 400, "invalid device key")
-			return
-		}
-		device, err := DB_FindDeviceByID(deviceID)
-		if err != nil {
-			senderr(w, 500, err.Error())
-			return
-		}
-		if device == nil {
-			senderr(w, 401, "Unauthorized")
-			return
-		}
-		for _, g := range server.Groups {
-			for _, ug := range device.Groups {
-				if g == ug {
-					allowed = true
-				}
-			}
-		}
-	} else if isAdminAPIKeyFromContext(r.Context()) {
-		allowed = true
-	} else {
-		user := getUserFromContext(r.Context())
-		if user == nil {
-			senderr(w, 401, "Unauthorized")
-			return
-		}
-		for _, ug := range user.Groups {
-			for _, sg := range server.Groups {
-				if sg == ug {
-					allowed = true
-				}
-			}
-		}
-	}
-
-	if len(server.Groups) == 0 {
-		allowed = true
-	}
-
-	if allowed {
-		sendObject(w, server)
+	user := getUserFromContext(r.Context())
+	if user == nil {
+		senderr(w, 401, "Unauthorized")
 		return
 	}
 
-	senderr(w, 401, "unauthorized")
+	if !hasSharedOrNoGroup(user.Groups, server.Groups) {
+		senderr(w, 401, "unauthorized")
+		return
+	}
+
+	sendObject(w, server)
 }
 
 func API_UserResetPassword(w http.ResponseWriter, r *http.Request) {
@@ -1281,34 +1384,6 @@ func API_UserResetPassword(w http.ResponseWriter, r *http.Request) {
 	err = DB_userResetPassword(user)
 	if err != nil {
 		senderr(w, 401, "Database error, please try again in a moment")
-		return
-	}
-
-	w.WriteHeader(200)
-}
-
-func API_UserToggleSubStatus(w http.ResponseWriter, r *http.Request) {
-	defer BasicRecover()
-	UF := new(USER_UPDATE_SUB_FORM)
-	err := decodeBody(r, UF)
-	if err != nil {
-		senderr(w, 400, "Invalid request body", slog.Any("error", err))
-		return
-	}
-
-	user := getUserFromContext(r.Context())
-	if user == nil && !isAdminAPIKeyFromContext(r.Context()) {
-		senderr(w, 401, "Unauthorized")
-		return
-	}
-
-	if user != nil && !user.IsAdmin {
-		UF.Email = user.Email
-	}
-
-	err = DB_toggleUserSubscriptionStatus(UF)
-	if err != nil {
-		senderr(w, 500, "unexpected error, please try again later")
 		return
 	}
 

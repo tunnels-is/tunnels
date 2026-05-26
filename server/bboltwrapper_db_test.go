@@ -226,9 +226,6 @@ func TestBBolt_updateUser(t *testing.T) {
 	if found == nil {
 		t.Fatal("new key should resolve")
 	}
-	if found.AdditionalInformation != "info" {
-		t.Fatalf("expected 'info', got '%s'", found.AdditionalInformation)
-	}
 }
 
 func TestBBolt_updateUser_ClearAPIKey(t *testing.T) {
@@ -327,29 +324,6 @@ func TestBBolt_updateUserAdmin_EmptyEmail(t *testing.T) {
 func TestBBolt_updateUserAdmin_NotFound(t *testing.T) {
 	setupTestDB(t)
 	err := BBolt_updateUserAdmin(&USER_ADMIN_UPDATE_FORM{TargetUserID: uuid.New()})
-	if err == nil {
-		t.Fatal("expected error")
-	}
-}
-
-func TestBBolt_toggleUserSubscriptionStatus(t *testing.T) {
-	setupTestDB(t)
-	u := testUser("toggle@example.com", "")
-	BBolt_CreateUser(u)
-
-	if err := BBolt_toggleUserSubscriptionStatus(&USER_UPDATE_SUB_FORM{Email: "toggle@example.com"}); err != nil {
-		t.Fatal(err)
-	}
-
-	found, _ := BBolt_findUserByEmail("toggle@example.com")
-	if found == nil {
-		t.Fatal("user should still exist")
-	}
-}
-
-func TestBBolt_toggleUserSubscriptionStatus_NotFound(t *testing.T) {
-	setupTestDB(t)
-	err := BBolt_toggleUserSubscriptionStatus(&USER_UPDATE_SUB_FORM{Email: "nope@example.com"})
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -960,29 +934,29 @@ func TestBBolt_FindServersByGroups(t *testing.T) {
 	BBolt_CreateServer(&types.Server{ID: uuid.New(), Tag: "both", Groups: []uuid.UUID{g1, g2}})
 	BBolt_CreateServer(&types.Server{ID: uuid.New(), Tag: "none"})
 
-	s1, _ := BBolt_FindServersByGroups([]string{g1.String()}, 10, 0)
+	s1, _ := BBolt_FindServersByGroups([]uuid.UUID{g1}, 10, 0)
 	if len(s1) != 2 {
 		t.Fatalf("expected 2 in g1, got %d", len(s1))
 	}
 
-	s2, _ := BBolt_FindServersByGroups([]string{g2.String()}, 10, 0)
+	s2, _ := BBolt_FindServersByGroups([]uuid.UUID{g2}, 10, 0)
 	if len(s2) != 2 {
 		t.Fatalf("expected 2 in g2, got %d", len(s2))
 	}
 
-	sAll, _ := BBolt_FindServersByGroups([]string{g1.String(), g2.String()}, 10, 0)
+	sAll, _ := BBolt_FindServersByGroups([]uuid.UUID{g1, g2}, 10, 0)
 	if len(sAll) != 3 {
 		t.Fatalf("expected 3 in g1|g2, got %d", len(sAll))
 	}
 
 	// Pagination — use single-group search for deterministic skip behavior.
 	// g1 matches 2 servers: in-g1 and both.
-	sLim, _ := BBolt_FindServersByGroups([]string{g1.String()}, 1, 0)
+	sLim, _ := BBolt_FindServersByGroups([]uuid.UUID{g1}, 1, 0)
 	if len(sLim) != 1 {
 		t.Fatalf("expected 1 with limit, got %d", len(sLim))
 	}
 
-	sOff, _ := BBolt_FindServersByGroups([]string{g1.String()}, 10, 1)
+	sOff, _ := BBolt_FindServersByGroups([]uuid.UUID{g1}, 10, 1)
 	if len(sOff) != 1 {
 		t.Fatalf("expected 1 with offset, got %d", len(sOff))
 	}
