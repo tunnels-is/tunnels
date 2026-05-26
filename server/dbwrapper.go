@@ -59,10 +59,6 @@ func DB_updateUserAdmin(UF *USER_ADMIN_UPDATE_FORM) (err error) {
 	return BBolt_updateUserAdmin(UF)
 }
 
-func DB_toggleUserSubscriptionStatus(UF *USER_UPDATE_SUB_FORM) (err error) {
-	return BBolt_toggleUserSubscriptionStatus(UF)
-}
-
 func DB_userUpdateTwoFactorCodes(TFP *TWO_FACTOR_DB_PACKAGE) (err error) {
 	return BBolt_userUpdateTwoFactorCodes(TFP)
 }
@@ -76,7 +72,7 @@ func DB_FindServersWithoutGroups(limit, offset int64) (DL []*types.Server, err e
 }
 
 func DB_FindServersByGroups(groups []uuid.UUID, limit, offset int64) (DL []*types.Server, err error) {
-	return BBolt_FindServersByGroups(uuidSliceToString(groups), limit, offset)
+	return BBolt_FindServersByGroups(groups, limit, offset)
 }
 
 func DB_FindEntitiesByGroupID(id uuid.UUID, objType string, limit, offset int64) (IL []any, err error) {
@@ -139,7 +135,6 @@ func DB_FindDeviceByWGKey(wgKey string) (dev *types.Device, err error) {
 	return BBolt_FindDeviceByWGKey(wgKey)
 }
 
-
 func DB_findGroupByID(id uuid.UUID) (G *Group, err error) {
 	return BBolt_findGroupByID(id.String())
 }
@@ -151,4 +146,3 @@ func DB_DeleteGroupByID(id uuid.UUID) (err error) {
 func DB_findGroups() (gl []*Group, err error) {
 	return BBolt_findGroups()
 }
-
