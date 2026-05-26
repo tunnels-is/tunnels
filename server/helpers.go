@@ -285,3 +285,18 @@ func decryptAdminCookie(cookieValue, remoteIP string) (uid uuid.UUID, deviceToke
 
 	return uid, deviceToken, nil
 }
+
+func hasSharedOrNoGroup(actorGroups []uuid.UUID, serverGroups []uuid.UUID) (yes bool) {
+	if len(serverGroups) == 0 {
+		return true
+	}
+	for _, g := range actorGroups {
+		for _, dg := range serverGroups {
+			if subtle.ConstantTimeCompare(g[:], dg[:]) == 1 {
+				return true
+			}
+		}
+	}
+
+	return false
+}

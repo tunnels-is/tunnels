@@ -482,7 +482,6 @@ func initializeAdminUser() error {
 	newUser.ID = uuid.New()
 	newUser.Password = string(hash)
 	newUser.IsAdmin = true
-	newUser.AdditionalInformation = ""
 	newUser.Email = "admin"
 	newUser.Updated = time.Now()
 	newUser.Trial = false
