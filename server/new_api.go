@@ -43,7 +43,6 @@ func launchAPIServer() {
 	mux.Handle("GET /wg/server-config/fetch", wgServerMW(API_WGServerConfigFetch))
 	mux.Handle("GET /wg/peers", wgServerMW(API_WGPeers))
 	mux.Handle("GET /wg/peer", wgServerMW(API_WGPeer))
-	mux.Handle("GET /wg/servers", wgServerMW(API_WGServers))
 
 	mux.HandleFunc("POST /client/user/login", API_UserLogin)
 	mux.HandleFunc("POST /client/user/create", API_UserCreate)
