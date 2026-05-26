@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"log/slog"
+	"math"
 	"net"
 	"os"
 	sig "os/signal"
@@ -506,7 +507,7 @@ const defaultWGSubnet = "10.0.0.0/22"
 func initializeDefaultServer() error {
 	cfg := Config.Load()
 
-	servers, err := DB_FindAllServers()
+	servers, err := DB_FindAllServers(math.MaxInt64, 0)
 	if err != nil {
 		return fmt.Errorf("find servers: %w", err)
 	}
