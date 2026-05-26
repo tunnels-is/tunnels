@@ -66,57 +66,11 @@ func AutoConnect() {
 		if cliConf != nil {
 			err = cliPublicConnect(meta.Tag)
 		} else {
-
 		}
 
 		if err != nil || code != 200 {
 			ERROR("Unable to connect, return code: ", code, " // error: ", err)
 		}
-		return true
-	})
-}
-
-func PingConnections() {
-	defer func() {
-		time.Sleep(10 * time.Second)
-	}()
-	defer RecoverAndLog()
-
-	conf := CONFIG.Load()
-
-	tunnelMapRange(func(tun *TUN) bool {
-		meta := tun.meta.Load()
-		if meta == nil {
-			return true
-		}
-
-		tun.registerPing(time.Now())
-
-		ping := tun.pingTime.Load()
-		if time.Since(*ping).Seconds() > 45 || tun.needsReconnect.Load() {
-			if meta.AutoReconnect {
-				DEBUG("45+ Seconds since ping from ", meta.Tag, " attempting reconnection")
-				var err error
-				if conf.CLIConfig != nil {
-					err = cliPublicConnect(meta.Tag)
-				} else {
-					_, err = PublicConnect(tun.CR)
-				}
-				if err != nil {
-					tun.SetState(TUN_NotReady)
-					ERROR("unable to reconnect: ", err)
-				} else {
-					tun.needsReconnect.Store(false)
-				}
-			} else {
-				DEBUG("30+ Seconds since ping from ", meta.Tag)
-				if !meta.KillSwitch {
-					_ = Disconnect(tun.ID, false)
-				}
-				tun.needsReconnect.Store(false)
-			}
-		}
-
 		return true
 	})
 }

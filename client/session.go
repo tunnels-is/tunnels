@@ -2,11 +2,11 @@ package client
 
 import (
 	"bufio"
+	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
-	"crypto/rand"
 	"math/big"
 	"net"
 	neturl "net/url"
@@ -272,7 +272,6 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	}
 
 	tunnel.SetState(TUN_Connected)
-	tunnel.registerPing(time.Now())
 	tunnel.ID = uuid.NewString()
 	TunnelMap.Store(tunnel.ID, tunnel)
 

@@ -21,7 +21,8 @@ const (
 func API_WGPeers(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 
-	if _, ok := HTTP_validateWGKey(r); !ok {
+	server := getServerFromContext(r.Context())
+	if server == nil {
 		senderr(w, 401, "Unauthorized")
 		return
 	}
@@ -88,7 +89,8 @@ func API_WGPeers(w http.ResponseWriter, r *http.Request) {
 func API_WGPeer(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 
-	if _, ok := HTTP_validateWGKey(r); !ok {
+	server := getServerFromContext(r.Context())
+	if server == nil {
 		senderr(w, 401, "Unauthorized")
 		return
 	}
@@ -142,12 +144,6 @@ func API_WGConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	server, err := DB_FindServerByID(serverID)
-	if err != nil || server == nil {
-		senderr(w, 404, "Server not found")
-		return
-	}
-
 	pubKey := r.URL.Query().Get("pubKey")
 	if pubKey == "" {
 		senderr(w, 401, "No pubkey given")
@@ -157,6 +153,23 @@ func API_WGConfig(w http.ResponseWriter, r *http.Request) {
 	d, err := DB_FindDeviceByWGKey(pubKey)
 	if err != nil {
 		senderr(w, 401, "Pubkey not on record")
+		return
+	}
+
+	user := getUserFromContext(r.Context())
+	if user == nil {
+		senderr(w, 401, "Unauthorized")
+		return
+	}
+
+	if d.UserID != user.ID {
+		senderr(w, 401, "Unauthorized")
+		return
+	}
+
+	server, err := DB_FindServerByID(serverID)
+	if err != nil || server == nil {
+		senderr(w, 404, "Server not found")
 		return
 	}
 
@@ -299,8 +312,8 @@ func validateCIDR(s string) error {
 func API_WGServerConfigFetch(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 
-	server, ok := HTTP_validateWGKey(r)
-	if !ok {
+	server := getServerFromContext(r.Context())
+	if server == nil {
 		senderr(w, 401, "Unauthorized")
 		return
 	}
@@ -330,7 +343,8 @@ func API_WGServerConfigFetch(w http.ResponseWriter, r *http.Request) {
 func API_WGServers(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 
-	if _, ok := HTTP_validateWGKey(r); !ok {
+	server := getServerFromContext(r.Context())
+	if server == nil {
 		senderr(w, 401, "Unauthorized")
 		return
 	}
@@ -361,33 +375,4 @@ func API_WGServers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	sendObject(w, resp)
-}
-
-func buildWGConf(assignedIP, assignedIPv6, clientPubKeyB64 string, server *types.Server) string {
-	address := assignedIP + "/32"
-	if assignedIPv6 != "" {
-		address += ", " + assignedIPv6 + "/128"
-	}
-
-	allowedIPs := "0.0.0.0/0"
-	if assignedIPv6 != "" {
-		allowedIPs += ", ::/0"
-	}
-
-	dns := "1.1.1.1"
-	if assignedIPv6 != "" {
-		dns += ", 2606:4700:4700::1111"
-	}
-
-	return fmt.Sprintf(`[Interface]
-Address = %s
-# PrivateKey = <paste your private key here>
-DNS = %s
-
-[Peer]
-PublicKey = %s
-Endpoint = %s:%d
-AllowedIPs = %s
-PersistentKeepalive = 15
-`, address, dns, server.WireGuardPubKey, server.IP, server.WireGuardPort, allowedIPs)
 }

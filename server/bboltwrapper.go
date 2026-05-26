@@ -385,7 +385,6 @@ func BBolt_updateUser(UF *USER_UPDATE_FORM) error {
 		}
 		oldAPIKey := U.APIKey
 		U.APIKey = UF.APIKey
-		U.AdditionalInformation = UF.AdditionalInformation
 		data, err := bboltMarshal(U)
 		if err != nil {
 			return err
@@ -453,29 +452,6 @@ func BBolt_updateUserAdmin(UF *USER_ADMIN_UPDATE_FORM) error {
 		}
 
 		return nil
-	})
-}
-
-func BBolt_toggleUserSubscriptionStatus(UF *USER_UPDATE_SUB_FORM) error {
-	return BBoltDB.Update(func(tx *gobolt.Tx) error {
-		uid := tx.Bucket([]byte(USERS_EMAIL_INDEX)).Get([]byte(UF.Email))
-		if uid == nil {
-			return errors.New("user not found")
-		}
-		b := tx.Bucket([]byte(USERS_BUCKET))
-		v := b.Get(uid)
-		if v == nil {
-			return errors.New("user not found")
-		}
-		U := new(User)
-		if err := bboltUnmarshal(v, U); err != nil {
-			return err
-		}
-		data, err := bboltMarshal(U)
-		if err != nil {
-			return err
-		}
-		return b.Put(uid, data)
 	})
 }
 
@@ -548,9 +524,9 @@ func BBolt_FindServersWithoutGroups(limit, offset int64) ([]*types.Server, error
 	return DL, err
 }
 
-func BBolt_FindServersByGroups(groups []string, limit, offset int64) ([]*types.Server, error) {
+func BBolt_FindServersByGroups(groups []uuid.UUID, limit, offset int64) ([]*types.Server, error) {
 	DL := make([]*types.Server, 0)
-	groupSet := make(map[string]struct{})
+	groupSet := make(map[uuid.UUID]struct{})
 	for _, g := range groups {
 		groupSet[g] = struct{}{}
 	}
@@ -561,7 +537,7 @@ func BBolt_FindServersByGroups(groups []string, limit, offset int64) ([]*types.S
 		for k, v := c.First(); k != nil; k, v = c.Next() {
 			S := new(types.Server)
 			if err := bboltUnmarshal(v, S); err == nil {
-				for _, gid := range uuidSliceToString(S.Groups) {
+				for _, gid := range S.Groups {
 					if _, ok := groupSet[gid]; ok {
 						if skipped < offset {
 							skipped++
