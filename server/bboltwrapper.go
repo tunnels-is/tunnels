@@ -809,18 +809,27 @@ func BBolt_FindServerByAPIKey(apiKey string) (*types.Server, error) {
 	return found, err
 }
 
-func BBolt_FindAllServers() ([]*types.Server, error) {
-	var out []*types.Server
+func BBolt_FindAllServers(limit, offset int64) ([]*types.Server, error) {
+	out := make([]*types.Server, 0)
 	err := BBoltDB.View(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(SERVERS_BUCKET))
-		return b.ForEach(func(_, v []byte) error {
+		c := b.Cursor()
+		var skipped int64
+		for k, v := c.First(); k != nil; k, v = c.Next() {
+			if skipped < offset {
+				skipped++
+				continue
+			}
+			if int64(len(out)) >= limit {
+				break
+			}
 			S := new(types.Server)
 			if err := bboltUnmarshal(v, S); err != nil {
 				return err
 			}
 			out = append(out, S)
-			return nil
-		})
+		}
+		return nil
 	})
 	return out, err
 }

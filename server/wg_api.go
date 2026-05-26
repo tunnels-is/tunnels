@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"log/slog"
+	"math"
 	"net"
 	"net/http"
 	"net/netip"
@@ -351,7 +352,7 @@ func API_WGServers(w http.ResponseWriter, r *http.Request) {
 
 	excludeID := r.URL.Query().Get("excludeID")
 
-	servers, err := DB_FindAllServers()
+	servers, err := DB_FindAllServers(math.MaxInt64, 0)
 	if err != nil {
 		senderr(w, 500, "Failed to fetch servers", slog.Any("err", err))
 		return

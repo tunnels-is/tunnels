@@ -892,12 +892,24 @@ func TestBBolt_FindAllServers(t *testing.T) {
 		BBolt_CreateServer(&types.Server{ID: uuid.New(), Tag: fmt.Sprintf("s%d", i)})
 	}
 
-	servers, err := BBolt_FindAllServers()
+	servers, err := BBolt_FindAllServers(100, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(servers) != 3 {
 		t.Fatalf("expected 3, got %d", len(servers))
+	}
+
+	// Limit.
+	servers, _ = BBolt_FindAllServers(2, 0)
+	if len(servers) != 2 {
+		t.Fatalf("expected 2 with limit, got %d", len(servers))
+	}
+
+	// Offset.
+	servers, _ = BBolt_FindAllServers(10, 2)
+	if len(servers) != 1 {
+		t.Fatalf("expected 1 with offset, got %d", len(servers))
 	}
 }
 
@@ -1378,7 +1390,7 @@ func TestBBolt_GetDevices_Empty(t *testing.T) {
 
 func TestBBolt_FindAllServers_Empty(t *testing.T) {
 	setupTestDB(t)
-	servers, err := BBolt_FindAllServers()
+	servers, err := BBolt_FindAllServers(100, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
