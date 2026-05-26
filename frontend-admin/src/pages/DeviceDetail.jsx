@@ -1,10 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import dayjs from 'dayjs';
-import { ArrowLeft, Pencil, Save, X } from 'lucide-react';
+import { ArrowLeft, Trash2 } from 'lucide-react';
 import { apiPost } from '../api';
-
-const inputClass = "w-full bg-[#fdfcf8] border border-[#e7e3d7] rounded px-3 py-1.5 text-[13px] text-[#0a0a0a] focus:outline-none focus:border-[#0a0a0a]";
 
 function Row({ label, children }) {
   return (
@@ -21,70 +19,38 @@ export default function DeviceDetail() {
   const location = useLocation();
 
   const [device, setDevice] = useState(location.state?.device || null);
-  const [servers, setServers] = useState([]);
-  const [editing, setEditing] = useState(false);
-  const [form, setForm] = useState({});
-  const [saving, setSaving] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState('');
 
   const load = async () => {
-    const [devResp, srvResp] = await Promise.all([
-      apiPost('/ui/device', { DeviceID: id }),
-      apiPost('/ui/servers', { StartIndex: 0 }),
-    ]);
-    if (devResp.status === 200) {
-      setDevice(await devResp.json());
-    }
-    if (srvResp.status === 200) {
-      const data = await srvResp.json();
-      setServers(Array.isArray(data) ? data : []);
+    const resp = await apiPost('/ui/device', { DeviceID: id });
+    if (resp.status === 200) {
+      setDevice(await resp.json());
     }
   };
 
   useEffect(() => {
-    load();
+    if (!device) load();
   }, [id]);
 
-  const serverTag = (sid) => {
-    const s = servers.find((s) => s._id === sid);
-    return s ? `${s.Tag} (${s.IP})` : sid || '—';
-  };
-
-  const startEdit = () => {
-    setForm({
-      Tag: device.Tag || '',
-      WireGuardKey: device.WireGuardKey || '',
-    });
-    setError('');
-    setEditing(true);
-  };
-
-  const handleSave = async () => {
-    setSaving(true);
+  const handleDelete = async () => {
+    setDeleting(true);
     setError('');
     try {
-      const resp = await apiPost('/ui/device/update', {
-        Device: {
-          ...device,
-          Tag: form.Tag,
-          WireGuardKey: form.WireGuardKey,
-        },
-      });
+      const resp = await apiPost('/ui/device/delete', { DID: id });
       if (resp.status === 200) {
-        setEditing(false);
-        await load();
+        navigate('/devices');
       } else {
         const data = await resp.json().catch(() => ({}));
-        setError(data.Error || 'Failed to save');
+        setError(data.Error || 'Failed to delete');
       }
     } catch (err) {
       setError(err.message);
     } finally {
-      setSaving(false);
+      setDeleting(false);
     }
   };
-
-  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
   if (!device) {
     return (
@@ -99,25 +65,25 @@ export default function DeviceDetail() {
 
   return (
     <div className="max-w-2xl">
-      {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <button onClick={() => navigate('/devices')} className="flex items-center gap-2 text-[12px] text-[#a3a3a3] hover:text-[#262626]">
           <ArrowLeft className="w-3.5 h-3.5" /> Back to Devices
         </button>
-        <div className="flex gap-2">
-          {editing ? (
+        <div className="flex items-center gap-2">
+          {error && <span className="text-[12px] text-[#dc2626] self-center">{error}</span>}
+          {confirmingDelete ? (
             <>
-              {error && <span className="text-[12px] text-[#dc2626] self-center">{error}</span>}
-              <button onClick={() => setEditing(false)} className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[12px] text-[#525252] hover:text-[#0a0a0a]">
-                <X className="w-3.5 h-3.5" /> Cancel
+              <span className="text-[12px] text-[#525252]">Delete this device?</span>
+              <button onClick={() => setConfirmingDelete(false)} disabled={deleting} className="px-3 py-1.5 rounded text-[12px] text-[#525252] hover:text-[#0a0a0a]">
+                Cancel
               </button>
-              <button onClick={handleSave} disabled={saving} className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[12px] bg-black/[0.05] text-[#0a0a0a] hover:bg-black/[0.08] disabled:opacity-50">
-                <Save className="w-3.5 h-3.5" /> {saving ? 'Saving...' : 'Save'}
+              <button onClick={handleDelete} disabled={deleting} className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[12px] bg-[#dc2626] hover:bg-[#b91c1c] text-white disabled:opacity-50">
+                <Trash2 className="w-3.5 h-3.5" /> {deleting ? 'Deleting...' : 'Confirm Delete'}
               </button>
             </>
           ) : (
-            <button onClick={startEdit} className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[12px] text-[#525252] hover:text-[#0a0a0a] hover:bg-black/[0.04]">
-              <Pencil className="w-3.5 h-3.5" /> Edit
+            <button onClick={() => setConfirmingDelete(true)} className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[12px] text-[#dc2626] hover:bg-[#dc2626]/10">
+              <Trash2 className="w-3.5 h-3.5" /> Delete
             </button>
           )}
         </div>
@@ -130,24 +96,16 @@ export default function DeviceDetail() {
           <span className="font-mono text-[12px] text-[#525252]">{device._id}</span>
         </Row>
         <Row label="Tag">
-          {editing ? (
-            <input className={inputClass} value={form.Tag} onChange={set('Tag')} />
-          ) : (
-            <span>{device.Tag}</span>
-          )}
+          <span>{device.Tag}</span>
         </Row>
         <Row label="WireGuard IP">
           <span className="font-mono text-[12px]">{device.WireGuardIP || '—'}</span>
         </Row>
         <Row label="WireGuard Key">
-          {editing ? (
-            <input className={`${inputClass} w-full font-mono text-[12px]`} value={form.WireGuardKey} onChange={set('WireGuardKey')} placeholder="base64 public key" />
-          ) : (
-            <span className="font-mono text-[12px] break-all text-[#525252]">{device.WireGuardKey || '—'}</span>
-          )}
+          <span className="font-mono text-[12px] break-all text-[#525252]">{device.WireGuardKey || '—'}</span>
         </Row>
-        <Row label="Server">
-          <span className="text-[12px]">{serverTag(device.ServerID)}</span>
+        <Row label="Server ID">
+          <span className="font-mono text-[12px] text-[#525252]">{device.ServerID || '—'}</span>
         </Row>
         <Row label="User ID">
           <span className="font-mono text-[12px] text-[#525252]">{device.UserID || '—'}</span>
