@@ -228,16 +228,6 @@ func API_UserAdminUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user := getUserFromContext(r.Context())
-	if user == nil {
-		senderr(w, 401, "Unauthorized")
-		return
-	}
-	if !user.IsAdmin {
-		senderr(w, 401, "You are not allowed to admin update users")
-		return
-	}
-
 	err = DB_updateUserAdmin(UF)
 	if err != nil {
 		senderr(w, 500, "Unable to admin update user, please try again in a moment")
@@ -452,18 +442,6 @@ func API_AdminDeviceUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !isAdminAPIKeyFromContext(r.Context()) {
-		user := getUserFromContext(r.Context())
-		if user == nil {
-			senderr(w, 401, "Unauthorized")
-			return
-		}
-		if !user.IsAdmin {
-			senderr(w, 401, "You are not allowed to update devices")
-			return
-		}
-	}
-
 	err = DB_UpdateDevice(F.Device)
 	if err != nil {
 		ERR(err)
@@ -481,18 +459,6 @@ func API_AdminDeviceDelete(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		senderr(w, 400, "Invalid request body", slog.Any("error", err))
 		return
-	}
-
-	if !isAdminAPIKeyFromContext(r.Context()) {
-		user := getUserFromContext(r.Context())
-		if user == nil {
-			senderr(w, 401, "Unauthorized")
-			return
-		}
-		if !user.IsAdmin {
-			senderr(w, 401, "You are not allowed to delete device")
-			return
-		}
 	}
 
 	err = DB_DeleteDeviceByID(F.DID)
@@ -544,18 +510,6 @@ func API_AdminDeviceList(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		senderr(w, 400, "Invalid request body", slog.Any("error", err))
 		return
-	}
-
-	if !isAdminAPIKeyFromContext(r.Context()) {
-		user := getUserFromContext(r.Context())
-		if user == nil {
-			senderr(w, 401, "Unauthorized")
-			return
-		}
-		if !user.IsAdmin {
-			senderr(w, 401, "You are not allowed to view devices")
-			return
-		}
 	}
 
 	devices, err := DB_GetDevices(int64(F.Limit), int64(F.Offset))
@@ -821,18 +775,6 @@ func API_AdminGroupCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !isAdminAPIKeyFromContext(r.Context()) {
-		user := getUserFromContext(r.Context())
-		if user == nil {
-			senderr(w, 401, "Unauthorized")
-			return
-		}
-		if !user.IsAdmin {
-			senderr(w, 401, "You are not allowed to create groups")
-			return
-		}
-	}
-
 	F.Group.ID = uuid.New()
 	F.Group.CreatedAt = time.Now()
 
@@ -853,18 +795,6 @@ func API_AdminGroupAdd(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		senderr(w, 400, "Invalid request body", slog.Any("error", err))
 		return
-	}
-
-	if !isAdminAPIKeyFromContext(r.Context()) {
-		user := getUserFromContext(r.Context())
-		if user == nil {
-			senderr(w, 401, "Unauthorized")
-			return
-		}
-		if !user.IsAdmin {
-			senderr(w, 401, "You are not allowed to update groups")
-			return
-		}
 	}
 
 	var u *User
@@ -928,18 +858,6 @@ func API_AdminGroupRemove(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !isAdminAPIKeyFromContext(r.Context()) {
-		user := getUserFromContext(r.Context())
-		if user == nil {
-			senderr(w, 401, "Unauthorized")
-			return
-		}
-		if !user.IsAdmin {
-			senderr(w, 401, "You are not allowed to update this entity")
-			return
-		}
-	}
-
 	err = DB_RemoveFromGroup(F.GroupID, F.TypeID, F.Type)
 	if err != nil {
 		senderr(w, 500, "Unknown error, please try again in a moment")
@@ -956,18 +874,6 @@ func API_AdminGroupUpdate(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		senderr(w, 400, "Invalid request body", slog.Any("error", err))
 		return
-	}
-
-	if !isAdminAPIKeyFromContext(r.Context()) {
-		user := getUserFromContext(r.Context())
-		if user == nil {
-			senderr(w, 401, "Unauthorized")
-			return
-		}
-		if !user.IsAdmin {
-			senderr(w, 401, "You are not allowed to update groups")
-			return
-		}
 	}
 
 	err = DB_UpdateGroup(F.Group)
@@ -987,18 +893,6 @@ func API_AdminGroupDelete(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		senderr(w, 400, "Invalid request body", slog.Any("error", err))
 		return
-	}
-
-	if !isAdminAPIKeyFromContext(r.Context()) {
-		user := getUserFromContext(r.Context())
-		if user == nil {
-			senderr(w, 401, "Unauthorized")
-			return
-		}
-		if !user.IsAdmin {
-			senderr(w, 401, "You are not allowed to delete groups")
-			return
-		}
 	}
 
 	err = DB_DeleteGroupByID(F.GID)
@@ -1052,18 +946,6 @@ func API_AdminGroupGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !isAdminAPIKeyFromContext(r.Context()) {
-		user := getUserFromContext(r.Context())
-		if user == nil {
-			senderr(w, 401, "Unauthorized")
-			return
-		}
-		if !user.IsAdmin {
-			senderr(w, 401, "You are not allowed to view groups")
-			return
-		}
-	}
-
 	group, err := DB_findGroupByID(F.GID)
 	if err != nil {
 		senderr(w, 500, "Unknown error, please try again in a moment")
@@ -1085,18 +967,6 @@ func API_AdminGroupGetEntities(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		senderr(w, 400, "Invalid request body", slog.Any("error", err))
 		return
-	}
-
-	if !isAdminAPIKeyFromContext(r.Context()) {
-		user := getUserFromContext(r.Context())
-		if user == nil {
-			senderr(w, 401, "Unauthorized")
-			return
-		}
-		if !user.IsAdmin {
-			senderr(w, 401, "You are not allowed to view groups")
-			return
-		}
 	}
 
 	entities, err := DB_FindEntitiesByGroupID(F.GID, F.Type, int64(F.Limit), int64(F.Offset))
@@ -1130,19 +1000,7 @@ func API_AdminGroupList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !isAdminAPIKeyFromContext(r.Context()) {
-		user := getUserFromContext(r.Context())
-		if user == nil {
-			senderr(w, 401, "Unauthorized")
-			return
-		}
-		if !user.IsAdmin {
-			senderr(w, 401, "You are not allowed to view groups")
-			return
-		}
-	}
-
-	groups, err := DB_findGroups()
+	groups, err := DB_ListGroups()
 	if err != nil {
 		senderr(w, 500, "Unknown error, please try again in a moment")
 		return
@@ -1225,18 +1083,6 @@ func API_AdminServerUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !isAdminAPIKeyFromContext(r.Context()) {
-		user := getUserFromContext(r.Context())
-		if user == nil {
-			senderr(w, 401, "Unauthorized")
-			return
-		}
-		if !user.IsAdmin {
-			senderr(w, 401, "You are not allowed to create servers")
-			return
-		}
-	}
-
 	if F.Server == nil {
 		senderr(w, 400, "Server is required")
 		return
@@ -1263,18 +1109,6 @@ func API_AdminServerCreate(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		senderr(w, 400, "Invalid request body", slog.Any("error", err))
 		return
-	}
-
-	if !isAdminAPIKeyFromContext(r.Context()) {
-		user := getUserFromContext(r.Context())
-		if user == nil {
-			senderr(w, 401, "Unauthorized")
-			return
-		}
-		if !user.IsAdmin {
-			senderr(w, 401, "You are not allowed to create servers")
-			return
-		}
 	}
 
 	if F.Server == nil {
