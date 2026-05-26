@@ -4,7 +4,6 @@ import (
 	"encoding/base64"
 	"fmt"
 	"log/slog"
-	"math"
 	"net"
 	"net/http"
 	"net/netip"

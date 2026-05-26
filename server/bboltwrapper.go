@@ -1056,12 +1056,20 @@ func BBolt_RemoveFromGroup(groupID, typeID, objType string) error {
 	})
 }
 
-func BBolt_findGroups() ([]*Group, error) {
+func BBolt_findGroups(limit, offset int64) ([]*Group, error) {
 	gl := make([]*Group, 0)
 	err := BBoltDB.View(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(GROUPS_BUCKET))
 		c := b.Cursor()
-		for _, v := c.First(); v != nil; _, v = c.Next() {
+		var skipped int64
+		for k, v := c.First(); k != nil; k, v = c.Next() {
+			if skipped < offset {
+				skipped++
+				continue
+			}
+			if int64(len(gl)) >= limit {
+				break
+			}
 			D := new(Group)
 			if err := bboltUnmarshal(v, D); err == nil {
 				gl = append(gl, D)
