@@ -1096,7 +1096,7 @@ func TestBBolt_findGroups(t *testing.T) {
 		BBolt_CreateGroup(&Group{ID: uuid.New(), Tag: fmt.Sprintf("g%d", i)})
 	}
 
-	groups, err := BBolt_findGroups()
+	groups, err := BBolt_findGroups(100, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1401,12 +1401,29 @@ func TestBBolt_FindAllServers_Empty(t *testing.T) {
 
 func TestBBolt_findGroups_Empty(t *testing.T) {
 	setupTestDB(t)
-	groups, err := BBolt_findGroups()
+	groups, err := BBolt_findGroups(100, 0)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(groups) != 0 {
 		t.Fatalf("expected 0, got %d", len(groups))
+	}
+}
+
+func TestBBolt_findGroups_LimitOffset(t *testing.T) {
+	setupTestDB(t)
+	for i := 0; i < 3; i++ {
+		BBolt_CreateGroup(&Group{ID: uuid.New(), Tag: fmt.Sprintf("p%d", i)})
+	}
+
+	groups, _ := BBolt_findGroups(2, 0)
+	if len(groups) != 2 {
+		t.Fatalf("expected 2 with limit, got %d", len(groups))
+	}
+
+	groups, _ = BBolt_findGroups(10, 2)
+	if len(groups) != 1 {
+		t.Fatalf("expected 1 with offset, got %d", len(groups))
 	}
 }
 

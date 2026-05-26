@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
-import { Plus, RefreshCw } from 'lucide-react';
+import { Plus, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
 import { apiPost } from '../api';
+
+const PAGE_SIZE = 100;
 
 function Modal({ title, onClose, children }) {
   return (
@@ -29,17 +31,24 @@ export default function Groups() {
   const [tag, setTag] = useState('');
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState('');
+  const [offset, setOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
 
-  const load = async () => {
+  const load = async (next = offset) => {
     setLoading(true);
     setError('');
     try {
-      const resp = await apiPost('/ui/group/list', {});
+      const resp = await apiPost('/ui/group/list', { Limit: PAGE_SIZE, Offset: next });
       if (resp.status === 200) {
         const data = await resp.json();
-        setGroups(Array.isArray(data) ? data : []);
+        const list = Array.isArray(data) ? data : [];
+        setGroups(list);
+        setHasMore(list.length === PAGE_SIZE);
+        setOffset(next);
       } else if (resp.status === 204) {
         setGroups([]);
+        setHasMore(false);
+        setOffset(next);
       } else {
         const data = await resp.json().catch(() => ({}));
         setError(data.Error || 'Failed to load groups');
@@ -51,7 +60,7 @@ export default function Groups() {
     }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(0); }, []);
 
   const handleCreate = async (e) => {
     e.preventDefault();
@@ -62,7 +71,7 @@ export default function Groups() {
       if (resp.status === 200) {
         setShowCreate(false);
         setTag('');
-        load();
+        load(offset);
       } else {
         const data = await resp.json().catch(() => ({}));
         setCreateError(data.Error || 'Failed to create group');
@@ -82,7 +91,7 @@ export default function Groups() {
           <span className="text-[11px] font-mono tabular-nums text-[#a3a3a3]">{groups.length}</span>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={load} disabled={loading} className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[12px] text-[#525252] hover:text-[#0a0a0a] hover:bg-black/[0.04] transition-colors">
+          <button onClick={() => load(offset)} disabled={loading} className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[12px] text-[#525252] hover:text-[#0a0a0a] hover:bg-black/[0.04] transition-colors">
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </button>
@@ -118,6 +127,28 @@ export default function Groups() {
             </span>
           </div>
         ))}
+      </div>
+
+      <div className="flex items-center justify-between mt-3 px-1">
+        <span className="text-[11px] font-mono tabular-nums text-[#a3a3a3]">
+          {groups.length === 0 ? '—' : `${offset + 1}–${offset + groups.length}`}
+        </span>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => load(Math.max(0, offset - PAGE_SIZE))}
+            disabled={loading || offset === 0}
+            className="flex items-center gap-1 px-2 py-1 rounded text-[12px] text-[#525252] hover:text-[#0a0a0a] hover:bg-black/[0.04] disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-[#525252]"
+          >
+            <ChevronLeft className="w-3.5 h-3.5" /> Prev
+          </button>
+          <button
+            onClick={() => load(offset + PAGE_SIZE)}
+            disabled={loading || !hasMore}
+            className="flex items-center gap-1 px-2 py-1 rounded text-[12px] text-[#525252] hover:text-[#0a0a0a] hover:bg-black/[0.04] disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-[#525252]"
+          >
+            Next <ChevronRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
       </div>
 
       {showCreate && (
