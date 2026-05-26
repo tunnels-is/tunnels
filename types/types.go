@@ -181,11 +181,6 @@ type WGServerInfo struct {
 	IP               string `json:"IP"`
 }
 
-// WGServersResponse is returned by GET /v3/wg/servers.
-type WGServersResponse struct {
-	Servers []WGServerInfo `json:"Servers"`
-}
-
 type Route struct {
 	Address string
 	Metric  string
