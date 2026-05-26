@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, RefreshCw } from 'lucide-react';
+import { Plus, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
 import { apiPost } from '../api';
+
+const PAGE_SIZE = 100;
 
 function Modal({ title, onClose, children }) {
   return (
@@ -30,15 +32,20 @@ export default function Servers() {
   const [createForm, setCreateForm] = useState(emptyForm());
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState('');
+  const [startIndex, setStartIndex] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
 
-  const load = async () => {
+  const load = async (index = startIndex) => {
     setLoading(true);
     setError('');
     try {
-      const resp = await apiPost('/ui/servers', { StartIndex: 0 });
+      const resp = await apiPost('/ui/servers', { StartIndex: index });
       if (resp.status === 200) {
         const data = await resp.json();
-        setServers(Array.isArray(data) ? data : []);
+        const list = Array.isArray(data) ? data : [];
+        setServers(list);
+        setHasMore(list.length === PAGE_SIZE);
+        setStartIndex(index);
       } else {
         const data = await resp.json().catch(() => ({}));
         setError(data.Error || 'Failed to load servers');
@@ -50,7 +57,7 @@ export default function Servers() {
     }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(0); }, []);
 
   const handleCreate = async (e) => {
     e.preventDefault();
@@ -63,7 +70,7 @@ export default function Servers() {
       if (resp.status === 200) {
         setShowCreate(false);
         setCreateForm(emptyForm());
-        load();
+        load(startIndex);
       } else {
         const data = await resp.json().catch(() => ({}));
         setCreateError(data.Error || 'Failed to create server');
@@ -85,7 +92,7 @@ export default function Servers() {
           <span className="text-[11px] font-mono tabular-nums text-[#a3a3a3]">{servers.length}</span>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={load} disabled={loading} className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[12px] text-[#525252] hover:text-[#0a0a0a] hover:bg-black/[0.04] transition-colors">
+          <button onClick={() => load(startIndex)} disabled={loading} className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[12px] text-[#525252] hover:text-[#0a0a0a] hover:bg-black/[0.04] transition-colors">
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </button>
@@ -124,6 +131,30 @@ export default function Servers() {
             </span>
           </div>
         ))}
+      </div>
+
+      <div className="flex items-center justify-between mt-3 px-1">
+        <span className="text-[11px] font-mono tabular-nums text-[#a3a3a3]">
+          {servers.length === 0
+            ? '—'
+            : `${startIndex + 1}–${startIndex + servers.length}`}
+        </span>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => load(Math.max(0, startIndex - PAGE_SIZE))}
+            disabled={loading || startIndex === 0}
+            className="flex items-center gap-1 px-2 py-1 rounded text-[12px] text-[#525252] hover:text-[#0a0a0a] hover:bg-black/[0.04] disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-[#525252]"
+          >
+            <ChevronLeft className="w-3.5 h-3.5" /> Prev
+          </button>
+          <button
+            onClick={() => load(startIndex + PAGE_SIZE)}
+            disabled={loading || !hasMore}
+            className="flex items-center gap-1 px-2 py-1 rounded text-[12px] text-[#525252] hover:text-[#0a0a0a] hover:bg-black/[0.04] disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-[#525252]"
+          >
+            Next <ChevronRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
       </div>
 
       {showCreate && (
