@@ -3,6 +3,8 @@ package main
 import (
 	"bytes"
 	"testing"
+
+	"github.com/google/uuid"
 )
 
 func TestCopySlice(t *testing.T) {
@@ -157,4 +159,100 @@ func abs(x int) int {
 		return -x
 	}
 	return x
+}
+
+func TestHasSharedOrNoGroup(t *testing.T) {
+	g1 := uuid.New()
+	g2 := uuid.New()
+	g3 := uuid.New()
+	g4 := uuid.New()
+
+	tests := []struct {
+		name         string
+		actorGroups  []uuid.UUID
+		serverGroups []uuid.UUID
+		want         bool
+	}{
+		{
+			name:         "no server restriction allows any actor",
+			actorGroups:  []uuid.UUID{g1, g2},
+			serverGroups: []uuid.UUID{},
+			want:         true,
+		},
+		{
+			name:         "nil server groups allows any actor",
+			actorGroups:  []uuid.UUID{g1},
+			serverGroups: nil,
+			want:         true,
+		},
+		{
+			name:         "both empty",
+			actorGroups:  []uuid.UUID{},
+			serverGroups: []uuid.UUID{},
+			want:         true,
+		},
+		{
+			name:         "both nil",
+			actorGroups:  nil,
+			serverGroups: nil,
+			want:         true,
+		},
+		{
+			name:         "actor without groups against restricted server",
+			actorGroups:  []uuid.UUID{},
+			serverGroups: []uuid.UUID{g1},
+			want:         false,
+		},
+		{
+			name:         "single overlap",
+			actorGroups:  []uuid.UUID{g1},
+			serverGroups: []uuid.UUID{g1},
+			want:         true,
+		},
+		{
+			name:         "no overlap",
+			actorGroups:  []uuid.UUID{g1, g2},
+			serverGroups: []uuid.UUID{g3, g4},
+			want:         false,
+		},
+		{
+			name:         "overlap when actor has many and server has one",
+			actorGroups:  []uuid.UUID{g1, g2, g3},
+			serverGroups: []uuid.UUID{g3},
+			want:         true,
+		},
+		{
+			name:         "overlap when server has many and actor has one",
+			actorGroups:  []uuid.UUID{g2},
+			serverGroups: []uuid.UUID{g1, g2, g3},
+			want:         true,
+		},
+		{
+			name:         "overlap on last element of both",
+			actorGroups:  []uuid.UUID{g1, g2, g3},
+			serverGroups: []uuid.UUID{g4, g3},
+			want:         true,
+		},
+		{
+			name:         "zero UUID is treated as a value, not a wildcard",
+			actorGroups:  []uuid.UUID{uuid.Nil},
+			serverGroups: []uuid.UUID{g1},
+			want:         false,
+		},
+		{
+			name:         "matching zero UUIDs",
+			actorGroups:  []uuid.UUID{uuid.Nil},
+			serverGroups: []uuid.UUID{uuid.Nil},
+			want:         true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := hasSharedOrNoGroup(tc.actorGroups, tc.serverGroups)
+			if got != tc.want {
+				t.Errorf("hasSharedOrNoGroup() = %v, want %v", got, tc.want)
+			}
+		})
+	}
 }
