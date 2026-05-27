@@ -76,9 +76,15 @@ func setupWireGuard(cfg *Config, logLevel string) error {
 	wgDevice = device.NewDevice(tunInterface, wgLazyBind, wgLogger)
 
 	// Build IPC config using []byte so key material can be zeroed after use.
+	// We intentionally omit listen_port: pinnedBind already owns the port and
+	// will bind on it during the first BindUpdate. Setting listen_port via
+	// UAPI here would race with the TUN event reader's device.Up() — if Up()
+	// runs first, BindUpdate opens on net.port=0 (random kernel port), and
+	// the later listen_port directive closes that bind and rebinds, which can
+	// leave the device without a receive routine if the rebind fails.
 	privKeyHex := make([]byte, hex.EncodedLen(32))
 	hex.Encode(privKeyHex, cfg.WireGuardPrivKey)
-	conf := fmt.Appendf(nil, "private_key=%s\nlisten_port=%d\n\n", privKeyHex, cfg.WireGuardPort)
+	conf := fmt.Appendf(nil, "private_key=%s\n\n", privKeyHex)
 	zeroBytes(privKeyHex)
 
 	if err := ipcSetBytes(conf); err != nil {
@@ -186,7 +192,7 @@ func buildInnerBind(cfg *Config) (conn.Bind, error) {
 		return nil, fmt.Errorf("parse PublicIP %q: %w", cfg.PublicIP, err)
 	}
 	INFO("WireGuard bind pinned to ", addr, ":", cfg.WireGuardPort)
-	return newPinnedBind(addr), nil
+	return newPinnedBind(addr, uint16(cfg.WireGuardPort)), nil
 }
 
 func b64ToHex(b64 string) (string, error) {

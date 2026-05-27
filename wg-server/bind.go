@@ -20,17 +20,26 @@ import (
 // pins its own IP.
 type pinnedBind struct {
 	addr netip.Addr
+	// port is the configured listen port. wireguard-go calls Open(0) on the
+	// first BindUpdate (the device's net.port field is 0 until UAPI sets
+	// listen_port). To avoid a race where the TUN event reader triggers
+	// device.Up() — and therefore the first BindUpdate — before the UAPI
+	// listen_port directive is parsed, we always bind on this fixed port and
+	// ignore the port argument. wireguard-go will pick up the actual port from
+	// Open's return value, so no rebind is needed when listen_port is set
+	// later via UAPI either.
+	port uint16
 
 	mu     sync.Mutex
 	c      *net.UDPConn
 	closed bool
 }
 
-func newPinnedBind(addr netip.Addr) *pinnedBind {
-	return &pinnedBind{addr: addr}
+func newPinnedBind(addr netip.Addr, port uint16) *pinnedBind {
+	return &pinnedBind{addr: addr, port: port}
 }
 
-func (b *pinnedBind) Open(port uint16) ([]conn.ReceiveFunc, uint16, error) {
+func (b *pinnedBind) Open(_ uint16) ([]conn.ReceiveFunc, uint16, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -45,7 +54,7 @@ func (b *pinnedBind) Open(port uint16) ([]conn.ReceiveFunc, uint16, error) {
 	if b.addr.Is6() && !b.addr.Is4In6() {
 		network = "udp6"
 	}
-	udpAddr := &net.UDPAddr{IP: b.addr.AsSlice(), Port: int(port)}
+	udpAddr := &net.UDPAddr{IP: b.addr.AsSlice(), Port: int(b.port)}
 	c, err := net.ListenUDP(network, udpAddr)
 	if err != nil {
 		return nil, 0, fmt.Errorf("listen %s %s: %w", network, udpAddr, err)
