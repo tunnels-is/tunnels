@@ -116,6 +116,12 @@ func API_WGPeer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	allowed := hasSharedOrNoGroup(dev.Groups, server.Groups)
+	if !allowed {
+		senderr(w, 401, "pubkey must be a base64-encoded 32-byte key")
+		return
+	}
+
 	hexKey, err := b64KeyToHex(dev.WireGuardKey)
 	if err != nil {
 		senderr(w, 500, "Failed to encode device key", slog.Any("err", err))
