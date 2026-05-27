@@ -2,6 +2,7 @@ package wgserver
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"sync/atomic"
 	"time"
@@ -41,6 +42,11 @@ func Init(ctx context.Context, controllerURL, apiKey, configPath string, insecur
 	}
 	INFO("config fetched, serverID=", cfg.ServerID,
 		" subnet=", cfg.WireGuardSubnet, subnet6Log, " iface=", cfg.WireGuardIface)
+
+	if err := preflightIPTables(cfg); err != nil {
+		fmt.Println(err)
+		return
+	}
 
 	if err := setupWireGuard(cfg, logLevel); err != nil {
 		ERR("wireguard setup failed: ", err)
