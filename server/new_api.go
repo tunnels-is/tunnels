@@ -83,6 +83,7 @@ func launchAPIServer() {
 	mux.Handle("POST /ui/user/logout", adminMW(API_AdminUILogout))
 	mux.Handle("POST /ui/user/list", adminMW(API_AdminUserList))
 	mux.Handle("POST /ui/user/adminupdate", adminMW(API_UserAdminUpdate))
+	mux.Handle("POST /ui/user/delete", adminMW(API_AdminUserDelete))
 
 	mux.Handle("POST /ui/device/list", adminMW(API_AdminDeviceList))
 	mux.Handle("POST /ui/device/delete", adminMW(API_AdminDeviceDelete))
@@ -99,6 +100,7 @@ func launchAPIServer() {
 
 	mux.Handle("POST /ui/server/create", adminMW(API_AdminServerCreate))
 	mux.Handle("POST /ui/server/update", adminMW(API_AdminServerUpdate))
+	mux.Handle("POST /ui/server/delete", adminMW(API_AdminServerDelete))
 
 	tlsConfig := APITLSConfig.Load()
 

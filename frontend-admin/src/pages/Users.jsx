@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
-import { Plus, RefreshCw } from 'lucide-react';
+import { Plus, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
 import { apiPost } from '../api';
+
+const PAGE_SIZE = 100;
 
 function Modal({ title, onClose, children }) {
   return (
@@ -29,15 +31,24 @@ export default function Users() {
   const [createForm, setCreateForm] = useState({ Email: '', Password: '' });
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState('');
+  const [offset, setOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
 
-  const load = async () => {
+  const load = async (next = offset) => {
     setLoading(true);
     setError('');
     try {
-      const resp = await apiPost('/ui/user/list', { Limit: 200, Offset: 0 });
+      const resp = await apiPost('/ui/user/list', { Limit: PAGE_SIZE, Offset: next });
       if (resp.status === 200) {
         const data = await resp.json();
-        setUsers(Array.isArray(data) ? data : []);
+        const list = Array.isArray(data) ? data : [];
+        setUsers(list);
+        setHasMore(list.length === PAGE_SIZE);
+        setOffset(next);
+      } else if (resp.status === 204) {
+        setUsers([]);
+        setHasMore(false);
+        setOffset(next);
       } else {
         const data = await resp.json().catch(() => ({}));
         setError(data.Error || 'Failed to load users');
@@ -49,7 +60,7 @@ export default function Users() {
     }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(0); }, []);
 
   const handleCreate = async (e) => {
     e.preventDefault();
@@ -64,7 +75,7 @@ export default function Users() {
       if (resp.status === 200) {
         setShowCreate(false);
         setCreateForm({ Email: '', Password: '' });
-        load();
+        load(offset);
       } else {
         const data = await resp.json().catch(() => ({}));
         setCreateError(data.Error || 'Failed to create user');
@@ -84,7 +95,7 @@ export default function Users() {
           <span className="text-[11px] font-mono tabular-nums text-[#a3a3a3]">{users.length}</span>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={load} disabled={loading} className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[12px] text-[#525252] hover:text-[#0a0a0a] hover:bg-black/[0.04] transition-colors">
+          <button onClick={() => load(offset)} disabled={loading} className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[12px] text-[#525252] hover:text-[#0a0a0a] hover:bg-black/[0.04] transition-colors">
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </button>
@@ -123,6 +134,28 @@ export default function Users() {
             </span>
           </div>
         ))}
+      </div>
+
+      <div className="flex items-center justify-between mt-3 px-1">
+        <span className="text-[11px] font-mono tabular-nums text-[#a3a3a3]">
+          {users.length === 0 ? '—' : `${offset + 1}–${offset + users.length}`}
+        </span>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => load(Math.max(0, offset - PAGE_SIZE))}
+            disabled={loading || offset === 0}
+            className="flex items-center gap-1 px-2 py-1 rounded text-[12px] text-[#525252] hover:text-[#0a0a0a] hover:bg-black/[0.04] disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-[#525252]"
+          >
+            <ChevronLeft className="w-3.5 h-3.5" /> Prev
+          </button>
+          <button
+            onClick={() => load(offset + PAGE_SIZE)}
+            disabled={loading || !hasMore}
+            className="flex items-center gap-1 px-2 py-1 rounded text-[12px] text-[#525252] hover:text-[#0a0a0a] hover:bg-black/[0.04] disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-[#525252]"
+          >
+            Next <ChevronRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
       </div>
 
       {showCreate && (
