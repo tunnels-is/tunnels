@@ -143,6 +143,14 @@ func DB_DeleteGroupByID(id uuid.UUID) (err error) {
 	return BBolt_DeleteGroupByID(id.String())
 }
 
+func DB_DeleteUserByID(id uuid.UUID) (err error) {
+	return BBolt_DeleteUserByID(id.String())
+}
+
+func DB_DeleteServerByID(id uuid.UUID) (err error) {
+	return BBolt_DeleteServerByID(id.String())
+}
+
 func DB_ListGroups(limit, offset int64) (gl []*Group, err error) {
 	return BBolt_findGroups(limit, offset)
 }
