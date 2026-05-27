@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"os/exec"
+	"strings"
 
 	"github.com/vishvananda/netlink"
 )
@@ -200,6 +201,52 @@ func addForwardRules(wgIface, netIface string) error {
 // ---------------------------------------------------------------------------
 // MASQUERADE (IPv4 uses iptables, IPv6 uses ip6tables)
 // ---------------------------------------------------------------------------
+
+// PreviewRules returns the iptables/ip6tables commands setupNet would execute
+// for cfg, as paste-ready shell lines in install order. Side-effect-free —
+// nothing is added to the table, and the function does not touch the network.
+//
+// Used by the --showRules CLI flag for dry-run inspection.
+func PreviewRules(cfg *Config) []string {
+	var lines []string
+	portStr := fmt.Sprintf("%d", cfg.WireGuardPort)
+	wg := cfg.WireGuardIface
+	net := cfg.InternetIface
+
+	// allowWireGuardPort — both families.
+	for _, bin := range []string{"iptables", "ip6tables"} {
+		lines = append(lines,
+			fmt.Sprintf("%s -A INPUT -p udp --dport %s -j ACCEPT", bin, portStr))
+	}
+
+	// addForwardRules — four rules per family.
+	for _, bin := range []string{"iptables", "ip6tables"} {
+		lines = append(lines,
+			fmt.Sprintf("%s -A FORWARD -i %s -o %s -j ACCEPT", bin, wg, wg),
+			fmt.Sprintf("%s -A FORWARD -i %s -o %s -j ACCEPT", bin, wg, net),
+			fmt.Sprintf("%s -A FORWARD -i %s -o %s -m state --state RELATED,ESTABLISHED -j ACCEPT", bin, net, wg),
+			fmt.Sprintf("%s -A FORWARD -i %s -o %s -j DROP", bin, net, wg),
+		)
+	}
+
+	// IPv4 egress NAT — SNAT when PublicIP set, otherwise MASQUERADE.
+	if cfg.WireGuardSubnet != "" {
+		lines = append(lines, "iptables "+strings.Join(masqueradeArgs("-A", cfg.WireGuardSubnet, net, cfg.PublicIP), " "))
+	}
+
+	// IPv6: either MASQUERADE (when v6 subnet set) or DROP both directions.
+	if cfg.WireGuardSubnet6 != "" {
+		lines = append(lines,
+			fmt.Sprintf("ip6tables -t nat -A POSTROUTING -s %s -o %s -j MASQUERADE", cfg.WireGuardSubnet6, net))
+	} else {
+		lines = append(lines,
+			fmt.Sprintf("ip6tables -A FORWARD -i %s -j DROP", wg),
+			fmt.Sprintf("ip6tables -A FORWARD -o %s -j DROP", wg),
+		)
+	}
+
+	return lines
+}
 
 // addMasquerade installs the POSTROUTING NAT rule for WG egress.
 // When publicIP is set, the rule pins the SNAT source to that address. This

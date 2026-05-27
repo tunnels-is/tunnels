@@ -112,14 +112,31 @@ func API_WGPeer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if dev == nil {
-		senderr(w, 404, "peer not found")
+		senderr(w, 404, "device not found")
+		return
+	}
+
+	if dev.ServerID != server.ID {
+		senderr(w, 401, "device not allowed on this server")
 		return
 	}
 
 	allowed := hasSharedOrNoGroup(dev.Groups, server.Groups)
 	if !allowed {
-		senderr(w, 401, "pubkey must be a base64-encoded 32-byte key")
-		return
+		user, err := DB_findUserByID(dev.UserID)
+		if err != nil {
+			senderr(w, 500, "error looking up user")
+			return
+		}
+		if user == nil {
+			senderr(w, 401, "user/device not allowed to connect")
+			return
+		}
+		allowed = hasSharedOrNoGroup(user.Groups, server.Groups)
+		if !allowed {
+			senderr(w, 401, "user/device not allowed to connect")
+			return
+		}
 	}
 
 	hexKey, err := b64KeyToHex(dev.WireGuardKey)
