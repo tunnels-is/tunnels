@@ -900,6 +900,41 @@ func BBolt_DeleteGroupByID(id string) error {
 	})
 }
 
+func BBolt_DeleteUserByID(id string) error {
+	return BBoltDB.Update(func(tx *gobolt.Tx) error {
+		b := tx.Bucket([]byte(USERS_BUCKET))
+		v := b.Get([]byte(id))
+		if v != nil {
+			U := new(User)
+			if err := bboltUnmarshal(v, U); err == nil {
+				if U.Email != "" {
+					_ = tx.Bucket([]byte(USERS_EMAIL_INDEX)).Delete([]byte(U.Email))
+				}
+				if U.APIKey != "" {
+					_ = tx.Bucket([]byte(USERS_APIKEY_INDEX)).Delete([]byte(U.APIKey))
+				}
+			}
+		}
+		return b.Delete([]byte(id))
+	})
+}
+
+func BBolt_DeleteServerByID(id string) error {
+	return BBoltDB.Update(func(tx *gobolt.Tx) error {
+		b := tx.Bucket([]byte(SERVERS_BUCKET))
+		v := b.Get([]byte(id))
+		if v != nil {
+			S := new(types.Server)
+			if err := bboltUnmarshal(v, S); err == nil {
+				if S.APIKey != "" {
+					_ = tx.Bucket([]byte(SERVERS_APIKEY_INDEX)).Delete([]byte(S.APIKey))
+				}
+			}
+		}
+		return b.Delete([]byte(id))
+	})
+}
+
 func BBolt_WipeUserConfirmCode(UF *USER_ENABLE_QUERY) error {
 	return BBoltDB.Update(func(tx *gobolt.Tx) error {
 		uid := tx.Bucket([]byte(USERS_EMAIL_INDEX)).Get([]byte(UF.Email))

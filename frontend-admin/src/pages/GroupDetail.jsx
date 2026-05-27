@@ -26,6 +26,8 @@ export default function GroupDetail() {
   const [form, setForm] = useState({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [activeTab, setActiveTab] = useState('user');
   const [addForm, setAddForm] = useState({ value: '' });
   const [addError, setAddError] = useState('');
@@ -103,6 +105,24 @@ export default function GroupDetail() {
     }
   };
 
+  const handleDelete = async () => {
+    setDeleting(true);
+    setError('');
+    try {
+      const resp = await apiPost('/ui/group/delete', { GID: id });
+      if (resp.status === 200) {
+        navigate('/groups');
+      } else {
+        const data = await resp.json().catch(() => ({}));
+        setError(data.Error || 'Failed to delete');
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const handleRemove = async (type, typeID) => {
     try {
       const resp = await apiPost('/ui/group/remove', { GroupID: id, Type: type, TypeID: typeID });
@@ -143,10 +163,26 @@ export default function GroupDetail() {
                 <Save className="w-3.5 h-3.5" /> {saving ? 'Saving...' : 'Save'}
               </button>
             </>
+          ) : confirmingDelete ? (
+            <>
+              {error && <span className="text-[12px] text-[#dc2626] self-center">{error}</span>}
+              <span className="text-[12px] text-[#525252] self-center">Delete this group?</span>
+              <button onClick={() => setConfirmingDelete(false)} disabled={deleting} className="px-3 py-1.5 rounded text-[12px] text-[#525252] hover:text-[#0a0a0a]">
+                Cancel
+              </button>
+              <button onClick={handleDelete} disabled={deleting} className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[12px] bg-[#dc2626] hover:bg-[#b91c1c] text-white disabled:opacity-50">
+                <Trash2 className="w-3.5 h-3.5" /> {deleting ? 'Deleting...' : 'Confirm Delete'}
+              </button>
+            </>
           ) : (
-            <button onClick={startEdit} className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[12px] text-[#525252] hover:text-[#0a0a0a] hover:bg-black/[0.04]">
-              <Pencil className="w-3.5 h-3.5" /> Edit
-            </button>
+            <>
+              <button onClick={startEdit} className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[12px] text-[#525252] hover:text-[#0a0a0a] hover:bg-black/[0.04]">
+                <Pencil className="w-3.5 h-3.5" /> Edit
+              </button>
+              <button onClick={() => { setError(''); setConfirmingDelete(true); }} className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[12px] text-[#dc2626] hover:bg-[#dc2626]/10">
+                <Trash2 className="w-3.5 h-3.5" /> Delete
+              </button>
+            </>
           )}
         </div>
       </div>

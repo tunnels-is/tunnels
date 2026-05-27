@@ -58,6 +58,18 @@ type FORM_DELETE_DEVICE struct {
 	DID         uuid.UUID `json:"DID"`
 }
 
+type FORM_DELETE_USER struct {
+	DeviceToken  string    `json:"DeviceToken"`
+	UID          uuid.UUID `json:"UID"`
+	TargetUserID uuid.UUID `json:"TargetUserID"`
+}
+
+type FORM_DELETE_SERVER struct {
+	DeviceToken string    `json:"DeviceToken"`
+	UID         uuid.UUID `json:"UID"`
+	ServerID    uuid.UUID `json:"ServerID"`
+}
+
 type FORM_LIST_GROUP struct {
 	DeviceToken string    `json:"DeviceToken"`
 	UID         uuid.UUID `json:"UID"`
