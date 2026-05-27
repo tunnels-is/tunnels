@@ -904,6 +904,48 @@ func API_AdminGroupDelete(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(200)
 }
 
+func API_AdminUserDelete(w http.ResponseWriter, r *http.Request) {
+	defer BasicRecover()
+	F := new(FORM_DELETE_USER)
+	err := decodeBody(r, F)
+	if err != nil {
+		senderr(w, 400, "Invalid request body", slog.Any("error", err))
+		return
+	}
+
+	caller := getUserFromContext(r.Context())
+	if caller != nil && caller.ID == F.TargetUserID {
+		senderr(w, 400, "Cannot delete your own account")
+		return
+	}
+
+	err = DB_DeleteUserByID(F.TargetUserID)
+	if err != nil {
+		senderr(w, 500, "Unknown error, please try again in a moment")
+		return
+	}
+
+	w.WriteHeader(200)
+}
+
+func API_AdminServerDelete(w http.ResponseWriter, r *http.Request) {
+	defer BasicRecover()
+	F := new(FORM_DELETE_SERVER)
+	err := decodeBody(r, F)
+	if err != nil {
+		senderr(w, 400, "Invalid request body", slog.Any("error", err))
+		return
+	}
+
+	err = DB_DeleteServerByID(F.ServerID)
+	if err != nil {
+		senderr(w, 500, "Unknown error, please try again in a moment")
+		return
+	}
+
+	w.WriteHeader(200)
+}
+
 func API_DeviceGet(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 	F := new(types.FORM_GET_DEVICE)

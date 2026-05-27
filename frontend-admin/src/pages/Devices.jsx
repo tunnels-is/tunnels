@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
-import { Plus, RefreshCw } from 'lucide-react';
+import { Plus, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
 import { apiPost } from '../api';
+
+const PAGE_SIZE = 100;
 
 function Modal({ title, onClose, children }) {
   return (
@@ -30,18 +32,30 @@ export default function Devices() {
   const [createForm, setCreateForm] = useState({ Tag: '', ServerID: '', WireGuardKey: '' });
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState('');
+  const [offset, setOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
 
-  const load = async () => {
+  const load = async (next = offset) => {
     setLoading(true);
     setError('');
     try {
       const [devResp, srvResp] = await Promise.all([
-        apiPost('/ui/device/list', { Limit: 500, Offset: 0 }),
+        apiPost('/ui/device/list', { Limit: PAGE_SIZE, Offset: next }),
         apiPost('/ui/servers', { StartIndex: 0 }),
       ]);
       if (devResp.status === 200) {
         const data = await devResp.json();
-        setDevices(Array.isArray(data) ? data : []);
+        const list = Array.isArray(data) ? data : [];
+        setDevices(list);
+        setHasMore(list.length === PAGE_SIZE);
+        setOffset(next);
+      } else if (devResp.status === 204) {
+        setDevices([]);
+        setHasMore(false);
+        setOffset(next);
+      } else {
+        const data = await devResp.json().catch(() => ({}));
+        setError(data.Error || 'Failed to load devices');
       }
       if (srvResp.status === 200) {
         const data = await srvResp.json();
@@ -54,7 +68,7 @@ export default function Devices() {
     }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(0); }, []);
 
   const serverTag = (id) => servers.find((s) => s._id === id)?.Tag || '—';
 
@@ -70,7 +84,7 @@ export default function Devices() {
       if (resp.status === 200) {
         setShowCreate(false);
         setCreateForm({ Tag: '', ServerID: '', WireGuardKey: '' });
-        load();
+        load(offset);
       } else {
         const data = await resp.json().catch(() => ({}));
         setCreateError(data.Error || 'Failed to create device');
@@ -90,7 +104,7 @@ export default function Devices() {
           <span className="text-[11px] font-mono tabular-nums text-[#a3a3a3]">{devices.length}</span>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={load} disabled={loading} className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[12px] text-[#525252] hover:text-[#0a0a0a] hover:bg-black/[0.04] transition-colors">
+          <button onClick={() => load(offset)} disabled={loading} className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[12px] text-[#525252] hover:text-[#0a0a0a] hover:bg-black/[0.04] transition-colors">
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </button>
@@ -128,6 +142,28 @@ export default function Devices() {
             </span>
           </div>
         ))}
+      </div>
+
+      <div className="flex items-center justify-between mt-3 px-1">
+        <span className="text-[11px] font-mono tabular-nums text-[#a3a3a3]">
+          {devices.length === 0 ? '—' : `${offset + 1}–${offset + devices.length}`}
+        </span>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => load(Math.max(0, offset - PAGE_SIZE))}
+            disabled={loading || offset === 0}
+            className="flex items-center gap-1 px-2 py-1 rounded text-[12px] text-[#525252] hover:text-[#0a0a0a] hover:bg-black/[0.04] disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-[#525252]"
+          >
+            <ChevronLeft className="w-3.5 h-3.5" /> Prev
+          </button>
+          <button
+            onClick={() => load(offset + PAGE_SIZE)}
+            disabled={loading || !hasMore}
+            className="flex items-center gap-1 px-2 py-1 rounded text-[12px] text-[#525252] hover:text-[#0a0a0a] hover:bg-black/[0.04] disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-[#525252]"
+          >
+            Next <ChevronRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
       </div>
 
       {showCreate && (
