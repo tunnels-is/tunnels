@@ -68,6 +68,8 @@ func main() {
 	createAdmin := flag.Bool("createAdmin", false, "Create the default admin user in the auth DB on startup")
 	createServer := flag.Bool("createServer", false, "Create the default 'tunnels' server (with WG bootstrap) in the auth DB on startup")
 	ipOverride := flag.String("ip", "", "Override the IP used for -createConfig and -createCert (defaults to auto-discovered default-route interface IP)")
+	showNewRules := flag.Bool("showNewRules", false, "After wg-server fetches config from the controller, print the iptables rules it would install and hard-exit. No rules are applied.")
+	showActiveRules := flag.Bool("showActiveRules", false, "Print currently-installed iptables rules matching a config-agnostic wg-server shape, then exit. Does not fetch config or touch the network.")
 	flag.Parse()
 
 	explicitFlags := make(map[string]bool)
@@ -80,6 +82,17 @@ func main() {
 	if showVersion {
 		fmt.Println(version.Version)
 		os.Exit(1)
+	}
+
+	// --showActiveRules is a pure read-only inspection: no controller, no DB,
+	// no certs, no network setup. Handle it before anything that has side
+	// effects on the system.
+	if *showActiveRules {
+		if err := wgserver.ShowActiveRules(); err != nil {
+			fmt.Fprintln(os.Stderr, "showActiveRules failed:", err)
+			os.Exit(1)
+		}
+		os.Exit(0)
 	}
 
 	configRequested := explicitFlags["createConfig"]
@@ -196,6 +209,7 @@ func main() {
 		})
 	}
 
+	var wgDone chan struct{}
 	if *wgServerEnabled || *allTheThings {
 		if err := LoadWGConfig(wgConfigPath); err != nil {
 			logger.Error("WG feature enabled but wg config could not be loaded", "path", wgConfigPath, slog.Any("err", err))
@@ -212,7 +226,8 @@ func main() {
 			ctrlURL = "https://" + latestCfg.APIIP + ":" + latestCfg.APIPort
 		}
 
-		go wgserver.Init(ctx, ctrlURL, wgCfg.APIKey, wgConfigPath, wgCfg.InsecureSkipVerify, *logLevel)
+		wgDone = make(chan struct{})
+		go wgserver.Init(ctx, ctrlURL, wgCfg.APIKey, wgConfigPath, wgCfg.InsecureSkipVerify, *logLevel, *showNewRules, wgDone)
 
 		go signal.NewSignal("WG-CONFIG", ctx, cancel, 30*time.Second, goroutineLogger, func() {
 			if err := LoadWGConfig(wgConfigPath); err != nil {
@@ -226,6 +241,20 @@ func main() {
 	sig.Notify(quit, os.Interrupt, syscall.SIGTERM)
 	<-quit
 	logger.Info("Tunnels server exiting")
+
+	// Cancel the root context so wg-server (and other ctx-aware goroutines)
+	// unblock their <-ctx.Done() branch. Then wait — bounded — for wg-server
+	// to finish cleanupNet so its iptables rules are drained and the next
+	// start's preflight has a clean slate.
+	cancel()
+	if wgDone != nil {
+		select {
+		case <-wgDone:
+			logger.Info("wg-server clean shutdown")
+		case <-time.After(10 * time.Second):
+			logger.Warn("wg-server shutdown timed out; iptables rules may remain")
+		}
+	}
 }
 
 func goroutineLogger(msg string) {
