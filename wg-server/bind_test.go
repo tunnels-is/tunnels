@@ -10,8 +10,8 @@ import (
 )
 
 func TestPinnedBind_OpenAndClose(t *testing.T) {
-	b := newPinnedBind(netip.MustParseAddr("127.0.0.1"))
-	fns, port, err := b.Open(0) // random port
+	b := newPinnedBind(netip.MustParseAddr("127.0.0.1"), 0)
+	fns, port, err := b.Open(0)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -25,8 +25,31 @@ func TestPinnedBind_OpenAndClose(t *testing.T) {
 	}
 }
 
+func TestPinnedBind_OpenIgnoresArgPort(t *testing.T) {
+	// Caller passes any port via Open(), but pinnedBind must bind on the port
+	// supplied to its constructor. This is the crux of avoiding the race with
+	// the TUN-event-driven device.Up().
+	b := newPinnedBind(netip.MustParseAddr("127.0.0.1"), 0) // kernel-assigned
+	_, configured, err := b.Open(0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = b.Close()
+
+	b2 := newPinnedBind(netip.MustParseAddr("127.0.0.1"), configured)
+	_, got, err := b2.Open(9999) // arg should be ignored
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer b2.Close()
+
+	if got != configured {
+		t.Fatalf("expected bound port %d, got %d", configured, got)
+	}
+}
+
 func TestPinnedBind_DoubleOpenRejected(t *testing.T) {
-	b := newPinnedBind(netip.MustParseAddr("127.0.0.1"))
+	b := newPinnedBind(netip.MustParseAddr("127.0.0.1"), 0)
 	if _, _, err := b.Open(0); err != nil {
 		t.Fatal(err)
 	}
@@ -38,7 +61,7 @@ func TestPinnedBind_DoubleOpenRejected(t *testing.T) {
 }
 
 func TestPinnedBind_ParseEndpoint(t *testing.T) {
-	b := newPinnedBind(netip.MustParseAddr("127.0.0.1"))
+	b := newPinnedBind(netip.MustParseAddr("127.0.0.1"), 0)
 	ep, err := b.ParseEndpoint("127.0.0.1:51820")
 	if err != nil {
 		t.Fatal(err)
@@ -53,7 +76,7 @@ func TestPinnedBind_ParseEndpoint(t *testing.T) {
 }
 
 func TestPinnedBind_SendReceiveLoopback(t *testing.T) {
-	b := newPinnedBind(netip.MustParseAddr("127.0.0.1"))
+	b := newPinnedBind(netip.MustParseAddr("127.0.0.1"), 0)
 	fns, port, err := b.Open(0)
 	if err != nil {
 		t.Fatal(err)
@@ -115,7 +138,7 @@ func TestPinnedBind_SendReceiveLoopback(t *testing.T) {
 
 func TestPinnedBind_SendToBoundPort(t *testing.T) {
 	// Bind to a random port, then Send to a peer that's also on loopback.
-	b := newPinnedBind(netip.MustParseAddr("127.0.0.1"))
+	b := newPinnedBind(netip.MustParseAddr("127.0.0.1"), 0)
 	_, _, err := b.Open(0)
 	if err != nil {
 		t.Fatal(err)
@@ -147,7 +170,7 @@ func TestPinnedBind_SendToBoundPort(t *testing.T) {
 }
 
 func TestPinnedBind_SendRejectsWrongFamily(t *testing.T) {
-	b := newPinnedBind(netip.MustParseAddr("127.0.0.1")) // v4 pinned
+	b := newPinnedBind(netip.MustParseAddr("127.0.0.1"), 0) // v4 pinned
 	if _, _, err := b.Open(0); err != nil {
 		t.Fatal(err)
 	}
@@ -161,7 +184,7 @@ func TestPinnedBind_SendRejectsWrongFamily(t *testing.T) {
 }
 
 func TestPinnedBind_SendAfterCloseFails(t *testing.T) {
-	b := newPinnedBind(netip.MustParseAddr("127.0.0.1"))
+	b := newPinnedBind(netip.MustParseAddr("127.0.0.1"), 0)
 	if _, _, err := b.Open(0); err != nil {
 		t.Fatal(err)
 	}
