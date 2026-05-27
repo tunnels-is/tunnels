@@ -1000,7 +1000,12 @@ func API_AdminGroupList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	groups, err := DB_ListGroups(int64(F.Limit), int64(F.Offset))
+	limit := F.Limit
+	if limit <= 0 {
+		limit = 100
+	}
+
+	groups, err := DB_ListGroups(int64(limit), int64(F.Offset))
 	if err != nil {
 		senderr(w, 500, "Unknown error, please try again in a moment")
 		return
