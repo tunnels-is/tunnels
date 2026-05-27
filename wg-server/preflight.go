@@ -2,6 +2,8 @@ package wgserver
 
 import (
 	"fmt"
+	"io"
+	"os"
 	"os/exec"
 	"strings"
 )
@@ -186,6 +188,116 @@ func hasFlagValue(rule, flag, value string) bool {
 	fields := strings.Fields(rule)
 	for i := 0; i < len(fields)-1; i++ {
 		if fields[i] == flag && fields[i+1] == value {
+			return true
+		}
+	}
+	return false
+}
+
+// ShowActiveRules writes every currently-installed iptables/ip6tables rule
+// across the chains wg-server cares about that matches a config-agnostic
+// "looks like wg-server" heuristic. Unlike preflightIPTables, this does not
+// take a Config — it surfaces rules left over from any prior run regardless
+// of which subnet / iface / PublicIP they were installed under.
+//
+// Useful for operators who hit a preflight conflict and want to see what
+// drain commands to run, without restarting against the offending config.
+func ShowActiveRules() error {
+	return showActiveRulesWith(os.Stdout, defaultRuleDumper)
+}
+
+func showActiveRulesWith(w io.Writer, dump ruleDumper) error {
+	chains := []struct {
+		bin, table, chain string
+	}{
+		{"iptables", "filter", "INPUT"},
+		{"iptables", "filter", "FORWARD"},
+		{"iptables", "nat", "POSTROUTING"},
+		{"ip6tables", "filter", "INPUT"},
+		{"ip6tables", "filter", "FORWARD"},
+		{"ip6tables", "nat", "POSTROUTING"},
+	}
+
+	fmt.Fprintln(w, "=== wg-server --showActiveRules: rules matching wg-server shape ===")
+	fmt.Fprintln(w, "Heuristic (config-agnostic):")
+	fmt.Fprintln(w, "  - FORWARD: any rule with -i or -o starting with \"wg\"")
+	fmt.Fprintln(w, "  - POSTROUTING (nat): any rule with -j SNAT or -j MASQUERADE")
+	fmt.Fprintln(w, "  - INPUT: any rule with -p udp and -j ACCEPT")
+
+	total := 0
+	for _, c := range chains {
+		out, err := dump(c.bin, c.table, c.chain)
+		if err != nil {
+			return fmt.Errorf("dump %s -t %s %s: %w", c.bin, c.table, c.chain, err)
+		}
+		type hit struct {
+			pos    int
+			rule   string
+			reason string
+		}
+		var matched []hit
+		pos := 0
+		for _, line := range strings.Split(out, "\n") {
+			line = strings.TrimSpace(line)
+			if !strings.HasPrefix(line, "-A ") {
+				continue
+			}
+			pos++
+			if reason := wgRuleHeuristic(line, c.chain); reason != "" {
+				matched = append(matched, hit{pos: pos, rule: line, reason: reason})
+			}
+		}
+		if len(matched) == 0 {
+			continue
+		}
+		fmt.Fprintf(w, "\n%s %s/%s:\n", c.bin, c.table, c.chain)
+		for _, m := range matched {
+			drain := fmt.Sprintf("%s -t %s %s", c.bin, c.table, strings.Replace(m.rule, "-A ", "-D ", 1))
+			fmt.Fprintf(w, "  #%d (%s)\n      rule:  %s\n      drain: %s\n", m.pos, m.reason, m.rule, drain)
+			total++
+		}
+	}
+	if total == 0 {
+		fmt.Fprintln(w, "\n(no matching rules)")
+	} else {
+		fmt.Fprintf(w, "\nTotal: %d rule(s) matched.\n", total)
+	}
+	return nil
+}
+
+// wgRuleHeuristic returns a non-empty reason if rule (a single `iptables -S`
+// line in `chain`) looks like something wg-server might own under SOME
+// configuration. Config-agnostic on purpose: callers use it to find stale
+// rules from prior runs whose subnet/iface/PublicIP no longer match what
+// the current config knows about.
+func wgRuleHeuristic(rule, chain string) string {
+	if interfaceTokenStartsWith(rule, "wg") {
+		return "references wg-prefixed iface"
+	}
+	if chain == "POSTROUTING" {
+		if strings.Contains(rule, "-j SNAT") || strings.Contains(rule, "-j MASQUERADE") {
+			return "SNAT/MASQUERADE in POSTROUTING"
+		}
+	}
+	if chain == "INPUT" {
+		// UDP ACCEPT in INPUT is uncommon outside VPN/DHCP-server-style
+		// setups, so worth surfacing for operator review.
+		if hasFlagValue(rule, "-p", "udp") && strings.HasSuffix(rule, "-j ACCEPT") {
+			return "UDP ACCEPT in INPUT"
+		}
+	}
+	return ""
+}
+
+// interfaceTokenStartsWith reports whether rule (an `iptables -S` line)
+// contains an -i or -o flag whose value starts with prefix. Token-level so
+// "wgateway0" doesn't false-match a "wg" prefix… wait, actually it does — but
+// for this heuristic that's acceptable: a sysadmin who names an unrelated
+// iface "wg…" is choosing into the false positive.
+func interfaceTokenStartsWith(rule, prefix string) bool {
+	fields := strings.Fields(rule)
+	for i := 0; i < len(fields)-1; i++ {
+		if (fields[i] == "-i" || fields[i] == "-o") && strings.HasPrefix(fields[i+1], prefix) {
 			return true
 		}
 	}

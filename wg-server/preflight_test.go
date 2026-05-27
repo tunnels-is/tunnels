@@ -1,6 +1,7 @@
 package wgserver
 
 import (
+	"bytes"
 	"errors"
 	"strings"
 	"testing"
@@ -232,6 +233,129 @@ func TestPreflight_PositionCountsOnlyAppendRules(t *testing.T) {
 	err := preflightIPTablesWith(baseCfg(), dump.dump)
 	if err == nil || !strings.Contains(err.Error(), "rule #2") {
 		t.Fatalf("expected position #2, got: %v", err)
+	}
+}
+
+func TestShowActiveRules_CatchesAllShapes(t *testing.T) {
+	// The heuristic is config-agnostic — it should pick up wg-server-style
+	// rules regardless of which subnet/iface/PublicIP they were installed
+	// with, and skip unrelated rules in the same chains.
+	dump := fakeDumper{
+		// INPUT: only -p udp ACCEPT counts.
+		"iptables|filter|INPUT": strings.Join([]string{
+			"-A INPUT -p udp -m udp --dport 51820 -j ACCEPT", // wg-shape
+			"-A INPUT -p tcp -m tcp --dport 22 -j ACCEPT",    // unrelated
+		}, "\n"),
+		// FORWARD: anything touching wg* counts.
+		"iptables|filter|FORWARD": strings.Join([]string{
+			"-A FORWARD -i wg0 -o eth0 -j ACCEPT", // wg-shape
+			"-A FORWARD -i wg01 -o wg01 -j ACCEPT", // wg-shape (stale iface name)
+			"-A FORWARD -i br0 -o br1 -j ACCEPT",   // unrelated bridge
+		}, "\n"),
+		// POSTROUTING: any SNAT or MASQUERADE counts.
+		"iptables|nat|POSTROUTING": strings.Join([]string{
+			"-A POSTROUTING -s 10.0.4.0/22 -o eth0 -j SNAT --to-source 63.143.33.107", // stale wg subnet
+			"-A POSTROUTING -s 10.0.0.0/22 -o eth0 -j SNAT --to-source 74.63.223.157", // current wg subnet
+			"-A POSTROUTING -s 192.168.99.0/24 -o eth0 -j RETURN",                     // unrelated
+		}, "\n"),
+	}
+
+	var buf bytes.Buffer
+	if err := showActiveRulesWith(&buf, dump.dump); err != nil {
+		t.Fatal(err)
+	}
+	out := buf.String()
+
+	mustContain := []string{
+		"-A INPUT -p udp -m udp --dport 51820",
+		"-A FORWARD -i wg0 -o eth0",
+		"-A FORWARD -i wg01 -o wg01",
+		"-A POSTROUTING -s 10.0.4.0/22 -o eth0 -j SNAT --to-source 63.143.33.107",
+		"-A POSTROUTING -s 10.0.0.0/22 -o eth0 -j SNAT --to-source 74.63.223.157",
+	}
+	for _, want := range mustContain {
+		if !strings.Contains(out, want) {
+			t.Errorf("expected %q in output, got:\n%s", want, out)
+		}
+	}
+	mustNotContain := []string{
+		"-A INPUT -p tcp",
+		"-A FORWARD -i br0",
+		"-A POSTROUTING -s 192.168.99.0/24",
+	}
+	for _, banned := range mustNotContain {
+		if strings.Contains(out, banned) {
+			t.Errorf("unexpected %q in output:\n%s", banned, out)
+		}
+	}
+}
+
+func TestShowActiveRules_EmitsDrainCommands(t *testing.T) {
+	// Each matched rule must come with a ready-to-paste drain command that
+	// rewrites -A → -D and prefixes the bin + table.
+	dump := fakeDumper{
+		"iptables|nat|POSTROUTING": "-A POSTROUTING -s 10.0.0.0/22 -o eth0 -j SNAT --to-source 1.2.3.4\n",
+	}
+	var buf bytes.Buffer
+	if err := showActiveRulesWith(&buf, dump.dump); err != nil {
+		t.Fatal(err)
+	}
+	want := "drain: iptables -t nat -D POSTROUTING -s 10.0.0.0/22 -o eth0 -j SNAT --to-source 1.2.3.4"
+	if !strings.Contains(buf.String(), want) {
+		t.Fatalf("missing drain command %q in:\n%s", want, buf.String())
+	}
+}
+
+func TestShowActiveRules_NoMatchingRules(t *testing.T) {
+	// Chains are empty / contain only unrelated rules. Output should still
+	// be produced (so the operator knows the check ran) and should clearly
+	// say nothing matched.
+	dump := fakeDumper{
+		"iptables|filter|INPUT": "-A INPUT -p tcp -m tcp --dport 22 -j ACCEPT\n",
+	}
+	var buf bytes.Buffer
+	if err := showActiveRulesWith(&buf, dump.dump); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(buf.String(), "(no matching rules)") {
+		t.Fatalf("expected '(no matching rules)' in:\n%s", buf.String())
+	}
+}
+
+func TestShowActiveRules_PropagatesDumpError(t *testing.T) {
+	failing := func(bin, table, chain string) (string, error) {
+		return "", errors.New("iptables: command not found")
+	}
+	var buf bytes.Buffer
+	err := showActiveRulesWith(&buf, failing)
+	if err == nil || !strings.Contains(err.Error(), "command not found") {
+		t.Fatalf("expected dump error to propagate, got: %v", err)
+	}
+}
+
+func TestWGRuleHeuristic_PerChain(t *testing.T) {
+	cases := []struct {
+		name, rule, chain string
+		wantMatch         bool
+	}{
+		{"wg iface input", "-A FORWARD -i wg0 -o eth0 -j ACCEPT", "FORWARD", true},
+		{"wg iface output", "-A FORWARD -i eth0 -o wg7 -j ACCEPT", "FORWARD", true},
+		{"non-wg forward", "-A FORWARD -i br0 -o br1 -j ACCEPT", "FORWARD", false},
+		{"postrouting SNAT", "-A POSTROUTING -s 10.0.0.0/22 -o eth0 -j SNAT --to-source 1.2.3.4", "POSTROUTING", true},
+		{"postrouting MASQUERADE", "-A POSTROUTING -s 10.0.0.0/22 -o eth0 -j MASQUERADE", "POSTROUTING", true},
+		{"postrouting RETURN unrelated", "-A POSTROUTING -s 10.0.0.0/22 -o eth0 -j RETURN", "POSTROUTING", false},
+		{"input udp accept", "-A INPUT -p udp -m udp --dport 51820 -j ACCEPT", "INPUT", true},
+		{"input tcp accept", "-A INPUT -p tcp -m tcp --dport 22 -j ACCEPT", "INPUT", false},
+		{"input udp drop", "-A INPUT -p udp -m udp --dport 5353 -j DROP", "INPUT", false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got := wgRuleHeuristic(c.rule, c.chain) != ""
+			if got != c.wantMatch {
+				t.Errorf("wgRuleHeuristic(%q, %q) match=%v want=%v",
+					c.rule, c.chain, got, c.wantMatch)
+			}
+		})
 	}
 }
 
