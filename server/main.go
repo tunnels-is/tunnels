@@ -478,7 +478,6 @@ func writeServerConfig(ipOverride, mode string) error {
 		TwoFactorKey:     strings.ReplaceAll(uuid.NewString(), "-", ""),
 		CookieSigningKey: strings.ReplaceAll(uuid.NewString(), "-", ""),
 		CertPem:          "./cert.pem",
-		KeyPem:           "./key.pem",
 		SignPem:          "./sign.pem",
 	}
 	Config.Store(newConfig)
