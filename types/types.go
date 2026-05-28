@@ -56,7 +56,6 @@ type ServerConfig struct {
 	PayKey           string
 	CertPem          string
 	SignPem          string
-	KeyPem           string
 
 	// Enables multiple key/pairs for API SNI rotation
 	CertPems []string
