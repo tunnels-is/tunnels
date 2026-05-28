@@ -31,6 +31,8 @@ func loadSecret(key string) (v string) {
 	case types.ConfigStore:
 		config := Config.Load()
 		switch key {
+		case "PayKey":
+			return config.PayKey
 		case "CertPem":
 			return config.CertPem
 		case "SignPem":
