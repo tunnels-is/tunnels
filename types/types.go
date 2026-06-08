@@ -45,9 +45,6 @@ type ServerConfig struct {
 	APIIP   string
 	APIPort string
 
-	Hostname string
-
-	SecretStore SecretStore
 	// If SecretStore set to "config"
 	AdminAPIKey      string
 	DBurl            string
@@ -55,37 +52,20 @@ type ServerConfig struct {
 	CookieSigningKey string
 	PayKey           string
 	CertPem          string
-	SignPem          string
+	KeyPem           string
 
 	// Enables multiple key/pairs for API SNI rotation
 	CertPems []string
 	KeyPems  []string
 }
 
-// WGBootstrap is the standalone wg-config.json content. The wg-server uses
-// these values to fetch its full config from the controller over HTTP,
-// preserving the same auth layer as the standalone wg-server binary.
 type WGBootstrap struct {
-	// APIKey is the per-server API key (from POST /ui/wg/server-config).
-	APIKey string
-	// ControllerURL is the base URL of the controller (e.g. "https://1.2.3.4").
-	// When empty it defaults to https://APIIP:APIPort (i.e. self).
-	ControllerURL string
-	// InsecureSkipVerify disables TLS certificate verification when calling
-	// the controller. Only use this for testing.
+	APIKey             string
+	ControllerURL      string
 	InsecureSkipVerify bool
-	// PrivateKey is the wg-server's Curve25519 private key, base64-encoded.
-	// Owned by wg-server (not the controller). Persisted across restarts so
-	// existing clients stay valid. Generated on first boot when empty.
-	PrivateKey string `json:"PrivateKey,omitempty"`
 }
 
 type SecretStore string
-
-const (
-	EnvStore    SecretStore = "env"
-	ConfigStore SecretStore = "config"
-)
 
 type Device struct {
 	ID        uuid.UUID   `json:"_id"`

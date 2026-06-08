@@ -44,7 +44,7 @@ func setupWireGuard(cfg *Config, logLevel string) error {
 
 	aclStore = NewACLStore()
 
-	var tunInterface tun.Device = tunDev
+	tunInterface := tunDev
 	if cfg.PacketInspection {
 		insp, err := newInspectingTUN(tunDev, aclStore, cfg)
 		if err != nil {
@@ -63,8 +63,6 @@ func setupWireGuard(cfg *Config, logLevel string) error {
 		return fmt.Errorf("derive pubkey for LazyBind: %w", err)
 	}
 
-	// Copy private key for LazyBind — it must retain this for handshake decryption.
-	// The original in cfg.WireGuardPrivKey is zeroed at the end of this function.
 	privCopy := make([]byte, 32)
 	copy(privCopy, cfg.WireGuardPrivKey)
 
@@ -75,13 +73,6 @@ func setupWireGuard(cfg *Config, logLevel string) error {
 	wgLazyBind = NewLazyBind(innerBind, privCopy, pubBytes, cfg.HandshakeBufferSize, cfg.HandshakeRatePerIP, func() {})
 	wgDevice = device.NewDevice(tunInterface, wgLazyBind, wgLogger)
 
-	// Build IPC config using []byte so key material can be zeroed after use.
-	// We intentionally omit listen_port: pinnedBind already owns the port and
-	// will bind on it during the first BindUpdate. Setting listen_port via
-	// UAPI here would race with the TUN event reader's device.Up() — if Up()
-	// runs first, BindUpdate opens on net.port=0 (random kernel port), and
-	// the later listen_port directive closes that bind and rebinds, which can
-	// leave the device without a receive routine if the rebind fails.
 	privKeyHex := make([]byte, hex.EncodedLen(32))
 	hex.Encode(privKeyHex, cfg.WireGuardPrivKey)
 	conf := fmt.Appendf(nil, "private_key=%s\n\n", privKeyHex)

@@ -21,7 +21,6 @@ import (
 	"github.com/NdoleStudio/lemonsqueezy-go"
 	"github.com/google/uuid"
 	"github.com/jackpal/gateway"
-	"github.com/joho/godotenv"
 	"github.com/tunnels-is/tunnels/crypt"
 	"github.com/tunnels-is/tunnels/signal"
 	"github.com/tunnels-is/tunnels/types"
@@ -84,9 +83,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	// --showActiveRules is a pure read-only inspection: no controller, no DB,
-	// no certs, no network setup. Handle it before anything that has side
-	// effects on the system.
 	if *showActiveRules {
 		if err := wgserver.ShowActiveRules(); err != nil {
 			fmt.Fprintln(os.Stderr, "showActiveRules failed:", err)
@@ -167,18 +163,10 @@ func main() {
 			logger.Error("unable to connect to bbolt", slog.Any("err", err))
 			os.Exit(1)
 		}
+
 		err = LoadServerConfig(serverConfigPath)
 		if err != nil {
 			panic(err)
-		}
-
-		config := Config.Load()
-		if config.SecretStore == types.EnvStore {
-			err = godotenv.Load(".env")
-			if err != nil {
-				logger.Error("no .env file found")
-				os.Exit(1)
-			}
 		}
 
 		err = loadCertificatesAndTLSSettings()
@@ -251,7 +239,7 @@ func main() {
 		select {
 		case <-wgDone:
 			logger.Info("wg-server clean shutdown")
-		case <-time.After(10 * time.Second):
+		case <-time.After(30 * time.Second):
 			logger.Warn("wg-server shutdown timed out; iptables rules may remain")
 		}
 	}
@@ -261,14 +249,6 @@ func goroutineLogger(msg string) {
 	if !disableLogs {
 		logger.Debug(msg)
 	}
-}
-
-func validateConfig(Config *types.ServerConfig) (err error) {
-	if Config.SecretStore == "" {
-		Config.SecretStore = types.EnvStore
-	}
-
-	return nil
 }
 
 func LoadServerConfig(path string) (err error) {
@@ -289,10 +269,6 @@ func LoadServerConfig(path string) (err error) {
 		return fmt.Errorf("unsupported config file format: %s (supported: .json, .yaml, .yml)", ext)
 	}
 
-	if err != nil {
-		return err
-	}
-	err = validateConfig(C)
 	if err != nil {
 		return err
 	}
@@ -471,14 +447,12 @@ func writeServerConfig(ipOverride, mode string) error {
 	newConfig := &types.ServerConfig{
 		APIIP:            interfaceIP,
 		APIPort:          "443",
-		Hostname:         "tunnels.local",
-		SecretStore:      "config",
 		DBurl:            "",
 		AdminAPIKey:      uuid.NewString(),
 		TwoFactorKey:     strings.ReplaceAll(uuid.NewString(), "-", ""),
 		CookieSigningKey: strings.ReplaceAll(uuid.NewString(), "-", ""),
 		CertPem:          "./cert.pem",
-		SignPem:          "./sign.pem",
+		KeyPem:           "./key.pem",
 	}
 	Config.Store(newConfig)
 	return SaveServerConfig(serverConfigPath)

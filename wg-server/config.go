@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -73,68 +74,52 @@ func derivePubKey(privKey []byte) (string, error) {
 	return base64.StdEncoding.EncodeToString(pubBytes), nil
 }
 
-// loadOrGenerateLocalPrivKey returns the wg-server's persistent WireGuard
-// private key, reading it from configPath (wg-config.json) or generating +
-// persisting one on first boot. The key is stored in the PrivateKey field of
-// the standalone WGBootstrap config. Callers own the returned slice and are
-// responsible for zeroing it.
-func loadOrGenerateLocalPrivKey(configPath string) ([]byte, error) {
-	data, err := os.ReadFile(configPath)
+const pkpath = "./.pk"
+
+func loadOrGenerateLocalPrivKey() ([]byte, error) {
+	data, err := os.ReadFile(pkpath)
 	if err != nil {
-		return nil, fmt.Errorf("read config %q: %w", configPath, err)
+		if !errors.Is(err, os.ErrNotExist) {
+			return nil, fmt.Errorf("read pk from .pk %w", err)
+		}
 	}
-
-	cfg := new(types.WGBootstrap)
-	if err := json.Unmarshal(data, cfg); err != nil {
-		return nil, fmt.Errorf("parse config %q: %w", configPath, err)
-	}
-
-	if cfg.PrivateKey != "" {
-		if info, statErr := os.Stat(configPath); statErr == nil {
+	if len(data) != 0 {
+		if info, statErr := os.Stat(pkpath); statErr == nil {
 			if mode := info.Mode().Perm(); mode&0o077 != 0 {
-				return nil, fmt.Errorf("config %q contains PrivateKey but has insecure permissions %#o; chmod 0600 and retry", configPath, mode)
+				return nil, fmt.Errorf(".pk file has insecure permissions")
 			}
 		}
-		priv, err := base64.StdEncoding.DecodeString(cfg.PrivateKey)
+
+		priv, err := base64.StdEncoding.DecodeString(string(data))
 		if err != nil {
+			zeroBytes(priv)
 			return nil, fmt.Errorf("decode PrivateKey: %w", err)
 		}
 		if len(priv) != 32 {
+			zeroBytes(priv)
 			return nil, fmt.Errorf("PrivateKey has wrong length: got %d, want 32", len(priv))
 		}
 		return priv, nil
 	}
 
-	INFO("no PrivateKey found in ", configPath, ", generating a new persistent key")
 	priv, err := generateWGPrivKey()
 	if err != nil {
+		zeroBytes(priv)
 		return nil, err
 	}
-	cfg.PrivateKey = base64.StdEncoding.EncodeToString(priv)
 
-	out, err := json.MarshalIndent(cfg, "", "    ")
-	if err != nil {
-		zeroBytes(priv)
-		return nil, fmt.Errorf("marshal config: %w", err)
-	}
+	pk := base64.StdEncoding.EncodeToString(priv)
 
-	tmp := configPath + ".wgkey.tmp"
-	if err := os.WriteFile(tmp, out, 0o600); err != nil {
+	if err := os.WriteFile(pkpath, []byte(pk), 0o600); err != nil {
 		zeroBytes(priv)
-		return nil, fmt.Errorf("write tmp config %q: %w", tmp, err)
-	}
-	if err := os.Rename(tmp, configPath); err != nil {
-		_ = os.Remove(tmp)
-		zeroBytes(priv)
-		return nil, fmt.Errorf("rename %q -> %q: %w", tmp, configPath, err)
+		return nil, fmt.Errorf("write ./.pk file %q: %w", pkpath, err)
 	}
 
 	return priv, nil
 }
 
 func FetchConfig(controllerURL, apiKey, configPath string, insecureSkipVerify bool) (*Config, error) {
-	// Load (or generate on first boot) the persistent wg-server private key.
-	privKey, err := loadOrGenerateLocalPrivKey(configPath)
+	privKey, err := loadOrGenerateLocalPrivKey()
 	if err != nil {
 		return nil, fmt.Errorf("load wg private key: %w", err)
 	}
