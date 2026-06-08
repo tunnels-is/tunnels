@@ -14,21 +14,6 @@ var (
 	activeConfig atomic.Pointer[Config]
 )
 
-// Init starts the wg-server feature. It fetches config from the controller
-// (retrying until successful or ctx is cancelled), sets up WireGuard and
-// networking, then blocks until ctx is done before cleaning up.
-//
-// done (optional, may be nil) is closed when Init's goroutine fully returns —
-// after iptables cleanup and key zeroing. The caller's signal handler uses
-// it to wait for clean shutdown before terminating the process; without this
-// wait, the process exits immediately on ^C and cleanupNet never runs,
-// leaving rules behind for the next start's preflight to refuse.
-//
-// When showNewRules is true, Init stops after FetchConfig: it prints the
-// iptables rules setupNet would install for the fetched config and then
-// terminates the whole process with os.Exit(0). No rules are applied, no
-// TUN device is created. done is not closed in that path (the process is
-// about to exit anyway).
 func Init(ctx context.Context, controllerURL, apiKey, configPath string, insecureSkipVerify bool, logLevel string, showNewRules bool, done chan<- struct{}) {
 	defer func() {
 		if done != nil {
