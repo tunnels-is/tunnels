@@ -8,6 +8,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"flag"
@@ -42,9 +43,8 @@ type MongoUser struct {
 	TwoFactorEnabled bool           `json:"TwoFactorEnabled" bson:"TwoFactorEnabled"`
 	Tokens           []*DeviceToken `json:"Tokens" bson:"Tokens"`
 
-	IsAdmin   bool                 `json:"IsAdmin" bson:"IsAdmin"`
-	IsManager bool                 `json:"IsManager" bson:"IsManager"`
-	Groups    []primitive.ObjectID `json:"Groups" bson:"Groups"`
+	IsAdmin bool                 `json:"IsAdmin" bson:"IsAdmin"`
+	Groups  []primitive.ObjectID `json:"Groups" bson:"Groups"`
 
 	Trial         bool        `json:"Trial" bson:"Trial"`
 	Key           *LicenseKey `json:"Key" bson:"Key"`
@@ -70,9 +70,8 @@ type BoltUser struct {
 	TwoFactorEnabled bool           `json:"TwoFactorEnabled"`
 	Tokens           []*DeviceToken `json:"Tokens"`
 
-	IsAdmin   bool        `json:"IsAdmin"`
-	IsManager bool        `json:"IsManager"`
-	Groups    []uuid.UUID `json:"Groups"`
+	IsAdmin bool        `json:"IsAdmin"`
+	Groups  []uuid.UUID `json:"Groups"`
 
 	Trial         bool        `json:"Trial"`
 	Key           *LicenseKey `json:"Key"`
@@ -80,10 +79,6 @@ type BoltUser struct {
 }
 
 func mongoToBolt(mu *MongoUser) *BoltUser {
-	groups := make([]uuid.UUID, len(mu.Groups))
-	for i := range mu.Groups {
-		groups[i] = uuid.New()
-	}
 	return &BoltUser{
 		ID:                    uuid.New(),
 		Email:                 mu.Email,
@@ -99,8 +94,7 @@ func mongoToBolt(mu *MongoUser) *BoltUser {
 		TwoFactorEnabled:      mu.TwoFactorEnabled,
 		Tokens:                mu.Tokens,
 		IsAdmin:               mu.IsAdmin,
-		IsManager:             mu.IsManager,
-		Groups:                groups,
+		Groups:                nil,
 		Trial:                 mu.Trial,
 		Key:                   mu.Key,
 		SubExpiration:         mu.SubExpiration,
@@ -276,7 +270,9 @@ func fetchAllMongoUsers(client *mongo.Client) ([]MongoUser, error) {
 	return users, cursor.Err()
 }
 
-// verifyFields compares all fields except ID and Groups (which changed format).
+// verifyFields compares every migrated field.
+// ID is skipped (ObjectID→UUID). Groups is intentionally emptied during
+// migration, so it is checked separately for len()==0.
 func verifyFields(bolt *BoltUser, mongo *MongoUser) bool {
 	ok := true
 	check := func(name string, match bool) {
@@ -294,12 +290,47 @@ func verifyFields(bolt *BoltUser, mongo *MongoUser) bool {
 	check("Password", bolt.Password == mongo.Password)
 	check("ConfirmCode", bolt.ConfirmCode == mongo.ConfirmCode)
 	check("LastResetRequest", bolt.LastResetRequest.Equal(mongo.LastResetRequest))
+	check("RecoveryCodes", bytes.Equal(bolt.RecoveryCodes, mongo.RecoveryCodes))
+	check("TwoFactorCode", bytes.Equal(bolt.TwoFactorCode, mongo.TwoFactorCode))
 	check("TwoFactorEnabled", bolt.TwoFactorEnabled == mongo.TwoFactorEnabled)
+	check("Tokens", tokensEqual(bolt.Tokens, mongo.Tokens))
 	check("IsAdmin", bolt.IsAdmin == mongo.IsAdmin)
-	check("IsManager", bolt.IsManager == mongo.IsManager)
+	check("Groups", len(bolt.Groups) == 0)
 	check("Trial", bolt.Trial == mongo.Trial)
+	check("Key", licenseKeyEqual(bolt.Key, mongo.Key))
 	check("SubExpiration", bolt.SubExpiration.Equal(mongo.SubExpiration))
 
-	// ID and Groups are intentionally skipped (ObjectID→UUID format change).
 	return ok
+}
+
+func tokensEqual(a, b []*DeviceToken) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if (a[i] == nil) != (b[i] == nil) {
+			return false
+		}
+		if a[i] == nil {
+			continue
+		}
+		if a[i].DT != b[i].DT ||
+			a[i].N != b[i].N ||
+			!a[i].Created.Equal(b[i].Created) {
+			return false
+		}
+	}
+	return true
+}
+
+func licenseKeyEqual(a, b *LicenseKey) bool {
+	if (a == nil) != (b == nil) {
+		return false
+	}
+	if a == nil {
+		return true
+	}
+	return a.Months == b.Months &&
+		a.Key == b.Key &&
+		a.Created.Equal(b.Created)
 }
