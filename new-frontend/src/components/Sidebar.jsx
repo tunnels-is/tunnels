@@ -16,7 +16,7 @@ const Sidebar = () => {
 			items: [
 				{ icon: Lock, label: "Login", route: "login", show: !loggedIn },
 				{ icon: Server, label: "Servers", route: "servers", show: loggedIn },
-				{ icon: Network, label: "Tunnels", route: "tunnels", show: loggedIn },
+				{ icon: Network, label: "Tunnels", route: "tunnels", show: loggedIn && advanced },
 				{ icon: Monitor, label: "Devices", route: "devices", show: loggedIn },
 				{ icon: Gauge, label: "Bandwidth", route: "bandwidth", show: loggedIn && !!config?.BandwidthGraphs },
 			],
