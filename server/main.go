@@ -53,14 +53,14 @@ func main() {
 	showVersion := false
 	flag.BoolVar(&showVersion, "version", false, "show version and exit")
 
-	allTheThings := flag.Bool("allinone", true, "full setup of an all-in-one vpn server + auth controller. This will create configs, generate certs and create a wrieguard server + admin user in the database. Essentially a (configure everything and run) flag")
-	wgServerEnabled := flag.Bool("wg", true, "enable/disable the wireguard vpn server module")
-	authServerEnabled := flag.Bool("auth", true, "enable/disable the auth server module")
+	allTheThings := flag.Bool("allinone", false, "full setup of an all-in-one vpn server + auth controller. This will create configs, generate certs and create a wrieguard server + admin user in the database. Essentially a (configure everything and run) flag")
+	wgServerEnabled := flag.Bool("wg", false, "enable/disable the wireguard vpn server module")
+	authServerEnabled := flag.Bool("auth", false, "enable/disable the auth server module")
 	createConfig := flag.String("createConfig", "", "Generate a config. '' or 'all' creates both config.json and wg-config.json; 'auth' creates config.json only; 'wg' creates wg-config.json only")
 	configPath := flag.String("configPath", "./config.json", "path to controller config file (supports .json, .yaml, .yml)")
 	wgConfigPathFlag := flag.String("wgConfigPath", "./wg-config.json", "path to wg-server config file")
-	jsonLogs := flag.Bool("json", true, "enable/disable json logging")
-	sourceInfo := flag.Bool("source", true, "disable source line information in logs")
+	jsonLogs := flag.Bool("json", false, "enable/disable json logging")
+	sourceInfo := flag.Bool("source", false, "disable source line information in logs")
 	createCert := flag.String("createCert", "", "Generate API certificates. Use 'selfsign' for a self-signed cert or a domain name (e.g. 'example.com') to obtain a Let's Encrypt certificate via ACME HTTP-01")
 	silent := flag.Bool("silent", true, "This command disables logging")
 	logLevel := flag.String("logLevel", "debug", "set the log level. Available levels: debug, info, warn, error")
@@ -95,14 +95,15 @@ func main() {
 	configMode := strings.ToLower(strings.TrimSpace(*createConfig))
 	if configRequested || *allTheThings {
 		switch configMode {
-		case "", "all", "auth", "wg":
+		case "all", "auth", "wg":
+			logger.Info("generating config", "mode", configMode)
+			if err := makeConfig(*ipOverride, configMode); err != nil {
+				logger.Error("unable to create config", "error", err)
+				os.Exit(1)
+			}
+		case "":
 		default:
 			logger.Error("invalid -createConfig value (allowed: '', 'all', 'auth', 'wg')", "value", *createConfig)
-			os.Exit(1)
-		}
-		logger.Info("generating config", "mode", configMode)
-		if err := makeConfig(*ipOverride, configMode); err != nil {
-			logger.Error("unable to create config", "error", err)
 			os.Exit(1)
 		}
 	}
@@ -135,7 +136,7 @@ func main() {
 
 	if *createCert != "" || *allTheThings {
 		certValue := strings.TrimSpace(*createCert)
-		if certValue == "" || certValue == "selfsign" {
+		if certValue == "selfsign" {
 			logger.Info("generating self-signed certificates")
 			if err := generateSelfSignedCerts(*ipOverride); err != nil {
 				logger.Error("unable to create self-signed certificates", "error", err)
@@ -418,8 +419,8 @@ func loadCertificatesAndTLSSettings() (err error) {
 }
 
 func makeConfig(ipOverride string, mode string) error {
-	writeServer := mode == "" || mode == "all" || mode == "auth"
-	writeWG := mode == "" || mode == "all" || mode == "wg"
+	writeServer := mode == "all" || mode == "auth"
+	writeWG := mode == "all" || mode == "wg"
 
 	if writeServer {
 		if err := writeServerConfig(ipOverride, mode); err != nil {

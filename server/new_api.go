@@ -32,11 +32,6 @@ func launchAPIServer() {
 		http.Redirect(w, r, "/admin/", http.StatusMovedPermanently)
 	})
 
-	adminAPIKeyMW := func(h http.HandlerFunc) http.Handler {
-		return applyMiddleware(h, xAdminAPIKeyMiddleware)
-	}
-	mux.Handle("POST /ui/device/create", adminAPIKeyMW(API_AdminDeviceCreate))
-
 	wgServerMW := func(h http.HandlerFunc) http.Handler {
 		return applyMiddleware(h, wireGuardServerKeyCheck)
 	}
@@ -68,6 +63,10 @@ func launchAPIServer() {
 		mux.Handle("POST /client/key/activate", clientMW(API_ActivateLicenseKey))
 	}
 	// ======================================
+	adminAPIKeyMW := func(h http.HandlerFunc) http.Handler {
+		return applyMiddleware(h, xAdminAPIKeyMiddleware)
+	}
+	mux.Handle("POST /ui/device/create", adminAPIKeyMW(API_AdminDeviceCreate))
 
 	mux.HandleFunc("POST /ui/user/login", API_AdminUILogin)
 	adminMW := func(h http.HandlerFunc) http.Handler {
