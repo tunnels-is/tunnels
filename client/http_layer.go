@@ -12,6 +12,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -191,6 +192,9 @@ func HTTPhandler(w http.ResponseWriter, r *http.Request) {
 	case "connect":
 		HTTP_Connect(w, r)
 		return
+	case "autoConnect":
+		HTTP_AutoConnect(w, r)
+		return
 	case "disconnect":
 		HTTP_Disconnect(w, r)
 		return
@@ -320,11 +324,26 @@ func JSON(w http.ResponseWriter, r *http.Request, code int, data any) {
 type StateResponse struct {
 	Version       string
 	APIVersion    int
+	Timezone      string
 	Config        *configV2
 	State         *stateV2
 	Tunnels       []*TunnelMETA
 	ActiveTunnels []*TUN
 	Network       StateNetworkResponse
+}
+
+// getSystemTimezone returns the host's IANA timezone name, best-effort.
+// Empty when undetectable (the UI falls back to the webview Intl API).
+func getSystemTimezone() string {
+	if tz := os.Getenv("TZ"); tz != "" {
+		return tz
+	}
+	if link, err := os.Readlink("/etc/localtime"); err == nil {
+		if i := strings.Index(link, "zoneinfo/"); i != -1 {
+			return link[i+len("zoneinfo/"):]
+		}
+	}
+	return ""
 }
 
 type StateNetworkResponse struct {
@@ -395,6 +414,7 @@ func GetFullState() (s *StateResponse) {
 	s = new(StateResponse)
 	s.Version = version.Version
 	s.APIVersion = version.ApiVersion
+	s.Timezone = getSystemTimezone()
 	s.Config = CONFIG.Load()
 	s.State = state
 
@@ -438,6 +458,22 @@ func HTTP_Connect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	JSON(w, r, code, nil)
+}
+
+func HTTP_AutoConnect(w http.ResponseWriter, r *http.Request) {
+	form := new(AutoConnectForm)
+	err := Bind(form, r)
+	if err != nil {
+		JSON(w, r, 400, err)
+		return
+	}
+
+	resp, code, err := CountryAutoConnect(form)
+	if err != nil {
+		STRING(w, r, code, err.Error())
+		return
+	}
+	JSON(w, r, code, resp)
 }
 
 func HTTP_Disconnect(w http.ResponseWriter, r *http.Request) {

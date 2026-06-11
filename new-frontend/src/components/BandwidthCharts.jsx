@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react"
-import { Card, Page, Toolbar } from "@/components/ui"
+import { Card, Toolbar } from "@/components/ui"
 import { fetchState } from "@/store/actions"
 import { useStore } from "@/store/store"
 
@@ -184,8 +184,9 @@ const StatsRow = ({ series, dataKey }) => (
 	</div>
 )
 
-const Bandwidth = () => {
-	const config = useStore((s) => s.config)
+// Live bandwidth charts (1s state polling while mounted). The parent is
+// responsible for only rendering this when Config.BandwidthGraphs is on.
+const BandwidthCharts = () => {
 	const activeTunnels = useStore((s) => s.activeTunnels)
 	const [range, setRange] = useState(TIME_RANGES[0])
 	const [disabledTunnels, setDisabledTunnels] = useState({})
@@ -216,25 +217,10 @@ const Bandwidth = () => {
 		return { series: out, totalSamples: samples }
 	}, [tunnels, range, disabledTunnels])
 
-	if (!config?.BandwidthGraphs) {
-		return (
-			<Page>
-				<div className="flex h-40 items-center justify-center text-[13px] opacity-50">
-					Bandwidth history is disabled
-				</div>
-			</Page>
-		)
-	}
-	if (tunnels.length === 0) {
-		return (
-			<Page>
-				<div className="flex h-40 items-center justify-center text-[13px] opacity-50">No active tunnels</div>
-			</Page>
-		)
-	}
+	if (tunnels.length === 0) return null
 
 	return (
-		<Page>
+		<div>
 			<Toolbar>
 				<div className="flex gap-1">
 						{TIME_RANGES.map((r) => (
@@ -293,8 +279,8 @@ const Bandwidth = () => {
 					</Card>
 				))}
 			</div>
-		</Page>
+		</div>
 	)
 }
 
-export default Bandwidth
+export default BandwidthCharts

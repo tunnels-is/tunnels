@@ -4,6 +4,7 @@ import { Pencil, Plus } from "lucide-react"
 import Dialog from "@/components/Dialog"
 import { TextField, Toggle } from "@/components/ui"
 import { controller, fetchState, loginUser, saveConfig } from "@/store/actions"
+import { v4 as uuid } from "uuid"
 import { session } from "@/store/session"
 import { useStore } from "@/store/store"
 
@@ -19,7 +20,7 @@ const MODES = [
 const SUBMIT_LABEL = { 1: "Login", 2: "Register", 3: "Login", 4: "Reset Password", 5: "Register", 6: "Enable Account" }
 
 const emptyAuthServer = () => ({
-	ID: crypto.randomUUID(),
+	ID: uuid(),
 	Host: "",
 	Port: "",
 	ValidateCertificate: true,
@@ -156,7 +157,7 @@ const Login = () => {
 	const switchMode = (m) => {
 		if (m === 5) {
 			setTokenLogin(true)
-			setInputs({ ...inputs, email: crypto.randomUUID() })
+			setInputs({ ...inputs, email: uuid() })
 		} else if (tokenLogin) {
 			setTokenLogin(false)
 			setInputs({ ...inputs, email: "" })
