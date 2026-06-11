@@ -71,6 +71,7 @@ const ListDialog = ({ open, onClose, title, list, onChange, onSave }) => (
 
 const DNS = () => {
 	const config = useStore((s) => s.config)
+	const advanced = useStore((s) => s.advanced)
 
 	const [editing, setEditing] = useState(false)
 	const [cfg, setCfg] = useState({ ...config })
@@ -114,6 +115,16 @@ const DNS = () => {
 	}
 
 	const updateDialogValue = (value) => setDialog({ ...dialog, value })
+
+	if (!advanced) {
+		return (
+			<Page>
+				<div className="flex h-40 items-center justify-center text-[13px] opacity-50">
+					Enable Advanced mode in Settings to manage DNS.
+				</div>
+			</Page>
+		)
+	}
 
 	return (
 		<Page>
