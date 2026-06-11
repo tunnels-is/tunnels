@@ -1056,6 +1056,14 @@ func API_AdminGroupList(w http.ResponseWriter, r *http.Request) {
 	sendObject(w, groups)
 }
 
+// sanitizeServerForClient strips secrets that must never leave the admin UI.
+// Returns a copy so cached DB objects are not mutated.
+func sanitizeServerForClient(s *types.Server) *types.Server {
+	c := *s
+	c.APIKey = ""
+	return &c
+}
+
 func API_ServersForUser(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 	F := new(FORM_GET_SERVERS)
@@ -1086,6 +1094,10 @@ func API_ServersForUser(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		servers = append(servers, puservers...)
+	}
+
+	for i, s := range servers {
+		servers[i] = sanitizeServerForClient(s)
 	}
 
 	sendObject(w, servers)
@@ -1203,7 +1215,7 @@ func API_ServerGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sendObject(w, server)
+	sendObject(w, sanitizeServerForClient(server))
 }
 
 func API_UserResetPassword(w http.ResponseWriter, r *http.Request) {
