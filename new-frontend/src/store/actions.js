@@ -2,6 +2,7 @@
 // directly for page-local data) — nothing else talks to the network.
 
 import { callController, callMethod, errorMessage } from "@/api/client"
+import { v4 as uuid } from "uuid"
 import { session } from "./session"
 import { useStore } from "./store"
 
@@ -74,6 +75,7 @@ export const fetchState = async () => {
 			activeTunnels: d.ActiveTunnels || [],
 			version: d.Version,
 			apiVersion: d.APIVersion,
+			timezone: d.Timezone,
 		})
 
 		// First load without a user: pick the only saved account automatically,
@@ -82,7 +84,7 @@ export const fetchState = async () => {
 			const users = await loadUsers()
 			if (users?.length === 1) {
 				store().setUser(users[0])
-				window.location.hash = "#/servers"
+				window.location.hash = "#/dashboard"
 			} else if (users?.length > 0) {
 				useStore.setState({ users })
 				window.location.hash = "#/accounts"
@@ -162,7 +164,7 @@ export const logoutCurrentToken = () => logoutToken(store().user?.DeviceToken, f
 export const logoutAllTokens = () => logoutToken(store().user?.DeviceToken, true)
 
 export const refreshApiKey = async () => {
-	const user = { ...store().user, APIKey: crypto.randomUUID() }
+	const user = { ...store().user, APIKey: uuid() }
 	const resp = await controller("/client/user/update", { APIKey: user.APIKey })
 	if (resp.status === 200) {
 		store().setUser(user)
@@ -247,8 +249,10 @@ export const connect = async (tunnel, server) => {
 		Server: user.ControlServer,
 	})
 	store().hideLoading()
-	if (resp.status === 200) store().notifySuccess("Connection ready")
+	const ok = resp.status === 200 || resp.networkError
+	if (ok) store().notifySuccess("Connection ready")
 	await fetchState()
+	return ok
 }
 
 export const disconnect = async (activeTunnel) => {

@@ -1,12 +1,11 @@
 import { useLocation, useNavigate } from "react-router-dom"
-import { BarChart3, CircleUser, Gauge, Globe, Info, Lock, Logs, Monitor, Network, Server, Settings, Users } from "lucide-react"
+import { BarChart3, CircleUser, Globe, Info, LayoutDashboard, Lock, Logs, Monitor, Network, Server, Settings, Users } from "lucide-react"
 import { useStore } from "@/store/store"
 
 const Sidebar = () => {
 	const navigate = useNavigate()
 	const { pathname } = useLocation()
 	const user = useStore((s) => s.user)
-	const config = useStore((s) => s.config)
 	const advanced = useStore((s) => s.advanced)
 
 	const loggedIn = !!user?.Email || !!user?._id
@@ -15,10 +14,10 @@ const Sidebar = () => {
 			title: "",
 			items: [
 				{ icon: Lock, label: "Login", route: "login", show: !loggedIn },
+				{ icon: LayoutDashboard, label: "Dashboard", route: "dashboard", show: loggedIn },
 				{ icon: Server, label: "Servers", route: "servers", show: loggedIn },
 				{ icon: Network, label: "Tunnels", route: "tunnels", show: loggedIn && advanced },
 				{ icon: Monitor, label: "Devices", route: "devices", show: loggedIn },
-				{ icon: Gauge, label: "Bandwidth", route: "bandwidth", show: loggedIn && !!config?.BandwidthGraphs },
 			],
 		},
 		{
@@ -41,7 +40,7 @@ const Sidebar = () => {
 
 	const parts = pathname.split("/")
 	const isActive = (route) =>
-		parts.includes(route) || (parts[1] === "" && (route === "login" || route === "servers"))
+		parts.includes(route) || (parts[1] === "" && (route === "login" || route === "dashboard"))
 
 	return (
 		<div className="group/sidebar fixed top-0 left-0 z-50 flex h-screen w-14 flex-col overflow-hidden border-r border-base-300 bg-base-100 transition-all duration-200 hover:w-52">

@@ -11,6 +11,12 @@ importers:
       '@fontsource-variable/inter':
         specifier: 5.0.18
         version: 5.0.18
+      '@svg-maps/world':
+        specifier: ^2.0.0
+        version: 2.0.0
+      countries-and-timezones:
+        specifier: ^3.9.0
+        version: 3.9.0
       flag-icons:
         specifier: ^7.5.0
         version: 7.5.0
@@ -29,6 +35,9 @@ importers:
       react-router-dom:
         specifier: 6.30.0
         version: 6.30.0(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
+      uuid:
+        specifier: ^14.0.0
+        version: 14.0.0
       zustand:
         specifier: 5.0.3
         version: 5.0.3(react@18.2.0)
@@ -441,6 +450,9 @@ packages:
     cpu: [x64]
     os: [win32]
 
+  '@svg-maps/world@2.0.0':
+    resolution: {integrity: sha512-VmYYnyygJ5Zhr48xPqukFBoq4aCBgVNIjBzqBnWKXSdHhrRK3pntdvbCa8lMsxwVCFzEw9a+smIMEGI2sC1xcQ==}
+
   '@tailwindcss/node@4.1.18':
     resolution: {integrity: sha512-DoR7U1P7iYhw16qJ49fgXUlry1t4CpXeErJHnQ44JgTSKMaZUdf17cfn5mHchfJ4KRBZRFA/Coo+MUF5+gOaCQ==}
 
@@ -572,6 +584,10 @@ packages:
 
   convert-source-map@2.0.0:
     resolution: {integrity: sha512-Kvp459HrV2FEJ1CAsi1Ku+MY3kasH19TFykTz2xWmMeq6bk2NU3XXvfJ+Q61m0xktWwt+1HSYf3JZsTms3aRJg==}
+
+  countries-and-timezones@3.9.0:
+    resolution: {integrity: sha512-3upkVtUfZgdp5xOQI/Deg1ye73ae6bygJMO4UvtUi6wLjwcj7cBqx2PzSZ1VL8i5iveBbjhsQp2Judx7kPKivA==}
+    engines: {node: '>=8.x', npm: '>=5.x'}
 
   cssesc@3.0.0:
     resolution: {integrity: sha512-/Tb/JcjK111nNScGob5MNtsntNM1aCNUDipB/TkwZFhyDrrE47SOx/18wF2bbjgc3ZzCSKW1T5nt5EbFoAz/Vg==}
@@ -855,6 +871,10 @@ packages:
 
   util-deprecate@1.0.2:
     resolution: {integrity: sha512-EPD5q1uXyFxJpCrLnCc1nHnq3gOa6DZBocAIiI2TaSCA7VCJ1UJDMagCzIkXNsUYfD1daK//LTEQ8xiIbrHtcw==}
+
+  uuid@14.0.0:
+    resolution: {integrity: sha512-Qo+uWgilfSmAhXCMav1uYFynlQO7fMFiMVZsQqZRMIXp0O7rR7qjkj+cPvBHLgBqi960QCoo/PH2/6ZtVqKvrg==}
+    hasBin: true
 
   vite@6.4.1:
     resolution: {integrity: sha512-+Oxm7q9hDoLMyJOYfUYBuHQo+dkAloi33apOPP56pzj+vsdJDzr+j1NISE5pyaAuKL4A3UD34qd0lx5+kfKp2g==}
@@ -1207,6 +1227,8 @@ snapshots:
   '@rollup/rollup-win32-x64-msvc@4.61.1':
     optional: true
 
+  '@svg-maps/world@2.0.0': {}
+
   '@tailwindcss/node@4.1.18':
     dependencies:
       '@jridgewell/remapping': 2.3.5
@@ -1330,6 +1352,8 @@ snapshots:
   caniuse-lite@1.0.30001799: {}
 
   convert-source-map@2.0.0: {}
+
+  countries-and-timezones@3.9.0: {}
 
   cssesc@3.0.0: {}
 
@@ -1589,6 +1613,8 @@ snapshots:
       picocolors: 1.1.1
 
   util-deprecate@1.0.2: {}
+
+  uuid@14.0.0: {}
 
   vite@6.4.1(jiti@2.7.0)(lightningcss@1.30.2):
     dependencies:

@@ -9,8 +9,8 @@ import Toasts from "@/components/Toasts"
 
 import Account from "@/pages/Account"
 import AccountSelect from "@/pages/AccountSelect"
-import Bandwidth from "@/pages/Bandwidth"
 import Connections from "@/pages/Connections"
+import Dashboard from "@/pages/Dashboard"
 import Devices from "@/pages/Devices"
 import DNS from "@/pages/DNS"
 import DNSStats from "@/pages/DNSStats"
@@ -51,12 +51,12 @@ const App = () => {
 							</>
 						) : (
 							<>
-								<Route path="/" element={<Servers />} />
-								<Route path="*" element={<Servers />} />
+								<Route path="/" element={<Dashboard />} />
+								<Route path="*" element={<Dashboard />} />
+								<Route path="dashboard" element={<Dashboard />} />
 								<Route path="servers" element={<Servers />} />
 								<Route path="tunnels" element={<Tunnels />} />
 								<Route path="connections" element={<Connections />} />
-								<Route path="bandwidth" element={<Bandwidth />} />
 								<Route path="account" element={<Account />} />
 								<Route path="devices" element={<Devices />} />
 							</>

@@ -1,6 +1,7 @@
 // Single zustand store for all global state. Async backend logic lives in
 // ./actions.js — this file only holds data and small synchronous UI helpers.
 
+import { v4 as uuid } from "uuid"
 import { create } from "zustand"
 import { session } from "./session"
 
@@ -18,11 +19,12 @@ export const useStore = create((set, get) => ({
 	logs: session.getObject("logs") || [],
 	version: undefined,
 	apiVersion: undefined,
+	timezone: undefined,
 
 	// --- ui state ---
-	// advanced mode exposes the full configuration surface; defaults to on.
+	// advanced mode exposes the full configuration surface; defaults to off.
 	// Stored in localStorage (not sessionStorage) so it survives restarts.
-	advanced: window.localStorage.getItem("advanced") !== "false",
+	advanced: window.localStorage.getItem("advanced") === "true",
 	setAdvanced: (advanced) => {
 		window.localStorage.setItem("advanced", String(advanced))
 		set({ advanced })
@@ -81,7 +83,7 @@ export const useStore = create((set, get) => ({
 }))
 
 const pushToast = (set, type, msg) => {
-	const id = crypto.randomUUID()
+	const id = uuid()
 	set((s) => ({ toasts: [...s.toasts, { id, type, msg }] }))
 	setTimeout(() => useStore.getState().removeToast(id), 3000)
 }

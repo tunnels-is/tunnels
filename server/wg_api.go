@@ -185,7 +185,9 @@ func API_WGConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if d.UserID != user.ID {
+	// d == nil means no device is registered for this pubkey yet — return the
+	// server config with an empty WireGuardIP so the client auto-creates one.
+	if d != nil && d.UserID != user.ID {
 		senderr(w, 401, "Unauthorized")
 		return
 	}
@@ -196,12 +198,19 @@ func API_WGConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	deviceIP := ""
+	deviceIPv6 := ""
+	if d != nil {
+		deviceIP = d.WireGuardIP
+		deviceIPv6 = d.WireGuardIPv6
+	}
+
 	sendObject(w, map[string]string{
 		"WireGuardPubKey":  server.WireGuardPubKey,
 		"WireGuardPort":    strconv.Itoa(server.WireGuardPort),
 		"ServerIP":         server.IP,
-		"WireGuardIP":      d.WireGuardIP,
-		"WireGuardIPv6":    d.WireGuardIPv6,
+		"WireGuardIP":      deviceIP,
+		"WireGuardIPv6":    deviceIPv6,
 		"WireGuardSubnet":  server.WireGuardSubnet,
 		"WireGuardSubnet6": server.WireGuardSubnet6,
 	})

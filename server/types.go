@@ -194,6 +194,12 @@ type FORM_GET_SERVERS struct {
 	StartIndex  int
 }
 
+type FORM_GET_SERVERS_BY_COUNTRY struct {
+	DeviceToken string    `json:"DeviceToken"`
+	UID         uuid.UUID `json:"UID"`
+	Country     string
+}
+
 type USER_UPDATE_SUB_FORM struct {
 	Email       string
 	DeviceToken string
