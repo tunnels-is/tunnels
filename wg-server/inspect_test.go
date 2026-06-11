@@ -124,6 +124,7 @@ func newTestInspector(t *testing.T) *inspectingTUN {
 	insp, err := newInspectingTUN(nil, NewACLStore(), &Config{
 		WireGuardSubnet:  "10.0.0.0/24",
 		WireGuardSubnet6: "fd00::/64",
+		EnableFirewall:   true,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -131,11 +132,66 @@ func newTestInspector(t *testing.T) *inspectingTUN {
 	return insp
 }
 
-func TestAllow_DefaultOpenForPeerToPeer(t *testing.T) {
+func newTestInspectorNoFirewall(t *testing.T) *inspectingTUN {
+	t.Helper()
+	insp, err := newInspectingTUN(nil, NewACLStore(), &Config{
+		WireGuardSubnet:  "10.0.0.0/24",
+		WireGuardSubnet6: "fd00::/64",
+		EnableFirewall:   false,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return insp
+}
+
+func TestAllow_DefaultDenyForPeerToPeer(t *testing.T) {
 	insp := newTestInspector(t)
 	pkt := buildIPv4UDP(t, "10.0.0.5", "10.0.0.10", 1, 2, nil)
-	if !insp.allow(pkt) {
-		t.Fatal("no policy => must allow")
+	if insp.allow(pkt) {
+		t.Fatal("no policy => peer-to-peer must be denied")
+	}
+}
+
+func TestAllow_ServerIPUnreachableByPeers(t *testing.T) {
+	insp := newTestInspector(t)
+	// Peers must never reach the server's own WG IP — not even with an ACL
+	// entry. Control packets are consumed by handleControl before allow runs.
+	insp.acl.Set(insp.serverIPv4, []netip.Addr{mustAddr(t, "10.0.0.5")})
+	toServer := buildIPv4UDP(t, "10.0.0.5", insp.serverIPv4.String(), 1, 2, nil)
+	if insp.allow(toServer) {
+		t.Fatal("traffic to server WG IP must be dropped")
+	}
+	toServer6 := buildIPv6UDP(t, "fd00::5", insp.serverIPv6.String(), 1, 2, nil)
+	if insp.allow(toServer6) {
+		t.Fatal("v6 traffic to server WG IP must be dropped")
+	}
+}
+
+func TestAllow_FirewallDisabled(t *testing.T) {
+	insp := newTestInspectorNoFirewall(t)
+	// With the firewall off, peer-to-peer passes without any ACL policy...
+	p2p := buildIPv4UDP(t, "10.0.0.5", "10.0.0.10", 1, 2, nil)
+	if !insp.allow(p2p) {
+		t.Fatal("firewall disabled => peer-to-peer must pass")
+	}
+	// ...but the server's WG IP stays unreachable.
+	toServer := buildIPv4UDP(t, "10.0.0.5", insp.serverIPv4.String(), 1, 2, nil)
+	if insp.allow(toServer) {
+		t.Fatal("server WG IP must be blocked even with firewall disabled")
+	}
+	toServer6 := buildIPv6UDP(t, "fd00::5", insp.serverIPv6.String(), 1, 2, nil)
+	if insp.allow(toServer6) {
+		t.Fatal("v6 server WG IP must be blocked even with firewall disabled")
+	}
+}
+
+func TestAllow_ServerOriginatedPasses(t *testing.T) {
+	insp := newTestInspector(t)
+	// Server-originated traffic (e.g. ICMP errors) passes without an ACL entry.
+	fromServer := buildIPv4UDP(t, insp.serverIPv4.String(), "10.0.0.5", 1, 2, nil)
+	if !insp.allow(fromServer) {
+		t.Fatal("traffic from server WG IP must not be filtered")
 	}
 }
 
@@ -241,7 +297,7 @@ func TestHandleControl_SrcOutsideWGSubnet(t *testing.T) {
 	if !insp.handleControl(pkt) {
 		t.Fatal("matching dst+port should be consumed even if src is invalid")
 	}
-	if !insp.acl.Allowed(mustAddr(t, "10.0.0.99"), mustAddr(t, "8.8.8.8")) {
+	if len(insp.acl.Snapshot()) != 0 {
 		t.Fatal("ACL must not have been written for an outside-subnet src")
 	}
 }
@@ -253,7 +309,7 @@ func TestHandleControl_BadJSON(t *testing.T) {
 		t.Fatal("malformed payload should still be consumed (not forwarded)")
 	}
 	// ACL unchanged — no policy stored for src.
-	if !insp.acl.Allowed(mustAddr(t, "10.0.0.99"), mustAddr(t, "10.0.0.5")) {
+	if len(insp.acl.Snapshot()) != 0 {
 		t.Fatal("no policy should be stored after a bad payload")
 	}
 }
