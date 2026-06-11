@@ -20,19 +20,22 @@ const (
 	protoUDP    byte = 17
 )
 
-// inspectingTUN sits between wireguard-go and the kernel TUN device.
+// inspectingTUN sits between wireguard-go and the kernel TUN device. It is
+// always installed, regardless of the EnableFirewall setting.
+//
 // On Write (decrypted peer packets entering the kernel) it:
 //   - consumes ACL-control UDP packets addressed to the server's WG IP,
-//   - drops peer-to-peer packets disallowed by ACL,
+//   - drops any other packet addressed to the server's WG IP,
+//   - drops peer-to-peer packets disallowed by ACL (firewall enabled only),
 //   - passes everything else through.
 //
-// On Read (kernel packets leaving toward WG for encryption) it drops
-// peer-to-peer packets disallowed by ACL. This catches cross-server
-// peer-to-peer traffic that arrives via the InternetIface and is routed
-// onto the WG interface.
+// On Read (kernel packets leaving toward WG for encryption) it applies the
+// same filtering. This catches cross-server peer-to-peer traffic that
+// arrives via the InternetIface and is routed onto the WG interface.
 type inspectingTUN struct {
 	tun.Device
 	acl        *ACLStore
+	firewall   bool // when false, peer-to-peer traffic is not ACL-checked
 	subnet4    netip.Prefix
 	subnet6    netip.Prefix
 	serverIPv4 netip.Addr
@@ -40,7 +43,7 @@ type inspectingTUN struct {
 }
 
 func newInspectingTUN(inner tun.Device, acl *ACLStore, cfg *Config) (*inspectingTUN, error) {
-	t := &inspectingTUN{Device: inner, acl: acl}
+	t := &inspectingTUN{Device: inner, acl: acl, firewall: cfg.EnableFirewall}
 
 	if cfg.WireGuardSubnet != "" {
 		p, err := netip.ParsePrefix(cfg.WireGuardSubnet)
@@ -103,9 +106,20 @@ func (t *inspectingTUN) File() *os.File {
 	return t.Device.File()
 }
 
-// allow returns true if pkt should be forwarded. It only filters
-// peer-to-peer traffic (both endpoints inside a WG subnet). All other
-// traffic (egress to internet, server-originated, malformed) passes through.
+// allow returns true if pkt should be forwarded. It only filters traffic
+// where both endpoints are inside a WG subnet. All other traffic (egress
+// to internet, malformed) passes through.
+//
+// The server's own WG IP is never reachable by peers — this holds whether
+// or not the firewall is enabled. The only packets a peer may address to
+// it are ACL control messages, which handleControl consumes before allow
+// runs. Server-originated traffic (ICMP errors for PMTU discovery, etc.)
+// still passes.
+//
+// Peer-to-peer traffic is only ACL-checked when the firewall is enabled,
+// and is then default-deny: a peer must announce an allowlist via the
+// control port before any other peer can reach it. With the firewall
+// disabled, peer-to-peer traffic passes freely.
 func (t *inspectingTUN) allow(pkt []byte) bool {
 	src, dst, _, _, ok := parseIPHeader(pkt)
 	if !ok {
@@ -114,7 +128,20 @@ func (t *inspectingTUN) allow(pkt []byte) bool {
 	if !t.inWGSubnet(src) || !t.inWGSubnet(dst) {
 		return true
 	}
+	if t.isServerIP(dst) {
+		return false
+	}
+	if t.isServerIP(src) {
+		return true
+	}
+	if !t.firewall {
+		return true
+	}
 	return t.acl.Allowed(src, dst)
+}
+
+func (t *inspectingTUN) isServerIP(a netip.Addr) bool {
+	return a == t.serverIPv4 || a == t.serverIPv6
 }
 
 // handleControl returns true if pkt was a control message that we consumed.

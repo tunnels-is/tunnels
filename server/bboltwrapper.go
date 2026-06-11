@@ -683,7 +683,7 @@ func BBolt_UpdateServer(S *types.Server) (*types.Server, error) {
 		SS.WireGuardSubnet = S.WireGuardSubnet
 		SS.WireGuardSubnet6 = S.WireGuardSubnet6
 		SS.InternetIface = S.InternetIface
-		SS.PacketInspection = S.PacketInspection
+		SS.EnableFirewall = S.EnableFirewall
 		SS.InsecureSkipVerify = S.InsecureSkipVerify
 
 		if S.APIKey != "" && S.APIKey != oldAPIKey {

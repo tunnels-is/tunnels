@@ -15,12 +15,12 @@ func mustAddr(t *testing.T, s string) netip.Addr {
 	return a
 }
 
-func TestACL_DefaultOpen(t *testing.T) {
+func TestACL_DefaultDeny(t *testing.T) {
 	s := NewACLStore()
 	dst := mustAddr(t, "10.0.0.5")
 	src := mustAddr(t, "10.0.0.10")
-	if !s.Allowed(src, dst) {
-		t.Fatal("no policy => default open")
+	if s.Allowed(src, dst) {
+		t.Fatal("no policy => default deny")
 	}
 }
 
@@ -71,13 +71,13 @@ func TestACL_Clear(t *testing.T) {
 	s := NewACLStore()
 	dst := mustAddr(t, "10.0.0.5")
 	src := mustAddr(t, "10.0.0.10")
-	s.Set(dst, nil) // total isolation
-	if s.Allowed(src, dst) {
-		t.Fatal("setup: should be denied")
+	s.Set(dst, []netip.Addr{src})
+	if !s.Allowed(src, dst) {
+		t.Fatal("setup: should be allowed")
 	}
 	s.Clear(dst)
-	if !s.Allowed(src, dst) {
-		t.Fatal("clear should revert to default-open")
+	if s.Allowed(src, dst) {
+		t.Fatal("clear should revert to default-deny")
 	}
 }
 
@@ -93,8 +93,8 @@ func TestACL_PerDestinationIndependent(t *testing.T) {
 	if !s.Allowed(x, dstA) {
 		t.Fatal("dstA should allow x")
 	}
-	if !s.Allowed(x, dstB) {
-		t.Fatal("dstB should default-open")
+	if s.Allowed(x, dstB) {
+		t.Fatal("dstB has no policy and should default-deny")
 	}
 	// Random src should be denied for dstA.
 	if s.Allowed(mustAddr(t, "10.0.0.99"), dstA) {

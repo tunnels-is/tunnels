@@ -10,10 +10,8 @@ const FEATURE_TOGGLES = [
 	{ key: "LocalhostNat", label: "Localhost NAT" },
 	{ key: "AutoReconnect", label: "Auto Reconnect" },
 	{ key: "AutoConnect", label: "Auto Connect" },
-	{ key: "RequestVPNPorts", label: "VPN Ports" },
 	{ key: "KillSwitch", label: "Kill Switch", warn: true },
 	{ key: "EnableDefaultRoute", label: "Default Route" },
-	{ key: "DisableFirewall", label: "Disable FW", warn: true },
 ]
 
 const Section = ({ title, children, defaultOpen = true }) => {
