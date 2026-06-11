@@ -21,7 +21,7 @@ function Modal({ title, onClose, children }) {
 
 const inputClass = "w-full bg-[#fdfcf8] border border-[#e7e3d7] rounded px-3 py-1.5 text-[13px] text-[#0a0a0a] placeholder-[#a3a3a3] focus:outline-none focus:border-[#0a0a0a]";
 
-const emptyForm = () => ({ Tag: '', IP: '', Port: '443', Country: '', WireGuardSubnet: '', WireGuardSubnet6: '', WireGuardPort: 51820 });
+const emptyForm = () => ({ Tag: '', IP: '', Port: '443', Country: '', WireGuardSubnet: '', WireGuardSubnet6: '', WireGuardPort: 51820, EnableFirewall: true });
 
 export default function Servers() {
   const navigate = useNavigate();
@@ -82,7 +82,10 @@ export default function Servers() {
     }
   };
 
-  const set = (k) => (e) => setCreateForm((f) => ({ ...f, [k]: e.target.value }));
+  const set = (k) => (e) => {
+    const val = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
+    setCreateForm((f) => ({ ...f, [k]: val }));
+  };
 
   return (
     <div>
@@ -106,8 +109,8 @@ export default function Servers() {
       {error && <p className="text-[12px] text-[#dc2626] mb-3">{error}</p>}
 
       <div className="bg-white border border-[#e7e3d7] rounded-lg overflow-hidden card-shadow">
-        <div className="grid grid-cols-[1fr_120px_60px_90px_90px_120px_160px] gap-4 px-4 py-2 border-b border-[#e7e3d7] bg-[#ffffff]">
-          {['Tag', 'IP', 'Port', 'WG Iface', 'Net Iface', 'WG Subnet', 'WG Pub Key'].map((h) => (
+        <div className="grid grid-cols-[1fr_120px_60px_90px_90px_120px_70px_160px] gap-4 px-4 py-2 border-b border-[#e7e3d7] bg-[#ffffff]">
+          {['Tag', 'IP', 'Port', 'WG Iface', 'Net Iface', 'WG Subnet', 'Firewall', 'WG Pub Key'].map((h) => (
             <span key={h} className="text-[10px] text-[#a3a3a3] uppercase tracking-wider">{h}</span>
           ))}
         </div>
@@ -120,7 +123,7 @@ export default function Servers() {
           <div
             key={s._id}
             onClick={() => navigate(`/servers/${s._id}`, { state: { server: s } })}
-            className="grid grid-cols-[1fr_120px_60px_90px_90px_120px_160px] gap-4 px-4 py-2.5 border-b border-[#e7e3d7]/50 hover:bg-black/[0.03] cursor-pointer items-center"
+            className="grid grid-cols-[1fr_120px_60px_90px_90px_120px_70px_160px] gap-4 px-4 py-2.5 border-b border-[#e7e3d7]/50 hover:bg-black/[0.03] cursor-pointer items-center"
           >
             <span className="text-[13px] text-[#0a0a0a] truncate">{s.Tag}</span>
             <span className="text-[12px] text-[#525252] font-mono truncate">{s.IP}</span>
@@ -128,6 +131,9 @@ export default function Servers() {
             <span className="text-[12px] text-[#525252] font-mono truncate">{s.WireGuardIface || '—'}</span>
             <span className="text-[12px] text-[#525252] font-mono truncate">{s.InternetIface || '—'}</span>
             <span className="text-[11px] text-[#a3a3a3] font-mono truncate">{s.WireGuardSubnet || '—'}</span>
+            <span className={`text-[12px] ${s.EnableFirewall ? 'text-[#15803d]' : 'text-[#a3a3a3]'}`}>
+              {s.EnableFirewall ? 'On' : 'Off'}
+            </span>
             <span className="text-[11px] text-[#a3a3a3] font-mono truncate">
               {s.WireGuardPubKey ? s.WireGuardPubKey.slice(0, 16) + '…' : '—'}
             </span>
@@ -189,6 +195,13 @@ export default function Servers() {
             <div>
               <label className="block text-[11px] text-[#a3a3a3] uppercase tracking-wider mb-1">WireGuard Port</label>
               <input type="number" className={inputClass} value={createForm.WireGuardPort} onChange={set('WireGuardPort')} />
+            </div>
+            <div>
+              <label className="block text-[11px] text-[#a3a3a3] uppercase tracking-wider mb-1">Firewall</label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={!!createForm.EnableFirewall} onChange={set('EnableFirewall')} className="accent-[#1d4ed8]" />
+                <span className="text-[12px] text-[#525252]">{createForm.EnableFirewall ? 'Enabled' : 'Disabled'}</span>
+              </label>
             </div>
             {createError && <p className="text-[12px] text-[#dc2626]">{createError}</p>}
             <div className="flex justify-end gap-2 pt-2">
