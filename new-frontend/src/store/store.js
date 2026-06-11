@@ -20,10 +20,11 @@ export const useStore = create((set, get) => ({
 	apiVersion: undefined,
 
 	// --- ui state ---
-	// advanced mode exposes the full configuration surface; defaults to on
-	advanced: session.get("advanced") !== "false",
+	// advanced mode exposes the full configuration surface; defaults to on.
+	// Stored in localStorage (not sessionStorage) so it survives restarts.
+	advanced: window.localStorage.getItem("advanced") !== "false",
 	setAdvanced: (advanced) => {
-		session.set("advanced", String(advanced))
+		window.localStorage.setItem("advanced", String(advanced))
 		set({ advanced })
 	},
 	loading: null, // { msg }

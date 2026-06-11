@@ -23,6 +23,7 @@ const Tunnels = () => {
 	const activeTunnels = useStore((s) => s.activeTunnels)
 	const servers = useStore((s) => s.servers)
 	const askConfirm = useStore((s) => s.askConfirm)
+	const advanced = useStore((s) => s.advanced)
 
 	const [editTunnel, setEditTunnel] = useState(null)
 	const [dialogOpen, setDialogOpen] = useState(false)
@@ -37,6 +38,16 @@ const Tunnels = () => {
 		() => Object.fromEntries((activeTunnels || []).map((at) => [at.CR?.Tag, at])),
 		[activeTunnels],
 	)
+
+	if (!advanced) {
+		return (
+			<Page>
+				<div className="flex h-40 items-center justify-center text-[13px] opacity-50">
+					Enable Advanced mode in Settings to manage tunnels.
+				</div>
+			</Page>
+		)
+	}
 
 	return (
 		<Page>
