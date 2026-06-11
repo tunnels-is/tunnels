@@ -13,7 +13,12 @@ const TIME_RANGES = [
 ]
 
 // chart series palette — theme red first, then distinguishable neutrals/accents
-const TUNNEL_COLORS = ["#d82e2e", "#737373", "#f59e0b", "#22c55e", "#a855f7", "#ec4899", "#84cc16", "#14b8a6"]
+// chart series palette — the active theme's primary color first, then
+// distinguishable neutrals/accents
+const seriesColors = () => {
+	const primary = getComputedStyle(document.documentElement).getPropertyValue("--color-primary").trim() || "#d82e2e"
+	return [primary, "#737373", "#f59e0b", "#22c55e", "#a855f7", "#ec4899", "#84cc16", "#14b8a6"]
+}
 
 const formatBytes = (bytes) => {
 	if (bytes === 0) return "0 B"
@@ -133,8 +138,10 @@ const MultiGraph = ({ series, dataKey, rangeSeconds, height = 170 }) => {
 			values.forEach((_, i) => ctx.lineTo(pointX(i), pointY(i)))
 			ctx.lineTo(pad.left + graphWidth, pad.top + graphHeight)
 			ctx.closePath()
-			ctx.fillStyle = s.color + "14"
+			ctx.globalAlpha = 0.08
+			ctx.fillStyle = s.color
 			ctx.fill()
+			ctx.globalAlpha = 1
 
 			ctx.beginPath()
 			values.forEach((_, i) => (i === 0 ? ctx.moveTo(pointX(i), pointY(i)) : ctx.lineTo(pointX(i), pointY(i))))
@@ -199,6 +206,7 @@ const BandwidthCharts = () => {
 	const tunnels = activeTunnels || []
 
 	const { series, totalSamples } = useMemo(() => {
+		const colors = seriesColors()
 		const out = []
 		let samples = 0
 		tunnels.forEach((tun, idx) => {
@@ -210,7 +218,7 @@ const BandwidthCharts = () => {
 				id: tun.ID,
 				data: aggregateRecords(filtered, range.seconds),
 				rawData: filtered,
-				color: TUNNEL_COLORS[idx % TUNNEL_COLORS.length],
+				color: colors[idx % colors.length],
 				label: tun.CR?.Tag || tun.ID?.slice(0, 8),
 			})
 		})
@@ -237,7 +245,8 @@ const BandwidthCharts = () => {
 					{tunnels.length > 1 && (
 						<div className="flex items-center gap-1.5">
 							{tunnels.map((tun, idx) => {
-								const color = TUNNEL_COLORS[idx % TUNNEL_COLORS.length]
+								const colors = seriesColors()
+								const color = colors[idx % colors.length]
 								const disabled = disabledTunnels[tun.ID]
 								return (
 									<button
