@@ -7,6 +7,7 @@ const Sidebar = () => {
 	const { pathname } = useLocation()
 	const user = useStore((s) => s.user)
 	const config = useStore((s) => s.config)
+	const advanced = useStore((s) => s.advanced)
 
 	const loggedIn = !!user?.Email || !!user?._id
 	const groups = [
@@ -22,8 +23,8 @@ const Sidebar = () => {
 		{
 			title: "DNS",
 			items: [
-				{ icon: Globe, label: "Settings", route: "dns", show: true },
-				{ icon: BarChart3, label: "Stats", route: "dnsstats", show: true },
+				{ icon: Globe, label: "Settings", route: "dns", show: advanced },
+				{ icon: BarChart3, label: "Stats", route: "dnsstats", show: advanced },
 			],
 		},
 		{
@@ -44,7 +45,9 @@ const Sidebar = () => {
 	return (
 		<div className="group/sidebar fixed top-0 left-0 z-50 flex h-screen w-14 flex-col overflow-hidden border-r border-base-300 bg-base-100 transition-all duration-200 hover:w-52">
 			<div className="flex-1 space-y-3 overflow-y-auto py-3">
-				{groups.map((g) => (
+				{groups
+				.filter((g) => g.items.some((i) => i.show))
+				.map((g) => (
 					<div key={g.title}>
 						{g.title && (
 							<div className="mb-1 overflow-hidden px-5">

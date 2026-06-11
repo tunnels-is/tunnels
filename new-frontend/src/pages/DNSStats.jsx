@@ -9,6 +9,7 @@ const PAGE_SIZE = 50
 
 const DNSStats = () => {
 	const dnsStats = useStore((s) => s.dnsStats)
+	const advanced = useStore((s) => s.advanced)
 	const [tab, setTab] = useState("blocked")
 	const [filter, setFilter] = useState("")
 	const [page, setPage] = useState(0)
@@ -31,6 +32,16 @@ const DNSStats = () => {
 	const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
 	const safePage = Math.min(page, totalPages - 1)
 	const paged = filtered.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE)
+
+	if (!advanced) {
+		return (
+			<Page>
+				<div className="flex h-40 items-center justify-center text-[13px] opacity-50">
+					Enable Advanced mode in Settings to view DNS stats.
+				</div>
+			</Page>
+		)
+	}
 
 	return (
 		<Page>
