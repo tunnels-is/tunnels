@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"math/big"
+	mrand "math/rand/v2"
 	"net/http"
 	"reflect"
 	"slices"
@@ -1062,6 +1063,71 @@ func sanitizeServerForClient(s *types.Server) *types.Server {
 	c := *s
 	c.APIKey = ""
 	return &c
+}
+
+// findServersForUser collects every server the user is allowed to see:
+// ungrouped servers plus servers sharing a group with the user.
+func findServersForUser(user *User, offset int64) ([]*types.Server, error) {
+	servers, err := DB_FindServersWithoutGroups(10000, offset)
+	if err != nil {
+		return nil, err
+	}
+	if len(user.Groups) > 0 {
+		grouped, err := DB_FindServersByGroups(user.Groups, 10000, offset)
+		if err != nil {
+			return nil, err
+		}
+		servers = append(servers, grouped...)
+	}
+	return servers, nil
+}
+
+// API_ServersForUserByCountry returns up to 10 randomly picked servers
+// matching the given country code, for latency probing on the client.
+func API_ServersForUserByCountry(w http.ResponseWriter, r *http.Request) {
+	defer BasicRecover()
+	F := new(FORM_GET_SERVERS_BY_COUNTRY)
+	err := decodeBody(r, F)
+	if err != nil {
+		senderr(w, 400, "Invalid request body", slog.Any("error", err))
+		return
+	}
+	if F.Country == "" {
+		senderr(w, 400, "Country is required")
+		return
+	}
+
+	user := getUserFromContext(r.Context())
+	if user == nil {
+		senderr(w, 401, "Unauthorized")
+		return
+	}
+
+	all, err := findServersForUser(user, 0)
+	if err != nil {
+		senderr(w, 500, "Unknown error, please try again in a moment")
+		return
+	}
+
+	matched := make([]*types.Server, 0)
+	for _, s := range all {
+		if strings.EqualFold(s.Country, F.Country) {
+			matched = append(matched, s)
+		}
+	}
+
+	mrand.Shuffle(len(matched), func(i, j int) {
+		matched[i], matched[j] = matched[j], matched[i]
+	})
+	if len(matched) > 10 {
+		matched = matched[:10]
+	}
+
+	for i, s := range matched {
+		matched[i] = sanitizeServerForClient(s)
+	}
+
+	sendObject(w, matched)
 }
 
 func API_ServersForUser(w http.ResponseWriter, r *http.Request) {

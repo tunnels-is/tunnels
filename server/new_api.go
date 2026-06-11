@@ -54,6 +54,7 @@ func launchAPIServer() {
 	mux.Handle("POST /client/device/delete", clientMW(API_ClientDeviceDelete))
 	mux.Handle("POST /client/device", clientMW(API_DeviceGet))
 	mux.Handle("POST /client/servers", clientMW(API_ServersForUser))
+	mux.Handle("POST /client/servers/country", clientMW(API_ServersForUserByCountry))
 	mux.Handle("POST /client/server", clientMW(API_ServerGet))
 	mux.Handle("GET /client/wg/config", clientMW(API_WGConfig))
 

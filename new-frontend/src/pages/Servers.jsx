@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight, Copy, Search, ZapOff } from "lucide-react"
 import "flag-icons/css/flag-icons.min.css"
 import { Card, Page, Toolbar } from "@/components/ui"
 import { connect, disconnect, fetchServers, fetchState } from "@/store/actions"
-import { countryName } from "@/lib/countries"
+import { countryName, normalizeCountryCode } from "@/lib/countries"
 import { useStore } from "@/store/store"
 
 const PAGE_SIZE = 20
@@ -150,7 +150,7 @@ const Servers = () => {
 												<div className="flex items-center gap-2 text-xs opacity-70">
 													{server.Country && (
 														<span
-															className={`fi fi-${server.Country.toLowerCase()} rounded-[2px]`}
+															className={`fi fi-${normalizeCountryCode(server.Country).toLowerCase()} rounded-[2px]`}
 															title={countryName(server.Country)}
 														/>
 													)}
@@ -227,7 +227,7 @@ const Servers = () => {
 								</div>
 								<div className="mb-1 flex items-center gap-2 text-xs opacity-70">
 									{server.Country && (
-										<span className={`fi fi-${server.Country.toLowerCase()} rounded-[2px]`} title={countryName(server.Country)} />
+										<span className={`fi fi-${normalizeCountryCode(server.Country).toLowerCase()} rounded-[2px]`} title={countryName(server.Country)} />
 									)}
 									{countryName(server.Country) || "—"}
 								</div>
