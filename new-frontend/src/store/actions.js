@@ -82,7 +82,7 @@ export const fetchState = async () => {
 			const users = await loadUsers()
 			if (users?.length === 1) {
 				store().setUser(users[0])
-				window.location.hash = "#/tunnels"
+				window.location.hash = "#/servers"
 			} else if (users?.length > 0) {
 				useStore.setState({ users })
 				window.location.hash = "#/accounts"
@@ -270,16 +270,6 @@ export const fetchServers = async () => {
 		store().setServers([])
 		store().notifyError("Unable to find servers")
 	}
-}
-
-export const createServer = async (form) => {
-	const resp = await controller("/client/server/create", { Server: form })
-	if (resp.status === 200 && resp.data) {
-		store().setServers([...store().servers, resp.data])
-		store().notifySuccess("Server created")
-		return true
-	}
-	return false
 }
 
 // --------------------------------------------------------------- config ---

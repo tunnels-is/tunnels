@@ -16,6 +16,7 @@ import DNS from "@/pages/DNS"
 import DNSStats from "@/pages/DNSStats"
 import Login from "@/pages/Login"
 import Logs from "@/pages/Logs"
+import Servers from "@/pages/Servers"
 import Settings from "@/pages/Settings"
 import Support from "@/pages/Support"
 import Tunnels from "@/pages/Tunnels"
@@ -50,8 +51,9 @@ const App = () => {
 							</>
 						) : (
 							<>
-								<Route path="/" element={<Tunnels />} />
-								<Route path="*" element={<Tunnels />} />
+								<Route path="/" element={<Servers />} />
+								<Route path="*" element={<Servers />} />
+								<Route path="servers" element={<Servers />} />
 								<Route path="tunnels" element={<Tunnels />} />
 								<Route path="connections" element={<Connections />} />
 								<Route path="bandwidth" element={<Bandwidth />} />
