@@ -42,7 +42,13 @@ type Config struct {
 	Silent   bool
 
 	InsecureSkipVerify bool
-	PacketInspection   bool
+
+	// EnableFirewall enables the peer-to-peer firewall on the WG interface.
+	// When true, all peer-to-peer ingress is denied by default and peers must
+	// announce their allowlist via the ACL control port to accept traffic.
+	// Independent of this setting, the packet inspector is always active and
+	// blocks all peer traffic to the server's own WG IP.
+	EnableFirewall bool
 
 	HandshakeBufferSize int
 	HandshakeRatePerIP  int
@@ -177,7 +183,7 @@ func FetchConfig(controllerURL, apiKey, configPath string, insecureSkipVerify bo
 		WireGuardSubnet6:   r.WireGuardSubnet6,
 		WireGuardIface:     r.WireGuardIface,
 		InternetIface:      r.InternetIface,
-		PacketInspection:   r.PacketInspection,
+		EnableFirewall:     r.EnableFirewall,
 		InsecureSkipVerify: insecureSkipVerify,
 	}
 

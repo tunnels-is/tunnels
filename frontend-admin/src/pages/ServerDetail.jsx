@@ -64,7 +64,7 @@ export default function ServerDetail() {
       WireGuardPort: server.WireGuardPort || 51820,
       WireGuardIface: server.WireGuardIface || 'wg0',
       InternetIface: server.InternetIface || '',
-      PacketInspection: !!server.PacketInspection,
+      EnableFirewall: !!server.EnableFirewall,
       InsecureSkipVerify: !!server.InsecureSkipVerify,
     });
     setError('');
@@ -319,15 +319,15 @@ export default function ServerDetail() {
               <span className="font-mono text-[12px]">{server.InternetIface || '—'}</span>
             )}
           </Row>
-          <Row label="Packet Inspect">
+          <Row label="Firewall">
             {editing ? (
               <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" checked={!!form.PacketInspection} onChange={set('PacketInspection')} className="accent-[#1d4ed8]" />
-                <span className="text-[12px] text-[#525252]">{form.PacketInspection ? 'Yes' : 'No'}</span>
+                <input type="checkbox" checked={!!form.EnableFirewall} onChange={set('EnableFirewall')} className="accent-[#1d4ed8]" />
+                <span className="text-[12px] text-[#525252]">{form.EnableFirewall ? 'Yes' : 'No'}</span>
               </label>
             ) : (
-              <span className={server.PacketInspection ? 'text-[#15803d]' : 'text-[#a3a3a3]'}>
-                {server.PacketInspection ? 'Yes' : 'No'}
+              <span className={server.EnableFirewall ? 'text-[#15803d]' : 'text-[#a3a3a3]'}>
+                {server.EnableFirewall ? 'Yes' : 'No'}
               </span>
             )}
           </Row>

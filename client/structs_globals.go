@@ -154,6 +154,11 @@ type TunnelMETA struct {
 	Routes             []*types.Route
 	BlockedPorts       []uint16
 
+	// AllowedHosts is the firewall allowlist announced to the wg-server: the
+	// WireGuard peer IPs permitted to send traffic to this device. Relevant
+	// when the server runs with EnableFirewall (default-deny peer-to-peer).
+	AllowedHosts []string
+
 	// WireGuard: persistent base64 Curve25519 private key for this device.
 	// Generated on first use and reused across sessions so the server can
 	// keep a stable peer entry (Device.WireGuardKey).

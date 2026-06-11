@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/netip"
 	"regexp"
 	"strconv"
 	"strings"
@@ -189,6 +190,12 @@ func validateTunnelMeta(tun *TunnelMETA, oldTag string) (err []string) {
 	errx := ValidateAdapterID(tun)
 	if errx != nil {
 		err = append(err, errx.Error())
+	}
+
+	for _, h := range tun.AllowedHosts {
+		if _, errp := netip.ParseAddr(h); errp != nil {
+			err = append(err, "allowed host must be a valid IP address: "+h)
+		}
 	}
 
 	return

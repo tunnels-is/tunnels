@@ -44,15 +44,19 @@ func setupWireGuard(cfg *Config, logLevel string) error {
 
 	aclStore = NewACLStore()
 
-	tunInterface := tunDev
-	if cfg.PacketInspection {
-		insp, err := newInspectingTUN(tunDev, aclStore, cfg)
-		if err != nil {
-			return fmt.Errorf("inspector setup: %w", err)
-		}
-		tunInterface = insp
-		INFO("packet inspection enabled on ", cfg.WireGuardIface,
-			" — peer ACLs active, control port udp/", aclControlPort)
+	// The inspector is always installed: it blocks all peer traffic to the
+	// server's own WG IP and consumes ACL control packets. The peer-to-peer
+	// firewall on top of it is gated by cfg.EnableFirewall.
+	tunInterface, err := newInspectingTUN(tunDev, aclStore, cfg)
+	if err != nil {
+		return fmt.Errorf("inspector setup: %w", err)
+	}
+	if cfg.EnableFirewall {
+		INFO("firewall enabled on ", cfg.WireGuardIface,
+			" — peer-to-peer ingress denied by default, control port udp/", aclControlPort)
+	} else {
+		INFO("firewall disabled on ", cfg.WireGuardIface,
+			" — peer-to-peer traffic unrestricted, server WG IP blocked for peers")
 	}
 
 	if len(cfg.WireGuardPrivKey) != 32 {
