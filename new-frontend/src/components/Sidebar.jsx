@@ -1,5 +1,5 @@
 import { useLocation, useNavigate } from "react-router-dom"
-import { BarChart3, CircleUser, Gauge, Globe, Info, Lock, Logs, Monitor, Network, Settings, Users } from "lucide-react"
+import { BarChart3, CircleUser, Gauge, Globe, Info, Lock, Logs, Monitor, Network, Server, Settings, Users } from "lucide-react"
 import { useStore } from "@/store/store"
 
 const Sidebar = () => {
@@ -15,6 +15,7 @@ const Sidebar = () => {
 			title: "",
 			items: [
 				{ icon: Lock, label: "Login", route: "login", show: !loggedIn },
+				{ icon: Server, label: "Servers", route: "servers", show: loggedIn },
 				{ icon: Network, label: "Tunnels", route: "tunnels", show: loggedIn },
 				{ icon: Monitor, label: "Devices", route: "devices", show: loggedIn },
 				{ icon: Gauge, label: "Bandwidth", route: "bandwidth", show: loggedIn && !!config?.BandwidthGraphs },
@@ -40,7 +41,7 @@ const Sidebar = () => {
 
 	const parts = pathname.split("/")
 	const isActive = (route) =>
-		parts.includes(route) || (parts[1] === "" && (route === "login" || route === "tunnels"))
+		parts.includes(route) || (parts[1] === "" && (route === "login" || route === "servers"))
 
 	return (
 		<div className="group/sidebar fixed top-0 left-0 z-50 flex h-screen w-14 flex-col overflow-hidden border-r border-base-300 bg-base-100 transition-all duration-200 hover:w-52">
