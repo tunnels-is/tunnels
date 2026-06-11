@@ -118,6 +118,7 @@ const usersBucket = "users"
 func main() {
 	mongoURI := flag.String("mongo", "mongodb://root:example@localhost:27017", "MongoDB connection URI")
 	dbPath := flag.String("db", "./tunnels.db", "path to BBolt database file")
+	dupeScan := flag.Bool("dupe", false, "scan MongoDB for duplicate accounts (by email) and exit; no BBolt work is performed")
 	flag.Parse()
 
 	// ── 0. Connect to MongoDB ───────────────────────────────────────
@@ -145,16 +146,35 @@ func main() {
 		log.Fatalf("fetch mongo users: %v", err)
 	}
 	fmt.Printf("found %d user(s) in MongoDB\n", len(mongoUsers))
+
+	if *dupeScan {
+		scanDuplicates(mongoUsers)
+		return
+	}
+
 	if len(mongoUsers) == 0 {
 		fmt.Println("nothing to migrate")
 		return
 	}
 
-	// Build a lookup map keyed by email for the verification step.
-	// (IDs change format during migration, so we match by email.)
+	// Dedupe by email, keeping the first occurrence (iteration order from
+	// Mongo). mongoByEmail doubles as the lookup map for verification.
 	mongoByEmail := make(map[string]*MongoUser, len(mongoUsers))
+	uniqueUsers := make([]MongoUser, 0, len(mongoUsers))
+	skipped := 0
 	for i := range mongoUsers {
-		mongoByEmail[mongoUsers[i].Email] = &mongoUsers[i]
+		email := mongoUsers[i].Email
+		if _, ok := mongoByEmail[email]; ok {
+			skipped++
+			fmt.Printf("  skipping duplicate  email=%q  _id=%s\n", email, mongoUsers[i].ID.Hex())
+			continue
+		}
+		uniqueUsers = append(uniqueUsers, mongoUsers[i])
+		mongoByEmail[email] = &uniqueUsers[len(uniqueUsers)-1]
+	}
+	mongoUsers = uniqueUsers
+	if skipped > 0 {
+		fmt.Printf("deduped: %d duplicate(s) skipped, %d unique user(s) to migrate\n", skipped, len(mongoUsers))
 	}
 
 	// ── 2. Open BBolt and write all users ───────────────────────────
@@ -247,6 +267,33 @@ func main() {
 	}
 
 	fmt.Println("all users migrated and verified successfully")
+}
+
+// scanDuplicates reports any email that appears in more than one MongoDB
+// document. Exits non-zero if duplicates are found.
+func scanDuplicates(users []MongoUser) {
+	byEmail := make(map[string][]primitive.ObjectID, len(users))
+	for i := range users {
+		byEmail[users[i].Email] = append(byEmail[users[i].Email], users[i].ID)
+	}
+
+	dupes := 0
+	for email, ids := range byEmail {
+		if len(ids) < 2 {
+			continue
+		}
+		dupes++
+		fmt.Printf("  DUPLICATE  email=%q  count=%d\n", email, len(ids))
+		for _, id := range ids {
+			fmt.Printf("      _id=%s\n", id.Hex())
+		}
+	}
+
+	if dupes == 0 {
+		fmt.Println("no duplicate accounts found")
+		return
+	}
+	log.Fatalf("found %d duplicated email(s) in MongoDB", dupes)
 }
 
 // fetchAllMongoUsers returns every document in the users.users collection.
