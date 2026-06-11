@@ -26,6 +26,8 @@ const UPDATE_OPTIONS = [
 
 const Settings = () => {
 	const config = useStore((s) => s.config)
+	const advanced = useStore((s) => s.advanced)
+	const setAdvanced = useStore((s) => s.setAdvanced)
 	const state = useStore((s) => s.state)
 	const network = useStore((s) => s.network)
 	const version = useStore((s) => s.version)
@@ -106,6 +108,11 @@ const Settings = () => {
 					</p>
 				</Card>
 
+				<Card title="Advanced" description="Show advanced configuration: API server, updates, network, DNS and system details.">
+					<Toggle label="Advanced mode" checked={advanced} onChange={() => setAdvanced(!advanced)} />
+				</Card>
+
+				{advanced && (
 				<Card
 					className="lg:col-span-2 2xl:col-span-3"
 					title="API server"
@@ -150,6 +157,7 @@ const Settings = () => {
 						</div>
 					)}
 				</Card>
+				)}
 
 				<Card title="Logging" description="Select which event types are captured.">
 					<div className="grid grid-cols-1 sm:grid-cols-2">
@@ -160,43 +168,51 @@ const Settings = () => {
 					</div>
 				</Card>
 
-				<Card title="Updates" description="Behaviour when a new build of Tunnels is available.">
-					<div className="grid grid-cols-1 sm:grid-cols-2">
-						{UPDATE_OPTIONS.map((opt) => (
-							<Toggle key={opt.key} label={opt.label} checked={!!config?.[opt.key]} onChange={() => toggleConfigKey(opt.key)} />
-						))}
-					</div>
-				</Card>
-
-				<Card title="DNS" description="The local DNS resolver is enabled by default.">
-					<Toggle label="Disable DNS" checked={!!config?.DisableDNS} onChange={() => toggleConfigKey("DisableDNS")} />
-				</Card>
-
-				<Card title="Network" description="Detected default network interface (read-only).">
-					<InfoRow label="Interface" value={network?.DefaultInterfaceName || "unknown"} />
-					<InfoRow label="IP Address" value={network?.DefaultInterface || "unknown"} mono />
-					<InfoRow label="Interface ID" value={network?.DefaultInterfaceID ?? "unknown"} mono />
-					<InfoRow label="Gateway" value={network?.DefaultGateway || "unknown"} mono />
-				</Card>
-
-				<Card
-					className="lg:col-span-2 2xl:col-span-3"
-					title="System"
-					description="Paths, files and privileges this app is running with."
-				>
-					<div className="grid grid-cols-1 gap-x-8 md:grid-cols-2">
-						<div>
-							<InfoRow label="Base Path" value={basePath || "unknown"} mono />
-							<InfoRow label="Config" value={state?.ConfigFileName || "unknown"} mono />
-							<InfoRow label="Log Path" value={logPath || "Default"} mono />
+				{advanced && (
+					<Card title="Updates" description="Behaviour when a new build of Tunnels is available.">
+						<div className="grid grid-cols-1 sm:grid-cols-2">
+							{UPDATE_OPTIONS.map((opt) => (
+								<Toggle key={opt.key} label={opt.label} checked={!!config?.[opt.key]} onChange={() => toggleConfigKey(opt.key)} />
+							))}
 						</div>
-						<div>
-							<InfoRow label="Log File" value={logFileName || "unknown"} mono />
-							<InfoRow label="Admin" value={state?.IsAdmin ? "Yes" : "No"} />
-							<InfoRow label="API Version" value={apiVersion || "unknown"} mono />
+					</Card>
+				)}
+
+				{advanced && (
+					<Card title="DNS" description="The local DNS resolver is enabled by default.">
+						<Toggle label="Disable DNS" checked={!!config?.DisableDNS} onChange={() => toggleConfigKey("DisableDNS")} />
+					</Card>
+				)}
+
+				{advanced && (
+					<Card title="Network" description="Detected default network interface (read-only).">
+						<InfoRow label="Interface" value={network?.DefaultInterfaceName || "unknown"} />
+						<InfoRow label="IP Address" value={network?.DefaultInterface || "unknown"} mono />
+						<InfoRow label="Interface ID" value={network?.DefaultInterfaceID ?? "unknown"} mono />
+						<InfoRow label="Gateway" value={network?.DefaultGateway || "unknown"} mono />
+					</Card>
+				)}
+
+				{advanced && (
+					<Card
+						className="lg:col-span-2 2xl:col-span-3"
+						title="System"
+						description="Paths, files and privileges this app is running with."
+					>
+						<div className="grid grid-cols-1 gap-x-8 md:grid-cols-2">
+							<div>
+								<InfoRow label="Base Path" value={basePath || "unknown"} mono />
+								<InfoRow label="Config" value={state?.ConfigFileName || "unknown"} mono />
+								<InfoRow label="Log Path" value={logPath || "Default"} mono />
+							</div>
+							<div>
+								<InfoRow label="Log File" value={logFileName || "unknown"} mono />
+								<InfoRow label="Admin" value={state?.IsAdmin ? "Yes" : "No"} />
+								<InfoRow label="API Version" value={apiVersion || "unknown"} mono />
+							</div>
 						</div>
-					</div>
-				</Card>
+					</Card>
+				)}
 			</div>
 		</Page>
 	)
