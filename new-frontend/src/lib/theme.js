@@ -1,16 +1,21 @@
-// Theme switching between the two daisyUI themes. Persisted in sessionStorage
-// and applied as `data-theme` on <html> before React mounts (no flash).
+// Theme switching between the daisyUI themes defined in app.css. Persisted in
+// sessionStorage and applied as `data-theme` on <html> before React mounts.
 
 import { session } from "@/store/session"
 
-export const THEMES = { light: "suzko", dark: "suzko-dark" }
+export const THEMES = [
+	{ value: "suzko", label: "Suzko Light" },
+	{ value: "suzko-dark", label: "Suzko Dark" },
+	{ value: "tunnels", label: "Tunnels Light" },
+	{ value: "tunnels-dark", label: "Tunnels Dark" },
+]
+
+const VALUES = THEMES.map((t) => t.value)
 
 export const getTheme = () => {
 	const stored = session.get("theme")
-	if (stored === THEMES.light || stored === THEMES.dark) return stored
-	return window.matchMedia?.("(prefers-color-scheme: dark)").matches
-		? THEMES.dark
-		: THEMES.light
+	if (VALUES.includes(stored)) return stored
+	return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "suzko-dark" : "suzko"
 }
 
 export const setTheme = (theme) => {

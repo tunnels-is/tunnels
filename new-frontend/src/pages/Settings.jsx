@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { Moon, Pencil, Save, Sun, X } from "lucide-react"
+import { Pencil, Save, X } from "lucide-react"
 import { Card, InfoRow, Page, TextField, Toggle } from "@/components/ui"
 import { fetchState, saveConfig, toggleConfigKey } from "@/store/actions"
 import { THEMES, getTheme, setTheme } from "@/lib/theme"
@@ -85,22 +85,15 @@ const Settings = () => {
 			<div className="grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-3">
 				<Card
 					title="Appearance"
-					description="Switch between the light and dark theme."
+					description="Select a color theme."
 					actions={
-						<div className="join">
-							<button
-								className={"btn join-item btn-sm " + (theme === THEMES.light ? "btn-primary" : "btn-ghost")}
-								onClick={() => changeTheme(THEMES.light)}
-							>
-								<Sun size={12} /> Light
-							</button>
-							<button
-								className={"btn join-item btn-sm " + (theme === THEMES.dark ? "btn-primary" : "btn-ghost")}
-								onClick={() => changeTheme(THEMES.dark)}
-							>
-								<Moon size={12} /> Dark
-							</button>
-						</div>
+						<select className="select select-sm" value={theme} onChange={(e) => changeTheme(e.target.value)}>
+							{THEMES.map((t) => (
+								<option key={t.value} value={t.value}>
+									{t.label}
+								</option>
+							))}
+						</select>
 					}
 				>
 					<p className="text-xs opacity-60">
