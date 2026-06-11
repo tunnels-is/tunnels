@@ -1,0 +1,69 @@
+// Small shared building blocks. Everything visual is daisyUI; these only
+// remove repetition (label + control pairs, page headers, cards, ...).
+
+// The sidebar already tells the user where they are — pages have no titles,
+// only an optional right-aligned action row.
+export const Page = ({ actions, children }) => (
+	<div className="min-h-screen bg-base-200 pl-14">
+		<div className="w-full p-6">
+			{actions && <div className="mb-4 flex flex-wrap items-center justify-end gap-2">{actions}</div>}
+			{children}
+		</div>
+	</div>
+)
+
+export const Card = ({ title, description, actions, children, className = "" }) => (
+	<div className={"card border border-base-300 bg-base-100 " + className}>
+		<div className="card-body gap-0 p-5">
+			{(title || actions) && (
+				<div className="mb-3 flex items-start justify-between gap-3">
+					<div>
+						{title && <h2 className="text-sm font-semibold tracking-tight">{title}</h2>}
+						{description && <p className="mt-0.5 text-[11px] leading-relaxed opacity-50">{description}</p>}
+					</div>
+					{actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
+				</div>
+			)}
+			{children}
+		</div>
+	</div>
+)
+
+export const Field = ({ label, hint, children }) => (
+	<fieldset className="fieldset">
+		<legend className="fieldset-legend text-xs">{label}</legend>
+		{children}
+		{hint && <p className="label text-xs">{hint}</p>}
+	</fieldset>
+)
+
+export const TextField = ({ label, hint, ...props }) => (
+	<Field label={label} hint={hint}>
+		<input className="input input-sm w-full" {...props} />
+	</Field>
+)
+
+export const Toggle = ({ label, checked, onChange, disabled }) => (
+	<label className="label cursor-pointer justify-start gap-3 py-1">
+		<input
+			type="checkbox"
+			className="toggle toggle-primary toggle-sm"
+			checked={!!checked}
+			disabled={disabled}
+			onChange={onChange}
+		/>
+		<span className="label-text text-sm">{label}</span>
+	</label>
+)
+
+export const InfoRow = ({ label, value, mono }) => (
+	<div className="flex items-center justify-between gap-4 border-b border-base-200 py-1.5 text-sm last:border-0">
+		<span className="shrink-0 opacity-60">{label}</span>
+		<span className={"truncate text-right " + (mono ? "font-mono text-xs" : "")}>{value}</span>
+	</div>
+)
+
+// Toolbar row under the page header — controls without a card around them.
+export const Toolbar = ({ children }) => (
+	<div className="mb-4 flex flex-wrap items-center gap-3">{children}</div>
+)
