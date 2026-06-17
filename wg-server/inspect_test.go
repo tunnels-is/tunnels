@@ -121,7 +121,8 @@ func TestParseIPHeader_BadTotalLen(t *testing.T) {
 
 func newTestInspector(t *testing.T) *inspectingTUN {
 	t.Helper()
-	insp, err := newInspectingTUN(nil, NewACLStore(), &Config{
+	setupFW(t, "10.0.0.0/24", "fd00::/64")
+	insp, err := newInspectingTUN(nil, &Config{
 		WireGuardSubnet:  "10.0.0.0/24",
 		WireGuardSubnet6: "fd00::/64",
 		EnableFirewall:   true,
@@ -134,7 +135,8 @@ func newTestInspector(t *testing.T) *inspectingTUN {
 
 func newTestInspectorNoFirewall(t *testing.T) *inspectingTUN {
 	t.Helper()
-	insp, err := newInspectingTUN(nil, NewACLStore(), &Config{
+	setupFW(t, "10.0.0.0/24", "fd00::/64")
+	insp, err := newInspectingTUN(nil, &Config{
 		WireGuardSubnet:  "10.0.0.0/24",
 		WireGuardSubnet6: "fd00::/64",
 		EnableFirewall:   false,
@@ -145,8 +147,21 @@ func newTestInspectorNoFirewall(t *testing.T) *inspectingTUN {
 	return insp
 }
 
+// allowFor installs a resident entry for dst and sets its allowlist.
+func allowFor(t *testing.T, dst string, srcs ...string) {
+	t.Helper()
+	resetPeer(dst)
+	addrs := make([]netip.Addr, len(srcs))
+	for i, s := range srcs {
+		addrs[i] = mustAddr(t, s)
+	}
+	entry(t, dst).setAllowed(addrs)
+}
+
 func TestAllow_DefaultDenyForPeerToPeer(t *testing.T) {
 	insp := newTestInspector(t)
+	resetPeer("10.0.0.5")
+	resetPeer("10.0.0.10")
 	pkt := buildIPv4UDP(t, "10.0.0.5", "10.0.0.10", 1, 2, nil)
 	if insp.allow(pkt) {
 		t.Fatal("no policy => peer-to-peer must be denied")
@@ -155,9 +170,8 @@ func TestAllow_DefaultDenyForPeerToPeer(t *testing.T) {
 
 func TestAllow_ServerIPUnreachableByPeers(t *testing.T) {
 	insp := newTestInspector(t)
-	// Peers must never reach the server's own WG IP — not even with an ACL
-	// entry. Control packets are consumed by handleControl before allow runs.
-	insp.acl.Set(insp.serverIPv4, []netip.Addr{mustAddr(t, "10.0.0.5")})
+	// The server's own WG IP is unconditionally unreachable by peers — the
+	// check runs before any firewall/allowlist logic.
 	toServer := buildIPv4UDP(t, "10.0.0.5", insp.serverIPv4.String(), 1, 2, nil)
 	if insp.allow(toServer) {
 		t.Fatal("traffic to server WG IP must be dropped")
@@ -170,7 +184,7 @@ func TestAllow_ServerIPUnreachableByPeers(t *testing.T) {
 
 func TestAllow_FirewallDisabled(t *testing.T) {
 	insp := newTestInspectorNoFirewall(t)
-	// With the firewall off, peer-to-peer passes without any ACL policy...
+	// With the firewall off, peer-to-peer passes without any policy...
 	p2p := buildIPv4UDP(t, "10.0.0.5", "10.0.0.10", 1, 2, nil)
 	if !insp.allow(p2p) {
 		t.Fatal("firewall disabled => peer-to-peer must pass")
@@ -188,16 +202,16 @@ func TestAllow_FirewallDisabled(t *testing.T) {
 
 func TestAllow_ServerOriginatedPasses(t *testing.T) {
 	insp := newTestInspector(t)
-	// Server-originated traffic (e.g. ICMP errors) passes without an ACL entry.
+	// Server-originated traffic (e.g. ICMP errors) passes without a policy.
 	fromServer := buildIPv4UDP(t, insp.serverIPv4.String(), "10.0.0.5", 1, 2, nil)
 	if !insp.allow(fromServer) {
 		t.Fatal("traffic from server WG IP must not be filtered")
 	}
 }
 
-func TestAllow_DeniesUnlistedSrc(t *testing.T) {
+func TestAllow_AllowlistedSrcPasses(t *testing.T) {
 	insp := newTestInspector(t)
-	insp.acl.Set(mustAddr(t, "10.0.0.10"), []netip.Addr{mustAddr(t, "10.0.0.5")})
+	allowFor(t, "10.0.0.10", "10.0.0.5")
 
 	allowed := buildIPv4UDP(t, "10.0.0.5", "10.0.0.10", 1, 2, nil)
 	denied := buildIPv4UDP(t, "10.0.0.99", "10.0.0.10", 1, 2, nil)
@@ -210,11 +224,41 @@ func TestAllow_DeniesUnlistedSrc(t *testing.T) {
 	}
 }
 
+// The SYN/SYN-ACK scenario: a one-sided allowlist plus connection tracking
+// lets replies flow back without the other peer allowlisting the initiator.
+func TestAllow_ConntrackReturnPath(t *testing.T) {
+	insp := newTestInspector(t)
+	resetPeer("10.0.0.3")               // phone
+	allowFor(t, "10.0.0.2", "10.0.0.3") // laptop allows phone; phone allows nobody
+
+	// SYN phone -> laptop:22 (allowed by laptop's allowlist; opens phone's flow)
+	syn := buildIPv4UDP(t, "10.0.0.3", "10.0.0.2", 40000, 22, nil)
+	if !insp.allow(syn) {
+		t.Fatal("SYN to an allowlisted peer must pass")
+	}
+	// SYN-ACK laptop:22 -> phone:40000 (no allowlist entry on phone; must match
+	// the flow the phone opened)
+	synack := buildIPv4UDP(t, "10.0.0.2", "10.0.0.3", 22, 40000, nil)
+	if !insp.allow(synack) {
+		t.Fatal("reply must be admitted by connection tracking")
+	}
+}
+
+func TestAllow_ConntrackNoUnsolicitedReturn(t *testing.T) {
+	insp := newTestInspector(t)
+	resetPeer("10.0.0.3")               // phone, no allowlist, no prior flow
+	allowFor(t, "10.0.0.2", "10.0.0.3") // laptop allows phone
+
+	// laptop -> phone with no prior phone-initiated flow: must be denied.
+	unsolicited := buildIPv4UDP(t, "10.0.0.2", "10.0.0.3", 22, 40000, nil)
+	if insp.allow(unsolicited) {
+		t.Fatal("unsolicited packet must be denied without a tracked flow")
+	}
+}
+
 func TestAllow_NonPeerToPeerAlwaysPasses(t *testing.T) {
 	insp := newTestInspector(t)
-	// Even with a strict ACL, traffic where one side is outside the WG
-	// subnet is untouched (internet egress, server-originated, etc.).
-	insp.acl.Set(mustAddr(t, "10.0.0.10"), nil) // total isolation
+	allowFor(t, "10.0.0.10") // strict (empty allowlist)
 
 	pkt := buildIPv4UDP(t, "10.0.0.5", "8.8.8.8", 1, 2, nil)
 	if !insp.allow(pkt) {
@@ -225,13 +269,14 @@ func TestAllow_NonPeerToPeerAlwaysPasses(t *testing.T) {
 func TestAllow_MalformedAlwaysPasses(t *testing.T) {
 	insp := newTestInspector(t)
 	if !insp.allow([]byte{0x00, 0x00}) {
-		t.Fatal("malformed packet must not be dropped by ACL")
+		t.Fatal("malformed packet must not be dropped")
 	}
 }
 
 func TestAllow_IPv6(t *testing.T) {
 	insp := newTestInspector(t)
-	insp.acl.Set(mustAddr(t, "fd00::10"), []netip.Addr{mustAddr(t, "fd00::5")})
+	resetPeer("10.0.0.10", "fd00::10")
+	entry(t, "10.0.0.10").setAllowed([]netip.Addr{mustAddr(t, "fd00::5")})
 
 	ok := buildIPv6UDP(t, "fd00::5", "fd00::10", 1, 2, nil)
 	bad := buildIPv6UDP(t, "fd00::99", "fd00::10", 1, 2, nil)
@@ -250,17 +295,18 @@ func TestAllow_IPv6(t *testing.T) {
 
 func TestHandleControl_UpdatesACL(t *testing.T) {
 	insp := newTestInspector(t)
+	resetPeer("10.0.0.5") // announcer must be a connected resident
 	payload := []byte(`{"Allowed":["10.0.0.10","10.0.0.11"]}`)
 	pkt := buildIPv4UDP(t, "10.0.0.5", insp.serverIPv4.String(), 33333, aclControlPort, payload)
 
 	if !insp.handleControl(pkt) {
 		t.Fatal("expected packet to be consumed")
 	}
-	dst := mustAddr(t, "10.0.0.5")
-	if !insp.acl.Allowed(mustAddr(t, "10.0.0.10"), dst) {
+	p := entry(t, "10.0.0.5")
+	if !p.allowedContains(mustAddr(t, "10.0.0.10")) {
 		t.Fatal("10.0.0.10 should be allowed after control message")
 	}
-	if insp.acl.Allowed(mustAddr(t, "10.0.0.99"), dst) {
+	if p.allowedContains(mustAddr(t, "10.0.0.99")) {
 		t.Fatal("non-listed src should be denied after control message")
 	}
 }
@@ -297,42 +343,91 @@ func TestHandleControl_SrcOutsideWGSubnet(t *testing.T) {
 	if !insp.handleControl(pkt) {
 		t.Fatal("matching dst+port should be consumed even if src is invalid")
 	}
-	if len(insp.acl.Snapshot()) != 0 {
-		t.Fatal("ACL must not have been written for an outside-subnet src")
+	if len(peerListSnapshot()) != 0 {
+		t.Fatal("no policy must be stored for an outside-subnet src")
 	}
 }
 
 func TestHandleControl_BadJSON(t *testing.T) {
 	insp := newTestInspector(t)
+	resetPeer("10.0.0.5")
 	pkt := buildIPv4UDP(t, "10.0.0.5", insp.serverIPv4.String(), 1, aclControlPort, []byte("not json"))
 	if !insp.handleControl(pkt) {
 		t.Fatal("malformed payload should still be consumed (not forwarded)")
 	}
-	// ACL unchanged — no policy stored for src.
-	if len(insp.acl.Snapshot()) != 0 {
+	if len(peerListSnapshot()) != 0 {
 		t.Fatal("no policy should be stored after a bad payload")
 	}
 }
 
 func TestHandleControl_EmptyListIsolatesSender(t *testing.T) {
 	insp := newTestInspector(t)
+	resetPeer("10.0.0.5")
 	pkt := buildIPv4UDP(t, "10.0.0.5", insp.serverIPv4.String(), 1, aclControlPort, []byte(`{"Allowed":[]}`))
 	if !insp.handleControl(pkt) {
 		t.Fatal("expected consume")
 	}
-	if insp.acl.Allowed(mustAddr(t, "10.0.0.10"), mustAddr(t, "10.0.0.5")) {
+	if entry(t, "10.0.0.5").allowedContains(mustAddr(t, "10.0.0.10")) {
 		t.Fatal("empty allowlist must isolate the sender")
+	}
+}
+
+func TestHandleControl_EmptyListClearsPolicy(t *testing.T) {
+	insp := newTestInspector(t)
+	resetPeer("10.0.0.5")
+	set := buildIPv4UDP(t, "10.0.0.5", insp.serverIPv4.String(), 1, aclControlPort, []byte(`{"Allowed":["10.0.0.10"]}`))
+	if !insp.handleControl(set) {
+		t.Fatal("expected consume")
+	}
+	if len(peerListSnapshot()) != 1 {
+		t.Fatal("setup: policy should be stored")
+	}
+	clear := buildIPv4UDP(t, "10.0.0.5", insp.serverIPv4.String(), 1, aclControlPort, []byte(`{"Allowed":[]}`))
+	if !insp.handleControl(clear) {
+		t.Fatal("expected consume")
+	}
+	if len(peerListSnapshot()) != 0 {
+		t.Fatal("empty allowlist must clear the stored policy")
+	}
+}
+
+func TestHandleControl_CrossServerIPAccepted(t *testing.T) {
+	insp := newTestInspector(t)
+	resetPeer("10.0.0.5")
+	// Peers can talk across wg-servers — an allowed IP outside this server's
+	// subnets must still be stored.
+	pkt := buildIPv4UDP(t, "10.0.0.5", insp.serverIPv4.String(), 1, aclControlPort, []byte(`{"Allowed":["10.99.0.7"]}`))
+	if !insp.handleControl(pkt) {
+		t.Fatal("expected consume")
+	}
+	if !entry(t, "10.0.0.5").allowedContains(mustAddr(t, "10.99.0.7")) {
+		t.Fatal("cross-server IP must be accepted into the allowlist")
+	}
+}
+
+func TestHandleControl_AnnounceWithoutEntryDropped(t *testing.T) {
+	insp := newTestInspector(t)
+	// No resetPeer for 10.0.0.5: an announce from a peer with no installed
+	// entry (raced the handshake) is consumed but applies nothing.
+	pkt := buildIPv4UDP(t, "10.0.0.5", insp.serverIPv4.String(), 1, aclControlPort, []byte(`{"Allowed":["10.0.0.10"]}`))
+	if !insp.handleControl(pkt) {
+		t.Fatal("expected consume")
+	}
+	if len(peerListSnapshot()) != 0 {
+		t.Fatal("announce without an installed entry must not store a policy")
 	}
 }
 
 func TestHandleControl_IPv6(t *testing.T) {
 	insp := newTestInspector(t)
+	resetPeer("10.0.0.5", "fd00::5")
 	payload := []byte(`{"Allowed":["fd00::10"]}`)
 	pkt := buildIPv6UDP(t, "fd00::5", insp.serverIPv6.String(), 1, aclControlPort, payload)
 	if !insp.handleControl(pkt) {
 		t.Fatal("v6 control should be consumed")
 	}
-	if !insp.acl.Allowed(mustAddr(t, "fd00::10"), mustAddr(t, "fd00::5")) {
+	p, _ := fwClassify(mustAddr(t, "fd00::5"))
+	if p == nil || !p.allowedContains(mustAddr(t, "fd00::10")) {
 		t.Fatal("v6 ACL not applied")
 	}
 }

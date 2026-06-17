@@ -3,9 +3,20 @@ package client
 import (
 	"crypto/rand"
 	"math/big"
+	"time"
 
 	"github.com/tunnels-is/tunnels/types"
 )
+
+// announceClearAndFlush sends the empty "clear my policy" announcement and
+// gives the datagram a moment to traverse TUN → WireGuard → wire before the
+// caller tears the device down. Best-effort: the authoritative cleanup is
+// the replace-set announce sent on the next connect.
+func announceClearAndFlush(tun *TUN) {
+	if err := tun.AnnounceAllowedHosts(nil); err == nil {
+		time.Sleep(200 * time.Millisecond)
+	}
+}
 
 func Disconnect(tunID string, switching bool) (err error) {
 	DEBUG("disconnecting from", tunID, switching)
@@ -14,6 +25,9 @@ func Disconnect(tunID string, switching bool) (err error) {
 			tun.SetState(TUN_Disconnecting)
 			tunnel := tun.tunnel.Load()
 			if !switching {
+				// Clear this device's firewall policy on the wg-server while
+				// the tunnel can still carry the packet.
+				announceClearAndFlush(tun)
 				_ = tunnel.Disconnect(tun)
 			}
 			TunnelMap.Delete(tun.ID)
@@ -91,6 +105,7 @@ func createDefaultTunnelMeta(t types.TunnelType) (M *TunnelMETA) {
 func CleanupOnClose() {
 	defer RecoverAndLog()
 	tunnelMapRange(func(tun *TUN) bool {
+		announceClearAndFlush(tun)
 		tunnel := tun.tunnel.Load()
 		err := tunnel.Disconnect(tun)
 		if err != nil {
