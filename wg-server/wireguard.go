@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/netip"
 	"strings"
+	"sync"
 
 	"golang.org/x/crypto/curve25519"
 	"golang.zx2c4.com/wireguard/conn"
@@ -18,7 +19,11 @@ import (
 var (
 	wgDevice   *device.Device
 	wgLazyBind *LazyBind
-	aclStore   *ACLStore
+
+	// addedPeerKeys tracks the hex pubkeys this process has added to the
+	// device. Lets the handshake path tell a fresh connect (reset the peer's
+	// firewall state) from a routine rekey (leave it alone).
+	addedPeerKeys sync.Map
 )
 
 func wgDeviceLogLevel(level string) int {
@@ -42,12 +47,15 @@ func setupWireGuard(cfg *Config, logLevel string) error {
 		return fmt.Errorf("CreateTUN %q: %w", cfg.WireGuardIface, err)
 	}
 
-	aclStore = NewACLStore()
+	if err := initPeerList(cfg.WireGuardSubnet, cfg.WireGuardSubnet6); err != nil {
+		return fmt.Errorf("init peer list: %w", err)
+	}
+	startFlowCleaner()
 
 	// The inspector is always installed: it blocks all peer traffic to the
 	// server's own WG IP and consumes ACL control packets. The peer-to-peer
 	// firewall on top of it is gated by cfg.EnableFirewall.
-	tunInterface, err := newInspectingTUN(tunDev, aclStore, cfg)
+	tunInterface, err := newInspectingTUN(tunDev, cfg)
 	if err != nil {
 		return fmt.Errorf("inspector setup: %w", err)
 	}

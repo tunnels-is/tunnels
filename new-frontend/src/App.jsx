@@ -19,6 +19,8 @@ import Logs from "@/pages/Logs"
 import Servers from "@/pages/Servers"
 import Settings from "@/pages/Settings"
 import Support from "@/pages/Support"
+import TunnelForm from "@/pages/TunnelForm"
+import TunnelPeers from "@/pages/TunnelPeers"
 import Tunnels from "@/pages/Tunnels"
 import TwoFactor from "@/pages/TwoFactor"
 
@@ -56,6 +58,8 @@ const App = () => {
 								<Route path="dashboard" element={<Dashboard />} />
 								<Route path="servers" element={<Servers />} />
 								<Route path="tunnels" element={<Tunnels />} />
+								<Route path="tunnels/:tag/edit" element={<TunnelForm />} />
+								<Route path="tunnels/:tag/peers" element={<TunnelPeers />} />
 								<Route path="connections" element={<Connections />} />
 								<Route path="account" element={<Account />} />
 								<Route path="devices" element={<Devices />} />

@@ -206,6 +206,13 @@ func (b *LazyBind) handleInitiation(pkt *bufferedPkt) {
 	} else if err := AddPeer(hexKey, peerAllowedIPs(rec.IP, rec.IPv6)...); err != nil {
 		WARN("LazyBind: AddPeer failed: ", err)
 	} else {
+		// Reset the firewall state only on a fresh connect — this path also
+		// runs on routine rekey handshakes (shouldSync debounce is shorter
+		// than the rekey interval), and those must not wipe the policy the
+		// peer announced after connecting.
+		if _, rekey := addedPeerKeys.LoadOrStore(hexKey, struct{}{}); !rekey {
+			resetPeer(rec.IP, rec.IPv6)
+		}
 		INFO("LazyBind: AddPeer OK → peer=", pubKeyB64[:12], "… ip=", rec.IP, " re-injecting handshake")
 	}
 

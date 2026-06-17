@@ -276,6 +276,7 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	TunnelMap.Store(tunnel.ID, tunnel)
 
 	go tunnel.RecordBandwidth()
+	go tunnel.announceAllowedHostsWithRetry()
 	go func() {
 		defer RecoverAndLog()
 		<-tunnel.wgDevice.Wait()

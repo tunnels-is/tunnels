@@ -206,6 +206,19 @@ export const saveTunnel = async (meta, oldTag) => {
 	return false
 }
 
+// Replaces the tunnel's peer list (AllowedHosts). Unlike saveTunnel this
+// works while the tunnel is connected — the client announces the new list
+// to the wg-server immediately.
+export const setTunnelPeers = async (tag, allowedHosts) => {
+	const resp = await api("setTunnelPeers", { Tag: tag, AllowedHosts: allowedHosts })
+	if (resp.status === 200) {
+		store().notifySuccess("Peer list updated")
+		await fetchState()
+		return true
+	}
+	return false
+}
+
 export const deleteTunnel = async (tunnel) => {
 	store().showLoading("Deleting tunnel..")
 	const resp = await api("deleteTunnel", tunnel)

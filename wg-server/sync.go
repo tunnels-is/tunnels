@@ -78,6 +78,8 @@ func assignAndAdd(pubKeyB64 string) bool {
 		WARN("assignAndAdd: AddPeer failed: ", err)
 		return false
 	}
+	addedPeerKeys.Store(hexKey, struct{}{})
+	resetPeer(ip, ipv6)
 	INFO("assignAndAdd: peer added to wg0 → ", pubKeyB64[:12], "… ip=", ip)
 	return true
 }

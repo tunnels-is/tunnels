@@ -11,6 +11,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/netip"
 	"os"
 	"strings"
 	"sync/atomic"
@@ -230,6 +231,9 @@ func HTTPhandler(w http.ResponseWriter, r *http.Request) {
 		return
 	case "setTunnel":
 		HTTP_SetTunnel(w, r)
+		return
+	case "setTunnelPeers":
+		HTTP_SetTunnelPeers(w, r)
 		return
 	case "getDNSStats":
 		HTTP_GetDNSStats(w, r)
@@ -556,6 +560,67 @@ func HTTP_SetTunnel(w http.ResponseWriter, r *http.Request) {
 	}
 
 	JSON(w, r, 200, nil)
+}
+
+type setTunnelPeersForm struct {
+	Tag          string
+	AllowedHosts []string
+}
+
+// HTTP_SetTunnelPeers replaces a tunnel's AllowedHosts (firewall peer list),
+// persists the meta, and announces the new list to the wg-server when the
+// tunnel is connected. Unlike setTunnel, this works on connected tunnels.
+func HTTP_SetTunnelPeers(w http.ResponseWriter, r *http.Request) {
+	form := new(setTunnelPeersForm)
+	if err := Bind(form, r); err != nil {
+		JSON(w, r, 400, err.Error())
+		return
+	}
+
+	meta, ok := TunnelMetaMap.Load(form.Tag)
+	if !ok {
+		JSON(w, r, 404, "tunnel not found")
+		return
+	}
+
+	seen := make(map[string]struct{}, len(form.AllowedHosts))
+	hosts := make([]string, 0, len(form.AllowedHosts))
+	for _, h := range form.AllowedHosts {
+		h = strings.TrimSpace(h)
+		a, err := netip.ParseAddr(h)
+		if err != nil {
+			JSON(w, r, 400, "peer must be a valid IP address: "+h)
+			return
+		}
+		ip := a.String()
+		if _, dup := seen[ip]; dup {
+			continue
+		}
+		seen[ip] = struct{}{}
+		hosts = append(hosts, ip)
+	}
+
+	meta.AllowedHosts = hosts
+	TunnelMetaMap.Store(meta.Tag, meta)
+	if err := writeTunnelsToDisk(meta.Tag); err != nil {
+		JSON(w, r, 400, err.Error())
+		return
+	}
+
+	tunnelMapRange(func(t *TUN) bool {
+		m := t.meta.Load()
+		if m == nil || m.Tag != form.Tag {
+			return true
+		}
+		if t.GetState() >= TUN_Connected {
+			if err := t.AnnounceAllowedHosts(hosts); err != nil {
+				DEBUG("peer list announce failed: ", err)
+			}
+		}
+		return false
+	})
+
+	JSON(w, r, 200, hosts)
 }
 
 func HTTP_GetTunnels(w http.ResponseWriter, r *http.Request) {

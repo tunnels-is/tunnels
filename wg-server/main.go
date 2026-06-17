@@ -102,6 +102,7 @@ func Init(ctx context.Context, controllerURL, apiKey, configPath string, insecur
 	if wgDevice != nil {
 		wgDevice.Close()
 	}
+	stopFlowCleaner()
 	cleanupNet(cfg)
 	INFO("wg-server shutdown complete")
 }

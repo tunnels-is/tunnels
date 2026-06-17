@@ -14,10 +14,10 @@ import (
 // updates to the wg-server's own WG-side IP. Packets matching this port are
 // consumed by the inspector and never reach the kernel.
 const (
-	aclControlPort   = 51821
-	aclMaxAllowed    = 1024
-	aclMaxPayload    = 65536 // hard cap on JSON payload bytes
-	protoUDP    byte = 17
+	aclControlPort      = 51821
+	aclMaxAllowed       = 1024
+	aclMaxPayload       = 65536 // hard cap on JSON payload bytes
+	protoUDP       byte = 17
 )
 
 // inspectingTUN sits between wireguard-go and the kernel TUN device. It is
@@ -26,24 +26,27 @@ const (
 // On Write (decrypted peer packets entering the kernel) it:
 //   - consumes ACL-control UDP packets addressed to the server's WG IP,
 //   - drops any other packet addressed to the server's WG IP,
-//   - drops peer-to-peer packets disallowed by ACL (firewall enabled only),
+//   - drops peer-to-peer packets disallowed by the firewall (when enabled),
 //   - passes everything else through.
 //
 // On Read (kernel packets leaving toward WG for encryption) it applies the
 // same filtering. This catches cross-server peer-to-peer traffic that
 // arrives via the InternetIface and is routed onto the WG interface.
+//
+// The per-peer allowlist + connection-tracking state lives in the package
+// peer list (peerlist.go), keyed by local-subnet address; the inspector only
+// classifies packets and consults it.
 type inspectingTUN struct {
 	tun.Device
-	acl        *ACLStore
-	firewall   bool // when false, peer-to-peer traffic is not ACL-checked
+	firewall   bool // when false, peer-to-peer traffic is not policy-checked
 	subnet4    netip.Prefix
 	subnet6    netip.Prefix
 	serverIPv4 netip.Addr
 	serverIPv6 netip.Addr
 }
 
-func newInspectingTUN(inner tun.Device, acl *ACLStore, cfg *Config) (*inspectingTUN, error) {
-	t := &inspectingTUN{Device: inner, acl: acl, firewall: cfg.EnableFirewall}
+func newInspectingTUN(inner tun.Device, cfg *Config) (*inspectingTUN, error) {
+	t := &inspectingTUN{Device: inner, firewall: cfg.EnableFirewall}
 
 	if cfg.WireGuardSubnet != "" {
 		p, err := netip.ParsePrefix(cfg.WireGuardSubnet)
@@ -106,26 +109,33 @@ func (t *inspectingTUN) File() *os.File {
 	return t.Device.File()
 }
 
-// allow returns true if pkt should be forwarded. It only filters traffic
-// where both endpoints are inside a WG subnet. All other traffic (egress
-// to internet, malformed) passes through.
+// allow returns true if pkt should be forwarded. It filters traffic where at
+// least one endpoint is a local WG resident; traffic with neither end local
+// (internet egress, malformed) passes through.
 //
-// The server's own WG IP is never reachable by peers — this holds whether
-// or not the firewall is enabled. The only packets a peer may address to
-// it are ACL control messages, which handleControl consumes before allow
-// runs. Server-originated traffic (ICMP errors for PMTU discovery, etc.)
-// still passes.
+// The server's own WG IP is never reachable by peers — this holds whether or
+// not the firewall is enabled. The only packets a peer may address to it are
+// ACL control messages, which handleControl consumes before allow runs.
+// Server-originated traffic (ICMP errors for PMTU discovery, etc.) still
+// passes.
 //
-// Peer-to-peer traffic is only ACL-checked when the firewall is enabled,
-// and is then default-deny: a peer must announce an allowlist via the
-// control port before any other peer can reach it. With the firewall
-// disabled, peer-to-peer traffic passes freely.
+// When the firewall is on:
+//   - a local sender's outbound packet records a flow, opening its own return
+//     path (connection tracking) — done even toward another server so the
+//     reply is admitted there;
+//   - a local receiver's inbound packet is admitted iff the source is in its
+//     allowlist or matches a flow it opened (default-deny otherwise).
+//
+// With the firewall off, peer-to-peer traffic passes freely (the server-IP
+// block above still applies).
 func (t *inspectingTUN) allow(pkt []byte) bool {
-	src, dst, _, _, ok := parseIPHeader(pkt)
+	src, dst, proto, l4, ok := parseIPHeader(pkt)
 	if !ok {
 		return true
 	}
-	if !t.inWGSubnet(src) || !t.inWGSubnet(dst) {
+	srcPeer, srcLocal := fwClassify(src)
+	dstPeer, dstLocal := fwClassify(dst)
+	if !srcLocal && !dstLocal {
 		return true
 	}
 	if t.isServerIP(dst) {
@@ -134,10 +144,30 @@ func (t *inspectingTUN) allow(pkt []byte) bool {
 	if t.isServerIP(src) {
 		return true
 	}
+
+	sport, dport := l4Ports(proto, l4)
+
+	// A local sender opens (or refreshes) its own return path.
+	if srcLocal && srcPeer != nil {
+		srcPeer.touchFlow(flowKey{remote: dst, rport: dport, lport: sport, proto: proto})
+	}
+
 	if !t.firewall {
 		return true
 	}
-	return t.acl.Allowed(src, dst)
+
+	// A local receiver: allowlist, or a reply to a flow it opened.
+	if dstLocal {
+		if dstPeer == nil {
+			return false // in our subnet but nobody connected — default-deny
+		}
+		if dstPeer.allowedContains(src) {
+			return true
+		}
+		return dstPeer.flowMatch(flowKey{remote: src, rport: sport, lport: dport, proto: proto})
+	}
+	// src is local, dst is on another server — that server enforces ingress.
+	return true
 }
 
 func (t *inspectingTUN) isServerIP(a netip.Addr) bool {
@@ -182,6 +212,10 @@ func (t *inspectingTUN) applyControl(src netip.Addr, payload []byte) {
 	if len(msg.Allowed) > aclMaxAllowed {
 		return
 	}
+	// Entries must parse as IP addresses; invalid ones are skipped without
+	// feedback — the control channel is fire-and-forget. No subnet check:
+	// peers can communicate across wg-servers, so an allowed IP may belong
+	// to another server's WG subnet.
 	srcs := make([]netip.Addr, 0, len(msg.Allowed))
 	for _, s := range msg.Allowed {
 		a, err := netip.ParseAddr(s)
@@ -190,7 +224,15 @@ func (t *inspectingTUN) applyControl(src netip.Addr, payload []byte) {
 		}
 		srcs = append(srcs, a)
 	}
-	t.acl.Set(src, srcs)
+	// The announcement comes from a local resident; apply it to that peer's
+	// entry. An empty list clears the allowlist (replace-set semantics), so a
+	// disconnecting peer removes itself. If no entry exists yet (announce
+	// raced the handshake), drop it — the client re-announces on a short retry.
+	p, local := fwClassify(src)
+	if !local || p == nil {
+		return
+	}
+	p.setAllowed(srcs)
 }
 
 func (t *inspectingTUN) inWGSubnet(a netip.Addr) bool {
