@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from "react"
-import { Copy, Pencil, Server, Trash2, Zap, ZapOff } from "lucide-react"
+import { useEffect, useMemo } from "react"
+import { useNavigate } from "react-router-dom"
+import { Copy, Pencil, Server, Trash2, Users, Zap, ZapOff } from "lucide-react"
 import { Page } from "@/components/ui"
-import TunnelFormDialog from "@/pages/TunnelFormDialog"
 import { connect, createTunnel, deleteTunnel, disconnect, fetchServers, fetchState } from "@/store/actions"
 import { encTypeName } from "@/lib/format"
 import { useStore } from "@/store/store"
@@ -24,9 +24,7 @@ const Tunnels = () => {
 	const servers = useStore((s) => s.servers)
 	const askConfirm = useStore((s) => s.askConfirm)
 	const advanced = useStore((s) => s.advanced)
-
-	const [editTunnel, setEditTunnel] = useState(null)
-	const [dialogOpen, setDialogOpen] = useState(false)
+	const navigate = useNavigate()
 
 	useEffect(() => {
 		fetchServers()
@@ -93,11 +91,15 @@ const Tunnels = () => {
 									</button>
 									<button
 										className="btn btn-square btn-ghost btn-xs opacity-60"
+										title="Peer List"
+										onClick={() => navigate(`/tunnels/${encodeURIComponent(tunnel.Tag)}/peers`)}
+									>
+										<Users size={12} />
+									</button>
+									<button
+										className="btn btn-square btn-ghost btn-xs opacity-60"
 										title="Edit"
-										onClick={() => {
-											setEditTunnel(tunnel)
-											setDialogOpen(true)
-										}}
+										onClick={() => navigate(`/tunnels/${encodeURIComponent(tunnel.Tag)}/edit`)}
 									>
 										<Pencil size={12} />
 									</button>
@@ -150,13 +152,6 @@ const Tunnels = () => {
 					<div className="mt-1 text-[11px] opacity-40">Create a tunnel to get started</div>
 				</div>
 			)}
-
-			<TunnelFormDialog
-				open={dialogOpen}
-				onClose={() => setDialogOpen(false)}
-				tunnel={editTunnel}
-				servers={servers}
-			/>
 		</Page>
 	)
 }
