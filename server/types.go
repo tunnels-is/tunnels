@@ -49,6 +49,7 @@ type UserCoreMapping struct {
 	AllowedHosts    []*AllowedHost
 	DHCP            *types.DHCPRecord
 	DisableFirewall bool
+	IsNetAdmin      bool
 
 	CPU  byte
 	RAM  byte

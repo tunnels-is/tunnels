@@ -69,6 +69,16 @@ func CreateClientCoreMapping(CRR *types.ServerConnectResponse, CR *types.Control
 				clientCoreMappings[i].DeviceToken = hashIdentifier(CR.DeviceKey)
 			}
 
+			// Net-admin status only depends on the (already hashed) ID/DeviceToken
+			// and the configured NetAdmins, so resolve it once here instead of
+			// scanning NetAdmins for every packet in the LAN firewall hot path.
+			for _, entity := range Config.Load().NetAdmins {
+				if entity == clientCoreMappings[i].DeviceToken || entity == clientCoreMappings[i].ID {
+					clientCoreMappings[i].IsNetAdmin = true
+					break
+				}
+			}
+
 			clientCoreMappings[i].EH = EH
 			clientCoreMappings[i].Created = time.Now()
 			clientCoreMappings[i].ToUser = make(chan []byte, 500_000)
@@ -501,7 +511,6 @@ func toUserChannel(index int) {
 	var isAdmin bool
 	var headLength byte
 	var activeHost *AllowedHost
-	Config := Config.Load()
 
 	for {
 		PACKET, ok = <-CM.ToUser
@@ -519,15 +528,7 @@ func toUserChannel(index int) {
 		if LANEnabled && (PACKET[12] == 10 && PACKET[13] == 0) {
 			originCM = VPLIPToCore[PACKET[12]][PACKET[13]][PACKET[14]][PACKET[15]]
 			if !lanFirewallDisabled && !CM.DisableFirewall {
-				isAdmin = false
-				if originCM != nil {
-					for _, entity := range Config.NetAdmins {
-						if entity == originCM.DeviceToken || entity == originCM.ID {
-							isAdmin = true
-							break
-						}
-					}
-				}
+				isAdmin = originCM != nil && originCM.IsNetAdmin
 
 				if !isAdmin {
 					headLength = (PACKET[0] & 0x0F) * 4
