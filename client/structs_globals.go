@@ -159,6 +159,11 @@ type TunnelMETA struct {
 	// when the server runs with EnableFirewall (default-deny peer-to-peer).
 	AllowedHosts []string
 
+	// AllowAll, when true, announces that ANY peer may reach this device,
+	// overriding AllowedHosts. Disabled by default — it effectively opts this
+	// device out of the default-deny firewall, so it must be set explicitly.
+	AllowAll bool
+
 	// WireGuard: persistent base64 Curve25519 private key for this device.
 	// Generated on first use and reused across sessions so the server can
 	// keep a stable peer entry (Device.WireGuardKey).
