@@ -155,7 +155,7 @@ func allowFor(t *testing.T, dst string, srcs ...string) {
 	for i, s := range srcs {
 		addrs[i] = mustAddr(t, s)
 	}
-	entry(t, dst).setAllowed(addrs)
+	entry(t, dst).setAllowed(addrs, false)
 }
 
 func TestAllow_DefaultDenyForPeerToPeer(t *testing.T) {
@@ -256,6 +256,32 @@ func TestAllow_ConntrackNoUnsolicitedReturn(t *testing.T) {
 	}
 }
 
+func TestAllow_AllowAllAdmitsAnySource(t *testing.T) {
+	insp := newTestInspector(t)
+	resetPeer("10.0.0.10")
+	entry(t, "10.0.0.10").setAllowed(nil, true) // allow-all, empty list
+
+	for _, src := range []string{"10.0.0.5", "10.0.0.99"} {
+		pkt := buildIPv4UDP(t, src, "10.0.0.10", 1, 2, nil)
+		if !insp.allow(pkt) {
+			t.Fatalf("allow-all must admit %s", src)
+		}
+	}
+}
+
+func TestHandleControl_AllowAll(t *testing.T) {
+	insp := newTestInspector(t)
+	resetPeer("10.0.0.5")
+	pkt := buildIPv4UDP(t, "10.0.0.5", insp.serverIPv4.String(), 1, aclControlPort,
+		[]byte(`{"AllowAll":true,"Allowed":[]}`))
+	if !insp.handleControl(pkt) {
+		t.Fatal("expected consume")
+	}
+	if !entry(t, "10.0.0.5").allowedContains(mustAddr(t, "10.0.0.123")) {
+		t.Fatal("AllowAll announcement must permit any source")
+	}
+}
+
 func TestAllow_NonPeerToPeerAlwaysPasses(t *testing.T) {
 	insp := newTestInspector(t)
 	allowFor(t, "10.0.0.10") // strict (empty allowlist)
@@ -276,7 +302,7 @@ func TestAllow_MalformedAlwaysPasses(t *testing.T) {
 func TestAllow_IPv6(t *testing.T) {
 	insp := newTestInspector(t)
 	resetPeer("10.0.0.10", "fd00::10")
-	entry(t, "10.0.0.10").setAllowed([]netip.Addr{mustAddr(t, "fd00::5")})
+	entry(t, "10.0.0.10").setAllowed([]netip.Addr{mustAddr(t, "fd00::5")}, false)
 
 	ok := buildIPv6UDP(t, "fd00::5", "fd00::10", 1, 2, nil)
 	bad := buildIPv6UDP(t, "fd00::99", "fd00::10", 1, 2, nil)

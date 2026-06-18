@@ -565,11 +565,13 @@ func HTTP_SetTunnel(w http.ResponseWriter, r *http.Request) {
 type setTunnelPeersForm struct {
 	Tag          string
 	AllowedHosts []string
+	AllowAll     bool
 }
 
-// HTTP_SetTunnelPeers replaces a tunnel's AllowedHosts (firewall peer list),
-// persists the meta, and announces the new list to the wg-server when the
-// tunnel is connected. Unlike setTunnel, this works on connected tunnels.
+// HTTP_SetTunnelPeers replaces a tunnel's firewall policy (AllowedHosts plus
+// the AllowAll flag), persists the meta, and announces it to the wg-server
+// when the tunnel is connected. Unlike setTunnel, this works on connected
+// tunnels.
 func HTTP_SetTunnelPeers(w http.ResponseWriter, r *http.Request) {
 	form := new(setTunnelPeersForm)
 	if err := Bind(form, r); err != nil {
@@ -601,6 +603,7 @@ func HTTP_SetTunnelPeers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	meta.AllowedHosts = hosts
+	meta.AllowAll = form.AllowAll
 	TunnelMetaMap.Store(meta.Tag, meta)
 	if err := writeTunnelsToDisk(meta.Tag); err != nil {
 		JSON(w, r, 400, err.Error())
@@ -613,7 +616,7 @@ func HTTP_SetTunnelPeers(w http.ResponseWriter, r *http.Request) {
 			return true
 		}
 		if t.GetState() >= TUN_Connected {
-			if err := t.AnnounceAllowedHosts(hosts); err != nil {
+			if err := t.AnnounceAllowedHosts(hosts, form.AllowAll); err != nil {
 				DEBUG("peer list announce failed: ", err)
 			}
 		}

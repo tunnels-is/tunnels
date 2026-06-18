@@ -67,14 +67,15 @@ type flowRec struct {
 	prev    uint64
 }
 
-// peer is one local resident's firewall state. The RWMutex guards the map
-// structures; the per-flow packet counter is atomic so the steady-state path
-// (an established flow) only needs a read lock.
+// peer is one local resident's firewall state. The RWMutex guards allowAll
+// and the map structures; the per-flow packet counter is atomic so the
+// steady-state path (an established flow) only needs a read lock.
 type peer struct {
-	mu      sync.RWMutex
-	v6      netip.Addr // this device's v6 address (for map cleanup); invalid if none
-	allowed map[netip.Addr]struct{}
-	flows   map[flowKey]*flowRec
+	mu       sync.RWMutex
+	v6       netip.Addr // this device's v6 address (for map cleanup); invalid if none
+	allowAll bool       // any source may reach this device (overrides allowed)
+	allowed  map[netip.Addr]struct{}
+	flows    map[flowKey]*flowRec
 }
 
 var (
@@ -224,21 +225,30 @@ func resetPeer(ips ...string) {
 	}
 }
 
+// allowedContains reports whether src is permitted by the static policy:
+// allow-all, or an explicit allowlist entry. (Connection-tracked replies are
+// handled separately by flowMatch.)
 func (p *peer) allowedContains(ip netip.Addr) bool {
 	p.mu.RLock()
+	defer p.mu.RUnlock()
+	if p.allowAll {
+		return true
+	}
 	_, ok := p.allowed[ip]
-	p.mu.RUnlock()
 	return ok
 }
 
-// setAllowed replaces the allowlist (replace-set semantics; empty clears it).
-func (p *peer) setAllowed(ips []netip.Addr) {
+// setAllowed replaces the firewall policy (replace-set semantics): the
+// allowlist plus the allow-all flag. An empty list with allowAll=false denies
+// all peer-to-peer ingress.
+func (p *peer) setAllowed(ips []netip.Addr, allowAll bool) {
 	m := make(map[netip.Addr]struct{}, len(ips))
 	for _, ip := range ips {
 		m[ip] = struct{}{}
 	}
 	p.mu.Lock()
 	p.allowed = m
+	p.allowAll = allowAll
 	p.mu.Unlock()
 }
 
