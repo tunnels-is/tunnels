@@ -1169,11 +1169,13 @@ func API_ServersForUser(w http.ResponseWriter, r *http.Request) {
 	sendObject(w, servers)
 }
 
-// applyWGDefaults stamps sensible WG defaults on a server that has just had
-// its APIKey set. No-op when APIKey is empty (WG not enabled on this server).
+// applyWGDefaults stamps sensible WG defaults on a server. Every server is
+// WG-enabled, so an empty APIKey is treated as a request to mint a fresh one:
+// this covers both creation (the client sends no key) and key rotation (the
+// client re-saves the server with the key cleared).
 func applyWGDefaults(s *types.Server) {
 	if s.APIKey == "" {
-		return
+		s.APIKey = uuid.NewString()
 	}
 	if s.WireGuardPort == 0 {
 		s.WireGuardPort = 51820
