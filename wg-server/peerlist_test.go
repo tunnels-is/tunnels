@@ -82,12 +82,12 @@ func TestSetAllowed_ReplaceAndClear(t *testing.T) {
 	resetPeer("10.0.0.5")
 	p := entry(t, "10.0.0.5")
 
-	p.setAllowed([]netip.Addr{mustAddr(t, "10.0.0.10")})
+	p.setAllowed([]netip.Addr{mustAddr(t, "10.0.0.10")}, false)
 	if !p.allowedContains(mustAddr(t, "10.0.0.10")) {
 		t.Fatal("allowed src should be present")
 	}
 
-	p.setAllowed([]netip.Addr{mustAddr(t, "10.0.0.11")}) // replace
+	p.setAllowed([]netip.Addr{mustAddr(t, "10.0.0.11")}, false) // replace
 	if p.allowedContains(mustAddr(t, "10.0.0.10")) {
 		t.Fatal("replace-set must drop the old entry")
 	}
@@ -95,9 +95,41 @@ func TestSetAllowed_ReplaceAndClear(t *testing.T) {
 		t.Fatal("replace-set must contain the new entry")
 	}
 
-	p.setAllowed(nil) // clear
+	p.setAllowed(nil, false) // clear
 	if p.allowedContains(mustAddr(t, "10.0.0.11")) {
 		t.Fatal("empty list must clear the allowlist")
+	}
+}
+
+func TestSetAllowed_AllowAll(t *testing.T) {
+	setupFW(t, "10.0.0.0/24", "")
+	resetPeer("10.0.0.5")
+	p := entry(t, "10.0.0.5")
+
+	// allow-all permits any source, even one not on the (empty) list.
+	p.setAllowed(nil, true)
+	if !p.allowedContains(mustAddr(t, "10.0.0.99")) {
+		t.Fatal("allow-all must permit any source")
+	}
+	if !p.allowedContains(mustAddr(t, "10.88.0.1")) {
+		t.Fatal("allow-all must permit a cross-server source too")
+	}
+
+	// turning allow-all off (replace-set) reverts to the explicit list.
+	p.setAllowed([]netip.Addr{mustAddr(t, "10.0.0.10")}, false)
+	if p.allowedContains(mustAddr(t, "10.0.0.99")) {
+		t.Fatal("clearing allow-all must revert to the explicit list")
+	}
+	if !p.allowedContains(mustAddr(t, "10.0.0.10")) {
+		t.Fatal("explicit entry should remain after allow-all is cleared")
+	}
+}
+
+func TestResetPeer_AllowAllDefaultsOff(t *testing.T) {
+	setupFW(t, "10.0.0.0/24", "")
+	resetPeer("10.0.0.5")
+	if entry(t, "10.0.0.5").allowedContains(mustAddr(t, "10.0.0.99")) {
+		t.Fatal("a fresh peer must not allow-all by default")
 	}
 }
 
@@ -149,7 +181,7 @@ func TestResetPeer_WipesPriorState(t *testing.T) {
 	setupFW(t, "10.0.0.0/24", "")
 	resetPeer("10.0.0.5")
 	p1 := entry(t, "10.0.0.5")
-	p1.setAllowed([]netip.Addr{mustAddr(t, "10.0.0.10")})
+	p1.setAllowed([]netip.Addr{mustAddr(t, "10.0.0.10")}, false)
 	p1.touchFlow(flowKey{remote: mustAddr(t, "10.0.0.11"), rport: 1, lport: 1, proto: 6})
 
 	resetPeer("10.0.0.5") // IP reuse / reconnect
@@ -191,7 +223,7 @@ func TestV6Map_CleanupOnReuse(t *testing.T) {
 func TestPeerListSnapshot(t *testing.T) {
 	setupFW(t, "10.0.0.0/24", "")
 	resetPeer("10.0.0.5")
-	entry(t, "10.0.0.5").setAllowed([]netip.Addr{mustAddr(t, "10.0.0.10"), mustAddr(t, "10.0.0.11")})
+	entry(t, "10.0.0.5").setAllowed([]netip.Addr{mustAddr(t, "10.0.0.10"), mustAddr(t, "10.0.0.11")}, false)
 	resetPeer("10.0.0.6") // no allowlist -> excluded from snapshot
 
 	snap := peerListSnapshot()
@@ -244,7 +276,7 @@ func TestPeer_ConcurrentSafe(t *testing.T) {
 		}(i)
 	}
 	for i := 0; i < 200; i++ {
-		p.setAllowed([]netip.Addr{mustAddr(t, "10.0.0.20")})
+		p.setAllowed([]netip.Addr{mustAddr(t, "10.0.0.20")}, false)
 		cleanFlows()
 	}
 	close(stop)

@@ -14,7 +14,10 @@ import (
 const aclControlPort = 51821
 
 type aclAnnouncement struct {
-	Allowed []string `json:"Allowed"`
+	// AllowAll, when true, tells the server any peer may reach this device,
+	// overriding Allowed. Omitted from the wire when false for compatibility.
+	AllowAll bool     `json:"AllowAll,omitempty"`
+	Allowed  []string `json:"Allowed"`
 }
 
 // wgServerGatewayIP returns the wg-server's own WG-side IP: the first host
@@ -34,11 +37,12 @@ func wgServerGatewayIP(subnet string) (net.IP, error) {
 	return gw, nil
 }
 
-// AnnounceAllowedHosts sends the given allowlist to the wg-server's ACL
-// control port through the tunnel. An empty list clears this device's policy
-// on the server (used on disconnect). Fire-and-forget: a lost packet is only
-// recovered by a later announce.
-func (t *TUN) AnnounceAllowedHosts(allowed []string) error {
+// AnnounceAllowedHosts sends the firewall policy to the wg-server's ACL
+// control port through the tunnel: the allowlist plus the allow-all flag.
+// An empty list with allowAll=false clears this device's policy on the server
+// (used on disconnect). Fire-and-forget: a lost packet is only recovered by a
+// later announce.
+func (t *TUN) AnnounceAllowedHosts(allowed []string, allowAll bool) error {
 	sr := t.ServerResponse
 	if sr == nil || sr.WireGuardSubnet == "" {
 		return errors.New("no WireGuard subnet known for tunnel")
@@ -54,7 +58,7 @@ func (t *TUN) AnnounceAllowedHosts(allowed []string) error {
 	if allowed == nil {
 		allowed = []string{}
 	}
-	payload, err := json.Marshal(&aclAnnouncement{Allowed: allowed})
+	payload, err := json.Marshal(&aclAnnouncement{AllowAll: allowAll, Allowed: allowed})
 	if err != nil {
 		return fmt.Errorf("marshal announcement: %w", err)
 	}
@@ -93,7 +97,7 @@ func (t *TUN) announceAllowedHostsWithRetry() {
 		if m == nil {
 			return
 		}
-		if err := t.AnnounceAllowedHosts(m.AllowedHosts); err != nil {
+		if err := t.AnnounceAllowedHosts(m.AllowedHosts, m.AllowAll); err != nil {
 			DEBUG("allowed hosts announce failed: ", err)
 		}
 	}

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 import { ArrowLeft, Plus, Trash2, Users } from "lucide-react"
-import { Card, Page } from "@/components/ui"
+import { Card, Page, Toggle } from "@/components/ui"
 import { fetchState, setTunnelPeers } from "@/store/actions"
 import { useStore } from "@/store/store"
 
@@ -26,6 +26,7 @@ const TunnelPeers = () => {
 	const tunnel = tunnels.find((t) => t.Tag === tag)
 	const connected = (activeTunnels || []).some((at) => at.CR?.Tag === tag)
 	const peers = tunnel?.AllowedHosts || []
+	const allowAll = !!tunnel?.AllowAll
 
 	if (!tunnel) {
 		return (
@@ -37,9 +38,10 @@ const TunnelPeers = () => {
 		)
 	}
 
-	const apply = async (next) => {
+	// apply preserves whichever half of the policy isn't being changed.
+	const apply = async (next, all = allowAll) => {
 		setBusy(true)
-		const ok = await setTunnelPeers(tag, next)
+		const ok = await setTunnelPeers(tag, next, all)
 		setBusy(false)
 		return ok
 	}
@@ -82,21 +84,37 @@ const TunnelPeers = () => {
 						enabled nobody can reach this device unless their VPN IP is listed here. Changes are saved
 						immediately and announced to the server while connected."
 				>
-					<div className="mb-3 flex items-center gap-2">
+					<div className="mb-3 rounded-box border border-warning/30 bg-warning/5 px-3 py-1">
+						<Toggle
+							label="Allow all peers (disables the firewall for this device)"
+							checked={allowAll}
+							disabled={busy}
+							onChange={() => apply(peers, !allowAll)}
+						/>
+					</div>
+
+					<div className={"mb-3 flex items-center gap-2 " + (allowAll ? "opacity-40" : "")}>
 						<input
 							className="input input-sm flex-1 font-mono"
 							placeholder="10.42.0.7"
 							value={newPeer}
-							disabled={busy}
+							disabled={busy || allowAll}
 							onChange={(e) => setNewPeer(e.target.value)}
 							onKeyDown={(e) => e.key === "Enter" && addPeer()}
 						/>
-						<button className="btn btn-primary btn-sm" disabled={busy || !newPeer.trim()} onClick={addPeer}>
+						<button className="btn btn-primary btn-sm" disabled={busy || allowAll || !newPeer.trim()} onClick={addPeer}>
 							<Plus size={14} /> Add
 						</button>
 					</div>
 
-					{peers.length > 0 ? (
+					{allowAll ? (
+						<div className="rounded-box border border-dashed border-warning/40 py-8 text-center">
+							<p className="text-[13px] opacity-70">All peers allowed</p>
+							<p className="mt-1 text-[11px] opacity-40">
+								Any device on the VPN can reach this device. The allowlist below is ignored until you turn this off.
+							</p>
+						</div>
+					) : peers.length > 0 ? (
 						<ul className="flex flex-col">
 							{peers.map((ip) => (
 								<li

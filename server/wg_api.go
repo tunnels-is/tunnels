@@ -365,7 +365,6 @@ func API_WGServerConfigFetch(w http.ResponseWriter, r *http.Request) {
 		WireGuardSubnet6:   server.WireGuardSubnet6,
 		WireGuardIface:     server.WireGuardIface,
 		InternetIface:      server.InternetIface,
-		EnableFirewall:     server.EnableFirewall,
 		InsecureSkipVerify: server.InsecureSkipVerify,
 	}
 

@@ -204,7 +204,8 @@ func (t *inspectingTUN) applyControl(src netip.Addr, payload []byte) {
 		return
 	}
 	var msg struct {
-		Allowed []string `json:"Allowed"`
+		AllowAll bool     `json:"AllowAll"`
+		Allowed  []string `json:"Allowed"`
 	}
 	if err := json.Unmarshal(payload, &msg); err != nil {
 		return
@@ -225,14 +226,15 @@ func (t *inspectingTUN) applyControl(src netip.Addr, payload []byte) {
 		srcs = append(srcs, a)
 	}
 	// The announcement comes from a local resident; apply it to that peer's
-	// entry. An empty list clears the allowlist (replace-set semantics), so a
-	// disconnecting peer removes itself. If no entry exists yet (announce
-	// raced the handshake), drop it — the client re-announces on a short retry.
+	// entry. An empty list with AllowAll=false clears the policy (replace-set
+	// semantics), so a disconnecting peer removes itself. If no entry exists
+	// yet (announce raced the handshake), drop it — the client re-announces on
+	// a short retry.
 	p, local := fwClassify(src)
 	if !local || p == nil {
 		return
 	}
-	p.setAllowed(srcs)
+	p.setAllowed(srcs, msg.AllowAll)
 }
 
 func (t *inspectingTUN) inWGSubnet(a netip.Addr) bool {
