@@ -13,7 +13,7 @@ import (
 // caller tears the device down. Best-effort: the authoritative cleanup is
 // the replace-set announce sent on the next connect.
 func announceClearAndFlush(tun *TUN) {
-	if err := tun.AnnounceAllowedHosts(nil); err == nil {
+	if err := tun.AnnounceAllowedHosts(nil, false); err == nil {
 		time.Sleep(200 * time.Millisecond)
 	}
 }
