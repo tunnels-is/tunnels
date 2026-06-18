@@ -24,6 +24,18 @@ func hashIdentifier(identifier string) string {
 	return hex.EncodeToString(hash[:])
 }
 
+// isNetAdmin reports whether a connection identified by the (already hashed)
+// userID or deviceToken is configured as a network admin. NetAdmins entries are
+// stored hashed via hashIdentifier, so both arguments must already be hashed.
+func isNetAdmin(netAdmins []string, hashedUserID, hashedDeviceToken string) bool {
+	for _, entity := range netAdmins {
+		if entity == hashedDeviceToken || entity == hashedUserID {
+			return true
+		}
+	}
+	return false
+}
+
 func countConnections(id string) (count int, userCount int) {
 	for i := range clientCoreMappings {
 		if clientCoreMappings[i] == nil {
@@ -72,12 +84,11 @@ func CreateClientCoreMapping(CRR *types.ServerConnectResponse, CR *types.Control
 			// Net-admin status only depends on the (already hashed) ID/DeviceToken
 			// and the configured NetAdmins, so resolve it once here instead of
 			// scanning NetAdmins for every packet in the LAN firewall hot path.
-			for _, entity := range Config.Load().NetAdmins {
-				if entity == clientCoreMappings[i].DeviceToken || entity == clientCoreMappings[i].ID {
-					clientCoreMappings[i].IsNetAdmin = true
-					break
-				}
-			}
+			clientCoreMappings[i].IsNetAdmin = isNetAdmin(
+				Config.Load().NetAdmins,
+				clientCoreMappings[i].ID,
+				clientCoreMappings[i].DeviceToken,
+			)
 
 			clientCoreMappings[i].EH = EH
 			clientCoreMappings[i].Created = time.Now()

@@ -88,3 +88,71 @@ func TestHashIdentifierSHA3_KnownValue(t *testing.T) {
 
 	t.Logf("Input: %q\nHash:  %s\nMatch: ✓", input, hash)
 }
+
+func TestIsNetAdmin(t *testing.T) {
+	const (
+		adminUserID      = "507f1f77bcf86cd799439011"
+		adminDeviceToken = "admin-device-token"
+		otherUserID      = "507f1f77bcf86cd799439099"
+		otherDeviceToken = "regular-device-token"
+	)
+
+	// NetAdmins stores hashed identifiers, mirroring addAdminToConfig.
+	netAdmins := []string{
+		hashIdentifier(adminUserID),
+		hashIdentifier(adminDeviceToken),
+	}
+
+	tests := []struct {
+		name              string
+		netAdmins         []string
+		hashedUserID      string
+		hashedDeviceToken string
+		want              bool
+	}{
+		{
+			name:              "match by user id",
+			netAdmins:         netAdmins,
+			hashedUserID:      hashIdentifier(adminUserID),
+			hashedDeviceToken: hashIdentifier(otherDeviceToken),
+			want:              true,
+		},
+		{
+			name:              "match by device token",
+			netAdmins:         netAdmins,
+			hashedUserID:      hashIdentifier(otherUserID),
+			hashedDeviceToken: hashIdentifier(adminDeviceToken),
+			want:              true,
+		},
+		{
+			name:              "no match",
+			netAdmins:         netAdmins,
+			hashedUserID:      hashIdentifier(otherUserID),
+			hashedDeviceToken: hashIdentifier(otherDeviceToken),
+			want:              false,
+		},
+		{
+			name:              "empty netadmins",
+			netAdmins:         nil,
+			hashedUserID:      hashIdentifier(adminUserID),
+			hashedDeviceToken: hashIdentifier(adminDeviceToken),
+			want:              false,
+		},
+		{
+			name:              "raw (unhashed) identifier must not match hashed entry",
+			netAdmins:         netAdmins,
+			hashedUserID:      adminUserID,
+			hashedDeviceToken: adminDeviceToken,
+			want:              false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := isNetAdmin(tc.netAdmins, tc.hashedUserID, tc.hashedDeviceToken)
+			if got != tc.want {
+				t.Errorf("isNetAdmin() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
