@@ -7,8 +7,8 @@ const PAGE_SIZE = 100;
 
 function Modal({ title, onClose, children }) {
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-      <div className="bg-[#ffffff] border border-[#e7e3d7] rounded-lg w-full max-w-md p-5">
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-6">
+      <div className="bg-[#ffffff] border border-[#e7e3d7] rounded-lg w-full max-w-md p-5 max-h-full overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-[14px] font-semibold text-[#0a0a0a]">{title}</h3>
           <button onClick={onClose} className="text-[#a3a3a3] hover:text-[#262626] text-lg leading-none">×</button>
@@ -21,7 +21,7 @@ function Modal({ title, onClose, children }) {
 
 const inputClass = "w-full bg-[#fdfcf8] border border-[#e7e3d7] rounded px-3 py-1.5 text-[13px] text-[#0a0a0a] placeholder-[#a3a3a3] focus:outline-none focus:border-[#0a0a0a]";
 
-const emptyForm = () => ({ Tag: '', IP: '', Port: '443', Country: '', WireGuardSubnet: '', WireGuardSubnet6: '', WireGuardPort: 51820, EnableFirewall: true });
+const emptyForm = () => ({ Tag: '', IP: '', Port: '443', Country: '', WireGuardSubnet: '', WireGuardSubnet6: '', WireGuardPort: 51820, WireGuardIface: 'wg0', InternetIface: '', EnableFirewall: true, InsecureSkipVerify: false });
 
 export default function Servers() {
   const navigate = useNavigate();
@@ -197,10 +197,25 @@ export default function Servers() {
               <input type="number" className={inputClass} value={createForm.WireGuardPort} onChange={set('WireGuardPort')} />
             </div>
             <div>
+              <label className="block text-[11px] text-[#a3a3a3] uppercase tracking-wider mb-1">WireGuard Interface</label>
+              <input type="text" className={inputClass} value={createForm.WireGuardIface} onChange={set('WireGuardIface')} placeholder="wg0" />
+            </div>
+            <div>
+              <label className="block text-[11px] text-[#a3a3a3] uppercase tracking-wider mb-1">Internet Interface</label>
+              <input type="text" className={inputClass} value={createForm.InternetIface} onChange={set('InternetIface')} placeholder="eth0" />
+            </div>
+            <div>
               <label className="block text-[11px] text-[#a3a3a3] uppercase tracking-wider mb-1">Firewall</label>
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" checked={!!createForm.EnableFirewall} onChange={set('EnableFirewall')} className="accent-[#1d4ed8]" />
                 <span className="text-[12px] text-[#525252]">{createForm.EnableFirewall ? 'Enabled' : 'Disabled'}</span>
+              </label>
+            </div>
+            <div>
+              <label className="block text-[11px] text-[#a3a3a3] uppercase tracking-wider mb-1">Skip Verify</label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={!!createForm.InsecureSkipVerify} onChange={set('InsecureSkipVerify')} className="accent-[#1d4ed8]" />
+                <span className="text-[12px] text-[#525252]">{createForm.InsecureSkipVerify ? 'Yes' : 'No'}</span>
               </label>
             </div>
             {createError && <p className="text-[12px] text-[#dc2626]">{createError}</p>}
