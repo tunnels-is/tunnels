@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import dayjs from 'dayjs';
-import { ArrowLeft, Pencil, Save, X, Copy, Shield, Trash2 } from 'lucide-react';
+import { ArrowLeft, Pencil, Save, X, Copy, Shield, Trash2, RefreshCw } from 'lucide-react';
 import { apiPost } from '../api';
 
 const inputClass = "w-full bg-[#fdfcf8] border border-[#e7e3d7] rounded px-3 py-1.5 text-[13px] text-[#0a0a0a] placeholder-[#a3a3a3] focus:outline-none focus:border-[#0a0a0a]";
@@ -15,17 +15,6 @@ function Row({ label, children }) {
   );
 }
 
-// RFC 4122 v4 UUID generator — used to mint a per-server WG APIKey client-side.
-function uuidv4() {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
-  const buf = new Uint8Array(16);
-  crypto.getRandomValues(buf);
-  buf[6] = (buf[6] & 0x0f) | 0x40;
-  buf[8] = (buf[8] & 0x3f) | 0x80;
-  const h = [...buf].map((b) => b.toString(16).padStart(2, '0')).join('');
-  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
-}
-
 export default function ServerDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -36,11 +25,11 @@ export default function ServerDetail() {
   const [form, setForm] = useState({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [enabling, setEnabling] = useState(false);
-  const [enableError, setEnableError] = useState('');
-  const [newAPIKey, setNewAPIKey] = useState('');
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [confirmingRegen, setConfirmingRegen] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
+  const [keyError, setKeyError] = useState('');
 
   const load = async () => {
     const resp = await apiPost('/ui/server', { ServerID: id });
@@ -49,8 +38,11 @@ export default function ServerDetail() {
     }
   };
 
+  // location.state.server is only an instant-paint placeholder from the list,
+  // which may be stale (e.g. after an APIKey rotation). Always refetch the
+  // authoritative record from the backend on mount.
   useEffect(() => {
-    if (!server) load();
+    load();
   }, [id]);
 
   const startEdit = () => {
@@ -92,35 +84,31 @@ export default function ServerDetail() {
     }
   };
 
-  const handleEnableWG = async () => {
-    setEnabling(true);
-    setEnableError('');
-    const apiKey = uuidv4();
+  const copy = (text) => {
+    navigator.clipboard.writeText(text).catch(() => {});
+  };
+
+  // Rotate the APIKey: re-save the server with the key cleared; the backend
+  // mints a fresh one when it sees an empty APIKey.
+  const handleRegenerateKey = async () => {
+    setRegenerating(true);
+    setKeyError('');
     try {
       const resp = await apiPost('/ui/server/update', {
-        Server: {
-          ...server,
-          APIKey: apiKey,
-          WireGuardPort: server.WireGuardPort || 51820,
-          WireGuardIface: server.WireGuardIface || 'wg0',
-        },
+        Server: { ...server, APIKey: '' },
       });
       if (resp.status === 200) {
-        setNewAPIKey(apiKey);
+        setConfirmingRegen(false);
         await load();
       } else {
         const data = await resp.json().catch(() => ({}));
-        setEnableError(data.Error || 'Failed to enable WG');
+        setKeyError(data.Error || 'Failed to generate key');
       }
     } catch (err) {
-      setEnableError(err.message);
+      setKeyError(err.message);
     } finally {
-      setEnabling(false);
+      setRegenerating(false);
     }
-  };
-
-  const copy = (text) => {
-    navigator.clipboard.writeText(text).catch(() => {});
   };
 
   const handleDelete = async () => {
@@ -158,8 +146,6 @@ export default function ServerDetail() {
       </div>
     );
   }
-
-  const wgEnabled = !!server.APIKey;
 
   return (
     <div className="max-w-2xl">
@@ -248,39 +234,34 @@ export default function ServerDetail() {
           <Shield className="w-3.5 h-3.5 text-[#a3a3a3]" />
           WireGuard
         </h2>
-        {!wgEnabled && !editing && (
-          <button
-            onClick={handleEnableWG}
-            disabled={enabling}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[12px] bg-[#0a0a0a] hover:bg-[#262626] text-white disabled:opacity-50"
-          >
-            {enabling ? 'Enabling…' : 'Enable WireGuard'}
-          </button>
-        )}
       </div>
-      {enableError && <p className="text-[12px] text-[#dc2626] mb-2">{enableError}</p>}
-      {newAPIKey && (
-        <div className="mb-3 p-3 rounded border border-[#b45309]/40 bg-[#fef3c7]/40 text-[12px]">
-          <div className="text-[#b45309] font-medium mb-1">Save this APIKey now — it will not be shown again.</div>
-          <div className="flex items-center gap-2">
-            <span className="font-mono text-[#262626] break-all flex-1">{newAPIKey}</span>
-            <button onClick={() => copy(newAPIKey)} className="flex items-center gap-1 px-2 py-0.5 rounded text-[11px] text-[#525252] hover:text-[#0a0a0a] hover:bg-black/[0.05] shrink-0">
-              <Copy className="w-3 h-3" /> Copy
-            </button>
-          </div>
-        </div>
-      )}
 
-      {wgEnabled && (
-        <div className="bg-white border border-[#e7e3d7] rounded-lg overflow-hidden card-shadow">
+      <div className="bg-white border border-[#e7e3d7] rounded-lg overflow-hidden card-shadow">
           <Row label="API Key (--key)">
             <div className="flex items-center gap-2 min-w-0">
               <span className="font-mono text-[12px] text-[#262626] truncate flex-1">{server.APIKey}</span>
               <button onClick={() => copy(server.APIKey)} className="flex items-center gap-1 px-2 py-0.5 rounded text-[11px] text-[#a3a3a3] hover:text-[#262626] hover:bg-black/[0.05] shrink-0">
                 <Copy className="w-3 h-3" /> Copy
               </button>
+              {confirmingRegen ? (
+                <div className="flex items-center gap-1 shrink-0">
+                  <button onClick={() => setConfirmingRegen(false)} disabled={regenerating} className="px-2 py-0.5 rounded text-[11px] text-[#525252] hover:text-[#0a0a0a]">
+                    Cancel
+                  </button>
+                  <button onClick={handleRegenerateKey} disabled={regenerating} className="flex items-center gap-1 px-2 py-0.5 rounded text-[11px] bg-[#0a0a0a] hover:bg-[#262626] text-white disabled:opacity-50">
+                    <RefreshCw className={`w-3 h-3 ${regenerating ? 'animate-spin' : ''}`} /> {regenerating ? 'Generating…' : 'Confirm'}
+                  </button>
+                </div>
+              ) : (
+                <button onClick={() => { setKeyError(''); setConfirmingRegen(true); }} className="flex items-center gap-1 px-2 py-0.5 rounded text-[11px] text-[#a3a3a3] hover:text-[#262626] hover:bg-black/[0.05] shrink-0">
+                  <RefreshCw className="w-3 h-3" /> New key
+                </button>
+              )}
             </div>
           </Row>
+          {keyError && (
+            <div className="px-4 py-2 text-[12px] text-[#dc2626] border-b border-[#e7e3d7]/50">{keyError}</div>
+          )}
           <Row label="WG Pub Key">
             <span className="font-mono text-[12px] text-[#525252] break-all">{server.WireGuardPubKey || '—'}</span>
           </Row>
@@ -344,7 +325,6 @@ export default function ServerDetail() {
             )}
           </Row>
         </div>
-      )}
     </div>
   );
 }
