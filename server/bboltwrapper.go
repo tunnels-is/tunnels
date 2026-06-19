@@ -673,6 +673,7 @@ func BBolt_UpdateServer(S *types.Server) (*types.Server, error) {
 		}
 		oldAPIKey := SS.APIKey
 		SS.Tag = S.Tag
+		SS.InfraTag = S.InfraTag
 		SS.Country = S.Country
 		SS.IP = S.IP
 		SS.Port = S.Port
