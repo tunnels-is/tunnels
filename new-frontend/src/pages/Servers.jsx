@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react"
 import { ChevronLeft, ChevronRight, Copy, Search, ZapOff } from "lucide-react"
 import "flag-icons/css/flag-icons.min.css"
 import { Card, Page, Toolbar } from "@/components/ui"
-import { connect, disconnect, fetchServers, fetchState } from "@/store/actions"
+import { connectServer, disconnect, fetchServers, fetchState } from "@/store/actions"
 import { countryName, normalizeCountryCode } from "@/lib/countries"
 import { useStore } from "@/store/store"
 
@@ -15,10 +15,8 @@ const copyText = (text) => {
 
 const Servers = () => {
 	const servers = useStore((s) => s.servers)
-	const tunnels = useStore((s) => s.tunnels)
 	const activeTunnels = useStore((s) => s.activeTunnels)
 	const askConfirm = useStore((s) => s.askConfirm)
-	const notifyError = useStore((s) => s.notifyError)
 	const advanced = useStore((s) => s.advanced)
 
 	const [filter, setFilter] = useState("")
@@ -52,29 +50,12 @@ const Servers = () => {
 	const paged = filtered.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE)
 
 	const connectToServer = (server) => {
-		// simple mode always connects through the default tunnel, ignoring
-		// any tunnel assigned to the server
-		if (!advanced) {
-			const tunnel = tunnels.find((t) => t.Tag === "tunnels") || tunnels[0]
-			if (!tunnel) {
-				notifyError("No tunnel available to connect with")
-				return
-			}
-			askConfirm("Connect", "Connect to " + server.Tag + "?", () => connect(tunnel, server))
-			return
-		}
-
-		const assigned = tunnels.filter((t) => t.ServerID === server._id)
-		if (assigned.length > 1) {
-			notifyError("Too many tunnels assigned to this server")
-			return
-		}
-		const tunnel = assigned[0] || tunnels[0]
-		if (!tunnel) {
-			notifyError("No tunnel available to connect with")
-			return
-		}
-		askConfirm("Connect", "Connect to " + server.Tag + "?", () => connect(tunnel, assigned[0] ? undefined : server))
+		// The server list always connects to the chosen server through the
+		// default tunnel (type 2), in both simple and advanced mode: the client
+		// reconciles the default tunnel's device to this server before
+		// connecting. Connecting a tunnel that is linked to its own server
+		// (type 3) is done from the Tunnels page.
+		askConfirm("Connect", "Connect to " + server.Tag + "?", () => connectServer(server))
 	}
 
 	const disconnectFromServer = (server) => {

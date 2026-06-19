@@ -193,6 +193,9 @@ func HTTPhandler(w http.ResponseWriter, r *http.Request) {
 	case "connect":
 		HTTP_Connect(w, r)
 		return
+	case "connectServer":
+		HTTP_ServerConnect(w, r)
+		return
 	case "autoConnect":
 		HTTP_AutoConnect(w, r)
 		return
@@ -457,6 +460,24 @@ func HTTP_Connect(w http.ResponseWriter, r *http.Request) {
 	}
 
 	code, err := PublicConnect(ns)
+	if err != nil {
+		STRING(w, r, code, err.Error())
+		return
+	}
+	JSON(w, r, code, nil)
+}
+
+// HTTP_ServerConnect connects to a chosen server using the default tunnel,
+// reconciling that tunnel's device to the target server first.
+func HTTP_ServerConnect(w http.ResponseWriter, r *http.Request) {
+	ns := new(ConnectionRequest)
+	err := Bind(ns, r)
+	if err != nil {
+		JSON(w, r, 400, err)
+		return
+	}
+
+	code, err := ServerConnect(ns)
 	if err != nil {
 		STRING(w, r, code, err.Error())
 		return
