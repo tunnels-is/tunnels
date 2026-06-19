@@ -99,12 +99,13 @@ type FORM_GET_SERVER struct {
 }
 
 type Server struct {
-	ID      uuid.UUID   `json:"_id"`
-	Tag     string      `json:"Tag"`
-	Country string      `json:"Country"`
-	IP      string      `json:"IP"`
-	Port    string      `json:"Port"`
-	Groups  []uuid.UUID `json:"Groups,omitempty"`
+	ID       uuid.UUID   `json:"_id"`
+	Tag      string      `json:"Tag"`
+	InfraTag string      `json:"InfraTag,omitempty"`
+	Country  string      `json:"Country"`
+	IP       string      `json:"IP"`
+	Port     string      `json:"Port"`
+	Groups   []uuid.UUID `json:"Groups,omitempty"`
 
 	// APIKey is the per-server secret; the wg-server running on this host sends
 	// it in X-WG-KEY to authenticate /wg/server-config/fetch, /wg/peers, and

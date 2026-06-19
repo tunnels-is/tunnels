@@ -48,6 +48,7 @@ export default function ServerDetail() {
   const startEdit = () => {
     setForm({
       Tag: server.Tag || '',
+      InfraTag: server.InfraTag || '',
       IP: server.IP || '',
       Port: server.Port || '443',
       Country: server.Country || '',
@@ -199,6 +200,13 @@ export default function ServerDetail() {
             <input className={inputClass} value={form.Tag} onChange={set('Tag')} required />
           ) : (
             <span>{server.Tag}</span>
+          )}
+        </Row>
+        <Row label="Infra Tag">
+          {editing ? (
+            <input className={inputClass} value={form.InfraTag} onChange={set('InfraTag')} />
+          ) : (
+            <span>{server.InfraTag || '—'}</span>
           )}
         </Row>
         <Row label="IP">

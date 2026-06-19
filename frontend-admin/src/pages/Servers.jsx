@@ -21,7 +21,7 @@ function Modal({ title, onClose, children }) {
 
 const inputClass = "w-full bg-[#fdfcf8] border border-[#e7e3d7] rounded px-3 py-1.5 text-[13px] text-[#0a0a0a] placeholder-[#a3a3a3] focus:outline-none focus:border-[#0a0a0a]";
 
-const emptyForm = () => ({ Tag: '', IP: '', Port: '443', Country: '', WireGuardSubnet: '', WireGuardSubnet6: '', WireGuardPort: 51820, WireGuardIface: 'wg0', InternetIface: '', EnableFirewall: true, InsecureSkipVerify: false });
+const emptyForm = () => ({ Tag: '', InfraTag: '', IP: '', Port: '443', Country: '', WireGuardSubnet: '', WireGuardSubnet6: '', WireGuardPort: 51820, WireGuardIface: 'wg0', InternetIface: '', EnableFirewall: true, InsecureSkipVerify: false });
 
 export default function Servers() {
   const navigate = useNavigate();
@@ -171,6 +171,10 @@ export default function Servers() {
             <div>
               <label className="block text-[11px] text-[#a3a3a3] uppercase tracking-wider mb-1">Tag</label>
               <input type="text" className={inputClass} value={createForm.Tag} onChange={set('Tag')} required />
+            </div>
+            <div>
+              <label className="block text-[11px] text-[#a3a3a3] uppercase tracking-wider mb-1">Infra Tag</label>
+              <input type="text" className={inputClass} value={createForm.InfraTag} onChange={set('InfraTag')} />
             </div>
             <div>
               <label className="block text-[11px] text-[#a3a3a3] uppercase tracking-wider mb-1">IP</label>
