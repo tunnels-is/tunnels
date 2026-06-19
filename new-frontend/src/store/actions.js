@@ -268,6 +268,36 @@ export const connect = async (tunnel, server) => {
 	return ok
 }
 
+// Connects to a specific server using the default tunnel. The client
+// reconciles the default tunnel's device to this server before connecting,
+// so it can safely move between servers. Use connect() instead when a tunnel
+// is linked to its own server.
+export const connectServer = async (server) => {
+	const user = store().user
+	if (!user?.DeviceToken) {
+		store().notifyError("You are not logged in")
+		session.clear()
+		return
+	}
+	if (!server) {
+		store().notifyError("Unable to find server with the given ID")
+		return
+	}
+
+	store().showLoading("Connecting...")
+	const resp = await api("connectServer", {
+		UserID: user._id,
+		DeviceToken: user.DeviceToken.DT,
+		ServerID: server._id,
+		Server: user.ControlServer,
+	})
+	store().hideLoading()
+	const ok = resp.status === 200 || resp.networkError
+	if (ok) store().notifySuccess("Connection ready")
+	await fetchState()
+	return ok
+}
+
 export const disconnect = async (activeTunnel) => {
 	store().showLoading("Disconnecting...")
 	const resp = await api("disconnect", { ID: activeTunnel.ID }, { timeout: 20000 })
