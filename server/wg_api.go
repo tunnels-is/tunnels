@@ -213,6 +213,7 @@ func API_WGConfig(w http.ResponseWriter, r *http.Request) {
 		"WireGuardIPv6":    deviceIPv6,
 		"WireGuardSubnet":  server.WireGuardSubnet,
 		"WireGuardSubnet6": server.WireGuardSubnet6,
+		"WANCIDR":          wanCIDRForServer(server),
 	})
 }
 
