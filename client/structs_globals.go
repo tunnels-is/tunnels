@@ -164,6 +164,12 @@ type TunnelMETA struct {
 	// device out of the default-deny firewall, so it must be set explicitly.
 	AllowAll bool
 
+	// EnableWAN, when true, routes the connected server's WAN CIDR (the
+	// over-arching network aggregating sibling server subnets) through the
+	// tunnel, so traffic to peers on other servers in the same WAN returns
+	// over the VPN. Enabled by default on tunnel creation.
+	EnableWAN bool
+
 	// WireGuard: persistent base64 Curve25519 private key for this device.
 	// Generated on first use and reused across sessions so the server can
 	// keep a stable peer entry (Device.WireGuardKey).

@@ -628,6 +628,17 @@ func (t *TInterface) Connect(tun *TUN) (err error) {
 		}
 	}
 
+	// Route the server's WAN (over-arching network) through the tunnel so
+	// traffic to peers on sibling servers in the same WAN returns over the VPN.
+	if meta.EnableWAN {
+		if wan := tun.ServerResponse.WANCIDR; wan != "" {
+			err = IP_AddRoute(wan, meta.IFName, t.IPv4Address, "0")
+			if err != nil {
+				return err
+			}
+		}
+	}
+
 	for _, n := range tun.ServerResponse.Networks {
 		if n.Nat != "" {
 			err = IP_AddRoute(n.Nat, meta.IFName, t.IPv4Address, "0")

@@ -201,6 +201,7 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		WireGuardPort:    wgCfg.WireGuardPort,
 		WireGuardSubnet:  wgCfg.WireGuardSubnet,
 		WireGuardSubnet6: wgCfg.WireGuardSubnet6,
+		WANCIDR:          wgCfg.WANCIDR,
 	}
 	tunnel.ServerResponse = ServerReponse
 
@@ -301,6 +302,7 @@ type wgServerConfig struct {
 	WireGuardIP      string `json:"WireGuardIP"`
 	WireGuardSubnet  string `json:"WireGuardSubnet"`
 	WireGuardSubnet6 string `json:"WireGuardSubnet6"`
+	WANCIDR          string `json:"WANCIDR"`
 }
 
 func getServerWGConfig(cr *ConnectionRequest, serverID string, pubKey string) (*wgServerConfig, error) {
@@ -374,6 +376,7 @@ func createServerDevice(cr *ConnectionRequest, serverID string, pubKey string, t
 		WireGuardIP:      resp.Device.WireGuardIP,
 		WireGuardSubnet:  resp.ServerSubnet,
 		WireGuardSubnet6: resp.ServerSubnet6,
+		WANCIDR:          resp.WANCIDR,
 	}, nil
 }
 
@@ -507,6 +510,7 @@ type createDeviceControllerResponse struct {
 	ServerIP      string        `json:"ServerIP"`
 	ServerSubnet  string        `json:"ServerSubnet"`
 	ServerSubnet6 string        `json:"ServerSubnet6"`
+	WANCIDR       string        `json:"WANCIDR"`
 }
 
 type createDeviceWithKeysResult struct {

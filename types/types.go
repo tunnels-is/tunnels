@@ -226,6 +226,11 @@ type ServerConnectResponse struct {
 	WireGuardPort    string `json:"WireGuardPort,omitempty"`
 	WireGuardSubnet  string `json:"WireGuardSubnet,omitempty"`
 	WireGuardSubnet6 string `json:"WireGuardSubnet6,omitempty"`
+
+	// WANCIDR is the over-arching network (WAN) the connected server belongs
+	// to. When non-empty and the tunnel has EnableWAN set, the client routes
+	// this CIDR through the tunnel to reach peers on sibling servers.
+	WANCIDR string `json:"WANCIDR,omitempty"`
 }
 
 type FORM_GET_DEVICE struct {

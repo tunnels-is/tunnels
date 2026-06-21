@@ -618,6 +618,7 @@ func API_DeviceCreate(w http.ResponseWriter, r *http.Request) {
 			"ServerIP":      wgServer.IP,
 			"ServerSubnet":  wgServer.WireGuardSubnet,
 			"ServerSubnet6": wgServer.WireGuardSubnet6,
+			"WANCIDR":       wanCIDRForServer(wgServer),
 		})
 	} else {
 		sendObject(w, F.Device)
@@ -694,6 +695,7 @@ func API_AdminDeviceCreate(w http.ResponseWriter, r *http.Request) {
 			"ServerIP":      wgServer.IP,
 			"ServerSubnet":  wgServer.WireGuardSubnet,
 			"ServerSubnet6": wgServer.WireGuardSubnet6,
+			"WANCIDR":       wanCIDRForServer(wgServer),
 		})
 	} else {
 		sendObject(w, F.Device)
