@@ -104,8 +104,8 @@ export default function Groups() {
 
       {error && <p className="text-[12px] text-[#dc2626] mb-3">{error}</p>}
 
-      <div className="bg-white border border-[#e7e3d7] rounded-lg overflow-hidden card-shadow">
-        <div className="grid grid-cols-[1fr_200px] gap-4 px-4 py-2 border-b border-[#e7e3d7] bg-[#ffffff]">
+      <div className="bg-white border border-[#e7e3d7] rounded-lg overflow-x-auto card-shadow">
+        <div className="grid grid-cols-[1fr_200px] min-w-[480px] gap-4 px-4 py-2 border-b border-[#e7e3d7] bg-[#ffffff]">
           {['Tag', 'Created'].map((h) => (
             <span key={h} className="text-[10px] text-[#a3a3a3] uppercase tracking-wider">{h}</span>
           ))}
@@ -119,7 +119,7 @@ export default function Groups() {
           <div
             key={g._id}
             onClick={() => navigate(`/groups/${g._id}`, { state: { group: g } })}
-            className="grid grid-cols-[1fr_200px] gap-4 px-4 py-2.5 border-b border-[#e7e3d7]/50 hover:bg-black/[0.03] cursor-pointer items-center"
+            className="grid grid-cols-[1fr_200px] min-w-[480px] gap-4 px-4 py-2.5 border-b border-[#e7e3d7]/50 hover:bg-black/[0.03] cursor-pointer items-center"
           >
             <span className="text-[13px] text-[#0a0a0a]">{g.Tag}</span>
             <span className="text-[11px] text-[#a3a3a3] font-mono">

@@ -117,8 +117,8 @@ export default function Devices() {
 
       {error && <p className="text-[12px] text-[#dc2626] mb-3">{error}</p>}
 
-      <div className="bg-white border border-[#e7e3d7] rounded-lg overflow-hidden card-shadow">
-        <div className="grid grid-cols-[1fr_130px_120px_160px] gap-4 px-4 py-2 border-b border-[#e7e3d7] bg-[#ffffff]">
+      <div className="bg-white border border-[#e7e3d7] rounded-lg overflow-x-auto card-shadow">
+        <div className="grid grid-cols-[1fr_130px_120px_160px] min-w-[680px] gap-4 px-4 py-2 border-b border-[#e7e3d7] bg-[#ffffff]">
           {['Tag', 'WireGuard IP', 'Server', 'Created'].map((h) => (
             <span key={h} className="text-[10px] text-[#a3a3a3] uppercase tracking-wider">{h}</span>
           ))}
@@ -132,7 +132,7 @@ export default function Devices() {
           <div
             key={d._id}
             onClick={() => navigate(`/devices/${d._id}`, { state: { device: d } })}
-            className="grid grid-cols-[1fr_130px_120px_160px] gap-4 px-4 py-2.5 border-b border-[#e7e3d7]/50 hover:bg-black/[0.03] cursor-pointer items-center"
+            className="grid grid-cols-[1fr_130px_120px_160px] min-w-[680px] gap-4 px-4 py-2.5 border-b border-[#e7e3d7]/50 hover:bg-black/[0.03] cursor-pointer items-center"
           >
             <span className="text-[13px] text-[#0a0a0a] truncate">{d.Tag}</span>
             <span className="text-[12px] text-[#525252] font-mono truncate">{d.WireGuardIP || '—'}</span>
