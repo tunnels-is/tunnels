@@ -185,6 +185,25 @@ func attachWANs(servers ...*types.Server) {
 	}
 }
 
+// wanCIDRForServer resolves the CIDR of the WAN a server belongs to, or ""
+// when the server has no WAN reference (or the referenced WAN was deleted).
+// Used to tell connecting clients which over-arching network to route through
+// the tunnel.
+func wanCIDRForServer(s *types.Server) string {
+	if s == nil || s.WANID == "" {
+		return ""
+	}
+	id, err := uuid.Parse(s.WANID)
+	if err != nil {
+		return ""
+	}
+	wan, err := DB_findWANByID(id)
+	if err != nil || wan == nil {
+		return ""
+	}
+	return wan.CIDR
+}
+
 // validateWAN checks required fields and the CIDR format.
 func validateWAN(wan *types.WAN) error {
 	if wan == nil {

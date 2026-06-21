@@ -78,6 +78,7 @@ func createTunnel() (T *TunnelMETA) {
 	T.DNSRecords = make([]*types.DNSRecord, 0)
 	T.Routes = make([]*types.Route, 0)
 	T.KillSwitch = true
+	T.EnableWAN = true
 	return
 }
 
