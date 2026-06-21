@@ -13,6 +13,7 @@ const FEATURE_TOGGLES = [
 	{ key: "AutoConnect", label: "Auto Connect" },
 	{ key: "KillSwitch", label: "Kill Switch" },
 	{ key: "EnableDefaultRoute", label: "Default Route" },
+	{ key: "EnableWAN", label: "WAN Routing" },
 ]
 
 const RemoveBtn = ({ onClick }) => (
