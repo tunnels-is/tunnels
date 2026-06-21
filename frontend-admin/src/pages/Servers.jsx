@@ -132,9 +132,7 @@ export default function Servers() {
           <div className="px-4 py-6 text-[12px] text-[#a3a3a3]">No servers found</div>
         )}
 
-        {servers.map((s) => {
-          const wan = s.WANID ? wans.find((w) => w.ID === s.WANID) : null;
-          return (
+        {servers.map((s) => (
           <div
             key={s._id}
             onClick={() => navigate(`/servers/${s._id}`, { state: { server: s } })}
@@ -146,8 +144,8 @@ export default function Servers() {
             <span className="text-[12px] text-[#525252] font-mono truncate">{s.WireGuardIface || '—'}</span>
             <span className="text-[12px] text-[#525252] font-mono truncate">{s.InternetIface || '—'}</span>
             <span className="text-[11px] text-[#a3a3a3] font-mono truncate">{s.WireGuardSubnet || '—'}</span>
-            <span className="text-[11px] text-[#525252] truncate" title={wan ? `${wan.Tag} (${wan.CIDR})` : (s.WANID || '')}>
-              {wan ? wan.Tag : <span className="text-[#a3a3a3]">—</span>}
+            <span className="text-[11px] text-[#525252] truncate" title={s.WAN ? `${s.WAN.Tag} (${s.WAN.CIDR})` : (s.WANID || '')}>
+              {s.WAN ? s.WAN.Tag : <span className="text-[#a3a3a3]">—</span>}
             </span>
             <span className={`text-[12px] ${s.EnableFirewall ? 'text-[#15803d]' : 'text-[#a3a3a3]'}`}>
               {s.EnableFirewall ? 'On' : 'Off'}
@@ -156,8 +154,7 @@ export default function Servers() {
               {s.WireGuardPubKey ? s.WireGuardPubKey.slice(0, 16) + '…' : '—'}
             </span>
           </div>
-          );
-        })}
+        ))}
       </div>
 
       <div className="flex items-center justify-between mt-3 px-1">

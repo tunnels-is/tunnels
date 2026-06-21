@@ -333,11 +333,9 @@ export default function ServerDetail() {
               </select>
             ) : (
               <span className="text-[12px]">
-                {(() => {
-                  const wan = server.WANID ? wans.find((w) => w.ID === server.WANID) : null;
-                  if (wan) return <>{wan.Tag} <span className="font-mono text-[#a3a3a3]">({wan.CIDR})</span></>;
-                  return server.WANID || '—';
-                })()}
+                {server.WAN ? (
+                  <>{server.WAN.Tag} <span className="font-mono text-[#a3a3a3]">({server.WAN.CIDR})</span></>
+                ) : (server.WANID || '—')}
               </span>
             )}
           </Row>
