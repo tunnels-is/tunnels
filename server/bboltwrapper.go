@@ -765,6 +765,8 @@ func BBolt_CreateGroup(G *Group) error {
 func BBolt_CreateServer(S *types.Server) error {
 	return BBoltDB.Update(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(SERVERS_BUCKET))
+		// WAN is a resolved, read-only field — never persist it (only WANID is).
+		S.WAN = nil
 		id := S.ID.String()
 		if S.APIKey != "" {
 			apikeyIdx := tx.Bucket([]byte(SERVERS_APIKEY_INDEX))

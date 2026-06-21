@@ -126,6 +126,11 @@ type Server struct {
 	// WAN propagate; resolve the WAN by this ID when its CIDR/Tag is needed.
 	WANID string `json:"WANID,omitempty"`
 
+	// WAN is the resolved WAN referenced by WANID. It is NOT persisted — it is
+	// populated only on get/list server responses (by loading the WAN table and
+	// matching WANID) so callers get the live WAN without a second lookup.
+	WAN *WAN `json:"WAN,omitempty"`
+
 	// APIKey is the per-server secret; the wg-server running on this host sends
 	// it in X-WG-KEY to authenticate /wg/server-config/fetch, /wg/peers, and
 	// /wg/servers. Empty when WG is not enabled on this server.
