@@ -741,6 +741,7 @@ func API_AdminServerGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	attachWANs(server)
 	sendObject(w, server)
 }
 
@@ -759,6 +760,7 @@ func API_AdminServersList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	attachWANs(servers...)
 	sendObject(w, servers)
 }
 
@@ -1127,6 +1129,7 @@ func API_ServersForUserByCountry(w http.ResponseWriter, r *http.Request) {
 		matched[i] = sanitizeServerForClient(s)
 	}
 
+	attachWANs(matched...)
 	sendObject(w, matched)
 }
 
@@ -1166,6 +1169,7 @@ func API_ServersForUser(w http.ResponseWriter, r *http.Request) {
 		servers[i] = sanitizeServerForClient(s)
 	}
 
+	attachWANs(servers...)
 	sendObject(w, servers)
 }
 
@@ -1283,7 +1287,9 @@ func API_ServerGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sendObject(w, sanitizeServerForClient(server))
+	sc := sanitizeServerForClient(server)
+	attachWANs(sc)
+	sendObject(w, sc)
 }
 
 func API_UserResetPassword(w http.ResponseWriter, r *http.Request) {
