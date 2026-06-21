@@ -151,6 +151,40 @@ func API_AdminWANList(w http.ResponseWriter, r *http.Request) {
 	sendObject(w, wans)
 }
 
+// attachWANs populates the transient Server.WAN field on each server from its
+// WANID by loading the WAN table once. WAN is never persisted (it is the
+// resolved form of WANID); this enriches get/list responses so callers receive
+// the live WAN — reflecting any edits — without a second lookup. A WANID with
+// no matching WAN (e.g. the WAN was deleted) leaves WAN nil.
+func attachWANs(servers ...*types.Server) {
+	hasRef := false
+	for _, s := range servers {
+		if s != nil && s.WANID != "" {
+			hasRef = true
+			break
+		}
+	}
+	if !hasRef {
+		return
+	}
+
+	wans, err := DB_ListWANs(1000000, 0)
+	if err != nil {
+		ERR(err)
+		return
+	}
+	byID := make(map[string]*types.WAN, len(wans))
+	for _, wan := range wans {
+		byID[wan.ID.String()] = wan
+	}
+
+	for _, s := range servers {
+		if s != nil && s.WANID != "" {
+			s.WAN = byID[s.WANID]
+		}
+	}
+}
+
 // validateWAN checks required fields and the CIDR format.
 func validateWAN(wan *types.WAN) error {
 	if wan == nil {
