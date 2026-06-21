@@ -229,14 +229,14 @@ export default function UserDetail() {
           <h2 className="text-[13px] font-semibold text-[#0a0a0a] mb-2">
             Active Sessions <span className="text-[#a3a3a3] font-normal">({user.Tokens.length})</span>
           </h2>
-          <div className="bg-white border border-[#e7e3d7] rounded-lg overflow-hidden card-shadow">
-            <div className="grid grid-cols-[1fr_160px] gap-4 px-4 py-2 border-b border-[#e7e3d7] bg-[#ffffff]">
+          <div className="bg-white border border-[#e7e3d7] rounded-lg overflow-x-auto card-shadow">
+            <div className="grid grid-cols-[1fr_160px] min-w-[420px] gap-4 px-4 py-2 border-b border-[#e7e3d7] bg-[#ffffff]">
               {['Device Name', 'Created'].map((h) => (
                 <span key={h} className="text-[10px] text-[#a3a3a3] uppercase tracking-wider">{h}</span>
               ))}
             </div>
             {user.Tokens.map((t, i) => (
-              <div key={i} className="grid grid-cols-[1fr_160px] gap-4 px-4 py-2.5 border-b border-[#e7e3d7]/50 items-center">
+              <div key={i} className="grid grid-cols-[1fr_160px] min-w-[420px] gap-4 px-4 py-2.5 border-b border-[#e7e3d7]/50 items-center">
                 <span className="text-[13px] text-[#262626]">{t.N || '—'}</span>
                 <span className="text-[11px] text-[#a3a3a3] font-mono">
                   {t.Created ? dayjs(t.Created).format('DD-MM-YYYY HH:mm') : '—'}

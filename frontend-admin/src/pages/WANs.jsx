@@ -141,8 +141,8 @@ export default function WANs() {
 
       {error && <p className="text-[12px] text-[#dc2626] mb-3">{error}</p>}
 
-      <div className="border border-[#e7e3d7] rounded-lg overflow-hidden bg-white">
-        <table className="w-full text-[13px]">
+      <div className="border border-[#e7e3d7] rounded-lg overflow-x-auto bg-white">
+        <table className="w-full min-w-[560px] text-[13px]">
           <thead>
             <tr className="border-b border-[#e7e3d7] text-[#737373]">
               <th className="text-left font-medium px-4 py-2.5">Tag</th>
