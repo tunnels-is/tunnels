@@ -30,6 +30,7 @@ export default function ServerDetail() {
   const [confirmingRegen, setConfirmingRegen] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
   const [keyError, setKeyError] = useState('');
+  const [wans, setWans] = useState([]);
 
   const load = async () => {
     const resp = await apiPost('/ui/server', { ServerID: id });
@@ -38,11 +39,24 @@ export default function ServerDetail() {
     }
   };
 
+  const loadWans = async () => {
+    try {
+      const resp = await apiPost('/ui/wan/list', {});
+      if (resp.status === 200) {
+        const data = await resp.json();
+        setWans(Array.isArray(data) ? data : []);
+      }
+    } catch {
+      // non-fatal: the WAN selector just stays empty
+    }
+  };
+
   // location.state.server is only an instant-paint placeholder from the list,
   // which may be stale (e.g. after an APIKey rotation). Always refetch the
   // authoritative record from the backend on mount.
   useEffect(() => {
     load();
+    loadWans();
   }, [id]);
 
   const startEdit = () => {
@@ -59,6 +73,7 @@ export default function ServerDetail() {
       InternetIface: server.InternetIface || '',
       EnableFirewall: !!server.EnableFirewall,
       InsecureSkipVerify: !!server.InsecureSkipVerify,
+      WANID: server.WANID || '',
     });
     setError('');
     setEditing(true);
@@ -306,6 +321,24 @@ export default function ServerDetail() {
               <input className={inputClass} value={form.InternetIface} onChange={set('InternetIface')} />
             ) : (
               <span className="font-mono text-[12px]">{server.InternetIface || '—'}</span>
+            )}
+          </Row>
+          <Row label="WAN">
+            {editing ? (
+              <select className={inputClass} value={form.WANID} onChange={set('WANID')}>
+                <option value="">None</option>
+                {wans.map((w) => (
+                  <option key={w.ID} value={w.ID}>{w.Tag} ({w.CIDR})</option>
+                ))}
+              </select>
+            ) : (
+              <span className="text-[12px]">
+                {(() => {
+                  const wan = server.WANID ? wans.find((w) => w.ID === server.WANID) : null;
+                  if (wan) return <>{wan.Tag} <span className="font-mono text-[#a3a3a3]">({wan.CIDR})</span></>;
+                  return server.WANID || '—';
+                })()}
+              </span>
             )}
           </Row>
           <Row label="Firewall">
