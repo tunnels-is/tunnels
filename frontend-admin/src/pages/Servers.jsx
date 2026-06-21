@@ -21,7 +21,7 @@ function Modal({ title, onClose, children }) {
 
 const inputClass = "w-full bg-[#fdfcf8] border border-[#e7e3d7] rounded px-3 py-1.5 text-[13px] text-[#0a0a0a] placeholder-[#a3a3a3] focus:outline-none focus:border-[#0a0a0a]";
 
-const emptyForm = () => ({ Tag: '', InfraTag: '', IP: '', Port: '443', Country: '', WireGuardSubnet: '', WireGuardSubnet6: '', WireGuardPort: 51820, WireGuardIface: 'wg0', InternetIface: '', EnableFirewall: true, InsecureSkipVerify: false });
+const emptyForm = () => ({ Tag: '', InfraTag: '', IP: '', Port: '443', Country: '', WireGuardSubnet: '', WireGuardSubnet6: '', WireGuardPort: 51820, WireGuardIface: 'wg0', InternetIface: '', EnableFirewall: true, InsecureSkipVerify: false, WANID: '' });
 
 export default function Servers() {
   const navigate = useNavigate();
@@ -34,6 +34,19 @@ export default function Servers() {
   const [createError, setCreateError] = useState('');
   const [startIndex, setStartIndex] = useState(0);
   const [hasMore, setHasMore] = useState(false);
+  const [wans, setWans] = useState([]);
+
+  const loadWans = async () => {
+    try {
+      const resp = await apiPost('/ui/wan/list', {});
+      if (resp.status === 200) {
+        const data = await resp.json();
+        setWans(Array.isArray(data) ? data : []);
+      }
+    } catch {
+      // non-fatal: the WAN selector just stays empty
+    }
+  };
 
   const load = async (index = startIndex) => {
     setLoading(true);
@@ -57,7 +70,7 @@ export default function Servers() {
     }
   };
 
-  useEffect(() => { load(0); }, []);
+  useEffect(() => { load(0); loadWans(); }, []);
 
   const handleCreate = async (e) => {
     e.preventDefault();
@@ -109,8 +122,8 @@ export default function Servers() {
       {error && <p className="text-[12px] text-[#dc2626] mb-3">{error}</p>}
 
       <div className="bg-white border border-[#e7e3d7] rounded-lg overflow-hidden card-shadow">
-        <div className="grid grid-cols-[1fr_120px_60px_90px_90px_120px_70px_160px] gap-4 px-4 py-2 border-b border-[#e7e3d7] bg-[#ffffff]">
-          {['Tag', 'IP', 'Port', 'WG Iface', 'Net Iface', 'WG Subnet', 'Firewall', 'WG Pub Key'].map((h) => (
+        <div className="grid grid-cols-[1fr_110px_50px_80px_80px_110px_100px_60px_150px] gap-4 px-4 py-2 border-b border-[#e7e3d7] bg-[#ffffff]">
+          {['Tag', 'IP', 'Port', 'WG Iface', 'Net Iface', 'WG Subnet', 'WAN', 'Firewall', 'WG Pub Key'].map((h) => (
             <span key={h} className="text-[10px] text-[#a3a3a3] uppercase tracking-wider">{h}</span>
           ))}
         </div>
@@ -119,11 +132,13 @@ export default function Servers() {
           <div className="px-4 py-6 text-[12px] text-[#a3a3a3]">No servers found</div>
         )}
 
-        {servers.map((s) => (
+        {servers.map((s) => {
+          const wan = s.WANID ? wans.find((w) => w.ID === s.WANID) : null;
+          return (
           <div
             key={s._id}
             onClick={() => navigate(`/servers/${s._id}`, { state: { server: s } })}
-            className="grid grid-cols-[1fr_120px_60px_90px_90px_120px_70px_160px] gap-4 px-4 py-2.5 border-b border-[#e7e3d7]/50 hover:bg-black/[0.03] cursor-pointer items-center"
+            className="grid grid-cols-[1fr_110px_50px_80px_80px_110px_100px_60px_150px] gap-4 px-4 py-2.5 border-b border-[#e7e3d7]/50 hover:bg-black/[0.03] cursor-pointer items-center"
           >
             <span className="text-[13px] text-[#0a0a0a] truncate">{s.Tag}</span>
             <span className="text-[12px] text-[#525252] font-mono truncate">{s.IP}</span>
@@ -131,6 +146,9 @@ export default function Servers() {
             <span className="text-[12px] text-[#525252] font-mono truncate">{s.WireGuardIface || '—'}</span>
             <span className="text-[12px] text-[#525252] font-mono truncate">{s.InternetIface || '—'}</span>
             <span className="text-[11px] text-[#a3a3a3] font-mono truncate">{s.WireGuardSubnet || '—'}</span>
+            <span className="text-[11px] text-[#525252] truncate" title={wan ? `${wan.Tag} (${wan.CIDR})` : (s.WANID || '')}>
+              {wan ? wan.Tag : <span className="text-[#a3a3a3]">—</span>}
+            </span>
             <span className={`text-[12px] ${s.EnableFirewall ? 'text-[#15803d]' : 'text-[#a3a3a3]'}`}>
               {s.EnableFirewall ? 'On' : 'Off'}
             </span>
@@ -138,7 +156,8 @@ export default function Servers() {
               {s.WireGuardPubKey ? s.WireGuardPubKey.slice(0, 16) + '…' : '—'}
             </span>
           </div>
-        ))}
+          );
+        })}
       </div>
 
       <div className="flex items-center justify-between mt-3 px-1">
@@ -207,6 +226,15 @@ export default function Servers() {
             <div>
               <label className="block text-[11px] text-[#a3a3a3] uppercase tracking-wider mb-1">Internet Interface</label>
               <input type="text" className={inputClass} value={createForm.InternetIface} onChange={set('InternetIface')} placeholder="eth0" />
+            </div>
+            <div>
+              <label className="block text-[11px] text-[#a3a3a3] uppercase tracking-wider mb-1">WAN</label>
+              <select className={inputClass} value={createForm.WANID} onChange={set('WANID')}>
+                <option value="">None</option>
+                {wans.map((w) => (
+                  <option key={w.ID} value={w.ID}>{w.Tag} ({w.CIDR})</option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="block text-[11px] text-[#a3a3a3] uppercase tracking-wider mb-1">Firewall</label>
