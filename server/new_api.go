@@ -102,6 +102,12 @@ func launchAPIServer() {
 	mux.Handle("POST /ui/server/update", adminMW(API_AdminServerUpdate))
 	mux.Handle("POST /ui/server/delete", adminMW(API_AdminServerDelete))
 
+	mux.Handle("POST /ui/wan/create", adminMW(API_AdminWANCreate))
+	mux.Handle("POST /ui/wan/update", adminMW(API_AdminWANUpdate))
+	mux.Handle("POST /ui/wan/delete", adminMW(API_AdminWANDelete))
+	mux.Handle("POST /ui/wan/list", adminMW(API_AdminWANList))
+	mux.Handle("POST /ui/wan", adminMW(API_AdminWANGet))
+
 	tlsConfig := APITLSConfig.Load()
 
 	addr := fmt.Sprintf("%s:%s",

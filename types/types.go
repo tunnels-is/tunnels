@@ -98,6 +98,18 @@ type FORM_GET_SERVER struct {
 	ServerID    uuid.UUID `json:"ServerID"`
 }
 
+// WAN describes an over-arching network that aggregates one or more
+// WireGuard server subnets (e.g. 10.0.0.0/8 covering 10.0.0.0/16 and
+// 10.3.0.0/16). Clients can route the whole WAN CIDR through the tunnel so
+// replies to any peer in the fleet return over the VPN instead of leaking
+// out the physical interface.
+type WAN struct {
+	ID          uuid.UUID `json:"ID"`
+	Tag         string    `json:"Tag"`
+	CIDR        string    `json:"CIDR"`
+	Description string    `json:"Description,omitempty"`
+}
+
 type Server struct {
 	ID       uuid.UUID   `json:"_id"`
 	Tag      string      `json:"Tag"`
@@ -106,6 +118,13 @@ type Server struct {
 	IP       string      `json:"IP"`
 	Port     string      `json:"Port"`
 	Groups   []uuid.UUID `json:"Groups,omitempty"`
+
+	// WANID references the over-arching network (WAN) this server's subnet
+	// belongs to, by WAN.ID. Optional — when set, clients can route the whole
+	// WAN CIDR through the tunnel to reach peers on sibling servers in the same
+	// WAN. Stored as a reference rather than an embedded copy so edits to the
+	// WAN propagate; resolve the WAN by this ID when its CIDR/Tag is needed.
+	WANID string `json:"WANID,omitempty"`
 
 	// APIKey is the per-server secret; the wg-server running on this host sends
 	// it in X-WG-KEY to authenticate /wg/server-config/fetch, /wg/peers, and

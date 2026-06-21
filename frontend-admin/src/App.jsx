@@ -10,6 +10,7 @@ import Groups from './pages/Groups';
 import GroupDetail from './pages/GroupDetail';
 import Servers from './pages/Servers';
 import ServerDetail from './pages/ServerDetail';
+import WANs from './pages/WANs';
 
 function RequireAuth({ children }) {
   if (!isLoggedIn()) {
@@ -40,6 +41,7 @@ export default function App() {
           <Route path="groups/:id" element={<GroupDetail />} />
           <Route path="servers" element={<Servers />} />
           <Route path="servers/:id" element={<ServerDetail />} />
+          <Route path="wans" element={<WANs />} />
           <Route path="*" element={<Navigate to="/users" replace />} />
         </Route>
       </Routes>
