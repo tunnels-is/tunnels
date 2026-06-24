@@ -134,7 +134,10 @@ const Tunnels = () => {
 									}
 								/>
 								<InfoLine label="Interface" value={tunnel.IFName || <span className="italic opacity-50">none</span>} />
-								<InfoLine label="IPv4" value={tunnel.IPv4Address || <span className="italic opacity-50">none</span>} />
+								<InfoLine
+									label="IPv4"
+									value={active?.CRResponse?.WireGuardIP || <span className="italic opacity-50">none</span>}
+								/>
 								<InfoLine label="MTU / TxQ" value={`${tunnel.MTU} / ${tunnel.TxQueueLen}`} />
 								{active && (
 									<div className="mt-2 flex gap-4 border-t border-base-200 pt-2">
