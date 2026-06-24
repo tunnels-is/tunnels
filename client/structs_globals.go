@@ -440,9 +440,6 @@ type TUN struct {
 
 	// Server States
 	PingInt atomic.Int64
-	CPU     byte
-	DISK    byte
-	MEM     byte
 
 	// EGRESS PACKET STUFF
 	EP_Protocol         byte
@@ -555,9 +552,6 @@ func (t *TUN) MarshalJSON() ([]byte, error) {
 		ID               string
 		CR               *ConnectionRequest
 		CRResponse       *types.ServerConnectResponse
-		CPU              byte
-		DISK             byte
-		MEM              byte
 		Egress           string
 		Ingress          string
 		BandwidthHistory []BandwidthRecord `json:"BandwidthHistory,omitempty"`
@@ -565,9 +559,6 @@ func (t *TUN) MarshalJSON() ([]byte, error) {
 		t.ID,
 		t.CR,
 		t.ServerResponse,
-		t.CPU,
-		t.DISK,
-		t.MEM,
 		eb,
 		ib,
 		bwHistory,

@@ -159,6 +159,47 @@ const MultiGraph = ({ series, dataKey, rangeSeconds, height = 170 }) => {
 	)
 }
 
+// Compact per-tunnel summary bar shown above the charts: identity (tag, server,
+// assigned IPv4) and session totals over the selected range.
+const TunnelInfoBar = ({ rows }) => {
+	if (rows.length === 0) return null
+	return (
+		<div className="mb-3 flex flex-col gap-1.5">
+			{rows.map((r) => (
+				<div
+					key={r.id}
+					className="flex flex-wrap items-center gap-x-5 gap-y-1.5 rounded-box border border-base-300 bg-base-100 px-3 py-2 text-[11px]"
+				>
+					<div className="flex min-w-0 items-center gap-2">
+						<div className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: r.color }} />
+						<span className="truncate font-semibold tracking-tight">{r.tag}</span>
+					</div>
+
+					<span className="flex items-center gap-1.5">
+						<span className="text-[10px] uppercase opacity-40">Server</span>
+						<span className="font-mono opacity-80">{r.server}</span>
+					</span>
+					<span className="flex items-center gap-1.5">
+						<span className="text-[10px] uppercase opacity-40">IPv4</span>
+						<span className="font-mono opacity-80">{r.ipv4}</span>
+					</span>
+
+					<span className="flex items-center gap-3 sm:ml-auto">
+						<span className="flex items-center gap-1.5">
+							<span className="text-[10px] uppercase opacity-40">Down</span>
+							<span className="font-mono opacity-80">{formatBytes(r.totalIg)}</span>
+						</span>
+						<span className="flex items-center gap-1.5">
+							<span className="text-[10px] uppercase opacity-40">Up</span>
+							<span className="font-mono opacity-80">{formatBytes(r.totalEg)}</span>
+						</span>
+					</span>
+				</div>
+			))}
+		</div>
+	)
+}
+
 const StatsRow = ({ series, dataKey }) => (
 	<div className="flex flex-col gap-1.5">
 		{series.map((s) => {
@@ -195,6 +236,7 @@ const StatsRow = ({ series, dataKey }) => (
 // responsible for only rendering this when Config.BandwidthGraphs is on.
 const BandwidthCharts = () => {
 	const activeTunnels = useStore((s) => s.activeTunnels)
+	const servers = useStore((s) => s.servers)
 	const [range, setRange] = useState(TIME_RANGES[0])
 	const [disabledTunnels, setDisabledTunnels] = useState({})
 
@@ -224,6 +266,24 @@ const BandwidthCharts = () => {
 		})
 		return { series: out, totalSamples: samples }
 	}, [tunnels, range, disabledTunnels])
+
+	const infoRows = useMemo(() => {
+		const colors = seriesColors()
+		const serverMap = Object.fromEntries(servers.map((s) => [s._id, s]))
+		const cutoff = Date.now() - range.seconds * 1000
+		return tunnels.map((tun, idx) => {
+			const records = (tun.BandwidthHistory || []).filter((r) => new Date(r?.ts) >= cutoff)
+			return {
+				id: tun.ID,
+				color: colors[idx % colors.length],
+				tag: tun.CR?.Tag || tun.ID?.slice(0, 8),
+				server: serverMap[tun.CR?.ServerID]?.Tag || tun.CR?.ServerIP || "—",
+				ipv4: tun.CRResponse?.WireGuardIP || "—",
+				totalEg: records.reduce((a, r) => a + r.eg, 0),
+				totalIg: records.reduce((a, r) => a + r.ig, 0),
+			}
+		})
+	}, [tunnels, servers, range])
 
 	if (tunnels.length === 0) return null
 
@@ -266,6 +326,8 @@ const BandwidthCharts = () => {
 					{totalSamples} sample{totalSamples !== 1 ? "s" : ""}
 				</span>
 			</Toolbar>
+
+			<TunnelInfoBar rows={infoRows} />
 
 			<div className="grid grid-cols-1 gap-4 2xl:grid-cols-2">
 				{[
