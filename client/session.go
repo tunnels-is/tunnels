@@ -334,12 +334,21 @@ func createServerDevice(cr *ConnectionRequest, serverID string, pubKey string, t
 		tag = DefaultTunnelName
 	}
 
+	// The default tunnel is named "tunnels" on every machine, so its controller
+	// device would otherwise collide by name. Give the default device a unique
+	// tag ("tunnel-<unixnano>") at creation; the WireGuard key still identifies
+	// the device for reuse on later connects.
+	deviceTag := tag
+	if tag == DefaultTunnelName {
+		deviceTag = fmt.Sprintf("tunnel-%d", time.Now().UnixNano())
+	}
+
 	url := cr.Server.GetURL("/client/device/create")
 	reqBody := &createDeviceRequest{
 		DeviceToken: cr.DeviceToken,
 		UID:         cr.UserID,
 		Device: &types.Device{
-			Tag:          tag,
+			Tag:          deviceTag,
 			WireGuardKey: pubKey,
 			ServerID:     serverOID,
 		},
