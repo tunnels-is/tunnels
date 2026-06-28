@@ -1,15 +1,9 @@
 import { useEffect, useMemo } from "react"
 import { useNavigate } from "react-router-dom"
-import { Copy, Pencil, Server, Trash2, Users, Zap, ZapOff } from "lucide-react"
+import { Pencil, Server, Shield, Trash2, Zap, ZapOff } from "lucide-react"
 import { Page } from "@/components/ui"
 import { connect, createTunnel, deleteTunnel, disconnect, fetchServers, fetchState } from "@/store/actions"
-import { encTypeName } from "@/lib/format"
 import { useStore } from "@/store/store"
-
-const copyText = (text) => {
-	navigator.clipboard?.writeText(text)
-	useStore.getState().notifySuccess("Copied to clipboard")
-}
 
 const InfoLine = ({ label, value }) => (
 	<div className="flex items-baseline justify-between gap-3 py-0.5">
@@ -68,34 +62,7 @@ const Tunnels = () => {
 									(active ? "border-success/50" : "border-base-300 hover:border-primary/40")
 								}
 							>
-								<div className="absolute right-2 top-2 flex gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-									{active ? (
-										<button
-											className="btn btn-square btn-ghost btn-xs text-error"
-											title="Disconnect"
-											onClick={() => askConfirm("Disconnect", "Disconnect " + tunnel.Tag + "?", () => disconnect(active))}
-										>
-											<ZapOff size={12} />
-										</button>
-									) : (
-										<button
-											className="btn btn-square btn-ghost btn-xs text-success"
-											title="Connect"
-											onClick={() => askConfirm("Connect", "Connect " + tunnel.Tag + "?", () => connect(tunnel))}
-										>
-											<Zap size={12} />
-										</button>
-									)}
-									<button className="btn btn-square btn-ghost btn-xs opacity-60" title="Copy Tag" onClick={() => copyText(tunnel.Tag)}>
-										<Copy size={12} />
-									</button>
-									<button
-										className="btn btn-square btn-ghost btn-xs opacity-60"
-										title="Peer List"
-										onClick={() => navigate(`/tunnels/${encodeURIComponent(tunnel.Tag)}/peers`)}
-									>
-										<Users size={12} />
-									</button>
+								<div className="absolute right-2 top-2 flex gap-0.5">
 									<button
 										className="btn btn-square btn-ghost btn-xs opacity-60"
 										title="Edit"
@@ -112,12 +79,9 @@ const Tunnels = () => {
 									</button>
 								</div>
 
-								<div className="mb-2 flex items-center gap-2 pr-24">
+								<div className="mb-2 flex items-center gap-2 pr-14">
 									<div className={"h-2 w-2 shrink-0 rounded-full " + (active ? "animate-pulse bg-success" : "bg-base-content/20")} />
 									<span className="truncate text-[13px] font-semibold tracking-tight">{tunnel.Tag}</span>
-									<span className="badge badge-ghost badge-xs font-semibold uppercase tracking-wider">
-										{encTypeName(tunnel.EncryptionType)}
-									</span>
 								</div>
 
 								<InfoLine
@@ -144,6 +108,32 @@ const Tunnels = () => {
 										<InfoLine label="Down" value={active.Ingress} />
 										<InfoLine label="Up" value={active.Egress} />
 									</div>
+								)}
+
+								<button
+									className="btn btn-ghost btn-sm mt-3 w-full gap-2 border border-base-300"
+									onClick={() => navigate(`/tunnels/${encodeURIComponent(tunnel.Tag)}/peers`)}
+								>
+									<Shield size={14} />
+									Firewall
+								</button>
+
+								{active ? (
+									<button
+										className="btn btn-sm mt-2 w-full gap-2 btn-error btn-outline"
+										onClick={() => askConfirm("Disconnect", "Disconnect " + tunnel.Tag + "?", () => disconnect(active))}
+									>
+										<ZapOff size={14} />
+										Disconnect
+									</button>
+								) : (
+									<button
+										className="btn btn-sm mt-2 w-full gap-2 btn-success btn-outline"
+										onClick={() => askConfirm("Connect", "Connect " + tunnel.Tag + "?", () => connect(tunnel))}
+									>
+										<Zap size={14} />
+										Connect
+									</button>
 								)}
 							</div>
 						)
