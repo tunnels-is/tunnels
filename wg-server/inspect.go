@@ -161,7 +161,7 @@ func (t *inspectingTUN) allow(pkt []byte) bool {
 		if dstPeer == nil {
 			return false // in our subnet but nobody connected — default-deny
 		}
-		if dstPeer.allowedContains(src) {
+		if dstPeer.allowedContains(src, dport) {
 			return true
 		}
 		return dstPeer.flowMatch(flowKey{remote: src, rport: sport, lport: dport, proto: proto})
@@ -213,17 +213,15 @@ func (t *inspectingTUN) applyControl(src netip.Addr, payload []byte) {
 	if len(msg.Allowed) > aclMaxAllowed {
 		return
 	}
-	// Entries must parse as IP addresses; invalid ones are skipped without
-	// feedback — the control channel is fire-and-forget. No subnet check:
-	// peers can communicate across wg-servers, so an allowed IP may belong
-	// to another server's WG subnet.
-	srcs := make([]netip.Addr, 0, len(msg.Allowed))
+	// Entries must parse as "IP", "IP:PORT", or "*:PORT"; invalid ones are
+	// skipped without feedback — the control channel is fire-and-forget. No
+	// subnet check: peers can communicate across wg-servers, so an allowed IP
+	// may belong to another server's WG subnet.
+	entries := make([]aclEntry, 0, len(msg.Allowed))
 	for _, s := range msg.Allowed {
-		a, err := netip.ParseAddr(s)
-		if err != nil {
-			continue
+		if e, ok := parseACLEntry(s); ok {
+			entries = append(entries, e)
 		}
-		srcs = append(srcs, a)
 	}
 	// The announcement comes from a local resident; apply it to that peer's
 	// entry. An empty list with AllowAll=false clears the policy (replace-set
@@ -234,7 +232,7 @@ func (t *inspectingTUN) applyControl(src netip.Addr, payload []byte) {
 	if !local || p == nil {
 		return
 	}
-	p.setAllowed(srcs, msg.AllowAll)
+	p.setAllowed(entries, msg.AllowAll)
 }
 
 func (t *inspectingTUN) inWGSubnet(a netip.Addr) bool {
