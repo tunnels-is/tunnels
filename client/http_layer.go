@@ -11,7 +11,6 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"net/netip"
 	"os"
 	"strings"
 	"sync/atomic"
@@ -609,18 +608,16 @@ func HTTP_SetTunnelPeers(w http.ResponseWriter, r *http.Request) {
 	seen := make(map[string]struct{}, len(form.AllowedHosts))
 	hosts := make([]string, 0, len(form.AllowedHosts))
 	for _, h := range form.AllowedHosts {
-		h = strings.TrimSpace(h)
-		a, err := netip.ParseAddr(h)
+		entry, err := NormalizeAllowedHost(h)
 		if err != nil {
-			JSON(w, r, 400, "peer must be a valid IP address: "+h)
+			JSON(w, r, 400, err.Error())
 			return
 		}
-		ip := a.String()
-		if _, dup := seen[ip]; dup {
+		if _, dup := seen[entry]; dup {
 			continue
 		}
-		seen[ip] = struct{}{}
-		hosts = append(hosts, ip)
+		seen[entry] = struct{}{}
+		hosts = append(hosts, entry)
 	}
 
 	meta.AllowedHosts = hosts

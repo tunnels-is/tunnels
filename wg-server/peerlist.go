@@ -4,6 +4,8 @@ import (
 	"encoding/binary"
 	"fmt"
 	"net/netip"
+	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -67,6 +69,55 @@ type flowRec struct {
 	prev    uint64
 }
 
+// portSet is the set of destination ports a given source may reach on this
+// device. all=true means every port (a bare-IP allowlist entry); otherwise
+// only the ports in the map are permitted (IP:PORT entries). Protocol is not
+// distinguished.
+type portSet struct {
+	all   bool
+	ports map[uint16]struct{}
+}
+
+func (s *portSet) contains(port uint16) bool {
+	if s.all {
+		return true
+	}
+	_, ok := s.ports[port]
+	return ok
+}
+
+// aclEntry is one parsed allowlist entry. Exactly one shape is valid:
+//   - bare host  ("IP")      → addr set, port 0  : all ports for that source
+//   - host:port  ("IP:PORT") → addr set, port>0  : that port for that source
+//   - any:port   ("*:PORT")  → anyHost,  port>0  : that port for any source
+type aclEntry struct {
+	addr    netip.Addr
+	port    uint16
+	anyHost bool
+}
+
+// parseACLEntry parses one wire allowlist token. Invalid tokens return ok=false
+// and are skipped by the caller (the control channel is fire-and-forget).
+func parseACLEntry(s string) (aclEntry, bool) {
+	if rest, ok := strings.CutPrefix(s, "*:"); ok {
+		port, err := strconv.ParseUint(rest, 10, 16)
+		if err != nil || port == 0 {
+			return aclEntry{}, false
+		}
+		return aclEntry{anyHost: true, port: uint16(port)}, true
+	}
+	if a, err := netip.ParseAddr(s); err == nil { // bare IP → all ports
+		return aclEntry{addr: a}, true
+	}
+	if ap, err := netip.ParseAddrPort(s); err == nil { // IP:PORT
+		if ap.Port() == 0 {
+			return aclEntry{}, false
+		}
+		return aclEntry{addr: ap.Addr(), port: ap.Port()}, true
+	}
+	return aclEntry{}, false
+}
+
 // peer is one local resident's firewall state. The RWMutex guards allowAll
 // and the map structures; the per-flow packet counter is atomic so the
 // steady-state path (an established flow) only needs a read lock.
@@ -74,7 +125,8 @@ type peer struct {
 	mu       sync.RWMutex
 	v6       netip.Addr // this device's v6 address (for map cleanup); invalid if none
 	allowAll bool       // any source may reach this device (overrides allowed)
-	allowed  map[netip.Addr]struct{}
+	allowed  map[netip.Addr]*portSet
+	anyPorts map[uint16]struct{} // "*:PORT" — any source may reach these ports
 	flows    map[flowKey]*flowRec
 }
 
@@ -187,8 +239,9 @@ func resetPeer(ips ...string) {
 		return
 	}
 	p := &peer{
-		allowed: make(map[netip.Addr]struct{}),
-		flows:   make(map[flowKey]*flowRec),
+		allowed:  make(map[netip.Addr]*portSet),
+		anyPorts: make(map[uint16]struct{}),
+		flows:    make(map[flowKey]*flowRec),
 	}
 	var v4 netip.Addr
 	for _, s := range ips {
@@ -225,29 +278,58 @@ func resetPeer(ips ...string) {
 	}
 }
 
-// allowedContains reports whether src is permitted by the static policy:
-// allow-all, or an explicit allowlist entry. (Connection-tracked replies are
-// handled separately by flowMatch.)
-func (p *peer) allowedContains(ip netip.Addr) bool {
+// allowedContains reports whether src may reach dport on this device under the
+// static policy: allow-all, an any-host rule for the port ("*:PORT"), or a
+// host entry covering the port (bare IP = all ports, or an explicit IP:PORT).
+// (Connection-tracked replies are handled separately by flowMatch.)
+func (p *peer) allowedContains(src netip.Addr, dport uint16) bool {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	if p.allowAll {
 		return true
 	}
-	_, ok := p.allowed[ip]
-	return ok
+	if _, ok := p.anyPorts[dport]; ok {
+		return true
+	}
+	if ps, ok := p.allowed[src]; ok {
+		return ps.contains(dport)
+	}
+	return false
 }
 
-// setAllowed replaces the firewall policy (replace-set semantics): the
-// allowlist plus the allow-all flag. An empty list with allowAll=false denies
-// all peer-to-peer ingress.
-func (p *peer) setAllowed(ips []netip.Addr, allowAll bool) {
-	m := make(map[netip.Addr]struct{}, len(ips))
-	for _, ip := range ips {
-		m[ip] = struct{}{}
+// setAllowed replaces the firewall policy (replace-set semantics): the parsed
+// allowlist entries plus the allow-all flag. An empty list with allowAll=false
+// denies all peer-to-peer ingress. A bare-host entry (port 0) grants all ports
+// and supersedes any IP:PORT entries for the same source.
+func (p *peer) setAllowed(entries []aclEntry, allowAll bool) {
+	allowed := make(map[netip.Addr]*portSet, len(entries))
+	anyPorts := make(map[uint16]struct{})
+	for _, e := range entries {
+		switch {
+		case e.anyHost:
+			anyPorts[e.port] = struct{}{}
+		case e.port == 0: // bare host: all ports
+			ps := allowed[e.addr]
+			if ps == nil {
+				ps = &portSet{}
+				allowed[e.addr] = ps
+			}
+			ps.all = true
+		default: // host:port
+			ps := allowed[e.addr]
+			if ps == nil {
+				ps = &portSet{ports: make(map[uint16]struct{})}
+				allowed[e.addr] = ps
+			}
+			if ps.ports == nil {
+				ps.ports = make(map[uint16]struct{})
+			}
+			ps.ports[e.port] = struct{}{}
+		}
 	}
 	p.mu.Lock()
-	p.allowed = m
+	p.allowed = allowed
+	p.anyPorts = anyPorts
 	p.allowAll = allowAll
 	p.mu.Unlock()
 }

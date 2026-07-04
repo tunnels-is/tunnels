@@ -15,6 +15,16 @@ func mustAddr(t *testing.T, s string) netip.Addr {
 	return a
 }
 
+// hostRules builds bare-host (all-ports) allowlist entries for the given IPs.
+func hostRules(t *testing.T, ips ...string) []aclEntry {
+	t.Helper()
+	e := make([]aclEntry, 0, len(ips))
+	for _, ip := range ips {
+		e = append(e, aclEntry{addr: mustAddr(t, ip)})
+	}
+	return e
+}
+
 // setupFW (re)initializes the package firewall tables for a test. The cleaner
 // goroutine is intentionally not started here.
 func setupFW(t *testing.T, subnet4, subnet6 string) {
@@ -72,7 +82,7 @@ func TestResetPeer_DefaultDeny(t *testing.T) {
 	setupFW(t, "10.0.0.0/24", "")
 	resetPeer("10.0.0.5")
 	p := entry(t, "10.0.0.5")
-	if p.allowedContains(mustAddr(t, "10.0.0.10")) {
+	if p.allowedContains(mustAddr(t, "10.0.0.10"), 80) {
 		t.Fatal("fresh peer must allow nobody")
 	}
 }
@@ -82,21 +92,21 @@ func TestSetAllowed_ReplaceAndClear(t *testing.T) {
 	resetPeer("10.0.0.5")
 	p := entry(t, "10.0.0.5")
 
-	p.setAllowed([]netip.Addr{mustAddr(t, "10.0.0.10")}, false)
-	if !p.allowedContains(mustAddr(t, "10.0.0.10")) {
+	p.setAllowed(hostRules(t, "10.0.0.10"), false)
+	if !p.allowedContains(mustAddr(t, "10.0.0.10"), 80) {
 		t.Fatal("allowed src should be present")
 	}
 
-	p.setAllowed([]netip.Addr{mustAddr(t, "10.0.0.11")}, false) // replace
-	if p.allowedContains(mustAddr(t, "10.0.0.10")) {
+	p.setAllowed(hostRules(t, "10.0.0.11"), false) // replace
+	if p.allowedContains(mustAddr(t, "10.0.0.10"), 80) {
 		t.Fatal("replace-set must drop the old entry")
 	}
-	if !p.allowedContains(mustAddr(t, "10.0.0.11")) {
+	if !p.allowedContains(mustAddr(t, "10.0.0.11"), 80) {
 		t.Fatal("replace-set must contain the new entry")
 	}
 
 	p.setAllowed(nil, false) // clear
-	if p.allowedContains(mustAddr(t, "10.0.0.11")) {
+	if p.allowedContains(mustAddr(t, "10.0.0.11"), 80) {
 		t.Fatal("empty list must clear the allowlist")
 	}
 }
@@ -108,19 +118,19 @@ func TestSetAllowed_AllowAll(t *testing.T) {
 
 	// allow-all permits any source, even one not on the (empty) list.
 	p.setAllowed(nil, true)
-	if !p.allowedContains(mustAddr(t, "10.0.0.99")) {
+	if !p.allowedContains(mustAddr(t, "10.0.0.99"), 80) {
 		t.Fatal("allow-all must permit any source")
 	}
-	if !p.allowedContains(mustAddr(t, "10.88.0.1")) {
+	if !p.allowedContains(mustAddr(t, "10.88.0.1"), 80) {
 		t.Fatal("allow-all must permit a cross-server source too")
 	}
 
 	// turning allow-all off (replace-set) reverts to the explicit list.
-	p.setAllowed([]netip.Addr{mustAddr(t, "10.0.0.10")}, false)
-	if p.allowedContains(mustAddr(t, "10.0.0.99")) {
+	p.setAllowed(hostRules(t, "10.0.0.10"), false)
+	if p.allowedContains(mustAddr(t, "10.0.0.99"), 80) {
 		t.Fatal("clearing allow-all must revert to the explicit list")
 	}
-	if !p.allowedContains(mustAddr(t, "10.0.0.10")) {
+	if !p.allowedContains(mustAddr(t, "10.0.0.10"), 80) {
 		t.Fatal("explicit entry should remain after allow-all is cleared")
 	}
 }
@@ -128,7 +138,7 @@ func TestSetAllowed_AllowAll(t *testing.T) {
 func TestResetPeer_AllowAllDefaultsOff(t *testing.T) {
 	setupFW(t, "10.0.0.0/24", "")
 	resetPeer("10.0.0.5")
-	if entry(t, "10.0.0.5").allowedContains(mustAddr(t, "10.0.0.99")) {
+	if entry(t, "10.0.0.5").allowedContains(mustAddr(t, "10.0.0.99"), 80) {
 		t.Fatal("a fresh peer must not allow-all by default")
 	}
 }
@@ -181,7 +191,7 @@ func TestResetPeer_WipesPriorState(t *testing.T) {
 	setupFW(t, "10.0.0.0/24", "")
 	resetPeer("10.0.0.5")
 	p1 := entry(t, "10.0.0.5")
-	p1.setAllowed([]netip.Addr{mustAddr(t, "10.0.0.10")}, false)
+	p1.setAllowed(hostRules(t, "10.0.0.10"), false)
 	p1.touchFlow(flowKey{remote: mustAddr(t, "10.0.0.11"), rport: 1, lport: 1, proto: 6})
 
 	resetPeer("10.0.0.5") // IP reuse / reconnect
@@ -189,7 +199,7 @@ func TestResetPeer_WipesPriorState(t *testing.T) {
 	if p2 == p1 {
 		t.Fatal("reset must install a fresh entry")
 	}
-	if p2.allowedContains(mustAddr(t, "10.0.0.10")) {
+	if p2.allowedContains(mustAddr(t, "10.0.0.10"), 80) {
 		t.Fatal("reset must wipe the allowlist")
 	}
 	if flowLen(p2) != 0 {
@@ -223,7 +233,7 @@ func TestV6Map_CleanupOnReuse(t *testing.T) {
 func TestPeerListSnapshot(t *testing.T) {
 	setupFW(t, "10.0.0.0/24", "")
 	resetPeer("10.0.0.5")
-	entry(t, "10.0.0.5").setAllowed([]netip.Addr{mustAddr(t, "10.0.0.10"), mustAddr(t, "10.0.0.11")}, false)
+	entry(t, "10.0.0.5").setAllowed(hostRules(t, "10.0.0.10", "10.0.0.11"), false)
 	resetPeer("10.0.0.6") // no allowlist -> excluded from snapshot
 
 	snap := peerListSnapshot()
@@ -232,6 +242,88 @@ func TestPeerListSnapshot(t *testing.T) {
 	}
 	if len(snap[mustAddr(t, "10.0.0.5")]) != 2 {
 		t.Fatalf("want 2 allowed srcs, got %d", len(snap[mustAddr(t, "10.0.0.5")]))
+	}
+}
+
+func TestParseACLEntry(t *testing.T) {
+	for _, tc := range []struct {
+		in      string
+		ok      bool
+		addr    string // "" for any-host
+		port    uint16
+		anyHost bool
+	}{
+		{"10.0.0.5", true, "10.0.0.5", 0, false},     // bare host: all ports
+		{"10.0.0.5:22", true, "10.0.0.5", 22, false}, // host:port
+		{"*:443", true, "", 443, true},               // any host:port
+		{"fd00::5", true, "fd00::5", 0, false},       // v6 bare host
+		{"[fd00::5]:22", true, "fd00::5", 22, false}, // v6 host:port
+		{"", false, "", 0, false},
+		{"10.0.0.5:0", false, "", 0, false},     // port 0 invalid
+		{"*:0", false, "", 0, false},            // any-host port 0 invalid
+		{"*:bad", false, "", 0, false},          // non-numeric port
+		{"10.0.0.5:99999", false, "", 0, false}, // port out of range
+		{"not-an-ip", false, "", 0, false},
+	} {
+		e, ok := parseACLEntry(tc.in)
+		if ok != tc.ok {
+			t.Fatalf("%q: ok=%v want %v", tc.in, ok, tc.ok)
+		}
+		if !ok {
+			continue
+		}
+		if e.anyHost != tc.anyHost || e.port != tc.port {
+			t.Fatalf("%q: got anyHost=%v port=%d", tc.in, e.anyHost, e.port)
+		}
+		if !tc.anyHost && e.addr != mustAddr(t, tc.addr) {
+			t.Fatalf("%q: got addr=%v want %v", tc.in, e.addr, tc.addr)
+		}
+	}
+}
+
+func TestSetAllowed_PortRules(t *testing.T) {
+	setupFW(t, "10.0.0.0/24", "")
+	resetPeer("10.0.0.5")
+	p := entry(t, "10.0.0.5")
+
+	p.setAllowed([]aclEntry{
+		{addr: mustAddr(t, "10.0.0.10"), port: 22}, // host:port
+		{anyHost: true, port: 443},                 // *:port
+		{addr: mustAddr(t, "10.0.0.11")},           // bare host: all ports
+	}, false)
+
+	// host:port — only that port for that source.
+	if !p.allowedContains(mustAddr(t, "10.0.0.10"), 22) {
+		t.Fatal("host:port must allow its port")
+	}
+	if p.allowedContains(mustAddr(t, "10.0.0.10"), 80) {
+		t.Fatal("host:port must deny other ports")
+	}
+	// *:port — that port for any source.
+	if !p.allowedContains(mustAddr(t, "10.0.0.99"), 443) {
+		t.Fatal("*:port must allow any source on that port")
+	}
+	if p.allowedContains(mustAddr(t, "10.0.0.99"), 22) {
+		t.Fatal("*:port must not allow other ports")
+	}
+	// bare host — all ports.
+	if !p.allowedContains(mustAddr(t, "10.0.0.11"), 1) || !p.allowedContains(mustAddr(t, "10.0.0.11"), 65000) {
+		t.Fatal("bare host must allow all ports")
+	}
+}
+
+func TestSetAllowed_BareHostSupersedesPort(t *testing.T) {
+	setupFW(t, "10.0.0.0/24", "")
+	resetPeer("10.0.0.5")
+	p := entry(t, "10.0.0.5")
+
+	// A bare-host entry for the same source as an IP:PORT entry grants all ports.
+	p.setAllowed([]aclEntry{
+		{addr: mustAddr(t, "10.0.0.10"), port: 22},
+		{addr: mustAddr(t, "10.0.0.10")},
+	}, false)
+	if !p.allowedContains(mustAddr(t, "10.0.0.10"), 80) {
+		t.Fatal("bare host must supersede a same-source IP:PORT entry")
 	}
 }
 
@@ -270,13 +362,13 @@ func TestPeer_ConcurrentSafe(t *testing.T) {
 				default:
 					p.touchFlow(k)
 					p.flowMatch(k)
-					p.allowedContains(mustAddr(t, "10.0.0.20"))
+					p.allowedContains(mustAddr(t, "10.0.0.20"), 80)
 				}
 			}
 		}(i)
 	}
 	for i := 0; i < 200; i++ {
-		p.setAllowed([]netip.Addr{mustAddr(t, "10.0.0.20")}, false)
+		p.setAllowed(hostRules(t, "10.0.0.20"), false)
 		cleanFlows()
 	}
 	close(stop)

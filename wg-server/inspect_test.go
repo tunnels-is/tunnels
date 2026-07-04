@@ -2,7 +2,6 @@ package wgserver
 
 import (
 	"encoding/binary"
-	"net/netip"
 	"testing"
 )
 
@@ -147,15 +146,12 @@ func newTestInspectorNoFirewall(t *testing.T) *inspectingTUN {
 	return insp
 }
 
-// allowFor installs a resident entry for dst and sets its allowlist.
+// allowFor installs a resident entry for dst and sets its allowlist to the
+// given bare-host (all-ports) sources.
 func allowFor(t *testing.T, dst string, srcs ...string) {
 	t.Helper()
 	resetPeer(dst)
-	addrs := make([]netip.Addr, len(srcs))
-	for i, s := range srcs {
-		addrs[i] = mustAddr(t, s)
-	}
-	entry(t, dst).setAllowed(addrs, false)
+	entry(t, dst).setAllowed(hostRules(t, srcs...), false)
 }
 
 func TestAllow_DefaultDenyForPeerToPeer(t *testing.T) {
@@ -224,6 +220,48 @@ func TestAllow_AllowlistedSrcPasses(t *testing.T) {
 	}
 }
 
+func TestAllow_HostPortRule(t *testing.T) {
+	insp := newTestInspector(t)
+	resetPeer("10.0.0.10")
+	// 10.0.0.10 admits 10.0.0.5 only on port 22.
+	ctrl := buildIPv4UDP(t, "10.0.0.10", insp.serverIPv4.String(), 1, aclControlPort,
+		[]byte(`{"Allowed":["10.0.0.5:22"]}`))
+	if !insp.handleControl(ctrl) {
+		t.Fatal("expected consume")
+	}
+
+	onPort := buildIPv4UDP(t, "10.0.0.5", "10.0.0.10", 40000, 22, nil)
+	if !insp.allow(onPort) {
+		t.Fatal("allowed src on its permitted port must pass")
+	}
+	otherPort := buildIPv4UDP(t, "10.0.0.5", "10.0.0.10", 40000, 80, nil)
+	if insp.allow(otherPort) {
+		t.Fatal("allowed src on a non-permitted port must be dropped")
+	}
+}
+
+func TestAllow_AnyHostPortRule(t *testing.T) {
+	insp := newTestInspector(t)
+	resetPeer("10.0.0.10")
+	// 10.0.0.10 admits ANY source on port 443 only ("*:443").
+	ctrl := buildIPv4UDP(t, "10.0.0.10", insp.serverIPv4.String(), 1, aclControlPort,
+		[]byte(`{"Allowed":["*:443"]}`))
+	if !insp.handleControl(ctrl) {
+		t.Fatal("expected consume")
+	}
+
+	for _, src := range []string{"10.0.0.5", "10.0.0.99"} {
+		ok := buildIPv4UDP(t, src, "10.0.0.10", 40000, 443, nil)
+		if !insp.allow(ok) {
+			t.Fatalf("*:443 must admit %s on port 443", src)
+		}
+		bad := buildIPv4UDP(t, src, "10.0.0.10", 40000, 22, nil)
+		if insp.allow(bad) {
+			t.Fatalf("*:443 must not admit %s on port 22", src)
+		}
+	}
+}
+
 // The SYN/SYN-ACK scenario: a one-sided allowlist plus connection tracking
 // lets replies flow back without the other peer allowlisting the initiator.
 func TestAllow_ConntrackReturnPath(t *testing.T) {
@@ -277,7 +315,7 @@ func TestHandleControl_AllowAll(t *testing.T) {
 	if !insp.handleControl(pkt) {
 		t.Fatal("expected consume")
 	}
-	if !entry(t, "10.0.0.5").allowedContains(mustAddr(t, "10.0.0.123")) {
+	if !entry(t, "10.0.0.5").allowedContains(mustAddr(t, "10.0.0.123"), 80) {
 		t.Fatal("AllowAll announcement must permit any source")
 	}
 }
@@ -302,7 +340,7 @@ func TestAllow_MalformedAlwaysPasses(t *testing.T) {
 func TestAllow_IPv6(t *testing.T) {
 	insp := newTestInspector(t)
 	resetPeer("10.0.0.10", "fd00::10")
-	entry(t, "10.0.0.10").setAllowed([]netip.Addr{mustAddr(t, "fd00::5")}, false)
+	entry(t, "10.0.0.10").setAllowed(hostRules(t, "fd00::5"), false)
 
 	ok := buildIPv6UDP(t, "fd00::5", "fd00::10", 1, 2, nil)
 	bad := buildIPv6UDP(t, "fd00::99", "fd00::10", 1, 2, nil)
@@ -329,10 +367,10 @@ func TestHandleControl_UpdatesACL(t *testing.T) {
 		t.Fatal("expected packet to be consumed")
 	}
 	p := entry(t, "10.0.0.5")
-	if !p.allowedContains(mustAddr(t, "10.0.0.10")) {
+	if !p.allowedContains(mustAddr(t, "10.0.0.10"), 80) {
 		t.Fatal("10.0.0.10 should be allowed after control message")
 	}
-	if p.allowedContains(mustAddr(t, "10.0.0.99")) {
+	if p.allowedContains(mustAddr(t, "10.0.0.99"), 80) {
 		t.Fatal("non-listed src should be denied after control message")
 	}
 }
@@ -393,7 +431,7 @@ func TestHandleControl_EmptyListIsolatesSender(t *testing.T) {
 	if !insp.handleControl(pkt) {
 		t.Fatal("expected consume")
 	}
-	if entry(t, "10.0.0.5").allowedContains(mustAddr(t, "10.0.0.10")) {
+	if entry(t, "10.0.0.5").allowedContains(mustAddr(t, "10.0.0.10"), 80) {
 		t.Fatal("empty allowlist must isolate the sender")
 	}
 }
@@ -426,7 +464,7 @@ func TestHandleControl_CrossServerIPAccepted(t *testing.T) {
 	if !insp.handleControl(pkt) {
 		t.Fatal("expected consume")
 	}
-	if !entry(t, "10.0.0.5").allowedContains(mustAddr(t, "10.99.0.7")) {
+	if !entry(t, "10.0.0.5").allowedContains(mustAddr(t, "10.99.0.7"), 80) {
 		t.Fatal("cross-server IP must be accepted into the allowlist")
 	}
 }
@@ -453,7 +491,7 @@ func TestHandleControl_IPv6(t *testing.T) {
 		t.Fatal("v6 control should be consumed")
 	}
 	p, _ := fwClassify(mustAddr(t, "fd00::5"))
-	if p == nil || !p.allowedContains(mustAddr(t, "fd00::10")) {
+	if p == nil || !p.allowedContains(mustAddr(t, "fd00::10"), 80) {
 		t.Fatal("v6 ACL not applied")
 	}
 }
