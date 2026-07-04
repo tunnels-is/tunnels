@@ -6,8 +6,11 @@ import { fetchState, setTunnelPeers } from "@/store/actions"
 import { useStore } from "@/store/store"
 
 // Loose shape check for instant feedback; the client backend does the real
-// validation and rejects anything that does not parse as an IP address.
-const looksLikeIP = (s) => /^[0-9a-fA-F:.]+$/.test(s) && (s.includes(".") || s.includes(":"))
+// validation. Accepted forms: "IP" (all ports), "IP:PORT", and "*:PORT" (any
+// host, that port). See NormalizeAllowedHost on the backend.
+const looksLikePeer = (s) =>
+	/^\*:\d{1,5}$/.test(s) || // *:PORT
+	(/^[0-9a-fA-F:.[\]]+$/.test(s) && (s.includes(".") || s.includes(":")))
 
 const TunnelPeers = () => {
 	const { tag } = useParams()
@@ -49,8 +52,8 @@ const TunnelPeers = () => {
 	const addPeer = async () => {
 		const ip = newPeer.trim()
 		if (!ip) return
-		if (!looksLikeIP(ip)) {
-			notifyError("Peer must be an IP address")
+		if (!looksLikePeer(ip)) {
+			notifyError("Peer must be an IP, IP:PORT, or *:PORT")
 			return
 		}
 		if (peers.includes(ip)) {
@@ -81,8 +84,9 @@ const TunnelPeers = () => {
 				<Card
 					title={`Peers (${peers.length})`}
 					description="Devices allowed to reach this device through the VPN. When the server firewall is
-						enabled nobody can reach this device unless their VPN IP is listed here. Changes are saved
-						immediately and announced to the server while connected."
+						enabled nobody can reach this device unless their VPN IP is listed here. Use IP for all ports,
+						IP:PORT for one port, or *:PORT to allow any device on that port. Changes are saved immediately
+						and announced to the server while connected."
 				>
 					<div className="mb-3 rounded-box border border-warning/30 bg-warning/5 px-3 py-1">
 						<Toggle
@@ -96,7 +100,7 @@ const TunnelPeers = () => {
 					<div className={"mb-3 flex items-center gap-2 " + (allowAll ? "opacity-40" : "")}>
 						<input
 							className="input input-sm flex-1 font-mono"
-							placeholder="10.42.0.7"
+							placeholder="10.42.0.7  ·  10.42.0.7:22  ·  *:443"
 							value={newPeer}
 							disabled={busy || allowAll}
 							onChange={(e) => setNewPeer(e.target.value)}

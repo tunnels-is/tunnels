@@ -5,6 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/netip"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -35,6 +38,35 @@ func wgServerGatewayIP(subnet string) (net.IP, error) {
 	copy(gw, base)
 	gw[3]++
 	return gw, nil
+}
+
+// NormalizeAllowedHost validates one allowlist entry and returns its canonical
+// form. Three shapes are accepted, matching the wg-server's parseACLEntry:
+//   - "IP"      a single source, all ports
+//   - "IP:PORT" a single source, that destination port only
+//   - "*:PORT"  any source, that destination port only
+//
+// AllowAll (handled separately) is the toggle that permits any source on any
+// port. Protocol is not distinguished.
+func NormalizeAllowedHost(s string) (string, error) {
+	s = strings.TrimSpace(s)
+	if rest, ok := strings.CutPrefix(s, "*:"); ok {
+		port, err := strconv.ParseUint(rest, 10, 16)
+		if err != nil || port == 0 {
+			return "", fmt.Errorf("allowed host has an invalid port: %s", s)
+		}
+		return "*:" + strconv.FormatUint(port, 10), nil
+	}
+	if a, err := netip.ParseAddr(s); err == nil { // bare IP → all ports
+		return a.String(), nil
+	}
+	if ap, err := netip.ParseAddrPort(s); err == nil { // IP:PORT
+		if ap.Port() == 0 {
+			return "", fmt.Errorf("allowed host has an invalid port: %s", s)
+		}
+		return ap.String(), nil
+	}
+	return "", fmt.Errorf("allowed host must be IP, IP:PORT, or *:PORT: %s", s)
 }
 
 // AnnounceAllowedHosts sends the firewall policy to the wg-server's ACL
