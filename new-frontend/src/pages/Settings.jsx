@@ -2,7 +2,7 @@ import { useEffect, useState } from "react"
 import { Pencil, Save, X } from "lucide-react"
 import { Card, InfoRow, Page, TextField, Toggle } from "@/components/ui"
 import { fetchState, saveConfig, toggleConfigKey } from "@/store/actions"
-import { THEMES, getTheme, setTheme } from "@/lib/theme"
+import { THEMES, getStoredTheme, setTheme, followsSystem, setFollowSystem } from "@/lib/theme"
 import { session } from "@/store/session"
 import { useStore } from "@/store/store"
 
@@ -35,7 +35,8 @@ const Settings = () => {
 
 	const [editing, setEditing] = useState(false)
 	const [cfg, setCfg] = useState({ ...config })
-	const [theme, setThemeState] = useState(getTheme())
+	const [theme, setThemeState] = useState(getStoredTheme())
+	const [useSystem, setUseSystem] = useState(followsSystem())
 
 	useEffect(() => {
 		fetchState()
@@ -48,6 +49,11 @@ const Settings = () => {
 	const changeTheme = (next) => {
 		setThemeState(next)
 		setTheme(next)
+	}
+
+	const changeUseSystem = (next) => {
+		setUseSystem(next)
+		setFollowSystem(next)
 	}
 
 	const updateCfg = (key, value) => {
@@ -96,9 +102,16 @@ const Settings = () => {
 						</select>
 					}
 				>
-					<p className="text-xs opacity-60">
-						Current theme: <code className="font-mono">{theme}</code>
-					</p>
+					<Toggle
+						label="Follow system light/dark"
+						checked={useSystem}
+						onChange={() => changeUseSystem(!useSystem)}
+					/>
+					{useSystem && (
+						<p className="text-xs opacity-60">
+							Automatically switching between this theme's light and dark variant based on your system setting.
+						</p>
+					)}
 				</Card>
 
 				<Card title="Advanced" description="Show advanced configuration: API server, updates, network, DNS and system details.">

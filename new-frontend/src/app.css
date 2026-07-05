@@ -2,9 +2,9 @@
 @plugin "@tailwindcss/typography";
 @plugin "daisyui" {
   themes:
-    suzko --default,
-    suzko-dark --prefersdark,
-    tunnels,
+    suzko,
+    suzko-dark,
+    tunnels --default,
     tunnels-dark;
 }
 
