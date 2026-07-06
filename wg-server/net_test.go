@@ -2,11 +2,12 @@ package wgserver
 
 import (
 	"slices"
+	"strings"
 	"testing"
 )
 
-func TestMasqueradeArgs_MASQUERADEWhenNoPublicIP(t *testing.T) {
-	got := masqueradeArgs("-A", "10.0.0.0/24", "eth0", "")
+func TestMasqueradeArgs_AlwaysMASQUERADE(t *testing.T) {
+	got := masqueradeArgs("-A", "10.0.0.0/24", "eth0")
 	want := []string{
 		"-t", "nat", "-A", "POSTROUTING",
 		"-s", "10.0.0.0/24", "-o", "eth0",
@@ -17,22 +18,10 @@ func TestMasqueradeArgs_MASQUERADEWhenNoPublicIP(t *testing.T) {
 	}
 }
 
-func TestMasqueradeArgs_SNATWhenPublicIPSet(t *testing.T) {
-	got := masqueradeArgs("-A", "10.0.0.0/24", "eth0", "63.143.33.106")
-	want := []string{
-		"-t", "nat", "-A", "POSTROUTING",
-		"-s", "10.0.0.0/24", "-o", "eth0",
-		"-j", "SNAT", "--to-source", "63.143.33.106",
-	}
-	if !slices.Equal(got, want) {
-		t.Fatalf("got %v, want %v", got, want)
-	}
-}
-
 func TestMasqueradeArgs_DrainShape(t *testing.T) {
 	// Drain (-D) must match install (-A) exactly except for the action.
-	install := masqueradeArgs("-A", "10.0.0.0/24", "eth0", "63.143.33.106")
-	drain := masqueradeArgs("-D", "10.0.0.0/24", "eth0", "63.143.33.106")
+	install := masqueradeArgs("-A", "10.0.0.0/24", "eth0")
+	drain := masqueradeArgs("-D", "10.0.0.0/24", "eth0")
 
 	if len(install) != len(drain) {
 		t.Fatalf("install/drain length mismatch")
@@ -50,7 +39,9 @@ func TestMasqueradeArgs_DrainShape(t *testing.T) {
 	}
 }
 
-func TestPreviewRules_SNATWithPublicIP(t *testing.T) {
+func TestPreviewRules_MASQUERADEEvenWithPublicIP(t *testing.T) {
+	// PublicIP is bind-only now, so egress NAT is always MASQUERADE — even when
+	// PublicIP is set, no SNAT rule is emitted.
 	cfg := &Config{
 		WireGuardSubnet:  "10.0.0.0/22",
 		WireGuardSubnet6: "fd00::/64",
@@ -70,13 +61,19 @@ func TestPreviewRules_SNATWithPublicIP(t *testing.T) {
 		"ip6tables -A FORWARD -i wg0 -o eth0 -j ACCEPT",
 		"ip6tables -A FORWARD -i eth0 -o wg0 -m state --state RELATED,ESTABLISHED -j ACCEPT",
 		"ip6tables -A FORWARD -i eth0 -o wg0 -j DROP",
-		"iptables -t nat -A POSTROUTING -s 10.0.0.0/22 -o eth0 -j SNAT --to-source 74.63.223.157",
+		"iptables -t nat -A POSTROUTING -s 10.0.0.0/22 -o eth0 -j MASQUERADE",
 		"ip6tables -t nat -A POSTROUTING -s fd00::/64 -o eth0 -j MASQUERADE",
 	}
 	got := PreviewRules(cfg)
 	if !slices.Equal(got, want) {
 		t.Fatalf("rule preview mismatch\nGOT:\n%s\nWANT:\n%s",
 			joinLines(got), joinLines(want))
+	}
+	// No SNAT rule may appear, regardless of PublicIP.
+	for _, line := range got {
+		if strings.Contains(line, "SNAT") {
+			t.Fatalf("SNAT rule leaked: %s", line)
+		}
 	}
 }
 
@@ -89,15 +86,9 @@ func TestPreviewRules_MASQUERADEWhenNoPublicIP(t *testing.T) {
 	}
 	got := PreviewRules(cfg)
 
-	// Empty PublicIP → MASQUERADE, not SNAT.
 	wantNAT := "iptables -t nat -A POSTROUTING -s 10.0.0.0/22 -o eth0 -j MASQUERADE"
 	if !slices.Contains(got, wantNAT) {
 		t.Fatalf("expected %q in output, got:\n%s", wantNAT, joinLines(got))
-	}
-	for _, line := range got {
-		if line == "iptables -t nat -A POSTROUTING -s 10.0.0.0/22 -o eth0 -j SNAT --to-source " {
-			t.Fatalf("SNAT rule leaked with empty --to-source: %s", line)
-		}
 	}
 }
 

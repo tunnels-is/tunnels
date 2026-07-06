@@ -95,7 +95,7 @@ func (b *pinnedBind) Close() error {
 
 func (b *pinnedBind) SetMark(mark uint32) error {
 	// SO_MARK is a Linux-specific routing hint; not needed for our use case
-	// since SNAT pins the source via iptables.
+	// since the socket is already bound to the intended source address.
 	return nil
 }
 

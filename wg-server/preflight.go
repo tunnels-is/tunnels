@@ -29,7 +29,7 @@ type ruleConflict struct {
 	table string // "filter" / "nat"
 	chain string // "INPUT" / "FORWARD" / "POSTROUTING"
 	pos   int    // 1-based position within the chain, matching `iptables -L --line-numbers`
-	field string // which config field clashed: "WireGuardSubnet" / "PublicIP" / "WireGuardIface" / "WireGuardPort"
+	field string // which config field clashed: "WireGuardSubnet" / "WireGuardIface" / "WireGuardPort"
 	match string // the exact "flag value" tokens that matched, e.g. `-s 10.0.0.0/22`
 	rule  string // the full -A line as printed by `iptables -S`
 }
@@ -53,15 +53,14 @@ func (c ruleConflict) String() string {
 
 // preflightIPTables refuses to start the wg-server if any existing
 // iptables/ip6tables rule references this config's WireGuardSubnet,
-// WireGuardSubnet6, WireGuardIface, PublicIP (as SNAT --to-source), or
-// WireGuardPort.
+// WireGuardSubnet6, WireGuardIface, or WireGuardPort.
 //
 // The check is intentionally strict: the legacy on-shutdown cleanup is
-// config-pinned and leaks rules whenever the operator changes subnet,
-// PublicIP, or iface between runs. Rather than try to auto-clean state we
-// no longer recognise (and risk silently shadowing it), we exit and ask the
-// operator to drain the table by hand. This also enforces the invariant
-// that only one wg-server ever owns a given subnet on a host.
+// config-pinned and leaks rules whenever the operator changes subnet or iface
+// between runs. Rather than try to auto-clean state we no longer recognise
+// (and risk silently shadowing it), we exit and ask the operator to drain the
+// table by hand. This also enforces the invariant that only one wg-server ever
+// owns a given subnet on a host.
 func preflightIPTables(cfg *Config) error {
 	return preflightIPTablesWith(cfg, defaultRuleDumper)
 }
@@ -134,13 +133,11 @@ func cfgOrDash(s string) string {
 
 // ruleConflictsWithCfg inspects a single `iptables -S` line and reports
 // whether it touches anything this wg-server owns under cfg. The returned
-// field is the offending config name ("WireGuardSubnet", "PublicIP",
-// "WireGuardIface", or "WireGuardPort") and match is the exact "flag value"
-// pair that triggered the hit (e.g. `-s 10.0.0.0/22`). Both are empty when
-// the rule does not conflict.
+// field is the offending config name ("WireGuardSubnet", "WireGuardIface", or
+// "WireGuardPort") and match is the exact "flag value" pair that triggered the
+// hit (e.g. `-s 10.0.0.0/22`). Both are empty when the rule does not conflict.
 //
-// The ipv6 flag selects IPv4 vs IPv6 subnet identity; PublicIP is IPv4-only
-// and skipped when ipv6.
+// The ipv6 flag selects IPv4 vs IPv6 subnet identity.
 func ruleConflictsWithCfg(rule string, cfg *Config, ipv6 bool) (field, match string) {
 	subnet := cfg.WireGuardSubnet
 	if ipv6 {
@@ -152,12 +149,6 @@ func ruleConflictsWithCfg(rule string, cfg *Config, ipv6 bool) (field, match str
 		}
 		if hasFlagValue(rule, "-d", subnet) {
 			return "WireGuardSubnet", "-d " + subnet
-		}
-	}
-
-	if !ipv6 && cfg.PublicIP != "" {
-		if hasFlagValue(rule, "--to-source", cfg.PublicIP) {
-			return "PublicIP", "--to-source " + cfg.PublicIP
 		}
 	}
 
