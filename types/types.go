@@ -154,6 +154,8 @@ type Server struct {
 	// itself up by announcing the peer IPs allowed to reach it via the ACL
 	// control port. Peer traffic to the server's own WG IP is always blocked,
 	// regardless of this setting.
+	EnableFirewall bool `json:"EnableFirewall"`
+
 	InsecureSkipVerify bool `json:"InsecureSkipVerify,omitempty"`
 }
 
