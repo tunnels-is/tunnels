@@ -210,6 +210,25 @@ func BBolt_GetDevices(limit, offset int64) ([]*types.Device, error) {
 	return DL, err
 }
 
+// BBolt_GetAllDevices returns every device in a single read transaction. Used
+// by callers that must see the complete set (e.g. WireGuard IP allocation),
+// avoiding the truncation of a capped GetDevices call.
+func BBolt_GetAllDevices() ([]*types.Device, error) {
+	DL := make([]*types.Device, 0)
+	err := BBoltDB.View(func(tx *gobolt.Tx) error {
+		b := tx.Bucket([]byte(DEVICES_BUCKET))
+		c := b.Cursor()
+		for k, v := c.First(); k != nil; k, v = c.Next() {
+			D := new(types.Device)
+			if err := bboltUnmarshal(v, D); err == nil {
+				DL = append(DL, D)
+			}
+		}
+		return nil
+	})
+	return DL, err
+}
+
 func BBolt_GetDevicesByUserID(userID uuid.UUID) ([]*types.Device, error) {
 	DL := make([]*types.Device, 0)
 	err := BBoltDB.View(func(tx *gobolt.Tx) error {

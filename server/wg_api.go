@@ -8,10 +8,21 @@ import (
 	"net/http"
 	"net/netip"
 	"strconv"
+	"sync"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/tunnels-is/tunnels/types"
 )
+
+// wgIPAllocMu serializes WireGuard IP allocation together with the device
+// creation that consumes it. assignNextWireGuardIP{,v6} pick the lowest free
+// address by scanning existing devices, then the caller persists the device in
+// a separate write; without this lock two concurrent creates can read the same
+// "free" address and both commit it, handing one IP to two devices (a TOCTOU
+// race). The controller is single-node (embedded BoltDB), so a process-wide
+// lock is sufficient. Callers hold it from allocation through DB_CreateDevice.
+var wgIPAllocMu sync.Mutex
 
 const (
 	wgPeersDefaultLimit = 500
@@ -121,22 +132,36 @@ func API_WGPeer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	allowed := hasSharedOrNoGroup(dev.Groups, server.Groups)
+	// Load the owning user so this authorization decision reflects the current
+	// account state — not just device existence. Without this, disabling a user
+	// or letting their subscription lapse would leave their VPN access intact
+	// (the wg-server treats this endpoint as its authorization oracle).
+	user, err := DB_findUserByID(dev.UserID)
+	if err != nil {
+		senderr(w, 500, "error looking up user")
+		return
+	}
+	if user == nil {
+		senderr(w, 401, "user/device not allowed to connect")
+		return
+	}
+	if user.Disabled {
+		senderr(w, 403, "user account is disabled")
+		return
+	}
+	// SubExpiration is enforced only when set: deployments that don't use
+	// subscriptions leave it as the zero value, in which case access never
+	// expires. Normal registration/admin/license flows always set it.
+	if !user.SubExpiration.IsZero() && time.Now().After(user.SubExpiration) {
+		senderr(w, 403, "user subscription has expired")
+		return
+	}
+
+	allowed := hasSharedOrNoGroup(dev.Groups, server.Groups) ||
+		hasSharedOrNoGroup(user.Groups, server.Groups)
 	if !allowed {
-		user, err := DB_findUserByID(dev.UserID)
-		if err != nil {
-			senderr(w, 500, "error looking up user")
-			return
-		}
-		if user == nil {
-			senderr(w, 401, "user/device not allowed to connect")
-			return
-		}
-		allowed = hasSharedOrNoGroup(user.Groups, server.Groups)
-		if !allowed {
-			senderr(w, 401, "user/device not allowed to connect")
-			return
-		}
+		senderr(w, 401, "user/device not allowed to connect")
+		return
 	}
 
 	hexKey, err := b64KeyToHex(dev.WireGuardKey)
@@ -230,7 +255,7 @@ func assignNextWireGuardIP(serverID uuid.UUID) (string, error) {
 		return "", fmt.Errorf("invalid subnet %q: %w", server.WireGuardSubnet, err)
 	}
 
-	devices, err := DB_GetDevices(100000, 0)
+	devices, err := DB_GetAllDevices()
 	if err != nil {
 		return "", fmt.Errorf("list devices: %w", err)
 	}
@@ -284,7 +309,7 @@ func assignNextWireGuardIPv6(serverID uuid.UUID) (string, error) {
 		return "", fmt.Errorf("invalid IPv6 subnet %q: %w", server.WireGuardSubnet6, err)
 	}
 
-	devices, err := DB_GetDevices(100000, 0)
+	devices, err := DB_GetAllDevices()
 	if err != nil {
 		return "", fmt.Errorf("list devices: %w", err)
 	}
