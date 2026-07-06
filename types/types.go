@@ -76,12 +76,12 @@ type WGBootstrap struct {
 type SecretStore string
 
 type Device struct {
-	ID        uuid.UUID   `json:"_id"`
-	CreatedAt time.Time   `json:"CreatedAt"`
-	Tag       string      `json:"Tag"`
-	Groups    []uuid.UUID `json:"Groups"`
+	ID        uuid.UUID `json:"_id"`
+	CreatedAt time.Time `json:"CreatedAt"`
+	Tag       string    `json:"Tag"`
 
-	// UserID is the ID of the user who owns this device.
+	// UserID is the ID of the user who owns this device. A device has no groups
+	// of its own — it inherits its owner's group membership for authorization.
 	UserID uuid.UUID `json:"UserID,omitempty"`
 
 	// ServerID links the device to its WireGuard server for subnet-based IP assignment.

@@ -82,6 +82,19 @@ func (ps *PeerStore) Set(deviceID, ip, ipv6, pubKeyB64 string) {
 	ps.records[deviceID] = PeerRecord{PubKeyB64: pubKeyB64, IP: ip, IPv6: ipv6}
 }
 
+// DeleteByPubKey drops the record for a peer the controller no longer
+// authorizes, freeing its IP for reuse. No-op if the pubkey isn't present.
+func (ps *PeerStore) DeleteByPubKey(pubKeyB64 string) {
+	ps.mu.Lock()
+	defer ps.mu.Unlock()
+	for id, rec := range ps.records {
+		if rec.PubKeyB64 == pubKeyB64 {
+			delete(ps.records, id)
+			return
+		}
+	}
+}
+
 func (ps *PeerStore) GetAll() map[string]PeerRecord {
 	ps.mu.RLock()
 	defer ps.mu.RUnlock()

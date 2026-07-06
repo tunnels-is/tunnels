@@ -1146,20 +1146,17 @@ func TestBBolt_AddToGroup_Server(t *testing.T) {
 	}
 }
 
-func TestBBolt_AddToGroup_Device(t *testing.T) {
+// Devices have no groups of their own (they inherit the owner's), so adding a
+// device to a group is an unknown type.
+func TestBBolt_AddToGroup_Device_Unsupported(t *testing.T) {
 	setupTestDB(t)
 	g := &Group{ID: uuid.New(), Tag: "dg"}
 	BBolt_CreateGroup(g)
 	d := &types.Device{ID: uuid.New(), UserID: uuid.New()}
 	BBolt_CreateDevice(d)
 
-	if err := BBolt_AddToGroup(g.ID.String(), d.ID.String(), "device"); err != nil {
-		t.Fatal(err)
-	}
-
-	found, _ := BBolt_FindDeviceByID(d.ID.String())
-	if !slices.Contains(uuidSliceToString(found.Groups), g.ID.String()) {
-		t.Fatal("device not in group")
+	if err := BBolt_AddToGroup(g.ID.String(), d.ID.String(), "device"); err == nil {
+		t.Fatal("adding a device to a group should be unsupported")
 	}
 }
 
@@ -1213,22 +1210,6 @@ func TestBBolt_RemoveFromGroup_Server(t *testing.T) {
 	}
 }
 
-func TestBBolt_RemoveFromGroup_Device(t *testing.T) {
-	setupTestDB(t)
-	g := &Group{ID: uuid.New(), Tag: "rdg"}
-	BBolt_CreateGroup(g)
-	d := &types.Device{ID: uuid.New(), UserID: uuid.New()}
-	BBolt_CreateDevice(d)
-	BBolt_AddToGroup(g.ID.String(), d.ID.String(), "device")
-
-	BBolt_RemoveFromGroup(g.ID.String(), d.ID.String(), "device")
-
-	found, _ := BBolt_FindDeviceByID(d.ID.String())
-	if len(found.Groups) != 0 {
-		t.Fatal("device should have 0 groups")
-	}
-}
-
 func TestBBolt_RemoveFromGroup_InvalidType(t *testing.T) {
 	setupTestDB(t)
 	err := BBolt_RemoveFromGroup(uuid.New().String(), uuid.New().String(), "invalid")
@@ -1240,7 +1221,7 @@ func TestBBolt_RemoveFromGroup_InvalidType(t *testing.T) {
 func TestBBolt_RemoveFromGroup_NotFound(t *testing.T) {
 	setupTestDB(t)
 	gid := uuid.New().String()
-	for _, typ := range []string{"user", "server", "device"} {
+	for _, typ := range []string{"user", "server"} {
 		err := BBolt_RemoveFromGroup(gid, uuid.New().String(), typ)
 		if err == nil {
 			t.Fatalf("expected error for non-existent %s", typ)
@@ -1264,10 +1245,6 @@ func TestBBolt_FindEntitiesByGroupID(t *testing.T) {
 	BBolt_CreateServer(s)
 	BBolt_AddToGroup(g.ID.String(), s.ID.String(), "server")
 
-	d := &types.Device{ID: uuid.New(), UserID: uuid.New()}
-	BBolt_CreateDevice(d)
-	BBolt_AddToGroup(g.ID.String(), d.ID.String(), "device")
-
 	entities, _ := BBolt_FindEntitiesByGroupID(g.ID.String(), "user", 10, 0)
 	if len(entities) != 2 {
 		t.Fatalf("expected 2 users, got %d", len(entities))
@@ -1278,9 +1255,9 @@ func TestBBolt_FindEntitiesByGroupID(t *testing.T) {
 		t.Fatalf("expected 1 server, got %d", len(entities))
 	}
 
-	entities, _ = BBolt_FindEntitiesByGroupID(g.ID.String(), "device", 10, 0)
-	if len(entities) != 1 {
-		t.Fatalf("expected 1 device, got %d", len(entities))
+	// Devices are not group entities (they inherit the owner's groups).
+	if _, err := BBolt_FindEntitiesByGroupID(g.ID.String(), "device", 10, 0); err == nil {
+		t.Fatal("device entity lookup should be unsupported")
 	}
 
 	// Pagination.
