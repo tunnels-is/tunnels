@@ -167,13 +167,38 @@ func loggingTimingMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+// originAllowed reports whether a browser Origin may make cross-origin requests
+// to the controller, per the configured AllowedOrigins list. A "*" entry allows
+// any origin; otherwise the match must be exact. An empty list denies all
+// cross-origin access (the same-origin admin UI does not go through CORS).
+func originAllowed(origin string) bool {
+	if origin == "" {
+		return false
+	}
+	for _, o := range Config.Load().AllowedOrigins {
+		if o == "*" || o == origin {
+			return true
+		}
+	}
+	return false
+}
+
 func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, X-API-KEY, X-Device-Token, X-UID, X-Email")
+		// Only emit CORS headers for allowlisted origins, and always echo the
+		// specific origin back (never the literal "*"), so credentials can never
+		// be granted to arbitrary sites even if Allow-Credentials is added later.
+		if origin := r.Header.Get("Origin"); originAllowed(origin) {
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+			w.Header().Add("Vary", "Origin")
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With, X-API-KEY, X-Device-Token, X-UID, X-Email")
+		}
 
 		if r.Method == http.MethodOptions {
+			// Preflight: the CORS headers set above (if any) tell the browser
+			// whether the real request is permitted; a disallowed origin gets
+			// none and is blocked client-side.
 			w.WriteHeader(http.StatusOK)
 			return
 		}

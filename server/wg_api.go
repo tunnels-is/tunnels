@@ -223,6 +223,15 @@ func API_WGConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Enforce the same group ACL as API_ServerGet / API_WGPeer so a user can't
+	// read the config of a server they aren't entitled to (least-privilege /
+	// consistency; the config fields aren't secret, but the endpoint should not
+	// be the one place that skips the check).
+	if !hasSharedOrNoGroup(user.Groups, server.Groups) {
+		senderr(w, 401, "unauthorized")
+		return
+	}
+
 	deviceIP := ""
 	deviceIPv6 := ""
 	if d != nil {
