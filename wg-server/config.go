@@ -24,10 +24,12 @@ type Config struct {
 	ServerID string
 
 	// PublicIP is this server's public IP as recorded on the controller's
-	// Server record. When non-empty, the WireGuard UDP socket is bound to this
-	// address (see pinnedBind) so a host with several local IPs listens on the
-	// intended one. It is bind-only: egress NAT always uses MASQUERADE, which
-	// auto-selects the single external IP under the one-IP-per-host topology.
+	// Server record. It is currently vestigial: the WireGuard socket uses the
+	// default wildcard bind (all local IPs, default routing) and egress NAT uses
+	// MASQUERADE (default-route source), so neither consults PublicIP. It is
+	// still read only to drain a legacy SNAT --to-source rule left by older
+	// binaries on upgrade (see flushWGRules). Safe to remove once no deployed
+	// host carries that legacy rule.
 	PublicIP string
 
 	WireGuardPort    int
