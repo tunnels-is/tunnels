@@ -54,21 +54,6 @@ func TestPreflight_StaleSNATWithDifferentPublicIP(t *testing.T) {
 	}
 }
 
-func TestPreflight_ConflictingPublicIP(t *testing.T) {
-	// A SNAT rule with --to-source matching PublicIP but a *different* source
-	// subnet is also a conflict, because it would cover/shadow any rule we'd
-	// install that shares the destination IP.
-	dump := fakeDumper{
-		"iptables|nat|POSTROUTING": strings.Join([]string{
-			"-A POSTROUTING -s 192.168.0.0/24 -o eth0 -j SNAT --to-source 74.63.223.157",
-		}, "\n"),
-	}
-	err := preflightIPTablesWith(baseCfg(), dump.dump)
-	if err == nil || !strings.Contains(err.Error(), "PublicIP") {
-		t.Fatalf("expected PublicIP conflict, got: %v", err)
-	}
-}
-
 func TestPreflight_ConflictingWireGuardIface(t *testing.T) {
 	dump := fakeDumper{
 		"iptables|filter|FORWARD": "-A FORWARD -i wg0 -o eth0 -j ACCEPT\n",
@@ -192,8 +177,8 @@ func TestPreflight_ErrorPinpointsLocation(t *testing.T) {
 	dump := fakeDumper{
 		"iptables|nat|POSTROUTING": strings.Join([]string{
 			"-P POSTROUTING ACCEPT",
-			"-A POSTROUTING -s 10.99.0.0/16 -o eth0 -j MASQUERADE",                              // rule #1 — no conflict
-			"-A POSTROUTING -s 10.0.0.0/22 -o eth0 -j SNAT --to-source 63.143.33.106",           // rule #2 — conflict
+			"-A POSTROUTING -s 10.99.0.0/16 -o eth0 -j MASQUERADE",                    // rule #1 — no conflict
+			"-A POSTROUTING -s 10.0.0.0/22 -o eth0 -j SNAT --to-source 63.143.33.106", // rule #2 — conflict
 		}, "\n"),
 	}
 	err := preflightIPTablesWith(baseCfg(), dump.dump)
@@ -203,11 +188,11 @@ func TestPreflight_ErrorPinpointsLocation(t *testing.T) {
 	msg := err.Error()
 
 	mustContain := []string{
-		"iptables nat/POSTROUTING rule #2",        // bin + table/chain + position
+		"iptables nat/POSTROUTING rule #2",          // bin + table/chain + position
 		`WireGuardSubnet clash on "-s 10.0.0.0/22"`, // field name + exact matched tokens
-		"rule:  -A POSTROUTING -s 10.0.0.0/22",    // full rule echoed
+		"rule:  -A POSTROUTING -s 10.0.0.0/22",      // full rule echoed
 		"drain: iptables -t nat -D POSTROUTING -s 10.0.0.0/22 -o eth0 -j SNAT --to-source 63.143.33.106",
-		"Config: subnet=10.0.0.0/22",              // current config summary
+		"Config: subnet=10.0.0.0/22", // current config summary
 	}
 	for _, want := range mustContain {
 		if !strings.Contains(msg, want) {
@@ -226,8 +211,8 @@ func TestPreflight_PositionCountsOnlyAppendRules(t *testing.T) {
 	dump := fakeDumper{
 		"iptables|filter|FORWARD": strings.Join([]string{
 			"-P FORWARD ACCEPT",
-			"-A FORWARD -i eth0 -o eth1 -j ACCEPT",      // rule #1 — no conflict
-			"-A FORWARD -i wg0 -o eth0 -j ACCEPT",       // rule #2 — conflict
+			"-A FORWARD -i eth0 -o eth1 -j ACCEPT", // rule #1 — no conflict
+			"-A FORWARD -i wg0 -o eth0 -j ACCEPT",  // rule #2 — conflict
 		}, "\n"),
 	}
 	err := preflightIPTablesWith(baseCfg(), dump.dump)
@@ -248,7 +233,7 @@ func TestShowActiveRules_CatchesAllShapes(t *testing.T) {
 		}, "\n"),
 		// FORWARD: anything touching wg* counts.
 		"iptables|filter|FORWARD": strings.Join([]string{
-			"-A FORWARD -i wg0 -o eth0 -j ACCEPT", // wg-shape
+			"-A FORWARD -i wg0 -o eth0 -j ACCEPT",  // wg-shape
 			"-A FORWARD -i wg01 -o wg01 -j ACCEPT", // wg-shape (stale iface name)
 			"-A FORWARD -i br0 -o br1 -j ACCEPT",   // unrelated bridge
 		}, "\n"),
