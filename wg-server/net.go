@@ -66,11 +66,8 @@ func setupNet(cfg *Config) error {
 		return fmt.Errorf("add FORWARD rules: %w", err)
 	}
 
-	if err := addMasquerade(cfg.WireGuardSubnet, cfg.InternetIface, cfg.PublicIP); err != nil {
+	if err := addMasquerade(cfg.WireGuardSubnet, cfg.InternetIface); err != nil {
 		return fmt.Errorf("add egress NAT: %w", err)
-	}
-	if cfg.PublicIP != "" {
-		INFO("egress SNAT pinned to ", cfg.PublicIP, " for ", cfg.WireGuardSubnet)
 	}
 
 	// IPv6-specific rules.
@@ -125,12 +122,14 @@ func flushWGRules(cfg *Config) {
 		drainRule(bin, "-D", "FORWARD", "-i", net, "-o", wg, "-j", "DROP")
 	}
 
-	// IPv4 egress NAT — drain both shapes (MASQUERADE and the pinned SNAT)
-	// so a config change in PublicIP cleans up across restarts.
+	// IPv4 egress NAT — drain the MASQUERADE rule. Also drain a legacy
+	// SNAT --to-source rule left by older binaries so in-place upgrades are
+	// clean: PublicIP is bind-only now and no longer installs an SNAT rule.
 	if cfg.WireGuardSubnet != "" {
-		drainRule("iptables", masqueradeArgs("-D", cfg.WireGuardSubnet, net, "")...)
+		drainRule("iptables", masqueradeArgs("-D", cfg.WireGuardSubnet, net)...)
 		if cfg.PublicIP != "" {
-			drainRule("iptables", masqueradeArgs("-D", cfg.WireGuardSubnet, net, cfg.PublicIP)...)
+			drainRule("iptables", "-t", "nat", "-D", "POSTROUTING",
+				"-s", cfg.WireGuardSubnet, "-o", net, "-j", "SNAT", "--to-source", cfg.PublicIP)
 		}
 	}
 	// IPv6 MASQUERADE
@@ -229,9 +228,9 @@ func PreviewRules(cfg *Config) []string {
 		)
 	}
 
-	// IPv4 egress NAT — SNAT when PublicIP set, otherwise MASQUERADE.
+	// IPv4 egress NAT — always MASQUERADE (single external IP auto-selected).
 	if cfg.WireGuardSubnet != "" {
-		lines = append(lines, "iptables "+strings.Join(masqueradeArgs("-A", cfg.WireGuardSubnet, net, cfg.PublicIP), " "))
+		lines = append(lines, "iptables "+strings.Join(masqueradeArgs("-A", cfg.WireGuardSubnet, net), " "))
 	}
 
 	// IPv6: either MASQUERADE (when v6 subnet set) or DROP both directions.
@@ -248,69 +247,21 @@ func PreviewRules(cfg *Config) []string {
 	return lines
 }
 
-// addMasquerade installs the POSTROUTING NAT rule for WG egress.
-// When publicIP is set, the rule pins the SNAT source to that address. This
-// matters on multi-homed hosts where MASQUERADE would otherwise auto-select
-// the interface's primary IP — which is rarely the desired public IP.
-// When publicIP is empty, fall back to MASQUERADE for single-homed setups.
-func addMasquerade(subnet, iface, publicIP string) error {
-	return execIPTables(masqueradeArgs("-A", subnet, iface, publicIP)...)
+// addMasquerade installs the POSTROUTING NAT rule for WG egress. Under the
+// single-external-IP topology, MASQUERADE auto-selects that one address, so no
+// pinned SNAT source is needed (PublicIP is bind-only).
+func addMasquerade(subnet, iface string) error {
+	return execIPTables(masqueradeArgs("-A", subnet, iface)...)
 }
 
 // masqueradeArgs builds the iptables argument list for the POSTROUTING NAT
 // rule. Action is "-A" to install or "-D" to drain.
-func masqueradeArgs(action, subnet, iface, publicIP string) []string {
-	args := []string{"-t", "nat", action, "POSTROUTING", "-s", subnet, "-o", iface, "-j"}
-	if publicIP != "" {
-		return append(args, "SNAT", "--to-source", publicIP)
-	}
-	return append(args, "MASQUERADE")
+func masqueradeArgs(action, subnet, iface string) []string {
+	return []string{"-t", "nat", action, "POSTROUTING", "-s", subnet, "-o", iface, "-j", "MASQUERADE"}
 }
 
 func addMasquerade6(subnet6, iface string) error {
 	return execIP6Tables("-t", "nat", "-A", "POSTROUTING", "-s", subnet6, "-o", iface, "-j", "MASQUERADE")
-}
-
-// ---------------------------------------------------------------------------
-// Cross-server masquerade exclusion (dual-stack)
-// ---------------------------------------------------------------------------
-
-func addCrossServerMasqueradeExclusion(peerSubnet, iface string) error {
-	args := []string{
-		"-t", "nat", "-C", "POSTROUTING",
-		"-s", peerSubnet, "-o", iface, "-j", "RETURN",
-	}
-	out, err := exec.Command("iptables", args...).CombinedOutput()
-	if err == nil {
-		return nil
-	}
-	_ = out
-	return execIPTables("-t", "nat", "-I", "POSTROUTING", "1",
-		"-s", peerSubnet, "-o", iface, "-j", "RETURN")
-}
-
-func removeCrossServerMasqueradeExclusion(peerSubnet, iface string) error {
-	return execIPTables("-t", "nat", "-D", "POSTROUTING",
-		"-s", peerSubnet, "-o", iface, "-j", "RETURN")
-}
-
-func addCrossServerMasqueradeExclusion6(peerSubnet6, iface string) error {
-	args := []string{
-		"-t", "nat", "-C", "POSTROUTING",
-		"-s", peerSubnet6, "-o", iface, "-j", "RETURN",
-	}
-	out, err := exec.Command("ip6tables", args...).CombinedOutput()
-	if err == nil {
-		return nil
-	}
-	_ = out
-	return execIP6Tables("-t", "nat", "-I", "POSTROUTING", "1",
-		"-s", peerSubnet6, "-o", iface, "-j", "RETURN")
-}
-
-func removeCrossServerMasqueradeExclusion6(peerSubnet6, iface string) error {
-	return execIP6Tables("-t", "nat", "-D", "POSTROUTING",
-		"-s", peerSubnet6, "-o", iface, "-j", "RETURN")
 }
 
 // ---------------------------------------------------------------------------
