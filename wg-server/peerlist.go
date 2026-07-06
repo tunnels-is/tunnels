@@ -69,6 +69,19 @@ type flowRec struct {
 	prev    uint64
 }
 
+// fragKey identifies an in-flight fragmented IPv4 datagram inbound to a local
+// receiver: the source that sent it plus the IPv4 identification field. Only
+// the first fragment of a datagram carries an L4 header (and thus a port), so
+// trailing fragments cannot be port-matched; instead, when a first fragment is
+// admitted the receiver records this key, and trailing fragments are admitted
+// iff their key was recorded. The source is authenticated by WireGuard (a peer
+// can only send from its own IP), so the (remote, id) namespace is per-source
+// and one peer cannot forge notes for another.
+type fragKey struct {
+	remote netip.Addr
+	id     uint16
+}
+
 // portSet is the set of destination ports a given source may reach on this
 // device. all=true means every port (a bare-IP allowlist entry); otherwise
 // only the ports in the map are permitted (IP:PORT entries). Protocol is not
@@ -128,6 +141,10 @@ type peer struct {
 	allowed  map[netip.Addr]*portSet
 	anyPorts map[uint16]struct{} // "*:PORT" — any source may reach these ports
 	flows    map[flowKey]*flowRec
+	// frags tracks fragmented datagrams whose first fragment this receiver
+	// admitted, so trailing fragments (which carry no port) can be matched.
+	// Aged by the same cleaner as flows.
+	frags map[fragKey]*flowRec
 }
 
 var (
@@ -242,6 +259,7 @@ func resetPeer(ips ...string) {
 		allowed:  make(map[netip.Addr]*portSet),
 		anyPorts: make(map[uint16]struct{}),
 		flows:    make(map[flowKey]*flowRec),
+		frags:    make(map[fragKey]*flowRec),
 	}
 	var v4 netip.Addr
 	for _, s := range ips {
@@ -293,6 +311,23 @@ func (p *peer) allowedContains(src netip.Addr, dport uint16) bool {
 	}
 	if ps, ok := p.allowed[src]; ok {
 		return ps.contains(dport)
+	}
+	return false
+}
+
+// allowedAnyPort reports whether src is admitted on ALL ports by the static
+// policy — allow-all, or a bare-host ("IP") entry. Such a grant does not depend
+// on the destination port, so it can admit a trailing fragment (which carries
+// no port) on its own, order-independently. Port-scoped rules ("*:PORT",
+// "IP:PORT") are deliberately excluded: they need the head-admitted note.
+func (p *peer) allowedAnyPort(src netip.Addr) bool {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	if p.allowAll {
+		return true
+	}
+	if ps, ok := p.allowed[src]; ok {
+		return ps.all
 	}
 	return false
 }
@@ -369,6 +404,43 @@ func (p *peer) flowMatch(k flowKey) bool {
 	return ok
 }
 
+// noteFragment records that the first fragment of the datagram identified by k
+// was admitted to this receiver, so its trailing fragments will match. Mirrors
+// touchFlow (read-lock fast path, write lock only to insert) and is bounded by
+// flowSoftCap.
+func (p *peer) noteFragment(k fragKey) {
+	p.mu.RLock()
+	if r, ok := p.frags[k]; ok {
+		r.packets.Add(1)
+		p.mu.RUnlock()
+		return
+	}
+	p.mu.RUnlock()
+
+	p.mu.Lock()
+	if r, ok := p.frags[k]; ok { // re-check after lock upgrade
+		r.packets.Add(1)
+	} else if len(p.frags) < flowSoftCap {
+		r := &flowRec{}
+		r.packets.Store(1)
+		p.frags[k] = r
+	}
+	p.mu.Unlock()
+}
+
+// fragmentAdmitted reports whether the first fragment of the datagram
+// identified by k was previously admitted to this receiver, refreshing
+// liveness so the entry survives while the datagram is still arriving.
+func (p *peer) fragmentAdmitted(k fragKey) bool {
+	p.mu.RLock()
+	r, ok := p.frags[k]
+	if ok {
+		r.packets.Add(1)
+	}
+	p.mu.RUnlock()
+	return ok
+}
+
 // cleanFlows ages conntrack across all residents: a flow with no traffic
 // since the last pass is dropped. Ranges only the v4 spine — every resident
 // has a v4 address, so v6 map entries are aliases already covered.
@@ -382,6 +454,13 @@ func cleanFlows() {
 		for k, r := range p.flows {
 			if pk := r.packets.Load(); pk == r.prev {
 				delete(p.flows, k)
+			} else {
+				r.prev = pk
+			}
+		}
+		for k, r := range p.frags {
+			if pk := r.packets.Load(); pk == r.prev {
+				delete(p.frags, k)
 			} else {
 				r.prev = pk
 			}
