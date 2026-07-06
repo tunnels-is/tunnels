@@ -19,6 +19,10 @@ func DB_GetDevices(limit, offset int64) (DL []*types.Device, err error) {
 	return BBolt_GetDevices(limit, offset)
 }
 
+func DB_GetAllDevices() (DL []*types.Device, err error) {
+	return BBolt_GetAllDevices()
+}
+
 func DB_GetDevicesByUserID(userID uuid.UUID) (DL []*types.Device, err error) {
 	return BBolt_GetDevicesByUserID(userID)
 }
