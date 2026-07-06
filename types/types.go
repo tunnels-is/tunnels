@@ -45,6 +45,14 @@ type ServerConfig struct {
 	APIIP   string
 	APIPort string
 
+	// AllowedOrigins is the CORS allowlist for browser callers. Each entry is an
+	// exact origin (scheme://host[:port]) that may make cross-origin requests and
+	// read responses; the matching origin is echoed back (never the literal "*").
+	// A single "*" entry allows any origin (still echoed per-request). Empty (the
+	// default) disables cross-origin access entirely — the same-origin admin UI is
+	// unaffected. Set this only if you host the frontend on a different origin.
+	AllowedOrigins []string
+
 	// If SecretStore set to "config"
 	AdminAPIKey      string
 	DBurl            string
