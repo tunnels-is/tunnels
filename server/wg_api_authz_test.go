@@ -64,6 +64,47 @@ func callWGPeerAuthz(t *testing.T, server *types.Server, pubKey string) *httptes
 	return w
 }
 
+func callWGConfig(t *testing.T, user *User, serverID uuid.UUID, pubKey string) *httptest.ResponseRecorder {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodGet,
+		"/client/wg/config?serverID="+serverID.String()+"&pubKey="+url.QueryEscape(pubKey), nil)
+	req = req.WithContext(context.WithValue(req.Context(), contextKeyUser, user))
+	w := httptest.NewRecorder()
+	API_WGConfig(w, req)
+	return w
+}
+
+func TestAPI_WGConfig_GroupACL(t *testing.T) {
+	setupTestDB(t)
+	if logger == nil {
+		logger = slog.New(slog.NewTextHandler(io.Discard, nil))
+	}
+	group := uuid.New()
+
+	groupedServer := &types.Server{ID: uuid.New(), Tag: "grouped", APIKey: uuid.NewString(), Groups: []uuid.UUID{group}}
+	publicServer := &types.Server{ID: uuid.New(), Tag: "public", APIKey: uuid.NewString(), Groups: []uuid.UUID{}}
+	if err := BBolt_CreateServer(groupedServer); err != nil {
+		t.Fatal(err)
+	}
+	if err := BBolt_CreateServer(publicServer); err != nil {
+		t.Fatal(err)
+	}
+
+	member := &User{ID: uuid.New(), Groups: []uuid.UUID{group}}
+	outsider := &User{ID: uuid.New(), Groups: []uuid.UUID{}}
+	key := makeWGKey() // unregistered pubkey → device lookup returns nil, path proceeds
+
+	if w := callWGConfig(t, member, groupedServer.ID, key); w.Code != http.StatusOK {
+		t.Fatalf("group member should read grouped server config (200), got %d: %s", w.Code, w.Body.String())
+	}
+	if w := callWGConfig(t, outsider, groupedServer.ID, key); w.Code != http.StatusUnauthorized {
+		t.Fatalf("non-member should be denied grouped server config (401), got %d", w.Code)
+	}
+	if w := callWGConfig(t, outsider, publicServer.ID, key); w.Code != http.StatusOK {
+		t.Fatalf("ungrouped server config should be readable by anyone (200), got %d: %s", w.Code, w.Body.String())
+	}
+}
+
 func TestAPI_WGPeer_ActiveUserAuthorized(t *testing.T) {
 	server := setupWGPeerTest(t)
 	pubKey := seedUserWithDevice(t, server, &User{
