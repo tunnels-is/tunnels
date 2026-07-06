@@ -20,11 +20,17 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+// randomAuthDelay sleeps a short randomised interval (50–150 ms) on
+// authentication endpoints. Layered on top of the constant-time credential
+// comparisons, the jitter blunts timing side-channels: response latency no
+// longer reveals whether an account existed or which check failed. Intended to
+// be deferred at the top of a handler so it runs on every return path.
+func randomAuthDelay() {
+	time.Sleep(time.Duration(50+mrand.IntN(100)) * time.Millisecond)
+}
+
 func API_AdminUILogin(w http.ResponseWriter, r *http.Request) {
-	defer func() {
-		// brute force timing-attack prevention
-		time.Sleep(50 * time.Millisecond)
-	}()
+	defer randomAuthDelay()
 
 	defer BasicRecover()
 
@@ -124,6 +130,7 @@ func API_AdminUILogout(w http.ResponseWriter, r *http.Request) {
 }
 
 func API_UserCreate(w http.ResponseWriter, r *http.Request) {
+	defer randomAuthDelay()
 	defer BasicRecover()
 	RF := new(REGISTER_FORM)
 	err := decodeBody(r, RF)
@@ -209,6 +216,16 @@ func API_UserUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// The personal APIKey is a bearer token for this account and is set by the
+	// frontend as a UUID. Reject anything else so a weak/short token can't be
+	// stored. Empty is allowed and clears the key.
+	if UF.APIKey != "" {
+		if _, perr := uuid.Parse(UF.APIKey); perr != nil {
+			senderr(w, 400, "APIKey must be a valid UUID")
+			return
+		}
+	}
+
 	UF.UID = user.ID
 	err = DB_updateUser(UF)
 	if err != nil {
@@ -239,10 +256,7 @@ func API_UserAdminUpdate(w http.ResponseWriter, r *http.Request) {
 }
 
 func API_UserLogin(w http.ResponseWriter, r *http.Request) {
-	defer func() {
-		// brute force timing-attack prevention
-		time.Sleep(50 * time.Millisecond)
-	}()
+	defer randomAuthDelay()
 	defer BasicRecover()
 
 	LF := new(LOGIN_FORM)
@@ -322,6 +336,7 @@ func API_UserLogout(w http.ResponseWriter, r *http.Request) {
 }
 
 func API_UserTwoFactorConfirm(w http.ResponseWriter, r *http.Request) {
+	defer randomAuthDelay()
 	defer BasicRecover()
 
 	LF := new(TWO_FACTOR_FORM)
@@ -1305,11 +1320,7 @@ func API_ServerGet(w http.ResponseWriter, r *http.Request) {
 }
 
 func API_UserResetPassword(w http.ResponseWriter, r *http.Request) {
-	defer func() {
-		// Randomised delay: slows brute-forcing of the reset code and masks the
-		// timing difference between failure paths (unknown user vs. wrong code).
-		time.Sleep(time.Duration(50+mrand.IntN(100)) * time.Millisecond)
-	}()
+	defer randomAuthDelay()
 	defer BasicRecover()
 
 	var user *User
