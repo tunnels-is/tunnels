@@ -81,7 +81,7 @@ func setupWireGuard(cfg *Config, logLevel string) error {
 	// and, via IP_PKTINFO sticky source, answers each peer from the address it
 	// was reached on (default routing otherwise). The listen port is set below
 	// via the listen_port UAPI directive, independent of the bind address.
-	wgLazyBind = NewLazyBind(conn.NewDefaultBind(), privCopy, pubBytes, cfg.HandshakeBufferSize, cfg.HandshakeRatePerIP, func() {})
+	wgLazyBind = NewLazyBind(conn.NewDefaultBind(), privCopy, pubBytes, cfg.HandshakeBufferSize, cfg.HandshakeRatePerIP)
 	wgDevice = device.NewDevice(tunInterface, wgLazyBind, wgLogger)
 
 	privKeyHex := make([]byte, hex.EncodedLen(32))
