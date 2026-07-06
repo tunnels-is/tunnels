@@ -185,9 +185,15 @@ func FetchConfig(controllerURL, apiKey, configPath string, insecureSkipVerify bo
 		WireGuardSubnet:    r.WireGuardSubnet,
 		WireGuardSubnet6:   r.WireGuardSubnet6,
 		WireGuardIface:     r.WireGuardIface,
-		InternetIface:      r.InternetIface,
-		EnableFirewall:     r.EnableFirewall,
-		InsecureSkipVerify: insecureSkipVerify,
+		InternetIface:  r.InternetIface,
+		EnableFirewall: r.EnableFirewall,
+		// The initial fetch above was governed by the bootstrap flag
+		// (insecureSkipVerify) — the wg-server must decide controller trust
+		// before it can fetch anything. For the ongoing controller calls
+		// (per-handshake /wg/peer) we also honor the server record's setting
+		// (r.InsecureSkipVerify), so the admin-UI toggle propagates here. Skip
+		// only if either says so; the default (both false) verifies.
+		InsecureSkipVerify: insecureSkipVerify || r.InsecureSkipVerify,
 	}
 
 	if cfg.WireGuardPort == 0 {
@@ -204,6 +210,12 @@ func FetchConfig(controllerURL, apiKey, configPath string, insecureSkipVerify bo
 	}
 	if cfg.HandshakeRatePerIP <= 0 {
 		cfg.HandshakeRatePerIP = 100
+	}
+
+	if cfg.InsecureSkipVerify {
+		WARN("wg-server: controller TLS certificate verification is DISABLED " +
+			"(InsecureSkipVerify) — only use this with a self-signed/trusted setup on a " +
+			"trusted network; the peer-authorization channel is exposed to MITM otherwise")
 	}
 
 	return cfg, nil

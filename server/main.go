@@ -502,7 +502,10 @@ func writeWGConfig() error {
 	if err := LoadWGConfig(wgConfigPath); err == nil {
 		return nil
 	}
-	WGConfig.Store(&types.WGBootstrap{InsecureSkipVerify: true})
+	// Default to verifying the controller's TLS certificate. Self-signed / all-in-one
+	// setups must set InsecureSkipVerify: true explicitly (self-signed certs can't be
+	// verified against system roots).
+	WGConfig.Store(&types.WGBootstrap{InsecureSkipVerify: false})
 	return SaveWGConfig(wgConfigPath)
 }
 
