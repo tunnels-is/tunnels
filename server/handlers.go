@@ -597,10 +597,6 @@ func API_DeviceCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if F.Device.Groups == nil {
-		F.Device.Groups = make([]uuid.UUID, 0)
-	}
-
 	// Hold the allocation lock from IP assignment through DB_CreateDevice so a
 	// concurrent create cannot claim the same address (see wgIPAllocMu).
 	wgIPAllocMu.Lock()
@@ -672,10 +668,6 @@ func API_AdminDeviceCreate(w http.ResponseWriter, r *http.Request) {
 
 	F.Device.ID = uuid.New()
 	F.Device.CreatedAt = time.Now()
-	if F.Device.Groups == nil {
-		F.Device.Groups = make([]uuid.UUID, 0)
-	}
-
 	// Hold the allocation lock from IP assignment through DB_CreateDevice so a
 	// concurrent create cannot claim the same address (see wgIPAllocMu).
 	wgIPAllocMu.Lock()
@@ -829,15 +821,8 @@ func API_AdminGroupAdd(w http.ResponseWriter, r *http.Request) {
 
 	var u *User
 	var s *types.Server
-	var d *types.Device
 
 	switch F.Type {
-	case "device":
-		d, err = DB_FindDeviceByID(F.TypeID)
-		if err != nil {
-			senderr(w, 400, err.Error())
-			return
-		}
 	case "server":
 		s, err = DB_FindServerByID(F.TypeID)
 		if err != nil {
@@ -872,8 +857,6 @@ func API_AdminGroupAdd(w http.ResponseWriter, r *http.Request) {
 		sendObject(w, u.ToMinifiedUser())
 	case s != nil:
 		sendObject(w, s)
-	case d != nil:
-		sendObject(w, d)
 	default:
 		senderr(w, 500, "Unknown error, please try again in a moment")
 	}
@@ -1397,7 +1380,7 @@ func API_ActivateLicenseKey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	INFO("KEY attempt:", AF.Key)
+	INFO("KEY attempt:", redactKey(AF.Key))
 
 	lemonClient := lc.Load()
 	key, resp, err := lemonClient.Licenses.Validate(context.Background(), AF.Key, "")
@@ -1424,7 +1407,7 @@ func API_ActivateLicenseKey(w http.ResponseWriter, r *http.Request) {
 		}
 		jitter, _ := rand.Int(rand.Reader, big.NewInt(60))
 		user.SubExpiration = user.SubExpiration.AddDate(0, 1, 0).Add(time.Duration(jitter.Int64()+60) * time.Minute)
-		INFO("KEY +1:", key.LicenseKey.Key, " - check activation in lemon")
+		INFO("KEY +1:", redactKey(key.LicenseKey.Key), " - check activation in lemon")
 
 		user.Key = &LicenseKey{
 			Created: key.LicenseKey.CreatedAt,
@@ -1443,7 +1426,7 @@ func API_ActivateLicenseKey(w http.ResponseWriter, r *http.Request) {
 		}
 		jitter2, _ := rand.Int(rand.Reader, big.NewInt(600))
 		user.SubExpiration = time.Now().AddDate(0, months, 0).Add(time.Duration(jitter2.Int64()+60) * time.Minute)
-		INFO("KEY +", months, ":", key.LicenseKey.Key, " - check activate in lemon")
+		INFO("KEY +", months, ":", redactKey(key.LicenseKey.Key), " - check activate in lemon")
 
 		user.Key = &LicenseKey{
 			Created: key.LicenseKey.CreatedAt,
@@ -1476,7 +1459,7 @@ func API_ActivateLicenseKey(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if key != nil {
-		INFO("KEY: Activated:", key.LicenseKey.Key)
+		INFO("KEY: Activated:", redactKey(key.LicenseKey.Key))
 	}
 
 	w.WriteHeader(200)

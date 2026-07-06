@@ -3,7 +3,6 @@ package wgserver
 import (
 	"crypto/tls"
 	"encoding/json"
-	"fmt"
 	"net"
 	"net/http"
 	"net/url"
@@ -26,62 +25,70 @@ func initSyncClient(cfg *Config) {
 	}
 }
 
-func assignAndAdd(pubKeyB64 string) bool {
+// authResult classifies the controller's answer for a peer at (re)connect time.
+type authResult int
+
+const (
+	authAllowed authResult = iota // authorized; peer is (re)installed
+	authDenied                    // controller definitively rejected it; caller removes the peer
+	authUnknown                   // transient failure (unreachable / 5xx); caller must NOT change peer state
+)
+
+// reconcilePeer re-checks the controller's authorization for pubKeyB64 and
+// installs the peer when allowed. It runs on every (re)connect handshake, so a
+// revocation on the controller (user disabled, subscription expired, device
+// deleted, group removed) takes effect on the peer's next handshake without a
+// wg-server restart. A transient controller error returns authUnknown so a blip
+// does not tear down live tunnels.
+func reconcilePeer(pubKeyB64 string) authResult {
 	cfg := activeConfig.Load()
 	if cfg == nil {
-		return false
+		return authUnknown
 	}
-
 	hexKey, err := b64ToHex(pubKeyB64)
 	if err != nil {
-		WARN("assignAndAdd: invalid pubkey: ", err)
-		return false
+		WARN("reconcilePeer: invalid pubkey: ", err)
+		return authDenied
 	}
 
-	p, err := fetchPeerByPubKey(cfg, pubKeyB64)
-	if err != nil {
-		WARN("assignAndAdd: fetchPeerByPubKey failed: ", err)
-		return false
+	res, p := queryPeer(cfg, pubKeyB64)
+	if res != authAllowed {
+		return res
 	}
-	if p == nil {
-		INFO("assignAndAdd: pubkey not authorized by controller → ", pubKeyB64[:12], "…")
-		return false
-	}
-
-	INFO("assignAndAdd: peer authorized by controller, deviceID=", p.DeviceID)
 
 	var ip, ipv6 string
 	if p.WireGuardIP != "" {
 		ip = p.WireGuardIP
 		ipv6 = p.WireGuardIPv6
 		if !subnetContains(cfg.WireGuardSubnet, ip) {
-			WARN("assignAndAdd: controller-assigned IP outside subnet: ", ip)
-			return false
+			WARN("reconcilePeer: controller-assigned IP outside subnet: ", ip)
+			return authDenied
 		}
 		if ipv6 != "" && cfg.WireGuardSubnet6 != "" && !subnetContains(cfg.WireGuardSubnet6, ipv6) {
-			WARN("assignAndAdd: controller-assigned IPv6 outside subnet: ", ipv6)
-			return false
+			WARN("reconcilePeer: controller-assigned IPv6 outside subnet: ", ipv6)
+			return authDenied
 		}
 		peerStore.Set(p.DeviceID, ip, ipv6, pubKeyB64)
 	} else {
 		var assignErr error
 		ip, ipv6, assignErr = peerStore.GetOrAssign(p.DeviceID, pubKeyB64)
 		if assignErr != nil {
-			WARN("assignAndAdd: GetOrAssign failed: ", assignErr)
-			return false
+			WARN("reconcilePeer: GetOrAssign failed: ", assignErr)
+			return authUnknown
 		}
 	}
 
-	allowedIPs := peerAllowedIPs(ip, ipv6)
-	INFO("assignAndAdd: ip=", ip, " ipv6=", ipv6, " calling AddPeer")
-	if err := AddPeer(hexKey, allowedIPs...); err != nil {
-		WARN("assignAndAdd: AddPeer failed: ", err)
-		return false
+	if err := AddPeer(hexKey, peerAllowedIPs(ip, ipv6)...); err != nil {
+		WARN("reconcilePeer: AddPeer failed: ", err)
+		return authUnknown
 	}
-	addedPeerKeys.Store(hexKey, struct{}{})
-	resetPeer(ip, ipv6)
-	INFO("assignAndAdd: peer added to wg0 → ", pubKeyB64[:12], "… ip=", ip)
-	return true
+	// Reset firewall state only on a fresh add — a rekey/reconnect of an already
+	// installed peer must not wipe the allowlist it announced after connecting.
+	if _, rekey := addedPeerKeys.LoadOrStore(hexKey, struct{}{}); !rekey {
+		resetPeer(ip, ipv6)
+	}
+	INFO("reconcilePeer: authorized → ", pubKeyB64[:12], "… ip=", ip)
+	return authAllowed
 }
 
 // peerAllowedIPs builds the list of allowed IPs for a peer.
@@ -106,20 +113,24 @@ func subnetContains(cidr, ipStr string) bool {
 	return subnet.Contains(ip)
 }
 
-// fetchPeerByPubKey asks the controller for the single peer record matching
-// pubKeyB64. Returns (nil, nil) when the controller reports 404 (not
-// authorized). Any other non-2xx or transport failure returns an error.
-func fetchPeerByPubKey(cfg *Config, pubKeyB64 string) (*types.WGPeer, error) {
+// queryPeer asks the controller whether pubKeyB64 is authorized on this server,
+// mapping the HTTP status to an authResult:
+//   - 200            → authAllowed (with the decoded peer);
+//   - 401/403/404    → authDenied (not allowed / disabled / expired / unknown device);
+//   - anything else  → authUnknown (5xx or transport error — treated as transient).
+func queryPeer(cfg *Config, pubKeyB64 string) (authResult, *types.WGPeer) {
 	endpoint := cfg.ControllerURL + "/wg/peer?pubkey=" + url.QueryEscape(pubKeyB64)
 	req, err := http.NewRequest(http.MethodGet, endpoint, nil)
 	if err != nil {
-		return nil, fmt.Errorf("build request: %w", err)
+		WARN("queryPeer: build request: ", err)
+		return authUnknown, nil
 	}
 	req.Header.Set("X-WG-KEY", cfg.APIKey)
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("request: %w", err)
+		WARN("queryPeer: request failed: ", err)
+		return authUnknown, nil
 	}
 	defer resp.Body.Close()
 
@@ -127,12 +138,14 @@ func fetchPeerByPubKey(cfg *Config, pubKeyB64 string) (*types.WGPeer, error) {
 	case http.StatusOK:
 		var peer types.WGPeer
 		if err := json.NewDecoder(resp.Body).Decode(&peer); err != nil {
-			return nil, fmt.Errorf("decode response: %w", err)
+			WARN("queryPeer: decode response: ", err)
+			return authUnknown, nil
 		}
-		return &peer, nil
-	case http.StatusNotFound:
-		return nil, nil
+		return authAllowed, &peer
+	case http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound:
+		return authDenied, nil
 	default:
-		return nil, fmt.Errorf("controller returned %d", resp.StatusCode)
+		WARN("queryPeer: controller returned ", resp.StatusCode)
+		return authUnknown, nil
 	}
 }

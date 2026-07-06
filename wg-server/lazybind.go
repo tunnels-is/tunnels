@@ -41,21 +41,18 @@ type LazyBind struct {
 	rateMu     sync.Mutex
 	ratePerIP  int
 	rateWindow map[netip.Addr]*ipRate
-
-	fallbackSync func()
 }
 
-func NewLazyBind(inner conn.Bind, serverPriv, serverPub []byte, bufferSize, ratePerIP int, fallbackSync func()) *LazyBind {
+func NewLazyBind(inner conn.Bind, serverPriv, serverPub []byte, bufferSize, ratePerIP int) *LazyBind {
 	return &LazyBind{
-		inner:        inner,
-		requeueCh:    make(chan *bufferedPkt, bufferSize),
-		done:         make(chan struct{}),
-		serverPriv:   serverPriv,
-		serverPub:    serverPub,
-		seenIPs:      make(map[netip.Addr]time.Time),
-		ratePerIP:    ratePerIP,
-		rateWindow:   make(map[netip.Addr]*ipRate),
-		fallbackSync: fallbackSync,
+		inner:      inner,
+		requeueCh:  make(chan *bufferedPkt, bufferSize),
+		done:       make(chan struct{}),
+		serverPriv: serverPriv,
+		serverPub:  serverPub,
+		seenIPs:    make(map[netip.Addr]time.Time),
+		ratePerIP:  ratePerIP,
+		rateWindow: make(map[netip.Addr]*ipRate),
 	}
 }
 
@@ -173,56 +170,35 @@ func (b *LazyBind) requeue(pkt *bufferedPkt) {
 }
 
 func (b *LazyBind) handleInitiation(pkt *bufferedPkt) {
-	INFO("LazyBind: handshake initiation received, attempting identity decrypt")
-
 	pubKeyB64, ok := tryDecryptInitiator(pkt.data, b.serverPriv, b.serverPub)
 	if !ok {
-		INFO("LazyBind: decrypt failed (wrong server key?), falling back to full sync")
-		b.fallbackSync()
+		// Not encrypted to this server's static key (or malformed). Let
+		// wireguard-go handle/drop it.
 		b.requeue(pkt)
 		return
 	}
 
-	INFO("LazyBind: decrypted initiator pubkey=", pubKeyB64[:12], "…")
-
-	rec, found := peerStore.GetByPubKey(pubKeyB64)
-	if !found {
-		INFO("LazyBind: pubkey not in peer store, attempting targeted assign from controller")
-		if assignAndAdd(pubKeyB64) {
-			INFO("LazyBind: targeted assign succeeded, re-injecting handshake")
-			b.requeue(pkt)
-			return
-		}
-		INFO("LazyBind: targeted assign failed, falling back to full sync")
-		b.fallbackSync()
+	// Reconcile authorization with the controller on every (re)connect. An
+	// already-open session is not torn down proactively, but any new handshake
+	// (initial connect, reconnect, or rekey) re-checks here — so a peer the
+	// controller has since revoked cannot re-establish.
+	switch reconcilePeer(pubKeyB64) {
+	case authAllowed:
 		b.requeue(pkt)
-		return
-	}
-
-	INFO("LazyBind: peer found in store → ip=", rec.IP, " ipv6=", rec.IPv6, " calling AddPeer")
-	hexKey, err := b64ToHex(pubKeyB64)
-	if err != nil {
-		WARN("LazyBind: b64ToHex failed: ", err)
-	} else if err := AddPeer(hexKey, peerAllowedIPs(rec.IP, rec.IPv6)...); err != nil {
-		WARN("LazyBind: AddPeer failed: ", err)
-	} else {
-		// Reset the firewall state only on a fresh connect — this path also
-		// runs on routine rekey handshakes (shouldSync debounce is shorter
-		// than the rekey interval), and those must not wipe the policy the
-		// peer announced after connecting.
-		if _, rekey := addedPeerKeys.LoadOrStore(hexKey, struct{}{}); !rekey {
-			resetPeer(rec.IP, rec.IPv6)
+	case authDenied:
+		INFO("LazyBind: peer no longer authorized, removing → ", pubKeyB64[:12], "…")
+		if hexKey, err := b64ToHex(pubKeyB64); err == nil {
+			_ = RemovePeer(hexKey)
+			addedPeerKeys.Delete(hexKey)
+			peerStore.DeleteByPubKey(pubKeyB64)
 		}
-		INFO("LazyBind: AddPeer OK → peer=", pubKeyB64[:12], "… ip=", rec.IP, " re-injecting handshake")
+		// Drop the handshake: the peer is not installed, so replaying it would
+		// only fail.
+	case authUnknown:
+		// Transient controller error — leave peer state untouched and requeue so
+		// an already-installed peer's handshake can still complete.
+		b.requeue(pkt)
 	}
-
-	ipc, err := wgDevice.IpcGet()
-	if err != nil {
-		ERR(err)
-	}
-	INFO(ipc)
-
-	b.requeue(pkt)
 }
 
 func (b *LazyBind) shouldSync(ip netip.Addr) bool {

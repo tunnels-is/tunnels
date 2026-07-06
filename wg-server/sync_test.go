@@ -9,7 +9,7 @@ import (
 	"github.com/tunnels-is/tunnels/types"
 )
 
-func TestFetchPeerByPubKey_OK(t *testing.T) {
+func TestQueryPeer_OK(t *testing.T) {
 	want := types.WGPeer{
 		PublicKeyHex:  "deadbeef",
 		DeviceID:      "dev-1",
@@ -35,37 +35,38 @@ func TestFetchPeerByPubKey_OK(t *testing.T) {
 	cfg := &Config{ControllerURL: srv.URL, APIKey: "test-api-key"}
 	initSyncClient(cfg)
 
-	got, err := fetchPeerByPubKey(cfg, "abc==")
-	if err != nil {
-		t.Fatal(err)
+	res, got := queryPeer(cfg, "abc==")
+	if res != authAllowed {
+		t.Fatalf("expected authAllowed, got %v", res)
 	}
-	if got == nil {
-		t.Fatal("expected peer, got nil")
-	}
-	if *got != want {
-		t.Fatalf("mismatch: got %+v want %+v", *got, want)
+	if got == nil || *got != want {
+		t.Fatalf("mismatch: got %+v want %+v", got, want)
 	}
 }
 
-func TestFetchPeerByPubKey_NotFound(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusNotFound)
-	}))
-	defer srv.Close()
+// 401/403/404 are all definitive denials — the peer must be removed. 403 in
+// particular is how the controller reports a disabled user / expired sub.
+func TestQueryPeer_Denied(t *testing.T) {
+	for _, code := range []int{http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound} {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(code)
+		}))
+		cfg := &Config{ControllerURL: srv.URL, APIKey: "k"}
+		initSyncClient(cfg)
 
-	cfg := &Config{ControllerURL: srv.URL, APIKey: "k"}
-	initSyncClient(cfg)
-
-	got, err := fetchPeerByPubKey(cfg, "missing")
-	if err != nil {
-		t.Fatalf("404 should be (nil, nil), got err: %v", err)
-	}
-	if got != nil {
-		t.Fatal("404 should produce nil peer")
+		res, got := queryPeer(cfg, "x")
+		srv.Close()
+		if res != authDenied {
+			t.Fatalf("status %d: expected authDenied, got %v", code, res)
+		}
+		if got != nil {
+			t.Fatalf("status %d: expected nil peer", code)
+		}
 	}
 }
 
-func TestFetchPeerByPubKey_ServerError(t *testing.T) {
+// A 5xx is transient: the caller must not tear down a live peer over a blip.
+func TestQueryPeer_ServerErrorIsUnknown(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}))
@@ -74,12 +75,12 @@ func TestFetchPeerByPubKey_ServerError(t *testing.T) {
 	cfg := &Config{ControllerURL: srv.URL, APIKey: "k"}
 	initSyncClient(cfg)
 
-	if _, err := fetchPeerByPubKey(cfg, "x"); err == nil {
-		t.Fatal("expected error on 5xx")
+	if res, _ := queryPeer(cfg, "x"); res != authUnknown {
+		t.Fatalf("5xx should be authUnknown, got %v", res)
 	}
 }
 
-func TestFetchPeerByPubKey_QueryEscaping(t *testing.T) {
+func TestQueryPeer_QueryEscaping(t *testing.T) {
 	var seen string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		seen = r.URL.Query().Get("pubkey")
@@ -91,8 +92,8 @@ func TestFetchPeerByPubKey_QueryEscaping(t *testing.T) {
 	initSyncClient(cfg)
 
 	raw := "abc/def+ghi=="
-	if _, err := fetchPeerByPubKey(cfg, raw); err != nil {
-		t.Fatal(err)
+	if res, _ := queryPeer(cfg, raw); res != authDenied {
+		t.Fatalf("404 should be authDenied, got %v", res)
 	}
 	if seen != raw {
 		t.Fatalf("query decode mismatch: got %q want %q", seen, raw)

@@ -586,8 +586,6 @@ func BBolt_FindEntitiesByGroupID(id string, objType string, limit, offset int64)
 		bucket = USERS_BUCKET
 	case "server":
 		bucket = SERVERS_BUCKET
-	case "device":
-		bucket = DEVICES_BUCKET
 	default:
 		return nil, fmt.Errorf("unknown type")
 	}
@@ -617,23 +615,6 @@ func BBolt_FindEntitiesByGroupID(id string, objType string, limit, offset int64)
 				}
 			case "user":
 				E := new(User)
-				if err := bboltUnmarshal(v, E); err == nil {
-					if slices.Contains(uuidSliceToString(E.Groups), id) {
-						match = true
-					}
-					if match {
-						if skipped < offset {
-							skipped++
-							continue
-						}
-						if int64(len(IL)) >= limit {
-							break
-						}
-						IL = append(IL, E)
-					}
-				}
-			case "device":
-				E := new(types.Device)
 				if err := bboltUnmarshal(v, E); err == nil {
 					if slices.Contains(uuidSliceToString(E.Groups), id) {
 						match = true
@@ -1015,8 +996,6 @@ func BBolt_AddToGroup(groupID, typeID, objType string) error {
 		bucket = USERS_BUCKET
 	case "server":
 		bucket = SERVERS_BUCKET
-	case "device":
-		bucket = DEVICES_BUCKET
 	default:
 		return fmt.Errorf("unknown type")
 	}
@@ -1028,19 +1007,6 @@ func BBolt_AddToGroup(groupID, typeID, objType string) error {
 		}
 		var err error
 		switch objType {
-		case "device":
-			D := new(types.Device)
-			_ = bboltUnmarshal(v, D)
-			groups := uuidSliceToString(D.Groups)
-			if !contains(groups, groupID) {
-				groups = append(groups, groupID)
-				D.Groups = stringSliceToUUID(groups)
-			}
-			v, err = bboltMarshal(D)
-			if err != nil {
-				return err
-			}
-			return b.Put([]byte(typeID), v)
 		case "user":
 			U := new(User)
 			_ = bboltUnmarshal(v, U)
@@ -1074,8 +1040,6 @@ func BBolt_RemoveFromGroup(groupID, typeID, objType string) error {
 		bucket = USERS_BUCKET
 	case "server":
 		bucket = SERVERS_BUCKET
-	case "device":
-		bucket = DEVICES_BUCKET
 	default:
 		return fmt.Errorf("unknown type")
 	}
@@ -1101,13 +1065,6 @@ func BBolt_RemoveFromGroup(groupID, typeID, objType string) error {
 			groups = removeString(groups, groupID)
 			S.Groups = stringSliceToUUID(groups)
 			v, err = bboltMarshal(S)
-		case "device":
-			D := new(types.Device)
-			_ = bboltUnmarshal(v, D)
-			groups := uuidSliceToString(D.Groups)
-			groups = removeString(groups, groupID)
-			D.Groups = stringSliceToUUID(groups)
-			v, err = bboltMarshal(D)
 		}
 		if err != nil {
 			return err
