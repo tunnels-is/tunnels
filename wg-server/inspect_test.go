@@ -51,9 +51,20 @@ func buildIPv6UDP(t *testing.T, src, dst string, sport, dport uint16, payload []
 	return pkt
 }
 
+// setFrag marks an IPv4 packet as a fragment: sets the identification field,
+// the fragment offset (in 8-byte units), and the MF (more-fragments) bit.
+func setFrag(pkt []byte, id, offsetUnits uint16, more bool) {
+	binary.BigEndian.PutUint16(pkt[4:6], id)
+	ff := offsetUnits & 0x1FFF
+	if more {
+		ff |= 0x2000
+	}
+	binary.BigEndian.PutUint16(pkt[6:8], ff)
+}
+
 func TestParseIPHeader_IPv4UDP(t *testing.T) {
 	pkt := buildIPv4UDP(t, "10.0.0.5", "10.0.0.10", 1234, 5678, []byte("hi"))
-	src, dst, proto, l4, ok := parseIPHeader(pkt)
+	src, dst, proto, l4, frag, ok := parseIPHeader(pkt)
 	if !ok {
 		t.Fatal("expected ok")
 	}
@@ -66,11 +77,14 @@ func TestParseIPHeader_IPv4UDP(t *testing.T) {
 	if binary.BigEndian.Uint16(l4[0:2]) != 1234 || binary.BigEndian.Uint16(l4[2:4]) != 5678 {
 		t.Fatalf("l4 ports wrong")
 	}
+	if frag.isFragment() {
+		t.Fatalf("a normal packet must not be flagged as a fragment")
+	}
 }
 
 func TestParseIPHeader_IPv6UDP(t *testing.T) {
 	pkt := buildIPv6UDP(t, "fd00::5", "fd00::10", 1234, 5678, []byte("hi"))
-	src, dst, proto, _, ok := parseIPHeader(pkt)
+	src, dst, proto, _, _, ok := parseIPHeader(pkt)
 	if !ok {
 		t.Fatal("expected ok")
 	}
@@ -84,7 +98,7 @@ func TestParseIPHeader_IPv6UDP(t *testing.T) {
 
 func TestParseIPHeader_TooShort(t *testing.T) {
 	for _, n := range []int{0, 1, 10, 19} {
-		if _, _, _, _, ok := parseIPHeader(make([]byte, n)); ok {
+		if _, _, _, _, _, ok := parseIPHeader(make([]byte, n)); ok {
 			t.Fatalf("len=%d should be invalid", n)
 		}
 	}
@@ -93,7 +107,7 @@ func TestParseIPHeader_TooShort(t *testing.T) {
 func TestParseIPHeader_BadVersion(t *testing.T) {
 	pkt := make([]byte, 40)
 	pkt[0] = 0x70 // not v4 or v6
-	if _, _, _, _, ok := parseIPHeader(pkt); ok {
+	if _, _, _, _, _, ok := parseIPHeader(pkt); ok {
 		t.Fatal("bad version must be rejected")
 	}
 }
@@ -101,7 +115,7 @@ func TestParseIPHeader_BadVersion(t *testing.T) {
 func TestParseIPHeader_BadIHL(t *testing.T) {
 	pkt := make([]byte, 20)
 	pkt[0] = 0x40 // IHL=0
-	if _, _, _, _, ok := parseIPHeader(pkt); ok {
+	if _, _, _, _, _, ok := parseIPHeader(pkt); ok {
 		t.Fatal("IHL<5 must be rejected")
 	}
 }
@@ -109,7 +123,7 @@ func TestParseIPHeader_BadIHL(t *testing.T) {
 func TestParseIPHeader_BadTotalLen(t *testing.T) {
 	pkt := buildIPv4UDP(t, "10.0.0.5", "10.0.0.10", 1, 2, []byte("x"))
 	binary.BigEndian.PutUint16(pkt[2:4], 9999) // > actual length
-	if _, _, _, _, ok := parseIPHeader(pkt); ok {
+	if _, _, _, _, _, ok := parseIPHeader(pkt); ok {
 		t.Fatal("total>len must be rejected")
 	}
 }
@@ -262,6 +276,167 @@ func TestAllow_AnyHostPortRule(t *testing.T) {
 	}
 }
 
+func TestParseIPHeader_Fragments(t *testing.T) {
+	head := buildIPv4UDP(t, "10.0.0.5", "10.0.0.10", 1, 2, make([]byte, 8))
+	setFrag(head, 4242, 0, true) // first fragment: MF set, offset 0
+	_, _, _, _, frag, ok := parseIPHeader(head)
+	if !ok || frag.id != 4242 || !frag.isFragment() || frag.isTrailing() {
+		t.Fatalf("first fragment: got id=%d isFragment=%v isTrailing=%v", frag.id, frag.isFragment(), frag.isTrailing())
+	}
+
+	tail := buildIPv4UDP(t, "10.0.0.5", "10.0.0.10", 1, 2, make([]byte, 8))
+	setFrag(tail, 4242, 185, false) // trailing fragment: offset > 0
+	_, _, _, _, frag, ok = parseIPHeader(tail)
+	if !ok || frag.id != 4242 || !frag.isFragment() || !frag.isTrailing() {
+		t.Fatalf("trailing fragment: got id=%d isFragment=%v isTrailing=%v", frag.id, frag.isFragment(), frag.isTrailing())
+	}
+}
+
+// A fragmented datagram to an allowed port: the first fragment is port-checked
+// and admitted, and its trailing fragments then pass by fragment-note.
+func TestAllow_FragmentedDatagramAdmitted(t *testing.T) {
+	insp := newTestInspector(t)
+	resetPeer("10.0.0.10")
+	ctrl := buildIPv4UDP(t, "10.0.0.10", insp.serverIPv4.String(), 1, aclControlPort,
+		[]byte(`{"Allowed":["10.0.0.5:5000"]}`))
+	if !insp.handleControl(ctrl) {
+		t.Fatal("expected consume")
+	}
+
+	head := buildIPv4UDP(t, "10.0.0.5", "10.0.0.10", 40000, 5000, make([]byte, 8))
+	setFrag(head, 42, 0, true)
+	if !insp.allow(head) {
+		t.Fatal("first fragment on an allowed port must pass")
+	}
+	// Trailing fragment carries garbage where the ports would be — irrelevant.
+	tail := buildIPv4UDP(t, "10.0.0.5", "10.0.0.10", 12345, 6789, make([]byte, 8))
+	setFrag(tail, 42, 185, false)
+	if !insp.allow(tail) {
+		t.Fatal("trailing fragment of an admitted datagram must pass")
+	}
+}
+
+// The evasion case: a trailing fragment with no admitted head must be dropped,
+// even when its payload bytes happen to equal an allowed port. This is the
+// bug the fix closes — before it, the garbage dport matched the rule.
+func TestAllow_OrphanTrailingFragmentDropped(t *testing.T) {
+	insp := newTestInspector(t)
+	resetPeer("10.0.0.10")
+	ctrl := buildIPv4UDP(t, "10.0.0.10", insp.serverIPv4.String(), 1, aclControlPort,
+		[]byte(`{"Allowed":["10.0.0.5:5000"]}`))
+	if !insp.handleControl(ctrl) {
+		t.Fatal("expected consume")
+	}
+	// dport bytes forged to 5000 (an allowed port), but no first fragment admitted.
+	tail := buildIPv4UDP(t, "10.0.0.5", "10.0.0.10", 1, 5000, make([]byte, 8))
+	setFrag(tail, 99, 185, false)
+	if insp.allow(tail) {
+		t.Fatal("orphan trailing fragment must be dropped even if its bytes look like an allowed port")
+	}
+}
+
+// A fragmented datagram whose first fragment is to a denied port is dropped and
+// leaves no note, so its trailing fragments are dropped too.
+func TestAllow_FragmentedToDeniedPortDropped(t *testing.T) {
+	insp := newTestInspector(t)
+	resetPeer("10.0.0.10")
+	ctrl := buildIPv4UDP(t, "10.0.0.10", insp.serverIPv4.String(), 1, aclControlPort,
+		[]byte(`{"Allowed":["10.0.0.5:5000"]}`))
+	if !insp.handleControl(ctrl) {
+		t.Fatal("expected consume")
+	}
+	head := buildIPv4UDP(t, "10.0.0.5", "10.0.0.10", 40000, 22, make([]byte, 8)) // denied port
+	setFrag(head, 7, 0, true)
+	if insp.allow(head) {
+		t.Fatal("first fragment to a denied port must be dropped")
+	}
+	tail := buildIPv4UDP(t, "10.0.0.5", "10.0.0.10", 40000, 22, make([]byte, 8))
+	setFrag(tail, 7, 185, false)
+	if insp.allow(tail) {
+		t.Fatal("trailing fragment of a denied datagram must be dropped")
+	}
+}
+
+// A bare-host (all-ports) rule admits every fragment, as before the port
+// feature — the head passes via portSet.all, the trailing via the all-ports
+// fast-path (no dependence on the note).
+func TestAllow_FragmentBareHostRule(t *testing.T) {
+	insp := newTestInspector(t)
+	allowFor(t, "10.0.0.10", "10.0.0.5")
+
+	head := buildIPv4UDP(t, "10.0.0.5", "10.0.0.10", 40000, 5000, make([]byte, 8))
+	setFrag(head, 5, 0, true)
+	tail := buildIPv4UDP(t, "10.0.0.5", "10.0.0.10", 0, 0, make([]byte, 8))
+	setFrag(tail, 5, 185, false)
+	if !insp.allow(head) || !insp.allow(tail) {
+		t.Fatal("bare-host rule must pass all fragments")
+	}
+}
+
+// Under an all-ports grant, a trailing fragment is admitted order-independently
+// — even if it arrives before its head (or the head is lost). This is the
+// pre-port-feature behavior the all-ports fast-path restores; without it, an
+// all-ports source's reordered fragment would be wrongly dropped.
+func TestAllow_FragmentBareHostOrderIndependent(t *testing.T) {
+	insp := newTestInspector(t)
+	allowFor(t, "10.0.0.10", "10.0.0.5")
+
+	// Trailing fragment first, with no head ever admitted.
+	tail := buildIPv4UDP(t, "10.0.0.5", "10.0.0.10", 0, 0, make([]byte, 8))
+	setFrag(tail, 33, 185, false)
+	if !insp.allow(tail) {
+		t.Fatal("all-ports source: a headless/reordered trailing fragment must still pass")
+	}
+
+	// Same, under allow-all.
+	resetPeer("10.0.0.11")
+	entry(t, "10.0.0.11").setAllowed(nil, true) // allow-all
+	tail2 := buildIPv4UDP(t, "10.0.0.99", "10.0.0.11", 0, 0, make([]byte, 8))
+	setFrag(tail2, 34, 185, false)
+	if !insp.allow(tail2) {
+		t.Fatal("allow-all: a headless trailing fragment must pass")
+	}
+}
+
+// The complement: under a port-scoped rule, a headless/reordered trailing
+// fragment is dropped (it needs the port-checked head's note). This is the
+// order-dependence we deliberately keep for port rules.
+func TestAllow_FragmentPortRuleNeedsHead(t *testing.T) {
+	insp := newTestInspector(t)
+	setRule("10.0.0.10", "10.0.0.5:5000")
+
+	tail := buildIPv4UDP(t, "10.0.0.5", "10.0.0.10", 0, 0, make([]byte, 8))
+	setFrag(tail, 55, 185, false)
+	if insp.allow(tail) {
+		t.Fatal("port-scoped rule: a trailing fragment with no admitted head must be dropped")
+	}
+}
+
+// Connection-tracked return path: a receiver that initiated a flow admits the
+// fragmented reply from a non-allowlisted source — first fragment via flowMatch,
+// trailing fragments via the note it seeds.
+func TestAllow_FragmentConntrackReturn(t *testing.T) {
+	insp := newTestInspector(t)
+	resetPeer("10.0.0.2") // A: no allowlist
+	resetPeer("10.0.0.3") // B: no allowlist
+
+	// A initiates to B:9000, opening A's return-path flow.
+	out := buildIPv4UDP(t, "10.0.0.2", "10.0.0.3", 40000, 9000, nil)
+	insp.allow(out)
+
+	// B replies to A, fragmented. First fragment matches A's flow.
+	head := buildIPv4UDP(t, "10.0.0.3", "10.0.0.2", 9000, 40000, make([]byte, 8))
+	setFrag(head, 77, 0, true)
+	if !insp.allow(head) {
+		t.Fatal("reply first fragment must be admitted by connection tracking")
+	}
+	tail := buildIPv4UDP(t, "10.0.0.3", "10.0.0.2", 0, 0, make([]byte, 8))
+	setFrag(tail, 77, 185, false)
+	if !insp.allow(tail) {
+		t.Fatal("reply trailing fragment must be admitted via the fragment note")
+	}
+}
+
 // The SYN/SYN-ACK scenario: a one-sided allowlist plus connection tracking
 // lets replies flow back without the other peer allowlisting the initiator.
 func TestAllow_ConntrackReturnPath(t *testing.T) {
@@ -397,6 +572,37 @@ func TestHandleControl_NonUDPIgnored(t *testing.T) {
 	pkt[9] = 6 // TCP
 	if insp.handleControl(pkt) {
 		t.Fatal("non-UDP must not be consumed as control")
+	}
+}
+
+func TestHandleControl_TrailingFragmentNotControl(t *testing.T) {
+	insp := newTestInspector(t)
+	resetPeer("10.0.0.5")
+	// A trailing fragment addressed to the server IP: its bytes at the dport
+	// position happen to equal the control port (buildIPv4UDP writes it there),
+	// but a trailing fragment carries no real UDP header, so it must not be
+	// treated as control — nor may it alter policy.
+	pkt := buildIPv4UDP(t, "10.0.0.5", insp.serverIPv4.String(), 1, aclControlPort,
+		[]byte(`{"Allowed":["10.0.0.10"]}`))
+	setFrag(pkt, 1234, 185, false) // offset > 0 → trailing fragment
+	if insp.handleControl(pkt) {
+		t.Fatal("a trailing fragment must not be consumed as a control packet")
+	}
+	if entry(t, "10.0.0.5").allowedContains(mustAddr(t, "10.0.0.10"), 80) {
+		t.Fatal("a trailing fragment must not modify firewall policy")
+	}
+}
+
+func TestHandleControl_FirstFragmentStillControl(t *testing.T) {
+	insp := newTestInspector(t)
+	resetPeer("10.0.0.5")
+	// The first fragment (offset 0) carries the real UDP header, so it is still
+	// classified as control — the guard only rejects trailing fragments.
+	pkt := buildIPv4UDP(t, "10.0.0.5", insp.serverIPv4.String(), 1, aclControlPort,
+		[]byte(`{"Allowed":["10.0.0.10"]}`))
+	setFrag(pkt, 1234, 0, true) // offset 0, MF set → first fragment
+	if !insp.handleControl(pkt) {
+		t.Fatal("a first fragment on the control port must be consumed")
 	}
 }
 

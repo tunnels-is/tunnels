@@ -129,7 +129,7 @@ func (t *inspectingTUN) File() *os.File {
 // With the firewall off, peer-to-peer traffic passes freely (the server-IP
 // block above still applies).
 func (t *inspectingTUN) allow(pkt []byte) bool {
-	src, dst, proto, l4, ok := parseIPHeader(pkt)
+	src, dst, proto, l4, frag, ok := parseIPHeader(pkt)
 	if !ok {
 		return true
 	}
@@ -147,8 +147,10 @@ func (t *inspectingTUN) allow(pkt []byte) bool {
 
 	sport, dport := l4Ports(proto, l4)
 
-	// A local sender opens (or refreshes) its own return path.
-	if srcLocal && srcPeer != nil {
+	// A local sender opens (or refreshes) its own return path. Only the first
+	// fragment carries the L4 ports; a trailing fragment would record a bogus
+	// (0,0) flow, so skip it — the first fragment already opened the flow.
+	if srcLocal && srcPeer != nil && !frag.isTrailing() {
 		srcPeer.touchFlow(flowKey{remote: dst, rport: dport, lport: sport, proto: proto})
 	}
 
@@ -161,10 +163,29 @@ func (t *inspectingTUN) allow(pkt []byte) bool {
 		if dstPeer == nil {
 			return false // in our subnet but nobody connected — default-deny
 		}
-		if dstPeer.allowedContains(src, dport) {
-			return true
+
+		// A trailing fragment carries no L4 header, so its ports cannot be
+		// matched. An all-ports grant (allow-all or a bare-IP rule) doesn't
+		// depend on the port, so such a fragment is admitted on its own,
+		// order-independently — matching the pre-port-feature behavior. Only a
+		// port-scoped rule (or conntrack) needs the head-admitted note, which
+		// ties the datagram to its port-checked head and defeats fragment-based
+		// ACL evasion. (An out-of-order trailing fragment that beats its head
+		// under a port rule is dropped; the sender retransmits the datagram.)
+		if frag.isTrailing() {
+			return dstPeer.allowedAnyPort(src) ||
+				dstPeer.fragmentAdmitted(fragKey{remote: src, id: frag.id})
 		}
-		return dstPeer.flowMatch(flowKey{remote: src, rport: sport, lport: dport, proto: proto})
+
+		admit := dstPeer.allowedContains(src, dport) ||
+			dstPeer.flowMatch(flowKey{remote: src, rport: sport, lport: dport, proto: proto})
+
+		// If the admitted packet is the first fragment of a fragmented
+		// datagram, remember it so the trailing fragments pass too.
+		if admit && frag.isFragment() {
+			dstPeer.noteFragment(fragKey{remote: src, id: frag.id})
+		}
+		return admit
 	}
 	// src is local, dst is on another server — that server enforces ingress.
 	return true
@@ -177,11 +198,17 @@ func (t *inspectingTUN) isServerIP(a netip.Addr) bool {
 // handleControl returns true if pkt was a control message that we consumed.
 // The caller MUST NOT forward such a packet to the kernel.
 func (t *inspectingTUN) handleControl(pkt []byte) bool {
-	src, dst, proto, l4, ok := parseIPHeader(pkt)
+	src, dst, proto, l4, frag, ok := parseIPHeader(pkt)
 	if !ok || proto != protoUDP {
 		return false
 	}
 	if dst != t.serverIPv4 && dst != t.serverIPv6 {
+		return false
+	}
+	// A trailing fragment has no L4 header — the bytes at l4[2:4] are payload,
+	// not a real dport, so they must not be interpreted as the control port.
+	// (The first fragment, offset 0, carries the header and is handled below.)
+	if frag.isTrailing() {
 		return false
 	}
 	if len(l4) < 8 {
@@ -245,11 +272,28 @@ func (t *inspectingTUN) inWGSubnet(a netip.Addr) bool {
 	return false
 }
 
+// fragInfo describes IPv4 fragmentation. For an unfragmented packet — and for
+// all IPv6 packets, whose fragmentation lives in an extension header this code
+// does not parse — it is the zero value (not a fragment).
+type fragInfo struct {
+	id     uint16 // IPv4 identification field (groups the fragments of one datagram)
+	offset uint16 // fragment offset in 8-byte units; 0 for the first/only fragment
+	more   bool   // MF bit: more fragments follow
+}
+
+// isFragment reports whether the packet is part of a fragmented datagram (the
+// first fragment has MF set with offset 0; trailing fragments have offset > 0).
+func (f fragInfo) isFragment() bool { return f.more || f.offset != 0 }
+
+// isTrailing reports whether the packet is a non-first fragment, i.e. carries
+// no L4 header and therefore no usable port.
+func (f fragInfo) isTrailing() bool { return f.offset != 0 }
+
 // parseIPHeader extracts addressing info from an IPv4 or IPv6 packet.
 // Returns ok=false for malformed or unsupported packets. Extension headers
 // on IPv6 are not parsed — the next-header byte is reported verbatim, which
 // is sufficient for the simple UDP case.
-func parseIPHeader(pkt []byte) (src, dst netip.Addr, proto byte, l4 []byte, ok bool) {
+func parseIPHeader(pkt []byte) (src, dst netip.Addr, proto byte, l4 []byte, frag fragInfo, ok bool) {
 	if len(pkt) < 1 {
 		return
 	}
@@ -273,6 +317,12 @@ func parseIPHeader(pkt []byte) (src, dst netip.Addr, proto byte, l4 []byte, ok b
 		dst = netip.AddrFrom4(d)
 		proto = pkt[9]
 		l4 = pkt[ihl:total]
+		ff := binary.BigEndian.Uint16(pkt[6:8])
+		frag = fragInfo{
+			id:     binary.BigEndian.Uint16(pkt[4:6]),
+			offset: ff & 0x1FFF,
+			more:   ff&0x2000 != 0,
+		}
 		ok = true
 		return
 	case 6:
