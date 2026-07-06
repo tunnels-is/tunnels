@@ -36,6 +36,18 @@ func CopySlice(in []byte) (out []byte) {
 	return out
 }
 
+// redactKey returns a short, non-reusable prefix of a license/credential key for
+// logs: the first 5 characters plus an ellipsis. Enough to correlate an
+// activation while debugging, but never the full key. Keys of 5 chars or fewer
+// are fully masked.
+func redactKey(k string) string {
+	const show = 5
+	if len(k) <= show {
+		return "…"
+	}
+	return k[:show] + "…"
+}
+
 var letterRunes = []rune("ABCDEFGHIJKLMNOPQRSTUVWXYZ234567")
 
 func GENERATE_CODE() string {

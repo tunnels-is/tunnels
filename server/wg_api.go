@@ -157,9 +157,9 @@ func API_WGPeer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	allowed := hasSharedOrNoGroup(dev.Groups, server.Groups) ||
-		hasSharedOrNoGroup(user.Groups, server.Groups)
-	if !allowed {
+	// A device inherits its owner's group membership; authorization is decided
+	// solely by the owning user's groups vs the server's.
+	if !hasSharedOrNoGroup(user.Groups, server.Groups) {
 		senderr(w, 401, "user/device not allowed to connect")
 		return
 	}
