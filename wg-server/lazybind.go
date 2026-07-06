@@ -119,6 +119,12 @@ func (b *LazyBind) wrapReceive(inner conn.ReceiveFunc) conn.ReceiveFunc {
 		for i := 0; i < n; i++ {
 			data := bufs[i][:sizes[i]]
 			if isHandshakeInit(data) {
+				// Cheap mac1 gate before any rate bookkeeping, X25519, goroutine
+				// spawn, or controller call: drop handshake-init packets not
+				// genuinely addressed to this server (junk/spoofed floods).
+				if !validMAC1(data, b.serverPub) {
+					continue
+				}
 				srcIP := eps[i].DstIP()
 				if !b.handshakeRateAllowed(srcIP) {
 					WARN("LazyBind: handshake rate limit exceeded for ", srcIP)
