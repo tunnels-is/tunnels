@@ -6,7 +6,6 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
-	"net/netip"
 	"strings"
 	"sync"
 
@@ -78,16 +77,19 @@ func setupWireGuard(cfg *Config, logLevel string) error {
 	privCopy := make([]byte, 32)
 	copy(privCopy, cfg.WireGuardPrivKey)
 
-	innerBind, err := buildInnerBind(cfg)
-	if err != nil {
-		return fmt.Errorf("build bind: %w", err)
-	}
-	wgLazyBind = NewLazyBind(innerBind, privCopy, pubBytes, cfg.HandshakeBufferSize, cfg.HandshakeRatePerIP, func() {})
+	// Default wildcard bind (0.0.0.0/[::]): WireGuard listens on every local IP
+	// and, via IP_PKTINFO sticky source, answers each peer from the address it
+	// was reached on (default routing otherwise). The listen port is set below
+	// via the listen_port UAPI directive, independent of the bind address.
+	wgLazyBind = NewLazyBind(conn.NewDefaultBind(), privCopy, pubBytes, cfg.HandshakeBufferSize, cfg.HandshakeRatePerIP, func() {})
 	wgDevice = device.NewDevice(tunInterface, wgLazyBind, wgLogger)
 
 	privKeyHex := make([]byte, hex.EncodedLen(32))
 	hex.Encode(privKeyHex, cfg.WireGuardPrivKey)
-	conf := fmt.Appendf(nil, "private_key=%s\n\n", privKeyHex)
+	// listen_port must be set explicitly: with the default bind the device
+	// supplies the port to Bind.Open (unlike the old pinnedBind, which carried
+	// its own port); without this the device would open a random port.
+	conf := fmt.Appendf(nil, "private_key=%s\nlisten_port=%d\n\n", privKeyHex, cfg.WireGuardPort)
 	zeroBytes(privKeyHex)
 
 	if err := ipcSetBytes(conf); err != nil {
@@ -179,23 +181,6 @@ func ipcGet() (string, error) {
 		return "", err
 	}
 	return sb.String(), nil
-}
-
-// buildInnerBind returns the underlying conn.Bind for wireguard-go.
-// When cfg.PublicIP is set we pin the listening socket to that address; this
-// lets multiple wg-server instances coexist on the same UDP port across
-// different public IPs on the same host. Empty PublicIP falls back to
-// wireguard-go's default wildcard bind.
-func buildInnerBind(cfg *Config) (conn.Bind, error) {
-	if cfg.PublicIP == "" {
-		return conn.NewDefaultBind(), nil
-	}
-	addr, err := netip.ParseAddr(cfg.PublicIP)
-	if err != nil {
-		return nil, fmt.Errorf("parse PublicIP %q: %w", cfg.PublicIP, err)
-	}
-	INFO("WireGuard bind pinned to ", addr, ":", cfg.WireGuardPort)
-	return newPinnedBind(addr, uint16(cfg.WireGuardPort)), nil
 }
 
 func b64ToHex(b64 string) (string, error) {
