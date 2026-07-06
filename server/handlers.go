@@ -586,6 +586,11 @@ func API_DeviceCreate(w http.ResponseWriter, r *http.Request) {
 		F.Device.Groups = make([]uuid.UUID, 0)
 	}
 
+	// Hold the allocation lock from IP assignment through DB_CreateDevice so a
+	// concurrent create cannot claim the same address (see wgIPAllocMu).
+	wgIPAllocMu.Lock()
+	defer wgIPAllocMu.Unlock()
+
 	if F.Device.ServerID != uuid.Nil {
 		ip, assignErr := assignNextWireGuardIP(F.Device.ServerID)
 		if assignErr != nil {
@@ -655,6 +660,11 @@ func API_AdminDeviceCreate(w http.ResponseWriter, r *http.Request) {
 	if F.Device.Groups == nil {
 		F.Device.Groups = make([]uuid.UUID, 0)
 	}
+
+	// Hold the allocation lock from IP assignment through DB_CreateDevice so a
+	// concurrent create cannot claim the same address (see wgIPAllocMu).
+	wgIPAllocMu.Lock()
+	defer wgIPAllocMu.Unlock()
 
 	var wgServer *types.Server
 	if F.Device.ServerID != uuid.Nil {
@@ -1295,6 +1305,11 @@ func API_ServerGet(w http.ResponseWriter, r *http.Request) {
 }
 
 func API_UserResetPassword(w http.ResponseWriter, r *http.Request) {
+	defer func() {
+		// Randomised delay: slows brute-forcing of the reset code and masks the
+		// timing difference between failure paths (unknown user vs. wrong code).
+		time.Sleep(time.Duration(50+mrand.IntN(100)) * time.Millisecond)
+	}()
 	defer BasicRecover()
 
 	var user *User
@@ -1310,26 +1325,32 @@ func API_UserResetPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// A single generic message for every authorization failure below (unknown
+	// user, missing/undecryptable 2FA secret, wrong reset code) so the response
+	// never reveals which accounts exist or whether the code was the only thing
+	// wrong. Keep the paired randomised delay (see the deferred sleep above).
+	const genericAuthErr = "invalid email or reset code"
+
 	user, err = DB_findUserByEmail(RF.Email)
-	if user == nil {
-		senderr(w, 401, "Invalid user, please try again")
-		return
-	}
 	if err != nil {
 		senderr(w, 500, "Unknown error, please try again in a moment")
+		return
+	}
+	if user == nil {
+		senderr(w, 401, genericAuthErr)
 		return
 	}
 
 	code, err := Decrypt(user.TwoFactorCode, []byte(loadSecret("TwoFactorKey")))
 	if err != nil {
-		senderr(w, 401, "unauthorized")
 		ADMIN(err)
+		senderr(w, 401, genericAuthErr)
 		return
 	}
 
 	otp := gotp.NewDefaultTOTP(code).Now()
 	if otp != RF.ResetCode {
-		senderr(w, 401, "unauthorized")
+		senderr(w, 401, genericAuthErr)
 		return
 	}
 
