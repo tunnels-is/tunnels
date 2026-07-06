@@ -296,6 +296,33 @@ func resetPeer(ips ...string) {
 	}
 }
 
+// policyAdmits is the lock-free core of the static-policy check: whether src
+// may reach `port` under the policy described by (allowAll, allowed, anyPorts).
+// Factored out so setAllowed can evaluate both the old and new policy while
+// holding the write lock.
+func policyAdmits(allowAll bool, allowed map[netip.Addr]*portSet, anyPorts map[uint16]struct{}, src netip.Addr, port uint16) bool {
+	if allowAll {
+		return true
+	}
+	if _, ok := anyPorts[port]; ok {
+		return true
+	}
+	if ps, ok := allowed[src]; ok {
+		return ps.contains(port)
+	}
+	return false
+}
+
+// policyAdmitsAny reports whether src may reach ANY port under the policy. Used
+// to age fragment notes (which carry no port) when a source is revoked.
+func policyAdmitsAny(allowAll bool, allowed map[netip.Addr]*portSet, anyPorts map[uint16]struct{}, src netip.Addr) bool {
+	if allowAll || len(anyPorts) > 0 {
+		return true
+	}
+	_, ok := allowed[src]
+	return ok
+}
+
 // allowedContains reports whether src may reach dport on this device under the
 // static policy: allow-all, an any-host rule for the port ("*:PORT"), or a
 // host entry covering the port (bare IP = all ports, or an explicit IP:PORT).
@@ -303,16 +330,7 @@ func resetPeer(ips ...string) {
 func (p *peer) allowedContains(src netip.Addr, dport uint16) bool {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
-	if p.allowAll {
-		return true
-	}
-	if _, ok := p.anyPorts[dport]; ok {
-		return true
-	}
-	if ps, ok := p.allowed[src]; ok {
-		return ps.contains(dport)
-	}
-	return false
+	return policyAdmits(p.allowAll, p.allowed, p.anyPorts, src, dport)
 }
 
 // allowedAnyPort reports whether src is admitted on ALL ports by the static
@@ -336,6 +354,15 @@ func (p *peer) allowedAnyPort(src netip.Addr) bool {
 // allowlist entries plus the allow-all flag. An empty list with allowAll=false
 // denies all peer-to-peer ingress. A bare-host entry (port 0) grants all ports
 // and supersedes any IP:PORT entries for the same source.
+//
+// Applying a new policy also prunes conntrack flows and fragment notes whose
+// remote just lost the access it previously had (admitted under the old policy,
+// denied under the new one). Without this, a revoked peer keeps reaching this
+// device by coasting on an already-established flow, since flows are otherwise
+// only reaped on idle timeout. Flows to remotes that are still permitted, or
+// that were never granted by the allowlist (return paths for connections this
+// device itself initiated), are left intact; a pruned flow to a remote this
+// device is actively talking to re-opens on its next outbound packet.
 func (p *peer) setAllowed(entries []aclEntry, allowAll bool) {
 	allowed := make(map[netip.Addr]*portSet, len(entries))
 	anyPorts := make(map[uint16]struct{})
@@ -363,9 +390,24 @@ func (p *peer) setAllowed(entries []aclEntry, allowAll bool) {
 		}
 	}
 	p.mu.Lock()
+	oldAllowAll, oldAllowed, oldAnyPorts := p.allowAll, p.allowed, p.anyPorts
 	p.allowed = allowed
 	p.anyPorts = anyPorts
 	p.allowAll = allowAll
+
+	// Revocation prune: drop flows/notes whose remote lost access it had before.
+	for k := range p.flows {
+		if policyAdmits(oldAllowAll, oldAllowed, oldAnyPorts, k.remote, k.lport) &&
+			!policyAdmits(allowAll, allowed, anyPorts, k.remote, k.lport) {
+			delete(p.flows, k)
+		}
+	}
+	for k := range p.frags {
+		if policyAdmitsAny(oldAllowAll, oldAllowed, oldAnyPorts, k.remote) &&
+			!policyAdmitsAny(allowAll, allowed, anyPorts, k.remote) {
+			delete(p.frags, k)
+		}
+	}
 	p.mu.Unlock()
 }
 

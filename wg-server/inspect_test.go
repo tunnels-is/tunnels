@@ -234,6 +234,75 @@ func TestAllow_AllowlistedSrcPasses(t *testing.T) {
 	}
 }
 
+// Revoking a source from the allowlist tears down its established conntrack
+// flow, so it can no longer reach this device by coasting on the flow. This is
+// the reported bug: remove the rule → the peer keeps talking via conntrack.
+func TestAllow_RevokeDropsConntrackFlow(t *testing.T) {
+	insp := newTestInspector(t)
+	resetPeer("10.0.0.3")               // B
+	allowFor(t, "10.0.0.2", "10.0.0.3") // A allows B (all ports)
+
+	// B initiates to A:22 (admitted by the allowlist); A replies, opening A's
+	// return-path flow {remote:B, rport:5000, lport:22}.
+	if !insp.allow(buildIPv4UDP(t, "10.0.0.3", "10.0.0.2", 5000, 22, nil)) {
+		t.Fatal("setup: B should reach A while allowlisted")
+	}
+	insp.allow(buildIPv4UDP(t, "10.0.0.2", "10.0.0.3", 22, 5000, nil)) // A's reply opens the flow
+
+	// Revoke B.
+	entry(t, "10.0.0.2").setAllowed(nil, false)
+
+	// B must now be dropped: allowlist denies and the coasting flow is gone.
+	if insp.allow(buildIPv4UDP(t, "10.0.0.3", "10.0.0.2", 5000, 22, nil)) {
+		t.Fatal("revoked peer must be dropped, not coast on the conntrack flow")
+	}
+}
+
+// A policy change must not tear down flows for connections this device itself
+// initiated to a remote that was never on the allowlist — those are its own
+// return paths, unrelated to who is being allowed in.
+func TestAllow_RevokeKeepsOwnOutboundFlow(t *testing.T) {
+	insp := newTestInspector(t)
+	resetPeer("10.0.0.2") // A, no allowlist
+
+	// A initiates outbound to C (cross-server, never allowlisted); C's reply is
+	// admitted by A's conntrack flow.
+	insp.allow(buildIPv4UDP(t, "10.0.0.2", "10.99.0.9", 40000, 80, nil))
+	if !insp.allow(buildIPv4UDP(t, "10.99.0.9", "10.0.0.2", 80, 40000, nil)) {
+		t.Fatal("setup: C's reply should match A's own outbound flow")
+	}
+
+	// An unrelated policy change (allow some other peer) must leave A's own
+	// outbound return path to C intact.
+	entry(t, "10.0.0.2").setAllowed(hostRules(t, "10.0.0.5"), false)
+	if !insp.allow(buildIPv4UDP(t, "10.99.0.9", "10.0.0.2", 80, 40000, nil)) {
+		t.Fatal("policy change must not drop A's own initiated-outbound return path")
+	}
+}
+
+// After revocation, if A itself starts talking to B again, A's outbound re-opens
+// the return path and B's replies flow once more — the "slight interruption,
+// then re-established" behavior for A-initiated traffic.
+func TestAllow_RevokeReestablishesOnOutbound(t *testing.T) {
+	insp := newTestInspector(t)
+	resetPeer("10.0.0.3")
+	allowFor(t, "10.0.0.2", "10.0.0.3")
+
+	insp.allow(buildIPv4UDP(t, "10.0.0.3", "10.0.0.2", 5000, 22, nil)) // B->A
+	insp.allow(buildIPv4UDP(t, "10.0.0.2", "10.0.0.3", 22, 5000, nil)) // A->B reply opens flow
+	entry(t, "10.0.0.2").setAllowed(nil, false)                        // revoke B
+
+	if insp.allow(buildIPv4UDP(t, "10.0.0.3", "10.0.0.2", 5000, 22, nil)) {
+		t.Fatal("B must be cut off immediately after revoke")
+	}
+
+	// A initiates to B again → re-opens the return-path flow.
+	insp.allow(buildIPv4UDP(t, "10.0.0.2", "10.0.0.3", 22, 5000, nil))
+	if !insp.allow(buildIPv4UDP(t, "10.0.0.3", "10.0.0.2", 5000, 22, nil)) {
+		t.Fatal("A's own outbound must re-establish the return path for B's replies")
+	}
+}
+
 func TestAllow_HostPortRule(t *testing.T) {
 	insp := newTestInspector(t)
 	resetPeer("10.0.0.10")
