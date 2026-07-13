@@ -139,6 +139,12 @@ type Server struct {
 	// matching WANID) so callers get the live WAN without a second lookup.
 	WAN *WAN `json:"WAN,omitempty"`
 
+	// MeshGroupID references the mesh group this server belongs to, by
+	// MeshGroup.ID. Servers sharing a mesh group form a WireGuard server-to-server
+	// mesh (see wg-server/mesh.go); GET /wg/mesh returns only same-mesh-group
+	// siblings. Empty means the server is not in any mesh.
+	MeshGroupID string `json:"MeshGroupID,omitempty"`
+
 	// APIKey is the per-server secret; the wg-server running on this host sends
 	// it in X-WG-KEY to authenticate /wg/server-config/fetch, /wg/peers, and
 	// /wg/servers. Empty when WG is not enabled on this server.
@@ -147,6 +153,10 @@ type Server struct {
 	WireGuardPort   int    `json:"WireGuardPort,omitempty"`
 	WireGuardPubKey string `json:"WireGuardPubKey,omitempty"`
 	WireGuardIface  string `json:"WireGuardIface,omitempty"`
+
+	// WireGuardMeshPort is the UDP port the server-to-server mesh interface
+	// (wgmesh) listens on. Defaults to WireGuardPort+1 when unset.
+	WireGuardMeshPort int `json:"WireGuardMeshPort,omitempty"`
 
 	// WireGuardSubnet is the IPv4 CIDR the wg-server hands out to peers.
 	WireGuardSubnet string `json:"WireGuardSubnet,omitempty"`
@@ -179,15 +189,39 @@ type WGServerConfigResponse struct {
 	// peer egress shows up with the correct public address on multi-homed hosts.
 	ServerIP string `json:"ServerIP,omitempty"`
 
-	WireGuardPort    int    `json:"WireGuardPort"`
-	WireGuardSubnet  string `json:"WireGuardSubnet"`
-	WireGuardSubnet6 string `json:"WireGuardSubnet6,omitempty"`
-	WireGuardIface   string `json:"WireGuardIface"`
+	WireGuardPort     int    `json:"WireGuardPort"`
+	WireGuardMeshPort int    `json:"WireGuardMeshPort,omitempty"`
+	WireGuardSubnet   string `json:"WireGuardSubnet"`
+	WireGuardSubnet6  string `json:"WireGuardSubnet6,omitempty"`
+	WireGuardIface    string `json:"WireGuardIface"`
 
 	InternetIface string `json:"InternetIface"`
 
 	EnableFirewall     bool `json:"EnableFirewall"`
 	InsecureSkipVerify bool `json:"InsecureSkipVerify"`
+}
+
+// MeshGroup scopes which servers form a WireGuard server-to-server mesh. Servers
+// sharing a MeshGroupID peer with each other; GET /wg/mesh returns only siblings
+// in the same mesh group. It is managed from the admin UI like WANs.
+type MeshGroup struct {
+	ID          uuid.UUID `json:"_id"`
+	Tag         string    `json:"Tag"`
+	Description string    `json:"Description,omitempty"`
+	CreatedAt   time.Time `json:"CreatedAt"`
+}
+
+// WGMeshPeer describes one sibling server a node should peer with on wgmesh.
+type WGMeshPeer struct {
+	PublicKeyHex   string   `json:"PublicKeyHex"`   // sibling's static WG pubkey (hex)
+	Endpoint       string   `json:"Endpoint"`       // "<sibling public IP>:<mesh port>"
+	AllowedSubnets []string `json:"AllowedSubnets"` // sibling's client WG subnet(s): v4 (+v6)
+}
+
+// WGMeshResponse is the controller's answer to GET /wg/mesh — the calling
+// server's same-mesh-group siblings.
+type WGMeshResponse struct {
+	Peers []WGMeshPeer `json:"Peers"`
 }
 
 // WGServerInfo describes a peer wg-server for cross-server routing.

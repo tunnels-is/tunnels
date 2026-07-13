@@ -1194,6 +1194,9 @@ func applyWGDefaults(s *types.Server) {
 	if s.WireGuardPort == 0 {
 		s.WireGuardPort = 51820
 	}
+	if s.WireGuardMeshPort == 0 {
+		s.WireGuardMeshPort = s.WireGuardPort + 1
+	}
 	if s.WireGuardIface == "" {
 		s.WireGuardIface = "wg0"
 	}
@@ -1228,6 +1231,10 @@ func API_AdminServerUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	applyWGDefaults(F.Server)
+	if err := validateServerMesh(F.Server); err != nil {
+		senderr(w, 400, err.Error())
+		return
+	}
 
 	_, err = DB_UpdateServer(F.Server)
 	if err != nil {
@@ -1256,8 +1263,12 @@ func API_AdminServerCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	applyWGDefaults(F.Server)
-
 	F.Server.ID = uuid.New()
+	if err := validateServerMesh(F.Server); err != nil {
+		senderr(w, 400, err.Error())
+		return
+	}
+
 	F.Server.Groups = make([]uuid.UUID, 0)
 	err = DB_CreateServer(F.Server)
 	if err != nil {
