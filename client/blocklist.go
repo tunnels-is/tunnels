@@ -145,8 +145,11 @@ func downloadList(url string) ([]byte, error) {
 	var tries int
 
 retry:
-	resp, err := http.Get(url)
+	resp, err := listHTTPClient.Get(url)
 	if err != nil || resp.StatusCode != http.StatusOK {
+		if resp != nil {
+			resp.Body.Close()
+		}
 		if tries < 5 {
 			time.Sleep(5 * time.Second)
 			tries++
@@ -163,7 +166,7 @@ retry:
 	}
 	defer resp.Body.Close()
 
-	bb, err := io.ReadAll(resp.Body)
+	bb, err := io.ReadAll(io.LimitReader(resp.Body, maxDNSListSize))
 	if err != nil {
 		return nil, err
 	}
@@ -223,13 +226,23 @@ func GetDefaultBlockLists() []*BlockList {
 	return bl
 }
 
+// maxDNSListSize caps a downloaded block/whitelist so a huge (or malicious)
+// list cannot exhaust memory; merged lists are typically tens of MB.
+const maxDNSListSize = 128 * 1024 * 1024
+
+// listHTTPClient downloads block/whitelists. The default http.Client has no
+// timeout; a stalled download would hang the reload goroutine forever.
+var listHTTPClient = &http.Client{Timeout: 5 * time.Minute}
+
+// CheckIfURL accepts only https:// list URLs. Plain http:// is rejected: a
+// MITM on an http whitelist could inject domains, and whitelisted domains
+// bypass the blocklists entirely.
 func CheckIfURL(s string) bool {
-	switch {
-	case strings.HasPrefix(s, "http"):
+	if strings.HasPrefix(s, "https://") {
 		return true
-	case strings.HasPrefix(s, "https"):
-		return true
-	default:
-		return false
 	}
+	if strings.HasPrefix(s, "http://") {
+		ERROR("list URLs must use https:// — refusing to download: ", s)
+	}
+	return false
 }

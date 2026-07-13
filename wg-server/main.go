@@ -82,6 +82,15 @@ func Init(ctx context.Context, controllerURL, apiKey, configPath string, insecur
 		return
 	}
 
+	// The peer store, active config and controller sync client MUST exist
+	// before setupWireGuard brings the device up: a handshake can arrive the
+	// moment the UDP port opens, and handleInitiation/reconcilePeer dereference
+	// all three. Initializing them afterwards left a window where an early
+	// handshake crashed the process on a nil peerStore.
+	peerStore = NewPeerStore(cfg.WireGuardSubnet, cfg.WireGuardSubnet6)
+	activeConfig.Store(cfg)
+	initSyncClient(cfg)
+
 	if err := setupWireGuard(cfg, logLevel); err != nil {
 		ERR("wireguard setup failed: ", err)
 		return
@@ -91,10 +100,6 @@ func Init(ctx context.Context, controllerURL, apiKey, configPath string, insecur
 		ERR("network setup failed: ", err)
 		return
 	}
-
-	peerStore = NewPeerStore(cfg.WireGuardSubnet, cfg.WireGuardSubnet6)
-	activeConfig.Store(cfg)
-	initSyncClient(cfg)
 
 	// Server-to-server mesh. Non-fatal: a node still serves its own clients if
 	// the mesh can't come up; only cross-server reachability is affected.
