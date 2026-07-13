@@ -56,7 +56,9 @@ func callWGPeers(t *testing.T, apiKey, query string) (*httptest.ResponseRecorder
 		req.Header.Set("X-WG-KEY", apiKey)
 	}
 	w := httptest.NewRecorder()
-	API_WGPeers(w, req)
+	// Route through the WG-key middleware like the real mux does — the key
+	// check and the server context live there, not in the handler.
+	wireGuardServerKeyCheck(http.HandlerFunc(API_WGPeers)).ServeHTTP(w, req)
 
 	var resp types.WGPeersResponse
 	if w.Code == http.StatusOK {

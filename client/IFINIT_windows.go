@@ -247,6 +247,9 @@ func (t *TInterface) Close() (err error) {
 }
 
 func IP_RouteMetric(network string, ifname string, metric string) (err error) {
+	if err = validateRouteArgs(network, "", metric); err != nil {
+		return err
+	}
 	if metric == "0" {
 		metric = "1"
 	}
@@ -290,6 +293,9 @@ func IP_AddRoute(
 	gateway string,
 	metric string,
 ) (err error) {
+	if err = validateRouteArgs(network, gateway, metric); err != nil {
+		return err
+	}
 	if metric == "0" {
 		metric = "1"
 	}
@@ -353,6 +359,9 @@ func IP_AddRouteV6(
 	gateway string,
 	metric string,
 ) (err error) {
+	if err = validateRouteArgs(network, "", metric); err != nil {
+		return err
+	}
 	if metric == "0" {
 		metric = "1"
 	}
@@ -876,7 +885,7 @@ func (d *DLL) GetAddr(index int) (addr *DLLAddress, err error) {
 		}
 	}
 
-	err = d.LazyLoadLibrary("./wintun.dll")
+	err = d.LazyLoadLibrary(wintunDLLPath())
 	if err != nil {
 		return
 	}
@@ -924,7 +933,7 @@ func (d *DLL) LazyLoadLibrary(name string) (err error) {
 }
 
 func (d *DLL) Init(name string) (err error) {
-	err = d.LazyLoadLibrary("./wintun.dll")
+	err = d.LazyLoadLibrary(wintunDLLPath())
 	if err != nil {
 		return
 	}

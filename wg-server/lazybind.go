@@ -14,6 +14,18 @@ const (
 
 	syncDebounce = 30 * time.Second
 	maxSeenIPs   = 200_000
+
+	// maxConcurrentHandshakes caps the number of in-flight handleInitiation
+	// goroutines (each may cost an X25519 + a controller round-trip). Excess
+	// handshake packets are dropped; the client retries.
+	maxConcurrentHandshakes = 128
+
+	// deniedKeyTTL debounces controller lookups for a pubkey the controller
+	// just rejected — a flood of handshakes for a revoked/unknown key would
+	// otherwise translate 1:1 into controller requests. A re-enabled peer is
+	// delayed at most this long.
+	deniedKeyTTL  = 10 * time.Second
+	maxDeniedKeys = 65_536
 )
 
 type bufferedPkt struct {
@@ -49,18 +61,27 @@ type LazyBind struct {
 	rateMu     sync.Mutex
 	ratePerIP  int
 	rateWindow map[netip.Addr]*ipRate
+
+	// handshakeSem bounds concurrent handleInitiation goroutines (global
+	// handshake budget, not just per-IP).
+	handshakeSem chan struct{}
+
+	deniedMu   sync.Mutex
+	deniedKeys map[string]time.Time
 }
 
 func NewLazyBind(inner conn.Bind, serverPriv, serverPub []byte, bufferSize, ratePerIP int) *LazyBind {
 	return &LazyBind{
-		inner:      inner,
-		requeueCh:  make(chan *bufferedPkt, bufferSize),
-		done:       make(chan struct{}),
-		serverPriv: serverPriv,
-		serverPub:  serverPub,
-		seenIPs:    make(map[netip.Addr]time.Time),
-		ratePerIP:  ratePerIP,
-		rateWindow: make(map[netip.Addr]*ipRate),
+		inner:        inner,
+		requeueCh:    make(chan *bufferedPkt, bufferSize),
+		done:         make(chan struct{}),
+		serverPriv:   serverPriv,
+		serverPub:    serverPub,
+		seenIPs:      make(map[netip.Addr]time.Time),
+		ratePerIP:    ratePerIP,
+		rateWindow:   make(map[netip.Addr]*ipRate),
+		handshakeSem: make(chan struct{}, maxConcurrentHandshakes),
+		deniedKeys:   make(map[string]time.Time),
 	}
 }
 
@@ -124,12 +145,63 @@ func (b *LazyBind) handshakeRateAllowed(ip netip.Addr) bool {
 
 	now := time.Now()
 	r, ok := b.rateWindow[ip]
-	if !ok || now.Sub(r.start) >= time.Second {
-		b.rateWindow[ip] = &ipRate{count: 1, start: now}
-		return true
+	if ok {
+		if now.Sub(r.start) >= time.Second {
+			r.count = 1
+			r.start = now
+			return true
+		}
+		r.count++
+		return r.count <= b.ratePerIP
 	}
-	r.count++
-	return r.count <= b.ratePerIP
+
+	// New IP: sweep expired windows opportunistically and hard-cap the map
+	// (mirrors seenIPs) so a spoofed-source flood cannot grow it without bound.
+	if len(b.rateWindow) > 1000 {
+		for k, v := range b.rateWindow {
+			if now.Sub(v.start) >= time.Second {
+				delete(b.rateWindow, k)
+			}
+		}
+	}
+	if len(b.rateWindow) >= maxSeenIPs {
+		return false
+	}
+	b.rateWindow[ip] = &ipRate{count: 1, start: now}
+	return true
+}
+
+// recentlyDenied reports whether the controller rejected this pubkey within
+// deniedKeyTTL, so repeated handshakes for a revoked/unknown key don't each
+// trigger a controller lookup.
+func (b *LazyBind) recentlyDenied(pubKeyB64 string) bool {
+	b.deniedMu.Lock()
+	defer b.deniedMu.Unlock()
+	t, ok := b.deniedKeys[pubKeyB64]
+	if !ok {
+		return false
+	}
+	if time.Since(t) >= deniedKeyTTL {
+		delete(b.deniedKeys, pubKeyB64)
+		return false
+	}
+	return true
+}
+
+func (b *LazyBind) noteDenied(pubKeyB64 string) {
+	b.deniedMu.Lock()
+	defer b.deniedMu.Unlock()
+	if len(b.deniedKeys) > 1000 {
+		for k, t := range b.deniedKeys {
+			if time.Since(t) >= deniedKeyTTL {
+				delete(b.deniedKeys, k)
+			}
+		}
+	}
+	if len(b.deniedKeys) >= maxDeniedKeys {
+		return
+	}
+	b.deniedKeys[pubKeyB64] = time.Now()
 }
 
 func (b *LazyBind) wrapReceive(inner conn.ReceiveFunc) conn.ReceiveFunc {
@@ -155,12 +227,23 @@ func (b *LazyBind) wrapReceive(inner conn.ReceiveFunc) conn.ReceiveFunc {
 					continue
 				}
 				if b.shouldSync(srcIP) {
-					pkt := &bufferedPkt{
-						data: make([]byte, len(data)),
-						ep:   eps[i],
+					// Global concurrency budget: past the cap the handshake is
+					// dropped (client retries) instead of spawning an unbounded
+					// number of goroutines.
+					select {
+					case b.handshakeSem <- struct{}{}:
+						pkt := &bufferedPkt{
+							data: make([]byte, len(data)),
+							ep:   eps[i],
+						}
+						copy(pkt.data, data)
+						go func() {
+							defer func() { <-b.handshakeSem }()
+							b.handleInitiation(pkt)
+						}()
+					default:
+						WARN("LazyBind: handshake concurrency limit reached, dropping packet")
 					}
-					copy(pkt.data, data)
-					go b.handleInitiation(pkt)
 					continue
 				}
 			}
@@ -212,6 +295,12 @@ func (b *LazyBind) handleInitiation(pkt *bufferedPkt) {
 		return
 	}
 
+	// A pubkey the controller rejected moments ago: drop without another
+	// controller round-trip (request-amplification guard).
+	if b.recentlyDenied(pubKeyB64) {
+		return
+	}
+
 	// Reconcile authorization with the controller on every (re)connect. An
 	// already-open session is not torn down proactively, but any new handshake
 	// (initial connect, reconnect, or rekey) re-checks here — so a peer the
@@ -220,6 +309,7 @@ func (b *LazyBind) handleInitiation(pkt *bufferedPkt) {
 	case authAllowed:
 		b.requeue(pkt)
 	case authDenied:
+		b.noteDenied(pubKeyB64)
 		INFO("LazyBind: peer no longer authorized, removing → ", pubKeyB64[:12], "…")
 		if hexKey, err := b64ToHex(pubKeyB64); err == nil {
 			_ = RemovePeer(hexKey)

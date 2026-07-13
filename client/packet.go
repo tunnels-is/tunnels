@@ -83,7 +83,9 @@ func (V *TUN) ProcessIngressPacket(packet []byte) bool {
 		return false
 	}
 
+	V.natMu.RLock()
 	V.IP_NAT_IP, V.IP_NAT_OK = V.NATIngress[V.IP_SrcIP]
+	V.natMu.RUnlock()
 	if V.IP_NAT_OK {
 		V.IP_IPv4Header[12] = V.IP_NAT_IP[0]
 		V.IP_IPv4Header[13] = V.IP_NAT_IP[1]
