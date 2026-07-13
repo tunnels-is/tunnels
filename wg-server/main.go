@@ -5,9 +5,22 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strconv"
 	"sync/atomic"
 	"time"
 )
+
+// meshReconcileInterval is how often the wg-server re-syncs its mesh peers with
+// the controller. Defaults to 2 minutes; overridable via
+// TUNNELS_MESH_RECONCILE_SECONDS (used by tests for fast convergence).
+func meshReconcileInterval() time.Duration {
+	if s := os.Getenv("TUNNELS_MESH_RECONCILE_SECONDS"); s != "" {
+		if n, err := strconv.Atoi(s); err == nil && n > 0 {
+			return time.Duration(n) * time.Second
+		}
+	}
+	return 2 * time.Minute
+}
 
 var (
 	peerStore    *PeerStore
@@ -83,6 +96,26 @@ func Init(ctx context.Context, controllerURL, apiKey, configPath string, insecur
 	activeConfig.Store(cfg)
 	initSyncClient(cfg)
 
+	// Server-to-server mesh. Non-fatal: a node still serves its own clients if
+	// the mesh can't come up; only cross-server reachability is affected.
+	if err := setupMesh(cfg, logLevel); err != nil {
+		ERR("mesh setup failed (continuing without mesh): ", err)
+	} else {
+		go func() {
+			reconcileMesh() // initial sync — in the goroutine so a slow controller can't delay startup
+			t := time.NewTicker(meshReconcileInterval())
+			defer t.Stop()
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-t.C:
+					reconcileMesh()
+				}
+			}
+		}()
+	}
+
 	INFO("wg-server started")
 
 	<-ctx.Done()
@@ -103,6 +136,7 @@ func Init(ctx context.Context, controllerURL, apiKey, configPath string, insecur
 		wgDevice.Close()
 	}
 	stopFlowCleaner()
+	cleanupMesh(cfg)
 	cleanupNet(cfg)
 	INFO("wg-server shutdown complete")
 }

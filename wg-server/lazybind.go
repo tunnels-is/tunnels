@@ -32,6 +32,14 @@ type LazyBind struct {
 	done      chan struct{}
 	closeOnce sync.Once
 
+	// closeCh is recreated on each Open and closed by Close. The reinject
+	// ReceiveFunc selects on it so it returns net.ErrClosed when the bind is
+	// closed during a BindUpdate (e.g. when listen_port is set) — otherwise that
+	// routine would never stop and wireguard-go's BindUpdate would deadlock
+	// waiting for it.
+	closeMu sync.Mutex
+	closeCh chan struct{}
+
 	serverPriv []byte
 	serverPub  []byte
 
@@ -62,11 +70,16 @@ func (b *LazyBind) Open(port uint16) ([]conn.ReceiveFunc, uint16, error) {
 		return nil, 0, err
 	}
 
+	b.closeMu.Lock()
+	b.closeCh = make(chan struct{})
+	closeCh := b.closeCh
+	b.closeMu.Unlock()
+
 	wrapped := make([]conn.ReceiveFunc, len(fns)+1)
 	for i, fn := range fns {
 		wrapped[i] = b.wrapReceive(fn)
 	}
-	wrapped[len(fns)] = b.reinjectReceive()
+	wrapped[len(fns)] = b.reinjectReceive(closeCh)
 	return wrapped, actualPort, nil
 }
 
@@ -75,6 +88,17 @@ func (b *LazyBind) Open(port uint16) ([]conn.ReceiveFunc, uint16, error) {
 // shutdown — so it MUST NOT wipe identity material or signal permanent shutdown.
 // Use Shutdown() for that.
 func (b *LazyBind) Close() error {
+	// Unblock the reinject ReceiveFunc for this bind generation so it returns
+	// net.ErrClosed and wireguard-go's BindUpdate can finish waiting on it.
+	b.closeMu.Lock()
+	if b.closeCh != nil {
+		select {
+		case <-b.closeCh:
+		default:
+			close(b.closeCh)
+		}
+	}
+	b.closeMu.Unlock()
 	return b.inner.Close()
 }
 
@@ -152,7 +176,7 @@ func (b *LazyBind) wrapReceive(inner conn.ReceiveFunc) conn.ReceiveFunc {
 	}
 }
 
-func (b *LazyBind) reinjectReceive() conn.ReceiveFunc {
+func (b *LazyBind) reinjectReceive(closeCh chan struct{}) conn.ReceiveFunc {
 	return func(bufs [][]byte, sizes []int, eps []conn.Endpoint) (int, error) {
 		select {
 		case pkt := <-b.requeueCh:
@@ -160,6 +184,10 @@ func (b *LazyBind) reinjectReceive() conn.ReceiveFunc {
 			sizes[0] = n
 			eps[0] = pkt.ep
 			return 1, nil
+		case <-closeCh:
+			// This bind generation was closed (BindUpdate/Close) — stop so
+			// wireguard-go's receive-routine WaitGroup can drain.
+			return 0, net.ErrClosed
 		case <-b.done:
 			return 0, net.ErrClosed
 		}

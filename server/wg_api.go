@@ -396,12 +396,72 @@ func API_WGServerConfigFetch(w http.ResponseWriter, r *http.Request) {
 		ServerID:           server.ID.String(),
 		ServerIP:           server.IP,
 		WireGuardPort:      server.WireGuardPort,
+		WireGuardMeshPort:  meshPortForServer(server),
 		WireGuardSubnet:    server.WireGuardSubnet,
 		WireGuardSubnet6:   server.WireGuardSubnet6,
 		WireGuardIface:     server.WireGuardIface,
 		InternetIface:      server.InternetIface,
 		EnableFirewall:     server.EnableFirewall,
 		InsecureSkipVerify: server.InsecureSkipVerify,
+	}
+
+	sendObject(w, resp)
+}
+
+// meshPortForServer returns the server's mesh UDP port, defaulting to
+// WireGuardPort+1 when unset.
+func meshPortForServer(s *types.Server) int {
+	if s.WireGuardMeshPort != 0 {
+		return s.WireGuardMeshPort
+	}
+	return s.WireGuardPort + 1
+}
+
+// API_WGMesh returns the calling server's same-mesh-group siblings so a
+// wg-server can build its server-to-server WireGuard mesh. Only servers sharing
+// this server's MeshGroupID that are already provisioned (have reported a
+// pubkey and have an IP + subnet) are returned; the caller itself is excluded.
+func API_WGMesh(w http.ResponseWriter, r *http.Request) {
+	defer BasicRecover()
+
+	server := getServerFromContext(r.Context())
+	if server == nil {
+		senderr(w, 401, "Unauthorized")
+		return
+	}
+
+	resp := types.WGMeshResponse{Peers: make([]types.WGMeshPeer, 0)}
+	if server.MeshGroupID == "" {
+		sendObject(w, resp)
+		return
+	}
+
+	siblings, err := DB_FindServersByMeshGroup(server.MeshGroupID)
+	if err != nil {
+		senderr(w, 500, "Failed to fetch mesh peers", slog.Any("err", err))
+		return
+	}
+
+	for _, s := range siblings {
+		if s.ID == server.ID {
+			continue
+		}
+		if s.WireGuardPubKey == "" || s.IP == "" || s.WireGuardSubnet == "" {
+			continue // not yet provisioned
+		}
+		hexKey, err := b64KeyToHex(s.WireGuardPubKey)
+		if err != nil {
+			continue
+		}
+		subnets := []string{s.WireGuardSubnet}
+		if s.WireGuardSubnet6 != "" {
+			subnets = append(subnets, s.WireGuardSubnet6)
+		}
+		resp.Peers = append(resp.Peers, types.WGMeshPeer{
+			PublicKeyHex:   hexKey,
+			Endpoint:       net.JoinHostPort(s.IP, strconv.Itoa(meshPortForServer(s))),
+			AllowedSubnets: subnets,
+		})
 	}
 
 	sendObject(w, resp)
