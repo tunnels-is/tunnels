@@ -15,7 +15,10 @@ func inc(ip net.IP) {
 }
 
 func (V *TUN) TransLateIP(ip [4]byte) ([4]byte, bool) {
-	if xxx, ok := V.NATEgress[ip]; ok {
+	V.natMu.RLock()
+	xxx, ok := V.NATEgress[ip]
+	V.natMu.RUnlock()
+	if ok {
 		return xxx, true
 	}
 
@@ -44,8 +47,10 @@ func (V *TUN) TransLateIP(ip [4]byte) ([4]byte, bool) {
 			newIP[3] = ip[3]
 		}
 
+		V.natMu.Lock()
 		V.NATEgress[ip] = newIP
 		V.NATIngress[newIP] = ip
+		V.natMu.Unlock()
 		break
 	}
 

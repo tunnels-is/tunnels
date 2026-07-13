@@ -83,7 +83,8 @@ func LaunchAPI() {
 	INFO("PORT: ", port)
 	INFO("Key: ", conf.APIKey)
 	INFO("Cert: ", conf.APICert)
-	INFO("Session Token: ", sessionToken)
+	// The session token is deliberately NOT logged — anything that can read
+	// the log would gain a valid local-API session.
 	if DevMode {
 		INFO("DEV MODE: API auth disabled, CORS enabled")
 	}

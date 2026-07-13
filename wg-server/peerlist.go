@@ -69,17 +69,18 @@ type flowRec struct {
 	prev    uint64
 }
 
-// fragKey identifies an in-flight fragmented IPv4 datagram inbound to a local
-// receiver: the source that sent it plus the IPv4 identification field. Only
-// the first fragment of a datagram carries an L4 header (and thus a port), so
-// trailing fragments cannot be port-matched; instead, when a first fragment is
-// admitted the receiver records this key, and trailing fragments are admitted
-// iff their key was recorded. The source is authenticated by WireGuard (a peer
-// can only send from its own IP), so the (remote, id) namespace is per-source
-// and one peer cannot forge notes for another.
+// fragKey identifies an in-flight fragmented datagram inbound to a local
+// receiver: the source that sent it plus the identification field (IPv4
+// header ID, or the 32-bit IPv6 fragment-header ID). Only the first fragment
+// of a datagram carries an L4 header (and thus a port), so trailing fragments
+// cannot be port-matched; instead, when a first fragment is admitted the
+// receiver records this key, and trailing fragments are admitted iff their
+// key was recorded. The source is authenticated by WireGuard (a peer can only
+// send from its own IP), so the (remote, id) namespace is per-source and one
+// peer cannot forge notes for another.
 type fragKey struct {
 	remote netip.Addr
-	id     uint16
+	id     uint32
 }
 
 // portSet is the set of destination ports a given source may reach on this

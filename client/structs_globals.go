@@ -431,6 +431,11 @@ type TUN struct {
 	serverInterfaceNetIP    net.IP
 	serverInterfaceIP4bytes [4]byte
 
+	// natMu guards both NAT maps. The egress path (TransLateIP, under the
+	// processingTUN egressMu) writes them while the ingress path (under the
+	// separate ingressMu) reads NATIngress — without a shared lock that is an
+	// unsynchronized map read/write and the runtime kills the process.
+	natMu      sync.RWMutex        `json:"-"`
 	NATEgress  map[[4]byte][4]byte `json:"-"`
 	NATIngress map[[4]byte][4]byte `json:"-"`
 

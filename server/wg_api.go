@@ -239,7 +239,7 @@ func API_WGConfig(w http.ResponseWriter, r *http.Request) {
 		deviceIPv6 = d.WireGuardIPv6
 	}
 
-	sendObject(w, map[string]string{
+	sendObject(w, map[string]any{
 		"WireGuardPubKey":  server.WireGuardPubKey,
 		"WireGuardPort":    strconv.Itoa(server.WireGuardPort),
 		"ServerIP":         server.IP,
@@ -248,6 +248,9 @@ func API_WGConfig(w http.ResponseWriter, r *http.Request) {
 		"WireGuardSubnet":  server.WireGuardSubnet,
 		"WireGuardSubnet6": server.WireGuardSubnet6,
 		"WANCIDR":          wanCIDRForServer(server),
+		// Lets the client tell the user whether their per-peer allowlist is
+		// actually enforced on this server (it is silently ignored otherwise).
+		"EnableFirewall": server.EnableFirewall,
 	})
 }
 
