@@ -28,6 +28,7 @@ const (
 	SERVERS_BUCKET       = "servers"
 	SERVERS_APIKEY_INDEX = "servers_by_apikey"
 	WANS_BUCKET          = "wans"
+	MESHGROUPS_BUCKET    = "meshgroups"
 )
 
 func ConnectToBBoltDB(path string) (err error) {
@@ -40,7 +41,7 @@ func ConnectToBBoltDB(path string) (err error) {
 			USERS_BUCKET, USERS_EMAIL_INDEX, USERS_APIKEY_INDEX,
 			DEVICES_BUCKET, DEVICES_USERID_INDEX, DEVICES_WGKEY_INDEX,
 			ORGS_BUCKET, GROUPS_BUCKET, SERVERS_BUCKET, SERVERS_APIKEY_INDEX,
-			WANS_BUCKET,
+			WANS_BUCKET, MESHGROUPS_BUCKET,
 		}
 		for _, b := range buckets {
 			_, err := tx.CreateBucketIfNotExists([]byte(b))
@@ -689,6 +690,8 @@ func BBolt_UpdateServer(S *types.Server) (*types.Server, error) {
 		SS.InsecureSkipVerify = S.InsecureSkipVerify
 		SS.EnableFirewall = S.EnableFirewall
 		SS.WANID = S.WANID
+		SS.MeshGroupID = S.MeshGroupID
+		SS.WireGuardMeshPort = S.WireGuardMeshPort
 
 		if S.APIKey != "" && S.APIKey != oldAPIKey {
 			if existing := apikeyIdx.Get([]byte(S.APIKey)); existing != nil && string(existing) != id {

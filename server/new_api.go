@@ -38,6 +38,7 @@ func launchAPIServer() {
 	mux.Handle("GET /wg/server-config/fetch", wgServerMW(API_WGServerConfigFetch))
 	mux.Handle("GET /wg/peers", wgServerMW(API_WGPeers))
 	mux.Handle("GET /wg/peer", wgServerMW(API_WGPeer))
+	mux.Handle("GET /wg/mesh", wgServerMW(API_WGMesh))
 
 	mux.HandleFunc("POST /client/user/login", API_UserLogin)
 	mux.HandleFunc("POST /client/user/create", API_UserCreate)
@@ -107,6 +108,12 @@ func launchAPIServer() {
 	mux.Handle("POST /ui/wan/delete", adminMW(API_AdminWANDelete))
 	mux.Handle("POST /ui/wan/list", adminMW(API_AdminWANList))
 	mux.Handle("POST /ui/wan", adminMW(API_AdminWANGet))
+
+	mux.Handle("POST /ui/meshgroup/create", adminMW(API_AdminMeshGroupCreate))
+	mux.Handle("POST /ui/meshgroup/update", adminMW(API_AdminMeshGroupUpdate))
+	mux.Handle("POST /ui/meshgroup/delete", adminMW(API_AdminMeshGroupDelete))
+	mux.Handle("POST /ui/meshgroup/list", adminMW(API_AdminMeshGroupList))
+	mux.Handle("POST /ui/meshgroup", adminMW(API_AdminMeshGroupGet))
 
 	tlsConfig := APITLSConfig.Load()
 
