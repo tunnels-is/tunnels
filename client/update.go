@@ -28,6 +28,21 @@ const (
 	prevVersionSuffix = ".prev"
 	repo              = "tunnels"
 	owner             = "tunnels-is"
+
+	// maxUpdateArchiveSize caps the release download and the extracted binary
+	// so a compromised/misbehaving release endpoint cannot fill the disk.
+	maxUpdateArchiveSize = 512 * 1024 * 1024
+	// maxUpdateMetaSize caps the release-metadata and checksum responses.
+	maxUpdateMetaSize = 10 * 1024 * 1024
+)
+
+// updateMetaClient fetches release metadata / checksums; updateFetchClient
+// downloads the archive itself (generous timeout for slow links). The default
+// http.Client has no timeout at all — a stalled connection would hang the
+// updater forever.
+var (
+	updateMetaClient  = &http.Client{Timeout: 30 * time.Second}
+	updateFetchClient = &http.Client{Timeout: 15 * time.Minute}
 )
 
 func updatePrint(s ...any) {
@@ -102,20 +117,20 @@ func doUpdate() {
 		shouldUpdate, err = checkForAndDownloadUpdate("")
 	}
 
+	if err != nil {
+		ERROR("update check/download failed:", err)
+		return
+	}
 	if !shouldUpdate {
 		return
 	}
 
-	if err == nil {
-		DEBUG("launching update process")
-		err = replaceCurrentVersion()
-		if err != nil {
-			ERROR("error switching binaries during update:", err)
-		}
-		err = revertBackToOldVersion()
-		if err != nil {
-			ERROR("error while revering back to prev version post update error:", err)
-		}
+	DEBUG("launching update process")
+	err = replaceCurrentVersion()
+	if err != nil {
+		// replaceCurrentVersion restores the previous binary itself when the
+		// final rename fails; nothing more to roll back here.
+		ERROR("error switching binaries during update:", err)
 		return
 	}
 
@@ -152,28 +167,25 @@ func doStartupUpdate() (didUpdate bool) {
 	if !shouldUpdate {
 		return false
 	}
+	if err != nil {
+		updatePrint("Unable to update:", err)
+		return false
+	}
 
-	if err == nil && !skipUpdatePrompt() {
+	if !skipUpdatePrompt() {
 		shouldUpdate = yesNoPrompt("Update tunnels now ?")
 	}
-
-	if err == nil && shouldUpdate {
-		err = replaceCurrentVersion()
-		if err != nil {
-			updatePrint("Unable to replace current version with new tunnels version:", err)
-			return false
-		}
-		err = revertBackToOldVersion()
-		if err != nil {
-			updatePrint("cleaning up files post update", err)
-			return false
-		}
-		updatePrint("update finished")
-		return true
+	if !shouldUpdate {
+		return false
 	}
 
-	updatePrint("Unable to update:", err)
-	return false
+	err = replaceCurrentVersion()
+	if err != nil {
+		updatePrint("Unable to replace current version with new tunnels version:", err)
+		return false
+	}
+	updatePrint("update finished")
+	return true
 }
 
 func checkForAndDownloadUpdate(targetTag string) (shouldUpdate bool, err error) {
@@ -181,7 +193,7 @@ func checkForAndDownloadUpdate(targetTag string) (shouldUpdate bool, err error) 
 		return false, nil
 	}
 
-	url, tag, _, err := getReleaseInfo(targetTag)
+	url, tag, apiDigest, err := getReleaseInfo(targetTag)
 	if err != nil {
 		return false, err
 	}
@@ -196,9 +208,18 @@ func checkForAndDownloadUpdate(targetTag string) (shouldUpdate bool, err error) 
 		return false, fmt.Errorf("unable to get expecetd sha sum from source: %s", err)
 	}
 
+	// Cross-check the checksums.txt entry against the GitHub API's asset
+	// digest ("sha256:<hex>"). Not a signature, but both sources must agree —
+	// a tampered checksums file alone no longer validates an archive.
+	if hexSum, ok := strings.CutPrefix(apiDigest, "sha256:"); ok {
+		if !strings.EqualFold(hexSum, expectedSum) {
+			return false, fmt.Errorf("checksum mismatch between release digest (%s) and checksums.txt (%s)", hexSum, expectedSum)
+		}
+	}
+
 	err = compareLocalArchiveToExpectedShaSum(expectedSum)
 	if err != nil {
-		assetResp, err := http.Get(url)
+		assetResp, err := updateFetchClient.Get(url)
 		if err != nil {
 			return false, fmt.Errorf("failed to download asset: %w", err)
 		}
@@ -218,7 +239,9 @@ func checkForAndDownloadUpdate(targetTag string) (shouldUpdate bool, err error) 
 
 		size, _ := strconv.ParseInt(assetResp.Header.Get("Content-Length"), 10, 64)
 		progress := &ProgressWriter{Total: size, barWidth: 40}
-		reader := io.TeeReader(assetResp.Body, progress)
+		// Cap the download: a body larger than the cap is truncated and then
+		// rejected by the checksum comparison below, instead of filling the disk.
+		reader := io.TeeReader(io.LimitReader(assetResp.Body, maxUpdateArchiveSize), progress)
 		_, err = io.Copy(out, reader)
 		if err != nil {
 			return false, fmt.Errorf("failed to write update to file: %w", err)
@@ -246,18 +269,6 @@ func compareLocalArchiveToExpectedShaSum(remoteSum string) (err error) {
 		return fmt.Errorf("local binary hash invalid, expected (%s) got (%s)", remoteSum, localShaSum)
 	}
 
-	return nil
-}
-
-func revertBackToOldVersion() (err error) {
-	ex, err := os.Executable()
-	if err != nil {
-		return err
-	}
-	err = os.Rename(ex+prevVersionSuffix, ex)
-	if err != nil {
-		return err
-	}
 	return nil
 }
 
@@ -321,14 +332,14 @@ func calculateSha256(filePath string) (string, error) {
 
 func getExpectedChecksum(tag string) (string, error) {
 	url := fmt.Sprintf("https://github.com/%s/%s/releases/download/%s/tunnels_%s_checksums.txt", owner, repo, tag, strings.ReplaceAll(tag, "v", ""))
-	resp, err := http.Get(url)
+	resp, err := updateMetaClient.Get(url)
 	if err != nil {
 		return "", err
 	}
 	defer resp.Body.Close()
 
 	matching := fmt.Sprintf("tunnels_%s_%s_%s", strings.ReplaceAll(tag, "v", ""), runtime.GOOS, runtime.GOARCH)
-	scanner := bufio.NewScanner(resp.Body)
+	scanner := bufio.NewScanner(io.LimitReader(resp.Body, maxUpdateMetaSize))
 	for scanner.Scan() {
 		line := scanner.Text()
 		if strings.Contains(strings.ToLower(line), matching) {
@@ -347,13 +358,13 @@ func getReleaseInfo(targetTag string) (url, tag, hash string, err error) {
 		apiURL = fmt.Sprintf("https://api.github.com/repos/%s/%s/releases/tags/v%s", owner, repo, targetTag)
 	}
 
-	resp, err := http.Get(apiURL)
+	resp, err := updateMetaClient.Get(apiURL)
 	if err != nil {
 		return "", "", "", err
 	}
 	defer resp.Body.Close()
 
-	b, _ := io.ReadAll(resp.Body)
+	b, _ := io.ReadAll(io.LimitReader(resp.Body, maxUpdateMetaSize))
 	r := new(Release)
 	err = json.Unmarshal(b, r)
 	if err != nil {
@@ -541,12 +552,16 @@ unziploop:
 				continue unziploop
 			}
 
-			f, err := os.OpenFile(dest, os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode))
+			// Fixed 0755 — the archive-supplied mode is untrusted (it could
+			// carry setuid/setgid bits).
+			f, err := os.OpenFile(dest, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0o755)
 			if err != nil {
 				return err
 			}
 
-			if _, err := io.Copy(f, tr); err != nil {
+			// Cap the decompressed size (gzip-bomb guard).
+			if _, err := io.Copy(f, io.LimitReader(tr, maxUpdateArchiveSize)); err != nil {
+				f.Close()
 				return err
 			}
 

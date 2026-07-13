@@ -14,6 +14,23 @@ import (
 	"github.com/tunnels-is/tunnels/types"
 )
 
+const (
+	// maxDNSCacheEntries / maxDNSStatsEntries bound the per-name maps — both
+	// grow one entry per unique (attacker-chosen) queried name and were
+	// previously unbounded.
+	maxDNSCacheEntries = 50_000
+	maxDNSStatsEntries = 50_000
+	// maxDNSStatsAnswers bounds the per-domain answer log inside DNSStats,
+	// which previously appended on every resolution forever.
+	maxDNSStatsAnswers = 100
+	// maxDNSCacheTTL clamps upstream-controlled TTLs so a hostile upstream
+	// cannot pin entries in the cache for days.
+	maxDNSCacheTTL = 6 * time.Hour
+	// maxDoHResponseSize caps a DNS-over-HTTPS response body; a DNS message
+	// cannot legitimately exceed 64 KiB.
+	maxDoHResponseSize = 65536
+)
+
 func FullCleanDNSCache() {
 	defer RecoverAndLog()
 	INFO("Dumping DNS cache")
@@ -231,6 +248,15 @@ func GlobalBlockEnabled(m *dns.Msg, w dns.ResponseWriter) bool {
 func DNSQuery(w dns.ResponseWriter, m *dns.Msg) {
 	defer RecoverAndLog()
 
+	// Everything downstream indexes m.Question[0]; a query with an empty
+	// question section is dropped here instead of recovering from a panic
+	// (log-spam vector).
+	if len(m.Question) == 0 {
+		_ = w.WriteMsg(m)
+		w.Close()
+		return
+	}
+
 	if !isValidDomain(m, w) {
 		return
 	}
@@ -392,16 +418,22 @@ DONE:
 }
 
 func CacheDnsReply(reply *dns.Msg) {
-	if len(reply.Answer) == 0 {
+	if len(reply.Answer) == 0 || len(reply.Question) == 0 {
 		return
 	}
 
 	name := reply.Question[0].Name + strconv.FormatUint(uint64(reply.Question[0].Qtype), 10)
+	if _, exists := DNSCache.Load(name); !exists && DNSCache.Size() >= maxDNSCacheEntries {
+		return
+	}
 	RP := new(DNSReply)
 	RP.A = make([]dns.RR, len(reply.Answer))
 	copy(RP.A, reply.Answer)
-	TTL := int(reply.Answer[0].Header().Ttl)
-	RP.Expires = time.Now().Add(time.Second * time.Duration(TTL))
+	ttl := time.Duration(reply.Answer[0].Header().Ttl) * time.Second
+	if ttl > maxDNSCacheTTL {
+		ttl = maxDNSCacheTTL
+	}
+	RP.Expires = time.Now().Add(ttl)
 	DNSCache.Store(name, RP)
 }
 
@@ -529,14 +561,17 @@ func ResolveDNSAsHTTPS(m *dns.Msg, w dns.ResponseWriter) (err error) {
 		}
 	}
 
-	bb, err := io.ReadAll(resp.Body)
+	bb, err := io.ReadAll(io.LimitReader(resp.Body, maxDoHResponseSize))
 	if err != nil {
 		ERROR("Unable to read DNS over HTTP response body:", err)
 		return err
 	}
 
 	newx := new(dns.Msg)
-	newx.Unpack(bb)
+	if err = newx.Unpack(bb); err != nil {
+		ERROR("Unable to unpack DNS over HTTPS response:", err)
+		return err
+	}
 	CacheDnsReply(newx)
 	err = w.WriteMsg(newx)
 	w.Close()
@@ -556,6 +591,9 @@ func IncrementDNSStats(domain string, blocked bool, tag string, answers []dns.RR
 	defer RecoverAndLog()
 
 	tn := time.Now()
+	if _, exists := DNSStatsMap.Load(domain); !exists && DNSStatsMap.Size() >= maxDNSStatsEntries {
+		return
+	}
 	dnsint, ok := DNSStatsMap.LoadOrStore(domain, &DNSStats{})
 	dnsStats := dnsint.(*DNSStats)
 
@@ -573,6 +611,11 @@ func IncrementDNSStats(domain string, blocked bool, tag string, answers []dns.RR
 	dnsStats.LastSeen = tn
 	for _, v := range answers {
 		dnsStats.Answers = append(dnsStats.Answers, v.String())
+	}
+	// Keep only the most recent answers — this log previously grew without
+	// bound for a domain that resolves often.
+	if len(dnsStats.Answers) > maxDNSStatsAnswers {
+		dnsStats.Answers = dnsStats.Answers[len(dnsStats.Answers)-maxDNSStatsAnswers:]
 	}
 	dnsStats.m.Unlock()
 }

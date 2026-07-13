@@ -17,16 +17,32 @@ type PeerRecord struct {
 type PeerStore struct {
 	mu      sync.RWMutex
 	records map[string]PeerRecord
-	subnet  string
-	subnet6 string
+	// byPubKey indexes pubkey → deviceID so the per-handshake lookup is O(1)
+	// instead of a scan over all records.
+	byPubKey map[string]string
+	subnet   string
+	subnet6  string
 }
 
 func NewPeerStore(subnet, subnet6 string) *PeerStore {
 	return &PeerStore{
-		records: make(map[string]PeerRecord),
-		subnet:  subnet,
-		subnet6: subnet6,
+		records:  make(map[string]PeerRecord),
+		byPubKey: make(map[string]string),
+		subnet:   subnet,
+		subnet6:  subnet6,
 	}
+}
+
+// setLocked stores rec under deviceID and keeps the pubkey index consistent
+// (drops the previous pubkey mapping if the device rekeyed). Callers hold mu.
+func (ps *PeerStore) setLocked(deviceID string, rec PeerRecord) {
+	if old, ok := ps.records[deviceID]; ok && old.PubKeyB64 != rec.PubKeyB64 {
+		if ps.byPubKey[old.PubKeyB64] == deviceID {
+			delete(ps.byPubKey, old.PubKeyB64)
+		}
+	}
+	ps.records[deviceID] = rec
+	ps.byPubKey[rec.PubKeyB64] = deviceID
 }
 
 func (ps *PeerStore) GetOrAssign(deviceID, pubKeyB64 string) (string, string, error) {
@@ -36,7 +52,7 @@ func (ps *PeerStore) GetOrAssign(deviceID, pubKeyB64 string) (string, string, er
 	if rec, ok := ps.records[deviceID]; ok {
 		if rec.PubKeyB64 != pubKeyB64 {
 			rec.PubKeyB64 = pubKeyB64
-			ps.records[deviceID] = rec
+			ps.setLocked(deviceID, rec)
 		}
 		return rec.IP, rec.IPv6, nil
 	}
@@ -54,7 +70,7 @@ func (ps *PeerStore) GetOrAssign(deviceID, pubKeyB64 string) (string, string, er
 		}
 	}
 
-	ps.records[deviceID] = PeerRecord{PubKeyB64: pubKeyB64, IP: ip, IPv6: ipv6}
+	ps.setLocked(deviceID, PeerRecord{PubKeyB64: pubKeyB64, IP: ip, IPv6: ipv6})
 	return ip, ipv6, nil
 }
 
@@ -68,18 +84,21 @@ func (ps *PeerStore) Get(deviceID string) (PeerRecord, bool) {
 func (ps *PeerStore) GetByPubKey(pubKeyB64 string) (PeerRecord, bool) {
 	ps.mu.RLock()
 	defer ps.mu.RUnlock()
-	for _, rec := range ps.records {
-		if rec.PubKeyB64 == pubKeyB64 {
-			return rec, true
-		}
+	deviceID, ok := ps.byPubKey[pubKeyB64]
+	if !ok {
+		return PeerRecord{}, false
 	}
-	return PeerRecord{}, false
+	rec, ok := ps.records[deviceID]
+	if !ok || rec.PubKeyB64 != pubKeyB64 {
+		return PeerRecord{}, false
+	}
+	return rec, true
 }
 
 func (ps *PeerStore) Set(deviceID, ip, ipv6, pubKeyB64 string) {
 	ps.mu.Lock()
 	defer ps.mu.Unlock()
-	ps.records[deviceID] = PeerRecord{PubKeyB64: pubKeyB64, IP: ip, IPv6: ipv6}
+	ps.setLocked(deviceID, PeerRecord{PubKeyB64: pubKeyB64, IP: ip, IPv6: ipv6})
 }
 
 // DeleteByPubKey drops the record for a peer the controller no longer
@@ -87,11 +106,13 @@ func (ps *PeerStore) Set(deviceID, ip, ipv6, pubKeyB64 string) {
 func (ps *PeerStore) DeleteByPubKey(pubKeyB64 string) {
 	ps.mu.Lock()
 	defer ps.mu.Unlock()
-	for id, rec := range ps.records {
-		if rec.PubKeyB64 == pubKeyB64 {
-			delete(ps.records, id)
-			return
-		}
+	deviceID, ok := ps.byPubKey[pubKeyB64]
+	if !ok {
+		return
+	}
+	delete(ps.byPubKey, pubKeyB64)
+	if rec, ok := ps.records[deviceID]; ok && rec.PubKeyB64 == pubKeyB64 {
+		delete(ps.records, deviceID)
 	}
 }
 

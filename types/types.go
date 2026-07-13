@@ -275,6 +275,11 @@ type ServerConnectResponse struct {
 	// to. When non-empty and the tunnel has EnableWAN set, the client routes
 	// this CIDR through the tunnel to reach peers on sibling servers.
 	WANCIDR string `json:"WANCIDR,omitempty"`
+
+	// EnableFirewall reports whether the connected server enforces the
+	// per-peer firewall. When false, any allowlist the client announces is
+	// accepted but ignored — surfaced so the UI can tell the user.
+	EnableFirewall bool `json:"EnableFirewall,omitempty"`
 }
 
 type FORM_GET_DEVICE struct {

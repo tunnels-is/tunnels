@@ -12,9 +12,11 @@ func TestCheckIfURL(t *testing.T) {
 		expected bool
 	}{
 		{
+			// http:// is rejected: a MITM on a plaintext whitelist could
+			// inject domains that bypass the blocklists.
 			name:     "http URL",
 			input:    "http://example.com",
-			expected: true,
+			expected: false,
 		},
 		{
 			name:     "https URL",
@@ -29,7 +31,7 @@ func TestCheckIfURL(t *testing.T) {
 		{
 			name:     "http URL with query",
 			input:    "http://example.com?query=param",
-			expected: true,
+			expected: false,
 		},
 		{
 			name:     "not a URL",
@@ -54,12 +56,12 @@ func TestCheckIfURL(t *testing.T) {
 		{
 			name:     "just http",
 			input:    "http",
-			expected: true,
+			expected: false,
 		},
 		{
 			name:     "just https",
 			input:    "https",
-			expected: true,
+			expected: false,
 		},
 	}
 

@@ -5,11 +5,27 @@ package client
 import (
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strconv"
 
 	"golang.org/x/sys/windows"
 )
+
+// wintunDLLPath resolves wintun.dll to an absolute path in the executable's
+// directory. A load path with a directory component makes LoadLibraryEx load
+// exactly that file (the LOAD_LIBRARY_SEARCH_* flags are ignored for such
+// paths) — the previous CWD-relative "./wintun.dll" resolved against whatever
+// directory the elevated process was started from, a DLL-hijacking vector.
+func wintunDLLPath() string {
+	ex, err := os.Executable()
+	if err != nil {
+		// Bare filename: LoadLibraryEx then honors the search flags
+		// (application dir + system32) instead of the CWD.
+		return "wintun.dll"
+	}
+	return filepath.Join(filepath.Dir(ex), "wintun.dll")
+}
 
 func openURL(url string) error {
 	return windows.ShellExecute(0, nil, windows.StringToUTF16Ptr(url), nil, nil, windows.SW_SHOWNORMAL)
@@ -26,7 +42,7 @@ func OSSpecificInit() error {
 		return err
 	}
 
-	written, err := verifyAndWriteFile("wintun.dll", fb)
+	written, err := verifyAndWriteFile(wintunDLLPath(), fb)
 	if err != nil {
 		ERROR("unable to verify/write wintun.dll: ", err)
 		return err

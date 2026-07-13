@@ -43,7 +43,6 @@ func (t *TInterface) Close() error {
 	return nil
 }
 
-
 type syscallCreateIF struct {
 	Name  [0x10]byte
 	Flags uint16

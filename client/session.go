@@ -194,6 +194,13 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		ClientCR.ServerIP = wgCfg.ServerIP
 	}
 
+	// Reject malformed controller-provided values before they reach interface
+	// configuration, routes, or the WireGuard endpoint string.
+	if valErr := validateWGServerConfig(wgCfg.WireGuardIP, ClientCR.ServerIP,
+		wgCfg.WireGuardSubnet, wgCfg.WireGuardSubnet6, wgCfg.WANCIDR); valErr != nil {
+		return 502, valErr
+	}
+
 	ServerReponse := &types.ServerConnectResponse{
 		InterfaceIP:      wgCfg.ServerIP,
 		WireGuardIP:      wgCfg.WireGuardIP,
@@ -202,8 +209,16 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		WireGuardSubnet:  wgCfg.WireGuardSubnet,
 		WireGuardSubnet6: wgCfg.WireGuardSubnet6,
 		WANCIDR:          wgCfg.WANCIDR,
+		EnableFirewall:   wgCfg.EnableFirewall,
 	}
 	tunnel.ServerResponse = ServerReponse
+
+	// The wg-server accepts allowlist announcements even with its firewall
+	// off — it just ignores them. Tell the user their policy is not enforced
+	// instead of letting the UI imply protection.
+	if !wgCfg.EnableFirewall && (len(meta.AllowedHosts) > 0 || !meta.AllowAll) {
+		ERROR("server ", ClientCR.ServerID, " has its peer firewall DISABLED — this tunnel's allowed-hosts policy is NOT enforced")
+	}
 
 	err = InitializeTunnelFromCRR(tunnel)
 	if err != nil {
@@ -303,6 +318,7 @@ type wgServerConfig struct {
 	WireGuardSubnet  string `json:"WireGuardSubnet"`
 	WireGuardSubnet6 string `json:"WireGuardSubnet6"`
 	WANCIDR          string `json:"WANCIDR"`
+	EnableFirewall   bool   `json:"EnableFirewall"`
 }
 
 func getServerWGConfig(cr *ConnectionRequest, serverID string, pubKey string) (*wgServerConfig, error) {

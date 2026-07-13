@@ -44,6 +44,9 @@ func TestUser_ToMinifiedUser(t *testing.T) {
 			},
 		},
 		{
+			// NOTE: the User struct has no manager field — MinifiedUser.IsManager
+			// is always false (vestigial; the admin UI still shows a manager
+			// toggle that the backend ignores).
 			name: "manager user",
 			user: &User{
 				ID:       uuid.New(),
@@ -55,7 +58,7 @@ func TestUser_ToMinifiedUser(t *testing.T) {
 				Email:     "manager@example.com",
 				Disabled:  false,
 				IsAdmin:   false,
-				IsManager: true,
+				IsManager: false,
 			},
 		},
 		{
@@ -70,7 +73,7 @@ func TestUser_ToMinifiedUser(t *testing.T) {
 				Email:     "superuser@example.com",
 				Disabled:  false,
 				IsAdmin:   true,
-				IsManager: true,
+				IsManager: false,
 			},
 		},
 		{

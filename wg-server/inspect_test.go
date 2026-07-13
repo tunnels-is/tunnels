@@ -770,3 +770,128 @@ func TestHandleControl_IPv6(t *testing.T) {
 		t.Fatal("v6 ACL not applied")
 	}
 }
+
+// buildIPv6FragUDP builds an IPv6 packet carrying a fragment extension header.
+// For offsetUnits==0 the payload starts with a UDP header (first fragment);
+// otherwise the payload is opaque mid-datagram bytes (trailing fragment).
+func buildIPv6FragUDP(t *testing.T, src, dst string, sport, dport uint16, id uint32, offsetUnits uint16, more bool, payload []byte) []byte {
+	t.Helper()
+	srcA := mustAddr(t, src).As16()
+	dstA := mustAddr(t, dst).As16()
+
+	inner := payload
+	if offsetUnits == 0 {
+		inner = make([]byte, 8+len(payload))
+		binary.BigEndian.PutUint16(inner[0:2], sport)
+		binary.BigEndian.PutUint16(inner[2:4], dport)
+		binary.BigEndian.PutUint16(inner[4:6], uint16(8+len(payload)))
+		copy(inner[8:], payload)
+	}
+
+	payloadLen := 8 + len(inner) // fragment header + inner
+	pkt := make([]byte, 40+payloadLen)
+	pkt[0] = 0x60
+	binary.BigEndian.PutUint16(pkt[4:6], uint16(payloadLen))
+	pkt[6] = 44 // fragment header
+	copy(pkt[8:24], srcA[:])
+	copy(pkt[24:40], dstA[:])
+
+	fh := pkt[40:]
+	fh[0] = protoUDP
+	fo := offsetUnits << 3
+	if more {
+		fo |= 0x1
+	}
+	binary.BigEndian.PutUint16(fh[2:4], fo)
+	binary.BigEndian.PutUint32(fh[4:8], id)
+	copy(fh[8:], inner)
+	return pkt
+}
+
+func TestParseIPHeader_IPv6FirstFragment(t *testing.T) {
+	pkt := buildIPv6FragUDP(t, "fd00::5", "fd00::10", 1234, 5678, 0xDEADBEEF, 0, true, []byte("hi"))
+	src, dst, proto, l4, frag, ok := parseIPHeader(pkt)
+	if !ok {
+		t.Fatal("expected ok")
+	}
+	if src != mustAddr(t, "fd00::5") || dst != mustAddr(t, "fd00::10") {
+		t.Fatalf("addr mismatch")
+	}
+	if proto != protoUDP {
+		t.Fatalf("expected UDP after fragment header, got %d", proto)
+	}
+	if sp, dp := l4Ports(proto, l4); sp != 1234 || dp != 5678 {
+		t.Fatalf("l4 ports wrong: %d,%d", sp, dp)
+	}
+	if !frag.isFragment() || frag.isTrailing() {
+		t.Fatalf("first fragment misclassified: %+v", frag)
+	}
+	if frag.id != 0xDEADBEEF {
+		t.Fatalf("fragment id wrong: %x", frag.id)
+	}
+}
+
+func TestParseIPHeader_IPv6TrailingFragment(t *testing.T) {
+	pkt := buildIPv6FragUDP(t, "fd00::5", "fd00::10", 0, 0, 7, 10, false, []byte("restofdata"))
+	_, _, _, _, frag, ok := parseIPHeader(pkt)
+	if !ok {
+		t.Fatal("expected ok")
+	}
+	if !frag.isFragment() || !frag.isTrailing() {
+		t.Fatalf("trailing fragment misclassified: %+v", frag)
+	}
+	if frag.id != 7 {
+		t.Fatalf("fragment id wrong: %d", frag.id)
+	}
+}
+
+func TestParseIPHeader_IPv6HopByHopSkipped(t *testing.T) {
+	// v6 | hop-by-hop (8 bytes) | UDP
+	udp := buildIPv6UDP(t, "fd00::5", "fd00::10", 42, 43, nil)
+	inner := udp[40:] // the UDP header+payload
+	payloadLen := 8 + len(inner)
+	pkt := make([]byte, 40+payloadLen)
+	copy(pkt, udp[:40])
+	binary.BigEndian.PutUint16(pkt[4:6], uint16(payloadLen))
+	pkt[6] = 0 // hop-by-hop
+	hbh := pkt[40:]
+	hbh[0] = protoUDP // next header
+	hbh[1] = 0        // length: 8 bytes total
+	copy(hbh[8:], inner)
+
+	_, _, proto, l4, _, ok := parseIPHeader(pkt)
+	if !ok {
+		t.Fatal("expected ok")
+	}
+	if proto != protoUDP {
+		t.Fatalf("expected UDP after hop-by-hop, got %d", proto)
+	}
+	if sp, dp := l4Ports(proto, l4); sp != 42 || dp != 43 {
+		t.Fatalf("l4 ports wrong: %d,%d", sp, dp)
+	}
+}
+
+func TestParseIPHeader_IPv6TruncatedExtHeader(t *testing.T) {
+	pkt := buildIPv6UDP(t, "fd00::5", "fd00::10", 1, 2, nil)
+	pkt[6] = 44                             // claim a fragment header...
+	binary.BigEndian.PutUint16(pkt[4:6], 4) // ...but only 4 payload bytes
+	pkt = pkt[:44]
+	if _, _, _, _, _, ok := parseIPHeader(pkt); ok {
+		t.Fatal("truncated extension header must be rejected")
+	}
+}
+
+func TestAllow_IPv6FragmentedDatagramAdmitted(t *testing.T) {
+	insp := newTestInspector(t)
+	resetPeer("10.0.0.5", "fd00::5")
+	allowFor(t, "fd00::5", "fd00::10")
+
+	head := buildIPv6FragUDP(t, "fd00::10", "fd00::5", 1111, 2222, 99, 0, true, []byte("head"))
+	if !insp.allow(head) {
+		t.Fatal("first fragment from allowlisted source must pass")
+	}
+	tail := buildIPv6FragUDP(t, "fd00::10", "fd00::5", 0, 0, 99, 12, false, []byte("tail"))
+	if !insp.allow(tail) {
+		t.Fatal("trailing fragment of an admitted datagram must pass")
+	}
+}

@@ -84,6 +84,14 @@ func derivePubKey(privKey []byte) (string, error) {
 	return base64.StdEncoding.EncodeToString(pubBytes), nil
 }
 
+// pkpath holds the server's long-lived Curve25519 private key. Persisting it
+// is a deliberate design choice (the server keeps a stable WG identity across
+// restarts, so peers reconnect without re-provisioning) and reverses the
+// earlier "ephemeral per boot" property: anyone who can read this file (disk
+// access, backup leak) can impersonate the server and identify peers in future
+// handshakes. Data forward-secrecy is unaffected (per-session ephemerals).
+// The file must be 0600 and owned by the wg-server user; both are enforced
+// below. Protect the working directory / backups accordingly.
 const pkpath = "./.pk"
 
 func loadOrGenerateLocalPrivKey() ([]byte, error) {
@@ -97,6 +105,9 @@ func loadOrGenerateLocalPrivKey() ([]byte, error) {
 		if info, statErr := os.Stat(pkpath); statErr == nil {
 			if mode := info.Mode().Perm(); mode&0o077 != 0 {
 				return nil, fmt.Errorf(".pk file has insecure permissions")
+			}
+			if ownErr := checkKeyFileOwner(info); ownErr != nil {
+				return nil, fmt.Errorf(".pk file: %w", ownErr)
 			}
 		}
 
@@ -177,18 +188,18 @@ func FetchConfig(controllerURL, apiKey, configPath string, insecureSkipVerify bo
 	}
 
 	cfg := &Config{
-		ControllerURL:      controllerURL,
-		APIKey:             apiKey,
-		ServerID:           r.ServerID,
-		PublicIP:           r.ServerIP,
-		WireGuardPort:      r.WireGuardPort,
-		WireGuardMeshPort:  r.WireGuardMeshPort,
-		WireGuardPrivKey:   privKey,
-		WireGuardSubnet:    r.WireGuardSubnet,
-		WireGuardSubnet6:   r.WireGuardSubnet6,
-		WireGuardIface:     r.WireGuardIface,
-		InternetIface:  r.InternetIface,
-		EnableFirewall: r.EnableFirewall,
+		ControllerURL:     controllerURL,
+		APIKey:            apiKey,
+		ServerID:          r.ServerID,
+		PublicIP:          r.ServerIP,
+		WireGuardPort:     r.WireGuardPort,
+		WireGuardMeshPort: r.WireGuardMeshPort,
+		WireGuardPrivKey:  privKey,
+		WireGuardSubnet:   r.WireGuardSubnet,
+		WireGuardSubnet6:  r.WireGuardSubnet6,
+		WireGuardIface:    r.WireGuardIface,
+		InternetIface:     r.InternetIface,
+		EnableFirewall:    r.EnableFirewall,
 		// The initial fetch above was governed by the bootstrap flag
 		// (insecureSkipVerify) — the wg-server must decide controller trust
 		// before it can fetch anything. For the ongoing controller calls

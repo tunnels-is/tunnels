@@ -358,6 +358,9 @@ func (t *TInterface) Disconnect(tun *TUN) (err error) {
 }
 
 func IP_AddDefaultRoute(gateway string) (err error) {
+	if err = validateRouteArgs("", gateway, ""); err != nil {
+		return err
+	}
 	DEBUG("route", "add", "default", gateway)
 
 	out, err := exec.Command("route", "add", "default", gateway).CombinedOutput()
@@ -385,6 +388,9 @@ func IP_AddRoute(
 	gateway string,
 	metric string,
 ) (err error) {
+	if err = validateRouteArgs(network, gateway, metric); err != nil {
+		return err
+	}
 	_ = IP_DelRoute(network, "", metric)
 
 	DEBUG("route", "-n", "add", "-net", network, gateway)
@@ -416,6 +422,9 @@ func IP_AddRouteV6(
 	gateway string,
 	metric string,
 ) (err error) {
+	if err = validateRouteArgs(network, "", metric); err != nil {
+		return err
+	}
 	_ = IP_DelRouteV6(network, gateway, metric)
 
 	var cmd *exec.Cmd

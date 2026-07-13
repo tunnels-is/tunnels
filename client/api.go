@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -27,7 +28,12 @@ func ResetEverything() {
 	RestoreSaneDNSDefaults()
 }
 
-func SendRequestToURL(tc *tls.Config, method string, url string, data any, timeoutMS int, skipVerify bool, extraHeaders ...map[string]string) ([]byte, int, error) {
+// SendRequestToURL sends a JSON request. validateCert mirrors
+// Server.ValidateCertificate: true verifies the peer's TLS certificate, false
+// skips verification (explicit opt-out for self-signed controllers). The
+// parameter was previously named skipVerify while carrying the opposite
+// meaning — a footgun that made the zero value fail open.
+func SendRequestToURL(tc *tls.Config, method string, url string, data any, timeoutMS int, validateCert bool, extraHeaders ...map[string]string) ([]byte, int, error) {
 	defer RecoverAndLog()
 
 	var body []byte
@@ -66,11 +72,14 @@ func SendRequestToURL(tc *tls.Config, method string, url string, data any, timeo
 			TLSClientConfig: tc,
 		}
 	} else {
+		if !validateCert {
+			warnInsecureHost(req.URL.Host)
+		}
 		client.Transport = &http.Transport{
 			TLSClientConfig: &tls.Config{
 				MinVersion:         tls.VersionTLS13,
 				CurvePreferences:   []tls.CurveID{tls.X25519MLKEM768},
-				InsecureSkipVerify: !skipVerify,
+				InsecureSkipVerify: !validateCert,
 			},
 		}
 	}
@@ -154,6 +163,17 @@ func ForwardToController(FR *FORWARD_REQUEST) (any, int) {
 	}
 
 	return respObj, code
+}
+
+// warnedInsecureHosts tracks hosts we've already warned about, so an
+// unverified-TLS controller shows up in the logs once instead of per request.
+var warnedInsecureHosts sync.Map
+
+func warnInsecureHost(host string) {
+	if _, loaded := warnedInsecureHosts.LoadOrStore(host, struct{}{}); !loaded {
+		ERROR("TLS certificate verification is DISABLED for ", host,
+			" (ValidateCertificate=false) — traffic to this controller can be intercepted")
+	}
 }
 
 var AZ_CHAR_CHECK = regexp.MustCompile(`^[a-zA-Z0-9]*$`)

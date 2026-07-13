@@ -272,11 +272,11 @@ func (t *inspectingTUN) inWGSubnet(a netip.Addr) bool {
 	return false
 }
 
-// fragInfo describes IPv4 fragmentation. For an unfragmented packet — and for
-// all IPv6 packets, whose fragmentation lives in an extension header this code
-// does not parse — it is the zero value (not a fragment).
+// fragInfo describes IP fragmentation (IPv4 header fields, or the IPv6
+// fragment extension header). For an unfragmented packet it is the zero value
+// (not a fragment).
 type fragInfo struct {
-	id     uint16 // IPv4 identification field (groups the fragments of one datagram)
+	id     uint32 // identification field (16-bit for IPv4, 32-bit for IPv6)
 	offset uint16 // fragment offset in 8-byte units; 0 for the first/only fragment
 	more   bool   // MF bit: more fragments follow
 }
@@ -290,9 +290,10 @@ func (f fragInfo) isFragment() bool { return f.more || f.offset != 0 }
 func (f fragInfo) isTrailing() bool { return f.offset != 0 }
 
 // parseIPHeader extracts addressing info from an IPv4 or IPv6 packet.
-// Returns ok=false for malformed or unsupported packets. Extension headers
-// on IPv6 are not parsed — the next-header byte is reported verbatim, which
-// is sufficient for the simple UDP case.
+// Returns ok=false for malformed or unsupported packets. On IPv6 the
+// skippable extension headers (hop-by-hop, routing, destination options,
+// fragment) are walked so proto/l4 describe the real upper-layer header and
+// fragmented datagrams get the same fragInfo treatment as IPv4.
 func parseIPHeader(pkt []byte) (src, dst netip.Addr, proto byte, l4 []byte, frag fragInfo, ok bool) {
 	if len(pkt) < 1 {
 		return
@@ -319,7 +320,7 @@ func parseIPHeader(pkt []byte) (src, dst netip.Addr, proto byte, l4 []byte, frag
 		l4 = pkt[ihl:total]
 		ff := binary.BigEndian.Uint16(pkt[6:8])
 		frag = fragInfo{
-			id:     binary.BigEndian.Uint16(pkt[4:6]),
+			id:     uint32(binary.BigEndian.Uint16(pkt[4:6])),
 			offset: ff & 0x1FFF,
 			more:   ff&0x2000 != 0,
 		}
@@ -338,8 +339,44 @@ func parseIPHeader(pkt []byte) (src, dst netip.Addr, proto byte, l4 []byte, frag
 		copy(d[:], pkt[24:40])
 		src = netip.AddrFrom16(s)
 		dst = netip.AddrFrom16(d)
-		proto = pkt[6]
-		l4 = pkt[40 : 40+payloadLen]
+
+		// Walk the skippable extension headers to the real upper-layer header.
+		// A truncated extension chain returns ok=false (the kernel drops such a
+		// packet too). Anything not in the switch is treated as the L4 protocol.
+		next := pkt[6]
+		off := 40
+		end := 40 + payloadLen
+	extLoop:
+		for {
+			switch next {
+			case 0, 43, 60: // hop-by-hop, routing, destination options
+				if off+8 > end {
+					return
+				}
+				hlen := 8 + int(pkt[off+1])*8
+				if off+hlen > end {
+					return
+				}
+				next = pkt[off]
+				off += hlen
+			case 44: // fragment header
+				if off+8 > end {
+					return
+				}
+				fo := binary.BigEndian.Uint16(pkt[off+2 : off+4])
+				frag = fragInfo{
+					id:     binary.BigEndian.Uint32(pkt[off+4 : off+8]),
+					offset: fo >> 3,
+					more:   fo&0x1 != 0,
+				}
+				next = pkt[off]
+				off += 8
+			default:
+				break extLoop
+			}
+		}
+		proto = next
+		l4 = pkt[off:end]
 		ok = true
 		return
 	}

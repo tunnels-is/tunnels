@@ -145,8 +145,11 @@ func downloadWhiteList(url string) ([]byte, error) {
 	var tries int
 
 retry:
-	resp, err := http.Get(url)
+	resp, err := listHTTPClient.Get(url)
 	if err != nil || resp.StatusCode != http.StatusOK {
+		if resp != nil {
+			resp.Body.Close()
+		}
 		if tries < 5 {
 			time.Sleep(5 * time.Second)
 			tries++
@@ -163,7 +166,7 @@ retry:
 	}
 	defer resp.Body.Close()
 
-	bb, err := io.ReadAll(resp.Body)
+	bb, err := io.ReadAll(io.LimitReader(resp.Body, maxDNSListSize))
 	if err != nil {
 		return nil, err
 	}
