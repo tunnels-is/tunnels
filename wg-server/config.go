@@ -32,11 +32,12 @@ type Config struct {
 	// host carries that legacy rule.
 	PublicIP string
 
-	WireGuardPort    int
-	WireGuardPrivKey []byte // raw 32-byte Curve25519 private key; zeroed after setup
-	WireGuardSubnet  string
-	WireGuardSubnet6 string
-	WireGuardIface   string
+	WireGuardPort     int
+	WireGuardMeshPort int    // server-to-server mesh UDP port (0 = mesh disabled)
+	WireGuardPrivKey  []byte // raw 32-byte Curve25519 private key; zeroed after setup
+	WireGuardSubnet   string
+	WireGuardSubnet6  string
+	WireGuardIface    string
 
 	InternetIface string
 
@@ -181,6 +182,7 @@ func FetchConfig(controllerURL, apiKey, configPath string, insecureSkipVerify bo
 		ServerID:           r.ServerID,
 		PublicIP:           r.ServerIP,
 		WireGuardPort:      r.WireGuardPort,
+		WireGuardMeshPort:  r.WireGuardMeshPort,
 		WireGuardPrivKey:   privKey,
 		WireGuardSubnet:    r.WireGuardSubnet,
 		WireGuardSubnet6:   r.WireGuardSubnet6,

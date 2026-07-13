@@ -141,6 +141,48 @@ func flushWGRules(cfg *Config) {
 	// IPv6 DROP (installed when no v6 subnet is configured)
 	drainRule("ip6tables", "-D", "FORWARD", "-i", wg, "-j", "DROP")
 	drainRule("ip6tables", "-D", "FORWARD", "-o", wg, "-j", "DROP")
+
+	// Server-to-server mesh rules (see addMeshRules).
+	if cfg.WireGuardMeshPort > 0 {
+		meshPort := fmt.Sprintf("%d", cfg.WireGuardMeshPort)
+		mesh := meshIface(cfg)
+		for _, bin := range []string{"iptables", "ip6tables"} {
+			drainRule(bin, "-D", "INPUT", "-p", "udp", "--dport", meshPort, "-j", "ACCEPT")
+		}
+		drainRule("iptables", "-D", "FORWARD", "-i", mesh, "-o", wg, "-j", "ACCEPT")
+		drainRule("iptables", "-D", "FORWARD", "-i", wg, "-o", mesh, "-j", "ACCEPT")
+		drainRule("iptables", "-t", "mangle", "-D", "FORWARD", "-o", mesh,
+			"-p", "tcp", "--tcp-flags", "SYN,RST", "SYN", "-j", "TCPMSS", "--clamp-mss-to-pmtu")
+	}
+}
+
+// addMeshRules installs the firewall rules for the server-to-server mesh:
+// accept inbound mesh WireGuard UDP (both families, since a sibling endpoint may
+// be v4 or v6), forward between the mesh and client interfaces, and clamp TCP
+// MSS so the extra WG hop doesn't fragment. IPv6 cross-server *transit* forward
+// rules are deferred (see R2-7); v4 client subnets are the common case.
+func addMeshRules(cfg *Config) error {
+	if cfg.WireGuardMeshPort == 0 {
+		return nil
+	}
+	mesh := meshIface(cfg)
+	wg := cfg.WireGuardIface
+	portStr := fmt.Sprintf("%d", cfg.WireGuardMeshPort)
+
+	if err := execIPTables("-A", "INPUT", "-p", "udp", "--dport", portStr, "-j", "ACCEPT"); err != nil {
+		return err
+	}
+	if err := execIP6Tables("-A", "INPUT", "-p", "udp", "--dport", portStr, "-j", "ACCEPT"); err != nil {
+		return err
+	}
+	if err := execIPTables("-A", "FORWARD", "-i", mesh, "-o", wg, "-j", "ACCEPT"); err != nil {
+		return err
+	}
+	if err := execIPTables("-A", "FORWARD", "-i", wg, "-o", mesh, "-j", "ACCEPT"); err != nil {
+		return err
+	}
+	return execIPTables("-t", "mangle", "-A", "FORWARD", "-o", mesh,
+		"-p", "tcp", "--tcp-flags", "SYN,RST", "SYN", "-j", "TCPMSS", "--clamp-mss-to-pmtu")
 }
 
 // drainRule runs `bin args...` (with args[0] = "-D ...") repeatedly until it
