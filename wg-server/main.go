@@ -77,6 +77,13 @@ func Init(ctx context.Context, controllerURL, apiKey, configPath string, insecur
 		os.Exit(0)
 	}
 
+	// Drain any of wg-server's OWN leftover iptables rules before the preflight
+	// conflict check. After a crash/ungraceful restart those self-installed
+	// rules would otherwise trip preflight and block startup with the identical
+	// config; flushWGRules deletes only the exact rules wg-server installs, so
+	// preflight still catches genuinely foreign rules touching this config.
+	flushWGRules(cfg)
+
 	if err := preflightIPTables(cfg); err != nil {
 		fmt.Println(err)
 		return
@@ -93,11 +100,27 @@ func Init(ctx context.Context, controllerURL, apiKey, configPath string, insecur
 
 	if err := setupWireGuard(cfg, logLevel); err != nil {
 		ERR("wireguard setup failed: ", err)
+		// setupWireGuard may have already started the flow cleaner before failing.
+		stopFlowCleaner()
+		if wgDevice != nil {
+			wgDevice.Close()
+		}
 		return
 	}
 
 	if err := setupNet(cfg); err != nil {
 		ERR("network setup failed: ", err)
+		// Undo whatever partial rules/device state was created so a retry has a
+		// clean table and no leaked TUN.
+		stopFlowCleaner()
+		cleanupNet(cfg)
+		if wgLazyBind != nil {
+			wgLazyBind.Shutdown()
+		}
+		if wgDevice != nil {
+			wgDevice.Close()
+			wgLazyBind.WipeKeys()
+		}
 		return
 	}
 
@@ -139,6 +162,11 @@ func Init(ctx context.Context, controllerURL, apiKey, configPath string, insecur
 	}
 	if wgDevice != nil {
 		wgDevice.Close()
+	}
+	// Only now that all receive routines have drained is it safe to erase the
+	// server key material (no handleInitiation goroutine can still read it).
+	if wgLazyBind != nil {
+		wgLazyBind.WipeKeys()
 	}
 	stopFlowCleaner()
 	cleanupMesh(cfg)

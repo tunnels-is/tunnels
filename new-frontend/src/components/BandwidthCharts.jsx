@@ -206,7 +206,10 @@ const StatsRow = ({ series, dataKey }) => (
 			const vals = s.rawData.map((d) => d[dataKey])
 			if (vals.length === 0) return null
 			const current = vals[vals.length - 1] || 0
-			const peak = Math.max(...vals)
+			// reduce, not Math.max(...vals): for the 24h/7d ranges vals is the
+			// raw per-second series (hundreds of thousands of points) and the
+			// spread would overflow the call stack (RangeError → blank app).
+			const peak = vals.reduce((m, v) => (v > m ? v : m), 0)
 			const avg = vals.reduce((a, b) => a + b, 0) / vals.length
 			const total = vals.reduce((a, b) => a + b, 0)
 			return (

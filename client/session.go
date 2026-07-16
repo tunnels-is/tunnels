@@ -40,6 +40,13 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		return 400, errors.New("no server id found when connecting")
 	}
 
+	// Only allow connecting through an allowlisted control server, and take its
+	// TLS/port settings from stored config (not the request) — no SSRF to
+	// arbitrary hosts, no request-driven TLS downgrade.
+	if err := authorizeControlServer(ClientCR.Server); err != nil {
+		return 403, err
+	}
+
 	if !IsConnecting.CompareAndSwap(false, true) {
 		INFO("Already connecting to another connection, please wait a moment")
 		return 400, errors.New("Already connecting to another connection, please wait a moment")
@@ -200,6 +207,11 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		wgCfg.WireGuardSubnet, wgCfg.WireGuardSubnet6, wgCfg.WANCIDR); valErr != nil {
 		return 502, valErr
 	}
+	// The port is interpolated into the WireGuard IPC config; validate it can't
+	// carry newlines / injected directives.
+	if valErr := validateWGPort(wgCfg.WireGuardPort); valErr != nil {
+		return 502, valErr
+	}
 
 	ServerReponse := &types.ServerConnectResponse{
 		InterfaceIP:      wgCfg.ServerIP,
@@ -217,7 +229,7 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	// off — it just ignores them. Tell the user their policy is not enforced
 	// instead of letting the UI imply protection.
 	if !wgCfg.EnableFirewall && (len(meta.AllowedHosts) > 0 || !meta.AllowAll) {
-		ERROR("server ", ClientCR.ServerID, " has its peer firewall DISABLED — this tunnel's allowed-hosts policy is NOT enforced")
+		SECURITY("server ", ClientCR.ServerID, " has its peer firewall DISABLED — this tunnel's allowed-hosts policy is NOT enforced")
 	}
 
 	err = InitializeTunnelFromCRR(tunnel)
@@ -544,6 +556,13 @@ type createDeviceWithKeysResult struct {
 }
 
 func CreateDeviceWithKeys(form *CreateDeviceWithKeysForm) (any, int) {
+	// Allowlist the control server and pin its TLS/port from stored config,
+	// so this can't be used to POST to an arbitrary host (SSRF) or over an
+	// unverified TLS connection.
+	if err := authorizeControlServer(form.Server); err != nil {
+		return &ErrorResponse{Error: err.Error()}, 403
+	}
+
 	privKey, err := generateWGPrivKey()
 	if err != nil {
 		return &ErrorResponse{Error: "failed to generate WireGuard private key: " + err.Error()}, 500

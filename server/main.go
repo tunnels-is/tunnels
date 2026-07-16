@@ -81,7 +81,7 @@ func main() {
 
 	if showVersion {
 		fmt.Println(version.Version)
-		os.Exit(1)
+		os.Exit(0)
 	}
 
 	if *showActiveRules {
@@ -197,10 +197,21 @@ func main() {
 		go signal.NewSignal("API", ctx, cancel, 1*time.Second, goroutineLogger, launchAPIServer)
 
 		go signal.NewSignal("CONFIG", ctx, cancel, 30*time.Second, goroutineLogger, func() {
-			err := LoadServerConfig(serverConfigPath)
+			// Validate the reloaded config before swapping it in — otherwise an
+			// edited config with a weak/empty CookieSigningKey or TwoFactorKey
+			// would silently downgrade cookie/2FA crypto at runtime (the startup
+			// check guards only the initial load). Keep the previous config on
+			// failure.
+			C, err := parseServerConfig(serverConfigPath)
 			if err != nil {
 				logger.Error("config could not be loaded", "path", serverConfigPath, slog.Any("err", err))
+				return
 			}
+			if err := validateServerConfig(C); err != nil {
+				logger.Error("reloaded config failed validation; keeping previous config", slog.Any("err", err))
+				return
+			}
+			Config.Store(C)
 		})
 	}
 
@@ -291,11 +302,12 @@ func validateServerConfig(c *types.ServerConfig) error {
 	return nil
 }
 
-func LoadServerConfig(path string) (err error) {
-	var nb []byte
-	nb, err = os.ReadFile(path)
+// parseServerConfig reads and unmarshals the server config WITHOUT storing it,
+// so callers can validate before swapping it in.
+func parseServerConfig(path string) (*types.ServerConfig, error) {
+	nb, err := os.ReadFile(path)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	C := new(types.ServerConfig)
 
@@ -306,19 +318,28 @@ func LoadServerConfig(path string) (err error) {
 	case ".json", "":
 		err = json.Unmarshal(nb, &C)
 	default:
-		return fmt.Errorf("unsupported config file format: %s (supported: .json, .yaml, .yml)", ext)
+		return nil, fmt.Errorf("unsupported config file format: %s (supported: .json, .yaml, .yml)", ext)
 	}
+	if err != nil {
+		return nil, err
+	}
+	return C, nil
+}
 
+func LoadServerConfig(path string) (err error) {
+	C, err := parseServerConfig(path)
 	if err != nil {
 		return err
 	}
 	Config.Store(C)
-	return err
+	return nil
 }
 
 func SaveServerConfig(path string) (err error) {
 	C := Config.Load()
-	f, err := os.Create(path)
+	// 0600: the config holds AdminAPIKey / TwoFactorKey / CookieSigningKey
+	// (AES-key seeds); os.Create's 0644 would expose them to every local user.
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
 		return err
 	}
@@ -375,7 +396,8 @@ func SaveWGConfig(path string) error {
 	if W == nil {
 		return fmt.Errorf("no wg config loaded")
 	}
-	f, err := os.Create(path)
+	// 0600: the wg config carries the per-server X-WG-KEY.
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
 		return err
 	}
@@ -437,8 +459,10 @@ func loadCertificatesAndTLSSettings() (err error) {
 	apiCerts := []tls.Certificate{}
 	keyPems := loadStringSliceKey("KeyPems")
 	CertPems := loadStringSliceKey("CertPems")
+	if len(keyPems) != len(CertPems) {
+		return fmt.Errorf("config KeyPems (%d) and CertPems (%d) must have the same length", len(keyPems), len(CertPems))
+	}
 	for i := range keyPems {
-		fmt.Println(keyPems[i], CertPems[i])
 		tlsc, err := loadKeyPair(keyPems[i], CertPems[i])
 		if err != nil {
 			return err

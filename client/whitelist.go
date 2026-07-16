@@ -19,6 +19,8 @@ func reloadWhiteLists(sleep bool) {
 	if sleep {
 		time.Sleep(1 * time.Hour)
 	}
+	listReloadMu.Lock()
+	defer listReloadMu.Unlock()
 	config := CONFIG.Load()
 
 	if config.DisableBlockLists {

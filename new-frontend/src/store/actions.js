@@ -2,7 +2,6 @@
 // directly for page-local data) — nothing else talks to the network.
 
 import { callController, callMethod, errorMessage } from "@/api/client"
-import { v4 as uuid } from "uuid"
 import { session } from "./session"
 import { useStore } from "./store"
 
@@ -78,13 +77,30 @@ export const fetchState = async () => {
 			timezone: d.Timezone,
 		})
 
-		// First load without a user: pick the only saved account automatically,
-		// or send the user to the account picker.
-		if (!store().user) {
+		// First load without a user: re-select the previously-active account by
+		// its persisted id (the token is never in web storage, so it's re-fetched
+		// from the daemon here), else auto-pick a lone account or show the picker.
+		// Skipped on the login/account routes so "Add Account" and the Login form
+		// aren't immediately bounced away by the auto-select (fetchState is also
+		// called from Login's own mount effect).
+		const hash = window.location.hash
+		const onAuthRoute = hash.startsWith("#/login") || hash.startsWith("#/accounts")
+		// Only redirect to the dashboard when there's no meaningful deep-link to
+		// preserve (fresh open / root). Since `user` is no longer persisted in web
+		// storage, fetchState re-selects the account on every reload; forcing
+		// "#/dashboard" here would bounce a user off whatever authenticated page
+		// (e.g. /tunnels/foo/edit) they just refreshed.
+		const onNoRoute = hash === "" || hash === "#" || hash === "#/"
+		if (!store().user && !onAuthRoute) {
 			const users = await loadUsers()
-			if (users?.length === 1) {
+			const activeID = session.get("activeUserID")
+			const match = activeID && users?.find((u) => u._id === activeID)
+			if (match) {
+				store().setUser(match)
+				if (onNoRoute) window.location.hash = "#/dashboard"
+			} else if (users?.length === 1) {
 				store().setUser(users[0])
-				window.location.hash = "#/dashboard"
+				if (onNoRoute) window.location.hash = "#/dashboard"
 			} else if (users?.length > 0) {
 				useStore.setState({ users })
 				window.location.hash = "#/accounts"
@@ -99,7 +115,9 @@ export const fetchState = async () => {
 
 export const loadUsers = async () => {
 	const resp = await api("getUsers", null, { logout: false, silent: true })
-	return resp.status === 200 ? resp.data : undefined
+	// Always return an array so callers' .find/.length can't throw on an
+	// unexpected backend shape.
+	return resp.status === 200 && Array.isArray(resp.data) ? resp.data : []
 }
 
 export const fetchUsers = async () => {
@@ -164,11 +182,16 @@ export const logoutCurrentToken = () => logoutToken(store().user?.DeviceToken, f
 export const logoutAllTokens = () => logoutToken(store().user?.DeviceToken, true)
 
 export const refreshApiKey = async () => {
-	const user = { ...store().user, APIKey: uuid() }
-	const resp = await controller("/client/user/update", { APIKey: user.APIKey })
-	if (resp.status === 200) {
-		store().setUser(user)
+	// The server generates the key now (the client no longer chooses its own
+	// secret); we send a non-empty sentinel to request one and use what's
+	// returned.
+	const resp = await controller("/client/user/update", { APIKey: "generate" })
+	if (resp.status === 200 && resp.data?.APIKey) {
+		store().setUser({ ...store().user, APIKey: resp.data.APIKey })
 		store().notifySuccess("User updated")
+	} else if (resp.status === 200) {
+		// Server didn't echo a key — don't blank the displayed one.
+		store().notifyError("Key refresh returned no key")
 	}
 }
 
@@ -243,7 +266,7 @@ export const connect = async (tunnel, server) => {
 	const user = store().user
 	if (!user?.DeviceToken) {
 		store().notifyError("You are not logged in")
-		session.clear()
+		finalizeLogout() // clear state + route to login (don't leave a stale user)
 		return
 	}
 	if (!server) server = store().servers.find((s) => s._id === tunnel?.ServerID)
@@ -276,7 +299,7 @@ export const connectServer = async (server) => {
 	const user = store().user
 	if (!user?.DeviceToken) {
 		store().notifyError("You are not logged in")
-		session.clear()
+		finalizeLogout() // clear state + route to login (don't leave a stale user)
 		return
 	}
 	if (!server) {
@@ -300,7 +323,9 @@ export const connectServer = async (server) => {
 
 export const disconnect = async (activeTunnel) => {
 	store().showLoading("Disconnecting...")
-	const resp = await api("disconnect", { ID: activeTunnel.ID }, { timeout: 20000 })
+	// Send Tag too: the live ID churns across auto-reconnects, so Tag lets the
+	// client stop exactly this tunnel's reconnect loop / kill switch.
+	const resp = await api("disconnect", { ID: activeTunnel.ID, Tag: activeTunnel.CR?.Tag }, { timeout: 20000 })
 	store().hideLoading()
 	if (resp.status === 200) store().notifySuccess("Disconnected from " + (activeTunnel.CR?.Tag || "tunnel"))
 	await fetchState()
@@ -323,7 +348,12 @@ export const fetchServers = async () => {
 
 let configSaveInProgress = false
 export const saveConfig = async (next) => {
-	if (configSaveInProgress) return false
+	if (configSaveInProgress) {
+		// Without feedback the second of two quick toggles is silently dropped and
+		// the user thinks it saved. Tell them to retry after the in-flight save.
+		store().notifyError("A config save is already in progress — please retry in a moment")
+		return false
+	}
 	configSaveInProgress = true
 	const config = next || store().config
 	try {

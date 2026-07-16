@@ -8,12 +8,13 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/tunnels-is/tunnels/types"
 )
 
-func setupWGTest(t *testing.T) string {
+func setupWGTest(t *testing.T) (string, uuid.UUID) {
 	t.Helper()
 	setupTestDB(t)
 	if logger == nil {
@@ -28,18 +29,36 @@ func setupWGTest(t *testing.T) string {
 	if err := BBolt_CreateServer(s); err != nil {
 		t.Fatal(err)
 	}
-	return apiKey
+	return apiKey, s.ID
 }
 
 func makeWGKey() string {
 	return base64.StdEncoding.EncodeToString(make([]byte, 32))
 }
 
-func seedDevice(t *testing.T, wgKey string) *types.Device {
+// seedEnabledUser creates an enabled, non-expired, group-less user and returns
+// its ID — the owner that /wg/peers scoping requires for a device to be served.
+func seedEnabledUser(t *testing.T) uuid.UUID {
+	t.Helper()
+	u := &User{
+		ID:            uuid.New(),
+		Email:         uuid.NewString() + "@test.local",
+		SubExpiration: time.Now().Add(24 * time.Hour),
+	}
+	if err := BBolt_CreateUser(u); err != nil {
+		t.Fatal(err)
+	}
+	return u.ID
+}
+
+// seedDevice creates a device bound to serverID with a fresh enabled owner, so
+// it passes the /wg/peers server/group/account scoping.
+func seedDevice(t *testing.T, wgKey string, serverID uuid.UUID) *types.Device {
 	t.Helper()
 	d := &types.Device{
 		ID:           uuid.New(),
-		UserID:       uuid.New(),
+		UserID:       seedEnabledUser(t),
+		ServerID:     serverID,
 		WireGuardKey: wgKey,
 		WireGuardIP:  "10.0.0.5",
 	}
@@ -87,7 +106,7 @@ func TestAPI_WGPeers_Unauthorized(t *testing.T) {
 }
 
 func TestAPI_WGPeers_BadLimit(t *testing.T) {
-	apiKey := setupWGTest(t)
+	apiKey, _ := setupWGTest(t)
 	for _, bad := range []string{"?limit=abc", "?limit=0", "?limit=-3"} {
 		w, _ := callWGPeers(t, apiKey, bad)
 		if w.Code != http.StatusBadRequest {
@@ -97,7 +116,7 @@ func TestAPI_WGPeers_BadLimit(t *testing.T) {
 }
 
 func TestAPI_WGPeers_BadOffset(t *testing.T) {
-	apiKey := setupWGTest(t)
+	apiKey, _ := setupWGTest(t)
 	for _, bad := range []string{"?offset=abc", "?offset=-1"} {
 		w, _ := callWGPeers(t, apiKey, bad)
 		if w.Code != http.StatusBadRequest {
@@ -107,7 +126,7 @@ func TestAPI_WGPeers_BadOffset(t *testing.T) {
 }
 
 func TestAPI_WGPeers_EmptyDB(t *testing.T) {
-	apiKey := setupWGTest(t)
+	apiKey, _ := setupWGTest(t)
 	w, resp := callWGPeers(t, apiKey, "?limit=10")
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", w.Code)
@@ -124,7 +143,7 @@ func TestAPI_WGPeers_EmptyDB(t *testing.T) {
 }
 
 func TestAPI_WGPeers_DefaultLimit(t *testing.T) {
-	apiKey := setupWGTest(t)
+	apiKey, _ := setupWGTest(t)
 	w, resp := callWGPeers(t, apiKey, "")
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", w.Code)
@@ -135,7 +154,7 @@ func TestAPI_WGPeers_DefaultLimit(t *testing.T) {
 }
 
 func TestAPI_WGPeers_MaxLimitCap(t *testing.T) {
-	apiKey := setupWGTest(t)
+	apiKey, _ := setupWGTest(t)
 	_, resp := callWGPeers(t, apiKey, "?limit=99999")
 	if resp.Limit != wgPeersMaxLimit {
 		t.Fatalf("expected cap %d, got %d", wgPeersMaxLimit, resp.Limit)
@@ -143,9 +162,9 @@ func TestAPI_WGPeers_MaxLimitCap(t *testing.T) {
 }
 
 func TestAPI_WGPeers_SinglePage(t *testing.T) {
-	apiKey := setupWGTest(t)
+	apiKey, srvID := setupWGTest(t)
 	for i := 0; i < 5; i++ {
-		seedDevice(t, uniqueWGKey(i))
+		seedDevice(t, uniqueWGKey(i), srvID)
 	}
 
 	_, resp := callWGPeers(t, apiKey, "?limit=10")
@@ -158,9 +177,9 @@ func TestAPI_WGPeers_SinglePage(t *testing.T) {
 }
 
 func TestAPI_WGPeers_Pagination(t *testing.T) {
-	apiKey := setupWGTest(t)
+	apiKey, srvID := setupWGTest(t)
 	for i := 0; i < 7; i++ {
-		seedDevice(t, uniqueWGKey(i))
+		seedDevice(t, uniqueWGKey(i), srvID)
 	}
 
 	seenIDs := make(map[string]int)
@@ -203,16 +222,17 @@ func TestAPI_WGPeers_Pagination(t *testing.T) {
 }
 
 func TestAPI_WGPeers_SkipsEmptyAndInvalidKeys(t *testing.T) {
-	apiKey := setupWGTest(t)
+	apiKey, srvID := setupWGTest(t)
 
-	good := seedDevice(t, uniqueWGKey(1))
-	// Empty WireGuardKey: still in the devices bucket, but excluded from Peers.
-	if err := BBolt_CreateDevice(&types.Device{ID: uuid.New(), UserID: uuid.New()}); err != nil {
+	good := seedDevice(t, uniqueWGKey(1), srvID)
+	// Empty WireGuardKey: bound to the server with a valid owner so it reaches
+	// (and is excluded by) the empty-key filter rather than the scoping filter.
+	if err := BBolt_CreateDevice(&types.Device{ID: uuid.New(), UserID: seedEnabledUser(t), ServerID: srvID}); err != nil {
 		t.Fatal(err)
 	}
-	// Non-32-byte WireGuardKey: included by cursor, filtered by b64KeyToHex.
+	// Non-32-byte WireGuardKey: reaches (and is filtered by) b64KeyToHex.
 	if err := BBolt_CreateDevice(&types.Device{
-		ID: uuid.New(), UserID: uuid.New(),
+		ID: uuid.New(), UserID: seedEnabledUser(t), ServerID: srvID,
 		WireGuardKey: base64.StdEncoding.EncodeToString([]byte("too-short")),
 	}); err != nil {
 		t.Fatal(err)
@@ -232,10 +252,10 @@ func TestAPI_WGPeers_SkipsEmptyAndInvalidKeys(t *testing.T) {
 }
 
 func TestAPI_WGPeers_PartialPageEndsPagination(t *testing.T) {
-	apiKey := setupWGTest(t)
+	apiKey, srvID := setupWGTest(t)
 	// 3 devices, limit=2: first page is full, second page has 1, then done.
 	for i := 0; i < 3; i++ {
-		seedDevice(t, uniqueWGKey(i))
+		seedDevice(t, uniqueWGKey(i), srvID)
 	}
 
 	_, page1 := callWGPeers(t, apiKey, "?limit=2")

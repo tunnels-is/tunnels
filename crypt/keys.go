@@ -114,12 +114,17 @@ func VerifySignature(data []byte, signature []byte, key any) error {
 		if err != nil {
 			return fmt.Errorf("rsa signature verification failed: %w", err)
 		}
+		return nil
 	} else if ecKey != nil {
 		ok := ecdsa.VerifyASN1(ecKey, hashed[:], signature)
 		if !ok {
 			return fmt.Errorf("ec signature verification failed")
 		}
-
+		return nil
 	}
-	return nil
+
+	// Fail closed: an unrecognized/nil key type must never be treated as a
+	// valid signature. Returning nil here would make VerifySignature pass for
+	// any input whenever the caller supplied the wrong key type.
+	return fmt.Errorf("no valid public key found for signature verification")
 }

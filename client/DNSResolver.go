@@ -206,8 +206,8 @@ func ProcessDNSMsg(m *dns.Msg, DNS *types.DNSRecord) (rm *dns.Msg) {
 				for ii := range DNS.IP {
 					rm.Answer = append(rm.Answer, &dns.A{
 						Hdr: dns.RR_Header{
-							Class:  dns.TypeA,
-							Rrtype: dns.ClassINET,
+							Rrtype: dns.TypeA,
+							Class:  dns.ClassINET,
 							Name:   rm.Question[i].Name,
 							Ttl:    5,
 						},
@@ -220,8 +220,8 @@ func ProcessDNSMsg(m *dns.Msg, DNS *types.DNSRecord) (rm *dns.Msg) {
 				for ii := range DNS.TXT {
 					rm.Answer = append(rm.Answer, &dns.TXT{
 						Hdr: dns.RR_Header{
-							Class:  dns.ClassNONE,
 							Rrtype: dns.TypeTXT,
+							Class:  dns.ClassINET,
 							Name:   rm.Question[i].Name,
 							Ttl:    30,
 						},
@@ -337,9 +337,15 @@ func DNSQuery(w dns.ResponseWriter, m *dns.Msg) {
 		}
 
 		if !hasInfo {
-			DEBUG("Redirect DNS to VPN: ", m.Question[0].Name)
-			ResolveDomainLocal(DNSTunnel, m, w)
-			return
+			// DNSTunnel is only set when the record came from a tunnel's
+			// ServerResponse; a record from the global config leaves it nil, and
+			// ResolveDomainLocal dereferences tun.ServerResponse. Fall through to
+			// normal resolution instead of panicking.
+			if DNSTunnel != nil {
+				DEBUG("Redirect DNS to VPN: ", m.Question[0].Name)
+				ResolveDomainLocal(DNSTunnel, m, w)
+				return
+			}
 		}
 
 		if conf.LogAllDomains {
@@ -553,12 +559,21 @@ func ResolveDNSAsHTTPS(m *dns.Msg, w dns.ResponseWriter) (err error) {
 
 		if err != nil {
 			if resp != nil {
+				resp.Body.Close()
 				ERROR("unable to query dns over https: ", m.Question[0].Name, " code: ", resp.StatusCode)
 			} else {
 				ERROR("unable to query dns over https: ", m.Question[0].Name, " err: ", err)
 			}
 			return err
 		}
+	}
+	// Always close the body — without this every DoH query leaks a connection
+	// (the transport can't reuse it and it stays pinned until IdleConnTimeout).
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		ERROR("dns over https: non-200 from ", server, ": ", resp.StatusCode)
+		return fmt.Errorf("dns over https status %d", resp.StatusCode)
 	}
 
 	bb, err := io.ReadAll(io.LimitReader(resp.Body, maxDoHResponseSize))

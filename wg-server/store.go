@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net"
 	"net/netip"
-	"sort"
 	"sync"
 )
 
@@ -132,24 +131,25 @@ func (ps *PeerStore) nextIP() (string, error) {
 		return "", fmt.Errorf("invalid subnet %q: %w", ps.subnet, err)
 	}
 
-	used := make([]uint32, 0, len(ps.records))
+	used := make(map[uint32]bool, len(ps.records))
 	for _, rec := range ps.records {
 		if ip := net.ParseIP(rec.IP).To4(); ip != nil && ipNet.Contains(ip) {
-			used = append(used, storeIPToUint32(ip))
+			used[storeIPToUint32(ip)] = true
 		}
 	}
-	sort.Slice(used, func(i, j int) bool { return used[i] < used[j] })
 
-	base := storeIPToUint32(ipNet.IP.To4()) + 2
-	if len(used) > 0 && used[len(used)-1] >= base {
-		base = used[len(used)-1] + 1
+	// Allocate the lowest free address (skip network + server address). Scanning
+	// for the lowest gap — rather than max+1 — reuses addresses freed by
+	// revocation, so churn doesn't exhaust the subnet prematurely.
+	for candidate := storeIPToUint32(ipNet.IP.To4()) + 2; ; candidate++ {
+		next := storeUint32ToIP(candidate)
+		if !ipNet.Contains(next) {
+			return "", fmt.Errorf("WireGuard subnet %s is exhausted", ps.subnet)
+		}
+		if !used[candidate] {
+			return next.String(), nil
+		}
 	}
-
-	next := storeUint32ToIP(base)
-	if !ipNet.Contains(next) {
-		return "", fmt.Errorf("WireGuard subnet %s is exhausted", ps.subnet)
-	}
-	return next.String(), nil
 }
 
 func (ps *PeerStore) nextIPv6() (string, error) {

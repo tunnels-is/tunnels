@@ -51,3 +51,16 @@ func validateWGServerConfig(ip, serverIP, subnet, subnet6, wanCIDR string) error
 	}
 	return nil
 }
+
+// validateWGPort rejects a non-numeric or out-of-range WireGuard port. The port
+// is interpolated into the line-oriented WireGuard IPC config
+// ("endpoint=<ip>:<port>\n..."), so a value containing a newline from a
+// compromised/allowlisted controller could inject extra IPC directives (peers,
+// allowed-ips). Requiring a plain 1–65535 integer closes that.
+func validateWGPort(port string) error {
+	n, err := strconv.ParseUint(port, 10, 16)
+	if err != nil || n == 0 {
+		return fmt.Errorf("controller returned an invalid WireGuard port %q", port)
+	}
+	return nil
+}

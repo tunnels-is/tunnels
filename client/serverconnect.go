@@ -22,6 +22,14 @@ func ServerConnect(cr *ConnectionRequest) (int, error) {
 		ERROR("No server id found when connecting: ", cr)
 		return 400, errors.New("no server id found when connecting")
 	}
+	// Gate the control server BEFORE reconcileDefaultDevice, which sends the
+	// device token/UserID to cr.Server. cr.Server comes from the local-API
+	// request body, so without this an attacker host could be named here and the
+	// credentials POSTed to it — PublicConnect's own authorizeControlServer check
+	// runs too late to protect the reconcile step.
+	if err := authorizeControlServer(cr.Server); err != nil {
+		return 403, err
+	}
 	cr.Tag = DefaultTunnelName
 	reconcileDefaultDevice(cr)
 	return PublicConnect(cr)

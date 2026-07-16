@@ -121,6 +121,25 @@ func ERROR(Line ...any) {
 	}
 }
 
+// SECURITY logs a security-relevant warning that must NOT be suppressed by the
+// debug-logging flag (unlike ERROR/INFO). It writes straight to stdout and, if
+// possible, also enqueues to the in-app log stream. Use for things the operator
+// must see regardless of log level — e.g. TLS verification disabled, firewall
+// off.
+func SECURITY(Line ...any) {
+	x := ""
+	for _, v := range Line {
+		x += fmt.Sprintf("%v ", v)
+	}
+	msg := fmt.Sprintf("%s || SECURITY || %s || %s",
+		time.Now().Format("01-02 15:04:05"), GET_FUNC(3), x)
+	log.Println(msg)
+	select {
+	case LogQueue <- msg:
+	default:
+	}
+}
+
 func INFO(Line ...any) {
 	conf := CONFIG.Load()
 	state := STATE.Load()

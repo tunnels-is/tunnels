@@ -166,13 +166,11 @@ func (S *SEAL) CreateAEAD(sharedSecret []byte) (err error) {
 	return
 }
 
-func (S *SEAL) Encrypt1(data []byte) []byte {
-	return S.AEAD1.Seal(nil, S.Nonce1, data, nil)
-}
-
-func (S *SEAL) Encrypt2(data []byte, staging []byte) []byte {
-	return S.AEAD2.Seal(nil, S.Nonce2, data, nil)
-}
+// NOTE: use Seal1/Seal2 for encryption — they derive a fresh per-message nonce
+// from an atomic counter. The previous Encrypt1/Encrypt2 helpers sealed with the
+// fixed all-zero S.Nonce1/S.Nonce2, so every message under a given SEAL reused
+// the same (key, nonce) pair — catastrophic for AES-GCM/ChaCha20-Poly1305. They
+// were unused and have been removed to prevent accidental adoption.
 
 func (S *SEAL) Seal1(data []byte, index []byte) (out []byte) {
 	n := make([]byte, S.Nonce1Len)

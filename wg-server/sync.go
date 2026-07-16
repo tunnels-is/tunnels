@@ -78,14 +78,16 @@ func reconcilePeer(pubKeyB64 string) authResult {
 		}
 	}
 
+	// Install the firewall slot BEFORE adding the peer to the wg device, so the
+	// slot exists the instant the peer can pass traffic. Reset only on a fresh
+	// add — a rekey/reconnect of an already-installed peer must not wipe the
+	// allowlist it announced after connecting.
+	if _, rekey := addedPeerKeys.LoadOrStore(hexKey, struct{}{}); !rekey {
+		resetPeer(ip, ipv6)
+	}
 	if err := AddPeer(hexKey, peerAllowedIPs(ip, ipv6)...); err != nil {
 		WARN("reconcilePeer: AddPeer failed: ", err)
 		return authUnknown
-	}
-	// Reset firewall state only on a fresh add — a rekey/reconnect of an already
-	// installed peer must not wipe the allowlist it announced after connecting.
-	if _, rekey := addedPeerKeys.LoadOrStore(hexKey, struct{}{}); !rekey {
-		resetPeer(ip, ipv6)
 	}
 	INFO("reconcilePeer: authorized → ", pubKeyB64[:12], "… ip=", ip)
 	return authAllowed

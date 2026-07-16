@@ -1,6 +1,7 @@
 cmd/service/service
 
 frontend/dist/
+new-frontend/dist/
 
 */server.crt
 server.crt

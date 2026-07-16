@@ -12,8 +12,9 @@ import (
 const (
 	msgInitiation byte = 1
 
-	syncDebounce = 30 * time.Second
-	maxSeenIPs   = 200_000
+	// maxRateWindowIPs caps the per-source-IP handshake rate-limiter map so a
+	// spoofed-source flood can't grow it without bound.
+	maxRateWindowIPs = 200_000
 
 	// maxConcurrentHandshakes caps the number of in-flight handleInitiation
 	// goroutines (each may cost an X25519 + a controller round-trip). Excess
@@ -55,17 +56,24 @@ type LazyBind struct {
 	serverPriv []byte
 	serverPub  []byte
 
-	mu      sync.Mutex
-	seenIPs map[netip.Addr]time.Time
-
 	rateMu     sync.Mutex
 	ratePerIP  int
 	rateWindow map[netip.Addr]*ipRate
 
 	// handshakeSem bounds concurrent handleInitiation goroutines (global
-	// handshake budget, not just per-IP).
+	// handshake budget, not just per-IP). handshakeWG tracks those same
+	// goroutines so WipeKeys can wait for every in-flight one to finish reading
+	// serverPriv/serverPub before it zeroes them — wgDevice.Close() only drains
+	// wireguard-go's own receive routines, not the goroutines we spawn from
+	// inside wrapReceive.
 	handshakeSem chan struct{}
+	handshakeWG  sync.WaitGroup
 
+	// deniedKeys debounces controller lookups per PUBKEY for a revoked/unknown
+	// key so a flood of reconnect attempts for it doesn't hammer the controller.
+	// Allowed keys are intentionally NOT cached: every handshake for an allowed
+	// pubkey re-checks the controller so a revocation takes effect on the peer's
+	// very next handshake (reconnect or rekey), regardless of NAT/shared IPs.
 	deniedMu   sync.Mutex
 	deniedKeys map[string]time.Time
 }
@@ -77,7 +85,6 @@ func NewLazyBind(inner conn.Bind, serverPriv, serverPub []byte, bufferSize, rate
 		done:         make(chan struct{}),
 		serverPriv:   serverPriv,
 		serverPub:    serverPub,
-		seenIPs:      make(map[netip.Addr]time.Time),
 		ratePerIP:    ratePerIP,
 		rateWindow:   make(map[netip.Addr]*ipRate),
 		handshakeSem: make(chan struct{}, maxConcurrentHandshakes),
@@ -123,15 +130,26 @@ func (b *LazyBind) Close() error {
 	return b.inner.Close()
 }
 
-// Shutdown performs the final teardown: signals the reinject goroutine to exit
-// and wipes key material from memory. Call this exactly once when the wg-server
-// process is exiting.
+// Shutdown signals the reinject goroutine to exit so wgDevice.Close() can drain
+// the receive routines. It does NOT wipe key material — a handshake may still be
+// in flight in handleInitiation, which reads serverPriv/serverPub; zeroing here
+// would be a data race and a wrong X25519. Call WipeKeys() after wgDevice.Close()
+// returns (all receive routines drained) to erase the keys. Call exactly once.
 func (b *LazyBind) Shutdown() {
 	b.closeOnce.Do(func() {
 		close(b.done)
-		zeroBytes(b.serverPriv)
-		zeroBytes(b.serverPub)
 	})
+}
+
+// WipeKeys erases the server key material. Call after wgDevice.Close() has
+// returned (all receive routines drained, so no new handleInitiation goroutine
+// can be spawned). It waits for any already-spawned handleInitiation goroutine
+// to finish — those read serverPriv/serverPub and are NOT tracked by
+// wgDevice.Close(), so without this wait the zeroing races the X25519.
+func (b *LazyBind) WipeKeys() {
+	b.handshakeWG.Wait()
+	zeroBytes(b.serverPriv)
+	zeroBytes(b.serverPub)
 }
 
 func (b *LazyBind) SetMark(mark uint32) error                     { return b.inner.SetMark(mark) }
@@ -156,7 +174,7 @@ func (b *LazyBind) handshakeRateAllowed(ip netip.Addr) bool {
 	}
 
 	// New IP: sweep expired windows opportunistically and hard-cap the map
-	// (mirrors seenIPs) so a spoofed-source flood cannot grow it without bound.
+	// (mirrors the denied/allowed caps) so a spoofed-source flood cannot grow it without bound.
 	if len(b.rateWindow) > 1000 {
 		for k, v := range b.rateWindow {
 			if now.Sub(v.start) >= time.Second {
@@ -164,7 +182,7 @@ func (b *LazyBind) handshakeRateAllowed(ip netip.Addr) bool {
 			}
 		}
 	}
-	if len(b.rateWindow) >= maxSeenIPs {
+	if len(b.rateWindow) >= maxRateWindowIPs {
 		return false
 	}
 	b.rateWindow[ip] = &ipRate{count: 1, start: now}
@@ -198,8 +216,14 @@ func (b *LazyBind) noteDenied(pubKeyB64 string) {
 			}
 		}
 	}
-	if len(b.deniedKeys) >= maxDeniedKeys {
-		return
+	// If still at capacity after sweeping expired entries (a flood of distinct
+	// fresh keys), evict entries to make room instead of refusing to record —
+	// refusing would let every subsequent handshake re-hit the controller.
+	for len(b.deniedKeys) >= maxDeniedKeys {
+		for k := range b.deniedKeys {
+			delete(b.deniedKeys, k)
+			break
+		}
 	}
 	b.deniedKeys[pubKeyB64] = time.Now()
 }
@@ -226,26 +250,32 @@ func (b *LazyBind) wrapReceive(inner conn.ReceiveFunc) conn.ReceiveFunc {
 					WARN("LazyBind: handshake rate limit exceeded for ", srcIP)
 					continue
 				}
-				if b.shouldSync(srcIP) {
-					// Global concurrency budget: past the cap the handshake is
-					// dropped (client retries) instead of spawning an unbounded
-					// number of goroutines.
-					select {
-					case b.handshakeSem <- struct{}{}:
-						pkt := &bufferedPkt{
-							data: make([]byte, len(data)),
-							ep:   eps[i],
-						}
-						copy(pkt.data, data)
-						go func() {
-							defer func() { <-b.handshakeSem }()
-							b.handleInitiation(pkt)
-						}()
-					default:
-						WARN("LazyBind: handshake concurrency limit reached, dropping packet")
+				// Every mac1-valid, rate-allowed handshake goes through
+				// handleInitiation so authorization is re-checked per PUBKEY
+				// (the pubkey isn't known until after the X25519 inside). The
+				// concurrency budget bounds cost; the per-pubkey allowed/denied
+				// caches bound controller load. Past the cap the packet is
+				// dropped and the client retries.
+				select {
+				case b.handshakeSem <- struct{}{}:
+					pkt := &bufferedPkt{
+						data: make([]byte, len(data)),
+						ep:   eps[i],
 					}
-					continue
+					copy(pkt.data, data)
+					// Add before spawning; WipeKeys waits on this group. Safe from
+					// Add-after-Wait because wgDevice.Close() stops these receive
+					// routines (no more wrapReceive calls) before WipeKeys runs.
+					b.handshakeWG.Add(1)
+					go func() {
+						defer b.handshakeWG.Done()
+						defer func() { <-b.handshakeSem }()
+						b.handleInitiation(pkt)
+					}()
+				default:
+					WARN("LazyBind: handshake concurrency limit reached, dropping packet")
 				}
+				continue
 			}
 
 			if out != i {
@@ -323,30 +353,6 @@ func (b *LazyBind) handleInitiation(pkt *bufferedPkt) {
 		// an already-installed peer's handshake can still complete.
 		b.requeue(pkt)
 	}
-}
-
-func (b *LazyBind) shouldSync(ip netip.Addr) bool {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
-	if t, ok := b.seenIPs[ip]; ok && time.Since(t) < syncDebounce {
-		return false
-	}
-
-	if len(b.seenIPs) > 1000 {
-		for k, t := range b.seenIPs {
-			if time.Since(t) >= syncDebounce {
-				delete(b.seenIPs, k)
-			}
-		}
-	}
-
-	if len(b.seenIPs) >= maxSeenIPs {
-		return false
-	}
-
-	b.seenIPs[ip] = time.Now()
-	return true
 }
 
 func isHandshakeInit(pkt []byte) bool {

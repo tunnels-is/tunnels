@@ -2,7 +2,6 @@ package client
 
 import (
 	"net"
-	"strings"
 )
 
 func inc(ip net.IP) {
@@ -27,6 +26,7 @@ func (V *TUN) TransLateIP(ip [4]byte) ([4]byte, bool) {
 	}
 
 	var newIP [4]byte
+	matched := false
 	for _, v := range V.ServerResponse.Networks {
 		if v.Nat == "" {
 			continue
@@ -36,25 +36,31 @@ func (V *TUN) TransLateIP(ip [4]byte) ([4]byte, bool) {
 			continue
 		}
 
-		if strings.HasSuffix(v.Network, "/32") {
-			for i := range 4 {
-				newIP[i] = v.NetIPNet.IP[i]&v.NetIPNet.Mask[i] | ip[i]&^v.NetIPNet.Mask[i]
-			}
-		} else {
-			for i := range 3 {
-				newIP[i] = v.NetIPNet.IP[i]&v.NetIPNet.Mask[i] | ip[i]&^v.NetIPNet.Mask[i]
-			}
-			newIP[3] = ip[3]
+		// Remap host bits into the target network: for each octet take the
+		// network bits from NetIPNet and the host bits from the original IP.
+		// This masked formula is correct for ANY prefix length (/8, /16, /24,
+		// /25..31, /32) — the previous /32-vs-else special-casing mishandled
+		// prefixes /25..31 by hardcoding the last octet.
+		// The NAT source (Nat) is IPv4 (ip is 4 bytes), so the target Network must
+		// be IPv4 too. If a misconfigured tunnel pairs it with a non-IPv4 Network,
+		// To4() is nil — skip rather than panic on net4[i] for every egress packet.
+		net4 := v.NetIPNet.IP.To4()
+		if net4 == nil || len(v.NetIPNet.Mask) != 4 {
+			continue
+		}
+		for i := range 4 {
+			newIP[i] = net4[i]&v.NetIPNet.Mask[i] | ip[i]&^v.NetIPNet.Mask[i]
 		}
 
 		V.natMu.Lock()
 		V.NATEgress[ip] = newIP
 		V.NATIngress[newIP] = ip
 		V.natMu.Unlock()
+		matched = true
 		break
 	}
 
-	if newIP == [4]byte{0, 0, 0, 0} {
+	if !matched {
 		newIP = ip
 	}
 

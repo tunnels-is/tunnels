@@ -312,6 +312,12 @@ func BBolt_CreateUser(U *User) error {
 	return BBoltDB.Update(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(USERS_BUCKET))
 		id := U.ID.String()
+		// Enforce email uniqueness inside the write transaction so two
+		// concurrent registrations with the same email can't both succeed.
+		emailIdx := tx.Bucket([]byte(USERS_EMAIL_INDEX))
+		if existing := emailIdx.Get([]byte(U.Email)); existing != nil {
+			return errors.New("email already registered")
+		}
 		data, err := bboltMarshal(U)
 		if err != nil {
 			return err
@@ -319,7 +325,7 @@ func BBolt_CreateUser(U *User) error {
 		if err := b.Put([]byte(id), data); err != nil {
 			return err
 		}
-		if err := tx.Bucket([]byte(USERS_EMAIL_INDEX)).Put([]byte(U.Email), []byte(id)); err != nil {
+		if err := emailIdx.Put([]byte(U.Email), []byte(id)); err != nil {
 			return err
 		}
 		if U.APIKey != "" {
@@ -444,7 +450,14 @@ func BBolt_updateUserAdmin(UF *USER_ADMIN_UPDATE_FORM) error {
 
 		oldEmail := U.Email
 
-		if UF.Email != "" {
+		if UF.Email != "" && UF.Email != oldEmail {
+			// Refuse to repoint the email index onto an address another account
+			// already owns — that would orphan the other account (it could no
+			// longer log in or reset by email).
+			emailIdx := tx.Bucket([]byte(USERS_EMAIL_INDEX))
+			if existing := emailIdx.Get([]byte(UF.Email)); existing != nil {
+				return errors.New("email already in use by another account")
+			}
 			U.Email = UF.Email
 		}
 
@@ -474,6 +487,30 @@ func BBolt_updateUserAdmin(UF *USER_ADMIN_UPDATE_FORM) error {
 		}
 
 		return nil
+	})
+}
+
+// BBolt_updateUserRecoveryCodes replaces the encrypted recovery-code blob for a
+// user. Used to consume a recovery code after it is redeemed at login so it
+// can't be reused.
+func BBolt_updateUserRecoveryCodes(uid uuid.UUID, codes []byte) error {
+	return BBoltDB.Update(func(tx *gobolt.Tx) error {
+		b := tx.Bucket([]byte(USERS_BUCKET))
+		id := uid.String()
+		v := b.Get([]byte(id))
+		if v == nil {
+			return errors.New("user not found")
+		}
+		U := new(User)
+		if err := bboltUnmarshal(v, U); err != nil {
+			return err
+		}
+		U.RecoveryCodes = codes
+		data, err := bboltMarshal(U)
+		if err != nil {
+			return err
+		}
+		return b.Put([]byte(id), data)
 	})
 }
 
@@ -594,6 +631,9 @@ func BBolt_FindEntitiesByGroupID(id string, objType string, limit, offset int64)
 		b := tx.Bucket([]byte(bucket))
 		c := b.Cursor()
 		var skipped int64
+		// Labeled so the limit check breaks the CURSOR loop, not just the inner
+		// switch — otherwise the whole bucket is scanned on every call.
+	cursorLoop:
 		for _, v := c.First(); v != nil; _, v = c.Next() {
 			var match bool
 			switch objType {
@@ -609,7 +649,7 @@ func BBolt_FindEntitiesByGroupID(id string, objType string, limit, offset int64)
 							continue
 						}
 						if int64(len(IL)) >= limit {
-							break
+							break cursorLoop
 						}
 						IL = append(IL, E)
 					}
@@ -626,7 +666,7 @@ func BBolt_FindEntitiesByGroupID(id string, objType string, limit, offset int64)
 							continue
 						}
 						if int64(len(IL)) >= limit {
-							break
+							break cursorLoop
 						}
 						IL = append(IL, E)
 					}
@@ -904,8 +944,74 @@ func BBolt_findGroupByID(id string) (*Group, error) {
 
 func BBolt_DeleteGroupByID(id string) error {
 	return BBoltDB.Update(func(tx *gobolt.Tx) error {
-		b := tx.Bucket([]byte(GROUPS_BUCKET))
-		return b.Delete([]byte(id))
+		// Group membership is stored redundantly on each entity (User.Groups /
+		// Server.Groups). Deleting only the group record would leave those UUIDs
+		// dangling, so hasSharedOrNoGroup would still match and access would
+		// persist. Scrub the group from every user and server first.
+		scrub := func(bucketName string, unmarshalGroups func([]byte) ([]string, any, error), rebuild func(any, []string) ([]byte, error)) error {
+			b := tx.Bucket([]byte(bucketName))
+			type upd struct {
+				key  []byte
+				data []byte
+			}
+			var updates []upd
+			c := b.Cursor()
+			for k, v := c.First(); k != nil; k, v = c.Next() {
+				groups, obj, err := unmarshalGroups(v)
+				if err != nil {
+					continue
+				}
+				newGroups := removeString(groups, id)
+				if len(newGroups) == len(groups) {
+					continue // group not present
+				}
+				data, err := rebuild(obj, newGroups)
+				if err != nil {
+					return err
+				}
+				updates = append(updates, upd{append([]byte(nil), k...), data})
+			}
+			for _, u := range updates {
+				if err := b.Put(u.key, u.data); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+
+		if err := scrub(USERS_BUCKET,
+			func(v []byte) ([]string, any, error) {
+				U := new(User)
+				if err := bboltUnmarshal(v, U); err != nil {
+					return nil, nil, err
+				}
+				return uuidSliceToString(U.Groups), U, nil
+			},
+			func(obj any, g []string) ([]byte, error) {
+				U := obj.(*User)
+				U.Groups = stringSliceToUUID(g)
+				return bboltMarshal(U)
+			}); err != nil {
+			return err
+		}
+
+		if err := scrub(SERVERS_BUCKET,
+			func(v []byte) ([]string, any, error) {
+				S := new(types.Server)
+				if err := bboltUnmarshal(v, S); err != nil {
+					return nil, nil, err
+				}
+				return uuidSliceToString(S.Groups), S, nil
+			},
+			func(obj any, g []string) ([]byte, error) {
+				S := obj.(*types.Server)
+				S.Groups = stringSliceToUUID(g)
+				return bboltMarshal(S)
+			}); err != nil {
+			return err
+		}
+
+		return tx.Bucket([]byte(GROUPS_BUCKET)).Delete([]byte(id))
 	})
 }
 
@@ -924,8 +1030,51 @@ func BBolt_DeleteUserByID(id string) error {
 				}
 			}
 		}
+		// Cascade-delete the user's devices; otherwise they linger forever,
+		// holding WireGuard IPs and reserving their pubkeys in the wgkey index
+		// (so re-registration of that key fails).
+		deleteDevicesTx(tx, func(devID string, D *types.Device) bool {
+			return D.UserID.String() == id
+		})
 		return b.Delete([]byte(id))
 	})
+}
+
+// deleteDevicesTx deletes every device matching pred (and its userID/wgkey index
+// entries) inside an existing write transaction. Keys are collected before
+// deletion because mutating a bucket mid-cursor is unsafe.
+func deleteDevicesTx(tx *gobolt.Tx, pred func(devID string, d *types.Device) bool) {
+	devB := tx.Bucket([]byte(DEVICES_BUCKET))
+	uidIdx := tx.Bucket([]byte(DEVICES_USERID_INDEX))
+	wgIdx := tx.Bucket([]byte(DEVICES_WGKEY_INDEX))
+
+	type match struct {
+		devID  string
+		wgKey  string
+		userID string
+	}
+	var matches []match
+	c := devB.Cursor()
+	for k, v := c.First(); k != nil; k, v = c.Next() {
+		D := new(types.Device)
+		if err := bboltUnmarshal(v, D); err != nil {
+			continue
+		}
+		devID := string(k)
+		if !pred(devID, D) {
+			continue
+		}
+		matches = append(matches, match{devID: devID, wgKey: D.WireGuardKey, userID: D.UserID.String()})
+	}
+	for _, m := range matches {
+		if m.wgKey != "" {
+			_ = wgIdx.Delete([]byte(m.wgKey))
+		}
+		if m.userID != "00000000-0000-0000-0000-000000000000" {
+			_ = uidIdx.Delete([]byte(m.userID + "/" + m.devID))
+		}
+		_ = devB.Delete([]byte(m.devID))
+	}
 }
 
 func BBolt_DeleteServerByID(id string) error {
@@ -940,6 +1089,12 @@ func BBolt_DeleteServerByID(id string) error {
 				}
 			}
 		}
+		// Cascade-delete devices bound to this server — they can no longer
+		// connect, yet would keep counting against the owner's device cap and
+		// holding WG IPs / wgkey reservations.
+		deleteDevicesTx(tx, func(devID string, D *types.Device) bool {
+			return D.ServerID.String() == id
+		})
 		return b.Delete([]byte(id))
 	})
 }

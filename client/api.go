@@ -107,25 +107,36 @@ func SendRequestToURL(tc *tls.Config, method string, url string, data any, timeo
 	return respBodyBytes, resp.StatusCode, nil
 }
 
+// authorizeControlServer enforces that s names a configured control server and
+// rewrites its transport-security-relevant fields (Port, ValidateCertificate,
+// CertificatePath) from the stored config. This prevents a caller that reaches
+// the local API from (a) pointing the client at an arbitrary host (SSRF) and
+// (b) supplying ValidateCertificate=false / a custom port to strip TLS or
+// redirect the connection. Only the Host is trusted from the request, and only
+// if it matches an allowlisted entry.
+func authorizeControlServer(s *ControlServer) error {
+	if s == nil {
+		return errors.New("no control server specified")
+	}
+	conf := CONFIG.Load()
+	for _, cs := range conf.ControlServers {
+		if cs.Host == s.Host {
+			s.Port = cs.Port
+			s.ValidateCertificate = cs.ValidateCertificate
+			s.CertificatePath = cs.CertificatePath
+			return nil
+		}
+	}
+	return errors.New("host not in configured control servers")
+}
+
 func ForwardToController(FR *FORWARD_REQUEST) (any, int) {
 	defer RecoverAndLog()
 
-	conf := CONFIG.Load()
-	allowed := false
-	for _, cs := range conf.ControlServers {
-		if cs.Host == FR.Server.Host {
-			allowed = true
-			break
-		}
-	}
-	if !allowed {
+	if err := authorizeControlServer(FR.Server); err != nil {
 		er := new(ErrorResponse)
-		er.Error = "host not in configured control servers"
+		er.Error = err.Error()
 		return er, 403
-	}
-
-	if strings.Contains(FR.Server.Host, "api.tunnels.is") {
-		FR.Server.ValidateCertificate = true
 	}
 
 	url := FR.Server.GetURL(FR.Path)
@@ -171,18 +182,44 @@ var warnedInsecureHosts sync.Map
 
 func warnInsecureHost(host string) {
 	if _, loaded := warnedInsecureHosts.LoadOrStore(host, struct{}{}); !loaded {
-		ERROR("TLS certificate verification is DISABLED for ", host,
+		SECURITY("TLS certificate verification is DISABLED for ", host,
 			" (ValidateCertificate=false) — traffic to this controller can be intercepted")
 	}
 }
 
 var AZ_CHAR_CHECK = regexp.MustCompile(`^[a-zA-Z0-9]*$`)
 
+// TAG_CHAR_CHECK bounds a tunnel Tag to a safe filename charset. Tag is
+// concatenated into on-disk paths (writeTunnelsToDisk, delete handlers), so
+// path separators or ".." would be a traversal (arbitrary file write/delete).
+var TAG_CHAR_CHECK = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
+
+// allowedConfigFormats is the whitelist of tunnel-file extensions. Anything
+// else is attacker-controlled input that would land in a filesystem path.
+var allowedConfigFormats = map[string]struct{}{
+	"": {}, ".json": {}, ".conf": {}, ".yaml": {}, ".yml": {},
+}
+
+// safeTunnelTag reports whether tag is a safe, non-traversing filename component.
+func safeTunnelTag(tag string) bool {
+	return TAG_CHAR_CHECK.MatchString(tag)
+}
+
 func validateTunnelMeta(tun *TunnelMETA, oldTag string) (err []string) {
 	ifnamemap := make(map[string]struct{})
 	ifFail := AZ_CHAR_CHECK.MatchString(tun.IFName)
 	if !ifFail {
 		err = append(err, "tunnel names can only contain a-z A-Z 0-9, invalid name: "+tun.IFName)
+	}
+
+	if !safeTunnelTag(tun.Tag) {
+		err = append(err, "tunnel tag may only contain a-z A-Z 0-9 _ - , invalid tag: "+tun.Tag)
+	}
+	if oldTag != "" && !safeTunnelTag(oldTag) {
+		err = append(err, "invalid old tunnel tag: "+oldTag)
+	}
+	if _, ok := allowedConfigFormats[tun.ConfigFormat]; !ok {
+		err = append(err, "unsupported tunnel config format: "+tun.ConfigFormat)
 	}
 
 	tunnelMetaMapRange(func(t *TunnelMETA) bool {

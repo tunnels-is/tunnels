@@ -74,10 +74,13 @@ func (t *inspectingTUN) Write(bufs [][]byte, offset int) (int, error) {
 	kept := bufs[:0]
 	for _, buf := range bufs {
 		pkt := buf[offset:]
-		if t.handleControl(pkt) {
+		// Parse the header once and share it between the control-channel check
+		// and the firewall check (this is the highest-volume path).
+		src, dst, proto, l4, frag, ok := parseIPHeader(pkt)
+		if t.handleControlParsed(src, dst, proto, l4, frag, ok) {
 			continue
 		}
-		if t.allow(pkt) {
+		if t.allowParsed(src, dst, proto, l4, frag, ok) {
 			kept = append(kept, buf)
 		}
 	}
@@ -130,6 +133,12 @@ func (t *inspectingTUN) File() *os.File {
 // block above still applies).
 func (t *inspectingTUN) allow(pkt []byte) bool {
 	src, dst, proto, l4, frag, ok := parseIPHeader(pkt)
+	return t.allowParsed(src, dst, proto, l4, frag, ok)
+}
+
+// allowParsed is allow() with the IP header already parsed, so callers that also
+// need the parsed fields (Write) don't parse twice on the hot path.
+func (t *inspectingTUN) allowParsed(src, dst netip.Addr, proto byte, l4 []byte, frag fragInfo, ok bool) bool {
 	if !ok {
 		return true
 	}
@@ -199,6 +208,11 @@ func (t *inspectingTUN) isServerIP(a netip.Addr) bool {
 // The caller MUST NOT forward such a packet to the kernel.
 func (t *inspectingTUN) handleControl(pkt []byte) bool {
 	src, dst, proto, l4, frag, ok := parseIPHeader(pkt)
+	return t.handleControlParsed(src, dst, proto, l4, frag, ok)
+}
+
+// handleControlParsed is handleControl() with the IP header already parsed.
+func (t *inspectingTUN) handleControlParsed(src, dst netip.Addr, proto byte, l4 []byte, frag fragInfo, ok bool) bool {
 	if !ok || proto != protoUDP {
 		return false
 	}

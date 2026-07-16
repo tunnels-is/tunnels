@@ -32,6 +32,7 @@ const Login = () => {
 	const { modeParam } = useParams()
 	const config = useStore((s) => s.config)
 	const notifySuccess = useStore((s) => s.notifySuccess)
+	const notifyError = useStore((s) => s.notifyError)
 
 	const [mode, setMode] = useState(Number(modeParam) || 1)
 	const [inputs, setInputs] = useState({
@@ -167,6 +168,12 @@ const Login = () => {
 	}
 
 	const saveAuthServer = async () => {
+		// Guard against saving before the daemon config has loaded — otherwise
+		// {...undefined, ControlServers} would drop every other config field.
+		if (!config) {
+			notifyError("Configuration is still loading, please try again")
+			return
+		}
 		const list = [...servers]
 		const idx = list.findIndex((s) => s.ID === editServer.ID)
 		if (idx >= 0) list[idx] = { ...editServer }
@@ -312,6 +319,14 @@ const Login = () => {
 							checked={editServer.ValidateCertificate}
 							onChange={() => setEditServer({ ...editServer, ValidateCertificate: !editServer.ValidateCertificate })}
 						/>
+						{!editServer.ValidateCertificate && (
+							<p className="text-xs text-error">
+								Warning: TLS certificate verification is disabled. Your login
+								credentials and device token can be intercepted by a
+								man-in-the-middle on the way to this server. Only turn this off
+								for a trusted self-signed server on a trusted network.
+							</p>
+						)}
 					</div>
 				)}
 			</Dialog>

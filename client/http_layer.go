@@ -86,7 +86,7 @@ func LaunchAPI() {
 	// The session token is deliberately NOT logged — anything that can read
 	// the log would gain a valid local-API session.
 	if DevMode {
-		INFO("DEV MODE: API auth disabled, CORS enabled")
+		SECURITY("DEV MODE ENABLED: local API authentication is DISABLED and credentialed CORS is open — never use this in a shipped/production build")
 	}
 	INFO("===========================")
 
@@ -157,7 +157,12 @@ func setSessionCookie(w http.ResponseWriter) {
 
 func withSessionCookie(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		setSessionCookie(w)
+		// Only hand the session token to a genuinely local caller. A DNS-rebound
+		// origin (evil.com→127.0.0.1) presents its own Host header (browsers
+		// forbid forging Host via fetch), so this refuses to bootstrap it.
+		if isLocalRequest(r) {
+			setSessionCookie(w)
+		}
 		next.ServeHTTP(w, r)
 	})
 }
@@ -170,7 +175,50 @@ func checkSessionToken(r *http.Request) bool {
 	return subtle.ConstantTimeCompare([]byte(cookie.Value), []byte(sessionToken)) == 1
 }
 
+// isLocalRequest reports whether the request's Host header names a loopback
+// address (or the Wails webview host). This is the anti-DNS-rebinding gate: an
+// attacker page rebinding its domain to 127.0.0.1 still sends `Host: evil.com`,
+// which fails here — a browser will not let script forge the Host header.
+func isLocalRequest(r *http.Request) bool {
+	host := r.Host
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		host = h
+	}
+	host = strings.TrimSuffix(strings.TrimPrefix(host, "["), "]") // strip IPv6 brackets
+	switch strings.ToLower(host) {
+	case "localhost", "wails.localhost", "wails":
+		return true
+	}
+	ip := net.ParseIP(host)
+	if ip != nil && ip.IsLoopback() {
+		return true
+	}
+	// Honor a deliberate non-loopback API bind so remote UI access an operator
+	// explicitly configured isn't broken. A wildcard bind (0.0.0.0/::) means
+	// "remote access opted in", so the Host check can't add value there; a
+	// concrete bind IP is matched exactly (a rebound evil.com Host still fails).
+	if conf := CONFIG.Load(); conf != nil && conf.APIIP != "" {
+		if bindIP := net.ParseIP(conf.APIIP); bindIP != nil {
+			if bindIP.IsUnspecified() {
+				return true
+			}
+			if ip != nil && ip.Equal(bindIP) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func HTTPhandler(w http.ResponseWriter, r *http.Request) {
+	// Reject anything not addressed to a loopback Host, regardless of auth —
+	// the primary defense against DNS rebinding driving the local API.
+	if !DevMode && !isLocalRequest(r) {
+		w.WriteHeader(403)
+		_, _ = w.Write([]byte(`{"error":"forbidden"}`))
+		r.Body.Close()
+		return
+	}
 	if DevMode {
 		w.Header().Set("Access-Control-Allow-Origin", r.Header.Get("Origin"))
 		w.Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
@@ -257,7 +305,7 @@ func HTTPhandler(w http.ResponseWriter, r *http.Request) {
 var LogSocket atomic.Pointer[websocket.Conn]
 
 func handleWebSocketAuth(w http.ResponseWriter, r *http.Request) {
-	if !DevMode && !checkSessionToken(r) {
+	if !DevMode && (!isLocalRequest(r) || !checkSessionToken(r)) {
 		w.WriteHeader(403)
 		_, _ = w.Write([]byte(`{"error":"forbidden"}`))
 		return
@@ -508,6 +556,34 @@ func HTTP_Disconnect(w http.ResponseWriter, r *http.Request) {
 		JSON(w, r, 400, err)
 		return
 	}
+
+	// A user-initiated disconnect must stop any auto-reconnect loop for this
+	// tunnel and release its kill switch — otherwise a tunnel that dropped (kill
+	// switch engaged, reconnect looping) would keep re-connecting and the
+	// blackhole route would strand it offline. Prefer the caller-supplied stable
+	// Tag; fall back to resolving it from the live tunnel by ID. Only if neither
+	// is available do we stop all loops (last resort — a mid-reconnect tunnel we
+	// can't otherwise name).
+	tag := DF.Tag
+	if tag == "" {
+		tunnelMapRange(func(t *TUN) bool {
+			if t.ID == DF.ID {
+				if m := t.meta.Load(); m != nil {
+					tag = m.Tag
+				}
+				return false
+			}
+			return true
+		})
+	}
+	if tag != "" {
+		stopReconnect(tag)
+		releaseKillSwitch(tag)
+	} else {
+		stopAllReconnects()
+		releaseAllKillSwitches()
+	}
+
 	err = Disconnect(DF.ID, false)
 	if err != nil {
 		JSON(w, r, 400, err)
@@ -676,6 +752,7 @@ func HTTP_GetQRCode(w http.ResponseWriter, r *http.Request) {
 	err := Bind(form, r)
 	if err != nil {
 		JSON(w, r, 400, err)
+		return
 	}
 	QR, err := GetQRCode(form)
 	if err != nil {
@@ -699,6 +776,13 @@ func HTTP_DeleteTunnels(w http.ResponseWriter, r *http.Request) {
 	err := Bind(form, r)
 	if err != nil {
 		JSON(w, r, 400, err)
+		return
+	}
+
+	// Reject a traversing tag before it reaches os.Remove (arbitrary file delete).
+	if !safeTunnelTag(form.Tag) {
+		JSON(w, r, 400, "invalid tunnel tag")
+		return
 	}
 
 	state := STATE.Load()
@@ -726,6 +810,7 @@ func HTTP_ForwardToController(w http.ResponseWriter, r *http.Request) {
 	err := Bind(form, r)
 	if err != nil {
 		JSON(w, r, 400, err)
+		return
 	}
 	data, code := ForwardToController(form)
 	JSON(w, r, code, data)

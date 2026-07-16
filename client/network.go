@@ -119,6 +119,14 @@ func loadDefaultGateway() {
 		return
 	}
 
+	// Ignore a nil/unspecified gateway. When the kill switch is engaged it
+	// installs a blackhole default route (no next hop); gateway discovery can
+	// then return 0.0.0.0, which would poison the stored gateway and break the
+	// endpoint-route pinning that a reconnect needs. Keep the last-known-good.
+	if newGateway == nil || newGateway.IsUnspecified() {
+		return
+	}
+
 	if bytes.Equal(oldGateway, newGateway.To4()) {
 		return
 	}

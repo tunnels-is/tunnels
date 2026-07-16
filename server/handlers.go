@@ -144,8 +144,11 @@ func API_UserCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if len(RF.Password) > 200 {
-		senderr(w, 400, "Password is too long, maximum 255 characters")
+	// bcrypt hashes at most 72 bytes and returns an error beyond that; cap here
+	// so an over-long password is rejected cleanly instead of erroring inside
+	// bcrypt below.
+	if len(RF.Password) > 72 {
+		senderr(w, 400, "Password is too long, maximum 72 characters")
 		return
 	}
 
@@ -172,6 +175,7 @@ func API_UserCreate(w http.ResponseWriter, r *http.Request) {
 	hash, err := bcrypt.GenerateFromPassword([]byte(RF.Password), 13)
 	if err != nil {
 		senderr(w, 500, "Unable to generate a secure password, please contact customer support")
+		return
 	}
 
 	newUser = new(User)
@@ -216,14 +220,12 @@ func API_UserUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// The personal APIKey is a bearer token for this account and is set by the
-	// frontend as a UUID. Reject anything else so a weak/short token can't be
-	// stored. Empty is allowed and clears the key.
+	// The personal APIKey is a bearer token for this account. The client no
+	// longer chooses its own secret: any non-empty request is treated as
+	// "generate a new key" and the server mints a fresh random UUID, so the
+	// client can never set a weak/guessable value. An empty value clears the key.
 	if UF.APIKey != "" {
-		if _, perr := uuid.Parse(UF.APIKey); perr != nil {
-			senderr(w, 400, "APIKey must be a valid UUID")
-			return
-		}
+		UF.APIKey = uuid.NewString()
 	}
 
 	UF.UID = user.ID
@@ -233,7 +235,9 @@ func API_UserUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.WriteHeader(200)
+	// Return the (server-generated) key so the client can display it without
+	// having to guess the value it sent.
+	sendObject(w, map[string]string{"APIKey": UF.APIKey})
 }
 
 func API_UserAdminUpdate(w http.ResponseWriter, r *http.Request) {
@@ -432,7 +436,7 @@ func API_AdminUserList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	users, err := DB_getUsers(int64(F.Limit), int64(F.Offset))
+	users, err := DB_getUsers(int64(clampListLimit(F.Limit)), int64(F.Offset))
 	if err != nil {
 		senderr(w, 500, "Unknown error, please try again in a moment")
 		return
@@ -528,13 +532,33 @@ func API_AdminDeviceList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	devices, err := DB_GetDevices(int64(F.Limit), int64(F.Offset))
+	devices, err := DB_GetDevices(int64(clampListLimit(F.Limit)), int64(F.Offset))
 	if err != nil {
 		senderr(w, 500, "Unknown error, please try again in a moment")
 		return
 	}
 
 	sendObject(w, devices)
+}
+
+// maxListLimit bounds admin list endpoints so a single request cannot load an
+// unbounded number of records into memory. maxDevicesPerUser caps how many
+// devices one account may create.
+const (
+	maxListLimit      = 10000
+	defaultListLimit  = 500
+	maxDevicesPerUser = 50
+)
+
+// clampListLimit returns a sane, bounded page size for the admin list endpoints.
+func clampListLimit(n int) int {
+	if n <= 0 {
+		return defaultListLimit
+	}
+	if n > maxListLimit {
+		return maxListLimit
+	}
+	return n
 }
 
 func API_ListDevicesByUser(w http.ResponseWriter, r *http.Request) {
@@ -582,6 +606,13 @@ func API_DeviceCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// An expired subscription must not be able to provision new devices (the
+	// auth middleware only checks Disabled). Mirrors the API_WGPeer check.
+	if !user.SubExpiration.IsZero() && time.Now().After(user.SubExpiration) {
+		senderr(w, 403, "subscription expired")
+		return
+	}
+
 	F.Device.UserID = user.ID
 	F.Device.ID = uuid.New()
 	F.Device.CreatedAt = time.Now()
@@ -597,10 +628,23 @@ func API_DeviceCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Hold the allocation lock from IP assignment through DB_CreateDevice so a
-	// concurrent create cannot claim the same address (see wgIPAllocMu).
+	// Hold the allocation lock from the device-cap check through IP assignment
+	// and DB_CreateDevice so a concurrent create can't both slip past the cap
+	// and can't claim the same address (see wgIPAllocMu).
 	wgIPAllocMu.Lock()
 	defer wgIPAllocMu.Unlock()
+
+	// Cap devices per account so a single user can't exhaust a server's WG
+	// subnet (and the DB) by creating devices without limit.
+	existing, listErr := DB_GetDevicesByUserID(user.ID)
+	if listErr != nil {
+		senderr(w, 500, "Unable to create device, please try again later")
+		return
+	}
+	if len(existing) >= maxDevicesPerUser {
+		senderr(w, 400, "device limit reached for this account")
+		return
+	}
 
 	if F.Device.ServerID != uuid.Nil {
 		ip, assignErr := assignNextWireGuardIP(F.Device.ServerID)
@@ -752,7 +796,7 @@ func API_AdminServerGet(w http.ResponseWriter, r *http.Request) {
 
 	server, err := DB_FindServerByID(F.ServerID)
 	if err != nil {
-		senderr(w, 500, err.Error())
+		senderr(w, 500, "Unknown error, please try again in a moment", slog.Any("error", err))
 		return
 	}
 	if server == nil {
@@ -829,8 +873,15 @@ func API_AdminGroupAdd(w http.ResponseWriter, r *http.Request) {
 			senderr(w, 400, err.Error())
 			return
 		}
+		if s == nil {
+			senderr(w, 404, "server not found")
+			return
+		}
 	case "user":
-		if F.TypeTag == "email" {
+		// Look up by email when no ID is supplied (TypeTag carries the address),
+		// otherwise by ID. The previous code compared TypeTag to the literal
+		// string "email" and then looked up a user whose email was "email".
+		if F.TypeID == uuid.Nil && F.TypeTag != "" {
 			u, err = DB_findUserByEmail(F.TypeTag)
 		} else {
 			u, err = DB_findUserByID(F.TypeID)
@@ -1289,7 +1340,7 @@ func API_ServerGet(w http.ResponseWriter, r *http.Request) {
 	}
 	server, err := DB_FindServerByID(F.ServerID)
 	if err != nil {
-		senderr(w, 500, err.Error())
+		senderr(w, 500, "Unknown error, please try again in a moment", slog.Any("error", err))
 		return
 	}
 	if server == nil {
@@ -1410,14 +1461,15 @@ func API_ActivateLicenseKey(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if strings.Contains(strings.ToLower(key.Meta.ProductName), "anonymous") {
-		if user.SubExpiration.IsZero() {
-			user.SubExpiration = time.Now()
-		}
-		if time.Until(user.SubExpiration).Seconds() > 1 {
-			user.SubExpiration = time.Now()
+		// Stack from the later of now / current expiry so a renewal keeps the
+		// remaining paid time instead of discarding it, and an activation on an
+		// expired sub lands in the future rather than onto a stale past date.
+		base := user.SubExpiration
+		if base.Before(time.Now()) {
+			base = time.Now()
 		}
 		jitter, _ := rand.Int(rand.Reader, big.NewInt(60))
-		user.SubExpiration = user.SubExpiration.AddDate(0, 1, 0).Add(time.Duration(jitter.Int64()+60) * time.Minute)
+		user.SubExpiration = base.AddDate(0, 1, 0).Add(time.Duration(jitter.Int64()+60) * time.Minute)
 		INFO("KEY +1:", redactKey(key.LicenseKey.Key), " - check activation in lemon")
 
 		user.Key = &LicenseKey{
@@ -1431,12 +1483,16 @@ func API_ActivateLicenseKey(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			ADMIN("unable to parse license key name:", err)
 			senderr(w, 500, "Something went wrong, please contact customer support")
+			return
 		}
-		if user.SubExpiration.IsZero() {
-			user.SubExpiration = time.Now()
+		// Stack from the later of now / current expiry so a renewal keeps the
+		// remaining paid time instead of discarding it.
+		base := user.SubExpiration
+		if base.Before(time.Now()) {
+			base = time.Now()
 		}
 		jitter2, _ := rand.Int(rand.Reader, big.NewInt(600))
-		user.SubExpiration = time.Now().AddDate(0, months, 0).Add(time.Duration(jitter2.Int64()+60) * time.Minute)
+		user.SubExpiration = base.AddDate(0, months, 0).Add(time.Duration(jitter2.Int64()+60) * time.Minute)
 		INFO("KEY +", months, ":", redactKey(key.LicenseKey.Key), " - check activate in lemon")
 
 		user.Key = &LicenseKey{
@@ -1446,14 +1502,9 @@ func API_ActivateLicenseKey(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	user.Trial = false
-	user.Disabled = false
-	err = DB_UserActivateKey(user.SubExpiration, user.Key, user.ID)
-	if err != nil {
-		senderr(w, 500, "unexpected error, please contact support")
-		return
-	}
-
+	// Confirm activation with the provider BEFORE persisting the granted
+	// subscription — otherwise a failed activation still extends the sub, and
+	// the key (ActivationUsage still 0 upstream) could be replayed to re-extend.
 	activeKey, resp, err := lemonClient.Licenses.Activate(context.Background(), AF.Key, "tunnels")
 	if err != nil {
 		if resp != nil && resp.Body != nil {
@@ -1466,6 +1517,14 @@ func API_ActivateLicenseKey(w http.ResponseWriter, r *http.Request) {
 
 	if activeKey.Error != "" {
 		senderr(w, 400, activeKey.Error)
+		return
+	}
+
+	user.Trial = false
+	user.Disabled = false
+	err = DB_UserActivateKey(user.SubExpiration, user.Key, user.ID)
+	if err != nil {
+		senderr(w, 500, "unexpected error, please contact support")
 		return
 	}
 
