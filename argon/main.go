@@ -75,6 +75,13 @@ func (a *Argon) Compare(data, encodedHash string) (match bool, err error) {
 	if _, err := fmt.Sscanf(parts[3], "m=%d,t=%d,p=%d", &memory, &iterations, &parallelism); err != nil {
 		return false, err
 	}
+	// Bound the cost parameters before handing them to argon2.IDKey. Without this
+	// a hostile encodedHash (e.g. m=4294967295) forces a multi-gigabyte
+	// allocation per verification — a trivial memory-exhaustion DoS. 1 GiB / 32
+	// passes is far above any legitimate configuration.
+	if memory == 0 || memory > 1<<20 || iterations == 0 || iterations > 32 || parallelism == 0 {
+		return false, errors.New("argon parameters out of range")
+	}
 
 	salt, err := base64.RawStdEncoding.DecodeString(parts[4])
 	if err != nil {

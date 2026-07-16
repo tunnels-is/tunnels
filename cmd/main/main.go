@@ -33,7 +33,7 @@ func main() {
 
 	if showVersion {
 		fmt.Println(version.Version)
-		os.Exit(1)
+		os.Exit(0)
 	}
 
 	client.DIST_EMBED = DIST

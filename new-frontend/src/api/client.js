@@ -58,12 +58,13 @@ const post = async (path, body, timeout) => {
 export const callMethod = (method, data, { timeout = 30000 } = {}) =>
 	post("/v1/method/" + method, data, timeout)
 
-// Tracks in-flight controller routes so a slow request isn't fired twice.
-const inFlight = new Set()
+// De-dupes identical in-flight controller requests by sharing the same promise.
+// Keyed on route + payload so two DIFFERENT requests to the same route (e.g. a
+// background poll and a user action) both run — the old set-of-routes collapsed
+// them and returned a fake {status:0} to the loser.
+const inFlight = new Map()
 
 export const callController = async (server, route, data = {}, { auth = true, timeout = 30000 } = {}) => {
-	if (inFlight.has(route)) return { status: 0, data: undefined, networkError: false }
-
 	if (auth) {
 		data.UID = data.UID || ""
 		data.DeviceToken = data.DeviceToken || ""
@@ -81,11 +82,20 @@ export const callController = async (server, route, data = {}, { auth = true, ti
 		Headers: auth ? { "X-Device-Token": data.DeviceToken, "X-UID": data.UID } : undefined,
 	}
 
-	inFlight.add(route)
+	// Key MUST include the target server: two identical-payload requests aimed at
+	// different control servers (e.g. a login retried after switching the server
+	// dropdown) would otherwise collapse into one, and the second caller would
+	// get the first server's response misattributed to its own server.
+	const key = JSON.stringify(server) + "|" + route + "|" + JSON.stringify(data)
+	const existing = inFlight.get(key)
+	if (existing) return existing
+
+	const p = post("/v1/method/forwardToController", request, timeout)
+	inFlight.set(key, p)
 	try {
-		return await post("/v1/method/forwardToController", request, timeout)
+		return await p
 	} finally {
-		inFlight.delete(route)
+		inFlight.delete(key)
 	}
 }
 

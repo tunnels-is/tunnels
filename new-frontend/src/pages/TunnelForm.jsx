@@ -108,6 +108,14 @@ const TunnelForm = () => {
 		fetchState()
 	}, [])
 
+	// React Router keeps this component mounted when only :tag changes (e.g.
+	// navigating from one tunnel's edit route to another). Without clearing the
+	// form the loader below sees a non-null form and never re-clones, so the page
+	// shows/saves the previous tunnel's data under the new tag. Reset on tag change.
+	useEffect(() => {
+		setForm(null)
+	}, [tag])
+
 	useEffect(() => {
 		if (form) return
 		const tunnel = tunnels.find((t) => t.Tag === tag)

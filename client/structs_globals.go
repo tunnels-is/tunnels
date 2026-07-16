@@ -127,6 +127,12 @@ var letterRunes = []rune("ABCDEFGHIJKLMNOPQRSTUVWXYZ234567")
 
 type DisconnectForm struct {
 	ID string `json:"ID"`
+	// Tag optionally identifies the tunnel by its stable config tag. The live
+	// tunnel ID churns across auto-reconnects, so a disconnect that arrives while
+	// a tunnel is mid-reconnect can't be matched by ID alone; Tag lets us stop
+	// exactly that tunnel's reconnect loop / kill switch instead of falling back
+	// to stopping every loop.
+	Tag string `json:"Tag"`
 }
 
 type TunnelMETA struct {
@@ -441,7 +447,7 @@ type TUN struct {
 
 	egressBytes      atomic.Int64
 	ingressBytes     atomic.Int64
-	BandwidthHistory *BandwidthHistory
+	BandwidthHistory atomic.Pointer[BandwidthHistory] `json:"-"`
 
 	// Server States
 	PingInt atomic.Int64
@@ -506,9 +512,10 @@ func (t *TUN) SetState(state TunnelState) {
 func (t *TUN) RecordBandwidth() {
 	defer RecoverAndLog()
 
-	t.BandwidthHistory = &BandwidthHistory{
+	bh := &BandwidthHistory{
 		records: make([]BandwidthRecord, 0, MaxBandwidthRecords),
 	}
+	t.BandwidthHistory.Store(bh)
 
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
@@ -535,7 +542,7 @@ func (t *TUN) RecordBandwidth() {
 			lastEgress = currentEgress
 			lastIngress = currentIngress
 
-			t.BandwidthHistory.Append(BandwidthRecord{
+			bh.Append(BandwidthRecord{
 				Timestamp:    time.Now(),
 				EgressBytes:  deltaEgress,
 				IngressBytes: deltaIngress,
@@ -549,8 +556,8 @@ func (t *TUN) MarshalJSON() ([]byte, error) {
 	ib := BandwidthBytesToString(t.ingressBytes.Load())
 
 	var bwHistory []BandwidthRecord
-	if t.BandwidthHistory != nil {
-		bwHistory = t.BandwidthHistory.Snapshot()
+	if bh := t.BandwidthHistory.Load(); bh != nil {
+		bwHistory = bh.Snapshot()
 	}
 
 	return json.Marshal(struct {

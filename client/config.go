@@ -9,14 +9,22 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 
 	"github.com/tunnels-is/tunnels/certs"
 	"github.com/tunnels-is/tunnels/types"
 	"gopkg.in/yaml.v3"
 )
 
+// configFileMu serializes writes to the on-disk config so concurrent callers
+// (the block/whitelist reloaders, SetConfig, ...) can't interleave the
+// rename+create+write and corrupt/truncate the file.
+var configFileMu sync.Mutex
+
 func writeConfigToDisk() (err error) {
 	defer RecoverAndLog()
+	configFileMu.Lock()
+	defer configFileMu.Unlock()
 	conf := CONFIG.Load()
 	s := STATE.Load()
 

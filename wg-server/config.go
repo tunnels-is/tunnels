@@ -123,6 +123,15 @@ func loadOrGenerateLocalPrivKey() ([]byte, error) {
 		return priv, nil
 	}
 
+	// A zero-length .pk (e.g. a crash between the O_EXCL create and the write
+	// below) would otherwise wedge startup forever: the load branch is skipped
+	// and the O_EXCL create fails with "file exists". Treat it as absent.
+	if _, statErr := os.Stat(pkpath); statErr == nil {
+		if err := os.Remove(pkpath); err != nil {
+			return nil, fmt.Errorf("remove empty ./.pk file: %w", err)
+		}
+	}
+
 	priv, err := generateWGPrivKey()
 	if err != nil {
 		zeroBytes(priv)
@@ -131,9 +140,24 @@ func loadOrGenerateLocalPrivKey() ([]byte, error) {
 
 	pk := base64.StdEncoding.EncodeToString(priv)
 
-	if err := os.WriteFile(pkpath, []byte(pk), 0o600); err != nil {
+	// O_EXCL: fail if the file already exists rather than truncating it. Writing
+	// with os.WriteFile into a pre-existing file does NOT apply the 0600 mode, so
+	// an attacker who pre-plants ./.pk (world-readable, owned by them) would
+	// otherwise receive our freshly generated private key. O_EXCL forces us to
+	// create it fresh with the right mode, or refuse.
+	f, err := os.OpenFile(pkpath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if err != nil {
+		zeroBytes(priv)
+		return nil, fmt.Errorf("create ./.pk file %q: %w", pkpath, err)
+	}
+	if _, err := f.WriteString(pk); err != nil {
+		f.Close()
 		zeroBytes(priv)
 		return nil, fmt.Errorf("write ./.pk file %q: %w", pkpath, err)
+	}
+	if err := f.Close(); err != nil {
+		zeroBytes(priv)
+		return nil, fmt.Errorf("close ./.pk file %q: %w", pkpath, err)
 	}
 
 	return priv, nil
@@ -210,12 +234,15 @@ func FetchConfig(controllerURL, apiKey, configPath string, insecureSkipVerify bo
 	}
 
 	if cfg.WireGuardPort == 0 {
+		zeroBytes(privKey)
 		return nil, fmt.Errorf("no port set in config during fetch")
 	}
 	if cfg.WireGuardIface == "" {
+		zeroBytes(privKey)
 		return nil, fmt.Errorf("no wg interface set in config during fetch")
 	}
 	if cfg.WireGuardSubnet == "" {
+		zeroBytes(privKey)
 		return nil, fmt.Errorf("no subnet set in config during fetch")
 	}
 	if cfg.HandshakeBufferSize <= 0 {
