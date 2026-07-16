@@ -62,7 +62,7 @@ func setupNet(cfg *Config) error {
 		return fmt.Errorf("allow WireGuard INPUT port: %w", err)
 	}
 
-	if err := addForwardRules(cfg.WireGuardIface, cfg.InternetIface); err != nil {
+	if err := addForwardRules(cfg.WireGuardIface, cfg.InternetIface, cfg.WireGuardSubnet6 != ""); err != nil {
 		return fmt.Errorf("add FORWARD rules: %w", err)
 	}
 
@@ -212,8 +212,15 @@ func allowWireGuardPort(port int) error {
 // FORWARD rules (applied to both iptables and ip6tables)
 // ---------------------------------------------------------------------------
 
-func addForwardRules(wgIface, netIface string) error {
-	for _, bin := range []func(...string) error{execIPTables, execIP6Tables} {
+func addForwardRules(wgIface, netIface string, withIPv6 bool) error {
+	// Only install the ip6tables ACCEPT rules when a v6 subnet is configured.
+	// Otherwise the v6 DROP rules (addIPv6Drop) would be appended AFTER these
+	// ACCEPTs and never match (iptables is first-match), silently forwarding v6.
+	bins := []func(...string) error{execIPTables}
+	if withIPv6 {
+		bins = append(bins, execIP6Tables)
+	}
+	for _, bin := range bins {
 		if err := bin("-A", "FORWARD", "-i", wgIface, "-o", wgIface, "-j", "ACCEPT"); err != nil {
 			return err
 		}
@@ -260,8 +267,13 @@ func PreviewRules(cfg *Config) []string {
 			fmt.Sprintf("%s -A INPUT -p udp --dport %s -j ACCEPT", bin, portStr))
 	}
 
-	// addForwardRules — four rules per family.
-	for _, bin := range []string{"iptables", "ip6tables"} {
+	// addForwardRules — four rules per family. ip6tables ACCEPTs are only
+	// installed when a v6 subnet is configured (else the v6 DROP below must win).
+	forwardBins := []string{"iptables"}
+	if cfg.WireGuardSubnet6 != "" {
+		forwardBins = append(forwardBins, "ip6tables")
+	}
+	for _, bin := range forwardBins {
 		lines = append(lines,
 			fmt.Sprintf("%s -A FORWARD -i %s -o %s -j ACCEPT", bin, wg, wg),
 			fmt.Sprintf("%s -A FORWARD -i %s -o %s -j ACCEPT", bin, wg, net),

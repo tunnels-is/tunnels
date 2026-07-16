@@ -67,6 +67,10 @@ func DB_userUpdateTwoFactorCodes(TFP *TWO_FACTOR_DB_PACKAGE) (err error) {
 	return BBolt_userUpdateTwoFactorCodes(TFP)
 }
 
+func DB_updateUserRecoveryCodes(uid uuid.UUID, codes []byte) (err error) {
+	return BBolt_updateUserRecoveryCodes(uid, codes)
+}
+
 func DB_userResetPassword(user *User) error {
 	return BBolt_userResetPassword(user)
 }

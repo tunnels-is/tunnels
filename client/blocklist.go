@@ -14,11 +14,19 @@ import (
 	"github.com/puzpuzpuz/xsync/v3"
 )
 
+// listReloadMu serializes the block-list and white-list reloaders. They run as
+// separate hourly goroutines and both mutate the shared config
+// (DNSBlockLists/DNSWhiteLists) and persist it, so without this they race on the
+// shared struct and on the config file.
+var listReloadMu sync.Mutex
+
 func reloadBlockLists(sleep bool) {
 	defer RecoverAndLog()
 	if sleep {
 		time.Sleep(1 * time.Hour)
 	}
+	listReloadMu.Lock()
+	defer listReloadMu.Unlock()
 	config := CONFIG.Load()
 
 	if config.DisableBlockLists {

@@ -105,6 +105,12 @@ func createDefaultTunnelMeta(t types.TunnelType) (M *TunnelMETA) {
 
 func CleanupOnClose() {
 	defer RecoverAndLog()
+	// Release the kill switch on a clean exit — otherwise a blackhole default
+	// route installed after a tunnel drop would persist with no app left to
+	// manage it, leaving the machine with no connectivity. (On a crash/SIGKILL
+	// this doesn't run, so it stays fail-closed.)
+	stopAllReconnects()
+	releaseAllKillSwitches()
 	tunnelMapRange(func(tun *TUN) bool {
 		announceClearAndFlush(tun)
 		tunnel := tun.tunnel.Load()

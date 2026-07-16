@@ -36,32 +36,80 @@ func getUserFileKey() ([]byte, error) {
 	s := STATE.Load()
 	path := s.BasePath + userKeyFileName
 	kb, err := os.ReadFile(path)
-	if err == nil {
+	if err == nil && len(kb) != 0 {
+		// Don't trust a key file another user could have planted or read: it
+		// protects every saved credential.
+		if info, statErr := os.Stat(path); statErr == nil {
+			if verr := validateUserKeyFile(info); verr != nil {
+				return nil, fmt.Errorf("user key file %q: %w — delete it to re-generate (saved logins will be lost)", path, verr)
+			}
+		}
 		key, derr := base64.StdEncoding.DecodeString(string(kb))
 		if derr != nil || len(key) != 32 {
 			return nil, fmt.Errorf("invalid user key file %q — delete it to re-generate (saved logins will be lost)", path)
 		}
 		return key, nil
 	}
-	if !errors.Is(err, os.ErrNotExist) {
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return nil, err
+	}
+
+	// A zero-length key file (e.g. a crash between the O_EXCL create and the
+	// write below) would otherwise wedge the O_EXCL create forever; treat it as
+	// absent and replace it.
+	if _, statErr := os.Stat(path); statErr == nil {
+		if rmErr := os.Remove(path); rmErr != nil {
+			return nil, fmt.Errorf("remove empty user key file %q: %w", path, rmErr)
+		}
 	}
 
 	key := make([]byte, 32)
 	if _, err := rand.Read(key); err != nil {
 		return nil, err
 	}
-	if err := os.WriteFile(path, []byte(base64.StdEncoding.EncodeToString(key)), 0o600); err != nil {
+	// O_EXCL: create fresh with 0600 or refuse. os.WriteFile into a pre-existing
+	// (attacker-planted) file does NOT re-apply the 0600 mode, which would hand
+	// our freshly generated key to a file the attacker can read.
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if err != nil {
+		return nil, fmt.Errorf("create user key file %q: %w", path, err)
+	}
+	if _, err := f.WriteString(base64.StdEncoding.EncodeToString(key)); err != nil {
+		f.Close()
+		return nil, err
+	}
+	if err := f.Close(); err != nil {
 		return nil, err
 	}
 	return key, nil
 }
 
 func delUser(hash string) (err error) {
+	// hash is attacker-controllable (the local API request body). Saved user
+	// files are always named with a hex hash (fmt.Sprintf("%x", ...)), so
+	// enforce a pure-hex charset here — without it a value like
+	// "../../../etc/foo" would resolve os.Remove outside UserPath and delete an
+	// arbitrary file the (elevated) client process can reach.
+	if !isHexString(hash) {
+		return fmt.Errorf("invalid user hash")
+	}
 	s := STATE.Load()
 	DEBUG("removing user: ", hash)
 	_ = os.Remove(s.UserPath + hash)
 	return
+}
+
+func isHexString(s string) bool {
+	if len(s) == 0 {
+		return false
+	}
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if (c < '0' || c > '9') && (c < 'a' || c > 'f') && (c < 'A' || c > 'F') {
+			return false
+		}
+	}
+	return true
 }
 
 func saveUser(u *User) (err error) {

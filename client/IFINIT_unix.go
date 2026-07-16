@@ -256,9 +256,11 @@ func (t *TInterface) Connect(tun *TUN) (err error) {
 	if err != nil {
 		return
 	}
-	err = t.SetTXQueueLen()
-	if err != nil {
-		return
+	// TX queue length is a non-critical tuning knob. Some restricted
+	// environments (e.g. rootless containers) reject SIOCSIFTXQLEN even when
+	// addressing/MTU succeed; don't fail the whole connection over it.
+	if txErr := t.SetTXQueueLen(); txErr != nil {
+		ERROR("unable to set tx queue length (continuing): ", txErr)
 	}
 
 	meta := tun.meta.Load()
@@ -555,14 +557,18 @@ func AdjustRoutersForTunneling() (err error) {
 
 	links, _ := netlink.LinkList()
 	for _, v := range links {
-		routes, _ := netlink.RouteList(v, 4)
-		for _, r := range routes {
+		// FAMILY_V4 (2), not the literal 4 (AF_IPX) — the old value matched no
+		// IPv4 routes, so the physical default was never demoted. Demote EVERY
+		// low-metric default (no early return) so the tunnel's metric-0 default
+		// and the kill-switch blackhole reliably win.
+		routes, _ := netlink.RouteList(v, netlink.FAMILY_V4)
+		for i := range routes {
+			r := routes[i]
 			if r.Dst == nil && r.Priority < 2 {
 				DEBUG("Adjusting Default Route: ", r)
 				_ = netlink.RouteDel(&r)
 				r.Priority = 100
 				_ = netlink.RouteAdd(&r)
-				return
 			}
 		}
 	}

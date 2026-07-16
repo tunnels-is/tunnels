@@ -35,6 +35,49 @@ func TestSameMeshPeer(t *testing.T) {
 	if sameMeshPeer(base, changedSubnets) {
 		t.Fatal("subnet change should not compare equal")
 	}
+
+	// Reordering must compare equal (set semantics), but a subnet replaced by a
+	// duplicate of another must NOT — this is the multiset case a plain-set
+	// comparison would miss.
+	twoSubnets := installedMeshPeer{
+		PublicKeyHex: "aa",
+		Endpoint:     "1.2.3.4:51821",
+		Subnets:      []string{"10.3.0.0/16", "10.4.0.0/16"},
+	}
+	reordered := types.WGMeshPeer{
+		PublicKeyHex:   "aa",
+		Endpoint:       "1.2.3.4:51821",
+		AllowedSubnets: []string{"10.4.0.0/16", "10.3.0.0/16"},
+	}
+	if !sameMeshPeer(twoSubnets, reordered) {
+		t.Fatal("reordered subnets should compare equal")
+	}
+	dupSubnet := types.WGMeshPeer{
+		PublicKeyHex:   "aa",
+		Endpoint:       "1.2.3.4:51821",
+		AllowedSubnets: []string{"10.3.0.0/16", "10.3.0.0/16"},
+	}
+	if sameMeshPeer(twoSubnets, dupSubnet) {
+		t.Fatal("[X,Y] vs [X,X] must not compare equal")
+	}
+}
+
+func TestValidMeshSubnet(t *testing.T) {
+	cases := map[string]bool{
+		"10.3.0.0/16": true,
+		"10.4.0.5/32": true,
+		"fd00::/64":   true,
+		"0.0.0.0/0":   false, // default route — would hijack all egress
+		"::/0":        false,
+		"not-a-cidr":  false,
+		"10.0.0.1":    false, // missing prefix
+		"":            false,
+	}
+	for in, want := range cases {
+		if got := validMeshSubnet(in); got != want {
+			t.Errorf("validMeshSubnet(%q) = %v, want %v", in, got, want)
+		}
+	}
 }
 
 func TestFetchMesh(t *testing.T) {
