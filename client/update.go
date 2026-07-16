@@ -203,6 +203,16 @@ func checkForAndDownloadUpdate(targetTag string) (shouldUpdate bool, err error) 
 		return false, nil
 	}
 
+	// Refuse a downgrade in every mode. A legitimate update is always newer, so
+	// an older "latest"/pinned tag means either a rolled-back release or a
+	// malicious/compromised source trying to force the client onto a known-
+	// vulnerable build. In pinned mode the target comes from the control server;
+	// in the default mode it comes from the GitHub "latest" release — both must be
+	// forward-only.
+	if compareVersions(versionNumber, version.Version) < 0 {
+		return false, fmt.Errorf("refusing downgrade: available version %s is older than running %s", versionNumber, version.Version)
+	}
+
 	expectedSum, err := getExpectedChecksum(tag)
 	if err != nil {
 		return false, fmt.Errorf("unable to get expecetd sha sum from source: %s", err)
@@ -315,6 +325,34 @@ func replaceCurrentVersion() (err error) {
 	return
 }
 
+// compareVersions compares dotted numeric versions ("1.2.3"). Returns -1 if a<b,
+// 0 if equal, 1 if a>b. Non-numeric components are treated as 0; a missing
+// component is treated as 0 (so "1.2" == "1.2.0"). Used to block downgrades.
+func compareVersions(a, b string) int {
+	as := strings.Split(strings.TrimPrefix(a, "v"), ".")
+	bs := strings.Split(strings.TrimPrefix(b, "v"), ".")
+	n := len(as)
+	if len(bs) > n {
+		n = len(bs)
+	}
+	for i := 0; i < n; i++ {
+		var ai, bi int
+		if i < len(as) {
+			ai, _ = strconv.Atoi(as[i])
+		}
+		if i < len(bs) {
+			bi, _ = strconv.Atoi(bs[i])
+		}
+		if ai != bi {
+			if ai < bi {
+				return -1
+			}
+			return 1
+		}
+	}
+	return 0
+}
+
 func calculateSha256(filePath string) (string, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
@@ -337,6 +375,9 @@ func getExpectedChecksum(tag string) (string, error) {
 		return "", err
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("checksums fetch returned status %d", resp.StatusCode)
+	}
 
 	matching := fmt.Sprintf("tunnels_%s_%s_%s", strings.ReplaceAll(tag, "v", ""), runtime.GOOS, runtime.GOARCH)
 	scanner := bufio.NewScanner(io.LimitReader(resp.Body, maxUpdateMetaSize))
@@ -363,6 +404,9 @@ func getReleaseInfo(targetTag string) (url, tag, hash string, err error) {
 		return "", "", "", err
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return "", "", "", fmt.Errorf("release info fetch returned status %d", resp.StatusCode)
+	}
 
 	b, _ := io.ReadAll(io.LimitReader(resp.Body, maxUpdateMetaSize))
 	r := new(Release)

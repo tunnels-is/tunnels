@@ -273,6 +273,10 @@ func CountryAutoConnect(form *AutoConnectForm) (*AutoConnectResponse, int, error
 		ERROR("auto-connect: no control server given")
 		return nil, 400, errors.New("no control server given")
 	}
+	// Allowlist the control server and pin its TLS/port from stored config.
+	if err := authorizeControlServer(form.Server); err != nil {
+		return nil, 403, err
+	}
 	if form.Country == "" {
 		ERROR("auto-connect: no country given")
 		return nil, 400, errors.New("no country given")

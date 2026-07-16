@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 )
@@ -207,7 +208,7 @@ mainLoop:
 			os.Exit(1)
 
 		case Tun := <-tunnelMonitor:
-			Tun.needsReconnect.Store(true)
+			go handleTunnelDeath(Tun)
 
 		case signal := <-concurrencyMonitor:
 			ROUTINE(signal.tag)
@@ -215,6 +216,133 @@ mainLoop:
 
 		default:
 			time.Sleep(200 * time.Millisecond)
+		}
+	}
+}
+
+// reconnectStops tracks running auto-reconnect loops by tunnel tag so a
+// user-initiated disconnect (or shutdown) can stop the loop it started.
+var reconnectStops sync.Map // tag(string) -> chan struct{}
+
+// stopReconnect signals the reconnect loop for tag (if any) to exit.
+func stopReconnect(tag string) {
+	if v, ok := reconnectStops.LoadAndDelete(tag); ok {
+		close(v.(chan struct{}))
+	}
+}
+
+// stopAllReconnects stops every running reconnect loop. Used when a
+// user-initiated disconnect can't resolve a tag (e.g. the tunnel was
+// mid-reconnect and had no live instance in the map).
+func stopAllReconnects() {
+	reconnectStops.Range(func(k, _ any) bool {
+		// Close the value LoadAndDelete returns — not the Range snapshot value,
+		// which a concurrent handleTunnelDeath may have replaced under the same
+		// tag (closing the snapshot would double-close and leak the new one).
+		if actual, ok := reconnectStops.LoadAndDelete(k); ok {
+			close(actual.(chan struct{}))
+		}
+		return true
+	})
+}
+
+// disconnectTunnelByTag disconnects the currently-connected tunnel with the
+// given tag, if any. Used to undo a reconnect that raced a user disconnect.
+func disconnectTunnelByTag(tag string) {
+	tunnelMapRange(func(t *TUN) bool {
+		if m := t.meta.Load(); m != nil && m.Tag == tag {
+			_ = Disconnect(t.ID, false)
+			return false
+		}
+		return true
+	})
+}
+
+// handleTunnelDeath reacts to a tunnel whose WireGuard device died unexpectedly.
+// For a kill-switch tunnel it blocks non-tunnel egress immediately (fail
+// closed); for an auto-reconnect tunnel it re-establishes the connection with
+// backoff, releasing the kill switch once the tunnel is back up. Runs in its own
+// goroutine so the main loop is never blocked.
+func handleTunnelDeath(t *TUN) {
+	defer RecoverAndLog()
+	if t == nil || t.GetState() < TUN_Connected {
+		// Already being torn down intentionally — nothing to recover.
+		return
+	}
+	meta := t.meta.Load()
+	if meta == nil {
+		return
+	}
+
+	killSwitch := meta.KillSwitch && meta.EnableDefaultRoute
+	if killSwitch {
+		if !killSwitchSupported() {
+			SECURITY("kill switch is ENABLED for ", meta.Tag,
+				" but is not enforced on this platform — traffic may leak after a tunnel drop")
+		} else if err := engageKillSwitch(meta.Tag); err != nil {
+			SECURITY("kill switch: could not block traffic after tunnel drop (", meta.Tag, "): ", err)
+		} else {
+			INFO("kill switch engaged after tunnel drop: ", meta.Tag)
+		}
+	}
+
+	cr := t.CR
+	// Tear the dead tunnel down cleanly (also moves it out of TUN_Connected).
+	Disconnect(t.ID, false)
+
+	if !meta.AutoReconnect || cr == nil {
+		// No auto-reconnect: a kill-switch tunnel stays blocked (fail closed)
+		// until the user reconnects or disconnects.
+		return
+	}
+
+	// Register this reconnect loop so a user disconnect / shutdown can stop it.
+	// If one is already running for this tag, don't start a second.
+	stopCh := make(chan struct{})
+	if _, exists := reconnectStops.LoadOrStore(meta.Tag, stopCh); exists {
+		return
+	}
+	defer reconnectStops.CompareAndDelete(meta.Tag, stopCh)
+
+	backoff := 2 * time.Second
+	for attempt := 1; ; attempt++ {
+		select {
+		case <-CancelContext.Done():
+			return
+		case <-stopCh:
+			return
+		default:
+		}
+		code, err := PublicConnect(cr)
+		if err == nil && code == 200 {
+			// A user disconnect can arrive while PublicConnect is in flight
+			// (the tunnel isn't in the map yet, so HTTP_Disconnect can't target
+			// it). If the stop was signalled, undo the tunnel we just created.
+			select {
+			case <-stopCh:
+				disconnectTunnelByTag(meta.Tag)
+				releaseKillSwitch(meta.Tag)
+				return
+			default:
+			}
+			INFO("auto-reconnect: ", meta.Tag, " reconnected")
+			if killSwitch {
+				// The reinstalled tunnel default route now carries traffic; drop
+				// this tunnel's kill-switch need (others keep theirs).
+				releaseKillSwitch(meta.Tag)
+			}
+			return
+		}
+		INFO("auto-reconnect: ", meta.Tag, " attempt ", attempt, " failed (code ", code, "): ", err)
+		select {
+		case <-CancelContext.Done():
+			return
+		case <-stopCh:
+			return
+		case <-time.After(backoff):
+		}
+		if backoff < 30*time.Second {
+			backoff *= 2
 		}
 	}
 }

@@ -72,8 +72,30 @@ func API_WGPeers(w http.ResponseWriter, r *http.Request) {
 		Limit:  limit,
 		Offset: offset,
 	}
+	// Scope to peers this server is actually entitled to serve — the same
+	// checks API_WGPeer applies per-handshake: the device must be bound to this
+	// server, and its owner must be enabled, non-expired, and group-authorized.
+	// Without this, one server's X-WG-KEY could enumerate every device on the
+	// platform (cross-tenant disclosure / ACL bypass for any node that programs
+	// its peer set from this endpoint). Owning users are cached within the call.
+	userCache := make(map[uuid.UUID]*User)
+	now := time.Now()
 	for _, d := range devices {
-		if d.WireGuardKey == "" {
+		if d.WireGuardKey == "" || d.ServerID != server.ID {
+			continue
+		}
+		owner, ok := userCache[d.UserID]
+		if !ok {
+			owner, _ = DB_findUserByID(d.UserID)
+			userCache[d.UserID] = owner
+		}
+		if owner == nil || owner.Disabled {
+			continue
+		}
+		if !owner.SubExpiration.IsZero() && now.After(owner.SubExpiration) {
+			continue
+		}
+		if !hasSharedOrNoGroup(owner.Groups, server.Groups) {
 			continue
 		}
 		hexKey, err := b64KeyToHex(d.WireGuardKey)
@@ -320,6 +342,10 @@ func assignNextWireGuardIPv6(serverID uuid.UUID) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("invalid IPv6 subnet %q: %w", server.WireGuardSubnet6, err)
 	}
+	// Mask off any host bits so allocation starts from the true network address
+	// (netip.ParsePrefix, unlike net.ParseCIDR, keeps host bits — e.g.
+	// "fd00::5/64" would otherwise start allocating at fd00::7).
+	prefix = prefix.Masked()
 
 	devices, err := DB_GetAllDevices()
 	if err != nil {
