@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react"
-import { ChevronLeft, ChevronRight, Copy, Search, ZapOff } from "lucide-react"
+import { ChevronLeft, ChevronRight, Copy, Search, Zap, ZapOff } from "lucide-react"
 import "flag-icons/css/flag-icons.min.css"
 import { Card, Page, Toolbar } from "@/components/ui"
 import { connectServer, disconnect, fetchServers, fetchState } from "@/store/actions"
@@ -12,6 +12,37 @@ const copyText = (text) => {
 	navigator.clipboard?.writeText(text)
 	useStore.getState().notifySuccess("Copied to clipboard")
 }
+
+// Rectangular flag with a graceful placeholder when the country is unknown.
+const Flag = ({ code, className = "" }) => {
+	const box = { width: "1.9rem", height: "1.4rem" }
+	if (!code) {
+		return (
+			<span
+				className={"grid shrink-0 place-items-center rounded-sm bg-base-300 text-[9px] opacity-40 " + className}
+				style={box}
+			>
+				??
+			</span>
+		)
+	}
+	return (
+		<span
+			className={`fi fi-${normalizeCountryCode(code).toLowerCase()} shrink-0 rounded-sm shadow-sm ring-1 ring-base-content/10 ${className}`}
+			style={{ ...box, backgroundSize: "cover" }}
+			title={countryName(code)}
+		/>
+	)
+}
+
+const StatusPill = ({ active }) =>
+	active ? (
+		<span className="badge badge-success badge-sm gap-1 border-none bg-success/15 text-success">
+			<span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-current" /> Connected
+		</span>
+	) : (
+		<span className="badge badge-ghost badge-sm opacity-50">Idle</span>
+	)
 
 const Servers = () => {
 	const servers = useStore((s) => s.servers)
@@ -45,6 +76,11 @@ const Servers = () => {
 		)
 	}, [servers, filter])
 
+	const activeCount = useMemo(
+		() => (servers || []).filter((s) => activeByServer[s._id]).length,
+		[servers, activeByServer],
+	)
+
 	const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
 	const safePage = Math.min(page, totalPages - 1)
 	const paged = filtered.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE)
@@ -67,11 +103,18 @@ const Servers = () => {
 	return (
 		<Page>
 			<Toolbar>
+				<div className="flex items-baseline gap-2">
+					<span className="text-sm font-semibold tracking-tight">Servers</span>
+					<span className="text-[11px] opacity-40">
+						{filtered.length}
+						{activeCount > 0 && <span className="text-success"> · {activeCount} connected</span>}
+					</span>
+				</div>
 				<div className="ml-auto flex items-center gap-1.5">
-					<label className="input input-xs flex w-44 items-center gap-1">
+					<label className="input input-xs flex w-48 items-center gap-1">
 						<Search size={12} className="opacity-40" />
 						<input
-							placeholder="Filter servers..."
+							placeholder="Filter by tag, IP, country..."
 							value={filter}
 							onChange={(e) => {
 								setFilter(e.target.value)
@@ -100,10 +143,10 @@ const Servers = () => {
 			</Toolbar>
 
 			{advanced ? (
-				<Card className="rounded-none">
+				<Card className="overflow-hidden p-0">
 					<table className="table table-sm">
 						<thead>
-							<tr>
+							<tr className="text-[11px] uppercase tracking-wide opacity-50">
 								<th className="w-8" />
 								<th>Tag</th>
 								<th>Country</th>
@@ -119,7 +162,7 @@ const Servers = () => {
 								paged.map((server) => {
 									const active = activeByServer[server._id]
 									return (
-										<tr key={server._id} className="hover transition-colors duration-300 ease-out hover:text-primary">
+										<tr key={server._id} className={"transition-colors " + (active ? "bg-success/5" : "hover:bg-base-200/60")}>
 											<td>
 												<div
 													className={"h-2 w-2 rounded-full " + (active ? "animate-pulse bg-success" : "bg-base-content/20")}
@@ -167,7 +210,7 @@ const Servers = () => {
 														</button>
 													) : (
 														<button className="btn btn-success btn-xs" onClick={() => connectToServer(server)}>
-															Connect
+															<Zap size={12} /> Connect
 														</button>
 													)}
 													<button className="btn btn-square btn-ghost btn-xs" title="Copy ID" onClick={() => copyText(server._id)}>
@@ -189,46 +232,66 @@ const Servers = () => {
 					</table>
 				</Card>
 			) : paged.length > 0 ? (
-				<div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))" }}>
+				<div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(248px, 1fr))" }}>
 					{paged.map((server) => {
 						const active = activeByServer[server._id]
 						return (
 							<div
 								key={server._id}
 								className={
-									"group rounded-box border bg-base-100 p-4 transition-colors " +
-									(active ? "border-success/50" : "border-base-300 hover:border-primary/40")
+									"group relative flex flex-col overflow-hidden rounded-box border bg-base-100 transition-all duration-200 " +
+									(active
+										? "border-success/50 shadow-sm ring-1 ring-success/20"
+										: "border-base-300 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md")
 								}
 							>
-								<div className="mb-2 flex items-center gap-2">
-									<div className={"h-2 w-2 shrink-0 rounded-full " + (active ? "animate-pulse bg-success" : "bg-base-content/20")} />
-									<span className="truncate text-[13px] font-semibold tracking-tight transition-colors duration-300 group-hover:text-primary">
-										{server.Tag}
-									</span>
+								{active && <div className="absolute inset-x-0 top-0 h-0.5 bg-success" />}
+
+								<div className="flex items-start gap-3 p-4 pb-3">
+									<Flag code={server.Country} />
+									<div className="min-w-0 flex-1">
+										<div className="truncate text-[13px] font-semibold leading-tight tracking-tight transition-colors group-hover:text-primary">
+											{server.Tag}
+										</div>
+										<div className="truncate text-[11px] opacity-50">{countryName(server.Country) || "Unknown region"}</div>
+									</div>
+									<StatusPill active={active} />
 								</div>
-								<div className="mb-1 flex items-center gap-2 text-xs opacity-70">
-									{server.Country && (
-										<span className={`fi fi-${normalizeCountryCode(server.Country).toLowerCase()} rounded-[2px]`} title={countryName(server.Country)} />
+
+								<div className="px-4">
+									<button
+										className="flex w-full items-center gap-2 rounded-btn bg-base-200/60 px-2.5 py-1.5 text-left font-mono text-[11px] opacity-70 transition-colors hover:bg-base-200 hover:opacity-100"
+										title="Copy address"
+										onClick={() => copyText(`${server.IP}:${server.Port}`)}
+									>
+										<span className="truncate">
+											{server.IP}
+											<span className="opacity-40">:{server.Port}</span>
+										</span>
+										<Copy size={11} className="ml-auto shrink-0 opacity-50" />
+									</button>
+								</div>
+
+								<div className="p-4 pt-3">
+									{active ? (
+										<button className="btn btn-outline btn-error btn-sm btn-block gap-1" onClick={() => disconnectFromServer(server)}>
+											<ZapOff size={14} /> Disconnect
+										</button>
+									) : (
+										<button className="btn btn-success btn-sm btn-block gap-1" onClick={() => connectToServer(server)}>
+											<Zap size={14} /> Connect
+										</button>
 									)}
-									{countryName(server.Country) || "—"}
 								</div>
-								<div className="mb-3 font-mono text-xs opacity-70">{server.IP}</div>
-								{active ? (
-									<button className="btn btn-outline btn-error btn-sm btn-block" onClick={() => disconnectFromServer(server)}>
-										Disconnect
-									</button>
-								) : (
-									<button className="btn btn-success btn-sm btn-block" onClick={() => connectToServer(server)}>
-										Connect
-									</button>
-								)}
 							</div>
 						)
 					})}
 				</div>
 			) : (
-				<div className="flex w-full flex-col items-center justify-center rounded-box border border-dashed border-base-300 py-20">
+				<div className="flex w-full flex-col items-center justify-center gap-2 rounded-box border border-dashed border-base-300 py-20">
+					<Search size={22} className="opacity-20" />
 					<div className="text-[13px] opacity-70">{filter ? "No matching servers" : "No servers found"}</div>
+					{filter && <div className="text-[11px] opacity-40">Try a different tag, IP, or country.</div>}
 				</div>
 			)}
 		</Page>
