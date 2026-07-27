@@ -108,23 +108,39 @@ func SendRequestToURL(tc *tls.Config, method string, url string, data any, timeo
 }
 
 // authorizeControlServer enforces that s names a configured control server and
-// rewrites its transport-security-relevant fields (Port, ValidateCertificate,
+// takes its transport-security-relevant fields (ValidateCertificate,
 // CertificatePath) from the stored config. This prevents a caller that reaches
-// the local API from (a) pointing the client at an arbitrary host (SSRF) and
-// (b) supplying ValidateCertificate=false / a custom port to strip TLS or
-// redirect the connection. Only the Host is trusted from the request, and only
-// if it matches an allowlisted entry.
+// the local API from (a) pointing the client at an arbitrary host/port (SSRF)
+// and (b) supplying ValidateCertificate=false / a custom cert path to strip TLS.
+//
+// The allowlist is the set of (Host, Port) pairs in ControlServers — a host may
+// legitimately be configured on multiple ports (e.g. api.tunnels.is:443 and
+// :444), so matching on Host alone and rewriting the port would force every
+// request onto whichever entry happened to be listed first. Match on Host+Port
+// and keep the requested port; only fall back to filling the port from the
+// config when the caller left it empty.
 func authorizeControlServer(s *ControlServer) error {
 	if s == nil {
 		return errors.New("no control server specified")
 	}
 	conf := CONFIG.Load()
 	for _, cs := range conf.ControlServers {
-		if cs.Host == s.Host {
-			s.Port = cs.Port
+		if cs.Host == s.Host && cs.Port == s.Port {
 			s.ValidateCertificate = cs.ValidateCertificate
 			s.CertificatePath = cs.CertificatePath
 			return nil
+		}
+	}
+	// Caller passed only a host (empty port): resolve it from the first host
+	// match, preserving the previous "fill port from config" behaviour.
+	if s.Port == "" {
+		for _, cs := range conf.ControlServers {
+			if cs.Host == s.Host {
+				s.Port = cs.Port
+				s.ValidateCertificate = cs.ValidateCertificate
+				s.CertificatePath = cs.CertificatePath
+				return nil
+			}
 		}
 	}
 	return errors.New("host not in configured control servers")
@@ -167,7 +183,7 @@ func ForwardToController(FR *FORWARD_REQUEST) (any, int) {
 	if len(responseBytes) != 0 {
 		err = json.Unmarshal(responseBytes, &respObj)
 		if err != nil {
-			ERROR("Could not parse response data: ", err)
+			ERROR("Could not parse response data from ", FR.Server.Host, ":", FR.Server.Port, " err:", err)
 			er.Error = "Unable to open response from controller"
 			return er, code
 		}
@@ -220,6 +236,15 @@ func validateTunnelMeta(tun *TunnelMETA, oldTag string) (err []string) {
 	}
 	if _, ok := allowedConfigFormats[tun.ConfigFormat]; !ok {
 		err = append(err, "unsupported tunnel config format: "+tun.ConfigFormat)
+	}
+
+	// The kill switch works by blackholing the default route when the tunnel
+	// drops; it is meaningless without a default route (there is nothing to
+	// blackhole) and at runtime handleTunnelDeath already gates on both flags.
+	// Reject the incoherent config so the toggle can't imply protection it will
+	// never provide.
+	if tun.KillSwitch && !tun.EnableDefaultRoute {
+		err = append(err, "kill switch requires the default route to be enabled")
 	}
 
 	tunnelMetaMapRange(func(t *TunnelMETA) bool {
