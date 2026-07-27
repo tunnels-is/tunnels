@@ -229,9 +229,41 @@ const TunnelForm = () => {
 
 				<Card title="Features" description="Behaviour of this tunnel while connected.">
 					<div className="grid grid-cols-1 sm:grid-cols-2">
-						{FEATURE_TOGGLES.map((opt) => (
-							<Toggle key={opt.key} label={opt.label} checked={!!form[opt.key]} onChange={() => set(opt.key, !form[opt.key])} />
-						))}
+						{FEATURE_TOGGLES.map((opt) => {
+							// The kill switch only works with a default route (it blackholes
+							// the default route on drop). Disable and force it off unless the
+							// default route is enabled, matching the backend validation.
+							if (opt.key === "KillSwitch") {
+								const allowed = !!form.EnableDefaultRoute
+								return (
+									<Toggle
+										key={opt.key}
+										label={allowed ? opt.label : opt.label + " (needs Default Route)"}
+										checked={allowed && !!form.KillSwitch}
+										disabled={!allowed}
+										onChange={() => set("KillSwitch", !form.KillSwitch)}
+									/>
+								)
+							}
+							// Turning the default route off must also clear the kill switch so
+							// the pair can never be left in the invalid combination.
+							if (opt.key === "EnableDefaultRoute") {
+								return (
+									<Toggle
+										key={opt.key}
+										label={opt.label}
+										checked={!!form.EnableDefaultRoute}
+										onChange={() =>
+											setForm((f) => {
+												const next = !f.EnableDefaultRoute
+												return { ...f, EnableDefaultRoute: next, KillSwitch: next ? f.KillSwitch : false }
+											})
+										}
+									/>
+								)
+							}
+							return <Toggle key={opt.key} label={opt.label} checked={!!form[opt.key]} onChange={() => set(opt.key, !form[opt.key])} />
+						})}
 					</div>
 				</Card>
 
