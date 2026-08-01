@@ -14,16 +14,21 @@
     "react": "18.2.0",
     "react-datepicker": "8.3.0",
     "react-dom": "18.2.0",
-    "react-router-dom": "6.4.5"
+    "react-router-dom": "7.18.2"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.18",
     "@types/react": "18.0.17",
     "@types/react-dom": "18.0.6",
-    "@vitejs/plugin-react": "4.3.4",
-    "postcss": "8.5.3",
+    "@vitejs/plugin-react": "4.7.0",
+    "postcss": "8.5.18",
     "tailwindcss": "4.1.17",
-    "vite": "6.4.1"
+    "vite": "6.4.3"
   },
-  "packageManager": "pnpm@10.10.0"
+  "packageManager": "pnpm@10.10.0",
+  "pnpm": {
+    "overrides": {
+      "picomatch": ">=4.0.4"
+    }
+  }
 }
