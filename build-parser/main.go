@@ -55,11 +55,6 @@ func checkDir(dir string) {
 						continue
 					}
 				}
-				if path == "../client/update.go" && i == 35 {
-					if bytes.Contains(fbs[i], []byte("fmt.Println(s...)")) {
-						continue
-					}
-				}
 				if path == "../server/main.go" && i == 142 {
 					if bytes.Contains(fbs[i], []byte("fmt.Println(version.Version)")) {
 						continue
