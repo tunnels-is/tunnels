@@ -5,17 +5,12 @@ import (
 	"embed"
 	"flag"
 	"fmt"
-	"io"
 	"log"
 	"net"
 	"net/http"
-	"net/http/httputil"
-	"net/url"
 	"os"
-	"path"
 	"runtime"
 	rdebug "runtime/debug"
-	"strings"
 	"time"
 
 	"github.com/tunnels-is/tunnels/client"
@@ -63,7 +58,8 @@ func main() {
 	conf.OpenUI = false
 	client.CONFIG.Store(conf)
 
-	// Resolve the API server address from the loaded config.
+	// Resolve the API bind address and the URL the webview should load.
+	// The UI always targets loopback even when the API binds on 0.0.0.0.
 	apiIP := conf.APIIP
 	if apiIP == "" {
 		apiIP = client.DefaultAPIIP
@@ -72,8 +68,13 @@ func main() {
 	if apiPort == "" {
 		apiPort = client.DefaultAPIPort
 	}
-	apiAddr := apiIP + ":" + apiPort
-	backendURL := "http://" + apiAddr
+	uiHost := apiIP
+	if ip := net.ParseIP(apiIP); ip != nil && ip.IsUnspecified() {
+		uiHost = "127.0.0.1"
+	}
+	uiURL := "http://" + net.JoinHostPort(uiHost, apiPort)
+	// Dial target for readiness: can't dial 0.0.0.0 usefully on all platforms.
+	dialAddr := net.JoinHostPort(uiHost, apiPort)
 
 	// Start the VPN client event loop in the background.
 	go func() {
@@ -86,23 +87,25 @@ func main() {
 	}()
 
 	// Wait for the API server to accept connections.
-	waitForAPI(apiAddr)
+	waitForAPI(dialAddr)
 
-	handler := newTunnelsHandler(backendURL)
-
+	// Wails always boots at wails.localhost; redirect once into the local API
+	// so the webview is same-origin with /v1 and the session cookie.
 	if err := wails.Run(&options.App{
-		Title:            "Tunnels",
-		Width:            1280,
-		Height:           800,
-		MinWidth:         800,
-		MinHeight:        600,
+		Title:                    "Tunnels",
+		Width:                    1280,
+		Height:                   800,
+		MinWidth:                 800,
+		MinHeight:                600,
 		BackgroundColour:         options.NewRGB(24, 24, 27),
 		EnableDefaultContextMenu: true,
 		Debug: options.Debug{
 			OpenInspectorOnStartup: false,
 		},
 		AssetServer: &assetserver.Options{
-			Handler: handler,
+			Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				http.Redirect(w, r, uiURL+r.URL.RequestURI(), http.StatusFound)
+			}),
 		},
 		OnShutdown: func(ctx context.Context) {
 			if client.CancelFunc != nil {
@@ -113,71 +116,6 @@ func main() {
 	}); err != nil {
 		log.Fatal(err)
 	}
-}
-
-// tunnelsHandler proxies all requests to the client's HTTPS API server.
-// For SPA routes (paths without file extensions that aren't API calls),
-// it serves index.html with an injected script that replaces WebSocket
-// log streaming with HTTP polling through the Wails proxy.
-type tunnelsHandler struct {
-	proxy      *httputil.ReverseProxy
-	backendURL string
-	httpClient *http.Client
-}
-
-func newTunnelsHandler(backendURL string) *tunnelsHandler {
-	target, _ := url.Parse(backendURL)
-	proxy := httputil.NewSingleHostReverseProxy(target)
-
-	return &tunnelsHandler{
-		proxy:      proxy,
-		backendURL: backendURL,
-		httpClient: &http.Client{
-			Timeout: 5 * time.Second,
-		},
-	}
-}
-
-func (h *tunnelsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	p := r.URL.Path
-
-	// Non-GET requests (API POST calls) go straight to the proxy.
-	if r.Method != http.MethodGet {
-		h.proxy.ServeHTTP(w, r)
-		return
-	}
-
-	// API endpoints and static asset paths go to the proxy.
-	if strings.HasPrefix(p, "/v1/") || strings.HasPrefix(p, "/assets/") {
-		h.proxy.ServeHTTP(w, r)
-		return
-	}
-
-	// Requests for files with extensions (favicon.ico, etc.) go to the proxy.
-	if path.Ext(p) != "" {
-		h.proxy.ServeHTTP(w, r)
-		return
-	}
-
-	// All other GET requests are SPA routes — serve index.html
-	// with the WebSocket override injected.
-	h.serveIndex(w, r)
-}
-
-// serveIndex serves index.html from the backend for SPA route fallback.
-// The frontend detects Wails and directs API/WebSocket calls to the
-// backend itself, so no script injection is needed here.
-func (h *tunnelsHandler) serveIndex(w http.ResponseWriter, r *http.Request) {
-	resp, err := h.httpClient.Get(h.backendURL + "/")
-	if err != nil {
-		h.proxy.ServeHTTP(w, r)
-		return
-	}
-	defer resp.Body.Close()
-
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.WriteHeader(resp.StatusCode)
-	_, _ = io.Copy(w, resp.Body)
 }
 
 // waitForAPI polls until the client's API server is accepting TCP connections.

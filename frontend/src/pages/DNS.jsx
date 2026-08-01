@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react"
-import { Pencil, Save, Trash2, X } from "lucide-react"
+import { Pencil, RefreshCw, Save, Trash2, X } from "lucide-react"
 import Dialog from "@/components/Dialog"
 import { Card, Page, TextField, Toggle } from "@/components/ui"
-import { fetchState, saveConfig, toggleConfigKey } from "@/store/actions"
+import { fetchState, saveConfig, toggleConfigKey, updateBlockLists } from "@/store/actions"
 import { useStore } from "@/store/store"
 
 const BEHAVIOUR_OPTIONS = [
@@ -77,6 +77,7 @@ const DNS = () => {
 	const [cfg, setCfg] = useState({ ...config })
 	// dialog state: { kind: "record" | "DNSBlockLists" | "DNSWhiteLists", value, index } — index -1 = create
 	const [dialog, setDialog] = useState(null)
+	const [updatingLists, setUpdatingLists] = useState(false)
 
 	useEffect(() => {
 		fetchState()
@@ -93,6 +94,16 @@ const DNS = () => {
 	const saveServer = async () => {
 		const ok = await saveConfig(cfg)
 		if (ok) setEditing(false)
+	}
+
+	const handleUpdateBlockLists = async () => {
+		if (updatingLists) return
+		setUpdatingLists(true)
+		try {
+			await updateBlockLists()
+		} finally {
+			setUpdatingLists(false)
+		}
 	}
 
 	// replace (or append) one item in a config list and save
@@ -224,18 +235,29 @@ const DNS = () => {
 					title="Block lists"
 					description="External lists of domains that will be blocked."
 					actions={
-						<button
-							className="btn btn-primary btn-xs"
-							onClick={() =>
-								setDialog({
-									kind: "DNSBlockLists",
-									value: { Tag: "new-blocklist", URL: "https://example.com/blocklist.txt", Enabled: true, Count: 0 },
-									index: -1,
-								})
-							}
-						>
-							Create
-						</button>
+						<>
+							<button
+								className="btn btn-outline btn-xs"
+								onClick={handleUpdateBlockLists}
+								disabled={updatingLists || blockLists.length === 0}
+								title="Re-download all block lists from their URLs"
+							>
+								<RefreshCw size={12} className={updatingLists ? "animate-spin" : undefined} />
+								{updatingLists ? "Updating..." : "Update"}
+							</button>
+							<button
+								className="btn btn-primary btn-xs"
+								onClick={() =>
+									setDialog({
+										kind: "DNSBlockLists",
+										value: { Tag: "new-blocklist", URL: "https://example.com/blocklist.txt", Enabled: true, Count: 0 },
+										index: -1,
+									})
+								}
+							>
+								Create
+							</button>
+						</>
 					}
 				>
 					{blockLists.length > 0 ? (
