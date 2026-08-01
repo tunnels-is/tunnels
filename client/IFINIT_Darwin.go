@@ -212,10 +212,6 @@ func (t *TInterface) AddrV6() (err error) {
 	return nil
 }
 
-func (t *TInterface) PrepareForSwitch() {
-
-}
-
 func (t *TInterface) Connect(tun *TUN) (err error) {
 	err = t.Up()
 	if err != nil {
