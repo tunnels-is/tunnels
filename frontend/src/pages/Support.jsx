@@ -1,4 +1,4 @@
-import { ArrowUpRight, BookOpen, Github, LifeBuoy, Mail, MessageCircle, MessageSquare, Twitter } from "lucide-react"
+import { ArrowUpRight, BookOpen, Github, Globe, LifeBuoy, Mail, MessageCircle, MessageSquare, Twitter } from "lucide-react"
 import { Card, Page } from "@/components/ui"
 import { useStore } from "@/store/store"
 
@@ -84,8 +84,9 @@ const Support = () => {
 			</Card>
 
 			<div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-				<Card title="Resources" description="Documentation and source code.">
+				<Card title="Resources" description="Website, documentation and source code.">
 					<div className="grid grid-cols-1">
+						<LinkRow icon={Globe} name="Website" value="tunnels.is" href="https://tunnels.is" />
 						<LinkRow icon={BookOpen} name="Documentation" value="tunnels.is/docs" href="https://www.tunnels.is/docs" />
 						<LinkRow icon={Github} name="GitHub" value="tunnels-is/tunnels" href="https://www.github.com/tunnels-is/tunnels" />
 					</div>
