@@ -107,6 +107,7 @@ export const fetchUsers = async () => {
 export const loginUser = async (user, remember, server) => {
 	user.ControlServer = server
 	store().setUser(user)
+	serversFetchedAt = 0 // force a fresh server list for the new session
 	if (remember) await saveUserToDisk(user)
 }
 
@@ -295,15 +296,35 @@ export const disconnect = async (activeTunnel) => {
 	await fetchState()
 }
 
-export const fetchServers = async () => {
-	const resp = await controller("/client/servers", { StartIndex: 0 }, { silent: true })
-	if (resp.status === 200) {
-		store().setServers(resp.data?.length > 0 ? resp.data : [])
-		if (!resp.data?.length) store().notifyError("Unable to find servers")
-	} else if (resp.status !== 0) {
-		store().setServers([])
-		store().notifyError("Unable to find servers")
+const SERVERS_TTL_MS = 30_000
+let serversFetchedAt = 0
+let serversInFlight = null
+
+/** Fetch /client/servers with a 30s TTL cache and in-flight dedupe. Pass { force: true } to bypass. */
+export const fetchServers = async ({ force = false } = {}) => {
+	if (!force && Date.now() - serversFetchedAt < SERVERS_TTL_MS) {
+		return store().servers
 	}
+	if (serversInFlight) return serversInFlight
+
+	serversInFlight = (async () => {
+		try {
+			const resp = await controller("/client/servers", { StartIndex: 0 }, { silent: true })
+			if (resp.status === 200) {
+				store().setServers(resp.data?.length > 0 ? resp.data : [])
+				serversFetchedAt = Date.now()
+				if (!resp.data?.length) store().notifyError("Unable to find servers")
+			} else if (resp.status !== 0) {
+				store().setServers([])
+				store().notifyError("Unable to find servers")
+			}
+			return store().servers
+		} finally {
+			serversInFlight = null
+		}
+	})()
+
+	return serversInFlight
 }
 
 let configSaveInProgress = false
