@@ -21,6 +21,16 @@ import (
 var listReloadMu sync.Mutex
 
 func reloadBlockLists(sleep bool) {
+	reloadBlockListsEx(sleep, false)
+}
+
+// forceReloadBlockLists re-downloads every configured list, ignoring the
+// usual 24h cache window. Used by the UI "Update" action.
+func forceReloadBlockLists() {
+	reloadBlockListsEx(false, true)
+}
+
+func reloadBlockListsEx(sleep bool, force bool) {
 	defer RecoverAndLog()
 	if sleep {
 		time.Sleep(1 * time.Hour)
@@ -54,7 +64,7 @@ func reloadBlockLists(sleep bool) {
 	wg := new(sync.WaitGroup)
 	for i := range config.DNSBlockLists {
 		wg.Add(1)
-		go processBlockList(i, wg, newMap)
+		go processBlockList(i, wg, newMap, force)
 	}
 	wg.Wait()
 
@@ -66,7 +76,7 @@ func reloadBlockLists(sleep bool) {
 	}
 }
 
-func processBlockList(index int, wg *sync.WaitGroup, nm *xsync.MapOf[string, bool]) {
+func processBlockList(index int, wg *sync.WaitGroup, nm *xsync.MapOf[string, bool], force bool) {
 	defer func() {
 		wg.Done()
 	}()
@@ -82,7 +92,8 @@ func processBlockList(index int, wg *sync.WaitGroup, nm *xsync.MapOf[string, boo
 	state := STATE.Load()
 	lowerTag := strings.ToLower(bl.Tag)
 
-	if time.Since(bl.LastDownload).Hours() > 24 && bl.URL != "" {
+	// force=true (manual Update) re-downloads even when LastDownload is fresh.
+	if (force || time.Since(bl.LastDownload).Hours() > 24) && bl.URL != "" {
 		listBytes, err = downloadList(bl.URL)
 		if err != nil {
 			ERROR("Could not download bocklist", bl.URL, err)

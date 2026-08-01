@@ -5,9 +5,10 @@ import path from "path"
 
 // Content-Security-Policy injected into the built index.html only. The dev
 // server needs a looser policy (HMR uses eval + a websocket), so we skip
-// injection when serving. connect-src is limited to same-origin plus the
-// loopback daemon (Wails/dev use 127.0.0.1:7777); all control-server traffic is
-// proxied through that daemon, so the browser never connects cross-origin.
+// injection when serving. connect-src is same-origin plus the loopback daemon
+// used by `vite dev` (port rewrite to 7777). Wails loads the UI from the API
+// origin itself, so 'self' covers it. Control-server traffic is always
+// proxied through the local daemon.
 const CSP = [
 	"default-src 'self'",
 	"connect-src 'self' http://127.0.0.1:7777 ws://127.0.0.1:7777",

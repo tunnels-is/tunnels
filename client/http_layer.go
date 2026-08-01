@@ -289,6 +289,9 @@ func HTTPhandler(w http.ResponseWriter, r *http.Request) {
 	case "getDNSStats":
 		HTTP_GetDNSStats(w, r)
 		return
+	case "updateBlockLists":
+		HTTP_UpdateBlockLists(w, r)
+		return
 	case "getLogs":
 		HTTP_GetLogs(w, r)
 		return
@@ -423,6 +426,14 @@ func HTTP_GetDNSStats(w http.ResponseWriter, r *http.Request) {
 		return true
 	})
 	JSON(w, r, 200, stats)
+}
+
+// HTTP_UpdateBlockLists force-reloads DNS block lists from their URLs
+// (ignoring the 24h download cache) and returns the updated list metadata.
+func HTTP_UpdateBlockLists(w http.ResponseWriter, r *http.Request) {
+	forceReloadBlockLists()
+	config := CONFIG.Load()
+	JSON(w, r, 200, config.DNSBlockLists)
 }
 
 func HTTP_GetState(w http.ResponseWriter, r *http.Request) {

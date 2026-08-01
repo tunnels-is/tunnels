@@ -385,3 +385,21 @@ export const fetchDnsStats = async () => {
 		useStore.setState({ dnsStats: resp.data || {} })
 	}
 }
+
+// Force-re-download all configured DNS block lists (bypasses the 24h cache).
+// Downloads can take a while for large lists, so the timeout is generous.
+export const updateBlockLists = async () => {
+	store().showLoading("Updating block lists...")
+	try {
+		const resp = await api("updateBlockLists", null, { timeout: 300000 })
+		if (resp.status === 200) {
+			store().notifySuccess("Block lists updated")
+			// Refresh config so domain counts / LastDownload show the new data.
+			await fetchState()
+			return true
+		}
+		return false
+	} finally {
+		store().hideLoading()
+	}
+}
