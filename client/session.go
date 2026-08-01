@@ -57,6 +57,14 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	}()
 	defer RecoverAndLog()
 
+	// Ensure tunnels/keys come from this account's workspace before looking up meta.
+	if ClientCR.UserID != "" {
+		if err := activateAccountByUserID(ClientCR.UserID); err != nil {
+			ERROR("unable to activate account workspace:", err)
+			return 500, errors.New("unable to activate account workspace")
+		}
+	}
+
 	state := STATE.Load()
 	loadDefaultGateway()
 	loadDefaultInterface()
@@ -160,41 +168,23 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		}
 	}
 
-	wgPrivKeyB64 := meta.WireGuardPrivKey
-	if wgPrivKeyB64 == "" {
-		wgPrivKeyB64, err = generateWGPrivKey()
-		if err != nil {
-			ERROR("unable to generate WireGuard private key: ", err)
-			return 502, errors.New("unable to generate WireGuard private key")
-		}
-		meta.WireGuardPrivKey = wgPrivKeyB64
-		if writeErr := writeTunnelsToDisk(meta.Tag); writeErr != nil {
-			ERROR("unable to persist WireGuard private key: ", writeErr)
-		}
-	}
-
-	pubKey, pubErr := deriveWGPubKey(wgPrivKeyB64)
-	if pubErr != nil {
-		return 502, errors.New("unable to derive WireGuard public key")
-	}
-
-	wgCfg, wgErr := getServerWGConfig(ClientCR, ClientCR.ServerID, pubKey)
+	// Identity is per local device (by ServerID), not the tunnel file.
+	localDev, wgCfg, wgErr := resolveLocalDeviceForServer(ClientCR, ClientCR.ServerID, meta.Tag)
 	if wgErr != nil {
-		ERROR("unable to fetch server WireGuard config: ", wgErr)
-		return 502, fmt.Errorf("unable to fetch server WireGuard config: %w", wgErr)
+		ERROR("unable to resolve local device for server: ", wgErr)
+		return 502, fmt.Errorf("unable to resolve local device for server: %w", wgErr)
 	}
-	if wgCfg.WireGuardIP == "" {
-		INFO("no device for this tunnel on server, auto-creating for tag: ", ClientCR.Tag)
-		wgCfg, wgErr = createServerDevice(ClientCR, ClientCR.ServerID, pubKey, ClientCR.Tag)
-		if wgErr != nil {
-			ERROR("unable to auto-create device on controller: ", wgErr)
-			return 502, fmt.Errorf("unable to auto-create device on controller: %w", wgErr)
-		}
-		if wgCfg.WireGuardIP == "" {
-			return 502, errors.New("controller did not assign a WireGuard IP to the new device")
-		}
-		INFO("auto-created device with WireGuard IP: ", wgCfg.WireGuardIP)
+	if localDev == nil || wgCfg == nil || localDev.WireGuardPrivKey == "" {
+		return 502, errors.New("no local device identity for server")
 	}
+	wgPrivKeyB64 := localDev.WireGuardPrivKey
+
+	// Stop storing WG keys on the tunnel meta (legacy field).
+	if meta.WireGuardPrivKey != "" {
+		meta.WireGuardPrivKey = ""
+		_ = writeTunnelsToDisk(meta.Tag)
+	}
+
 	if ClientCR.ServerIP == "" {
 		ClientCR.ServerIP = wgCfg.ServerIP
 	}
@@ -345,10 +335,10 @@ func getServerWGConfig(cr *ConnectionRequest, serverID string, pubKey string) (*
 	return cfg, nil
 }
 
-func createServerDevice(cr *ConnectionRequest, serverID string, pubKey string, tag string) (*wgServerConfig, error) {
+func createServerDeviceFull(cr *ConnectionRequest, serverID string, pubKey string, tag string) (*wgServerConfig, *types.Device, error) {
 	serverOID, err := uuid.Parse(serverID)
 	if err != nil {
-		return nil, fmt.Errorf("invalid ServerID: %w", err)
+		return nil, nil, fmt.Errorf("invalid ServerID: %w", err)
 	}
 	if tag == "" {
 		tag = DefaultTunnelName
@@ -375,23 +365,23 @@ func createServerDevice(cr *ConnectionRequest, serverID string, pubKey string, t
 	}
 	responseBytes, code, reqErr := SendRequestToURL(nil, "POST", url, reqBody, 15000, cr.Server.ValidateCertificate, authHeaders)
 	if reqErr != nil {
-		return nil, fmt.Errorf("create device: %w", reqErr)
+		return nil, nil, fmt.Errorf("create device: %w", reqErr)
 	}
 	if code != 200 {
 		var er ErrorResponse
 		_ = json.Unmarshal(responseBytes, &er)
 		if er.Error != "" {
-			return nil, fmt.Errorf("create device: code=%d: %s", code, er.Error)
+			return nil, nil, fmt.Errorf("create device: code=%d: %s", code, er.Error)
 		}
-		return nil, fmt.Errorf("create device: code=%d", code)
+		return nil, nil, fmt.Errorf("create device: code=%d", code)
 	}
 
 	var resp createDeviceControllerResponse
 	if err := json.Unmarshal(responseBytes, &resp); err != nil {
-		return nil, fmt.Errorf("decode create device response: %w", err)
+		return nil, nil, fmt.Errorf("decode create device response: %w", err)
 	}
 	if resp.Device == nil {
-		return nil, errors.New("controller returned no device")
+		return nil, nil, errors.New("controller returned no device")
 	}
 
 	return &wgServerConfig{
@@ -402,7 +392,13 @@ func createServerDevice(cr *ConnectionRequest, serverID string, pubKey string, t
 		WireGuardSubnet:  resp.ServerSubnet,
 		WireGuardSubnet6: resp.ServerSubnet6,
 		WANCIDR:          resp.WANCIDR,
-	}, nil
+		EnableFirewall:   false, // filled from getServerWGConfig when available
+	}, resp.Device, nil
+}
+
+func createServerDevice(cr *ConnectionRequest, serverID string, pubKey string, tag string) (*wgServerConfig, error) {
+	cfg, _, err := createServerDeviceFull(cr, serverID, pubKey, tag)
+	return cfg, err
 }
 
 func InitializeTunnelFromCRR(TUN *TUN) (err error) {

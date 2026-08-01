@@ -299,6 +299,9 @@ func HTTPhandler(w http.ResponseWriter, r *http.Request) {
 	case "createDeviceWithKeys":
 		HTTP_CreateDeviceWithKeys(w, r)
 		return
+	case "getLocalDevices":
+		HTTP_GetLocalDevices(w, r)
+		return
 	default:
 	}
 
@@ -804,4 +807,27 @@ func HTTP_CreateDeviceWithKeys(w http.ResponseWriter, r *http.Request) {
 	}
 	data, code := CreateDeviceWithKeys(form)
 	JSON(w, r, code, data)
+}
+
+func HTTP_GetLocalDevices(w http.ResponseWriter, r *http.Request) {
+	// Optional UserID to activate the correct account workspace before listing.
+	form := struct {
+		UserID string `json:"UserID"`
+	}{}
+	_ = Bind(&form, r)
+	if form.UserID != "" {
+		if err := activateAccountByUserID(form.UserID); err != nil {
+			JSON(w, r, 400, err.Error())
+			return
+		}
+	}
+	list, err := listLocalDeviceInfo()
+	if err != nil {
+		JSON(w, r, 500, err.Error())
+		return
+	}
+	if list == nil {
+		list = []LocalDeviceInfo{}
+	}
+	JSON(w, r, 200, list)
 }

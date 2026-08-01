@@ -78,9 +78,11 @@ export const fetchState = async () => {
 			const match = activeID && users?.find((u) => u._id === activeID)
 			if (match) {
 				store().setUser(match)
+				await api("setUser", match, { logout: false, silent: true })
 				if (onNoRoute) window.location.hash = "#/dashboard"
 			} else if (users?.length === 1) {
 				store().setUser(users[0])
+				await api("setUser", users[0], { logout: false, silent: true })
 				if (onNoRoute) window.location.hash = "#/dashboard"
 			} else if (users?.length > 0) {
 				useStore.setState({ users })
@@ -105,10 +107,17 @@ export const fetchUsers = async () => {
 }
 
 export const loginUser = async (user, remember, server) => {
+	clearAccountScopedCache()
 	user.ControlServer = server
 	store().setUser(user)
-	serversFetchedAt = 0 // force a fresh server list for the new session
 	if (remember) await saveUserToDisk(user)
+}
+
+export const switchAccount = async (user) => {
+	clearAccountScopedCache()
+	store().setUser(user)
+	// Persist + activate account workspace on the local daemon (tunnels/devices paths).
+	await api("setUser", user, { logout: false, silent: true })
 }
 
 export const saveUserToDisk = async (user) => {
@@ -122,6 +131,7 @@ export const saveUserToDisk = async (user) => {
 export const deleteUserFile = (hash) => api("delUser", { Hash: hash }, { logout: false })
 
 export const finalizeLogout = () => {
+	clearAccountScopedCache()
 	session.clear()
 	window.location.replace("/#/login")
 	window.location.reload()
@@ -299,6 +309,20 @@ export const disconnect = async (activeTunnel) => {
 const SERVERS_TTL_MS = 30_000
 let serversFetchedAt = 0
 let serversInFlight = null
+// Which user id the current devices[] list was fetched for (null = empty/unknown).
+let devicesFetchedForUser = null
+let devicesInFlight = null
+
+// Drop controller-side lists that belong to a previous account so a
+// switch/login cannot briefly show the wrong servers or devices.
+export const clearAccountScopedCache = () => {
+	serversFetchedAt = 0
+	serversInFlight = null
+	devicesFetchedForUser = null
+	devicesInFlight = null
+	session.setObject("servers", [])
+	useStore.setState({ servers: [], devices: [], localDevices: [] })
+}
 
 /** Fetch /client/servers with a 30s TTL cache and in-flight dedupe. Pass { force: true } to bypass. */
 export const fetchServers = async ({ force = false } = {}) => {
@@ -325,6 +349,46 @@ export const fetchServers = async ({ force = false } = {}) => {
 	})()
 
 	return serversInFlight
+}
+
+/** Fetch controller devices + local devices for the active account. */
+export const fetchDevices = async ({ force = false } = {}) => {
+	const userID = store().user?._id || ""
+	if (!userID) {
+		store().setDevices([])
+		store().setLocalDevices([])
+		devicesFetchedForUser = null
+		return []
+	}
+	if (!force && devicesFetchedForUser === userID) {
+		return store().devices
+	}
+	if (devicesInFlight) return devicesInFlight
+
+	devicesInFlight = (async () => {
+		try {
+			const [remote, local] = await Promise.all([
+				controller("/client/device/list/user", {}, { silent: true }),
+				api("getLocalDevices", { UserID: userID }, { silent: true, logout: false }),
+			])
+			if (remote.status === 200 && Array.isArray(remote.data)) {
+				store().setDevices(remote.data)
+			} else if (remote.status !== 0) {
+				store().setDevices([])
+			}
+			if (local.status === 200 && Array.isArray(local.data)) {
+				store().setLocalDevices(local.data)
+			} else {
+				store().setLocalDevices([])
+			}
+			devicesFetchedForUser = userID
+			return store().devices
+		} finally {
+			devicesInFlight = null
+		}
+	})()
+
+	return devicesInFlight
 }
 
 let configSaveInProgress = false

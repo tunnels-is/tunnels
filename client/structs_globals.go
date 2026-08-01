@@ -335,9 +335,13 @@ type stateV2 struct {
 	LogPath        string
 	ConfigFileName string
 	BasePath       string
+	AccountsPath   string
 	TunnelsPath    string
+	DevicesPath    string
 	LogFileName    string
-	UserPath       string
+	UserPath       string // accounts root (list/delete); per-account user file is accounts/<hash>/user
+
+	ActiveAccountHash string
 }
 
 type TunnelState int
