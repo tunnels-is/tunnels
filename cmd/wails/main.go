@@ -44,6 +44,7 @@ func main() {
 	flag.StringVar(&s.TunnelType, "tunnelType", "default", "tunnel type: default, strict, iot")
 	flag.BoolVar(&s.Debug, "debug", false, "enable debug logging")
 	flag.BoolVar(&s.RequireConfig, "requireConfig", false, "require config file to start")
+	flag.BoolVar(&client.EnablePprof, "pprof", false, "enable net/http/pprof on the local API server (/debug/pprof/)")
 	flag.Parse()
 	client.STATE.Store(s)
 

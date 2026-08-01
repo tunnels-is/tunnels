@@ -16,6 +16,16 @@ import (
 
 var listReloadMu sync.Mutex
 
+var domainDot = []byte(".")
+
+const (
+	maxDNSListSize    = 128 * 1024 * 1024
+	dnsListScanBuf    = 64 * 1024
+	dnsListMaxLineLen = 1024 * 1024
+)
+
+var listHTTPClient = &http.Client{Timeout: 5 * time.Minute}
+
 func reloadBlockLists(sleep bool) {
 	reloadBlockListsEx(sleep, false)
 }
@@ -81,60 +91,47 @@ func processBlockList(index int, wg *sync.WaitGroup, nm *xsync.MapOf[string, boo
 		return
 	}
 
-	var err error
-	var listBytes []byte
 	state := STATE.Load()
 	lowerTag := strings.ToLower(bl.Tag)
+	path := state.BlockListPath + lowerTag
 
+	// Prefer download when stale/forced; fall back to on-disk cache.
+	// Downloads stream straight to disk so we never hold the full list + per-line strings twice.
 	if (force || time.Since(bl.LastDownload).Hours() > 24) && bl.URL != "" {
-		listBytes, err = downloadList(bl.URL)
-		if err != nil {
+		if err := downloadListToFile(bl.URL, path); err != nil {
 			ERROR("Could not download bocklist", bl.URL, err)
-			listBytes, err = os.ReadFile(state.BlockListPath + lowerTag)
-			if err != nil {
+			if !fileExistsNonEmpty(path) {
 				ERROR("Could not read from disk or download blocklist", bl.URL, err)
 				return
 			}
 		}
 	} else if bl.Tag != "" {
-		listBytes, err = os.ReadFile(state.BlockListPath + lowerTag)
-		if err != nil {
-			ERROR("Could not read blocklist", lowerTag, err)
-			listBytes, err = downloadList(bl.URL)
-			if err != nil {
+		if !fileExistsNonEmpty(path) {
+			if bl.URL == "" {
+				ERROR("No bytes in DNS blocklist: ", bl.URL, lowerTag)
+				return
+			}
+			if err := downloadListToFile(bl.URL, path); err != nil {
 				ERROR("Could not read from disk or download blocklist", bl.URL, err)
 				return
 			}
 		}
+	} else {
+		return
 	}
 
-	if len(listBytes) == 0 {
+	if !fileExistsNonEmpty(path) {
 		ERROR("No bytes in DNS blocklist: ", bl.URL, lowerTag)
 		return
 	}
 
-	err = os.WriteFile(state.BlockListPath+lowerTag, listBytes, 0o600)
+	count, badLines, err := loadDomainsFromFile(path, bl.Enabled, nm)
 	if err != nil {
-		ERROR("Could not save", bl.URL, err)
+		ERROR("Could not parse blocklist", path, err)
 		return
 	}
 
-	bl.Count = 0
-	var badLines int
-	buff := bytes.NewBuffer(listBytes)
-	scanner := bufio.NewScanner(buff)
-	for scanner.Scan() {
-		d := scanner.Text()
-		if CheckIfPlainDomain(d) {
-			if bl.Enabled {
-				nm.Store(d, true)
-			}
-			bl.Count++
-		} else {
-			badLines++
-		}
-	}
-
+	bl.Count = count
 	bl.LastDownload = time.Now()
 	if badLines > 0 {
 		DEBUG(badLines, " invalid lines in list: ", bl.URL)
@@ -142,10 +139,55 @@ func processBlockList(index int, wg *sync.WaitGroup, nm *xsync.MapOf[string, boo
 	config.DNSBlockLists[index] = bl
 }
 
-func downloadList(url string) ([]byte, error) {
+func fileExistsNonEmpty(path string) bool {
+	fi, err := os.Stat(path)
+	return err == nil && fi.Size() > 0
+}
+
+// loadDomainsFromFile streams a list file line-by-line without loading the whole
+// file into memory. Only domains that pass validation (and are enabled) allocate strings.
+func loadDomainsFromFile(path string, enabled bool, nm *xsync.MapOf[string, bool]) (count, bad int, err error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return 0, 0, err
+	}
+	defer f.Close()
+	return loadDomainsFromReader(f, enabled, nm)
+}
+
+func loadDomainsFromReader(r io.Reader, enabled bool, nm *xsync.MapOf[string, bool]) (count, bad int, err error) {
+	scanner := bufio.NewScanner(r)
+	buf := make([]byte, 0, dnsListScanBuf)
+	scanner.Buffer(buf, dnsListMaxLineLen)
+
+	for scanner.Scan() {
+		line := scanner.Bytes()
+		// Skip empty / comment-only lines without allocating.
+		if len(line) == 0 || line[0] == '#' {
+			bad++
+			continue
+		}
+		if !bytes.Contains(line, domainDot) {
+			bad++
+			continue
+		}
+		count++
+		if enabled && nm != nil {
+			// string(line) allocates once per kept domain; scanner.Text() did this for every line.
+			nm.Store(string(line), true)
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return count, bad, err
+	}
+	return count, bad, nil
+}
+
+// downloadListToFile streams a remote list straight to path (capped at maxDNSListSize).
+func downloadListToFile(url, path string) error {
 	defer RecoverAndLog()
 	if !CheckIfURL(url) {
-		return nil, nil
+		return fmt.Errorf("invalid list URL")
 	}
 
 	DEBUG("Downloading Blocklist: ", url)
@@ -155,10 +197,9 @@ func downloadList(url string) ([]byte, error) {
 	}()
 
 	var tries int
-
 retry:
 	resp, err := listHTTPClient.Get(url)
-	if err != nil || resp.StatusCode != http.StatusOK {
+	if err != nil || resp == nil || resp.StatusCode != http.StatusOK {
 		if resp != nil {
 			resp.Body.Close()
 		}
@@ -171,19 +212,38 @@ retry:
 			}
 		}
 		if resp != nil {
-			return nil, fmt.Errorf("failed to download list: %d %s ", resp.StatusCode, err)
-		} else {
-			return nil, fmt.Errorf("failed to download list:  %s ", err)
+			return fmt.Errorf("failed to download list: %d %s ", resp.StatusCode, err)
 		}
+		return fmt.Errorf("failed to download list:  %s ", err)
 	}
 	defer resp.Body.Close()
 
-	bb, err := io.ReadAll(io.LimitReader(resp.Body, maxDNSListSize))
+	// Atomic-ish write: temp file then rename so a partial download never replaces a good list.
+	tmp := path + ".tmp"
+	f, err := os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return bb, nil
+	written, copyErr := io.Copy(f, io.LimitReader(resp.Body, maxDNSListSize))
+	closeErr := f.Close()
+	if copyErr != nil {
+		_ = os.Remove(tmp)
+		return copyErr
+	}
+	if closeErr != nil {
+		_ = os.Remove(tmp)
+		return closeErr
+	}
+	if written == 0 {
+		_ = os.Remove(tmp)
+		return fmt.Errorf("empty list body")
+	}
+	if err := os.Rename(tmp, path); err != nil {
+		_ = os.Remove(tmp)
+		return err
+	}
+	return nil
 }
 
 func GetDefaultBlockLists() []*BlockList {
@@ -237,10 +297,6 @@ func GetDefaultBlockLists() []*BlockList {
 
 	return bl
 }
-
-const maxDNSListSize = 128 * 1024 * 1024
-
-var listHTTPClient = &http.Client{Timeout: 5 * time.Minute}
 
 func CheckIfURL(s string) bool {
 	if strings.HasPrefix(s, "https://") {
