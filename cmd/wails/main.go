@@ -18,6 +18,9 @@ import (
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
+	"github.com/wailsapp/wails/v2/pkg/options/linux"
+	"github.com/wailsapp/wails/v2/pkg/options/mac"
+	"github.com/wailsapp/wails/v2/pkg/options/windows"
 )
 
 //go:embed dist
@@ -25,6 +28,11 @@ var DIST embed.FS
 
 //go:embed wintun.dll
 var DLL embed.FS
+
+// App icon (PNG). Windows taskbar/exe icon comes from rsrc_windows_*.syso next to this package.
+//
+//go:embed build/appicon.png
+var appIcon []byte
 
 func main() {
 	showVersion := false
@@ -97,6 +105,18 @@ func main() {
 			Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				http.Redirect(w, r, uiURL+r.URL.RequestURI(), http.StatusFound)
 			}),
+		},
+		Windows: &windows.Options{
+			DisableWindowIcon: false,
+		},
+		Linux: &linux.Options{
+			Icon: appIcon,
+		},
+		Mac: &mac.Options{
+			About: &mac.AboutInfo{
+				Title: "Tunnels",
+				Icon:  appIcon,
+			},
 		},
 		OnShutdown: func(ctx context.Context) {
 			if client.CancelFunc != nil {

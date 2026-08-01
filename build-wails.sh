@@ -18,6 +18,11 @@ echo "==> Building frontend"
 
 build_windows() {
     echo "==> Building windows/amd64"
+    # rsrc_windows_amd64.syso in cmd/wails embeds the taskbar/exe icon (see cmd/wails/build/)
+    if [ ! -f cmd/wails/rsrc_windows_amd64.syso ]; then
+        echo "    warning: cmd/wails/rsrc_windows_amd64.syso missing — Windows build will have no app icon"
+        echo "    regenerate with: see cmd/wails/build/README.md"
+    fi
     CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build \
         -tags "$TAGS" -trimpath -ldflags "$LDFLAGS -H windowsgui" \
         -o "$BIN_DIR/tunnels-app-windows-amd64.exe" \
