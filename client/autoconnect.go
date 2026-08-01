@@ -182,31 +182,33 @@ func deleteDevice(form *AutoConnectForm, device *types.Device) error {
 	return nil
 }
 
-func ensureDeviceForServer(form *AutoConnectForm, meta *TunnelMETA, server *types.Server) {
-	if meta == nil || meta.WireGuardPrivKey == "" {
-		return
+// preferLocalServerInCountry tries servers we already have a local device for
+// in the requested country (avoids probing when we can reconnect quickly).
+func preferLocalServerInCountry(form *AutoConnectForm, country string) (*types.Server, int64, bool) {
+	locals, err := listLocalDevices()
+	if err != nil || len(locals) == 0 {
+		return nil, 0, false
 	}
-	pubKey, err := deriveWGPubKey(meta.WireGuardPrivKey)
-	if err != nil {
-		return
+	for _, d := range locals {
+		if d.ServerID == "" {
+			continue
+		}
+		sid, err := uuid.Parse(d.ServerID)
+		if err != nil {
+			continue
+		}
+		server, err := fetchServerByID(form, sid)
+		if err != nil || server == nil || !countryEqual(server.Country, country) {
+			continue
+		}
+		latency, ok := pingICMP(server)
+		if !ok {
+			continue
+		}
+		INFO("auto-connect: local device ", d.ID, " already for ", server.Tag, " in ", country)
+		return server, latency.Milliseconds(), true
 	}
-	device, err := findDeviceByPubKey(form, pubKey)
-	if err != nil {
-		ERROR("auto-connect: device lookup failed: ", err)
-		return
-	}
-	if device == nil {
-		INFO("auto-connect: no existing device for tunnel pubkey, one will be created on connect")
-		return
-	}
-	if device.ServerID == server.ID {
-		INFO("auto-connect: existing device already bound to ", server.Tag)
-		return
-	}
-	DEBUG("auto-connect: deleting device bound to another server: ", device.ID)
-	if err := deleteDevice(form, device); err != nil {
-		ERROR("auto-connect: unable to delete mismatched device: ", err)
-	}
+	return nil, 0, false
 }
 
 func countryEqual(a, b string) bool {
@@ -269,38 +271,35 @@ func CountryAutoConnect(form *AutoConnectForm) (*AutoConnectResponse, int, error
 	}
 	INFO("auto-connect: starting, country: ", form.Country, " tag: ", form.Tag, " controller: ", form.Server.Host, ":", form.Server.Port)
 
+	if form.UserID != "" {
+		if err := activateAccountByUserID(form.UserID); err != nil {
+			ERROR("auto-connect: unable to activate account workspace: ", err)
+			return nil, 500, errors.New("unable to activate account workspace")
+		}
+	}
+
 	meta := findTunnelMetaByTag(form.Tag)
 	if meta == nil {
 		INFO("auto-connect: no tunnel meta found for tag ", form.Tag, ", PublicConnect will report if this is fatal")
 	}
 
-	if meta != nil && meta.WireGuardPrivKey != "" {
-		if pubKey, err := deriveWGPubKey(meta.WireGuardPrivKey); err == nil {
-			device, err := findDeviceByPubKey(form, pubKey)
-			if err == nil && device != nil {
-				server, err := fetchServerByID(form, device.ServerID)
-				if err == nil && server != nil && countryEqual(server.Country, form.Country) {
-					INFO("auto-connect: existing device already on ", server.Tag, " in ", form.Country, ", connecting directly")
-					latency, _ := pingICMP(server)
-					cr := &ConnectionRequest{
-						UserID:      form.UserID,
-						DeviceToken: form.DeviceToken,
-						Tag:         form.Tag,
-						ServerID:    server.ID.String(),
-						Server:      form.Server,
-					}
-					code, connErr := PublicConnect(cr)
-					if connErr == nil {
-						return &AutoConnectResponse{
-							ServerTag: server.Tag,
-							ServerIP:  server.IP,
-							LatencyMS: latency.Milliseconds(),
-						}, 200, nil
-					}
-					ERROR("auto-connect: direct connect via existing device failed (code=", code, "): ", connErr, " — falling back to discovery")
-				}
-			}
+	if server, latencyMS, ok := preferLocalServerInCountry(form, form.Country); ok {
+		cr := &ConnectionRequest{
+			UserID:      form.UserID,
+			DeviceToken: form.DeviceToken,
+			Tag:         form.Tag,
+			ServerID:    server.ID.String(),
+			Server:      form.Server,
 		}
+		code, connErr := PublicConnect(cr)
+		if connErr == nil {
+			return &AutoConnectResponse{
+				ServerTag: server.Tag,
+				ServerIP:  server.IP,
+				LatencyMS: latencyMS,
+			}, 200, nil
+		}
+		ERROR("auto-connect: direct connect via local device failed (code=", code, "): ", connErr, " — falling back to discovery")
 	}
 
 	servers, err := fetchServersByCountry(form)
@@ -332,7 +331,6 @@ func CountryAutoConnect(form *AutoConnectForm) (*AutoConnectResponse, int, error
 	lastCode := 502
 	for _, p := range reachable {
 		INFO("auto-connect: attempting ", p.server.Tag, " (", p.server.IP, ", ", p.latency.Milliseconds(), "ms)")
-		ensureDeviceForServer(form, meta, p.server)
 
 		cr := &ConnectionRequest{
 			UserID:      form.UserID,
