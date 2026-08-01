@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react"
-import { Card, Toolbar } from "@/components/ui"
+import { ArrowDown, ArrowUp, Activity } from "lucide-react"
 import { fetchState } from "@/store/actions"
 import { useStore } from "@/store/store"
 
@@ -12,10 +12,8 @@ const TIME_RANGES = [
 	{ label: "7d", seconds: 604800 },
 ]
 
-const seriesColors = () => {
-	const primary = getComputedStyle(document.documentElement).getPropertyValue("--color-primary").trim() || "#d82e2e"
-	return [primary, "#737373", "#f59e0b", "#22c55e", "#a855f7", "#ec4899", "#84cc16", "#14b8a6"]
-}
+const DOWNLOAD_COLOR = "#22c55e"
+const UPLOAD_COLOR = "#f59e0b"
 
 const formatBytes = (bytes) => {
 	if (bytes === 0) return "0 B"
@@ -52,17 +50,26 @@ const aggregateRecords = (records, rangeSeconds) => {
 	return buckets
 }
 
-const MultiGraph = ({ series, dataKey, rangeSeconds, height = 170 }) => {
+const summarize = (records, key) => {
+	if (!records?.length) return { current: 0, avg: 0, peak: 0, total: 0 }
+	const vals = records.map((d) => d[key])
+	const total = vals.reduce((a, b) => a + b, 0)
+	return {
+		current: vals[vals.length - 1] || 0,
+		avg: total / vals.length,
+		peak: vals.reduce((m, v) => (v > m ? v : m), 0),
+		total,
+	}
+}
+
+/** Dual-line chart: download + upload for a single tunnel */
+const DualRateGraph = ({ data, rangeSeconds, height = 160 }) => {
 	const canvasRef = useRef(null)
 	const containerRef = useRef(null)
 
 	const globalMax = useMemo(
-		() => Math.max(1, ...series.flatMap((s) => s.data.map((d) => d[dataKey]))),
-		[series, dataKey],
-	)
-	const longestSeries = useMemo(
-		() => series.reduce((longest, s) => (s.data.length > longest.length ? s.data : longest), []),
-		[series],
+		() => Math.max(1, ...data.flatMap((d) => [d.ig, d.eg])),
+		[data],
 	)
 
 	useEffect(() => {
@@ -78,30 +85,32 @@ const MultiGraph = ({ series, dataKey, rangeSeconds, height = 170 }) => {
 		canvas.style.height = height + "px"
 
 		const ctx = canvas.getContext("2d")
-		ctx.scale(dpr, dpr)
+		ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
 
-		const pad = { left: 72, right: 16, top: 12, bottom: 28 }
-		const graphWidth = width - pad.left - pad.right
+		const pad = { left: 64, right: 12, top: 10, bottom: 26 }
+		const graphWidth = Math.max(1, width - pad.left - pad.right)
 		const graphHeight = height - pad.top - pad.bottom
 
 		ctx.clearRect(0, 0, width, height)
-		const textColor = "rgba(128,128,128,0.7)"
-		const gridColor = "rgba(128,128,128,0.12)"
+		const textColor = "rgba(128,128,128,0.65)"
+		const gridColor = "rgba(128,128,128,0.10)"
 
-		if (longestSeries.length === 0) {
+		if (data.length === 0) {
 			ctx.fillStyle = textColor
 			ctx.font = "11px system-ui, sans-serif"
 			ctx.textAlign = "center"
-			ctx.fillText("No data", width / 2, height / 2)
+			ctx.fillText("No data yet", width / 2, height / 2)
 			return
 		}
 
+		// Y grid + labels
 		const yTicks = 4
 		ctx.font = "10px ui-monospace, monospace"
 		ctx.textAlign = "right"
 		for (let i = 0; i <= yTicks; i++) {
 			const y = pad.top + (graphHeight / yTicks) * i
 			ctx.strokeStyle = gridColor
+			ctx.lineWidth = 1
 			ctx.beginPath()
 			ctx.moveTo(pad.left, y)
 			ctx.lineTo(pad.left + graphWidth, y)
@@ -110,40 +119,59 @@ const MultiGraph = ({ series, dataKey, rangeSeconds, height = 170 }) => {
 			ctx.fillText(formatRate(globalMax * (1 - i / yTicks)), pad.left - 8, y + 3)
 		}
 
-		const xLabelCount = Math.min(longestSeries.length, 5)
+		// X labels
+		const xLabelCount = Math.min(data.length, 5)
 		ctx.textAlign = "center"
 		ctx.fillStyle = textColor
 		for (let i = 0; i < xLabelCount; i++) {
-			const idx = Math.floor((i / (xLabelCount - 1)) * (longestSeries.length - 1))
-			if (!longestSeries[idx]) continue
-			const x = pad.left + (idx / (longestSeries.length - 1)) * graphWidth
-			ctx.fillText(formatTimeLabel(new Date(longestSeries[idx].ts), rangeSeconds), x, height - 6)
+			const idx = xLabelCount === 1 ? 0 : Math.floor((i / (xLabelCount - 1)) * (data.length - 1))
+			if (!data[idx]) continue
+			const x = pad.left + (data.length === 1 ? graphWidth / 2 : (idx / (data.length - 1)) * graphWidth)
+			ctx.fillText(formatTimeLabel(new Date(data[idx].ts), rangeSeconds), x, height - 6)
 		}
 
-		for (const s of series) {
-			if (s.data.length < 2) continue
-			const values = s.data.map((d) => d[dataKey])
-			const pointX = (i) => pad.left + (i / (s.data.length - 1)) * graphWidth
-			const pointY = (i) => pad.top + graphHeight - (values[i] / globalMax) * graphHeight
+		const pointX = (i) =>
+			data.length === 1 ? pad.left + graphWidth / 2 : pad.left + (i / (data.length - 1)) * graphWidth
+		const pointY = (v) => pad.top + graphHeight - (v / globalMax) * graphHeight
 
+		const drawSeries = (key, color) => {
+			if (data.length < 2) {
+				// Single point: draw a soft marker
+				const x = pointX(0)
+				const y = pointY(data[0][key])
+				ctx.beginPath()
+				ctx.arc(x, y, 3, 0, Math.PI * 2)
+				ctx.fillStyle = color
+				ctx.fill()
+				return
+			}
+
+			// Fill under curve
 			ctx.beginPath()
 			ctx.moveTo(pad.left, pad.top + graphHeight)
-			values.forEach((_, i) => ctx.lineTo(pointX(i), pointY(i)))
+			data.forEach((d, i) => ctx.lineTo(pointX(i), pointY(d[key])))
 			ctx.lineTo(pad.left + graphWidth, pad.top + graphHeight)
 			ctx.closePath()
-			ctx.globalAlpha = 0.08
-			ctx.fillStyle = s.color
+			const grad = ctx.createLinearGradient(0, pad.top, 0, pad.top + graphHeight)
+			grad.addColorStop(0, color + "28")
+			grad.addColorStop(1, color + "00")
+			ctx.fillStyle = grad
 			ctx.fill()
-			ctx.globalAlpha = 1
 
+			// Stroke
 			ctx.beginPath()
-			values.forEach((_, i) => (i === 0 ? ctx.moveTo(pointX(i), pointY(i)) : ctx.lineTo(pointX(i), pointY(i))))
-			ctx.strokeStyle = s.color
-			ctx.lineWidth = 1.5
+			data.forEach((d, i) => (i === 0 ? ctx.moveTo(pointX(i), pointY(d[key])) : ctx.lineTo(pointX(i), pointY(d[key]))))
+			ctx.strokeStyle = color
+			ctx.lineWidth = 1.75
 			ctx.lineJoin = "round"
+			ctx.lineCap = "round"
 			ctx.stroke()
 		}
-	}, [series, dataKey, globalMax, longestSeries, height, rangeSeconds])
+
+		// Download first (under), upload on top
+		drawSeries("ig", DOWNLOAD_COLOR)
+		drawSeries("eg", UPLOAD_COLOR)
+	}, [data, globalMax, height, rangeSeconds])
 
 	return (
 		<div ref={containerRef} className="w-full">
@@ -152,83 +180,133 @@ const MultiGraph = ({ series, dataKey, rangeSeconds, height = 170 }) => {
 	)
 }
 
-const TunnelInfoBar = ({ rows }) => {
-	if (rows.length === 0) return null
+const StatChip = ({ label, value }) => (
+	<div className="flex flex-col gap-0.5">
+		<span className="text-[9px] font-medium uppercase tracking-wider text-base-content/35">{label}</span>
+		<span className="font-mono text-[11px] tabular-nums text-base-content/80">{value}</span>
+	</div>
+)
+
+const RatePill = ({ direction, rate }) => {
+	const isDown = direction === "down"
+	const Icon = isDown ? ArrowDown : ArrowUp
 	return (
-		<div className="mb-3 flex flex-col gap-1.5">
-			{rows.map((r) => (
-				<div
-					key={r.id}
-					className="flex flex-wrap items-center gap-x-5 gap-y-1.5 rounded-box border border-base-300 bg-base-100 px-3 py-2 text-[11px]"
-				>
-					<div className="flex min-w-0 items-center gap-2">
-						<div className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: r.color }} />
-						<span className="truncate font-semibold tracking-tight">{r.tag}</span>
-					</div>
-
-					<span className="flex items-center gap-1.5">
-						<span className="text-[10px] uppercase opacity-40">Server</span>
-						<span className="font-mono opacity-80">{r.server}</span>
-					</span>
-					<span className="flex items-center gap-1.5">
-						<span className="text-[10px] uppercase opacity-40">IPv4</span>
-						<span className="font-mono opacity-80">{r.ipv4}</span>
-					</span>
-
-					<span className="flex items-center gap-3 sm:ml-auto">
-						<span className="flex items-center gap-1.5">
-							<span className="text-[10px] uppercase opacity-40">Down</span>
-							<span className="font-mono opacity-80">{formatBytes(r.totalIg)}</span>
-						</span>
-						<span className="flex items-center gap-1.5">
-							<span className="text-[10px] uppercase opacity-40">Up</span>
-							<span className="font-mono opacity-80">{formatBytes(r.totalEg)}</span>
-						</span>
-					</span>
-				</div>
-			))}
+		<div
+			className={
+				"inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-mono text-[11px] tabular-nums " +
+				(isDown ? "bg-success/10 text-success" : "bg-warning/10 text-warning")
+			}
+		>
+			<Icon size={12} strokeWidth={2.5} />
+			{formatRate(rate)}
 		</div>
 	)
 }
 
-const StatsRow = ({ series, dataKey }) => (
-	<div className="flex flex-col gap-1.5">
-		{series.map((s) => {
-			const vals = s.rawData.map((d) => d[dataKey])
-			if (vals.length === 0) return null
-			const current = vals[vals.length - 1] || 0
+const TunnelCard = ({ tunnel, server, range, nested = false }) => {
+	const rawData = useMemo(() => {
+		const cutoff = Date.now() - range.seconds * 1000
+		return (tunnel.BandwidthHistory || []).filter((r) => new Date(r?.ts) >= cutoff)
+	}, [tunnel.BandwidthHistory, range.seconds])
+	const data = useMemo(() => aggregateRecords(rawData, range.seconds), [rawData, range.seconds])
+	const down = useMemo(() => summarize(rawData, "ig"), [rawData])
+	const up = useMemo(() => summarize(rawData, "eg"), [rawData])
 
-			const peak = vals.reduce((m, v) => (v > m ? v : m), 0)
-			const avg = vals.reduce((a, b) => a + b, 0) / vals.length
-			const total = vals.reduce((a, b) => a + b, 0)
-			return (
-				<div key={s.id} className="flex flex-wrap items-center gap-x-5 gap-y-1 px-1 text-[11px]">
-					<div className="flex w-28 shrink-0 items-center gap-1.5">
-						<div className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: s.color }} />
-						<span className="truncate font-mono opacity-70">{s.label}</span>
+	const tag = tunnel.CR?.Tag || tunnel.ID?.slice(0, 8) || "Tunnel"
+	const serverLabel = server?.Tag || tunnel.CR?.ServerIP || "—"
+	const ipv4 = tunnel.CRResponse?.WireGuardIP || "—"
+	const country = server?.Country
+
+	return (
+		<div
+			className={
+				"overflow-hidden bg-base-100 " +
+				(nested
+					? "rounded-box border border-base-300 shadow-sm transition-shadow hover:shadow-md"
+					: "")
+			}
+		>
+			{/* Identity + live rates */}
+			<div className="flex flex-wrap items-start gap-3 border-b border-base-200 px-4 py-3.5 sm:items-center">
+				<div className="min-w-0 flex-1">
+					<div className="flex flex-wrap items-center gap-2">
+						<span className="inline-block h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-success" />
+						<span className="truncate text-[13px] font-semibold tracking-tight">{tag}</span>
+						{country && (
+							<span className="rounded-md bg-base-200/80 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-base-content/50">
+								{country}
+							</span>
+						)}
 					</div>
-					{[
-						["Cur", formatRate(current)],
-						["Avg", formatRate(avg)],
-						["Peak", formatRate(peak)],
-						["Total", formatBytes(total)],
-					].map(([label, value]) => (
-						<span key={label}>
-							<span className="text-[10px] uppercase opacity-40">{label} </span>
-							<span className="font-mono">{value}</span>
+					<div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-base-content/50">
+						<span className="flex items-center gap-1.5">
+							<span className="text-[9px] font-medium uppercase tracking-wider text-base-content/35">Server</span>
+							<span className="font-mono text-base-content/70">{serverLabel}</span>
 						</span>
-					))}
+						<span className="hidden h-3 w-px bg-base-300 sm:inline-block" />
+						<span className="flex items-center gap-1.5">
+							<span className="text-[9px] font-medium uppercase tracking-wider text-base-content/35">IPv4</span>
+							<span className="font-mono text-base-content/70">{ipv4}</span>
+						</span>
+					</div>
 				</div>
-			)
-		})}
-	</div>
-)
+
+				<div className="flex shrink-0 items-center gap-2">
+					<RatePill direction="down" rate={down.current} />
+					<RatePill direction="up" rate={up.current} />
+				</div>
+			</div>
+
+			{/* Chart */}
+			<div className="bg-gradient-to-b from-base-100 to-base-200/30 px-2 pb-1 pt-3 sm:px-3">
+				<div className="mb-1 flex items-center justify-end gap-3 px-2">
+					<span className="flex items-center gap-1.5 text-[10px] text-base-content/45">
+						<span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: DOWNLOAD_COLOR }} />
+						Download
+					</span>
+					<span className="flex items-center gap-1.5 text-[10px] text-base-content/45">
+						<span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: UPLOAD_COLOR }} />
+						Upload
+					</span>
+				</div>
+				<DualRateGraph data={data} rangeSeconds={range.seconds} />
+			</div>
+
+			{/* Stats footer — both directions, one cohesive strip */}
+			<div className="grid grid-cols-1 gap-px border-t border-base-200 bg-base-200/60 sm:grid-cols-2">
+				<div className="bg-base-100 px-4 py-3">
+					<div className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-success/80">
+						<ArrowDown size={11} strokeWidth={2.5} />
+						Download
+					</div>
+					<div className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-4">
+						<StatChip label="Cur" value={formatRate(down.current)} />
+						<StatChip label="Avg" value={formatRate(down.avg)} />
+						<StatChip label="Peak" value={formatRate(down.peak)} />
+						<StatChip label="Total" value={formatBytes(down.total)} />
+					</div>
+				</div>
+				<div className="bg-base-100 px-4 py-3">
+					<div className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-warning/80">
+						<ArrowUp size={11} strokeWidth={2.5} />
+						Upload
+					</div>
+					<div className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-4">
+						<StatChip label="Cur" value={formatRate(up.current)} />
+						<StatChip label="Avg" value={formatRate(up.avg)} />
+						<StatChip label="Peak" value={formatRate(up.peak)} />
+						<StatChip label="Total" value={formatBytes(up.total)} />
+					</div>
+				</div>
+			</div>
+		</div>
+	)
+}
 
 const BandwidthCharts = () => {
 	const activeTunnels = useStore((s) => s.activeTunnels)
 	const servers = useStore((s) => s.servers)
 	const [range, setRange] = useState(TIME_RANGES[0])
-	const [disabledTunnels, setDisabledTunnels] = useState({})
 
 	useEffect(() => {
 		const interval = setInterval(fetchState, 1000)
@@ -236,110 +314,70 @@ const BandwidthCharts = () => {
 	}, [])
 
 	const tunnels = activeTunnels || []
+	const serverMap = useMemo(() => Object.fromEntries(servers.map((s) => [s._id, s])), [servers])
 
-	const { series, totalSamples } = useMemo(() => {
-		const colors = seriesColors()
-		const out = []
-		let samples = 0
-		tunnels.forEach((tun, idx) => {
-			if (disabledTunnels[tun.ID] || !tun.BandwidthHistory?.length) return
-			const cutoff = Date.now() - range.seconds * 1000
-			const filtered = tun.BandwidthHistory.filter((r) => new Date(r?.ts) >= cutoff)
-			samples += filtered.length
-			out.push({
-				id: tun.ID,
-				data: aggregateRecords(filtered, range.seconds),
-				rawData: filtered,
-				color: colors[idx % colors.length],
-				label: tun.CR?.Tag || tun.ID?.slice(0, 8),
-			})
-		})
-		return { series: out, totalSamples: samples }
-	}, [tunnels, range, disabledTunnels])
-
-	const infoRows = useMemo(() => {
-		const colors = seriesColors()
-		const serverMap = Object.fromEntries(servers.map((s) => [s._id, s]))
+	const totalSamples = useMemo(() => {
 		const cutoff = Date.now() - range.seconds * 1000
-		return tunnels.map((tun, idx) => {
-			const records = (tun.BandwidthHistory || []).filter((r) => new Date(r?.ts) >= cutoff)
-			return {
-				id: tun.ID,
-				color: colors[idx % colors.length],
-				tag: tun.CR?.Tag || tun.ID?.slice(0, 8),
-				server: serverMap[tun.CR?.ServerID]?.Tag || tun.CR?.ServerIP || "—",
-				ipv4: tun.CRResponse?.WireGuardIP || "—",
-				totalEg: records.reduce((a, r) => a + r.eg, 0),
-				totalIg: records.reduce((a, r) => a + r.ig, 0),
-			}
-		})
-	}, [tunnels, servers, range])
+		return tunnels.reduce((n, tun) => {
+			const hist = tun.BandwidthHistory || []
+			return n + hist.filter((r) => new Date(r?.ts) >= cutoff).length
+		}, 0)
+	}, [tunnels, range])
 
 	if (tunnels.length === 0) return null
 
 	return (
-		<div>
-			<Toolbar>
-				<div className="flex gap-1">
-						{TIME_RANGES.map((r) => (
-							<button
-								key={r.label}
-								className={"btn btn-xs " + (range.label === r.label ? "btn-primary" : "btn-ghost")}
-								onClick={() => setRange(r)}
-							>
-								{r.label}
-							</button>
-						))}
-					</div>
-
+		<div className="mt-4 overflow-hidden rounded-box border border-base-300 bg-base-100 shadow-sm">
+			{/* Shared toolbar */}
+			<div className="flex flex-wrap items-center gap-3 border-b border-base-200 bg-base-200/40 px-4 py-2.5">
+				<div className="flex items-center gap-2">
+					<Activity size={14} className="text-base-content/40" />
+					<span className="text-[13px] font-semibold tracking-tight">Bandwidth</span>
 					{tunnels.length > 1 && (
-						<div className="flex items-center gap-1.5">
-							{tunnels.map((tun, idx) => {
-								const colors = seriesColors()
-								const color = colors[idx % colors.length]
-								const disabled = disabledTunnels[tun.ID]
-								return (
-									<button
-										key={tun.ID}
-										className={"btn btn-ghost btn-xs gap-1.5 " + (disabled ? "opacity-40" : "")}
-										onClick={() => setDisabledTunnels((p) => ({ ...p, [tun.ID]: !p[tun.ID] }))}
-									>
-										<div className="h-2 w-2 rounded-full" style={{ backgroundColor: color, opacity: disabled ? 0.2 : 1 }} />
-										<span className={disabled ? "line-through" : ""}>{tun.CR?.Tag || tun.ID?.slice(0, 8)}</span>
-									</button>
-								)
-							})}
-						</div>
+						<span className="rounded-full bg-base-300/80 px-2 py-0.5 text-[10px] font-medium text-base-content/50">
+							{tunnels.length} tunnels
+						</span>
 					)}
+				</div>
 
-				<span className="ml-auto font-mono text-[10px] opacity-50">
+				<div className="flex items-center gap-0.5 rounded-lg bg-base-100 p-0.5 ring-1 ring-base-300">
+					{TIME_RANGES.map((r) => (
+						<button
+							key={r.label}
+							className={
+								"rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors " +
+								(range.label === r.label
+									? "bg-primary text-primary-content shadow-sm"
+									: "text-base-content/50 hover:bg-base-200 hover:text-base-content/80")
+							}
+							onClick={() => setRange(r)}
+						>
+							{r.label}
+						</button>
+					))}
+				</div>
+
+				<span className="ml-auto font-mono text-[10px] tabular-nums text-base-content/40">
 					{totalSamples} sample{totalSamples !== 1 ? "s" : ""}
 				</span>
-			</Toolbar>
-
-			<TunnelInfoBar rows={infoRows} />
-
-			<div className="grid grid-cols-1 gap-4 2xl:grid-cols-2">
-				{[
-					{ key: "eg", label: "Upload", dot: "bg-warning" },
-					{ key: "ig", label: "Download", dot: "bg-success" },
-				].map(({ key, label, dot }) => (
-					<Card
-						key={key}
-						title={
-							<span className="flex items-center gap-2">
-								<span className={"h-1.5 w-1.5 rounded-full " + dot} />
-								{label}
-							</span>
-						}
-					>
-						<MultiGraph series={series} dataKey={key} rangeSeconds={range.seconds} />
-						<div className="mt-2.5 border-t border-base-300 pt-2">
-							<StatsRow series={series} dataKey={key} />
-						</div>
-					</Card>
-				))}
 			</div>
+
+			{/* Per-tunnel panels — nested cards when multiple so each connection reads as a unit */}
+			{tunnels.length === 1 ? (
+				<TunnelCard tunnel={tunnels[0]} server={serverMap[tunnels[0].CR?.ServerID]} range={range} />
+			) : (
+				<div className="grid gap-3 p-3 xl:grid-cols-2">
+					{tunnels.map((tun) => (
+						<TunnelCard
+							key={tun.ID}
+							tunnel={tun}
+							server={serverMap[tun.CR?.ServerID]}
+							range={range}
+							nested
+						/>
+					))}
+				</div>
+			)}
 		</div>
 	)
 }
