@@ -114,20 +114,6 @@ func setupWireGuard(cfg *Config, logLevel string) error {
 	return nil
 }
 
-func GetCurrentPeerKeys() (map[string]struct{}, error) {
-	data, err := ipcGet()
-	if err != nil {
-		return nil, err
-	}
-	result := make(map[string]struct{})
-	for _, line := range strings.Split(data, "\n") {
-		if after, ok := strings.CutPrefix(line, "public_key="); ok {
-			result[strings.TrimSpace(after)] = struct{}{}
-		}
-	}
-	return result, nil
-}
-
 // sanitizeIPC strips newlines and carriage returns to prevent IPC directive injection.
 func sanitizeIPC(s string) string {
 	s = strings.ReplaceAll(s, "\n", "")
@@ -141,15 +127,6 @@ func AddPeer(pubKeyHex string, allowedIPs ...string) error {
 		conf += fmt.Sprintf("allowed_ip=%s\n", sanitizeIPC(aip))
 	}
 	conf += "\n"
-	return ipcSet(conf)
-}
-
-func AddPeerWithEndpoint(pubKeyHex, endpoint string, allowedIPs ...string) error {
-	conf := fmt.Sprintf("public_key=%s\n", sanitizeIPC(pubKeyHex))
-	for _, aip := range allowedIPs {
-		conf += fmt.Sprintf("allowed_ip=%s\n", sanitizeIPC(aip))
-	}
-	conf += fmt.Sprintf("endpoint=%s\npersistent_keepalive_interval=15\n\n", sanitizeIPC(endpoint))
 	return ipcSet(conf)
 }
 
@@ -170,17 +147,6 @@ func ipcSetBytes(conf []byte) error {
 		return fmt.Errorf("wireguard device not initialized")
 	}
 	return wgDevice.IpcSetOperation(bufio.NewReader(bytes.NewReader(conf)))
-}
-
-func ipcGet() (string, error) {
-	if wgDevice == nil {
-		return "", fmt.Errorf("wireguard device not initialized")
-	}
-	var sb strings.Builder
-	if err := wgDevice.IpcGetOperation(&sb); err != nil {
-		return "", err
-	}
-	return sb.String(), nil
 }
 
 func b64ToHex(b64 string) (string, error) {

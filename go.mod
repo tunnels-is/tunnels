@@ -11,7 +11,6 @@ require (
 	github.com/miekg/dns v1.1.62
 	github.com/puzpuzpuz/xsync/v3 v3.5.1
 	github.com/skip2/go-qrcode v0.0.0-20200617195104-da1b6568686e
-	github.com/songgao/water v0.0.0-20200317203138-2b4b6d7c09d8
 	github.com/vishvananda/netlink v1.3.0
 	github.com/wailsapp/wails/v2 v2.11.0
 	github.com/xlzd/gotp v0.1.0

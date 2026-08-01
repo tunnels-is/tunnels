@@ -73,27 +73,6 @@ func (ps *PeerStore) GetOrAssign(deviceID, pubKeyB64 string) (string, string, er
 	return ip, ipv6, nil
 }
 
-func (ps *PeerStore) Get(deviceID string) (PeerRecord, bool) {
-	ps.mu.RLock()
-	defer ps.mu.RUnlock()
-	rec, ok := ps.records[deviceID]
-	return rec, ok
-}
-
-func (ps *PeerStore) GetByPubKey(pubKeyB64 string) (PeerRecord, bool) {
-	ps.mu.RLock()
-	defer ps.mu.RUnlock()
-	deviceID, ok := ps.byPubKey[pubKeyB64]
-	if !ok {
-		return PeerRecord{}, false
-	}
-	rec, ok := ps.records[deviceID]
-	if !ok || rec.PubKeyB64 != pubKeyB64 {
-		return PeerRecord{}, false
-	}
-	return rec, true
-}
-
 func (ps *PeerStore) Set(deviceID, ip, ipv6, pubKeyB64 string) {
 	ps.mu.Lock()
 	defer ps.mu.Unlock()
@@ -113,16 +92,6 @@ func (ps *PeerStore) DeleteByPubKey(pubKeyB64 string) {
 	if rec, ok := ps.records[deviceID]; ok && rec.PubKeyB64 == pubKeyB64 {
 		delete(ps.records, deviceID)
 	}
-}
-
-func (ps *PeerStore) GetAll() map[string]PeerRecord {
-	ps.mu.RLock()
-	defer ps.mu.RUnlock()
-	out := make(map[string]PeerRecord, len(ps.records))
-	for k, v := range ps.records {
-		out[k] = v
-	}
-	return out
 }
 
 func (ps *PeerStore) nextIP() (string, error) {

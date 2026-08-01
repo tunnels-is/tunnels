@@ -4,39 +4,27 @@ import (
 	"context"
 	"fmt"
 	"runtime/debug"
-	"sync/atomic"
 	"time"
 )
 
-func NewSignal(tag string, ctx context.Context, cancel context.CancelFunc, sleep time.Duration, logFunc func(string), method func()) *Signal {
+func NewSignal(tag string, ctx context.Context, sleep time.Duration, logFunc func(string), method func()) *Signal {
 	newSignal := &Signal{
-		Ctx:        ctx,
-		Cancel:     cancel,
-		Method:     method,
-		Log:        logFunc,
-		Tag:        tag,
-		Sleep:      sleep,
-		ShouldStop: atomic.Bool{},
+		Ctx:    ctx,
+		Method: method,
+		Log:    logFunc,
+		Tag:    tag,
+		Sleep:  sleep,
 	}
 	go newSignal.Start()
 	return newSignal
 }
 
 type Signal struct {
-	Ctx        context.Context
-	Cancel     context.CancelFunc
-	Method     func()
-	Log        func(string)
-	Tag        string
-	Sleep      time.Duration
-	ShouldStop atomic.Bool
-}
-
-func (s *Signal) Stop() {
-	if s.Cancel != nil {
-		s.Cancel()
-	}
-	s.ShouldStop.Store(true)
+	Ctx    context.Context
+	Method func()
+	Log    func(string)
+	Tag    string
+	Sleep  time.Duration
 }
 
 func (s *Signal) Start() {
@@ -50,7 +38,7 @@ func (s *Signal) Start() {
 		s.Log("goroutine exit: " + s.Tag)
 	}()
 
-	for !s.ShouldStop.Load() && s.Ctx.Err() == nil {
+	for s.Ctx.Err() == nil {
 		s.Method()
 		time.Sleep(s.Sleep)
 		s.Log("goroutine restart: " + s.Tag)

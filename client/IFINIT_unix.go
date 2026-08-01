@@ -337,24 +337,6 @@ func (t *TInterface) Disconnect(tun *TUN) (err error) {
 	return
 }
 
-func createDevNetTun() {
-	out, err := exec.Command("mkdir", "-p", "/dev/net").CombinedOutput()
-	if err != nil {
-		ERROR("TUN CREATE:", err, string(out))
-		return
-	}
-	out, err = exec.Command("mknod", "/dev/net/tun", "c", "10", "200").CombinedOutput()
-	if err != nil {
-		ERROR("TUN CREATE:", err, string(out))
-		return
-	}
-	out, err = exec.Command("chmod", "600", "/dev/net/tun").CombinedOutput()
-	if err != nil {
-		ERROR("TUN CREATE:", err, string(out))
-		return
-	}
-}
-
 func tunnelCtl(fd uintptr, request uintptr, argp uintptr) error {
 	_, _, errno := syscall.Syscall(syscall.SYS_IOCTL, fd, uintptr(request), argp)
 	if errno != 0 {

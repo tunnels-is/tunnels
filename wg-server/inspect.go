@@ -204,14 +204,9 @@ func (t *inspectingTUN) isServerIP(a netip.Addr) bool {
 	return a == t.serverIPv4 || a == t.serverIPv6
 }
 
-// handleControl returns true if pkt was a control message that we consumed.
-// The caller MUST NOT forward such a packet to the kernel.
-func (t *inspectingTUN) handleControl(pkt []byte) bool {
-	src, dst, proto, l4, frag, ok := parseIPHeader(pkt)
-	return t.handleControlParsed(src, dst, proto, l4, frag, ok)
-}
-
-// handleControlParsed is handleControl() with the IP header already parsed.
+// handleControlParsed returns true if the packet was a control message that we
+// consumed. The IP header must already be parsed. The caller MUST NOT forward
+// such a packet to the kernel.
 func (t *inspectingTUN) handleControlParsed(src, dst netip.Addr, proto byte, l4 []byte, frag fragInfo, ok bool) bool {
 	if !ok || proto != protoUDP {
 		return false

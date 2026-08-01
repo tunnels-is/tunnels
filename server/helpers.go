@@ -36,12 +36,6 @@ func BasicRecover() {
 	}
 }
 
-func CopySlice(in []byte) (out []byte) {
-	out = make([]byte, len(in))
-	_ = copy(out, in)
-	return out
-}
-
 // redactKey returns a short, non-reusable prefix of a license/credential key for
 // logs: the first 5 characters plus an ellipsis. Enough to correlate an
 // activation while debugging, but never the full key. Keys of 5 chars or fewer

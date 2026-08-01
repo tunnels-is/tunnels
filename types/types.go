@@ -7,14 +7,6 @@ import (
 	"github.com/google/uuid"
 )
 
-type Feature string
-
-const (
-	AUTH Feature = "AUTH"
-	DNS  Feature = "DNS"
-	WG   Feature = "WG"
-)
-
 type TunnelType string
 
 const (
@@ -28,13 +20,6 @@ type HealthResponse struct {
 	ServerVersion string
 	ClientVersion string
 	Uptime        time.Time
-}
-
-type LogConfig struct {
-	Level  string `json:"Level,omitempty"`
-	JSON   bool   `json:"JSON,omitempty"`
-	Silent bool   `json:"Silent,omitempty"`
-	Source bool   `json:"Source,omitempty"`
 }
 
 type ServerConfig struct {
@@ -72,8 +57,6 @@ type WGBootstrap struct {
 	ControllerURL      string
 	InsecureSkipVerify bool
 }
-
-type SecretStore string
 
 type Device struct {
 	ID        uuid.UUID `json:"_id"`
@@ -222,15 +205,6 @@ type WGMeshPeer struct {
 // server's same-mesh-group siblings.
 type WGMeshResponse struct {
 	Peers []WGMeshPeer `json:"Peers"`
-}
-
-// WGServerInfo describes a peer wg-server for cross-server routing.
-type WGServerInfo struct {
-	WireGuardPubKey  string `json:"WireGuardPubKey"`
-	WireGuardPort    int    `json:"WireGuardPort"`
-	WireGuardSubnet  string `json:"WireGuardSubnet"`
-	WireGuardSubnet6 string `json:"WireGuardSubnet6,omitempty"`
-	IP               string `json:"IP"`
 }
 
 type Route struct {

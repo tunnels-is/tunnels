@@ -8,8 +8,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"strconv"
-
-	"golang.org/x/sys/windows"
 )
 
 // wintunDLLPath resolves wintun.dll to an absolute path in the executable's
@@ -25,10 +23,6 @@ func wintunDLLPath() string {
 		return "wintun.dll"
 	}
 	return filepath.Join(filepath.Dir(ex), "wintun.dll")
-}
-
-func openURL(url string) error {
-	return windows.ShellExecute(0, nil, windows.StringToUTF16Ptr(url), nil, nil, windows.SW_SHOWNORMAL)
 }
 
 func ValidateAdapterID(meta *TunnelMETA) error {

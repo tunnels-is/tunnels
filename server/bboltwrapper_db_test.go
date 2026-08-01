@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/tunnels-is/tunnels/types"
+	gobolt "go.etcd.io/bbolt"
 )
 
 func setupTestDB(t *testing.T) {
@@ -67,12 +68,17 @@ func TestBBolt_CreateUser(t *testing.T) {
 		t.Fatal("user not found by email index")
 	}
 
-	found, err = BBolt_findUserByAPIKey("apikey123")
-	if err != nil {
+	if err := BBoltDB.View(func(tx *gobolt.Tx) error {
+		uid := tx.Bucket([]byte(USERS_APIKEY_INDEX)).Get([]byte("apikey123"))
+		if uid == nil {
+			t.Fatal("apikey index missing")
+		}
+		if string(uid) != u.ID.String() {
+			t.Fatalf("apikey index uid = %s, want %s", uid, u.ID)
+		}
+		return nil
+	}); err != nil {
 		t.Fatal(err)
-	}
-	if found == nil || found.ID != u.ID {
-		t.Fatal("user not found by apikey index")
 	}
 }
 
@@ -83,9 +89,13 @@ func TestBBolt_CreateUser_NoAPIKey(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	found, _ := BBolt_findUserByAPIKey("")
-	if found != nil {
-		t.Fatal("empty apikey should not match")
+	if err := BBoltDB.View(func(tx *gobolt.Tx) error {
+		if v := tx.Bucket([]byte(USERS_APIKEY_INDEX)).Get([]byte("")); v != nil {
+			t.Fatal("empty apikey should not be indexed")
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -111,16 +121,6 @@ func TestBBolt_findUserByEmail_NotFound(t *testing.T) {
 	}
 }
 
-func TestBBolt_findUserByAPIKey_NotFound(t *testing.T) {
-	setupTestDB(t)
-	found, err := BBolt_findUserByAPIKey("no-such-key")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if found != nil {
-		t.Fatal("expected nil")
-	}
-}
 
 func TestBBolt_getUsers(t *testing.T) {
 	setupTestDB(t)
@@ -216,15 +216,16 @@ func TestBBolt_updateUser(t *testing.T) {
 	}
 
 	// Old key gone.
-	found, _ := BBolt_findUserByAPIKey("oldkey")
-	if found != nil {
-		t.Fatal("old key should not resolve")
-	}
-
-	// New key works.
-	found, _ = BBolt_findUserByAPIKey("newkey")
-	if found == nil {
-		t.Fatal("new key should resolve")
+	if err := BBoltDB.View(func(tx *gobolt.Tx) error {
+		if tx.Bucket([]byte(USERS_APIKEY_INDEX)).Get([]byte("oldkey")) != nil {
+			t.Fatal("old key should not resolve")
+		}
+		if tx.Bucket([]byte(USERS_APIKEY_INDEX)).Get([]byte("newkey")) == nil {
+			t.Fatal("new key should resolve")
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -235,9 +236,13 @@ func TestBBolt_updateUser_ClearAPIKey(t *testing.T) {
 
 	BBolt_updateUser(&USER_UPDATE_FORM{UID: u.ID, APIKey: ""})
 
-	found, _ := BBolt_findUserByAPIKey("mykey")
-	if found != nil {
-		t.Fatal("cleared key should not resolve")
+	if err := BBoltDB.View(func(tx *gobolt.Tx) error {
+		if tx.Bucket([]byte(USERS_APIKEY_INDEX)).Get([]byte("mykey")) != nil {
+			t.Fatal("cleared key should not resolve")
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -390,29 +395,7 @@ func TestBBolt_userResetPassword_NotFound(t *testing.T) {
 	}
 }
 
-func TestBBolt_WipeUserConfirmCode(t *testing.T) {
-	setupTestDB(t)
-	u := testUser("confirm@example.com", "")
-	u.ConfirmCode = "abc123"
-	BBolt_CreateUser(u)
 
-	if err := BBolt_WipeUserConfirmCode(&USER_ENABLE_QUERY{Email: "confirm@example.com"}); err != nil {
-		t.Fatal(err)
-	}
-
-	found, _ := BBolt_findUserByID(u.ID.String())
-	if found.ConfirmCode != "" {
-		t.Fatalf("expected empty, got '%s'", found.ConfirmCode)
-	}
-}
-
-func TestBBolt_WipeUserConfirmCode_NotFound(t *testing.T) {
-	setupTestDB(t)
-	err := BBolt_WipeUserConfirmCode(&USER_ENABLE_QUERY{Email: "ghost@example.com"})
-	if err == nil {
-		t.Fatal("expected error")
-	}
-}
 
 func TestBBolt_UserActivateKey(t *testing.T) {
 	setupTestDB(t)
@@ -1436,8 +1419,13 @@ func TestConnectToBBoltDB_BackfillIndexes(t *testing.T) {
 	if found, _ := BBolt_findUserByEmail("bf@example.com"); found == nil {
 		t.Fatal("user email index not backfilled")
 	}
-	if found, _ := BBolt_findUserByAPIKey("bf-key"); found == nil {
-		t.Fatal("user apikey index not backfilled")
+	if err := BBoltDB.View(func(tx *gobolt.Tx) error {
+		if tx.Bucket([]byte(USERS_APIKEY_INDEX)).Get([]byte("bf-key")) == nil {
+			t.Fatal("user apikey index not backfilled")
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
 	}
 	if devs, _ := BBolt_GetDevicesByUserID(d.UserID); len(devs) != 1 {
 		t.Fatal("device userid index not backfilled")

@@ -7,10 +7,6 @@ import (
 	"os"
 )
 
-func LOG(x ...any) {
-	logger.Info("INFO", "msg", buildOut(x))
-}
-
 func INFO(x ...any) {
 	logger.Info("INFO", "msg", buildOut(x))
 }

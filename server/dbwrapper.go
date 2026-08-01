@@ -31,10 +31,6 @@ func DB_getUsers(limit, offset int64) (UL []*User, err error) {
 	return BBolt_getUsers(limit, offset)
 }
 
-func DB_findUserByAPIKey(Key string) (USER *User, err error) {
-	return BBolt_findUserByAPIKey(Key)
-}
-
 func DB_findUserByID(UID uuid.UUID) (USER *User, err error) {
 	return BBolt_findUserByID(UID.String())
 }
@@ -117,10 +113,6 @@ func DB_FindAllServers(limit, offset int64) ([]*types.Server, error) {
 
 func DB_FindServerByID(ID uuid.UUID) (S *types.Server, err error) {
 	return BBolt_FindServerByID(ID.String())
-}
-
-func DB_WipeUserConfirmCode(UF *USER_ENABLE_QUERY) (err error) {
-	return BBolt_WipeUserConfirmCode(UF)
 }
 
 func DB_UserActivateKey(SubExpiration time.Time, Key *LicenseKey, userID uuid.UUID) (err error) {

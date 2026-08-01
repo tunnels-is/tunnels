@@ -277,23 +277,6 @@ func BBolt_getUsers(limit, offset int64) ([]*User, error) {
 	return UL, err
 }
 
-func BBolt_findUserByAPIKey(Key string) (*User, error) {
-	var found *User
-	err := BBoltDB.View(func(tx *gobolt.Tx) error {
-		uid := tx.Bucket([]byte(USERS_APIKEY_INDEX)).Get([]byte(Key))
-		if uid == nil {
-			return nil
-		}
-		v := tx.Bucket([]byte(USERS_BUCKET)).Get(uid)
-		if v == nil {
-			return nil
-		}
-		found = new(User)
-		return bboltUnmarshal(v, found)
-	})
-	return found, err
-}
-
 func BBolt_findUserByID(UID string) (*User, error) {
 	var U *User
 	err := BBoltDB.View(func(tx *gobolt.Tx) error {
@@ -1096,30 +1079,6 @@ func BBolt_DeleteServerByID(id string) error {
 			return D.ServerID.String() == id
 		})
 		return b.Delete([]byte(id))
-	})
-}
-
-func BBolt_WipeUserConfirmCode(UF *USER_ENABLE_QUERY) error {
-	return BBoltDB.Update(func(tx *gobolt.Tx) error {
-		uid := tx.Bucket([]byte(USERS_EMAIL_INDEX)).Get([]byte(UF.Email))
-		if uid == nil {
-			return errors.New("user not found")
-		}
-		b := tx.Bucket([]byte(USERS_BUCKET))
-		v := b.Get(uid)
-		if v == nil {
-			return errors.New("user not found")
-		}
-		U := new(User)
-		if err := bboltUnmarshal(v, U); err != nil {
-			return err
-		}
-		U.ConfirmCode = ""
-		data, err := bboltMarshal(U)
-		if err != nil {
-			return err
-		}
-		return b.Put(uid, data)
 	})
 }
 

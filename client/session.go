@@ -417,42 +417,6 @@ func createServerDevice(cr *ConnectionRequest, serverID string, pubKey string, t
 	}, nil
 }
 
-func GetDeviceByID(server *ControlServer, deviceID string) (d *types.Device, err error) {
-	DID, _ := uuid.Parse(deviceID)
-
-	FR := &FORWARD_REQUEST{
-		Server:  server,
-		Path:    "/client/device",
-		Method:  "POST",
-		Timeout: 10000,
-		JSONData: &types.FORM_GET_DEVICE{
-			DeviceID: DID,
-		},
-	}
-	url := FR.Server.GetURL(FR.Path)
-	responseBytes, code, err := SendRequestToURL(
-		nil,
-		FR.Method,
-		url,
-		FR.JSONData,
-		FR.Timeout,
-		FR.Server.ValidateCertificate,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("%s: %s", "error calling controller", err)
-	}
-	if code != 200 {
-		return nil, fmt.Errorf("%s: %d", "invalid code from controller", code)
-	}
-
-	d = new(types.Device)
-	err = json.Unmarshal(responseBytes, d)
-	if err != nil {
-		return nil, fmt.Errorf("%s: %s", "invalid response from controller", err)
-	}
-	return
-}
-
 func InitializeTunnelFromCRR(TUN *TUN) (err error) {
 	DNSGlobalBlock.Store(true)
 	defer func() {

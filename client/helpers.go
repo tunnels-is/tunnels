@@ -3,27 +3,15 @@ package client
 import (
 	"context"
 	"crypto/sha256"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
 	"runtime/debug"
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/tunnels-is/tunnels/types"
 )
-
-func CreateConnectionUUID() string {
-	return "{" + strings.ToUpper(uuid.NewString()) + "}"
-}
-
-func IsAlphanumeric(s string) bool {
-	matched, _ := regexp.MatchString(`^[a-z0-9]+$`, s)
-	return matched
-}
 
 func InitBaseFoldersAndPaths() {
 	defer RecoverAndLog()
@@ -203,12 +191,6 @@ func RecoverAndLog() {
 	}
 }
 
-func CopySlice(in []byte) (out []byte) {
-	out = make([]byte, len(in))
-	_ = copy(out, in)
-	return
-}
-
 func GetDomainAndSubDomain(domain string) (d, s string) {
 	parts := strings.Split(domain, ".")
 
@@ -279,18 +261,6 @@ func doEvent(channel chan *event, method func()) {
 	}:
 	default:
 		panic("priority channel full")
-	}
-}
-
-func (e *event) Wait(method func(any), timeout time.Duration) {
-	defer RecoverAndLog()
-	tick := time.NewTimer(timeout)
-	select {
-	case done := <-e.done:
-		method(done)
-		return
-	case <-tick.C:
-		method(errors.New("timeout waiting"))
 	}
 }
 
