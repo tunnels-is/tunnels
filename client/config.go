@@ -141,13 +141,8 @@ func DefaultConfig() *configV2 {
 		DNSHTTPSAutomatic:    true,
 		DNSBlockLists:        GetDefaultBlockLists(),
 		DNSWhiteLists:        GetDefaultWhiteLists(),
-		APIIP:                "127.0.0.1",
-		APIPort:              "7777",
-		RestartPostUpdate:    false,
-		ExitPostUpdate:       false,
-		AutoDownloadUpdate:   false,
-		UpdateWhileConnected: false,
-		DisableUpdates:       true,
+		APIIP:   "127.0.0.1",
+		APIPort: "7777",
 	}
 	conf.ControlServers = append(conf.ControlServers, &ControlServer{
 		ID:                  "tunnels",
