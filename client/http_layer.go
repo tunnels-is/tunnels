@@ -11,6 +11,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/http/pprof"
 	"os"
 	"strings"
 	"sync/atomic"
@@ -45,6 +46,14 @@ func LaunchAPI() {
 	mux.Handle("/", withSessionCookie(assetHandler))
 	mux.Handle("/assets/", withSessionCookie(assetHandler))
 	mux.HandleFunc("/v1/method/{method}", HTTPhandler)
+	if EnablePprof {
+		// Opt-in only: same bind as the local API (often 127.0.0.1:7777).
+		mux.HandleFunc("/debug/pprof/", pprof.Index)
+		mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+		mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+		mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+		mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+	}
 	API_SERVER = http.Server{
 		Handler: mux,
 	}
@@ -86,6 +95,9 @@ func LaunchAPI() {
 
 	if DevMode {
 		SECURITY("DEV MODE ENABLED: local API authentication is DISABLED and credentialed CORS is open — never use this in a shipped/production build")
+	}
+	if EnablePprof {
+		SECURITY("pprof ENABLED at http://", API_SERVER.Addr, "/debug/pprof/ — for local debugging only")
 	}
 	INFO("===========================")
 

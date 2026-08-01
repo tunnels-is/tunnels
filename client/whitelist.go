@@ -1,12 +1,6 @@
 package client
 
 import (
-	"bufio"
-	"bytes"
-	"fmt"
-	"io"
-	"net/http"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -71,109 +65,50 @@ func processWhiteList(index int, wg *sync.WaitGroup, nm *xsync.MapOf[string, boo
 		return
 	}
 
-	var err error
-	var listBytes []byte
 	state := STATE.Load()
 	lowerTag := strings.ToLower(wl.Tag)
+	path := state.WhiteListPath + lowerTag
 
 	if time.Since(wl.LastDownload).Hours() > 24 && wl.URL != "" {
-		listBytes, err = downloadWhiteList(wl.URL)
-		if err != nil {
+		if err := downloadListToFile(wl.URL, path); err != nil {
 			ERROR("Could not download whitelist", wl.URL, err)
-			listBytes, err = os.ReadFile(state.WhiteListPath + lowerTag)
-			if err != nil {
+			if !fileExistsNonEmpty(path) {
 				ERROR("Could not read from disk or download whitelist", wl.URL, err)
 				return
 			}
 		}
 	} else if wl.Tag != "" {
-		listBytes, err = os.ReadFile(state.WhiteListPath + lowerTag)
-		if err != nil {
-			ERROR("Could not read whitelist", lowerTag, err)
-			listBytes, err = downloadWhiteList(wl.URL)
-			if err != nil {
+		if !fileExistsNonEmpty(path) {
+			if wl.URL == "" {
+				ERROR("No bytes in DNS whitelist: ", wl.URL, lowerTag)
+				return
+			}
+			if err := downloadListToFile(wl.URL, path); err != nil {
 				ERROR("Could not read from disk or download whitelist", wl.URL, err)
 				return
 			}
 		}
+	} else {
+		return
 	}
 
-	if len(listBytes) == 0 {
+	if !fileExistsNonEmpty(path) {
 		ERROR("No bytes in DNS whitelist: ", wl.URL, lowerTag)
 		return
 	}
 
-	err = os.WriteFile(state.WhiteListPath+lowerTag, listBytes, 0o600)
+	count, badLines, err := loadDomainsFromFile(path, wl.Enabled, nm)
 	if err != nil {
-		ERROR("Could not save", wl.URL, err)
+		ERROR("Could not parse whitelist", path, err)
 		return
 	}
 
-	wl.Count = 0
-	var badLines int
-	buff := bytes.NewBuffer(listBytes)
-	scanner := bufio.NewScanner(buff)
-	for scanner.Scan() {
-		d := scanner.Text()
-		if CheckIfPlainDomain(d) {
-			if wl.Enabled {
-				nm.Store(d, true)
-			}
-			wl.Count++
-		} else {
-			badLines++
-		}
-	}
-
+	wl.Count = count
 	wl.LastDownload = time.Now()
 	if badLines > 0 {
 		DEBUG(badLines, " invalid lines in list: ", wl.URL)
 	}
 	config.DNSWhiteLists[index] = wl
-}
-
-func downloadWhiteList(url string) ([]byte, error) {
-	defer RecoverAndLog()
-	if !CheckIfURL(url) {
-		return nil, nil
-	}
-
-	DEBUG("Downloading Whitelist: ", url)
-	start := time.Now()
-	defer func() {
-		DEBUG(url, " : Download time > ", time.Since(start).Seconds(), " seconds")
-	}()
-
-	var tries int
-
-retry:
-	resp, err := listHTTPClient.Get(url)
-	if err != nil || resp.StatusCode != http.StatusOK {
-		if resp != nil {
-			resp.Body.Close()
-		}
-		if tries < 5 {
-			time.Sleep(5 * time.Second)
-			tries++
-			if tries < 5 {
-				DEBUG("Unable to load list (retrying): ", url)
-				goto retry
-			}
-		}
-		if resp != nil {
-			return nil, fmt.Errorf("failed to download list: %d %s ", resp.StatusCode, err)
-		} else {
-			return nil, fmt.Errorf("failed to download list:  %s ", err)
-		}
-	}
-	defer resp.Body.Close()
-
-	bb, err := io.ReadAll(io.LimitReader(resp.Body, maxDNSListSize))
-	if err != nil {
-		return nil, err
-	}
-
-	return bb, nil
 }
 
 func GetDefaultWhiteLists() []*BlockList {
