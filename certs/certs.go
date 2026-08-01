@@ -9,16 +9,13 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
-	"encoding/hex"
 	"encoding/pem"
-	"errors"
 	"fmt"
 	"log"
 	"math/big"
 	"net"
 	"os"
 	"runtime/debug"
-	"strings"
 	"time"
 )
 
@@ -267,77 +264,5 @@ func MakeCertV2(ct CertType, certPath string, keyPath string, ips []string, doma
 			}
 		}
 	}
-	return
-}
-
-func ExtractSerialNumberHex(cert tls.Certificate) string {
-	if cert.Leaf == nil {
-		return ""
-	}
-	serialNumber := cert.Leaf.SerialNumber
-	serialBytes := serialNumber.Bytes()
-	serialHex := hex.EncodeToString(serialBytes)
-	return serialHex
-}
-
-func ExtractSerialNumberFromCRT(path string) (serial string, err error) {
-	var data []byte
-	data, err = os.ReadFile(path)
-	if err != nil {
-		return "", err
-	}
-
-	pemBlock, _ := pem.Decode(data)
-	if pemBlock == nil {
-		return "", fmt.Errorf("unable to decode pem block")
-	}
-
-	cert, err := x509.ParseCertificate(pemBlock.Bytes)
-	if err != nil {
-		return "", err
-	}
-
-	return fmt.Sprintf("%X", cert.SerialNumber), nil
-}
-
-type DNSInfo struct {
-	Cert     []byte
-	IP       string
-	Port     string
-	ServerID string
-}
-
-func ResolveMetaTXT(domain string) (info *DNSInfo, err error) {
-	txt, err := net.LookupTXT(domain)
-	if err != nil {
-		return nil, fmt.Errorf("error in base lookup: %s", err)
-	}
-	info = new(DNSInfo)
-	info.Cert = make([]byte, 0)
-
-	for _, v := range txt {
-		if strings.Contains(v, "----") {
-			info.Cert = []byte(v)
-		} else {
-			split := strings.Split(v, ":")
-			if len(split) < 3 {
-				return nil, errors.New("bad dns format, 0: field is less then 4 in length")
-			}
-			info.IP = split[0]
-			info.Port = split[1]
-			info.ServerID = split[2]
-			continue
-		}
-	}
-	if info.IP == "" {
-		return nil, errors.New("bad dns format, IP is empty")
-	}
-	if info.Port == "" {
-		return nil, errors.New("bad dns format, Port is empty")
-	}
-	if info.ServerID == "" {
-		return nil, errors.New("bad dns format, ServerID is empty")
-	}
-
 	return
 }

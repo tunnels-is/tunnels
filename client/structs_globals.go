@@ -430,7 +430,6 @@ type TUN struct {
 
 	blockedPortsSet map[[2]byte]uint16 `json:"-"`
 
-	needsReconnect          atomic.Bool
 	localInterfaceNetIP     net.IP
 	localDNSClient          *dns.Client
 	localInterfaceIP4bytes  [4]byte
@@ -473,8 +472,6 @@ type TUN struct {
 
 type event struct {
 	method func()
-
-	done chan any
 }
 
 type goSignal struct {

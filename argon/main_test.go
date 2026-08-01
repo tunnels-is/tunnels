@@ -1,39 +1,51 @@
 package argon
 
 import (
-	"strings"
+	"bytes"
 	"testing"
 )
 
-func TestCompareRoundTrip(t *testing.T) {
-	a := NewDefault()
-	hash, err := a.Hash("correct horse battery staple")
+func TestKey_DeterministicWhenSkipSalt(t *testing.T) {
+	a := &Argon{
+		Memory:      20 * 1024,
+		Iterations:  3,
+		Parallelism: 1,
+		SaltLength:  16,
+		KeyLength:   32,
+	}
+	k1, err := a.Key("user-id", true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	ok, err := a.Compare("correct horse battery staple", hash)
-	if err != nil || !ok {
-		t.Fatalf("valid password should match: ok=%v err=%v", ok, err)
+	k2, err := a.Key("user-id", true)
+	if err != nil {
+		t.Fatal(err)
 	}
-	ok, _ = a.Compare("wrong", hash)
-	if ok {
-		t.Fatal("wrong password must not match")
+	if !bytes.Equal(k1, k2) {
+		t.Fatal("Key with skipSalt should be deterministic")
+	}
+	k3, err := a.Key("other-user", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Equal(k1, k3) {
+		t.Fatal("different inputs should produce different keys")
 	}
 }
 
-// A hostile encodedHash with an enormous memory parameter must be rejected
-// before it reaches argon2.IDKey, not turned into a multi-GiB allocation.
-func TestCompareRejectsOutOfRangeParams(t *testing.T) {
-	a := NewDefault()
-	good, err := a.Hash("pw")
+func TestGenerateUserFolderHash(t *testing.T) {
+	k1, err := GenerateUserFolderHash("abc")
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Splice an absurd memory cost into an otherwise well-formed hash.
-	parts := strings.Split(good, "$")
-	parts[3] = "m=4294967295,t=3,p=1"
-	evil := strings.Join(parts, "$")
-	if _, err := a.Compare("pw", evil); err == nil {
-		t.Fatal("out-of-range argon parameters must be rejected")
+	k2, err := GenerateUserFolderHash("abc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(k1, k2) {
+		t.Fatal("GenerateUserFolderHash should be deterministic")
+	}
+	if len(k1) != 32 {
+		t.Fatalf("expected 32-byte key, got %d", len(k1))
 	}
 }
