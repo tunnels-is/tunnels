@@ -17,14 +17,6 @@ const LOGGING_OPTIONS = [
 	// toggle was a no-op that misled the user.
 ]
 
-const UPDATE_OPTIONS = [
-	{ key: "DisableUpdates", label: "Disable Updates" },
-	{ key: "AutoDownloadUpdate", label: "Auto Download" },
-	{ key: "UpdateWhileConnected", label: "While Connected" },
-	{ key: "RestartPostUpdate", label: "Restart After" },
-	{ key: "ExitPostUpdate", label: "Exit After" },
-]
-
 const Settings = () => {
 	const config = useStore((s) => s.config)
 	const advanced = useStore((s) => s.advanced)
@@ -115,7 +107,7 @@ const Settings = () => {
 					)}
 				</Card>
 
-				<Card title="Advanced" description="Show advanced configuration: API server, updates, network, DNS and system details.">
+				<Card title="Advanced" description="Show advanced configuration: API server, network, DNS and system details.">
 					<Toggle label="Advanced mode" checked={advanced} onChange={() => setAdvanced(!advanced)} />
 				</Card>
 
@@ -174,16 +166,6 @@ const Settings = () => {
 						<Toggle label="Debug Mode" checked={session.getBool("debug")} onChange={toggleDebug} />
 					</div>
 				</Card>
-
-				{advanced && (
-					<Card title="Updates" description="Behaviour when a new build of Tunnels is available.">
-						<div className="grid grid-cols-1 sm:grid-cols-2">
-							{UPDATE_OPTIONS.map((opt) => (
-								<Toggle key={opt.key} label={opt.label} checked={!!config?.[opt.key]} onChange={() => toggleConfigKey(opt.key)} />
-							))}
-						</div>
-					</Card>
-				)}
 
 				{advanced && (
 					<Card title="DNS" description="The local DNS resolver is enabled by default.">
