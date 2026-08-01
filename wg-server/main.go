@@ -10,9 +10,6 @@ import (
 	"time"
 )
 
-// meshReconcileInterval is how often the wg-server re-syncs its mesh peers with
-// the controller. Defaults to 2 minutes; overridable via
-// TUNNELS_MESH_RECONCILE_SECONDS (used by tests for fast convergence).
 func meshReconcileInterval() time.Duration {
 	if s := os.Getenv("TUNNELS_MESH_RECONCILE_SECONDS"); s != "" {
 		if n, err := strconv.Atoi(s); err == nil && n > 0 {
@@ -77,11 +74,6 @@ func Init(ctx context.Context, controllerURL, apiKey, configPath string, insecur
 		os.Exit(0)
 	}
 
-	// Drain any of wg-server's OWN leftover iptables rules before the preflight
-	// conflict check. After a crash/ungraceful restart those self-installed
-	// rules would otherwise trip preflight and block startup with the identical
-	// config; flushWGRules deletes only the exact rules wg-server installs, so
-	// preflight still catches genuinely foreign rules touching this config.
 	flushWGRules(cfg)
 
 	if err := preflightIPTables(cfg); err != nil {
@@ -89,18 +81,13 @@ func Init(ctx context.Context, controllerURL, apiKey, configPath string, insecur
 		return
 	}
 
-	// The peer store, active config and controller sync client MUST exist
-	// before setupWireGuard brings the device up: a handshake can arrive the
-	// moment the UDP port opens, and handleInitiation/reconcilePeer dereference
-	// all three. Initializing them afterwards left a window where an early
-	// handshake crashed the process on a nil peerStore.
 	peerStore = NewPeerStore(cfg.WireGuardSubnet, cfg.WireGuardSubnet6)
 	activeConfig.Store(cfg)
 	initSyncClient(cfg)
 
 	if err := setupWireGuard(cfg, logLevel); err != nil {
 		ERR("wireguard setup failed: ", err)
-		// setupWireGuard may have already started the flow cleaner before failing.
+
 		stopFlowCleaner()
 		if wgDevice != nil {
 			wgDevice.Close()
@@ -110,8 +97,7 @@ func Init(ctx context.Context, controllerURL, apiKey, configPath string, insecur
 
 	if err := setupNet(cfg); err != nil {
 		ERR("network setup failed: ", err)
-		// Undo whatever partial rules/device state was created so a retry has a
-		// clean table and no leaked TUN.
+
 		stopFlowCleaner()
 		cleanupNet(cfg)
 		if wgLazyBind != nil {
@@ -124,13 +110,11 @@ func Init(ctx context.Context, controllerURL, apiKey, configPath string, insecur
 		return
 	}
 
-	// Server-to-server mesh. Non-fatal: a node still serves its own clients if
-	// the mesh can't come up; only cross-server reachability is affected.
 	if err := setupMesh(cfg, logLevel); err != nil {
 		ERR("mesh setup failed (continuing without mesh): ", err)
 	} else {
 		go func() {
-			reconcileMesh() // initial sync — in the goroutine so a slow controller can't delay startup
+			reconcileMesh()
 			t := time.NewTicker(meshReconcileInterval())
 			defer t.Stop()
 			for {
@@ -149,22 +133,14 @@ func Init(ctx context.Context, controllerURL, apiKey, configPath string, insecur
 	<-ctx.Done()
 
 	INFO("wg-server shutting down...")
-	// Order matters: Shutdown() closes LazyBind.done, which unblocks the
-	// reinjectReceive goroutine that wireguard-go's RoutineReceiveIncoming is
-	// parked in. wgDevice.Close() waits on every receive routine to finish
-	// (device.state.stopping.Wait()); if reinjectReceive hasn't been told to
-	// exit, Close deadlocks. LazyBind.Close() (called transitively by
-	// wgDevice.Close() during BindClose) is intentionally non-destructive and
-	// does NOT close LazyBind.done — that's reserved for Shutdown — so the
-	// signal has to come from us, here, first.
+
 	if wgLazyBind != nil {
 		wgLazyBind.Shutdown()
 	}
 	if wgDevice != nil {
 		wgDevice.Close()
 	}
-	// Only now that all receive routines have drained is it safe to erase the
-	// server key material (no handleInitiation goroutine can still read it).
+
 	if wgLazyBind != nil {
 		wgLazyBind.WipeKeys()
 	}

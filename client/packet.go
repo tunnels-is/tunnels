@@ -4,11 +4,6 @@ import (
 	"encoding/binary"
 )
 
-// ipv4IsTrailingFragment reports whether an IPv4 packet is a non-first fragment
-// (fragment offset > 0), i.e. it carries no L4 header. isFragmented reports
-// whether the packet is part of a fragmented datagram at all (MF set or a
-// non-zero offset). frag lives in bytes 6-7: top 3 bits are flags (0x2000=MF),
-// low 13 bits are the offset in 8-byte units.
 func ipv4FragInfo(packet []byte) (isFragmented, isTrailing bool) {
 	f := binary.BigEndian.Uint16(packet[6:8])
 	isTrailing = f&0x1FFF != 0
@@ -22,8 +17,7 @@ func (V *TUN) ProcessEgressPacket(p *[]byte) (sendRemote bool) {
 	if len(packet) < 1 {
 		return false
 	}
-	// IPv6 has no NAT/port-control here and no header checksum; pass it through
-	// untouched so dual-stack tunnels are not black-holed.
+
 	if (packet[0] >> 4) == 6 {
 		return true
 	}
@@ -45,9 +39,6 @@ func (V *TUN) ProcessEgressPacket(p *[]byte) (sendRemote bool) {
 
 	isFragmented, isTrailing := ipv4FragInfo(packet)
 
-	// The L4 header (ports, checksum) only exists on the first/only fragment.
-	// A trailing fragment's "transport bytes" are raw payload — never read a
-	// port from them or overwrite them with a checksum.
 	if !isTrailing {
 		if V.EP_Protocol == 17 && len(V.EP_TPHeader) < 8 {
 			return false
@@ -80,11 +71,7 @@ func (V *TUN) ProcessEgressPacket(p *[]byte) (sendRemote bool) {
 	}
 
 	RecalculateIPv4HeaderChecksum(V.EP_IPv4Header)
-	// The transport checksum covers the whole (reassembled) datagram, so it can
-	// only be recomputed from a complete, unfragmented packet. Fragments already
-	// carry a software-computed L4 checksum (offload can't span fragments), so
-	// leaving it intact is correct for the non-NAT case. (NAT of a fragmented
-	// datagram would need reassembly/incremental fixup and is unsupported.)
+
 	if !isFragmented {
 		RecalculateTransportChecksum(V.EP_IPv4Header, V.EP_TPHeader)
 	}
@@ -96,7 +83,7 @@ func (V *TUN) ProcessIngressPacket(packet []byte) bool {
 	if len(packet) < 1 {
 		return false
 	}
-	// IPv6: pass through untouched (see egress note).
+
 	if (packet[0] >> 4) == 6 {
 		return true
 	}
@@ -110,9 +97,7 @@ func (V *TUN) ProcessIngressPacket(packet []byte) bool {
 	V.IP_SrcIP[3] = packet[15]
 
 	V.IP_IPv4HeaderLength = (packet[0] & 0x0F) * 4
-	// A header shorter than the minimum 20 bytes would make the checksum
-	// recalculation index past a too-short slice and panic. A hostile/
-	// compromised server can send exactly this, so reject it here.
+
 	if int(V.IP_IPv4HeaderLength) < 20 || int(V.IP_IPv4HeaderLength) > len(packet) {
 		return false
 	}
@@ -203,9 +188,7 @@ func RecalculateTransportChecksum(IPv4Header []byte, TPPacket []byte) {
 	case 6:
 		binary.BigEndian.PutUint16(TPPacket[16:18], ^uint16(csum))
 	case 17:
-		// RFC 768: a computed UDP checksum of zero must be sent as 0xFFFF, since
-		// 0x0000 in the field means "no checksum" and the receiver would skip
-		// validation. (TCP has no such rule — 0 is a legal TCP checksum.)
+
 		udpsum := ^uint16(csum)
 		if udpsum == 0 {
 			udpsum = 0xFFFF

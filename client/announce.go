@@ -11,20 +11,13 @@ import (
 	"time"
 )
 
-// aclControlPort is the UDP port on the wg-server's WG-side IP that receives
-// firewall allowlist announcements. The server consumes these packets in its
-// packet inspector; they are fire-and-forget (no response).
 const aclControlPort = 51821
 
 type aclAnnouncement struct {
-	// AllowAll, when true, tells the server any peer may reach this device,
-	// overriding Allowed. Omitted from the wire when false for compatibility.
 	AllowAll bool     `json:"AllowAll,omitempty"`
 	Allowed  []string `json:"Allowed"`
 }
 
-// wgServerGatewayIP returns the wg-server's own WG-side IP: the first host
-// address of the WireGuard subnet (mirrors the wg-server's address setup).
 func wgServerGatewayIP(subnet string) (net.IP, error) {
 	_, ipNet, err := net.ParseCIDR(subnet)
 	if err != nil {
@@ -40,14 +33,6 @@ func wgServerGatewayIP(subnet string) (net.IP, error) {
 	return gw, nil
 }
 
-// NormalizeAllowedHost validates one allowlist entry and returns its canonical
-// form. Three shapes are accepted, matching the wg-server's parseACLEntry:
-//   - "IP"      a single source, all ports
-//   - "IP:PORT" a single source, that destination port only
-//   - "*:PORT"  any source, that destination port only
-//
-// AllowAll (handled separately) is the toggle that permits any source on any
-// port. Protocol is not distinguished.
 func NormalizeAllowedHost(s string) (string, error) {
 	s = strings.TrimSpace(s)
 	if rest, ok := strings.CutPrefix(s, "*:"); ok {
@@ -57,10 +42,10 @@ func NormalizeAllowedHost(s string) (string, error) {
 		}
 		return "*:" + strconv.FormatUint(port, 10), nil
 	}
-	if a, err := netip.ParseAddr(s); err == nil { // bare IP → all ports
+	if a, err := netip.ParseAddr(s); err == nil {
 		return a.String(), nil
 	}
-	if ap, err := netip.ParseAddrPort(s); err == nil { // IP:PORT
+	if ap, err := netip.ParseAddrPort(s); err == nil {
 		if ap.Port() == 0 {
 			return "", fmt.Errorf("allowed host has an invalid port: %s", s)
 		}
@@ -69,11 +54,6 @@ func NormalizeAllowedHost(s string) (string, error) {
 	return "", fmt.Errorf("allowed host must be IP, IP:PORT, or *:PORT: %s", s)
 }
 
-// AnnounceAllowedHosts sends the firewall policy to the wg-server's ACL
-// control port through the tunnel: the allowlist plus the allow-all flag.
-// An empty list with allowAll=false clears this device's policy on the server
-// (used on disconnect). Fire-and-forget: a lost packet is only recovered by a
-// later announce.
 func (t *TUN) AnnounceAllowedHosts(allowed []string, allowAll bool) error {
 	sr := t.ServerResponse
 	if sr == nil || sr.WireGuardSubnet == "" {
@@ -111,13 +91,6 @@ func (t *TUN) AnnounceAllowedHosts(allowed []string, allowAll bool) error {
 	return nil
 }
 
-// announceAllowedHostsWithRetry announces the tunnel meta's AllowedHosts a
-// few times with delays. Used right after connect, when the WireGuard
-// handshake may not have completed yet and the first packet can be lost.
-//
-// An empty list is announced too — announcements are replace-set, so the
-// empty announce is what overwrites a stale policy left on the server by a
-// previous session (e.g. when the disconnect-time clear was lost).
 func (t *TUN) announceAllowedHostsWithRetry() {
 	defer RecoverAndLog()
 	for _, delay := range []time.Duration{0, 2 * time.Second, 5 * time.Second} {

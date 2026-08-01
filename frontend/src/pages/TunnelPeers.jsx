@@ -5,15 +5,10 @@ import { Card, Page } from "@/components/ui"
 import { fetchState, setTunnelPeers } from "@/store/actions"
 import { useStore } from "@/store/store"
 
-// Loose shape check for instant feedback; the client backend does the real
-// validation. Accepted forms: "IP" (all ports), "IP:PORT", and "*:PORT" (any
-// host, that port). See NormalizeAllowedHost on the backend.
 const looksLikePeer = (s) =>
-	/^\*:\d{1,5}$/.test(s) || // *:PORT
+	/^\*:\d{1,5}$/.test(s) ||
 	(/^[0-9a-fA-F:.[\]]+$/.test(s) && (s.includes(".") || s.includes(":")))
 
-// Split a peer entry into a display host + optional port, without mangling IPv6
-// (which is only treated as host:port when bracketed).
 const parsePeer = (s) => {
 	let m = s.match(/^\*:(\d{1,5})$/)
 	if (m) return { host: "Any device", port: m[1], any: true }
@@ -53,7 +48,6 @@ const TunnelPeers = () => {
 		)
 	}
 
-	// apply preserves whichever half of the policy isn't being changed.
 	const apply = async (next, all = allowAll) => {
 		setBusy(true)
 		const ok = await setTunnelPeers(tag, next, all)
@@ -98,7 +92,7 @@ const TunnelPeers = () => {
 
 			<div className="max-w-xl space-y-4">
 				<Card title="Firewall">
-					{/* Current policy at a glance */}
+					{}
 					<div
 						className={
 							"flex items-start gap-3 rounded-box border px-4 py-3 " +

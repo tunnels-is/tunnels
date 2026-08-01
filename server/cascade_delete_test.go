@@ -7,8 +7,6 @@ import (
 	"github.com/tunnels-is/tunnels/types"
 )
 
-// C3: deleting a user cascade-deletes their devices and the device indexes,
-// freeing WG IPs and releasing the wgkey reservation.
 func TestDeleteUser_CascadesDevices(t *testing.T) {
 	setupTestDB(t)
 	u := testUser("cascade@example.com", "")
@@ -31,13 +29,12 @@ func TestDeleteUser_CascadesDevices(t *testing.T) {
 	if len(devs) != 0 {
 		t.Fatalf("expected 0 devices after user delete, got %d", len(devs))
 	}
-	// The wgkey must be free for re-registration.
+
 	if d, _ := BBolt_FindDeviceByWGKey("wgkey-cascade-user"); d != nil {
 		t.Fatal("wgkey index still reserved after user delete")
 	}
 }
 
-// C4: deleting a server cascade-deletes devices bound to it.
 func TestDeleteServer_CascadesDevices(t *testing.T) {
 	setupTestDB(t)
 	srv := &types.Server{ID: uuid.New(), Tag: "s", APIKey: "srvkey"}
@@ -49,7 +46,7 @@ func TestDeleteServer_CascadesDevices(t *testing.T) {
 	if err := BBolt_CreateDevice(dev); err != nil {
 		t.Fatal(err)
 	}
-	// A device on a different server must survive.
+
 	other := &types.Device{ID: uuid.New(), UserID: owner, ServerID: uuid.New(), WireGuardKey: "wgkey-other"}
 	if err := BBolt_CreateDevice(other); err != nil {
 		t.Fatal(err)
@@ -67,8 +64,6 @@ func TestDeleteServer_CascadesDevices(t *testing.T) {
 	}
 }
 
-// C1: deleting a group scrubs its ID from every user and server, so access
-// (hasSharedOrNoGroup) is actually revoked.
 func TestDeleteGroup_ScrubsMembership(t *testing.T) {
 	setupTestDB(t)
 	g := &Group{ID: uuid.New(), Tag: "g"}

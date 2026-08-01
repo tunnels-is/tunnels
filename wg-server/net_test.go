@@ -19,7 +19,7 @@ func TestMasqueradeArgs_AlwaysMASQUERADE(t *testing.T) {
 }
 
 func TestMasqueradeArgs_DrainShape(t *testing.T) {
-	// Drain (-D) must match install (-A) exactly except for the action.
+
 	install := masqueradeArgs("-A", "10.0.0.0/24", "eth0")
 	drain := masqueradeArgs("-D", "10.0.0.0/24", "eth0")
 
@@ -40,8 +40,7 @@ func TestMasqueradeArgs_DrainShape(t *testing.T) {
 }
 
 func TestPreviewRules_MASQUERADEEvenWithPublicIP(t *testing.T) {
-	// PublicIP is bind-only now, so egress NAT is always MASQUERADE — even when
-	// PublicIP is set, no SNAT rule is emitted.
+
 	cfg := &Config{
 		WireGuardSubnet:  "10.0.0.0/22",
 		WireGuardSubnet6: "fd00::/64",
@@ -69,7 +68,7 @@ func TestPreviewRules_MASQUERADEEvenWithPublicIP(t *testing.T) {
 		t.Fatalf("rule preview mismatch\nGOT:\n%s\nWANT:\n%s",
 			joinLines(got), joinLines(want))
 	}
-	// No SNAT rule may appear, regardless of PublicIP.
+
 	for _, line := range got {
 		if strings.Contains(line, "SNAT") {
 			t.Fatalf("SNAT rule leaked: %s", line)
@@ -109,7 +108,7 @@ func TestPreviewRules_NoSubnet6_EmitsDropRules(t *testing.T) {
 			t.Errorf("expected %q in output, got:\n%s", want, joinLines(got))
 		}
 	}
-	// No ip6tables MASQUERADE rule when there's no v6 subnet.
+
 	for _, line := range got {
 		if line == "ip6tables -t nat -A POSTROUTING -s  -o eth0 -j MASQUERADE" {
 			t.Fatalf("v6 MASQUERADE leaked with empty subnet6")

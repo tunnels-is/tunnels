@@ -17,23 +17,12 @@ const (
 	labelMAC1         = "mac1----"
 )
 
-// validMAC1 reports whether a handshake-initiation packet carries the mac1 that
-// WireGuard binds to this server's static public key:
-//
-//	mac1 = KEYED-BLAKE2s-128( msg[:mac1Offset], key = BLAKE2s-256(LABEL_MAC1 ‖ serverPub) )
-//
-// It is a cheap keyed hash computed BEFORE any Diffie-Hellman, so junk/spoofed
-// flood packets that aren't genuinely addressed to this server are dropped
-// without spending an X25519 (or spawning a goroutine / calling the controller).
-// A peer that knows serverPub can still forge a valid mac1 — that is what
-// WireGuard's cookie/mac2 under-load mechanism defends against — but this
-// eliminates the cheap random-flood vector.
 func validMAC1(pkt, serverPub []byte) bool {
 	if len(pkt) < msgInitiationSize {
 		return false
 	}
-	// Message layout: [ ...alpha... | mac1 (16) | mac2 (16) ]. mac1 covers alpha.
-	const mac1Offset = msgInitiationSize - 2*blake2s.Size128 // 148 - 32 = 116
+
+	const mac1Offset = msgInitiationSize - 2*blake2s.Size128
 
 	key := noiseHash([]byte(labelMAC1), serverPub)
 	defer zeroBytes(key)

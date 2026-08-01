@@ -36,8 +36,6 @@ func makeWGKey() string {
 	return base64.StdEncoding.EncodeToString(make([]byte, 32))
 }
 
-// seedEnabledUser creates an enabled, non-expired, group-less user and returns
-// its ID — the owner that /wg/peers scoping requires for a device to be served.
 func seedEnabledUser(t *testing.T) uuid.UUID {
 	t.Helper()
 	u := &User{
@@ -51,8 +49,6 @@ func seedEnabledUser(t *testing.T) uuid.UUID {
 	return u.ID
 }
 
-// seedDevice creates a device bound to serverID with a fresh enabled owner, so
-// it passes the /wg/peers server/group/account scoping.
 func seedDevice(t *testing.T, wgKey string, serverID uuid.UUID) *types.Device {
 	t.Helper()
 	d := &types.Device{
@@ -75,8 +71,7 @@ func callWGPeers(t *testing.T, apiKey, query string) (*httptest.ResponseRecorder
 		req.Header.Set("X-WG-KEY", apiKey)
 	}
 	w := httptest.NewRecorder()
-	// Route through the WG-key middleware like the real mux does — the key
-	// check and the server context live there, not in the handler.
+
 	wireGuardServerKeyCheck(http.HandlerFunc(API_WGPeers)).ServeHTTP(w, req)
 
 	var resp types.WGPeersResponse
@@ -88,8 +83,6 @@ func callWGPeers(t *testing.T, apiKey, query string) (*httptest.ResponseRecorder
 	return w, resp
 }
 
-// uniqueWGKey returns a 32-byte base64 key derived from i so it's stable and
-// distinct across seeds within one test.
 func uniqueWGKey(i int) string {
 	raw := make([]byte, 32)
 	raw[31] = byte(i)
@@ -225,12 +218,11 @@ func TestAPI_WGPeers_SkipsEmptyAndInvalidKeys(t *testing.T) {
 	apiKey, srvID := setupWGTest(t)
 
 	good := seedDevice(t, uniqueWGKey(1), srvID)
-	// Empty WireGuardKey: bound to the server with a valid owner so it reaches
-	// (and is excluded by) the empty-key filter rather than the scoping filter.
+
 	if err := BBolt_CreateDevice(&types.Device{ID: uuid.New(), UserID: seedEnabledUser(t), ServerID: srvID}); err != nil {
 		t.Fatal(err)
 	}
-	// Non-32-byte WireGuardKey: reaches (and is filtered by) b64KeyToHex.
+
 	if err := BBolt_CreateDevice(&types.Device{
 		ID: uuid.New(), UserID: seedEnabledUser(t), ServerID: srvID,
 		WireGuardKey: base64.StdEncoding.EncodeToString([]byte("too-short")),
@@ -245,7 +237,7 @@ func TestAPI_WGPeers_SkipsEmptyAndInvalidKeys(t *testing.T) {
 	if resp.Peers[0].DeviceID != good.ID.String() {
 		t.Fatalf("wrong device returned: %s", resp.Peers[0].DeviceID)
 	}
-	// All three devices fit within limit=10, so this is the final page.
+
 	if resp.NextOffset != -1 {
 		t.Fatalf("expected NextOffset=-1 on terminal page, got %d", resp.NextOffset)
 	}
@@ -253,7 +245,7 @@ func TestAPI_WGPeers_SkipsEmptyAndInvalidKeys(t *testing.T) {
 
 func TestAPI_WGPeers_PartialPageEndsPagination(t *testing.T) {
 	apiKey, srvID := setupWGTest(t)
-	// 3 devices, limit=2: first page is full, second page has 1, then done.
+
 	for i := 0; i < 3; i++ {
 		seedDevice(t, uniqueWGKey(i), srvID)
 	}
@@ -272,7 +264,6 @@ func TestAPI_WGPeers_PartialPageEndsPagination(t *testing.T) {
 	}
 }
 
-// small local itoa to avoid pulling in strconv just for tests.
 func itoa(n int) string {
 	if n == 0 {
 		return "0"

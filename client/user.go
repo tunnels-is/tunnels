@@ -21,14 +21,6 @@ const userKeyFileName = "user.key"
 
 var userKeyMu sync.Mutex
 
-// getUserFileKey returns the AES-256 key protecting saved user files: 32
-// random bytes generated once per install and stored 0600 in BasePath. The
-// previous scheme derived the key from public filesystem names with a zero
-// salt (argon.GetKeyFromLocalInfo), which any local file reader could
-// recompute — files encrypted that way are transparently migrated in
-// getUsers. This key still lives on the same disk as the user files, so it
-// defends against other local users and casual file exfiltration, not
-// against an attacker with full access to this account's files.
 func getUserFileKey() ([]byte, error) {
 	userKeyMu.Lock()
 	defer userKeyMu.Unlock()
@@ -37,8 +29,7 @@ func getUserFileKey() ([]byte, error) {
 	path := s.BasePath + userKeyFileName
 	kb, err := os.ReadFile(path)
 	if err == nil && len(kb) != 0 {
-		// Don't trust a key file another user could have planted or read: it
-		// protects every saved credential.
+
 		if info, statErr := os.Stat(path); statErr == nil {
 			if verr := validateUserKeyFile(info); verr != nil {
 				return nil, fmt.Errorf("user key file %q: %w — delete it to re-generate (saved logins will be lost)", path, verr)
@@ -54,9 +45,6 @@ func getUserFileKey() ([]byte, error) {
 		return nil, err
 	}
 
-	// A zero-length key file (e.g. a crash between the O_EXCL create and the
-	// write below) would otherwise wedge the O_EXCL create forever; treat it as
-	// absent and replace it.
 	if _, statErr := os.Stat(path); statErr == nil {
 		if rmErr := os.Remove(path); rmErr != nil {
 			return nil, fmt.Errorf("remove empty user key file %q: %w", path, rmErr)
@@ -67,9 +55,7 @@ func getUserFileKey() ([]byte, error) {
 	if _, err := rand.Read(key); err != nil {
 		return nil, err
 	}
-	// O_EXCL: create fresh with 0600 or refuse. os.WriteFile into a pre-existing
-	// (attacker-planted) file does NOT re-apply the 0600 mode, which would hand
-	// our freshly generated key to a file the attacker can read.
+
 	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
 	if err != nil {
 		return nil, fmt.Errorf("create user key file %q: %w", path, err)
@@ -85,11 +71,7 @@ func getUserFileKey() ([]byte, error) {
 }
 
 func delUser(hash string) (err error) {
-	// hash is attacker-controllable (the local API request body). Saved user
-	// files are always named with a hex hash (fmt.Sprintf("%x", ...)), so
-	// enforce a pure-hex charset here — without it a value like
-	// "../../../etc/foo" would resolve os.Remove outside UserPath and delete an
-	// arbitrary file the (elevated) client process can reach.
+
 	if !isHexString(hash) {
 		return fmt.Errorf("invalid user hash")
 	}
@@ -157,8 +139,6 @@ func getUsers() (ul []*User, err error) {
 		return nil, err
 	}
 
-	// Legacy key (public-info derivation, zero salt) — only computed if an
-	// old-format file is actually encountered, and only once.
 	var legacyKey []byte
 	legacyKeyOnce := func() []byte {
 		if legacyKey == nil {
@@ -190,8 +170,7 @@ func getUsers() (ul []*User, err error) {
 				migrate = er == nil
 			}
 			if er != nil {
-				// Undecryptable with either key: skip this file instead of
-				// aborting the walk (one corrupt file must not hide all users).
+
 				ERROR("unable to decrypt user file:", base, " err:", er)
 				return nil
 			}

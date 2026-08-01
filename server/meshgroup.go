@@ -13,14 +13,6 @@ import (
 	gobolt "go.etcd.io/bbolt"
 )
 
-// A MeshGroup scopes the server-to-server WireGuard mesh: servers sharing a
-// MeshGroupID peer with each other, and GET /wg/mesh returns only same-group
-// siblings. Managed from the admin UI, mirroring WANs.
-
-// ---------------------------------------------------------------------------
-// Forms
-// ---------------------------------------------------------------------------
-
 type FORM_CREATE_MESHGROUP struct {
 	MeshGroup *types.MeshGroup `json:"MeshGroup"`
 }
@@ -41,10 +33,6 @@ type FORM_LIST_MESHGROUP struct {
 	Limit  int `json:"Limit"`
 	Offset int `json:"Offset"`
 }
-
-// ---------------------------------------------------------------------------
-// Handlers
-// ---------------------------------------------------------------------------
 
 func API_AdminMeshGroupCreate(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
@@ -103,8 +91,6 @@ func API_AdminMeshGroupDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Disband the mesh: clear MeshGroupID from every member so they stop meshing
-	// (otherwise they'd keep peering by the now-orphaned group ID).
 	if servers, err := DB_FindServersByMeshGroup(F.MeshGroupID.String()); err == nil {
 		for _, s := range servers {
 			s.MeshGroupID = ""
@@ -122,15 +108,12 @@ func API_AdminMeshGroupDelete(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(200)
 }
 
-// validateServerMesh enforces the invariants a server's mesh assignment must
-// satisfy. Call it after applyWGDefaults (so ports are populated) and with DB
-// access available.
 func validateServerMesh(s *types.Server) error {
 	if s.WireGuardMeshPort != 0 && s.WireGuardMeshPort == s.WireGuardPort {
 		return errors.New("WireGuardMeshPort must differ from WireGuardPort")
 	}
 	if s.MeshGroupID == "" {
-		return nil // not in a mesh
+		return nil
 	}
 	gid, err := uuid.Parse(s.MeshGroupID)
 	if err != nil {
@@ -143,7 +126,7 @@ func validateServerMesh(s *types.Server) error {
 	if mg == nil {
 		return errors.New("mesh group not found")
 	}
-	// Within a mesh group, subnets are routed by CIDR, so they must not overlap.
+
 	siblings, err := DB_FindServersByMeshGroup(s.MeshGroupID)
 	if err != nil {
 		return err
@@ -162,8 +145,6 @@ func validateServerMesh(s *types.Server) error {
 	return nil
 }
 
-// cidrsOverlap reports whether two CIDRs share any address. Empty strings never
-// overlap. Two networks overlap iff one contains the other's network address.
 func cidrsOverlap(a, b string) bool {
 	if a == "" || b == "" {
 		return false
@@ -229,10 +210,6 @@ func validateMeshGroup(mg *types.MeshGroup) error {
 	return nil
 }
 
-// ---------------------------------------------------------------------------
-// DB wrappers
-// ---------------------------------------------------------------------------
-
 func DB_CreateMeshGroup(mg *types.MeshGroup) error { return BBolt_CreateMeshGroup(mg) }
 func DB_UpdateMeshGroup(mg *types.MeshGroup) error { return BBolt_UpdateMeshGroup(mg) }
 func DB_DeleteMeshGroupByID(id uuid.UUID) error    { return BBolt_DeleteMeshGroupByID(id.String()) }
@@ -243,7 +220,6 @@ func DB_ListMeshGroups(limit, offset int64) ([]*types.MeshGroup, error) {
 	return BBolt_findMeshGroups(limit, offset)
 }
 
-// DB_FindServersByMeshGroup returns every server assigned to meshGroupID.
 func DB_FindServersByMeshGroup(meshGroupID string) ([]*types.Server, error) {
 	all, err := BBolt_FindAllServers(1000000, 0)
 	if err != nil {
@@ -257,10 +233,6 @@ func DB_FindServersByMeshGroup(meshGroupID string) ([]*types.Server, error) {
 	}
 	return out, nil
 }
-
-// ---------------------------------------------------------------------------
-// bbolt storage
-// ---------------------------------------------------------------------------
 
 func BBolt_CreateMeshGroup(mg *types.MeshGroup) error {
 	return BBoltDB.Update(func(tx *gobolt.Tx) error {

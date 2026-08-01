@@ -10,15 +10,6 @@ import (
 	gobolt "go.etcd.io/bbolt"
 )
 
-// WAN ("wide area network") is an over-arching network that aggregates one or
-// more WireGuard server subnets (e.g. 10.0.0.0/8 covering 10.0.0.0/16 and
-// 10.3.0.0/16). It is managed as a first-class entity here and referenced from
-// Server.WAN.
-
-// ---------------------------------------------------------------------------
-// Forms
-// ---------------------------------------------------------------------------
-
 type FORM_CREATE_WAN struct {
 	WAN *types.WAN `json:"WAN"`
 }
@@ -39,10 +30,6 @@ type FORM_LIST_WAN struct {
 	Limit  int `json:"Limit"`
 	Offset int `json:"Offset"`
 }
-
-// ---------------------------------------------------------------------------
-// Handlers
-// ---------------------------------------------------------------------------
 
 func API_AdminWANCreate(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
@@ -151,11 +138,6 @@ func API_AdminWANList(w http.ResponseWriter, r *http.Request) {
 	sendObject(w, wans)
 }
 
-// attachWANs populates the transient Server.WAN field on each server from its
-// WANID by loading the WAN table once. WAN is never persisted (it is the
-// resolved form of WANID); this enriches get/list responses so callers receive
-// the live WAN — reflecting any edits — without a second lookup. A WANID with
-// no matching WAN (e.g. the WAN was deleted) leaves WAN nil.
 func attachWANs(servers ...*types.Server) {
 	hasRef := false
 	for _, s := range servers {
@@ -185,10 +167,6 @@ func attachWANs(servers ...*types.Server) {
 	}
 }
 
-// wanCIDRForServer resolves the CIDR of the WAN a server belongs to, or ""
-// when the server has no WAN reference (or the referenced WAN was deleted).
-// Used to tell connecting clients which over-arching network to route through
-// the tunnel.
 func wanCIDRForServer(s *types.Server) string {
 	if s == nil || s.WANID == "" {
 		return ""
@@ -204,7 +182,6 @@ func wanCIDRForServer(s *types.Server) string {
 	return wan.CIDR
 }
 
-// validateWAN checks required fields and the CIDR format.
 func validateWAN(wan *types.WAN) error {
 	if wan == nil {
 		return errors.New("WAN is required")
@@ -221,10 +198,6 @@ func validateWAN(wan *types.WAN) error {
 	return nil
 }
 
-// ---------------------------------------------------------------------------
-// DB wrappers
-// ---------------------------------------------------------------------------
-
 func DB_CreateWAN(wan *types.WAN) error   { return BBolt_CreateWAN(wan) }
 func DB_UpdateWAN(wan *types.WAN) error   { return BBolt_UpdateWAN(wan) }
 func DB_DeleteWANByID(id uuid.UUID) error { return BBolt_DeleteWANByID(id.String()) }
@@ -234,10 +207,6 @@ func DB_findWANByID(id uuid.UUID) (*types.WAN, error) {
 func DB_ListWANs(limit, offset int64) ([]*types.WAN, error) {
 	return BBolt_findWANs(limit, offset)
 }
-
-// ---------------------------------------------------------------------------
-// bbolt storage
-// ---------------------------------------------------------------------------
 
 func BBolt_CreateWAN(wan *types.WAN) error {
 	return BBoltDB.Update(func(tx *gobolt.Tx) error {

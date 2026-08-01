@@ -13,7 +13,6 @@ const copyText = (text) => {
 	useStore.getState().notifySuccess("Copied to clipboard")
 }
 
-// Rectangular flag with a graceful placeholder when the country is unknown.
 const Flag = ({ code, className = "" }) => {
 	const box = { width: "1.9rem", height: "1.4rem" }
 	if (!code) {
@@ -58,7 +57,6 @@ const Servers = () => {
 		fetchState()
 	}, [])
 
-	// server id -> live connection
 	const activeByServer = useMemo(() => {
 		const map = {}
 		activeTunnels?.forEach((at) => at.CR?.ServerID && (map[at.CR.ServerID] = at))
@@ -86,11 +84,7 @@ const Servers = () => {
 	const paged = filtered.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE)
 
 	const connectToServer = (server) => {
-		// The server list always connects to the chosen server through the
-		// default tunnel (type 2), in both simple and advanced mode: the client
-		// reconciles the default tunnel's device to this server before
-		// connecting. Connecting a tunnel that is linked to its own server
-		// (type 3) is done from the Tunnels page.
+
 		askConfirm("Connect", "Connect to " + server.Tag + "?", () => connectServer(server))
 	}
 

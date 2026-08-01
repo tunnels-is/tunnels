@@ -91,11 +91,6 @@ func CreateFile(file string) (f *os.File, err error) {
 	return
 }
 
-// writeFileWithBackup replaces path with newContent, keeping the previous
-// version as path+backupFileSuffix. The write (and backup) is skipped when the
-// on-disk content is already identical, so the .bak never ends up equal to the
-// live file. It refuses to touch a file owned by another user, so a client
-// started as e.g. root cannot wipe a user-owned config.
 func writeFileWithBackup(path string, newContent []byte) (err error) {
 	existing, err := os.ReadFile(path)
 	if err == nil && sha256.Sum256(existing) == sha256.Sum256(newContent) {
@@ -146,9 +141,6 @@ func CreateFolder(path string) {
 	DEBUG("New directory:", path)
 }
 
-// verifyAndWriteFile checks whether the file at diskPath matches the expected
-// content. If the file is missing or its SHA-256 differs, it is replaced with
-// the expected content. Returns true if the file was written.
 func verifyAndWriteFile(diskPath string, expected []byte) (bool, error) {
 	expectedHash := sha256.Sum256(expected)
 

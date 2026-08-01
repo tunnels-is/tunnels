@@ -26,7 +26,7 @@ func LoadPrivateKey(filePath string) (any, []byte, error) {
 
 	keyInterface, err := x509.ParsePKCS8PrivateKey(block.Bytes)
 	if err != nil {
-		// If both failed, return the PKCS#8 error
+
 		return nil, nil, fmt.Errorf("failed to parse private key (tried PKCS#1 and PKCS#8): %w", err)
 	}
 
