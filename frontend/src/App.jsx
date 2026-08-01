@@ -1,181 +1,123 @@
-import { HashRouter, Route, Routes } from "react-router-dom";
-import { createRoot } from "react-dom/client";
-import React, { useEffect } from "react";
-import { createPortal } from "react-dom";
-import { Toaster } from "react-hot-toast";
+import React, { useEffect } from "react"
+import { HashRouter, Route, Routes } from "react-router-dom"
+import "@/lib/theme"
 
-import "./assets/style/app.scss";
-import "@fontsource-variable/inter";
-import "./theme";
+import ConfirmDialog from "@/components/ConfirmDialog"
+import LoadingBar from "@/components/LoadingBar"
+import Sidebar from "@/components/Sidebar"
+import Toasts from "@/components/Toasts"
 
-import DNSAnswers from "./App/component/DNSAnswers";
-import ScreenLoader from "./App/ScreenLoader";
-import UserSelect from "./App/UserSelect";
-import Enable2FA from "./App/Enable2FA";
-import Settings from "./App/Settings";
-import Account from "./App/Account";
-import Welcome from "./App/Welcome";
-import SideBar from "./App/SideBar";
-import GLOBAL_STATE from "./state";
-import Login from "./App/Login";
-import { STATE } from "./state";
-import Stats from "./App/Stats";
-import Logs from "./App/Logs";
-import STORE from "./store";
-import Graph from "./App/Graph";
-import DNSStats from "./App/DNSStats";
-import ConfirmDialog from "./App/ConfirmDialog";
-import DNS from "./App/dns";
-import WS from "./ws";
-import Bandwidth from "./App/BandwidthHistory";
-import UserDevices from "./App/UserDevices";
+import Account from "@/pages/Account"
+import AccountSelect from "@/pages/AccountSelect"
+import Connections from "@/pages/Connections"
+import Dashboard from "@/pages/Dashboard"
+import Devices from "@/pages/Devices"
+import DNS from "@/pages/DNS"
+import DNSStats from "@/pages/DNSStats"
+import Login from "@/pages/Login"
+import Logs from "@/pages/Logs"
+import Servers from "@/pages/Servers"
+import Settings from "@/pages/Settings"
+import Support from "@/pages/Support"
+import TunnelForm from "@/pages/TunnelForm"
+import TunnelPeers from "@/pages/TunnelPeers"
+import Tunnels from "@/pages/Tunnels"
+import TwoFactor from "@/pages/TwoFactor"
 
-const appElement = document.getElementById("app");
-const root = createRoot(appElement);
+import { connectLogSocket } from "@/api/logs"
+import { fetchState } from "@/store/actions"
+import { session } from "@/store/session"
+import { useStore } from "@/store/store"
 
-const LaunchApp = () => {
-  const state = GLOBAL_STATE("root");
+const App = () => {
+	const user = useStore((s) => s.user)
 
+	useEffect(() => {
+		fetchState()
+		connectLogSocket()
+	}, [])
 
-  useEffect(() => {
-    state.GetBackendState();
-    WS.NewSocket(WS.GetURL("logs"), "logs", WS.ReceiveLogEvent);
-  }, []);
+	return (
+		<HashRouter>
+			<div className="min-h-screen w-full bg-base-200">
+				<LoadingBar />
+				<Toasts />
+				<Sidebar />
 
-  return (
-    <HashRouter>
-      {createPortal(
-        <Toaster
-          toastOptions={{
-            className: "toast border !text-[#0a0a0a] !bg-[#ffffff] !border-[#e7e3d7]",
-            position: "top-right",
-            success: {
-              duration: 2000,
-            },
+				<main className="min-h-screen">
+					<Routes>
+						{!user ? (
+							<>
+								<Route path="/" element={<Login />} />
+								<Route path="*" element={<AccountSelect />} />
+							</>
+						) : (
+							<>
+								<Route path="/" element={<Dashboard />} />
+								<Route path="*" element={<Dashboard />} />
+								<Route path="dashboard" element={<Dashboard />} />
+								<Route path="servers" element={<Servers />} />
+								<Route path="tunnels" element={<Tunnels />} />
+								<Route path="tunnels/:tag/edit" element={<TunnelForm />} />
+								<Route path="tunnels/:tag/peers" element={<TunnelPeers />} />
+								<Route path="connections" element={<Connections />} />
+								<Route path="account" element={<Account />} />
+								<Route path="devices" element={<Devices />} />
+							</>
+						)}
 
-            icon: null,
-            error: {
-              duration: 2000,
-            },
-          }
-          }
-        />,
-        document.body,
-      )}
-      <div className="bg-[#fdfcf8] w-full min-h-screen">
-        <ScreenLoader />
-        <SideBar />
+						<Route path="accounts" element={<AccountSelect />} />
+						<Route path="twofactor/create" element={<TwoFactor />} />
+						<Route path="logs" element={<Logs />} />
+						<Route path="settings" element={<Settings />} />
+						<Route path="dns" element={<DNS />} />
+						<Route path="dnsstats" element={<DNSStats />} />
+						<Route path="login" element={<Login />} />
+						<Route path="login/:modeParam" element={<Login />} />
+						<Route path="help" element={<Support />} />
+					</Routes>
+				</main>
 
-        <main className="pl-14 pb-8 min-h-screen">
-          <div className="px-6 py-5">
-            <Routes>
-              {!state.User && (
-                <>
-                  <Route path="/" element={<Login />} />
-                  <Route path="*" element={<UserSelect />} />
-                </>
-              )}
-
-              {state.User && (
-                <>
-                  <Route path="/" element={<Graph />} />
-                  <Route path="*" element={<Graph />} />
-
-                  <Route path="connections" element={<Stats />} />
-                  <Route path="bandwidth" element={<Bandwidth />} />
-
-                  <Route path="tunnels" element={<Graph />} />
-                  <Route path="account" element={<Account />} />
-                  <Route path="devices" element={<UserDevices />} />
-
-
-                </>
-              )}
-              <Route path="accounts" element={<UserSelect />} />
-
-              <Route path="twofactor/create" element={<Enable2FA />} />
-
-              <Route path="logs" element={<Logs />} />
-              <Route path="settings" element={<Settings />} />
-
-              <Route path="dns" element={<DNS />} />
-              <Route path="dns/answers/:domain" element={<DNSAnswers />} />
-              <Route path="dnsstats" element={<DNSStats />} />
-
-              <Route path="login" element={<Login />} />
-              <Route path="login/:modeParam" element={<Login />} />
-              <Route path="help" element={<Welcome />} />
-            </Routes>
-          </div>
-        </main>
-      </div>
-      <ConfirmDialog />
-    </HashRouter>
-  );
-};
-
-class ErrorBoundary extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = {
-      hasError: false,
-      title:
-        "Something unexpected happened, please press Reload. If that doesn't work try pressing 'Close And Reset'. If nothing works, please contact customer support",
-    };
-  }
-
-  static getDerivedStateFromError() {
-    return { hasError: true };
-  }
-
-  componentDidCatch() {
-    this.state.hasError = true;
-  }
-
-  reloadAll() {
-    STORE.Cache.Clear();
-    window.location.reload();
-  }
-
-  async quit() {
-    STORE.Cache.Clear();
-    window.location.reload();
-  }
-
-  async ProductionCheck() {
-    if (!STATE.debug) {
-      window.console.apply = function() { };
-      window.console.dir = function() { };
-      window.console.log = function() { };
-      window.console.info = function() { };
-      window.console.warn = function() { };
-      window.console.error = function() { };
-      window.console.debug = function() { };
-    }
-  }
-
-  render() {
-    this.ProductionCheck();
-
-    if (this.state.hasError) {
-      return (
-        <>
-          <h1 className="exception-title">{this.state.title}</h1>
-          <button className="exception-button" onClick={() => this.reloadAll()}>
-            Reload
-          </button>
-        </>
-      );
-    }
-
-    return this.props.children;
-  }
+				<ConfirmDialog />
+			</div>
+		</HashRouter>
+	)
 }
 
-root.render(
-  <React.StrictMode>
-    <ErrorBoundary>
-      <LaunchApp />
-    </ErrorBoundary>
-  </React.StrictMode>,
-);
+class ErrorBoundary extends React.Component {
+	state = { hasError: false }
+
+	static getDerivedStateFromError() {
+		return { hasError: true }
+	}
+
+	reset() {
+		session.clear()
+		window.location.reload()
+	}
+
+	render() {
+		if (this.state.hasError) {
+			return (
+				<div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-base-200 p-8 text-center">
+					<h1 className="max-w-lg text-sm opacity-70">
+						Something unexpected happened, please press Reload. If that doesn&apos;t work, please contact
+						customer support.
+					</h1>
+					<button className="btn btn-primary btn-sm" onClick={() => this.reset()}>
+						Reload
+					</button>
+				</div>
+			)
+		}
+		return this.props.children
+	}
+}
+
+const Root = () => (
+	<ErrorBoundary>
+		<App />
+	</ErrorBoundary>
+)
+
+export default Root
