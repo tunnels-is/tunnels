@@ -84,25 +84,33 @@ $ make lint
  - linux: setcap 'cap_net_raw,cap_net_bind_service,cap_net_admin+eip' main
 
 ## Building
-Tests are automatically run before building in the goreleaser pipeline.
+The goreleaser pipeline builds three artifacts:
 
- - DEV: ./releaser-build-snapshot.sh (or `make release`)
- - PROD: ./releaser-build-release.sh ( requires GITHUB_TOKEN )
+| Binary | Path | Notes |
+| --- | --- | --- |
+| `tunnels-cli` | `./cmd/main` | Client with embedded browser UI (no Wails) |
+| `tunnels-server` | `./server` | Control plane (Linux) |
+| `tunnels-app` | `./cmd/wails` | Wails desktop app (Windows always; Linux/macOS only on a matching host) |
+
+ - DEV: `./releaser-build-snapshot.sh` (or `make release`)
+ - PROD: `./releaser-build-release.sh` (requires `GITHUB_TOKEN`)
 
 ```bash
 # Build using make
-$ make build           # Build all binaries
-$ make build-server    # Build server only
-$ make build-client    # Build client only
+$ make build           # tunnels-cli + tunnels-server
+$ make build-server    # tunnels-server only
+$ make build-client    # tunnels-cli only
+$ make build-app       # tunnels-app (via ./build-wails.sh)
 
 # Test before building
 $ make pre-commit      # Run tests and linting
 $ make ci              # Run CI checks locally
 ```
 
-# Experimental
-## Wails
-We are experimenting with a wails GUI, it will output it's build into the `build` directory.  
+### Wails desktop (`tunnels-app`)
+Requires the frontend to be built first (`./build-ui.sh`). Linux needs
+`libgtk-3-dev` + `libwebkit2gtk-4.1-dev`. macOS needs Xcode CLT. Windows
+cross-compiles with `CGO_ENABLED=0` from any host.  
 
 # Special mentiones
 These are the real MVPs:
