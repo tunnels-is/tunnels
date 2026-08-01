@@ -10,15 +10,11 @@
 
 import { session } from "@/store/session"
 
-export const isWails = () => {
-	const h = window.location.hostname
-	return h === "wails.localhost" || h === "wails" || window.location.protocol === "wails:"
-}
-
+// Dev vite ports proxy to the local API; production / Wails load the UI from
+// the API origin itself (e.g. http://127.0.0.1:7777), so same-origin is enough.
 const DEV_PORTS = ["5173", "5174", "5175"]
 
 export const baseURL = () => {
-	if (isWails()) return "http://127.0.0.1:7777"
 	let host = window.location.origin
 	if (import.meta.env.DEV || session.getBool("dev")) {
 		DEV_PORTS.forEach((p) => (host = host.replace(p, "7777")))
@@ -26,10 +22,7 @@ export const baseURL = () => {
 	return host
 }
 
-export const wsURL = (route) => {
-	if (isWails()) return "ws://127.0.0.1:7777/" + route
-	return baseURL().replace(/^http/, "ws") + "/" + route
-}
+export const wsURL = (route) => baseURL().replace(/^http/, "ws") + "/" + route
 
 const post = async (path, body, timeout) => {
 	const controller = new AbortController()
