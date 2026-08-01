@@ -439,6 +439,31 @@ func API_AdminUserList(w http.ResponseWriter, r *http.Request) {
 	sendObject(w, users)
 }
 
+// API_AdminUserLatest returns the 100 most recently Updated users plus aggregate stats.
+// Users are scanned in batches of 100 so the full table is never held in memory.
+func API_AdminUserLatest(w http.ResponseWriter, r *http.Request) {
+	defer BasicRecover()
+	// Optional empty body for admin session auth middleware.
+	_ = decodeBody(r, new(FORM_LIST_USERS))
+
+	const topN = 100
+	const batchSize = 100
+	users, total, trial, active, err := DB_getUsersLatest(topN, batchSize)
+	if err != nil {
+		senderr(w, 500, "Unknown error, please try again in a moment")
+		return
+	}
+	for i := range users {
+		users[i].RemoveSensitiveInformation()
+	}
+	sendObject(w, USER_LATEST_RESPONSE{
+		Users:             users,
+		Total:             total,
+		Trial:             trial,
+		ActiveSubscribers: active,
+	})
+}
+
 func API_AdminDeviceUpdate(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 	F := new(FORM_UPDATE_DEVICE)
