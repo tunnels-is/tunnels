@@ -98,10 +98,11 @@ type ErrorResponse struct {
 }
 
 var (
-	DIST_EMBED embed.FS
-	DLL_EMBED  embed.FS
-	EnableTLS  bool
-	DevMode    bool
+	DIST_EMBED  embed.FS
+	DLL_EMBED   embed.FS
+	EnableTLS   bool
+	DevMode     bool
+	EnablePprof bool // expose net/http/pprof on the local API server
 )
 
 var (
