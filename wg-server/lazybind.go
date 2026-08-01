@@ -12,19 +12,10 @@ import (
 const (
 	msgInitiation byte = 1
 
-	// maxRateWindowIPs caps the per-source-IP handshake rate-limiter map so a
-	// spoofed-source flood can't grow it without bound.
 	maxRateWindowIPs = 200_000
 
-	// maxConcurrentHandshakes caps the number of in-flight handleInitiation
-	// goroutines (each may cost an X25519 + a controller round-trip). Excess
-	// handshake packets are dropped; the client retries.
 	maxConcurrentHandshakes = 128
 
-	// deniedKeyTTL debounces controller lookups for a pubkey the controller
-	// just rejected — a flood of handshakes for a revoked/unknown key would
-	// otherwise translate 1:1 into controller requests. A re-enabled peer is
-	// delayed at most this long.
 	deniedKeyTTL  = 10 * time.Second
 	maxDeniedKeys = 65_536
 )
@@ -45,11 +36,6 @@ type LazyBind struct {
 	done      chan struct{}
 	closeOnce sync.Once
 
-	// closeCh is recreated on each Open and closed by Close. The reinject
-	// ReceiveFunc selects on it so it returns net.ErrClosed when the bind is
-	// closed during a BindUpdate (e.g. when listen_port is set) — otherwise that
-	// routine would never stop and wireguard-go's BindUpdate would deadlock
-	// waiting for it.
 	closeMu sync.Mutex
 	closeCh chan struct{}
 
@@ -60,20 +46,9 @@ type LazyBind struct {
 	ratePerIP  int
 	rateWindow map[netip.Addr]*ipRate
 
-	// handshakeSem bounds concurrent handleInitiation goroutines (global
-	// handshake budget, not just per-IP). handshakeWG tracks those same
-	// goroutines so WipeKeys can wait for every in-flight one to finish reading
-	// serverPriv/serverPub before it zeroes them — wgDevice.Close() only drains
-	// wireguard-go's own receive routines, not the goroutines we spawn from
-	// inside wrapReceive.
 	handshakeSem chan struct{}
 	handshakeWG  sync.WaitGroup
 
-	// deniedKeys debounces controller lookups per PUBKEY for a revoked/unknown
-	// key so a flood of reconnect attempts for it doesn't hammer the controller.
-	// Allowed keys are intentionally NOT cached: every handshake for an allowed
-	// pubkey re-checks the controller so a revocation takes effect on the peer's
-	// very next handshake (reconnect or rekey), regardless of NAT/shared IPs.
 	deniedMu   sync.Mutex
 	deniedKeys map[string]time.Time
 }
@@ -111,13 +86,8 @@ func (b *LazyBind) Open(port uint16) ([]conn.ReceiveFunc, uint16, error) {
 	return wrapped, actualPort, nil
 }
 
-// Close closes the underlying UDP bind. It is called by wireguard-go as part of
-// normal BindUpdate cycles (e.g. when listen_port is set), not only at final
-// shutdown — so it MUST NOT wipe identity material or signal permanent shutdown.
-// Use Shutdown() for that.
 func (b *LazyBind) Close() error {
-	// Unblock the reinject ReceiveFunc for this bind generation so it returns
-	// net.ErrClosed and wireguard-go's BindUpdate can finish waiting on it.
+
 	b.closeMu.Lock()
 	if b.closeCh != nil {
 		select {
@@ -130,22 +100,12 @@ func (b *LazyBind) Close() error {
 	return b.inner.Close()
 }
 
-// Shutdown signals the reinject goroutine to exit so wgDevice.Close() can drain
-// the receive routines. It does NOT wipe key material — a handshake may still be
-// in flight in handleInitiation, which reads serverPriv/serverPub; zeroing here
-// would be a data race and a wrong X25519. Call WipeKeys() after wgDevice.Close()
-// returns (all receive routines drained) to erase the keys. Call exactly once.
 func (b *LazyBind) Shutdown() {
 	b.closeOnce.Do(func() {
 		close(b.done)
 	})
 }
 
-// WipeKeys erases the server key material. Call after wgDevice.Close() has
-// returned (all receive routines drained, so no new handleInitiation goroutine
-// can be spawned). It waits for any already-spawned handleInitiation goroutine
-// to finish — those read serverPriv/serverPub and are NOT tracked by
-// wgDevice.Close(), so without this wait the zeroing races the X25519.
 func (b *LazyBind) WipeKeys() {
 	b.handshakeWG.Wait()
 	zeroBytes(b.serverPriv)
@@ -173,8 +133,6 @@ func (b *LazyBind) handshakeRateAllowed(ip netip.Addr) bool {
 		return r.count <= b.ratePerIP
 	}
 
-	// New IP: sweep expired windows opportunistically and hard-cap the map
-	// (mirrors the denied/allowed caps) so a spoofed-source flood cannot grow it without bound.
 	if len(b.rateWindow) > 1000 {
 		for k, v := range b.rateWindow {
 			if now.Sub(v.start) >= time.Second {
@@ -189,9 +147,6 @@ func (b *LazyBind) handshakeRateAllowed(ip netip.Addr) bool {
 	return true
 }
 
-// recentlyDenied reports whether the controller rejected this pubkey within
-// deniedKeyTTL, so repeated handshakes for a revoked/unknown key don't each
-// trigger a controller lookup.
 func (b *LazyBind) recentlyDenied(pubKeyB64 string) bool {
 	b.deniedMu.Lock()
 	defer b.deniedMu.Unlock()
@@ -216,9 +171,7 @@ func (b *LazyBind) noteDenied(pubKeyB64 string) {
 			}
 		}
 	}
-	// If still at capacity after sweeping expired entries (a flood of distinct
-	// fresh keys), evict entries to make room instead of refusing to record —
-	// refusing would let every subsequent handshake re-hit the controller.
+
 	for len(b.deniedKeys) >= maxDeniedKeys {
 		for k := range b.deniedKeys {
 			delete(b.deniedKeys, k)
@@ -239,9 +192,7 @@ func (b *LazyBind) wrapReceive(inner conn.ReceiveFunc) conn.ReceiveFunc {
 		for i := 0; i < n; i++ {
 			data := bufs[i][:sizes[i]]
 			if isHandshakeInit(data) {
-				// Cheap mac1 gate before any rate bookkeeping, X25519, goroutine
-				// spawn, or controller call: drop handshake-init packets not
-				// genuinely addressed to this server (junk/spoofed floods).
+
 				if !validMAC1(data, b.serverPub) {
 					continue
 				}
@@ -250,12 +201,7 @@ func (b *LazyBind) wrapReceive(inner conn.ReceiveFunc) conn.ReceiveFunc {
 					WARN("LazyBind: handshake rate limit exceeded for ", srcIP)
 					continue
 				}
-				// Every mac1-valid, rate-allowed handshake goes through
-				// handleInitiation so authorization is re-checked per PUBKEY
-				// (the pubkey isn't known until after the X25519 inside). The
-				// concurrency budget bounds cost; the per-pubkey allowed/denied
-				// caches bound controller load. Past the cap the packet is
-				// dropped and the client retries.
+
 				select {
 				case b.handshakeSem <- struct{}{}:
 					pkt := &bufferedPkt{
@@ -263,9 +209,7 @@ func (b *LazyBind) wrapReceive(inner conn.ReceiveFunc) conn.ReceiveFunc {
 						ep:   eps[i],
 					}
 					copy(pkt.data, data)
-					// Add before spawning; WipeKeys waits on this group. Safe from
-					// Add-after-Wait because wgDevice.Close() stops these receive
-					// routines (no more wrapReceive calls) before WipeKeys runs.
+
 					b.handshakeWG.Add(1)
 					go func() {
 						defer b.handshakeWG.Done()
@@ -298,8 +242,7 @@ func (b *LazyBind) reinjectReceive(closeCh chan struct{}) conn.ReceiveFunc {
 			eps[0] = pkt.ep
 			return 1, nil
 		case <-closeCh:
-			// This bind generation was closed (BindUpdate/Close) — stop so
-			// wireguard-go's receive-routine WaitGroup can drain.
+
 			return 0, net.ErrClosed
 		case <-b.done:
 			return 0, net.ErrClosed
@@ -319,22 +262,15 @@ func (b *LazyBind) requeue(pkt *bufferedPkt) {
 func (b *LazyBind) handleInitiation(pkt *bufferedPkt) {
 	pubKeyB64, ok := tryDecryptInitiator(pkt.data, b.serverPriv, b.serverPub)
 	if !ok {
-		// Not encrypted to this server's static key (or malformed). Let
-		// wireguard-go handle/drop it.
+
 		b.requeue(pkt)
 		return
 	}
 
-	// A pubkey the controller rejected moments ago: drop without another
-	// controller round-trip (request-amplification guard).
 	if b.recentlyDenied(pubKeyB64) {
 		return
 	}
 
-	// Reconcile authorization with the controller on every (re)connect. An
-	// already-open session is not torn down proactively, but any new handshake
-	// (initial connect, reconnect, or rekey) re-checks here — so a peer the
-	// controller has since revoked cannot re-establish.
 	switch reconcilePeer(pubKeyB64) {
 	case authAllowed:
 		b.requeue(pkt)
@@ -346,11 +282,9 @@ func (b *LazyBind) handleInitiation(pkt *bufferedPkt) {
 			addedPeerKeys.Delete(hexKey)
 			peerStore.DeleteByPubKey(pubKeyB64)
 		}
-		// Drop the handshake: the peer is not installed, so replaying it would
-		// only fail.
+
 	case authUnknown:
-		// Transient controller error — leave peer state untouched and requeue so
-		// an already-installed peer's handshake can still complete.
+
 		b.requeue(pkt)
 	}
 }

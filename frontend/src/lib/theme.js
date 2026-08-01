@@ -1,6 +1,3 @@
-// Theme switching between the daisyUI themes defined in app.css. Persisted in
-// sessionStorage and applied as `data-theme` on <html> before React mounts.
-
 import { session } from "@/store/session"
 
 export const THEMES = [
@@ -13,8 +10,6 @@ export const THEMES = [
 const VALUES = THEMES.map((t) => t.value)
 const DEFAULT_THEME = "tunnels"
 
-// Light/dark counterparts grouped by family, so "follow system" can swap
-// between them while keeping the user's chosen family.
 const LIGHT_DARK = {
 	suzko: { light: "suzko", dark: "suzko-dark" },
 	"suzko-dark": { light: "suzko", dark: "suzko-dark" },
@@ -24,7 +19,6 @@ const LIGHT_DARK = {
 
 const prefersDark = () => window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false
 
-// The theme the user explicitly selected, before any "follow system" override.
 export const getStoredTheme = () => {
 	const stored = session.get("theme")
 	return VALUES.includes(stored) ? stored : DEFAULT_THEME
@@ -32,8 +26,6 @@ export const getStoredTheme = () => {
 
 export const followsSystem = () => session.getBool("themeSystem")
 
-// The theme actually applied to <html>. When following the system, the chosen
-// family's light or dark variant is picked based on `prefers-color-scheme`.
 export const getTheme = () => {
 	const base = getStoredTheme()
 	if (!followsSystem()) return base
@@ -55,7 +47,6 @@ export const applyTheme = (theme) => {
 	document.documentElement.setAttribute("data-theme", theme)
 }
 
-// Re-apply when the OS light/dark preference changes while following the system.
 window.matchMedia?.("(prefers-color-scheme: dark)").addEventListener?.("change", () => {
 	if (followsSystem()) applyTheme(getTheme())
 })

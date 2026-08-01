@@ -5,7 +5,6 @@ import { useStore } from "@/store/store"
 
 const PAGE_SIZE = 100
 
-// log line format: "01-02 15:04:05 || LEVEL || funcName || message"
 const TAGS = [
 	{ key: "", label: "All" },
 	{ key: "INFO", label: "Info" },
@@ -27,7 +26,7 @@ const Logs = () => {
 	const filteredLogs = useMemo(() => {
 		let filtered = logs
 		if (filter) filtered = filtered.filter((line) => line.toLowerCase().includes(filter.toLowerCase()))
-		// ROUTINE noise is hidden unless explicitly selected
+
 		filtered = filtered.filter((line) => {
 			const tag = line.split(" || ")[1]?.trim()
 			return tagFilter ? tag === tagFilter : tag !== "ROUTINE"

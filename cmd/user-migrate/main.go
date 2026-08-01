@@ -1,10 +1,3 @@
-// user-migrate copies all users from MongoDB into a BBolt database, then
-// iterates every record in BBolt and verifies it matches its MongoDB
-// counterpart field-by-field.
-//
-// Usage:
-//
-//	user-migrate -mongo "mongodb://root:example@localhost:27017" -db ./tunnels.db
 package main
 
 import (
@@ -24,7 +17,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-// MongoUser is the MongoDB-side shape used for BSON decoding.
 type MongoUser struct {
 	ID primitive.ObjectID `json:"_id" bson:"_id"`
 
@@ -51,7 +43,6 @@ type MongoUser struct {
 	SubExpiration time.Time   `json:"SubExpiration" bson:"SubExpiration"`
 }
 
-// BoltUser is the BBolt-side shape using uuid.UUID (matches the server).
 type BoltUser struct {
 	ID uuid.UUID `json:"_id"`
 
@@ -121,7 +112,6 @@ func main() {
 	dupeScan := flag.Bool("dupe", false, "scan MongoDB for duplicate accounts (by email) and exit; no BBolt work is performed")
 	flag.Parse()
 
-	// ── 0. Connect to MongoDB ───────────────────────────────────────
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
@@ -140,7 +130,6 @@ func main() {
 	}
 	fmt.Println("connected to MongoDB")
 
-	// ── 1. Read all users from MongoDB ──────────────────────────────
 	mongoUsers, err := fetchAllMongoUsers(client)
 	if err != nil {
 		log.Fatalf("fetch mongo users: %v", err)
@@ -157,8 +146,6 @@ func main() {
 		return
 	}
 
-	// Dedupe by email, keeping the first occurrence (iteration order from
-	// Mongo). mongoByEmail doubles as the lookup map for verification.
 	mongoByEmail := make(map[string]*MongoUser, len(mongoUsers))
 	uniqueUsers := make([]MongoUser, 0, len(mongoUsers))
 	skipped := 0
@@ -177,7 +164,6 @@ func main() {
 		fmt.Printf("deduped: %d duplicate(s) skipped, %d unique user(s) to migrate\n", skipped, len(mongoUsers))
 	}
 
-	// ── 2. Open BBolt and write all users ───────────────────────────
 	bolt, err := gobolt.Open(*dbPath, 0o600, &gobolt.Options{Timeout: 3 * time.Second})
 	if err != nil {
 		log.Fatalf("bbolt open: %v", err)
@@ -208,9 +194,6 @@ func main() {
 	}
 	fmt.Printf("wrote %d user(s) to BBolt\n", written)
 
-	// ── 3. Iterate BBolt and verify against MongoDB ─────────────────
-	// IDs and Groups changed format (ObjectID→UUID), so verification
-	// compares all other fields individually.
 	fmt.Println("verifying ...")
 	verified := 0
 	mismatches := 0
@@ -253,7 +236,6 @@ func main() {
 		log.Fatal("MIGRATION FAILED: mismatches detected")
 	}
 
-	// ── 4. Count verification ───────────────────────────────────────
 	boltCount := 0
 	_ = bolt.View(func(tx *gobolt.Tx) error {
 		boltCount = tx.Bucket([]byte(usersBucket)).Stats().KeyN
@@ -269,8 +251,6 @@ func main() {
 	fmt.Println("all users migrated and verified successfully")
 }
 
-// scanDuplicates reports any email that appears in more than one MongoDB
-// document. Exits non-zero if duplicates are found.
 func scanDuplicates(users []MongoUser) {
 	byEmail := make(map[string][]primitive.ObjectID, len(users))
 	for i := range users {
@@ -296,7 +276,6 @@ func scanDuplicates(users []MongoUser) {
 	log.Fatalf("found %d duplicated email(s) in MongoDB", dupes)
 }
 
-// fetchAllMongoUsers returns every document in the users.users collection.
 func fetchAllMongoUsers(client *mongo.Client) ([]MongoUser, error) {
 	cursor, err := client.Database("users").
 		Collection("users").
@@ -317,9 +296,6 @@ func fetchAllMongoUsers(client *mongo.Client) ([]MongoUser, error) {
 	return users, cursor.Err()
 }
 
-// verifyFields compares every migrated field.
-// ID is skipped (ObjectID→UUID). Groups is intentionally emptied during
-// migration, so it is checked separately for len()==0.
 func verifyFields(bolt *BoltUser, mongo *MongoUser) bool {
 	ok := true
 	check := func(name string, match bool) {

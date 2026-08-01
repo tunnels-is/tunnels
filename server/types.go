@@ -245,7 +245,6 @@ type User struct {
 	DeviceToken *DeviceToken `json:"DeviceToken,omitempty"`
 	APIKey      string       `json:"APIKey"`
 
-	// these do not get sent over the network for security reasons
 	Password         string         `json:"Password"`
 	Password2        string         `json:"-"`
 	ConfirmCode      string         `json:"ConfirmCode"`
@@ -258,7 +257,6 @@ type User struct {
 	IsAdmin bool        `json:"IsAdmin"`
 	Groups  []uuid.UUID `json:"Groups"`
 
-	// tunnels public network
 	Trial         bool        `json:"Trial"`
 	Key           *LicenseKey `json:"Key"`
 	SubExpiration time.Time   `json:"SubExpiration"`

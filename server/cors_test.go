@@ -26,7 +26,6 @@ func TestOriginAllowed(t *testing.T) {
 		}
 	}
 
-	// A "*" entry allows any concrete origin but never a missing one.
 	Config.Store(&types.ServerConfig{AllowedOrigins: []string{"*"}})
 	if !originAllowed("https://anything.example") {
 		t.Error(`"*" should allow any concrete origin`)

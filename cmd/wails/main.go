@@ -46,20 +46,15 @@ func main() {
 	client.DIST_EMBED = DIST
 	client.DLL_EMBED = DLL
 
-	// Initialize the VPN client synchronously so config is available
-	// before building the Wails app.
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	if err := client.InitService(); err != nil {
 		log.Fatal("Failed to initialize tunnels: ", err)
 	}
 
-	// Disable browser auto-open since Wails provides the window.
 	conf := client.CONFIG.Load()
 	conf.OpenUI = false
 	client.CONFIG.Store(conf)
 
-	// Resolve the API bind address and the URL the webview should load.
-	// The UI always targets loopback even when the API binds on 0.0.0.0.
 	apiIP := conf.APIIP
 	if apiIP == "" {
 		apiIP = client.DefaultAPIIP
@@ -73,10 +68,9 @@ func main() {
 		uiHost = "127.0.0.1"
 	}
 	uiURL := "http://" + net.JoinHostPort(uiHost, apiPort)
-	// Dial target for readiness: can't dial 0.0.0.0 usefully on all platforms.
+
 	dialAddr := net.JoinHostPort(uiHost, apiPort)
 
-	// Start the VPN client event loop in the background.
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
@@ -86,11 +80,8 @@ func main() {
 		client.LaunchTunnels()
 	}()
 
-	// Wait for the API server to accept connections.
 	waitForAPI(dialAddr)
 
-	// Wails always boots at wails.localhost; redirect once into the local API
-	// so the webview is same-origin with /v1 and the session cookie.
 	if err := wails.Run(&options.App{
 		Title:                    "Tunnels",
 		Width:                    1280,
@@ -118,7 +109,6 @@ func main() {
 	}
 }
 
-// waitForAPI polls until the client's API server is accepting TCP connections.
 func waitForAPI(addr string) {
 	for {
 		conn, err := net.DialTimeout("tcp4", addr, time.Second)

@@ -12,9 +12,6 @@ const TIME_RANGES = [
 	{ label: "7d", seconds: 604800 },
 ]
 
-// chart series palette — theme red first, then distinguishable neutrals/accents
-// chart series palette — the active theme's primary color first, then
-// distinguishable neutrals/accents
 const seriesColors = () => {
 	const primary = getComputedStyle(document.documentElement).getPropertyValue("--color-primary").trim() || "#d82e2e"
 	return [primary, "#737373", "#f59e0b", "#22c55e", "#a855f7", "#ec4899", "#84cc16", "#14b8a6"]
@@ -34,7 +31,6 @@ const formatTimeLabel = (date, rangeSeconds) => {
 	return date.toLocaleDateString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })
 }
 
-// average raw 1s records into buckets so long ranges stay readable
 const aggregateRecords = (records, rangeSeconds) => {
 	if (!records?.length) return []
 	let bucketSize = 1
@@ -56,7 +52,6 @@ const aggregateRecords = (records, rangeSeconds) => {
 	return buckets
 }
 
-// series: [{ data: [{ts, eg, ig}], color, label }]
 const MultiGraph = ({ series, dataKey, rangeSeconds, height = 170 }) => {
 	const canvasRef = useRef(null)
 	const containerRef = useRef(null)
@@ -101,7 +96,6 @@ const MultiGraph = ({ series, dataKey, rangeSeconds, height = 170 }) => {
 			return
 		}
 
-		// y grid + labels
 		const yTicks = 4
 		ctx.font = "10px ui-monospace, monospace"
 		ctx.textAlign = "right"
@@ -116,7 +110,6 @@ const MultiGraph = ({ series, dataKey, rangeSeconds, height = 170 }) => {
 			ctx.fillText(formatRate(globalMax * (1 - i / yTicks)), pad.left - 8, y + 3)
 		}
 
-		// x labels
 		const xLabelCount = Math.min(longestSeries.length, 5)
 		ctx.textAlign = "center"
 		ctx.fillStyle = textColor
@@ -159,8 +152,6 @@ const MultiGraph = ({ series, dataKey, rangeSeconds, height = 170 }) => {
 	)
 }
 
-// Compact per-tunnel summary bar shown above the charts: identity (tag, server,
-// assigned IPv4) and session totals over the selected range.
 const TunnelInfoBar = ({ rows }) => {
 	if (rows.length === 0) return null
 	return (
@@ -206,9 +197,7 @@ const StatsRow = ({ series, dataKey }) => (
 			const vals = s.rawData.map((d) => d[dataKey])
 			if (vals.length === 0) return null
 			const current = vals[vals.length - 1] || 0
-			// reduce, not Math.max(...vals): for the 24h/7d ranges vals is the
-			// raw per-second series (hundreds of thousands of points) and the
-			// spread would overflow the call stack (RangeError → blank app).
+
 			const peak = vals.reduce((m, v) => (v > m ? v : m), 0)
 			const avg = vals.reduce((a, b) => a + b, 0) / vals.length
 			const total = vals.reduce((a, b) => a + b, 0)
@@ -235,8 +224,6 @@ const StatsRow = ({ series, dataKey }) => (
 	</div>
 )
 
-// Live bandwidth charts (1s state polling while mounted). The parent is
-// responsible for only rendering this when Config.BandwidthGraphs is on.
 const BandwidthCharts = () => {
 	const activeTunnels = useStore((s) => s.activeTunnels)
 	const servers = useStore((s) => s.servers)

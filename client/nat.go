@@ -27,14 +27,6 @@ func (V *TUN) TransLateIP(ip [4]byte) ([4]byte, bool) {
 			continue
 		}
 
-		// Remap host bits into the target network: for each octet take the
-		// network bits from NetIPNet and the host bits from the original IP.
-		// This masked formula is correct for ANY prefix length (/8, /16, /24,
-		// /25..31, /32) — the previous /32-vs-else special-casing mishandled
-		// prefixes /25..31 by hardcoding the last octet.
-		// The NAT source (Nat) is IPv4 (ip is 4 bytes), so the target Network must
-		// be IPv4 too. If a misconfigured tunnel pairs it with a non-IPv4 Network,
-		// To4() is nil — skip rather than panic on net4[i] for every egress packet.
 		net4 := v.NetIPNet.IP.To4()
 		if net4 == nil || len(v.NetIPNet.Mask) != 4 {
 			continue

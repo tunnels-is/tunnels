@@ -1,22 +1,6 @@
 #!/bin/bash
 set -e
 
-# Build the Wails desktop client.
-#
-# Outputs go to ./bin/ in the project root.
-#
-# Usage:
-#   ./build-wails.sh                    # build all possible targets
-#   ./build-wails.sh windows            # Windows (cross-compiles from any OS)
-#   ./build-wails.sh linux              # Linux (must build on Linux)
-#   ./build-wails.sh darwin             # macOS (must build on macOS)
-#
-# Prerequisites:
-#   - Go 1.22+, pnpm
-#   - Linux:   sudo apt install libgtk-3-dev libwebkit2gtk-4.1-dev
-#   - macOS:   xcode-select --install
-#   - Windows: WebView2 runtime (bundled with Win 11, install on Win 10)
-
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
@@ -29,11 +13,9 @@ HOST_OS="$(go env GOHOSTOS)"
 
 mkdir -p "$BIN_DIR"
 
-# --- Frontend (shared with CLI / goreleaser) ---
 echo "==> Building frontend"
 ./build-ui.sh
 
-# --- Build helpers ---
 build_windows() {
     echo "==> Building windows/amd64"
     CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build \
@@ -76,7 +58,6 @@ build_darwin() {
     echo "    -> bin/tunnels-app-darwin-amd64"
 }
 
-# --- Dispatch ---
 case "$TARGET" in
     windows) build_windows ;;
     linux)   build_linux ;;

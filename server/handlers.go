@@ -20,11 +20,6 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// randomAuthDelay sleeps a short randomised interval (50–150 ms) on
-// authentication endpoints. Layered on top of the constant-time credential
-// comparisons, the jitter blunts timing side-channels: response latency no
-// longer reveals whether an account existed or which check failed. Intended to
-// be deferred at the top of a handler so it runs on every return path.
 func randomAuthDelay() {
 	time.Sleep(time.Duration(50+mrand.IntN(100)) * time.Millisecond)
 }
@@ -144,9 +139,6 @@ func API_UserCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// bcrypt hashes at most 72 bytes and returns an error beyond that; cap here
-	// so an over-long password is rejected cleanly instead of erroring inside
-	// bcrypt below.
 	if len(RF.Password) > 72 {
 		senderr(w, 400, "Password is too long, maximum 72 characters")
 		return
@@ -220,10 +212,6 @@ func API_UserUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// The personal APIKey is a bearer token for this account. The client no
-	// longer chooses its own secret: any non-empty request is treated as
-	// "generate a new key" and the server mints a fresh random UUID, so the
-	// client can never set a weak/guessable value. An empty value clears the key.
 	if UF.APIKey != "" {
 		UF.APIKey = uuid.NewString()
 	}
@@ -235,8 +223,6 @@ func API_UserUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Return the (server-generated) key so the client can display it without
-	// having to guess the value it sent.
 	sendObject(w, map[string]string{"APIKey": UF.APIKey})
 }
 
@@ -541,16 +527,12 @@ func API_AdminDeviceList(w http.ResponseWriter, r *http.Request) {
 	sendObject(w, devices)
 }
 
-// maxListLimit bounds admin list endpoints so a single request cannot load an
-// unbounded number of records into memory. maxDevicesPerUser caps how many
-// devices one account may create.
 const (
 	maxListLimit      = 10000
 	defaultListLimit  = 500
 	maxDevicesPerUser = 50
 )
 
-// clampListLimit returns a sane, bounded page size for the admin list endpoints.
 func clampListLimit(n int) int {
 	if n <= 0 {
 		return defaultListLimit
@@ -606,8 +588,6 @@ func API_DeviceCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// An expired subscription must not be able to provision new devices (the
-	// auth middleware only checks Disabled). Mirrors the API_WGPeer check.
 	if !user.SubExpiration.IsZero() && time.Now().After(user.SubExpiration) {
 		senderr(w, 403, "subscription expired")
 		return
@@ -628,14 +608,9 @@ func API_DeviceCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Hold the allocation lock from the device-cap check through IP assignment
-	// and DB_CreateDevice so a concurrent create can't both slip past the cap
-	// and can't claim the same address (see wgIPAllocMu).
 	wgIPAllocMu.Lock()
 	defer wgIPAllocMu.Unlock()
 
-	// Cap devices per account so a single user can't exhaust a server's WG
-	// subnet (and the DB) by creating devices without limit.
 	existing, listErr := DB_GetDevicesByUserID(user.ID)
 	if listErr != nil {
 		senderr(w, 500, "Unable to create device, please try again later")
@@ -712,8 +687,7 @@ func API_AdminDeviceCreate(w http.ResponseWriter, r *http.Request) {
 
 	F.Device.ID = uuid.New()
 	F.Device.CreatedAt = time.Now()
-	// Hold the allocation lock from IP assignment through DB_CreateDevice so a
-	// concurrent create cannot claim the same address (see wgIPAllocMu).
+
 	wgIPAllocMu.Lock()
 	defer wgIPAllocMu.Unlock()
 
@@ -878,9 +852,7 @@ func API_AdminGroupAdd(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	case "user":
-		// Look up by email when no ID is supplied (TypeTag carries the address),
-		// otherwise by ID. The previous code compared TypeTag to the literal
-		// string "email" and then looked up a user whose email was "email".
+
 		if F.TypeID == uuid.Nil && F.TypeTag != "" {
 			u, err = DB_findUserByEmail(F.TypeTag)
 		} else {
@@ -1120,16 +1092,12 @@ func API_AdminGroupList(w http.ResponseWriter, r *http.Request) {
 	sendObject(w, groups)
 }
 
-// sanitizeServerForClient strips secrets that must never leave the admin UI.
-// Returns a copy so cached DB objects are not mutated.
 func sanitizeServerForClient(s *types.Server) *types.Server {
 	c := *s
 	c.APIKey = ""
 	return &c
 }
 
-// findServersForUser collects every server the user is allowed to see:
-// ungrouped servers plus servers sharing a group with the user.
 func findServersForUser(user *User, offset int64) ([]*types.Server, error) {
 	servers, err := DB_FindServersWithoutGroups(10000, offset)
 	if err != nil {
@@ -1145,8 +1113,6 @@ func findServersForUser(user *User, offset int64) ([]*types.Server, error) {
 	return servers, nil
 }
 
-// API_ServersForUserByCountry returns up to 10 randomly picked servers
-// matching the given country code, for latency probing on the client.
 func API_ServersForUserByCountry(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 	F := new(FORM_GET_SERVERS_BY_COUNTRY)
@@ -1234,10 +1200,6 @@ func API_ServersForUser(w http.ResponseWriter, r *http.Request) {
 	sendObject(w, servers)
 }
 
-// applyWGDefaults stamps sensible WG defaults on a server. Every server is
-// WG-enabled, so an empty APIKey is treated as a request to mint a fresh one:
-// this covers both creation (the client sends no key) and key rotation (the
-// client re-saves the server with the key cleared).
 func applyWGDefaults(s *types.Server) {
 	if s.APIKey == "" {
 		s.APIKey = uuid.NewString()
@@ -1381,10 +1343,6 @@ func API_UserResetPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// A single generic message for every authorization failure below (unknown
-	// user, missing/undecryptable 2FA secret, wrong reset code) so the response
-	// never reveals which accounts exist or whether the code was the only thing
-	// wrong. Keep the paired randomised delay (see the deferred sleep above).
 	const genericAuthErr = "invalid email or reset code"
 
 	user, err = DB_findUserByEmail(RF.Email)
@@ -1461,9 +1419,7 @@ func API_ActivateLicenseKey(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if strings.Contains(strings.ToLower(key.Meta.ProductName), "anonymous") {
-		// Stack from the later of now / current expiry so a renewal keeps the
-		// remaining paid time instead of discarding it, and an activation on an
-		// expired sub lands in the future rather than onto a stale past date.
+
 		base := user.SubExpiration
 		if base.Before(time.Now()) {
 			base = time.Now()
@@ -1485,8 +1441,7 @@ func API_ActivateLicenseKey(w http.ResponseWriter, r *http.Request) {
 			senderr(w, 500, "Something went wrong, please contact customer support")
 			return
 		}
-		// Stack from the later of now / current expiry so a renewal keeps the
-		// remaining paid time instead of discarding it.
+
 		base := user.SubExpiration
 		if base.Before(time.Now()) {
 			base = time.Now()
@@ -1502,9 +1457,6 @@ func API_ActivateLicenseKey(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Confirm activation with the provider BEFORE persisting the granted
-	// subscription — otherwise a failed activation still extends the sub, and
-	// the key (ActivationUsage still 0 upstream) could be replayed to re-extend.
 	activeKey, resp, err := lemonClient.Licenses.Activate(context.Background(), AF.Key, "tunnels")
 	if err != nil {
 		if resp != nil && resp.Body != nil {
