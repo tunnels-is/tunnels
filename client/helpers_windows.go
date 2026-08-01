@@ -4,16 +4,12 @@ package client
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
-	"regexp"
-	"strconv"
 )
 
 func wintunDLLPath() string {
 	ex, err := os.Executable()
 	if err != nil {
-
 		return "wintun.dll"
 	}
 	return filepath.Join(filepath.Dir(ex), "wintun.dll")
@@ -40,41 +36,6 @@ func OSSpecificInit() error {
 	}
 
 	return nil
-}
-
-func RestoreSaneDNSDefaults() {
-	state := STATE.Load()
-	ifid := int(state.DefaultInterfaceID.Load())
-	INFO("restoring dns: 1.1.1.1, 1.0.0.1")
-	_ = DNS_Del(strconv.Itoa(ifid))
-	if ifid != 0 {
-		_ = DNS_Set(strconv.Itoa(ifid), "1.1.1.1", "1")
-		_ = DNS_Set(strconv.Itoa(ifid), "1.0.0.1", "2")
-	} else {
-		ERROR("unable to restore dns, could not find default interface")
-	}
-}
-
-func GetDNSServers(intf string) (err error) {
-	var out []byte
-	cmd := exec.Command("netsh", "interface", "ipv4", "show", "dnsservers", intf)
-	out, err = cmd.CombinedOutput()
-	if err != nil {
-		ERROR("could not find default dns servers: ", err)
-		return err
-	}
-
-	rxp := `\b(?:(?:25[0-5]|[1-2][0-9]{2}|[0-9]{1,2})\.){3}(?:25[0-5]|[1-2][0-9]{2}|[0-9]{1,2})\b`
-	re := regexp.MustCompile(rxp)
-
-	DEFAULT_DNS_SERVERS = re.FindAllString(string(out), -1)
-
-	if DEFAULT_DNS_SERVERS != nil {
-		INFO("default dns servers found: ", DEFAULT_DNS_SERVERS)
-	} else {
-		ERROR("could not find default dns servers")
-	}
-	return
 }
 
 func AdminCheck() {
