@@ -149,24 +149,33 @@ const TunnelForm = () => {
 	}
 
 	return (
-		<Page
-			actions={
-				<>
-					<button className="btn btn-ghost btn-sm" onClick={() => navigate("/tunnels")}>
-						<X size={14} /> Cancel
-					</button>
-					<button className="btn btn-primary btn-sm" disabled={saving} onClick={save}>
-						<Save size={14} /> {saving ? "Saving..." : "Save"}
-					</button>
-				</>
-			}
-		>
-			<div className="mb-4 flex items-center gap-3">
-				<button className="btn btn-square btn-ghost btn-sm" onClick={() => navigate("/tunnels")}>
+		<Page>
+			<div className="mb-5 flex flex-wrap items-center gap-3">
+				<button
+					type="button"
+					className="btn btn-square btn-ghost btn-sm shrink-0"
+					onClick={() => navigate("/tunnels")}
+					title="Back to tunnels"
+				>
 					<ArrowLeft size={16} />
 				</button>
-				<h1 className="text-base font-semibold tracking-tight">{tag}</h1>
-				{connected && <span className="badge badge-success badge-sm">connected</span>}
+				<div className="flex min-w-0 flex-1 items-center gap-2">
+					<h1 className="truncate text-base font-semibold tracking-tight">{tag}</h1>
+					{connected && (
+						<span className="badge badge-success badge-sm shrink-0 gap-1 border-none bg-success/15 text-success">
+							<span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-current" />
+							connected
+						</span>
+					)}
+				</div>
+				<div className="flex shrink-0 items-center gap-2">
+					<button type="button" className="btn btn-ghost btn-sm gap-1.5" onClick={() => navigate("/tunnels")}>
+						<X size={14} /> Cancel
+					</button>
+					<button type="button" className="btn btn-primary btn-sm gap-1.5" disabled={saving} onClick={save}>
+						<Save size={14} /> {saving ? "Saving..." : "Save"}
+					</button>
+				</div>
 			</div>
 
 			{connected && (
