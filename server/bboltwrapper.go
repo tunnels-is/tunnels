@@ -271,6 +271,89 @@ func BBolt_getUsers(limit, offset int64) ([]*User, error) {
 	return UL, err
 }
 
+// BBolt_getUsersLatest streams users in batches of batchSize, accumulates stats, and
+// keeps only the topN users by Updated DESC without loading the full user table.
+func BBolt_getUsersLatest(topN, batchSize int) (users []*User, total, trial, active int64, err error) {
+	if topN <= 0 {
+		topN = 100
+	}
+	if batchSize <= 0 {
+		batchSize = 100
+	}
+	now := time.Now()
+	top := make([]*User, 0, topN)
+	batch := make([]*User, 0, batchSize)
+
+	flushBatch := func() {
+		for _, u := range batch {
+			total++
+			if u.Trial {
+				trial++
+			}
+			if !u.Disabled && u.SubExpiration.After(now) {
+				active++
+			}
+			top = insertUserByUpdatedDesc(top, u, topN)
+		}
+		// Drop batch refs so non-top users can be GC'd.
+		for i := range batch {
+			batch[i] = nil
+		}
+		batch = batch[:0]
+	}
+
+	err = BBoltDB.View(func(tx *gobolt.Tx) error {
+		b := tx.Bucket([]byte(USERS_BUCKET))
+		if b == nil {
+			return nil
+		}
+		c := b.Cursor()
+		for k, v := c.First(); k != nil; k, v = c.Next() {
+			U := new(User)
+			if err := bboltUnmarshal(v, U); err != nil {
+				continue
+			}
+			batch = append(batch, U)
+			if len(batch) >= batchSize {
+				flushBatch()
+			}
+		}
+		if len(batch) > 0 {
+			flushBatch()
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, 0, 0, 0, err
+	}
+	return top, total, trial, active, nil
+}
+
+// insertUserByUpdatedDesc keeps list sorted newest-first, capped at n.
+func insertUserByUpdatedDesc(list []*User, u *User, n int) []*User {
+	if u == nil || n <= 0 {
+		return list
+	}
+	// Fast path: older than the oldest kept entry and list is full.
+	if len(list) >= n && !u.Updated.After(list[len(list)-1].Updated) {
+		return list
+	}
+	i := 0
+	for i < len(list) && !u.Updated.After(list[i].Updated) {
+		i++
+	}
+	if i >= n {
+		return list
+	}
+	list = append(list, nil)
+	copy(list[i+1:], list[i:])
+	list[i] = u
+	if len(list) > n {
+		list = list[:n]
+	}
+	return list
+}
+
 func BBolt_findUserByID(UID string) (*User, error) {
 	var U *User
 	err := BBoltDB.View(func(tx *gobolt.Tx) error {
