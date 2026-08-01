@@ -2,21 +2,21 @@ import { useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { X } from "lucide-react"
 import { Card, InfoRow, Page } from "@/components/ui"
-import { deleteUserFile, fetchUsers } from "@/store/actions"
+import { deleteUserFile, fetchUsers, switchAccount } from "@/store/actions"
 import { fullDate } from "@/lib/format"
 import { useStore } from "@/store/store"
 
 const AccountSelect = () => {
 	const navigate = useNavigate()
 	const users = useStore((s) => s.users)
-	const setUser = useStore((s) => s.setUser)
 
 	useEffect(() => {
 		fetchUsers()
 	}, [])
 
 	const selectUser = (user) => {
-		setUser(user)
+		// Clears server/device caches so the next session cannot show the previous account's data.
+		switchAccount(user)
 		navigate("/account")
 		window.location.reload()
 	}
