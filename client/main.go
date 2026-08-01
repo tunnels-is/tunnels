@@ -67,13 +67,6 @@ func InitService() error {
 	}
 	conf := CONFIG.Load()
 
-	if conf.AutoDownloadUpdate {
-		didUpdate := doStartupUpdate()
-		if didUpdate {
-			os.Exit(1)
-		}
-	}
-
 	loadTunnelsFromDisk()
 	loadDefaultGateway()
 	loadDefaultInterface()
@@ -178,10 +171,6 @@ func LaunchTunnels() {
 
 	newConcurrentSignal("AutoConnect", CancelContext, func() {
 		AutoConnect()
-	})
-
-	newConcurrentSignal("Updater", CancelContext, func() {
-		doUpdate()
 	})
 
 mainLoop:

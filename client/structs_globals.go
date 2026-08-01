@@ -283,13 +283,11 @@ func (c *ControlServer) GetURL(path string) string {
 
 type CLIConfig struct {
 	// Cli specific settings
-	ControlServerID  string
-	DeviceToken      string
-	UserID           string
-	ServerID         string
-	SendStats        bool
-	PinVersion       bool
-	SkipUpdatePrompt bool
+	ControlServerID string
+	DeviceToken     string
+	UserID          string
+	ServerID        string
+	SendStats       bool
 }
 
 type configV2 struct {
@@ -298,14 +296,6 @@ type configV2 struct {
 	ControlServers    []*ControlServer
 	DisableBlockLists bool
 	CLIConfig         *CLIConfig
-
-	// Updating
-	AutoDownloadUpdate   bool
-	ExitPostUpdate       bool
-	RestartPostUpdate    bool
-	UpdateWhileConnected bool
-	UpdateCheckInterval  int
-	DisableUpdates       bool
 
 	// API Setting
 	APIIP          string

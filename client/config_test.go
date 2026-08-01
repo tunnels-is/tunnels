@@ -52,22 +52,6 @@ func TestDefaultConfig(t *testing.T) {
 		t.Errorf("APIPort should be 7777, got %s", conf.APIPort)
 	}
 
-	if conf.RestartPostUpdate {
-		t.Error("RestartPostUpdate should be false by default")
-	}
-	if conf.ExitPostUpdate {
-		t.Error("ExitPostUpdate should be false by default")
-	}
-	if conf.AutoDownloadUpdate {
-		t.Error("AutoDownloadUpdate should be false by default")
-	}
-	if conf.UpdateWhileConnected {
-		t.Error("UpdateWhileConnected should be false by default")
-	}
-	if !conf.DisableUpdates {
-		t.Error("DisableUpdates should be true by default")
-	}
-
 	if conf.LogBlockedDomains {
 		t.Error("LogBlockedDomains should be false by default")
 	}
