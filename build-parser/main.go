@@ -26,19 +26,11 @@ func main() {
 
 func checkDir(dir string) {
 	filepath.Walk(dir, func(path string, info fs.FileInfo, err error) error {
-		if info.IsDir() {
+		if err != nil || info.IsDir() {
 			return nil
 		}
-		if strings.HasSuffix(path, ".crt") {
-			return nil
-		}
-		if strings.HasSuffix(path, ".dll") {
-			return nil
-		}
-		if strings.HasSuffix(path, ".json") {
-			return nil
-		}
-		if strings.HasSuffix(path, "server") {
+		// Only scan Go sources — binaries/assets can contain the filter as noise.
+		if !strings.HasSuffix(path, ".go") {
 			return nil
 		}
 		if path == "../setcap/setcap.go" {
@@ -47,18 +39,19 @@ func checkDir(dir string) {
 
 		fmt.Println(path)
 		fb, err := os.ReadFile(path)
+		if err != nil {
+			return nil
+		}
 		fbs := bytes.Split(fb, []byte{10})
 		for i := range fbs {
 			if bytes.Contains(fbs[i], filter) {
-				if path == "../client/logging.go" && i == 157 {
-					if bytes.Contains(fbs[i], []byte("fmt.Println(line)")) {
-						continue
-					}
+				// Intentional prints allowed in the product (not debug leftovers).
+				// Match by content only — line numbers drift as the files change.
+				if path == "../client/logging.go" && bytes.Contains(fbs[i], []byte("fmt.Println(line)")) {
+					continue
 				}
-				if path == "../server/main.go" && i == 142 {
-					if bytes.Contains(fbs[i], []byte("fmt.Println(version.Version)")) {
-						continue
-					}
+				if path == "../server/main.go" && bytes.Contains(fbs[i], []byte("fmt.Println(version.Version)")) {
+					continue
 				}
 				fmt.Println(i, string(fbs[i]))
 				fmtCount++

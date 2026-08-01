@@ -23,30 +23,24 @@ cd "$SCRIPT_DIR"
 TARGET="${1:-all}"
 VERSION="${VERSION:-dev}"
 LDFLAGS="-s -w -X github.com/tunnels-is/tunnels/version.Version=${VERSION}"
-TAGS="desktop,production,devtools"
+TAGS="desktop,production"
 BIN_DIR="$SCRIPT_DIR/bin"
 HOST_OS="$(go env GOHOSTOS)"
 
 mkdir -p "$BIN_DIR"
 
-# --- Frontend ---
+# --- Frontend (shared with CLI / goreleaser) ---
 echo "==> Building frontend"
-rm -rf ./frontend/dist ./cmd/wails/dist
-cd ./frontend
-pnpm install --frozen-lockfile
-pnpm run build
-cd ..
-cp -R ./frontend/dist ./cmd/wails
-cp ./cmd/main/wintun.dll ./cmd/wails/wintun.dll 2>/dev/null || true
+./build-ui.sh
 
 # --- Build helpers ---
 build_windows() {
     echo "==> Building windows/amd64"
     CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build \
         -tags "$TAGS" -trimpath -ldflags "$LDFLAGS -H windowsgui" \
-        -o "$BIN_DIR/tunnels-desktop-windows-amd64.exe" \
+        -o "$BIN_DIR/tunnels-app-windows-amd64.exe" \
         ./cmd/wails
-    echo "    -> bin/tunnels-desktop-windows-amd64.exe"
+    echo "    -> bin/tunnels-app-windows-amd64.exe"
 }
 
 build_linux() {
@@ -57,9 +51,9 @@ build_linux() {
     echo "==> Building linux/amd64"
     CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build \
         -tags "$TAGS,webkit2_41" -trimpath -ldflags "$LDFLAGS" \
-        -o "$BIN_DIR/tunnels-desktop-linux-amd64" \
+        -o "$BIN_DIR/tunnels-app-linux-amd64" \
         ./cmd/wails
-    echo "    -> bin/tunnels-desktop-linux-amd64"
+    echo "    -> bin/tunnels-app-linux-amd64"
 }
 
 build_darwin() {
@@ -70,16 +64,16 @@ build_darwin() {
     echo "==> Building darwin/arm64"
     CGO_ENABLED=1 GOOS=darwin GOARCH=arm64 go build \
         -tags "$TAGS" -trimpath -ldflags "$LDFLAGS" \
-        -o "$BIN_DIR/tunnels-desktop-darwin-arm64" \
+        -o "$BIN_DIR/tunnels-app-darwin-arm64" \
         ./cmd/wails
-    echo "    -> bin/tunnels-desktop-darwin-arm64"
+    echo "    -> bin/tunnels-app-darwin-arm64"
 
     echo "==> Building darwin/amd64"
     CGO_ENABLED=1 GOOS=darwin GOARCH=amd64 go build \
         -tags "$TAGS" -trimpath -ldflags "$LDFLAGS" \
-        -o "$BIN_DIR/tunnels-desktop-darwin-amd64" \
+        -o "$BIN_DIR/tunnels-app-darwin-amd64" \
         ./cmd/wails
-    echo "    -> bin/tunnels-desktop-darwin-amd64"
+    echo "    -> bin/tunnels-app-darwin-amd64"
 }
 
 # --- Dispatch ---
@@ -101,4 +95,4 @@ esac
 
 echo ""
 echo "==> Done"
-ls -lh "$BIN_DIR"/tunnels-desktop-* 2>/dev/null || echo "    (no binaries built)"
+ls -lh "$BIN_DIR"/tunnels-app-* 2>/dev/null || echo "    (no binaries built)"
