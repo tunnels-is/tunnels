@@ -8,13 +8,15 @@ import (
 	"syscall"
 )
 
-func checkKeyFileOwner(info os.FileInfo) error {
+func checkKeyFileOwner(path string, info os.FileInfo) error {
 	st, ok := info.Sys().(*syscall.Stat_t)
 	if !ok {
 		return nil
 	}
 	if st.Uid != uint32(os.Getuid()) {
-		return fmt.Errorf("owned by uid %d, expected uid %d", st.Uid, os.Getuid())
+		err := fmt.Errorf("owned by uid %d, expected uid %d", st.Uid, os.Getuid())
+		ERR("file permission check failed:", path, "—", err)
+		return err
 	}
 	return nil
 }
