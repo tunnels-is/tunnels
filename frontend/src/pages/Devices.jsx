@@ -3,14 +3,14 @@ import QRCode from "react-qr-code"
 import { Copy, Monitor, Plus, Search, Trash2 } from "lucide-react"
 import Dialog from "@/components/Dialog"
 import { Field, Page, TextField, Toolbar } from "@/components/ui"
-import { api, controller } from "@/store/actions"
+import { api, controller, fetchState } from "@/store/actions"
 import { fullDate } from "@/lib/format"
 import { countryName } from "@/lib/countries"
 import { useStore } from "@/store/store"
 
 const Devices = () => {
 	const user = useStore((s) => s.user)
-	const tunnels = useStore((s) => s.tunnels)
+	const activeTunnels = useStore((s) => s.activeTunnels)
 	const askConfirm = useStore((s) => s.askConfirm)
 	const notifyError = useStore((s) => s.notifyError)
 	const notifySuccess = useStore((s) => s.notifySuccess)
@@ -31,6 +31,7 @@ const Devices = () => {
 
 	useEffect(() => {
 		loadDevices()
+		fetchState()
 	}, [])
 
 	const openCreate = async () => {
@@ -88,24 +89,37 @@ const Devices = () => {
 		notifySuccess("Copied to clipboard")
 	}
 
-	const localIPs = useMemo(
-		() => new Set(tunnels.map((t) => t.IPv4Address).filter(Boolean)),
-		[tunnels],
-	)
+	// Device is connected when its WireGuardIP matches any ActiveTunnels[].CRResponse.WireGuardIP
+	const connectedIPs = useMemo(() => {
+		const ips = new Set()
+		for (const at of activeTunnels || []) {
+			const ip = at?.CRResponse?.WireGuardIP
+			if (ip) ips.add(ip)
+		}
+		return ips
+	}, [activeTunnels])
 
 	const filtered = useMemo(() => {
-		if (!filter) return devices
 		const f = filter.toLowerCase()
-		return devices.filter(
-			(d) =>
-				d.Tag?.toLowerCase().includes(f) ||
-				d.WireGuardIP?.toLowerCase().includes(f),
-		)
-	}, [devices, filter])
+		const list = !filter
+			? [...devices]
+			: devices.filter(
+					(d) =>
+						d.Tag?.toLowerCase().includes(f) ||
+						d.WireGuardIP?.toLowerCase().includes(f),
+				)
+		list.sort((a, b) => {
+			const aConn = a.WireGuardIP && connectedIPs.has(a.WireGuardIP) ? 1 : 0
+			const bConn = b.WireGuardIP && connectedIPs.has(b.WireGuardIP) ? 1 : 0
+			if (aConn !== bConn) return bConn - aConn
+			return (a.Tag || "").localeCompare(b.Tag || "")
+		})
+		return list
+	}, [devices, filter, connectedIPs])
 
-	const thisDeviceCount = useMemo(
-		() => devices.filter((d) => d.WireGuardIP && localIPs.has(d.WireGuardIP)).length,
-		[devices, localIPs],
+	const connectedCount = useMemo(
+		() => devices.filter((d) => d.WireGuardIP && connectedIPs.has(d.WireGuardIP)).length,
+		[devices, connectedIPs],
 	)
 
 	return (
@@ -116,8 +130,8 @@ const Devices = () => {
 					<span className="text-[11px] opacity-40">
 						{filtered.length}
 						{filter && devices.length !== filtered.length && <span> of {devices.length}</span>}
-						{thisDeviceCount > 0 && (
-							<span className="text-success"> · {thisDeviceCount} this device</span>
+						{connectedCount > 0 && (
+							<span className="text-success"> · {connectedCount} connected</span>
 						)}
 					</span>
 				</div>
@@ -157,13 +171,13 @@ const Devices = () => {
 						<tbody className="divide-y divide-base-200">
 							{filtered.length > 0 ? (
 								filtered.map((d) => {
-									const isCurrent = d.WireGuardIP && localIPs.has(d.WireGuardIP)
+									const isConnected = !!(d.WireGuardIP && connectedIPs.has(d.WireGuardIP))
 									return (
 										<tr
 											key={d._id}
 											className={
 												"group transition-colors duration-150 " +
-												(isCurrent
+												(isConnected
 													? "bg-success/[0.04] hover:bg-success/[0.07]"
 													: "hover:bg-base-200/40")
 											}
@@ -173,11 +187,11 @@ const Devices = () => {
 													<span
 														className={
 															"block h-2 w-2 rounded-full ring-2 " +
-															(isCurrent
+															(isConnected
 																? "animate-pulse bg-success ring-success/25"
 																: "bg-base-content/15 ring-transparent")
 														}
-														title={isCurrent ? "This device" : "Device"}
+														title={isConnected ? "Connected" : "Idle"}
 													/>
 												</div>
 											</td>
@@ -186,7 +200,9 @@ const Devices = () => {
 													<div
 														className={
 															"grid h-8 w-8 shrink-0 place-items-center rounded-lg " +
-															(isCurrent ? "bg-success/10 text-success" : "bg-base-200 text-base-content/40")
+															(isConnected
+																? "bg-success/10 text-success"
+																: "bg-base-200 text-base-content/40")
 														}
 													>
 														<Monitor size={14} />
@@ -195,8 +211,8 @@ const Devices = () => {
 														<div className="truncate text-[13px] font-semibold tracking-tight">
 															{d.Tag}
 														</div>
-														{isCurrent && (
-															<span className="text-[10px] font-medium text-success">This device</span>
+														{isConnected && (
+															<span className="text-[10px] font-medium text-success">Connected</span>
 														)}
 													</div>
 												</div>

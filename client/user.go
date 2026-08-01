@@ -29,25 +29,34 @@ func getUserFileKey() ([]byte, error) {
 	path := s.BasePath + userKeyFileName
 	kb, err := os.ReadFile(path)
 	if err == nil && len(kb) != 0 {
-
 		if info, statErr := os.Stat(path); statErr == nil {
-			if verr := validateUserKeyFile(info); verr != nil {
-				return nil, fmt.Errorf("user key file %q: %w — delete it to re-generate (saved logins will be lost)", path, verr)
+			if verr := validateUserKeyFile(path, info); verr != nil {
+				ERROR("user key file unusable, removing and regenerating (saved logins will be lost):", path, "—", verr)
+				if rmErr := os.Remove(path); rmErr != nil {
+					return nil, fmt.Errorf("user key file %q: %w — remove failed: %v", path, verr, rmErr)
+				}
+				// fall through and recreate
+			} else {
+				key, derr := base64.StdEncoding.DecodeString(string(kb))
+				if derr != nil || len(key) != 32 {
+					return nil, fmt.Errorf("invalid user key file %q — delete it to re-generate (saved logins will be lost)", path)
+				}
+				return key, nil
 			}
+		} else {
+			key, derr := base64.StdEncoding.DecodeString(string(kb))
+			if derr != nil || len(key) != 32 {
+				return nil, fmt.Errorf("invalid user key file %q — delete it to re-generate (saved logins will be lost)", path)
+			}
+			return key, nil
 		}
-		key, derr := base64.StdEncoding.DecodeString(string(kb))
-		if derr != nil || len(key) != 32 {
-			return nil, fmt.Errorf("invalid user key file %q — delete it to re-generate (saved logins will be lost)", path)
-		}
-		return key, nil
-	}
-	if err != nil && !errors.Is(err, os.ErrNotExist) {
+	} else if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return nil, err
 	}
 
 	if _, statErr := os.Stat(path); statErr == nil {
 		if rmErr := os.Remove(path); rmErr != nil {
-			return nil, fmt.Errorf("remove empty user key file %q: %w", path, rmErr)
+			return nil, fmt.Errorf("remove user key file %q: %w", path, rmErr)
 		}
 	}
 
@@ -67,6 +76,7 @@ func getUserFileKey() ([]byte, error) {
 	if err := f.Close(); err != nil {
 		return nil, err
 	}
+	DEBUG("created user key file:", path)
 	return key, nil
 }
 
