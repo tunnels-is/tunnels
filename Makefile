@@ -46,17 +46,24 @@ clean:
 	@go clean -testcache
 	@echo "Clean complete"
 
-## build-server: Build server binary
+## build-server: Build tunnels-server binary
 build-server:
-	@echo "Building server..."
-	@cd server && go build -o ../builds/server .
+	@echo "Building tunnels-server..."
+	@mkdir -p builds
+	@cd server && go build -o ../builds/tunnels-server .
 
-## build-client: Build client binary
+## build-client: Build tunnels-cli binary
 build-client:
-	@echo "Building client..."
-	@cd cmd/main && go build -o ../../builds/tunnels .
+	@echo "Building tunnels-cli..."
+	@mkdir -p builds
+	@cd cmd/main && go build -o ../../builds/tunnels-cli .
 
-## build: Build all binaries
+## build-app: Build tunnels-app (Wails desktop) for the host OS
+build-app:
+	@echo "Building tunnels-app..."
+	@./build-wails.sh
+
+## build: Build CLI + server binaries
 build: build-server build-client
 	@echo "Build complete"
 

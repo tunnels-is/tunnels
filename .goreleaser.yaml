@@ -1,23 +1,27 @@
-# This is an example .goreleaser.yml file with some sensible defaults.
-# Make sure to check the documentation at https://goreleaser.com
-
-# The lines below are called `modelines`. See `:help modeline`
-# Feel free to remove those if you don't want/need to use them.
 # yaml-language-server: $schema=https://goreleaser.com/static/schema.json
 # vim: set ts=2 sw=2 tw=0 fo=cnqoj
 
 version: 2
 
+project_name: tunnels
+
 before:
   hooks:
-    # You may remove this if you don't use go modules.
     - go mod tidy
-    # Run all tests before building (fail fast if tests fail)
+    # Build the shared React UI and copy it into both client entrypoints
+    # (cmd/main for the CLI, cmd/wails for the desktop app).
     - ./build-ui.sh
     - ./build-parser.sh
 
 builds:
-  - env:
+  # ---------------------------------------------------------------------------
+  # tunnels-cli — headless / browser UI client (embeds frontend, no Wails)
+  # Entry: ./cmd/main (wraps the client package)
+  # ---------------------------------------------------------------------------
+  - id: tunnels-cli
+    main: ./cmd/main
+    binary: tunnels-cli
+    env:
       - CGO_ENABLED=0
     goos:
       - linux
@@ -26,56 +30,146 @@ builds:
     goarch:
       - amd64
       - arm64
-    main: ./cmd/main
-    ldflags: '-s -w -X github.com/tunnels-is/tunnels/version.Version={{.Version}} -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}} -X main.builtBy=goreleaser'
-    flags: [ '-trimpath' ]
+    ldflags:
+      - -s -w -X github.com/tunnels-is/tunnels/version.Version={{.Version}}
+    flags:
+      - -trimpath
 
-  - id: server
+  # ---------------------------------------------------------------------------
+  # tunnels-server — control plane / API server
+  # ---------------------------------------------------------------------------
+  - id: tunnels-server
+    main: ./server
+    binary: tunnels-server
+    env:
+      - CGO_ENABLED=0
     goos:
       - linux
     goarch:
       - amd64
       - arm64
       - arm
-    main: ./server
-    ldflags: '-s -w -X github.com/tunnels-is/tunnels/version.Version={{.Version}} -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}} -X main.builtBy=goreleaser'
-    flags: [ '-trimpath' ]
+    ldflags:
+      - -s -w -X github.com/tunnels-is/tunnels/version.Version={{.Version}}
+    flags:
+      - -trimpath
+
+  # ---------------------------------------------------------------------------
+  # tunnels-app — Wails desktop client
+  #
+  # Windows is pure-Go (CGO_ENABLED=0) and cross-compiles from any host.
+  # Linux/macOS need native CGO + system webview libs, so those builds are
+  # only attempted on a matching host (mirrors ./build-wails.sh).
+  # ---------------------------------------------------------------------------
+  - id: tunnels-app-windows
+    main: ./cmd/wails
+    binary: tunnels-app
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - windows
+    goarch:
+      - amd64
+    tags:
+      - desktop
+      - production
+    ldflags:
+      - -s -w -H windowsgui -X github.com/tunnels-is/tunnels/version.Version={{.Version}}
+    flags:
+      - -trimpath
+
+  - id: tunnels-app-linux
+    main: ./cmd/wails
+    binary: tunnels-app
+    # Requires: libgtk-3-dev libwebkit2gtk-4.1-dev (or equivalent)
+    skip: '{{ ne .Runtime.Goos "linux" }}'
+    env:
+      - CGO_ENABLED=1
+    goos:
+      - linux
+    goarch:
+      - amd64
+    tags:
+      - desktop
+      - production
+      - webkit2_41
+    ldflags:
+      - -s -w -X github.com/tunnels-is/tunnels/version.Version={{.Version}}
+    flags:
+      - -trimpath
+
+  - id: tunnels-app-darwin
+    main: ./cmd/wails
+    binary: tunnels-app
+    # Requires a macOS host with Xcode CLT
+    skip: '{{ ne .Runtime.Goos "darwin" }}'
+    env:
+      - CGO_ENABLED=1
+    goos:
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    tags:
+      - desktop
+      - production
+    ldflags:
+      - -s -w -X github.com/tunnels-is/tunnels/version.Version={{.Version}}
+    flags:
+      - -trimpath
 
 dist: ./builds
 
 archives:
-    # this name template makes the OS and Arch compatible with the results of `uname`.
-    # use zip for windows archives
-
-  - id: a1
-    ids: [tunnels]
-    formats: [tar.gz]
+  - id: tunnels-cli
+    ids:
+      - tunnels-cli
+    formats:
+      - tar.gz
     name_template: >-
-      tunnels_
-      {{- title .Version}}_
-      {{- title .Os}}_
+      tunnels-cli_
+      {{- .Version }}_
+      {{- .Os }}_
       {{- .Arch }}
-    allow_different_binary_count: true
     format_overrides:
       - goos: windows
-        formats: [zip]
+        formats:
+          - zip
 
-  - id: a2
-    ids: [server]
-    formats: [tar.gz]
+  - id: tunnels-server
+    ids:
+      - tunnels-server
+    formats:
+      - tar.gz
     name_template: >-
-      server_
-      {{- title .Version}}_
-      {{- title .Os}}_
-      {{- .Arch}}
-    allow_different_binary_count: true
+      tunnels-server_
+      {{- .Version }}_
+      {{- .Os }}_
+      {{- .Arch }}
+
+  - id: tunnels-app
+    ids:
+      - tunnels-app-windows
+      - tunnels-app-linux
+      - tunnels-app-darwin
+    formats:
+      - tar.gz
+    name_template: >-
+      tunnels-app_
+      {{- .Version }}_
+      {{- .Os }}_
+      {{- .Arch }}
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
 
 release:
-   draft: true  
-   replace_existing_draft: true
-   replace_existing_artifacts: true
-   prerelease: auto
-   mode: replace
+  draft: true
+  replace_existing_draft: true
+  replace_existing_artifacts: true
+  prerelease: auto
+  mode: replace
 
 changelog:
   sort: asc
@@ -83,13 +177,3 @@ changelog:
     exclude:
       - "^docs:"
       - "^test:"
-
-# announce:
-#   webhook:
-#     enabled: true
-#     skip_tls_verify: true
-#     message_template: '{ "username": "RELEASE", "content":"Release {{.Tag}} is out"}'
-#     content_type: "application/json"
-#     endpoint_url: "https://discord.com/api/webhooks/1297177799508885545/MffN0DtZz-DL1Jt9egcqM980-_mNs3Rjbab1o8ezAhHC-f0ng7w3-JZCFdVMDToHrmEJ"
-#     headers:
-#       User-Agent: "goreleaser"
