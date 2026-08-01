@@ -12,6 +12,10 @@ export const useStore = create((set, get) => ({
 	tunnels: [],
 	activeTunnels: [],
 	servers: session.getObject("servers") || [],
+	// Controller devices for the active account — never session-persisted.
+	devices: [],
+	// This machine's devices under accounts/<hash>/devices (no privkeys).
+	localDevices: [],
 	dnsStats: session.getObject("dns-stats") || {},
 
 	logs: [],
@@ -29,7 +33,6 @@ export const useStore = create((set, get) => ({
 	toasts: [],
 
 	setUser: (user) => {
-
 		if (user?._id) session.set("activeUserID", user._id)
 		set({ user })
 	},
@@ -41,6 +44,8 @@ export const useStore = create((set, get) => ({
 		session.setObject("servers", servers)
 		set({ servers })
 	},
+	setDevices: (devices) => set({ devices: Array.isArray(devices) ? devices : [] }),
+	setLocalDevices: (localDevices) => set({ localDevices: Array.isArray(localDevices) ? localDevices : [] }),
 
 	appendLog: (line) => {
 		let logs = get().logs

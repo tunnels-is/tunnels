@@ -67,7 +67,13 @@ func InitService() error {
 	}
 	conf := CONFIG.Load()
 
-	loadTunnelsFromDisk()
+	// CLI can activate a workspace immediately; UI does it via setUser after login/select.
+	if conf.CLIConfig != nil && conf.CLIConfig.UserID != "" {
+		if err := activateAccountByUserID(conf.CLIConfig.UserID); err != nil {
+			ERROR("unable to activate CLI account workspace:", err)
+		}
+	}
+
 	loadDefaultGateway()
 	loadDefaultInterface()
 

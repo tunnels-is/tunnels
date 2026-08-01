@@ -4,91 +4,127 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"io/fs"
 	"os"
-	"path/filepath"
-	"sync"
 
-	"github.com/tunnels-is/tunnels/argon"
+	"golang.org/x/crypto/argon2"
 )
 
-const userKeyFileName = "user.key"
+// Account file blob format (single file, no sidecar key):
+//
+//	version (1 byte) || salt (16 bytes) || nonce (gcm.NonceSize()) || ciphertext
+//
+// The AES key is Argon2id(password=accountFolderHash, salt=salt). The folder
+// hash is known from the path accounts/<hash>/… so we can decrypt without the
+// raw userID (needed when listing locked accounts).
+const (
+	accountCryptoVersion byte = 1
+	accountSaltLen            = 16
 
-var userKeyMu sync.Mutex
+	// KDF params: moderate cost so multi-account list stays snappy.
+	accountKDFTime    = 2
+	accountKDFMemory  = 32 * 1024 // KiB
+	accountKDFThreads = 1
+	accountKDFKeyLen  = 32
+)
 
-func getUserFileKey() ([]byte, error) {
-	userKeyMu.Lock()
-	defer userKeyMu.Unlock()
+func deriveAccountFileKey(folderHash string, salt []byte) []byte {
+	return argon2.IDKey(
+		[]byte(folderHash),
+		salt,
+		accountKDFTime,
+		accountKDFMemory,
+		accountKDFThreads,
+		accountKDFKeyLen,
+	)
+}
 
-	s := STATE.Load()
-	path := s.BasePath + userKeyFileName
-	kb, err := os.ReadFile(path)
-	if err == nil && len(kb) != 0 {
-		if info, statErr := os.Stat(path); statErr == nil {
-			if verr := validateUserKeyFile(path, info); verr != nil {
-				ERROR("user key file unusable, removing and regenerating (saved logins will be lost):", path, "—", verr)
-				if rmErr := os.Remove(path); rmErr != nil {
-					return nil, fmt.Errorf("user key file %q: %w — remove failed: %v", path, verr, rmErr)
-				}
-				// fall through and recreate
-			} else {
-				key, derr := base64.StdEncoding.DecodeString(string(kb))
-				if derr != nil || len(key) != 32 {
-					return nil, fmt.Errorf("invalid user key file %q — delete it to re-generate (saved logins will be lost)", path)
-				}
-				return key, nil
-			}
-		} else {
-			key, derr := base64.StdEncoding.DecodeString(string(kb))
-			if derr != nil || len(key) != 32 {
-				return nil, fmt.Errorf("invalid user key file %q — delete it to re-generate (saved logins will be lost)", path)
-			}
-			return key, nil
-		}
-	} else if err != nil && !errors.Is(err, os.ErrNotExist) {
+// encryptAccountBlob encrypts plaintext under a key derived from folderHash.
+// Output includes salt+nonce so the same hash can open the file later.
+func encryptAccountBlob(plaintext []byte, folderHash string) ([]byte, error) {
+	if !isHexString(folderHash) {
+		return nil, fmt.Errorf("invalid account hash")
+	}
+	salt := make([]byte, accountSaltLen)
+	if _, err := io.ReadFull(rand.Reader, salt); err != nil {
 		return nil, err
 	}
+	key := deriveAccountFileKey(folderHash, salt)
 
-	if _, statErr := os.Stat(path); statErr == nil {
-		if rmErr := os.Remove(path); rmErr != nil {
-			return nil, fmt.Errorf("remove user key file %q: %w", path, rmErr)
-		}
-	}
-
-	key := make([]byte, 32)
-	if _, err := rand.Read(key); err != nil {
-		return nil, err
-	}
-
-	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	block, err := aes.NewCipher(key)
 	if err != nil {
-		return nil, fmt.Errorf("create user key file %q: %w", path, err)
-	}
-	if _, err := f.WriteString(base64.StdEncoding.EncodeToString(key)); err != nil {
-		f.Close()
 		return nil, err
 	}
-	if err := f.Close(); err != nil {
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
 		return nil, err
 	}
-	DEBUG("created user key file:", path)
-	return key, nil
+	nonce := make([]byte, gcm.NonceSize())
+	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+		return nil, err
+	}
+	ct := gcm.Seal(nil, nonce, plaintext, nil)
+
+	out := make([]byte, 1+accountSaltLen+len(nonce)+len(ct))
+	out[0] = accountCryptoVersion
+	copy(out[1:], salt)
+	copy(out[1+accountSaltLen:], nonce)
+	copy(out[1+accountSaltLen+len(nonce):], ct)
+	return out, nil
+}
+
+// decryptAccountBlob opens a blob produced by encryptAccountBlob.
+func decryptAccountBlob(blob []byte, folderHash string) ([]byte, error) {
+	if !isHexString(folderHash) {
+		return nil, fmt.Errorf("invalid account hash")
+	}
+	if len(blob) < 1+accountSaltLen+12 {
+		return nil, errors.New("ciphertext too short")
+	}
+	if blob[0] != accountCryptoVersion {
+		return nil, fmt.Errorf("unsupported account crypto version %d", blob[0])
+	}
+	salt := blob[1 : 1+accountSaltLen]
+	key := deriveAccountFileKey(folderHash, salt)
+
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, err
+	}
+	nonceSize := gcm.NonceSize()
+	rest := blob[1+accountSaltLen:]
+	if len(rest) < nonceSize+gcm.Overhead() {
+		return nil, errors.New("ciphertext too short")
+	}
+	nonce, ct := rest[:nonceSize], rest[nonceSize:]
+	return gcm.Open(nil, nonce, ct, nil)
 }
 
 func delUser(hash string) (err error) {
-
 	if !isHexString(hash) {
 		return fmt.Errorf("invalid user hash")
 	}
 	s := STATE.Load()
-	DEBUG("removing user: ", hash)
-	_ = os.Remove(s.UserPath + hash)
-	return
+	DEBUG("removing account: ", hash)
+	dir := accountDir(hash)
+	if err := os.RemoveAll(dir); err != nil {
+		return err
+	}
+	if s.ActiveAccountHash == hash {
+		s.ActiveAccountHash = ""
+		s.TunnelsPath = ""
+		s.DevicesPath = ""
+		STATE.Store(s)
+		clearTunnelMetaMap()
+	}
+	return nil
 }
 
 func isHexString(s string) bool {
@@ -105,116 +141,86 @@ func isHexString(s string) bool {
 }
 
 func saveUser(u *User) (err error) {
-	key, err := getUserFileKey()
+	hash, err := userIDToAccountHash(u.ID)
 	if err != nil {
 		return err
 	}
-	userFile, err := argon.GenerateUserFolderHash(u.ID)
-	if err != nil {
+	u.SaveFileHash = hash
+
+	if err := ensureAccountDirs(hash); err != nil {
 		return err
 	}
-	u.SaveFileHash = fmt.Sprintf("%x", userFile)
 
 	ub, err := json.Marshal(u)
 	if err != nil {
 		return err
 	}
 
-	encryptged, err := Encrypt(ub, key)
+	encrypted, err := encryptAccountBlob(ub, hash)
 	if err != nil {
 		return err
 	}
 
-	s := STATE.Load()
-	DEBUG("Saving user:", fmt.Sprintf("%x", userFile))
-	f, err := CreateFile(s.UserPath + fmt.Sprintf("%x", userFile))
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	_, err = f.Write(encryptged)
-	if err != nil {
+	path := accountUserFile(hash)
+	DEBUG("Saving user:", hash)
+	if err := os.WriteFile(path, encrypted, 0o600); err != nil {
 		return err
 	}
 
+	if actErr := activateAccountByHash(hash); actErr != nil {
+		ERROR("unable to activate account after save:", actErr)
+	}
 	return nil
 }
 
 func getUsers() (ul []*User, err error) {
 	ul = make([]*User, 0)
 	s := STATE.Load()
-	key, err := getUserFileKey()
+
+	entries, err := os.ReadDir(s.AccountsPath)
 	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return ul, nil
+		}
 		return nil, err
 	}
 
-	var legacyKey []byte
-	legacyKeyOnce := func() []byte {
-		if legacyKey == nil {
-			legacyKey, _ = argon.GetKeyFromLocalInfo()
+	for _, e := range entries {
+		if !e.IsDir() || !isHexString(e.Name()) {
+			continue
 		}
-		return legacyKey
-	}
-
-	err = filepath.WalkDir(s.UserPath, func(path string, d fs.DirEntry, err error) error {
-		if d.IsDir() {
-			return nil
-		}
-		if err != nil {
-			ERROR("unable to walk path", err)
-			return nil
-		}
-		base := filepath.Base(path)
-		DEBUG("loading user:", base)
+		hash := e.Name()
+		path := accountUserFile(hash)
 		fb, er := os.ReadFile(path)
 		if er != nil {
-			ERROR("unable to read user file:", er)
-			return nil
+			if !errors.Is(er, os.ErrNotExist) {
+				ERROR("unable to read user file:", path, er)
+			}
+			continue
 		}
-		migrate := false
-		decrypted, er := Decrypt(fb, key)
+		DEBUG("loading user:", hash)
+		decrypted, er := decryptAccountBlob(fb, hash)
 		if er != nil {
-			if lk := legacyKeyOnce(); lk != nil {
-				decrypted, er = Decrypt(fb, lk)
-				migrate = er == nil
-			}
-			if er != nil {
-
-				ERROR("unable to decrypt user file:", base, " err:", er)
-				return nil
-			}
+			ERROR("unable to decrypt user file:", hash, " err:", er)
+			continue
 		}
 		if len(decrypted) == 0 {
-			return nil
+			continue
 		}
-
 		u := new(User)
-		er = json.Unmarshal(decrypted, u)
-		if er != nil {
-			ERROR("unable to decode user file (user will be removed):", base)
-			_ = os.Remove(path)
-			return nil
+		if er = json.Unmarshal(decrypted, u); er != nil {
+			ERROR("unable to decode user file:", hash)
+			continue
 		}
-		if u.SaveFileHash == "" {
-			u.SaveFileHash = base
-		}
-
-		if migrate {
-			if serr := saveUser(u); serr != nil {
-				ERROR("unable to migrate user file to new key:", base, " err:", serr)
-			} else {
-				DEBUG("migrated user file to per-install key:", base)
-			}
-		}
-
+		u.SaveFileHash = hash
 		ul = append(ul, u)
-		return nil
-	})
+	}
 
-	return ul, err
+	return ul, nil
 }
 
+// Encrypt / Decrypt are low-level AES-GCM helpers (nonce||ciphertext) for tests
+// and any non-account payloads that already hold a raw key.
 func Decrypt(data, key []byte) ([]byte, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
@@ -242,16 +248,13 @@ func Encrypt(text, key []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	gcm, err := cipher.NewGCM(block)
 	if err != nil {
 		return nil, err
 	}
-
 	nonce := make([]byte, gcm.NonceSize())
 	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
 		return nil, err
 	}
-
 	return gcm.Seal(nonce, nonce, text, nil), nil
 }

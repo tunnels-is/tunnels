@@ -3,20 +3,22 @@ import QRCode from "react-qr-code"
 import { Copy, Monitor, Plus, Search, Trash2 } from "lucide-react"
 import Dialog from "@/components/Dialog"
 import { Field, Page, TextField, Toolbar } from "@/components/ui"
-import { api, controller, fetchServers, fetchState } from "@/store/actions"
+import { api, controller, fetchDevices, fetchServers, fetchState } from "@/store/actions"
 import { fullDate } from "@/lib/format"
 import { countryName } from "@/lib/countries"
 import { useStore } from "@/store/store"
 
 const Devices = () => {
 	const user = useStore((s) => s.user)
+	const devices = useStore((s) => s.devices)
+	const localDevices = useStore((s) => s.localDevices)
+	const setDevices = useStore((s) => s.setDevices)
 	const activeTunnels = useStore((s) => s.activeTunnels)
 	const servers = useStore((s) => s.servers)
 	const askConfirm = useStore((s) => s.askConfirm)
 	const notifyError = useStore((s) => s.notifyError)
 	const notifySuccess = useStore((s) => s.notifySuccess)
 
-	const [devices, setDevices] = useState([])
 	const [showCreate, setShowCreate] = useState(false)
 	const [tag, setTag] = useState("")
 	const [serverID, setServerID] = useState("")
@@ -24,21 +26,24 @@ const Devices = () => {
 	const [submitting, setSubmitting] = useState(false)
 	const [filter, setFilter] = useState("")
 
-	const loadDevices = async () => {
-		const resp = await controller("/client/device/list/user", {})
-		if (resp.status === 200 && Array.isArray(resp.data)) setDevices(resp.data)
-	}
-
+	// Reload devices whenever the active account changes (not only on first mount).
 	useEffect(() => {
-		loadDevices()
 		fetchState()
 	}, [])
+
+	useEffect(() => {
+		if (!user?._id) {
+			setDevices([])
+			return
+		}
+		fetchDevices({ force: true })
+	}, [user?._id, setDevices])
 
 	const openCreate = async () => {
 		setTag("")
 		setWgConfig(null)
 		setShowCreate(true)
-		const list = await fetchServers()
+		const list = await fetchServers({ force: true })
 		if (list?.length > 0) setServerID(list[0]._id)
 	}
 
@@ -71,13 +76,13 @@ const Devices = () => {
 		setWgConfig(null)
 		setTag("")
 		setServerID("")
-		loadDevices()
+		fetchDevices({ force: true })
 	}
 
 	const deleteDevice = (device) => {
 		askConfirm("Delete Device", `Delete "${device.Tag}"? This cannot be undone.`, async () => {
 			const resp = await controller("/client/device/delete", { DeviceID: device._id })
-			if (resp.status === 200) setDevices((prev) => prev.filter((d) => d._id !== device._id))
+			if (resp.status === 200) setDevices(devices.filter((d) => d._id !== device._id))
 		})
 	}
 
@@ -86,15 +91,24 @@ const Devices = () => {
 		notifySuccess("Copied to clipboard")
 	}
 
-	// Device is connected when its WireGuardIP matches any ActiveTunnels[].CRResponse.WireGuardIP
+	// Connected: controller device WG IP matches a live tunnel.
 	const connectedIPs = useMemo(() => {
 		const ips = new Set()
 		for (const at of activeTunnels || []) {
-			const ip = at?.CRResponse?.WireGuardIP
+			const ip = at?.CRResponse?.WireGuardIP || at?.ServerResponse?.WireGuardIP
 			if (ip) ips.add(ip)
 		}
 		return ips
 	}, [activeTunnels])
+
+	// Local: this machine has a devices/ file (match by controller id or pubkey).
+	const localIDs = useMemo(() => new Set((localDevices || []).map((d) => d.ID).filter(Boolean)), [localDevices])
+	const localPubs = useMemo(
+		() => new Set((localDevices || []).map((d) => d.WireGuardPubKey).filter(Boolean)),
+		[localDevices],
+	)
+	const isLocalDevice = (d) =>
+		!!(d && ((d._id && localIDs.has(d._id)) || (d.WireGuardKey && localPubs.has(d.WireGuardKey))))
 
 	const filtered = useMemo(() => {
 		const f = filter.toLowerCase()
@@ -109,15 +123,19 @@ const Devices = () => {
 			const aConn = a.WireGuardIP && connectedIPs.has(a.WireGuardIP) ? 1 : 0
 			const bConn = b.WireGuardIP && connectedIPs.has(b.WireGuardIP) ? 1 : 0
 			if (aConn !== bConn) return bConn - aConn
+			const aLoc = isLocalDevice(a) ? 1 : 0
+			const bLoc = isLocalDevice(b) ? 1 : 0
+			if (aLoc !== bLoc) return bLoc - aLoc
 			return (a.Tag || "").localeCompare(b.Tag || "")
 		})
 		return list
-	}, [devices, filter, connectedIPs])
+	}, [devices, filter, connectedIPs, localIDs, localPubs])
 
 	const connectedCount = useMemo(
 		() => devices.filter((d) => d.WireGuardIP && connectedIPs.has(d.WireGuardIP)).length,
 		[devices, connectedIPs],
 	)
+	const localCount = useMemo(() => devices.filter((d) => isLocalDevice(d)).length, [devices, localIDs, localPubs])
 
 	return (
 		<Page>
@@ -127,6 +145,7 @@ const Devices = () => {
 					<span className="text-[11px] opacity-40">
 						{filtered.length}
 						{filter && devices.length !== filtered.length && <span> of {devices.length}</span>}
+						{localCount > 0 && <span className="text-info"> · {localCount} on this device</span>}
 						{connectedCount > 0 && (
 							<span className="text-success"> · {connectedCount} connected</span>
 						)}
@@ -169,6 +188,7 @@ const Devices = () => {
 							{filtered.length > 0 ? (
 								filtered.map((d) => {
 									const isConnected = !!(d.WireGuardIP && connectedIPs.has(d.WireGuardIP))
+									const isLocal = isLocalDevice(d)
 									return (
 										<tr
 											key={d._id}
@@ -176,7 +196,9 @@ const Devices = () => {
 												"group transition-colors duration-150 " +
 												(isConnected
 													? "bg-success/[0.04] hover:bg-success/[0.07]"
-													: "hover:bg-base-200/40")
+													: isLocal
+														? "bg-info/[0.04] hover:bg-info/[0.07]"
+														: "hover:bg-base-200/40")
 											}
 										>
 											<td className="px-4 py-3.5">
@@ -186,9 +208,11 @@ const Devices = () => {
 															"block h-2 w-2 rounded-full ring-2 " +
 															(isConnected
 																? "animate-pulse bg-success ring-success/25"
-																: "bg-base-content/15 ring-transparent")
+																: isLocal
+																	? "bg-info ring-info/25"
+																	: "bg-base-content/15 ring-transparent")
 														}
-														title={isConnected ? "Connected" : "Idle"}
+														title={isConnected ? "Connected" : isLocal ? "On this device" : "Other machine"}
 													/>
 												</div>
 											</td>
@@ -199,7 +223,9 @@ const Devices = () => {
 															"grid h-8 w-8 shrink-0 place-items-center rounded-lg " +
 															(isConnected
 																? "bg-success/10 text-success"
-																: "bg-base-200 text-base-content/40")
+																: isLocal
+																	? "bg-info/10 text-info"
+																	: "bg-base-200 text-base-content/40")
 														}
 													>
 														<Monitor size={14} />
@@ -208,9 +234,17 @@ const Devices = () => {
 														<div className="truncate text-[13px] font-semibold tracking-tight">
 															{d.Tag}
 														</div>
-														{isConnected && (
-															<span className="text-[10px] font-medium text-success">Connected</span>
-														)}
+														<div className="flex flex-wrap gap-1.5">
+															{isLocal && (
+																<span className="text-[10px] font-medium text-info">This device</span>
+															)}
+															{isConnected && (
+																<span className="text-[10px] font-medium text-success">Connected</span>
+															)}
+															{!isLocal && !isConnected && (
+																<span className="text-[10px] font-medium text-base-content/35">Other machine</span>
+															)}
+														</div>
 													</div>
 												</div>
 											</td>

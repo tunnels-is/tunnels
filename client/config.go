@@ -173,6 +173,10 @@ func applyCertificateDefaultsToConfig(cfg *configV2) {
 
 func writeTunnelsToDisk(tag string) (outErr error) {
 	s := STATE.Load()
+	if s.TunnelsPath == "" {
+		DEBUG("writeTunnelsToDisk: no tunnels path (no active account), skip")
+		return nil
+	}
 	TunnelMetaMap.Range(func(key string, value *TunnelMETA) bool {
 		t := value
 		if tag != "" {
@@ -226,6 +230,10 @@ func writeTunnelsToDisk(tag string) (outErr error) {
 
 func loadTunnelsFromDisk() (err error) {
 	s := STATE.Load()
+	if s.TunnelsPath == "" {
+		DEBUG("loadTunnelsFromDisk: no tunnels path (no active account), skip")
+		return nil
+	}
 	foundDefault := false
 	err = filepath.WalkDir(s.TunnelsPath, func(path string, d fs.DirEntry, err error) error {
 		if d == nil {

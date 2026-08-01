@@ -222,7 +222,7 @@ func TestInitBaseFoldersAndPaths_CreatesAllSubdirs(t *testing.T) {
 		path string
 	}{
 		{"BasePath", s.BasePath},
-		{"TunnelsPath", s.TunnelsPath},
+		{"AccountsPath", s.AccountsPath},
 		{"UserPath", s.UserPath},
 		{"LogPath", s.LogPath},
 		{"BlockListPath", s.BlockListPath},
@@ -238,6 +238,11 @@ func TestInitBaseFoldersAndPaths_CreatesAllSubdirs(t *testing.T) {
 		if !info.IsDir() {
 			t.Errorf("%s (%s) is not a directory", e.name, e.path)
 		}
+	}
+	// Tunnels/devices paths are empty until an account is activated.
+	if s.TunnelsPath != "" || s.DevicesPath != "" || s.ActiveAccountHash != "" {
+		t.Errorf("expected empty tunnel/device workspace before account activate, got tunnels=%q devices=%q active=%q",
+			s.TunnelsPath, s.DevicesPath, s.ActiveAccountHash)
 	}
 }
 

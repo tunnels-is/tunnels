@@ -40,11 +40,14 @@ func InitBaseFoldersAndPaths() {
 	CreateFolder(s.BasePath)
 	s.ConfigFileName = s.BasePath + "tunnels" + configFileSuffix
 
-	s.TunnelsPath = s.BasePath + "tunnel" + string(os.PathSeparator)
-	CreateFolder(s.TunnelsPath)
-
-	s.UserPath = s.BasePath + "users" + string(os.PathSeparator)
-	CreateFolder(s.UserPath)
+	// Per-account workspaces: accounts/<hash>/{user,tunnels/,devices/}
+	// TunnelsPath/DevicesPath stay empty until an account is activated (saveUser / connect).
+	s.AccountsPath = s.BasePath + accountsDirName + string(os.PathSeparator)
+	CreateFolder(s.AccountsPath)
+	s.UserPath = s.AccountsPath
+	s.TunnelsPath = ""
+	s.DevicesPath = ""
+	s.ActiveAccountHash = ""
 
 	s.LogPath = s.BasePath + "logs" + string(os.PathSeparator)
 	CreateFolder(s.LogPath)
