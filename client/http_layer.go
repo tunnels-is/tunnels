@@ -597,10 +597,6 @@ func HTTP_ResetNetwork(w http.ResponseWriter, r *http.Request) {
 	JSON(w, r, 200, nil)
 }
 
-func HTTP_GetConfig(w http.ResponseWriter, r *http.Request) {
-	JSON(w, r, 200, CONFIG.Load())
-}
-
 type saveTunnelForm struct {
 	Meta   *TunnelMETA
 	OldTag string
@@ -719,16 +715,6 @@ func HTTP_SetTunnelPeers(w http.ResponseWriter, r *http.Request) {
 	})
 
 	JSON(w, r, 200, hosts)
-}
-
-func HTTP_GetTunnels(w http.ResponseWriter, r *http.Request) {
-	out := make([]*TunnelMETA, 0)
-	tunnelMetaMapRange(func(tun *TunnelMETA) bool {
-		out = append(out, tun)
-		return true
-	})
-
-	JSON(w, r, 200, out)
 }
 
 func HTTP_SetConfig(w http.ResponseWriter, r *http.Request) {

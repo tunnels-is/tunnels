@@ -42,32 +42,6 @@ func GET_FUNC(skip int) string {
 	return sn[len(sn)-1]
 }
 
-func DEEP(Line ...any) {
-	conf := CONFIG.Load()
-	state := STATE.Load()
-	if !state.Debug {
-		if !conf.DebugLogging {
-			return
-		}
-	}
-
-	x := ""
-	for _, v := range Line {
-		x += fmt.Sprintf("%v ", v)
-	}
-
-	select {
-	case LogQueue <- fmt.Sprintf(
-		"%s || DEEP || %s || %s",
-		time.Now().Format("01-02 15:04:05"),
-		GET_FUNC(3),
-		fmt.Sprint(x),
-	):
-	default:
-		ErrorLog(false, "COULD NOT PLACE LOG IN THE LOG QUEUE")
-	}
-}
-
 func DEBUG(Line ...any) {
 	conf := CONFIG.Load()
 	state := STATE.Load()

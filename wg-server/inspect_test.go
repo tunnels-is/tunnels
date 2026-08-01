@@ -2,8 +2,39 @@ package wgserver
 
 import (
 	"encoding/binary"
+	"net/netip"
 	"testing"
 )
+
+// Test-only wrappers for helpers removed from production code.
+func handleControl(t *inspectingTUN, pkt []byte) bool {
+	src, dst, proto, l4, frag, ok := parseIPHeader(pkt)
+	return t.handleControlParsed(src, dst, proto, l4, frag, ok)
+}
+
+func peerListSnapshot() map[netip.Addr][]netip.Addr {
+	out := make(map[netip.Addr][]netip.Addr)
+	for i := range fwV4Slots {
+		p := fwV4Slots[i].Load()
+		if p == nil {
+			continue
+		}
+		p.mu.RLock()
+		if len(p.allowed) > 0 {
+			srcs := make([]netip.Addr, 0, len(p.allowed))
+			for src := range p.allowed {
+				srcs = append(srcs, src)
+			}
+			var b [4]byte
+			binary.BigEndian.PutUint32(b[:], fwBase4+uint32(i))
+			out[netip.AddrFrom4(b)] = srcs
+		}
+		p.mu.RUnlock()
+	}
+	return out
+}
+
+
 
 // ---------------------------------------------------------------------------
 // parseIPHeader
@@ -309,7 +340,7 @@ func TestAllow_HostPortRule(t *testing.T) {
 	// 10.0.0.10 admits 10.0.0.5 only on port 22.
 	ctrl := buildIPv4UDP(t, "10.0.0.10", insp.serverIPv4.String(), 1, aclControlPort,
 		[]byte(`{"Allowed":["10.0.0.5:22"]}`))
-	if !insp.handleControl(ctrl) {
+	if !handleControl(insp, ctrl) {
 		t.Fatal("expected consume")
 	}
 
@@ -329,7 +360,7 @@ func TestAllow_AnyHostPortRule(t *testing.T) {
 	// 10.0.0.10 admits ANY source on port 443 only ("*:443").
 	ctrl := buildIPv4UDP(t, "10.0.0.10", insp.serverIPv4.String(), 1, aclControlPort,
 		[]byte(`{"Allowed":["*:443"]}`))
-	if !insp.handleControl(ctrl) {
+	if !handleControl(insp, ctrl) {
 		t.Fatal("expected consume")
 	}
 
@@ -368,7 +399,7 @@ func TestAllow_FragmentedDatagramAdmitted(t *testing.T) {
 	resetPeer("10.0.0.10")
 	ctrl := buildIPv4UDP(t, "10.0.0.10", insp.serverIPv4.String(), 1, aclControlPort,
 		[]byte(`{"Allowed":["10.0.0.5:5000"]}`))
-	if !insp.handleControl(ctrl) {
+	if !handleControl(insp, ctrl) {
 		t.Fatal("expected consume")
 	}
 
@@ -393,7 +424,7 @@ func TestAllow_OrphanTrailingFragmentDropped(t *testing.T) {
 	resetPeer("10.0.0.10")
 	ctrl := buildIPv4UDP(t, "10.0.0.10", insp.serverIPv4.String(), 1, aclControlPort,
 		[]byte(`{"Allowed":["10.0.0.5:5000"]}`))
-	if !insp.handleControl(ctrl) {
+	if !handleControl(insp, ctrl) {
 		t.Fatal("expected consume")
 	}
 	// dport bytes forged to 5000 (an allowed port), but no first fragment admitted.
@@ -411,7 +442,7 @@ func TestAllow_FragmentedToDeniedPortDropped(t *testing.T) {
 	resetPeer("10.0.0.10")
 	ctrl := buildIPv4UDP(t, "10.0.0.10", insp.serverIPv4.String(), 1, aclControlPort,
 		[]byte(`{"Allowed":["10.0.0.5:5000"]}`))
-	if !insp.handleControl(ctrl) {
+	if !handleControl(insp, ctrl) {
 		t.Fatal("expected consume")
 	}
 	head := buildIPv4UDP(t, "10.0.0.5", "10.0.0.10", 40000, 22, make([]byte, 8)) // denied port
@@ -556,7 +587,7 @@ func TestHandleControl_AllowAll(t *testing.T) {
 	resetPeer("10.0.0.5")
 	pkt := buildIPv4UDP(t, "10.0.0.5", insp.serverIPv4.String(), 1, aclControlPort,
 		[]byte(`{"AllowAll":true,"Allowed":[]}`))
-	if !insp.handleControl(pkt) {
+	if !handleControl(insp, pkt) {
 		t.Fatal("expected consume")
 	}
 	if !entry(t, "10.0.0.5").allowedContains(mustAddr(t, "10.0.0.123"), 80) {
@@ -607,7 +638,7 @@ func TestHandleControl_UpdatesACL(t *testing.T) {
 	payload := []byte(`{"Allowed":["10.0.0.10","10.0.0.11"]}`)
 	pkt := buildIPv4UDP(t, "10.0.0.5", insp.serverIPv4.String(), 33333, aclControlPort, payload)
 
-	if !insp.handleControl(pkt) {
+	if !handleControl(insp, pkt) {
 		t.Fatal("expected packet to be consumed")
 	}
 	p := entry(t, "10.0.0.5")
@@ -622,7 +653,7 @@ func TestHandleControl_UpdatesACL(t *testing.T) {
 func TestHandleControl_IgnoresWrongPort(t *testing.T) {
 	insp := newTestInspector(t)
 	pkt := buildIPv4UDP(t, "10.0.0.5", insp.serverIPv4.String(), 1, 12345, []byte(`{"Allowed":[]}`))
-	if insp.handleControl(pkt) {
+	if handleControl(insp, pkt) {
 		t.Fatal("wrong port must not be consumed")
 	}
 }
@@ -630,7 +661,7 @@ func TestHandleControl_IgnoresWrongPort(t *testing.T) {
 func TestHandleControl_IgnoresWrongDst(t *testing.T) {
 	insp := newTestInspector(t)
 	pkt := buildIPv4UDP(t, "10.0.0.5", "10.0.0.10", 1, aclControlPort, []byte(`{"Allowed":[]}`))
-	if insp.handleControl(pkt) {
+	if handleControl(insp, pkt) {
 		t.Fatal("packet not addressed to server WG IP must not be consumed")
 	}
 }
@@ -639,7 +670,7 @@ func TestHandleControl_NonUDPIgnored(t *testing.T) {
 	insp := newTestInspector(t)
 	pkt := buildIPv4UDP(t, "10.0.0.5", insp.serverIPv4.String(), 1, aclControlPort, nil)
 	pkt[9] = 6 // TCP
-	if insp.handleControl(pkt) {
+	if handleControl(insp, pkt) {
 		t.Fatal("non-UDP must not be consumed as control")
 	}
 }
@@ -654,7 +685,7 @@ func TestHandleControl_TrailingFragmentNotControl(t *testing.T) {
 	pkt := buildIPv4UDP(t, "10.0.0.5", insp.serverIPv4.String(), 1, aclControlPort,
 		[]byte(`{"Allowed":["10.0.0.10"]}`))
 	setFrag(pkt, 1234, 185, false) // offset > 0 → trailing fragment
-	if insp.handleControl(pkt) {
+	if handleControl(insp, pkt) {
 		t.Fatal("a trailing fragment must not be consumed as a control packet")
 	}
 	if entry(t, "10.0.0.5").allowedContains(mustAddr(t, "10.0.0.10"), 80) {
@@ -670,7 +701,7 @@ func TestHandleControl_FirstFragmentStillControl(t *testing.T) {
 	pkt := buildIPv4UDP(t, "10.0.0.5", insp.serverIPv4.String(), 1, aclControlPort,
 		[]byte(`{"Allowed":["10.0.0.10"]}`))
 	setFrag(pkt, 1234, 0, true) // offset 0, MF set → first fragment
-	if !insp.handleControl(pkt) {
+	if !handleControl(insp, pkt) {
 		t.Fatal("a first fragment on the control port must be consumed")
 	}
 }
@@ -679,7 +710,7 @@ func TestHandleControl_SrcOutsideWGSubnet(t *testing.T) {
 	insp := newTestInspector(t)
 	// src outside subnet should be consumed (because dst+port match) but ignored.
 	pkt := buildIPv4UDP(t, "8.8.8.8", insp.serverIPv4.String(), 1, aclControlPort, []byte(`{"Allowed":["10.0.0.10"]}`))
-	if !insp.handleControl(pkt) {
+	if !handleControl(insp, pkt) {
 		t.Fatal("matching dst+port should be consumed even if src is invalid")
 	}
 	if len(peerListSnapshot()) != 0 {
@@ -691,7 +722,7 @@ func TestHandleControl_BadJSON(t *testing.T) {
 	insp := newTestInspector(t)
 	resetPeer("10.0.0.5")
 	pkt := buildIPv4UDP(t, "10.0.0.5", insp.serverIPv4.String(), 1, aclControlPort, []byte("not json"))
-	if !insp.handleControl(pkt) {
+	if !handleControl(insp, pkt) {
 		t.Fatal("malformed payload should still be consumed (not forwarded)")
 	}
 	if len(peerListSnapshot()) != 0 {
@@ -703,7 +734,7 @@ func TestHandleControl_EmptyListIsolatesSender(t *testing.T) {
 	insp := newTestInspector(t)
 	resetPeer("10.0.0.5")
 	pkt := buildIPv4UDP(t, "10.0.0.5", insp.serverIPv4.String(), 1, aclControlPort, []byte(`{"Allowed":[]}`))
-	if !insp.handleControl(pkt) {
+	if !handleControl(insp, pkt) {
 		t.Fatal("expected consume")
 	}
 	if entry(t, "10.0.0.5").allowedContains(mustAddr(t, "10.0.0.10"), 80) {
@@ -715,14 +746,14 @@ func TestHandleControl_EmptyListClearsPolicy(t *testing.T) {
 	insp := newTestInspector(t)
 	resetPeer("10.0.0.5")
 	set := buildIPv4UDP(t, "10.0.0.5", insp.serverIPv4.String(), 1, aclControlPort, []byte(`{"Allowed":["10.0.0.10"]}`))
-	if !insp.handleControl(set) {
+	if !handleControl(insp, set) {
 		t.Fatal("expected consume")
 	}
 	if len(peerListSnapshot()) != 1 {
 		t.Fatal("setup: policy should be stored")
 	}
 	clear := buildIPv4UDP(t, "10.0.0.5", insp.serverIPv4.String(), 1, aclControlPort, []byte(`{"Allowed":[]}`))
-	if !insp.handleControl(clear) {
+	if !handleControl(insp, clear) {
 		t.Fatal("expected consume")
 	}
 	if len(peerListSnapshot()) != 0 {
@@ -736,7 +767,7 @@ func TestHandleControl_CrossServerIPAccepted(t *testing.T) {
 	// Peers can talk across wg-servers — an allowed IP outside this server's
 	// subnets must still be stored.
 	pkt := buildIPv4UDP(t, "10.0.0.5", insp.serverIPv4.String(), 1, aclControlPort, []byte(`{"Allowed":["10.99.0.7"]}`))
-	if !insp.handleControl(pkt) {
+	if !handleControl(insp, pkt) {
 		t.Fatal("expected consume")
 	}
 	if !entry(t, "10.0.0.5").allowedContains(mustAddr(t, "10.99.0.7"), 80) {
@@ -749,7 +780,7 @@ func TestHandleControl_AnnounceWithoutEntryDropped(t *testing.T) {
 	// No resetPeer for 10.0.0.5: an announce from a peer with no installed
 	// entry (raced the handshake) is consumed but applies nothing.
 	pkt := buildIPv4UDP(t, "10.0.0.5", insp.serverIPv4.String(), 1, aclControlPort, []byte(`{"Allowed":["10.0.0.10"]}`))
-	if !insp.handleControl(pkt) {
+	if !handleControl(insp, pkt) {
 		t.Fatal("expected consume")
 	}
 	if len(peerListSnapshot()) != 0 {
@@ -762,7 +793,7 @@ func TestHandleControl_IPv6(t *testing.T) {
 	resetPeer("10.0.0.5", "fd00::5")
 	payload := []byte(`{"Allowed":["fd00::10"]}`)
 	pkt := buildIPv6UDP(t, "fd00::5", insp.serverIPv6.String(), 1, aclControlPort, payload)
-	if !insp.handleControl(pkt) {
+	if !handleControl(insp, pkt) {
 		t.Fatal("v6 control should be consumed")
 	}
 	p, _ := fwClassify(mustAddr(t, "fd00::5"))
