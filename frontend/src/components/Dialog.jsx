@@ -1,5 +1,3 @@
-// Generic modal. Usage:
-//   <Dialog open={open} onClose={...} title="..." actions={<>...</>}>fields</Dialog>
 const Dialog = ({ open, onClose, title, children, actions, wide }) => {
 	if (!open) return null
 	return (

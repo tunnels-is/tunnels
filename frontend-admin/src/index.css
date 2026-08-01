@@ -1,7 +1,6 @@
 @import "tailwindcss";
 @import "react-datepicker/dist/react-datepicker.css";
 
-/* ─── Card depth ─────────────────────────────────────────────────── */
 .card-shadow {
   box-shadow:
     0 1px 2px rgba(10, 10, 10, 0.06),
@@ -16,7 +15,6 @@
     0 6px 14px rgba(10, 10, 10, 0.06);
 }
 
-/* Paper-light palette — matches the marketing website */
 :root {
   --bg: #fdfcf8;
   --surface: #f4f1e8;
@@ -75,7 +73,6 @@ code, pre, .font-mono {
 ::-webkit-scrollbar-thumb { background: #d5d0c0; border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: #a3a3a3; }
 
-/* react-datepicker — paper-light theme */
 .react-datepicker {
   background-color: #ffffff;
   border: 1px solid #e7e3d7;
@@ -158,20 +155,14 @@ code, pre, .font-mono {
   border-color: #0a0a0a;
 }
 
-/* ════════════════════════════════════════════════════════════════════════
-   Dark theme — applies when <html class="dark"> is set
-   ════════════════════════════════════════════════════════════════════════ */
-
 .dark html, .dark body { background-color: #0e1116; color: #ebebeb; }
 
-/* ─── Backgrounds ─────────────────────────────────────────────────────── */
 .dark .bg-white,
 .dark .bg-\[\#ffffff\]           { background-color: #1a1d23; }
 .dark .bg-\[\#fdfcf8\]           { background-color: #0e1116; }
 .dark .bg-\[\#f4f1e8\]           { background-color: #15181f; }
 .dark .bg-\[\#ffffff\]\/80       { background-color: rgb(26 29 35 / 0.92); }
 
-/* ─── Text ────────────────────────────────────────────────────────────── */
 .dark .text-\[\#0a0a0a\]         { color: #ebebeb; }
 .dark .text-\[\#262626\]         { color: #d6d6d6; }
 .dark .text-\[\#525252\]         { color: #a3a3a3; }
@@ -183,14 +174,12 @@ code, pre, .font-mono {
 .dark .hover\:text-\[\#262626\]:hover { color: #ffffff; }
 .dark .placeholder-\[\#a3a3a3\]::placeholder { color: #5a5a5a; }
 
-/* ─── Borders ─────────────────────────────────────────────────────────── */
 .dark .border-\[\#e7e3d7\]                 { border-color: #2c3038; }
 .dark .border-\[\#e7e3d7\]\/50             { border-color: rgb(44 48 56 / 0.5); }
 .dark .border-\[\#e7e3d7\]\/70             { border-color: rgb(44 48 56 / 0.7); }
 .dark .border-\[\#d5d0c0\]                 { border-color: #3a3e47; }
 .dark .hover\:border-\[\#0a0a0a\]:hover    { border-color: #ffffff; }
 
-/* ─── Inverted overlays (black -> white on dark) ──────────────────────── */
 .dark .bg-black\/\[0\.03\]    { background-color: rgb(255 255 255 / 0.03); }
 .dark .bg-black\/\[0\.04\]    { background-color: rgb(255 255 255 / 0.04); }
 .dark .bg-black\/\[0\.05\]    { background-color: rgb(255 255 255 / 0.05); }
@@ -203,7 +192,6 @@ code, pre, .font-mono {
 .dark .hover\:bg-black\/\[0\.06\]:hover { background-color: rgb(255 255 255 / 0.07); }
 .dark .hover\:bg-black\/\[0\.08\]:hover { background-color: rgb(255 255 255 / 0.09); }
 
-/* ─── Card shadow — deeper on dark ────────────────────────────────────── */
 .dark .card-shadow {
   box-shadow:
     0 1px 2px rgba(0, 0, 0, 0.35),
@@ -215,14 +203,12 @@ code, pre, .font-mono {
     0 8px 18px rgba(0, 0, 0, 0.32);
 }
 
-/* ─── Accent color shifts ─────────────────────────────────────────────── */
 .dark .text-\[\#1d4ed8\]   { color: #60a5fa; }
 .dark .text-\[\#15803d\]   { color: #4ade80; }
 .dark .text-\[\#b45309\]   { color: #fbbf24; }
 .dark .text-\[\#b91c1c\]   { color: #fca5a5; }
 .dark .text-\[\#dc2626\]   { color: #f87171; }
-/* Raw bg-[#0a0a0a] — used for buttons, brand dots, etc. Use a muted dark
-   gray so decorative uses look subdued, not bright-white in dark mode. */
+
 .dark .bg-\[\#0a0a0a\]     { background-color: #3a3e47; }
 .dark .bg-\[\#0a0a0a\].text-white,
 .dark .bg-\[\#0a0a0a\] .text-white { color: #ebebeb; }
@@ -230,9 +216,6 @@ code, pre, .font-mono {
 .dark .hover\:bg-\[\#262626\]:hover { background-color: #4a4e57; }
 .dark .hover\:bg-\[\#b91c1c\]:hover { background-color: #dc2626; }
 
-/* Buttons styled inline with bg-[#0a0a0a] hover:bg-[#262626] text-white
-   (admin pages don't use the .btn-primary class). Make them visible and
-   clearly CTAs in dark mode by inverting to a light pill. */
 .dark .bg-\[\#0a0a0a\].hover\:bg-\[\#262626\] {
   background-color: #ebebeb;
   color: #0a0a0a;
@@ -246,10 +229,6 @@ code, pre, .font-mono {
 .dark .bg-\[\#15803d\]\/\[0\.05\] { background-color: rgb(74 222 128 / 0.07); }
 .dark .border-\[\#15803d\]\/25 { border-color: rgb(74 222 128 / 0.35); }
 
-/* ─── Sidebar / Layout specifics ──────────────────────────────────────── */
-/* Sidebar uses bg-white (already remapped) and bg-[#fdfcf8] on the main area */
-
-/* ─── react-datepicker dark overrides ─────────────────────────────────── */
 .dark .react-datepicker {
   background-color: #1a1d23;
   border-color: #2c3038;
@@ -282,7 +261,6 @@ code, pre, .font-mono {
   color: #ebebeb;
 }
 
-/* ─── Scrollbar in dark ───────────────────────────────────────────────── */
 .dark * { scrollbar-color: #3a3e47 transparent; }
 .dark ::-webkit-scrollbar-thumb { background: #3a3e47; }
 .dark ::-webkit-scrollbar-thumb:hover { background: #4a4e57; }

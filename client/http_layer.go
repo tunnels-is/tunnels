@@ -83,8 +83,7 @@ func LaunchAPI() {
 	INFO("PORT: ", port)
 	INFO("Key: ", conf.APIKey)
 	INFO("Cert: ", conf.APICert)
-	// The session token is deliberately NOT logged — anything that can read
-	// the log would gain a valid local-API session.
+
 	if DevMode {
 		SECURITY("DEV MODE ENABLED: local API authentication is DISABLED and credentialed CORS is open — never use this in a shipped/production build")
 	}
@@ -157,9 +156,7 @@ func setSessionCookie(w http.ResponseWriter) {
 
 func withSessionCookie(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Only hand the session token to a genuinely local caller. A DNS-rebound
-		// origin (evil.com→127.0.0.1) presents its own Host header (browsers
-		// forbid forging Host via fetch), so this refuses to bootstrap it.
+
 		if isLocalRequest(r) {
 			setSessionCookie(w)
 		}
@@ -175,16 +172,12 @@ func checkSessionToken(r *http.Request) bool {
 	return subtle.ConstantTimeCompare([]byte(cookie.Value), []byte(sessionToken)) == 1
 }
 
-// isLocalRequest reports whether the request's Host header names a loopback
-// address (or the Wails webview host). This is the anti-DNS-rebinding gate: an
-// attacker page rebinding its domain to 127.0.0.1 still sends `Host: evil.com`,
-// which fails here — a browser will not let script forge the Host header.
 func isLocalRequest(r *http.Request) bool {
 	host := r.Host
 	if h, _, err := net.SplitHostPort(host); err == nil {
 		host = h
 	}
-	host = strings.TrimSuffix(strings.TrimPrefix(host, "["), "]") // strip IPv6 brackets
+	host = strings.TrimSuffix(strings.TrimPrefix(host, "["), "]")
 	switch strings.ToLower(host) {
 	case "localhost", "wails.localhost", "wails":
 		return true
@@ -193,10 +186,7 @@ func isLocalRequest(r *http.Request) bool {
 	if ip != nil && ip.IsLoopback() {
 		return true
 	}
-	// Honor a deliberate non-loopback API bind so remote UI access an operator
-	// explicitly configured isn't broken. A wildcard bind (0.0.0.0/::) means
-	// "remote access opted in", so the Host check can't add value there; a
-	// concrete bind IP is matched exactly (a rebound evil.com Host still fails).
+
 	if conf := CONFIG.Load(); conf != nil && conf.APIIP != "" {
 		if bindIP := net.ParseIP(conf.APIIP); bindIP != nil {
 			if bindIP.IsUnspecified() {
@@ -211,8 +201,7 @@ func isLocalRequest(r *http.Request) bool {
 }
 
 func HTTPhandler(w http.ResponseWriter, r *http.Request) {
-	// Reject anything not addressed to a loopback Host, regardless of auth —
-	// the primary defense against DNS rebinding driving the local API.
+
 	if !DevMode && !isLocalRequest(r) {
 		w.WriteHeader(403)
 		_, _ = w.Write([]byte(`{"error":"forbidden"}`))
@@ -340,7 +329,7 @@ func handleWebSocket(ws *websocket.Conn) {
 }
 
 func Bind[I any](form I, r *http.Request) (err error) {
-	r.Body = http.MaxBytesReader(nil, r.Body, 2<<20) // 2MB
+	r.Body = http.MaxBytesReader(nil, r.Body, 2<<20)
 	decoder := json.NewDecoder(r.Body)
 	err = decoder.Decode(form)
 	return
@@ -390,8 +379,6 @@ type StateResponse struct {
 	Network       StateNetworkResponse
 }
 
-// getSystemTimezone returns the host's IANA timezone name, best-effort.
-// Empty when undetectable (the UI falls back to the webview Intl API).
 func getSystemTimezone() string {
 	if tz := os.Getenv("TZ"); tz != "" {
 		return tz
@@ -428,8 +415,6 @@ func HTTP_GetDNSStats(w http.ResponseWriter, r *http.Request) {
 	JSON(w, r, 200, stats)
 }
 
-// HTTP_UpdateBlockLists force-reloads DNS block lists from their URLs
-// (ignoring the 24h download cache) and returns the updated list metadata.
 func HTTP_UpdateBlockLists(w http.ResponseWriter, r *http.Request) {
 	forceReloadBlockLists()
 	config := CONFIG.Load()
@@ -526,8 +511,6 @@ func HTTP_Connect(w http.ResponseWriter, r *http.Request) {
 	JSON(w, r, code, nil)
 }
 
-// HTTP_ServerConnect connects to a chosen server using the default tunnel,
-// reconciling that tunnel's device to the target server first.
 func HTTP_ServerConnect(w http.ResponseWriter, r *http.Request) {
 	ns := new(ConnectionRequest)
 	err := Bind(ns, r)
@@ -568,13 +551,6 @@ func HTTP_Disconnect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// A user-initiated disconnect must stop any auto-reconnect loop for this
-	// tunnel and release its kill switch — otherwise a tunnel that dropped (kill
-	// switch engaged, reconnect looping) would keep re-connecting and the
-	// blackhole route would strand it offline. Prefer the caller-supplied stable
-	// Tag; fall back to resolving it from the live tunnel by ID. Only if neither
-	// is available do we stop all loops (last resort — a mid-reconnect tunnel we
-	// can't otherwise name).
 	tag := DF.Tag
 	if tag == "" {
 		tunnelMapRange(func(t *TUN) bool {
@@ -672,10 +648,6 @@ type setTunnelPeersForm struct {
 	AllowAll     bool
 }
 
-// HTTP_SetTunnelPeers replaces a tunnel's firewall policy (AllowedHosts plus
-// the AllowAll flag), persists the meta, and announces it to the wg-server
-// when the tunnel is connected. Unlike setTunnel, this works on connected
-// tunnels.
 func HTTP_SetTunnelPeers(w http.ResponseWriter, r *http.Request) {
 	form := new(setTunnelPeersForm)
 	if err := Bind(form, r); err != nil {
@@ -776,7 +748,6 @@ func HTTP_DeleteTunnels(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Reject a traversing tag before it reaches os.Remove (arbitrary file delete).
 	if !safeTunnelTag(form.Tag) {
 		JSON(w, r, 400, "invalid tunnel tag")
 		return

@@ -15,7 +15,6 @@ func mustAddr(t *testing.T, s string) netip.Addr {
 	return a
 }
 
-// hostRules builds bare-host (all-ports) allowlist entries for the given IPs.
 func hostRules(t *testing.T, ips ...string) []aclEntry {
 	t.Helper()
 	e := make([]aclEntry, 0, len(ips))
@@ -25,8 +24,6 @@ func hostRules(t *testing.T, ips ...string) []aclEntry {
 	return e
 }
 
-// setupFW (re)initializes the package firewall tables for a test. The cleaner
-// goroutine is intentionally not started here.
 func setupFW(t *testing.T, subnet4, subnet6 string) {
 	t.Helper()
 	if err := initPeerList(subnet4, subnet6); err != nil {
@@ -68,7 +65,7 @@ func TestV4Offset(t *testing.T) {
 		{"10.0.0.0", 0, true},
 		{"10.0.0.1", 1, true},
 		{"10.0.0.255", 255, true},
-		{"10.0.1.0", 0, false}, // outside /24
+		{"10.0.1.0", 0, false},
 		{"8.8.8.8", 0, false},
 	} {
 		off, ok := v4Offset(mustAddr(t, tc.ip))
@@ -97,7 +94,7 @@ func TestSetAllowed_ReplaceAndClear(t *testing.T) {
 		t.Fatal("allowed src should be present")
 	}
 
-	p.setAllowed(hostRules(t, "10.0.0.11"), false) // replace
+	p.setAllowed(hostRules(t, "10.0.0.11"), false)
 	if p.allowedContains(mustAddr(t, "10.0.0.10"), 80) {
 		t.Fatal("replace-set must drop the old entry")
 	}
@@ -105,7 +102,7 @@ func TestSetAllowed_ReplaceAndClear(t *testing.T) {
 		t.Fatal("replace-set must contain the new entry")
 	}
 
-	p.setAllowed(nil, false) // clear
+	p.setAllowed(nil, false)
 	if p.allowedContains(mustAddr(t, "10.0.0.11"), 80) {
 		t.Fatal("empty list must clear the allowlist")
 	}
@@ -116,7 +113,6 @@ func TestSetAllowed_AllowAll(t *testing.T) {
 	resetPeer("10.0.0.5")
 	p := entry(t, "10.0.0.5")
 
-	// allow-all permits any source, even one not on the (empty) list.
 	p.setAllowed(nil, true)
 	if !p.allowedContains(mustAddr(t, "10.0.0.99"), 80) {
 		t.Fatal("allow-all must permit any source")
@@ -125,7 +121,6 @@ func TestSetAllowed_AllowAll(t *testing.T) {
 		t.Fatal("allow-all must permit a cross-server source too")
 	}
 
-	// turning allow-all off (replace-set) reverts to the explicit list.
 	p.setAllowed(hostRules(t, "10.0.0.10"), false)
 	if p.allowedContains(mustAddr(t, "10.0.0.99"), 80) {
 		t.Fatal("clearing allow-all must revert to the explicit list")
@@ -172,13 +167,13 @@ func TestCleanFlows_AgesIdleKeepsActive(t *testing.T) {
 	p.touchFlow(idle)
 	p.touchFlow(active)
 
-	cleanFlows() // first pass: both seen since creation -> snapshot, keep
+	cleanFlows()
 	if flowLen(p) != 2 {
 		t.Fatalf("after first clean want 2 flows, got %d", flowLen(p))
 	}
 
-	p.touchFlow(active) // only 'active' sees traffic
-	cleanFlows()        // idle unchanged -> dropped; active changed -> kept
+	p.touchFlow(active)
+	cleanFlows()
 	if flowLen(p) != 1 {
 		t.Fatalf("after second clean want 1 flow, got %d", flowLen(p))
 	}
@@ -194,7 +189,7 @@ func TestResetPeer_WipesPriorState(t *testing.T) {
 	p1.setAllowed(hostRules(t, "10.0.0.10"), false)
 	p1.touchFlow(flowKey{remote: mustAddr(t, "10.0.0.11"), rport: 1, lport: 1, proto: 6})
 
-	resetPeer("10.0.0.5") // IP reuse / reconnect
+	resetPeer("10.0.0.5")
 	p2 := entry(t, "10.0.0.5")
 	if p2 == p1 {
 		t.Fatal("reset must install a fresh entry")
@@ -219,8 +214,8 @@ func TestDualStack_SharesEntry(t *testing.T) {
 
 func TestV6Map_CleanupOnReuse(t *testing.T) {
 	setupFW(t, "10.0.0.0/24", "fd00::/64")
-	resetPeer("10.0.0.5", "fd00::aaaa") // device A
-	resetPeer("10.0.0.5", "fd00::bbbb") // device B reuses the v4 IP
+	resetPeer("10.0.0.5", "fd00::aaaa")
+	resetPeer("10.0.0.5", "fd00::bbbb")
 
 	if p, _ := fwClassify(mustAddr(t, "fd00::aaaa")); p != nil {
 		t.Fatal("old device's v6 map entry must be reclaimed on v4 reuse")
@@ -234,7 +229,7 @@ func TestPeerListSnapshot(t *testing.T) {
 	setupFW(t, "10.0.0.0/24", "")
 	resetPeer("10.0.0.5")
 	entry(t, "10.0.0.5").setAllowed(hostRules(t, "10.0.0.10", "10.0.0.11"), false)
-	resetPeer("10.0.0.6") // no allowlist -> excluded from snapshot
+	resetPeer("10.0.0.6")
 
 	snap := peerListSnapshot()
 	if len(snap) != 1 {
@@ -249,20 +244,20 @@ func TestParseACLEntry(t *testing.T) {
 	for _, tc := range []struct {
 		in      string
 		ok      bool
-		addr    string // "" for any-host
+		addr    string
 		port    uint16
 		anyHost bool
 	}{
-		{"10.0.0.5", true, "10.0.0.5", 0, false},     // bare host: all ports
-		{"10.0.0.5:22", true, "10.0.0.5", 22, false}, // host:port
-		{"*:443", true, "", 443, true},               // any host:port
-		{"fd00::5", true, "fd00::5", 0, false},       // v6 bare host
-		{"[fd00::5]:22", true, "fd00::5", 22, false}, // v6 host:port
+		{"10.0.0.5", true, "10.0.0.5", 0, false},
+		{"10.0.0.5:22", true, "10.0.0.5", 22, false},
+		{"*:443", true, "", 443, true},
+		{"fd00::5", true, "fd00::5", 0, false},
+		{"[fd00::5]:22", true, "fd00::5", 22, false},
 		{"", false, "", 0, false},
-		{"10.0.0.5:0", false, "", 0, false},     // port 0 invalid
-		{"*:0", false, "", 0, false},            // any-host port 0 invalid
-		{"*:bad", false, "", 0, false},          // non-numeric port
-		{"10.0.0.5:99999", false, "", 0, false}, // port out of range
+		{"10.0.0.5:0", false, "", 0, false},
+		{"*:0", false, "", 0, false},
+		{"*:bad", false, "", 0, false},
+		{"10.0.0.5:99999", false, "", 0, false},
 		{"not-an-ip", false, "", 0, false},
 	} {
 		e, ok := parseACLEntry(tc.in)
@@ -287,26 +282,25 @@ func TestSetAllowed_PortRules(t *testing.T) {
 	p := entry(t, "10.0.0.5")
 
 	p.setAllowed([]aclEntry{
-		{addr: mustAddr(t, "10.0.0.10"), port: 22}, // host:port
-		{anyHost: true, port: 443},                 // *:port
-		{addr: mustAddr(t, "10.0.0.11")},           // bare host: all ports
+		{addr: mustAddr(t, "10.0.0.10"), port: 22},
+		{anyHost: true, port: 443},
+		{addr: mustAddr(t, "10.0.0.11")},
 	}, false)
 
-	// host:port — only that port for that source.
 	if !p.allowedContains(mustAddr(t, "10.0.0.10"), 22) {
 		t.Fatal("host:port must allow its port")
 	}
 	if p.allowedContains(mustAddr(t, "10.0.0.10"), 80) {
 		t.Fatal("host:port must deny other ports")
 	}
-	// *:port — that port for any source.
+
 	if !p.allowedContains(mustAddr(t, "10.0.0.99"), 443) {
 		t.Fatal("*:port must allow any source on that port")
 	}
 	if p.allowedContains(mustAddr(t, "10.0.0.99"), 22) {
 		t.Fatal("*:port must not allow other ports")
 	}
-	// bare host — all ports.
+
 	if !p.allowedContains(mustAddr(t, "10.0.0.11"), 1) || !p.allowedContains(mustAddr(t, "10.0.0.11"), 65000) {
 		t.Fatal("bare host must allow all ports")
 	}
@@ -317,7 +311,6 @@ func TestSetAllowed_BareHostSupersedesPort(t *testing.T) {
 	resetPeer("10.0.0.5")
 	p := entry(t, "10.0.0.5")
 
-	// A bare-host entry for the same source as an IP:PORT entry grants all ports.
 	p.setAllowed([]aclEntry{
 		{addr: mustAddr(t, "10.0.0.10"), port: 22},
 		{addr: mustAddr(t, "10.0.0.10")},
@@ -328,14 +321,14 @@ func TestSetAllowed_BareHostSupersedesPort(t *testing.T) {
 }
 
 func TestL4Ports(t *testing.T) {
-	l4 := []byte{0x00, 0x16, 0x30, 0x39} // sport 22, dport 12345
+	l4 := []byte{0x00, 0x16, 0x30, 0x39}
 	for _, proto := range []byte{6, protoUDP} {
 		sp, dp := l4Ports(proto, l4)
 		if sp != 22 || dp != 12345 {
 			t.Fatalf("proto %d: got %d/%d", proto, sp, dp)
 		}
 	}
-	if sp, dp := l4Ports(1 /*ICMP*/, l4); sp != 0 || dp != 0 {
+	if sp, dp := l4Ports(1, l4); sp != 0 || dp != 0 {
 		t.Fatalf("ICMP should report 0/0, got %d/%d", sp, dp)
 	}
 	if sp, dp := l4Ports(6, []byte{0x00}); sp != 0 || dp != 0 {

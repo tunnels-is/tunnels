@@ -22,21 +22,16 @@ const Dashboard = () => {
 		fetchState()
 	}, [])
 
-	// the server we're currently connected to (first active tunnel)
 	const connectedServer = useMemo(() => {
 		const serverID = activeTunnels?.[0]?.CR?.ServerID
 		return serverID ? servers.find((s) => s._id === serverID) : undefined
 	}, [activeTunnels, servers])
 
-	// timezone country, or the nearest server country by UTC offset when the
-	// timezone names no country (UTC, Etc/*)
 	const targetCountry = useMemo(
 		() => resolveTargetCountry(timezone, servers.map((s) => s.Country)),
 		[timezone, servers],
 	)
 
-	// The UI only translates timezone -> country; the client backend does the
-	// rest (server discovery, latency probing, device bookkeeping, connect).
 	const autoConnect = async () => {
 		if (autoConnecting) return
 		setAutoConnecting(true)

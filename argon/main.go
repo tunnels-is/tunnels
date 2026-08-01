@@ -30,7 +30,7 @@ func (a *Argon) Key(password string, skipSalt bool) (key []byte, err error) {
 
 func GenerateUserFolderHash(userID string) (key []byte, err error) {
 	a := &Argon{
-		Memory:      20 * 1024, // 20 MiB
+		Memory:      20 * 1024,
 		Iterations:  3,
 		Parallelism: 1,
 		SaltLength:  16,
@@ -71,7 +71,7 @@ func GetKeyFromLocalInfo(extraParams ...any) (key []byte, err error) {
 	}
 
 	a := &Argon{
-		Memory:      20 * 1024, // 20 MiB
+		Memory:      20 * 1024,
 		Iterations:  3,
 		Parallelism: 1,
 		SaltLength:  16,

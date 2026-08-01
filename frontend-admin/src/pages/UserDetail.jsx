@@ -114,7 +114,7 @@ export default function UserDetail() {
 
   return (
     <div className="max-w-2xl">
-      {/* Header */}
+      {}
       <div className="flex items-center justify-between mb-6">
         <button onClick={() => navigate('/users')} className="flex items-center gap-2 text-[12px] text-[#a3a3a3] hover:text-[#262626]">
           <ArrowLeft className="w-3.5 h-3.5" /> Back to Users
@@ -156,7 +156,7 @@ export default function UserDetail() {
 
       <h1 className="text-[16px] font-semibold text-[#0a0a0a] mb-4">{user.Email}</h1>
 
-      {/* Info / Edit fields */}
+      {}
       <div className="bg-white border border-[#e7e3d7] rounded-lg overflow-hidden card-shadow mb-5">
         <Row label="ID">
           <span className="font-mono text-[12px] text-[#525252]">{user._id}</span>
@@ -223,7 +223,7 @@ export default function UserDetail() {
         </Row>
       </div>
 
-      {/* Active sessions */}
+      {}
       {user.Tokens && user.Tokens.length > 0 && (
         <div>
           <h2 className="text-[13px] font-semibold text-[#0a0a0a] mb-2">

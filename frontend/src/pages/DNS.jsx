@@ -42,7 +42,6 @@ const ListRow = ({ enabled, onToggle, name, meta, onEdit, onDelete }) => (
 
 const EmptyRow = ({ children }) => <div className="px-1 py-5 text-center text-[11px] italic opacity-40">{children}</div>
 
-// Edits either DNSBlockLists or DNSWhiteLists — same {Tag, URL, Enabled, Count} shape.
 const ListDialog = ({ open, onClose, title, list, onChange, onSave }) => (
 	<Dialog
 		open={open}
@@ -75,7 +74,7 @@ const DNS = () => {
 
 	const [editing, setEditing] = useState(false)
 	const [cfg, setCfg] = useState({ ...config })
-	// dialog state: { kind: "record" | "DNSBlockLists" | "DNSWhiteLists", value, index } — index -1 = create
+
 	const [dialog, setDialog] = useState(null)
 	const [updatingLists, setUpdatingLists] = useState(false)
 
@@ -106,7 +105,6 @@ const DNS = () => {
 		}
 	}
 
-	// replace (or append) one item in a config list and save
 	const saveListItem = async (key, value, index) => {
 		const list = [...(config[key] || [])]
 		if (index >= 0) list[index] = value
@@ -313,7 +311,7 @@ const DNS = () => {
 				</Card>
 			</div>
 
-			{/* record dialog */}
+			{}
 			<Dialog
 				open={dialog?.kind === "record"}
 				onClose={() => setDialog(null)}
@@ -380,7 +378,7 @@ const DNS = () => {
 				)}
 			</Dialog>
 
-			{/* block/white list dialog */}
+			{}
 			<ListDialog
 				open={dialog?.kind === "DNSBlockLists" || dialog?.kind === "DNSWhiteLists"}
 				onClose={() => setDialog(null)}

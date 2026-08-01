@@ -16,25 +16,16 @@ import (
 )
 
 type Config struct {
-	// Bootstrap fields (from CLI flags)
 	ControllerURL string
 	APIKey        string
 
-	// ServerID is the hex ObjectID of this server's record in the controller DB.
 	ServerID string
 
-	// PublicIP is this server's public IP as recorded on the controller's
-	// Server record. It is currently vestigial: the WireGuard socket uses the
-	// default wildcard bind (all local IPs, default routing) and egress NAT uses
-	// MASQUERADE (default-route source), so neither consults PublicIP. It is
-	// still read only to drain a legacy SNAT --to-source rule left by older
-	// binaries on upgrade (see flushWGRules). Safe to remove once no deployed
-	// host carries that legacy rule.
 	PublicIP string
 
 	WireGuardPort     int
-	WireGuardMeshPort int    // server-to-server mesh UDP port (0 = mesh disabled)
-	WireGuardPrivKey  []byte // raw 32-byte Curve25519 private key; zeroed after setup
+	WireGuardMeshPort int
+	WireGuardPrivKey  []byte
 	WireGuardSubnet   string
 	WireGuardSubnet6  string
 	WireGuardIface    string
@@ -47,19 +38,12 @@ type Config struct {
 
 	InsecureSkipVerify bool
 
-	// EnableFirewall enables the peer-to-peer firewall on the WG interface.
-	// When true, all peer-to-peer ingress is denied by default and peers must
-	// announce their allowlist via the ACL control port to accept traffic.
-	// Independent of this setting, the packet inspector is always active and
-	// blocks all peer traffic to the server's own WG IP.
 	EnableFirewall bool
 
 	HandshakeBufferSize int
 	HandshakeRatePerIP  int
 }
 
-// generateWGPrivKey generates a new Curve25519 private key with proper clamping.
-// Returns the raw 32-byte key as a []byte so it can be zeroed after use.
 func generateWGPrivKey() ([]byte, error) {
 	priv := make([]byte, 32)
 	if _, err := rand.Read(priv); err != nil {
@@ -71,8 +55,6 @@ func generateWGPrivKey() ([]byte, error) {
 	return priv, nil
 }
 
-// derivePubKey derives the Curve25519 public key from a raw 32-byte private key
-// and returns it as a base64-encoded string.
 func derivePubKey(privKey []byte) (string, error) {
 	if len(privKey) != 32 {
 		return "", fmt.Errorf("private key must be 32 bytes, got %d", len(privKey))
@@ -84,14 +66,6 @@ func derivePubKey(privKey []byte) (string, error) {
 	return base64.StdEncoding.EncodeToString(pubBytes), nil
 }
 
-// pkpath holds the server's long-lived Curve25519 private key. Persisting it
-// is a deliberate design choice (the server keeps a stable WG identity across
-// restarts, so peers reconnect without re-provisioning) and reverses the
-// earlier "ephemeral per boot" property: anyone who can read this file (disk
-// access, backup leak) can impersonate the server and identify peers in future
-// handshakes. Data forward-secrecy is unaffected (per-session ephemerals).
-// The file must be 0600 and owned by the wg-server user; both are enforced
-// below. Protect the working directory / backups accordingly.
 const pkpath = "./.pk"
 
 func loadOrGenerateLocalPrivKey() ([]byte, error) {
@@ -123,9 +97,6 @@ func loadOrGenerateLocalPrivKey() ([]byte, error) {
 		return priv, nil
 	}
 
-	// A zero-length .pk (e.g. a crash between the O_EXCL create and the write
-	// below) would otherwise wedge startup forever: the load branch is skipped
-	// and the O_EXCL create fails with "file exists". Treat it as absent.
 	if _, statErr := os.Stat(pkpath); statErr == nil {
 		if err := os.Remove(pkpath); err != nil {
 			return nil, fmt.Errorf("remove empty ./.pk file: %w", err)
@@ -140,11 +111,6 @@ func loadOrGenerateLocalPrivKey() ([]byte, error) {
 
 	pk := base64.StdEncoding.EncodeToString(priv)
 
-	// O_EXCL: fail if the file already exists rather than truncating it. Writing
-	// with os.WriteFile into a pre-existing file does NOT apply the 0600 mode, so
-	// an attacker who pre-plants ./.pk (world-readable, owned by them) would
-	// otherwise receive our freshly generated private key. O_EXCL forces us to
-	// create it fresh with the right mode, or refuse.
 	f, err := os.OpenFile(pkpath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
 	if err != nil {
 		zeroBytes(priv)
@@ -224,12 +190,7 @@ func FetchConfig(controllerURL, apiKey, configPath string, insecureSkipVerify bo
 		WireGuardIface:    r.WireGuardIface,
 		InternetIface:     r.InternetIface,
 		EnableFirewall:    r.EnableFirewall,
-		// The initial fetch above was governed by the bootstrap flag
-		// (insecureSkipVerify) — the wg-server must decide controller trust
-		// before it can fetch anything. For the ongoing controller calls
-		// (per-handshake /wg/peer) we also honor the server record's setting
-		// (r.InsecureSkipVerify), so the admin-UI toggle propagates here. Skip
-		// only if either says so; the default (both false) verifies.
+
 		InsecureSkipVerify: insecureSkipVerify || r.InsecureSkipVerify,
 	}
 

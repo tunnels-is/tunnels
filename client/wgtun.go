@@ -11,9 +11,6 @@ import (
 	"golang.zx2c4.com/wireguard/tun"
 )
 
-// processingTUN wraps a real OS tun.Device and intercepts Read/Write to apply
-// packet processing (NAT, port blocking, checksum recalculation) and track
-// bandwidth. It replaces the old chanTUN + bridge goroutine architecture.
 type processingTUN struct {
 	tun.Device
 	tunnel    *TUN
@@ -25,10 +22,8 @@ func newProcessingTUN(d tun.Device, t *TUN) *processingTUN {
 	return &processingTUN{Device: d, tunnel: t}
 }
 
-// Read is called by WireGuard to get plaintext packets to encrypt and send
-// (egress: OS → WireGuard). We apply egress packet processing here.
 func (p *processingTUN) Read(bufs [][]byte, sizes []int, offset int) (int, error) {
-	defer RecoverAndLog() // never let a malformed packet crash the wireguard routine
+	defer RecoverAndLog()
 	n, err := p.Device.Read(bufs, sizes, offset)
 	if err != nil || n == 0 {
 		return n, err
@@ -61,10 +56,8 @@ func (p *processingTUN) Read(bufs [][]byte, sizes []int, offset int) (int, error
 	return kept, nil
 }
 
-// Write is called by WireGuard to deliver decrypted packets to the OS
-// (ingress: WireGuard → OS). We apply ingress packet processing here.
 func (p *processingTUN) Write(bufs [][]byte, offset int) (int, error) {
-	defer RecoverAndLog() // never let a malformed decrypted packet crash the process
+	defer RecoverAndLog()
 	p.ingressMu.Lock()
 	defer p.ingressMu.Unlock()
 

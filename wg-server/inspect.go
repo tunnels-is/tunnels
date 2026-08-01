@@ -10,35 +10,16 @@ import (
 	"golang.zx2c4.com/wireguard/tun"
 )
 
-// aclControlPort is the UDP destination port that peers use to send ACL
-// updates to the wg-server's own WG-side IP. Packets matching this port are
-// consumed by the inspector and never reach the kernel.
 const (
 	aclControlPort      = 51821
 	aclMaxAllowed       = 1024
-	aclMaxPayload       = 65536 // hard cap on JSON payload bytes
+	aclMaxPayload       = 65536
 	protoUDP       byte = 17
 )
 
-// inspectingTUN sits between wireguard-go and the kernel TUN device. It is
-// always installed, regardless of the EnableFirewall setting.
-//
-// On Write (decrypted peer packets entering the kernel) it:
-//   - consumes ACL-control UDP packets addressed to the server's WG IP,
-//   - drops any other packet addressed to the server's WG IP,
-//   - drops peer-to-peer packets disallowed by the firewall (when enabled),
-//   - passes everything else through.
-//
-// On Read (kernel packets leaving toward WG for encryption) it applies the
-// same filtering. This catches cross-server peer-to-peer traffic that
-// arrives via the InternetIface and is routed onto the WG interface.
-//
-// The per-peer allowlist + connection-tracking state lives in the package
-// peer list (peerlist.go), keyed by local-subnet address; the inspector only
-// classifies packets and consults it.
 type inspectingTUN struct {
 	tun.Device
-	firewall   bool // when false, peer-to-peer traffic is not policy-checked
+	firewall   bool
 	subnet4    netip.Prefix
 	subnet6    netip.Prefix
 	serverIPv4 netip.Addr
@@ -74,8 +55,7 @@ func (t *inspectingTUN) Write(bufs [][]byte, offset int) (int, error) {
 	kept := bufs[:0]
 	for _, buf := range bufs {
 		pkt := buf[offset:]
-		// Parse the header once and share it between the control-channel check
-		// and the firewall check (this is the highest-volume path).
+
 		src, dst, proto, l4, frag, ok := parseIPHeader(pkt)
 		if t.handleControlParsed(src, dst, proto, l4, frag, ok) {
 			continue
@@ -112,32 +92,11 @@ func (t *inspectingTUN) File() *os.File {
 	return t.Device.File()
 }
 
-// allow returns true if pkt should be forwarded. It filters traffic where at
-// least one endpoint is a local WG resident; traffic with neither end local
-// (internet egress, malformed) passes through.
-//
-// The server's own WG IP is never reachable by peers — this holds whether or
-// not the firewall is enabled. The only packets a peer may address to it are
-// ACL control messages, which handleControl consumes before allow runs.
-// Server-originated traffic (ICMP errors for PMTU discovery, etc.) still
-// passes.
-//
-// When the firewall is on:
-//   - a local sender's outbound packet records a flow, opening its own return
-//     path (connection tracking) — done even toward another server so the
-//     reply is admitted there;
-//   - a local receiver's inbound packet is admitted iff the source is in its
-//     allowlist or matches a flow it opened (default-deny otherwise).
-//
-// With the firewall off, peer-to-peer traffic passes freely (the server-IP
-// block above still applies).
 func (t *inspectingTUN) allow(pkt []byte) bool {
 	src, dst, proto, l4, frag, ok := parseIPHeader(pkt)
 	return t.allowParsed(src, dst, proto, l4, frag, ok)
 }
 
-// allowParsed is allow() with the IP header already parsed, so callers that also
-// need the parsed fields (Write) don't parse twice on the hot path.
 func (t *inspectingTUN) allowParsed(src, dst netip.Addr, proto byte, l4 []byte, frag fragInfo, ok bool) bool {
 	if !ok {
 		return true
@@ -156,9 +115,6 @@ func (t *inspectingTUN) allowParsed(src, dst netip.Addr, proto byte, l4 []byte, 
 
 	sport, dport := l4Ports(proto, l4)
 
-	// A local sender opens (or refreshes) its own return path. Only the first
-	// fragment carries the L4 ports; a trailing fragment would record a bogus
-	// (0,0) flow, so skip it — the first fragment already opened the flow.
 	if srcLocal && srcPeer != nil && !frag.isTrailing() {
 		srcPeer.touchFlow(flowKey{remote: dst, rport: dport, lport: sport, proto: proto})
 	}
@@ -167,20 +123,11 @@ func (t *inspectingTUN) allowParsed(src, dst netip.Addr, proto byte, l4 []byte, 
 		return true
 	}
 
-	// A local receiver: allowlist, or a reply to a flow it opened.
 	if dstLocal {
 		if dstPeer == nil {
-			return false // in our subnet but nobody connected — default-deny
+			return false
 		}
 
-		// A trailing fragment carries no L4 header, so its ports cannot be
-		// matched. An all-ports grant (allow-all or a bare-IP rule) doesn't
-		// depend on the port, so such a fragment is admitted on its own,
-		// order-independently — matching the pre-port-feature behavior. Only a
-		// port-scoped rule (or conntrack) needs the head-admitted note, which
-		// ties the datagram to its port-checked head and defeats fragment-based
-		// ACL evasion. (An out-of-order trailing fragment that beats its head
-		// under a port rule is dropped; the sender retransmits the datagram.)
 		if frag.isTrailing() {
 			return dstPeer.allowedAnyPort(src) ||
 				dstPeer.fragmentAdmitted(fragKey{remote: src, id: frag.id})
@@ -189,14 +136,12 @@ func (t *inspectingTUN) allowParsed(src, dst netip.Addr, proto byte, l4 []byte, 
 		admit := dstPeer.allowedContains(src, dport) ||
 			dstPeer.flowMatch(flowKey{remote: src, rport: sport, lport: dport, proto: proto})
 
-		// If the admitted packet is the first fragment of a fragmented
-		// datagram, remember it so the trailing fragments pass too.
 		if admit && frag.isFragment() {
 			dstPeer.noteFragment(fragKey{remote: src, id: frag.id})
 		}
 		return admit
 	}
-	// src is local, dst is on another server — that server enforces ingress.
+
 	return true
 }
 
@@ -204,9 +149,6 @@ func (t *inspectingTUN) isServerIP(a netip.Addr) bool {
 	return a == t.serverIPv4 || a == t.serverIPv6
 }
 
-// handleControlParsed returns true if the packet was a control message that we
-// consumed. The IP header must already be parsed. The caller MUST NOT forward
-// such a packet to the kernel.
 func (t *inspectingTUN) handleControlParsed(src, dst netip.Addr, proto byte, l4 []byte, frag fragInfo, ok bool) bool {
 	if !ok || proto != protoUDP {
 		return false
@@ -214,9 +156,7 @@ func (t *inspectingTUN) handleControlParsed(src, dst netip.Addr, proto byte, l4 
 	if dst != t.serverIPv4 && dst != t.serverIPv6 {
 		return false
 	}
-	// A trailing fragment has no L4 header — the bytes at l4[2:4] are payload,
-	// not a real dport, so they must not be interpreted as the control port.
-	// (The first fragment, offset 0, carries the header and is handled below.)
+
 	if frag.isTrailing() {
 		return false
 	}
@@ -228,7 +168,7 @@ func (t *inspectingTUN) handleControlParsed(src, dst netip.Addr, proto byte, l4 
 		return false
 	}
 	if !t.inWGSubnet(src) {
-		return true // consume but ignore — wrong source
+		return true
 	}
 	payload := l4[8:]
 	t.applyControl(src, payload)
@@ -249,21 +189,14 @@ func (t *inspectingTUN) applyControl(src netip.Addr, payload []byte) {
 	if len(msg.Allowed) > aclMaxAllowed {
 		return
 	}
-	// Entries must parse as "IP", "IP:PORT", or "*:PORT"; invalid ones are
-	// skipped without feedback — the control channel is fire-and-forget. No
-	// subnet check: peers can communicate across wg-servers, so an allowed IP
-	// may belong to another server's WG subnet.
+
 	entries := make([]aclEntry, 0, len(msg.Allowed))
 	for _, s := range msg.Allowed {
 		if e, ok := parseACLEntry(s); ok {
 			entries = append(entries, e)
 		}
 	}
-	// The announcement comes from a local resident; apply it to that peer's
-	// entry. An empty list with AllowAll=false clears the policy (replace-set
-	// semantics), so a disconnecting peer removes itself. If no entry exists
-	// yet (announce raced the handshake), drop it — the client re-announces on
-	// a short retry.
+
 	p, local := fwClassify(src)
 	if !local || p == nil {
 		return
@@ -281,28 +214,16 @@ func (t *inspectingTUN) inWGSubnet(a netip.Addr) bool {
 	return false
 }
 
-// fragInfo describes IP fragmentation (IPv4 header fields, or the IPv6
-// fragment extension header). For an unfragmented packet it is the zero value
-// (not a fragment).
 type fragInfo struct {
-	id     uint32 // identification field (16-bit for IPv4, 32-bit for IPv6)
-	offset uint16 // fragment offset in 8-byte units; 0 for the first/only fragment
-	more   bool   // MF bit: more fragments follow
+	id     uint32
+	offset uint16
+	more   bool
 }
 
-// isFragment reports whether the packet is part of a fragmented datagram (the
-// first fragment has MF set with offset 0; trailing fragments have offset > 0).
 func (f fragInfo) isFragment() bool { return f.more || f.offset != 0 }
 
-// isTrailing reports whether the packet is a non-first fragment, i.e. carries
-// no L4 header and therefore no usable port.
 func (f fragInfo) isTrailing() bool { return f.offset != 0 }
 
-// parseIPHeader extracts addressing info from an IPv4 or IPv6 packet.
-// Returns ok=false for malformed or unsupported packets. On IPv6 the
-// skippable extension headers (hop-by-hop, routing, destination options,
-// fragment) are walked so proto/l4 describe the real upper-layer header and
-// fragmented datagrams get the same fragInfo treatment as IPv4.
 func parseIPHeader(pkt []byte) (src, dst netip.Addr, proto byte, l4 []byte, frag fragInfo, ok bool) {
 	if len(pkt) < 1 {
 		return
@@ -349,16 +270,13 @@ func parseIPHeader(pkt []byte) (src, dst netip.Addr, proto byte, l4 []byte, frag
 		src = netip.AddrFrom16(s)
 		dst = netip.AddrFrom16(d)
 
-		// Walk the skippable extension headers to the real upper-layer header.
-		// A truncated extension chain returns ok=false (the kernel drops such a
-		// packet too). Anything not in the switch is treated as the L4 protocol.
 		next := pkt[6]
 		off := 40
 		end := 40 + payloadLen
 	extLoop:
 		for {
 			switch next {
-			case 0, 43, 60: // hop-by-hop, routing, destination options
+			case 0, 43, 60:
 				if off+8 > end {
 					return
 				}
@@ -368,7 +286,7 @@ func parseIPHeader(pkt []byte) (src, dst netip.Addr, proto byte, l4 []byte, frag
 				}
 				next = pkt[off]
 				off += hlen
-			case 44: // fragment header
+			case 44:
 				if off+8 > end {
 					return
 				}

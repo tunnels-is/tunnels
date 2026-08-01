@@ -8,11 +8,6 @@ import (
 	"syscall"
 )
 
-// checkFileOwnership returns an error when path exists but is owned by a
-// different uid than the current process. Config and tunnel files are
-// rewritten in place (rename to .bak + recreate); without this check a client
-// started as one user (e.g. root) and later as another would wipe the other
-// user's files.
 func checkFileOwnership(path string) error {
 	info, err := os.Stat(path)
 	if err != nil {

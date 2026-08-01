@@ -1,9 +1,3 @@
-// meshpeer is a minimal userspace WireGuard client used by the mesh
-// integration test. It brings up a single wg0 peer pointed at a tunnels
-// wg-server, assigns its controller-issued WireGuard IP, and routes the WAN
-// CIDR through the tunnel — enough to exercise cross-server reachability
-// (LazyBind provisioning + the server-to-server mesh) without the full GUI
-// client. It then blocks until killed.
 package main
 
 import (
@@ -83,7 +77,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Assign the WG IP and route the WAN CIDR through the interface.
 	if err := run("ip", "address", "add", *wgIP+"/32", "dev", *iface); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
@@ -98,5 +91,5 @@ func main() {
 	}
 
 	fmt.Printf("meshpeer up: iface=%s ip=%s endpoint=%s allowed=%s\n", *iface, *wgIP, *endpoint, *allowed)
-	select {} // block forever
+	select {}
 }

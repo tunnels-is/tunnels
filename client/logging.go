@@ -95,11 +95,6 @@ func ERROR(Line ...any) {
 	}
 }
 
-// SECURITY logs a security-relevant warning that must NOT be suppressed by the
-// debug-logging flag (unlike ERROR/INFO). It writes straight to stdout and, if
-// possible, also enqueues to the in-app log stream. Use for things the operator
-// must see regardless of log level — e.g. TLS verification disabled, firewall
-// off.
 func SECURITY(Line ...any) {
 	x := ""
 	for _, v := range Line {
@@ -215,9 +210,6 @@ func ErrorLog(err any, msgs ...any) {
 	log.Println(TAG_ERROR+" || ", fmt.Sprint(msgs...), " >> system error: ", err)
 }
 
-// wgInfoPatterns are substrings of wireguard-go Verbosef format strings that
-// represent meaningful state-change events worth surfacing at INFO level.
-// Anything not matched is treated as DEBUG (per-packet, per-routine noise).
 var wgInfoPatterns = []string{
 	"Interface up requested",
 	"Interface down requested",
@@ -262,11 +254,6 @@ func wgLog(level, format string, args ...any) {
 	}
 }
 
-// NewWGLogger returns a wireguard-go *device.Logger that routes through the
-// app's LogQueue, inheriting the app's debug gating, console/API/file
-// fan-out, and timestamp formatting. Errorf maps to ERROR; Verbosef is
-// classified into INFO (state changes) or DEBUG (per-packet/routine noise)
-// via isWGInfoFormat.
 func NewWGLogger() *wgdevice.Logger {
 	return &wgdevice.Logger{
 		Verbosef: func(format string, args ...any) {

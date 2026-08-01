@@ -25,9 +25,6 @@ import (
 	"github.com/xlzd/gotp"
 )
 
-// recoveryConsumeMu serializes the read-check-consume of 2FA recovery codes so
-// two concurrent logins presenting the same code can't both observe it as
-// unused and both succeed (recovery codes are single-use).
 var recoveryConsumeMu sync.Mutex
 
 func BasicRecover() {
@@ -36,10 +33,6 @@ func BasicRecover() {
 	}
 }
 
-// redactKey returns a short, non-reusable prefix of a license/credential key for
-// logs: the first 5 characters plus an ellipsis. Enough to correlate an
-// activation while debugging, but never the full key. Keys of 5 chars or fewer
-// are fully masked.
 func redactKey(k string) string {
 	const show = 5
 	if len(k) <= show {
@@ -65,7 +58,7 @@ func GENERATE_CODE() string {
 }
 
 func decodeBody(r *http.Request, target any) (err error) {
-	r.Body = http.MaxBytesReader(nil, r.Body, 2<<20) // 2MB
+	r.Body = http.MaxBytesReader(nil, r.Body, 2<<20)
 	dec := json.NewDecoder(r.Body)
 	err = dec.Decode(target)
 	if err != nil {
@@ -142,10 +135,7 @@ func validateUserTwoFactor(user *User, LF *LOGIN_FORM) (err error) {
 	recoveryEnabled := false
 	if user.TwoFactorEnabled {
 		if LF.Recovery != "" {
-			// Serialize consumption and re-read the current codes under the lock:
-			// the `user` passed in was fetched in an earlier, separate transaction,
-			// so two concurrent logins would otherwise both act on the same stale
-			// snapshot and both consume the same code.
+
 			recoveryConsumeMu.Lock()
 			defer recoveryConsumeMu.Unlock()
 
@@ -167,7 +157,7 @@ func validateUserTwoFactor(user *User, LF *LOGIN_FORM) (err error) {
 				if v == recoveryUpper {
 					recoveryEnabled = true
 					recoveryFound = true
-					continue // consume: drop the used code from the set
+					continue
 				}
 				remaining = append(remaining, v)
 			}
@@ -176,10 +166,6 @@ func validateUserTwoFactor(user *User, LF *LOGIN_FORM) (err error) {
 				return errors.New("invalid Recovery code")
 			}
 
-			// Persist the code as spent so it can't be reused (recovery codes
-			// are single-use). Best-effort: a persistence failure must not let a
-			// used code silently remain valid, so reject the login if we can't
-			// record consumption.
 			newBlob, encErr := Encrypt(strings.Join(remaining, " "), []byte(loadSecret("TwoFactorKey")))
 			if encErr != nil {
 				ADMIN(encErr)
@@ -225,11 +211,6 @@ func authenticateUserFromEmailOrIDAndToken(email string, id uuid.UUID, token str
 		return nil, errors.New("This account has been disabled, please contact customer support")
 	}
 
-	// Reject an empty token up front. Otherwise a user whose APIKey (or a token
-	// entry) is still the zero value "" would authenticate against an empty
-	// presented token via ConstantTimeCompare("","")==1. No current caller can
-	// reach here with token=="" (the middleware rejects it first), but this keeps
-	// the function safe for any future caller.
 	if token == "" {
 		return nil, errors.New("authentication token missing")
 	}
@@ -254,7 +235,6 @@ func authenticateUserFromEmailOrIDAndToken(email string, id uuid.UUID, token str
 	return nil, errors.New("unauthorized")
 }
 
-// clientIP extracts the remote IP address from the request, stripping the port.
 func clientIP(r *http.Request) string {
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
@@ -263,7 +243,6 @@ func clientIP(r *http.Request) string {
 	return host
 }
 
-// cookieCipher returns an AES-256-GCM cipher derived from CookieSigningKey.
 func cookieCipher() (cipher.AEAD, error) {
 	key := sha256.Sum256([]byte(loadSecret("CookieSigningKey")))
 	block, err := aes.NewCipher(key[:])
@@ -273,9 +252,6 @@ func cookieCipher() (cipher.AEAD, error) {
 	return cipher.NewGCM(block)
 }
 
-// encryptAdminCookie encrypts userID, deviceToken and the client IP into an
-// opaque base64 cookie value. AES-256-GCM provides both confidentiality and
-// authenticity, so a separate HMAC is not needed.
 func encryptAdminCookie(userID, deviceToken, ip string) (string, error) {
 	gcm, err := cookieCipher()
 	if err != nil {
@@ -293,8 +269,6 @@ func encryptAdminCookie(userID, deviceToken, ip string) (string, error) {
 	return base64.RawURLEncoding.EncodeToString(ciphertext), nil
 }
 
-// decryptAdminCookie decrypts and authenticates the cookie, then verifies
-// that the embedded IP matches the current request's remote IP.
 func decryptAdminCookie(cookieValue, remoteIP string) (uid uuid.UUID, deviceToken string, err error) {
 	gcm, err := cookieCipher()
 	if err != nil {

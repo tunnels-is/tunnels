@@ -162,8 +162,6 @@ func TestIsDefaultConnection(t *testing.T) {
 	}
 }
 
-// --- createFolder tests ---
-
 func TestCreateFolder_NewDirectory(t *testing.T) {
 	dir := t.TempDir()
 	target := filepath.Join(dir, "newdir")
@@ -208,8 +206,6 @@ func TestCreateFolder_ParentMissing(t *testing.T) {
 		t.Fatal("createFolder should fail when parent directory does not exist")
 	}
 }
-
-// --- InitBaseFoldersAndPaths tests ---
 
 func TestInitBaseFoldersAndPaths_CreatesAllSubdirs(t *testing.T) {
 	dir := t.TempDir()
@@ -256,7 +252,6 @@ func TestInitBaseFoldersAndPaths_TrailingSeparator(t *testing.T) {
 
 	s = STATE.Load()
 
-	// BasePath should end with exactly one separator, not two
 	if strings.HasSuffix(s.BasePath, string(os.PathSeparator)+string(os.PathSeparator)) {
 		t.Errorf("BasePath has double separator: %q", s.BasePath)
 	}
@@ -279,8 +274,6 @@ func TestInitBaseFoldersAndPaths_SetsConfigFileName(t *testing.T) {
 		t.Errorf("ConfigFileName should end with .conf, got: %q", s.ConfigFileName)
 	}
 }
-
-// --- verifyAndWriteFile tests ---
 
 func TestVerifyAndWriteFile_CreatesNewFile(t *testing.T) {
 	dir := t.TempDir()

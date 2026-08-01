@@ -1,7 +1,5 @@
 import { useStore } from "@/store/store"
 
-// Thin indeterminate bar pinned to the top of the viewport while any
-// backend call is in flight.
 const LoadingBar = () => {
 	const loading = useStore((s) => s.loading)
 	if (!loading) return null

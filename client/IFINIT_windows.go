@@ -28,10 +28,8 @@ type TInterface struct {
 	Persistent  bool
 	Gateway     string
 
-	// DLL
 	WDLL *DLL
 
-	// Windows specific
 	GUID          windows.GUID
 	NamePtr       *uint16
 	TypePtr       *uint16
@@ -637,8 +635,6 @@ func (t *TInterface) Connect(tun *TUN) (err error) {
 		}
 	}
 
-	// Route the server's WAN (over-arching network) through the tunnel so
-	// traffic to peers on sibling servers in the same WAN returns over the VPN.
 	if meta.EnableWAN {
 		if wan := tun.ServerResponse.WANCIDR; wan != "" {
 			err = IP_AddRoute(wan, meta.IFName, t.IPv4Address, "0")
@@ -868,7 +864,6 @@ type DLL struct {
 	moduleHandle    windows.Handle
 	moduleUnsafePTR *unsafe.Pointer
 
-	// NEW
 	AddressMap [100]*DLLAddress
 }
 type DLLAddress struct {

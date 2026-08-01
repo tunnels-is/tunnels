@@ -13,7 +13,7 @@ import (
 
 func CheckCapabilities() (err error) {
 	orig := cap.GetProc()
-	defer orig.SetProc() // restore original caps on exit.
+	defer orig.SetProc()
 
 	c, err := orig.Dup()
 	if err != nil {
@@ -61,7 +61,7 @@ func CheckCapabilities() (err error) {
 				"  To grant permissions manually, run:\n"+
 				"  \033[1;34m→\033[0m  sudo setcap 'cap_net_raw,cap_net_bind_service,cap_net_admin+eip' [BINARY]\n\n", err)
 		} else {
-			// Reload binary after applying set cap
+
 			argv0, _ := exec.LookPath(os.Args[0])
 			syscall.Exec(argv0, os.Args, os.Environ())
 		}

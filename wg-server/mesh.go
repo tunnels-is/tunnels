@@ -18,37 +18,23 @@ import (
 	"golang.zx2c4.com/wireguard/tun"
 )
 
-// The server-to-server mesh: a second WireGuard interface (derived from the
-// client iface, e.g. wg0 -> wg0mesh) whose peers are the sibling wg-servers in
-// the same mesh group, as told by the controller (GET /wg/mesh). Cross-server
-// client traffic is routed wg0 -> wgmesh -> sibling wgmesh -> sibling wg0, so
-// the real client source IP is preserved end-to-end and the inter-server hop is
-// encrypted + authenticated. Unlike wg0 there is no LazyBind and no inspector.
-
 var (
 	wgMeshDevice *device.Device
 
 	meshMu    sync.Mutex
-	meshPeers = map[string]installedMeshPeer{} // key: PublicKeyHex
+	meshPeers = map[string]installedMeshPeer{}
 )
 
-// installedMeshPeer is the local record of a sibling currently configured on
-// the mesh interface, so reconcileMesh can diff against the controller's list
-// and know which routes to withdraw when a sibling leaves.
 type installedMeshPeer struct {
 	PublicKeyHex string
 	Endpoint     string
 	Subnets      []string
 }
 
-// meshIface derives the mesh interface name from the client interface.
 func meshIface(cfg *Config) string {
 	return cfg.WireGuardIface + "mesh"
 }
 
-// setupMesh brings up the mesh WireGuard interface (reusing the server static
-// key) and installs its firewall rules. It is a no-op when no mesh port is
-// configured. Peers are added later by reconcileMesh.
 func setupMesh(cfg *Config, logLevel string) error {
 	if cfg.WireGuardMeshPort == 0 {
 		INFO("mesh: no mesh port configured, mesh disabled")
@@ -74,10 +60,6 @@ func setupMesh(cfg *Config, logLevel string) error {
 	wgLogger := device.NewLogger(wgDeviceLogLevel(logLevel), "["+iface+"] ")
 	wgMeshDevice = device.NewDevice(tunDev, conn.NewDefaultBind(), wgLogger)
 
-	// device.NewDevice immediately starts worker goroutines and holds the TUN fd.
-	// Every error path below must tear it down, otherwise a non-fatal mesh setup
-	// failure (missing ip6tables, LinkSetUp EPERM, ...) leaks the device and its
-	// goroutines for the whole process lifetime.
 	success := false
 	defer func() {
 		if !success {
@@ -117,11 +99,6 @@ func setupMesh(cfg *Config, logLevel string) error {
 	return nil
 }
 
-// validMeshSubnet accepts only a specific (non-default) CIDR. A mesh sibling is
-// meant to advertise concrete subnets; a /0 (0.0.0.0/0 or ::/0) from the
-// controller would install a default route/allowed-ip and silently hijack all
-// of this server's egress to the sibling. This mirrors the validation the
-// client-peer path already does in sync.go's reconcilePeer.
 func validMeshSubnet(subnet string) bool {
 	_, ipnet, err := net.ParseCIDR(subnet)
 	if err != nil {
@@ -183,7 +160,6 @@ func delMeshRoute(cfg *Config, subnet string) {
 	_ = netlink.RouteDel(&netlink.Route{LinkIndex: link.Attrs().Index, Dst: dst})
 }
 
-// fetchMesh asks the controller for this server's same-mesh-group siblings.
 func fetchMesh(cfg *Config) (*types.WGMeshResponse, error) {
 	req, err := http.NewRequest(http.MethodGet, cfg.ControllerURL+"/wg/mesh", nil)
 	if err != nil {
@@ -206,32 +182,18 @@ func fetchMesh(cfg *Config) (*types.WGMeshResponse, error) {
 	return &r, nil
 }
 
-// reconcileMesh syncs the installed mesh peers with the controller's current
-// same-mesh-group list: add new siblings, drop departed/changed ones, and keep
-// their routes in step. A controller error is transient — the current mesh is
-// left untouched. Called at startup and on a 2-minute timer.
 func reconcileMesh() {
 	cfg := activeConfig.Load()
 	if cfg == nil {
 		return
 	}
 
-	// fetchMesh does network I/O, so it runs outside meshMu. All wgMeshDevice
-	// access happens under the lock below, where cleanupMesh's close+nil is also
-	// serialized — otherwise a shutdown mid-reconcile is a data race (and an
-	// IpcSet on an already-closed device).
 	resp, err := fetchMesh(cfg)
 	if err != nil {
 		WARN("mesh: fetch failed (keeping current peers): ", err)
 		return
 	}
 
-	// Filter each peer's subnets to the valid (specific, non-default) set HERE,
-	// once, so the drop-loop comparison and the add-loop install both operate on
-	// the same list. Filtering only at add time would make sameMeshPeer compare a
-	// stored filtered list against the raw controller list and tear the peer down
-	// and re-add it on every reconcile. A peer left with no valid subnets is
-	// simply not desired (dropped if currently installed).
 	desired := make(map[string]types.WGMeshPeer, len(resp.Peers))
 	for _, p := range resp.Peers {
 		if p.PublicKeyHex == "" {
@@ -256,12 +218,10 @@ func reconcileMesh() {
 	meshMu.Lock()
 	defer meshMu.Unlock()
 
-	// cleanupMesh may have torn the device down while we were fetching.
 	if wgMeshDevice == nil {
 		return
 	}
 
-	// Drop peers that left the group or whose endpoint/subnets changed.
 	for key, inst := range meshPeers {
 		if want, ok := desired[key]; ok && sameMeshPeer(inst, want) {
 			continue
@@ -274,7 +234,6 @@ func reconcileMesh() {
 		INFO("mesh: removed peer ", short(key))
 	}
 
-	// Add new (or re-add changed) peers. desired already holds only valid subnets.
 	for key, want := range desired {
 		if _, ok := meshPeers[key]; ok {
 			continue
@@ -297,12 +256,7 @@ func sameMeshPeer(a installedMeshPeer, b types.WGMeshPeer) bool {
 	if a.Endpoint != b.Endpoint || len(a.Subnets) != len(b.AllowedSubnets) {
 		return false
 	}
-	// Compare as a multiset — the controller's subnet ordering isn't guaranteed
-	// stable, and treating a reordering as a change would needlessly tear down
-	// and re-add the peer (dropping routes / blipping the mesh) every reconcile.
-	// Counts matter: comparing as a plain set would treat [X,Y] and [X,X] as
-	// equal (both lengths 2, both members present) and miss that a subnet was
-	// replaced by a duplicate.
+
 	counts := make(map[string]int, len(a.Subnets))
 	for _, s := range a.Subnets {
 		counts[s]++
@@ -316,7 +270,6 @@ func sameMeshPeer(a installedMeshPeer, b types.WGMeshPeer) bool {
 	return true
 }
 
-// cleanupMesh removes all mesh peers/routes and tears down the mesh device.
 func cleanupMesh(cfg *Config) {
 	meshMu.Lock()
 	defer meshMu.Unlock()
@@ -328,8 +281,6 @@ func cleanupMesh(cfg *Config) {
 		delete(meshPeers, key)
 	}
 
-	// Close + nil the device under the lock so a concurrent reconcileMesh
-	// (holding meshMu) can't use it mid-teardown.
 	if wgMeshDevice != nil {
 		wgMeshDevice.Close()
 		wgMeshDevice = nil

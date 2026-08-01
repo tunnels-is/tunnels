@@ -1,14 +1,8 @@
-// World map with the user's country highlighted and the 24 UTC offset bands
-// overlaid; the secure-connection button sits centered on top. Lazy-loaded —
-// the map path data is large and only needed in simple mode.
-
 import ct from "countries-and-timezones"
 import world from "@svg-maps/world"
 import { countryName, normalizeCountryCode } from "@/lib/countries"
 import { timezoneOffsetMinutes } from "@/lib/geo"
 
-// Lowercase ISO codes of every country with a timezone at the given UTC
-// offset — the political timezone "band" at country resolution.
 const countriesAtOffset = (offsetMinutes) => {
 	const out = new Set()
 	for (const country of Object.values(ct.getAllCountries())) {
@@ -32,9 +26,9 @@ const TimezoneMap = ({ timezone, country, serverCountry, connecting, connected, 
 	const sameOffset = countriesAtOffset(offset)
 
 	const fillFor = (id) => {
-		if (id === scc) return "fill-success" // country of the connected server
-		if (id === cc) return "animate-pulse fill-success" // closest server country
-		if (sameOffset.has(id)) return "fill-primary/30" // shares the user's UTC offset
+		if (id === scc) return "fill-success"
+		if (id === cc) return "animate-pulse fill-success"
+		if (sameOffset.has(id)) return "fill-primary/30"
 		return "fill-base-content/15"
 	}
 
@@ -50,7 +44,7 @@ const TimezoneMap = ({ timezone, country, serverCountry, connecting, connected, 
 				</svg>
 			</div>
 
-			{/* user timezone + country translation — colors match the map */}
+			{}
 			<div className="absolute left-3 top-3 space-y-3">
 				<div>
 					<div className="text-[10px] font-semibold uppercase tracking-wider text-primary">Current timezone</div>
@@ -74,7 +68,7 @@ const TimezoneMap = ({ timezone, country, serverCountry, connecting, connected, 
 				</div>
 			</div>
 
-			{/* action */}
+			{}
 			<div className="absolute bottom-3 left-3">
 				{connected ? (
 					<button className="btn btn-error shadow-lg" onClick={onDisconnect}>

@@ -14,18 +14,12 @@ import (
 	"github.com/puzpuzpuz/xsync/v3"
 )
 
-// listReloadMu serializes the block-list and white-list reloaders. They run as
-// separate hourly goroutines and both mutate the shared config
-// (DNSBlockLists/DNSWhiteLists) and persist it, so without this they race on the
-// shared struct and on the config file.
 var listReloadMu sync.Mutex
 
 func reloadBlockLists(sleep bool) {
 	reloadBlockListsEx(sleep, false)
 }
 
-// forceReloadBlockLists re-downloads every configured list, ignoring the
-// usual 24h cache window. Used by the UI "Update" action.
 func forceReloadBlockLists() {
 	reloadBlockListsEx(false, true)
 }
@@ -92,7 +86,6 @@ func processBlockList(index int, wg *sync.WaitGroup, nm *xsync.MapOf[string, boo
 	state := STATE.Load()
 	lowerTag := strings.ToLower(bl.Tag)
 
-	// force=true (manual Update) re-downloads even when LastDownload is fresh.
 	if (force || time.Since(bl.LastDownload).Hours() > 24) && bl.URL != "" {
 		listBytes, err = downloadList(bl.URL)
 		if err != nil {
@@ -245,17 +238,10 @@ func GetDefaultBlockLists() []*BlockList {
 	return bl
 }
 
-// maxDNSListSize caps a downloaded block/whitelist so a huge (or malicious)
-// list cannot exhaust memory; merged lists are typically tens of MB.
 const maxDNSListSize = 128 * 1024 * 1024
 
-// listHTTPClient downloads block/whitelists. The default http.Client has no
-// timeout; a stalled download would hang the reload goroutine forever.
 var listHTTPClient = &http.Client{Timeout: 5 * time.Minute}
 
-// CheckIfURL accepts only https:// list URLs. Plain http:// is rejected: a
-// MITM on an http whitelist could inject domains, and whitelisted domains
-// bypass the blocklists entirely.
 func CheckIfURL(s string) bool {
 	if strings.HasPrefix(s, "https://") {
 		return true

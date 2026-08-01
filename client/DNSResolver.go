@@ -15,19 +15,13 @@ import (
 )
 
 const (
-	// maxDNSCacheEntries / maxDNSStatsEntries bound the per-name maps — both
-	// grow one entry per unique (attacker-chosen) queried name and were
-	// previously unbounded.
 	maxDNSCacheEntries = 50_000
 	maxDNSStatsEntries = 50_000
-	// maxDNSStatsAnswers bounds the per-domain answer log inside DNSStats,
-	// which previously appended on every resolution forever.
+
 	maxDNSStatsAnswers = 100
-	// maxDNSCacheTTL clamps upstream-controlled TTLs so a hostile upstream
-	// cannot pin entries in the cache for days.
+
 	maxDNSCacheTTL = 6 * time.Hour
-	// maxDoHResponseSize caps a DNS-over-HTTPS response body; a DNS message
-	// cannot legitimately exceed 64 KiB.
+
 	maxDoHResponseSize = 65536
 )
 
@@ -248,9 +242,6 @@ func GlobalBlockEnabled(m *dns.Msg, w dns.ResponseWriter) bool {
 func DNSQuery(w dns.ResponseWriter, m *dns.Msg) {
 	defer RecoverAndLog()
 
-	// Everything downstream indexes m.Question[0]; a query with an empty
-	// question section is dropped here instead of recovering from a panic
-	// (log-spam vector).
 	if len(m.Question) == 0 {
 		_ = w.WriteMsg(m)
 		w.Close()
@@ -337,10 +328,7 @@ func DNSQuery(w dns.ResponseWriter, m *dns.Msg) {
 		}
 
 		if !hasInfo {
-			// DNSTunnel is only set when the record came from a tunnel's
-			// ServerResponse; a record from the global config leaves it nil, and
-			// ResolveDomainLocal dereferences tun.ServerResponse. Fall through to
-			// normal resolution instead of panicking.
+
 			if DNSTunnel != nil {
 				DEBUG("Redirect DNS to VPN: ", m.Question[0].Name)
 				ResolveDomainLocal(DNSTunnel, m, w)
@@ -567,8 +555,7 @@ func ResolveDNSAsHTTPS(m *dns.Msg, w dns.ResponseWriter) (err error) {
 			return err
 		}
 	}
-	// Always close the body — without this every DoH query leaks a connection
-	// (the transport can't reuse it and it stays pinned until IdleConnTimeout).
+
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
@@ -627,8 +614,7 @@ func IncrementDNSStats(domain string, blocked bool, tag string, answers []dns.RR
 	for _, v := range answers {
 		dnsStats.Answers = append(dnsStats.Answers, v.String())
 	}
-	// Keep only the most recent answers — this log previously grew without
-	// bound for a domain that resolves often.
+
 	if len(dnsStats.Answers) > maxDNSStatsAnswers {
 		dnsStats.Answers = dnsStats.Answers[len(dnsStats.Answers)-maxDNSStatsAnswers:]
 	}

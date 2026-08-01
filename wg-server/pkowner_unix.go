@@ -8,9 +8,6 @@ import (
 	"syscall"
 )
 
-// checkKeyFileOwner rejects a private-key file owned by another user. Mode
-// bits alone don't establish trust: a pre-planted file with 0600 permissions
-// but a different owner would otherwise be loaded as this server's identity.
 func checkKeyFileOwner(info os.FileInfo) error {
 	st, ok := info.Sys().(*syscall.Stat_t)
 	if !ok {

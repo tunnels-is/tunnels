@@ -59,12 +59,10 @@ func launchAPIServer() {
 	mux.Handle("POST /client/server", clientMW(API_ServerGet))
 	mux.Handle("GET /client/wg/config", clientMW(API_WGConfig))
 
-	// this is only used for production environments (tunnels.is)
-	// ======================================
 	if loadSecret("PayKey") != "" {
 		mux.Handle("POST /client/key/activate", clientMW(API_ActivateLicenseKey))
 	}
-	// ======================================
+
 	adminAPIKeyMW := func(h http.HandlerFunc) http.Handler {
 		return applyMiddleware(h, xAdminAPIKeyMiddleware)
 	}
@@ -75,7 +73,6 @@ func launchAPIServer() {
 		return applyMiddleware(h, adminUIMiddleware)
 	}
 
-	// todo.. needs pagination
 	mux.Handle("POST /ui/servers", adminMW(API_AdminServersList))
 	mux.Handle("POST /ui/server", adminMW(API_AdminServerGet))
 
@@ -174,10 +171,6 @@ func loggingTimingMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// originAllowed reports whether a browser Origin may make cross-origin requests
-// to the controller, per the configured AllowedOrigins list. A "*" entry allows
-// any origin; otherwise the match must be exact. An empty list denies all
-// cross-origin access (the same-origin admin UI does not go through CORS).
 func originAllowed(origin string) bool {
 	if origin == "" {
 		return false
@@ -192,9 +185,7 @@ func originAllowed(origin string) bool {
 
 func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Only emit CORS headers for allowlisted origins, and always echo the
-		// specific origin back (never the literal "*"), so credentials can never
-		// be granted to arbitrary sites even if Allow-Credentials is added later.
+
 		if origin := r.Header.Get("Origin"); originAllowed(origin) {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 			w.Header().Add("Vary", "Origin")
@@ -203,9 +194,7 @@ func corsMiddleware(next http.Handler) http.Handler {
 		}
 
 		if r.Method == http.MethodOptions {
-			// Preflight: the CORS headers set above (if any) tell the browser
-			// whether the real request is permitted; a disallowed origin gets
-			// none and is blocked client-side.
+
 			w.WriteHeader(http.StatusOK)
 			return
 		}

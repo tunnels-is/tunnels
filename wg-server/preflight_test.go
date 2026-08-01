@@ -7,14 +7,13 @@ import (
 	"testing"
 )
 
-// fakeDumper returns canned chain listings keyed by "bin|table|chain".
 type fakeDumper map[string]string
 
 func (f fakeDumper) dump(bin, table, chain string) (string, error) {
 	if out, ok := f[bin+"|"+table+"|"+chain]; ok {
 		return out, nil
 	}
-	return "", nil // empty chain
+	return "", nil
 }
 
 func baseCfg() *Config {
@@ -36,9 +35,7 @@ func TestPreflight_CleanHost(t *testing.T) {
 }
 
 func TestPreflight_StaleSNATWithDifferentPublicIP(t *testing.T) {
-	// This is exactly the bug we saw in prod — a prior run with PublicIP
-	// 63.143.33.106 left a SNAT rule behind. The new run with .157 must
-	// refuse to start.
+
 	dump := fakeDumper{
 		"iptables|nat|POSTROUTING": strings.Join([]string{
 			"-P POSTROUTING ACCEPT",
@@ -75,7 +72,7 @@ func TestPreflight_ConflictingPort(t *testing.T) {
 }
 
 func TestPreflight_PortMatchRequiresUDP(t *testing.T) {
-	// A TCP rule on the same port number is not our concern.
+
 	dump := fakeDumper{
 		"iptables|filter|INPUT": "-A INPUT -p tcp -m tcp --dport 51820 -j ACCEPT\n",
 	}
@@ -85,8 +82,7 @@ func TestPreflight_PortMatchRequiresUDP(t *testing.T) {
 }
 
 func TestPreflight_NonWGForwardIsAllowed(t *testing.T) {
-	// FORWARD rules using a different wg iface (e.g., a sibling wg-server
-	// running on the same host with its own subnet) must not block this one.
+
 	dump := fakeDumper{
 		"iptables|filter|FORWARD": strings.Join([]string{
 			"-A FORWARD -i wg1 -o eth0 -j ACCEPT",
@@ -110,7 +106,7 @@ func TestPreflight_IPv6Subnet(t *testing.T) {
 }
 
 func TestPreflight_ReportsAllConflicts(t *testing.T) {
-	// Operator should see every offending rule, not just the first.
+
 	dump := fakeDumper{
 		"iptables|nat|POSTROUTING": strings.Join([]string{
 			"-A POSTROUTING -s 10.0.0.0/22 -o eth0 -j SNAT --to-source 63.143.33.106",
@@ -152,7 +148,7 @@ func TestHasFlagValue_TokenBoundary(t *testing.T) {
 	if !hasFlagValue(rule, "-s", "10.0.0.0/22") {
 		t.Error("should match exact -s value")
 	}
-	// Substring-style false positive must not trigger.
+
 	if hasFlagValue(rule, "-s", "10.0.0.0/2") {
 		t.Error("must not match a prefix that happens to be a substring")
 	}
@@ -168,17 +164,12 @@ func TestHasFlagValue_TokenBoundary(t *testing.T) {
 }
 
 func TestPreflight_ErrorPinpointsLocation(t *testing.T) {
-	// The error must give an operator everything they need to find and drain
-	// the offending rule without re-running iptables -L themselves:
-	//   - bin/table/chain
-	//   - the rule's position within the chain (1-based, like iptables -L)
-	//   - the exact "flag value" tokens that triggered the match
-	//   - a ready-to-paste `iptables -D ...` drain command
+
 	dump := fakeDumper{
 		"iptables|nat|POSTROUTING": strings.Join([]string{
 			"-P POSTROUTING ACCEPT",
-			"-A POSTROUTING -s 10.99.0.0/16 -o eth0 -j MASQUERADE",                    // rule #1 — no conflict
-			"-A POSTROUTING -s 10.0.0.0/22 -o eth0 -j SNAT --to-source 63.143.33.106", // rule #2 — conflict
+			"-A POSTROUTING -s 10.99.0.0/16 -o eth0 -j MASQUERADE",
+			"-A POSTROUTING -s 10.0.0.0/22 -o eth0 -j SNAT --to-source 63.143.33.106",
 		}, "\n"),
 	}
 	err := preflightIPTablesWith(baseCfg(), dump.dump)
@@ -188,31 +179,30 @@ func TestPreflight_ErrorPinpointsLocation(t *testing.T) {
 	msg := err.Error()
 
 	mustContain := []string{
-		"iptables nat/POSTROUTING rule #2",          // bin + table/chain + position
-		`WireGuardSubnet clash on "-s 10.0.0.0/22"`, // field name + exact matched tokens
-		"rule:  -A POSTROUTING -s 10.0.0.0/22",      // full rule echoed
+		"iptables nat/POSTROUTING rule #2",
+		`WireGuardSubnet clash on "-s 10.0.0.0/22"`,
+		"rule:  -A POSTROUTING -s 10.0.0.0/22",
 		"drain: iptables -t nat -D POSTROUTING -s 10.0.0.0/22 -o eth0 -j SNAT --to-source 63.143.33.106",
-		"Config: subnet=10.0.0.0/22", // current config summary
+		"Config: subnet=10.0.0.0/22",
 	}
 	for _, want := range mustContain {
 		if !strings.Contains(msg, want) {
 			t.Errorf("error missing %q\nfull message:\n%s", want, msg)
 		}
 	}
-	// The non-conflicting rule on line #1 must NOT appear in the report.
+
 	if strings.Contains(msg, "10.99.0.0/16") {
 		t.Errorf("non-conflicting rule leaked into the report:\n%s", msg)
 	}
 }
 
 func TestPreflight_PositionCountsOnlyAppendRules(t *testing.T) {
-	// Position numbering must skip -P (policy) lines so it lines up with what
-	// `iptables -L --line-numbers` would show.
+
 	dump := fakeDumper{
 		"iptables|filter|FORWARD": strings.Join([]string{
 			"-P FORWARD ACCEPT",
-			"-A FORWARD -i eth0 -o eth1 -j ACCEPT", // rule #1 — no conflict
-			"-A FORWARD -i wg0 -o eth0 -j ACCEPT",  // rule #2 — conflict
+			"-A FORWARD -i eth0 -o eth1 -j ACCEPT",
+			"-A FORWARD -i wg0 -o eth0 -j ACCEPT",
 		}, "\n"),
 	}
 	err := preflightIPTablesWith(baseCfg(), dump.dump)
@@ -222,26 +212,24 @@ func TestPreflight_PositionCountsOnlyAppendRules(t *testing.T) {
 }
 
 func TestShowActiveRules_CatchesAllShapes(t *testing.T) {
-	// The heuristic is config-agnostic — it should pick up wg-server-style
-	// rules regardless of which subnet/iface/PublicIP they were installed
-	// with, and skip unrelated rules in the same chains.
+
 	dump := fakeDumper{
-		// INPUT: only -p udp ACCEPT counts.
+
 		"iptables|filter|INPUT": strings.Join([]string{
-			"-A INPUT -p udp -m udp --dport 51820 -j ACCEPT", // wg-shape
-			"-A INPUT -p tcp -m tcp --dport 22 -j ACCEPT",    // unrelated
+			"-A INPUT -p udp -m udp --dport 51820 -j ACCEPT",
+			"-A INPUT -p tcp -m tcp --dport 22 -j ACCEPT",
 		}, "\n"),
-		// FORWARD: anything touching wg* counts.
+
 		"iptables|filter|FORWARD": strings.Join([]string{
-			"-A FORWARD -i wg0 -o eth0 -j ACCEPT",  // wg-shape
-			"-A FORWARD -i wg01 -o wg01 -j ACCEPT", // wg-shape (stale iface name)
-			"-A FORWARD -i br0 -o br1 -j ACCEPT",   // unrelated bridge
+			"-A FORWARD -i wg0 -o eth0 -j ACCEPT",
+			"-A FORWARD -i wg01 -o wg01 -j ACCEPT",
+			"-A FORWARD -i br0 -o br1 -j ACCEPT",
 		}, "\n"),
-		// POSTROUTING: any SNAT or MASQUERADE counts.
+
 		"iptables|nat|POSTROUTING": strings.Join([]string{
-			"-A POSTROUTING -s 10.0.4.0/22 -o eth0 -j SNAT --to-source 63.143.33.107", // stale wg subnet
-			"-A POSTROUTING -s 10.0.0.0/22 -o eth0 -j SNAT --to-source 74.63.223.157", // current wg subnet
-			"-A POSTROUTING -s 192.168.99.0/24 -o eth0 -j RETURN",                     // unrelated
+			"-A POSTROUTING -s 10.0.4.0/22 -o eth0 -j SNAT --to-source 63.143.33.107",
+			"-A POSTROUTING -s 10.0.0.0/22 -o eth0 -j SNAT --to-source 74.63.223.157",
+			"-A POSTROUTING -s 192.168.99.0/24 -o eth0 -j RETURN",
 		}, "\n"),
 	}
 
@@ -276,8 +264,7 @@ func TestShowActiveRules_CatchesAllShapes(t *testing.T) {
 }
 
 func TestShowActiveRules_EmitsDrainCommands(t *testing.T) {
-	// Each matched rule must come with a ready-to-paste drain command that
-	// rewrites -A → -D and prefixes the bin + table.
+
 	dump := fakeDumper{
 		"iptables|nat|POSTROUTING": "-A POSTROUTING -s 10.0.0.0/22 -o eth0 -j SNAT --to-source 1.2.3.4\n",
 	}
@@ -292,9 +279,7 @@ func TestShowActiveRules_EmitsDrainCommands(t *testing.T) {
 }
 
 func TestShowActiveRules_NoMatchingRules(t *testing.T) {
-	// Chains are empty / contain only unrelated rules. Output should still
-	// be produced (so the operator knows the check ran) and should clearly
-	// say nothing matched.
+
 	dump := fakeDumper{
 		"iptables|filter|INPUT": "-A INPUT -p tcp -m tcp --dport 22 -j ACCEPT\n",
 	}
@@ -345,7 +330,7 @@ func TestWGRuleHeuristic_PerChain(t *testing.T) {
 }
 
 func TestPreflight_IgnoresPolicyAndComments(t *testing.T) {
-	// -P (policy) and blank lines must not be parsed as rules.
+
 	dump := fakeDumper{
 		"iptables|nat|POSTROUTING": strings.Join([]string{
 			"-P POSTROUTING ACCEPT",

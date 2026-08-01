@@ -29,21 +29,13 @@ func testUser(email, apiKey string) *User {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// ConnectToBBoltDB
-// ---------------------------------------------------------------------------
-
 func TestConnectToBBoltDB(t *testing.T) {
 	setupTestDB(t)
-	// Verify DB is usable.
+
 	if err := BBolt_CreateGroup(&Group{ID: uuid.New(), Tag: "smoke"}); err != nil {
 		t.Fatal(err)
 	}
 }
-
-// ---------------------------------------------------------------------------
-// User CRUD
-// ---------------------------------------------------------------------------
 
 func TestBBolt_CreateUser(t *testing.T) {
 	setupTestDB(t)
@@ -120,7 +112,6 @@ func TestBBolt_findUserByEmail_NotFound(t *testing.T) {
 		t.Fatal("expected nil")
 	}
 }
-
 
 func TestBBolt_getUsers(t *testing.T) {
 	setupTestDB(t)
@@ -215,7 +206,6 @@ func TestBBolt_updateUser(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Old key gone.
 	if err := BBoltDB.View(func(tx *gobolt.Tx) error {
 		if tx.Bucket([]byte(USERS_APIKEY_INDEX)).Get([]byte("oldkey")) != nil {
 			t.Fatal("old key should not resolve")
@@ -270,13 +260,11 @@ func TestBBolt_updateUserAdmin(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Old email gone.
 	found, _ := BBolt_findUserByEmail("admin@example.com")
 	if found != nil {
 		t.Fatal("old email should not resolve")
 	}
 
-	// New email works.
 	found, _ = BBolt_findUserByEmail("new@example.com")
 	if found == nil {
 		t.Fatal("new email should resolve")
@@ -395,8 +383,6 @@ func TestBBolt_userResetPassword_NotFound(t *testing.T) {
 	}
 }
 
-
-
 func TestBBolt_UserActivateKey(t *testing.T) {
 	setupTestDB(t)
 	u := testUser("activate@example.com", "")
@@ -429,10 +415,6 @@ func TestBBolt_UserActivateKey_NotFound(t *testing.T) {
 		t.Fatal("expected error")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Device CRUD
-// ---------------------------------------------------------------------------
 
 func TestBBolt_CreateDevice(t *testing.T) {
 	setupTestDB(t)
@@ -656,7 +638,6 @@ func TestBBolt_UpdateDevice_DuplicateWGKey(t *testing.T) {
 		t.Fatal("expected uniqueness error on update")
 	}
 
-	// "key-a" still resolves to device a.
 	found, _ := BBolt_FindDeviceByWGKey("key-a")
 	if found == nil || found.ID != a.ID {
 		t.Fatal("key-a should still belong to device a")
@@ -781,8 +762,6 @@ func TestBBolt_GetDevices_StableOrder(t *testing.T) {
 		}
 	}
 
-	// Cursor order must match boundary-respecting pagination: walking by
-	// page size N must yield the same sequence as a single full read.
 	full, _ := BBolt_GetDevices(8, 0)
 	var walked []*types.Device
 	for off := int64(0); ; off += 3 {
@@ -801,10 +780,6 @@ func TestBBolt_GetDevices_StableOrder(t *testing.T) {
 		}
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Server CRUD
-// ---------------------------------------------------------------------------
 
 func TestBBolt_CreateServer(t *testing.T) {
 	setupTestDB(t)
@@ -854,7 +829,6 @@ func TestBBolt_UpdateServer(t *testing.T) {
 		t.Fatalf("wireguard fields mismatch: port=%d pubkey=%s", updated.WireGuardPort, updated.WireGuardPubKey)
 	}
 
-	// Verify persisted.
 	found, _ := BBolt_FindServerByID(s.ID.String())
 	if found.WireGuardPort != 51820 || found.WireGuardPubKey != "pubkey-abc" {
 		t.Fatal("wireguard fields not persisted")
@@ -883,13 +857,11 @@ func TestBBolt_FindAllServers(t *testing.T) {
 		t.Fatalf("expected 3, got %d", len(servers))
 	}
 
-	// Limit.
 	servers, _ = BBolt_FindAllServers(2, 0)
 	if len(servers) != 2 {
 		t.Fatalf("expected 2 with limit, got %d", len(servers))
 	}
 
-	// Offset.
 	servers, _ = BBolt_FindAllServers(10, 2)
 	if len(servers) != 1 {
 		t.Fatalf("expected 1 with offset, got %d", len(servers))
@@ -908,13 +880,11 @@ func TestBBolt_FindServersWithoutGroups(t *testing.T) {
 		t.Fatalf("expected 3, got %d", len(servers))
 	}
 
-	// Limit.
 	servers, _ = BBolt_FindServersWithoutGroups(2, 0)
 	if len(servers) != 2 {
 		t.Fatalf("expected 2 with limit, got %d", len(servers))
 	}
 
-	// Offset.
 	servers, _ = BBolt_FindServersWithoutGroups(10, 2)
 	if len(servers) != 1 {
 		t.Fatalf("expected 1 with offset, got %d", len(servers))
@@ -944,8 +914,6 @@ func TestBBolt_FindServersByGroups(t *testing.T) {
 		t.Fatalf("expected 3 in g1|g2, got %d", len(sAll))
 	}
 
-	// Pagination — use single-group search for deterministic skip behavior.
-	// g1 matches 2 servers: in-g1 and both.
 	sLim, _ := BBolt_FindServersByGroups([]uuid.UUID{g1}, 1, 0)
 	if len(sLim) != 1 {
 		t.Fatalf("expected 1 with limit, got %d", len(sLim))
@@ -1006,10 +974,6 @@ func TestBBolt_UpdateServer_RotateAPIKey(t *testing.T) {
 		t.Fatal("new key should resolve")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Group CRUD
-// ---------------------------------------------------------------------------
 
 func TestBBolt_CreateGroup(t *testing.T) {
 	setupTestDB(t)
@@ -1104,7 +1068,6 @@ func TestBBolt_AddToGroup_User(t *testing.T) {
 		t.Fatal("user not in group")
 	}
 
-	// Idempotent.
 	BBolt_AddToGroup(g.ID.String(), u.ID.String(), "user")
 	found, _ = BBolt_findUserByID(u.ID.String())
 	if len(found.Groups) != 1 {
@@ -1129,8 +1092,6 @@ func TestBBolt_AddToGroup_Server(t *testing.T) {
 	}
 }
 
-// Devices have no groups of their own (they inherit the owner's), so adding a
-// device to a group is an unknown type.
 func TestBBolt_AddToGroup_Device_Unsupported(t *testing.T) {
 	setupTestDB(t)
 	g := &Group{ID: uuid.New(), Tag: "dg"}
@@ -1238,12 +1199,10 @@ func TestBBolt_FindEntitiesByGroupID(t *testing.T) {
 		t.Fatalf("expected 1 server, got %d", len(entities))
 	}
 
-	// Devices are not group entities (they inherit the owner's groups).
 	if _, err := BBolt_FindEntitiesByGroupID(g.ID.String(), "device", 10, 0); err == nil {
 		t.Fatal("device entity lookup should be unsupported")
 	}
 
-	// Pagination.
 	entities, _ = BBolt_FindEntitiesByGroupID(g.ID.String(), "user", 1, 0)
 	if len(entities) != 1 {
 		t.Fatalf("expected 1 with limit, got %d", len(entities))
@@ -1254,16 +1213,11 @@ func TestBBolt_FindEntitiesByGroupID(t *testing.T) {
 		t.Fatalf("expected 1 with offset, got %d", len(entities))
 	}
 
-	// Invalid type.
 	_, err := BBolt_FindEntitiesByGroupID(g.ID.String(), "invalid", 10, 0)
 	if err == nil {
 		t.Fatal("expected error")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Server-with-APIKey (merged WG config)
-// ---------------------------------------------------------------------------
 
 func TestBBolt_CreateServer_WithAPIKey(t *testing.T) {
 	setupTestDB(t)
@@ -1321,10 +1275,6 @@ func TestBBolt_UpdateServer_ClearAPIKey(t *testing.T) {
 		t.Fatal("cleared key should not resolve")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// Empty collection returns
-// ---------------------------------------------------------------------------
 
 func TestBBolt_getUsers_Empty(t *testing.T) {
 	setupTestDB(t)
@@ -1387,10 +1337,6 @@ func TestBBolt_findGroups_LimitOffset(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Index backfill on reopen
-// ---------------------------------------------------------------------------
-
 func TestConnectToBBoltDB_BackfillIndexes(t *testing.T) {
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "test.db")
@@ -1410,7 +1356,6 @@ func TestConnectToBBoltDB_BackfillIndexes(t *testing.T) {
 
 	BBoltDB.Close()
 
-	// Reopen — backfill rebuilds all indexes.
 	if err := ConnectToBBoltDB(dbPath); err != nil {
 		t.Fatal(err)
 	}

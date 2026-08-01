@@ -168,8 +168,7 @@ const Login = () => {
 	}
 
 	const saveAuthServer = async () => {
-		// Guard against saving before the daemon config has loaded — otherwise
-		// {...undefined, ControlServers} would drop every other config field.
+
 		if (!config) {
 			notifyError("Configuration is still loading, please try again")
 			return

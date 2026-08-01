@@ -32,7 +32,6 @@ const TwoFactor = () => {
 		setErrors(errs)
 		if (Object.keys(errs).length > 0) return
 
-		// the TOTP secret is embedded in the otpauth:// URL as ?secret=...
 		const secret = qrValue.split("&")[0]?.split("secret=")[1] || qrValue.split("&")[1]?.split("=")[1]
 		if (!secret) {
 			notifyError("Could not parse authenticator secret")

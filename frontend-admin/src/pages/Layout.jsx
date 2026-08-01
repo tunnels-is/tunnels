@@ -29,7 +29,7 @@ export default function Layout() {
     try {
       await apiPost('/ui/user/logout', {});
     } catch {
-      // ignore
+
     }
     clearUserMeta();
     navigate('/login', { replace: true });
@@ -40,7 +40,7 @@ export default function Layout() {
 
   return (
     <div className="flex min-h-screen bg-[#fdfcf8]">
-      {/* Sidebar */}
+      {}
       <div className="w-[220px] shrink-0 bg-white border-r border-[#e7e3d7] flex flex-col">
         <div className="h-14 flex items-center px-5 border-b border-[#e7e3d7] shrink-0">
           <div className="flex items-center gap-1">
@@ -100,7 +100,7 @@ export default function Layout() {
         </div>
       </div>
 
-      {/* Main content */}
+      {}
       <main className="flex-1 overflow-auto px-8 py-6">
         <Outlet />
       </main>

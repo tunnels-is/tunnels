@@ -14,9 +14,6 @@ import (
 	"github.com/tunnels-is/tunnels/types"
 )
 
-// setupWGPeerTest creates a fresh DB + a wg-server record and returns it so
-// tests can inject it into the request context the way wireGuardServerKeyCheck
-// middleware would in production.
 func setupWGPeerTest(t *testing.T) *types.Server {
 	t.Helper()
 	setupTestDB(t)
@@ -34,8 +31,6 @@ func setupWGPeerTest(t *testing.T) *types.Server {
 	return s
 }
 
-// seedUserWithDevice persists a user and a device bound to server, returning the
-// device's WireGuard pubkey.
 func seedUserWithDevice(t *testing.T, server *types.Server, u *User) string {
 	t.Helper()
 	if err := BBolt_CreateUser(u); err != nil {
@@ -92,7 +87,7 @@ func TestAPI_WGConfig_GroupACL(t *testing.T) {
 
 	member := &User{ID: uuid.New(), Groups: []uuid.UUID{group}}
 	outsider := &User{ID: uuid.New(), Groups: []uuid.UUID{}}
-	key := makeWGKey() // unregistered pubkey → device lookup returns nil, path proceeds
+	key := makeWGKey()
 
 	if w := callWGConfig(t, member, groupedServer.ID, key); w.Code != http.StatusOK {
 		t.Fatalf("group member should read grouped server config (200), got %d: %s", w.Code, w.Body.String())
@@ -145,8 +140,6 @@ func TestAPI_WGPeer_ExpiredSubscriptionRejected(t *testing.T) {
 	}
 }
 
-// A zero SubExpiration means the deployment does not use subscriptions; access
-// must not be treated as expired.
 func TestAPI_WGPeer_ZeroSubExpirationAllowed(t *testing.T) {
 	server := setupWGPeerTest(t)
 	pubKey := seedUserWithDevice(t, server, &User{

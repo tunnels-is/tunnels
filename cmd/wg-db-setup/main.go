@@ -1,6 +1,3 @@
-// wg-db-setup patches the WireGuard fields on a server record in the BoltDB.
-// Usage: wg-db-setup -db /opt/tunnels/tunnels.db -ip 74.63.223.157 \
-//                    -pubkey <b64> -port 442 -base http://127.0.0.1:8181
 package main
 
 import (
@@ -11,11 +8,10 @@ import (
 	"strconv"
 	"time"
 
-	gobolt "go.etcd.io/bbolt"
 	"github.com/google/uuid"
+	gobolt "go.etcd.io/bbolt"
 )
 
-// Minimal server shape — matches types.Server JSON tags exactly.
 type serverRecord struct {
 	ID              uuid.UUID   `json:"_id"`
 	Tag             string      `json:"Tag"`
@@ -29,12 +25,12 @@ type serverRecord struct {
 }
 
 func main() {
-	dbPath  := flag.String("db",      "/opt/tunnels/tunnels.db",  "path to BoltDB file")
-	targetIP := flag.String("ip",     "",                          "server IP to update")
-	pubKeyB64 := flag.String("pubkey", "",                         "wg-server base64 public key")
-	port    := flag.String("port",    "",                          "WireGuard port (e.g. 442)")
-	baseURL := flag.String("base",    "http://127.0.0.1:8181",    "wg-server management base URL")
-	listOnly := flag.Bool("list",     false,                       "list server records and exit")
+	dbPath := flag.String("db", "/opt/tunnels/tunnels.db", "path to BoltDB file")
+	targetIP := flag.String("ip", "", "server IP to update")
+	pubKeyB64 := flag.String("pubkey", "", "wg-server base64 public key")
+	port := flag.String("port", "", "WireGuard port (e.g. 442)")
+	baseURL := flag.String("base", "http://127.0.0.1:8181", "wg-server management base URL")
+	listOnly := flag.Bool("list", false, "list server records and exit")
 	flag.Parse()
 
 	db, err := gobolt.Open(*dbPath, 0o600, &gobolt.Options{Timeout: 3 * time.Second})

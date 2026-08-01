@@ -5,9 +5,8 @@ import (
 	"testing"
 )
 
-// C1: only loopback Host headers may reach the local API (anti-DNS-rebinding).
 func TestIsLocalRequest(t *testing.T) {
-	// Default (loopback) API bind: only loopback/localhost/wails Hosts pass.
+
 	prev := CONFIG.Load()
 	t.Cleanup(func() { CONFIG.Store(prev) })
 	CONFIG.Store(&configV2{APIIP: "127.0.0.1", APIPort: "7777"})
@@ -35,8 +34,6 @@ func TestIsLocalRequest(t *testing.T) {
 		}
 	}
 
-	// A deliberate concrete non-loopback bind allows exactly that host (P1 fix),
-	// but still rejects a rebound attacker Host.
 	CONFIG.Store(&configV2{APIIP: "192.168.1.10", APIPort: "7777"})
 	if !isLocalRequest(&http.Request{Host: "192.168.1.10:7777"}) {
 		t.Error("configured bind IP should be accepted")
@@ -45,14 +42,12 @@ func TestIsLocalRequest(t *testing.T) {
 		t.Error("attacker Host must still be rejected under a concrete bind")
 	}
 
-	// A wildcard bind means remote access was opted into — Host check can't help.
 	CONFIG.Store(&configV2{APIIP: "0.0.0.0", APIPort: "7777"})
 	if !isLocalRequest(&http.Request{Host: "anything.example:7777"}) {
 		t.Error("wildcard bind should accept any Host")
 	}
 }
 
-// C5: tunnel tags must be safe filename components (no traversal).
 func TestSafeTunnelTag(t *testing.T) {
 	good := []string{"tunnels", "tunnel-123", "my_tun", "A1"}
 	bad := []string{"", "../etc/passwd", "a/b", "a\\b", "..", "with space", "dot.name"}
@@ -67,5 +62,3 @@ func TestSafeTunnelTag(t *testing.T) {
 		}
 	}
 }
-
-

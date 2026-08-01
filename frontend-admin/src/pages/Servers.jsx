@@ -44,7 +44,7 @@ export default function Servers() {
         setWans(Array.isArray(data) ? data : []);
       }
     } catch {
-      // non-fatal: the WAN selector just stays empty
+
     }
   };
 

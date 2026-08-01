@@ -6,7 +6,6 @@ import (
 	"github.com/google/uuid"
 )
 
-
 func TestGENERATE_CODE(t *testing.T) {
 
 	codes := make(map[string]bool)

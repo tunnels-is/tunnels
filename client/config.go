@@ -16,9 +16,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// configFileMu serializes writes to the on-disk config so concurrent callers
-// (the block/whitelist reloaders, SetConfig, ...) can't interleave the
-// rename+create+write and corrupt/truncate the file.
 var configFileMu sync.Mutex
 
 func writeConfigToDisk() (err error) {
@@ -126,23 +123,23 @@ func loadConfigFromDisk(newConfig bool) error {
 
 func DefaultConfig() *configV2 {
 	conf := &configV2{
-		DebugLogging:         false,
-		InfoLogging:          false,
-		ErrorLogging:         false,
-		ConnectionTracer:     false,
-		DNSServerIP:          "127.0.0.1",
-		DNSServerPort:        "53",
-		DNS1Default:          "1.1.1.1",
-		DNS2Default:          "8.8.8.8",
-		LogBlockedDomains:    false,
-		LogAllDomains:        false,
-		BandwidthGraphs:      true,
-		DNSstats:             false,
-		DNSHTTPSAutomatic:    true,
-		DNSBlockLists:        GetDefaultBlockLists(),
-		DNSWhiteLists:        GetDefaultWhiteLists(),
-		APIIP:   "127.0.0.1",
-		APIPort: "7777",
+		DebugLogging:      false,
+		InfoLogging:       false,
+		ErrorLogging:      false,
+		ConnectionTracer:  false,
+		DNSServerIP:       "127.0.0.1",
+		DNSServerPort:     "53",
+		DNS1Default:       "1.1.1.1",
+		DNS2Default:       "8.8.8.8",
+		LogBlockedDomains: false,
+		LogAllDomains:     false,
+		BandwidthGraphs:   true,
+		DNSstats:          false,
+		DNSHTTPSAutomatic: true,
+		DNSBlockLists:     GetDefaultBlockLists(),
+		DNSWhiteLists:     GetDefaultWhiteLists(),
+		APIIP:             "127.0.0.1",
+		APIPort:           "7777",
 	}
 	conf.ControlServers = append(conf.ControlServers, &ControlServer{
 		ID:                  "tunnels",

@@ -89,7 +89,6 @@ func MakeCert(ct CertType, certPath string, keyPath string, ips []string, domain
 		parsedIPs = append(parsedIPs, net.ParseIP(v).To4())
 	}
 
-	// Create a self-signed certificate template
 	if org == "" {
 		org = "Tunnels Server"
 	}

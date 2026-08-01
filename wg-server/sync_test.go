@@ -44,8 +44,6 @@ func TestQueryPeer_OK(t *testing.T) {
 	}
 }
 
-// 401/403/404 are all definitive denials — the peer must be removed. 403 in
-// particular is how the controller reports a disabled user / expired sub.
 func TestQueryPeer_Denied(t *testing.T) {
 	for _, code := range []int{http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound} {
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -65,7 +63,6 @@ func TestQueryPeer_Denied(t *testing.T) {
 	}
 }
 
-// A 5xx is transient: the caller must not tear down a live peer over a blip.
 func TestQueryPeer_ServerErrorIsUnknown(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)

@@ -150,7 +150,6 @@ func TestDecryptTamperedCiphertext(t *testing.T) {
 		t.Fatalf("Encryption failed: %v", err)
 	}
 
-	// Flip a byte in the ciphertext portion (after the nonce)
 	tampered := make([]byte, len(ciphertext))
 	copy(tampered, ciphertext)
 	tampered[len(tampered)-1] ^= 0xFF
@@ -186,7 +185,7 @@ func TestEncryptWithInvalidKeySize(t *testing.T) {
 }
 
 func TestDecryptWithInvalidKeySize(t *testing.T) {
-	// Need valid-looking data: at least nonce (12) + tag (16) = 28 bytes
+
 	encrypted := make([]byte, 28)
 	invalidKey := []byte{0x01, 0x02, 0x03}
 

@@ -29,7 +29,7 @@ func checkDir(dir string) {
 		if err != nil || info.IsDir() {
 			return nil
 		}
-		// Only scan Go sources — binaries/assets can contain the filter as noise.
+
 		if !strings.HasSuffix(path, ".go") {
 			return nil
 		}
@@ -45,8 +45,7 @@ func checkDir(dir string) {
 		fbs := bytes.Split(fb, []byte{10})
 		for i := range fbs {
 			if bytes.Contains(fbs[i], filter) {
-				// Intentional prints allowed in the product (not debug leftovers).
-				// Match by content only — line numbers drift as the files change.
+
 				if path == "../client/logging.go" && bytes.Contains(fbs[i], []byte("fmt.Println(line)")) {
 					continue
 				}

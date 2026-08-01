@@ -1,5 +1,3 @@
-// Live log stream from the backend. One websocket, reconnects after 1s.
-
 import { wsURL } from "./client"
 import { useStore } from "@/store/store"
 

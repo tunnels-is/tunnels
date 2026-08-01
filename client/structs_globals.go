@@ -89,7 +89,6 @@ type ConnectionRequest struct {
 	Tag      string `json:"Tag"`
 	ServerID string `json:"ServerID"`
 
-	// Set using API call in PublicConnect
 	ServerIP   string `json:"ServerIP"`
 	ServerPort string `json:"ServerPort"`
 }
@@ -118,7 +117,6 @@ var (
 )
 
 type DNSReply struct {
-	// M       *dns.Msg
 	A       []dns.RR
 	Expires time.Time
 }
@@ -127,11 +125,7 @@ var letterRunes = []rune("ABCDEFGHIJKLMNOPQRSTUVWXYZ234567")
 
 type DisconnectForm struct {
 	ID string `json:"ID"`
-	// Tag optionally identifies the tunnel by its stable config tag. The live
-	// tunnel ID churns across auto-reconnects, so a disconnect that arrives while
-	// a tunnel is mid-reconnect can't be matched by ID alone; Tag lets us stop
-	// exactly that tunnel's reconnect loop / kill switch instead of falling back
-	// to stopping every loop.
+
 	Tag string `json:"Tag"`
 }
 
@@ -151,8 +145,6 @@ type TunnelMETA struct {
 	Tag      string
 	ServerID string
 
-	// This overwrites or adds to settings
-	// that are applied to the Node
 	EnableDefaultRoute bool
 	DNSServers         []string
 	DNSRecords         []*types.DNSRecord
@@ -160,32 +152,18 @@ type TunnelMETA struct {
 	Routes             []*types.Route
 	BlockedPorts       []uint16
 
-	// AllowedHosts is the firewall allowlist announced to the wg-server: the
-	// WireGuard peer IPs permitted to send traffic to this device. Relevant
-	// when the server runs with EnableFirewall (default-deny peer-to-peer).
 	AllowedHosts []string
 
-	// AllowAll, when true, announces that ANY peer may reach this device,
-	// overriding AllowedHosts. Disabled by default — it effectively opts this
-	// device out of the default-deny firewall, so it must be set explicitly.
 	AllowAll bool
 
-	// EnableWAN, when true, routes the connected server's WAN CIDR (the
-	// over-arching network aggregating sibling server subnets) through the
-	// tunnel, so traffic to peers on other servers in the same WAN returns
-	// over the VPN. Enabled by default on tunnel creation.
 	EnableWAN bool
 
-	// WireGuard: persistent base64 Curve25519 private key for this device.
-	// Generated on first use and reused across sessions so the server can
-	// keep a stable peer entry (Device.WireGuardKey).
 	WireGuardPrivKey string
 }
 
 type FORWARD_REQUEST struct {
 	Server *ControlServer
-	// URL      string
-	// Secure   bool
+
 	Path     string
 	Method   string
 	Timeout  int
@@ -238,7 +216,6 @@ type User struct {
 	IsAdmin               bool            `json:"IsAdmin"`
 	IsManager             bool            `json:"IsManager"`
 
-	// Client only
 	ControlServer *ControlServer
 	SaveFileHash  string
 }
@@ -282,7 +259,6 @@ func (c *ControlServer) GetURL(path string) string {
 }
 
 type CLIConfig struct {
-	// Cli specific settings
 	ControlServerID string
 	DeviceToken     string
 	UserID          string
@@ -297,7 +273,6 @@ type configV2 struct {
 	DisableBlockLists bool
 	CLIConfig         *CLIConfig
 
-	// API Setting
 	APIIP          string
 	APIPort        string
 	APICert        string
@@ -306,7 +281,6 @@ type configV2 struct {
 	APICertIPs     []string
 	APICertType    certs.CertType
 
-	// Generic
 	LogBlockedPorts  bool
 	DebugLogging     bool
 	ConsoleLogging   bool
@@ -316,7 +290,6 @@ type configV2 struct {
 	ConnectionTracer bool
 	BandwidthGraphs  bool
 
-	// DNS
 	DisableDNS        bool
 	LogBlockedDomains bool
 	LogAllDomains     bool
@@ -335,18 +308,15 @@ type configV2 struct {
 type stateV2 struct {
 	adminState bool
 
-	// Networking parameters
 	DefaultGateway       atomic.Pointer[net.IP] `json:"-"`
 	DefaultInterface     atomic.Pointer[net.IP] `json:"-"`
 	DefaultInterfaceID   atomic.Int32           `json:"-"`
 	DefaultInterfaceName atomic.Pointer[string] `json:"-"`
 
-	// Flags
 	Debug         bool
 	RequireConfig bool
 	TunnelType    string
 
-	// Disk Paths and filenames
 	BlockListPath  string
 	WhiteListPath  string
 	LogPath        string
@@ -414,7 +384,6 @@ type TUN struct {
 
 	wgDevice *device.Device
 
-	// Connection Requests + Response
 	CR             *ConnectionRequest
 	ServerResponse *types.ServerConnectResponse
 
@@ -426,10 +395,6 @@ type TUN struct {
 	serverInterfaceNetIP    net.IP
 	serverInterfaceIP4bytes [4]byte
 
-	// natMu guards both NAT maps. The egress path (TransLateIP, under the
-	// processingTUN egressMu) writes them while the ingress path (under the
-	// separate ingressMu) reads NATIngress — without a shared lock that is an
-	// unsynchronized map read/write and the runtime kills the process.
 	natMu      sync.RWMutex        `json:"-"`
 	NATEgress  map[[4]byte][4]byte `json:"-"`
 	NATIngress map[[4]byte][4]byte `json:"-"`
@@ -438,10 +403,8 @@ type TUN struct {
 	ingressBytes     atomic.Int64
 	BandwidthHistory atomic.Pointer[BandwidthHistory] `json:"-"`
 
-	// Server States
 	PingInt atomic.Int64
 
-	// EGRESS PACKET STUFF
 	EP_Protocol         byte
 	EP_DstIP            [4]byte
 	EP_IPv4HeaderLength byte
@@ -451,7 +414,6 @@ type TUN struct {
 	EP_NAT_IP           [4]byte
 	EP_NAT_OK           bool
 
-	// INGRESS PACKET STUFF
 	IP_SrcIP            [4]byte
 	IP_IPv4HeaderLength byte
 	IP_IPv4Header       []byte

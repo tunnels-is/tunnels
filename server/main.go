@@ -181,8 +181,6 @@ func main() {
 			panic(err)
 		}
 
-		// this is only used for production environments (tunnels.is)
-		// ======================================
 		if loadSecret("PayKey") != "" {
 			lemonClient := lemonsqueezy.New(lemonsqueezy.WithAPIKey(loadSecret("PayKey")))
 			if lemonClient == nil {
@@ -192,16 +190,11 @@ func main() {
 			lc.Store(lemonClient)
 			go signal.NewSignal("SUBSCANNER", ctx, 12*time.Hour, goroutineLogger, scanSubs)
 		}
-		// ======================================
 
 		go signal.NewSignal("API", ctx, 1*time.Second, goroutineLogger, launchAPIServer)
 
 		go signal.NewSignal("CONFIG", ctx, 30*time.Second, goroutineLogger, func() {
-			// Validate the reloaded config before swapping it in — otherwise an
-			// edited config with a weak/empty CookieSigningKey or TwoFactorKey
-			// would silently downgrade cookie/2FA crypto at runtime (the startup
-			// check guards only the initial load). Keep the previous config on
-			// failure.
+
 			C, err := parseServerConfig(serverConfigPath)
 			if err != nil {
 				logger.Error("config could not be loaded", "path", serverConfigPath, slog.Any("err", err))
@@ -248,10 +241,6 @@ func main() {
 	<-quit
 	logger.Info("Tunnels server exiting")
 
-	// Cancel the root context so wg-server (and other ctx-aware goroutines)
-	// unblock their <-ctx.Done() branch. Then wait — bounded — for wg-server
-	// to finish cleanupNet so its iptables rules are drained and the next
-	// start's preflight has a clean slate.
 	cancel()
 	if wgDone != nil {
 		select {
@@ -284,8 +273,6 @@ func validateServerConfig(c *types.ServerConfig) error {
 	return nil
 }
 
-// parseServerConfig reads and unmarshals the server config WITHOUT storing it,
-// so callers can validate before swapping it in.
 func parseServerConfig(path string) (*types.ServerConfig, error) {
 	nb, err := os.ReadFile(path)
 	if err != nil {
@@ -319,8 +306,7 @@ func LoadServerConfig(path string) (err error) {
 
 func SaveServerConfig(path string) (err error) {
 	C := Config.Load()
-	// 0600: the config holds AdminAPIKey / TwoFactorKey / CookieSigningKey
-	// (AES-key seeds); os.Create's 0644 would expose them to every local user.
+
 	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
 		return err
@@ -378,7 +364,7 @@ func SaveWGConfig(path string) error {
 	if W == nil {
 		return fmt.Errorf("no wg config loaded")
 	}
-	// 0600: the wg config carries the per-server X-WG-KEY.
+
 	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
 		return err
@@ -508,9 +494,7 @@ func writeWGConfig() error {
 	if err := LoadWGConfig(wgConfigPath); err == nil {
 		return nil
 	}
-	// Default to verifying the controller's TLS certificate. Self-signed / all-in-one
-	// setups must set InsecureSkipVerify: true explicitly (self-signed certs can't be
-	// verified against system roots).
+
 	WGConfig.Store(&types.WGBootstrap{InsecureSkipVerify: false})
 	return SaveWGConfig(wgConfigPath)
 }
@@ -550,9 +534,6 @@ func initializeAdminUser() error {
 	return nil
 }
 
-// defaultWGSubnet is the IPv4 CIDR assigned to the default "tunnels" server on
-// first boot. Override via /ui/wg/server-config/update if the network conflicts
-// with the host's LAN.
 const defaultWGSubnet = "10.0.0.0/22"
 
 func initializeDefaultServer() error {

@@ -1,7 +1,3 @@
-// Lightweight theme manager — persists user choice to localStorage and
-// toggles a `dark` class on <html>. Imported once at app startup so the
-// class is applied before React mounts (prevents a flash).
-
 const STORAGE_KEY = "tunnels-admin:theme";
 
 export const getTheme = () => {
@@ -9,7 +5,7 @@ export const getTheme = () => {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored === "light" || stored === "dark") return stored;
   } catch {
-    // ignore
+
   }
   return "light";
 };
@@ -27,10 +23,9 @@ export const setTheme = (theme) => {
   try {
     localStorage.setItem(STORAGE_KEY, theme);
   } catch {
-    // ignore
+
   }
   applyTheme(theme);
 };
 
-// Apply on module import (synchronous, before React mounts).
 applyTheme(getTheme());

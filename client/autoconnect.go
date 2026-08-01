@@ -16,10 +16,6 @@ import (
 	"golang.org/x/net/ipv4"
 )
 
-// AutoConnect wraps PublicConnect: the UI only translates the user's timezone
-// to a country code; everything else (server discovery, latency probing,
-// device bookkeeping, connecting) happens here.
-
 type AutoConnectForm struct {
 	Country     string         `json:"Country"`
 	UserID      string         `json:"UserID"`
@@ -43,8 +39,6 @@ func (f *AutoConnectForm) authHeaders() map[string]string {
 	}
 }
 
-// fetchServersByCountry asks the controller for up to 10 random servers in
-// the given country.
 func fetchServersByCountry(form *AutoConnectForm) ([]*types.Server, error) {
 	url := form.Server.GetURL("/client/servers/country")
 	reqBody := map[string]any{
@@ -68,10 +62,6 @@ func fetchServersByCountry(form *AutoConnectForm) ([]*types.Server, error) {
 	return servers, nil
 }
 
-// pingICMP measures round-trip time to a server using an ICMP echo. The VPN
-// servers do not accept TCP connections, so this is a real ping. Tries a raw
-// ICMP socket first (the client usually runs privileged), then the
-// unprivileged datagram fallback.
 func pingICMP(server *types.Server) (time.Duration, bool) {
 	ip := net.ParseIP(server.IP)
 	if ip == nil {
@@ -138,7 +128,7 @@ func pingICMP(server *types.Server) (time.Duration, bool) {
 			peerIP = a.IP
 		}
 		if peerIP == nil || !peerIP.Equal(ip) {
-			continue // a reply from someone else — keep reading until deadline
+			continue
 		}
 
 		parsed, err := icmp.ParseMessage(1, reply[:n])
@@ -152,7 +142,6 @@ func pingICMP(server *types.Server) (time.Duration, bool) {
 	}
 }
 
-// findDeviceByPubKey looks up the user's device matching the tunnel pubkey.
 func findDeviceByPubKey(form *AutoConnectForm, pubKey string) (*types.Device, error) {
 	url := form.Server.GetURL("/client/device/list/user")
 	reqBody := map[string]any{
@@ -193,12 +182,9 @@ func deleteDevice(form *AutoConnectForm, device *types.Device) error {
 	return nil
 }
 
-// ensureDeviceForServer deletes the tunnel's device on the controller when it
-// is bound to a different server, so PublicConnect re-creates it with an IP
-// from the right subnet.
 func ensureDeviceForServer(form *AutoConnectForm, meta *TunnelMETA, server *types.Server) {
 	if meta == nil || meta.WireGuardPrivKey == "" {
-		return // no key yet -> no device exists, PublicConnect will create one
+		return
 	}
 	pubKey, err := deriveWGPubKey(meta.WireGuardPrivKey)
 	if err != nil {
@@ -223,7 +209,6 @@ func ensureDeviceForServer(form *AutoConnectForm, meta *TunnelMETA, server *type
 	}
 }
 
-// countryEqual compares ISO country codes, treating the common UK alias as GB.
 func countryEqual(a, b string) bool {
 	norm := func(s string) string {
 		s = strings.ToUpper(s)
@@ -264,8 +249,6 @@ func findTunnelMetaByTag(tag string) (meta *TunnelMETA) {
 	return
 }
 
-// CountryAutoConnect finds the fastest reachable server in a country and
-// connects the tunnel to it. (AutoConnect is taken by the reconnect loop.)
 func CountryAutoConnect(form *AutoConnectForm) (*AutoConnectResponse, int, error) {
 	defer RecoverAndLog()
 
@@ -273,7 +256,7 @@ func CountryAutoConnect(form *AutoConnectForm) (*AutoConnectResponse, int, error
 		ERROR("auto-connect: no control server given")
 		return nil, 400, errors.New("no control server given")
 	}
-	// Allowlist the control server and pin its TLS/port from stored config.
+
 	if err := authorizeControlServer(form.Server); err != nil {
 		return nil, 403, err
 	}
@@ -291,8 +274,6 @@ func CountryAutoConnect(form *AutoConnectForm) (*AutoConnectResponse, int, error
 		INFO("auto-connect: no tunnel meta found for tag ", form.Tag, ", PublicConnect will report if this is fatal")
 	}
 
-	// Shortcut: when the tunnel already has a device whose server is in the
-	// requested country, reuse it instead of probing for a new server.
 	if meta != nil && meta.WireGuardPrivKey != "" {
 		if pubKey, err := deriveWGPubKey(meta.WireGuardPrivKey); err == nil {
 			device, err := findDeviceByPubKey(form, pubKey)

@@ -1,8 +1,3 @@
-// Small shared building blocks. Everything visual is daisyUI; these only
-// remove repetition (label + control pairs, page headers, cards, ...).
-
-// The sidebar already tells the user where they are — pages have no titles,
-// only an optional right-aligned action row.
 export const Page = ({ actions, children }) => (
 	<div className="min-h-screen bg-base-200 pl-14">
 		<div className="w-full p-6">
@@ -63,7 +58,6 @@ export const InfoRow = ({ label, value, mono }) => (
 	</div>
 )
 
-// Toolbar row under the page header — controls without a card around them.
 export const Toolbar = ({ children }) => (
 	<div className="mb-4 flex flex-wrap items-center gap-3">{children}</div>
 )

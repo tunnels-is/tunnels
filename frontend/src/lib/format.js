@@ -1,5 +1,3 @@
-// Small formatting helpers (replaces dayjs).
-
 const dateFmt = new Intl.DateTimeFormat("en-GB", {
 	weekday: "short",
 	day: "numeric",
@@ -18,7 +16,6 @@ const fullFmt = new Intl.DateTimeFormat("en-GB", {
 	hour12: false,
 })
 
-// "Wed 11. 14:05:33" — used in DNS stats and logs
 export const shortDate = (value) => {
 	const d = new Date(value)
 	if (isNaN(d)) return String(value)
@@ -26,7 +23,6 @@ export const shortDate = (value) => {
 	return `${p.weekday} ${p.day}. ${p.hour}:${p.minute}:${p.second}`
 }
 
-// "11 Jun 2026, 14:05"
 export const fullDate = (value) => {
 	const d = new Date(value)
 	if (isNaN(d)) return String(value)

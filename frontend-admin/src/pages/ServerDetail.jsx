@@ -47,13 +47,10 @@ export default function ServerDetail() {
         setWans(Array.isArray(data) ? data : []);
       }
     } catch {
-      // non-fatal: the WAN selector just stays empty
+
     }
   };
 
-  // location.state.server is only an instant-paint placeholder from the list,
-  // which may be stale (e.g. after an APIKey rotation). Always refetch the
-  // authoritative record from the backend on mount.
   useEffect(() => {
     load();
     loadWans();
@@ -104,8 +101,6 @@ export default function ServerDetail() {
     navigator.clipboard.writeText(text).catch(() => {});
   };
 
-  // Rotate the APIKey: re-save the server with the key cleared; the backend
-  // mints a fresh one when it sees an empty APIKey.
   const handleRegenerateKey = async () => {
     setRegenerating(true);
     setKeyError('');

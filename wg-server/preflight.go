@@ -8,8 +8,6 @@ import (
 	"strings"
 )
 
-// ruleDumper returns the output of `bin -t table -S chain`. Indirected so
-// tests can feed canned chain listings.
 type ruleDumper func(bin, table, chain string) (string, error)
 
 func defaultRuleDumper(bin, table, chain string) (string, error) {
@@ -21,22 +19,16 @@ func defaultRuleDumper(bin, table, chain string) (string, error) {
 	return string(out), nil
 }
 
-// ruleConflict is one offending iptables rule discovered by the preflight
-// check. It carries enough context for the operator to locate and drain the
-// rule by hand without re-running iptables -L themselves.
 type ruleConflict struct {
-	bin   string // "iptables" / "ip6tables"
-	table string // "filter" / "nat"
-	chain string // "INPUT" / "FORWARD" / "POSTROUTING"
-	pos   int    // 1-based position within the chain, matching `iptables -L --line-numbers`
-	field string // which config field clashed: "WireGuardSubnet" / "WireGuardIface" / "WireGuardPort"
-	match string // the exact "flag value" tokens that matched, e.g. `-s 10.0.0.0/22`
-	rule  string // the full -A line as printed by `iptables -S`
+	bin   string
+	table string
+	chain string
+	pos   int
+	field string
+	match string
+	rule  string
 }
 
-// drainCommand returns a ready-to-paste shell command that removes this rule.
-// It simply rewrites the leading `-A <chain>` to `-D <chain>`, which is
-// exactly what `iptables -S` is meant to round-trip into.
 func (c ruleConflict) drainCommand() string {
 	delForm := strings.Replace(c.rule, "-A ", "-D ", 1)
 	return fmt.Sprintf("%s -t %s %s", c.bin, c.table, delForm)
@@ -51,16 +43,6 @@ func (c ruleConflict) String() string {
 	)
 }
 
-// preflightIPTables refuses to start the wg-server if any existing
-// iptables/ip6tables rule references this config's WireGuardSubnet,
-// WireGuardSubnet6, WireGuardIface, or WireGuardPort.
-//
-// The check is intentionally strict: the legacy on-shutdown cleanup is
-// config-pinned and leaks rules whenever the operator changes subnet or iface
-// between runs. Rather than try to auto-clean state we no longer recognise
-// (and risk silently shadowing it), we exit and ask the operator to drain the
-// table by hand. This also enforces the invariant that only one wg-server ever
-// owns a given subnet on a host.
 func preflightIPTables(cfg *Config) error {
 	return preflightIPTablesWith(cfg, defaultRuleDumper)
 }
@@ -91,7 +73,7 @@ func preflightIPTablesWith(cfg *Config, dump ruleDumper) error {
 			if !strings.HasPrefix(line, "-A ") {
 				continue
 			}
-			pos++ // counts only -A rules, mirroring how iptables numbers them
+			pos++
 			field, match := ruleConflictsWithCfg(line, cfg, c.ipv6)
 			if field == "" {
 				continue
@@ -131,13 +113,6 @@ func cfgOrDash(s string) string {
 	return s
 }
 
-// ruleConflictsWithCfg inspects a single `iptables -S` line and reports
-// whether it touches anything this wg-server owns under cfg. The returned
-// field is the offending config name ("WireGuardSubnet", "WireGuardIface", or
-// "WireGuardPort") and match is the exact "flag value" pair that triggered the
-// hit (e.g. `-s 10.0.0.0/22`). Both are empty when the rule does not conflict.
-//
-// The ipv6 flag selects IPv4 vs IPv6 subnet identity.
 func ruleConflictsWithCfg(rule string, cfg *Config, ipv6 bool) (field, match string) {
 	subnet := cfg.WireGuardSubnet
 	if ipv6 {
@@ -171,10 +146,6 @@ func ruleConflictsWithCfg(rule string, cfg *Config, ipv6 bool) (field, match str
 	return "", ""
 }
 
-// hasFlagValue reports whether rule (a single `iptables -S` line, whitespace-
-// separated) contains the pair `flag value` as adjacent tokens. Token-level
-// matching avoids substring false positives — e.g. WireGuardSubnet=10.0.0.0/2
-// must not match a rule that carries -s 10.0.0.0/22.
 func hasFlagValue(rule, flag, value string) bool {
 	fields := strings.Fields(rule)
 	for i := 0; i < len(fields)-1; i++ {
@@ -185,14 +156,6 @@ func hasFlagValue(rule, flag, value string) bool {
 	return false
 }
 
-// ShowActiveRules writes every currently-installed iptables/ip6tables rule
-// across the chains wg-server cares about that matches a config-agnostic
-// "looks like wg-server" heuristic. Unlike preflightIPTables, this does not
-// take a Config — it surfaces rules left over from any prior run regardless
-// of which subnet / iface / PublicIP they were installed under.
-//
-// Useful for operators who hit a preflight conflict and want to see what
-// drain commands to run, without restarting against the offending config.
 func ShowActiveRules() error {
 	return showActiveRulesWith(os.Stdout, defaultRuleDumper)
 }
@@ -256,11 +219,6 @@ func showActiveRulesWith(w io.Writer, dump ruleDumper) error {
 	return nil
 }
 
-// wgRuleHeuristic returns a non-empty reason if rule (a single `iptables -S`
-// line in `chain`) looks like something wg-server might own under SOME
-// configuration. Config-agnostic on purpose: callers use it to find stale
-// rules from prior runs whose subnet/iface/PublicIP no longer match what
-// the current config knows about.
 func wgRuleHeuristic(rule, chain string) string {
 	if interfaceTokenStartsWith(rule, "wg") {
 		return "references wg-prefixed iface"
@@ -271,8 +229,7 @@ func wgRuleHeuristic(rule, chain string) string {
 		}
 	}
 	if chain == "INPUT" {
-		// UDP ACCEPT in INPUT is uncommon outside VPN/DHCP-server-style
-		// setups, so worth surfacing for operator review.
+
 		if hasFlagValue(rule, "-p", "udp") && strings.HasSuffix(rule, "-j ACCEPT") {
 			return "UDP ACCEPT in INPUT"
 		}
@@ -280,11 +237,6 @@ func wgRuleHeuristic(rule, chain string) string {
 	return ""
 }
 
-// interfaceTokenStartsWith reports whether rule (an `iptables -S` line)
-// contains an -i or -o flag whose value starts with prefix. Token-level so
-// "wgateway0" doesn't false-match a "wg" prefix… wait, actually it does — but
-// for this heuristic that's acceptable: a sysadmin who names an unrelated
-// iface "wg…" is choosing into the false positive.
 func interfaceTokenStartsWith(rule, prefix string) bool {
 	fields := strings.Fields(rule)
 	for i := 0; i < len(fields)-1; i++ {

@@ -13,8 +13,7 @@ const LOGGING_OPTIONS = [
 	{ key: "DebugLogging", label: "Debug" },
 	{ key: "BandwidthGraphs", label: "Bandwidth Graphs" },
 	{ key: "ConsoleLogOnly", label: "Console Only" },
-	// "DeepDebugLoggin" removed — the backend Config has no such field, so the
-	// toggle was a no-op that misled the user.
+
 ]
 
 const Settings = () => {

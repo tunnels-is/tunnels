@@ -25,21 +25,14 @@ func initSyncClient(cfg *Config) {
 	}
 }
 
-// authResult classifies the controller's answer for a peer at (re)connect time.
 type authResult int
 
 const (
-	authAllowed authResult = iota // authorized; peer is (re)installed
-	authDenied                    // controller definitively rejected it; caller removes the peer
-	authUnknown                   // transient failure (unreachable / 5xx); caller must NOT change peer state
+	authAllowed authResult = iota
+	authDenied
+	authUnknown
 )
 
-// reconcilePeer re-checks the controller's authorization for pubKeyB64 and
-// installs the peer when allowed. It runs on every (re)connect handshake, so a
-// revocation on the controller (user disabled, subscription expired, device
-// deleted, group removed) takes effect on the peer's next handshake without a
-// wg-server restart. A transient controller error returns authUnknown so a blip
-// does not tear down live tunnels.
 func reconcilePeer(pubKeyB64 string) authResult {
 	cfg := activeConfig.Load()
 	if cfg == nil {
@@ -78,10 +71,6 @@ func reconcilePeer(pubKeyB64 string) authResult {
 		}
 	}
 
-	// Install the firewall slot BEFORE adding the peer to the wg device, so the
-	// slot exists the instant the peer can pass traffic. Reset only on a fresh
-	// add — a rekey/reconnect of an already-installed peer must not wipe the
-	// allowlist it announced after connecting.
 	if _, rekey := addedPeerKeys.LoadOrStore(hexKey, struct{}{}); !rekey {
 		resetPeer(ip, ipv6)
 	}
@@ -93,8 +82,6 @@ func reconcilePeer(pubKeyB64 string) authResult {
 	return authAllowed
 }
 
-// peerAllowedIPs builds the list of allowed IPs for a peer.
-// Always includes the IPv4 /32; adds the IPv6 /128 if non-empty.
 func peerAllowedIPs(ip, ipv6 string) []string {
 	ips := []string{ip + "/32"}
 	if ipv6 != "" {
@@ -115,11 +102,6 @@ func subnetContains(cidr, ipStr string) bool {
 	return subnet.Contains(ip)
 }
 
-// queryPeer asks the controller whether pubKeyB64 is authorized on this server,
-// mapping the HTTP status to an authResult:
-//   - 200            → authAllowed (with the decoded peer);
-//   - 401/403/404    → authDenied (not allowed / disabled / expired / unknown device);
-//   - anything else  → authUnknown (5xx or transport error — treated as transient).
 func queryPeer(cfg *Config, pubKeyB64 string) (authResult, *types.WGPeer) {
 	endpoint := cfg.ControllerURL + "/wg/peer?pubkey=" + url.QueryEscape(pubKeyB64)
 	req, err := http.NewRequest(http.MethodGet, endpoint, nil)

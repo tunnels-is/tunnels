@@ -28,11 +28,6 @@ func ResetEverything() {
 	RestoreSaneDNSDefaults()
 }
 
-// SendRequestToURL sends a JSON request. validateCert mirrors
-// Server.ValidateCertificate: true verifies the peer's TLS certificate, false
-// skips verification (explicit opt-out for self-signed controllers). The
-// parameter was previously named skipVerify while carrying the opposite
-// meaning — a footgun that made the zero value fail open.
 func SendRequestToURL(tc *tls.Config, method string, url string, data any, timeoutMS int, validateCert bool, extraHeaders ...map[string]string) ([]byte, int, error) {
 	defer RecoverAndLog()
 
@@ -107,18 +102,6 @@ func SendRequestToURL(tc *tls.Config, method string, url string, data any, timeo
 	return respBodyBytes, resp.StatusCode, nil
 }
 
-// authorizeControlServer enforces that s names a configured control server and
-// takes its transport-security-relevant fields (ValidateCertificate,
-// CertificatePath) from the stored config. This prevents a caller that reaches
-// the local API from (a) pointing the client at an arbitrary host/port (SSRF)
-// and (b) supplying ValidateCertificate=false / a custom cert path to strip TLS.
-//
-// The allowlist is the set of (Host, Port) pairs in ControlServers — a host may
-// legitimately be configured on multiple ports (e.g. api.tunnels.is:443 and
-// :444), so matching on Host alone and rewriting the port would force every
-// request onto whichever entry happened to be listed first. Match on Host+Port
-// and keep the requested port; only fall back to filling the port from the
-// config when the caller left it empty.
 func authorizeControlServer(s *ControlServer) error {
 	if s == nil {
 		return errors.New("no control server specified")
@@ -131,8 +114,7 @@ func authorizeControlServer(s *ControlServer) error {
 			return nil
 		}
 	}
-	// Caller passed only a host (empty port): resolve it from the first host
-	// match, preserving the previous "fill port from config" behaviour.
+
 	if s.Port == "" {
 		for _, cs := range conf.ControlServers {
 			if cs.Host == s.Host {
@@ -192,8 +174,6 @@ func ForwardToController(FR *FORWARD_REQUEST) (any, int) {
 	return respObj, code
 }
 
-// warnedInsecureHosts tracks hosts we've already warned about, so an
-// unverified-TLS controller shows up in the logs once instead of per request.
 var warnedInsecureHosts sync.Map
 
 func warnInsecureHost(host string) {
@@ -205,18 +185,12 @@ func warnInsecureHost(host string) {
 
 var AZ_CHAR_CHECK = regexp.MustCompile(`^[a-zA-Z0-9]*$`)
 
-// TAG_CHAR_CHECK bounds a tunnel Tag to a safe filename charset. Tag is
-// concatenated into on-disk paths (writeTunnelsToDisk, delete handlers), so
-// path separators or ".." would be a traversal (arbitrary file write/delete).
 var TAG_CHAR_CHECK = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
 
-// allowedConfigFormats is the whitelist of tunnel-file extensions. Anything
-// else is attacker-controlled input that would land in a filesystem path.
 var allowedConfigFormats = map[string]struct{}{
 	"": {}, ".json": {}, ".conf": {}, ".yaml": {}, ".yml": {},
 }
 
-// safeTunnelTag reports whether tag is a safe, non-traversing filename component.
 func safeTunnelTag(tag string) bool {
 	return TAG_CHAR_CHECK.MatchString(tag)
 }
@@ -238,11 +212,6 @@ func validateTunnelMeta(tun *TunnelMETA, oldTag string) (err []string) {
 		err = append(err, "unsupported tunnel config format: "+tun.ConfigFormat)
 	}
 
-	// The kill switch works by blackholing the default route when the tunnel
-	// drops; it is meaningless without a default route (there is nothing to
-	// blackhole) and at runtime handleTunnelDeath already gates on both flags.
-	// Reject the incoherent config so the toggle can't imply protection it will
-	// never provide.
 	if tun.KillSwitch && !tun.EnableDefaultRoute {
 		err = append(err, "kill switch requires the default route to be enabled")
 	}

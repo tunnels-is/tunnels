@@ -28,7 +28,6 @@ type TInterface struct {
 	Persistent  bool
 	Gateway     string
 
-	// linux ?
 	Multiqueue bool
 	User       uint
 	Group      uint
@@ -267,8 +266,6 @@ func (t *TInterface) Connect(tun *TUN) (err error) {
 		}
 	}
 
-	// Route the server's WAN (over-arching network) through the tunnel so
-	// traffic to peers on sibling servers in the same WAN returns over the VPN.
 	if meta.EnableWAN {
 		if wan := tun.ServerResponse.WANCIDR; wan != "" {
 			err = IP_AddRoute(wan, "", t.IPv4Address, "0")

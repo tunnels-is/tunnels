@@ -5,19 +5,19 @@ import (
 	"fmt"
 	"os"
 
-	qrcode "github.com/skip2/go-qrcode"
 	"github.com/mdp/qrterminal/v3"
+	qrcode "github.com/skip2/go-qrcode"
 )
 
 func main() {
-	privKey    := flag.String("privkey",    "", "client private key (base64)")
-	address    := flag.String("address",    "", "client VPN address, e.g. 10.1.0.2/32")
-	dns        := flag.String("dns",        "1.1.1.1", "DNS server")
-	serverPub  := flag.String("serverpub",  "", "server WireGuard public key (base64)")
-	endpoint   := flag.String("endpoint",   "", "server endpoint, e.g. 1.2.3.4:442")
-	allowedIPs := flag.String("allowed",    "0.0.0.0/0", "AllowedIPs")
-	keepalive  := flag.Int("keepalive",     25, "PersistentKeepalive in seconds")
-	out        := flag.String("out",        "wg-client.png", "output PNG filename")
+	privKey := flag.String("privkey", "", "client private key (base64)")
+	address := flag.String("address", "", "client VPN address, e.g. 10.1.0.2/32")
+	dns := flag.String("dns", "1.1.1.1", "DNS server")
+	serverPub := flag.String("serverpub", "", "server WireGuard public key (base64)")
+	endpoint := flag.String("endpoint", "", "server endpoint, e.g. 1.2.3.4:442")
+	allowedIPs := flag.String("allowed", "0.0.0.0/0", "AllowedIPs")
+	keepalive := flag.Int("keepalive", 25, "PersistentKeepalive in seconds")
+	out := flag.String("out", "wg-client.png", "output PNG filename")
 	flag.Parse()
 
 	if *privKey == "" || *address == "" || *serverPub == "" || *endpoint == "" {

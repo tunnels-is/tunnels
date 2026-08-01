@@ -23,7 +23,6 @@ func TestValidateUserKeyFile(t *testing.T) {
 		t.Fatalf("0600 file owned by us should validate: %v", err)
 	}
 
-	// Group/other-readable must be rejected — the key encrypts saved credentials.
 	insecure := filepath.Join(dir, "insecure.key")
 	if err := os.WriteFile(insecure, []byte("x"), 0o644); err != nil {
 		t.Fatal(err)
