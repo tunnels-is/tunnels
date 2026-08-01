@@ -345,66 +345,6 @@ func IP_DelRouteV6(network string, _ string, _ string) (err error) {
 	return
 }
 
-func DNS_Del(IFNameOrIndex string) (err error) {
-	cmd := exec.Command(
-		"netsh",
-		"interface",
-		"ipv4",
-		"delete",
-		"dnsservers",
-		`name=`+IFNameOrIndex,
-		"all",
-	)
-	DEBUG(
-		"netsh",
-		"interface",
-		"ipv4",
-		"delete",
-		"dnsservers",
-		`name=`+IFNameOrIndex,
-		"all",
-	)
-	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
-	ob, cerr := cmd.Output()
-	if cerr != nil {
-		ERROR(fmt.Sprintf("%s - out: %s ", ob, cerr))
-		return cerr
-	}
-
-	return nil
-}
-
-func DNS_Set(IFNameOrIndex, DNSIP, Index string) (err error) {
-	cmd := exec.Command(
-		"netsh",
-		"interface",
-		"ipv4",
-		"add",
-		"dnsservers",
-		`name=`+IFNameOrIndex,
-		"address="+DNSIP,
-		"index="+Index,
-	)
-	DEBUG(
-		"netsh",
-		"interface",
-		"ipv4",
-		"add",
-		"dnsservers",
-		`name=`+IFNameOrIndex,
-		"address="+DNSIP,
-		"index="+Index,
-	)
-	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
-	ob, cerr := cmd.Output()
-	if cerr != nil {
-		ERROR(fmt.Sprintf("%s - out: %s ", ob, cerr))
-		return cerr
-	}
-
-	return nil
-}
-
 func (t *TInterface) SetMTU() error {
 	cmd := exec.Command(
 		"netsh",

@@ -24,8 +24,6 @@ func ResetEverything() {
 		}
 		return true
 	})
-
-	RestoreSaneDNSDefaults()
 }
 
 func SendRequestToURL(tc *tls.Config, method string, url string, data any, timeoutMS int, validateCert bool, extraHeaders ...map[string]string) ([]byte, int, error) {

@@ -3,146 +3,28 @@
 package client
 
 import (
-	"bytes"
-	"fmt"
-	"io"
-	"os"
 	"os/exec"
 	"strconv"
 	"strings"
 	"sync/atomic"
-	"syscall"
-	"unsafe"
 )
 
 type TInterface struct {
 	tunnel atomic.Pointer[*TUN]
 
 	Name        string
-	SystemName  string
 	IPv4Address string
 	IPv6Address string
 	NetMask     string
 	TxQueuelen  int32
 	MTU         int32
-	Persistent  bool
 	Gateway     string
-
-	Multiqueue bool
-	User       uint
-	Group      uint
-	TunnelFile string
-	RWC        io.ReadWriteCloser
-	FD         uintptr
-}
-
-func (t *TInterface) Close() error {
-	if t.RWC != nil {
-		return t.RWC.Close()
-	}
-	return nil
-}
-
-const (
-	appleUTUNCtl     = "com.apple.net.utun_control"
-	appleCTLIOCGINFO = (0x40000000 | 0x80000000) | ((100 & 0x1fff) << 16) | uint32(byte('N'))<<8 | 3
-	appleTUNSIFMODE  = (0x80000000) | ((4 & 0x1fff) << 16) | uint32(byte('t'))<<8 | 94
-)
-
-type sockaddrCtl struct {
-	scLen      uint8
-	scFamily   uint8
-	ssSysaddr  uint16
-	scID       uint32
-	scUnit     uint32
-	scReserved [5]uint32
-}
-
-var sockaddrCtlSize uintptr = 32
-
-func (t *TInterface) Create() (err error) {
-	ifIndex := -1
-
-	var fd int
-	if fd, err = syscall.Socket(
-		syscall.AF_SYSTEM,
-		syscall.SOCK_DGRAM,
-		2,
-	); err != nil {
-		return fmt.Errorf("error in syscall.Socket: %v", err)
-	}
-
-	ctlInfo := &struct {
-		ctlID   uint32
-		ctlName [96]byte
-	}{}
-	copy(ctlInfo.ctlName[:], []byte(appleUTUNCtl))
-
-	if _, _, errno := syscall.Syscall(
-		syscall.SYS_IOCTL,
-		uintptr(fd),
-		uintptr(appleCTLIOCGINFO),
-		uintptr(unsafe.Pointer(ctlInfo)),
-	); errno != 0 {
-		err = errno
-		return fmt.Errorf("error in syscall.Syscall(syscall.SYS_IOCTL, ...): %v", err)
-	}
-
-	addrP := unsafe.Pointer(&sockaddrCtl{
-		scLen:     uint8(sockaddrCtlSize),
-		scFamily:  syscall.AF_SYSTEM,
-		ssSysaddr: 2,
-		scID:      ctlInfo.ctlID,
-		scUnit:    uint32(ifIndex) + 1,
-	})
-
-	if _, _, errno := syscall.RawSyscall(
-		syscall.SYS_CONNECT,
-		uintptr(fd),
-		uintptr(addrP),
-		uintptr(sockaddrCtlSize),
-	); errno != 0 {
-		err = errno
-		return fmt.Errorf("error in syscall.RawSyscall(syscall.SYS_CONNECT, ...): %v", err)
-	}
-
-	var ifName struct {
-		name [16]byte
-	}
-	ifNameSize := uintptr(16)
-
-	_, _, errno := syscall.Syscall6(syscall.SYS_GETSOCKOPT, uintptr(fd),
-		2,
-		2,
-		uintptr(unsafe.Pointer(&ifName)),
-		uintptr(unsafe.Pointer(&ifNameSize)), 0)
-	if errno != 0 {
-		err = errno
-		return fmt.Errorf("error in syscall.Syscall6(syscall.SYS_GETSOCKOPT, ...): %v", err)
-	}
-
-	err = syscall.SetNonblock(fd, true)
-	if err != nil {
-		return fmt.Errorf("setting non-blocking error")
-	}
-
-	t.SystemName = string(bytes.Replace(ifName.name[:], []byte{0}, []byte{}, -1))
-	t.RWC = os.NewFile(uintptr(fd), t.SystemName)
-	return nil
-}
-
-func (t *TInterface) sysName() string {
-	if t.SystemName != "" {
-		return t.SystemName
-	}
-	return t.Name
 }
 
 func (t *TInterface) Up() (err error) {
-	name := t.sysName()
-	DEBUG("ifconfig", name, t.IPv4Address, t.Gateway, "up")
+	DEBUG("ifconfig", t.Name, t.IPv4Address, t.Gateway, "up")
 
-	out, err := exec.Command("ifconfig", name, t.IPv4Address, t.Gateway, "up").CombinedOutput()
+	out, err := exec.Command("ifconfig", t.Name, t.IPv4Address, t.Gateway, "up").CombinedOutput()
 	if err != nil {
 		ERROR("unable to bring up tunnel adapter: ", string(out), " err: ", err)
 		return err
@@ -151,23 +33,9 @@ func (t *TInterface) Up() (err error) {
 	return
 }
 
-func (t *TInterface) Down() (err error) {
-	name := t.sysName()
-	DEBUG("ifconfig", name, "down")
-
-	out, err := exec.Command("ifconfig", name, "down").CombinedOutput()
-	if err != nil {
-		ERROR("unable to bring down tunnel adapter: ", string(out), " err: ", err)
-		return err
-	}
-
-	return
-}
-
 func (t *TInterface) SetMTU() (err error) {
-	name := t.sysName()
-	DEBUG("ifconfig", name, "mtu", strconv.FormatInt(int64(t.MTU), 10))
-	out, err := exec.Command("ifconfig", name, "mtu", strconv.FormatInt(int64(t.MTU), 10)).CombinedOutput()
+	DEBUG("ifconfig", t.Name, "mtu", strconv.FormatInt(int64(t.MTU), 10))
+	out, err := exec.Command("ifconfig", t.Name, "mtu", strconv.FormatInt(int64(t.MTU), 10)).CombinedOutput()
 	if err != nil {
 		ERROR("Unable to change mtu out: ", string(out), " err: ", err)
 		return err
@@ -175,40 +43,28 @@ func (t *TInterface) SetMTU() (err error) {
 	return
 }
 
-func (t *TInterface) Netmask() (err error) {
-	return nil
-}
-
-func (t *TInterface) SetTXQueueLen() (err error) {
-
-	return nil
-}
-
 func (t *TInterface) AddrV6() (err error) {
-
 	if t.IPv6Address == "" {
 		return nil
 	}
 
-	name := t.sysName()
 	ipv6Addr := t.IPv6Address
 	if !strings.Contains(ipv6Addr, "/") {
 		ipv6Addr = ipv6Addr + "/64"
 	}
 
-	DEBUG("ifconfig", name, "inet6", ipv6Addr)
-	out, err := exec.Command("ifconfig", name, "inet6", ipv6Addr).CombinedOutput()
+	DEBUG("ifconfig", t.Name, "inet6", ipv6Addr)
+	out, err := exec.Command("ifconfig", t.Name, "inet6", ipv6Addr).CombinedOutput()
 	if err != nil {
-
 		if strings.Contains(string(out), "File exists") || strings.Contains(err.Error(), "exists") {
-			DEBUG("IPv6 address already exists on interface: ", name)
+			DEBUG("IPv6 address already exists on interface: ", t.Name)
 			return nil
 		}
 		ERROR("IPv6 address configuration failed: ", err, " out: ", string(out))
 		return err
 	}
 
-	DEBUG("Added IPv6 address ", t.IPv6Address, " to interface ", name)
+	DEBUG("Added IPv6 address ", t.IPv6Address, " to interface ", t.Name)
 	return nil
 }
 
@@ -218,10 +74,6 @@ func (t *TInterface) Connect(tun *TUN) (err error) {
 		return
 	}
 	err = t.SetMTU()
-	if err != nil {
-		return
-	}
-	err = t.SetTXQueueLen()
 	if err != nil {
 		return
 	}
@@ -242,7 +94,7 @@ func (t *TInterface) Connect(tun *TUN) (err error) {
 		}
 
 		if t.IPv6Address != "" {
-			iperr := IP_AddRouteV6("default", t.SystemName, t.IPv6Address, "0")
+			iperr := IP_AddRouteV6("default", t.Name, t.IPv6Address, "0")
 			if iperr != nil {
 				DEBUG("Unable to add IPv6 route, maybe IPv6 is turned off ?, err : ", iperr)
 			}
@@ -256,7 +108,7 @@ func (t *TInterface) Connect(tun *TUN) (err error) {
 		}
 	}
 	if sub6 := tun.ServerResponse.WireGuardSubnet6; sub6 != "" && t.IPv6Address != "" {
-		iperr := IP_AddRouteV6(sub6, t.SystemName, t.IPv6Address, "0")
+		iperr := IP_AddRouteV6(sub6, t.Name, t.IPv6Address, "0")
 		if iperr != nil {
 			DEBUG("Unable to add IPv6 WireGuard subnet route, err : ", iperr)
 		}
@@ -294,11 +146,6 @@ func (t *TInterface) Disconnect(tun *TUN) (err error) {
 	defer RecoverAndLog()
 	if tun.wgDevice != nil {
 		tun.wgDevice.Close()
-	}
-
-	err = t.Close()
-	if err != nil {
-		ERROR("unable to close the interface", err)
 	}
 
 	meta := tun.meta.Load()
@@ -422,17 +269,14 @@ func IP_AddRouteV6(
 
 	var cmd *exec.Cmd
 	if network == "default" {
-
 		DEBUG("route", "-n", "add", "-inet6", "default", "-interface", ifName)
 		cmd = exec.Command("route", "-n", "add", "-inet6", "default", "-interface", ifName)
 	} else {
-
 		DEBUG("route", "-n", "add", "-inet6", "-net", network, "-interface", ifName)
 		cmd = exec.Command("route", "-n", "add", "-inet6", "-net", network, "-interface", ifName)
 	}
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-
 		if strings.Contains(string(out), "File exists") || strings.Contains(err.Error(), "exists") {
 			DEBUG("IPv6 route already exists: ", network)
 			return nil
@@ -456,7 +300,6 @@ func IP_DelRouteV6(network string, _ string, _ string) (err error) {
 
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-
 		if strings.Contains(string(out), "not in table") || strings.Contains(string(out), "No such process") {
 			DEBUG("IPv6 route doesn't exist (already deleted): ", network)
 			return nil
@@ -468,20 +311,6 @@ func IP_DelRouteV6(network string, _ string, _ string) (err error) {
 	return
 }
 
-func RestoreDNSOnClose() {
-
-}
-
-func RestoreSaneDNSDefaults() {
-
-}
-
-func GetDNSServers(id string) error {
-	DEFAULT_DNS_SERVERS = nil
-	return nil
-}
-
 func AdjustRoutersForTunneling() (err error) {
-
 	return nil
 }
