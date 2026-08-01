@@ -105,8 +105,7 @@ var (
 )
 
 var (
-	DEFAULT_DNS_SERVERS []string
-	DNSClient           = new(dns.Client)
+	DNSClient = new(dns.Client)
 
 	API_SERVER http.Server
 

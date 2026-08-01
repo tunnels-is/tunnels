@@ -518,14 +518,6 @@ func IP_DelRouteV6(network string, gateway string, metric string) (err error) {
 	return
 }
 
-func RestoreDNSOnClose() {
-
-}
-
-func RestoreSaneDNSDefaults() {
-
-}
-
 func AdjustRoutersForTunneling() (err error) {
 	defer RecoverAndLog()
 
