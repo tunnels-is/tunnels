@@ -80,6 +80,7 @@ func launchAPIServer() {
 
 	mux.Handle("POST /ui/user/logout", adminMW(API_AdminUILogout))
 	mux.Handle("POST /ui/user/list", adminMW(API_AdminUserList))
+	mux.Handle("POST /ui/user/latest", adminMW(API_AdminUserLatest))
 	mux.Handle("POST /ui/user/adminupdate", adminMW(API_UserAdminUpdate))
 	mux.Handle("POST /ui/user/delete", adminMW(API_AdminUserDelete))
 

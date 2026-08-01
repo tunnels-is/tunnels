@@ -31,6 +31,10 @@ func DB_getUsers(limit, offset int64) (UL []*User, err error) {
 	return BBolt_getUsers(limit, offset)
 }
 
+func DB_getUsersLatest(topN, batchSize int) (users []*User, total, trial, active int64, err error) {
+	return BBolt_getUsersLatest(topN, batchSize)
+}
+
 func DB_findUserByID(UID uuid.UUID) (USER *User, err error) {
 	return BBolt_findUserByID(UID.String())
 }
