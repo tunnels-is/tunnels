@@ -3,7 +3,7 @@ import QRCode from "react-qr-code"
 import { Copy, Monitor, Plus, Search, Trash2 } from "lucide-react"
 import Dialog from "@/components/Dialog"
 import { Field, Page, TextField, Toolbar } from "@/components/ui"
-import { api, controller, fetchState } from "@/store/actions"
+import { api, controller, fetchServers, fetchState } from "@/store/actions"
 import { fullDate } from "@/lib/format"
 import { countryName } from "@/lib/countries"
 import { useStore } from "@/store/store"
@@ -11,12 +11,12 @@ import { useStore } from "@/store/store"
 const Devices = () => {
 	const user = useStore((s) => s.user)
 	const activeTunnels = useStore((s) => s.activeTunnels)
+	const servers = useStore((s) => s.servers)
 	const askConfirm = useStore((s) => s.askConfirm)
 	const notifyError = useStore((s) => s.notifyError)
 	const notifySuccess = useStore((s) => s.notifySuccess)
 
 	const [devices, setDevices] = useState([])
-	const [servers, setServers] = useState([])
 	const [showCreate, setShowCreate] = useState(false)
 	const [tag, setTag] = useState("")
 	const [serverID, setServerID] = useState("")
@@ -38,11 +38,8 @@ const Devices = () => {
 		setTag("")
 		setWgConfig(null)
 		setShowCreate(true)
-		const resp = await controller("/client/servers", { StartIndex: 0 })
-		if (resp.status === 200 && Array.isArray(resp.data)) {
-			setServers(resp.data)
-			if (resp.data.length > 0) setServerID(resp.data[0]._id)
-		}
+		const list = await fetchServers()
+		if (list?.length > 0) setServerID(list[0]._id)
 	}
 
 	const createDevice = async () => {
