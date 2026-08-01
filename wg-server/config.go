@@ -78,28 +78,48 @@ func loadOrGenerateLocalPrivKey() ([]byte, error) {
 	if len(data) != 0 {
 		if info, statErr := os.Stat(pkpath); statErr == nil {
 			if mode := info.Mode().Perm(); mode&0o077 != 0 {
-				return nil, fmt.Errorf(".pk file has insecure permissions")
+				err := fmt.Errorf(".pk file has insecure permissions %o (want 0600)", mode)
+				ERR("file permission check failed:", pkpath, "—", err)
+				ERR("private key file unusable, removing and regenerating:", pkpath)
+				if rmErr := os.Remove(pkpath); rmErr != nil {
+					return nil, fmt.Errorf("%w — remove failed: %v", err, rmErr)
+				}
+				// fall through and regenerate
+			} else if ownErr := checkKeyFileOwner(pkpath, info); ownErr != nil {
+				ERR("private key file unusable, removing and regenerating:", pkpath, "—", ownErr)
+				if rmErr := os.Remove(pkpath); rmErr != nil {
+					return nil, fmt.Errorf(".pk file: %w — remove failed: %v", ownErr, rmErr)
+				}
+				// fall through and regenerate
+			} else {
+				priv, err := base64.StdEncoding.DecodeString(string(data))
+				if err != nil {
+					zeroBytes(priv)
+					return nil, fmt.Errorf("decode PrivateKey: %w", err)
+				}
+				if len(priv) != 32 {
+					zeroBytes(priv)
+					return nil, fmt.Errorf("PrivateKey has wrong length: got %d, want 32", len(priv))
+				}
+				return priv, nil
 			}
-			if ownErr := checkKeyFileOwner(info); ownErr != nil {
-				return nil, fmt.Errorf(".pk file: %w", ownErr)
+		} else {
+			priv, err := base64.StdEncoding.DecodeString(string(data))
+			if err != nil {
+				zeroBytes(priv)
+				return nil, fmt.Errorf("decode PrivateKey: %w", err)
 			}
+			if len(priv) != 32 {
+				zeroBytes(priv)
+				return nil, fmt.Errorf("PrivateKey has wrong length: got %d, want 32", len(priv))
+			}
+			return priv, nil
 		}
-
-		priv, err := base64.StdEncoding.DecodeString(string(data))
-		if err != nil {
-			zeroBytes(priv)
-			return nil, fmt.Errorf("decode PrivateKey: %w", err)
-		}
-		if len(priv) != 32 {
-			zeroBytes(priv)
-			return nil, fmt.Errorf("PrivateKey has wrong length: got %d, want 32", len(priv))
-		}
-		return priv, nil
 	}
 
 	if _, statErr := os.Stat(pkpath); statErr == nil {
 		if err := os.Remove(pkpath); err != nil {
-			return nil, fmt.Errorf("remove empty ./.pk file: %w", err)
+			return nil, fmt.Errorf("remove ./.pk file: %w", err)
 		}
 	}
 
