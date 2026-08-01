@@ -9,120 +9,19 @@ import (
 	"strings"
 	"sync/atomic"
 	"syscall"
-	"time"
-	"unsafe"
-
-	"golang.org/x/sys/windows"
 )
 
 type TInterface struct {
-	tunnel      atomic.Pointer[*TUN]
-	exitChannel chan byte
+	tunnel atomic.Pointer[*TUN]
 
-	Name        string
-	IPv4Address string
-	IPv6Address string
-	NetMask     string
-	TxQueuelen  int32
-	MTU         int32
-	Persistent  bool
-	Gateway     string
-
-	WDLL *DLL
-
-	GUID          windows.GUID
-	NamePtr       *uint16
-	TypePtr       *uint16
-	UNamePtr      uintptr
-	UTypePtr      uintptr
-	UGUIDPtr      uintptr
-	Handle        uintptr
-	SessionHandle uintptr
-	RingCap       uint32
+	Name          string
+	IPv4Address   string
+	IPv6Address   string
+	NetMask       string
+	TxQueuelen    int32
+	MTU           int32
+	Gateway       string
 	GatewayMetric string
-	IFIndex       int
-}
-
-func (t *TInterface) VerifyOrLoadPointer(method string) {
-
-}
-
-func (t *TInterface) CreateOrOpen() (err error) {
-	t.NamePtr, err = windows.UTF16PtrFromString(t.Name)
-	if err != nil {
-		DEBUG(fmt.Sprintf("Adapter creation error (%s) err: %s", t.Name, err))
-		return
-	}
-	t.UNamePtr = uintptr(unsafe.Pointer(t.NamePtr))
-
-	t.TypePtr, err = windows.UTF16PtrFromString("tunnels")
-	if err != nil {
-		DEBUG(fmt.Sprintf("Adapter creation error (%s) err: %s", t.Name, err))
-		return
-	}
-	t.UTypePtr = uintptr(unsafe.Pointer(t.TypePtr))
-
-	t.UGUIDPtr = uintptr(unsafe.Pointer(&t.GUID))
-
-	var msg error
-	add, err := t.WDLL.GetAddr(0)
-	if err != nil {
-		return
-	}
-	t.Handle, _, msg = syscall.SyscallN(
-		add.UPTR,
-
-		t.UNamePtr,
-	)
-
-	DEBUG(fmt.Sprintf("Opened adapter (%s) err: %s", t.Name, msg))
-
-	if t.Handle == 0 {
-		add, err = t.WDLL.GetAddr(2)
-		if err != nil {
-			return
-		}
-		t.Handle, _, msg = syscall.SyscallN(
-
-			add.UPTR,
-			t.UNamePtr,
-			t.UTypePtr,
-			t.UGUIDPtr,
-		)
-		if t.Handle == 0 {
-			err = msg
-			ERROR(fmt.Sprintf("Created adapter (%s) err: %s", t.Name, msg))
-			return
-		}
-		DEBUG(fmt.Sprintf("Created adapter (%s)", t.Name))
-	}
-
-	return
-}
-
-func (t *TInterface) Up() (err error) {
-	var msg error
-	add, err := t.WDLL.GetAddr(3)
-	if err != nil {
-		return
-	}
-	t.SessionHandle, _, msg = syscall.SyscallN(
-
-		add.UPTR,
-		t.Handle,
-		uintptr(t.RingCap))
-	if t.SessionHandle == 0 {
-		err = msg
-		ERROR(fmt.Sprintf("Interface/Adapter (%s) state (up) error(%s)", t.Name, err))
-	} else {
-		DEBUG(fmt.Sprintf("Interface/Adapter (%s) state (up)", t.Name))
-	}
-	return
-}
-
-func (t *TInterface) Down() (err error) {
-
-	return nil
 }
 
 func (t *TInterface) Addr() (err error) {
@@ -153,7 +52,7 @@ func (t *TInterface) Addr() (err error) {
 		t.NetMask,
 		t.Gateway,
 		"gwmetric="+t.GatewayMetric,
-		"store=presistent",
+		"store=persistent",
 	)
 
 	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
@@ -167,7 +66,6 @@ func (t *TInterface) Addr() (err error) {
 }
 
 func (t *TInterface) AddrV6() (err error) {
-
 	ipv6Addr := t.IPv6Address
 	if ipv6Addr == "" {
 		return nil
@@ -202,7 +100,6 @@ func (t *TInterface) AddrV6() (err error) {
 	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
 	ob, err := cmd.Output()
 	if err != nil {
-
 		if strings.Contains(string(ob), "already exists") || strings.Contains(err.Error(), "already exists") {
 			DEBUG("IPv6 address already exists on interface: ", t.Name)
 			return nil
@@ -212,36 +109,7 @@ func (t *TInterface) AddrV6() (err error) {
 	}
 
 	DEBUG("Added IPv6 address ", t.IPv6Address, " to interface ", t.Name)
-
 	return nil
-}
-
-func (t *TInterface) Close() (err error) {
-	add, err := t.WDLL.GetAddr(4)
-	if err != nil {
-		return
-	}
-	r1, _, msg := syscall.SyscallN(add.UPTR, t.SessionHandle)
-	if r1 == 0 {
-		err = msg
-		ERROR(fmt.Sprintf("Interface/Adapter (%s) state (close/endsession) error(%s)", t.Name, err))
-	} else {
-		DEBUG(fmt.Sprintf("Interface/Adapter (%s) state (close/endsession)", t.Name))
-	}
-
-	add, err = t.WDLL.GetAddr(1)
-	if err != nil {
-		return
-	}
-	r1, _, msg = syscall.SyscallN(add.UPTR, t.Handle)
-	if r1 == 0 {
-		err = msg
-		ERROR(fmt.Sprintf("Interface/Adapter (%s) state (close/remove) error(%s)", t.Name, err))
-	} else {
-		DEBUG(fmt.Sprintf("Interface/Adapter (%s) state (close/remove)", t.Name))
-	}
-
-	return
 }
 
 func IP_RouteMetric(network string, ifname string, metric string) (err error) {
@@ -368,7 +236,6 @@ func IP_AddRouteV6(
 
 	var cmd *exec.Cmd
 	if network == "default" {
-
 		cmd = exec.Command(
 			"netsh",
 			"interface",
@@ -392,7 +259,6 @@ func IP_AddRouteV6(
 			"store=active",
 		)
 	} else {
-
 		cmd = exec.Command(
 			"netsh",
 			"interface",
@@ -421,7 +287,6 @@ func IP_AddRouteV6(
 	ob, cerr := cmd.Output()
 
 	if cerr != nil {
-
 		if strings.Contains(string(ob), "already exists") || strings.Contains(cerr.Error(), "already exists") {
 			DEBUG("IPv6 route already exists: ", network)
 			return nil
@@ -571,12 +436,6 @@ func (t *TInterface) SetMTU() error {
 }
 
 func (t *TInterface) Connect(tun *TUN) (err error) {
-	if t.WDLL != nil {
-		err = t.CreateOrOpen()
-		if err != nil {
-			return
-		}
-	}
 	t.GatewayMetric = "2000"
 	if err = t.Addr(); err != nil {
 		return
@@ -589,11 +448,6 @@ func (t *TInterface) Connect(tun *TUN) (err error) {
 		}
 	}
 
-	if t.WDLL != nil {
-		if err = t.Up(); err != nil {
-			return
-		}
-	}
 	err = t.SetMTU()
 	if err != nil {
 		return
@@ -601,13 +455,9 @@ func (t *TInterface) Connect(tun *TUN) (err error) {
 
 	closeAllOpenTCPconnections()
 
-	if t.WDLL != nil {
-		t.exitChannel = make(chan byte, 10)
-	}
 	meta := tun.meta.Load()
 
 	if meta.EnableDefaultRoute {
-
 		t.GatewayMetric = "1"
 		err = IP_RouteMetric("0.0.0.0/0", t.Name, "1")
 		if err != nil {
@@ -661,45 +511,7 @@ func (t *TInterface) Connect(tun *TUN) (err error) {
 	}
 
 	closeAllOpenTCPconnections()
-
 	return
-}
-
-func (t *TInterface) EndSession() {
-	if t.SessionHandle == 0 {
-		return
-	}
-	add, err := t.WDLL.GetAddr(4)
-	if err != nil {
-		ERROR("unable to get EndSession address: ", err)
-		return
-	}
-	_, _, msg := syscall.SyscallN(add.UPTR, t.SessionHandle)
-	DEBUG(fmt.Sprintf("Interface/Adapter (%s) session ended: %s", t.Name, msg))
-	t.SessionHandle = 0
-}
-
-func (t *TInterface) PrepareForSwitch() {
-	t.CloseReadAndWriteLoop()
-	t.EndSession()
-}
-
-func (t *TInterface) CloseReadAndWriteLoop() {
-	exitTimeout := time.NewTicker(10 * time.Second)
-	exitCount := 0
-exitLoop:
-	for {
-		select {
-		case <-t.exitChannel:
-			exitCount++
-			if exitCount >= 2 {
-				break exitLoop
-			}
-		case <-exitTimeout.C:
-			ERROR("timed out waiting for reader and writer to exit")
-			return
-		}
-	}
 }
 
 func (t *TInterface) Disconnect(tun *TUN) (err error) {
@@ -707,15 +519,6 @@ func (t *TInterface) Disconnect(tun *TUN) (err error) {
 
 	if tun.wgDevice != nil {
 		tun.wgDevice.Close()
-	}
-
-	if t.WDLL != nil {
-		t.CloseReadAndWriteLoop()
-
-		err = t.Close()
-		if err != nil {
-			ERROR("unable to delete the interface", err)
-		}
 	}
 
 	meta := tun.meta.Load()
@@ -755,206 +558,5 @@ func (t *TInterface) Disconnect(tun *TUN) (err error) {
 			return err
 		}
 	}
-	return
-}
-
-var (
-	GUID *windows.GUID
-
-	IPHLPApi = syscall.NewLazyDLL("iphlpapi.dll")
-	GetTCP   = IPHLPApi.NewProc("GetExtendedTcpTable")
-	GetUDP   = IPHLPApi.NewProc("GetExtendedUdpTable")
-	SetTCP   = IPHLPApi.NewProc("SetTcpEntry")
-)
-
-const (
-	PacketSizeMax                       = 0xffff
-	RingCapacityMin                     = 0x20000
-	RingCapacityMax                     = 0x4000000
-	AdapterNameMax                      = 128
-	LOAD_LIBRARY_SEARCH_APPLICATION_DIR = 0x00000200
-	LOAD_LIBRARY_SEARCH_SYSTEM32        = 0x00000800
-)
-
-func logMessage(_ int, timestamp uint64, msg *uint16) int {
-	DEBUG(timestamp, " > ", windows.UTF16PtrToString(msg))
-	return 0
-}
-
-func (t *TInterface) ReceivePacket() (packet []byte, size uint16, err error) {
-	add, err := t.WDLL.GetAddr(5)
-	if err != nil {
-		return
-	}
-	r0, _, msg := syscall.SyscallN(
-		add.UPTR,
-
-		t.SessionHandle,
-		uintptr(unsafe.Pointer(&size)),
-	)
-
-	if r0 == 0 {
-		err = msg
-		return
-	}
-
-	packet = unsafe.Slice((*byte)(unsafe.Pointer(r0)), size)
-
-	return
-}
-
-func (t *TInterface) ReleaseReceivePacket(packet []byte) (err error) {
-	if packet == nil {
-		return
-	}
-	add, err := t.WDLL.GetAddr(7)
-	if err != nil {
-		return
-	}
-	r0, _, msg := syscall.SyscallN(
-		add.UPTR,
-
-		t.SessionHandle,
-		uintptr(unsafe.Pointer(&packet[0])),
-	)
-	if r0 == 0 {
-		err = msg
-		return
-	}
-
-	return
-}
-
-func (t *TInterface) AllocateSendPacket(packetSize int) (packet []byte, err error) {
-	add, err := t.WDLL.GetAddr(6)
-	if err != nil {
-		return
-	}
-	r0, _, msg := syscall.SyscallN(
-		add.UPTR,
-		t.SessionHandle,
-		uintptr(packetSize),
-	)
-
-	if r0 == 0 {
-		err = msg
-		return
-	}
-
-	packet = unsafe.Slice((*byte)(unsafe.Pointer(r0)), packetSize)
-	return
-}
-
-func (t *TInterface) SendPacket(packet []byte) (err error) {
-	add, err := t.WDLL.GetAddr(8)
-	if err != nil {
-		return
-	}
-	_, _, _ = syscall.SyscallN(
-
-		add.UPTR,
-		t.SessionHandle,
-		uintptr(unsafe.Pointer(&packet[0])),
-	)
-	return
-}
-
-type DLL struct {
-	module          uintptr
-	moduleHandle    windows.Handle
-	moduleUnsafePTR *unsafe.Pointer
-
-	AddressMap [100]*DLLAddress
-}
-type DLLAddress struct {
-	Name string
-	PTR  *unsafe.Pointer
-	UPTR uintptr
-}
-
-func (d *DLL) GetAddr(index int) (addr *DLLAddress, err error) {
-	addr = d.AddressMap[index]
-	if addr.PTR != nil {
-		if atomic.LoadPointer(addr.PTR) != nil {
-			return
-		}
-	}
-
-	err = d.LazyLoadLibrary(wintunDLLPath())
-	if err != nil {
-		return
-	}
-
-	addr.UPTR, err = windows.GetProcAddress(d.moduleHandle, addr.Name)
-	if err != nil {
-		ERROR("unable to load proc address: ", err)
-		return
-	}
-
-	atomic.StorePointer(
-		(*unsafe.Pointer)(unsafe.Pointer(&addr.PTR)),
-		unsafe.Pointer(addr.UPTR),
-	)
-
-	return
-}
-
-func (d *DLL) LazyLoadLibrary(name string) (err error) {
-	if d.moduleUnsafePTR != nil {
-		if atomic.LoadPointer(d.moduleUnsafePTR) != nil {
-			return
-		}
-	}
-
-	d.moduleHandle, err = windows.LoadLibraryEx(
-		name,
-		0,
-		LOAD_LIBRARY_SEARCH_APPLICATION_DIR|LOAD_LIBRARY_SEARCH_SYSTEM32,
-	)
-	if err != nil {
-		ERROR("Unable to load DLL: ", name, " ERR: ", err)
-		return err
-	}
-	atomic.StoreUintptr(
-		&d.module,
-		uintptr(unsafe.Pointer(d.moduleHandle)),
-	)
-
-	atomic.StorePointer(
-		(*unsafe.Pointer)(unsafe.Pointer(&d.moduleUnsafePTR)),
-		unsafe.Pointer(d.moduleHandle),
-	)
-	return
-}
-
-func (d *DLL) Init(name string) (err error) {
-	err = d.LazyLoadLibrary(wintunDLLPath())
-	if err != nil {
-		return
-	}
-
-	d.AddressMap[0] = &DLLAddress{Name: "WintunOpenAdapter"}
-	d.AddressMap[1] = &DLLAddress{Name: "WintunCloseAdapter"}
-	d.AddressMap[2] = &DLLAddress{Name: "WintunCreateAdapter"}
-	d.AddressMap[3] = &DLLAddress{Name: "WintunStartSession"}
-	d.AddressMap[4] = &DLLAddress{Name: "WintunEndSession"}
-	d.AddressMap[5] = &DLLAddress{Name: "WintunReceivePacket"}
-	d.AddressMap[6] = &DLLAddress{Name: "WintunAllocateSendPacket"}
-	d.AddressMap[7] = &DLLAddress{Name: "WintunReleaseReceivePacket"}
-	d.AddressMap[8] = &DLLAddress{Name: "WintunSendPacket"}
-	d.AddressMap[9] = &DLLAddress{Name: "WintunSetLogger"}
-
-	d.AddressMap[9].UPTR, err = windows.GetProcAddress(d.moduleHandle, "WintunSetLogger")
-	if err != nil {
-		ERROR("unable to load proc address: ", err)
-		return
-	}
-
-	r1, r2, err := syscall.SyscallN(
-		d.AddressMap[9].UPTR,
-		windows.NewCallback(logMessage),
-	)
-	DEBUG("Adapter logger created: ", r1, r2, err)
-
 	return
 }
