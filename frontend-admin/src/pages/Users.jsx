@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
-import { Plus, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Clock, Plus, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
 import { apiPost } from '../api';
 
 const PAGE_SIZE = 100;
@@ -22,6 +22,13 @@ function Modal({ title, onClose, children }) {
 
 const inputClass = "w-full bg-[#fdfcf8] border border-[#e7e3d7] rounded px-3 py-1.5 text-[13px] text-[#0a0a0a] placeholder-[#a3a3a3] focus:outline-none focus:border-[#0a0a0a]";
 
+const StatPill = ({ label, value }) => (
+  <div className="flex items-baseline gap-1.5 rounded-md border border-[#e7e3d7] bg-[#fdfcf8] px-2.5 py-1.5">
+    <span className="text-[10px] uppercase tracking-wider text-[#a3a3a3]">{label}</span>
+    <span className="text-[13px] font-mono tabular-nums font-semibold text-[#0a0a0a]">{value ?? '—'}</span>
+  </div>
+);
+
 export default function Users() {
   const navigate = useNavigate();
   const [users, setUsers] = useState([]);
@@ -33,10 +40,14 @@ export default function Users() {
   const [createError, setCreateError] = useState('');
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(false);
+  const [mode, setMode] = useState('browse'); // 'browse' | 'latest'
+  const [stats, setStats] = useState(null);
 
   const load = async (next = offset) => {
     setLoading(true);
     setError('');
+    setMode('browse');
+    setStats(null);
     try {
       const resp = await apiPost('/ui/user/list', { Limit: PAGE_SIZE, Offset: next });
       if (resp.status === 200) {
@@ -60,6 +71,33 @@ export default function Users() {
     }
   };
 
+  const loadLatest = async () => {
+    setLoading(true);
+    setError('');
+    setMode('latest');
+    try {
+      const resp = await apiPost('/ui/user/latest', {});
+      if (resp.status === 200) {
+        const data = await resp.json();
+        setUsers(Array.isArray(data.Users) ? data.Users : []);
+        setStats({
+          Total: data.Total ?? 0,
+          Trial: data.Trial ?? 0,
+          ActiveSubscribers: data.ActiveSubscribers ?? 0,
+        });
+        setHasMore(false);
+        setOffset(0);
+      } else {
+        const data = await resp.json().catch(() => ({}));
+        setError(data.Error || 'Failed to load latest users');
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => { load(0); }, []);
 
   const handleCreate = async (e) => {
@@ -75,7 +113,8 @@ export default function Users() {
       if (resp.status === 200) {
         setShowCreate(false);
         setCreateForm({ Email: '', Password: '' });
-        load(offset);
+        if (mode === 'latest') loadLatest();
+        else load(offset);
       } else {
         const data = await resp.json().catch(() => ({}));
         setCreateError(data.Error || 'Failed to create user');
@@ -92,10 +131,28 @@ export default function Users() {
       <div className="flex items-center justify-between gap-4 mb-5">
         <div className="flex items-baseline gap-2.5">
           <h1 className="text-[16px] font-semibold tracking-tight text-[#0a0a0a]">Users</h1>
-          <span className="text-[11px] font-mono tabular-nums text-[#a3a3a3]">{users.length}</span>
+          <span className="text-[11px] font-mono tabular-nums text-[#a3a3a3]">
+            {mode === 'latest' ? `latest ${users.length}` : users.length}
+          </span>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={() => load(offset)} disabled={loading} className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[12px] text-[#525252] hover:text-[#0a0a0a] hover:bg-black/[0.04] transition-colors">
+          <button
+            onClick={loadLatest}
+            disabled={loading}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-[12px] transition-colors ${
+              mode === 'latest'
+                ? 'bg-[#0a0a0a] text-white'
+                : 'text-[#525252] hover:text-[#0a0a0a] hover:bg-black/[0.04]'
+            }`}
+          >
+            <Clock className="w-3.5 h-3.5" />
+            Latest
+          </button>
+          <button
+            onClick={() => (mode === 'latest' ? loadLatest() : load(offset))}
+            disabled={loading}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[12px] text-[#525252] hover:text-[#0a0a0a] hover:bg-black/[0.04] transition-colors"
+          >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </button>
@@ -106,11 +163,20 @@ export default function Users() {
         </div>
       </div>
 
+      {stats && (
+        <div className="flex flex-wrap items-center gap-2 mb-4">
+          <StatPill label="Total" value={stats.Total} />
+          <StatPill label="Trial" value={stats.Trial} />
+          <StatPill label="Active subs" value={stats.ActiveSubscribers} />
+          <span className="text-[11px] text-[#a3a3a3]">Showing 100 most recently updated</span>
+        </div>
+      )}
+
       {error && <p className="text-[12px] text-[#dc2626] mb-3">{error}</p>}
 
       <div className="bg-white border border-[#e7e3d7] rounded-lg overflow-x-auto card-shadow">
-        <div className="grid grid-cols-[1fr_80px_80px_80px_160px] min-w-[680px] gap-4 px-4 py-2 border-b border-[#e7e3d7] bg-[#ffffff]">
-          {['Email', 'Admin', 'Manager', 'Disabled', 'Sub Expiry'].map((h) => (
+        <div className="grid grid-cols-[1fr_80px_80px_80px_160px_160px] min-w-[840px] gap-4 px-4 py-2 border-b border-[#e7e3d7] bg-[#ffffff]">
+          {['Email', 'Admin', 'Manager', 'Disabled', 'Sub Expiry', 'Updated'].map((h) => (
             <span key={h} className="text-[10px] text-[#a3a3a3] uppercase tracking-wider">{h}</span>
           ))}
         </div>
@@ -123,7 +189,7 @@ export default function Users() {
           <div
             key={u._id}
             onClick={() => navigate(`/users/${u._id}`, { state: { user: u } })}
-            className="grid grid-cols-[1fr_80px_80px_80px_160px] min-w-[680px] gap-4 px-4 py-2.5 border-b border-[#e7e3d7]/50 hover:bg-black/[0.03] cursor-pointer items-center"
+            className="grid grid-cols-[1fr_80px_80px_80px_160px_160px] min-w-[840px] gap-4 px-4 py-2.5 border-b border-[#e7e3d7]/50 hover:bg-black/[0.03] cursor-pointer items-center"
           >
             <span className="text-[13px] text-[#0a0a0a] truncate">{u.Email}</span>
             <span className={`text-[11px] ${u.IsAdmin ? 'text-[#15803d]' : 'text-[#a3a3a3]'}`}>{u.IsAdmin ? 'Yes' : 'No'}</span>
@@ -132,31 +198,36 @@ export default function Users() {
             <span className="text-[11px] text-[#a3a3a3] font-mono">
               {u.SubExpiration ? dayjs(u.SubExpiration).format('DD-MM-YYYY') : '—'}
             </span>
+            <span className="text-[11px] text-[#a3a3a3] font-mono">
+              {u.Updated ? dayjs(u.Updated).format('DD-MM-YYYY HH:mm') : '—'}
+            </span>
           </div>
         ))}
       </div>
 
-      <div className="flex items-center justify-between mt-3 px-1">
-        <span className="text-[11px] font-mono tabular-nums text-[#a3a3a3]">
-          {users.length === 0 ? '—' : `${offset + 1}–${offset + users.length}`}
-        </span>
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => load(Math.max(0, offset - PAGE_SIZE))}
-            disabled={loading || offset === 0}
-            className="flex items-center gap-1 px-2 py-1 rounded text-[12px] text-[#525252] hover:text-[#0a0a0a] hover:bg-black/[0.04] disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-[#525252]"
-          >
-            <ChevronLeft className="w-3.5 h-3.5" /> Prev
-          </button>
-          <button
-            onClick={() => load(offset + PAGE_SIZE)}
-            disabled={loading || !hasMore}
-            className="flex items-center gap-1 px-2 py-1 rounded text-[12px] text-[#525252] hover:text-[#0a0a0a] hover:bg-black/[0.04] disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-[#525252]"
-          >
-            Next <ChevronRight className="w-3.5 h-3.5" />
-          </button>
+      {mode === 'browse' && (
+        <div className="flex items-center justify-between mt-3 px-1">
+          <span className="text-[11px] font-mono tabular-nums text-[#a3a3a3]">
+            {users.length === 0 ? '—' : `${offset + 1}–${offset + users.length}`}
+          </span>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => load(Math.max(0, offset - PAGE_SIZE))}
+              disabled={loading || offset === 0}
+              className="flex items-center gap-1 px-2 py-1 rounded text-[12px] text-[#525252] hover:text-[#0a0a0a] hover:bg-black/[0.04] disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-[#525252]"
+            >
+              <ChevronLeft className="w-3.5 h-3.5" /> Prev
+            </button>
+            <button
+              onClick={() => load(offset + PAGE_SIZE)}
+              disabled={loading || !hasMore}
+              className="flex items-center gap-1 px-2 py-1 rounded text-[12px] text-[#525252] hover:text-[#0a0a0a] hover:bg-black/[0.04] disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-[#525252]"
+            >
+              Next <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       {showCreate && (
         <Modal title="New User" onClose={() => setShowCreate(false)}>

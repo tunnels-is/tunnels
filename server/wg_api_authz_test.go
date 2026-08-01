@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"log/slog"
 	"net/http"
@@ -97,6 +98,40 @@ func TestAPI_WGConfig_GroupACL(t *testing.T) {
 	}
 	if w := callWGConfig(t, outsider, publicServer.ID, key); w.Code != http.StatusOK {
 		t.Fatalf("ungrouped server config should be readable by anyone (200), got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestAPI_WGConfig_NoDeviceReturnsEmptyIP(t *testing.T) {
+	setupTestDB(t)
+	if logger == nil {
+		logger = slog.New(slog.NewTextHandler(io.Discard, nil))
+	}
+	server := &types.Server{
+		ID:              uuid.New(),
+		Tag:             "public",
+		APIKey:          uuid.NewString(),
+		IP:              "1.2.3.4",
+		WireGuardPort:   51820,
+		WireGuardPubKey: makeWGKey(),
+		WireGuardSubnet: "10.7.0.0/24",
+	}
+	if err := BBolt_CreateServer(server); err != nil {
+		t.Fatal(err)
+	}
+	// User only needs to be in the request context (same as GroupACL tests).
+	user := &User{ID: uuid.New()}
+
+	// Unknown pubkey: still 200 so the client can auto-create a device.
+	w := callWGConfig(t, user, server.ID, makeWGKey())
+	if w.Code != http.StatusOK {
+		t.Fatalf("missing device should return 200 with empty WireGuardIP, got %d: %s", w.Code, w.Body.String())
+	}
+	var body map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v body=%s", err, w.Body.String())
+	}
+	if ip, _ := body["WireGuardIP"].(string); ip != "" {
+		t.Fatalf("expected empty WireGuardIP for unknown device, got %q", ip)
 	}
 }
 

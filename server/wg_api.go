@@ -196,24 +196,13 @@ func API_WGConfig(w http.ResponseWriter, r *http.Request) {
 
 	pubKey := r.URL.Query().Get("pubKey")
 	if pubKey == "" {
-		senderr(w, 401, "No pubkey given")
-		return
-	}
-
-	d, err := DB_FindDeviceByWGKey(pubKey)
-	if err != nil {
-		senderr(w, 401, "Pubkey not on record")
+		senderr(w, 400, "No pubkey given")
 		return
 	}
 
 	user := getUserFromContext(r.Context())
 	if user == nil {
-		senderr(w, 401, "Unauthorized")
-		return
-	}
-
-	if d != nil && d.UserID != user.ID {
-		senderr(w, 401, "Unauthorized")
+		senderr(w, 401, "Unauthorized - no user in context")
 		return
 	}
 
@@ -224,15 +213,32 @@ func API_WGConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !hasSharedOrNoGroup(user.Groups, server.Groups) {
-		senderr(w, 401, "unauthorized")
+		senderr(w, 401, "Unauthorized - no group access")
+		return
+	}
+
+	// Device may not exist yet: clients auto-create via POST /client/device/create
+	// when WireGuardIP is empty. That is not an auth failure.
+	d, err := DB_FindDeviceByWGKey(pubKey)
+	if err != nil {
+		senderr(w, 500, "Database error looking up device")
 		return
 	}
 
 	deviceIP := ""
 	deviceIPv6 := ""
 	if d != nil {
-		deviceIP = d.WireGuardIP
-		deviceIPv6 = d.WireGuardIPv6
+		if d.UserID != user.ID {
+			senderr(w, 401, "Unauthorized - device user id and given user id do not match")
+			return
+		}
+		// Only return the assigned IP when the device is bound to this server.
+		// A device on another server yields empty WireGuardIP so the client can
+		// remake/rebind (after deleting the old device).
+		if d.ServerID == serverID {
+			deviceIP = d.WireGuardIP
+			deviceIPv6 = d.WireGuardIPv6
+		}
 	}
 
 	sendObject(w, map[string]any{
@@ -244,8 +250,7 @@ func API_WGConfig(w http.ResponseWriter, r *http.Request) {
 		"WireGuardSubnet":  server.WireGuardSubnet,
 		"WireGuardSubnet6": server.WireGuardSubnet6,
 		"WANCIDR":          wanCIDRForServer(server),
-
-		"EnableFirewall": server.EnableFirewall,
+		"EnableFirewall":   server.EnableFirewall,
 	})
 }
 

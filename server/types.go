@@ -84,6 +84,14 @@ type FORM_LIST_USERS struct {
 	Offset      int       `json:"Offset"`
 }
 
+// USER_LATEST_RESPONSE is returned by POST /ui/user/latest.
+type USER_LATEST_RESPONSE struct {
+	Users              []*User `json:"Users"`
+	Total              int64   `json:"Total"`
+	Trial              int64   `json:"Trial"`
+	ActiveSubscribers  int64   `json:"ActiveSubscribers"`
+}
+
 type FORM_LIST_DEVICE struct {
 	DeviceToken string    `json:"DeviceToken"`
 	UID         uuid.UUID `json:"UID"`

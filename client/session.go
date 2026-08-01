@@ -184,7 +184,7 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		return 502, fmt.Errorf("unable to fetch server WireGuard config: %w", wgErr)
 	}
 	if wgCfg.WireGuardIP == "" {
-		DEBUG("no device found on controller, auto-creating for tag: ", ClientCR.Tag)
+		INFO("no device for this tunnel on server, auto-creating for tag: ", ClientCR.Tag)
 		wgCfg, wgErr = createServerDevice(ClientCR, ClientCR.ServerID, pubKey, ClientCR.Tag)
 		if wgErr != nil {
 			ERROR("unable to auto-create device on controller: ", wgErr)
@@ -193,6 +193,7 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		if wgCfg.WireGuardIP == "" {
 			return 502, errors.New("controller did not assign a WireGuard IP to the new device")
 		}
+		INFO("auto-created device with WireGuard IP: ", wgCfg.WireGuardIP)
 	}
 	if ClientCR.ServerIP == "" {
 		ClientCR.ServerIP = wgCfg.ServerIP

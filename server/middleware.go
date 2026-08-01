@@ -94,7 +94,7 @@ func clientAuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		deviceToken := r.Header.Get("X-Device-Token")
 		if deviceToken == "" {
-			senderr(w, 401, "Unauthorized")
+			senderr(w, 401, "Unauthorized - no device token")
 			return
 		}
 
