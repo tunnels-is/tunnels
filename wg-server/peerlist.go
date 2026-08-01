@@ -512,33 +512,6 @@ func cleanFlows() {
 	}
 }
 
-// peerListSnapshot returns dst IP → allowed src IPs, for diagnostics.
-func peerListSnapshot() map[netip.Addr][]netip.Addr {
-	out := make(map[netip.Addr][]netip.Addr)
-	for i := range fwV4Slots {
-		p := fwV4Slots[i].Load()
-		if p == nil {
-			continue
-		}
-		p.mu.RLock()
-		if len(p.allowed) > 0 {
-			srcs := make([]netip.Addr, 0, len(p.allowed))
-			for src := range p.allowed {
-				srcs = append(srcs, src)
-			}
-			out[addrAt(uint32(i))] = srcs
-		}
-		p.mu.RUnlock()
-	}
-	return out
-}
-
-func addrAt(off uint32) netip.Addr {
-	var b [4]byte
-	binary.BigEndian.PutUint32(b[:], fwBase4+off)
-	return netip.AddrFrom4(b)
-}
-
 // l4Ports extracts source/destination ports for TCP and UDP; other protocols
 // (ICMP, etc.) report 0,0 — one flow per remote host-pair-per-protocol.
 func l4Ports(proto byte, l4 []byte) (sport, dport uint16) {

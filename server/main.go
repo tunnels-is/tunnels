@@ -190,13 +190,13 @@ func main() {
 				os.Exit(1)
 			}
 			lc.Store(lemonClient)
-			go signal.NewSignal("SUBSCANNER", ctx, cancel, 12*time.Hour, goroutineLogger, scanSubs)
+			go signal.NewSignal("SUBSCANNER", ctx, 12*time.Hour, goroutineLogger, scanSubs)
 		}
 		// ======================================
 
-		go signal.NewSignal("API", ctx, cancel, 1*time.Second, goroutineLogger, launchAPIServer)
+		go signal.NewSignal("API", ctx, 1*time.Second, goroutineLogger, launchAPIServer)
 
-		go signal.NewSignal("CONFIG", ctx, cancel, 30*time.Second, goroutineLogger, func() {
+		go signal.NewSignal("CONFIG", ctx, 30*time.Second, goroutineLogger, func() {
 			// Validate the reloaded config before swapping it in — otherwise an
 			// edited config with a weak/empty CookieSigningKey or TwoFactorKey
 			// would silently downgrade cookie/2FA crypto at runtime (the startup
@@ -235,7 +235,7 @@ func main() {
 		wgDone = make(chan struct{})
 		go wgserver.Init(ctx, ctrlURL, wgCfg.APIKey, wgConfigPath, wgCfg.InsecureSkipVerify, *logLevel, *showNewRules, wgDone)
 
-		go signal.NewSignal("WG-CONFIG", ctx, cancel, 30*time.Second, goroutineLogger, func() {
+		go signal.NewSignal("WG-CONFIG", ctx, 30*time.Second, goroutineLogger, func() {
 			if err := LoadWGConfig(wgConfigPath); err != nil {
 				logger.Error("WG feature enabled but wg config could not be loaded", "path", wgConfigPath, slog.Any("err", err))
 			}
@@ -269,26 +269,8 @@ func goroutineLogger(msg string) {
 	}
 }
 
-// minSecretLen is the minimum length for config secrets that seed AES-256 keys.
-// The values are not used as raw keys — CookieSigningKey is SHA-256'd and
-// TwoFactorKey is PBKDF2-stretched, both producing a 32-byte key regardless of
-// input length — so this floor bounds the input *entropy*, not the key size.
-// It matches the length of the values -createConfig generates
-// (uuid-without-dashes = 32 chars).
 const minSecretLen = 32
 
-// validateServerConfig enforces invariants the auth server needs to run safely.
-// It fails on anything that would silently downgrade security rather than let
-// the server boot in a weakened state:
-//   - CookieSigningKey seeds the AES key that seals the encrypted, IP-bound
-//     admin session cookies; empty/weak makes cookieCipher derive its key from
-//     a low-entropy (or publicly known, sha256("")) input, neutralising cookie
-//     confidentiality and IP-binding. It is only hashed once, so low entropy is
-//     directly brute-forceable against a captured cookie.
-//   - TwoFactorKey seeds the AES key encrypting 2FA secrets and recovery codes
-//     at rest; empty/weak exposes them.
-//
-// (AdminAPIKey already fails closed when empty, so it is not required here.)
 func validateServerConfig(c *types.ServerConfig) error {
 	if c == nil {
 		return errors.New("server config is nil")

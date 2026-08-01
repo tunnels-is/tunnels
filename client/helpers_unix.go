@@ -3,21 +3,8 @@
 package client
 
 import (
-	"os/exec"
-
 	"github.com/tunnels-is/tunnels/setcap"
 )
-
-func openURL(url string) error {
-	var cmd string
-	var args []string
-	cmd = "xdg-open"
-	args = []string{url}
-	if len(args) > 1 {
-		args = append(args[:1], append([]string{""}, args[1:]...)...)
-	}
-	return exec.Command(cmd, args...).Start()
-}
 
 func OSSpecificInit() error {
 	return AdjustRoutersForTunneling()

@@ -18,7 +18,6 @@ func main() {
 	checkDir("../server")
 	checkDir("../client")
 	checkDir("../certs")
-	checkDir("../iptables")
 	checkDir("../setcap")
 	if fmtCount > 0 {
 		panic("YOU HAVE DEBUG PRINTS IN THE BUILD")
