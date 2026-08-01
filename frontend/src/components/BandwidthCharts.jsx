@@ -13,7 +13,7 @@ const TIME_RANGES = [
 ]
 
 const DOWNLOAD_COLOR = "#22c55e"
-const UPLOAD_COLOR = "#f59e0b"
+const UPLOAD_COLOR = "#1d4ed8" // tunnels blue
 
 const formatBytes = (bytes) => {
 	if (bytes === 0) return "0 B"
@@ -194,7 +194,7 @@ const RatePill = ({ direction, rate }) => {
 		<div
 			className={
 				"inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-mono text-[11px] tabular-nums " +
-				(isDown ? "bg-success/10 text-success" : "bg-warning/10 text-warning")
+				(isDown ? "bg-success/10 text-success" : "bg-primary/10 text-primary")
 			}
 		>
 			<Icon size={12} strokeWidth={2.5} />
@@ -287,7 +287,7 @@ const TunnelCard = ({ tunnel, server, range, nested = false }) => {
 					</div>
 				</div>
 				<div className="bg-base-100 px-4 py-3">
-					<div className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-warning/80">
+					<div className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-primary/80">
 						<ArrowUp size={11} strokeWidth={2.5} />
 						Upload
 					</div>
