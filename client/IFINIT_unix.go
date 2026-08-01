@@ -230,10 +230,6 @@ func (t *TInterface) Delete() (err error) {
 	return
 }
 
-func (t *TInterface) PrepareForSwitch() {
-
-}
-
 func (t *TInterface) Connect(tun *TUN) (err error) {
 	err = t.Addr()
 	if err != nil {
