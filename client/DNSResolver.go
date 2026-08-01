@@ -473,27 +473,16 @@ func DNSCacheCheck(m *dns.Msg, w dns.ResponseWriter) bool {
 func isBlocked(m *dns.Msg) (ok bool, tag string) {
 	name := strings.TrimSuffix(m.Question[0].Name, ".")
 	bl := DNSBlockList.Load()
-	if bl == nil {
+	if bl == nil || !bl.Has(name) {
 		return false, ""
 	}
-
-	blocked, ok := (*bl).Load(name)
-	if ok && blocked {
-		tag = "blocked"
-	}
-
-	return ok, tag
+	return true, "blocked"
 }
 
 func isWhitelisted(m *dns.Msg) bool {
 	name := strings.TrimSuffix(m.Question[0].Name, ".")
 	wl := DNSWhiteList.Load()
-	if wl == nil {
-		return false
-	}
-
-	whitelisted, ok := (*wl).Load(name)
-	return ok && whitelisted
+	return wl != nil && wl.Has(name)
 }
 
 func ResolveDNSAsHTTPS(m *dns.Msg, w dns.ResponseWriter) (err error) {

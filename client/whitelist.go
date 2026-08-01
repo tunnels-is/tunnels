@@ -1,11 +1,10 @@
 package client
 
 import (
+	"os"
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/puzpuzpuz/xsync/v3"
 )
 
 func reloadWhiteLists(sleep bool) {
@@ -37,32 +36,43 @@ func reloadWhiteLists(sleep bool) {
 	if badList {
 		config.DNSWhiteLists = GetDefaultWhiteLists()
 	}
-	newMap := xsync.NewMapOf[string, bool]()
 
+	partials := make([]*DomainSet, len(config.DNSWhiteLists))
 	wg := new(sync.WaitGroup)
 	for i := range config.DNSWhiteLists {
 		wg.Add(1)
-		go processWhiteList(i, wg, newMap)
+		go func(i int) {
+			defer wg.Done()
+			partials[i] = processWhiteList(i)
+		}(i)
 	}
 	wg.Wait()
 
-	DEBUG("finished updating whitelists")
-	DNSWhiteList.Store(&newMap)
+	totalCap := 0
+	for _, p := range partials {
+		if p != nil {
+			totalCap += p.Len()
+		}
+	}
+	final := NewDomainSet(totalCap)
+	for _, p := range partials {
+		final.MergeFrom(p)
+	}
+
+	DEBUG("finished updating whitelists, domains=", final.Len())
+	DNSWhiteList.Store(final)
 	err := writeConfigToDisk()
 	if err != nil {
 		ERROR("unable to write config to disk post whitelist update", err)
 	}
 }
 
-func processWhiteList(index int, wg *sync.WaitGroup, nm *xsync.MapOf[string, bool]) {
-	defer func() {
-		wg.Done()
-	}()
+func processWhiteList(index int) *DomainSet {
 	defer RecoverAndLog()
 	config := CONFIG.Load()
 	wl := config.DNSWhiteLists[index]
 	if wl == nil {
-		return
+		return nil
 	}
 
 	state := STATE.Load()
@@ -74,33 +84,38 @@ func processWhiteList(index int, wg *sync.WaitGroup, nm *xsync.MapOf[string, boo
 			ERROR("Could not download whitelist", wl.URL, err)
 			if !fileExistsNonEmpty(path) {
 				ERROR("Could not read from disk or download whitelist", wl.URL, err)
-				return
+				return nil
 			}
 		}
 	} else if wl.Tag != "" {
 		if !fileExistsNonEmpty(path) {
 			if wl.URL == "" {
 				ERROR("No bytes in DNS whitelist: ", wl.URL, lowerTag)
-				return
+				return nil
 			}
 			if err := downloadListToFile(wl.URL, path); err != nil {
 				ERROR("Could not read from disk or download whitelist", wl.URL, err)
-				return
+				return nil
 			}
 		}
 	} else {
-		return
+		return nil
 	}
 
 	if !fileExistsNonEmpty(path) {
 		ERROR("No bytes in DNS whitelist: ", wl.URL, lowerTag)
-		return
+		return nil
 	}
 
-	count, badLines, err := loadDomainsFromFile(path, wl.Enabled, nm)
+	var capHint int
+	if fi, err := os.Stat(path); err == nil {
+		capHint = estimateDomainCapacity(fi.Size())
+	}
+	set := NewDomainSet(capHint)
+	count, badLines, err := loadDomainsFromFile(path, wl.Enabled, set)
 	if err != nil {
 		ERROR("Could not parse whitelist", path, err)
-		return
+		return nil
 	}
 
 	wl.Count = count
@@ -109,6 +124,10 @@ func processWhiteList(index int, wg *sync.WaitGroup, nm *xsync.MapOf[string, boo
 		DEBUG(badLines, " invalid lines in list: ", wl.URL)
 	}
 	config.DNSWhiteLists[index] = wl
+	if !wl.Enabled {
+		return nil
+	}
+	return set
 }
 
 func GetDefaultWhiteLists() []*BlockList {

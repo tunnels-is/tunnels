@@ -61,8 +61,8 @@ var (
 	CancelFunc    context.CancelFunc
 
 	DNSGlobalBlock atomic.Bool
-	DNSBlockList   atomic.Pointer[*xsync.MapOf[string, bool]]
-	DNSWhiteList   atomic.Pointer[*xsync.MapOf[string, bool]]
+	DNSBlockList   atomic.Pointer[DomainSet]
+	DNSWhiteList   atomic.Pointer[DomainSet]
 	DNSCache       *xsync.MapOf[string, any]
 	DNSStatsMap    *xsync.MapOf[string, any]
 )

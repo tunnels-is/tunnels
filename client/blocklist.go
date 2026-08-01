@@ -10,8 +10,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/puzpuzpuz/xsync/v3"
 )
 
 var listReloadMu sync.Mutex
@@ -63,72 +61,89 @@ func reloadBlockListsEx(sleep bool, force bool) {
 	if badList {
 		config.DNSBlockLists = GetDefaultBlockLists()
 	}
-	newMap := xsync.NewMapOf[string, bool]()
 
+	// Load each list into its own map (no concurrent writes), then merge once.
+	// Avoids xsync concurrent-map overhead which dominated retained heap (~250MB+).
+	partials := make([]*DomainSet, len(config.DNSBlockLists))
 	wg := new(sync.WaitGroup)
 	for i := range config.DNSBlockLists {
 		wg.Add(1)
-		go processBlockList(i, wg, newMap, force)
+		go func(i int) {
+			defer wg.Done()
+			partials[i] = processBlockList(i, force)
+		}(i)
 	}
 	wg.Wait()
 
-	DEBUG("finished updating blocklists")
-	DNSBlockList.Store(&newMap)
+	totalCap := 0
+	for _, p := range partials {
+		if p != nil {
+			totalCap += p.Len()
+		}
+	}
+	final := NewDomainSet(totalCap)
+	for _, p := range partials {
+		final.MergeFrom(p)
+	}
+
+	DEBUG("finished updating blocklists, domains=", final.Len())
+	DNSBlockList.Store(final)
 	err := writeConfigToDisk()
 	if err != nil {
 		ERROR("unable to write config to disk post blocklist update", err)
 	}
 }
 
-func processBlockList(index int, wg *sync.WaitGroup, nm *xsync.MapOf[string, bool], force bool) {
-	defer func() {
-		wg.Done()
-	}()
+// processBlockList loads one list into a private DomainSet (or nil on failure).
+func processBlockList(index int, force bool) *DomainSet {
 	defer RecoverAndLog()
 	config := CONFIG.Load()
 	bl := config.DNSBlockLists[index]
 	if bl == nil {
-		return
+		return nil
 	}
 
 	state := STATE.Load()
 	lowerTag := strings.ToLower(bl.Tag)
 	path := state.BlockListPath + lowerTag
 
-	// Prefer download when stale/forced; fall back to on-disk cache.
-	// Downloads stream straight to disk so we never hold the full list + per-line strings twice.
 	if (force || time.Since(bl.LastDownload).Hours() > 24) && bl.URL != "" {
 		if err := downloadListToFile(bl.URL, path); err != nil {
 			ERROR("Could not download bocklist", bl.URL, err)
 			if !fileExistsNonEmpty(path) {
 				ERROR("Could not read from disk or download blocklist", bl.URL, err)
-				return
+				return nil
 			}
 		}
 	} else if bl.Tag != "" {
 		if !fileExistsNonEmpty(path) {
 			if bl.URL == "" {
 				ERROR("No bytes in DNS blocklist: ", bl.URL, lowerTag)
-				return
+				return nil
 			}
 			if err := downloadListToFile(bl.URL, path); err != nil {
 				ERROR("Could not read from disk or download blocklist", bl.URL, err)
-				return
+				return nil
 			}
 		}
 	} else {
-		return
+		return nil
 	}
 
 	if !fileExistsNonEmpty(path) {
 		ERROR("No bytes in DNS blocklist: ", bl.URL, lowerTag)
-		return
+		return nil
 	}
 
-	count, badLines, err := loadDomainsFromFile(path, bl.Enabled, nm)
+	var capHint int
+	if fi, err := os.Stat(path); err == nil {
+		capHint = estimateDomainCapacity(fi.Size())
+	}
+	set := NewDomainSet(capHint)
+	count, badLines, err := loadDomainsFromFile(path, bl.Enabled, set)
 	if err != nil {
 		ERROR("Could not parse blocklist", path, err)
-		return
+		return nil
 	}
 
 	bl.Count = count
@@ -137,6 +152,10 @@ func processBlockList(index int, wg *sync.WaitGroup, nm *xsync.MapOf[string, boo
 		DEBUG(badLines, " invalid lines in list: ", bl.URL)
 	}
 	config.DNSBlockLists[index] = bl
+	if !bl.Enabled {
+		return nil // counted but not stored
+	}
+	return set
 }
 
 func fileExistsNonEmpty(path string) bool {
@@ -144,25 +163,23 @@ func fileExistsNonEmpty(path string) bool {
 	return err == nil && fi.Size() > 0
 }
 
-// loadDomainsFromFile streams a list file line-by-line without loading the whole
-// file into memory. Only domains that pass validation (and are enabled) allocate strings.
-func loadDomainsFromFile(path string, enabled bool, nm *xsync.MapOf[string, bool]) (count, bad int, err error) {
+// loadDomainsFromFile streams a list file line-by-line without loading the whole file.
+func loadDomainsFromFile(path string, enabled bool, set *DomainSet) (count, bad int, err error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return 0, 0, err
 	}
 	defer f.Close()
-	return loadDomainsFromReader(f, enabled, nm)
+	return loadDomainsFromReader(f, enabled, set)
 }
 
-func loadDomainsFromReader(r io.Reader, enabled bool, nm *xsync.MapOf[string, bool]) (count, bad int, err error) {
+func loadDomainsFromReader(r io.Reader, enabled bool, set *DomainSet) (count, bad int, err error) {
 	scanner := bufio.NewScanner(r)
 	buf := make([]byte, 0, dnsListScanBuf)
 	scanner.Buffer(buf, dnsListMaxLineLen)
 
 	for scanner.Scan() {
 		line := scanner.Bytes()
-		// Skip empty / comment-only lines without allocating.
 		if len(line) == 0 || line[0] == '#' {
 			bad++
 			continue
@@ -172,9 +189,8 @@ func loadDomainsFromReader(r io.Reader, enabled bool, nm *xsync.MapOf[string, bo
 			continue
 		}
 		count++
-		if enabled && nm != nil {
-			// string(line) allocates once per kept domain; scanner.Text() did this for every line.
-			nm.Store(string(line), true)
+		if enabled && set != nil {
+			set.Add(string(line))
 		}
 	}
 	if err := scanner.Err(); err != nil {
@@ -218,7 +234,6 @@ retry:
 	}
 	defer resp.Body.Close()
 
-	// Atomic-ish write: temp file then rename so a partial download never replaces a good list.
 	tmp := path + ".tmp"
 	f, err := os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
