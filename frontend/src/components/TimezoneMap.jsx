@@ -33,7 +33,7 @@ const TimezoneMap = ({ timezone, country, serverCountry, connecting, connected, 
 	}
 
 	return (
-		<div className="relative mb-4 w-full overflow-hidden border border-base-300 bg-base-100 py-4">
+		<div className="relative mb-4 w-full overflow-hidden py-4">
 			<div className="mx-auto w-[60%] max-w-4xl">
 				<svg viewBox={world.viewBox} className="block h-auto w-full">
 					{world.locations.map((l) => (
