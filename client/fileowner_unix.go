@@ -18,7 +18,9 @@ func checkFileOwnership(path string) error {
 	}
 	if st, ok := info.Sys().(*syscall.Stat_t); ok {
 		if st.Uid != uint32(os.Getuid()) {
-			return fmt.Errorf("%s is owned by uid %d, current uid is %d", path, st.Uid, os.Getuid())
+			err := fmt.Errorf("%s is owned by uid %d, current uid is %d", path, st.Uid, os.Getuid())
+			ERROR("file permission check failed:", path, "—", err)
+			return err
 		}
 	}
 	return nil

@@ -19,7 +19,7 @@ func TestValidateUserKeyFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := validateUserKeyFile(info); err != nil {
+	if err := validateUserKeyFile(secure, info); err != nil {
 		t.Fatalf("0600 file owned by us should validate: %v", err)
 	}
 
@@ -31,7 +31,7 @@ func TestValidateUserKeyFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := validateUserKeyFile(info); err == nil {
+	if err := validateUserKeyFile(insecure, info); err == nil {
 		t.Fatal("world-readable key file must be rejected")
 	}
 }

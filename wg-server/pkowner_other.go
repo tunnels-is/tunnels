@@ -4,4 +4,4 @@ package wgserver
 
 import "os"
 
-func checkKeyFileOwner(info os.FileInfo) error { return nil }
+func checkKeyFileOwner(path string, info os.FileInfo) error { return nil }
