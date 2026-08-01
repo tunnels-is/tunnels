@@ -29,7 +29,8 @@ var DIST embed.FS
 //go:embed wintun.dll
 var DLL embed.FS
 
-// App icon (PNG). Windows taskbar/exe icon comes from rsrc_windows_*.syso next to this package.
+// App icon (PNG) for Linux window / macOS About.
+// Windows title-bar + taskbar icons come from rsrc_windows_*.syso (icon resource ID 3 = Wails AppIconID).
 //
 //go:embed build/appicon.png
 var appIcon []byte
@@ -107,7 +108,9 @@ func main() {
 			}),
 		},
 		Windows: &windows.Options{
-			DisableWindowIcon: false,
+			DisableWindowIcon:    false,
+			IsZoomControlEnabled: true, // Ctrl+mouse wheel / keyboard zoom in WebView2
+			DisablePinchZoom:     false,
 		},
 		Linux: &linux.Options{
 			Icon: appIcon,
