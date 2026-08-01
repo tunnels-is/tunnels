@@ -103,6 +103,42 @@ func CreateFile(file string) (f *os.File, err error) {
 	return
 }
 
+// writeFileWithBackup replaces path with newContent, keeping the previous
+// version as path+backupFileSuffix. The write (and backup) is skipped when the
+// on-disk content is already identical, so the .bak never ends up equal to the
+// live file. It refuses to touch a file owned by another user, so a client
+// started as e.g. root cannot wipe a user-owned config.
+func writeFileWithBackup(path string, newContent []byte) (err error) {
+	existing, err := os.ReadFile(path)
+	if err == nil && sha256.Sum256(existing) == sha256.Sum256(newContent) {
+		DEBUG("File content unchanged, skipping write: ", path)
+		return nil
+	}
+
+	err = checkFileOwnership(path)
+	if err != nil {
+		return fmt.Errorf("refusing to modify file: %w", err)
+	}
+
+	err = RenameFile(path, path+backupFileSuffix)
+	if err != nil {
+		ERROR("Unable to rename file: ", err)
+	}
+
+	f, err := CreateFile(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	_, err = f.Write(newContent)
+	if err != nil {
+		return err
+	}
+
+	return f.Sync()
+}
+
 func createFolder(path string) error {
 	err := os.Mkdir(path, 0o700)
 	if err != nil {
