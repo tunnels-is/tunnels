@@ -19,9 +19,6 @@ var (
 	wgDevice   *device.Device
 	wgLazyBind *LazyBind
 
-	// addedPeerKeys tracks the hex pubkeys this process has added to the
-	// device. Lets the handshake path tell a fresh connect (reset the peer's
-	// firewall state) from a routine rekey (leave it alone).
 	addedPeerKeys sync.Map
 )
 
@@ -51,9 +48,6 @@ func setupWireGuard(cfg *Config, logLevel string) error {
 	}
 	startFlowCleaner()
 
-	// The inspector is always installed: it blocks all peer traffic to the
-	// server's own WG IP and consumes ACL control packets. The peer-to-peer
-	// firewall on top of it is gated by cfg.EnableFirewall.
 	tunInterface, err := newInspectingTUN(tunDev, cfg)
 	if err != nil {
 		return fmt.Errorf("inspector setup: %w", err)
@@ -77,18 +71,12 @@ func setupWireGuard(cfg *Config, logLevel string) error {
 	privCopy := make([]byte, 32)
 	copy(privCopy, cfg.WireGuardPrivKey)
 
-	// Default wildcard bind (0.0.0.0/[::]): WireGuard listens on every local IP
-	// and, via IP_PKTINFO sticky source, answers each peer from the address it
-	// was reached on (default routing otherwise). The listen port is set below
-	// via the listen_port UAPI directive, independent of the bind address.
 	wgLazyBind = NewLazyBind(conn.NewDefaultBind(), privCopy, pubBytes, cfg.HandshakeBufferSize, cfg.HandshakeRatePerIP)
 	wgDevice = device.NewDevice(tunInterface, wgLazyBind, wgLogger)
 
 	privKeyHex := make([]byte, hex.EncodedLen(32))
 	hex.Encode(privKeyHex, cfg.WireGuardPrivKey)
-	// listen_port must be set explicitly: with the default bind the device
-	// supplies the port to Bind.Open (unlike the old pinnedBind, which carried
-	// its own port); without this the device would open a random port.
+
 	conf := fmt.Appendf(nil, "private_key=%s\nlisten_port=%d\n\n", privKeyHex, cfg.WireGuardPort)
 	zeroBytes(privKeyHex)
 
@@ -107,14 +95,12 @@ func setupWireGuard(cfg *Config, logLevel string) error {
 		return fmt.Errorf("derive pubkey: %w", err)
 	}
 
-	// Zero the config's copy — LazyBind has its own independent copy.
 	zeroBytes(cfg.WireGuardPrivKey)
 
 	INFO("wireguard device started, pubkey=", pubKeyB64, " port=", cfg.WireGuardPort)
 	return nil
 }
 
-// sanitizeIPC strips newlines and carriage returns to prevent IPC directive injection.
 func sanitizeIPC(s string) string {
 	s = strings.ReplaceAll(s, "\n", "")
 	s = strings.ReplaceAll(s, "\r", "")

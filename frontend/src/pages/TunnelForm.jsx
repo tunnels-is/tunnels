@@ -108,10 +108,6 @@ const TunnelForm = () => {
 		fetchState()
 	}, [])
 
-	// React Router keeps this component mounted when only :tag changes (e.g.
-	// navigating from one tunnel's edit route to another). Without clearing the
-	// form the loader below sees a non-null form and never re-clones, so the page
-	// shows/saves the previous tunnel's data under the new tag. Reset on tag change.
 	useEffect(() => {
 		setForm(null)
 	}, [tag])
@@ -230,9 +226,7 @@ const TunnelForm = () => {
 				<Card title="Features" description="Behaviour of this tunnel while connected.">
 					<div className="grid grid-cols-1 sm:grid-cols-2">
 						{FEATURE_TOGGLES.map((opt) => {
-							// The kill switch only works with a default route (it blackholes
-							// the default route on drop). Disable and force it off unless the
-							// default route is enabled, matching the backend validation.
+
 							if (opt.key === "KillSwitch") {
 								const allowed = !!form.EnableDefaultRoute
 								return (
@@ -245,8 +239,7 @@ const TunnelForm = () => {
 									/>
 								)
 							}
-							// Turning the default route off must also clear the kill switch so
-							// the pair can never be left in the invalid combination.
+
 							if (opt.key === "EnableDefaultRoute") {
 								return (
 									<Toggle

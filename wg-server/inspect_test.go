@@ -6,7 +6,6 @@ import (
 	"testing"
 )
 
-// Test-only wrappers for helpers removed from production code.
 func handleControl(t *inspectingTUN, pkt []byte) bool {
 	src, dst, proto, l4, frag, ok := parseIPHeader(pkt)
 	return t.handleControlParsed(src, dst, proto, l4, frag, ok)
@@ -34,12 +33,6 @@ func peerListSnapshot() map[netip.Addr][]netip.Addr {
 	return out
 }
 
-
-
-// ---------------------------------------------------------------------------
-// parseIPHeader
-// ---------------------------------------------------------------------------
-
 func buildIPv4UDP(t *testing.T, src, dst string, sport, dport uint16, payload []byte) []byte {
 	t.Helper()
 	srcA := mustAddr(t, src).As4()
@@ -47,7 +40,7 @@ func buildIPv4UDP(t *testing.T, src, dst string, sport, dport uint16, payload []
 	total := 20 + 8 + len(payload)
 
 	pkt := make([]byte, total)
-	pkt[0] = 0x45 // v4, IHL=5
+	pkt[0] = 0x45
 	binary.BigEndian.PutUint16(pkt[2:4], uint16(total))
 	pkt[9] = protoUDP
 	copy(pkt[12:16], srcA[:])
@@ -68,7 +61,7 @@ func buildIPv6UDP(t *testing.T, src, dst string, sport, dport uint16, payload []
 	payloadLen := 8 + len(payload)
 
 	pkt := make([]byte, 40+payloadLen)
-	pkt[0] = 0x60 // v6
+	pkt[0] = 0x60
 	binary.BigEndian.PutUint16(pkt[4:6], uint16(payloadLen))
 	pkt[6] = protoUDP
 	copy(pkt[8:24], srcA[:])
@@ -82,8 +75,6 @@ func buildIPv6UDP(t *testing.T, src, dst string, sport, dport uint16, payload []
 	return pkt
 }
 
-// setFrag marks an IPv4 packet as a fragment: sets the identification field,
-// the fragment offset (in 8-byte units), and the MF (more-fragments) bit.
 func setFrag(pkt []byte, id, offsetUnits uint16, more bool) {
 	binary.BigEndian.PutUint16(pkt[4:6], id)
 	ff := offsetUnits & 0x1FFF
@@ -137,7 +128,7 @@ func TestParseIPHeader_TooShort(t *testing.T) {
 
 func TestParseIPHeader_BadVersion(t *testing.T) {
 	pkt := make([]byte, 40)
-	pkt[0] = 0x70 // not v4 or v6
+	pkt[0] = 0x70
 	if _, _, _, _, _, ok := parseIPHeader(pkt); ok {
 		t.Fatal("bad version must be rejected")
 	}
@@ -145,7 +136,7 @@ func TestParseIPHeader_BadVersion(t *testing.T) {
 
 func TestParseIPHeader_BadIHL(t *testing.T) {
 	pkt := make([]byte, 20)
-	pkt[0] = 0x40 // IHL=0
+	pkt[0] = 0x40
 	if _, _, _, _, _, ok := parseIPHeader(pkt); ok {
 		t.Fatal("IHL<5 must be rejected")
 	}
@@ -153,15 +144,11 @@ func TestParseIPHeader_BadIHL(t *testing.T) {
 
 func TestParseIPHeader_BadTotalLen(t *testing.T) {
 	pkt := buildIPv4UDP(t, "10.0.0.5", "10.0.0.10", 1, 2, []byte("x"))
-	binary.BigEndian.PutUint16(pkt[2:4], 9999) // > actual length
+	binary.BigEndian.PutUint16(pkt[2:4], 9999)
 	if _, _, _, _, _, ok := parseIPHeader(pkt); ok {
 		t.Fatal("total>len must be rejected")
 	}
 }
-
-// ---------------------------------------------------------------------------
-// inspectingTUN.allow
-// ---------------------------------------------------------------------------
 
 func newTestInspector(t *testing.T) *inspectingTUN {
 	t.Helper()
@@ -191,8 +178,6 @@ func newTestInspectorNoFirewall(t *testing.T) *inspectingTUN {
 	return insp
 }
 
-// allowFor installs a resident entry for dst and sets its allowlist to the
-// given bare-host (all-ports) sources.
 func allowFor(t *testing.T, dst string, srcs ...string) {
 	t.Helper()
 	resetPeer(dst)
@@ -211,8 +196,7 @@ func TestAllow_DefaultDenyForPeerToPeer(t *testing.T) {
 
 func TestAllow_ServerIPUnreachableByPeers(t *testing.T) {
 	insp := newTestInspector(t)
-	// The server's own WG IP is unconditionally unreachable by peers — the
-	// check runs before any firewall/allowlist logic.
+
 	toServer := buildIPv4UDP(t, "10.0.0.5", insp.serverIPv4.String(), 1, 2, nil)
 	if insp.allow(toServer) {
 		t.Fatal("traffic to server WG IP must be dropped")
@@ -225,12 +209,12 @@ func TestAllow_ServerIPUnreachableByPeers(t *testing.T) {
 
 func TestAllow_FirewallDisabled(t *testing.T) {
 	insp := newTestInspectorNoFirewall(t)
-	// With the firewall off, peer-to-peer passes without any policy...
+
 	p2p := buildIPv4UDP(t, "10.0.0.5", "10.0.0.10", 1, 2, nil)
 	if !insp.allow(p2p) {
 		t.Fatal("firewall disabled => peer-to-peer must pass")
 	}
-	// ...but the server's WG IP stays unreachable.
+
 	toServer := buildIPv4UDP(t, "10.0.0.5", insp.serverIPv4.String(), 1, 2, nil)
 	if insp.allow(toServer) {
 		t.Fatal("server WG IP must be blocked even with firewall disabled")
@@ -243,7 +227,7 @@ func TestAllow_FirewallDisabled(t *testing.T) {
 
 func TestAllow_ServerOriginatedPasses(t *testing.T) {
 	insp := newTestInspector(t)
-	// Server-originated traffic (e.g. ICMP errors) passes without a policy.
+
 	fromServer := buildIPv4UDP(t, insp.serverIPv4.String(), "10.0.0.5", 1, 2, nil)
 	if !insp.allow(fromServer) {
 		t.Fatal("traffic from server WG IP must not be filtered")
@@ -265,69 +249,51 @@ func TestAllow_AllowlistedSrcPasses(t *testing.T) {
 	}
 }
 
-// Revoking a source from the allowlist tears down its established conntrack
-// flow, so it can no longer reach this device by coasting on the flow. This is
-// the reported bug: remove the rule → the peer keeps talking via conntrack.
 func TestAllow_RevokeDropsConntrackFlow(t *testing.T) {
 	insp := newTestInspector(t)
-	resetPeer("10.0.0.3")               // B
-	allowFor(t, "10.0.0.2", "10.0.0.3") // A allows B (all ports)
+	resetPeer("10.0.0.3")
+	allowFor(t, "10.0.0.2", "10.0.0.3")
 
-	// B initiates to A:22 (admitted by the allowlist); A replies, opening A's
-	// return-path flow {remote:B, rport:5000, lport:22}.
 	if !insp.allow(buildIPv4UDP(t, "10.0.0.3", "10.0.0.2", 5000, 22, nil)) {
 		t.Fatal("setup: B should reach A while allowlisted")
 	}
-	insp.allow(buildIPv4UDP(t, "10.0.0.2", "10.0.0.3", 22, 5000, nil)) // A's reply opens the flow
+	insp.allow(buildIPv4UDP(t, "10.0.0.2", "10.0.0.3", 22, 5000, nil))
 
-	// Revoke B.
 	entry(t, "10.0.0.2").setAllowed(nil, false)
 
-	// B must now be dropped: allowlist denies and the coasting flow is gone.
 	if insp.allow(buildIPv4UDP(t, "10.0.0.3", "10.0.0.2", 5000, 22, nil)) {
 		t.Fatal("revoked peer must be dropped, not coast on the conntrack flow")
 	}
 }
 
-// A policy change must not tear down flows for connections this device itself
-// initiated to a remote that was never on the allowlist — those are its own
-// return paths, unrelated to who is being allowed in.
 func TestAllow_RevokeKeepsOwnOutboundFlow(t *testing.T) {
 	insp := newTestInspector(t)
-	resetPeer("10.0.0.2") // A, no allowlist
+	resetPeer("10.0.0.2")
 
-	// A initiates outbound to C (cross-server, never allowlisted); C's reply is
-	// admitted by A's conntrack flow.
 	insp.allow(buildIPv4UDP(t, "10.0.0.2", "10.99.0.9", 40000, 80, nil))
 	if !insp.allow(buildIPv4UDP(t, "10.99.0.9", "10.0.0.2", 80, 40000, nil)) {
 		t.Fatal("setup: C's reply should match A's own outbound flow")
 	}
 
-	// An unrelated policy change (allow some other peer) must leave A's own
-	// outbound return path to C intact.
 	entry(t, "10.0.0.2").setAllowed(hostRules(t, "10.0.0.5"), false)
 	if !insp.allow(buildIPv4UDP(t, "10.99.0.9", "10.0.0.2", 80, 40000, nil)) {
 		t.Fatal("policy change must not drop A's own initiated-outbound return path")
 	}
 }
 
-// After revocation, if A itself starts talking to B again, A's outbound re-opens
-// the return path and B's replies flow once more — the "slight interruption,
-// then re-established" behavior for A-initiated traffic.
 func TestAllow_RevokeReestablishesOnOutbound(t *testing.T) {
 	insp := newTestInspector(t)
 	resetPeer("10.0.0.3")
 	allowFor(t, "10.0.0.2", "10.0.0.3")
 
-	insp.allow(buildIPv4UDP(t, "10.0.0.3", "10.0.0.2", 5000, 22, nil)) // B->A
-	insp.allow(buildIPv4UDP(t, "10.0.0.2", "10.0.0.3", 22, 5000, nil)) // A->B reply opens flow
-	entry(t, "10.0.0.2").setAllowed(nil, false)                        // revoke B
+	insp.allow(buildIPv4UDP(t, "10.0.0.3", "10.0.0.2", 5000, 22, nil))
+	insp.allow(buildIPv4UDP(t, "10.0.0.2", "10.0.0.3", 22, 5000, nil))
+	entry(t, "10.0.0.2").setAllowed(nil, false)
 
 	if insp.allow(buildIPv4UDP(t, "10.0.0.3", "10.0.0.2", 5000, 22, nil)) {
 		t.Fatal("B must be cut off immediately after revoke")
 	}
 
-	// A initiates to B again → re-opens the return-path flow.
 	insp.allow(buildIPv4UDP(t, "10.0.0.2", "10.0.0.3", 22, 5000, nil))
 	if !insp.allow(buildIPv4UDP(t, "10.0.0.3", "10.0.0.2", 5000, 22, nil)) {
 		t.Fatal("A's own outbound must re-establish the return path for B's replies")
@@ -337,7 +303,7 @@ func TestAllow_RevokeReestablishesOnOutbound(t *testing.T) {
 func TestAllow_HostPortRule(t *testing.T) {
 	insp := newTestInspector(t)
 	resetPeer("10.0.0.10")
-	// 10.0.0.10 admits 10.0.0.5 only on port 22.
+
 	ctrl := buildIPv4UDP(t, "10.0.0.10", insp.serverIPv4.String(), 1, aclControlPort,
 		[]byte(`{"Allowed":["10.0.0.5:22"]}`))
 	if !handleControl(insp, ctrl) {
@@ -357,7 +323,7 @@ func TestAllow_HostPortRule(t *testing.T) {
 func TestAllow_AnyHostPortRule(t *testing.T) {
 	insp := newTestInspector(t)
 	resetPeer("10.0.0.10")
-	// 10.0.0.10 admits ANY source on port 443 only ("*:443").
+
 	ctrl := buildIPv4UDP(t, "10.0.0.10", insp.serverIPv4.String(), 1, aclControlPort,
 		[]byte(`{"Allowed":["*:443"]}`))
 	if !handleControl(insp, ctrl) {
@@ -378,22 +344,20 @@ func TestAllow_AnyHostPortRule(t *testing.T) {
 
 func TestParseIPHeader_Fragments(t *testing.T) {
 	head := buildIPv4UDP(t, "10.0.0.5", "10.0.0.10", 1, 2, make([]byte, 8))
-	setFrag(head, 4242, 0, true) // first fragment: MF set, offset 0
+	setFrag(head, 4242, 0, true)
 	_, _, _, _, frag, ok := parseIPHeader(head)
 	if !ok || frag.id != 4242 || !frag.isFragment() || frag.isTrailing() {
 		t.Fatalf("first fragment: got id=%d isFragment=%v isTrailing=%v", frag.id, frag.isFragment(), frag.isTrailing())
 	}
 
 	tail := buildIPv4UDP(t, "10.0.0.5", "10.0.0.10", 1, 2, make([]byte, 8))
-	setFrag(tail, 4242, 185, false) // trailing fragment: offset > 0
+	setFrag(tail, 4242, 185, false)
 	_, _, _, _, frag, ok = parseIPHeader(tail)
 	if !ok || frag.id != 4242 || !frag.isFragment() || !frag.isTrailing() {
 		t.Fatalf("trailing fragment: got id=%d isFragment=%v isTrailing=%v", frag.id, frag.isFragment(), frag.isTrailing())
 	}
 }
 
-// A fragmented datagram to an allowed port: the first fragment is port-checked
-// and admitted, and its trailing fragments then pass by fragment-note.
 func TestAllow_FragmentedDatagramAdmitted(t *testing.T) {
 	insp := newTestInspector(t)
 	resetPeer("10.0.0.10")
@@ -408,7 +372,7 @@ func TestAllow_FragmentedDatagramAdmitted(t *testing.T) {
 	if !insp.allow(head) {
 		t.Fatal("first fragment on an allowed port must pass")
 	}
-	// Trailing fragment carries garbage where the ports would be — irrelevant.
+
 	tail := buildIPv4UDP(t, "10.0.0.5", "10.0.0.10", 12345, 6789, make([]byte, 8))
 	setFrag(tail, 42, 185, false)
 	if !insp.allow(tail) {
@@ -416,9 +380,6 @@ func TestAllow_FragmentedDatagramAdmitted(t *testing.T) {
 	}
 }
 
-// The evasion case: a trailing fragment with no admitted head must be dropped,
-// even when its payload bytes happen to equal an allowed port. This is the
-// bug the fix closes — before it, the garbage dport matched the rule.
 func TestAllow_OrphanTrailingFragmentDropped(t *testing.T) {
 	insp := newTestInspector(t)
 	resetPeer("10.0.0.10")
@@ -427,7 +388,7 @@ func TestAllow_OrphanTrailingFragmentDropped(t *testing.T) {
 	if !handleControl(insp, ctrl) {
 		t.Fatal("expected consume")
 	}
-	// dport bytes forged to 5000 (an allowed port), but no first fragment admitted.
+
 	tail := buildIPv4UDP(t, "10.0.0.5", "10.0.0.10", 1, 5000, make([]byte, 8))
 	setFrag(tail, 99, 185, false)
 	if insp.allow(tail) {
@@ -435,8 +396,6 @@ func TestAllow_OrphanTrailingFragmentDropped(t *testing.T) {
 	}
 }
 
-// A fragmented datagram whose first fragment is to a denied port is dropped and
-// leaves no note, so its trailing fragments are dropped too.
 func TestAllow_FragmentedToDeniedPortDropped(t *testing.T) {
 	insp := newTestInspector(t)
 	resetPeer("10.0.0.10")
@@ -445,7 +404,7 @@ func TestAllow_FragmentedToDeniedPortDropped(t *testing.T) {
 	if !handleControl(insp, ctrl) {
 		t.Fatal("expected consume")
 	}
-	head := buildIPv4UDP(t, "10.0.0.5", "10.0.0.10", 40000, 22, make([]byte, 8)) // denied port
+	head := buildIPv4UDP(t, "10.0.0.5", "10.0.0.10", 40000, 22, make([]byte, 8))
 	setFrag(head, 7, 0, true)
 	if insp.allow(head) {
 		t.Fatal("first fragment to a denied port must be dropped")
@@ -457,9 +416,6 @@ func TestAllow_FragmentedToDeniedPortDropped(t *testing.T) {
 	}
 }
 
-// A bare-host (all-ports) rule admits every fragment, as before the port
-// feature — the head passes via portSet.all, the trailing via the all-ports
-// fast-path (no dependence on the note).
 func TestAllow_FragmentBareHostRule(t *testing.T) {
 	insp := newTestInspector(t)
 	allowFor(t, "10.0.0.10", "10.0.0.5")
@@ -473,24 +429,18 @@ func TestAllow_FragmentBareHostRule(t *testing.T) {
 	}
 }
 
-// Under an all-ports grant, a trailing fragment is admitted order-independently
-// — even if it arrives before its head (or the head is lost). This is the
-// pre-port-feature behavior the all-ports fast-path restores; without it, an
-// all-ports source's reordered fragment would be wrongly dropped.
 func TestAllow_FragmentBareHostOrderIndependent(t *testing.T) {
 	insp := newTestInspector(t)
 	allowFor(t, "10.0.0.10", "10.0.0.5")
 
-	// Trailing fragment first, with no head ever admitted.
 	tail := buildIPv4UDP(t, "10.0.0.5", "10.0.0.10", 0, 0, make([]byte, 8))
 	setFrag(tail, 33, 185, false)
 	if !insp.allow(tail) {
 		t.Fatal("all-ports source: a headless/reordered trailing fragment must still pass")
 	}
 
-	// Same, under allow-all.
 	resetPeer("10.0.0.11")
-	entry(t, "10.0.0.11").setAllowed(nil, true) // allow-all
+	entry(t, "10.0.0.11").setAllowed(nil, true)
 	tail2 := buildIPv4UDP(t, "10.0.0.99", "10.0.0.11", 0, 0, make([]byte, 8))
 	setFrag(tail2, 34, 185, false)
 	if !insp.allow(tail2) {
@@ -498,9 +448,6 @@ func TestAllow_FragmentBareHostOrderIndependent(t *testing.T) {
 	}
 }
 
-// The complement: under a port-scoped rule, a headless/reordered trailing
-// fragment is dropped (it needs the port-checked head's note). This is the
-// order-dependence we deliberately keep for port rules.
 func TestAllow_FragmentPortRuleNeedsHead(t *testing.T) {
 	insp := newTestInspector(t)
 	setRule("10.0.0.10", "10.0.0.5:5000")
@@ -512,19 +459,14 @@ func TestAllow_FragmentPortRuleNeedsHead(t *testing.T) {
 	}
 }
 
-// Connection-tracked return path: a receiver that initiated a flow admits the
-// fragmented reply from a non-allowlisted source — first fragment via flowMatch,
-// trailing fragments via the note it seeds.
 func TestAllow_FragmentConntrackReturn(t *testing.T) {
 	insp := newTestInspector(t)
-	resetPeer("10.0.0.2") // A: no allowlist
-	resetPeer("10.0.0.3") // B: no allowlist
+	resetPeer("10.0.0.2")
+	resetPeer("10.0.0.3")
 
-	// A initiates to B:9000, opening A's return-path flow.
 	out := buildIPv4UDP(t, "10.0.0.2", "10.0.0.3", 40000, 9000, nil)
 	insp.allow(out)
 
-	// B replies to A, fragmented. First fragment matches A's flow.
 	head := buildIPv4UDP(t, "10.0.0.3", "10.0.0.2", 9000, 40000, make([]byte, 8))
 	setFrag(head, 77, 0, true)
 	if !insp.allow(head) {
@@ -537,20 +479,16 @@ func TestAllow_FragmentConntrackReturn(t *testing.T) {
 	}
 }
 
-// The SYN/SYN-ACK scenario: a one-sided allowlist plus connection tracking
-// lets replies flow back without the other peer allowlisting the initiator.
 func TestAllow_ConntrackReturnPath(t *testing.T) {
 	insp := newTestInspector(t)
-	resetPeer("10.0.0.3")               // phone
-	allowFor(t, "10.0.0.2", "10.0.0.3") // laptop allows phone; phone allows nobody
+	resetPeer("10.0.0.3")
+	allowFor(t, "10.0.0.2", "10.0.0.3")
 
-	// SYN phone -> laptop:22 (allowed by laptop's allowlist; opens phone's flow)
 	syn := buildIPv4UDP(t, "10.0.0.3", "10.0.0.2", 40000, 22, nil)
 	if !insp.allow(syn) {
 		t.Fatal("SYN to an allowlisted peer must pass")
 	}
-	// SYN-ACK laptop:22 -> phone:40000 (no allowlist entry on phone; must match
-	// the flow the phone opened)
+
 	synack := buildIPv4UDP(t, "10.0.0.2", "10.0.0.3", 22, 40000, nil)
 	if !insp.allow(synack) {
 		t.Fatal("reply must be admitted by connection tracking")
@@ -559,10 +497,9 @@ func TestAllow_ConntrackReturnPath(t *testing.T) {
 
 func TestAllow_ConntrackNoUnsolicitedReturn(t *testing.T) {
 	insp := newTestInspector(t)
-	resetPeer("10.0.0.3")               // phone, no allowlist, no prior flow
-	allowFor(t, "10.0.0.2", "10.0.0.3") // laptop allows phone
+	resetPeer("10.0.0.3")
+	allowFor(t, "10.0.0.2", "10.0.0.3")
 
-	// laptop -> phone with no prior phone-initiated flow: must be denied.
 	unsolicited := buildIPv4UDP(t, "10.0.0.2", "10.0.0.3", 22, 40000, nil)
 	if insp.allow(unsolicited) {
 		t.Fatal("unsolicited packet must be denied without a tracked flow")
@@ -572,7 +509,7 @@ func TestAllow_ConntrackNoUnsolicitedReturn(t *testing.T) {
 func TestAllow_AllowAllAdmitsAnySource(t *testing.T) {
 	insp := newTestInspector(t)
 	resetPeer("10.0.0.10")
-	entry(t, "10.0.0.10").setAllowed(nil, true) // allow-all, empty list
+	entry(t, "10.0.0.10").setAllowed(nil, true)
 
 	for _, src := range []string{"10.0.0.5", "10.0.0.99"} {
 		pkt := buildIPv4UDP(t, src, "10.0.0.10", 1, 2, nil)
@@ -597,7 +534,7 @@ func TestHandleControl_AllowAll(t *testing.T) {
 
 func TestAllow_NonPeerToPeerAlwaysPasses(t *testing.T) {
 	insp := newTestInspector(t)
-	allowFor(t, "10.0.0.10") // strict (empty allowlist)
+	allowFor(t, "10.0.0.10")
 
 	pkt := buildIPv4UDP(t, "10.0.0.5", "8.8.8.8", 1, 2, nil)
 	if !insp.allow(pkt) {
@@ -628,13 +565,9 @@ func TestAllow_IPv6(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// handleControl
-// ---------------------------------------------------------------------------
-
 func TestHandleControl_UpdatesACL(t *testing.T) {
 	insp := newTestInspector(t)
-	resetPeer("10.0.0.5") // announcer must be a connected resident
+	resetPeer("10.0.0.5")
 	payload := []byte(`{"Allowed":["10.0.0.10","10.0.0.11"]}`)
 	pkt := buildIPv4UDP(t, "10.0.0.5", insp.serverIPv4.String(), 33333, aclControlPort, payload)
 
@@ -669,7 +602,7 @@ func TestHandleControl_IgnoresWrongDst(t *testing.T) {
 func TestHandleControl_NonUDPIgnored(t *testing.T) {
 	insp := newTestInspector(t)
 	pkt := buildIPv4UDP(t, "10.0.0.5", insp.serverIPv4.String(), 1, aclControlPort, nil)
-	pkt[9] = 6 // TCP
+	pkt[9] = 6
 	if handleControl(insp, pkt) {
 		t.Fatal("non-UDP must not be consumed as control")
 	}
@@ -678,13 +611,10 @@ func TestHandleControl_NonUDPIgnored(t *testing.T) {
 func TestHandleControl_TrailingFragmentNotControl(t *testing.T) {
 	insp := newTestInspector(t)
 	resetPeer("10.0.0.5")
-	// A trailing fragment addressed to the server IP: its bytes at the dport
-	// position happen to equal the control port (buildIPv4UDP writes it there),
-	// but a trailing fragment carries no real UDP header, so it must not be
-	// treated as control — nor may it alter policy.
+
 	pkt := buildIPv4UDP(t, "10.0.0.5", insp.serverIPv4.String(), 1, aclControlPort,
 		[]byte(`{"Allowed":["10.0.0.10"]}`))
-	setFrag(pkt, 1234, 185, false) // offset > 0 → trailing fragment
+	setFrag(pkt, 1234, 185, false)
 	if handleControl(insp, pkt) {
 		t.Fatal("a trailing fragment must not be consumed as a control packet")
 	}
@@ -696,11 +626,10 @@ func TestHandleControl_TrailingFragmentNotControl(t *testing.T) {
 func TestHandleControl_FirstFragmentStillControl(t *testing.T) {
 	insp := newTestInspector(t)
 	resetPeer("10.0.0.5")
-	// The first fragment (offset 0) carries the real UDP header, so it is still
-	// classified as control — the guard only rejects trailing fragments.
+
 	pkt := buildIPv4UDP(t, "10.0.0.5", insp.serverIPv4.String(), 1, aclControlPort,
 		[]byte(`{"Allowed":["10.0.0.10"]}`))
-	setFrag(pkt, 1234, 0, true) // offset 0, MF set → first fragment
+	setFrag(pkt, 1234, 0, true)
 	if !handleControl(insp, pkt) {
 		t.Fatal("a first fragment on the control port must be consumed")
 	}
@@ -708,7 +637,7 @@ func TestHandleControl_FirstFragmentStillControl(t *testing.T) {
 
 func TestHandleControl_SrcOutsideWGSubnet(t *testing.T) {
 	insp := newTestInspector(t)
-	// src outside subnet should be consumed (because dst+port match) but ignored.
+
 	pkt := buildIPv4UDP(t, "8.8.8.8", insp.serverIPv4.String(), 1, aclControlPort, []byte(`{"Allowed":["10.0.0.10"]}`))
 	if !handleControl(insp, pkt) {
 		t.Fatal("matching dst+port should be consumed even if src is invalid")
@@ -764,8 +693,7 @@ func TestHandleControl_EmptyListClearsPolicy(t *testing.T) {
 func TestHandleControl_CrossServerIPAccepted(t *testing.T) {
 	insp := newTestInspector(t)
 	resetPeer("10.0.0.5")
-	// Peers can talk across wg-servers — an allowed IP outside this server's
-	// subnets must still be stored.
+
 	pkt := buildIPv4UDP(t, "10.0.0.5", insp.serverIPv4.String(), 1, aclControlPort, []byte(`{"Allowed":["10.99.0.7"]}`))
 	if !handleControl(insp, pkt) {
 		t.Fatal("expected consume")
@@ -777,8 +705,7 @@ func TestHandleControl_CrossServerIPAccepted(t *testing.T) {
 
 func TestHandleControl_AnnounceWithoutEntryDropped(t *testing.T) {
 	insp := newTestInspector(t)
-	// No resetPeer for 10.0.0.5: an announce from a peer with no installed
-	// entry (raced the handshake) is consumed but applies nothing.
+
 	pkt := buildIPv4UDP(t, "10.0.0.5", insp.serverIPv4.String(), 1, aclControlPort, []byte(`{"Allowed":["10.0.0.10"]}`))
 	if !handleControl(insp, pkt) {
 		t.Fatal("expected consume")
@@ -802,9 +729,6 @@ func TestHandleControl_IPv6(t *testing.T) {
 	}
 }
 
-// buildIPv6FragUDP builds an IPv6 packet carrying a fragment extension header.
-// For offsetUnits==0 the payload starts with a UDP header (first fragment);
-// otherwise the payload is opaque mid-datagram bytes (trailing fragment).
 func buildIPv6FragUDP(t *testing.T, src, dst string, sport, dport uint16, id uint32, offsetUnits uint16, more bool, payload []byte) []byte {
 	t.Helper()
 	srcA := mustAddr(t, src).As16()
@@ -819,11 +743,11 @@ func buildIPv6FragUDP(t *testing.T, src, dst string, sport, dport uint16, id uin
 		copy(inner[8:], payload)
 	}
 
-	payloadLen := 8 + len(inner) // fragment header + inner
+	payloadLen := 8 + len(inner)
 	pkt := make([]byte, 40+payloadLen)
 	pkt[0] = 0x60
 	binary.BigEndian.PutUint16(pkt[4:6], uint16(payloadLen))
-	pkt[6] = 44 // fragment header
+	pkt[6] = 44
 	copy(pkt[8:24], srcA[:])
 	copy(pkt[24:40], dstA[:])
 
@@ -877,17 +801,17 @@ func TestParseIPHeader_IPv6TrailingFragment(t *testing.T) {
 }
 
 func TestParseIPHeader_IPv6HopByHopSkipped(t *testing.T) {
-	// v6 | hop-by-hop (8 bytes) | UDP
+
 	udp := buildIPv6UDP(t, "fd00::5", "fd00::10", 42, 43, nil)
-	inner := udp[40:] // the UDP header+payload
+	inner := udp[40:]
 	payloadLen := 8 + len(inner)
 	pkt := make([]byte, 40+payloadLen)
 	copy(pkt, udp[:40])
 	binary.BigEndian.PutUint16(pkt[4:6], uint16(payloadLen))
-	pkt[6] = 0 // hop-by-hop
+	pkt[6] = 0
 	hbh := pkt[40:]
-	hbh[0] = protoUDP // next header
-	hbh[1] = 0        // length: 8 bytes total
+	hbh[0] = protoUDP
+	hbh[1] = 0
 	copy(hbh[8:], inner)
 
 	_, _, proto, l4, _, ok := parseIPHeader(pkt)
@@ -904,8 +828,8 @@ func TestParseIPHeader_IPv6HopByHopSkipped(t *testing.T) {
 
 func TestParseIPHeader_IPv6TruncatedExtHeader(t *testing.T) {
 	pkt := buildIPv6UDP(t, "fd00::5", "fd00::10", 1, 2, nil)
-	pkt[6] = 44                             // claim a fragment header...
-	binary.BigEndian.PutUint16(pkt[4:6], 4) // ...but only 4 payload bytes
+	pkt[6] = 44
+	binary.BigEndian.PutUint16(pkt[4:6], 4)
 	pkt = pkt[:44]
 	if _, _, _, _, _, ok := parseIPHeader(pkt); ok {
 		t.Fatal("truncated extension header must be rejected")

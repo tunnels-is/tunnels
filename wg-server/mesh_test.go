@@ -36,9 +36,6 @@ func TestSameMeshPeer(t *testing.T) {
 		t.Fatal("subnet change should not compare equal")
 	}
 
-	// Reordering must compare equal (set semantics), but a subnet replaced by a
-	// duplicate of another must NOT — this is the multiset case a plain-set
-	// comparison would miss.
 	twoSubnets := installedMeshPeer{
 		PublicKeyHex: "aa",
 		Endpoint:     "1.2.3.4:51821",
@@ -67,10 +64,10 @@ func TestValidMeshSubnet(t *testing.T) {
 		"10.3.0.0/16": true,
 		"10.4.0.5/32": true,
 		"fd00::/64":   true,
-		"0.0.0.0/0":   false, // default route — would hijack all egress
+		"0.0.0.0/0":   false,
 		"::/0":        false,
 		"not-a-cidr":  false,
-		"10.0.0.1":    false, // missing prefix
+		"10.0.0.1":    false,
 		"":            false,
 	}
 	for in, want := range cases {

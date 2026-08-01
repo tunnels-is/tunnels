@@ -1,7 +1,3 @@
-// Typed wrappers around window.sessionStorage — the only storage used by the app.
-// Object values are JSON-encoded under a "data_" prefix (same keys as the old
-// frontend, so an in-flight session survives the swap).
-
 const PREFIX = "data_"
 
 export const session = {
@@ -27,7 +23,7 @@ export const session = {
 		try {
 			window.sessionStorage.setItem(PREFIX + key, JSON.stringify(value))
 		} catch {
-			// storage full or unavailable — values are recoverable from the backend
+
 		}
 	},
 	clear() {

@@ -5,8 +5,6 @@ import (
 	"testing"
 )
 
-// Kill switch must be rejected unless the tunnel also has the default route
-// enabled — a kill switch without a default route protects nothing.
 func TestValidateTunnelMeta_KillSwitchRequiresDefaultRoute(t *testing.T) {
 	hasKSErr := func(errs []string) bool {
 		for _, e := range errs {

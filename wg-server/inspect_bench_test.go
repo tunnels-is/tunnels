@@ -11,20 +11,6 @@ import (
 	"golang.zx2c4.com/wireguard/tun"
 )
 
-// This file benchmarks the inspecting TUN's Write path — the per-packet
-// firewall + connection-tracking + fragment-tracking work that every decrypted
-// peer packet passes through before it reaches the kernel. It answers "how much
-// bandwidth can we push through the inspector", isolated from WireGuard crypto
-// and the real kernel TUN by swapping in a no-op device.
-//
-// Each sub-benchmark sets b.SetBytes to the total IP bytes in one batch, so the
-// framework reports throughput in MB/s (goodput through the inspector, i.e.
-// excluding the WireGuard framing/encryption that happens on another stage).
-// ns/op is the wall-clock cost of inspecting one full batch.
-
-// benchDevice is a no-op tun.Device: Write discards, everything else is inert.
-// It lets us drive inspectingTUN.Write without a kernel TUN so the benchmark
-// measures only the inspection cost.
 type benchDevice struct{}
 
 func (benchDevice) File() *os.File                          { return nil }
@@ -37,8 +23,8 @@ func (benchDevice) Close() error                            { return nil }
 func (benchDevice) BatchSize() int                          { return benchBatch }
 
 const (
-	benchMTU   = 1420 // typical WireGuard tunnel MTU
-	benchBatch = 128  // wireguard-go's ideal read/write batch size
+	benchMTU   = 1420
+	benchBatch = 128
 )
 
 func mustIP(s string) netip.Addr {
@@ -49,8 +35,6 @@ func mustIP(s string) netip.Addr {
 	return a
 }
 
-// ipv4UDP builds an IPv4/UDP packet of exactly `size` total bytes (>= 28). The
-// UDP payload is left zeroed — only headers are read by the inspector.
 func ipv4UDP(src, dst string, sport, dport uint16, size int) []byte {
 	if size < 28 {
 		size = 28
@@ -58,7 +42,7 @@ func ipv4UDP(src, dst string, sport, dport uint16, size int) []byte {
 	s := mustIP(src).As4()
 	d := mustIP(dst).As4()
 	pkt := make([]byte, size)
-	pkt[0] = 0x45 // v4, IHL=5
+	pkt[0] = 0x45
 	binary.BigEndian.PutUint16(pkt[2:4], uint16(size))
 	pkt[9] = protoUDP
 	copy(pkt[12:16], s[:])
@@ -70,7 +54,6 @@ func ipv4UDP(src, dst string, sport, dport uint16, size int) []byte {
 	return pkt
 }
 
-// rules parses ACL tokens into entries, panicking on a bad token (setup only).
 func rules(ss ...string) []aclEntry {
 	e := make([]aclEntry, 0, len(ss))
 	for _, s := range ss {
@@ -107,8 +90,6 @@ func setRule(dst string, tokens ...string) {
 	p.setAllowed(rules(tokens...), false)
 }
 
-// batchUnfrag builds benchBatch distinct unfragmented packets src->dst:port,
-// varying the source port so the flow/allow lookups hit realistic distinct keys.
 func batchUnfrag(src, dst string, dport uint16, size int) [][]byte {
 	b := make([][]byte, benchBatch)
 	for i := range b {
@@ -117,35 +98,25 @@ func batchUnfrag(src, dst string, dport uint16, size int) [][]byte {
 	return b
 }
 
-// buildConntrack pre-opens benchBatch return-path flows on the receiver, then
-// returns the inbound replies (matched by flowMatch, not the allowlist).
 func buildConntrack(size int) (*inspectingTUN, [][]byte) {
 	insp := newBenchInspector(true)
-	const R, S = "10.0.0.10", "10.99.0.5" // S is cross-server (not a resident)
-	resetPeer(R)                          // empty allowlist — only conntrack admits
+	const R, S = "10.0.0.10", "10.99.0.5"
+	resetPeer(R)
 	for i := 0; i < benchBatch; i++ {
-		insp.allow(ipv4UDP(R, S, uint16(40000+i), 443, 28)) // R initiates → opens flow
+		insp.allow(ipv4UDP(R, S, uint16(40000+i), 443, 28))
 	}
 	master := make([][]byte, benchBatch)
 	for i := range master {
-		master[i] = ipv4UDP(S, R, 443, uint16(40000+i), size) // the fragmented-free reply
+		master[i] = ipv4UDP(S, R, 443, uint16(40000+i), size)
 	}
 	return insp, master
 }
 
 const (
-	benchFragDatagrams = 16                              // distinct fragmented datagrams per batch
-	benchFragsPer      = benchBatch / benchFragDatagrams // 8 fragments each: 1 head + 7 trailing
+	benchFragDatagrams = 16
+	benchFragsPer      = benchBatch / benchFragDatagrams
 )
 
-// buildFrag builds a batch of fragmented datagrams under the given receiver
-// rule: benchFragDatagrams datagrams, each 1 head + (benchFragsPer-1) trailing
-// fragments, ordered head-then-trailing so the head is processed first. Every
-// packet is admitted, so the batch measures the real per-fragment cost:
-//   - port-scoped rule ("IP:PORT"): head is port-checked and seeds a note; the
-//     7 trailing fragments go allowedAnyPort(miss) → fragmentAdmitted(note hit).
-//   - bare-host rule ("IP"): head passes via portSet.all; the 7 trailing go
-//     through the allowedAnyPort fast-path (no note lookup).
 func buildFrag(rule string, size int) (*inspectingTUN, [][]byte) {
 	insp := newBenchInspector(true)
 	const R, S = "10.0.0.10", "10.0.0.5"
@@ -155,11 +126,11 @@ func buildFrag(rule string, size int) (*inspectingTUN, [][]byte) {
 	for d := 0; d < benchFragDatagrams; d++ {
 		id := uint16(1000 + d)
 		head := ipv4UDP(S, R, uint16(30000+d), 5000, size)
-		setFrag(head, id, 0, true) // first fragment: MF set, offset 0
+		setFrag(head, id, 0, true)
 		master = append(master, head)
 		for f := 1; f < benchFragsPer; f++ {
 			tail := ipv4UDP(S, R, 0, 0, size)
-			setFrag(tail, id, uint16(185*f), f < benchFragsPer-1) // offset>0; last clears MF
+			setFrag(tail, id, uint16(185*f), f < benchFragsPer-1)
 			master = append(master, tail)
 		}
 	}
@@ -196,7 +167,7 @@ func benchScenarios() []benchScenario {
 			}},
 			benchScenario{fmt.Sprintf("unfrag-denied/%d", sz), func() (*inspectingTUN, [][]byte) {
 				insp := newBenchInspector(true)
-				resetPeer("10.0.0.10") // empty allowlist → every packet dropped
+				resetPeer("10.0.0.10")
 				return insp, batchUnfrag("10.0.0.5", "10.0.0.10", 5000, sz)
 			}},
 			benchScenario{fmt.Sprintf("frag-barehost/%d", sz), func() (*inspectingTUN, [][]byte) {
@@ -207,7 +178,7 @@ func benchScenarios() []benchScenario {
 			}},
 			benchScenario{fmt.Sprintf("firewall-off/%d", sz), func() (*inspectingTUN, [][]byte) {
 				insp := newBenchInspector(false)
-				resetPeer("10.0.0.5") // resident sender so touchFlow cost is included
+				resetPeer("10.0.0.5")
 				return insp, batchUnfrag("10.0.0.5", "10.0.0.10", 5000, sz)
 			}},
 		)
@@ -223,8 +194,6 @@ func batchBytes(master [][]byte) int64 {
 	return n
 }
 
-// BenchmarkInspectWrite measures single-goroutine throughput of the inspection
-// Write path across firewall/conntrack/fragment scenarios and two packet sizes.
 func BenchmarkInspectWrite(b *testing.B) {
 	for _, sc := range benchScenarios() {
 		b.Run(sc.name, func(b *testing.B) {
@@ -234,9 +203,7 @@ func BenchmarkInspectWrite(b *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				// Write filters in place (bufs[:0]); restore the batch's
-				// slice order each iteration. The packet bytes are read-only,
-				// so only the []byte pointers are copied (cheap vs inspection).
+
 				copy(scratch, master)
 				insp.Write(scratch, 0)
 			}
@@ -244,9 +211,6 @@ func BenchmarkInspectWrite(b *testing.B) {
 	}
 }
 
-// BenchmarkInspectWriteParallel measures aggregate throughput under concurrent
-// writers (many peer handlers hitting the shared firewall tables at once),
-// exposing lock/atomic contention on the per-peer conntrack and fragment maps.
 func BenchmarkInspectWriteParallel(b *testing.B) {
 	for _, sc := range benchScenarios() {
 		b.Run(sc.name, func(b *testing.B) {
@@ -254,7 +218,7 @@ func BenchmarkInspectWriteParallel(b *testing.B) {
 			b.SetBytes(batchBytes(master))
 			b.ResetTimer()
 			b.RunParallel(func(pb *testing.PB) {
-				scratch := make([][]byte, len(master)) // per-goroutine scratch
+				scratch := make([][]byte, len(master))
 				for pb.Next() {
 					copy(scratch, master)
 					insp.Write(scratch, 0)
@@ -264,12 +228,6 @@ func BenchmarkInspectWriteParallel(b *testing.B) {
 	}
 }
 
-// TestBenchScenariosAdmitAsExpected guards the benchmarks: it runs one Write per
-// scenario and checks how many packets are forwarded. If a scenario meant to
-// exercise the "admit" path silently dropped packets (e.g. fragment notes not
-// seeded, trailing fragments mis-handled), the benchmark would be measuring the
-// cheap drop path and the throughput numbers would be meaningless. Every
-// scenario admits its whole batch except the deliberately-denied one.
 func TestBenchScenariosAdmitAsExpected(t *testing.T) {
 	for _, sc := range benchScenarios() {
 		insp, master := sc.build()
@@ -290,9 +248,6 @@ func TestBenchScenariosAdmitAsExpected(t *testing.T) {
 	}
 }
 
-// TestBuildFragShape verifies the fragment benchmark batch really is multiple
-// fragments per datagram (one head + several trailing), not a batch of whole
-// packets — otherwise "frag" benchmarks wouldn't exercise fragment tracking.
 func TestBuildFragShape(t *testing.T) {
 	_, master := buildFrag("10.0.0.5:5000", benchMTU)
 	if len(master) != benchBatch {

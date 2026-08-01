@@ -45,18 +45,18 @@ func TestAPI_WGMesh_SiblingSelection(t *testing.T) {
 		WireGuardPubKey: makeWGKey(), IP: "10.0.0.1",
 		WireGuardSubnet: "10.0.0.0/22", WireGuardPort: 51820,
 	}
-	// same group, fully provisioned → included
+
 	siblingIn := &types.Server{
 		ID: uuid.New(), APIKey: uuid.NewString(), MeshGroupID: mg,
 		WireGuardPubKey: makeWGKey(), IP: "2.2.2.2",
-		WireGuardSubnet: "10.3.0.0/16", WireGuardPort: 51820, // mesh port defaults to 51821
+		WireGuardSubnet: "10.3.0.0/16", WireGuardPort: 51820,
 	}
-	// same group, not yet provisioned (no pubkey) → excluded
+
 	siblingUnprov := &types.Server{
 		ID: uuid.New(), APIKey: uuid.NewString(), MeshGroupID: mg,
 		IP: "3.3.3.3", WireGuardSubnet: "10.4.0.0/16", WireGuardPort: 51820,
 	}
-	// different group → excluded
+
 	siblingOther := &types.Server{
 		ID: uuid.New(), APIKey: uuid.NewString(), MeshGroupID: uuid.New().String(),
 		WireGuardPubKey: makeWGKey(), IP: "4.4.4.4",
@@ -89,7 +89,7 @@ func TestAPI_WGMesh_NoMeshGroup(t *testing.T) {
 	if logger == nil {
 		logger = slog.New(slog.NewTextHandler(io.Discard, nil))
 	}
-	caller := &types.Server{ID: uuid.New(), APIKey: uuid.NewString()} // no MeshGroupID
+	caller := &types.Server{ID: uuid.New(), APIKey: uuid.NewString()}
 	if err := BBolt_CreateServer(caller); err != nil {
 		t.Fatal(err)
 	}
@@ -106,15 +106,14 @@ func TestValidateServerMesh(t *testing.T) {
 	setupTestDB(t)
 	meshTestLogger()
 
-	// mesh port collides with client port
 	if err := validateServerMesh(&types.Server{WireGuardPort: 51820, WireGuardMeshPort: 51820}); err == nil {
 		t.Fatal("meshport == wgport should error")
 	}
-	// no mesh group → ok
+
 	if err := validateServerMesh(&types.Server{WireGuardPort: 51820, WireGuardMeshPort: 51821}); err != nil {
 		t.Fatalf("no mesh group should pass, got %v", err)
 	}
-	// references a non-existent mesh group
+
 	if err := validateServerMesh(&types.Server{
 		ID: uuid.New(), WireGuardPort: 51820, WireGuardMeshPort: 51821,
 		MeshGroupID: uuid.New().String(), WireGuardSubnet: "10.0.0.0/22",
@@ -122,7 +121,6 @@ func TestValidateServerMesh(t *testing.T) {
 		t.Fatal("non-existent mesh group should error")
 	}
 
-	// real group with a sibling on 10.3.0.0/16
 	mg := &types.MeshGroup{ID: uuid.New(), Tag: "g"}
 	if err := DB_CreateMeshGroup(mg); err != nil {
 		t.Fatal(err)
@@ -135,14 +133,13 @@ func TestValidateServerMesh(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// non-overlapping subnet → ok
 	if err := validateServerMesh(&types.Server{
 		ID: uuid.New(), MeshGroupID: mg.ID.String(), WireGuardPort: 51820,
 		WireGuardMeshPort: 51821, WireGuardSubnet: "10.4.0.0/16",
 	}); err != nil {
 		t.Fatalf("non-overlapping subnet should pass, got %v", err)
 	}
-	// overlapping subnet → error
+
 	if err := validateServerMesh(&types.Server{
 		ID: uuid.New(), MeshGroupID: mg.ID.String(), WireGuardPort: 51820,
 		WireGuardMeshPort: 51821, WireGuardSubnet: "10.3.0.0/24",
@@ -151,8 +148,6 @@ func TestValidateServerMesh(t *testing.T) {
 	}
 }
 
-// Exercises both the delete-clears-members behavior (fix #3) and that
-// BBolt_UpdateServer persists MeshGroupID changes (fix #1).
 func TestMeshGroupDelete_ClearsMembers(t *testing.T) {
 	setupTestDB(t)
 	meshTestLogger()

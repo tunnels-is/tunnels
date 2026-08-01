@@ -30,15 +30,8 @@ type ServerConfig struct {
 	APIIP   string
 	APIPort string
 
-	// AllowedOrigins is the CORS allowlist for browser callers. Each entry is an
-	// exact origin (scheme://host[:port]) that may make cross-origin requests and
-	// read responses; the matching origin is echoed back (never the literal "*").
-	// A single "*" entry allows any origin (still echoed per-request). Empty (the
-	// default) disables cross-origin access entirely — the same-origin admin UI is
-	// unaffected. Set this only if you host the frontend on a different origin.
 	AllowedOrigins []string
 
-	// If SecretStore set to "config"
 	AdminAPIKey      string
 	DBurl            string
 	TwoFactorKey     string
@@ -47,7 +40,6 @@ type ServerConfig struct {
 	CertPem          string
 	KeyPem           string
 
-	// Enables multiple key/pairs for API SNI rotation
 	CertPems []string
 	KeyPems  []string
 }
@@ -63,22 +55,14 @@ type Device struct {
 	CreatedAt time.Time `json:"CreatedAt"`
 	Tag       string    `json:"Tag"`
 
-	// UserID is the ID of the user who owns this device. A device has no groups
-	// of its own — it inherits its owner's group membership for authorization.
 	UserID uuid.UUID `json:"UserID,omitempty"`
 
-	// ServerID links the device to its WireGuard server for subnet-based IP assignment.
 	ServerID uuid.UUID `json:"ServerID,omitempty"`
 
-	// WireGuardKey is the client's Curve25519 public key (base64).
 	WireGuardKey string `json:"WireGuardKey,omitempty"`
 
-	// WireGuardIP is the IP assigned to this device within the server's WireGuard subnet.
-	// Assigned at device creation time by the controller.
 	WireGuardIP string `json:"WireGuardIP,omitempty"`
 
-	// WireGuardIPv6 is the IPv6 address assigned within the server's v6 subnet.
-	// Empty when IPv6 is not configured on the server.
 	WireGuardIPv6 string `json:"WireGuardIPv6,omitempty"`
 }
 
@@ -89,11 +73,6 @@ type FORM_GET_SERVER struct {
 	ServerID    uuid.UUID `json:"ServerID"`
 }
 
-// WAN describes an over-arching network that aggregates one or more
-// WireGuard server subnets (e.g. 10.0.0.0/8 covering 10.0.0.0/16 and
-// 10.3.0.0/16). Clients can route the whole WAN CIDR through the tunnel so
-// replies to any peer in the fleet return over the VPN instead of leaking
-// out the physical interface.
 type WAN struct {
 	ID          uuid.UUID `json:"ID"`
 	Tag         string    `json:"Tag"`
@@ -110,66 +89,34 @@ type Server struct {
 	Port     string      `json:"Port"`
 	Groups   []uuid.UUID `json:"Groups,omitempty"`
 
-	// WANID references the over-arching network (WAN) this server's subnet
-	// belongs to, by WAN.ID. Optional — when set, clients can route the whole
-	// WAN CIDR through the tunnel to reach peers on sibling servers in the same
-	// WAN. Stored as a reference rather than an embedded copy so edits to the
-	// WAN propagate; resolve the WAN by this ID when its CIDR/Tag is needed.
 	WANID string `json:"WANID,omitempty"`
 
-	// WAN is the resolved WAN referenced by WANID. It is NOT persisted — it is
-	// populated only on get/list server responses (by loading the WAN table and
-	// matching WANID) so callers get the live WAN without a second lookup.
 	WAN *WAN `json:"WAN,omitempty"`
 
-	// MeshGroupID references the mesh group this server belongs to, by
-	// MeshGroup.ID. Servers sharing a mesh group form a WireGuard server-to-server
-	// mesh (see wg-server/mesh.go); GET /wg/mesh returns only same-mesh-group
-	// siblings. Empty means the server is not in any mesh.
 	MeshGroupID string `json:"MeshGroupID,omitempty"`
 
-	// APIKey is the per-server secret; the wg-server running on this host sends
-	// it in X-WG-KEY to authenticate /wg/server-config/fetch, /wg/peers, and
-	// /wg/servers. Empty when WG is not enabled on this server.
 	APIKey string `json:"APIKey,omitempty"`
 
 	WireGuardPort   int    `json:"WireGuardPort,omitempty"`
 	WireGuardPubKey string `json:"WireGuardPubKey,omitempty"`
 	WireGuardIface  string `json:"WireGuardIface,omitempty"`
 
-	// WireGuardMeshPort is the UDP port the server-to-server mesh interface
-	// (wgmesh) listens on. Defaults to WireGuardPort+1 when unset.
 	WireGuardMeshPort int `json:"WireGuardMeshPort,omitempty"`
 
-	// WireGuardSubnet is the IPv4 CIDR the wg-server hands out to peers.
 	WireGuardSubnet string `json:"WireGuardSubnet,omitempty"`
 
-	// WireGuardSubnet6 is the IPv6 CIDR for peers. Optional — when empty, IPv6
-	// is not served.
 	WireGuardSubnet6 string `json:"WireGuardSubnet6,omitempty"`
 
 	InternetIface string `json:"InternetIface,omitempty"`
 
-	// EnableFirewall turns on the wg-server's peer-to-peer firewall. When
-	// enabled, all peer-to-peer ingress is blocked by default; a device opens
-	// itself up by announcing the peer IPs allowed to reach it via the ACL
-	// control port. Peer traffic to the server's own WG IP is always blocked,
-	// regardless of this setting.
 	EnableFirewall bool `json:"EnableFirewall"`
 
 	InsecureSkipVerify bool `json:"InsecureSkipVerify,omitempty"`
 }
 
-// WGServerConfigResponse is returned by GET /wg/server-config/fetch to the
-// wg-server. It includes all operational parameters needed to bring up the
-// WireGuard interface. The private key is generated locally by the wg-server.
 type WGServerConfigResponse struct {
-	// ServerID is the UUID of the Server record linked to this config.
 	ServerID string `json:"ServerID"`
 
-	// ServerIP is the public IP of this wg-server, as recorded on the Server
-	// record. The wg-server uses it as the SNAT source for outbound traffic so
-	// peer egress shows up with the correct public address on multi-homed hosts.
 	ServerIP string `json:"ServerIP,omitempty"`
 
 	WireGuardPort     int    `json:"WireGuardPort"`
@@ -184,9 +131,6 @@ type WGServerConfigResponse struct {
 	InsecureSkipVerify bool `json:"InsecureSkipVerify"`
 }
 
-// MeshGroup scopes which servers form a WireGuard server-to-server mesh. Servers
-// sharing a MeshGroupID peer with each other; GET /wg/mesh returns only siblings
-// in the same mesh group. It is managed from the admin UI like WANs.
 type MeshGroup struct {
 	ID          uuid.UUID `json:"_id"`
 	Tag         string    `json:"Tag"`
@@ -194,15 +138,12 @@ type MeshGroup struct {
 	CreatedAt   time.Time `json:"CreatedAt"`
 }
 
-// WGMeshPeer describes one sibling server a node should peer with on wgmesh.
 type WGMeshPeer struct {
-	PublicKeyHex   string   `json:"PublicKeyHex"`   // sibling's static WG pubkey (hex)
-	Endpoint       string   `json:"Endpoint"`       // "<sibling public IP>:<mesh port>"
-	AllowedSubnets []string `json:"AllowedSubnets"` // sibling's client WG subnet(s): v4 (+v6)
+	PublicKeyHex   string   `json:"PublicKeyHex"`
+	Endpoint       string   `json:"Endpoint"`
+	AllowedSubnets []string `json:"AllowedSubnets"`
 }
 
-// WGMeshResponse is the controller's answer to GET /wg/mesh — the calling
-// server's same-mesh-group siblings.
 type WGMeshResponse struct {
 	Peers []WGMeshPeer `json:"Peers"`
 }
@@ -237,7 +178,6 @@ type ServerConnectResponse struct {
 	Routes     []*Route     `json:"Routes"`
 	DNSServers []string     `json:"DNSServers"`
 
-	// WireGuard transport fields (populated when server has WG enabled)
 	WireGuardIP      string `json:"WireGuardIP,omitempty"`
 	WireGuardIPv6    string `json:"WireGuardIPv6,omitempty"`
 	WireGuardPubKey  string `json:"WireGuardPubKey,omitempty"`
@@ -245,22 +185,14 @@ type ServerConnectResponse struct {
 	WireGuardSubnet  string `json:"WireGuardSubnet,omitempty"`
 	WireGuardSubnet6 string `json:"WireGuardSubnet6,omitempty"`
 
-	// WANCIDR is the over-arching network (WAN) the connected server belongs
-	// to. When non-empty and the tunnel has EnableWAN set, the client routes
-	// this CIDR through the tunnel to reach peers on sibling servers.
 	WANCIDR string `json:"WANCIDR,omitempty"`
 
-	// EnableFirewall reports whether the connected server enforces the
-	// per-peer firewall. When false, any allowlist the client announces is
-	// accepted but ignored — surfaced so the UI can tell the user.
 	EnableFirewall bool `json:"EnableFirewall,omitempty"`
 }
 
 type FORM_GET_DEVICE struct {
 	DeviceID uuid.UUID
 }
-
-// WireGuard types
 
 type WGPeer struct {
 	PublicKeyHex  string `json:"PublicKeyHex"`
@@ -273,5 +205,5 @@ type WGPeersResponse struct {
 	Peers      []WGPeer `json:"Peers"`
 	Limit      int      `json:"Limit"`
 	Offset     int      `json:"Offset"`
-	NextOffset int      `json:"NextOffset"` // -1 when there are no more pages
+	NextOffset int      `json:"NextOffset"`
 }

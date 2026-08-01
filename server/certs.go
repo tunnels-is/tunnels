@@ -229,7 +229,7 @@ func writeECKey(path string, key *ecdsa.PrivateKey) error {
 	if err != nil {
 		return err
 	}
-	// 0600: a TLS private key must not be world-readable (os.Create → 0644).
+
 	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
 		return err

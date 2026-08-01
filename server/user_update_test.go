@@ -13,8 +13,6 @@ import (
 	"github.com/google/uuid"
 )
 
-// The APIKey is now server-generated: any non-empty request yields a fresh
-// server-minted UUID (the client can't set its own secret), and empty clears it.
 func TestAPI_UserUpdate_APIKeyServerGenerated(t *testing.T) {
 	setupTestDB(t)
 	if logger == nil {
@@ -34,8 +32,6 @@ func TestAPI_UserUpdate_APIKeyServerGenerated(t *testing.T) {
 		return w
 	}
 
-	// A client-supplied (even weak) value is ignored; the server returns a fresh
-	// valid-UUID key that is NOT the submitted value.
 	w := call(`{"APIKey":"not-a-uuid"}`)
 	if w.Code != http.StatusOK {
 		t.Fatalf("non-empty APIKey request should regenerate (200), got %d: %s", w.Code, w.Body.String())
@@ -51,7 +47,6 @@ func TestAPI_UserUpdate_APIKeyServerGenerated(t *testing.T) {
 		t.Fatalf("server-generated APIKey is not a valid UUID: %q", resp.APIKey)
 	}
 
-	// Empty clears the key.
 	if w := call(`{"APIKey":""}`); w.Code != http.StatusOK {
 		t.Fatalf("empty APIKey should be allowed (clears the key), got %d", w.Code)
 	}

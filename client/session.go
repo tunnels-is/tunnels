@@ -40,9 +40,6 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		return 400, errors.New("no server id found when connecting")
 	}
 
-	// Only allow connecting through an allowlisted control server, and take its
-	// TLS/port settings from stored config (not the request) — no SSRF to
-	// arbitrary hosts, no request-driven TLS downgrade.
 	if err := authorizeControlServer(ClientCR.Server); err != nil {
 		return 403, err
 	}
@@ -201,14 +198,11 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		ClientCR.ServerIP = wgCfg.ServerIP
 	}
 
-	// Reject malformed controller-provided values before they reach interface
-	// configuration, routes, or the WireGuard endpoint string.
 	if valErr := validateWGServerConfig(wgCfg.WireGuardIP, ClientCR.ServerIP,
 		wgCfg.WireGuardSubnet, wgCfg.WireGuardSubnet6, wgCfg.WANCIDR); valErr != nil {
 		return 502, valErr
 	}
-	// The port is interpolated into the WireGuard IPC config; validate it can't
-	// carry newlines / injected directives.
+
 	if valErr := validateWGPort(wgCfg.WireGuardPort); valErr != nil {
 		return 502, valErr
 	}
@@ -225,9 +219,6 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	}
 	tunnel.ServerResponse = ServerReponse
 
-	// The wg-server accepts allowlist announcements even with its firewall
-	// off — it just ignores them. Tell the user their policy is not enforced
-	// instead of letting the UI imply protection.
 	if !wgCfg.EnableFirewall && (len(meta.AllowedHosts) > 0 || !meta.AllowAll) {
 		SECURITY("server ", ClientCR.ServerID, " has its peer firewall DISABLED — this tunnel's allowed-hosts policy is NOT enforced")
 	}
@@ -362,10 +353,6 @@ func createServerDevice(cr *ConnectionRequest, serverID string, pubKey string, t
 		tag = DefaultTunnelName
 	}
 
-	// The default tunnel is named "tunnels" on every machine, so its controller
-	// device would otherwise collide by name. Give the default device a unique
-	// tag ("tunnel-<unixnano>") at creation; the WireGuard key still identifies
-	// the device for reuse on later connects.
 	deviceTag := tag
 	if tag == DefaultTunnelName {
 		deviceTag = fmt.Sprintf("tunnel-%d", time.Now().UnixNano())
@@ -520,9 +507,7 @@ type createDeviceWithKeysResult struct {
 }
 
 func CreateDeviceWithKeys(form *CreateDeviceWithKeysForm) (any, int) {
-	// Allowlist the control server and pin its TLS/port from stored config,
-	// so this can't be used to POST to an arbitrary host (SSRF) or over an
-	// unverified TLS connection.
+
 	if err := authorizeControlServer(form.Server); err != nil {
 		return &ErrorResponse{Error: err.Error()}, 403
 	}

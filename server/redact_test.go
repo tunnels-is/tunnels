@@ -5,9 +5,9 @@ import "testing"
 func TestRedactKey(t *testing.T) {
 	cases := map[string]string{
 		"":                        "…",
-		"abc":                     "…",      // shorter than the prefix
-		"abcde":                   "…",      // exactly the prefix length → fully masked
-		"abcdef":                  "abcde…", // one longer → 5-char prefix
+		"abc":                     "…",
+		"abcde":                   "…",
+		"abcdef":                  "abcde…",
 		"ABCDE-12345-67890-FGHIJ": "ABCDE…",
 	}
 	for in, want := range cases {

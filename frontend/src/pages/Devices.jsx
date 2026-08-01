@@ -81,7 +81,6 @@ const Devices = () => {
 		})
 	}
 
-	// devices whose WireGuard IP matches a local tunnel belong to this machine
 	const localIPs = new Set(tunnels.map((t) => t.IPv4Address).filter(Boolean))
 
 	return (

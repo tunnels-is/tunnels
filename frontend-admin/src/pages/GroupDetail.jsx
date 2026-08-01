@@ -128,7 +128,7 @@ export default function GroupDetail() {
       const resp = await apiPost('/ui/group/remove', { GroupID: id, Type: type, TypeID: typeID });
       if (resp.status === 200) loadMembers();
     } catch {
-      // ignore
+
     }
   };
 
@@ -147,7 +147,7 @@ export default function GroupDetail() {
 
   return (
     <div className="max-w-2xl">
-      {/* Header */}
+      {}
       <div className="flex items-center justify-between mb-6">
         <button onClick={() => navigate('/groups')} className="flex items-center gap-2 text-[12px] text-[#a3a3a3] hover:text-[#262626]">
           <ArrowLeft className="w-3.5 h-3.5" /> Back to Groups
@@ -189,7 +189,7 @@ export default function GroupDetail() {
 
       <h1 className="text-[16px] font-semibold text-[#0a0a0a] mb-4">{group.Tag}</h1>
 
-      {/* Info */}
+      {}
       <div className="bg-white border border-[#e7e3d7] rounded-lg overflow-hidden card-shadow mb-6">
         <Row label="ID">
           <span className="font-mono text-[12px] text-[#525252]">{group._id}</span>
@@ -215,10 +215,10 @@ export default function GroupDetail() {
         </Row>
       </div>
 
-      {/* Members */}
+      {}
       <h2 className="text-[14px] font-semibold text-[#0a0a0a] mb-3">Members</h2>
 
-      {/* Tabs */}
+      {}
       {(() => {
         const tabs = [
           { key: 'users', label: 'Users', type: 'user', nameKey: 'Email' },
@@ -230,7 +230,7 @@ export default function GroupDetail() {
 
         return (
           <div className="bg-white border border-[#e7e3d7] rounded-lg overflow-hidden card-shadow">
-            {/* Tab bar */}
+            {}
             <div className="flex border-b border-[#e7e3d7] bg-[#ffffff]">
               {tabs.map((t) => (
                 <button
@@ -248,7 +248,7 @@ export default function GroupDetail() {
               ))}
             </div>
 
-            {/* Add member */}
+            {}
             <div className="px-4 py-3 border-b border-[#e7e3d7]/50 bg-[#f4f1e8]">
               <form onSubmit={handleAdd} className="flex gap-2">
                 <input
@@ -264,7 +264,7 @@ export default function GroupDetail() {
               {addError && <p className="text-[11px] text-[#dc2626] mt-1.5">{addError}</p>}
             </div>
 
-            {/* List */}
+            {}
             {items.length === 0 ? (
               <div className="px-4 py-6 text-[12px] text-[#a3a3a3] text-center">
                 No {current.label.toLowerCase()} in this group

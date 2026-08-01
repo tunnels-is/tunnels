@@ -31,19 +31,16 @@ jobs:
         with:
           go-version: "1.24"
 
-      # ---------- platform dependencies ----------
       - name: Install Linux dependencies
         if: matrix.goos == 'linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
 
-      # ---------- version ----------
       - name: Set version
         shell: bash
         run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
 
-      # ---------- build ----------
       - name: Build (Linux)
         if: matrix.goos == 'linux'
         env:
@@ -75,7 +72,6 @@ jobs:
             -ldflags "-s -w -H windowsgui -X github.com/tunnels-is/tunnels/version.Version=${{ env.VERSION }}" `
             -o tunnels-desktop.exe ./cmd/wails
 
-      # ---------- package ----------
       - name: Package (Linux)
         if: matrix.goos == 'linux'
         run: |
@@ -95,7 +91,6 @@ jobs:
           7z a "tunnels-desktop_${VERSION}_Windows_amd64.zip" tunnels-desktop.exe
           echo "ASSET=tunnels-desktop_${VERSION}_Windows_amd64.zip" >> "$GITHUB_ENV"
 
-      # ---------- upload to release ----------
       - uses: softprops/action-gh-release@v2
         with:
           draft: true

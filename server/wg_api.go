@@ -15,13 +15,6 @@ import (
 	"github.com/tunnels-is/tunnels/types"
 )
 
-// wgIPAllocMu serializes WireGuard IP allocation together with the device
-// creation that consumes it. assignNextWireGuardIP{,v6} pick the lowest free
-// address by scanning existing devices, then the caller persists the device in
-// a separate write; without this lock two concurrent creates can read the same
-// "free" address and both commit it, handing one IP to two devices (a TOCTOU
-// race). The controller is single-node (embedded BoltDB), so a process-wide
-// lock is sufficient. Callers hold it from allocation through DB_CreateDevice.
 var wgIPAllocMu sync.Mutex
 
 const (
@@ -72,12 +65,7 @@ func API_WGPeers(w http.ResponseWriter, r *http.Request) {
 		Limit:  limit,
 		Offset: offset,
 	}
-	// Scope to peers this server is actually entitled to serve — the same
-	// checks API_WGPeer applies per-handshake: the device must be bound to this
-	// server, and its owner must be enabled, non-expired, and group-authorized.
-	// Without this, one server's X-WG-KEY could enumerate every device on the
-	// platform (cross-tenant disclosure / ACL bypass for any node that programs
-	// its peer set from this endpoint). Owning users are cached within the call.
+
 	userCache := make(map[uuid.UUID]*User)
 	now := time.Now()
 	for _, d := range devices {
@@ -154,10 +142,6 @@ func API_WGPeer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Load the owning user so this authorization decision reflects the current
-	// account state — not just device existence. Without this, disabling a user
-	// or letting their subscription lapse would leave their VPN access intact
-	// (the wg-server treats this endpoint as its authorization oracle).
 	user, err := DB_findUserByID(dev.UserID)
 	if err != nil {
 		senderr(w, 500, "error looking up user")
@@ -171,16 +155,12 @@ func API_WGPeer(w http.ResponseWriter, r *http.Request) {
 		senderr(w, 403, "user account is disabled")
 		return
 	}
-	// SubExpiration is enforced only when set: deployments that don't use
-	// subscriptions leave it as the zero value, in which case access never
-	// expires. Normal registration/admin/license flows always set it.
+
 	if !user.SubExpiration.IsZero() && time.Now().After(user.SubExpiration) {
 		senderr(w, 403, "user subscription has expired")
 		return
 	}
 
-	// A device inherits its owner's group membership; authorization is decided
-	// solely by the owning user's groups vs the server's.
 	if !hasSharedOrNoGroup(user.Groups, server.Groups) {
 		senderr(w, 401, "user/device not allowed to connect")
 		return
@@ -232,8 +212,6 @@ func API_WGConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// d == nil means no device is registered for this pubkey yet — return the
-	// server config with an empty WireGuardIP so the client auto-creates one.
 	if d != nil && d.UserID != user.ID {
 		senderr(w, 401, "Unauthorized")
 		return
@@ -245,10 +223,6 @@ func API_WGConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Enforce the same group ACL as API_ServerGet / API_WGPeer so a user can't
-	// read the config of a server they aren't entitled to (least-privilege /
-	// consistency; the config fields aren't secret, but the endpoint should not
-	// be the one place that skips the check).
 	if !hasSharedOrNoGroup(user.Groups, server.Groups) {
 		senderr(w, 401, "unauthorized")
 		return
@@ -270,8 +244,7 @@ func API_WGConfig(w http.ResponseWriter, r *http.Request) {
 		"WireGuardSubnet":  server.WireGuardSubnet,
 		"WireGuardSubnet6": server.WireGuardSubnet6,
 		"WANCIDR":          wanCIDRForServer(server),
-		// Lets the client tell the user whether their per-peer allowlist is
-		// actually enforced on this server (it is silently ignored otherwise).
+
 		"EnableFirewall": server.EnableFirewall,
 	})
 }
@@ -327,9 +300,6 @@ func wgU32ToIP(n uint32) net.IP {
 	return net.IP{byte(n >> 24), byte(n >> 16), byte(n >> 8), byte(n)}
 }
 
-// assignNextWireGuardIPv6 allocates the next free IPv6 address from the
-// server's WireGuardSubnet6. Returns "" (no error) if no IPv6 subnet is
-// configured on the server.
 func assignNextWireGuardIPv6(serverID uuid.UUID) (string, error) {
 	server, err := DB_FindServerByID(serverID)
 	if err != nil || server == nil {
@@ -342,9 +312,7 @@ func assignNextWireGuardIPv6(serverID uuid.UUID) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("invalid IPv6 subnet %q: %w", server.WireGuardSubnet6, err)
 	}
-	// Mask off any host bits so allocation starts from the true network address
-	// (netip.ParsePrefix, unlike net.ParseCIDR, keeps host bits — e.g.
-	// "fd00::5/64" would otherwise start allocating at fd00::7).
+
 	prefix = prefix.Masked()
 
 	devices, err := DB_GetAllDevices()
@@ -395,8 +363,6 @@ func HTTP_validateWGKey(r *http.Request) (*types.Server, bool) {
 	return s, true
 }
 
-// validateCIDR returns an error if s is set but not a parseable CIDR. Empty
-// strings are allowed (caller decides whether they're required).
 func validateCIDR(s string) error {
 	if s == "" {
 		return nil
@@ -414,7 +380,6 @@ func API_WGServerConfigFetch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Accept the wg-server's public key from the request header.
 	pubKeyB64 := r.Header.Get("X-WG-PubKey")
 	if pubKeyB64 != "" && pubKeyB64 != server.WireGuardPubKey {
 		server.WireGuardPubKey = pubKeyB64
@@ -437,8 +402,6 @@ func API_WGServerConfigFetch(w http.ResponseWriter, r *http.Request) {
 	sendObject(w, resp)
 }
 
-// meshPortForServer returns the server's mesh UDP port, defaulting to
-// WireGuardPort+1 when unset.
 func meshPortForServer(s *types.Server) int {
 	if s.WireGuardMeshPort != 0 {
 		return s.WireGuardMeshPort
@@ -446,10 +409,6 @@ func meshPortForServer(s *types.Server) int {
 	return s.WireGuardPort + 1
 }
 
-// API_WGMesh returns the calling server's same-mesh-group siblings so a
-// wg-server can build its server-to-server WireGuard mesh. Only servers sharing
-// this server's MeshGroupID that are already provisioned (have reported a
-// pubkey and have an IP + subnet) are returned; the caller itself is excluded.
 func API_WGMesh(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 
@@ -476,7 +435,7 @@ func API_WGMesh(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		if s.WireGuardPubKey == "" || s.IP == "" || s.WireGuardSubnet == "" {
-			continue // not yet provisioned
+			continue
 		}
 		hexKey, err := b64KeyToHex(s.WireGuardPubKey)
 		if err != nil {

@@ -20,7 +20,7 @@ const DNSStats = () => {
 
 	const allItems = useMemo(() => {
 		const entries = Object.entries(dnsStats || {}).map(([domain, value]) => ({ ...value, domain }))
-		// a domain counts as blocked when its last block is at or after its last resolution
+
 		const wanted = entries.filter((e) => {
 			const blocked = new Date(e.LastSeen) - new Date(e.LastBlocked) <= 0
 			return tab === "blocked" ? blocked : !blocked
