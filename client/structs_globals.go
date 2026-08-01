@@ -241,10 +241,23 @@ type ControlServer struct {
 	ValidateCertificate bool
 }
 
+// effectivePort returns the port used for outbound controller connections.
+// Temporary: while old and new controllers co-exist, force api.tunnels.is:443 → :444
+// at request time only — config on disk is left unchanged.
+func (c *ControlServer) effectivePort() string {
+	if c == nil {
+		return ""
+	}
+	if c.Host == "api.tunnels.is" && c.Port == "443" {
+		return "444"
+	}
+	return c.Port
+}
+
 func (c *ControlServer) GetHostAndPort() string {
 	hostPort := c.Host
-	if c.Port != "" {
-		hostPort += ":" + c.Port
+	if p := c.effectivePort(); p != "" {
+		hostPort += ":" + p
 	}
 	return hostPort
 }
