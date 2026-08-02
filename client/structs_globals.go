@@ -61,10 +61,11 @@ var (
 	CancelFunc    context.CancelFunc
 
 	DNSGlobalBlock atomic.Bool
-	DNSBlockList   atomic.Pointer[DomainSet]
-	DNSWhiteList   atomic.Pointer[DomainSet]
-	DNSCache       *xsync.MapOf[string, any]
-	DNSStatsMap    *xsync.MapOf[string, any]
+	// Per-enabled-list compact domain sets (see DomainCatalog / DomainSet).
+	DNSBlockList atomic.Pointer[DomainCatalog]
+	DNSWhiteList atomic.Pointer[DomainCatalog]
+	DNSCache     *xsync.MapOf[string, any]
+	DNSStatsMap  *xsync.MapOf[string, any]
 )
 
 type DNSStats struct {
