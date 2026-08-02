@@ -44,6 +44,7 @@ const StatusPill = ({ active }) =>
 	)
 
 const Servers = () => {
+	const user = useStore((s) => s.user)
 	const servers = useStore((s) => s.servers)
 	const activeTunnels = useStore((s) => s.activeTunnels)
 	const askConfirm = useStore((s) => s.askConfirm)
@@ -57,11 +58,15 @@ const Servers = () => {
 		fetchState()
 	}, [])
 
+	// Only treat as connected when the live tunnel belongs to the active UI account.
 	const activeByServer = useMemo(() => {
 		const map = {}
-		activeTunnels?.forEach((at) => at.CR?.ServerID && (map[at.CR.ServerID] = at))
+		const uid = user?._id
+		activeTunnels?.forEach((at) => {
+			if (at.CR?.ServerID && uid && at.CR?.UserID === uid) map[at.CR.ServerID] = at
+		})
 		return map
-	}, [activeTunnels])
+	}, [activeTunnels, user?._id])
 
 	const filtered = useMemo(() => {
 		if (!filter) return servers
