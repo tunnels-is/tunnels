@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"net"
 	"strings"
-	"time"
 
 	"github.com/jackpal/gateway"
 )
@@ -97,7 +96,7 @@ LOOP:
 	)
 }
 
-func loadDefaultGateway() {
+func loadDefaultGateway() net.IP {
 	defer RecoverAndLog()
 	s := STATE.Load()
 
@@ -110,25 +109,25 @@ func loadDefaultGateway() {
 	}
 
 	if isDefaultRouteOnTunnel() {
-		return
+		return oldGateway
 	}
 
 	newGateway, err = gateway.DiscoverGateway()
 	if err != nil {
 		ERROR("Error looking for default gateway:", err)
-		return
+		return oldGateway
 	}
 
 	if newGateway == nil || newGateway.IsUnspecified() {
-		return
+		return oldGateway
 	}
 
 	if bytes.Equal(oldGateway, newGateway.To4()) {
-		return
+		return oldGateway
 	}
 
 	if isInterfaceATunnel(newGateway.To4()) {
-		return
+		return oldGateway
 	}
 	DEBUG("new default gateway discovered", newGateway.To4())
 	s.DefaultGateway.Store(&newGateway)
@@ -137,17 +136,5 @@ func loadDefaultGateway() {
 		"Default Gateway",
 		s.DefaultGateway.Load(),
 	)
-}
-
-func GetDefaultGateway() {
-	s := STATE.Load()
-	defer func() {
-		if s.DefaultGateway.Load() != nil {
-			time.Sleep(5 * time.Second)
-		} else {
-			time.Sleep(2 * time.Second)
-		}
-	}()
-	loadDefaultGateway()
-	loadDefaultInterface()
+	return newGateway
 }
