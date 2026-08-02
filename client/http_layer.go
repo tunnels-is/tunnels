@@ -391,7 +391,6 @@ type StateResponse struct {
 	State         *stateV2
 	Tunnels       []*TunnelMETA
 	ActiveTunnels []*TUN
-	Network       StateNetworkResponse
 }
 
 func getSystemTimezone() string {
@@ -404,13 +403,6 @@ func getSystemTimezone() string {
 		}
 	}
 	return ""
-}
-
-type StateNetworkResponse struct {
-	DefaultGateway       net.IP
-	DefaultInterface     net.IP
-	DefaultInterfaceID   int32
-	DefaultInterfaceName string
 }
 
 func HTTP_GetLogs(w http.ResponseWriter, r *http.Request) {
@@ -483,20 +475,6 @@ func GetFullState() (s *StateResponse) {
 	s.Timezone = getSystemTimezone()
 	s.Config = CONFIG.Load()
 	s.State = state
-
-	s.Network.DefaultInterfaceID = state.DefaultInterfaceID.Load()
-	defInt := state.DefaultInterface.Load()
-	if defInt != nil {
-		s.Network.DefaultInterface = *defInt
-	}
-	defIntName := state.DefaultInterfaceName.Load()
-	if defIntName != nil {
-		s.Network.DefaultInterfaceName = *defIntName
-	}
-	defGate := state.DefaultGateway.Load()
-	if defGate != nil {
-		s.Network.DefaultGateway = *defGate
-	}
 
 	tunnelMetaMapRange(func(tun *TunnelMETA) bool {
 		s.Tunnels = append(s.Tunnels, tun)

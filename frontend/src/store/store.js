@@ -8,7 +8,6 @@ export const useStore = create((set, get) => ({
 	users: [],
 	config: session.getObject("config"),
 	state: session.getObject("state"),
-	network: undefined,
 	tunnels: [],
 	activeTunnels: [],
 	servers: session.getObject("servers") || [],

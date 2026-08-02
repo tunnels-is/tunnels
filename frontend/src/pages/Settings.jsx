@@ -21,7 +21,6 @@ const Settings = () => {
 	const advanced = useStore((s) => s.advanced)
 	const setAdvanced = useStore((s) => s.setAdvanced)
 	const state = useStore((s) => s.state)
-	const network = useStore((s) => s.network)
 	const version = useStore((s) => s.version)
 	const apiVersion = useStore((s) => s.apiVersion)
 
@@ -106,7 +105,7 @@ const Settings = () => {
 					)}
 				</Card>
 
-				<Card title="Advanced" description="Show advanced configuration: API server, network, DNS and system details.">
+				<Card title="Advanced" description="Show advanced configuration: API server, DNS and system details.">
 					<Toggle label="Advanced mode" checked={advanced} onChange={() => setAdvanced(!advanced)} />
 				</Card>
 
@@ -169,15 +168,6 @@ const Settings = () => {
 				{advanced && (
 					<Card title="DNS" description="The local DNS resolver is enabled by default.">
 						<Toggle label="Disable DNS" checked={!!config?.DisableDNS} onChange={() => toggleConfigKey("DisableDNS")} />
-					</Card>
-				)}
-
-				{advanced && (
-					<Card title="Network" description="Detected default network interface (read-only).">
-						<InfoRow label="Interface" value={network?.DefaultInterfaceName || "unknown"} />
-						<InfoRow label="IP Address" value={network?.DefaultInterface || "unknown"} mono />
-						<InfoRow label="Interface ID" value={network?.DefaultInterfaceID ?? "unknown"} mono />
-						<InfoRow label="Gateway" value={network?.DefaultGateway || "unknown"} mono />
 					</Card>
 				)}
 

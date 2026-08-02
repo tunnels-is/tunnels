@@ -65,9 +65,17 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		}
 	}
 
-	state := STATE.Load()
 	loadDefaultGateway()
 	loadDefaultInterface()
+	state := STATE.Load()
+	gateway := state.DefaultGateway.Load()
+	if gateway != nil {
+		if isInterfaceATunnel(*gateway) {
+			return 502, errors.New("default gateway is a tunnel, please retry in a moment")
+		}
+	} else {
+		return 502, errors.New("no default gateway, check your connection settings")
+	}
 
 	if ClientCR.Tag == "" {
 		ClientCR.Tag = DefaultTunnelName
@@ -125,15 +133,6 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 			ERROR("unable to write tunnel meta to drive", err)
 			return 400, errors.New("unable to write tunnel meta to drive")
 		}
-	}
-
-	gateway := state.DefaultGateway.Load()
-	if gateway != nil {
-		if isInterfaceATunnel(*gateway) {
-			return 502, errors.New("default gateway is a tunnel, please retry in a moment")
-		}
-	} else {
-		return 502, errors.New("no default gateway, check your connection settings")
 	}
 
 	ifName := state.DefaultInterfaceName.Load()
@@ -396,11 +395,6 @@ func createServerDeviceFull(cr *ConnectionRequest, serverID string, pubKey strin
 	}, resp.Device, nil
 }
 
-func createServerDevice(cr *ConnectionRequest, serverID string, pubKey string, tag string) (*wgServerConfig, error) {
-	cfg, _, err := createServerDeviceFull(cr, serverID, pubKey, tag)
-	return cfg, err
-}
-
 func InitializeTunnelFromCRR(TUN *TUN) (err error) {
 	DNSGlobalBlock.Store(true)
 	defer func() {
@@ -427,7 +421,7 @@ func InitializeTunnelFromCRR(TUN *TUN) (err error) {
 			IP: TUN.localInterfaceNetIP.To4(),
 		}
 		TUN.localDNSClient.Dialer.Resolver = DNSClient.Dialer.Resolver
-		TUN.localDNSClient.Dialer.Timeout = time.Duration(5 * time.Second)
+		TUN.localDNSClient.Dialer.Timeout = 5 * time.Second
 		TUN.localDNSClient.Timeout = time.Second * 5
 	}
 
@@ -504,7 +498,6 @@ type createDeviceWithKeysResult struct {
 }
 
 func CreateDeviceWithKeys(form *CreateDeviceWithKeysForm) (any, int) {
-
 	if err := authorizeControlServer(form.Server); err != nil {
 		return &ErrorResponse{Error: err.Error()}, 403
 	}
