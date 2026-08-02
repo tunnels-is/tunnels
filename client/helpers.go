@@ -83,17 +83,6 @@ func RenameFile(oldName, newName string) (err error) {
 	return nil
 }
 
-func CreateFile(file string) (f *os.File, err error) {
-	f, err = os.OpenFile(file, os.O_APPEND|os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0o600)
-	if err != nil {
-		ERROR("Unable to open file: ", err)
-		return
-	}
-
-	DEBUG("File opened: ", f.Name())
-	return
-}
-
 func writeFileWithBackup(path string, newContent []byte) (err error) {
 	existing, err := os.ReadFile(path)
 	if err == nil && sha256.Sum256(existing) == sha256.Sum256(newContent) {
@@ -111,8 +100,9 @@ func writeFileWithBackup(path string, newContent []byte) (err error) {
 		ERROR("Unable to rename file: ", err)
 	}
 
-	f, err := CreateFile(path)
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
 	if err != nil {
+		ERROR("Unable to open file: ", err)
 		return err
 	}
 	defer f.Close()
