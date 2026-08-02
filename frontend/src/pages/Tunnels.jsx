@@ -6,6 +6,7 @@ import { connect, createTunnel, deleteTunnel, disconnect, fetchServers, fetchSta
 import { useStore } from "@/store/store"
 
 const Tunnels = () => {
+	const user = useStore((s) => s.user)
 	const tunnels = useStore((s) => s.tunnels)
 	const activeTunnels = useStore((s) => s.activeTunnels)
 	const servers = useStore((s) => s.servers)
@@ -21,10 +22,15 @@ const Tunnels = () => {
 	}, [])
 
 	const serverMap = useMemo(() => Object.fromEntries(servers.map((s) => [s._id, s])), [servers])
-	const activeMap = useMemo(
-		() => Object.fromEntries((activeTunnels || []).map((at) => [at.CR?.Tag, at])),
-		[activeTunnels],
-	)
+	// Only this UI account's connections count as "connected" for highlighting.
+	const activeMap = useMemo(() => {
+		const uid = user?._id
+		const map = {}
+		for (const at of activeTunnels || []) {
+			if (at.CR?.Tag && uid && at.CR?.UserID === uid) map[at.CR.Tag] = at
+		}
+		return map
+	}, [activeTunnels, user?._id])
 
 	const activeCount = useMemo(
 		() => (tunnels || []).filter((t) => activeMap[t.Tag]).length,
