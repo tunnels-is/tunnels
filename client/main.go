@@ -74,9 +74,6 @@ func InitService() error {
 		}
 	}
 
-	loadDefaultGateway()
-	loadDefaultInterface()
-
 	if conf.CLIConfig != nil {
 		DEBUG("cli config loaded")
 		wasChanged := false
@@ -169,10 +166,6 @@ func LaunchTunnels() {
 
 	newConcurrentSignal("LogMapCleaner", CancelContext, func() {
 		CleanUniqueLogMap()
-	})
-
-	newConcurrentSignal("DefaultGateway", CancelContext, func() {
-		GetDefaultGateway()
 	})
 
 	newConcurrentSignal("AutoConnect", CancelContext, func() {

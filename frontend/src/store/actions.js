@@ -60,7 +60,6 @@ export const fetchState = async () => {
 		useStore.setState({
 			state: d.State,
 			config: d.Config,
-			network: d.Network,
 			tunnels: d.Tunnels || [],
 			activeTunnels: d.ActiveTunnels || [],
 			version: d.Version,
