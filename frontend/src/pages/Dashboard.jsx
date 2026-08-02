@@ -22,10 +22,16 @@ const Dashboard = () => {
 		fetchState()
 	}, [])
 
+	// Map connect/disconnect is scoped to the active UI account.
+	const myActiveTunnels = useMemo(
+		() => (activeTunnels || []).filter((at) => at.CR?.UserID && at.CR.UserID === user?._id),
+		[activeTunnels, user?._id],
+	)
+
 	const connectedServer = useMemo(() => {
-		const serverID = activeTunnels?.[0]?.CR?.ServerID
+		const serverID = myActiveTunnels?.[0]?.CR?.ServerID
 		return serverID ? servers.find((s) => s._id === serverID) : undefined
-	}, [activeTunnels, servers])
+	}, [myActiveTunnels, servers])
 
 	const targetCountry = useMemo(
 		() => resolveTargetCountry(timezone, servers.map((s) => s.Country)),
@@ -63,9 +69,9 @@ const Dashboard = () => {
 					country={targetCountry}
 					serverCountry={connectedServer?.Country}
 					connecting={autoConnecting}
-					connected={activeTunnels?.length > 0}
+					connected={myActiveTunnels?.length > 0}
 					onConnect={autoConnect}
-					onDisconnect={() => activeTunnels?.[0] && disconnect(activeTunnels[0])}
+					onDisconnect={() => myActiveTunnels?.[0] && disconnect(myActiveTunnels[0])}
 				/>
 			</Suspense>
 

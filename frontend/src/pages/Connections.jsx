@@ -11,23 +11,29 @@ const Section = ({ title, children }) => (
 )
 
 const Connections = () => {
+	const user = useStore((s) => s.user)
 	const tunnels = useStore((s) => s.tunnels)
 	const activeTunnels = useStore((s) => s.activeTunnels)
 
+	const myActiveTunnels = (activeTunnels || []).filter(
+		(ac) => ac.CR?.UserID && ac.CR.UserID === user?._id,
+	)
+
 	return (
 		<Page>
-			{!activeTunnels?.length && (
+			{!myActiveTunnels?.length && (
 				<Card>
 					<div className="py-6 text-center text-xs opacity-50">No active connections</div>
 				</Card>
 			)}
 			<div className="grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-3">
-				{activeTunnels?.map((ac) => {
+				{myActiveTunnels?.map((ac) => {
 					const tunnel = tunnels.find((t) => t.Tag === ac.CR?.Tag)
 					return (
 						<Card key={ac.ID}>
 							<Section title="Tunnel Interface">
 								<InfoRow label="Tag" value={tunnel?.Tag} />
+								<InfoRow label="User ID" value={ac.CR?.UserID} mono />
 								<InfoRow label="Interface" value={tunnel?.IFName} />
 								<InfoRow label="IP" value={tunnel?.IPv4Address} mono />
 								<InfoRow label="MTU" value={tunnel?.MTU} mono />

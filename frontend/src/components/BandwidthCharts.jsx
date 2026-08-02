@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { ArrowDown, ArrowUp, Activity } from "lucide-react"
-import { fetchState } from "@/store/actions"
+import { fetchState, fetchUsers } from "@/store/actions"
 import { useStore } from "@/store/store"
 
 const TIME_RANGES = [
@@ -203,7 +203,7 @@ const RatePill = ({ direction, rate }) => {
 	)
 }
 
-const TunnelCard = ({ tunnel, server, range, nested = false }) => {
+const TunnelCard = ({ tunnel, server, range, nested = false, currentUserID, emailByUserID }) => {
 	const rawData = useMemo(() => {
 		const cutoff = Date.now() - range.seconds * 1000
 		return (tunnel.BandwidthHistory || []).filter((r) => new Date(r?.ts) >= cutoff)
@@ -215,6 +215,9 @@ const TunnelCard = ({ tunnel, server, range, nested = false }) => {
 	const tag = tunnel.CR?.Tag || tunnel.ID?.slice(0, 8) || "Tunnel"
 	const serverLabel = server?.Tag || tunnel.CR?.ServerIP || "—"
 	const ipv4 = tunnel.CRResponse?.WireGuardIP || "—"
+	const userID = tunnel.CR?.UserID || ""
+	const email = (userID && emailByUserID?.[userID]) || ""
+	const isMine = userID && currentUserID && userID === currentUserID
 	const country = server?.Country
 
 	return (
@@ -237,8 +240,20 @@ const TunnelCard = ({ tunnel, server, range, nested = false }) => {
 								{country}
 							</span>
 						)}
+						{isMine && (
+							<span className="badge badge-ghost badge-xs shrink-0 opacity-60">you</span>
+						)}
 					</div>
 					<div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-base-content/50">
+						<span className="flex min-w-0 items-center gap-1.5">
+							<span className="shrink-0 text-[9px] font-medium uppercase tracking-wider text-base-content/35">
+								User
+							</span>
+							<span className="truncate text-base-content/70" title={email || userID || undefined}>
+								{email || "—"}
+							</span>
+						</span>
+						<span className="hidden h-3 w-px bg-base-300 sm:inline-block" />
 						<span className="flex items-center gap-1.5">
 							<span className="text-[9px] font-medium uppercase tracking-wider text-base-content/35">Server</span>
 							<span className="font-mono text-base-content/70">{serverLabel}</span>
@@ -304,6 +319,8 @@ const TunnelCard = ({ tunnel, server, range, nested = false }) => {
 }
 
 const BandwidthCharts = () => {
+	const user = useStore((s) => s.user)
+	const users = useStore((s) => s.users)
 	const activeTunnels = useStore((s) => s.activeTunnels)
 	const servers = useStore((s) => s.servers)
 	const [range, setRange] = useState(TIME_RANGES[0])
@@ -313,8 +330,21 @@ const BandwidthCharts = () => {
 		return () => clearInterval(interval)
 	}, [])
 
+	useEffect(() => {
+		fetchUsers()
+	}, [])
+
+	// Graph every live tunnel on the daemon (all accounts).
 	const tunnels = activeTunnels || []
 	const serverMap = useMemo(() => Object.fromEntries(servers.map((s) => [s._id, s])), [servers])
+	const emailByUserID = useMemo(() => {
+		const map = {}
+		for (const u of users || []) {
+			if (u?._id) map[u._id] = u.Email || ""
+		}
+		if (user?._id) map[user._id] = user.Email || map[user._id] || ""
+		return map
+	}, [users, user])
 
 	const totalSamples = useMemo(() => {
 		const cutoff = Date.now() - range.seconds * 1000
@@ -364,7 +394,13 @@ const BandwidthCharts = () => {
 
 			{/* Per-tunnel panels — nested cards when multiple so each connection reads as a unit */}
 			{tunnels.length === 1 ? (
-				<TunnelCard tunnel={tunnels[0]} server={serverMap[tunnels[0].CR?.ServerID]} range={range} />
+				<TunnelCard
+					tunnel={tunnels[0]}
+					server={serverMap[tunnels[0].CR?.ServerID]}
+					range={range}
+					currentUserID={user?._id}
+					emailByUserID={emailByUserID}
+				/>
 			) : (
 				<div className="grid gap-3 p-3 xl:grid-cols-2">
 					{tunnels.map((tun) => (
@@ -374,6 +410,8 @@ const BandwidthCharts = () => {
 							server={serverMap[tun.CR?.ServerID]}
 							range={range}
 							nested
+							currentUserID={user?._id}
+							emailByUserID={emailByUserID}
 						/>
 					))}
 				</div>
