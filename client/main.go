@@ -95,7 +95,8 @@ func InitService() error {
 
 	if !conf.ConsoleLogOnly {
 		var err error
-		LogFile, err = CreateFile(state.LogFileName)
+		// Process-lifetime log handle; closed in cleanup (tunnel.Cleanup / shutdown).
+		LogFile, err = os.OpenFile(state.LogFileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
 		if err != nil {
 			return err
 		}
