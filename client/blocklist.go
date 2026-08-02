@@ -2,7 +2,6 @@ package client
 
 import (
 	"bufio"
-	"bytes"
 	"fmt"
 	"io"
 	"net/http"
@@ -13,8 +12,6 @@ import (
 )
 
 var listReloadMu sync.Mutex
-
-var domainDot = []byte(".")
 
 const (
 	maxDNSListSize    = 128 * 1024 * 1024
@@ -42,6 +39,7 @@ func reloadBlockListsEx(sleep bool, force bool) {
 	config := CONFIG.Load()
 
 	if config.DisableBlockLists {
+		DNSBlockList.Store(EmptyCatalog())
 		return
 	}
 
@@ -62,100 +60,157 @@ func reloadBlockListsEx(sleep bool, force bool) {
 		config.DNSBlockLists = GetDefaultBlockLists()
 	}
 
-	// Load each list into its own map (no concurrent writes), then merge once.
-	// Avoids xsync concurrent-map overhead which dominated retained heap (~250MB+).
-	partials := make([]*DomainSet, len(config.DNSBlockLists))
-	wg := new(sync.WaitGroup)
-	for i := range config.DNSBlockLists {
-		wg.Add(1)
-		go func(i int) {
-			defer wg.Done()
-			partials[i] = processBlockList(i, force)
-		}(i)
-	}
-	wg.Wait()
+	// Reuse compact sets for lists that stay enabled and were not re-downloaded.
+	prev := DNSBlockList.Load()
+	prevByTag := prev.Snapshot()
 
-	totalCap := 0
-	for _, p := range partials {
-		if p != nil {
-			totalCap += p.Len()
+	lists := config.DNSBlockLists
+	n := len(lists)
+	if n == 0 {
+		DNSBlockList.Store(EmptyCatalog())
+		return
+	}
+
+	// Workers send results on a channel so only this goroutine writes result slots.
+	ch := make(chan indexedListResult, n)
+	var wg sync.WaitGroup
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func(i int, bl *BlockList) {
+			defer wg.Done()
+			ch <- indexedListResult{i: i, r: processBlockList(bl, force, prevByTag)}
+		}(i, lists[i])
+	}
+	go func() {
+		wg.Wait()
+		close(ch)
+	}()
+
+	results := make([]listLoadResult, n)
+	for ir := range ch {
+		results[ir.i] = ir.r
+	}
+
+	tags := make([]string, n)
+	sets := make([]*DomainSet, n)
+	var nReuse, nLoad, nSkip int
+	for i := 0; i < n; i++ {
+		r := results[i]
+		tags[i] = r.tag
+		sets[i] = r.set
+		if r.updateMeta && lists[i] != nil {
+			lists[i].Count = r.count
+			if !r.didReuse {
+				lists[i].LastDownload = r.lastDownload
+			}
+		}
+		bl := lists[i]
+		if bl == nil || !bl.Enabled {
+			nSkip++
+			continue
+		}
+		if r.didReuse {
+			nReuse++
+		} else if r.set != nil {
+			nLoad++
+		} else {
+			nSkip++
 		}
 	}
-	final := NewDomainSet(totalCap)
-	for _, p := range partials {
-		final.MergeFrom(p)
-	}
 
-	DEBUG("finished updating blocklists, domains=", final.Len())
-	DNSBlockList.Store(final)
+	cat := NewCatalog(tags, sets)
+	DNSBlockList.Store(cat)
+
+	DEBUG("finished updating blocklists, domains=", cat.Len(),
+		" lists=", cat.ListCount(), " loaded=", nLoad, " reused=", nReuse, " skipped=", nSkip)
+
 	err := writeConfigToDisk()
 	if err != nil {
 		ERROR("unable to write config to disk post blocklist update", err)
 	}
 }
 
-// processBlockList loads one list into a private DomainSet (or nil on failure).
-func processBlockList(index int, force bool) *DomainSet {
+// processBlockList loads one enabled list into a compact DomainSet.
+// Disabled lists are skipped entirely. Does not write CONFIG or mutate bl;
+// callers apply Count/LastDownload after all workers finish.
+func processBlockList(bl *BlockList, force bool, prevByTag map[string]*DomainSet) listLoadResult {
 	defer RecoverAndLog()
-	config := CONFIG.Load()
-	bl := config.DNSBlockLists[index]
 	if bl == nil {
-		return nil
+		return listLoadResult{}
+	}
+	tag := bl.Tag
+	if !bl.Enabled {
+		return listLoadResult{tag: tag}
 	}
 
 	state := STATE.Load()
 	lowerTag := strings.ToLower(bl.Tag)
 	path := state.BlockListPath + lowerTag
 
+	downloaded := false
 	if (force || time.Since(bl.LastDownload).Hours() > 24) && bl.URL != "" {
 		if err := downloadListToFile(bl.URL, path); err != nil {
 			ERROR("Could not download bocklist", bl.URL, err)
 			if !fileExistsNonEmpty(path) {
 				ERROR("Could not read from disk or download blocklist", bl.URL, err)
-				return nil
+				return listLoadResult{tag: tag}
 			}
+		} else {
+			downloaded = true
 		}
 	} else if bl.Tag != "" {
 		if !fileExistsNonEmpty(path) {
 			if bl.URL == "" {
 				ERROR("No bytes in DNS blocklist: ", bl.URL, lowerTag)
-				return nil
+				return listLoadResult{tag: tag}
 			}
 			if err := downloadListToFile(bl.URL, path); err != nil {
 				ERROR("Could not read from disk or download blocklist", bl.URL, err)
-				return nil
+				return listLoadResult{tag: tag}
 			}
+			downloaded = true
 		}
 	} else {
-		return nil
+		return listLoadResult{tag: tag}
 	}
 
 	if !fileExistsNonEmpty(path) {
 		ERROR("No bytes in DNS blocklist: ", bl.URL, lowerTag)
-		return nil
+		return listLoadResult{tag: tag}
+	}
+
+	// Reuse prior compact set when content was not re-fetched.
+	if !force && !downloaded && prevByTag != nil {
+		if old := prevByTag[tag]; old != nil && old.Len() > 0 {
+			return listLoadResult{
+				tag:        tag,
+				set:        old,
+				count:      old.Len(),
+				didReuse:   true,
+				updateMeta: true,
+			}
+		}
 	}
 
 	var capHint int
 	if fi, err := os.Stat(path); err == nil {
 		capHint = estimateDomainCapacity(fi.Size())
 	}
-	set := NewDomainSet(capHint)
-	count, badLines, err := loadDomainsFromFile(path, bl.Enabled, set)
+	loaded, count, badLines, err := loadDomainSetFromFile(path, capHint)
 	if err != nil {
 		ERROR("Could not parse blocklist", path, err)
-		return nil
+		return listLoadResult{tag: tag}
 	}
-
-	bl.Count = count
-	bl.LastDownload = time.Now()
 	if badLines > 0 {
 		DEBUG(badLines, " invalid lines in list: ", bl.URL)
 	}
-	config.DNSBlockLists[index] = bl
-	if !bl.Enabled {
-		return nil // counted but not stored
+	return listLoadResult{
+		tag:          tag,
+		set:          loaded,
+		count:        count,
+		lastDownload: time.Now(),
+		updateMeta:   true,
 	}
-	return set
 }
 
 func fileExistsNonEmpty(path string) bool {
@@ -163,40 +218,40 @@ func fileExistsNonEmpty(path string) bool {
 	return err == nil && fi.Size() > 0
 }
 
-// loadDomainsFromFile streams a list file line-by-line without loading the whole file.
-func loadDomainsFromFile(path string, enabled bool, set *DomainSet) (count, bad int, err error) {
+func loadDomainSetFromFile(path string, capHint int) (set *DomainSet, count, bad int, err error) {
 	f, err := os.Open(path)
 	if err != nil {
-		return 0, 0, err
+		return nil, 0, 0, err
 	}
 	defer f.Close()
-	return loadDomainsFromReader(f, enabled, set)
+	return loadDomainSetFromReader(f, capHint)
 }
 
-func loadDomainsFromReader(r io.Reader, enabled bool, set *DomainSet) (count, bad int, err error) {
+// loadDomainSetFromReader streams a list file into a compact DomainSet.
+// Invalid lines are counted but not stored. count is valid domains seen
+// (including duplicates before unique-pack).
+func loadDomainSetFromReader(r io.Reader, capHint int) (set *DomainSet, count, bad int, err error) {
 	scanner := bufio.NewScanner(r)
 	buf := make([]byte, 0, dnsListScanBuf)
 	scanner.Buffer(buf, dnsListMaxLineLen)
 
+	b := newDomainBuilder(capHint)
 	for scanner.Scan() {
 		line := scanner.Bytes()
-		if len(line) == 0 || line[0] == '#' {
+		if len(line) == 0 {
 			bad++
 			continue
 		}
-		if !bytes.Contains(line, domainDot) {
+		if !b.tryAddLine(line) {
 			bad++
 			continue
 		}
 		count++
-		if enabled && set != nil {
-			set.Add(string(line))
-		}
 	}
 	if err := scanner.Err(); err != nil {
-		return count, bad, err
+		return nil, count, bad, err
 	}
-	return count, bad, nil
+	return b.Build(), count, bad, nil
 }
 
 // downloadListToFile streams a remote list straight to path (capped at maxDNSListSize).
