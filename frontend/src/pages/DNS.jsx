@@ -123,6 +123,14 @@ const DNS = () => {
 		saveConfig({ ...config, [key]: list })
 	}
 
+	const setAllListsEnabled = (key, enabled) => {
+		const current = config[key] || []
+		if (current.length === 0) return
+		if (current.every((l) => !!l.Enabled === enabled)) return
+		const list = current.map((l) => ({ ...l, Enabled: enabled }))
+		saveConfig({ ...config, [key]: list })
+	}
+
 	const updateDialogValue = (value) => setDialog({ ...dialog, value })
 
 	if (!advanced) {
@@ -234,6 +242,22 @@ const DNS = () => {
 					description="External lists of domains that will be blocked."
 					actions={
 						<>
+							<button
+								className="btn btn-ghost btn-xs"
+								onClick={() => setAllListsEnabled("DNSBlockLists", true)}
+								disabled={blockLists.length === 0 || blockLists.every((l) => l.Enabled)}
+								title="Enable every block list"
+							>
+								Enable all
+							</button>
+							<button
+								className="btn btn-ghost btn-xs"
+								onClick={() => setAllListsEnabled("DNSBlockLists", false)}
+								disabled={blockLists.length === 0 || blockLists.every((l) => !l.Enabled)}
+								title="Disable every block list"
+							>
+								Disable all
+							</button>
 							<button
 								className="btn btn-outline btn-xs"
 								onClick={handleUpdateBlockLists}
