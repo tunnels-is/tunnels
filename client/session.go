@@ -230,7 +230,9 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		}
 	}
 
-	osTun, tunErr := wgtun.CreateTUN(meta.IFName, int(meta.MTU))
+	// On Darwin, CreateTUN only accepts "utun"/"utunN"; logical IFName
+	// (e.g. "tunnels") is not a kernel name. Other OSes use IFName as-is.
+	osTun, tunErr := wgtun.CreateTUN(resolveTUNCreateName(meta.IFName), int(meta.MTU))
 	if tunErr != nil {
 		return 502, fmt.Errorf("unable to create TUN interface: %w", tunErr)
 	}

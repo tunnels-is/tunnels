@@ -22,7 +22,6 @@ func printInfo() {
 	blue := "\033[1;34m"
 	dim := "\033[34m"
 	bold := "\033[1m"
-	warn := "\033[33m"
 	reset := "\033[0m"
 	divider := dim + "  ────────────────────────────────────────────" + reset + "\n"
 
@@ -45,8 +44,6 @@ func printInfo() {
 		"  ·  configure system dns servers to prevent leaks\n"+
 		"  ·  --basePath to change the config directory\n"+
 		"\n"+
-		"  "+warn+"⚠"+reset+"  if the app closes without logs,\n"+
-		"     delete your config and restart\n"+
 		"\n",
 		scheme, conf.APIIP, conf.APIPort, s.BasePath,
 	)
@@ -219,7 +216,6 @@ func stopReconnect(tag string) {
 
 func stopAllReconnects() {
 	reconnectStops.Range(func(k, _ any) bool {
-
 		if actual, ok := reconnectStops.LoadAndDelete(k); ok {
 			close(actual.(chan struct{}))
 		}
@@ -240,7 +236,6 @@ func disconnectTunnelByTag(tag string) {
 func handleTunnelDeath(t *TUN) {
 	defer RecoverAndLog()
 	if t == nil || t.GetState() < TUN_Connected {
-
 		return
 	}
 	meta := t.meta.Load()
@@ -265,7 +260,6 @@ func handleTunnelDeath(t *TUN) {
 	Disconnect(t.ID, false)
 
 	if !meta.AutoReconnect || cr == nil {
-
 		return
 	}
 
@@ -296,7 +290,6 @@ func handleTunnelDeath(t *TUN) {
 			}
 			INFO("auto-reconnect: ", meta.Tag, " reconnected")
 			if killSwitch {
-
 				releaseKillSwitch(meta.Tag)
 			}
 			return
