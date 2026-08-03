@@ -19,6 +19,11 @@ func ValidateAdapterID(meta *TunnelMETA) error {
 	return nil
 }
 
+// resolveTUNCreateName returns the Wintun adapter name (logical IFName).
+func resolveTUNCreateName(logical string) string {
+	return logical
+}
+
 func OSSpecificInit() error {
 	fb, err := DLL_EMBED.ReadFile("wintun.dll")
 	if err != nil {
