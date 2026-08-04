@@ -241,7 +241,8 @@ const TunnelForm = () => {
 								return (
 									<Toggle
 										key={opt.key}
-										label={allowed ? opt.label : opt.label + " (needs Default Route)"}
+										label={opt.label}
+										warning={!allowed ? "Requires Default Route to be enabled" : undefined}
 										checked={allowed && !!form.KillSwitch}
 										disabled={!allowed}
 										onChange={() => set("KillSwitch", !form.KillSwitch)}
