@@ -42,7 +42,7 @@ func TestLocalDevice_SaveLoadByServerID(t *testing.T) {
 	if list[0].WireGuardPubKey != "pub-key-material" {
 		t.Fatalf("info missing pub: %+v", list[0])
 	}
-	// Ensure private key never appears in info JSON path fields used by UI
+
 	if list[0].ID != "device-aaa" {
 		t.Fatalf("id: %s", list[0].ID)
 	}

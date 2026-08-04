@@ -7,22 +7,13 @@ import (
 	"sync/atomic"
 )
 
-// DomainSet is an immutable, compact set of DNS names after Build/load.
-//
-// Storage layout (far smaller than map[string]struct{}):
-//   - data: all domains concatenated, ASCII-lowercased
-//   - off:  start offset of each domain in data (sorted lexicographically)
-//
-// Domain i is data[off[i]:end] where end is off[i+1] or len(data).
-// Safe for concurrent readers once published (never mutate after publish).
+
 type DomainSet struct {
 	data []byte
 	off  []uint32
 }
 
-// DomainCatalog holds per-list DomainSets for enabled lists only (option B).
-// Lookup walks lists; with several lists it may search them in parallel.
-// Immutable after publish via atomic.Pointer.
+
 type DomainCatalog struct {
 	items []domainList
 }
@@ -50,14 +41,12 @@ func (s *DomainSet) domain(i int) []byte {
 	return s.data[start:end]
 }
 
-// Has reports whether name is in the set. name should already be normalized
-// (ASCII lower, no trailing dot) for best performance; non-normalized input
-// is still handled correctly via normalizeDomainString.
+
 func (s *DomainSet) Has(name string) bool {
 	if s == nil || len(s.off) == 0 || name == "" {
 		return false
 	}
-	// Fast path: already normalized lowercase without trailing dot.
+
 	if !needsDomainNormalize(name) {
 		return s.hasNormalized(name)
 	}
@@ -81,7 +70,7 @@ func (s *DomainSet) hasNormalized(name string) bool {
 	return false
 }
 
-// NewCatalog builds a catalog from parallel slices (nil sets are skipped).
+
 func NewCatalog(tags []string, sets []*DomainSet) *DomainCatalog {
 	if len(tags) != len(sets) {
 		panic("NewCatalog: len(tags) != len(sets)")
@@ -119,7 +108,7 @@ func (c *DomainCatalog) ListCount() int {
 	return len(c.items)
 }
 
-// Snapshot returns a tag→set map for reuse across reloads (enabled lists only).
+
 func (c *DomainCatalog) Snapshot() map[string]*DomainSet {
 	if c == nil || len(c.items) == 0 {
 		return nil
@@ -131,9 +120,7 @@ func (c *DomainCatalog) Snapshot() map[string]*DomainSet {
 	return m
 }
 
-// Has returns whether name is in any list, plus the tag of the first match.
-// With 1 list: single binary search. With 2–3: sequential. With 4+: parallel
-// searches with early exit (useful when many independent lists are enabled).
+
 func (c *DomainCatalog) Has(name string) (bool, string) {
 	if c == nil || len(c.items) == 0 || name == "" {
 		return false, ""
@@ -161,13 +148,13 @@ func (c *DomainCatalog) Has(name string) (bool, string) {
 		return false, ""
 	}
 
-	// Parallel walk for larger catalogs.
+
 	var (
 		wg     sync.WaitGroup
 		found  atomic.Bool
-		tagPtr atomic.Value // string
+		tagPtr atomic.Value
 	)
-	// Bound fan-out; each worker does pure CPU binary search.
+
 	for i := range items {
 		if found.Load() {
 			break
@@ -193,11 +180,10 @@ func (c *DomainCatalog) Has(name string) (bool, string) {
 	return true, tag
 }
 
-// domainBuilder accumulates domains into one buffer (no per-domain string headers
-// during the scan), then packs a sorted unique DomainSet.
+
 type domainBuilder struct {
 	buf  []byte
-	// start offsets into buf for each added domain (unsorted until Build)
+
 	off []uint32
 }
 
@@ -205,7 +191,7 @@ func newDomainBuilder(capHint int) *domainBuilder {
 	if capHint < 0 {
 		capHint = 0
 	}
-	// Assume ~16 bytes average domain for buffer growth.
+
 	b := &domainBuilder{}
 	if capHint > 0 {
 		b.buf = make([]byte, 0, capHint*16)
@@ -214,7 +200,7 @@ func newDomainBuilder(capHint int) *domainBuilder {
 	return b
 }
 
-// addNormalized appends an already-normalized domain (lower ASCII, no trailing dot).
+
 func (b *domainBuilder) addNormalized(dom []byte) {
 	if len(dom) == 0 || b == nil {
 		return
@@ -224,8 +210,7 @@ func (b *domainBuilder) addNormalized(dom []byte) {
 	b.off = append(b.off, start)
 }
 
-// tryAddLine normalizes a raw list line into the builder without an intermediate
-// domain allocation. Returns false if the line is not a valid domain entry.
+
 func (b *domainBuilder) tryAddLine(line []byte) bool {
 	if b == nil {
 		return false
@@ -234,7 +219,7 @@ func (b *domainBuilder) tryAddLine(line []byte) bool {
 	if len(line) == 0 || line[0] == '#' {
 		return false
 	}
-	// Hosts-file style: "0.0.0.0 domain.tld" — use last field.
+
 	if hasASCIISpace(line) {
 		fields := splitFields(line)
 		if len(fields) == 0 {
@@ -249,7 +234,7 @@ func (b *domainBuilder) tryAddLine(line []byte) bool {
 		return false
 	}
 	start := uint32(len(b.buf))
-	// Ensure capacity then write lowercased bytes in place.
+
 	b.buf = append(b.buf, line...)
 	dst := b.buf[start:]
 	for i := 0; i < len(dst); i++ {
@@ -280,9 +265,9 @@ func hasASCIISpace(b []byte) bool {
 	return false
 }
 
-// splitFields splits on ASCII whitespace without allocating if single field.
+
 func splitFields(line []byte) [][]byte {
-	// Fast path: no spaces after first trim — caller already trimmed ends.
+
 	hasSpace := false
 	for i := 0; i < len(line); i++ {
 		if line[i] == ' ' || line[i] == '\t' {
@@ -317,8 +302,7 @@ func (b *domainBuilder) count() int {
 	return len(b.off)
 }
 
-// Build sorts, uniques, and packs into an immutable DomainSet.
-// The builder must not be used after Build.
+
 func (b *domainBuilder) Build() *DomainSet {
 	if b == nil || len(b.off) == 0 {
 		return &DomainSet{}
@@ -329,7 +313,7 @@ func (b *domainBuilder) Build() *DomainSet {
 		idx[i] = i
 	}
 
-	// ends[i] = exclusive end offset of domain i in add order.
+
 	ends := make([]uint32, len(b.off))
 	for i := 0; i < len(b.off)-1; i++ {
 		ends[i] = b.off[i+1]
@@ -344,7 +328,7 @@ func (b *domainBuilder) Build() *DomainSet {
 		return bytes.Compare(sliceAt(idx[i]), sliceAt(idx[j])) < 0
 	})
 
-	// Count unique and total packed size.
+
 	nUnique := 0
 	total := 0
 	var prev []byte
@@ -375,8 +359,7 @@ func (b *domainBuilder) Build() *DomainSet {
 	return out
 }
 
-// DomainSetFromDomains builds a set from arbitrary domain strings (normalizes).
-// Handy for tests and small merges.
+
 func DomainSetFromDomains(domains []string) *DomainSet {
 	b := newDomainBuilder(len(domains))
 	for _, d := range domains {
@@ -387,7 +370,7 @@ func DomainSetFromDomains(domains []string) *DomainSet {
 	return b.Build()
 }
 
-// MergeDomainSets packs the union of sets into a new DomainSet.
+
 func MergeDomainSets(sets ...*DomainSet) *DomainSet {
 	total := 0
 	for _, s := range sets {
@@ -457,7 +440,7 @@ func normalizeDomainString(name string) string {
 	if name == "" {
 		return ""
 	}
-	// ASCII lower only (DNS labels we care about for blocklists).
+
 	needLower := false
 	for i := 0; i < len(name); i++ {
 		if name[i] >= 'A' && name[i] <= 'Z' {
@@ -514,7 +497,7 @@ func trimASCIISpaceBytes(b []byte) []byte {
 	return b[start:end]
 }
 
-// estimateDomainCapacity guesses entry count from file size (~20 bytes/line avg).
+
 func estimateDomainCapacity(fileSize int64) int {
 	if fileSize <= 0 {
 		return 0

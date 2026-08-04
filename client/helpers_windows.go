@@ -19,7 +19,7 @@ func ValidateAdapterID(meta *TunnelMETA) error {
 	return nil
 }
 
-// resolveTUNCreateName returns the Wintun adapter name (logical IFName).
+
 func resolveTUNCreateName(logical string) string {
 	return logical
 }

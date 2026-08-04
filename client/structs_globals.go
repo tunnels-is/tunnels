@@ -61,7 +61,7 @@ var (
 	CancelFunc    context.CancelFunc
 
 	DNSGlobalBlock atomic.Bool
-	// Per-enabled-list compact domain sets (see DomainCatalog / DomainSet).
+
 	DNSBlockList atomic.Pointer[DomainCatalog]
 	DNSWhiteList atomic.Pointer[DomainCatalog]
 	DNSCache     *xsync.MapOf[string, any]
@@ -103,7 +103,7 @@ var (
 	DLL_EMBED   embed.FS
 	EnableTLS   bool
 	DevMode     bool
-	EnablePprof bool // expose net/http/pprof on the local API server
+	EnablePprof bool
 )
 
 var (
@@ -243,9 +243,7 @@ type ControlServer struct {
 	ValidateCertificate bool
 }
 
-// effectivePort returns the port used for outbound controller connections.
-// Temporary: while old and new controllers co-exist, force api.tunnels.is:443 → :444
-// at request time only — config on disk is left unchanged.
+
 func (c *ControlServer) effectivePort() string {
 	if c == nil {
 		return ""
@@ -340,7 +338,7 @@ type stateV2 struct {
 	TunnelsPath    string
 	DevicesPath    string
 	LogFileName    string
-	UserPath       string // accounts root (list/delete); per-account user file is accounts/<hash>/user
+	UserPath       string
 
 	ActiveAccountHash string
 }

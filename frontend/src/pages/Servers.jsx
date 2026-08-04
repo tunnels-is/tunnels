@@ -58,7 +58,7 @@ const Servers = () => {
 		fetchState()
 	}, [])
 
-	// Only treat as connected when the live tunnel belongs to the active UI account.
+
 	const activeByServer = useMemo(() => {
 		const map = {}
 		const uid = user?._id

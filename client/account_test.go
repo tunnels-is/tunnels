@@ -42,7 +42,7 @@ func TestAccountWorkspace_SaveLoadActivate(t *testing.T) {
 		t.Fatalf("devices dir missing: %v", err)
 	}
 
-	// Second account — separate workspace.
+
 	u2 := &User{
 		ID:    "user-bbb-222",
 		Email: "b@example.com",
@@ -58,7 +58,7 @@ func TestAccountWorkspace_SaveLoadActivate(t *testing.T) {
 		t.Fatal("accounts must have distinct hashes")
 	}
 
-	// List without knowing userIDs — only folder hashes (path names).
+
 	users, err := getUsers()
 	if err != nil {
 		t.Fatalf("getUsers: %v", err)
@@ -66,7 +66,7 @@ func TestAccountWorkspace_SaveLoadActivate(t *testing.T) {
 	if len(users) != 2 {
 		t.Fatalf("getUsers len = %d, want 2", len(users))
 	}
-	// Tokens must round-trip (proves decrypt by folder hash works).
+
 	foundA := false
 	for _, got := range users {
 		if got.Email == "a@example.com" && got.DeviceToken != nil && got.DeviceToken.DT == "token-a" {
@@ -77,12 +77,12 @@ func TestAccountWorkspace_SaveLoadActivate(t *testing.T) {
 		t.Fatal("did not decrypt account A via folder hash alone")
 	}
 
-	// No user.key on disk.
+
 	if _, err := os.Stat(filepath.Join(dir, "user.key")); err == nil {
 		t.Fatal("user.key should not be created")
 	}
 
-	// Switch back to first account — tunnels path must move.
+
 	if err := activateAccountByUserID(u.ID); err != nil {
 		t.Fatalf("activate first: %v", err)
 	}
@@ -114,9 +114,9 @@ func TestAccountWorkspace_SaveLoadActivate(t *testing.T) {
 func TestEncryptAccountBlob_UsesFolderHashOnly(t *testing.T) {
 	hash := "aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899"
 	if len(hash) != 64 {
-		// folder hash is 32 bytes hex = 64 chars
+
 	}
-	// Use a valid 64-char hex string
+
 	h, err := userIDToAccountHash("test-user-for-blob")
 	if err != nil {
 		t.Fatal(err)
@@ -136,7 +136,7 @@ func TestEncryptAccountBlob_UsesFolderHashOnly(t *testing.T) {
 	if !bytes.Equal(out, pt) {
 		t.Fatalf("round trip mismatch")
 	}
-	// Wrong hash must fail
+
 	_, err = decryptAccountBlob(blob, "0000000000000000000000000000000000000000000000000000000000000000")
 	if err == nil {
 		t.Fatal("expected decrypt failure with wrong hash")

@@ -26,7 +26,7 @@ const Devices = () => {
 	const [submitting, setSubmitting] = useState(false)
 	const [filter, setFilter] = useState("")
 
-	// Reload devices whenever the active account changes (not only on first mount).
+
 	useEffect(() => {
 		fetchState()
 	}, [])
@@ -91,7 +91,7 @@ const Devices = () => {
 		notifySuccess("Copied to clipboard")
 	}
 
-	// Connected: controller device WG IP matches a live tunnel.
+
 	const connectedIPs = useMemo(() => {
 		const ips = new Set()
 		for (const at of activeTunnels || []) {
@@ -101,7 +101,7 @@ const Devices = () => {
 		return ips
 	}, [activeTunnels])
 
-	// Local: this machine has a devices/ file (match by controller id or pubkey).
+
 	const localIDs = useMemo(() => new Set((localDevices || []).map((d) => d.ID).filter(Boolean)), [localDevices])
 	const localPubs = useMemo(
 		() => new Set((localDevices || []).map((d) => d.WireGuardPubKey).filter(Boolean)),

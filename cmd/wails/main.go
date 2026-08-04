@@ -29,9 +29,7 @@ var DIST embed.FS
 //go:embed wintun.dll
 var DLL embed.FS
 
-// App icon (PNG) for Linux window / macOS About.
-// Windows title-bar + taskbar icons come from rsrc_windows_*.syso (icon resource ID 3 = Wails AppIconID).
-//
+
 //go:embed build/appicon.png
 var appIcon []byte
 
@@ -110,7 +108,7 @@ func main() {
 		},
 		Windows: &windows.Options{
 			DisableWindowIcon:    false,
-			IsZoomControlEnabled: true, // Ctrl+mouse wheel / keyboard zoom in WebView2
+			IsZoomControlEnabled: true,
 			DisablePinchZoom:     false,
 		},
 		Linux: &linux.Options{

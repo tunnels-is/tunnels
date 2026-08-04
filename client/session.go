@@ -57,7 +57,7 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	}()
 	defer RecoverAndLog()
 
-	// Ensure tunnels/keys come from this account's workspace before looking up meta.
+
 	if ClientCR.UserID != "" {
 		if err := activateAccountByUserID(ClientCR.UserID); err != nil {
 			ERROR("unable to activate account workspace:", err)
@@ -167,7 +167,7 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		}
 	}
 
-	// Identity is per local device (by ServerID), not the tunnel file.
+
 	localDev, wgCfg, wgErr := resolveLocalDeviceForServer(ClientCR, ClientCR.ServerID, meta.Tag)
 	if wgErr != nil {
 		ERROR("unable to resolve local device for server: ", wgErr)
@@ -178,7 +178,7 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	}
 	wgPrivKeyB64 := localDev.WireGuardPrivKey
 
-	// Stop storing WG keys on the tunnel meta (legacy field).
+
 	if meta.WireGuardPrivKey != "" {
 		meta.WireGuardPrivKey = ""
 		_ = writeTunnelsToDisk(meta.Tag)
@@ -230,8 +230,8 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		}
 	}
 
-	// On Darwin, CreateTUN only accepts "utun"/"utunN"; logical IFName
-	// (e.g. "tunnels") is not a kernel name. Other OSes use IFName as-is.
+
+
 	osTun, tunErr := wgtun.CreateTUN(resolveTUNCreateName(meta.IFName), int(meta.MTU))
 	if tunErr != nil {
 		return 502, fmt.Errorf("unable to create TUN interface: %w", tunErr)
@@ -393,7 +393,7 @@ func createServerDeviceFull(cr *ConnectionRequest, serverID string, pubKey strin
 		WireGuardSubnet:  resp.ServerSubnet,
 		WireGuardSubnet6: resp.ServerSubnet6,
 		WANCIDR:          resp.WANCIDR,
-		EnableFirewall:   false, // filled from getServerWGConfig when available
+		EnableFirewall:   false,
 	}, resp.Device, nil
 }
 
