@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import DatePicker from 'react-datepicker';
 import { ArrowLeft, Pencil, Save, X, Trash2 } from 'lucide-react';
@@ -17,9 +17,9 @@ function Row({ label, children }) {
 export default function UserDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const location = useLocation();
 
-  const [user, setUser] = useState(location.state?.user || null);
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({});
   const [saving, setSaving] = useState(false);
@@ -28,16 +28,27 @@ export default function UserDetail() {
   const [deleting, setDeleting] = useState(false);
 
   const load = async () => {
-    const resp = await apiPost('/ui/user/list', { Limit: 500, Offset: 0 });
-    if (resp.status === 200) {
-      const list = await resp.json();
-      const found = (list || []).find((u) => u._id === id);
-      if (found) setUser(found);
+    setLoading(true);
+    setError('');
+    try {
+      const resp = await apiPost('/ui/user', { TargetUserID: id });
+      if (resp.status === 200) {
+        setUser(await resp.json());
+      } else {
+        const data = await resp.json().catch(() => ({}));
+        setUser(null);
+        setError(data.Error || 'User not found');
+      }
+    } catch (err) {
+      setUser(null);
+      setError(err.message);
+    } finally {
+      setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (!user) load();
+    load();
   }, [id]);
 
   const startEdit = () => {
@@ -101,13 +112,17 @@ export default function UserDetail() {
     }
   };
 
-  if (!user) {
+  if (loading || !user) {
     return (
       <div>
         <button onClick={() => navigate('/users')} className="flex items-center gap-2 text-[12px] text-[#a3a3a3] hover:text-[#262626] mb-5">
           <ArrowLeft className="w-3.5 h-3.5" /> Back to Users
         </button>
-        <p className="text-[13px] text-[#a3a3a3]">Loading...</p>
+        {error ? (
+          <p className="text-[13px] text-[#dc2626]">{error}</p>
+        ) : (
+          <p className="text-[13px] text-[#a3a3a3]">Loading...</p>
+        )}
       </div>
     );
   }
@@ -239,7 +254,7 @@ export default function UserDetail() {
               <div key={i} className="grid grid-cols-[1fr_160px] min-w-[420px] gap-4 px-4 py-2.5 border-b border-[#e7e3d7]/50 items-center">
                 <span className="text-[13px] text-[#262626]">{t.N || '—'}</span>
                 <span className="text-[11px] text-[#a3a3a3] font-mono">
-                  {t.Created ? dayjs(t.Created).format('DD-MM-YYYY HH:mm') : '—'}
+                  {(t.C || t.Created) ? dayjs(t.C || t.Created).format('DD-MM-YYYY HH:mm') : '—'}
                 </span>
               </div>
             ))}

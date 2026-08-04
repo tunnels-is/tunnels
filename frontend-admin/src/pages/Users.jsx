@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
-import { Clock, Plus, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Clock, Plus, RefreshCw, ChevronLeft, ChevronRight, Search } from 'lucide-react';
 import { apiPost } from '../api';
 
 const PAGE_SIZE = 100;
@@ -40,8 +40,9 @@ export default function Users() {
   const [createError, setCreateError] = useState('');
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(false);
-  const [mode, setMode] = useState('browse'); // 'browse' | 'latest'
+  const [mode, setMode] = useState('browse'); // 'browse' | 'latest' | 'search'
   const [stats, setStats] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const load = async (next = offset) => {
     setLoading(true);
@@ -75,6 +76,7 @@ export default function Users() {
     setLoading(true);
     setError('');
     setMode('latest');
+    setStats(null);
     try {
       const resp = await apiPost('/ui/user/latest', {});
       if (resp.status === 200) {
@@ -98,6 +100,37 @@ export default function Users() {
     }
   };
 
+  const handleSearch = async (e) => {
+    e?.preventDefault?.();
+    const email = searchQuery.trim();
+    if (!email) {
+      setError('Enter a username / email to search');
+      return;
+    }
+    setLoading(true);
+    setError('');
+    setMode('search');
+    setStats(null);
+    setHasMore(false);
+    setOffset(0);
+    try {
+      const resp = await apiPost('/ui/user/search', { Email: email });
+      if (resp.status === 200) {
+        const data = await resp.json();
+        setUsers(Array.isArray(data) ? data : data ? [data] : []);
+      } else {
+        const data = await resp.json().catch(() => ({}));
+        setError(data.Error || 'Search failed');
+        setUsers([]);
+      }
+    } catch (err) {
+      setError(err.message);
+      setUsers([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => { load(0); }, []);
 
   const handleCreate = async (e) => {
@@ -114,6 +147,7 @@ export default function Users() {
         setShowCreate(false);
         setCreateForm({ Email: '', Password: '' });
         if (mode === 'latest') loadLatest();
+        else if (mode === 'search') handleSearch();
         else load(offset);
       } else {
         const data = await resp.json().catch(() => ({}));
@@ -126,14 +160,23 @@ export default function Users() {
     }
   };
 
+  const refresh = () => {
+    if (mode === 'latest') loadLatest();
+    else if (mode === 'search') handleSearch();
+    else load(offset);
+  };
+
+  const countLabel =
+    mode === 'latest' ? `latest ${users.length}` :
+    mode === 'search' ? `search ${users.length}` :
+    users.length;
+
   return (
     <div>
       <div className="flex items-center justify-between gap-4 mb-5">
         <div className="flex items-baseline gap-2.5">
           <h1 className="text-[16px] font-semibold tracking-tight text-[#0a0a0a]">Users</h1>
-          <span className="text-[11px] font-mono tabular-nums text-[#a3a3a3]">
-            {mode === 'latest' ? `latest ${users.length}` : users.length}
-          </span>
+          <span className="text-[11px] font-mono tabular-nums text-[#a3a3a3]">{countLabel}</span>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -149,7 +192,7 @@ export default function Users() {
             Latest
           </button>
           <button
-            onClick={() => (mode === 'latest' ? loadLatest() : load(offset))}
+            onClick={refresh}
             disabled={loading}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[12px] text-[#525252] hover:text-[#0a0a0a] hover:bg-black/[0.04] transition-colors"
           >
@@ -163,6 +206,37 @@ export default function Users() {
         </div>
       </div>
 
+      <form onSubmit={handleSearch} className="flex items-center gap-2 mb-4">
+        <div className="relative flex-1 max-w-md">
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#a3a3a3]" />
+          <input
+            type="text"
+            className={`${inputClass} pl-8`}
+            placeholder="Search by username / email"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            autoComplete="off"
+          />
+        </div>
+        <button
+          type="submit"
+          disabled={loading}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[12px] bg-[#0a0a0a] text-white hover:bg-[#262626] disabled:opacity-50 transition-colors"
+        >
+          <Search className="w-3.5 h-3.5" />
+          Search
+        </button>
+        {mode === 'search' && (
+          <button
+            type="button"
+            onClick={() => { setSearchQuery(''); load(0); }}
+            className="px-3 py-1.5 rounded text-[12px] text-[#525252] hover:text-[#0a0a0a] hover:bg-black/[0.04]"
+          >
+            Clear
+          </button>
+        )}
+      </form>
+
       {stats && (
         <div className="flex flex-wrap items-center gap-2 mb-4">
           <StatPill label="Total" value={stats.Total} />
@@ -170,6 +244,12 @@ export default function Users() {
           <StatPill label="Active subs" value={stats.ActiveSubscribers} />
           <span className="text-[11px] text-[#a3a3a3]">Showing 100 most recently updated</span>
         </div>
+      )}
+
+      {mode === 'search' && !loading && !error && (
+        <p className="text-[11px] text-[#a3a3a3] mb-3">
+          Search results for <span className="font-mono text-[#525252]">{searchQuery.trim()}</span>
+        </p>
       )}
 
       {error && <p className="text-[12px] text-[#dc2626] mb-3">{error}</p>}
@@ -188,7 +268,7 @@ export default function Users() {
         {users.map((u) => (
           <div
             key={u._id}
-            onClick={() => navigate(`/users/${u._id}`, { state: { user: u } })}
+            onClick={() => navigate(`/users/${u._id}`)}
             className="grid grid-cols-[1fr_80px_80px_80px_160px_160px] min-w-[840px] gap-4 px-4 py-2.5 border-b border-[#e7e3d7]/50 hover:bg-black/[0.03] cursor-pointer items-center"
           >
             <span className="text-[13px] text-[#0a0a0a] truncate">{u.Email}</span>
