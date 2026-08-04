@@ -271,8 +271,7 @@ func BBolt_getUsers(limit, offset int64) ([]*User, error) {
 	return UL, err
 }
 
-// BBolt_getUsersLatest streams users in batches of batchSize, accumulates stats, and
-// keeps only the topN users by Updated DESC without loading the full user table.
+
 func BBolt_getUsersLatest(topN, batchSize int) (users []*User, total, trial, active int64, err error) {
 	if topN <= 0 {
 		topN = 100
@@ -295,7 +294,7 @@ func BBolt_getUsersLatest(topN, batchSize int) (users []*User, total, trial, act
 			}
 			top = insertUserByUpdatedDesc(top, u, topN)
 		}
-		// Drop batch refs so non-top users can be GC'd.
+
 		for i := range batch {
 			batch[i] = nil
 		}
@@ -329,12 +328,12 @@ func BBolt_getUsersLatest(topN, batchSize int) (users []*User, total, trial, act
 	return top, total, trial, active, nil
 }
 
-// insertUserByUpdatedDesc keeps list sorted newest-first, capped at n.
+
 func insertUserByUpdatedDesc(list []*User, u *User, n int) []*User {
 	if u == nil || n <= 0 {
 		return list
 	}
-	// Fast path: older than the oldest kept entry and list is full.
+
 	if len(list) >= n && !u.Updated.After(list[len(list)-1].Updated) {
 		return list
 	}

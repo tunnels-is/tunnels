@@ -60,7 +60,7 @@ func reloadBlockListsEx(sleep bool, force bool) {
 		config.DNSBlockLists = GetDefaultBlockLists()
 	}
 
-	// Reuse compact sets for lists that stay enabled and were not re-downloaded.
+
 	prev := DNSBlockList.Load()
 	prevByTag := prev.Snapshot()
 
@@ -71,7 +71,7 @@ func reloadBlockListsEx(sleep bool, force bool) {
 		return
 	}
 
-	// Workers send results on a channel so only this goroutine writes result slots.
+
 	ch := make(chan indexedListResult, n)
 	var wg sync.WaitGroup
 	for i := 0; i < n; i++ {
@@ -130,9 +130,7 @@ func reloadBlockListsEx(sleep bool, force bool) {
 	}
 }
 
-// processBlockList loads one enabled list into a compact DomainSet.
-// Disabled lists are skipped entirely. Does not write CONFIG or mutate bl;
-// callers apply Count/LastDownload after all workers finish.
+
 func processBlockList(bl *BlockList, force bool, prevByTag map[string]*DomainSet) listLoadResult {
 	defer RecoverAndLog()
 	if bl == nil {
@@ -179,7 +177,7 @@ func processBlockList(bl *BlockList, force bool, prevByTag map[string]*DomainSet
 		return listLoadResult{tag: tag}
 	}
 
-	// Reuse prior compact set when content was not re-fetched.
+
 	if !force && !downloaded && prevByTag != nil {
 		if old := prevByTag[tag]; old != nil && old.Len() > 0 {
 			return listLoadResult{
@@ -227,9 +225,7 @@ func loadDomainSetFromFile(path string, capHint int) (set *DomainSet, count, bad
 	return loadDomainSetFromReader(f, capHint)
 }
 
-// loadDomainSetFromReader streams a list file into a compact DomainSet.
-// Invalid lines are counted but not stored. count is valid domains seen
-// (including duplicates before unique-pack).
+
 func loadDomainSetFromReader(r io.Reader, capHint int) (set *DomainSet, count, bad int, err error) {
 	scanner := bufio.NewScanner(r)
 	buf := make([]byte, 0, dnsListScanBuf)
@@ -254,7 +250,7 @@ func loadDomainSetFromReader(r io.Reader, capHint int) (set *DomainSet, count, b
 	return b.Build(), count, bad, nil
 }
 
-// downloadListToFile streams a remote list straight to path (capped at maxDNSListSize).
+
 func downloadListToFile(url, path string) error {
 	defer RecoverAndLog()
 	if !CheckIfURL(url) {
