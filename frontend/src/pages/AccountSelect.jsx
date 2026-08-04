@@ -15,7 +15,7 @@ const AccountSelect = () => {
 	}, [])
 
 	const selectUser = (user) => {
-		// Clears server/device caches so the next session cannot show the previous account's data.
+
 		switchAccount(user)
 		navigate("/account")
 		window.location.reload()

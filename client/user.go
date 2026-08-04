@@ -13,20 +13,14 @@ import (
 	"golang.org/x/crypto/argon2"
 )
 
-// Account file blob format (single file, no sidecar key):
-//
-//	version (1 byte) || salt (16 bytes) || nonce (gcm.NonceSize()) || ciphertext
-//
-// The AES key is Argon2id(password=accountFolderHash, salt=salt). The folder
-// hash is known from the path accounts/<hash>/… so we can decrypt without the
-// raw userID (needed when listing locked accounts).
+
 const (
 	accountCryptoVersion byte = 1
 	accountSaltLen            = 16
 
-	// KDF params: moderate cost so multi-account list stays snappy.
+
 	accountKDFTime    = 2
-	accountKDFMemory  = 32 * 1024 // KiB
+	accountKDFMemory  = 32 * 1024
 	accountKDFThreads = 1
 	accountKDFKeyLen  = 32
 )
@@ -42,8 +36,7 @@ func deriveAccountFileKey(folderHash string, salt []byte) []byte {
 	)
 }
 
-// encryptAccountBlob encrypts plaintext under a key derived from folderHash.
-// Output includes salt+nonce so the same hash can open the file later.
+
 func encryptAccountBlob(plaintext []byte, folderHash string) ([]byte, error) {
 	if !isHexString(folderHash) {
 		return nil, fmt.Errorf("invalid account hash")
@@ -76,7 +69,7 @@ func encryptAccountBlob(plaintext []byte, folderHash string) ([]byte, error) {
 	return out, nil
 }
 
-// decryptAccountBlob opens a blob produced by encryptAccountBlob.
+
 func decryptAccountBlob(blob []byte, folderHash string) ([]byte, error) {
 	if !isHexString(folderHash) {
 		return nil, fmt.Errorf("invalid account hash")
@@ -219,8 +212,7 @@ func getUsers() (ul []*User, err error) {
 	return ul, nil
 }
 
-// Encrypt / Decrypt are low-level AES-GCM helpers (nonce||ciphertext) for tests
-// and any non-account payloads that already hold a raw key.
+
 func Decrypt(data, key []byte) ([]byte, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {

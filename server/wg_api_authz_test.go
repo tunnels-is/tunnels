@@ -118,10 +118,10 @@ func TestAPI_WGConfig_NoDeviceReturnsEmptyIP(t *testing.T) {
 	if err := BBolt_CreateServer(server); err != nil {
 		t.Fatal(err)
 	}
-	// User only needs to be in the request context (same as GroupACL tests).
+
 	user := &User{ID: uuid.New()}
 
-	// Unknown pubkey: still 200 so the client can auto-create a device.
+
 	w := callWGConfig(t, user, server.ID, makeWGKey())
 	if w.Code != http.StatusOK {
 		t.Fatalf("missing device should return 200 with empty WireGuardIP, got %d: %s", w.Code, w.Body.String())

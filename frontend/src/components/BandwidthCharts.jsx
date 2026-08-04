@@ -13,7 +13,7 @@ const TIME_RANGES = [
 ]
 
 const DOWNLOAD_COLOR = "#22c55e"
-const UPLOAD_COLOR = "#1d4ed8" // tunnels blue
+const UPLOAD_COLOR = "#1d4ed8"
 
 const formatBytes = (bytes) => {
 	if (bytes === 0) return "0 B"
@@ -62,7 +62,7 @@ const summarize = (records, key) => {
 	}
 }
 
-/** Dual-line chart: download + upload for a single tunnel */
+
 const DualRateGraph = ({ data, rangeSeconds, height = 160 }) => {
 	const canvasRef = useRef(null)
 	const containerRef = useRef(null)
@@ -103,7 +103,7 @@ const DualRateGraph = ({ data, rangeSeconds, height = 160 }) => {
 			return
 		}
 
-		// Y grid + labels
+
 		const yTicks = 4
 		ctx.font = "10px ui-monospace, monospace"
 		ctx.textAlign = "right"
@@ -119,7 +119,7 @@ const DualRateGraph = ({ data, rangeSeconds, height = 160 }) => {
 			ctx.fillText(formatRate(globalMax * (1 - i / yTicks)), pad.left - 8, y + 3)
 		}
 
-		// X labels
+
 		const xLabelCount = Math.min(data.length, 5)
 		ctx.textAlign = "center"
 		ctx.fillStyle = textColor
@@ -136,7 +136,7 @@ const DualRateGraph = ({ data, rangeSeconds, height = 160 }) => {
 
 		const drawSeries = (key, color) => {
 			if (data.length < 2) {
-				// Single point: draw a soft marker
+
 				const x = pointX(0)
 				const y = pointY(data[0][key])
 				ctx.beginPath()
@@ -146,7 +146,7 @@ const DualRateGraph = ({ data, rangeSeconds, height = 160 }) => {
 				return
 			}
 
-			// Fill under curve
+
 			ctx.beginPath()
 			ctx.moveTo(pad.left, pad.top + graphHeight)
 			data.forEach((d, i) => ctx.lineTo(pointX(i), pointY(d[key])))
@@ -158,7 +158,7 @@ const DualRateGraph = ({ data, rangeSeconds, height = 160 }) => {
 			ctx.fillStyle = grad
 			ctx.fill()
 
-			// Stroke
+
 			ctx.beginPath()
 			data.forEach((d, i) => (i === 0 ? ctx.moveTo(pointX(i), pointY(d[key])) : ctx.lineTo(pointX(i), pointY(d[key]))))
 			ctx.strokeStyle = color
@@ -168,7 +168,7 @@ const DualRateGraph = ({ data, rangeSeconds, height = 160 }) => {
 			ctx.stroke()
 		}
 
-		// Download first (under), upload on top
+
 		drawSeries("ig", DOWNLOAD_COLOR)
 		drawSeries("eg", UPLOAD_COLOR)
 	}, [data, globalMax, height, rangeSeconds])
@@ -229,7 +229,7 @@ const TunnelCard = ({ tunnel, server, range, nested = false, currentUserID, emai
 					: "")
 			}
 		>
-			{/* Identity + live rates */}
+			{}
 			<div className="flex flex-wrap items-start gap-3 border-b border-base-200 px-4 py-3.5 sm:items-center">
 				<div className="min-w-0 flex-1">
 					<div className="flex flex-wrap items-center gap-2">
@@ -272,7 +272,7 @@ const TunnelCard = ({ tunnel, server, range, nested = false, currentUserID, emai
 				</div>
 			</div>
 
-			{/* Chart */}
+			{}
 			<div className="bg-gradient-to-b from-base-100 to-base-200/30 px-2 pb-1 pt-3 sm:px-3">
 				<div className="mb-1 flex items-center justify-end gap-3 px-2">
 					<span className="flex items-center gap-1.5 text-[10px] text-base-content/45">
@@ -287,7 +287,7 @@ const TunnelCard = ({ tunnel, server, range, nested = false, currentUserID, emai
 				<DualRateGraph data={data} rangeSeconds={range.seconds} />
 			</div>
 
-			{/* Stats footer — both directions, one cohesive strip */}
+			{}
 			<div className="grid grid-cols-1 gap-px border-t border-base-200 bg-base-200/60 sm:grid-cols-2">
 				<div className="bg-base-100 px-4 py-3">
 					<div className="mb-2 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-success/80">
@@ -334,7 +334,7 @@ const BandwidthCharts = () => {
 		fetchUsers()
 	}, [])
 
-	// Graph every live tunnel on the daemon (all accounts).
+
 	const tunnels = activeTunnels || []
 	const serverMap = useMemo(() => Object.fromEntries(servers.map((s) => [s._id, s])), [servers])
 	const emailByUserID = useMemo(() => {
@@ -358,7 +358,7 @@ const BandwidthCharts = () => {
 
 	return (
 		<div className="mt-4 overflow-hidden rounded-box border border-base-300 bg-base-100 shadow-sm">
-			{/* Shared toolbar */}
+			{}
 			<div className="flex flex-wrap items-center gap-3 border-b border-base-200 bg-base-200/40 px-4 py-2.5">
 				<div className="flex items-center gap-2">
 					<Activity size={14} className="text-base-content/40" />
@@ -392,7 +392,7 @@ const BandwidthCharts = () => {
 				</span>
 			</div>
 
-			{/* Per-tunnel panels — nested cards when multiple so each connection reads as a unit */}
+			{}
 			{tunnels.length === 1 ? (
 				<TunnelCard
 					tunnel={tunnels[0]}

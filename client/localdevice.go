@@ -11,8 +11,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// LocalDevice is this machine's VPN identity for one controller server.
-// Stored encrypted under accounts/<hash>/devices/<id>.
+
 type LocalDevice struct {
 	ID               string    `json:"ID"`
 	ServerID         string    `json:"ServerID"`
@@ -23,7 +22,7 @@ type LocalDevice struct {
 	CreatedAt        time.Time `json:"CreatedAt"`
 }
 
-// LocalDeviceInfo is a safe summary for the UI (no private key).
+
 type LocalDeviceInfo struct {
 	ID              string    `json:"ID"`
 	ServerID        string    `json:"ServerID"`
@@ -166,7 +165,7 @@ func shortDeviceTag() string {
 	return "client-" + strings.ReplaceAll(uuid.NewString(), "-", "")[:12]
 }
 
-// createLocalDeviceForServer generates keys, registers on controller, saves under devices/.
+
 func createLocalDeviceForServer(cr *ConnectionRequest, serverID, tag string) (*LocalDevice, *wgServerConfig, error) {
 	priv, err := generateWGPrivKey()
 	if err != nil {
@@ -188,7 +187,7 @@ func createLocalDeviceForServer(cr *ConnectionRequest, serverID, tag string) (*L
 	if cfg.WireGuardIP == "" {
 		return nil, nil, errors.New("controller did not assign a WireGuard IP")
 	}
-	// Refresh fields the create response may omit (e.g. EnableFirewall).
+
 	if full, e := getServerWGConfig(cr, serverID, pub); e == nil && full != nil {
 		cfg.EnableFirewall = full.EnableFirewall
 		if full.WireGuardPubKey != "" {
@@ -225,7 +224,7 @@ func createLocalDeviceForServer(cr *ConnectionRequest, serverID, tag string) (*L
 	return local, cfg, nil
 }
 
-// resolveLocalDeviceForServer finds a local device for serverID or creates one.
+
 func resolveLocalDeviceForServer(cr *ConnectionRequest, serverID, tag string) (*LocalDevice, *wgServerConfig, error) {
 	existing, err := findLocalDeviceByServerID(serverID)
 	if err != nil {

@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from "react"
 import { useStore } from "@/store/store"
 
-/** Delay before the indicator appears (skips flash for sub-debounce requests). */
+
 const SHOW_DELAY_MS = 180
-/** Once shown, keep visible at least this long so it doesn't pop out instantly. */
+
 const MIN_VISIBLE_MS = 400
-/** Exit animation duration — must match CSS. */
+
 const EXIT_MS = 280
 
 const LoadingBar = () => {
@@ -66,7 +66,7 @@ const LoadingBar = () => {
 		}, remain)
 
 		return clearHide
-		// eslint-disable-next-line react-hooks/exhaustive-deps -- driven by store loading only
+
 	}, [loading])
 
 	useEffect(
@@ -87,7 +87,7 @@ const LoadingBar = () => {
 			aria-live="polite"
 			aria-busy="true"
 		>
-			{/* Soft scrim */}
+			{}
 			<div
 				className="absolute inset-0 bg-base-200/45 backdrop-blur-[3px]"
 				style={{
@@ -96,7 +96,7 @@ const LoadingBar = () => {
 				}}
 			/>
 
-			{/* Center card */}
+			{}
 			<div
 				className={
 					"loading-panel relative flex min-w-[12rem] max-w-[min(90vw,22rem)] flex-col items-center gap-5 " +
@@ -110,23 +110,23 @@ const LoadingBar = () => {
 					transition: `opacity ${EXIT_MS}ms ease, transform ${EXIT_MS}ms cubic-bezier(0.22, 1, 0.36, 1)`,
 				}}
 			>
-				{/* Spinner */}
+				{}
 				<div className="relative h-14 w-14">
-					{/* Soft track */}
+					{}
 					<div className="absolute inset-0 rounded-full border-2 border-primary/10" />
 
-					{/* Primary arc */}
+					{}
 					<div className="loading-spin absolute inset-0 rounded-full border-[2.5px] border-transparent border-t-primary border-r-primary/30" />
 
-					{/* Reverse dashed ring */}
+					{}
 					<div className="loading-spin-rev absolute inset-[5px] rounded-full border border-dashed border-primary/35" />
 
-					{/* Orbiting bead (full-size wrapper so rotation is centered) */}
+					{}
 					<div className="loading-spin absolute inset-0">
 						<span className="absolute left-1/2 top-0 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary shadow-[0_0_12px_var(--color-primary)]" />
 					</div>
 
-					{/* Core pulse */}
+					{}
 					<div className="loading-pulse absolute inset-[18px] rounded-full bg-primary" />
 				</div>
 

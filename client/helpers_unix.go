@@ -14,8 +14,7 @@ func ValidateAdapterID(meta *TunnelMETA) error {
 	return nil
 }
 
-// resolveTUNCreateName returns the kernel TUN name. On Linux/BSD the logical
-// IFName is the real interface name.
+
 func resolveTUNCreateName(logical string) string {
 	return logical
 }

@@ -262,8 +262,7 @@ func deleteDevice(form *AutoConnectForm, device *types.Device) error {
 	return nil
 }
 
-// preferLocalServerInCountry tries servers we already have a local device for
-// in the requested country (avoids probing when we can reconnect quickly).
+
 func preferLocalServerInCountry(form *AutoConnectForm, country string) (*types.Server, int64, bool) {
 	locals, err := listLocalDevices()
 	if err != nil || len(locals) == 0 {
@@ -331,8 +330,7 @@ func findTunnelMetaByTag(tag string) (meta *TunnelMETA) {
 	return
 }
 
-// discoverBestServer picks the best server without connecting.
-// Order: country match (local device → country list → subset of full list) then full-list ping probe.
+
 func discoverBestServer(form *AutoConnectForm) (*types.Server, int64, int, error) {
 	if form.Country != "" {
 		if server, latencyMS, ok := preferLocalServerInCountry(form, form.Country); ok {
@@ -408,7 +406,7 @@ func prepareAutoConnectForm(form *AutoConnectForm) (int, error) {
 	return 0, nil
 }
 
-// ProbeBestServer runs country match + ping probe and returns the winner without connecting.
+
 func ProbeBestServer(form *AutoConnectForm) (*AutoConnectResponse, int, error) {
 	defer RecoverAndLog()
 	if code, err := prepareAutoConnectForm(form); err != nil {
@@ -441,7 +439,7 @@ func CountryAutoConnect(form *AutoConnectForm) (*AutoConnectResponse, int, error
 		return nil, code, err
 	}
 
-	// Connect to the winner first; if that fails, try remaining candidates in latency order via full reconnect path.
+
 	cr := &ConnectionRequest{
 		UserID:      form.UserID,
 		DeviceToken: form.DeviceToken,
@@ -460,12 +458,12 @@ func CountryAutoConnect(form *AutoConnectForm) (*AutoConnectResponse, int, error
 	}
 	ERROR("auto-connect: failed to connect to best server ", server.Tag, ": ", connErr, " — trying remaining fleet")
 
-	// Fall back: re-probe fleet and try each reachable server until one connects.
+
 	allServers, ferr := fetchAllServers(form)
 	if ferr != nil {
 		return nil, connCode, fmt.Errorf("unable to connect to best server: %w", connErr)
 	}
-	// Skip the one we already failed.
+
 	remaining := make([]*types.Server, 0, len(allServers))
 	for _, s := range allServers {
 		if s != nil && s.ID != server.ID {
