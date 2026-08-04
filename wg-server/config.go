@@ -84,13 +84,13 @@ func loadOrGenerateLocalPrivKey() ([]byte, error) {
 				if rmErr := os.Remove(pkpath); rmErr != nil {
 					return nil, fmt.Errorf("%w — remove failed: %v", err, rmErr)
 				}
-				// fall through and regenerate
+
 			} else if ownErr := checkKeyFileOwner(pkpath, info); ownErr != nil {
 				ERR("private key file unusable, removing and regenerating:", pkpath, "—", ownErr)
 				if rmErr := os.Remove(pkpath); rmErr != nil {
 					return nil, fmt.Errorf(".pk file: %w — remove failed: %v", ownErr, rmErr)
 				}
-				// fall through and regenerate
+
 			} else {
 				priv, err := base64.StdEncoding.DecodeString(string(data))
 				if err != nil {

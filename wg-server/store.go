@@ -13,12 +13,11 @@ type PeerRecord struct {
 	IPv6      string
 }
 
-// PeerStore is a concurrency-safe IP assignment table.
-// All access to records/byPubKey goes through methods that hold mu.
+
 type PeerStore struct {
 	mu       sync.RWMutex
-	records  map[string]PeerRecord // deviceID → record
-	byPubKey map[string]string     // pubKeyB64 → deviceID
+	records  map[string]PeerRecord
+	byPubKey map[string]string
 	subnet   string
 	subnet6  string
 }
@@ -93,7 +92,7 @@ func (ps *PeerStore) DeleteByPubKey(pubKeyB64 string) {
 	}
 }
 
-// nextIPLocked requires ps.mu held for writing (or exclusive read of records).
+
 func (ps *PeerStore) nextIPLocked() (string, error) {
 	_, ipNet, err := net.ParseCIDR(ps.subnet)
 	if err != nil {
@@ -118,7 +117,7 @@ func (ps *PeerStore) nextIPLocked() (string, error) {
 	}
 }
 
-// nextIPv6Locked requires ps.mu held for writing (or exclusive read of records).
+
 func (ps *PeerStore) nextIPv6Locked() (string, error) {
 	prefix, err := netip.ParsePrefix(ps.subnet6)
 	if err != nil {

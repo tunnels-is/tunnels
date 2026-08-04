@@ -62,8 +62,7 @@ func clearTunnelMetaMap() {
 	})
 }
 
-// activateAccountByHash points tunnel/device paths at accounts/<hash>/ and reloads tunnels.
-// In-memory only: the UI re-selects the user on start via activeUserID + setUser.
+
 func activateAccountByHash(hash string) error {
 	accountMu.Lock()
 	defer accountMu.Unlock()

@@ -16,20 +16,20 @@ func TestLoadDomainSetFromReader(t *testing.T) {
 		"ads.tracker.net",
 		"ok.co.uk",
 		"0.0.0.0 hosts.style.example",
-		"EXAMPLE.COM", // duplicate of example.com after normalize
+		"EXAMPLE.COM",
 	}, "\n")
 
 	set, count, bad, err := loadDomainSetFromReader(strings.NewReader(input), 8)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if count != 5 { // example.com, ads..., ok..., hosts..., EXAMPLE.COM
+	if count != 5 {
 		t.Fatalf("count=%d want 5", count)
 	}
 	if bad != 3 {
 		t.Fatalf("bad=%d want 3", bad)
 	}
-	// unique after pack
+
 	if set.Len() != 4 {
 		t.Fatalf("unique len=%d want 4", set.Len())
 	}
@@ -41,7 +41,7 @@ func TestLoadDomainSetFromReader(t *testing.T) {
 	if set.Has("nodot") {
 		t.Fatal("should not store invalid domain")
 	}
-	// case-insensitive lookup
+
 	if !set.Has("Example.COM") {
 		t.Fatal("expected case-insensitive match")
 	}
@@ -71,7 +71,7 @@ func TestDomainSet_HasBinarySearch(t *testing.T) {
 		"zeta.example",
 		"alpha.example",
 		"mu.example",
-		"alpha.example", // dup
+		"alpha.example",
 	})
 	if set.Len() != 3 {
 		t.Fatalf("len=%d want 3", set.Len())
@@ -109,13 +109,13 @@ func TestDomainCatalog_PerList(t *testing.T) {
 		t.Fatal("should not match")
 	}
 
-	// disable malware by rebuilding without it
+
 	cat2 := NewCatalog([]string{"Ads"}, []*DomainSet{ads})
 	ok, _ = cat2.Has("bad.malware.test")
 	if ok {
 		t.Fatal("disabled list should not match")
 	}
-	// reuse snapshot
+
 	snap := cat.Snapshot()
 	if snap["Ads"] == nil || snap["Malware"] == nil {
 		t.Fatal("snapshot missing lists")
@@ -123,7 +123,7 @@ func TestDomainCatalog_PerList(t *testing.T) {
 }
 
 func TestDomainCatalog_ParallelHas(t *testing.T) {
-	// 4+ lists exercise the parallel path
+
 	tags := make([]string, 5)
 	sets := make([]*DomainSet, 5)
 	for i := 0; i < 5; i++ {
