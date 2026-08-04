@@ -3,8 +3,7 @@ import world from "@svg-maps/world"
 import { countryName, normalizeCountryCode } from "@/lib/countries"
 import { countriesAtOffset, resolveDisplayTimezone, timezoneOffsetMinutes } from "@/lib/geo"
 
-// Inline fills — Tailwind fill-* / opacity modifiers are unreliable on SVG paths
-// with daisyUI theme tokens across light/dark.
+
 const FILL = {
 	base: "color-mix(in oklab, var(--color-base-content) 14%, transparent)",
 	zone: "color-mix(in oklab, var(--color-info) 32%, transparent)",
@@ -34,7 +33,7 @@ const TimezoneMap = ({
 	const matchCC = normalizeCountryCode(matchedServerCountry)?.toLowerCase() || ""
 	const scc = normalizeCountryCode(serverCountry || pickedServer?.country)?.toLowerCase() || ""
 
-	// When we cannot pin a country, paint every country that shares this UTC offset.
+
 	const zoneCountries = useMemo(() => {
 		if (userCC) return null
 		return countriesAtOffset(offset)
@@ -91,7 +90,7 @@ const TimezoneMap = ({
 				</>
 			)
 		}
-		// No country for this zone — show timezone name, not a wrong country guess.
+
 		return <span className="truncate">{tz || "—"}</span>
 	}
 

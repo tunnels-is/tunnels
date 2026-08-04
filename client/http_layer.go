@@ -48,7 +48,7 @@ func LaunchAPI() {
 	mux.Handle("/assets/", withSessionCookie(assetHandler))
 	mux.HandleFunc("/v1/method/{method}", HTTPhandler)
 	if EnablePprof {
-		// Opt-in only: same bind as the local API (often 127.0.0.1:7777).
+
 		mux.HandleFunc("/debug/pprof/", pprof.Index)
 		mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
 		mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
@@ -401,7 +401,7 @@ func getSystemTimezone() string {
 	if tz := os.Getenv("TZ"); tz != "" && tz != ":/etc/localtime" {
 		return strings.TrimPrefix(tz, ":")
 	}
-	// Debian/Ubuntu keep the IANA name here even when localtime is a file copy.
+
 	if b, err := os.ReadFile("/etc/timezone"); err == nil {
 		if name := strings.TrimSpace(string(b)); name != "" {
 			return name
@@ -412,7 +412,7 @@ func getSystemTimezone() string {
 			return link[i+len("zoneinfo/"):]
 		}
 	}
-	// macOS / some Linux: resolve absolute path after eval.
+
 	if resolved, err := filepath.EvalSymlinks("/etc/localtime"); err == nil {
 		if i := strings.Index(resolved, "zoneinfo/"); i != -1 {
 			return resolved[i+len("zoneinfo/"):]
@@ -820,7 +820,7 @@ func HTTP_CreateDeviceWithKeys(w http.ResponseWriter, r *http.Request) {
 }
 
 func HTTP_GetLocalDevices(w http.ResponseWriter, r *http.Request) {
-	// Optional UserID to activate the correct account workspace before listing.
+
 	form := struct {
 		UserID string `json:"UserID"`
 	}{}

@@ -11,9 +11,9 @@ export const useStore = create((set, get) => ({
 	tunnels: [],
 	activeTunnels: [],
 	servers: session.getObject("servers") || [],
-	// Controller devices for the active account — never session-persisted.
+
 	devices: [],
-	// This machine's devices under accounts/<hash>/devices (no privkeys).
+
 	localDevices: [],
 	dnsStats: session.getObject("dns-stats") || {},
 
