@@ -3,7 +3,6 @@ import { Pencil, Save, X } from "lucide-react"
 import { Card, InfoRow, Page, TextField, Toggle } from "@/components/ui"
 import { fetchState, saveConfig, toggleConfigKey } from "@/store/actions"
 import { THEMES, getStoredTheme, setTheme, followsSystem, setFollowSystem } from "@/lib/theme"
-import { session } from "@/store/session"
 import { useStore } from "@/store/store"
 
 const LOGGING_OPTIONS = [
@@ -11,9 +10,7 @@ const LOGGING_OPTIONS = [
 	{ key: "ErrorLogging", label: "Errors" },
 	{ key: "ConsoleLogging", label: "Console" },
 	{ key: "DebugLogging", label: "Debug" },
-	{ key: "BandwidthGraphs", label: "Bandwidth Graphs" },
-	{ key: "ConsoleLogOnly", label: "Console Only" },
-
+	{ key: "ConsoleLogOnly", label: "Terminal Only" },
 ]
 
 const Settings = () => {
@@ -55,11 +52,6 @@ const Settings = () => {
 	const saveApi = async () => {
 		const ok = await saveConfig(cfg)
 		if (ok) setEditing(false)
-	}
-
-	const toggleDebug = () => {
-		session.set("debug", session.getBool("debug") ? "false" : "true")
-		window.location.reload()
 	}
 
 	const basePath = state?.BasePath
@@ -107,6 +99,11 @@ const Settings = () => {
 
 				<Card title="Advanced" description="Show advanced configuration: API server, DNS and system details.">
 					<Toggle label="Advanced mode" checked={advanced} onChange={() => setAdvanced(!advanced)} />
+					<Toggle
+						label="Bandwidth Graphs"
+						checked={!!config?.BandwidthGraphs}
+						onChange={() => toggleConfigKey("BandwidthGraphs")}
+					/>
 				</Card>
 
 				{advanced && (
@@ -161,7 +158,6 @@ const Settings = () => {
 						{LOGGING_OPTIONS.map((opt) => (
 							<Toggle key={opt.key} label={opt.label} checked={!!config?.[opt.key]} onChange={() => toggleConfigKey(opt.key)} />
 						))}
-						<Toggle label="Debug Mode" checked={session.getBool("debug")} onChange={toggleDebug} />
 					</div>
 				</Card>
 

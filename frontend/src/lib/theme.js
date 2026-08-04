@@ -1,6 +1,5 @@
 export const THEMES = [
-	{ value: "suzko", label: "Suzko Light" },
-	{ value: "suzko-dark", label: "Suzko Dark" },
+	{ value: "suzko", label: "Suzko" },
 	{ value: "tunnels", label: "Tunnels Light" },
 	{ value: "tunnels-dark", label: "Tunnels Dark" },
 ]
@@ -12,9 +11,14 @@ const DEFAULT_THEME = "tunnels"
 const KEY_THEME = "theme"
 const KEY_SYSTEM = "themeSystem"
 
+// Legacy theme ids remapped after renames/removals.
+const THEME_ALIASES = {
+	"suzko-dark": "suzko",
+}
+
 const LIGHT_DARK = {
-	suzko: { light: "suzko", dark: "suzko-dark" },
-	"suzko-dark": { light: "suzko", dark: "suzko-dark" },
+	// Suzko is dark-only; keep it for both system modes.
+	suzko: { light: "suzko", dark: "suzko" },
 	tunnels: { light: "tunnels", dark: "tunnels-dark" },
 	"tunnels-dark": { light: "tunnels", dark: "tunnels-dark" },
 }
@@ -53,12 +57,23 @@ const migrateFromSession = () => {
 	}
 }
 
+const normalizeTheme = (theme) => {
+	if (!theme) return DEFAULT_THEME
+	const mapped = THEME_ALIASES[theme] || theme
+	return VALUES.includes(mapped) ? mapped : DEFAULT_THEME
+}
+
 migrateFromSession()
 
-export const getStoredTheme = () => {
+// Migrate stored suzko-dark → suzko once.
+;(() => {
 	const stored = storageGet(KEY_THEME)
-	return VALUES.includes(stored) ? stored : DEFAULT_THEME
-}
+	if (stored && THEME_ALIASES[stored]) {
+		storageSet(KEY_THEME, THEME_ALIASES[stored])
+	}
+})()
+
+export const getStoredTheme = () => normalizeTheme(storageGet(KEY_THEME))
 
 export const followsSystem = () => storageGet(KEY_SYSTEM) === "true"
 
@@ -70,7 +85,7 @@ export const getTheme = () => {
 }
 
 export const setTheme = (theme) => {
-	storageSet(KEY_THEME, theme)
+	storageSet(KEY_THEME, normalizeTheme(theme))
 	applyTheme(getTheme())
 }
 
@@ -80,7 +95,7 @@ export const setFollowSystem = (on) => {
 }
 
 export const applyTheme = (theme) => {
-	document.documentElement.setAttribute("data-theme", theme)
+	document.documentElement.setAttribute("data-theme", normalizeTheme(theme))
 }
 
 window.matchMedia?.("(prefers-color-scheme: dark)").addEventListener?.("change", () => {
