@@ -9,6 +9,8 @@ permissions:
   contents: write
 
 jobs:
+  # Builds CLI, server, Windows app, Linux app via GoReleaser (ubuntu).
+  # Darwin desktop is skipped here (needs a macOS runner) and handled below.
   goreleaser:
     runs-on: ubuntu-latest
     steps:
@@ -22,17 +24,12 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Set up pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10
-
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
           node-version: "20"
-          cache: pnpm
-          cache-dependency-path: frontend/pnpm-lock.yaml
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
 
       - name: Install Linux desktop build deps
         run: |
@@ -45,5 +42,86 @@ jobs:
           distribution: goreleaser
           version: "~> v2"
           args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Native macOS build: universal Tunnels.app attached to the same draft release.
+  macos-app:
+    needs: goreleaser
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Set version
+        shell: bash
+        run: |
+          # Tag is v1.2.3 — strip leading v for asset names / Info.plist
+          echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+          echo "TAG=${GITHUB_REF_NAME}" >> "$GITHUB_ENV"
+
+      - name: Build frontend
+        run: ./build-ui.sh
+
+      - name: Build universal macOS app
+        env:
+          CGO_ENABLED: "1"
+          CGO_LDFLAGS: "-framework UniformTypeIdentifiers"
+        run: |
+          set -euo pipefail
+          TAGS="desktop,production"
+          LDFLAGS="-s -w -X github.com/tunnels-is/tunnels/version.Version=${VERSION}"
+          OUT_DIR="${RUNNER_TEMP}/tunnels-macos"
+          mkdir -p "$OUT_DIR"
+
+          echo "==> Building darwin/arm64"
+          GOOS=darwin GOARCH=arm64 go build \
+            -tags "$TAGS" -trimpath -ldflags "$LDFLAGS" \
+            -o "$OUT_DIR/tunnels-app-arm64" \
+            ./cmd/wails
+
+          echo "==> Building darwin/amd64"
+          GOOS=darwin GOARCH=amd64 go build \
+            -tags "$TAGS" -trimpath -ldflags "$LDFLAGS" \
+            -o "$OUT_DIR/tunnels-app-amd64" \
+            ./cmd/wails
+
+          echo "==> Creating universal binary"
+          lipo -create -output "$OUT_DIR/tunnels-app" \
+            "$OUT_DIR/tunnels-app-arm64" \
+            "$OUT_DIR/tunnels-app-amd64"
+          lipo -info "$OUT_DIR/tunnels-app"
+
+          echo "==> Packaging Tunnels.app"
+          ./scripts/package-darwin-app.sh \
+            "$OUT_DIR/tunnels-app" \
+            "$OUT_DIR/Tunnels.app" \
+            "$VERSION"
+
+          # ditto preserves .app structure correctly for Finder
+          ASSET="tunnels-app_${VERSION}_darwin_universal.zip"
+          ditto -c -k --keepParent "$OUT_DIR/Tunnels.app" "$ASSET"
+          ls -lh "$ASSET"
+          echo "ASSET=$ASSET" >> "$GITHUB_ENV"
+
+      - name: Upload macOS app to release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG }}
+          draft: true
+          files: ${{ env.ASSET }}
+          fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
