@@ -3,8 +3,10 @@ package main
 import (
 	"context"
 	"embed"
+	"encoding/json"
 	"flag"
 	"fmt"
+	"html"
 	"log"
 	"net"
 	"net/http"
@@ -78,7 +80,6 @@ func main() {
 		uiHost = "127.0.0.1"
 	}
 	uiURL := "http://" + net.JoinHostPort(uiHost, apiPort)
-
 	dialAddr := net.JoinHostPort(uiHost, apiPort)
 
 	go func() {
@@ -92,6 +93,13 @@ func main() {
 
 	waitForAPI(dialAddr)
 
+	// Wails boots at wails.localhost. The UI must then run on the local API origin
+	// (same host as /v1 + session cookie). We intentionally do not reverse-proxy
+	// the API through the asset server (security policy).
+	//
+	// HTTP 302 from the asset server is not reliably followed by WKWebView on
+	// macOS (window shows Go's redirect body "Found."). A 200 HTML page that
+	// navigates with location.replace() is.
 	if err := wails.Run(&options.App{
 		Title:                    "Tunnels",
 		Width:                    1280,
@@ -104,9 +112,7 @@ func main() {
 			OpenInspectorOnStartup: false,
 		},
 		AssetServer: &assetserver.Options{
-			Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				http.Redirect(w, r, uiURL+r.URL.RequestURI(), http.StatusFound)
-			}),
+			Handler: bootstrapToLocalUI(uiURL),
 		},
 		Windows: &windows.Options{
 			DisableWindowIcon:    false,
@@ -131,6 +137,34 @@ func main() {
 	}); err != nil {
 		log.Fatal(err)
 	}
+}
+
+// bootstrapToLocalUI returns a handler that serves a tiny page navigating the
+// webview to the local API UI (no reverse proxy, no HTTP redirect).
+func bootstrapToLocalUI(uiURL string) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		dest := uiURL + r.URL.RequestURI()
+		jsDest, err := json.Marshal(dest)
+		if err != nil {
+			http.Error(w, "invalid UI URL", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Header().Set("Cache-Control", "no-store")
+		w.WriteHeader(http.StatusOK)
+		_, _ = fmt.Fprintf(w, `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="refresh" content="0;url=%s">
+<title>Tunnels</title>
+<script>location.replace(%s)</script>
+</head>
+<body></body>
+</html>
+`, html.EscapeString(dest), jsDest)
+	})
 }
 
 func waitForAPI(addr string) {
