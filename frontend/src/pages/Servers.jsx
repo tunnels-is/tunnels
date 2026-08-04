@@ -271,7 +271,7 @@ const Servers = () => {
 															</button>
 														)}
 														<button
-															className="btn btn-square btn-ghost btn-xs opacity-0 transition-opacity group-hover:opacity-60 hover:!opacity-100"
+															className="btn btn-square btn-ghost btn-xs"
 															title="Copy ID"
 															onClick={() => copyText(server._id)}
 														>
