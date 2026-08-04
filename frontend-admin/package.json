@@ -21,7 +21,7 @@
     "@types/react": "18.0.17",
     "@types/react-dom": "18.0.6",
     "@vitejs/plugin-react": "4.7.0",
-    "postcss": "8.5.18",
+    "postcss": "8.5.23",
     "tailwindcss": "4.1.17",
     "vite": "6.4.3"
   },
