@@ -27,6 +27,7 @@ type AutoConnectForm struct {
 type AutoConnectResponse struct {
 	ServerTag string `json:"ServerTag"`
 	ServerIP  string `json:"ServerIP"`
+	Country   string `json:"Country"`
 	LatencyMS int64  `json:"LatencyMS"`
 }
 
@@ -60,6 +61,85 @@ func fetchServersByCountry(form *AutoConnectForm) ([]*types.Server, error) {
 	}
 	INFO("auto-connect: controller returned ", len(servers), " server(s) for country ", form.Country)
 	return servers, nil
+}
+
+func fetchAllServers(form *AutoConnectForm) ([]*types.Server, error) {
+	url := form.Server.GetURL("/client/servers")
+	reqBody := map[string]any{
+		"StartIndex":  0,
+		"DeviceToken": form.DeviceToken,
+		"UID":         form.UserID,
+	}
+	INFO("auto-connect: fetching full server list: ", url)
+	respBytes, code, err := SendRequestToURL(nil, "POST", url, reqBody, 15000, form.Server.ValidateCertificate, form.authHeaders())
+	if err != nil {
+		return nil, fmt.Errorf("fetch all servers: %w", err)
+	}
+	if code != 200 {
+		return nil, fmt.Errorf("fetch all servers: code=%d body=%s", code, string(respBytes))
+	}
+	servers := make([]*types.Server, 0)
+	if err := json.Unmarshal(respBytes, &servers); err != nil {
+		return nil, fmt.Errorf("decode all servers: %w", err)
+	}
+	INFO("auto-connect: controller returned ", len(servers), " server(s) total")
+	return servers, nil
+}
+
+type latencyProbe struct {
+	server  *types.Server
+	latency time.Duration
+}
+
+func probeServersByLatency(servers []*types.Server) []latencyProbe {
+	reachable := make([]latencyProbe, 0, len(servers))
+	for _, s := range servers {
+		if s == nil {
+			continue
+		}
+		if latency, ok := pingICMP(s); ok {
+			reachable = append(reachable, latencyProbe{server: s, latency: latency})
+		}
+	}
+	sort.Slice(reachable, func(i, j int) bool { return reachable[i].latency < reachable[j].latency })
+	return reachable
+}
+
+func connectInLatencyOrder(form *AutoConnectForm, servers []*types.Server) (*AutoConnectResponse, int, error) {
+	ordered := probeServersByLatency(servers)
+	if len(ordered) == 0 {
+		ERROR("auto-connect: no servers responded to ping (", len(servers), " tried)")
+		return nil, 502, errors.New("no servers responded to ping")
+	}
+
+	var lastErr error
+	lastCode := 502
+	for _, p := range ordered {
+		latencyMS := p.latency.Milliseconds()
+		INFO("auto-connect: attempting ", p.server.Tag, " (", p.server.IP, ", ", latencyMS, "ms)")
+
+		cr := &ConnectionRequest{
+			UserID:      form.UserID,
+			DeviceToken: form.DeviceToken,
+			Tag:         form.Tag,
+			ServerID:    p.server.ID.String(),
+			Server:      form.Server,
+		}
+		code, err := PublicConnect(cr)
+		if err == nil {
+			INFO("auto-connect: connected to ", p.server.Tag, " (", latencyMS, "ms)")
+			return &AutoConnectResponse{
+				ServerTag: p.server.Tag,
+				ServerIP:  p.server.IP,
+				Country:   p.server.Country,
+				LatencyMS: latencyMS,
+			}, 200, nil
+		}
+		ERROR("auto-connect: failed to connect to ", p.server.Tag, ": ", err)
+		lastErr = err
+		lastCode = code
+	}
+	return nil, lastCode, fmt.Errorf("unable to connect to any server: %w", lastErr)
 }
 
 func pingICMP(server *types.Server) (time.Duration, bool) {
@@ -251,107 +331,149 @@ func findTunnelMetaByTag(tag string) (meta *TunnelMETA) {
 	return
 }
 
-func CountryAutoConnect(form *AutoConnectForm) (*AutoConnectResponse, int, error) {
-	defer RecoverAndLog()
+// discoverBestServer picks the best server without connecting.
+// Order: country match (local device → country list → subset of full list) then full-list ping probe.
+func discoverBestServer(form *AutoConnectForm) (*types.Server, int64, int, error) {
+	if form.Country != "" {
+		if server, latencyMS, ok := preferLocalServerInCountry(form, form.Country); ok {
+			return server, latencyMS, 200, nil
+		}
 
+		countryServers, countryErr := fetchServersByCountry(form)
+		if countryErr != nil {
+			ERROR("auto-connect: country fetch failed: ", countryErr, " — falling back to full list")
+		} else if len(countryServers) > 0 {
+			INFO("auto-connect: country match — probing ", len(countryServers), " server(s) in ", form.Country)
+			ordered := probeServersByLatency(countryServers)
+			if len(ordered) > 0 {
+				return ordered[0].server, ordered[0].latency.Milliseconds(), 200, nil
+			}
+			ERROR("auto-connect: no country servers responded to ping — falling back to full list")
+		} else {
+			INFO("auto-connect: no servers in country ", form.Country, " — full list ping probe")
+		}
+	}
+
+	allServers, err := fetchAllServers(form)
+	if err != nil {
+		ERROR("auto-connect: ", err)
+		return nil, 0, 502, errors.New("unable to fetch servers from controller")
+	}
+	if len(allServers) == 0 {
+		return nil, 0, 404, errors.New("no servers available")
+	}
+
+	if form.Country != "" {
+		matched := make([]*types.Server, 0)
+		for _, s := range allServers {
+			if s != nil && countryEqual(s.Country, form.Country) {
+				matched = append(matched, s)
+			}
+		}
+		if len(matched) > 0 {
+			INFO("auto-connect: country match from full list — probing ", len(matched), " server(s) in ", form.Country)
+			ordered := probeServersByLatency(matched)
+			if len(ordered) > 0 {
+				return ordered[0].server, ordered[0].latency.Milliseconds(), 200, nil
+			}
+			ERROR("auto-connect: country subset from full list failed ping — probing all servers")
+		}
+	}
+
+	INFO("auto-connect: ping probing ", len(allServers), " server(s)")
+	ordered := probeServersByLatency(allServers)
+	if len(ordered) == 0 {
+		return nil, 0, 502, errors.New("no servers responded to ping")
+	}
+	return ordered[0].server, ordered[0].latency.Milliseconds(), 200, nil
+}
+
+func prepareAutoConnectForm(form *AutoConnectForm) (int, error) {
 	if form.Server == nil {
 		ERROR("auto-connect: no control server given")
-		return nil, 400, errors.New("no control server given")
+		return 400, errors.New("no control server given")
 	}
-
 	if err := authorizeControlServer(form.Server); err != nil {
-		return nil, 403, err
-	}
-	if form.Country == "" {
-		ERROR("auto-connect: no country given")
-		return nil, 400, errors.New("no country given")
+		return 403, err
 	}
 	if form.Tag == "" {
 		form.Tag = DefaultTunnelName
 	}
-	INFO("auto-connect: starting, country: ", form.Country, " tag: ", form.Tag, " controller: ", form.Server.Host, ":", form.Server.Port)
-
 	if form.UserID != "" {
 		if err := activateAccountByUserID(form.UserID); err != nil {
 			ERROR("auto-connect: unable to activate account workspace: ", err)
-			return nil, 500, errors.New("unable to activate account workspace")
+			return 500, errors.New("unable to activate account workspace")
 		}
 	}
+	return 0, nil
+}
 
-	meta := findTunnelMetaByTag(form.Tag)
-	if meta == nil {
-		INFO("auto-connect: no tunnel meta found for tag ", form.Tag, ", PublicConnect will report if this is fatal")
+// ProbeBestServer runs country match + ping probe and returns the winner without connecting.
+func ProbeBestServer(form *AutoConnectForm) (*AutoConnectResponse, int, error) {
+	defer RecoverAndLog()
+	if code, err := prepareAutoConnectForm(form); err != nil {
+		return nil, code, err
 	}
+	INFO("auto-connect probe: country=", form.Country, " controller=", form.Server.Host, ":", form.Server.Port)
 
-	if server, latencyMS, ok := preferLocalServerInCountry(form, form.Country); ok {
-		cr := &ConnectionRequest{
-			UserID:      form.UserID,
-			DeviceToken: form.DeviceToken,
-			Tag:         form.Tag,
-			ServerID:    server.ID.String(),
-			Server:      form.Server,
-		}
-		code, connErr := PublicConnect(cr)
-		if connErr == nil {
-			return &AutoConnectResponse{
-				ServerTag: server.Tag,
-				ServerIP:  server.IP,
-				LatencyMS: latencyMS,
-			}, 200, nil
-		}
-		ERROR("auto-connect: direct connect via local device failed (code=", code, "): ", connErr, " — falling back to discovery")
-	}
-
-	servers, err := fetchServersByCountry(form)
+	server, latencyMS, code, err := discoverBestServer(form)
 	if err != nil {
-		ERROR("auto-connect: ", err)
-		return nil, 502, errors.New("unable to fetch servers from controller")
+		return nil, code, err
 	}
-	if len(servers) == 0 {
-		return nil, 404, errors.New("no servers available in country: " + form.Country)
+	return &AutoConnectResponse{
+		ServerTag: server.Tag,
+		ServerIP:  server.IP,
+		Country:   server.Country,
+		LatencyMS: latencyMS,
+	}, 200, nil
+}
+
+func CountryAutoConnect(form *AutoConnectForm) (*AutoConnectResponse, int, error) {
+	defer RecoverAndLog()
+
+	if code, err := prepareAutoConnectForm(form); err != nil {
+		return nil, code, err
+	}
+	INFO("auto-connect: starting, country: ", form.Country, " tag: ", form.Tag, " controller: ", form.Server.Host, ":", form.Server.Port)
+
+	server, latencyMS, code, err := discoverBestServer(form)
+	if err != nil {
+		return nil, code, err
 	}
 
-	type probe struct {
-		server  *types.Server
-		latency time.Duration
+	// Connect to the winner first; if that fails, try remaining candidates in latency order via full reconnect path.
+	cr := &ConnectionRequest{
+		UserID:      form.UserID,
+		DeviceToken: form.DeviceToken,
+		Tag:         form.Tag,
+		ServerID:    server.ID.String(),
+		Server:      form.Server,
 	}
-	reachable := make([]probe, 0, len(servers))
-	for _, s := range servers {
-		if latency, ok := pingICMP(s); ok {
-			reachable = append(reachable, probe{server: s, latency: latency})
+	connCode, connErr := PublicConnect(cr)
+	if connErr == nil {
+		return &AutoConnectResponse{
+			ServerTag: server.Tag,
+			ServerIP:  server.IP,
+			Country:   server.Country,
+			LatencyMS: latencyMS,
+		}, 200, nil
+	}
+	ERROR("auto-connect: failed to connect to best server ", server.Tag, ": ", connErr, " — trying remaining fleet")
+
+	// Fall back: re-probe fleet and try each reachable server until one connects.
+	allServers, ferr := fetchAllServers(form)
+	if ferr != nil {
+		return nil, connCode, fmt.Errorf("unable to connect to best server: %w", connErr)
+	}
+	// Skip the one we already failed.
+	remaining := make([]*types.Server, 0, len(allServers))
+	for _, s := range allServers {
+		if s != nil && s.ID != server.ID {
+			remaining = append(remaining, s)
 		}
 	}
-	if len(reachable) == 0 {
-		ERROR("auto-connect: no servers responded to ping (", len(servers), " tried)")
-		return nil, 502, errors.New("no servers responded to ping")
+	if len(remaining) == 0 {
+		return nil, connCode, fmt.Errorf("unable to connect to best server: %w", connErr)
 	}
-	sort.Slice(reachable, func(i, j int) bool { return reachable[i].latency < reachable[j].latency })
-
-	var lastErr error
-	lastCode := 502
-	for _, p := range reachable {
-		INFO("auto-connect: attempting ", p.server.Tag, " (", p.server.IP, ", ", p.latency.Milliseconds(), "ms)")
-
-		cr := &ConnectionRequest{
-			UserID:      form.UserID,
-			DeviceToken: form.DeviceToken,
-			Tag:         form.Tag,
-			ServerID:    p.server.ID.String(),
-			Server:      form.Server,
-		}
-		code, err := PublicConnect(cr)
-		if err == nil {
-			INFO("auto-connect: connected to ", p.server.Tag, " (", p.latency.Milliseconds(), "ms)")
-			return &AutoConnectResponse{
-				ServerTag: p.server.Tag,
-				ServerIP:  p.server.IP,
-				LatencyMS: p.latency.Milliseconds(),
-			}, 200, nil
-		}
-		ERROR("auto-connect: failed to connect to ", p.server.Tag, ": ", err)
-		lastErr = err
-		lastCode = code
-	}
-
-	return nil, lastCode, fmt.Errorf("unable to connect to any server: %w", lastErr)
+	return connectInLatencyOrder(form, remaining)
 }
