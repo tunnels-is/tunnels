@@ -439,6 +439,62 @@ func API_AdminUserList(w http.ResponseWriter, r *http.Request) {
 	sendObject(w, users)
 }
 
+// API_AdminUserSearch finds a user by email (username) via DB_findUserByEmail.
+// Returns a one-element array so the admin UI can render the same table as list/latest.
+func API_AdminUserSearch(w http.ResponseWriter, r *http.Request) {
+	defer BasicRecover()
+	F := new(FORM_ADMIN_USER_SEARCH)
+	err := decodeBody(r, F)
+	if err != nil {
+		senderr(w, 400, "Invalid request body", slog.Any("error", err))
+		return
+	}
+	email := strings.TrimSpace(F.Email)
+	if email == "" {
+		senderr(w, 400, "Email is required")
+		return
+	}
+
+	user, err := DB_findUserByEmail(email)
+	if err != nil {
+		senderr(w, 500, "Unknown error, please try again in a moment")
+		return
+	}
+	if user == nil {
+		sendObject(w, []*User{})
+		return
+	}
+	user.RemoveSensitiveInformation()
+	sendObject(w, []*User{user})
+}
+
+// API_AdminUserGet returns a single user by ID (fresh from DB).
+func API_AdminUserGet(w http.ResponseWriter, r *http.Request) {
+	defer BasicRecover()
+	F := new(FORM_ADMIN_USER_GET)
+	err := decodeBody(r, F)
+	if err != nil {
+		senderr(w, 400, "Invalid request body", slog.Any("error", err))
+		return
+	}
+	if F.TargetUserID == uuid.Nil {
+		senderr(w, 400, "TargetUserID is required")
+		return
+	}
+
+	user, err := DB_findUserByID(F.TargetUserID)
+	if err != nil {
+		senderr(w, 500, "Unknown error, please try again in a moment")
+		return
+	}
+	if user == nil {
+		senderr(w, 404, "user not found")
+		return
+	}
+	user.RemoveSensitiveInformation()
+	sendObject(w, user)
+}
+
 // API_AdminUserLatest returns the 100 most recently Updated users plus aggregate stats.
 // Users are scanned in batches of 100 so the full table is never held in memory.
 func API_AdminUserLatest(w http.ResponseWriter, r *http.Request) {
