@@ -306,9 +306,9 @@ func (u *User) RemoveSensitiveInformation() {
 }
 
 type DeviceToken struct {
-	DT      string
-	N       string
-	Created time.Time
+	DT      string    `json:"DT"`
+	N       string    `json:"N"`
+	Created time.Time `json:"C"`
 }
 
 type Group struct {

@@ -254,7 +254,7 @@ const Tunnels = () => {
 														<Pencil size={13} />
 													</button>
 													<button
-														className="btn btn-square btn-ghost btn-xs text-error/70 opacity-0 transition-opacity group-hover:opacity-100 hover:!opacity-100"
+														className="btn btn-square btn-ghost btn-xs text-error/70"
 														title="Delete"
 														onClick={() =>
 															askConfirm("Delete", "Delete tunnel " + tunnel.Tag + "?", () =>
