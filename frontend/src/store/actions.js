@@ -152,10 +152,20 @@ export const logoutToken = async (token, all) => {
 			finalizeLogout()
 			return
 		}
-		user.Tokens = user.Tokens?.filter((t) => t.DT !== token?.DT)
-		store().setUser({ ...user })
+		const updated = {
+			...user,
+			Tokens: (user.Tokens || []).filter((t) => t.DT !== token?.DT),
+		}
+		store().setUser(updated)
+		const users = store().users
+		if (users?.length) {
+			useStore.setState({
+				users: users.map((u) => (u._id === updated._id ? { ...u, Tokens: updated.Tokens } : u)),
+			})
+		}
+		// Persist so reload / account re-select does not revive the session.
+		await saveUserToDisk(updated)
 	} else if (resp.status === 401) {
-
 		await deleteUserFile(user.SaveFileHash)
 		finalizeLogout()
 	} else {
