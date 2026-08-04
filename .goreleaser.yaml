@@ -84,6 +84,8 @@ builds:
     skip: '{{ ne .Runtime.Goos "darwin" }}'
     env:
       - CGO_ENABLED=1
+      # Wails UTType file filters need UniformTypeIdentifiers (missing from wails v2.11 cgo LDFLAGS)
+      - CGO_LDFLAGS=-framework UniformTypeIdentifiers
     goos:
       - darwin
     goarch:

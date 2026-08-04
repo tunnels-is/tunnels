@@ -4,8 +4,8 @@ set -e
 rm -rf ./frontend/dist ./cmd/main/dist ./cmd/wails/dist
 
 cd ./frontend
-pnpm install --frozen-lockfile
-pnpm run build
+npm install --frozen-lockfile
+npm run build
 cd ..
 
 cp -R ./frontend/dist ./cmd/main
