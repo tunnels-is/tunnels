@@ -40,7 +40,7 @@ export default function Users() {
   const [createError, setCreateError] = useState('');
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(false);
-  const [mode, setMode] = useState('browse'); // 'browse' | 'latest' | 'search'
+  const [mode, setMode] = useState('browse');
   const [stats, setStats] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
 

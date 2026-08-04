@@ -22,7 +22,7 @@ const Tunnels = () => {
 	}, [])
 
 	const serverMap = useMemo(() => Object.fromEntries(servers.map((s) => [s._id, s])), [servers])
-	// Only this UI account's connections count as "connected" for highlighting.
+
 	const activeMap = useMemo(() => {
 		const uid = user?._id
 		const map = {}

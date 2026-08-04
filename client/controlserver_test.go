@@ -20,7 +20,7 @@ func TestControlServer_effectivePort_hotswap443to444(t *testing.T) {
 			if got := c.effectivePort(); got != tc.want {
 				t.Fatalf("effectivePort() = %q, want %q", got, tc.want)
 			}
-			// Must not mutate the struct (disk config / UI must keep original port).
+
 			if c.Port != tc.port {
 				t.Fatalf("Port field mutated: got %q, want %q", c.Port, tc.port)
 			}

@@ -64,7 +64,7 @@ func InitService() error {
 	}
 	conf := CONFIG.Load()
 
-	// CLI can activate a workspace immediately; UI does it via setUser after login/select.
+
 	if conf.CLIConfig != nil && conf.CLIConfig.UserID != "" {
 		if err := activateAccountByUserID(conf.CLIConfig.UserID); err != nil {
 			ERROR("unable to activate CLI account workspace:", err)
@@ -92,7 +92,7 @@ func InitService() error {
 
 	if !conf.ConsoleLogOnly {
 		var err error
-		// Process-lifetime log handle; closed in cleanup (tunnel.Cleanup / shutdown).
+
 		LogFile, err = os.OpenFile(state.LogFileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
 		if err != nil {
 			return err

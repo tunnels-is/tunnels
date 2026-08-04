@@ -84,7 +84,7 @@ type FORM_LIST_USERS struct {
 	Offset      int       `json:"Offset"`
 }
 
-// USER_LATEST_RESPONSE is returned by POST /ui/user/latest.
+
 type USER_LATEST_RESPONSE struct {
 	Users              []*User `json:"Users"`
 	Total              int64   `json:"Total"`
@@ -92,12 +92,12 @@ type USER_LATEST_RESPONSE struct {
 	ActiveSubscribers  int64   `json:"ActiveSubscribers"`
 }
 
-// FORM_ADMIN_USER_SEARCH is the body for POST /ui/user/search (email / username).
+
 type FORM_ADMIN_USER_SEARCH struct {
 	Email string `json:"Email"`
 }
 
-// FORM_ADMIN_USER_GET is the body for POST /ui/user (single user by ID).
+
 type FORM_ADMIN_USER_GET struct {
 	TargetUserID uuid.UUID `json:"TargetUserID"`
 }
