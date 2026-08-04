@@ -7,15 +7,14 @@ import (
 	"time"
 )
 
-// listLoadResult is produced by a worker; config is updated only on the
-// reload goroutine after all workers finish (no concurrent CONFIG writes).
+
 type listLoadResult struct {
 	tag          string
 	set          *DomainSet
 	count        int
 	lastDownload time.Time
 	didReuse     bool
-	updateMeta   bool // Count / LastDownload should be written back
+	updateMeta   bool
 }
 
 type indexedListResult struct {
@@ -57,7 +56,7 @@ func reloadWhiteLists(sleep bool) {
 	prev := DNSWhiteList.Load()
 	prevByTag := prev.Snapshot()
 
-	// Snapshot under the reload lock; workers only read these pointers.
+
 	lists := config.DNSWhiteLists
 	n := len(lists)
 	if n == 0 {
@@ -65,8 +64,8 @@ func reloadWhiteLists(sleep bool) {
 		return
 	}
 
-	// Workers send results on a channel so only this goroutine writes the
-	// results slice (avoids concurrent index writes flagged by some analyzers).
+
+
 	ch := make(chan indexedListResult, n)
 	var wg sync.WaitGroup
 	for i := 0; i < n; i++ {
@@ -86,7 +85,7 @@ func reloadWhiteLists(sleep bool) {
 		results[ir.i] = ir.r
 	}
 
-	// Serial metadata write-back.
+
 	tags := make([]string, n)
 	sets := make([]*DomainSet, n)
 	for i := 0; i < n; i++ {
@@ -110,8 +109,7 @@ func reloadWhiteLists(sleep bool) {
 	}
 }
 
-// processWhiteList loads one whitelist. It must not write to CONFIG or mutate
-// the shared BlockList; callers apply Count/LastDownload after all workers finish.
+
 func processWhiteList(wl *BlockList, prevByTag map[string]*DomainSet) listLoadResult {
 	defer RecoverAndLog()
 	if wl == nil {

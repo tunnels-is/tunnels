@@ -217,8 +217,8 @@ func API_WGConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Device may not exist yet: clients auto-create via POST /client/device/create
-	// when WireGuardIP is empty. That is not an auth failure.
+
+
 	d, err := DB_FindDeviceByWGKey(pubKey)
 	if err != nil {
 		senderr(w, 500, "Database error looking up device")
@@ -232,9 +232,9 @@ func API_WGConfig(w http.ResponseWriter, r *http.Request) {
 			senderr(w, 401, "Unauthorized - device user id and given user id do not match")
 			return
 		}
-		// Only return the assigned IP when the device is bound to this server.
-		// A device on another server yields empty WireGuardIP so the client can
-		// remake/rebind (after deleting the old device).
+
+
+
 		if d.ServerID == serverID {
 			deviceIP = d.WireGuardIP
 			deviceIPv6 = d.WireGuardIPv6

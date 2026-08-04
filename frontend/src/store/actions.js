@@ -115,7 +115,7 @@ export const loginUser = async (user, remember, server) => {
 export const switchAccount = async (user) => {
 	clearAccountScopedCache()
 	store().setUser(user)
-	// Persist + activate account workspace on the local daemon (tunnels/devices paths).
+
 	await api("setUser", user, { logout: false, silent: true })
 }
 
@@ -163,7 +163,7 @@ export const logoutToken = async (token, all) => {
 				users: users.map((u) => (u._id === updated._id ? { ...u, Tokens: updated.Tokens } : u)),
 			})
 		}
-		// Persist so reload / account re-select does not revive the session.
+
 		await saveUserToDisk(updated)
 	} else if (resp.status === 401) {
 		await deleteUserFile(user.SaveFileHash)
@@ -318,12 +318,11 @@ export const disconnect = async (activeTunnel) => {
 const SERVERS_TTL_MS = 30_000
 let serversFetchedAt = 0
 let serversInFlight = null
-// Which user id the current devices[] list was fetched for (null = empty/unknown).
+
 let devicesFetchedForUser = null
 let devicesInFlight = null
 
-// Drop controller-side lists that belong to a previous account so a
-// switch/login cannot briefly show the wrong servers or devices.
+
 export const clearAccountScopedCache = () => {
 	serversFetchedAt = 0
 	serversInFlight = null
@@ -333,7 +332,7 @@ export const clearAccountScopedCache = () => {
 	useStore.setState({ servers: [], devices: [], localDevices: [] })
 }
 
-/** Fetch /client/servers with a 30s TTL cache and in-flight dedupe. Pass { force: true } to bypass. */
+
 export const fetchServers = async ({ force = false } = {}) => {
 	if (!force && Date.now() - serversFetchedAt < SERVERS_TTL_MS) {
 		return store().servers
@@ -360,7 +359,7 @@ export const fetchServers = async ({ force = false } = {}) => {
 	return serversInFlight
 }
 
-/** Fetch controller devices + local devices for the active account. */
+
 export const fetchDevices = async ({ force = false } = {}) => {
 	const userID = store().user?._id || ""
 	if (!userID) {

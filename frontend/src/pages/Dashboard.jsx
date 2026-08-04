@@ -31,10 +31,10 @@ const Dashboard = () => {
 
 	const [autoConnecting, setAutoConnecting] = useState(false)
 	const [probing, setProbing] = useState(false)
-	// Server chosen by probe / auto-connect (tag/ip/latency/country).
+
 	const [pickedServer, setPickedServer] = useState(null)
 
-	// Map connect/disconnect is scoped to the active UI account.
+
 	const myActiveTunnels = useMemo(
 		() => (activeTunnels || []).filter((at) => at.CR?.UserID && at.CR.UserID === user?._id),
 		[activeTunnels, user?._id],
@@ -45,7 +45,7 @@ const Dashboard = () => {
 		return serverID ? servers.find((s) => s._id === serverID || s.ID === serverID) : undefined
 	}, [myActiveTunnels, servers])
 
-	// Country from timezone only when the zone maps to a real country (never locale guess).
+
 	const userCountry = useMemo(() => resolveUserCountry(timezone), [timezone])
 
 	const matchedServerCountry = useMemo(
@@ -84,16 +84,16 @@ const Dashboard = () => {
 		fetchState()
 	}, [])
 
-	// Probe once we have an account + no live connection yet.
+
 	useEffect(() => {
 		if (!user?._id || !user?.ControlServer) return
 		if (myActiveTunnels.length > 0) return
 		if (pickedServer) return
 		runProbe()
-		// eslint-disable-next-line react-hooks/exhaustive-deps -- probe when auth/servers ready
+
 	}, [user?._id, user?.ControlServer, servers?.length, myActiveTunnels.length])
 
-	// When already connected (e.g. page reload), surface the live server as the pick.
+
 	useEffect(() => {
 		if (!connectedServer) return
 		setPickedServer((prev) => ({
