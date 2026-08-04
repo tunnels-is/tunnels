@@ -27,7 +27,7 @@ const Account = () => {
 	}, [])
 
 	const tokens = useMemo(
-		() => [...(user?.Tokens || [])].sort((a, b) => new Date(b.Created) - new Date(a.Created)),
+		() => [...(user?.Tokens || [])].sort((a, b) => new Date(b.C) - new Date(a.C)),
 		[user],
 	)
 
@@ -95,15 +95,15 @@ const Account = () => {
 						<tbody>
 							{tokens.length > 0 ? (
 								tokens.map((t, i) => (
-									<tr key={i} className="group hover">
+									<tr key={i} className="hover">
 										<td className="font-medium">
 											{t.N}
 											{t.DT === user.DeviceToken?.DT && <span className="badge badge-ghost badge-xs ml-2">current</span>}
 										</td>
-										<td className="text-right text-xs opacity-60">{t.Created ? fullDate(t.Created) : "—"}</td>
+										<td className="text-right text-xs opacity-60">{t.C ? fullDate(t.C) : "—"}</td>
 										<td className="text-right">
 											<button
-												className="btn btn-ghost btn-xs text-error opacity-0 transition-opacity group-hover:opacity-100"
+												className="btn btn-ghost btn-xs text-error"
 												onClick={() => logoutToken(t, false)}
 											>
 												<LogOut size={12} /> Logout
