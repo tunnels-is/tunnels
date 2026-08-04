@@ -14,6 +14,6 @@ func ServerConnect(cr *ConnectionRequest) (int, error) {
 		return 403, err
 	}
 	cr.Tag = DefaultTunnelName
-	// Device identity is resolved by ServerID inside PublicConnect (local devices/).
+
 	return PublicConnect(cr)
 }
