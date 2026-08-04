@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"net/http/pprof"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -248,6 +249,9 @@ func HTTPhandler(w http.ResponseWriter, r *http.Request) {
 	case "autoConnect":
 		HTTP_AutoConnect(w, r)
 		return
+	case "probeServer":
+		HTTP_ProbeServer(w, r)
+		return
 	case "disconnect":
 		HTTP_Disconnect(w, r)
 		return
@@ -394,12 +398,24 @@ type StateResponse struct {
 }
 
 func getSystemTimezone() string {
-	if tz := os.Getenv("TZ"); tz != "" {
-		return tz
+	if tz := os.Getenv("TZ"); tz != "" && tz != ":/etc/localtime" {
+		return strings.TrimPrefix(tz, ":")
+	}
+	// Debian/Ubuntu keep the IANA name here even when localtime is a file copy.
+	if b, err := os.ReadFile("/etc/timezone"); err == nil {
+		if name := strings.TrimSpace(string(b)); name != "" {
+			return name
+		}
 	}
 	if link, err := os.Readlink("/etc/localtime"); err == nil {
 		if i := strings.Index(link, "zoneinfo/"); i != -1 {
 			return link[i+len("zoneinfo/"):]
+		}
+	}
+	// macOS / some Linux: resolve absolute path after eval.
+	if resolved, err := filepath.EvalSymlinks("/etc/localtime"); err == nil {
+		if i := strings.Index(resolved, "zoneinfo/"); i != -1 {
+			return resolved[i+len("zoneinfo/"):]
 		}
 	}
 	return ""
@@ -529,6 +545,22 @@ func HTTP_AutoConnect(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp, code, err := CountryAutoConnect(form)
+	if err != nil {
+		STRING(w, r, code, err.Error())
+		return
+	}
+	JSON(w, r, code, resp)
+}
+
+func HTTP_ProbeServer(w http.ResponseWriter, r *http.Request) {
+	form := new(AutoConnectForm)
+	err := Bind(form, r)
+	if err != nil {
+		JSON(w, r, 400, err)
+		return
+	}
+
+	resp, code, err := ProbeBestServer(form)
 	if err != nil {
 		STRING(w, r, code, err.Error())
 		return
