@@ -193,7 +193,7 @@ const Devices = () => {
 										<tr
 											key={d._id}
 											className={
-												"group transition-colors duration-150 " +
+												"transition-colors duration-150 " +
 												(isConnected
 													? "bg-success/[0.04] hover:bg-success/[0.07]"
 													: isLocal
@@ -270,7 +270,7 @@ const Devices = () => {
 											<td className="px-4 py-3.5">
 												<div className="flex items-center justify-end">
 													<button
-														className="btn btn-ghost btn-xs gap-1 text-error/70 opacity-0 transition-opacity group-hover:opacity-100 hover:!opacity-100 hover:bg-error/10 hover:text-error"
+														className="btn btn-ghost btn-xs gap-1 text-error/70 hover:bg-error/10 hover:text-error"
 														title="Delete device"
 														onClick={() => deleteDevice(d)}
 													>
