@@ -38,16 +38,24 @@ export const TextField = ({ label, hint, ...props }) => (
 	</Field>
 )
 
-export const Toggle = ({ label, checked, onChange, disabled }) => (
-	<label className="label cursor-pointer justify-start gap-3 py-1">
+export const Toggle = ({ label, checked, onChange, disabled, warning, hint }) => (
+	<label className={"label cursor-pointer justify-start gap-3 py-1 " + (disabled ? "opacity-60" : "")}>
 		<input
 			type="checkbox"
-			className="toggle toggle-primary toggle-sm"
+			className="toggle toggle-primary toggle-sm shrink-0"
 			checked={!!checked}
 			disabled={disabled}
 			onChange={onChange}
 		/>
-		<span className="label-text text-sm">{label}</span>
+		<span className="min-w-0 flex-1">
+			<span className="label-text block text-sm leading-snug">{label}</span>
+			{warning && (
+				<span className="mt-0.5 block text-[11px] font-medium leading-snug text-warning">{warning}</span>
+			)}
+			{hint && !warning && (
+				<span className="mt-0.5 block text-[11px] leading-snug opacity-50">{hint}</span>
+			)}
+		</span>
 	</label>
 )
 
