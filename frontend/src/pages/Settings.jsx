@@ -2,6 +2,7 @@ import { useEffect, useState } from "react"
 import { Pencil, Save, X } from "lucide-react"
 import { Card, InfoRow, Page, TextField, Toggle } from "@/components/ui"
 import { fetchState, saveConfig, toggleConfigKey } from "@/store/actions"
+import { LOG_FONT_SIZES } from "@/lib/logFontSize"
 import { THEMES, getStoredTheme, setTheme, followsSystem, setFollowSystem } from "@/lib/theme"
 import { useStore } from "@/store/store"
 
@@ -17,6 +18,8 @@ const Settings = () => {
 	const config = useStore((s) => s.config)
 	const advanced = useStore((s) => s.advanced)
 	const setAdvanced = useStore((s) => s.setAdvanced)
+	const logFontSize = useStore((s) => s.logFontSize)
+	const setLogFontSize = useStore((s) => s.setLogFontSize)
 	const state = useStore((s) => s.state)
 	const version = useStore((s) => s.version)
 	const apiVersion = useStore((s) => s.apiVersion)
@@ -153,7 +156,24 @@ const Settings = () => {
 				</Card>
 				)}
 
-				<Card title="Logging" description="Select which event types are captured.">
+				<Card
+					title="Logging"
+					description="Select which event types are captured and how large log text appears."
+					actions={
+						<select
+							className="select select-sm"
+							value={logFontSize}
+							onChange={(e) => setLogFontSize(e.target.value)}
+							title="Log font size"
+						>
+							{LOG_FONT_SIZES.map((opt) => (
+								<option key={opt.value} value={opt.value}>
+									{opt.label}
+								</option>
+							))}
+						</select>
+					}
+				>
 					<div className="grid grid-cols-1 sm:grid-cols-2">
 						{LOGGING_OPTIONS.map((opt) => (
 							<Toggle key={opt.key} label={opt.label} checked={!!config?.[opt.key]} onChange={() => toggleConfigKey(opt.key)} />

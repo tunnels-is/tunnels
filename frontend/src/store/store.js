@@ -1,6 +1,12 @@
 import { v4 as uuid } from "uuid"
 import { create } from "zustand"
+import { DEFAULT_LOG_FONT_SIZE, LOG_FONT_SIZE_STYLES } from "@/lib/logFontSize"
 import { session } from "./session"
+
+const readLogFontSize = () => {
+	const v = window.localStorage.getItem("logFontSize")
+	return v && LOG_FONT_SIZE_STYLES[v] ? v : DEFAULT_LOG_FONT_SIZE
+}
 
 export const useStore = create((set, get) => ({
 
@@ -26,6 +32,13 @@ export const useStore = create((set, get) => ({
 	setAdvanced: (advanced) => {
 		window.localStorage.setItem("advanced", String(advanced))
 		set({ advanced })
+	},
+
+	logFontSize: readLogFontSize(),
+	setLogFontSize: (logFontSize) => {
+		const next = LOG_FONT_SIZE_STYLES[logFontSize] ? logFontSize : DEFAULT_LOG_FONT_SIZE
+		window.localStorage.setItem("logFontSize", next)
+		set({ logFontSize: next })
 	},
 	loading: null,
 	confirm: null,

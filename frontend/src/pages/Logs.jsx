@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react"
 import { ChevronLeft, ChevronRight, Search, Trash2 } from "lucide-react"
 import { Page, Toolbar } from "@/components/ui"
+import { LOG_FONT_SIZES, resolveLogFontSize } from "@/lib/logFontSize"
 import { useStore } from "@/store/store"
 
 const PAGE_SIZE = 100
@@ -19,9 +20,13 @@ const tagColor = (tag) =>
 const Logs = () => {
 	const logs = useStore((s) => s.logs)
 	const clearLogs = useStore((s) => s.clearLogs)
+	const logFontSize = useStore((s) => s.logFontSize)
+	const setLogFontSize = useStore((s) => s.setLogFontSize)
 	const [page, setPage] = useState(0)
 	const [filter, setFilter] = useState("")
 	const [tagFilter, setTagFilter] = useState("")
+
+	const size = resolveLogFontSize(logFontSize)
 
 	const filteredLogs = useMemo(() => {
 		let filtered = logs
@@ -56,6 +61,18 @@ const Logs = () => {
 					<button className="btn btn-square btn-ghost btn-xs text-error" title="Clear logs" onClick={clearLogs}>
 						<Trash2 size={12} />
 					</button>
+					<select
+						className="select select-xs w-auto"
+						value={logFontSize}
+						onChange={(e) => setLogFontSize(e.target.value)}
+						title="Log font size"
+					>
+						{LOG_FONT_SIZES.map((opt) => (
+							<option key={opt.value} value={opt.value}>
+								{opt.label}
+							</option>
+						))}
+					</select>
 					{filteredLogs.length > PAGE_SIZE && (
 						<div className="flex items-center gap-1">
 							<button className="btn btn-square btn-ghost btn-xs" disabled={safePage === 0} onClick={() => setPage(safePage - 1)}>
@@ -97,19 +114,21 @@ const Logs = () => {
 						const [timestamp, tag, func, ...rest] = line.split(" || ")
 						return (
 							<div key={i} className="flex items-baseline gap-1.5 pl-1 transition-colors hover:bg-base-300/30">
-								<span className="shrink-0 font-mono text-[10px] opacity-40">{timestamp}</span>
-								<span className={"w-12 shrink-0 text-[10px] font-medium uppercase " + tagColor(tag?.trim())}>
+								<span className={"shrink-0 font-mono opacity-40 " + size.meta}>{timestamp}</span>
+								<span className={"shrink-0 font-medium uppercase " + size.tagW + " " + size.meta + " " + tagColor(tag?.trim())}>
 									{tag?.trim()}
 								</span>
-								<span className="hidden max-w-44 shrink-0 truncate font-mono text-[11px] opacity-40 lg:block">
+								<span className={"hidden shrink-0 truncate font-mono opacity-40 lg:block " + size.funcW + " " + size.meta}>
 									{func}
 								</span>
-								<span className="min-w-0 truncate font-mono text-[11px]">{rest.join(" || ")}</span>
+								<span className={"min-w-0 truncate font-mono " + size.message}>{rest.join(" || ")}</span>
 							</div>
 						)
 					})
 				) : (
-					<div className="py-6 pl-3 text-xs opacity-50">{filter || tagFilter ? "No matching logs" : "No logs"}</div>
+					<div className={"py-6 pl-3 opacity-50 " + size.message}>
+						{filter || tagFilter ? "No matching logs" : "No logs"}
+					</div>
 				)}
 			</div>
 			</div>
