@@ -115,12 +115,14 @@ func main() {
 		Windows: &windows.Options{
 			DisableWindowIcon:    false,
 			IsZoomControlEnabled: true,
+			ZoomFactor:           1.0,
 			DisablePinchZoom:     false,
 		},
 		Linux: &linux.Options{
 			Icon: appIcon,
 		},
 		Mac: &mac.Options{
+			DisableZoom: false,
 			About: &mac.AboutInfo{
 				Title: "Tunnels",
 				Icon:  appIcon,
