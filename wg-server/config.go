@@ -8,12 +8,55 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/tunnels-is/tunnels/types"
 	"golang.org/x/crypto/curve25519"
 )
+
+// errControllerRedirect is returned by the controller HTTP client when the
+// server answers with a redirect. Redirects are refused so X-WG-KEY is never
+// re-sent to a different Location (Go does not strip custom auth headers).
+var errControllerRedirect = errors.New("refusing to follow controller redirect (X-WG-KEY must not leave the configured controller URL)")
+
+// requireHTTPSControllerURL rejects non-https controller base URLs.
+func requireHTTPSControllerURL(raw string) error {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return fmt.Errorf("controller URL is empty")
+	}
+	u, err := url.Parse(raw)
+	if err != nil {
+		return fmt.Errorf("invalid controller URL: %w", err)
+	}
+	if !strings.EqualFold(u.Scheme, "https") {
+		return fmt.Errorf("controller URL must use https:// (got scheme %q)", u.Scheme)
+	}
+	if u.Host == "" {
+		return fmt.Errorf("controller URL missing host")
+	}
+	return nil
+}
+
+// newControllerHTTPClient builds the client used for all controller calls that
+// carry X-WG-KEY. Redirects are never followed. InsecureSkipVerify remains a
+// supported local option for self-signed controllers.
+func newControllerHTTPClient(insecureSkipVerify bool) *http.Client {
+	return &http.Client{
+		Timeout: 15 * time.Second,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return errControllerRedirect
+		},
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: insecureSkipVerify, //nolint:gosec // intentional for self-signed deployments
+			},
+		},
+	}
+}
 
 type Config struct {
 	ControllerURL string
@@ -150,6 +193,10 @@ func loadOrGenerateLocalPrivKey() ([]byte, error) {
 }
 
 func FetchConfig(controllerURL, apiKey, configPath string, insecureSkipVerify bool) (*Config, error) {
+	if err := requireHTTPSControllerURL(controllerURL); err != nil {
+		return nil, err
+	}
+
 	privKey, err := loadOrGenerateLocalPrivKey()
 	if err != nil {
 		return nil, fmt.Errorf("load wg private key: %w", err)
@@ -160,18 +207,10 @@ func FetchConfig(controllerURL, apiKey, configPath string, insecureSkipVerify bo
 		return nil, fmt.Errorf("derive wg public key: %w", err)
 	}
 
-	transport := &http.Transport{
-		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: insecureSkipVerify,
-		},
-	}
-	client := &http.Client{
-		Transport: transport,
-		Timeout:   15 * time.Second,
-	}
+	client := newControllerHTTPClient(insecureSkipVerify)
 
-	url := controllerURL + "/wg/server-config/fetch"
-	req, err := http.NewRequest(http.MethodGet, url, nil)
+	fetchURL := strings.TrimRight(controllerURL, "/") + "/wg/server-config/fetch"
+	req, err := http.NewRequest(http.MethodGet, fetchURL, nil)
 	if err != nil {
 		zeroBytes(privKey)
 		return nil, fmt.Errorf("build request: %w", err)

@@ -1,12 +1,11 @@
 package wgserver
 
 import (
-	"crypto/tls"
 	"encoding/json"
 	"net"
 	"net/http"
 	"net/url"
-	"time"
+	"strings"
 
 	"github.com/tunnels-is/tunnels/types"
 )
@@ -14,15 +13,11 @@ import (
 var httpClient *http.Client
 
 func initSyncClient(cfg *Config) {
-	transport := &http.Transport{
-		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: cfg.InsecureSkipVerify,
-		},
+	insecure := false
+	if cfg != nil {
+		insecure = cfg.InsecureSkipVerify
 	}
-	httpClient = &http.Client{
-		Transport: transport,
-		Timeout:   15 * time.Second,
-	}
+	httpClient = newControllerHTTPClient(insecure)
 }
 
 type authResult int
@@ -103,7 +98,11 @@ func subnetContains(cidr, ipStr string) bool {
 }
 
 func queryPeer(cfg *Config, pubKeyB64 string) (authResult, *types.WGPeer) {
-	endpoint := cfg.ControllerURL + "/wg/peer?pubkey=" + url.QueryEscape(pubKeyB64)
+	if err := requireHTTPSControllerURL(cfg.ControllerURL); err != nil {
+		WARN("queryPeer: ", err)
+		return authUnknown, nil
+	}
+	endpoint := strings.TrimRight(cfg.ControllerURL, "/") + "/wg/peer?pubkey=" + url.QueryEscape(pubKeyB64)
 	req, err := http.NewRequest(http.MethodGet, endpoint, nil)
 	if err != nil {
 		WARN("queryPeer: build request: ", err)
