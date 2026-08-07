@@ -311,6 +311,10 @@ func loadTunnelsFromDisk() (err error) {
 func SetConfig(config *configV2) (err error) {
 	defer RecoverAndLog()
 
+	if err := validateDNSListConfig(config); err != nil {
+		return err
+	}
+
 	oldConf := CONFIG.Load()
 
 	dnsChange := oldConf.DNSServerIP != config.DNSServerIP ||
@@ -339,4 +343,29 @@ func SetConfig(config *configV2) (err error) {
 	INFO("Config saved")
 
 	return err
+}
+
+// validateDNSListConfig rejects blocklist/whitelist tags that could escape the
+// list directories on disk (path traversal via Tag).
+func validateDNSListConfig(config *configV2) error {
+	if config == nil {
+		return nil
+	}
+	for _, bl := range config.DNSBlockLists {
+		if bl == nil || bl.Tag == "" {
+			continue
+		}
+		if !safeListTag(bl.Tag) {
+			return fmt.Errorf("invalid DNS blocklist tag %q: only a-z A-Z 0-9 _ - allowed", bl.Tag)
+		}
+	}
+	for _, wl := range config.DNSWhiteLists {
+		if wl == nil || wl.Tag == "" {
+			continue
+		}
+		if !safeListTag(wl.Tag) {
+			return fmt.Errorf("invalid DNS whitelist tag %q: only a-z A-Z 0-9 _ - allowed", wl.Tag)
+		}
+	}
+	return nil
 }

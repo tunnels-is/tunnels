@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -189,8 +191,34 @@ var allowedConfigFormats = map[string]struct{}{
 	"": {}, ".json": {}, ".conf": {}, ".yaml": {}, ".yml": {},
 }
 
+// safeTunnelTag validates tunnel tags used as on-disk identifiers.
 func safeTunnelTag(tag string) bool {
 	return TAG_CHAR_CHECK.MatchString(tag)
+}
+
+// safeListTag validates DNS blocklist/whitelist tags used as filenames under
+// blocklists/ and whitelists/. Same charset as tunnel tags to prevent path traversal.
+func safeListTag(tag string) bool {
+	return TAG_CHAR_CHECK.MatchString(tag)
+}
+
+// listFilePath joins baseDir with a validated, lowercased list tag and ensures
+// the result stays inside baseDir (no ".." / separator escapes).
+func listFilePath(baseDir, tag string) (string, error) {
+	if !safeListTag(tag) {
+		return "", fmt.Errorf("invalid list tag %q: only a-z A-Z 0-9 _ - allowed", tag)
+	}
+	lower := strings.ToLower(tag)
+	base := filepath.Clean(baseDir)
+	path := filepath.Join(base, lower)
+	rel, err := filepath.Rel(base, path)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
+		return "", fmt.Errorf("list path escapes base directory")
+	}
+	if filepath.IsAbs(rel) {
+		return "", fmt.Errorf("list path escapes base directory")
+	}
+	return path, nil
 }
 
 func validateTunnelMeta(tun *TunnelMETA, oldTag string) (err []string) {
