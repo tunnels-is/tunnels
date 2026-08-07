@@ -161,7 +161,10 @@ func delMeshRoute(cfg *Config, subnet string) {
 }
 
 func fetchMesh(cfg *Config) (*types.WGMeshResponse, error) {
-	req, err := http.NewRequest(http.MethodGet, cfg.ControllerURL+"/wg/mesh", nil)
+	if err := requireHTTPSControllerURL(cfg.ControllerURL); err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequest(http.MethodGet, strings.TrimRight(cfg.ControllerURL, "/")+"/wg/mesh", nil)
 	if err != nil {
 		return nil, err
 	}
