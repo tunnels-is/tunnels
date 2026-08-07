@@ -9,6 +9,21 @@ import (
 	"github.com/tunnels-is/tunnels/types"
 )
 
+func startTLSController(t *testing.T, h http.HandlerFunc) *httptest.Server {
+	t.Helper()
+	srv := httptest.NewTLSServer(h)
+	t.Cleanup(srv.Close)
+	return srv
+}
+
+func testControllerCfg(srv *httptest.Server, apiKey string) *Config {
+	return &Config{
+		ControllerURL:      srv.URL,
+		APIKey:             apiKey,
+		InsecureSkipVerify: true, // test TLS cert is self-signed
+	}
+}
+
 func TestQueryPeer_OK(t *testing.T) {
 	want := types.WGPeer{
 		PublicKeyHex:  "deadbeef",
@@ -17,7 +32,7 @@ func TestQueryPeer_OK(t *testing.T) {
 		WireGuardIPv6: "fd00::5",
 	}
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := startTLSController(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/wg/peer" {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
@@ -29,10 +44,9 @@ func TestQueryPeer_OK(t *testing.T) {
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(want)
-	}))
-	defer srv.Close()
+	})
 
-	cfg := &Config{ControllerURL: srv.URL, APIKey: "test-api-key"}
+	cfg := testControllerCfg(srv, "test-api-key")
 	initSyncClient(cfg)
 
 	res, got := queryPeer(cfg, "abc==")
@@ -46,14 +60,13 @@ func TestQueryPeer_OK(t *testing.T) {
 
 func TestQueryPeer_Denied(t *testing.T) {
 	for _, code := range []int{http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound} {
-		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		srv := startTLSController(t, func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(code)
-		}))
-		cfg := &Config{ControllerURL: srv.URL, APIKey: "k"}
+		})
+		cfg := testControllerCfg(srv, "k")
 		initSyncClient(cfg)
 
 		res, got := queryPeer(cfg, "x")
-		srv.Close()
 		if res != authDenied {
 			t.Fatalf("status %d: expected authDenied, got %v", code, res)
 		}
@@ -64,12 +77,11 @@ func TestQueryPeer_Denied(t *testing.T) {
 }
 
 func TestQueryPeer_ServerErrorIsUnknown(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := startTLSController(t, func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
-	}))
-	defer srv.Close()
+	})
 
-	cfg := &Config{ControllerURL: srv.URL, APIKey: "k"}
+	cfg := testControllerCfg(srv, "k")
 	initSyncClient(cfg)
 
 	if res, _ := queryPeer(cfg, "x"); res != authUnknown {
@@ -79,13 +91,12 @@ func TestQueryPeer_ServerErrorIsUnknown(t *testing.T) {
 
 func TestQueryPeer_QueryEscaping(t *testing.T) {
 	var seen string
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := startTLSController(t, func(w http.ResponseWriter, r *http.Request) {
 		seen = r.URL.Query().Get("pubkey")
 		w.WriteHeader(http.StatusNotFound)
-	}))
-	defer srv.Close()
+	})
 
-	cfg := &Config{ControllerURL: srv.URL, APIKey: "k"}
+	cfg := testControllerCfg(srv, "k")
 	initSyncClient(cfg)
 
 	raw := "abc/def+ghi=="
@@ -94,5 +105,39 @@ func TestQueryPeer_QueryEscaping(t *testing.T) {
 	}
 	if seen != raw {
 		t.Fatalf("query decode mismatch: got %q want %q", seen, raw)
+	}
+}
+
+func TestQueryPeer_HTTPControllerURLRejected(t *testing.T) {
+	cfg := &Config{ControllerURL: "http://127.0.0.1:1", APIKey: "k"}
+	initSyncClient(cfg)
+	if res, _ := queryPeer(cfg, "x"); res != authUnknown {
+		t.Fatalf("http:// controller must be rejected, got %v", res)
+	}
+}
+
+func TestQueryPeer_RedirectNotFollowed(t *testing.T) {
+	var evilHits int
+	evil := startTLSController(t, func(w http.ResponseWriter, r *http.Request) {
+		evilHits++
+		if r.Header.Get("X-WG-KEY") != "" {
+			t.Error("X-WG-KEY must not be sent to redirect target")
+		}
+		w.WriteHeader(http.StatusOK)
+	})
+
+	good := startTLSController(t, func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, evil.URL+"/wg/peer?pubkey=stolen", http.StatusFound)
+	})
+
+	cfg := testControllerCfg(good, "secret-key")
+	initSyncClient(cfg)
+
+	res, peer := queryPeer(cfg, "x")
+	if res != authUnknown {
+		t.Fatalf("redirect should fail closed as authUnknown, got %v peer=%v", res, peer)
+	}
+	if evilHits != 0 {
+		t.Fatalf("redirect target was contacted %d times", evilHits)
 	}
 }

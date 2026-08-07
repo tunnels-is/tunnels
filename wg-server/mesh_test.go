@@ -81,7 +81,7 @@ func TestFetchMesh(t *testing.T) {
 	want := types.WGMeshResponse{Peers: []types.WGMeshPeer{
 		{PublicKeyHex: "deadbeef", Endpoint: "2.2.2.2:51821", AllowedSubnets: []string{"10.3.0.0/16"}},
 	}}
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/wg/mesh" {
 			t.Errorf("unexpected path %s", r.URL.Path)
 		}
@@ -92,7 +92,7 @@ func TestFetchMesh(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	cfg := &Config{ControllerURL: srv.URL, APIKey: "k"}
+	cfg := &Config{ControllerURL: srv.URL, APIKey: "k", InsecureSkipVerify: true}
 	initSyncClient(cfg)
 
 	got, err := fetchMesh(cfg)
@@ -101,5 +101,12 @@ func TestFetchMesh(t *testing.T) {
 	}
 	if len(got.Peers) != 1 || got.Peers[0].Endpoint != "2.2.2.2:51821" {
 		t.Fatalf("unexpected mesh response: %+v", got)
+	}
+}
+
+func TestFetchMesh_HTTPRejected(t *testing.T) {
+	cfg := &Config{ControllerURL: "http://127.0.0.1:1", APIKey: "k"}
+	if _, err := fetchMesh(cfg); err == nil {
+		t.Fatal("expected error for http:// controller URL")
 	}
 }
