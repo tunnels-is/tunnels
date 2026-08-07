@@ -193,6 +193,8 @@ func main() {
 
 		go signal.NewSignal("API", ctx, 1*time.Second, goroutineLogger, launchAPIServer)
 
+		go signal.NewSignal("PWRESET-CLEAN", ctx, passwordResetCleanEvery, goroutineLogger, cleanPasswordResetAttempts)
+
 		go signal.NewSignal("CONFIG", ctx, 30*time.Second, goroutineLogger, func() {
 			C, err := parseServerConfig(serverConfigPath)
 			if err != nil {
