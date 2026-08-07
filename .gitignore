@@ -1,14 +1,23 @@
 cmd/service/service
 
 frontend/dist/
+frontend-admin/dist/
 new-frontend/dist/
+server/admin_dist/
 
 */server.crt
 server.crt
 
 bin/
 build/*
-builds/*
+builds/
+
+# Local runtime secrets / state (never commit)
+**/.pk
+**/wg-config.json
+*.pem
+*.key
+!go.sum
 
 cmd/main/files
 cmd/main/logs
@@ -38,10 +47,16 @@ cmd/main/*.tun.json.bak
 server/cert.pem
 server/key.pem
 server/config.json
+server/wg-config.json
 server/tunnels.db
+server/*.db
 server/server
+server/tunnels
+server/tunnels-server
 
 certcheck/.env
+**/.env
+**/.env.*
 
 node_modules
 files
@@ -53,3 +68,7 @@ files
 new_server/new_server
 api.crt
 api.key
+
+# Coverage / local test artifacts
+coverage.txt
+coverage.html
