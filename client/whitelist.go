@@ -121,8 +121,12 @@ func processWhiteList(wl *BlockList, prevByTag map[string]*DomainSet) listLoadRe
 	}
 
 	state := STATE.Load()
+	path, pathErr := listFilePath(state.WhiteListPath, wl.Tag)
+	if pathErr != nil {
+		ERROR("Invalid DNS whitelist tag, refusing path: ", wl.Tag, pathErr)
+		return listLoadResult{tag: tag}
+	}
 	lowerTag := strings.ToLower(wl.Tag)
-	path := state.WhiteListPath + lowerTag
 
 	downloaded := false
 	if time.Since(wl.LastDownload).Hours() > 24 && wl.URL != "" {

@@ -142,8 +142,12 @@ func processBlockList(bl *BlockList, force bool, prevByTag map[string]*DomainSet
 	}
 
 	state := STATE.Load()
+	path, pathErr := listFilePath(state.BlockListPath, bl.Tag)
+	if pathErr != nil {
+		ERROR("Invalid DNS blocklist tag, refusing path: ", bl.Tag, pathErr)
+		return listLoadResult{tag: tag}
+	}
 	lowerTag := strings.ToLower(bl.Tag)
-	path := state.BlockListPath + lowerTag
 
 	downloaded := false
 	if (force || time.Since(bl.LastDownload).Hours() > 24) && bl.URL != "" {
