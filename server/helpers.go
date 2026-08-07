@@ -67,6 +67,38 @@ func decodeBody(r *http.Request, target any) (err error) {
 	return nil
 }
 
+// deviceTokenMatchesLogout reports whether dt should be revoked for LF.
+// Prefer LogoutToken (raw session secret). When Tokens[].DT is redacted in API
+// responses, clients revoke other sessions by LogoutName + LogoutCreated.
+func deviceTokenMatchesLogout(dt *DeviceToken, lf *LOGOUT_FORM) bool {
+	if dt == nil || lf == nil {
+		return false
+	}
+	if lf.LogoutToken != "" {
+		return subtle.ConstantTimeCompare([]byte(dt.DT), []byte(lf.LogoutToken)) == 1
+	}
+	if lf.LogoutName == "" || lf.LogoutCreated.IsZero() {
+		return false
+	}
+	if dt.N != lf.LogoutName {
+		return false
+	}
+	// Compare at second resolution so JSON/RFC3339 round-trips match.
+	return dt.Created.Unix() == lf.LogoutCreated.Unix()
+}
+
+func revokeUserDeviceTokens(tokens []*DeviceToken, lf *LOGOUT_FORM) []*DeviceToken {
+	if lf == nil {
+		return tokens
+	}
+	if lf.All {
+		return make([]*DeviceToken, 0)
+	}
+	return slices.DeleteFunc(tokens, func(dt *DeviceToken) bool {
+		return deviceTokenMatchesLogout(dt, lf)
+	})
+}
+
 func sendObject(w http.ResponseWriter, obj any) {
 	w.WriteHeader(200)
 	var err error

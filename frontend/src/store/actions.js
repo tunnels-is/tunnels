@@ -136,15 +136,30 @@ export const finalizeLogout = () => {
 	window.location.reload()
 }
 
+const sameSession = (a, b) => {
+	if (!a || !b) return false
+	if (a.DT && b.DT && a.DT === b.DT) return true
+	if (!a.N || !b.N || a.N !== b.N) return false
+	if (!a.C || !b.C) return false
+	return new Date(a.C).getTime() === new Date(b.C).getTime()
+}
+
 export const logoutToken = async (token, all) => {
 	const user = store().user
 	if (!user) {
 		finalizeLogout()
 		return
 	}
-	const isOwnToken = user.DeviceToken?.DT === token?.DT
+	const isOwnToken = sameSession(user.DeviceToken, token)
 
-	const resp = await controller("/client/user/logout", { LogoutToken: token?.DT, All: all }, { silent: true })
+	// Other sessions have DT redacted by the server; revoke by name + created.
+	const body = all
+		? { All: true }
+		: token?.DT
+			? { LogoutToken: token.DT }
+			: { LogoutName: token?.N || "", LogoutCreated: token?.C }
+
+	const resp = await controller("/client/user/logout", body, { silent: true })
 	if (resp.status === 200) {
 		store().notifySuccess("Device logged out")
 		if (isOwnToken || all) {
@@ -154,7 +169,7 @@ export const logoutToken = async (token, all) => {
 		}
 		const updated = {
 			...user,
-			Tokens: (user.Tokens || []).filter((t) => t.DT !== token?.DT),
+			Tokens: (user.Tokens || []).filter((t) => !sameSession(t, token)),
 		}
 		store().setUser(updated)
 		const users = store().users
