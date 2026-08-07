@@ -70,6 +70,8 @@ func API_AdminUILogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	clearPasswordResetAttempts(LF.Email)
+
 	cookieValue, err := encryptAdminCookie(user.ID.String(), user.DeviceToken.DT, clientIP(r))
 	if err != nil {
 		senderr(w, 500, "Failed to create session")
@@ -284,6 +286,8 @@ func API_UserLogin(w http.ResponseWriter, r *http.Request) {
 		senderr(w, 500, "Database error, please try again in a moment")
 		return
 	}
+
+	clearPasswordResetAttempts(LF.Email)
 
 	user.RemoveSensitiveInformation()
 	sendObject(w, user)
@@ -1421,8 +1425,18 @@ func API_UserResetPassword(w http.ResponseWriter, r *http.Request) {
 		senderr(w, 400, "password smaller then 10 characters")
 		return
 	}
+	if len(RF.Password) > 72 {
+		senderr(w, 400, "Password is too long, maximum 72 characters")
+		return
+	}
 
 	const genericAuthErr = "invalid email or reset code"
+	const rateLimitErr = "too many attempts, try again later"
+
+	if !passwordResetAllowed(RF.Email) {
+		senderr(w, 429, rateLimitErr)
+		return
+	}
 
 	user, err = DB_findUserByEmail(RF.Email)
 	if err != nil {
@@ -1430,6 +1444,7 @@ func API_UserResetPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if user == nil {
+		recordPasswordResetFailure(RF.Email)
 		senderr(w, 401, genericAuthErr)
 		return
 	}
@@ -1437,12 +1452,14 @@ func API_UserResetPassword(w http.ResponseWriter, r *http.Request) {
 	code, err := Decrypt(user.TwoFactorCode, []byte(loadSecret("TwoFactorKey")))
 	if err != nil {
 		ADMIN(err)
+		recordPasswordResetFailure(RF.Email)
 		senderr(w, 401, genericAuthErr)
 		return
 	}
 
 	otp := gotp.NewDefaultTOTP(code).Now()
 	if otp != RF.ResetCode {
+		recordPasswordResetFailure(RF.Email)
 		senderr(w, 401, genericAuthErr)
 		return
 	}
@@ -1460,6 +1477,7 @@ func API_UserResetPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	clearPasswordResetAttempts(RF.Email)
 	w.WriteHeader(200)
 }
 
