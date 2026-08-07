@@ -9,7 +9,6 @@ import (
 	mrand "math/rand/v2"
 	"net/http"
 	"reflect"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -109,13 +108,7 @@ func API_AdminUILogout(w http.ResponseWriter, r *http.Request) {
 		LF := new(LOGOUT_FORM)
 		_ = decodeBody(r, LF)
 
-		if LF.All {
-			user.Tokens = make([]*DeviceToken, 0)
-		} else if LF.LogoutToken != "" {
-			user.Tokens = slices.DeleteFunc(user.Tokens, func(dt *DeviceToken) bool {
-				return dt.DT == LF.LogoutToken
-			})
-		}
+		user.Tokens = revokeUserDeviceTokens(user.Tokens, LF)
 
 		update := new(UPDATE_USER_TOKENS)
 		update.ID = user.ID
@@ -308,13 +301,7 @@ func API_UserLogout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if LF.All {
-		user.Tokens = make([]*DeviceToken, 0)
-	} else {
-		user.Tokens = slices.DeleteFunc(user.Tokens, func(dt *DeviceToken) bool {
-			return dt.DT == LF.LogoutToken
-		})
-	}
+	user.Tokens = revokeUserDeviceTokens(user.Tokens, LF)
 
 	userTokenUpdate := new(UPDATE_USER_TOKENS)
 	userTokenUpdate.ID = user.ID

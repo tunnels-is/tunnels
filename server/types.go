@@ -235,10 +235,12 @@ type LOGIN_FORM struct {
 }
 
 type LOGOUT_FORM struct {
-	UID         uuid.UUID
-	DeviceToken string
-	LogoutToken string
-	All         bool
+	UID           uuid.UUID
+	DeviceToken   string
+	LogoutToken   string
+	LogoutName    string    `json:"LogoutName,omitempty"`
+	LogoutCreated time.Time `json:"LogoutCreated,omitempty"`
+	All           bool
 }
 
 type UPDATE_USER_TOKENS struct {
@@ -313,6 +315,22 @@ func (u *User) RemoveSensitiveInformation() {
 	u.RecoveryCodes = nil
 	u.TwoFactorCode = nil
 	u.APIKey = ""
+
+	// Session secrets: keep only the current DeviceToken.DT (needed by the
+	// client for subsequent auth). Strip every other Tokens[].DT so login and
+	// admin list/get responses cannot impersonate other devices.
+	currentDT := ""
+	if u.DeviceToken != nil {
+		currentDT = u.DeviceToken.DT
+	}
+	for _, t := range u.Tokens {
+		if t == nil {
+			continue
+		}
+		if currentDT == "" || t.DT != currentDT {
+			t.DT = ""
+		}
+	}
 }
 
 type DeviceToken struct {

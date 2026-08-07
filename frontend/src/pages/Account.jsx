@@ -94,11 +94,19 @@ const Account = () => {
 						</thead>
 						<tbody>
 							{tokens.length > 0 ? (
-								tokens.map((t, i) => (
+								tokens.map((t, i) => {
+									const isCurrent =
+										(t.DT && t.DT === user.DeviceToken?.DT) ||
+										(t.N &&
+											t.N === user.DeviceToken?.N &&
+											t.C &&
+											user.DeviceToken?.C &&
+											new Date(t.C).getTime() === new Date(user.DeviceToken.C).getTime())
+									return (
 									<tr key={i} className="hover">
 										<td className="font-medium">
 											{t.N}
-											{t.DT === user.DeviceToken?.DT && <span className="badge badge-ghost badge-xs ml-2">current</span>}
+											{isCurrent && <span className="badge badge-ghost badge-xs ml-2">current</span>}
 										</td>
 										<td className="text-right text-xs opacity-60">{t.C ? fullDate(t.C) : "—"}</td>
 										<td className="text-right">
@@ -110,7 +118,8 @@ const Account = () => {
 											</button>
 										</td>
 									</tr>
-								))
+									)
+								})
 							) : (
 								<tr>
 									<td colSpan={3} className="py-6 text-center text-xs opacity-50">

@@ -323,3 +323,97 @@ func TestUser_RemoveSensitiveInformation_PreservesNonSensitiveData(t *testing.T)
 
 	t.Log("RemoveSensitiveInformation() correctly preserves non-sensitive data ✓")
 }
+
+func TestUser_RemoveSensitiveInformation_RedactsOtherSessionTokens(t *testing.T) {
+	current := &DeviceToken{DT: "current-secret", N: "this-device", Created: time.Now()}
+	other := &DeviceToken{DT: "other-secret", N: "other-device", Created: time.Now().Add(-time.Hour)}
+	user := &User{
+		Email:       "sess@example.com",
+		DeviceToken: current,
+		Tokens:      []*DeviceToken{current, other},
+		APIKey:      "should-clear",
+	}
+
+	user.RemoveSensitiveInformation()
+
+	if user.APIKey != "" {
+		t.Fatalf("APIKey should be cleared, got %q", user.APIKey)
+	}
+	if user.DeviceToken == nil || user.DeviceToken.DT != "current-secret" {
+		t.Fatalf("current DeviceToken.DT must be preserved, got %#v", user.DeviceToken)
+	}
+	if len(user.Tokens) != 2 {
+		t.Fatalf("expected 2 tokens, got %d", len(user.Tokens))
+	}
+	if user.Tokens[0].DT != "current-secret" {
+		t.Errorf("current entry in Tokens should keep DT, got %q", user.Tokens[0].DT)
+	}
+	if user.Tokens[1].DT != "" {
+		t.Errorf("other session DT must be redacted, got %q", user.Tokens[1].DT)
+	}
+	if user.Tokens[1].N != "other-device" {
+		t.Errorf("other session name should remain, got %q", user.Tokens[1].N)
+	}
+}
+
+func TestUser_RemoveSensitiveInformation_AdminListNoDeviceToken(t *testing.T) {
+	user := &User{
+		Email: "admin-view@example.com",
+		Tokens: []*DeviceToken{
+			{DT: "s1", N: "phone", Created: time.Now()},
+			{DT: "s2", N: "laptop", Created: time.Now()},
+		},
+	}
+	user.RemoveSensitiveInformation()
+	for i, tok := range user.Tokens {
+		if tok.DT != "" {
+			t.Errorf("token %d DT should be empty without DeviceToken context, got %q", i, tok.DT)
+		}
+	}
+}
+
+func TestDeviceTokenMatchesLogout(t *testing.T) {
+	created := time.Date(2026, 3, 1, 12, 0, 0, 123456789, time.UTC)
+	dt := &DeviceToken{DT: "secret-dt", N: "laptop", Created: created}
+
+	if !deviceTokenMatchesLogout(dt, &LOGOUT_FORM{LogoutToken: "secret-dt"}) {
+		t.Error("should match by LogoutToken")
+	}
+	if deviceTokenMatchesLogout(dt, &LOGOUT_FORM{LogoutToken: "wrong"}) {
+		t.Error("should not match wrong LogoutToken")
+	}
+	// Sub-second noise in JSON round-trip: match on Unix seconds.
+	if !deviceTokenMatchesLogout(dt, &LOGOUT_FORM{
+		LogoutName:    "laptop",
+		LogoutCreated: time.Unix(created.Unix(), 0).UTC(),
+	}) {
+		t.Error("should match by name + created (second resolution)")
+	}
+	if deviceTokenMatchesLogout(dt, &LOGOUT_FORM{LogoutName: "laptop"}) {
+		t.Error("name alone must not match without created")
+	}
+}
+
+func TestRevokeUserDeviceTokens(t *testing.T) {
+	t1 := &DeviceToken{DT: "a", N: "one", Created: time.Unix(100, 0)}
+	t2 := &DeviceToken{DT: "b", N: "two", Created: time.Unix(200, 0)}
+	tokens := []*DeviceToken{t1, t2}
+
+	out := revokeUserDeviceTokens(tokens, &LOGOUT_FORM{All: true})
+	if len(out) != 0 {
+		t.Fatalf("All should clear tokens, got %d", len(out))
+	}
+
+	out = revokeUserDeviceTokens([]*DeviceToken{t1, t2}, &LOGOUT_FORM{LogoutToken: "b"})
+	if len(out) != 1 || out[0].DT != "a" {
+		t.Fatalf("LogoutToken revoke failed: %#v", out)
+	}
+
+	out = revokeUserDeviceTokens([]*DeviceToken{t1, t2}, &LOGOUT_FORM{
+		LogoutName:    "one",
+		LogoutCreated: time.Unix(100, 0),
+	})
+	if len(out) != 1 || out[0].N != "two" {
+		t.Fatalf("LogoutName+Created revoke failed: %#v", out)
+	}
+}
