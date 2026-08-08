@@ -8,6 +8,19 @@ import (
 	"os"
 )
 
+// CheckKeyFilePermissions reports whether a private key file is group/other-readable.
+// Callers should log a warning and continue (or fail closed) based on policy.
+func CheckKeyFilePermissions(path string) error {
+	info, err := os.Stat(path)
+	if err != nil {
+		return err
+	}
+	if mode := info.Mode().Perm(); mode&0o077 != 0 {
+		return fmt.Errorf("%s has insecure permissions %o (want 0600)", path, mode)
+	}
+	return nil
+}
+
 func LoadPrivateKey(filePath string) (any, []byte, error) {
 	keyBytes, err := os.ReadFile(filePath)
 	if err != nil {

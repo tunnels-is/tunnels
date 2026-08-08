@@ -152,6 +152,9 @@ func makeTLSConfig() (tc *tls.Config) {
 			ERROR("Certificate error:", err)
 			return
 		}
+	} else {
+		// Existing private key: warn if permissions are too open.
+		warnIfInsecureSecretFile(conf.APIKey)
 	}
 	return
 }

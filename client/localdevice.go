@@ -90,6 +90,7 @@ func loadLocalDevice(id string) (*LocalDevice, error) {
 	if err != nil {
 		return nil, err
 	}
+	warnIfInsecureSecretFile(path)
 	raw, err := decryptAccountBlob(fb, s.ActiveAccountHash)
 	if err != nil {
 		return nil, err
