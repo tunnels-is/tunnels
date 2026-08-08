@@ -394,6 +394,9 @@ func SaveWGConfig(path string) error {
 }
 
 func loadKeyPair(key, cert string) (c tls.Certificate, err error) {
+	if err := crypt.CheckKeyFilePermissions(key); err != nil {
+		logger.Warn("TLS private key has insecure file permissions (continuing)", "path", key, "err", err)
+	}
 	_, priv, err := crypt.LoadPrivateKey(key)
 	if err != nil {
 		return c, err
@@ -411,7 +414,11 @@ func loadKeyPair(key, cert string) (c tls.Certificate, err error) {
 }
 
 func loadCertificatesAndTLSSettings() (err error) {
-	_, privB, err := crypt.LoadPrivateKey(loadSecret("KeyPem"))
+	keyPem := loadSecret("KeyPem")
+	if err := crypt.CheckKeyFilePermissions(keyPem); err != nil {
+		logger.Warn("TLS private key has insecure file permissions (continuing)", "path", keyPem, "err", err)
+	}
+	_, privB, err := crypt.LoadPrivateKey(keyPem)
 	if err != nil {
 		return err
 	}

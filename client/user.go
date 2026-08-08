@@ -191,6 +191,7 @@ func getUsers() (ul []*User, err error) {
 			}
 			continue
 		}
+		warnIfInsecureSecretFile(path)
 		DEBUG("loading user:", hash)
 		decrypted, er := decryptAccountBlob(fb, hash)
 		if er != nil {
