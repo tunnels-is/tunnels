@@ -42,7 +42,7 @@ func MakeCert(ct CertType, certPath string, keyPath string, ips []string, domain
 	var keyFile *os.File
 
 	if saveToDisk {
-		keyFile, err = os.Create(keyPath)
+		keyFile, err = openPrivateKeyFile(keyPath)
 		if err != nil {
 			return c, err
 		}
@@ -253,15 +253,29 @@ func MakeCertV2(ct CertType, certPath string, keyPath string, ips []string, doma
 
 		_, err = os.Stat(keyPath)
 		if err != nil {
-			kpem, err := os.Create(keyPath)
+			kpem, err := openPrivateKeyFile(keyPath)
 			if err != nil {
 				return nil, err
 			}
 			defer kpem.Close()
 			if err := pem.Encode(kpem, &pem.Block{Type: "PRIVATE KEY", Bytes: CR.KeyPKCS8}); err != nil {
-				return nil, fmt.Errorf("failed to write certificate data to %s: %w", certPath, err)
+				return nil, fmt.Errorf("failed to write private key to %s: %w", keyPath, err)
 			}
 		}
 	}
 	return
+}
+
+// openPrivateKeyFile creates/truncates a private key file at 0600 and forces
+// that mode even if the file already existed with looser permissions.
+func openPrivateKeyFile(path string) (*os.File, error) {
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
+	if err != nil {
+		return nil, err
+	}
+	if err := f.Chmod(0o600); err != nil {
+		_ = f.Close()
+		return nil, fmt.Errorf("chmod 0600 %s: %w", path, err)
+	}
+	return f, nil
 }

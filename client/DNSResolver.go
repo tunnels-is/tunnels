@@ -248,10 +248,6 @@ func DNSQuery(w dns.ResponseWriter, m *dns.Msg) {
 		return
 	}
 
-	if !isValidDomain(m, w) {
-		return
-	}
-
 	if DNSCacheCheck(m, w) {
 		return
 	}
@@ -328,7 +324,6 @@ func DNSQuery(w dns.ResponseWriter, m *dns.Msg) {
 		}
 
 		if !hasInfo {
-
 			if DNSTunnel != nil {
 				DEBUG("Redirect DNS to VPN: ", m.Question[0].Name)
 				ResolveDomainLocal(DNSTunnel, m, w)
@@ -390,25 +385,6 @@ func DNSQuery(w dns.ResponseWriter, m *dns.Msg) {
 	if err != nil {
 		_ = w.WriteMsg(m)
 	}
-}
-
-func isValidDomain(m *dns.Msg, w dns.ResponseWriter) bool {
-	shouldDrop := false
-
-	if strings.HasSuffix(m.Question[0].Name, ".arpa.") {
-		shouldDrop = true
-		goto DONE
-	}
-
-DONE:
-	if shouldDrop {
-		_ = w.WriteMsg(m)
-		w.Close()
-		DEBUG("Invalid domain: ", m.Question[0].Name)
-		return false
-	}
-
-	return true
 }
 
 func CacheDnsReply(reply *dns.Msg) {
