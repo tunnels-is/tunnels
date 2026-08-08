@@ -58,9 +58,9 @@ func InitDNSHandler() {
 	DNSClient.Dialer.Resolver = new(net.Resolver)
 	DNSClient.Dialer.Resolver.PreferGo = false
 	DNSClient.Timeout = time.Second * 5
-	DNSClient.Dialer.Timeout = time.Duration(5 * time.Second)
-	DNSClient.WriteTimeout = time.Duration(5 * time.Second)
-	DNSClient.ReadTimeout = time.Duration(5 * time.Second)
+	DNSClient.Dialer.Timeout = 5 * time.Second
+	DNSClient.WriteTimeout = 5 * time.Second
+	DNSClient.ReadTimeout = 5 * time.Second
 }
 
 func StartUDPDNSHandler() {
