@@ -3,8 +3,119 @@ package client
 import (
 	"testing"
 
+	"github.com/miekg/dns"
 	"github.com/tunnels-is/tunnels/types"
 )
+
+func dnsQueryMsg(name string) *dns.Msg {
+	m := new(dns.Msg)
+	m.SetQuestion(dns.Fqdn(name), dns.TypeA)
+	return m
+}
+
+func TestDNSListDecision_WhitelistTakesPriority(t *testing.T) {
+	prevBL := DNSBlockList.Load()
+	prevWL := DNSWhiteList.Load()
+	t.Cleanup(func() {
+		DNSBlockList.Store(prevBL)
+		DNSWhiteList.Store(prevWL)
+	})
+
+	// Domain is on both block and white lists.
+	blockedDomain := "both.example.com"
+	// Only blocklisted.
+	onlyBlocked := "ads.tracker.example"
+	// Only whitelisted.
+	onlyWhite := "safe.partner.example"
+	// On neither list.
+	clean := "clean.example.com"
+
+	DNSBlockList.Store(NewCatalog(
+		[]string{"Ads"},
+		[]*DomainSet{DomainSetFromDomains([]string{blockedDomain, onlyBlocked})},
+	))
+	DNSWhiteList.Store(NewCatalog(
+		[]string{"custom"},
+		[]*DomainSet{DomainSetFromDomains([]string{blockedDomain, onlyWhite})},
+	))
+
+	// Whitelisted + blocklisted → allowed (whitelist wins).
+	blocked, tag := dnsListDecision(dnsQueryMsg(blockedDomain))
+	if blocked {
+		t.Fatalf("%s should be allowed (whitelist priority), got blocked tag=%q", blockedDomain, tag)
+	}
+	if tag != "" {
+		t.Fatalf("whitelisted decision should not return a block tag, got %q", tag)
+	}
+	if !isWhitelisted(dnsQueryMsg(blockedDomain)) {
+		t.Fatal("expected isWhitelisted true")
+	}
+	// isBlocked still reports true when called alone — decision must skip it.
+	if ok, _ := isBlocked(dnsQueryMsg(blockedDomain)); !ok {
+		t.Fatal("expected isBlocked true for dual-listed domain (decision still must allow)")
+	}
+
+	// Blocklist only → blocked.
+	blocked, tag = dnsListDecision(dnsQueryMsg(onlyBlocked))
+	if !blocked {
+		t.Fatalf("%s should be blocked", onlyBlocked)
+	}
+	if tag != "Ads" {
+		t.Fatalf("block tag = %q, want Ads", tag)
+	}
+
+	// Whitelist only → allowed.
+	blocked, tag = dnsListDecision(dnsQueryMsg(onlyWhite))
+	if blocked {
+		t.Fatalf("%s should be allowed (whitelist only), tag=%q", onlyWhite, tag)
+	}
+
+	// Neither → allowed.
+	blocked, tag = dnsListDecision(dnsQueryMsg(clean))
+	if blocked {
+		t.Fatalf("%s should be allowed (not listed), tag=%q", clean, tag)
+	}
+
+	// Trailing-dot / case variants of dual-listed domain still allow.
+	for _, name := range []string{"BOTH.EXAMPLE.COM", "both.example.com.", "Both.Example.Com."} {
+		blocked, tag = dnsListDecision(dnsQueryMsg(name))
+		if blocked {
+			t.Fatalf("%q should be allowed via whitelist, tag=%q", name, tag)
+		}
+	}
+}
+
+func TestIsWhitelistedAndIsBlocked_NilCatalogs(t *testing.T) {
+	prevBL := DNSBlockList.Load()
+	prevWL := DNSWhiteList.Load()
+	t.Cleanup(func() {
+		DNSBlockList.Store(prevBL)
+		DNSWhiteList.Store(prevWL)
+	})
+
+	DNSBlockList.Store(nil)
+	DNSWhiteList.Store(nil)
+	m := dnsQueryMsg("anything.example.com")
+	if isWhitelisted(m) {
+		t.Fatal("nil whitelist catalog should not match")
+	}
+	if ok, _ := isBlocked(m); ok {
+		t.Fatal("nil blocklist catalog should not match")
+	}
+	blocked, _ := dnsListDecision(m)
+	if blocked {
+		t.Fatal("nil catalogs should not block")
+	}
+
+	DNSBlockList.Store(EmptyCatalog())
+	DNSWhiteList.Store(EmptyCatalog())
+	if isWhitelisted(m) {
+		t.Fatal("empty whitelist should not match")
+	}
+	if ok, _ := isBlocked(m); ok {
+		t.Fatal("empty blocklist should not match")
+	}
+}
 
 func TestDNSAMapping(t *testing.T) {
 

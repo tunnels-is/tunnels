@@ -7,6 +7,16 @@ import (
 	"time"
 )
 
+// customWhiteListFileContent is written when whitelists/custom is missing.
+// Comments keep the file non-empty so local load does not treat it as absent.
+const customWhiteListFileContent = `# Tunnels custom DNS whitelist
+# Domains listed here always resolve, even if they appear on a block list.
+# One domain per line. Lines starting with # are ignored.
+#
+# Example:
+# example.com
+# cdn.mycompany.com
+`
 
 type listLoadResult struct {
 	tag          string
@@ -30,14 +40,26 @@ func reloadWhiteLists(sleep bool) {
 	listReloadMu.Lock()
 	defer listReloadMu.Unlock()
 	config := CONFIG.Load()
+	state := STATE.Load()
+
+	if err := ensureCustomWhiteListFile(state.WhiteListPath); err != nil {
+		ERROR("unable to create custom whitelist file: ", err)
+	}
+	configChanged := ensureCustomWhiteListInConfig(config)
 
 	if config.DisableBlockLists {
 		DNSWhiteList.Store(EmptyCatalog())
+		if configChanged {
+			if err := writeConfigToDisk(); err != nil {
+				ERROR("unable to write config to disk post whitelist ensure", err)
+			}
+		}
 		return
 	}
 
 	if len(config.DNSWhiteLists) == 0 {
 		config.DNSWhiteLists = GetDefaultWhiteLists()
+		configChanged = true
 	}
 	badList := false
 	for _, v := range config.DNSWhiteLists {
@@ -51,20 +73,27 @@ func reloadWhiteLists(sleep bool) {
 	}
 	if badList {
 		config.DNSWhiteLists = GetDefaultWhiteLists()
+		configChanged = true
+	}
+	// Re-ensure after any full replacement of the list slice.
+	if ensureCustomWhiteListInConfig(config) {
+		configChanged = true
 	}
 
 	prev := DNSWhiteList.Load()
 	prevByTag := prev.Snapshot()
 
-
 	lists := config.DNSWhiteLists
 	n := len(lists)
 	if n == 0 {
 		DNSWhiteList.Store(EmptyCatalog())
+		if configChanged {
+			if err := writeConfigToDisk(); err != nil {
+				ERROR("unable to write config to disk post whitelist ensure", err)
+			}
+		}
 		return
 	}
-
-
 
 	ch := make(chan indexedListResult, n)
 	var wg sync.WaitGroup
@@ -84,7 +113,6 @@ func reloadWhiteLists(sleep bool) {
 	for ir := range ch {
 		results[ir.i] = ir.r
 	}
-
 
 	tags := make([]string, n)
 	sets := make([]*DomainSet, n)
@@ -109,7 +137,6 @@ func reloadWhiteLists(sleep bool) {
 	}
 }
 
-
 func processWhiteList(wl *BlockList, prevByTag map[string]*DomainSet) listLoadResult {
 	defer RecoverAndLog()
 	if wl == nil {
@@ -127,6 +154,13 @@ func processWhiteList(wl *BlockList, prevByTag map[string]*DomainSet) listLoadRe
 		return listLoadResult{tag: tag}
 	}
 	lowerTag := strings.ToLower(wl.Tag)
+
+	// Local custom list: recreate the starter file if someone deleted it.
+	if wl.URL == "" && strings.EqualFold(wl.Tag, customDNSListTag) {
+		if err := ensureCustomWhiteListFile(state.WhiteListPath); err != nil {
+			ERROR("unable to create custom whitelist file: ", err)
+		}
+	}
 
 	downloaded := false
 	if time.Since(wl.LastDownload).Hours() > 24 && wl.URL != "" {
@@ -193,13 +227,20 @@ func processWhiteList(wl *BlockList, prevByTag map[string]*DomainSet) listLoadRe
 	}
 }
 
-func GetDefaultWhiteLists() []*BlockList {
-	wl := []*BlockList{}
+func ensureCustomWhiteListFile(whiteListDir string) error {
+	return ensureCustomDNSListFile(whiteListDir, customWhiteListFileContent)
+}
 
-	dlt := time.Now().AddDate(-2, 0, 0)
-	for i := range wl {
-		wl[i].LastDownload = dlt
+// ensureCustomWhiteListInConfig adds the "custom" whitelist (Enabled) when
+// no entry with that tag is present. Existing entries are not modified, so a
+// user who disabled "custom" stays disabled.
+func ensureCustomWhiteListInConfig(config *configV2) bool {
+	if config == nil {
+		return false
 	}
+	return ensureCustomDNSListInSlice(&config.DNSWhiteLists)
+}
 
-	return wl
+func GetDefaultWhiteLists() []*BlockList {
+	return []*BlockList{newCustomDNSList()}
 }

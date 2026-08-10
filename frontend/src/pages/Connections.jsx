@@ -1,6 +1,6 @@
 import { Card, InfoRow, Page } from "@/components/ui"
 import { disconnect } from "@/store/actions"
-import { encTypeName, fullDate } from "@/lib/format"
+import { fullDate } from "@/lib/format"
 import { useStore } from "@/store/store"
 
 const Section = ({ title, children }) => (
@@ -39,7 +39,6 @@ const Connections = () => {
 								<InfoRow label="MTU" value={tunnel?.MTU} mono />
 								<InfoRow label="DNS Blocking" value={tunnel?.DNSBlocking ? "enabled" : "disabled"} />
 								<InfoRow label="DNS Servers" value={tunnel?.DNSServers?.join(" ")} mono />
-								<InfoRow label="Encryption" value={encTypeName(tunnel?.EncryptionType)} />
 								<InfoRow label="Handshake" value="mlkem + x25519" />
 								<InfoRow label="Auto Connect" value={tunnel?.AutoConnect ? "enabled" : "disabled"} />
 								<InfoRow label="Auto Re-Connect" value={tunnel?.AutoReconnect ? "enabled" : "disabled"} />

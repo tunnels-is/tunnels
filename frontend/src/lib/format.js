@@ -28,6 +28,3 @@ export const fullDate = (value) => {
 	if (isNaN(d)) return String(value)
 	return fullFmt.format(d)
 }
-
-export const ENC_TYPES = ["None", "AES128", "AES256", "CHACHA20"]
-export const encTypeName = (n) => ENC_TYPES[n] ?? "unknown"
