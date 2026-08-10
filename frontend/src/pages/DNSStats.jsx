@@ -7,6 +7,13 @@ import { useStore } from "@/store/store"
 
 const PAGE_SIZE = 50
 
+/** True when Go/JSON time is a real timestamp (not zero-value 0001-01-01). */
+const hasTime = (t) => {
+	if (!t) return false
+	const ms = new Date(t).getTime()
+	return Number.isFinite(ms) && ms > 0
+}
+
 const DNSStats = () => {
 	const dnsStats = useStore((s) => s.dnsStats)
 	const advanced = useStore((s) => s.advanced)
@@ -21,17 +28,18 @@ const DNSStats = () => {
 	const allItems = useMemo(() => {
 		const entries = Object.entries(dnsStats || {}).map(([domain, value]) => ({ ...value, domain }))
 
-		const wanted = entries.filter((e) => {
-			const blocked = new Date(e.LastSeen) - new Date(e.LastBlocked) <= 0
-			return tab === "blocked" ? blocked : !blocked
-		})
-		return wanted.sort((a, b) => new Date(b.LastSeen) - new Date(a.LastSeen))
+		// Tabs are independent histories: a domain stays in "blocked" after it was
+		// blocked even if a later resolve (e.g. whitelist) also recorded it.
+		const wanted = entries.filter((e) => (tab === "blocked" ? hasTime(e.LastBlocked) : hasTime(e.LastResolved)))
+		const sortKey = tab === "blocked" ? "LastBlocked" : "LastResolved"
+		return wanted.sort((a, b) => new Date(b[sortKey]) - new Date(a[sortKey]))
 	}, [dnsStats, tab])
 
 	const filtered = filter ? allItems.filter((d) => d.domain.toLowerCase().includes(filter.toLowerCase())) : allItems
 	const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
 	const safePage = Math.min(page, totalPages - 1)
 	const paged = filtered.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE)
+	const lastColLabel = tab === "blocked" ? "Last blocked" : "Last resolved"
 
 	if (!advanced) {
 		return (
@@ -103,9 +111,10 @@ const DNSStats = () => {
 					<thead>
 						<tr>
 							<th>Domain</th>
+							{tab === "blocked" && <th className="w-28">List</th>}
 							<th className="w-16 text-right">Count</th>
 							<th className="hidden w-32 text-right md:table-cell">First seen</th>
-							<th className="w-32 text-right">Last seen</th>
+							<th className="w-32 text-right">{lastColLabel}</th>
 						</tr>
 					</thead>
 					<tbody>
@@ -113,14 +122,19 @@ const DNSStats = () => {
 							paged.map((d, i) => (
 								<tr key={i} className="hover">
 									<td className={"truncate font-mono " + (tab === "blocked" ? "text-error" : "")}>{d.domain}</td>
+									{tab === "blocked" && (
+										<td className="truncate text-[11px] opacity-50">{d.Tag || "—"}</td>
+									)}
 									<td className="text-right font-mono">{d.Count}</td>
 									<td className="hidden text-right text-[11px] opacity-50 md:table-cell">{shortDate(d.FirstSeen)}</td>
-									<td className="text-right text-[11px] opacity-50">{shortDate(d.LastSeen)}</td>
+									<td className="text-right text-[11px] opacity-50">
+										{shortDate(tab === "blocked" ? d.LastBlocked : d.LastResolved)}
+									</td>
 								</tr>
 							))
 						) : (
 							<tr>
-								<td colSpan={4} className="py-6 text-center text-xs opacity-50">
+								<td colSpan={tab === "blocked" ? 5 : 4} className="py-6 text-center text-xs opacity-50">
 									{filter ? "No matching domains" : "No data"}
 								</td>
 							</tr>

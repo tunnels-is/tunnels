@@ -10,13 +10,17 @@ export const Page = ({ actions, children }) => (
 export const Card = ({ title, description, actions, children, className = "" }) => (
 	<div className={"card border border-base-300 bg-base-100 " + className}>
 		<div className="card-body gap-0 p-5">
-			{(title || actions) && (
-				<div className="mb-3 flex items-start justify-between gap-3">
-					<div>
-						{title && <h2 className="text-sm font-semibold tracking-tight">{title}</h2>}
-						{description && <p className="mt-0.5 text-[11px] leading-relaxed opacity-50">{description}</p>}
-					</div>
-					{actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
+			{(title || actions || description) && (
+				<div className="mb-3">
+					{(title || actions) && (
+						<div className="flex items-start justify-between gap-3">
+							{title && <h2 className="min-w-0 flex-1 text-sm font-semibold tracking-tight">{title}</h2>}
+							{actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
+						</div>
+					)}
+					{description && (
+						<p className="mt-0.5 w-full text-[11px] leading-relaxed opacity-50">{description}</p>
+					)}
 				</div>
 			)}
 			{children}

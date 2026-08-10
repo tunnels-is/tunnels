@@ -288,7 +288,7 @@ func TestEnsureCustomDNSListInConfig(t *testing.T) {
 
 		cfg.DNSBlockLists[0].Enabled = false
 		if ensureCustomBlockListInConfig(cfg) {
-			t.Fatal("expected no change when custom already present")
+			t.Fatal("expected no change when custom already present at front")
 		}
 		if cfg.DNSBlockLists[0].Enabled {
 			t.Fatal("should not re-enable a user-disabled custom blocklist")
@@ -297,6 +297,47 @@ func TestEnsureCustomDNSListInConfig(t *testing.T) {
 		cfg2 := &configV2{DNSBlockLists: []*BlockList{{Tag: "Custom", Enabled: false}}}
 		if ensureCustomBlockListInConfig(cfg2) {
 			t.Fatal("Custom should count as the custom tag")
+		}
+	})
+
+	t.Run("custom moved to front", func(t *testing.T) {
+		cfg := &configV2{
+			DNSBlockLists: []*BlockList{
+				{Tag: "Ads", Enabled: true},
+				{Tag: "custom", Enabled: false},
+				{Tag: "Malware", Enabled: true},
+			},
+		}
+		if !ensureCustomBlockListInConfig(cfg) {
+			t.Fatal("expected reorder when custom not first")
+		}
+		if len(cfg.DNSBlockLists) != 3 {
+			t.Fatalf("len=%d", len(cfg.DNSBlockLists))
+		}
+		if cfg.DNSBlockLists[0].Tag != "custom" {
+			t.Fatalf("custom should be first, got %q", cfg.DNSBlockLists[0].Tag)
+		}
+		if cfg.DNSBlockLists[0].Enabled {
+			t.Fatal("reorder must not re-enable custom")
+		}
+		if cfg.DNSBlockLists[1].Tag != "Ads" || cfg.DNSBlockLists[2].Tag != "Malware" {
+			t.Fatalf("unexpected order: %+v", cfg.DNSBlockLists)
+		}
+		// Already first → no change.
+		if ensureCustomBlockListInConfig(cfg) {
+			t.Fatal("expected no change when custom already first")
+		}
+	})
+
+	t.Run("custom prepended before existing lists", func(t *testing.T) {
+		cfg := &configV2{
+			DNSBlockLists: []*BlockList{{Tag: "Ads", Enabled: true}},
+		}
+		if !ensureCustomBlockListInConfig(cfg) {
+			t.Fatal("expected prepend")
+		}
+		if len(cfg.DNSBlockLists) != 2 || cfg.DNSBlockLists[0].Tag != customDNSListTag || cfg.DNSBlockLists[1].Tag != "Ads" {
+			t.Fatalf("unexpected lists: %+v", cfg.DNSBlockLists)
 		}
 	})
 }
