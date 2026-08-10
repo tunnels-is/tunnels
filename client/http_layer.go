@@ -300,6 +300,15 @@ func HTTPhandler(w http.ResponseWriter, r *http.Request) {
 	case "updateBlockLists":
 		HTTP_UpdateBlockLists(w, r)
 		return
+	case "updateWhiteLists":
+		HTTP_UpdateWhiteLists(w, r)
+		return
+	case "getDNSListContent":
+		HTTP_GetDNSListContent(w, r)
+		return
+	case "setDNSListContent":
+		HTTP_SetDNSListContent(w, r)
+		return
 	case "getLogs":
 		HTTP_GetLogs(w, r)
 		return
@@ -445,6 +454,42 @@ func HTTP_UpdateBlockLists(w http.ResponseWriter, r *http.Request) {
 	forceReloadBlockLists()
 	config := CONFIG.Load()
 	JSON(w, r, 200, config.DNSBlockLists)
+}
+
+func HTTP_UpdateWhiteLists(w http.ResponseWriter, r *http.Request) {
+	forceReloadWhiteLists()
+	config := CONFIG.Load()
+	JSON(w, r, 200, config.DNSWhiteLists)
+}
+
+func HTTP_GetDNSListContent(w http.ResponseWriter, r *http.Request) {
+	form := new(DNSListContent)
+	err := Bind(form, r)
+	if err != nil {
+		JSON(w, r, 400, err.Error())
+		return
+	}
+	out, err := getCustomDNSListContent(form.Kind)
+	if err != nil {
+		JSON(w, r, 400, err.Error())
+		return
+	}
+	JSON(w, r, 200, out)
+}
+
+func HTTP_SetDNSListContent(w http.ResponseWriter, r *http.Request) {
+	form := new(DNSListContent)
+	err := Bind(form, r)
+	if err != nil {
+		JSON(w, r, 400, err.Error())
+		return
+	}
+	out, err := setCustomDNSListContent(form.Kind, form.Content)
+	if err != nil {
+		JSON(w, r, 400, err.Error())
+		return
+	}
+	JSON(w, r, 200, out)
 }
 
 func HTTP_GetState(w http.ResponseWriter, r *http.Request) {

@@ -1,8 +1,16 @@
 import { useEffect, useState } from "react"
-import { Pencil, RefreshCw, Save, Trash2, X } from "lucide-react"
+import { FileText, Pencil, RefreshCw, Save, Trash2, X } from "lucide-react"
 import Dialog from "@/components/Dialog"
 import { Card, Page, TextField, Toggle } from "@/components/ui"
-import { fetchState, saveConfig, toggleConfigKey, updateBlockLists } from "@/store/actions"
+import {
+	fetchState,
+	getDNSListContent,
+	saveConfig,
+	setDNSListContent,
+	toggleConfigKey,
+	updateBlockLists,
+	updateWhiteLists,
+} from "@/store/actions"
 import { useStore } from "@/store/store"
 
 const BEHAVIOUR_OPTIONS = [
@@ -15,7 +23,9 @@ const BEHAVIOUR_OPTIONS = [
 
 const NEW_RECORD = { Domain: "yourdomain.com", IP: ["127.0.0.1"], TXT: ["yourdomain.com text record"], Wildcard: true }
 
-const ListRow = ({ enabled, onToggle, name, meta, onEdit, onDelete }) => (
+const isCustomList = (list) => (list?.Tag || "").toLowerCase() === "custom"
+
+const ListRow = ({ enabled, onToggle, name, meta, onEdit, onDelete, onEditDomains, custom }) => (
 	<div className="group flex items-center gap-3 border-b border-base-200 px-1 py-2 last:border-0">
 		<button
 			className={"btn btn-xs w-12 shrink-0 " + (enabled ? "btn-success" : "btn-ghost")}
@@ -26,16 +36,35 @@ const ListRow = ({ enabled, onToggle, name, meta, onEdit, onDelete }) => (
 			{enabled ? "ON" : "OFF"}
 		</button>
 		<div className="min-w-0 flex-1">
-			<div className="truncate text-[13px] font-medium">{name}</div>
+			<div className="flex items-center gap-1.5">
+				<div className="truncate text-[13px] font-medium">{name}</div>
+				{custom && (
+					<span className="shrink-0 rounded bg-base-200 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide opacity-60">
+						local
+					</span>
+				)}
+			</div>
 			{meta && <div className="truncate font-mono text-[11px] opacity-50">{meta}</div>}
 		</div>
-		<div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-			<button className="btn btn-square btn-ghost btn-xs" onClick={onEdit}>
-				<Pencil size={12} />
-			</button>
-			<button className="btn btn-square btn-ghost btn-xs text-error" onClick={onDelete}>
-				<Trash2 size={12} />
-			</button>
+		<div className="flex items-center gap-0.5">
+			{onEditDomains && (
+				<button className="btn btn-outline btn-xs gap-1" onClick={onEditDomains} title="Edit domains in this list">
+					<FileText size={12} />
+					Edit
+				</button>
+			)}
+			<div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+				{onEdit && (
+					<button className="btn btn-square btn-ghost btn-xs" onClick={onEdit} title="Edit list settings">
+						<Pencil size={12} />
+					</button>
+				)}
+				{onDelete && (
+					<button className="btn btn-square btn-ghost btn-xs text-error" onClick={onDelete} title="Remove list">
+						<Trash2 size={12} />
+					</button>
+				)}
+			</div>
 		</div>
 	</div>
 )
@@ -76,7 +105,9 @@ const DNS = () => {
 	const [cfg, setCfg] = useState({ ...config })
 
 	const [dialog, setDialog] = useState(null)
-	const [updatingLists, setUpdatingLists] = useState(false)
+	const [updatingBlockLists, setUpdatingBlockLists] = useState(false)
+	const [updatingWhiteLists, setUpdatingWhiteLists] = useState(false)
+	const [domainsEditor, setDomainsEditor] = useState(null) // { kind, title, content, loading, saving }
 
 	useEffect(() => {
 		fetchState()
@@ -96,13 +127,42 @@ const DNS = () => {
 	}
 
 	const handleUpdateBlockLists = async () => {
-		if (updatingLists) return
-		setUpdatingLists(true)
+		if (updatingBlockLists) return
+		setUpdatingBlockLists(true)
 		try {
 			await updateBlockLists()
 		} finally {
-			setUpdatingLists(false)
+			setUpdatingBlockLists(false)
 		}
+	}
+
+	const handleUpdateWhiteLists = async () => {
+		if (updatingWhiteLists) return
+		setUpdatingWhiteLists(true)
+		try {
+			await updateWhiteLists()
+		} finally {
+			setUpdatingWhiteLists(false)
+		}
+	}
+
+	const openDomainsEditor = async (kind) => {
+		const title = kind === "blocklist" ? "Edit custom block list" : "Edit custom white list"
+		setDomainsEditor({ kind, title, content: "", loading: true, saving: false })
+		const data = await getDNSListContent(kind)
+		if (!data) {
+			setDomainsEditor(null)
+			return
+		}
+		setDomainsEditor({ kind, title, content: data.Content ?? "", loading: false, saving: false })
+	}
+
+	const saveDomainsEditor = async () => {
+		if (!domainsEditor || domainsEditor.saving) return
+		setDomainsEditor({ ...domainsEditor, saving: true })
+		const data = await setDNSListContent(domainsEditor.kind, domainsEditor.content)
+		if (data) setDomainsEditor(null)
+		else setDomainsEditor((prev) => (prev ? { ...prev, saving: false } : null))
 	}
 
 	const saveListItem = async (key, value, index) => {
@@ -261,11 +321,11 @@ const DNS = () => {
 							<button
 								className="btn btn-outline btn-xs"
 								onClick={handleUpdateBlockLists}
-								disabled={updatingLists || blockLists.length === 0}
+								disabled={updatingBlockLists || blockLists.length === 0}
 								title="Re-download all block lists from their URLs"
 							>
-								<RefreshCw size={12} className={updatingLists ? "animate-spin" : undefined} />
-								{updatingLists ? "Updating..." : "Update"}
+								<RefreshCw size={12} className={updatingBlockLists ? "animate-spin" : undefined} />
+								{updatingBlockLists ? "Updating..." : "Update"}
 							</button>
 							<button
 								className="btn btn-primary btn-xs"
@@ -283,17 +343,26 @@ const DNS = () => {
 					}
 				>
 					{blockLists.length > 0 ? (
-						blockLists.map((bl, i) => (
-							<ListRow
-								key={i}
-								enabled={bl.Enabled}
-								onToggle={() => toggleListItem("DNSBlockLists", i)}
-								name={bl.Tag}
-								meta={`${bl.Count?.toLocaleString?.() ?? bl.Count} domains`}
-								onEdit={() => setDialog({ kind: "DNSBlockLists", value: { ...bl }, index: i })}
-								onDelete={() => deleteListItem("DNSBlockLists", i)}
-							/>
-						))
+						blockLists.map((bl, i) => {
+							const custom = isCustomList(bl)
+							return (
+								<ListRow
+									key={i}
+									custom={custom}
+									enabled={bl.Enabled}
+									onToggle={() => toggleListItem("DNSBlockLists", i)}
+									name={bl.Tag}
+									meta={`${bl.Count?.toLocaleString?.() ?? bl.Count} domains`}
+									onEditDomains={custom ? () => openDomainsEditor("blocklist") : undefined}
+									onEdit={
+										custom
+											? undefined
+											: () => setDialog({ kind: "DNSBlockLists", value: { ...bl }, index: i })
+									}
+									onDelete={custom ? undefined : () => deleteListItem("DNSBlockLists", i)}
+								/>
+							)
+						})
 					) : (
 						<EmptyRow>No block lists configured</EmptyRow>
 					)}
@@ -303,32 +372,52 @@ const DNS = () => {
 					title="White lists"
 					description="Domains here always resolve, even if they appear on a block list."
 					actions={
-						<button
-							className="btn btn-primary btn-xs"
-							onClick={() =>
-								setDialog({
-									kind: "DNSWhiteLists",
-									value: { Tag: "new-whitelist", URL: "https://example.com/whitelist.txt", Enabled: true, Count: 0 },
-									index: -1,
-								})
-							}
-						>
-							Create
-						</button>
+						<>
+							<button
+								className="btn btn-outline btn-xs"
+								onClick={handleUpdateWhiteLists}
+								disabled={updatingWhiteLists || whiteLists.length === 0}
+								title="Re-download all white lists from their URLs and reload local lists"
+							>
+								<RefreshCw size={12} className={updatingWhiteLists ? "animate-spin" : undefined} />
+								{updatingWhiteLists ? "Updating..." : "Update"}
+							</button>
+							<button
+								className="btn btn-primary btn-xs"
+								onClick={() =>
+									setDialog({
+										kind: "DNSWhiteLists",
+										value: { Tag: "new-whitelist", URL: "https://example.com/whitelist.txt", Enabled: true, Count: 0 },
+										index: -1,
+									})
+								}
+							>
+								Create
+							</button>
+						</>
 					}
 				>
 					{whiteLists.length > 0 ? (
-						whiteLists.map((wl, i) => (
-							<ListRow
-								key={i}
-								enabled={wl.Enabled}
-								onToggle={() => toggleListItem("DNSWhiteLists", i)}
-								name={wl.Tag}
-								meta={`${wl.Count?.toLocaleString?.() ?? wl.Count} domains`}
-								onEdit={() => setDialog({ kind: "DNSWhiteLists", value: { ...wl }, index: i })}
-								onDelete={() => deleteListItem("DNSWhiteLists", i)}
-							/>
-						))
+						whiteLists.map((wl, i) => {
+							const custom = isCustomList(wl)
+							return (
+								<ListRow
+									key={i}
+									custom={custom}
+									enabled={wl.Enabled}
+									onToggle={() => toggleListItem("DNSWhiteLists", i)}
+									name={wl.Tag}
+									meta={`${wl.Count?.toLocaleString?.() ?? wl.Count} domains`}
+									onEditDomains={custom ? () => openDomainsEditor("whitelist") : undefined}
+									onEdit={
+										custom
+											? undefined
+											: () => setDialog({ kind: "DNSWhiteLists", value: { ...wl }, index: i })
+									}
+									onDelete={custom ? undefined : () => deleteListItem("DNSWhiteLists", i)}
+								/>
+							)
+						})
 					) : (
 						<EmptyRow>No white lists configured</EmptyRow>
 					)}
@@ -413,6 +502,55 @@ const DNS = () => {
 				onChange={updateDialogValue}
 				onSave={() => saveListItem(dialog.kind, dialog.value, dialog.index)}
 			/>
+
+			<Dialog
+				open={!!domainsEditor}
+				onClose={() => !domainsEditor?.saving && setDomainsEditor(null)}
+				title={domainsEditor?.title}
+				wide
+				actions={
+					<>
+						<button
+							className="btn btn-ghost btn-sm"
+							onClick={() => setDomainsEditor(null)}
+							disabled={domainsEditor?.saving}
+						>
+							Cancel
+						</button>
+						<button
+							className="btn btn-primary btn-sm"
+							onClick={saveDomainsEditor}
+							disabled={domainsEditor?.loading || domainsEditor?.saving}
+						>
+							<Save size={12} />
+							{domainsEditor?.saving ? "Saving..." : "Save"}
+						</button>
+					</>
+				}
+			>
+				{domainsEditor?.loading ? (
+					<div className="py-8 text-center text-sm opacity-50">Loading list…</div>
+				) : (
+					<div className="space-y-2">
+						<p className="text-[11px] leading-relaxed opacity-50">
+							One domain per line (e.g. <code className="font-mono">example.com</code>). Lines starting with{" "}
+							<code className="font-mono">#</code> are comments. Exact hostnames only —{" "}
+							<code className="font-mono">example.com</code> does not include{" "}
+							<code className="font-mono">www.example.com</code>.
+							{domainsEditor?.kind === "whitelist"
+								? " Whitelisted domains always resolve, even if they appear on a block list."
+								: " These domains will be blocked by the local DNS resolver."}
+						</p>
+						<textarea
+							className="textarea textarea-bordered h-72 w-full font-mono text-xs leading-relaxed"
+							spellCheck={false}
+							value={domainsEditor?.content ?? ""}
+							onChange={(e) => setDomainsEditor({ ...domainsEditor, content: e.target.value })}
+							placeholder={"# one domain per line\nexample.com\ncdn.mycompany.com"}
+						/>
+					</div>
+				)}
+			</Dialog>
 		</Page>
 	)
 }

@@ -33,6 +33,14 @@ type indexedListResult struct {
 }
 
 func reloadWhiteLists(sleep bool) {
+	reloadWhiteListsEx(sleep, false)
+}
+
+func forceReloadWhiteLists() {
+	reloadWhiteListsEx(false, true)
+}
+
+func reloadWhiteListsEx(sleep bool, force bool) {
 	defer RecoverAndLog()
 	if sleep {
 		time.Sleep(1 * time.Hour)
@@ -101,7 +109,7 @@ func reloadWhiteLists(sleep bool) {
 		wg.Add(1)
 		go func(i int, wl *BlockList) {
 			defer wg.Done()
-			ch <- indexedListResult{i: i, r: processWhiteList(wl, prevByTag)}
+			ch <- indexedListResult{i: i, r: processWhiteList(wl, force, prevByTag)}
 		}(i, lists[i])
 	}
 	go func() {
@@ -137,7 +145,7 @@ func reloadWhiteLists(sleep bool) {
 	}
 }
 
-func processWhiteList(wl *BlockList, prevByTag map[string]*DomainSet) listLoadResult {
+func processWhiteList(wl *BlockList, force bool, prevByTag map[string]*DomainSet) listLoadResult {
 	defer RecoverAndLog()
 	if wl == nil {
 		return listLoadResult{}
@@ -163,7 +171,7 @@ func processWhiteList(wl *BlockList, prevByTag map[string]*DomainSet) listLoadRe
 	}
 
 	downloaded := false
-	if time.Since(wl.LastDownload).Hours() > 24 && wl.URL != "" {
+	if (force || time.Since(wl.LastDownload).Hours() > 24) && wl.URL != "" {
 		if err := downloadListToFile(wl.URL, path); err != nil {
 			ERROR("Could not download whitelist", wl.URL, err)
 			if !fileExistsNonEmpty(path) {
@@ -194,7 +202,7 @@ func processWhiteList(wl *BlockList, prevByTag map[string]*DomainSet) listLoadRe
 		return listLoadResult{tag: tag}
 	}
 
-	if !downloaded && prevByTag != nil {
+	if !force && !downloaded && prevByTag != nil {
 		if old := prevByTag[tag]; old != nil && old.Len() > 0 {
 			return listLoadResult{
 				tag:        tag,

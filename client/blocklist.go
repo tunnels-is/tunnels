@@ -278,18 +278,34 @@ func ensureCustomBlockListFile(blockListDir string) error {
 	return ensureCustomDNSListFile(blockListDir, customBlockListFileContent)
 }
 
-// ensureCustomDNSListInSlice appends an enabled "custom" list when missing.
-// Existing entries are not modified, so a user who disabled "custom" stays disabled.
+// ensureCustomDNSListInSlice ensures an enabled "custom" list exists and is first.
+// If missing, it is prepended (Enabled=true). If present but not first, it is
+// moved to the front. Existing Enabled/URL/etc. are otherwise left unchanged.
 func ensureCustomDNSListInSlice(lists *[]*BlockList) bool {
 	if lists == nil {
 		return false
 	}
-	for _, l := range *lists {
+	idx := -1
+	for i, l := range *lists {
 		if l != nil && strings.EqualFold(l.Tag, customDNSListTag) {
-			return false
+			idx = i
+			break
 		}
 	}
-	*lists = append(*lists, newCustomDNSList())
+	if idx == -1 {
+		*lists = append([]*BlockList{newCustomDNSList()}, *lists...)
+		return true
+	}
+	if idx == 0 {
+		return false
+	}
+	// Keep custom at the top of the list for UI and defaults.
+	custom := (*lists)[idx]
+	out := make([]*BlockList, 0, len(*lists))
+	out = append(out, custom)
+	out = append(out, (*lists)[:idx]...)
+	out = append(out, (*lists)[idx+1:]...)
+	*lists = out
 	return true
 }
 

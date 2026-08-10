@@ -465,3 +465,44 @@ export const updateBlockLists = async () => {
 		store().hideLoading()
 	}
 }
+
+export const updateWhiteLists = async () => {
+	store().showLoading("Updating white lists...")
+	try {
+		const resp = await api("updateWhiteLists", null, { timeout: 300000 })
+		if (resp.status === 200) {
+			store().notifySuccess("White lists updated")
+			await fetchState()
+			return true
+		}
+		return false
+	} finally {
+		store().hideLoading()
+	}
+}
+
+/** kind: "blocklist" | "whitelist" — local custom list file only */
+export const getDNSListContent = async (kind) => {
+	const resp = await api("getDNSListContent", { Kind: kind })
+	if (resp.status === 200) return resp.data
+	return null
+}
+
+/** kind: "blocklist" | "whitelist" — writes custom list file and hot-reloads it */
+export const setDNSListContent = async (kind, content) => {
+	store().showLoading("Saving list...")
+	try {
+		const resp = await api("setDNSListContent", { Kind: kind, Content: content })
+		if (resp.status === 200) {
+			const n = resp.data?.Count
+			store().notifySuccess(
+				typeof n === "number" ? `Custom list saved (${n.toLocaleString()} domains)` : "Custom list saved",
+			)
+			await fetchState()
+			return resp.data
+		}
+		return null
+	} finally {
+		store().hideLoading()
+	}
+}
