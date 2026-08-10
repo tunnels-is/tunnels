@@ -284,7 +284,6 @@ export const connect = async (tunnel, server) => {
 		UserID: user._id,
 		DeviceToken: user.DeviceToken.DT,
 		Tag: tunnel.Tag,
-		EncType: tunnel.EncryptionType,
 		ServerID: server._id,
 		Server: user.ControlServer,
 	})

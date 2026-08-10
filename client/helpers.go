@@ -55,9 +55,15 @@ func InitBaseFoldersAndPaths() {
 
 	s.BlockListPath = s.BasePath + "blocklists" + string(os.PathSeparator)
 	CreateFolder(s.BlockListPath)
+	if err := ensureCustomBlockListFile(s.BlockListPath); err != nil {
+		ERROR("unable to create custom blocklist file: ", err)
+	}
 
 	s.WhiteListPath = s.BasePath + "whitelists" + string(os.PathSeparator)
 	CreateFolder(s.WhiteListPath)
+	if err := ensureCustomWhiteListFile(s.WhiteListPath); err != nil {
+		ERROR("unable to create custom whitelist file: ", err)
+	}
 
 	STATE.Store(s)
 }

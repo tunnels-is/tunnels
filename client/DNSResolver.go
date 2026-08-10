@@ -252,12 +252,9 @@ func DNSQuery(w dns.ResponseWriter, m *dns.Msg) {
 		return
 	}
 
-	whitelisted := isWhitelisted(m)
-	var blocked bool
-	var tag string
-	if !whitelisted {
-		blocked, tag = isBlocked(m)
-	}
+	// Whitelist always wins: a domain on any enabled whitelist is allowed even
+	// if it also appears on a block list (block check is skipped entirely).
+	blocked, tag := dnsListDecision(m)
 
 	var DNSTunnel *TUN
 	var ServerDNS *types.DNSRecord
@@ -444,6 +441,15 @@ func DNSCacheCheck(m *dns.Msg, w dns.ResponseWriter) bool {
 
 	IncrementDNSStats(m.Question[0].Name, false, "", cachedReply.A)
 	return true
+}
+
+// dnsListDecision applies whitelist-over-blocklist priority.
+// If the name is whitelisted, blocked is always false.
+func dnsListDecision(m *dns.Msg) (blocked bool, tag string) {
+	if isWhitelisted(m) {
+		return false, ""
+	}
+	return isBlocked(m)
 }
 
 func isBlocked(m *dns.Msg) (ok bool, tag string) {
