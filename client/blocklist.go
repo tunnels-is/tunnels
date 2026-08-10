@@ -17,7 +17,22 @@ const (
 	maxDNSListSize    = 128 * 1024 * 1024
 	dnsListScanBuf    = 64 * 1024
 	dnsListMaxLineLen = 1024 * 1024
+
+	// customDNSListTag is the local user-editable blocklist/whitelist filename
+	// and config tag (blocklists/custom, whitelists/custom).
+	customDNSListTag = "custom"
 )
+
+// customBlockListFileContent is written when blocklists/custom is missing.
+// Comments keep the file non-empty so local load does not treat it as absent.
+const customBlockListFileContent = `# Tunnels custom DNS block list
+# Domains listed here are blocked by the local DNS resolver.
+# One domain per line. Lines starting with # are ignored.
+#
+# Example:
+# ads.tracker.example
+# malware.example.com
+`
 
 var listHTTPClient = &http.Client{Timeout: 5 * time.Minute}
 
@@ -37,14 +52,26 @@ func reloadBlockListsEx(sleep bool, force bool) {
 	listReloadMu.Lock()
 	defer listReloadMu.Unlock()
 	config := CONFIG.Load()
+	state := STATE.Load()
+
+	if err := ensureCustomBlockListFile(state.BlockListPath); err != nil {
+		ERROR("unable to create custom blocklist file: ", err)
+	}
+	configChanged := ensureCustomBlockListInConfig(config)
 
 	if config.DisableBlockLists {
 		DNSBlockList.Store(EmptyCatalog())
+		if configChanged {
+			if err := writeConfigToDisk(); err != nil {
+				ERROR("unable to write config to disk post blocklist ensure", err)
+			}
+		}
 		return
 	}
 
 	if len(config.DNSBlockLists) == 0 {
 		config.DNSBlockLists = GetDefaultBlockLists()
+		configChanged = true
 	}
 	badList := false
 	for _, v := range config.DNSBlockLists {
@@ -58,8 +85,12 @@ func reloadBlockListsEx(sleep bool, force bool) {
 	}
 	if badList {
 		config.DNSBlockLists = GetDefaultBlockLists()
+		configChanged = true
 	}
-
+	// Re-ensure after any full replacement of the list slice.
+	if ensureCustomBlockListInConfig(config) {
+		configChanged = true
+	}
 
 	prev := DNSBlockList.Load()
 	prevByTag := prev.Snapshot()
@@ -68,9 +99,13 @@ func reloadBlockListsEx(sleep bool, force bool) {
 	n := len(lists)
 	if n == 0 {
 		DNSBlockList.Store(EmptyCatalog())
+		if configChanged {
+			if err := writeConfigToDisk(); err != nil {
+				ERROR("unable to write config to disk post blocklist ensure", err)
+			}
+		}
 		return
 	}
-
 
 	ch := make(chan indexedListResult, n)
 	var wg sync.WaitGroup
@@ -130,7 +165,6 @@ func reloadBlockListsEx(sleep bool, force bool) {
 	}
 }
 
-
 func processBlockList(bl *BlockList, force bool, prevByTag map[string]*DomainSet) listLoadResult {
 	defer RecoverAndLog()
 	if bl == nil {
@@ -148,6 +182,13 @@ func processBlockList(bl *BlockList, force bool, prevByTag map[string]*DomainSet
 		return listLoadResult{tag: tag}
 	}
 	lowerTag := strings.ToLower(bl.Tag)
+
+	// Local custom list: recreate the starter file if someone deleted it.
+	if bl.URL == "" && strings.EqualFold(bl.Tag, customDNSListTag) {
+		if err := ensureCustomBlockListFile(state.BlockListPath); err != nil {
+			ERROR("unable to create custom blocklist file: ", err)
+		}
+	}
 
 	downloaded := false
 	if (force || time.Since(bl.LastDownload).Hours() > 24) && bl.URL != "" {
@@ -181,7 +222,6 @@ func processBlockList(bl *BlockList, force bool, prevByTag map[string]*DomainSet
 		return listLoadResult{tag: tag}
 	}
 
-
 	if !force && !downloaded && prevByTag != nil {
 		if old := prevByTag[tag]; old != nil && old.Len() > 0 {
 			return listLoadResult{
@@ -212,6 +252,60 @@ func processBlockList(bl *BlockList, force bool, prevByTag map[string]*DomainSet
 		count:        count,
 		lastDownload: time.Now(),
 		updateMeta:   true,
+	}
+}
+
+// ensureCustomDNSListFile creates <dir>/custom when missing or empty.
+// Existing non-empty files (including user edits) are left untouched.
+func ensureCustomDNSListFile(dir, content string) error {
+	if dir == "" {
+		return nil
+	}
+	path, err := listFilePath(dir, customDNSListTag)
+	if err != nil {
+		return err
+	}
+	if fileExistsNonEmpty(path) {
+		return nil
+	}
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return err
+	}
+	return os.WriteFile(path, []byte(content), 0o600)
+}
+
+func ensureCustomBlockListFile(blockListDir string) error {
+	return ensureCustomDNSListFile(blockListDir, customBlockListFileContent)
+}
+
+// ensureCustomDNSListInSlice appends an enabled "custom" list when missing.
+// Existing entries are not modified, so a user who disabled "custom" stays disabled.
+func ensureCustomDNSListInSlice(lists *[]*BlockList) bool {
+	if lists == nil {
+		return false
+	}
+	for _, l := range *lists {
+		if l != nil && strings.EqualFold(l.Tag, customDNSListTag) {
+			return false
+		}
+	}
+	*lists = append(*lists, newCustomDNSList())
+	return true
+}
+
+func ensureCustomBlockListInConfig(config *configV2) bool {
+	if config == nil {
+		return false
+	}
+	return ensureCustomDNSListInSlice(&config.DNSBlockLists)
+}
+
+func newCustomDNSList() *BlockList {
+	return &BlockList{
+		Tag:          customDNSListTag,
+		URL:          "",
+		Enabled:      true,
+		LastDownload: time.Now().AddDate(-2, 0, 0),
 	}
 }
 
@@ -317,7 +411,9 @@ retry:
 }
 
 func GetDefaultBlockLists() []*BlockList {
+	dlt := time.Now().AddDate(-2, 0, 0)
 	bl := []*BlockList{
+		newCustomDNSList(),
 		{
 			Tag: "Ads",
 			URL: "https://raw.githubusercontent.com/n00bady/bluam/master/dns/merged/ads",
@@ -360,8 +456,11 @@ func GetDefaultBlockLists() []*BlockList {
 		},
 	}
 
-	dlt := time.Now().AddDate(-2, 0, 0)
 	for i := range bl {
+		// custom already has LastDownload/Enabled from newCustomDNSList.
+		if bl[i].Tag == customDNSListTag {
+			continue
+		}
 		bl[i].LastDownload = dlt
 	}
 

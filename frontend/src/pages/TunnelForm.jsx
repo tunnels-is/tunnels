@@ -3,7 +3,6 @@ import { useNavigate, useParams } from "react-router-dom"
 import { ArrowLeft, Minus, Plus, Save, X } from "lucide-react"
 import { Card, Field, Page, TextField, Toggle } from "@/components/ui"
 import { fetchServers, fetchState, saveTunnel } from "@/store/actions"
-import { ENC_TYPES } from "@/lib/format"
 import { useStore } from "@/store/store"
 
 const FEATURE_TOGGLES = [
@@ -200,19 +199,6 @@ const TunnelForm = () => {
 								{servers?.map((s) => (
 									<option key={s._id} value={s._id}>
 										{s.Tag} ({s.IP})
-									</option>
-								))}
-							</select>
-						</Field>
-						<Field label="Encryption">
-							<select
-								className="select select-sm w-full"
-								value={form.EncryptionType ?? 0}
-								onChange={(e) => set("EncryptionType", Number(e.target.value))}
-							>
-								{ENC_TYPES.map((label, i) => (
-									<option key={i} value={i}>
-										{label}
 									</option>
 								))}
 							</select>

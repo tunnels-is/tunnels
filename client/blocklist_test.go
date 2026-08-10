@@ -1,6 +1,8 @@
 package client
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 )
@@ -91,11 +93,17 @@ func TestGetDefaultBlockLists(t *testing.T) {
 			t.Errorf("Block list at index %d has empty Tag", i)
 		}
 
-		if bl.URL == "" {
+		isCustom := bl.Tag == customDNSListTag
+		if isCustom {
+			if bl.URL != "" {
+				t.Errorf("custom block list should have empty URL, got %q", bl.URL)
+			}
+			if !bl.Enabled {
+				t.Error("custom block list should be Enabled")
+			}
+		} else if bl.URL == "" {
 			t.Errorf("Block list at index %d (%s) has empty URL", i, bl.Tag)
-		}
-
-		if !CheckIfURL(bl.URL) {
+		} else if !CheckIfURL(bl.URL) {
 			t.Errorf("Block list %s has invalid URL: %s", bl.Tag, bl.URL)
 		}
 
@@ -104,10 +112,10 @@ func TestGetDefaultBlockLists(t *testing.T) {
 			t.Errorf("Block list %s LastDownload should be ~2 years ago, got %.2f years", bl.Tag, yearsDiff)
 		}
 
-		t.Logf("Block list: Tag=%s, URL=%s", bl.Tag, bl.URL)
+		t.Logf("Block list: Tag=%s, URL=%s, Enabled=%v", bl.Tag, bl.URL, bl.Enabled)
 	}
 
-	expectedTags := []string{"Ads", "AdultContent", "CryptoCurrency", "Drugs", "FakeNews",
+	expectedTags := []string{customDNSListTag, "Ads", "AdultContent", "CryptoCurrency", "Drugs", "FakeNews",
 		"Fraud", "Gambling", "Malware", "SocialMedia", "Surveillance"}
 
 	foundTags := make(map[string]bool)
@@ -123,6 +131,10 @@ func TestGetDefaultBlockLists(t *testing.T) {
 		}
 	}
 
+	if lists[0].Tag != customDNSListTag {
+		t.Errorf("custom block list should be first, got %q", lists[0].Tag)
+	}
+
 	t.Logf("Total default block lists: %d", len(lists))
 }
 
@@ -130,7 +142,10 @@ func TestGetDefaultWhiteLists(t *testing.T) {
 	lists := GetDefaultWhiteLists()
 
 	if lists == nil {
-		t.Error("Default white lists should not be nil")
+		t.Fatal("Default white lists should not be nil")
+	}
+	if len(lists) != 1 {
+		t.Fatalf("expected 1 default white list, got %d", len(lists))
 	}
 
 	for i, wl := range lists {
@@ -152,8 +167,136 @@ func TestGetDefaultWhiteLists(t *testing.T) {
 			t.Errorf("White list %s LastDownload should be ~2 years ago, got %.2f years", wl.Tag, yearsDiff)
 		}
 
-		t.Logf("White list: Tag=%s, URL=%s", wl.Tag, wl.URL)
+		t.Logf("White list: Tag=%s, URL=%s, Enabled=%v", wl.Tag, wl.URL, wl.Enabled)
+	}
+
+	def := lists[0]
+	if def.Tag != customDNSListTag {
+		t.Errorf("custom white list tag = %q, want %q", def.Tag, customDNSListTag)
+	}
+	if !def.Enabled {
+		t.Error("custom white list should be Enabled")
+	}
+	if def.URL != "" {
+		t.Errorf("custom white list should have empty URL (local file), got %q", def.URL)
 	}
 
 	t.Logf("Total default white lists: %d", len(lists))
+}
+
+func TestEnsureCustomDNSListFiles(t *testing.T) {
+	cases := []struct {
+		name    string
+		ensure  func(string) error
+		content string
+	}{
+		{"whitelist", ensureCustomWhiteListFile, customWhiteListFileContent},
+		{"blocklist", ensureCustomBlockListFile, customBlockListFileContent},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			path := filepath.Join(dir, customDNSListTag)
+
+			if err := tc.ensure(dir); err != nil {
+				t.Fatalf("create: %v", err)
+			}
+			data, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatalf("read: %v", err)
+			}
+			if string(data) != tc.content {
+				t.Fatalf("unexpected custom file content:\n%s", data)
+			}
+
+			// Existing non-empty file must not be overwritten.
+			user := []byte("keep.example.com\n")
+			if err := os.WriteFile(path, user, 0o600); err != nil {
+				t.Fatal(err)
+			}
+			if err := tc.ensure(dir); err != nil {
+				t.Fatalf("re-ensure: %v", err)
+			}
+			data, err = os.ReadFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if string(data) != string(user) {
+				t.Fatalf("user file was overwritten: %q", data)
+			}
+
+			// Empty file is recreated.
+			if err := os.WriteFile(path, nil, 0o600); err != nil {
+				t.Fatal(err)
+			}
+			if err := tc.ensure(dir); err != nil {
+				t.Fatalf("recreate empty: %v", err)
+			}
+			data, err = os.ReadFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if string(data) != tc.content {
+				t.Fatalf("empty file was not recreated")
+			}
+		})
+	}
+}
+
+func TestEnsureCustomDNSListInConfig(t *testing.T) {
+	t.Run("whitelist", func(t *testing.T) {
+		cfg := &configV2{}
+		if !ensureCustomWhiteListInConfig(cfg) {
+			t.Fatal("expected config change when custom whitelist missing")
+		}
+		if len(cfg.DNSWhiteLists) != 1 || cfg.DNSWhiteLists[0].Tag != customDNSListTag {
+			t.Fatalf("custom whitelist not added: %+v", cfg.DNSWhiteLists)
+		}
+		if !cfg.DNSWhiteLists[0].Enabled {
+			t.Fatal("custom whitelist should be enabled on creation")
+		}
+
+		cfg.DNSWhiteLists[0].Enabled = false
+		if ensureCustomWhiteListInConfig(cfg) {
+			t.Fatal("expected no change when custom already present")
+		}
+		if cfg.DNSWhiteLists[0].Enabled {
+			t.Fatal("should not re-enable a user-disabled custom whitelist")
+		}
+		if len(cfg.DNSWhiteLists) != 1 {
+			t.Fatalf("should not duplicate custom, got %d entries", len(cfg.DNSWhiteLists))
+		}
+
+		cfg2 := &configV2{DNSWhiteLists: []*BlockList{{Tag: "CUSTOM", Enabled: false}}}
+		if ensureCustomWhiteListInConfig(cfg2) {
+			t.Fatal("CUSTOM should count as the custom tag")
+		}
+	})
+
+	t.Run("blocklist", func(t *testing.T) {
+		cfg := &configV2{}
+		if !ensureCustomBlockListInConfig(cfg) {
+			t.Fatal("expected config change when custom blocklist missing")
+		}
+		if len(cfg.DNSBlockLists) != 1 || cfg.DNSBlockLists[0].Tag != customDNSListTag {
+			t.Fatalf("custom blocklist not added: %+v", cfg.DNSBlockLists)
+		}
+		if !cfg.DNSBlockLists[0].Enabled {
+			t.Fatal("custom blocklist should be enabled on creation")
+		}
+
+		cfg.DNSBlockLists[0].Enabled = false
+		if ensureCustomBlockListInConfig(cfg) {
+			t.Fatal("expected no change when custom already present")
+		}
+		if cfg.DNSBlockLists[0].Enabled {
+			t.Fatal("should not re-enable a user-disabled custom blocklist")
+		}
+
+		cfg2 := &configV2{DNSBlockLists: []*BlockList{{Tag: "Custom", Enabled: false}}}
+		if ensureCustomBlockListInConfig(cfg2) {
+			t.Fatal("Custom should count as the custom tag")
+		}
+	})
 }
