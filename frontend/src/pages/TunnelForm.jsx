@@ -10,7 +10,6 @@ const FEATURE_TOGGLES = [
 	{ key: "LocalhostNat", label: "Localhost NAT" },
 	{ key: "AutoReconnect", label: "Auto Reconnect" },
 	{ key: "AutoConnect", label: "Auto Connect" },
-	{ key: "KillSwitch", label: "Kill Switch" },
 	{ key: "EnableDefaultRoute", label: "Default Route" },
 	{ key: "EnableWAN", label: "WAN Routing" },
 ]
@@ -220,39 +219,9 @@ const TunnelForm = () => {
 
 				<Card title="Features" description="Behaviour of this tunnel while connected.">
 					<div className="grid grid-cols-1 sm:grid-cols-2">
-						{FEATURE_TOGGLES.map((opt) => {
-
-							if (opt.key === "KillSwitch") {
-								const allowed = !!form.EnableDefaultRoute
-								return (
-									<Toggle
-										key={opt.key}
-										label={opt.label}
-										warning={!allowed ? "Requires Default Route to be enabled" : undefined}
-										checked={allowed && !!form.KillSwitch}
-										disabled={!allowed}
-										onChange={() => set("KillSwitch", !form.KillSwitch)}
-									/>
-								)
-							}
-
-							if (opt.key === "EnableDefaultRoute") {
-								return (
-									<Toggle
-										key={opt.key}
-										label={opt.label}
-										checked={!!form.EnableDefaultRoute}
-										onChange={() =>
-											setForm((f) => {
-												const next = !f.EnableDefaultRoute
-												return { ...f, EnableDefaultRoute: next, KillSwitch: next ? f.KillSwitch : false }
-											})
-										}
-									/>
-								)
-							}
-							return <Toggle key={opt.key} label={opt.label} checked={!!form[opt.key]} onChange={() => set(opt.key, !form[opt.key])} />
-						})}
+						{FEATURE_TOGGLES.map((opt) => (
+							<Toggle key={opt.key} label={opt.label} checked={!!form[opt.key]} onChange={() => set(opt.key, !form[opt.key])} />
+						))}
 					</div>
 				</Card>
 

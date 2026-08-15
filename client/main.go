@@ -64,7 +64,6 @@ func InitService() error {
 	}
 	conf := CONFIG.Load()
 
-
 	if conf.CLIConfig != nil && conf.CLIConfig.UserID != "" {
 		if err := activateAccountByUserID(conf.CLIConfig.UserID); err != nil {
 			ERROR("unable to activate CLI account workspace:", err)
@@ -106,6 +105,10 @@ func InitService() error {
 	AdminCheck()
 
 	printInfo()
+
+	if err := applyConfiguredKillSwitch(); err != nil {
+		SECURITY("kill switch: failed to apply on startup: ", err)
+	}
 
 	if !conf.DisableDNS {
 		InitDNSHandler()
@@ -243,21 +246,10 @@ func handleTunnelDeath(t *TUN) {
 		return
 	}
 
-	killSwitch := meta.KillSwitch && meta.EnableDefaultRoute
-	if killSwitch {
-		if !killSwitchSupported() {
-			SECURITY("kill switch is ENABLED for ", meta.Tag,
-				" but is not enforced on this platform — traffic may leak after a tunnel drop")
-		} else if err := engageKillSwitch(meta.Tag); err != nil {
-			SECURITY("kill switch: could not block traffic after tunnel drop (", meta.Tag, "): ", err)
-		} else {
-			INFO("kill switch engaged after tunnel drop: ", meta.Tag)
-		}
-	}
-
 	cr := t.CR
 
 	Disconnect(t.ID, false)
+	_ = applyConfiguredKillSwitch()
 
 	if !meta.AutoReconnect || cr == nil {
 		return
@@ -284,14 +276,10 @@ func handleTunnelDeath(t *TUN) {
 			select {
 			case <-stopCh:
 				disconnectTunnelByTag(meta.Tag)
-				releaseKillSwitch(meta.Tag)
 				return
 			default:
 			}
 			INFO("auto-reconnect: ", meta.Tag, " reconnected")
-			if killSwitch {
-				releaseKillSwitch(meta.Tag)
-			}
 			return
 		}
 		INFO("auto-reconnect: ", meta.Tag, " attempt ", attempt, " failed (code ", code, "): ", err)

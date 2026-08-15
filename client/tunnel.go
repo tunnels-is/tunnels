@@ -24,6 +24,7 @@ func Disconnect(tunID string, switching bool) (err error) {
 
 				announceClearAndFlush(tun)
 				_ = tunnel.Disconnect(tun)
+				_ = applyConfiguredKillSwitch()
 			}
 			TunnelMap.Delete(tun.ID)
 			m := tun.meta.Load()
@@ -72,7 +73,6 @@ func createTunnel() (T *TunnelMETA) {
 	T.DNSServers = make([]string, 0)
 	T.DNSRecords = make([]*types.DNSRecord, 0)
 	T.Routes = make([]*types.Route, 0)
-	T.KillSwitch = true
 	T.EnableWAN = true
 	return
 }
@@ -102,7 +102,6 @@ func CleanupOnClose() {
 	defer RecoverAndLog()
 
 	stopAllReconnects()
-	releaseAllKillSwitches()
 	tunnelMapRange(func(tun *TUN) bool {
 		announceClearAndFlush(tun)
 		tunnel := tun.tunnel.Load()

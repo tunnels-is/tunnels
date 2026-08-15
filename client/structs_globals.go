@@ -243,7 +243,6 @@ type ControlServer struct {
 	ValidateCertificate bool
 }
 
-
 func (c *ControlServer) effectivePort() string {
 	if c == nil {
 		return ""
@@ -280,6 +279,13 @@ type CLIConfig struct {
 
 type configV2 struct {
 	OpenUI bool
+
+	// KillSwitchIPv4 blackholes 0.0.0.0/0 until the user turns it off.
+	// Off by default. When on, controller/VPN endpoints are pinned /32.
+	KillSwitchIPv4 bool
+	// KillSwitchIPv6 blackholes ::/0 until the user turns it off.
+	// On by default: the client does not tunnel IPv6.
+	KillSwitchIPv6 bool
 
 	ControlServers    []*ControlServer
 	DisableBlockLists bool

@@ -238,10 +238,6 @@ func validateTunnelMeta(tun *TunnelMETA, oldTag string) (err []string) {
 		err = append(err, "unsupported tunnel config format: "+tun.ConfigFormat)
 	}
 
-	if tun.KillSwitch && !tun.EnableDefaultRoute {
-		err = append(err, "kill switch requires the default route to be enabled")
-	}
-
 	tunnelMetaMapRange(func(t *TunnelMETA) bool {
 		if t.Tag == tun.Tag {
 			return true

@@ -106,6 +106,28 @@ const Settings = () => {
 					/>
 				</Card>
 
+				<Card
+					title="Kill switch"
+					description="Blackhole routes stay installed until you turn the switch off — including after disconnect or quitting the app. A reboot clears them; they are re-applied on next start if still enabled."
+				>
+					<Toggle
+						label="IPv6 kill switch"
+						checked={config?.KillSwitchIPv6 !== false}
+						onChange={() => toggleConfigKey("KillSwitchIPv6")}
+					/>
+					<p className="text-xs opacity-60">
+						On by default. Tunnels does not put IPv6 in the tunnel; this drops ::/0 so AAAA destinations cannot leak to the ISP.
+					</p>
+					<Toggle
+						label="IPv4 kill switch"
+						checked={!!config?.KillSwitchIPv4}
+						onChange={() => toggleConfigKey("KillSwitchIPv4")}
+					/>
+					<p className="text-xs opacity-60">
+						Off by default. When on, 0.0.0.0/0 is blackholed except the tunnel and pinned controller/VPN endpoints. You will have no general internet until you connect or turn this off.
+					</p>
+				</Card>
+
 				{advanced && (
 				<Card
 					className="lg:col-span-2 2xl:col-span-3"

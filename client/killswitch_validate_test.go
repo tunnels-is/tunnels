@@ -5,28 +5,44 @@ import (
 	"testing"
 )
 
-func TestValidateTunnelMeta_KillSwitchRequiresDefaultRoute(t *testing.T) {
-	hasKSErr := func(errs []string) bool {
-		for _, e := range errs {
-			if strings.Contains(e, "kill switch requires the default route") {
-				return true
-			}
+func TestDefaultConfig_KillSwitchDefaults(t *testing.T) {
+	conf := DefaultConfig()
+	if conf.KillSwitchIPv4 {
+		t.Fatal("IPv4 kill switch should be off by default")
+	}
+	if !conf.KillSwitchIPv6 {
+		t.Fatal("IPv6 kill switch should be on by default")
+	}
+}
+
+func TestApplyMissingKillSwitchDefaults_IPv6OnWhenAbsent(t *testing.T) {
+	cfg := &configV2{}
+	applyMissingKillSwitchDefaults([]byte(`{"APIIP":"127.0.0.1"}`), cfg)
+	if !cfg.KillSwitchIPv6 {
+		t.Fatal("missing KillSwitchIPv6 must default to on")
+	}
+	if cfg.KillSwitchIPv4 {
+		t.Fatal("missing KillSwitchIPv4 must stay off")
+	}
+
+	off := &configV2{}
+	applyMissingKillSwitchDefaults([]byte(`{"KillSwitchIPv6":false}`), off)
+	if off.KillSwitchIPv6 {
+		t.Fatal("explicit KillSwitchIPv6 false must be preserved")
+	}
+}
+
+func TestValidateTunnelMeta_NoPerTunnelKillSwitchRule(t *testing.T) {
+	tun := &TunnelMETA{IFName: "tunt", Tag: "t1", EnableDefaultRoute: false}
+	for _, e := range validateTunnelMeta(tun, "") {
+		if strings.Contains(e, "kill switch") {
+			t.Fatalf("per-tunnel kill switch rule should be gone: %s", e)
 		}
-		return false
 	}
+}
 
-	bad := &TunnelMETA{IFName: "tunt", Tag: "t1", KillSwitch: true, EnableDefaultRoute: false}
-	if !hasKSErr(validateTunnelMeta(bad, "")) {
-		t.Fatal("kill switch without default route should be rejected")
-	}
-
-	good := &TunnelMETA{IFName: "tunt", Tag: "t1", KillSwitch: true, EnableDefaultRoute: true}
-	if hasKSErr(validateTunnelMeta(good, "")) {
-		t.Fatal("kill switch with default route should be allowed")
-	}
-
-	off := &TunnelMETA{IFName: "tunt", Tag: "t1", KillSwitch: false, EnableDefaultRoute: false}
-	if hasKSErr(validateTunnelMeta(off, "")) {
-		t.Fatal("kill switch off should not trigger the rule")
+func TestKillSwitchSupportedOnThisPlatform(t *testing.T) {
+	if !killSwitchSupported() {
+		t.Skip("no blackhole implementation on this OS")
 	}
 }

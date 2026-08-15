@@ -638,10 +638,8 @@ func HTTP_Disconnect(w http.ResponseWriter, r *http.Request) {
 	}
 	if tag != "" {
 		stopReconnect(tag)
-		releaseKillSwitch(tag)
 	} else {
 		stopAllReconnects()
-		releaseAllKillSwitches()
 	}
 
 	err = Disconnect(DF.ID, false)
