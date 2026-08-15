@@ -23,6 +23,9 @@ func Disconnect(tunID string, switching bool) (err error) {
 			if !switching {
 
 				announceClearAndFlush(tun)
+				if tun.osTUN != nil {
+					_ = tun.osTUN.Release()
+				}
 				_ = tunnel.Disconnect(tun)
 				_ = applyConfiguredKillSwitch()
 			}
@@ -104,6 +107,9 @@ func CleanupOnClose() {
 	stopAllReconnects()
 	tunnelMapRange(func(tun *TUN) bool {
 		announceClearAndFlush(tun)
+		if tun.osTUN != nil {
+			_ = tun.osTUN.Release()
+		}
 		tunnel := tun.tunnel.Load()
 		err := tunnel.Disconnect(tun)
 		if err != nil {

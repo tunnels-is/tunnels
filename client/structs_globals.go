@@ -405,6 +405,8 @@ type TUN struct {
 	tunnel atomic.Pointer[TInterface] `json:"-"`
 
 	wgDevice *device.Device
+	osTUN    *stickyTUN
+	procTUN  *processingTUN
 
 	CR             *ConnectionRequest
 	ServerResponse *types.ServerConnectResponse

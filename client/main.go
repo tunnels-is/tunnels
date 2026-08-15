@@ -247,12 +247,16 @@ func handleTunnelDeath(t *TUN) {
 	}
 
 	cr := t.CR
-
-	Disconnect(t.ID, false)
-	_ = applyConfiguredKillSwitch()
-
-	if !meta.AutoReconnect || cr == nil {
-		return
+	keepPath := meta.AutoReconnect && cr != nil && t.osTUN != nil && t.osTUN.CanReuse()
+	if !keepPath {
+		Disconnect(t.ID, false)
+		_ = applyConfiguredKillSwitch()
+		if !meta.AutoReconnect || cr == nil {
+			return
+		}
+	} else {
+		t.SetState(TUN_Connecting)
+		_ = applyConfiguredKillSwitch()
 	}
 
 	stopCh := make(chan struct{})
@@ -265,8 +269,14 @@ func handleTunnelDeath(t *TUN) {
 	for attempt := 1; ; attempt++ {
 		select {
 		case <-CancelContext.Done():
+			if keepPath {
+				Disconnect(t.ID, false)
+			}
 			return
 		case <-stopCh:
+			if keepPath {
+				Disconnect(t.ID, false)
+			}
 			return
 		default:
 		}
@@ -285,8 +295,14 @@ func handleTunnelDeath(t *TUN) {
 		INFO("auto-reconnect: ", meta.Tag, " attempt ", attempt, " failed (code ", code, "): ", err)
 		select {
 		case <-CancelContext.Done():
+			if keepPath {
+				Disconnect(t.ID, false)
+			}
 			return
 		case <-stopCh:
+			if keepPath {
+				Disconnect(t.ID, false)
+			}
 			return
 		case <-time.After(backoff):
 		}

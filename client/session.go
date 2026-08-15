@@ -1,7 +1,6 @@
 package client
 
 import (
-	"bufio"
 	"crypto/rand"
 	"encoding/json"
 	"errors"
@@ -56,7 +55,6 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		runtime.GC()
 	}()
 	defer RecoverAndLog()
-
 
 	if ClientCR.UserID != "" {
 		if err := activateAccountByUserID(ClientCR.UserID); err != nil {
@@ -167,7 +165,6 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		}
 	}
 
-
 	localDev, wgCfg, wgErr := resolveLocalDeviceForServer(ClientCR, ClientCR.ServerID, meta.Tag)
 	if wgErr != nil {
 		ERROR("unable to resolve local device for server: ", wgErr)
@@ -177,7 +174,6 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		return 502, errors.New("no local device identity for server")
 	}
 	wgPrivKeyB64 := localDev.WireGuardPrivKey
-
 
 	if meta.WireGuardPrivKey != "" {
 		meta.WireGuardPrivKey = ""
@@ -223,14 +219,95 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		return 502, errors.New("unable to initialize routes")
 	}
 
-	if oldTunnel != nil {
+	privHex, hexErr := wgB64ToHex(wgPrivKeyB64)
+	if hexErr != nil {
+		return 502, errors.New("unable to encode WireGuard private key")
+	}
+	serverPubHex, hexErr := wgB64ToHex(ServerReponse.WireGuardPubKey)
+	if hexErr != nil {
+		return 502, errors.New("unable to encode WireGuard server public key")
+	}
+	ipcConf := buildWGIPC(privHex, serverPubHex, ClientCR.ServerIP, ServerReponse.WireGuardPort)
+
+	if oldTunnel != nil && wgDeviceAlive(oldTunnel.wgDevice) {
+		if ipcErr := applyWGIPC(oldTunnel.wgDevice, ipcConf); ipcErr != nil {
+			ERROR("in-place WireGuard IPC failed, keeping existing session: ", ipcErr)
+			return 502, fmt.Errorf("WireGuard IPC configuration failed: %w", ipcErr)
+		}
+		oldTunnel.SetState(TUN_Disconnecting)
+		tunnel.wgDevice = oldTunnel.wgDevice
+		tunnel.osTUN = oldTunnel.osTUN
+		tunnel.procTUN = oldTunnel.procTUN
+		if tunnel.procTUN != nil {
+			tunnel.procTUN.bindTunnel(tunnel)
+		}
+		inter := oldTunnel.tunnel.Load()
+		if inter == nil {
+			return 502, errors.New("existing tunnel has no interface")
+		}
+		inter.IPv4Address = wgCfg.WireGuardIP
+		inter.Gateway = wgCfg.WireGuardIP
+		inter.MTU = meta.MTU
+		inter.TxQueuelen = meta.TxQueueLen
+		tunnel.tunnel.Store(inter)
+		inter.tunnel.Store(&tunnel)
+		if err = inter.Connect(tunnel); err != nil {
+			ERROR("unable to refresh tunnel interface after in-place replace: ", err)
+			return 502, errors.New("unable to connect to tunnel interface")
+		}
+		tunnel.SetState(TUN_Connected)
+		tunnel.ID = uuid.NewString()
+		TunnelMap.Store(tunnel.ID, tunnel)
+		go tunnel.RecordBandwidth()
+		go tunnel.announceAllowedHostsWithRetry()
+		watchWGDevice(tunnel)
+		Disconnect(oldTunnel.ID, true)
+		DEBUG("replaced WireGuard session in place (no TUN recreate)")
+		return 200, nil
+	}
+
+	if oldTunnel != nil && oldTunnel.osTUN != nil && oldTunnel.osTUN.CanReuse() {
 		oldTunnel.SetState(TUN_Disconnecting)
 		if oldTunnel.wgDevice != nil {
 			oldTunnel.wgDevice.Close()
 		}
+		if err := oldTunnel.osTUN.ResetForReuse(); err != nil {
+			ERROR("sticky TUN reset failed: ", err)
+			destroyReusablePath(oldTunnel)
+		} else {
+			tunnel.osTUN = oldTunnel.osTUN
+			tunnel.procTUN = oldTunnel.procTUN
+			if tunnel.procTUN != nil {
+				tunnel.procTUN.bindTunnel(tunnel)
+			}
+			inter := oldTunnel.tunnel.Load()
+			if inter != nil {
+				inter.IPv4Address = wgCfg.WireGuardIP
+				inter.Gateway = wgCfg.WireGuardIP
+				inter.MTU = meta.MTU
+				inter.TxQueuelen = meta.TxQueueLen
+				if err := attachWGDevice(tunnel, inter, tunnel.procTUN, ipcConf); err != nil {
+					ERROR("reuse TUN attach failed: ", err)
+					destroyReusablePath(oldTunnel)
+				} else {
+					tunnel.SetState(TUN_Connected)
+					tunnel.ID = uuid.NewString()
+					TunnelMap.Store(tunnel.ID, tunnel)
+					go tunnel.RecordBandwidth()
+					go tunnel.announceAllowedHostsWithRetry()
+					watchWGDevice(tunnel)
+					Disconnect(oldTunnel.ID, true)
+					DEBUG("reused OS TUN after WireGuard device death")
+					return 200, nil
+				}
+			}
+		}
 	}
 
-
+	if oldTunnel != nil {
+		oldTunnel.SetState(TUN_Disconnecting)
+		destroyReusablePath(oldTunnel)
+	}
 
 	osTun, tunErr := wgtun.CreateTUN(resolveTUNCreateName(meta.IFName), int(meta.MTU))
 	if tunErr != nil {
@@ -246,40 +323,14 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		TxQueuelen:  meta.TxQueueLen,
 		Gateway:     wgCfg.WireGuardIP,
 	}
-
-	pt := newProcessingTUN(osTun, tunnel)
-	wgDev := wgdevice.NewDevice(pt, wgconn.NewDefaultBind(), NewWGLogger())
-	privHex, hexErr := wgB64ToHex(wgPrivKeyB64)
-	if hexErr != nil {
-		wgDev.Close()
-		return 502, errors.New("unable to encode WireGuard private key")
-	}
-	serverPubHex, hexErr := wgB64ToHex(ServerReponse.WireGuardPubKey)
-	if hexErr != nil {
-		wgDev.Close()
-		return 502, errors.New("unable to encode WireGuard server public key")
-	}
-	ipcConf := fmt.Sprintf(
-		"private_key=%s\npublic_key=%s\nendpoint=%s:%s\nallowed_ip=0.0.0.0/0\npersistent_keepalive_interval=25\n\n",
-		privHex, serverPubHex, ClientCR.ServerIP, ServerReponse.WireGuardPort,
-	)
-	if ipcErr := wgDev.IpcSetOperation(bufio.NewReader(strings.NewReader(ipcConf))); ipcErr != nil {
-		wgDev.Close()
-		return 502, fmt.Errorf("WireGuard IPC configuration failed: %w", ipcErr)
-	}
-	if upErr := wgDev.Up(); upErr != nil {
-		wgDev.Close()
-		return 502, fmt.Errorf("WireGuard device Up failed: %w", upErr)
-	}
-	tunnel.wgDevice = wgDev
-
-	tunnel.tunnel.Store(inter)
-	inter.tunnel.Store(&tunnel)
-	err = inter.Connect(tunnel)
-	if err != nil {
-		ERROR("unable to configure tunnel interface: ", err)
-		wgDev.Close()
-		return 502, errors.New("unable to connect to tunnel interface")
+	pt := wrapCreatedTUN(osTun, tunnel)
+	if err := attachWGDevice(tunnel, inter, pt, ipcConf); err != nil {
+		if tunnel.osTUN != nil {
+			_ = tunnel.osTUN.Release()
+		} else {
+			_ = osTun.Close()
+		}
+		return 502, err
 	}
 
 	tunnel.SetState(TUN_Connected)
@@ -288,21 +339,34 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 
 	go tunnel.RecordBandwidth()
 	go tunnel.announceAllowedHostsWithRetry()
-	go func() {
-		defer RecoverAndLog()
-		<-tunnel.wgDevice.Wait()
-		m := tunnel.meta.Load()
-		DEBUG("WireGuard device closed:", m.Tag, tunnel.ID)
-		if tunnel.GetState() >= TUN_Connected {
-			tunnelMonitor <- tunnel
-		}
-	}()
+	watchWGDevice(tunnel)
 
 	if oldTunnel != nil {
 		Disconnect(oldTunnel.ID, true)
 	}
 
 	return 200, nil
+}
+
+func attachWGDevice(tunnel *TUN, inter *TInterface, pt wgtun.Device, ipcConf string) error {
+	wgDev := wgdevice.NewDevice(pt, wgconn.NewDefaultBind(), NewWGLogger())
+	if ipcErr := applyWGIPC(wgDev, ipcConf); ipcErr != nil {
+		wgDev.Close()
+		return fmt.Errorf("WireGuard IPC configuration failed: %w", ipcErr)
+	}
+	if upErr := wgDev.Up(); upErr != nil {
+		wgDev.Close()
+		return fmt.Errorf("WireGuard device Up failed: %w", upErr)
+	}
+	tunnel.wgDevice = wgDev
+	tunnel.tunnel.Store(inter)
+	inter.tunnel.Store(&tunnel)
+	if err := inter.Connect(tunnel); err != nil {
+		ERROR("unable to configure tunnel interface: ", err)
+		wgDev.Close()
+		return errors.New("unable to connect to tunnel interface")
+	}
+	return nil
 }
 
 type wgServerConfig struct {
