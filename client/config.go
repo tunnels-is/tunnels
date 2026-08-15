@@ -85,6 +85,8 @@ func ReadConfigFileFromDisk() (err error) {
 		return
 	}
 
+	applyMissingKillSwitchDefaults(config, Conf)
+
 	if len(Conf.ControlServers) < 1 {
 		Conf.ControlServers = append(Conf.ControlServers, &ControlServer{
 			ID:                  "tunnels",
@@ -140,6 +142,8 @@ func DefaultConfig() *configV2 {
 		DNSWhiteLists:     GetDefaultWhiteLists(),
 		APIIP:             "127.0.0.1",
 		APIPort:           "7777",
+		KillSwitchIPv4:    false,
+		KillSwitchIPv6:    true,
 	}
 	conf.ControlServers = append(conf.ControlServers, &ControlServer{
 		ID:                  "tunnels",
@@ -339,6 +343,9 @@ func SetConfig(config *configV2) (err error) {
 	CONFIG.Store(config)
 	reloadBlockLists(false)
 	reloadWhiteLists(false)
+	if ksErr := applyConfiguredKillSwitch(); ksErr != nil {
+		ERROR("kill switch apply after config save: ", ksErr)
+	}
 	err = writeConfigToDisk()
 	INFO("Config saved")
 
