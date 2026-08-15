@@ -142,6 +142,8 @@ func (t *TInterface) Connect(tun *TUN) (err error) {
 	return nil
 }
 
+func (t *TInterface) Delete() error { return nil }
+
 func (t *TInterface) Disconnect(tun *TUN) (err error) {
 	defer RecoverAndLog()
 	if tun.wgDevice != nil {

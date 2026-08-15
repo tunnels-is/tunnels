@@ -355,12 +355,63 @@ func socketCtl(request uintptr, argp uintptr) error {
 	return nil
 }
 
+// ipv4HostOnLink reports whether dest is already covered by a connected
+// IPv4 prefix. A via-gateway /32 for an on-link peer (same podman/LAN
+// subnet) breaks reachability: traffic hairpins through the default
+// gateway instead of going L2.
+func ipv4HostOnLink(network string) bool {
+	if network == "" || network == "default" {
+		return false
+	}
+	var host net.IP
+	if _, dst, err := net.ParseCIDR(network); err == nil && dst != nil {
+		ones, bits := dst.Mask.Size()
+		if bits != 32 || ones == 0 {
+			return false
+		}
+		host = dst.IP.To4()
+	} else {
+		host = net.ParseIP(network).To4()
+	}
+	if host == nil {
+		return false
+	}
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		return false
+	}
+	for _, iface := range ifaces {
+		addrs, err := iface.Addrs()
+		if err != nil {
+			continue
+		}
+		for _, a := range addrs {
+			n, ok := a.(*net.IPNet)
+			if !ok || n.IP.To4() == nil {
+				continue
+			}
+			ones, bits := n.Mask.Size()
+			if bits != 32 || ones == 0 || ones >= 32 {
+				continue
+			}
+			if n.Contains(host) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func IP_AddRoute(
 	network string,
 	_ string,
 	gateway string,
 	metric string,
 ) (err error) {
+	if ipv4HostOnLink(network) {
+		DEBUG("skip route add, dest on-link: ", network)
+		return nil
+	}
 	_ = IP_DelRoute(network, gateway, metric)
 
 	mInt, err := strconv.Atoi(metric)
