@@ -70,6 +70,7 @@ func main() {
 	ipOverride := flag.String("ip", "", "Override the IP used for -createConfig and -createCert (defaults to auto-discovered default-route interface IP)")
 	showNewRules := flag.Bool("showNewRules", false, "After wg-server fetches config from the controller, print the iptables rules it would install and hard-exit. No rules are applied.")
 	showActiveRules := flag.Bool("showActiveRules", false, "Print currently-installed iptables rules matching a config-agnostic wg-server shape, then exit. Does not fetch config or touch the network.")
+	disablePublicReg := flag.Bool("disablePublicRegistration", false, "reject anonymous POST /client/user/create; admin UI user create still works")
 	flag.Parse()
 
 	explicitFlags := make(map[string]bool)
@@ -77,6 +78,7 @@ func main() {
 
 	serverConfigPath = *configPath
 	wgConfigPath = *wgConfigPathFlag
+	disablePublicRegistrationCLI = *disablePublicReg
 	initLogging(*silent, *jsonLogs, *sourceInfo, *logLevel)
 
 	if showVersion {
