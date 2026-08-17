@@ -36,6 +36,9 @@ type ServerConfig struct {
 	DBurl            string
 	TwoFactorKey     string
 	CookieSigningKey string
+	// DisablePublicRegistration rejects unauthenticated POST /client/user/create.
+	// Admin UI create (/ui/user/create) is unaffected. Off by default.
+	DisablePublicRegistration bool
 	PayKey           string
 	CertPem          string
 	KeyPem           string

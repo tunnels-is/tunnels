@@ -119,9 +119,34 @@ func API_AdminUILogout(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(200)
 }
 
+// Set by -disablePublicRegistration. Also honored from config.json
+// DisablePublicRegistration (config reload applies without restart).
+var disablePublicRegistrationCLI bool
+
+func publicRegistrationDisabled() bool {
+	if disablePublicRegistrationCLI {
+		return true
+	}
+	cfg := Config.Load()
+	return cfg != nil && cfg.DisablePublicRegistration
+}
+
 func API_UserCreate(w http.ResponseWriter, r *http.Request) {
 	defer randomAuthDelay()
 	defer BasicRecover()
+	if publicRegistrationDisabled() {
+		senderr(w, 403, "public registration is disabled")
+		return
+	}
+	createUserFromRequest(w, r)
+}
+
+func API_AdminUserCreate(w http.ResponseWriter, r *http.Request) {
+	defer BasicRecover()
+	createUserFromRequest(w, r)
+}
+
+func createUserFromRequest(w http.ResponseWriter, r *http.Request) {
 	RF := new(REGISTER_FORM)
 	err := decodeBody(r, RF)
 	if err != nil {

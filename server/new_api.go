@@ -79,6 +79,7 @@ func launchAPIServer() {
 	mux.Handle("POST /ui/device", adminMW(API_AdminDeviceGet))
 
 	mux.Handle("POST /ui/user/logout", adminMW(API_AdminUILogout))
+	mux.Handle("POST /ui/user/create", adminMW(API_AdminUserCreate))
 	mux.Handle("POST /ui/user", adminMW(API_AdminUserGet))
 	mux.Handle("POST /ui/user/list", adminMW(API_AdminUserList))
 	mux.Handle("POST /ui/user/latest", adminMW(API_AdminUserLatest))

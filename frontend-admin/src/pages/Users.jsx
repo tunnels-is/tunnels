@@ -138,10 +138,9 @@ export default function Users() {
     setCreateError('');
     setCreating(true);
     try {
-      const resp = await fetch('/client/user/create', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ Email: createForm.Email, Password: createForm.Password }),
+      const resp = await apiPost('/ui/user/create', {
+        Email: createForm.Email,
+        Password: createForm.Password,
       });
       if (resp.status === 200) {
         setShowCreate(false);
