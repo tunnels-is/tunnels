@@ -285,3 +285,70 @@ func itoa(n int) string {
 	}
 	return string(buf[i:])
 }
+
+func callWGConfigFetch(t *testing.T, apiKey, pubKey string) *httptest.ResponseRecorder {
+	t.Helper()
+	req := httptest.NewRequest(http.MethodGet, "/wg/server-config/fetch", nil)
+	if apiKey != "" {
+		req.Header.Set("X-WG-KEY", apiKey)
+	}
+	if pubKey != "" {
+		req.Header.Set("X-WG-PubKey", pubKey)
+	}
+	w := httptest.NewRecorder()
+	wireGuardServerKeyCheck(http.HandlerFunc(API_WGServerConfigFetch)).ServeHTTP(w, req)
+	return w
+}
+
+func TestAPI_WGServerConfigFetch_PinsThenRejectsReplacement(t *testing.T) {
+	apiKey, id := setupWGTest(t)
+	first := makeWGKey()
+	second := uniqueWGKey(99)
+
+	w := callWGConfigFetch(t, apiKey, first)
+	if w.Code != http.StatusOK {
+		t.Fatalf("first pin: %d %s", w.Code, w.Body.String())
+	}
+	got, err := BBolt_FindServerByID(id.String())
+	if err != nil || got == nil || got.WireGuardPubKey != first {
+		t.Fatalf("stored pubkey=%q want %q err=%v", got.WireGuardPubKey, first, err)
+	}
+
+	w = callWGConfigFetch(t, apiKey, first)
+	if w.Code != http.StatusOK {
+		t.Fatalf("same key restart: %d %s", w.Code, w.Body.String())
+	}
+
+	w = callWGConfigFetch(t, apiKey, second)
+	if w.Code != http.StatusConflict {
+		t.Fatalf("replacement: %d %s, want 409", w.Code, w.Body.String())
+	}
+	got, _ = BBolt_FindServerByID(id.String())
+	if got.WireGuardPubKey != first {
+		t.Fatalf("pin changed to %q", got.WireGuardPubKey)
+	}
+}
+
+func TestAPI_WGServerConfigFetch_NewAPIKeyAllowsNewPubKey(t *testing.T) {
+	apiKey, id := setupWGTest(t)
+	first := makeWGKey()
+	if w := callWGConfigFetch(t, apiKey, first); w.Code != http.StatusOK {
+		t.Fatalf("pin: %d", w.Code)
+	}
+
+	s, _ := BBolt_FindServerByID(id.String())
+	s.APIKey = "rotated-key"
+	if _, err := BBolt_UpdateServer(s); err != nil {
+		t.Fatal(err)
+	}
+
+	second := uniqueWGKey(7)
+	w := callWGConfigFetch(t, "rotated-key", second)
+	if w.Code != http.StatusOK {
+		t.Fatalf("rebind after rotate: %d %s", w.Code, w.Body.String())
+	}
+	got, _ := BBolt_FindServerByID(id.String())
+	if got.WireGuardPubKey != second {
+		t.Fatalf("pubkey=%q want %q", got.WireGuardPubKey, second)
+	}
+}

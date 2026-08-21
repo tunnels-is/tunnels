@@ -825,13 +825,16 @@ func TestBBolt_UpdateServer(t *testing.T) {
 	if updated.Tag != "new" || updated.Country != "UK" || updated.IP != "5.6.7.8" || updated.Port != "8443" {
 		t.Fatal("basic field update mismatch")
 	}
-	if updated.WireGuardPort != 51820 || updated.WireGuardPubKey != "pubkey-abc" {
-		t.Fatalf("wireguard fields mismatch: port=%d pubkey=%s", updated.WireGuardPort, updated.WireGuardPubKey)
+	if updated.WireGuardPort != 51820 {
+		t.Fatalf("wireguard port mismatch: port=%d", updated.WireGuardPort)
+	}
+	if updated.WireGuardPubKey != "" {
+		t.Fatal("pubkey must not be set via admin update; only config fetch pins it")
 	}
 
 	found, _ := BBolt_FindServerByID(s.ID.String())
-	if found.WireGuardPort != 51820 || found.WireGuardPubKey != "pubkey-abc" {
-		t.Fatal("wireguard fields not persisted")
+	if found.WireGuardPort != 51820 {
+		t.Fatal("wireguard port not persisted")
 	}
 }
 
@@ -957,14 +960,18 @@ func TestBBolt_FindServerByAPIKey_NotFound(t *testing.T) {
 
 func TestBBolt_UpdateServer_RotateAPIKey(t *testing.T) {
 	setupTestDB(t)
-	s := &types.Server{ID: uuid.New(), APIKey: "old"}
+	s := &types.Server{ID: uuid.New(), APIKey: "old", WireGuardPubKey: "pinned-key"}
 	if err := BBolt_CreateServer(s); err != nil {
 		t.Fatal(err)
 	}
 
 	s.APIKey = "fresh"
-	if _, err := BBolt_UpdateServer(s); err != nil {
+	updated, err := BBolt_UpdateServer(s)
+	if err != nil {
 		t.Fatal(err)
+	}
+	if updated.WireGuardPubKey != "" {
+		t.Fatal("rotating API key must unpin WireGuardPubKey")
 	}
 
 	if found, _ := BBolt_FindServerByAPIKey("old"); found != nil {

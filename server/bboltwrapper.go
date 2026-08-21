@@ -774,7 +774,9 @@ func BBolt_UpdateServer(S *types.Server) (*types.Server, error) {
 		SS.Port = S.Port
 		SS.APIKey = S.APIKey
 		SS.WireGuardPort = S.WireGuardPort
-		SS.WireGuardPubKey = S.WireGuardPubKey
+		if oldAPIKey != S.APIKey {
+			SS.WireGuardPubKey = ""
+		}
 		SS.WireGuardIface = S.WireGuardIface
 		SS.WireGuardSubnet = S.WireGuardSubnet
 		SS.WireGuardSubnet6 = S.WireGuardSubnet6
@@ -810,6 +812,27 @@ func BBolt_UpdateServer(S *types.Server) (*types.Server, error) {
 		return nil
 	})
 	return RS, err
+}
+
+func BBolt_SetServerWireGuardPubKey(id uuid.UUID, pubKey string) error {
+	return BBoltDB.Update(func(tx *gobolt.Tx) error {
+		b := tx.Bucket([]byte(SERVERS_BUCKET))
+		key := []byte(id.String())
+		v := b.Get(key)
+		if v == nil {
+			return errors.New("server not found")
+		}
+		SS := new(types.Server)
+		if err := bboltUnmarshal(v, SS); err != nil {
+			return err
+		}
+		SS.WireGuardPubKey = pubKey
+		data, err := bboltMarshal(SS)
+		if err != nil {
+			return err
+		}
+		return b.Put(key, data)
+	})
 }
 
 func BBolt_CreateDevice(D *types.Device) error {
