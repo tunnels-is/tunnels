@@ -425,7 +425,7 @@ func getServerWGConfig(cr *ConnectionRequest, serverID string, pubKey string) (*
 		"X-Device-Token": cr.DeviceToken,
 		"X-UID":          cr.UserID,
 	}
-	responseBytes, code, err := SendRequestToURL(nil, "GET", url, nil, 10000, cr.Server.ValidateCertificate, authHeaders)
+	responseBytes, code, err := SendRequestToURL(nil, "GET", url, nil, 10000, cr.Server.ValidateCertificate, cr.Server.CertificatePath, authHeaders)
 	if err != nil {
 		return nil, fmt.Errorf("get wg config: %w", err)
 	}
@@ -467,7 +467,7 @@ func createServerDeviceFull(cr *ConnectionRequest, serverID string, pubKey strin
 		"X-Device-Token": cr.DeviceToken,
 		"X-UID":          cr.UserID,
 	}
-	responseBytes, code, reqErr := SendRequestToURL(nil, "POST", url, reqBody, 15000, cr.Server.ValidateCertificate, authHeaders)
+	responseBytes, code, reqErr := SendRequestToURL(nil, "POST", url, reqBody, 15000, cr.Server.ValidateCertificate, cr.Server.CertificatePath, authHeaders)
 	if reqErr != nil {
 		return nil, nil, fmt.Errorf("create device: %w", reqErr)
 	}
@@ -638,7 +638,7 @@ func CreateDeviceWithKeys(form *CreateDeviceWithKeysForm) (any, int) {
 		"X-Device-Token": form.DeviceToken,
 		"X-UID":          form.UID,
 	}
-	responseBytes, code, reqErr := SendRequestToURL(nil, "POST", url, reqBody, 15000, form.Server.ValidateCertificate, authHeaders)
+	responseBytes, code, reqErr := SendRequestToURL(nil, "POST", url, reqBody, 15000, form.Server.ValidateCertificate, form.Server.CertificatePath, authHeaders)
 	if reqErr != nil {
 		return &ErrorResponse{Error: "controller request failed: " + reqErr.Error()}, 500
 	}
