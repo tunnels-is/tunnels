@@ -18,6 +18,11 @@ import (
 	"time"
 )
 
+// errControllerRedirect is returned when the controller answers with a
+// redirect. Redirects are refused so X-Device-Token is never re-sent to
+// a different Location (Go does not strip custom auth headers).
+var errControllerRedirect = errors.New("refusing to follow controller redirect (X-Device-Token must not leave the configured controller URL)")
+
 func ResetEverything() {
 	defer RecoverAndLog()
 	tunnelMapRange(func(tun *TUN) bool {
@@ -62,7 +67,12 @@ func SendRequestToURL(tc *tls.Config, method string, url string, data any, timeo
 		}
 	}
 
-	client := http.Client{Timeout: time.Duration(timeoutMS) * time.Millisecond}
+	client := http.Client{
+		Timeout: time.Duration(timeoutMS) * time.Millisecond,
+		CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
+			return errControllerRedirect
+		},
+	}
 	if tc != nil {
 		client.Transport = &http.Transport{
 			TLSClientConfig: tc,
