@@ -357,12 +357,10 @@ func socketCtl(request uintptr, argp uintptr) error {
 
 func IP_AddRoute(
 	network string,
-	_ string,
+	ifName string,
 	gateway string,
 	metric string,
 ) (err error) {
-	_ = IP_DelRoute(network, gateway, metric)
-
 	mInt, err := strconv.Atoi(metric)
 	if err != nil {
 		return err
@@ -379,12 +377,35 @@ func IP_AddRoute(
 	}
 
 	r.Priority = mInt
-	r.Gw = net.ParseIP(gateway).To4()
+	if gw := net.ParseIP(gateway); gw != nil {
+		r.Gw = gw.To4()
+	}
 
-	err = netlink.RouteAdd(r)
+	if ifName != "" {
+		link, lerr := netlink.LinkByName(ifName)
+		if lerr != nil {
+			return lerr
+		}
+		r.LinkIndex = link.Attrs().Index
+		if r.Dst != nil {
+			ones, bits := r.Dst.Mask.Size()
+			if ones == bits {
+				existing, _ := netlink.RouteListFiltered(netlink.FAMILY_V4, &netlink.Route{Dst: r.Dst}, netlink.RT_FILTER_DST)
+				for i := range existing {
+					_ = netlink.RouteDel(&existing[i])
+				}
+			} else {
+				_ = IP_DelRoute(network, gateway, metric)
+			}
+		}
+	} else {
+		_ = IP_DelRoute(network, gateway, metric)
+	}
+
+	err = netlink.RouteReplace(r)
 	if err != nil {
 		if strings.Contains(err.Error(), "exists") {
-			DEBUG("Default IPv4 route already exists")
+			DEBUG("IPv4 route already exists")
 			return nil
 		}
 		return err
@@ -397,6 +418,8 @@ func IP_AddRoute(
 		network,
 		" via ",
 		gateway,
+		" dev ",
+		ifName,
 		" metric ",
 		metric,
 	)

@@ -243,7 +243,6 @@ type ControlServer struct {
 	ValidateCertificate bool
 }
 
-
 func (c *ControlServer) effectivePort() string {
 	if c == nil {
 		return ""
@@ -410,6 +409,8 @@ type TUN struct {
 	localInterfaceIP4bytes  [4]byte
 	serverInterfaceNetIP    net.IP
 	serverInterfaceIP4bytes [4]byte
+	wgEndpointSet           bool
+	wgLoopDropLogged        atomic.Bool
 
 	natMu      sync.RWMutex        `json:"-"`
 	NATEgress  map[[4]byte][4]byte `json:"-"`

@@ -19,7 +19,6 @@ import (
 	"github.com/miekg/dns"
 	"github.com/tunnels-is/tunnels/types"
 	"github.com/xlzd/gotp"
-	wgconn "golang.zx2c4.com/wireguard/conn"
 	wgdevice "golang.zx2c4.com/wireguard/device"
 	wgtun "golang.zx2c4.com/wireguard/tun"
 )
@@ -56,7 +55,6 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		runtime.GC()
 	}()
 	defer RecoverAndLog()
-
 
 	if ClientCR.UserID != "" {
 		if err := activateAccountByUserID(ClientCR.UserID); err != nil {
@@ -167,7 +165,6 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		}
 	}
 
-
 	localDev, wgCfg, wgErr := resolveLocalDeviceForServer(ClientCR, ClientCR.ServerID, meta.Tag)
 	if wgErr != nil {
 		ERROR("unable to resolve local device for server: ", wgErr)
@@ -177,7 +174,6 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		return 502, errors.New("no local device identity for server")
 	}
 	wgPrivKeyB64 := localDev.WireGuardPrivKey
-
 
 	if meta.WireGuardPrivKey != "" {
 		meta.WireGuardPrivKey = ""
@@ -198,7 +194,7 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	}
 
 	ServerReponse := &types.ServerConnectResponse{
-		InterfaceIP:      wgCfg.ServerIP,
+		InterfaceIP:      ClientCR.ServerIP,
 		WireGuardIP:      wgCfg.WireGuardIP,
 		WireGuardPubKey:  wgCfg.WireGuardPubKey,
 		WireGuardPort:    wgCfg.WireGuardPort,
@@ -218,10 +214,26 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		return 502, err
 	}
 
-	err = IP_AddRoute(ServerReponse.InterfaceIP+"/32", *ifName, gateway.To4().String(), "0")
+	gw4 := gateway.To4().String()
+	err = IP_AddRoute(ClientCR.ServerIP+"/32", *ifName, gw4, "0")
 	if err != nil {
 		return 502, errors.New("unable to initialize routes")
 	}
+	if wgCfg.ServerIP != "" && wgCfg.ServerIP != ClientCR.ServerIP {
+		if rerr := IP_AddRoute(wgCfg.ServerIP+"/32", *ifName, gw4, "0"); rerr != nil {
+			ERROR("unable to add extra server IP route: ", rerr)
+		}
+	}
+
+	if protErr := applyEndpointProtect(*ifName, gateway.To4()); protErr != nil {
+		ERROR("unable to install WireGuard socket protect route: ", protErr)
+	}
+	success := false
+	defer func() {
+		if !success {
+			removeEndpointProtect()
+		}
+	}()
 
 	if oldTunnel != nil {
 		oldTunnel.SetState(TUN_Disconnecting)
@@ -229,8 +241,6 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 			oldTunnel.wgDevice.Close()
 		}
 	}
-
-
 
 	osTun, tunErr := wgtun.CreateTUN(resolveTUNCreateName(meta.IFName), int(meta.MTU))
 	if tunErr != nil {
@@ -248,7 +258,13 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	}
 
 	pt := newProcessingTUN(osTun, tunnel)
-	wgDev := wgdevice.NewDevice(pt, wgconn.NewDefaultBind(), NewWGLogger())
+	var ifIndex uint32
+	if id := state.DefaultInterfaceID.Load(); id > 0 {
+		ifIndex = uint32(id)
+	} else {
+		ERROR("no physical interface index; WireGuard socket will not be pinned to the NIC")
+	}
+	wgDev := wgdevice.NewDevice(pt, newProtectBind(ifIndex), NewWGLogger())
 	privHex, hexErr := wgB64ToHex(wgPrivKeyB64)
 	if hexErr != nil {
 		wgDev.Close()
@@ -259,10 +275,7 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		wgDev.Close()
 		return 502, errors.New("unable to encode WireGuard server public key")
 	}
-	ipcConf := fmt.Sprintf(
-		"private_key=%s\npublic_key=%s\nendpoint=%s:%s\nallowed_ip=0.0.0.0/0\npersistent_keepalive_interval=25\n\n",
-		privHex, serverPubHex, ClientCR.ServerIP, ServerReponse.WireGuardPort,
-	)
+	ipcConf := wgIPCConfig(privHex, serverPubHex, ClientCR.ServerIP, ServerReponse.WireGuardPort)
 	if ipcErr := wgDev.IpcSetOperation(bufio.NewReader(strings.NewReader(ipcConf))); ipcErr != nil {
 		wgDev.Close()
 		return 502, fmt.Errorf("WireGuard IPC configuration failed: %w", ipcErr)
@@ -302,6 +315,7 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		Disconnect(oldTunnel.ID, true)
 	}
 
+	success = true
 	return 200, nil
 }
 
@@ -436,6 +450,7 @@ func InitializeTunnelFromCRR(TUN *TUN) (err error) {
 	TUN.serverInterfaceIP4bytes[1] = TUN.serverInterfaceNetIP[1]
 	TUN.serverInterfaceIP4bytes[2] = TUN.serverInterfaceNetIP[2]
 	TUN.serverInterfaceIP4bytes[3] = TUN.serverInterfaceNetIP[3]
+	TUN.wgEndpointSet = true
 
 	if meta.LocalhostNat {
 		NN := new(types.Network)

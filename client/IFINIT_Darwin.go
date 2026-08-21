@@ -224,7 +224,7 @@ func IP_DelDefaultRoute() (err error) {
 
 func IP_AddRoute(
 	network string,
-	_ string,
+	ifName string,
 	gateway string,
 	metric string,
 ) (err error) {
@@ -233,9 +233,14 @@ func IP_AddRoute(
 	}
 	_ = IP_DelRoute(network, "", metric)
 
-	DEBUG("route", "-n", "add", "-net", network, gateway)
+	args := []string{"-n", "add"}
+	if ifName != "" {
+		args = append(args, "-ifscope", ifName)
+	}
+	args = append(args, "-net", network, gateway)
 
-	out, err := exec.Command("route", "-n", "add", "-net", network, gateway).CombinedOutput()
+	DEBUG("route ", args)
+	out, err := exec.Command("route", args...).CombinedOutput()
 	if err != nil {
 		ERROR("Unable to add route: ", string(out), " err: ", err)
 		return err
