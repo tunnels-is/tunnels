@@ -57,6 +57,11 @@ func API_AdminUILogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if user.Disabled {
+		senderr(w, 403, "This account has been disabled, please contact customer support")
+		return
+	}
+
 	if !user.IsAdmin {
 		senderr(w, 401, "Admin or Manager access required")
 		return
@@ -295,6 +300,11 @@ func API_UserLogin(w http.ResponseWriter, r *http.Request) {
 	err = validateUserTwoFactor(user, LF)
 	if err != nil {
 		senderr(w, 401, err.Error())
+		return
+	}
+
+	if user.Disabled {
+		senderr(w, 403, "This account has been disabled, please contact customer support")
 		return
 	}
 
@@ -1456,6 +1466,11 @@ func API_UserResetPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if user == nil {
+		recordPasswordResetFailure(RF.Email)
+		senderr(w, 401, genericAuthErr)
+		return
+	}
+	if user.Disabled {
 		recordPasswordResetFailure(RF.Email)
 		senderr(w, 401, genericAuthErr)
 		return
