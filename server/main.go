@@ -96,11 +96,15 @@ func main() {
 
 	configRequested := explicitFlags["createConfig"]
 	configMode := strings.ToLower(strings.TrimSpace(*createConfig))
+	if *allTheThings && configMode == "" {
+		configMode = "all"
+	}
+	skipWGVerify := wgBootstrapSkipVerify(*createCert)
 	if configRequested || *allTheThings {
 		switch configMode {
 		case "all", "auth", "wg":
 			logger.Info("generating config", "mode", configMode)
-			if err := makeConfig(*ipOverride, configMode); err != nil {
+			if err := makeConfig(*ipOverride, configMode, skipWGVerify); err != nil {
 				logger.Error("unable to create config", "error", err)
 				os.Exit(1)
 			}
@@ -459,7 +463,7 @@ func loadCertificatesAndTLSSettings() (err error) {
 	return nil
 }
 
-func makeConfig(ipOverride string, mode string) error {
+func makeConfig(ipOverride string, mode string, skipWGVerify bool) error {
 	writeServer := mode == "all" || mode == "auth"
 	writeWG := mode == "all" || mode == "wg"
 
@@ -469,7 +473,7 @@ func makeConfig(ipOverride string, mode string) error {
 		}
 	}
 	if writeWG {
-		if err := writeWGConfig(); err != nil {
+		if err := writeWGConfig(skipWGVerify); err != nil {
 			return err
 		}
 	}
@@ -500,12 +504,16 @@ func writeServerConfig(ipOverride, mode string) error {
 	return SaveServerConfig(serverConfigPath)
 }
 
-func writeWGConfig() error {
+func wgBootstrapSkipVerify(createCert string) bool {
+	return strings.EqualFold(strings.TrimSpace(createCert), "selfsign")
+}
+
+func writeWGConfig(skipVerify bool) error {
 	if err := LoadWGConfig(wgConfigPath); err == nil {
 		return nil
 	}
 
-	WGConfig.Store(&types.WGBootstrap{InsecureSkipVerify: false})
+	WGConfig.Store(&types.WGBootstrap{InsecureSkipVerify: skipVerify})
 	return SaveWGConfig(wgConfigPath)
 }
 

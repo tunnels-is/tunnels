@@ -69,7 +69,6 @@ export default function ServerDetail() {
       WireGuardIface: server.WireGuardIface || 'wg0',
       InternetIface: server.InternetIface || '',
       EnableFirewall: !!server.EnableFirewall,
-      InsecureSkipVerify: !!server.InsecureSkipVerify,
       WANID: server.WANID || '',
     });
     setError('');
@@ -343,18 +342,6 @@ export default function ServerDetail() {
             ) : (
               <span className={server.EnableFirewall ? 'text-[#15803d]' : 'text-[#a3a3a3]'}>
                 {server.EnableFirewall ? 'Yes' : 'No'}
-              </span>
-            )}
-          </Row>
-          <Row label="Skip Verify">
-            {editing ? (
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" checked={!!form.InsecureSkipVerify} onChange={set('InsecureSkipVerify')} className="accent-[#1d4ed8]" />
-                <span className="text-[12px] text-[#525252]">{form.InsecureSkipVerify ? 'Yes' : 'No'}</span>
-              </label>
-            ) : (
-              <span className={server.InsecureSkipVerify ? 'text-[#b45309]' : 'text-[#a3a3a3]'}>
-                {server.InsecureSkipVerify ? 'Yes' : 'No'}
               </span>
             )}
           </Row>
