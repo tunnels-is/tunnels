@@ -36,3 +36,40 @@ func TestSendRequestToURL_RefusesRedirectWithDeviceToken(t *testing.T) {
 	default:
 	}
 }
+
+func TestSendRequestToURL_RejectsOversizedBody(t *testing.T) {
+	prev := maxControllerResponseBytes
+	maxControllerResponseBytes = 64
+	t.Cleanup(func() { maxControllerResponseBytes = prev })
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+		_, _ = w.Write(make([]byte, 65))
+	}))
+	t.Cleanup(srv.Close)
+
+	_, _, err := SendRequestToURL(nil, "GET", srv.URL, nil, 5000, false, "")
+	if !errors.Is(err, errControllerResponseTooLarge) {
+		t.Fatalf("err = %v, want errControllerResponseTooLarge", err)
+	}
+}
+
+func TestSendRequestToURL_AcceptsBodyAtLimit(t *testing.T) {
+	prev := maxControllerResponseBytes
+	maxControllerResponseBytes = 64
+	t.Cleanup(func() { maxControllerResponseBytes = prev })
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+		_, _ = w.Write(make([]byte, 64))
+	}))
+	t.Cleanup(srv.Close)
+
+	body, code, err := SendRequestToURL(nil, "GET", srv.URL, nil, 5000, false, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if code != 200 || len(body) != 64 {
+		t.Fatalf("code=%d len=%d", code, len(body))
+	}
+}
