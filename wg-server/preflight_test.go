@@ -317,6 +317,7 @@ func TestWGRuleHeuristic_PerChain(t *testing.T) {
 		{"input udp accept", "-A INPUT -p udp -m udp --dport 51820 -j ACCEPT", "INPUT", true},
 		{"input tcp accept", "-A INPUT -p tcp -m tcp --dport 22 -j ACCEPT", "INPUT", false},
 		{"input udp drop", "-A INPUT -p udp -m udp --dport 5353 -j DROP", "INPUT", false},
+		{"input wg host drop", "-A INPUT -i wg0 -j DROP", "INPUT", true},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
