@@ -143,6 +143,7 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		if err != nil {
 			return 502, errors.New("unable to initialize controller route: " + err.Error())
 		}
+		registerProtectHost(tunnel, DefaultControllerIP)
 	} else {
 		netip := net.ParseIP(ClientCR.Server.Host)
 		if netip == nil {
@@ -157,11 +158,13 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 			if err != nil {
 				return 502, errors.New("unable to initialize controller route: " + err.Error())
 			}
+			registerProtectHost(tunnel, addrs[0])
 		} else {
 			err = IP_AddRoute(ClientCR.Server.Host+"/32", *ifName, gateway.To4().String(), "0")
 			if err != nil {
 				return 502, errors.New("unable to initialize controller route: " + err.Error())
 			}
+			registerProtectHost(tunnel, ClientCR.Server.Host)
 		}
 	}
 
@@ -219,10 +222,12 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	if err != nil {
 		return 502, errors.New("unable to initialize routes")
 	}
+	registerProtectHost(tunnel, ClientCR.ServerIP)
 	if wgCfg.ServerIP != "" && wgCfg.ServerIP != ClientCR.ServerIP {
 		if rerr := IP_AddRoute(wgCfg.ServerIP+"/32", *ifName, gw4, "0"); rerr != nil {
 			ERROR("unable to add extra server IP route: ", rerr)
 		}
+		registerProtectHost(tunnel, wgCfg.ServerIP)
 	}
 
 	if protErr := applyEndpointProtect(*ifName, gateway.To4()); protErr != nil {
@@ -264,7 +269,10 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	} else {
 		ERROR("no physical interface index; WireGuard socket will not be pinned to the NIC")
 	}
-	wgDev := wgdevice.NewDevice(pt, newProtectBind(ifIndex), NewWGLogger())
+	bind := newProtectBind(ifIndex)
+	tunnel.wgBind = bind
+	startProtectWatcher()
+	wgDev := wgdevice.NewDevice(pt, bind, NewWGLogger())
 	privHex, hexErr := wgB64ToHex(wgPrivKeyB64)
 	if hexErr != nil {
 		wgDev.Close()

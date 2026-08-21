@@ -5,6 +5,7 @@ package client
 import (
 	"fmt"
 	"net"
+	"os/exec"
 	"reflect"
 	"unsafe"
 
@@ -15,6 +16,82 @@ import (
 func applyEndpointProtect(string, net.IP) error { return nil }
 
 func removeEndpointProtect() {}
+
+func runProtectWatcher() { protectTickerLoop() }
+
+func protectRoutesPresent(ifName string, gw net.IP, ifIndex int, hosts []string) bool {
+	gw4 := gw.To4()
+	if ifName == "" || gw4 == nil {
+		return false
+	}
+	iface, err := net.InterfaceByName(ifName)
+	if err != nil || iface.Flags&net.FlagUp == 0 {
+		return false
+	}
+	if ifIndex != 0 && iface.Index != ifIndex {
+		return false
+	}
+	for _, host := range hosts {
+		out, err := exec.Command("route", "-n", "get", "-ifscope", ifName, host).CombinedOutput()
+		if err != nil {
+			return false
+		}
+		got := parseRouteGetGateway(string(out))
+		if got == nil || !got.Equal(gw4) {
+			return false
+		}
+	}
+	return true
+}
+
+func physicalIPv4Default() (ifName string, gw net.IP, ifIndex int, err error) {
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		return "", nil, 0, err
+	}
+	tunnels := tunnelNameSet()
+	tunnGws := tunnelGatewaySet()
+	preferred := ""
+	if n := STATE.Load().DefaultInterfaceName.Load(); n != nil {
+		preferred = *n
+	}
+	try := func(iface net.Interface) (string, net.IP, int, bool) {
+		if iface.Flags&net.FlagUp == 0 || iface.Flags&net.FlagLoopback != 0 {
+			return "", nil, 0, false
+		}
+		if _, ok := tunnels[iface.Name]; ok {
+			return "", nil, 0, false
+		}
+		out, err := exec.Command("route", "-n", "get", "-ifscope", iface.Name, "default").CombinedOutput()
+		if err != nil {
+			return "", nil, 0, false
+		}
+		g := parseRouteGetGateway(string(out))
+		if g == nil {
+			return "", nil, 0, false
+		}
+		if _, ok := tunnGws[g.String()]; ok {
+			return "", nil, 0, false
+		}
+		return iface.Name, g, iface.Index, true
+	}
+	if preferred != "" {
+		for _, iface := range ifaces {
+			if iface.Name != preferred {
+				continue
+			}
+			if n, g, idx, ok := try(iface); ok {
+				return n, g, idx, nil
+			}
+		}
+	}
+	for _, iface := range ifaces {
+		if n, g, idx, ok := try(iface); ok {
+			return n, g, idx, nil
+		}
+	}
+	return "", nil, 0, fmt.Errorf("no physical IPv4 default route")
+}
 
 func bindProtectToInterface(b wgconn.Bind, ifIndex uint32) error {
 	if ifIndex == 0 {

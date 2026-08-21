@@ -16,6 +16,7 @@ import (
 	"github.com/puzpuzpuz/xsync/v3"
 	"github.com/tunnels-is/tunnels/certs"
 	"github.com/tunnels-is/tunnels/types"
+	wgconn "golang.zx2c4.com/wireguard/conn"
 	"golang.zx2c4.com/wireguard/device"
 )
 
@@ -398,6 +399,7 @@ type TUN struct {
 	tunnel atomic.Pointer[TInterface] `json:"-"`
 
 	wgDevice *device.Device
+	wgBind   wgconn.Bind
 
 	CR             *ConnectionRequest
 	ServerResponse *types.ServerConnectResponse
@@ -411,6 +413,7 @@ type TUN struct {
 	serverInterfaceIP4bytes [4]byte
 	wgEndpointSet           bool
 	wgLoopDropLogged        atomic.Bool
+	protectHosts            []string
 
 	natMu      sync.RWMutex        `json:"-"`
 	NATEgress  map[[4]byte][4]byte `json:"-"`

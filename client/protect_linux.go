@@ -60,6 +60,7 @@ func applyEndpointProtect(ifName string, gw net.IP) error {
 	}
 
 	endpointProtectInstalled.Store(true)
+	startProtectWatcher()
 	DEBUG("installed WireGuard socket protect: fwmark ", wgProtectMark,
 		" table ", wgProtectTable, " via ", gw4, " dev ", ifName)
 	return nil

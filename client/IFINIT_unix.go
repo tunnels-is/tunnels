@@ -391,6 +391,10 @@ func IP_AddRoute(
 			ones, bits := r.Dst.Mask.Size()
 			if ones == bits {
 				existing, _ := netlink.RouteListFiltered(netlink.FAMILY_V4, &netlink.Route{Dst: r.Dst}, netlink.RT_FILTER_DST)
+				if len(existing) == 1 && existing[0].LinkIndex == r.LinkIndex &&
+					existing[0].Gw != nil && r.Gw != nil && existing[0].Gw.Equal(r.Gw) {
+					return nil
+				}
 				for i := range existing {
 					_ = netlink.RouteDel(&existing[i])
 				}
