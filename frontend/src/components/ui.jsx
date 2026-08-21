@@ -1,8 +1,12 @@
-export const Page = ({ actions, children }) => (
-	<div className="min-h-screen bg-base-200 pl-14">
-		<div className="w-full p-6">
-			{actions && <div className="mb-4 flex flex-wrap items-center justify-end gap-2">{actions}</div>}
-			{children}
+export const Page = ({ actions, children, fill }) => (
+	<div className={(fill ? "h-full" : "min-h-full") + " bg-base-200 pl-14"}>
+		<div className={"w-full p-6" + (fill ? " flex h-full min-h-0 flex-col" : "")}>
+			{actions && (
+				<div className={"mb-4 flex flex-wrap items-center justify-end gap-2" + (fill ? " shrink-0" : "")}>
+					{actions}
+				</div>
+			)}
+			{fill ? <div className="flex min-h-0 flex-1 flex-col">{children}</div> : children}
 		</div>
 	</div>
 )

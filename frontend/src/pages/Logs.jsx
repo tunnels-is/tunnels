@@ -39,8 +39,8 @@ const Logs = () => {
 	const paged = filteredLogs.slice(safePage * PAGE_SIZE, (safePage + 1) * PAGE_SIZE)
 
 	return (
-		<Page>
-			<div className="flex h-[calc(100vh-3rem)] flex-col">
+		<Page fill>
+			<div className="flex h-full min-h-0 flex-col">
 			<Toolbar>
 				<label className="input input-xs flex w-52 items-center gap-1">
 						<Search size={12} className="opacity-40" />

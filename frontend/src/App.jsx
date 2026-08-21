@@ -39,12 +39,12 @@ const App = () => {
 
 	return (
 		<HashRouter>
-			<div className="min-h-screen w-full bg-base-200">
+			<div className="relative h-full w-full overflow-hidden bg-base-200">
 				<LoadingBar />
 				<Toasts />
 				<Sidebar />
 
-				<main className="min-h-screen">
+				<main className="h-full overflow-auto">
 					<Routes>
 						{!user ? (
 							<>
@@ -99,7 +99,7 @@ class ErrorBoundary extends React.Component {
 	render() {
 		if (this.state.hasError) {
 			return (
-				<div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-base-200 p-8 text-center">
+				<div className="flex h-full flex-col items-center justify-center gap-4 bg-base-200 p-8 text-center">
 					<h1 className="max-w-lg text-sm opacity-70">
 						Something unexpected happened, please press Reload. If that doesn&apos;t work, please contact
 						customer support.

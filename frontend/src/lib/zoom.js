@@ -6,7 +6,9 @@ const STEP = 0.1
 const clamp = (v) => Math.min(MAX, Math.max(MIN, Math.round(v * 100) / 100))
 
 const apply = (level) => {
-	document.documentElement.style.zoom = String(level)
+	const root = document.documentElement
+	root.style.removeProperty("zoom")
+	root.style.setProperty("--ui-zoom", String(level))
 }
 
 const readStored = () => {

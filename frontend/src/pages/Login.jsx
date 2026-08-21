@@ -201,7 +201,7 @@ const Login = () => {
 	)
 
 	return (
-		<div className="min-h-screen bg-base-200 pl-14">
+		<div className="min-h-full bg-base-200 pl-14">
 			<div className="w-full max-w-md px-6 pt-20">
 				<div className="mb-8">
 					<div className="mb-1 flex items-center gap-1">

@@ -43,7 +43,7 @@ const Sidebar = () => {
 		parts.includes(route) || (parts[1] === "" && (route === "login" || route === "dashboard"))
 
 	return (
-		<div className="group/sidebar fixed top-0 left-0 z-50 flex h-screen w-14 flex-col overflow-hidden border-r border-base-300 bg-base-100 transition-all duration-200 hover:w-52">
+		<div className="group/sidebar absolute top-0 left-0 z-50 flex h-full w-14 flex-col overflow-hidden border-r border-base-300 bg-base-100 transition-all duration-200 hover:w-52">
 			<div className="flex-1 space-y-3 overflow-y-auto py-3">
 				{groups
 				.filter((g) => g.items.some((i) => i.show))
