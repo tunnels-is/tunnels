@@ -82,7 +82,7 @@ const LoadingBar = () => {
 
 	return (
 		<div
-			className="pointer-events-none fixed inset-0 z-[90] flex items-center justify-center"
+			className="pointer-events-none absolute inset-0 z-[90] flex items-center justify-center"
 			role="status"
 			aria-live="polite"
 			aria-busy="true"
@@ -99,7 +99,7 @@ const LoadingBar = () => {
 			{}
 			<div
 				className={
-					"loading-panel relative flex min-w-[12rem] max-w-[min(90vw,22rem)] flex-col items-center gap-5 " +
+					"loading-panel relative flex min-w-[12rem] max-w-[min(90%,22rem)] flex-col items-center gap-5 " +
 					"rounded-2xl border border-base-300/80 bg-base-100/95 px-9 py-8 " +
 					"shadow-2xl shadow-black/15 ring-1 ring-black/5 backdrop-blur-xl " +
 					"dark:shadow-black/50 dark:ring-white/5"

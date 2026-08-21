@@ -136,12 +136,26 @@
   --font-mono: ui-monospace, "SF Mono", "Menlo", "Consolas", "Liberation Mono", monospace;
 }
 
-html,
-body,
-#app {
+html {
+  --ui-zoom: 1;
   height: 100%;
+  overflow: hidden;
 }
 
 body {
+  height: 100%;
+  overflow: hidden;
   font-family: var(--font-sans);
+}
+
+#app {
+  width: calc(100% / var(--ui-zoom));
+  height: calc(100% / var(--ui-zoom));
+  overflow: hidden;
+  transform: scale(var(--ui-zoom));
+  transform-origin: 0 0;
+}
+
+.toast {
+  max-width: calc(100% - 2rem);
 }
