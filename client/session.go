@@ -18,7 +18,6 @@ import (
 	"github.com/miekg/dns"
 	"github.com/tunnels-is/tunnels/types"
 	"github.com/xlzd/gotp"
-	wgconn "golang.zx2c4.com/wireguard/conn"
 	wgdevice "golang.zx2c4.com/wireguard/device"
 	wgtun "golang.zx2c4.com/wireguard/tun"
 )
@@ -138,11 +137,13 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		return 502, errors.New("no default interface, please check try again")
 	}
 
+	gw4 := gateway.To4().String()
 	if strings.Contains(ClientCR.Server.Host, "api.tunnels.is") {
-		err = IP_AddRoute(DefaultControllerIP+"/32", *ifName, gateway.To4().String(), "0")
+		err = IP_AddRoute(DefaultControllerIP+"/32", *ifName, gw4, "0")
 		if err != nil {
 			return 502, errors.New("unable to initialize controller route: " + err.Error())
 		}
+		registerProtectHost(tunnel, DefaultControllerIP)
 	} else {
 		netip := net.ParseIP(ClientCR.Server.Host)
 		if netip == nil {
@@ -153,15 +154,17 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 			if len(addrs) == 0 {
 				return 502, errors.New("did not find any addresses when resolving controller host")
 			}
-			err = IP_AddRoute(addrs[0]+"/32", *ifName, gateway.To4().String(), "0")
+			err = IP_AddRoute(addrs[0]+"/32", *ifName, gw4, "0")
 			if err != nil {
 				return 502, errors.New("unable to initialize controller route: " + err.Error())
 			}
+			registerProtectHost(tunnel, addrs[0])
 		} else {
-			err = IP_AddRoute(ClientCR.Server.Host+"/32", *ifName, gateway.To4().String(), "0")
+			err = IP_AddRoute(ClientCR.Server.Host+"/32", *ifName, gw4, "0")
 			if err != nil {
 				return 502, errors.New("unable to initialize controller route: " + err.Error())
 			}
+			registerProtectHost(tunnel, ClientCR.Server.Host)
 		}
 	}
 
@@ -194,7 +197,7 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	}
 
 	ServerReponse := &types.ServerConnectResponse{
-		InterfaceIP:      wgCfg.ServerIP,
+		InterfaceIP:      ClientCR.ServerIP,
 		WireGuardIP:      wgCfg.WireGuardIP,
 		WireGuardPubKey:  wgCfg.WireGuardPubKey,
 		WireGuardPort:    wgCfg.WireGuardPort,
@@ -214,10 +217,28 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		return 502, err
 	}
 
-	err = IP_AddRoute(ServerReponse.InterfaceIP+"/32", *ifName, gateway.To4().String(), "0")
+	err = IP_AddRoute(ClientCR.ServerIP+"/32", *ifName, gw4, "0")
 	if err != nil {
 		return 502, errors.New("unable to initialize routes")
 	}
+	registerProtectHost(tunnel, ClientCR.ServerIP)
+	if wgCfg.ServerIP != "" && wgCfg.ServerIP != ClientCR.ServerIP {
+		if rerr := IP_AddRoute(wgCfg.ServerIP+"/32", *ifName, gw4, "0"); rerr != nil {
+			ERROR("unable to add extra server IP route: ", rerr)
+		}
+		registerProtectHost(tunnel, wgCfg.ServerIP)
+	}
+
+	if protErr := applyEndpointProtect(*ifName, gateway.To4()); protErr != nil {
+		ERROR("unable to install WireGuard socket protect route: ", protErr)
+	}
+	startProtectWatcher()
+	success := false
+	defer func() {
+		if !success {
+			removeEndpointProtect()
+		}
+	}()
 
 	privHex, hexErr := wgB64ToHex(wgPrivKeyB64)
 	if hexErr != nil {
@@ -236,6 +257,7 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		}
 		oldTunnel.SetState(TUN_Disconnecting)
 		tunnel.wgDevice = oldTunnel.wgDevice
+		tunnel.wgBind = oldTunnel.wgBind
 		tunnel.osTUN = oldTunnel.osTUN
 		tunnel.procTUN = oldTunnel.procTUN
 		if tunnel.procTUN != nil {
@@ -262,7 +284,13 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		go tunnel.announceAllowedHostsWithRetry()
 		watchWGDevice(tunnel)
 		Disconnect(oldTunnel.ID, true)
+		if id := state.DefaultInterfaceID.Load(); id > 0 {
+			if pinErr := pinProtectBind(tunnel.wgBind, uint32(id)); pinErr != nil {
+				ERROR("unable to refresh WireGuard socket pin after in-place replace: ", pinErr)
+			}
+		}
 		DEBUG("replaced WireGuard session in place (no TUN recreate)")
+		success = true
 		return 200, nil
 	}
 
@@ -298,6 +326,7 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 					watchWGDevice(tunnel)
 					Disconnect(oldTunnel.ID, true)
 					DEBUG("reused OS TUN after WireGuard device death")
+					success = true
 					return 200, nil
 				}
 			}
@@ -345,11 +374,21 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		Disconnect(oldTunnel.ID, true)
 	}
 
+	success = true
 	return 200, nil
 }
 
 func attachWGDevice(tunnel *TUN, inter *TInterface, pt wgtun.Device, ipcConf string) error {
-	wgDev := wgdevice.NewDevice(pt, wgconn.NewDefaultBind(), NewWGLogger())
+	var ifIndex uint32
+	if id := STATE.Load().DefaultInterfaceID.Load(); id > 0 {
+		ifIndex = uint32(id)
+	} else {
+		ERROR("no physical interface index; WireGuard socket will not be pinned to the NIC")
+	}
+	bind := newProtectBind(ifIndex)
+	tunnel.wgBind = bind
+	startProtectWatcher()
+	wgDev := wgdevice.NewDevice(pt, bind, NewWGLogger())
 	if ipcErr := applyWGIPC(wgDev, ipcConf); ipcErr != nil {
 		wgDev.Close()
 		return fmt.Errorf("WireGuard IPC configuration failed: %w", ipcErr)
@@ -500,6 +539,7 @@ func InitializeTunnelFromCRR(TUN *TUN) (err error) {
 	TUN.serverInterfaceIP4bytes[1] = TUN.serverInterfaceNetIP[1]
 	TUN.serverInterfaceIP4bytes[2] = TUN.serverInterfaceNetIP[2]
 	TUN.serverInterfaceIP4bytes[3] = TUN.serverInterfaceNetIP[3]
+	TUN.wgEndpointSet = true
 
 	if meta.LocalhostNat {
 		NN := new(types.Network)

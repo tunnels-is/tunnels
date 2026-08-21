@@ -46,6 +46,12 @@ func syncKillSwitch(want4, want6 bool) error {
 	} else {
 		disableKillSwitchIPv6()
 	}
+
+	// Reinstall the WireGuard protect table / host /32s / socket pin if a
+	// tunnel is up. The IPv4 blackhole is in the main table; marked WG
+	// packets use table wgProtectTable and must not be left pointing at a
+	// stale default after demoteLowMetricDefaults.
+	refreshEndpointProtect()
 	return first
 }
 
@@ -83,6 +89,9 @@ func pinControlPlaneIPv4Routes() {
 	}
 
 	pin(DefaultControllerIP)
+	for _, h := range collectProtectHosts() {
+		pin(h)
+	}
 	cfg := CONFIG.Load()
 	if cfg == nil {
 		return
