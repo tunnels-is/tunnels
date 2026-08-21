@@ -192,8 +192,8 @@ func validateWAN(wan *types.WAN) error {
 	if wan.CIDR == "" {
 		return errors.New("WAN CIDR is required")
 	}
-	if err := validateCIDR(wan.CIDR); err != nil {
-		return errors.New("invalid CIDR: " + err.Error())
+	if err := types.ValidateWANCIDR(wan.CIDR); err != nil {
+		return err
 	}
 	return nil
 }

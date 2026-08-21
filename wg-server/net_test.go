@@ -51,7 +51,9 @@ func TestPreviewRules_MASQUERADEEvenWithPublicIP(t *testing.T) {
 	}
 	want := []string{
 		"iptables -A INPUT -p udp --dport 51820 -j ACCEPT",
+		"iptables -I INPUT -i wg0 -j DROP",
 		"ip6tables -A INPUT -p udp --dport 51820 -j ACCEPT",
+		"ip6tables -I INPUT -i wg0 -j DROP",
 		"iptables -A FORWARD -i wg0 -o wg0 -j ACCEPT",
 		"iptables -A FORWARD -i wg0 -o eth0 -j ACCEPT",
 		"iptables -A FORWARD -i eth0 -o wg0 -m state --state RELATED,ESTABLISHED -j ACCEPT",
@@ -72,6 +74,32 @@ func TestPreviewRules_MASQUERADEEvenWithPublicIP(t *testing.T) {
 	for _, line := range got {
 		if strings.Contains(line, "SNAT") {
 			t.Fatalf("SNAT rule leaked: %s", line)
+		}
+	}
+}
+
+func TestPreviewRules_HostInputDrop(t *testing.T) {
+	cfg := &Config{
+		WireGuardSubnet:   "10.0.0.0/22",
+		WireGuardIface:    "wg0",
+		WireGuardPort:     51820,
+		WireGuardMeshPort: 51821,
+		InternetIface:     "eth0",
+	}
+	got := PreviewRules(cfg)
+	for _, want := range []string{
+		"iptables -I INPUT -i wg0 -j DROP",
+		"ip6tables -I INPUT -i wg0 -j DROP",
+		"iptables -I INPUT -i wg0mesh -j DROP",
+		"ip6tables -I INPUT -i wg0mesh -j DROP",
+	} {
+		if !slices.Contains(got, want) {
+			t.Errorf("expected %q in preview, got:\n%s", want, joinLines(got))
+		}
+	}
+	for _, line := range got {
+		if strings.Contains(line, "INPUT") && strings.Contains(line, "-i wg0 -j DROP") && !strings.Contains(line, "-I INPUT") {
+			t.Fatalf("host INPUT drop must be inserted (-I), got: %s", line)
 		}
 	}
 }

@@ -53,6 +53,10 @@ func setupNet(cfg *Config) error {
 		return fmt.Errorf("allow WireGuard INPUT port: %w", err)
 	}
 
+	if err := dropHostInput(cfg.WireGuardIface); err != nil {
+		return fmt.Errorf("drop host INPUT from %s: %w", cfg.WireGuardIface, err)
+	}
+
 	if err := addForwardRules(cfg.WireGuardIface, cfg.InternetIface, cfg.WireGuardSubnet6 != ""); err != nil {
 		return fmt.Errorf("add FORWARD rules: %w", err)
 	}
@@ -89,6 +93,7 @@ func flushWGRules(cfg *Config) {
 	for _, bin := range []string{"iptables", "ip6tables"} {
 
 		drainRule(bin, "-D", "INPUT", "-p", "udp", "--dport", portStr, "-j", "ACCEPT")
+		drainRule(bin, "-D", "INPUT", "-i", wg, "-j", "DROP")
 
 		drainRule(bin, "-D", "FORWARD", "-i", wg, "-o", wg, "-j", "ACCEPT")
 
@@ -124,6 +129,7 @@ func flushWGRules(cfg *Config) {
 		mesh := meshIface(cfg)
 		for _, bin := range []string{"iptables", "ip6tables"} {
 			drainRule(bin, "-D", "INPUT", "-p", "udp", "--dport", meshPort, "-j", "ACCEPT")
+			drainRule(bin, "-D", "INPUT", "-i", mesh, "-j", "DROP")
 		}
 		drainRule("iptables", "-D", "FORWARD", "-i", mesh, "-o", wg, "-j", "ACCEPT")
 		drainRule("iptables", "-D", "FORWARD", "-i", wg, "-o", mesh, "-j", "ACCEPT")
@@ -144,6 +150,9 @@ func addMeshRules(cfg *Config) error {
 		return err
 	}
 	if err := execIP6Tables("-A", "INPUT", "-p", "udp", "--dport", portStr, "-j", "ACCEPT"); err != nil {
+		return err
+	}
+	if err := dropHostInput(mesh); err != nil {
 		return err
 	}
 	if err := execIPTables("-A", "FORWARD", "-i", mesh, "-o", wg, "-j", "ACCEPT"); err != nil {
@@ -170,6 +179,17 @@ func allowWireGuardPort(port int) error {
 		return err
 	}
 	return execIP6Tables("-A", "INPUT", "-p", "udp", "--dport", portStr, "-j", "ACCEPT")
+}
+
+// dropHostInput inserts INPUT DROP on the WG/mesh TUN so decrypted
+// packets cannot reach host services (SSH, API, other local IPs).
+// -I so this wins over later generic INPUT ACCEPTs. FORWARD (P2P,
+// internet egress, mesh transit) is unchanged.
+func dropHostInput(iface string) error {
+	if err := execIPTables("-I", "INPUT", "-i", iface, "-j", "DROP"); err != nil {
+		return err
+	}
+	return execIP6Tables("-I", "INPUT", "-i", iface, "-j", "DROP")
 }
 
 func addForwardRules(wgIface, netIface string, withIPv6 bool) error {
@@ -209,7 +229,17 @@ func PreviewRules(cfg *Config) []string {
 
 	for _, bin := range []string{"iptables", "ip6tables"} {
 		lines = append(lines,
-			fmt.Sprintf("%s -A INPUT -p udp --dport %s -j ACCEPT", bin, portStr))
+			fmt.Sprintf("%s -A INPUT -p udp --dport %s -j ACCEPT", bin, portStr),
+			fmt.Sprintf("%s -I INPUT -i %s -j DROP", bin, wg),
+		)
+	}
+	if cfg.WireGuardMeshPort > 0 {
+		mesh := meshIface(cfg)
+		for _, bin := range []string{"iptables", "ip6tables"} {
+			lines = append(lines,
+				fmt.Sprintf("%s -I INPUT -i %s -j DROP", bin, mesh),
+			)
+		}
 	}
 
 	forwardBins := []string{"iptables"}

@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"net"
 	"strconv"
+
+	"github.com/tunnels-is/tunnels/types"
 )
 
 func validateRouteArgs(network, gateway, metric string) error {
@@ -32,13 +34,16 @@ func validateWGServerConfig(ip, serverIP, subnet, subnet6, wanCIDR string) error
 	if serverIP != "" && net.ParseIP(serverIP) == nil {
 		return fmt.Errorf("controller returned an invalid server IP %q", serverIP)
 	}
-	for _, cidr := range []string{subnet, subnet6, wanCIDR} {
+	for _, cidr := range []string{subnet, subnet6} {
 		if cidr == "" {
 			continue
 		}
 		if _, _, err := net.ParseCIDR(cidr); err != nil {
 			return fmt.Errorf("controller returned an invalid CIDR %q", cidr)
 		}
+	}
+	if err := types.ValidateWANCIDR(wanCIDR); err != nil {
+		return fmt.Errorf("controller returned an invalid WAN CIDR: %w", err)
 	}
 	return nil
 }
