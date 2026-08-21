@@ -48,7 +48,7 @@ func fetchServersByCountry(form *AutoConnectForm) ([]*types.Server, error) {
 		"UID":         form.UserID,
 	}
 	INFO("auto-connect: fetching servers by country: ", url, " country: ", form.Country)
-	respBytes, code, err := SendRequestToURL(nil, "POST", url, reqBody, 15000, form.Server.ValidateCertificate, form.authHeaders())
+	respBytes, code, err := SendRequestToURL(nil, "POST", url, reqBody, 15000, form.Server.ValidateCertificate, form.Server.CertificatePath, form.authHeaders())
 	if err != nil {
 		return nil, fmt.Errorf("fetch servers: %w", err)
 	}
@@ -71,7 +71,7 @@ func fetchAllServers(form *AutoConnectForm) ([]*types.Server, error) {
 		"UID":         form.UserID,
 	}
 	INFO("auto-connect: fetching full server list: ", url)
-	respBytes, code, err := SendRequestToURL(nil, "POST", url, reqBody, 15000, form.Server.ValidateCertificate, form.authHeaders())
+	respBytes, code, err := SendRequestToURL(nil, "POST", url, reqBody, 15000, form.Server.ValidateCertificate, form.Server.CertificatePath, form.authHeaders())
 	if err != nil {
 		return nil, fmt.Errorf("fetch all servers: %w", err)
 	}
@@ -228,7 +228,7 @@ func findDeviceByPubKey(form *AutoConnectForm, pubKey string) (*types.Device, er
 		"DeviceToken": form.DeviceToken,
 		"UID":         form.UserID,
 	}
-	respBytes, code, err := SendRequestToURL(nil, "POST", url, reqBody, 15000, form.Server.ValidateCertificate, form.authHeaders())
+	respBytes, code, err := SendRequestToURL(nil, "POST", url, reqBody, 15000, form.Server.ValidateCertificate, form.Server.CertificatePath, form.authHeaders())
 	if err != nil || code != 200 {
 		return nil, fmt.Errorf("list devices: code=%d err=%v", code, err)
 	}
@@ -252,7 +252,7 @@ func deleteDevice(form *AutoConnectForm, device *types.Device) error {
 		"DeviceToken": form.DeviceToken,
 		"UID":         form.UserID,
 	}
-	_, code, err := SendRequestToURL(nil, "POST", url, reqBody, 15000, form.Server.ValidateCertificate, form.authHeaders())
+	_, code, err := SendRequestToURL(nil, "POST", url, reqBody, 15000, form.Server.ValidateCertificate, form.Server.CertificatePath, form.authHeaders())
 	if err != nil {
 		return err
 	}
@@ -308,7 +308,7 @@ func fetchServerByID(form *AutoConnectForm, serverID uuid.UUID) (*types.Server, 
 		"DeviceToken": form.DeviceToken,
 		"UID":         form.UserID,
 	}
-	respBytes, code, err := SendRequestToURL(nil, "POST", url, reqBody, 15000, form.Server.ValidateCertificate, form.authHeaders())
+	respBytes, code, err := SendRequestToURL(nil, "POST", url, reqBody, 15000, form.Server.ValidateCertificate, form.Server.CertificatePath, form.authHeaders())
 	if err != nil || code != 200 {
 		return nil, fmt.Errorf("fetch server: code=%d err=%v", code, err)
 	}

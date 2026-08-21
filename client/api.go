@@ -3,6 +3,7 @@ package client
 import (
 	"bytes"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -28,7 +29,7 @@ func ResetEverything() {
 	})
 }
 
-func SendRequestToURL(tc *tls.Config, method string, url string, data any, timeoutMS int, validateCert bool, extraHeaders ...map[string]string) ([]byte, int, error) {
+func SendRequestToURL(tc *tls.Config, method string, url string, data any, timeoutMS int, validateCert bool, certPath string, extraHeaders ...map[string]string) ([]byte, int, error) {
 	defer RecoverAndLog()
 
 	var body []byte
@@ -70,12 +71,12 @@ func SendRequestToURL(tc *tls.Config, method string, url string, data any, timeo
 		if !validateCert {
 			warnInsecureHost(req.URL.Host)
 		}
+		tlsCfg, tlsErr := tlsConfigForController(validateCert, certPath)
+		if tlsErr != nil {
+			return nil, 400, tlsErr
+		}
 		client.Transport = &http.Transport{
-			TLSClientConfig: &tls.Config{
-				MinVersion:         tls.VersionTLS13,
-				CurvePreferences:   []tls.CurveID{tls.X25519MLKEM768},
-				InsecureSkipVerify: !validateCert,
-			},
+			TLSClientConfig: tlsCfg,
 		}
 	}
 
@@ -100,6 +101,30 @@ func SendRequestToURL(tc *tls.Config, method string, url string, data any, timeo
 	}
 
 	return respBodyBytes, resp.StatusCode, nil
+}
+
+func tlsConfigForController(validateCert bool, certPath string) (*tls.Config, error) {
+	cfg := &tls.Config{
+		MinVersion:       tls.VersionTLS13,
+		CurvePreferences: []tls.CurveID{tls.X25519MLKEM768},
+	}
+	if !validateCert {
+		cfg.InsecureSkipVerify = true
+		return cfg, nil
+	}
+	if certPath == "" {
+		return cfg, nil
+	}
+	pemBytes, err := os.ReadFile(certPath)
+	if err != nil {
+		return nil, fmt.Errorf("certificate path: %w", err)
+	}
+	pool := x509.NewCertPool()
+	if !pool.AppendCertsFromPEM(pemBytes) {
+		return nil, fmt.Errorf("certificate path %q contains no PEM certificates", certPath)
+	}
+	cfg.RootCAs = pool
+	return cfg, nil
 }
 
 func authorizeControlServer(s *ControlServer) error {
@@ -145,6 +170,7 @@ func ForwardToController(FR *FORWARD_REQUEST) (any, int) {
 		FR.JSONData,
 		FR.Timeout,
 		FR.Server.ValidateCertificate,
+		FR.Server.CertificatePath,
 		FR.Headers,
 	)
 
