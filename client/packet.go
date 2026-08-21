@@ -2,6 +2,7 @@ package client
 
 import (
 	"encoding/binary"
+	"net"
 )
 
 func ipv4FragInfo(packet []byte) (isFragmented, isTrailing bool) {
@@ -60,6 +61,15 @@ func (V *TUN) ProcessEgressPacket(p *[]byte) (sendRemote bool) {
 	V.EP_DstIP[1] = packet[17]
 	V.EP_DstIP[2] = packet[18]
 	V.EP_DstIP[3] = packet[19]
+
+	if V.wgEndpointSet && V.EP_Protocol == 17 && V.EP_DstIP == V.serverInterfaceIP4bytes {
+		if V.wgLoopDropLogged.CompareAndSwap(false, true) {
+			SECURITY("dropping UDP to WireGuard endpoint on the tunnel interface — packets to ",
+				net.IP(V.serverInterfaceIP4bytes[:]).String(),
+				" must leave on the physical interface, not through the tunnel")
+		}
+		return false
+	}
 
 	V.EP_NAT_IP, V.EP_NAT_OK = V.TransLateIP(V.EP_DstIP)
 

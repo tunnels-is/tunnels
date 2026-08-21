@@ -37,6 +37,7 @@ func Disconnect(tunID string, switching bool) (err error) {
 			} else {
 				DEBUG("disconnected from ", "(tag unknown)", tun.ID)
 			}
+			removeEndpointProtect()
 			return false
 		}
 		return true

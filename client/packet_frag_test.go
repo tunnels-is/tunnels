@@ -67,6 +67,60 @@ func TestProcessEgress_TrailingFragmentIgnoresPortBlock(t *testing.T) {
 	}
 }
 
+func TestProcessEgress_DropsUDPToWireGuardEndpoint(t *testing.T) {
+	tun := newBareTUN()
+	tun.wgEndpointSet = true
+	tun.serverInterfaceIP4bytes = [4]byte{74, 63, 223, 157}
+
+	for _, payload := range []int{8, 112, 176, 240, 1452} {
+		l4 := make([]byte, payload)
+		binary.BigEndian.PutUint16(l4[0:2], 51067)
+		binary.BigEndian.PutUint16(l4[2:4], 51820)
+		pkt := buildV4(17, [4]byte{10, 0, 0, 2}, tun.serverInterfaceIP4bytes, 0, l4)
+		p := pkt
+		if tun.ProcessEgressPacket(&p) {
+			t.Fatalf("UDP length %d to WireGuard endpoint must be dropped to prevent encapsulation loop", payload)
+		}
+	}
+}
+
+func TestProcessEgress_AllowsTCPToWireGuardEndpoint(t *testing.T) {
+	tun := newBareTUN()
+	tun.wgEndpointSet = true
+	tun.serverInterfaceIP4bytes = [4]byte{74, 63, 223, 157}
+	l4 := make([]byte, 20)
+	binary.BigEndian.PutUint16(l4[2:4], 443)
+	pkt := buildV4(6, [4]byte{10, 0, 0, 2}, tun.serverInterfaceIP4bytes, 0, l4)
+	p := pkt
+	if !tun.ProcessEgressPacket(&p) {
+		t.Fatal("TCP to the server public IP should still go through the tunnel")
+	}
+}
+
+func TestProcessEgress_AllowsUDPToOtherHosts(t *testing.T) {
+	tun := newBareTUN()
+	tun.wgEndpointSet = true
+	tun.serverInterfaceIP4bytes = [4]byte{74, 63, 223, 157}
+	l4 := make([]byte, 8)
+	binary.BigEndian.PutUint16(l4[2:4], 51820)
+	pkt := buildV4(17, [4]byte{10, 0, 0, 2}, [4]byte{1, 1, 1, 1}, 0, l4)
+	p := pkt
+	if !tun.ProcessEgressPacket(&p) {
+		t.Fatal("UDP to other hosts must not be dropped")
+	}
+}
+
+func TestProcessEgress_DropsUDPFragmentToEndpoint(t *testing.T) {
+	tun := newBareTUN()
+	tun.wgEndpointSet = true
+	tun.serverInterfaceIP4bytes = [4]byte{74, 63, 223, 157}
+	pkt := buildV4(17, [4]byte{10, 0, 0, 2}, tun.serverInterfaceIP4bytes, 185, []byte{1, 2, 3, 4, 5, 6, 7, 8})
+	p := pkt
+	if tun.ProcessEgressPacket(&p) {
+		t.Fatal("UDP fragments to the WireGuard endpoint must be dropped")
+	}
+}
+
 func TestProcess_IPv6PassThrough(t *testing.T) {
 	tun := newBareTUN()
 	v6 := make([]byte, 40)

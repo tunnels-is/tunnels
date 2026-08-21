@@ -23,8 +23,8 @@ func wgDeviceAlive(d *wgdevice.Device) bool {
 
 func buildWGIPC(privHex, serverPubHex, endpointIP, endpointPort string) string {
 	return fmt.Sprintf(
-		"private_key=%s\nreplace_peers=true\npublic_key=%s\nendpoint=%s:%s\nreplace_allowed_ips=true\nallowed_ip=0.0.0.0/0\npersistent_keepalive_interval=25\n\n",
-		privHex, serverPubHex, endpointIP, endpointPort,
+		"private_key=%s\nfwmark=%d\nreplace_peers=true\npublic_key=%s\nendpoint=%s:%s\nreplace_allowed_ips=true\nallowed_ip=0.0.0.0/0\npersistent_keepalive_interval=25\n\n",
+		privHex, wgProtectMark, serverPubHex, endpointIP, endpointPort,
 	)
 }
 
