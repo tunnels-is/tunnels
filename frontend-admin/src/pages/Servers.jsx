@@ -21,7 +21,7 @@ function Modal({ title, onClose, children }) {
 
 const inputClass = "w-full bg-[#fdfcf8] border border-[#e7e3d7] rounded px-3 py-1.5 text-[13px] text-[#0a0a0a] placeholder-[#a3a3a3] focus:outline-none focus:border-[#0a0a0a]";
 
-const emptyForm = () => ({ Tag: '', InfraTag: '', IP: '', Port: '443', Country: '', WireGuardSubnet: '', WireGuardSubnet6: '', WireGuardPort: 51820, WireGuardIface: 'wg0', InternetIface: '', EnableFirewall: true, InsecureSkipVerify: false, WANID: '' });
+const emptyForm = () => ({ Tag: '', InfraTag: '', IP: '', Port: '443', Country: '', WireGuardSubnet: '', WireGuardSubnet6: '', WireGuardPort: 51820, WireGuardIface: 'wg0', InternetIface: '', EnableFirewall: true, WANID: '' });
 
 export default function Servers() {
   const navigate = useNavigate();
@@ -238,13 +238,6 @@ export default function Servers() {
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" checked={!!createForm.EnableFirewall} onChange={set('EnableFirewall')} className="accent-[#1d4ed8]" />
                 <span className="text-[12px] text-[#525252]">{createForm.EnableFirewall ? 'Enabled' : 'Disabled'}</span>
-              </label>
-            </div>
-            <div>
-              <label className="block text-[11px] text-[#a3a3a3] uppercase tracking-wider mb-1">Skip Verify</label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" checked={!!createForm.InsecureSkipVerify} onChange={set('InsecureSkipVerify')} className="accent-[#1d4ed8]" />
-                <span className="text-[12px] text-[#525252]">{createForm.InsecureSkipVerify ? 'Yes' : 'No'}</span>
               </label>
             </div>
             {createError && <p className="text-[12px] text-[#dc2626]">{createError}</p>}

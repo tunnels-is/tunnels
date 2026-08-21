@@ -401,7 +401,6 @@ func API_WGServerConfigFetch(w http.ResponseWriter, r *http.Request) {
 		WireGuardIface:     server.WireGuardIface,
 		InternetIface:      server.InternetIface,
 		EnableFirewall:     server.EnableFirewall,
-		InsecureSkipVerify: server.InsecureSkipVerify,
 	}
 
 	sendObject(w, resp)

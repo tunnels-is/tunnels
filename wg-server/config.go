@@ -248,9 +248,11 @@ func FetchConfig(controllerURL, apiKey, configPath string, insecureSkipVerify bo
 		WireGuardSubnet6:  r.WireGuardSubnet6,
 		WireGuardIface:    r.WireGuardIface,
 		InternetIface:     r.InternetIface,
-		EnableFirewall:    r.EnableFirewall,
+		EnableFirewall: r.EnableFirewall,
 
-		InsecureSkipVerify: insecureSkipVerify || r.InsecureSkipVerify,
+		// Local wg-config.json / CLI only. The controller must not remotely
+		// disable TLS verification for X-WG-KEY calls.
+		InsecureSkipVerify: insecureSkipVerify,
 	}
 
 	if cfg.WireGuardPort == 0 {
