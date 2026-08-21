@@ -23,6 +23,13 @@ import (
 // a different Location (Go does not strip custom auth headers).
 var errControllerRedirect = errors.New("refusing to follow controller redirect (X-Device-Token must not leave the configured controller URL)")
 
+const defaultMaxControllerResponseBytes int64 = 50 << 20 // 50 MiB
+
+var (
+	maxControllerResponseBytes    = defaultMaxControllerResponseBytes
+	errControllerResponseTooLarge = errors.New("controller response exceeds size limit")
+)
+
 func ResetEverything() {
 	defer RecoverAndLog()
 	tunnelMapRange(func(tun *TUN) bool {
@@ -100,14 +107,18 @@ func SendRequestToURL(tc *tls.Config, method string, url string, data any, timeo
 	}
 
 	client.CloseIdleConnections()
-	if resp.Body != nil {
-		defer resp.Body.Close()
+	if resp.Body == nil {
+		return nil, resp.StatusCode, nil
 	}
+	defer resp.Body.Close()
 
-	var respBodyBytes []byte
-	respBodyBytes, err = io.ReadAll(resp.Body)
+	limited := io.LimitReader(resp.Body, maxControllerResponseBytes+1)
+	respBodyBytes, err := io.ReadAll(limited)
 	if err != nil {
 		return nil, resp.StatusCode, err
+	}
+	if int64(len(respBodyBytes)) > maxControllerResponseBytes {
+		return nil, resp.StatusCode, errControllerResponseTooLarge
 	}
 
 	return respBodyBytes, resp.StatusCode, nil
