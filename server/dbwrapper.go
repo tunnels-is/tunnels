@@ -95,6 +95,10 @@ func DB_UpdateServer(S *types.Server) (RS *types.Server, err error) {
 	return BBolt_UpdateServer(S)
 }
 
+func DB_SetServerWireGuardPubKey(id uuid.UUID, pubKey string) error {
+	return BBolt_SetServerWireGuardPubKey(id, pubKey)
+}
+
 func DB_CreateDevice(D *types.Device) (err error) {
 	return BBolt_CreateDevice(D)
 }

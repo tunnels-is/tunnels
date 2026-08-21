@@ -386,9 +386,9 @@ func API_WGServerConfigFetch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	pubKeyB64 := r.Header.Get("X-WG-PubKey")
-	if pubKeyB64 != "" && pubKeyB64 != server.WireGuardPubKey {
-		server.WireGuardPubKey = pubKeyB64
-		_, _ = DB_UpdateServer(server)
+	if err := pinWireGuardPubKey(server, pubKeyB64); err != nil {
+		senderr(w, http.StatusConflict, err.Error())
+		return
 	}
 
 	resp := &types.WGServerConfigResponse{
@@ -405,6 +405,26 @@ func API_WGServerConfigFetch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	sendObject(w, resp)
+}
+
+// pinWireGuardPubKey records the node's pubkey on first bind. A different
+// key is rejected until an admin rotates the server API key (which clears
+// WireGuardPubKey). Same key on restart is a no-op.
+func pinWireGuardPubKey(server *types.Server, pubKeyB64 string) error {
+	if pubKeyB64 == "" {
+		return nil
+	}
+	if server.WireGuardPubKey == "" {
+		if err := DB_SetServerWireGuardPubKey(server.ID, pubKeyB64); err != nil {
+			return err
+		}
+		server.WireGuardPubKey = pubKeyB64
+		return nil
+	}
+	if pubKeyB64 == server.WireGuardPubKey {
+		return nil
+	}
+	return fmt.Errorf("WireGuard public key is pinned; rotate the server API key to replace it")
 }
 
 func meshPortForServer(s *types.Server) int {
