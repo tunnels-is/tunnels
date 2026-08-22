@@ -84,19 +84,16 @@ type FORM_LIST_USERS struct {
 	Offset      int       `json:"Offset"`
 }
 
-
 type USER_LATEST_RESPONSE struct {
-	Users              []*User `json:"Users"`
-	Total              int64   `json:"Total"`
-	Trial              int64   `json:"Trial"`
-	ActiveSubscribers  int64   `json:"ActiveSubscribers"`
+	Users             []*User `json:"Users"`
+	Total             int64   `json:"Total"`
+	Trial             int64   `json:"Trial"`
+	ActiveSubscribers int64   `json:"ActiveSubscribers"`
 }
-
 
 type FORM_ADMIN_USER_SEARCH struct {
 	Email string `json:"Email"`
 }
-
 
 type FORM_ADMIN_USER_GET struct {
 	TargetUserID uuid.UUID `json:"TargetUserID"`
@@ -300,10 +297,10 @@ type MinifiedUser struct {
 }
 
 func (u *User) RemoveSensitiveInformation() {
-	if u.Key != nil {
+	if u.Key != nil && u.Key.Key != "" {
 		ks := strings.Split(u.Key.Key, "-")
-		if len(ks) < 1 {
-			u.Key.Key = "redacted"
+		if len(ks) < 2 {
+			u.Key.Key = redactKey(u.Key.Key)
 		} else {
 			u.Key.Key = ks[len(ks)-1]
 		}

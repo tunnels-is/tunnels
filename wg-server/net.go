@@ -6,8 +6,30 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/tunnels-is/tunnels/types"
 	"github.com/vishvananda/netlink"
 )
+
+const tunnelsFwdChainPrefix = "TUNNELS_FWD"
+
+func tunnelsFwdChainName(iface string) string {
+	clean := strings.Map(func(r rune) rune {
+		switch {
+		case r >= 'A' && r <= 'Z', r >= 'a' && r <= 'z', r >= '0' && r <= '9', r == '_':
+			return r
+		default:
+			return '_'
+		}
+	}, iface)
+	if clean == "" {
+		return tunnelsFwdChainPrefix
+	}
+	name := tunnelsFwdChainPrefix + "_" + clean
+	if len(name) > 28 {
+		return name[:28]
+	}
+	return name
+}
 
 func setupNet(cfg *Config) error {
 	link, err := netlink.LinkByName(cfg.WireGuardIface)
@@ -57,7 +79,7 @@ func setupNet(cfg *Config) error {
 		return fmt.Errorf("drop host INPUT from %s: %w", cfg.WireGuardIface, err)
 	}
 
-	if err := addForwardRules(cfg.WireGuardIface, cfg.InternetIface, cfg.WireGuardSubnet6 != ""); err != nil {
+	if err := addForwardRules(cfg, cfg.WireGuardSubnet6 != ""); err != nil {
 		return fmt.Errorf("add FORWARD rules: %w", err)
 	}
 
@@ -94,6 +116,15 @@ func flushWGRules(cfg *Config) {
 
 		drainRule(bin, "-D", "INPUT", "-p", "udp", "--dport", portStr, "-j", "ACCEPT")
 		drainRule(bin, "-D", "INPUT", "-i", wg, "-j", "DROP")
+
+		chain := tunnelsFwdChainName(wg)
+		drainRule(bin, "-D", "FORWARD", "-j", chain)
+		_ = exec.Command(bin, "-F", chain).Run()
+		_ = exec.Command(bin, "-X", chain).Run()
+		// Previous builds used a shared TUNNELS_FWD name.
+		drainRule(bin, "-D", "FORWARD", "-j", tunnelsFwdChainPrefix)
+		_ = exec.Command(bin, "-F", tunnelsFwdChainPrefix).Run()
+		_ = exec.Command(bin, "-X", tunnelsFwdChainPrefix).Run()
 
 		drainRule(bin, "-D", "FORWARD", "-i", wg, "-o", wg, "-j", "ACCEPT")
 
@@ -143,7 +174,6 @@ func addMeshRules(cfg *Config) error {
 		return nil
 	}
 	mesh := meshIface(cfg)
-	wg := cfg.WireGuardIface
 	portStr := fmt.Sprintf("%d", cfg.WireGuardMeshPort)
 
 	if err := execIPTables("-A", "INPUT", "-p", "udp", "--dport", portStr, "-j", "ACCEPT"); err != nil {
@@ -153,12 +183,6 @@ func addMeshRules(cfg *Config) error {
 		return err
 	}
 	if err := dropHostInput(mesh); err != nil {
-		return err
-	}
-	if err := execIPTables("-A", "FORWARD", "-i", mesh, "-o", wg, "-j", "ACCEPT"); err != nil {
-		return err
-	}
-	if err := execIPTables("-A", "FORWARD", "-i", wg, "-o", mesh, "-j", "ACCEPT"); err != nil {
 		return err
 	}
 	return execIPTables("-t", "mangle", "-A", "FORWARD", "-o", mesh,
@@ -192,33 +216,80 @@ func dropHostInput(iface string) error {
 	return execIP6Tables("-I", "INPUT", "-i", iface, "-j", "DROP")
 }
 
-func addForwardRules(wgIface, netIface string, withIPv6 bool) error {
-
+func addForwardRules(cfg *Config, withIPv6 bool) error {
+	wgIface := cfg.WireGuardIface
+	netIface := cfg.InternetIface
+	chain := tunnelsFwdChainName(wgIface)
+	drop4, drop6, err := egressDropCIDRs(cfg)
+	if err != nil {
+		return fmt.Errorf("host egress prefixes: %w", err)
+	}
 	bins := []func(...string) error{execIPTables}
 	if withIPv6 {
 		bins = append(bins, execIP6Tables)
 	}
-	for _, bin := range bins {
-		if err := bin("-A", "FORWARD", "-i", wgIface, "-o", wgIface, "-j", "ACCEPT"); err != nil {
+	for i, bin := range bins {
+		if err := ensureTunnelsFwdChain(bin, chain); err != nil {
 			return err
 		}
-		if err := bin("-A", "FORWARD", "-i", wgIface, "-o", netIface, "-j", "ACCEPT"); err != nil {
+		if err := bin("-A", chain, "-i", wgIface, "-o", wgIface, "-j", "ACCEPT"); err != nil {
 			return err
 		}
 		if err := bin(
-			"-A", "FORWARD",
+			"-A", chain,
 			"-i", netIface, "-o", wgIface,
 			"-m", "state", "--state", "RELATED,ESTABLISHED",
 			"-j", "ACCEPT",
 		); err != nil {
 			return err
 		}
-
-		if err := bin("-A", "FORWARD", "-i", netIface, "-o", wgIface, "-j", "DROP"); err != nil {
+		if err := bin("-A", chain, "-i", netIface, "-o", wgIface, "-j", "DROP"); err != nil {
+			return err
+		}
+		if cfg.WireGuardMeshPort > 0 {
+			mesh := meshIface(cfg)
+			if err := bin("-A", chain, "-i", mesh, "-o", wgIface, "-j", "ACCEPT"); err != nil {
+				return err
+			}
+			if err := bin("-A", chain, "-i", wgIface, "-o", mesh, "-j", "ACCEPT"); err != nil {
+				return err
+			}
+			if err := bin("-A", chain, "-i", mesh, "-j", "DROP"); err != nil {
+				return err
+			}
+		}
+		cidrs := drop4
+		if i != 0 {
+			cidrs = drop6
+		}
+		for _, d := range cidrs {
+			if err := bin(destDropArgs(chain, netIface, d)...); err != nil {
+				return err
+			}
+		}
+		if err := bin("-A", chain, "-i", wgIface, "-o", netIface, "-j", "ACCEPT"); err != nil {
+			return err
+		}
+		if err := bin("-A", chain, "-i", wgIface, "-j", "DROP"); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func ensureTunnelsFwdChain(bin func(...string) error, chain string) error {
+	_ = bin("-N", chain)
+	if err := bin("-F", chain); err != nil {
+		if nerr := bin("-N", chain); nerr != nil {
+			return err
+		}
+	}
+	for {
+		if err := bin("-D", "FORWARD", "-j", chain); err != nil {
+			break
+		}
+	}
+	return bin("-I", "FORWARD", "1", "-j", chain)
 }
 
 func PreviewRules(cfg *Config) []string {
@@ -242,16 +313,40 @@ func PreviewRules(cfg *Config) []string {
 		}
 	}
 
+	chain := tunnelsFwdChainName(wg)
+	drop4, drop6, dropErr := egressDropCIDRs(cfg)
+	if dropErr != nil {
+		WARN("host egress prefixes: ", dropErr)
+	}
 	forwardBins := []string{"iptables"}
 	if cfg.WireGuardSubnet6 != "" {
 		forwardBins = append(forwardBins, "ip6tables")
 	}
 	for _, bin := range forwardBins {
+		lines = append(lines, fmt.Sprintf("%s -I FORWARD 1 -j %s", bin, chain))
 		lines = append(lines,
-			fmt.Sprintf("%s -A FORWARD -i %s -o %s -j ACCEPT", bin, wg, wg),
-			fmt.Sprintf("%s -A FORWARD -i %s -o %s -j ACCEPT", bin, wg, net),
-			fmt.Sprintf("%s -A FORWARD -i %s -o %s -m state --state RELATED,ESTABLISHED -j ACCEPT", bin, net, wg),
-			fmt.Sprintf("%s -A FORWARD -i %s -o %s -j DROP", bin, net, wg),
+			fmt.Sprintf("%s -A %s -i %s -o %s -j ACCEPT", bin, chain, wg, wg),
+			fmt.Sprintf("%s -A %s -i %s -o %s -m state --state RELATED,ESTABLISHED -j ACCEPT", bin, chain, net, wg),
+			fmt.Sprintf("%s -A %s -i %s -o %s -j DROP", bin, chain, net, wg),
+		)
+		if cfg.WireGuardMeshPort > 0 {
+			mesh := meshIface(cfg)
+			lines = append(lines,
+				fmt.Sprintf("%s -A %s -i %s -o %s -j ACCEPT", bin, chain, mesh, wg),
+				fmt.Sprintf("%s -A %s -i %s -o %s -j ACCEPT", bin, chain, wg, mesh),
+				fmt.Sprintf("%s -A %s -i %s -j DROP", bin, chain, mesh),
+			)
+		}
+		cidrs := drop4
+		if bin == "ip6tables" {
+			cidrs = drop6
+		}
+		for _, d := range cidrs {
+			lines = append(lines, fmt.Sprintf("%s %s", bin, strings.Join(destDropArgs(chain, net, d), " ")))
+		}
+		lines = append(lines,
+			fmt.Sprintf("%s -A %s -i %s -o %s -j ACCEPT", bin, chain, wg, net),
+			fmt.Sprintf("%s -A %s -i %s -j DROP", bin, chain, wg),
 		)
 	}
 
@@ -308,17 +403,15 @@ func execIP6Tables(args ...string) error {
 }
 
 func firstHost(n *net.IPNet) net.IP {
-	ip := make(net.IP, 4)
-	base := n.IP.To4()
-	copy(ip, base)
-	ip[3]++
-	return ip
+	return types.IPv4Gateway(n)
 }
 
 func firstHost6(n *net.IPNet) net.IP {
 	ip := make(net.IP, net.IPv6len)
 	copy(ip, n.IP.To16())
-
+	for i := 0; i < net.IPv6len; i++ {
+		ip[i] &= n.Mask[i]
+	}
 	for i := net.IPv6len - 1; i >= 0; i-- {
 		ip[i]++
 		if ip[i] != 0 {

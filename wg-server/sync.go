@@ -52,6 +52,10 @@ func reconcilePeer(pubKeyB64 string) authResult {
 			WARN("reconcilePeer: controller-assigned IP outside subnet: ", ip)
 			return authDenied
 		}
+		if err := types.ValidateDeviceWireGuardAddrs(cfg.WireGuardSubnet, cfg.WireGuardSubnet6, ip, ipv6); err != nil {
+			WARN("reconcilePeer: reserved or invalid assigned IP: ", err)
+			return authDenied
+		}
 		if ipv6 != "" && cfg.WireGuardSubnet6 != "" && !subnetContains(cfg.WireGuardSubnet6, ipv6) {
 			WARN("reconcilePeer: controller-assigned IPv6 outside subnet: ", ipv6)
 			return authDenied
@@ -66,15 +70,34 @@ func reconcilePeer(pubKeyB64 string) authResult {
 		}
 	}
 
-	if _, rekey := addedPeerKeys.LoadOrStore(hexKey, struct{}{}); !rekey {
-		resetPeer(ip, ipv6)
-	}
+	applyPeerFirewallSlot(hexKey, ip, ipv6)
 	if err := AddPeer(hexKey, peerAllowedIPs(ip, ipv6)...); err != nil {
 		WARN("reconcilePeer: AddPeer failed: ", err)
 		return authUnknown
 	}
 	INFO("reconcilePeer: authorized → ", pubKeyB64[:12], "… ip=", ip)
 	return authAllowed
+}
+
+type peerAddrs struct {
+	ip, ipv6 string
+}
+
+func applyPeerFirewallSlot(hexKey, ip, ipv6 string) {
+	next := peerAddrs{ip: ip, ipv6: ipv6}
+	prev, loaded := addedPeerKeys.Load(hexKey)
+	if !loaded {
+		resetPeer(ip, ipv6)
+		addedPeerKeys.Store(hexKey, next)
+		return
+	}
+	old, _ := prev.(peerAddrs)
+	if old.ip == ip && old.ipv6 == ipv6 {
+		return
+	}
+	dropPeer(old.ip, old.ipv6)
+	resetPeer(ip, ipv6)
+	addedPeerKeys.Store(hexKey, next)
 }
 
 func peerAllowedIPs(ip, ipv6 string) []string {

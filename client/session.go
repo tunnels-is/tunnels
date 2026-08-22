@@ -138,7 +138,7 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	}
 
 	gw4 := gateway.To4().String()
-	if strings.Contains(ClientCR.Server.Host, "api.tunnels.is") {
+	if isOfficialControllerHost(ClientCR.Server.Host) {
 		err = IP_AddRoute(DefaultControllerIP+"/32", *ifName, gw4, "0")
 		if err != nil {
 			return 502, errors.New("unable to initialize controller route: " + err.Error())

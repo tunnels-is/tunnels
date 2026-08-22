@@ -52,6 +52,7 @@ func setupWireGuard(cfg *Config, logLevel string) error {
 	if err != nil {
 		return fmt.Errorf("inspector setup: %w", err)
 	}
+	inspectDevice.Store(tunInterface)
 	if cfg.EnableFirewall {
 		INFO("firewall enabled on ", cfg.WireGuardIface,
 			" — peer-to-peer ingress denied by default, control port udp/", aclControlPort)
@@ -108,7 +109,7 @@ func sanitizeIPC(s string) string {
 }
 
 func AddPeer(pubKeyHex string, allowedIPs ...string) error {
-	conf := fmt.Sprintf("public_key=%s\n", sanitizeIPC(pubKeyHex))
+	conf := fmt.Sprintf("public_key=%s\nreplace_allowed_ips=true\n", sanitizeIPC(pubKeyHex))
 	for _, aip := range allowedIPs {
 		conf += fmt.Sprintf("allowed_ip=%s\n", sanitizeIPC(aip))
 	}

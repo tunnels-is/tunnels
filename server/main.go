@@ -277,6 +277,9 @@ func validateServerConfig(c *types.ServerConfig) error {
 	if len(c.TwoFactorKey) < minSecretLen {
 		return fmt.Errorf("TwoFactorKey must be set and at least %d characters: it seeds the AES-256 key that encrypts 2FA and recovery codes at rest; generate a config with -createConfig or set a strong random value", minSecretLen)
 	}
+	if c.AdminAPIKey != "" && len(c.AdminAPIKey) < 16 {
+		return fmt.Errorf("AdminAPIKey must be at least 16 characters when set")
+	}
 	return nil
 }
 
@@ -399,9 +402,20 @@ func SaveWGConfig(path string) error {
 	return nil
 }
 
+func secretFileWorldAccessible(path string) bool {
+	info, err := os.Stat(path)
+	if err != nil {
+		return false
+	}
+	return info.Mode().Perm()&0o007 != 0
+}
+
 func loadKeyPair(key, cert string) (c tls.Certificate, err error) {
 	if err := crypt.CheckKeyFilePermissions(key); err != nil {
-		logger.Warn("TLS private key has insecure file permissions (continuing)", "path", key, "err", err)
+		if secretFileWorldAccessible(key) {
+			return c, err
+		}
+		logger.Warn("TLS private key is group-accessible (continuing)", "path", key, "err", err)
 	}
 	_, priv, err := crypt.LoadPrivateKey(key)
 	if err != nil {
@@ -422,7 +436,10 @@ func loadKeyPair(key, cert string) (c tls.Certificate, err error) {
 func loadCertificatesAndTLSSettings() (err error) {
 	keyPem := loadSecret("KeyPem")
 	if err := crypt.CheckKeyFilePermissions(keyPem); err != nil {
-		logger.Warn("TLS private key has insecure file permissions (continuing)", "path", keyPem, "err", err)
+		if secretFileWorldAccessible(keyPem) {
+			return err
+		}
+		logger.Warn("TLS private key is group-accessible (continuing)", "path", keyPem, "err", err)
 	}
 	_, privB, err := crypt.LoadPrivateKey(keyPem)
 	if err != nil {
@@ -523,6 +540,9 @@ func initializeAdminUser() error {
 		return err
 	}
 	if user != nil {
+		if !user.IsAdmin {
+			return fmt.Errorf("user %q exists but is not an admin; delete or promote it before -createAdmin", user.Email)
+		}
 		return nil
 	}
 	pw := GENERATE_CODE()
@@ -547,7 +567,7 @@ func initializeAdminUser() error {
 		return err
 	}
 
-	logger.Info("ADMIN PASSWORD (change this!!)", "pass", pw)
+	fmt.Fprintf(os.Stderr, "ADMIN PASSWORD (change this!!): pass=%s\n", pw)
 	return nil
 }
 
@@ -573,6 +593,9 @@ func initializeDefaultServer() error {
 
 	apiKey := uuid.NewString()
 	internetIface := discoverInternetIface()
+	if !types.ValidIfaceName(internetIface) {
+		return fmt.Errorf("could not discover a valid InternetIface (got %q)", internetIface)
+	}
 
 	server := &types.Server{
 		ID:                 uuid.New(),

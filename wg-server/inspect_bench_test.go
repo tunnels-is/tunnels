@@ -238,7 +238,7 @@ func TestBenchScenariosAdmitAsExpected(t *testing.T) {
 			t.Fatalf("%s: Write error: %v", sc.name, err)
 		}
 		want := len(master)
-		if strings.Contains(sc.name, "denied") {
+		if strings.Contains(sc.name, "denied") || strings.HasPrefix(sc.name, "frag-") {
 			want = 0
 		}
 		if n != want {

@@ -3,10 +3,12 @@ package main
 import (
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -49,14 +51,17 @@ func seedEnabledUser(t *testing.T) uuid.UUID {
 	return u.ID
 }
 
+var seedIP uint32 = 10
+
 func seedDevice(t *testing.T, wgKey string, serverID uuid.UUID) *types.Device {
 	t.Helper()
+	n := atomic.AddUint32(&seedIP, 1)
 	d := &types.Device{
 		ID:           uuid.New(),
 		UserID:       seedEnabledUser(t),
 		ServerID:     serverID,
 		WireGuardKey: wgKey,
-		WireGuardIP:  "10.0.0.5",
+		WireGuardIP:  fmt.Sprintf("10.0.0.%d", 10+n%200),
 	}
 	if err := BBolt_CreateDevice(d); err != nil {
 		t.Fatal(err)

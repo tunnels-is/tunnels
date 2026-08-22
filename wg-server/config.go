@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -85,6 +86,8 @@ type Config struct {
 
 	HandshakeBufferSize int
 	HandshakeRatePerIP  int
+
+	ConfigPath string
 }
 
 func generateWGPrivKey() ([]byte, error) {
@@ -109,61 +112,66 @@ func derivePubKey(privKey []byte) (string, error) {
 	return base64.StdEncoding.EncodeToString(pubBytes), nil
 }
 
-const pkpath = "./.pk"
+var localPrivKeyPath string
 
-func loadOrGenerateLocalPrivKey() ([]byte, error) {
-	data, err := os.ReadFile(pkpath)
+func validIfaceName(name string) bool {
+	return types.ValidIfaceName(name)
+}
+
+func setPKPathFromConfig(configPath string) {
+	dir := "."
+	if configPath != "" {
+		dir = filepath.Dir(configPath)
+	}
+	p, err := filepath.Abs(filepath.Join(dir, ".pk"))
 	if err != nil {
-		if !errors.Is(err, os.ErrNotExist) {
-			return nil, fmt.Errorf("read pk from .pk %w", err)
-		}
+		localPrivKeyPath = filepath.Join(dir, ".pk")
+		return
+	}
+	localPrivKeyPath = p
+}
+
+func pkPath() string {
+	if localPrivKeyPath != "" {
+		return localPrivKeyPath
+	}
+	p, err := filepath.Abs(".pk")
+	if err != nil {
+		return ".pk"
+	}
+	return p
+}
+
+func loadOrGenerateLocalPrivKey(allowGenerate bool) ([]byte, error) {
+	path := pkPath()
+	data, err := os.ReadFile(path)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return nil, fmt.Errorf("read pk from %s: %w", path, err)
+	}
+	if len(data) == 0 && !allowGenerate {
+		return nil, fmt.Errorf("%s missing; refusing to mint a new WireGuard key", path)
 	}
 	if len(data) != 0 {
-		if info, statErr := os.Stat(pkpath); statErr == nil {
-			if mode := info.Mode().Perm(); mode&0o077 != 0 {
-				err := fmt.Errorf(".pk file has insecure permissions %o (want 0600)", mode)
-				ERR("file permission check failed:", pkpath, "—", err)
-				ERR("private key file unusable, removing and regenerating:", pkpath)
-				if rmErr := os.Remove(pkpath); rmErr != nil {
-					return nil, fmt.Errorf("%w — remove failed: %v", err, rmErr)
-				}
-
-			} else if ownErr := checkKeyFileOwner(pkpath, info); ownErr != nil {
-				ERR("private key file unusable, removing and regenerating:", pkpath, "—", ownErr)
-				if rmErr := os.Remove(pkpath); rmErr != nil {
-					return nil, fmt.Errorf(".pk file: %w — remove failed: %v", ownErr, rmErr)
-				}
-
-			} else {
-				priv, err := base64.StdEncoding.DecodeString(string(data))
-				if err != nil {
-					zeroBytes(priv)
-					return nil, fmt.Errorf("decode PrivateKey: %w", err)
-				}
-				if len(priv) != 32 {
-					zeroBytes(priv)
-					return nil, fmt.Errorf("PrivateKey has wrong length: got %d, want 32", len(priv))
-				}
-				return priv, nil
-			}
-		} else {
-			priv, err := base64.StdEncoding.DecodeString(string(data))
-			if err != nil {
-				zeroBytes(priv)
-				return nil, fmt.Errorf("decode PrivateKey: %w", err)
-			}
-			if len(priv) != 32 {
-				zeroBytes(priv)
-				return nil, fmt.Errorf("PrivateKey has wrong length: got %d, want 32", len(priv))
-			}
-			return priv, nil
+		info, statErr := os.Stat(path)
+		if statErr != nil {
+			return nil, fmt.Errorf("stat %s: %w", path, statErr)
 		}
-	}
-
-	if _, statErr := os.Stat(pkpath); statErr == nil {
-		if err := os.Remove(pkpath); err != nil {
-			return nil, fmt.Errorf("remove ./.pk file: %w", err)
+		if mode := info.Mode().Perm(); mode&0o077 != 0 {
+			return nil, fmt.Errorf("%s has insecure permissions %o (want 0600); refusing to start", path, mode)
 		}
+		if ownErr := checkKeyFileOwner(path, info); ownErr != nil {
+			return nil, fmt.Errorf("%s: %w", path, ownErr)
+		}
+		priv, err := base64.StdEncoding.DecodeString(strings.TrimSpace(string(data)))
+		if err != nil {
+			zeroBytes(priv)
+			return nil, fmt.Errorf("decode PrivateKey: %w", err)
+		}
+		if len(priv) != 32 {
+			zeroBytes(priv)
+			return nil, fmt.Errorf("PrivateKey has wrong length: got %d, want 32", len(priv))
+		}
+		return priv, nil
 	}
 
 	priv, err := generateWGPrivKey()
@@ -174,30 +182,35 @@ func loadOrGenerateLocalPrivKey() ([]byte, error) {
 
 	pk := base64.StdEncoding.EncodeToString(priv)
 
-	f, err := os.OpenFile(pkpath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
 	if err != nil {
 		zeroBytes(priv)
-		return nil, fmt.Errorf("create ./.pk file %q: %w", pkpath, err)
+		return nil, fmt.Errorf("create .pk file %q: %w", path, err)
 	}
 	if _, err := f.WriteString(pk); err != nil {
 		f.Close()
 		zeroBytes(priv)
-		return nil, fmt.Errorf("write ./.pk file %q: %w", pkpath, err)
+		return nil, fmt.Errorf("write .pk file %q: %w", path, err)
 	}
 	if err := f.Close(); err != nil {
 		zeroBytes(priv)
-		return nil, fmt.Errorf("close ./.pk file %q: %w", pkpath, err)
+		return nil, fmt.Errorf("close .pk file %q: %w", path, err)
 	}
 
 	return priv, nil
 }
 
 func FetchConfig(controllerURL, apiKey, configPath string, insecureSkipVerify bool) (*Config, error) {
+	return fetchConfig(controllerURL, apiKey, configPath, insecureSkipVerify, true)
+}
+
+func fetchConfig(controllerURL, apiKey, configPath string, insecureSkipVerify bool, generateKey bool) (*Config, error) {
 	if err := requireHTTPSControllerURL(controllerURL); err != nil {
 		return nil, err
 	}
 
-	privKey, err := loadOrGenerateLocalPrivKey()
+	setPKPathFromConfig(configPath)
+	privKey, err := loadOrGenerateLocalPrivKey(generateKey)
 	if err != nil {
 		return nil, fmt.Errorf("load wg private key: %w", err)
 	}
@@ -248,7 +261,8 @@ func FetchConfig(controllerURL, apiKey, configPath string, insecureSkipVerify bo
 		WireGuardSubnet6:  r.WireGuardSubnet6,
 		WireGuardIface:    r.WireGuardIface,
 		InternetIface:     r.InternetIface,
-		EnableFirewall: r.EnableFirewall,
+		EnableFirewall:    r.EnableFirewall,
+		ConfigPath:        configPath,
 
 		// Local wg-config.json / CLI only. The controller must not remotely
 		// disable TLS verification for X-WG-KEY calls.
@@ -259,9 +273,13 @@ func FetchConfig(controllerURL, apiKey, configPath string, insecureSkipVerify bo
 		zeroBytes(privKey)
 		return nil, fmt.Errorf("no port set in config during fetch")
 	}
-	if cfg.WireGuardIface == "" {
+	if !validIfaceName(cfg.WireGuardIface) {
 		zeroBytes(privKey)
-		return nil, fmt.Errorf("no wg interface set in config during fetch")
+		return nil, fmt.Errorf("invalid WireGuardIface %q", cfg.WireGuardIface)
+	}
+	if !validIfaceName(cfg.InternetIface) {
+		zeroBytes(privKey)
+		return nil, fmt.Errorf("invalid or empty InternetIface %q", cfg.InternetIface)
 	}
 	if cfg.WireGuardSubnet == "" {
 		zeroBytes(privKey)

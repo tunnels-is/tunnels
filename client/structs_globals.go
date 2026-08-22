@@ -32,6 +32,20 @@ const (
 	DefaultDNSPort = "53"
 )
 
+const officialControllerHost = "api.tunnels.is"
+
+func isOfficialControllerHost(host string) bool {
+	h := strings.ToLower(strings.TrimSpace(host))
+	if h == "" {
+		return false
+	}
+	if name, _, err := net.SplitHostPort(h); err == nil {
+		h = strings.ToLower(name)
+	}
+	h = strings.TrimSuffix(strings.TrimPrefix(h, "["), "]")
+	return h == officialControllerHost
+}
+
 var (
 	DefaultControllerIP = "89.147.109.61"
 

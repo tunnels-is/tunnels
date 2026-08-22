@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/subtle"
 	"encoding/base64"
 	"fmt"
 	"log/slog"
@@ -8,6 +9,7 @@ import (
 	"net/http"
 	"net/netip"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -206,6 +208,11 @@ func API_WGConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !user.SubExpiration.IsZero() && time.Now().After(user.SubExpiration) {
+		senderr(w, 403, "subscription expired")
+		return
+	}
+
 	server, err := DB_FindServerByID(serverID)
 	if err != nil || server == nil {
 		senderr(w, 404, "Server not found")
@@ -217,8 +224,6 @@ func API_WGConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-
-
 	d, err := DB_FindDeviceByWGKey(pubKey)
 	if err != nil {
 		senderr(w, 500, "Database error looking up device")
@@ -227,13 +232,12 @@ func API_WGConfig(w http.ResponseWriter, r *http.Request) {
 
 	deviceIP := ""
 	deviceIPv6 := ""
+	if d != nil && d.UserID != user.ID {
+		// Occupancy oracle: do not distinguish "someone else's key"
+		// from an unknown key.
+		d = nil
+	}
 	if d != nil {
-		if d.UserID != user.ID {
-			senderr(w, 401, "Unauthorized - device user id and given user id do not match")
-			return
-		}
-
-
 
 		if d.ServerID == serverID {
 			deviceIP = d.WireGuardIP
@@ -289,6 +293,10 @@ func assignNextWireGuardIP(serverID uuid.UUID) (string, error) {
 		if !ipNet.Contains(next) {
 			return "", fmt.Errorf("WireGuard subnet %s is exhausted", server.WireGuardSubnet)
 		}
+		if types.IsReservedWireGuardIPv4(ipNet, next) {
+			base++
+			continue
+		}
 		if !used[base] {
 			return next.String(), nil
 		}
@@ -337,12 +345,35 @@ func assignNextWireGuardIPv6(serverID uuid.UUID) (string, error) {
 
 	candidate := prefix.Addr().Next().Next()
 	for prefix.Contains(candidate) {
+		if types.IsReservedWireGuardIPv6(prefix, candidate) {
+			candidate = candidate.Next()
+			continue
+		}
 		if !used[candidate] {
 			return candidate.String(), nil
 		}
 		candidate = candidate.Next()
 	}
 	return "", fmt.Errorf("WireGuard IPv6 subnet %s is exhausted", server.WireGuardSubnet6)
+}
+
+func rejectServerWireGuardKey(key string) error {
+	if strings.TrimSpace(key) == "" {
+		return fmt.Errorf("WireGuard key required")
+	}
+	servers, err := DB_FindAllServers(10000, 0)
+	if err != nil {
+		return err
+	}
+	for _, s := range servers {
+		if s == nil || s.WireGuardPubKey == "" {
+			continue
+		}
+		if subtle.ConstantTimeCompare([]byte(s.WireGuardPubKey), []byte(key)) == 1 {
+			return fmt.Errorf("WireGuard key is reserved")
+		}
+	}
+	return nil
 }
 
 func b64KeyToHex(b64 string) (string, error) {
@@ -392,15 +423,15 @@ func API_WGServerConfigFetch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := &types.WGServerConfigResponse{
-		ServerID:           server.ID.String(),
-		ServerIP:           server.IP,
-		WireGuardPort:      server.WireGuardPort,
-		WireGuardMeshPort:  meshPortForServer(server),
-		WireGuardSubnet:    server.WireGuardSubnet,
-		WireGuardSubnet6:   server.WireGuardSubnet6,
-		WireGuardIface:     server.WireGuardIface,
-		InternetIface:      server.InternetIface,
-		EnableFirewall:     server.EnableFirewall,
+		ServerID:          server.ID.String(),
+		ServerIP:          server.IP,
+		WireGuardPort:     server.WireGuardPort,
+		WireGuardMeshPort: meshPortForServer(server),
+		WireGuardSubnet:   server.WireGuardSubnet,
+		WireGuardSubnet6:  server.WireGuardSubnet6,
+		WireGuardIface:    server.WireGuardIface,
+		InternetIface:     server.InternetIface,
+		EnableFirewall:    server.EnableFirewall,
 	}
 
 	sendObject(w, resp)

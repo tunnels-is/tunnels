@@ -48,12 +48,11 @@ func LaunchAPI() {
 	mux.Handle("/assets/", withSessionCookie(assetHandler))
 	mux.HandleFunc("/v1/method/{method}", HTTPhandler)
 	if EnablePprof {
-
-		mux.HandleFunc("/debug/pprof/", pprof.Index)
-		mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
-		mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
-		mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
-		mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+		mux.HandleFunc("/debug/pprof/", localAPIAuth(pprof.Index))
+		mux.HandleFunc("/debug/pprof/cmdline", localAPIAuth(pprof.Cmdline))
+		mux.HandleFunc("/debug/pprof/profile", localAPIAuth(pprof.Profile))
+		mux.HandleFunc("/debug/pprof/symbol", localAPIAuth(pprof.Symbol))
+		mux.HandleFunc("/debug/pprof/trace", localAPIAuth(pprof.Trace))
 	}
 	API_SERVER = http.Server{
 		Handler: mux,
@@ -216,13 +215,21 @@ func isLocalRequest(r *http.Request) bool {
 	return false
 }
 
-func HTTPhandler(w http.ResponseWriter, r *http.Request) {
+func localAPIAuth(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !authorizeLocalAPI(w, r) {
+			return
+		}
+		next(w, r)
+	}
+}
 
+func authorizeLocalAPI(w http.ResponseWriter, r *http.Request) bool {
 	if !DevMode && !isLocalRequest(r) {
 		w.WriteHeader(403)
 		_, _ = w.Write([]byte(`{"error":"forbidden"}`))
 		r.Body.Close()
-		return
+		return false
 	}
 	if DevMode {
 		w.Header().Set("Access-Control-Allow-Origin", r.Header.Get("Origin"))
@@ -232,12 +239,21 @@ func HTTPhandler(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "OPTIONS" {
 			w.WriteHeader(204)
 			r.Body.Close()
-			return
+			return false
 		}
-	} else if !checkSessionToken(r) {
+		return true
+	}
+	if !checkSessionToken(r) {
 		w.WriteHeader(403)
 		_, _ = w.Write([]byte(`{"error":"forbidden"}`))
 		r.Body.Close()
+		return false
+	}
+	return true
+}
+
+func HTTPhandler(w http.ResponseWriter, r *http.Request) {
+	if !authorizeLocalAPI(w, r) {
 		return
 	}
 

@@ -367,3 +367,19 @@ func TestPeer_ConcurrentSafe(t *testing.T) {
 	close(stop)
 	wg.Wait()
 }
+
+func TestApplyPeerFirewallSlot_MovesOnIPChange(t *testing.T) {
+	setupFW(t, "10.0.0.0/24", "")
+	applyPeerFirewallSlot("abc", "10.0.0.10", "")
+	p, local := fwClassify(mustAddr(t, "10.0.0.10"))
+	if !local || p == nil {
+		t.Fatal("missing peer at old IP")
+	}
+	applyPeerFirewallSlot("abc", "10.0.0.20", "")
+	if p, local := fwClassify(mustAddr(t, "10.0.0.10")); local && p != nil {
+		t.Fatal("old IP slot must be dropped")
+	}
+	if p, local := fwClassify(mustAddr(t, "10.0.0.20")); !local || p == nil {
+		t.Fatal("new IP must have a firewall slot")
+	}
+}

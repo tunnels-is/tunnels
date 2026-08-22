@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -39,26 +38,57 @@ func checkIfUserSubIsActive(u *User) {
 		if resp != nil && resp.Body != nil {
 			bs := string(*resp.Body)
 			if !strings.Contains(bs, "expired") {
-				ADMIN("KEY: unable to validate", u.Key.Key, err)
-				return
-			} else {
+				ADMIN("KEY: unable to validate", redactKey(u.Key.Key), err)
 				return
 			}
-		} else {
-			ADMIN("KEY: unable to validate:", u.Key.Key, err)
 			return
 		}
+		ADMIN("KEY: unable to validate:", redactKey(u.Key.Key), err)
+		return
 	}
 
-	if key.LicenseKey.Status == "active" {
-		ns := strings.Split(key.Meta.ProductName, " ")
-		months, err := strconv.Atoi(ns[0])
-		if err != nil {
-			ADMIN("unable to parse license key name:", err)
-			return
+	newExp, update := nextSubExpirationFromLemon(u, key.LicenseKey.Status, key.LicenseKey.ExpiresAt)
+	if !update {
+		return
+	}
+	u.SubExpiration = newExp
+	_ = DB_updateUserSubTime(u)
+}
+
+func licensePaidThrough(u *User) time.Time {
+	if u == nil || u.Key == nil || u.Key.Months <= 0 {
+		if u == nil {
+			return time.Time{}
 		}
-		u.SubExpiration = time.Now().AddDate(0, months, 0)
-
-		_ = DB_updateUserSubTime(u)
+		return u.SubExpiration
 	}
+	if u.Key.Created.IsZero() {
+		return u.SubExpiration
+	}
+	return u.Key.Created.AddDate(0, u.Key.Months, 0)
+}
+
+// nextSubExpirationFromLemon never stacks another product term on Lemon
+// status "active". Prefer LS expires_at. If that is missing, honor the
+// original paid-through date and do not extend past it.
+func nextSubExpirationFromLemon(u *User, status string, expiresAt *time.Time) (time.Time, bool) {
+	if u == nil {
+		return time.Time{}, false
+	}
+	status = strings.ToLower(strings.TrimSpace(status))
+	switch status {
+	case "expired", "disabled", "inactive":
+		return u.SubExpiration, false
+	}
+	if expiresAt != nil && !expiresAt.IsZero() {
+		return expiresAt.UTC(), true
+	}
+	if status != "active" {
+		return u.SubExpiration, false
+	}
+	through := licensePaidThrough(u)
+	if through.After(time.Now()) && !through.Equal(u.SubExpiration) {
+		return through, true
+	}
+	return u.SubExpiration, false
 }

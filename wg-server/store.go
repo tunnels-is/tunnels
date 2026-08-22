@@ -5,6 +5,8 @@ import (
 	"net"
 	"net/netip"
 	"sync"
+
+	"github.com/tunnels-is/tunnels/types"
 )
 
 type PeerRecord struct {
@@ -12,7 +14,6 @@ type PeerRecord struct {
 	IP        string
 	IPv6      string
 }
-
 
 type PeerStore struct {
 	mu       sync.RWMutex
@@ -92,7 +93,6 @@ func (ps *PeerStore) DeleteByPubKey(pubKeyB64 string) {
 	}
 }
 
-
 func (ps *PeerStore) nextIPLocked() (string, error) {
 	_, ipNet, err := net.ParseCIDR(ps.subnet)
 	if err != nil {
@@ -111,12 +111,14 @@ func (ps *PeerStore) nextIPLocked() (string, error) {
 		if !ipNet.Contains(next) {
 			return "", fmt.Errorf("WireGuard subnet %s is exhausted", ps.subnet)
 		}
+		if types.IsReservedWireGuardIPv4(ipNet, next) {
+			continue
+		}
 		if !used[candidate] {
 			return next.String(), nil
 		}
 	}
 }
-
 
 func (ps *PeerStore) nextIPv6Locked() (string, error) {
 	prefix, err := netip.ParsePrefix(ps.subnet6)
@@ -136,6 +138,10 @@ func (ps *PeerStore) nextIPv6Locked() (string, error) {
 
 	candidate := prefix.Addr().Next().Next()
 	for prefix.Contains(candidate) {
+		if types.IsReservedWireGuardIPv6(prefix, candidate) {
+			candidate = candidate.Next()
+			continue
+		}
 		if !used[candidate] {
 			return candidate.String(), nil
 		}

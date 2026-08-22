@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/netip"
 	"os"
+	"sync/atomic"
 
 	"golang.zx2c4.com/wireguard/tun"
 )
@@ -17,9 +18,11 @@ const (
 	protoUDP       byte = 17
 )
 
+var inspectDevice atomic.Pointer[inspectingTUN]
+
 type inspectingTUN struct {
 	tun.Device
-	firewall   bool
+	firewall   atomic.Bool
 	subnet4    netip.Prefix
 	subnet6    netip.Prefix
 	serverIPv4 netip.Addr
@@ -27,7 +30,8 @@ type inspectingTUN struct {
 }
 
 func newInspectingTUN(inner tun.Device, cfg *Config) (*inspectingTUN, error) {
-	t := &inspectingTUN{Device: inner, firewall: cfg.EnableFirewall}
+	t := &inspectingTUN{Device: inner}
+	t.firewall.Store(cfg.EnableFirewall)
 
 	if cfg.WireGuardSubnet != "" {
 		p, err := netip.ParsePrefix(cfg.WireGuardSubnet)
@@ -35,7 +39,7 @@ func newInspectingTUN(inner tun.Device, cfg *Config) (*inspectingTUN, error) {
 			return nil, fmt.Errorf("parse WireGuardSubnet: %w", err)
 		}
 		t.subnet4 = p.Masked()
-		t.serverIPv4 = p.Addr().Next()
+		t.serverIPv4 = t.subnet4.Addr().Next()
 	}
 	if cfg.WireGuardSubnet6 != "" {
 		p, err := netip.ParsePrefix(cfg.WireGuardSubnet6)
@@ -43,7 +47,7 @@ func newInspectingTUN(inner tun.Device, cfg *Config) (*inspectingTUN, error) {
 			return nil, fmt.Errorf("parse WireGuardSubnet6: %w", err)
 		}
 		t.subnet6 = p.Masked()
-		t.serverIPv6 = p.Addr().Next()
+		t.serverIPv6 = t.subnet6.Addr().Next()
 	}
 	if !t.subnet4.IsValid() && !t.subnet6.IsValid() {
 		return nil, fmt.Errorf("inspector requires at least one WireGuard subnet")
@@ -99,7 +103,10 @@ func (t *inspectingTUN) allow(pkt []byte) bool {
 
 func (t *inspectingTUN) allowParsed(src, dst netip.Addr, proto byte, l4 []byte, frag fragInfo, ok bool) bool {
 	if !ok {
-		return true
+		return false
+	}
+	if frag.isFragment() {
+		return false
 	}
 	srcPeer, srcLocal := fwClassify(src)
 	dstPeer, dstLocal := fwClassify(dst)
@@ -115,34 +122,25 @@ func (t *inspectingTUN) allowParsed(src, dst netip.Addr, proto byte, l4 []byte, 
 
 	sport, dport := l4Ports(proto, l4)
 
-	if srcLocal && srcPeer != nil && !frag.isTrailing() {
+	admit := false
+	switch {
+	case !t.firewall.Load():
+		admit = true
+	case dstLocal:
+		if dstPeer == nil {
+			admit = false
+			break
+		}
+		admit = dstPeer.allowedContains(src, dport) ||
+			dstPeer.flowMatch(flowKey{remote: src, rport: sport, lport: dport, proto: proto})
+	default:
+		admit = true
+	}
+
+	if admit && srcLocal && srcPeer != nil {
 		srcPeer.touchFlow(flowKey{remote: dst, rport: dport, lport: sport, proto: proto})
 	}
-
-	if !t.firewall {
-		return true
-	}
-
-	if dstLocal {
-		if dstPeer == nil {
-			return false
-		}
-
-		if frag.isTrailing() {
-			return dstPeer.allowedAnyPort(src) ||
-				dstPeer.fragmentAdmitted(fragKey{remote: src, id: frag.id})
-		}
-
-		admit := dstPeer.allowedContains(src, dport) ||
-			dstPeer.flowMatch(flowKey{remote: src, rport: sport, lport: dport, proto: proto})
-
-		if admit && frag.isFragment() {
-			dstPeer.noteFragment(fragKey{remote: src, id: frag.id})
-		}
-		return admit
-	}
-
-	return true
+	return admit
 }
 
 func (t *inspectingTUN) isServerIP(a netip.Addr) bool {
@@ -157,7 +155,7 @@ func (t *inspectingTUN) handleControlParsed(src, dst netip.Addr, proto byte, l4 
 		return false
 	}
 
-	if frag.isTrailing() {
+	if frag.isFragment() {
 		return false
 	}
 	if len(l4) < 8 {

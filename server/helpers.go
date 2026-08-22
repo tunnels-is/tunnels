@@ -227,7 +227,7 @@ func validateUserTwoFactor(user *User, LF *LOGIN_FORM) (err error) {
 
 func authenticateUserFromEmailOrIDAndToken(email string, id uuid.UUID, token string) (user *User, err error) {
 	if email != "" {
-		user, err = DB_findUserByEmail(email)
+		user, err = DB_findUserByEmail(normalizeEmail(email))
 	} else if id != uuid.Nil {
 		user, err = DB_findUserByID(id)
 	} else {
@@ -284,20 +284,37 @@ func cookieCipher() (cipher.AEAD, error) {
 	return cipher.NewGCM(block)
 }
 
+const adminSessionTTL = 7 * 24 * time.Hour
+
+type adminCookiePayload struct {
+	UID string `json:"u"`
+	DT  string `json:"t"`
+	IP  string `json:"i"`
+	Exp int64  `json:"e"`
+}
+
 func encryptAdminCookie(userID, deviceToken, ip string) (string, error) {
 	gcm, err := cookieCipher()
 	if err != nil {
 		return "", err
 	}
 
-	plaintext := []byte(userID + ":" + deviceToken + ":" + ip)
+	plain, err := json.Marshal(adminCookiePayload{
+		UID: userID,
+		DT:  deviceToken,
+		IP:  ip,
+		Exp: time.Now().Add(adminSessionTTL).Unix(),
+	})
+	if err != nil {
+		return "", err
+	}
 
 	nonce := make([]byte, gcm.NonceSize())
 	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
 		return "", err
 	}
 
-	ciphertext := gcm.Seal(nonce, nonce, plaintext, nil)
+	ciphertext := gcm.Seal(nonce, nonce, plain, nil)
 	return base64.RawURLEncoding.EncodeToString(ciphertext), nil
 }
 
@@ -322,23 +339,27 @@ func decryptAdminCookie(cookieValue, remoteIP string) (uid uuid.UUID, deviceToke
 		return uuid.Nil, "", errors.New("invalid session")
 	}
 
-	parts := strings.SplitN(string(plaintext), ":", 3)
-	if len(parts) != 3 {
-		return uuid.Nil, "", errors.New("invalid session format")
+	var payload adminCookiePayload
+	if err := json.Unmarshal(plaintext, &payload); err != nil {
+		return uuid.Nil, "", errors.New("invalid session")
+	}
+	if payload.UID == "" || payload.DT == "" || payload.Exp == 0 {
+		return uuid.Nil, "", errors.New("invalid session")
+	}
+	if time.Now().Unix() > payload.Exp {
+		return uuid.Nil, "", errors.New("invalid session")
 	}
 
-	userIDStr, deviceToken, cookieIP := parts[0], parts[1], parts[2]
-
-	if subtle.ConstantTimeCompare([]byte(remoteIP), []byte(cookieIP)) != 1 {
-		return uuid.Nil, "", errors.New("session IP mismatch")
+	if subtle.ConstantTimeCompare([]byte(remoteIP), []byte(payload.IP)) != 1 {
+		return uuid.Nil, "", errors.New("invalid session")
 	}
 
-	uid, err = uuid.Parse(userIDStr)
+	uid, err = uuid.Parse(payload.UID)
 	if err != nil {
 		return uuid.Nil, "", errors.New("invalid session")
 	}
 
-	return uid, deviceToken, nil
+	return uid, payload.DT, nil
 }
 
 func hasSharedOrNoGroup(actorGroups []uuid.UUID, serverGroups []uuid.UUID) (yes bool) {

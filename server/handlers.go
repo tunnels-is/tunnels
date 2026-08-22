@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"log/slog"
 	"math/big"
@@ -35,25 +36,34 @@ func API_AdminUILogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := DB_findUserByEmail(LF.Email)
+	email := normalizeEmail(LF.Email)
+	if email == "" || !passwordResetAllowed(email) {
+		senderr(w, 401, "Invalid login credentials")
+		return
+	}
+
+	user, err := DB_findUserByEmail(email)
 	if err != nil {
 		senderr(w, 500, "Unknown error, please try again in a moment")
 		return
 	}
 	if user == nil {
+		recordPasswordResetFailure(email)
 		senderr(w, 401, "Invalid login credentials")
 		return
 	}
 
 	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(LF.Password))
 	if err != nil {
+		recordPasswordResetFailure(email)
 		senderr(w, 401, "Invalid login credentials")
 		return
 	}
 
 	err = validateUserTwoFactor(user, LF)
 	if err != nil {
-		senderr(w, 401, err.Error())
+		recordPasswordResetFailure(email)
+		senderr(w, 401, "Invalid login credentials")
 		return
 	}
 
@@ -74,7 +84,7 @@ func API_AdminUILogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	clearPasswordResetAttempts(LF.Email)
+	clearPasswordResetAttempts(email)
 
 	cookieValue, err := encryptAdminCookie(user.ID.String(), user.DeviceToken.DT, clientIP(r))
 	if err != nil {
@@ -98,6 +108,25 @@ func API_AdminUILogin(w http.ResponseWriter, r *http.Request) {
 func API_AdminUILogout(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 
+	user := getUserFromContext(r.Context())
+	if user != nil {
+		LF := new(LOGOUT_FORM)
+		_ = decodeBody(r, LF)
+		if !LF.All && LF.LogoutToken == "" {
+			LF.LogoutToken = getDeviceTokenFromContext(r.Context())
+		}
+
+		user.Tokens = revokeUserDeviceTokens(user.Tokens, LF)
+
+		update := new(UPDATE_USER_TOKENS)
+		update.ID = user.ID
+		update.Tokens = user.Tokens
+		if err := DB_updateUserDeviceTokens(update); err != nil {
+			senderr(w, 500, "Database error, please try again in a moment")
+			return
+		}
+	}
+
 	http.SetCookie(w, &http.Cookie{
 		Name:     "admin_session",
 		Value:    "",
@@ -107,20 +136,6 @@ func API_AdminUILogout(w http.ResponseWriter, r *http.Request) {
 		SameSite: http.SameSiteStrictMode,
 		MaxAge:   -1,
 	})
-
-	user := getUserFromContext(r.Context())
-	if user != nil {
-		LF := new(LOGOUT_FORM)
-		_ = decodeBody(r, LF)
-
-		user.Tokens = revokeUserDeviceTokens(user.Tokens, LF)
-
-		update := new(UPDATE_USER_TOKENS)
-		update.ID = user.ID
-		update.Tokens = user.Tokens
-		_ = DB_updateUserDeviceTokens(update)
-	}
-
 	w.WriteHeader(200)
 }
 
@@ -174,14 +189,23 @@ func createUserFromRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	RF.Email = normalizeEmail(RF.Email)
+	if RF.Email == "" {
+		senderr(w, 400, "Email/Username is required")
+		return
+	}
 	if len(RF.Email) > 320 {
 		senderr(w, 400, "Email/Username is too long, maximum 320 characters")
+		return
+	}
+	if isReservedAccountEmail(RF.Email) {
+		senderr(w, 400, "Unable to complete registration")
 		return
 	}
 
 	newUser, err := DB_findUserByEmail(RF.Email)
 	if newUser != nil {
-		senderr(w, 400, "User already registered")
+		senderr(w, 400, "Unable to complete registration")
 		return
 	}
 	if err != nil {
@@ -214,6 +238,10 @@ func createUserFromRequest(w http.ResponseWriter, r *http.Request) {
 	newUser.Tokens = append(newUser.Tokens, T)
 	err = DB_CreateUser(newUser)
 	if err != nil {
+		if errors.Is(err, errEmailRegistered) {
+			senderr(w, 400, "Unable to complete registration")
+			return
+		}
 		senderr(w, 500, "Unexpected error, please try again in a moment")
 		return
 	}
@@ -281,25 +309,34 @@ func API_UserLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := DB_findUserByEmail(LF.Email)
+	email := normalizeEmail(LF.Email)
+	if email == "" || !passwordResetAllowed(email) {
+		senderr(w, 401, "Invalid login credentials")
+		return
+	}
+
+	user, err := DB_findUserByEmail(email)
 	if err != nil {
 		senderr(w, 500, "Unknown error, please try again in a moment")
 		return
 	}
 	if user == nil {
+		recordPasswordResetFailure(email)
 		senderr(w, 401, "Invalid login credentials")
 		return
 	}
 
 	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(LF.Password))
 	if err != nil {
+		recordPasswordResetFailure(email)
 		senderr(w, 401, "Invalid login credentials")
 		return
 	}
 
 	err = validateUserTwoFactor(user, LF)
 	if err != nil {
-		senderr(w, 401, err.Error())
+		recordPasswordResetFailure(email)
+		senderr(w, 401, "Invalid login credentials")
 		return
 	}
 
@@ -315,7 +352,7 @@ func API_UserLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	clearPasswordResetAttempts(LF.Email)
+	clearPasswordResetAttempts(email)
 
 	user.RemoveSensitiveInformation()
 	sendObject(w, user)
@@ -334,6 +371,14 @@ func API_UserLogout(w http.ResponseWriter, r *http.Request) {
 	if user == nil {
 		senderr(w, 204, "User not found")
 		return
+	}
+
+	if !LF.All && LF.LogoutToken == "" {
+		if LF.DeviceToken != "" {
+			LF.LogoutToken = LF.DeviceToken
+		} else {
+			LF.LogoutToken = getDeviceTokenFromContext(r.Context())
+		}
 	}
 
 	user.Tokens = revokeUserDeviceTokens(user.Tokens, LF)
@@ -465,7 +510,6 @@ func API_AdminUserList(w http.ResponseWriter, r *http.Request) {
 	sendObject(w, users)
 }
 
-
 func API_AdminUserSearch(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 	F := new(FORM_ADMIN_USER_SEARCH)
@@ -493,7 +537,6 @@ func API_AdminUserSearch(w http.ResponseWriter, r *http.Request) {
 	sendObject(w, []*User{user})
 }
 
-
 func API_AdminUserGet(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 	F := new(FORM_ADMIN_USER_GET)
@@ -519,7 +562,6 @@ func API_AdminUserGet(w http.ResponseWriter, r *http.Request) {
 	user.RemoveSensitiveInformation()
 	sendObject(w, user)
 }
-
 
 func API_AdminUserLatest(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
@@ -553,9 +595,15 @@ func API_AdminDeviceUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	wgIPAllocMu.Lock()
 	err = DB_UpdateDevice(F.Device)
+	wgIPAllocMu.Unlock()
 	if err != nil {
 		ERR(err)
+		if errors.Is(err, errDeviceIPInUse) || errors.Is(err, errDeviceIPReserved) || errors.Is(err, errDeviceIPv6InUse) {
+			senderr(w, 400, err.Error())
+			return
+		}
 		senderr(w, 500, "Unknown error, please try again in a moment")
 		return
 	}
@@ -713,6 +761,11 @@ func API_DeviceCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if err := rejectServerWireGuardKey(F.Device.WireGuardKey); err != nil {
+		senderr(w, 400, "invalid WireGuard key")
+		return
+	}
+
 	wgIPAllocMu.Lock()
 	defer wgIPAllocMu.Unlock()
 
@@ -792,6 +845,11 @@ func API_AdminDeviceCreate(w http.ResponseWriter, r *http.Request) {
 
 	F.Device.ID = uuid.New()
 	F.Device.CreatedAt = time.Now()
+
+	if err := rejectServerWireGuardKey(F.Device.WireGuardKey); err != nil {
+		senderr(w, 400, "invalid WireGuard key")
+		return
+	}
 
 	wgIPAllocMu.Lock()
 	defer wgIPAllocMu.Unlock()
@@ -1327,6 +1385,12 @@ func validateServerWGFields(s *types.Server) error {
 	if err := validateCIDR(s.WireGuardSubnet6); err != nil {
 		return fmt.Errorf("invalid WireGuardSubnet6: %w", err)
 	}
+	if s.WireGuardIface != "" && !types.ValidIfaceName(s.WireGuardIface) {
+		return fmt.Errorf("invalid WireGuardIface %q", s.WireGuardIface)
+	}
+	if s.InternetIface != "" && !types.ValidIfaceName(s.InternetIface) {
+		return fmt.Errorf("invalid InternetIface %q", s.InternetIface)
+	}
 	return nil
 }
 
@@ -1455,6 +1519,12 @@ func API_UserResetPassword(w http.ResponseWriter, r *http.Request) {
 	const genericAuthErr = "invalid email or reset code"
 	const rateLimitErr = "too many attempts, try again later"
 
+	RF.Email = normalizeEmail(RF.Email)
+	if RF.Email == "" {
+		senderr(w, 401, genericAuthErr)
+		return
+	}
+
 	if !passwordResetAllowed(RF.Email) {
 		senderr(w, 429, rateLimitErr)
 		return
@@ -1579,6 +1649,9 @@ func API_ActivateLicenseKey(w http.ResponseWriter, r *http.Request) {
 			Months:  months,
 			Key:     key.LicenseKey.Key,
 		}
+	}
+	if key.LicenseKey.ExpiresAt != nil && !key.LicenseKey.ExpiresAt.IsZero() {
+		user.SubExpiration = key.LicenseKey.ExpiresAt.UTC()
 	}
 
 	activeKey, resp, err := lemonClient.Licenses.Activate(context.Background(), AF.Key, "tunnels")
