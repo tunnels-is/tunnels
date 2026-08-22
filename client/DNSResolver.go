@@ -6,6 +6,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -490,7 +491,8 @@ func ResolveDNSAsHTTPS(m *dns.Msg, w dns.ResponseWriter) (err error) {
 	}
 
 	cln := &http.Client{
-		Timeout: 10 * time.Second,
+		Timeout:       10 * time.Second,
+		CheckRedirect: checkPublicHTTPSRedirect,
 		Transport: &http.Transport{
 			IdleConnTimeout:     10 * time.Second,
 			TLSHandshakeTimeout: 10 * time.Second,
@@ -500,7 +502,14 @@ func ResolveDNSAsHTTPS(m *dns.Msg, w dns.ResponseWriter) (err error) {
 	var req1 *http.Request
 	var req2 *http.Request
 	server := conf.DNS1Default
-	req1, err = http.NewRequest("POST", "https://"+conf.DNS1Default+"/dns-query", bytes.NewBuffer(x))
+	dohURL := "https://" + conf.DNS1Default + "/dns-query"
+	if u, perr := url.Parse(dohURL); perr != nil {
+		return perr
+	} else if err := requirePublicHTTPSURL(u); err != nil {
+		ERROR("DoH resolver URL refused: ", err)
+		return err
+	}
+	req1, err = http.NewRequest("POST", dohURL, bytes.NewBuffer(x))
 	if err != nil {
 		ERROR("unable to create http.request for DNS query")
 		return err
@@ -513,7 +522,14 @@ func ResolveDNSAsHTTPS(m *dns.Msg, w dns.ResponseWriter) (err error) {
 
 		if conf.DNS2Default != "" {
 			server = conf.DNS2Default
-			req2, err = http.NewRequest("POST", "https://"+conf.DNS2Default+"/dns-query", bytes.NewBuffer(x))
+			dohURL2 := "https://" + conf.DNS2Default + "/dns-query"
+			if u2, perr := url.Parse(dohURL2); perr != nil {
+				return perr
+			} else if err := requirePublicHTTPSURL(u2); err != nil {
+				ERROR("DoH resolver URL refused: ", err)
+				return err
+			}
+			req2, err = http.NewRequest("POST", dohURL2, bytes.NewBuffer(x))
 			if err != nil {
 				ERROR("unable to create http.request for DNS query")
 				return err

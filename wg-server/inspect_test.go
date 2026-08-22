@@ -358,7 +358,7 @@ func TestParseIPHeader_Fragments(t *testing.T) {
 	}
 }
 
-func TestAllow_FragmentedDatagramAdmitted(t *testing.T) {
+func TestAllow_FragmentsAlwaysDropped(t *testing.T) {
 	insp := newTestInspector(t)
 	resetPeer("10.0.0.10")
 	ctrl := buildIPv4UDP(t, "10.0.0.10", insp.serverIPv4.String(), 1, aclControlPort,
@@ -369,14 +369,14 @@ func TestAllow_FragmentedDatagramAdmitted(t *testing.T) {
 
 	head := buildIPv4UDP(t, "10.0.0.5", "10.0.0.10", 40000, 5000, make([]byte, 8))
 	setFrag(head, 42, 0, true)
-	if !insp.allow(head) {
-		t.Fatal("first fragment on an allowed port must pass")
+	if insp.allow(head) {
+		t.Fatal("IPv4 fragments must be dropped")
 	}
 
 	tail := buildIPv4UDP(t, "10.0.0.5", "10.0.0.10", 12345, 6789, make([]byte, 8))
 	setFrag(tail, 42, 185, false)
-	if !insp.allow(tail) {
-		t.Fatal("trailing fragment of an admitted datagram must pass")
+	if insp.allow(tail) {
+		t.Fatal("trailing IPv4 fragments must be dropped")
 	}
 }
 
@@ -424,8 +424,8 @@ func TestAllow_FragmentBareHostRule(t *testing.T) {
 	setFrag(head, 5, 0, true)
 	tail := buildIPv4UDP(t, "10.0.0.5", "10.0.0.10", 0, 0, make([]byte, 8))
 	setFrag(tail, 5, 185, false)
-	if !insp.allow(head) || !insp.allow(tail) {
-		t.Fatal("bare-host rule must pass all fragments")
+	if insp.allow(head) || insp.allow(tail) {
+		t.Fatal("fragments must be dropped even for bare-host rules")
 	}
 }
 
@@ -435,16 +435,16 @@ func TestAllow_FragmentBareHostOrderIndependent(t *testing.T) {
 
 	tail := buildIPv4UDP(t, "10.0.0.5", "10.0.0.10", 0, 0, make([]byte, 8))
 	setFrag(tail, 33, 185, false)
-	if !insp.allow(tail) {
-		t.Fatal("all-ports source: a headless/reordered trailing fragment must still pass")
+	if insp.allow(tail) {
+		t.Fatal("headless fragments must be dropped")
 	}
 
 	resetPeer("10.0.0.11")
 	entry(t, "10.0.0.11").setAllowed(nil, true)
 	tail2 := buildIPv4UDP(t, "10.0.0.99", "10.0.0.11", 0, 0, make([]byte, 8))
 	setFrag(tail2, 34, 185, false)
-	if !insp.allow(tail2) {
-		t.Fatal("allow-all: a headless trailing fragment must pass")
+	if insp.allow(tail2) {
+		t.Fatal("allow-all still drops fragments")
 	}
 }
 
@@ -469,13 +469,27 @@ func TestAllow_FragmentConntrackReturn(t *testing.T) {
 
 	head := buildIPv4UDP(t, "10.0.0.3", "10.0.0.2", 9000, 40000, make([]byte, 8))
 	setFrag(head, 77, 0, true)
-	if !insp.allow(head) {
-		t.Fatal("reply first fragment must be admitted by connection tracking")
+	if insp.allow(head) {
+		t.Fatal("fragmented replies must be dropped")
 	}
 	tail := buildIPv4UDP(t, "10.0.0.3", "10.0.0.2", 0, 0, make([]byte, 8))
 	setFrag(tail, 77, 185, false)
-	if !insp.allow(tail) {
-		t.Fatal("reply trailing fragment must be admitted via the fragment note")
+	if insp.allow(tail) {
+		t.Fatal("trailing fragmented replies must be dropped")
+	}
+}
+
+func TestInspector_ServerIPUsesMaskedPrefix(t *testing.T) {
+	setupFW(t, "10.0.0.0/22", "")
+	insp, err := newInspectingTUN(nil, &Config{
+		WireGuardSubnet: "10.0.0.5/22",
+		EnableFirewall:  true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if insp.serverIPv4.String() != "10.0.0.1" {
+		t.Fatalf("server IPv4 = %s, want 10.0.0.1", insp.serverIPv4)
 	}
 }
 
@@ -542,10 +556,26 @@ func TestAllow_NonPeerToPeerAlwaysPasses(t *testing.T) {
 	}
 }
 
-func TestAllow_MalformedAlwaysPasses(t *testing.T) {
+func TestAllow_MalformedDropped(t *testing.T) {
 	insp := newTestInspector(t)
-	if !insp.allow([]byte{0x00, 0x00}) {
-		t.Fatal("malformed packet must not be dropped")
+	if insp.allow([]byte{0x00, 0x00}) {
+		t.Fatal("malformed packet must be dropped")
+	}
+}
+
+func TestAllow_ConntrackOnlyAfterAdmit(t *testing.T) {
+	insp := newTestInspector(t)
+	resetPeer("10.0.0.2")
+	resetPeer("10.0.0.3")
+	allowFor(t, "10.0.0.3", "10.0.0.99")
+
+	denied := buildIPv4UDP(t, "10.0.0.2", "10.0.0.3", 40000, 53, nil)
+	if insp.allow(denied) {
+		t.Fatal("A→B on a closed port must drop")
+	}
+	reply := buildIPv4UDP(t, "10.0.0.3", "10.0.0.2", 53, 40000, nil)
+	if insp.allow(reply) {
+		t.Fatal("B must not open a return flow from a dropped attempt")
 	}
 }
 
@@ -630,8 +660,8 @@ func TestHandleControl_FirstFragmentStillControl(t *testing.T) {
 	pkt := buildIPv4UDP(t, "10.0.0.5", insp.serverIPv4.String(), 1, aclControlPort,
 		[]byte(`{"Allowed":["10.0.0.10"]}`))
 	setFrag(pkt, 1234, 0, true)
-	if !handleControl(insp, pkt) {
-		t.Fatal("a first fragment on the control port must be consumed")
+	if handleControl(insp, pkt) {
+		t.Fatal("fragmented control packets must not be consumed")
 	}
 }
 
@@ -842,11 +872,11 @@ func TestAllow_IPv6FragmentedDatagramAdmitted(t *testing.T) {
 	allowFor(t, "fd00::5", "fd00::10")
 
 	head := buildIPv6FragUDP(t, "fd00::10", "fd00::5", 1111, 2222, 99, 0, true, []byte("head"))
-	if !insp.allow(head) {
-		t.Fatal("first fragment from allowlisted source must pass")
+	if insp.allow(head) {
+		t.Fatal("IPv6 fragments must be dropped")
 	}
 	tail := buildIPv6FragUDP(t, "fd00::10", "fd00::5", 0, 0, 99, 12, false, []byte("tail"))
-	if !insp.allow(tail) {
-		t.Fatal("trailing fragment of an admitted datagram must pass")
+	if insp.allow(tail) {
+		t.Fatal("trailing IPv6 fragments must be dropped")
 	}
 }

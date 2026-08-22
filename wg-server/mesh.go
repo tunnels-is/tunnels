@@ -43,7 +43,7 @@ func setupMesh(cfg *Config, logLevel string) error {
 
 	iface := meshIface(cfg)
 
-	priv, err := loadOrGenerateLocalPrivKey()
+	priv, err := loadOrGenerateLocalPrivKey(false)
 	if err != nil {
 		return fmt.Errorf("mesh: load key: %w", err)
 	}
@@ -123,7 +123,7 @@ func ipcSetMeshStr(conf string) error {
 }
 
 func addMeshPeer(pubKeyHex, endpoint string, allowedIPs []string) error {
-	conf := fmt.Sprintf("public_key=%s\n", sanitizeIPC(pubKeyHex))
+	conf := fmt.Sprintf("public_key=%s\nreplace_allowed_ips=true\n", sanitizeIPC(pubKeyHex))
 	for _, aip := range allowedIPs {
 		conf += fmt.Sprintf("allowed_ip=%s\n", sanitizeIPC(aip))
 	}

@@ -6,12 +6,20 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"slices"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/tunnels-is/tunnels/types"
 	gobolt "go.etcd.io/bbolt"
+)
+
+var (
+	errDeviceIPInUse    = errors.New("WireGuard IP already in use")
+	errDeviceIPReserved = errors.New("WireGuard IP is reserved")
+	errDeviceIPv6InUse  = errors.New("WireGuard IPv6 already in use")
+	errEmailRegistered  = errors.New("email already registered")
 )
 
 var BBoltDB *gobolt.DB
@@ -32,6 +40,13 @@ const (
 )
 
 func ConnectToBBoltDB(path string) (err error) {
+	if st, statErr := os.Stat(path); statErr == nil {
+		// Fail only if world-accessible. Group-readable (0640) is common
+		// for a dedicated service account and must not block production.
+		if mode := st.Mode().Perm(); mode&0o007 != 0 {
+			return fmt.Errorf("database %s is world-accessible (mode %o, want 0600)", path, mode)
+		}
+	}
 	BBoltDB, err = gobolt.Open(path, 0o600, &gobolt.Options{Timeout: 1 * time.Second})
 	if err != nil {
 		return err
@@ -157,6 +172,10 @@ func BBolt_UpdateDevice(D *types.Device) error {
 			}
 		}
 
+		if err := deviceAddressConflicts(tx, D); err != nil {
+			return err
+		}
+
 		data, err := bboltMarshal(D)
 		if err != nil {
 			return err
@@ -182,6 +201,50 @@ func BBolt_UpdateDevice(D *types.Device) error {
 		}
 		return nil
 	})
+}
+
+func deviceAddressConflicts(tx *gobolt.Tx, D *types.Device) error {
+	if D == nil {
+		return nil
+	}
+	if D.ServerID != uuid.Nil && (D.WireGuardIP != "" || D.WireGuardIPv6 != "") {
+		sv := tx.Bucket([]byte(SERVERS_BUCKET)).Get([]byte(D.ServerID.String()))
+		if sv != nil {
+			s := new(types.Server)
+			if err := bboltUnmarshal(sv, s); err == nil {
+				if s.WireGuardSubnet != "" || s.WireGuardSubnet6 != "" {
+					if err := types.ValidateDeviceWireGuardAddrs(s.WireGuardSubnet, s.WireGuardSubnet6, D.WireGuardIP, D.WireGuardIPv6); err != nil {
+						return fmt.Errorf("%w: %s", errDeviceIPReserved, err.Error())
+					}
+				}
+			}
+		}
+	}
+	if D.WireGuardIP == "" && D.WireGuardIPv6 == "" {
+		return nil
+	}
+	id := D.ID.String()
+	b := tx.Bucket([]byte(DEVICES_BUCKET))
+	c := b.Cursor()
+	for k, v := c.First(); k != nil; k, v = c.Next() {
+		if string(k) == id {
+			continue
+		}
+		other := new(types.Device)
+		if err := bboltUnmarshal(v, other); err != nil {
+			continue
+		}
+		if other.ServerID != D.ServerID {
+			continue
+		}
+		if D.WireGuardIP != "" && other.WireGuardIP == D.WireGuardIP {
+			return errDeviceIPInUse
+		}
+		if D.WireGuardIPv6 != "" && other.WireGuardIPv6 == D.WireGuardIPv6 {
+			return errDeviceIPv6InUse
+		}
+	}
+	return nil
 }
 
 func BBolt_GetDevices(limit, offset int64) ([]*types.Device, error) {
@@ -271,7 +334,6 @@ func BBolt_getUsers(limit, offset int64) ([]*User, error) {
 	return UL, err
 }
 
-
 func BBolt_getUsersLatest(topN, batchSize int) (users []*User, total, trial, active int64, err error) {
 	if topN <= 0 {
 		topN = 100
@@ -328,7 +390,6 @@ func BBolt_getUsersLatest(topN, batchSize int) (users []*User, total, trial, act
 	return top, total, trial, active, nil
 }
 
-
 func insertUserByUpdatedDesc(list []*User, u *User, n int) []*User {
 	if u == nil || n <= 0 {
 		return list
@@ -373,8 +434,9 @@ func BBolt_CreateUser(U *User) error {
 		id := U.ID.String()
 
 		emailIdx := tx.Bucket([]byte(USERS_EMAIL_INDEX))
-		if existing := emailIdx.Get([]byte(U.Email)); existing != nil {
-			return errors.New("email already registered")
+		U.Email = normalizeEmail(U.Email)
+		if U.Email != "" && emailInUse(tx, U.Email, id) {
+			return errEmailRegistered
 		}
 		data, err := bboltMarshal(U)
 		if err != nil {
@@ -383,8 +445,10 @@ func BBolt_CreateUser(U *User) error {
 		if err := b.Put([]byte(id), data); err != nil {
 			return err
 		}
-		if err := emailIdx.Put([]byte(U.Email), []byte(id)); err != nil {
-			return err
+		if U.Email != "" {
+			if err := emailIdx.Put([]byte(U.Email), []byte(id)); err != nil {
+				return err
+			}
 		}
 		if U.APIKey != "" {
 			if err := tx.Bucket([]byte(USERS_APIKEY_INDEX)).Put([]byte(U.APIKey), []byte(id)); err != nil {
@@ -395,19 +459,77 @@ func BBolt_CreateUser(U *User) error {
 	})
 }
 
+func emailIndexGet(idx *gobolt.Bucket, email string) []byte {
+	if idx == nil {
+		return nil
+	}
+	if email != "" {
+		if v := idx.Get([]byte(email)); v != nil {
+			return v
+		}
+	}
+	n := normalizeEmail(email)
+	if n != "" && n != email {
+		return idx.Get([]byte(n))
+	}
+	return nil
+}
+
+func emailInUse(tx *gobolt.Tx, email, exceptID string) bool {
+	n := normalizeEmail(email)
+	if n == "" {
+		return false
+	}
+	if v := emailIndexGet(tx.Bucket([]byte(USERS_EMAIL_INDEX)), email); v != nil && string(v) != exceptID {
+		return true
+	}
+	users := tx.Bucket([]byte(USERS_BUCKET))
+	c := users.Cursor()
+	for k, v := c.First(); k != nil; k, v = c.Next() {
+		if exceptID != "" && string(k) == exceptID {
+			continue
+		}
+		U := new(User)
+		if err := bboltUnmarshal(v, U); err != nil {
+			continue
+		}
+		if normalizeEmail(U.Email) == n {
+			return true
+		}
+	}
+	return false
+}
+
 func BBolt_findUserByEmail(Email string) (*User, error) {
 	var found *User
+	n := normalizeEmail(Email)
 	err := BBoltDB.View(func(tx *gobolt.Tx) error {
-		uid := tx.Bucket([]byte(USERS_EMAIL_INDEX)).Get([]byte(Email))
-		if uid == nil {
+		uid := emailIndexGet(tx.Bucket([]byte(USERS_EMAIL_INDEX)), Email)
+		users := tx.Bucket([]byte(USERS_BUCKET))
+		if uid != nil {
+			v := users.Get(uid)
+			if v != nil {
+				found = new(User)
+				return bboltUnmarshal(v, found)
+			}
+		}
+		if n == "" {
 			return nil
 		}
-		v := tx.Bucket([]byte(USERS_BUCKET)).Get(uid)
-		if v == nil {
-			return nil
+		// Pre-migration mixed-case records: index key may still be the
+		// stored Email. Do not rewrite the index here.
+		c := users.Cursor()
+		for k, v := c.First(); k != nil; k, v = c.Next() {
+			U := new(User)
+			if err := bboltUnmarshal(v, U); err != nil {
+				continue
+			}
+			if normalizeEmail(U.Email) == n {
+				found = U
+				return nil
+			}
 		}
-		found = new(User)
-		return bboltUnmarshal(v, found)
+		return nil
 	})
 	return found, err
 }
@@ -435,12 +557,16 @@ func BBolt_updateUserDeviceTokens(TU *UPDATE_USER_TOKENS) error {
 
 func BBolt_updateUserSubTime(u *User) error {
 	return BBoltDB.Update(func(tx *gobolt.Tx) error {
-		uid := tx.Bucket([]byte(USERS_EMAIL_INDEX)).Get([]byte(u.Email))
-		if uid == nil {
-			return errors.New("user not found")
-		}
 		b := tx.Bucket([]byte(USERS_BUCKET))
-		v := b.Get(uid)
+		id := u.ID.String()
+		v := b.Get([]byte(id))
+		if v == nil && u.Email != "" {
+			uid := emailIndexGet(tx.Bucket([]byte(USERS_EMAIL_INDEX)), u.Email)
+			if uid != nil {
+				id = string(uid)
+				v = b.Get(uid)
+			}
+		}
 		if v == nil {
 			return errors.New("user not found")
 		}
@@ -453,7 +579,7 @@ func BBolt_updateUserSubTime(u *User) error {
 		if err != nil {
 			return err
 		}
-		return b.Put(uid, data)
+		return b.Put([]byte(id), data)
 	})
 }
 
@@ -507,14 +633,20 @@ func BBolt_updateUserAdmin(UF *USER_ADMIN_UPDATE_FORM) error {
 		}
 
 		oldEmail := U.Email
+		emailChanged := false
 
-		if UF.Email != "" && UF.Email != oldEmail {
-
-			emailIdx := tx.Bucket([]byte(USERS_EMAIL_INDEX))
-			if existing := emailIdx.Get([]byte(UF.Email)); existing != nil {
-				return errors.New("email already in use by another account")
+		if UF.Email != "" {
+			newEmail := normalizeEmail(UF.Email)
+			oldKey := normalizeEmail(oldEmail)
+			// Case/whitespace-only changes are left for the one-shot
+			// normalize-emails migration; do not rewrite stored Email here.
+			if newEmail != oldKey {
+				if emailInUse(tx, newEmail, id) {
+					return errors.New("email already in use by another account")
+				}
+				U.Email = newEmail
+				emailChanged = true
 			}
-			U.Email = UF.Email
 		}
 
 		if !UF.SubExpiration.IsZero() {
@@ -532,13 +664,18 @@ func BBolt_updateUserAdmin(UF *USER_ADMIN_UPDATE_FORM) error {
 			return err
 		}
 
-		if UF.Email != "" && UF.Email != oldEmail {
+		if emailChanged {
 			emailIdx := tx.Bucket([]byte(USERS_EMAIL_INDEX))
-			if err := emailIdx.Delete([]byte(oldEmail)); err != nil {
-				return err
+			if oldEmail != "" {
+				_ = emailIdx.Delete([]byte(oldEmail))
 			}
-			if err := emailIdx.Put([]byte(UF.Email), []byte(id)); err != nil {
-				return err
+			if oldKey := normalizeEmail(oldEmail); oldKey != "" && oldKey != oldEmail {
+				_ = emailIdx.Delete([]byte(oldKey))
+			}
+			if U.Email != "" {
+				if err := emailIdx.Put([]byte(U.Email), []byte(id)); err != nil {
+					return err
+				}
 			}
 		}
 
@@ -847,6 +984,10 @@ func BBolt_CreateDevice(D *types.Device) error {
 			}
 		}
 
+		if err := deviceAddressConflicts(tx, D); err != nil {
+			return err
+		}
+
 		data, err := bboltMarshal(D)
 		if err != nil {
 			return err
@@ -1095,7 +1236,9 @@ func BBolt_DeleteUserByID(id string) error {
 			U := new(User)
 			if err := bboltUnmarshal(v, U); err == nil {
 				if U.Email != "" {
-					_ = tx.Bucket([]byte(USERS_EMAIL_INDEX)).Delete([]byte(U.Email))
+					emailIdx := tx.Bucket([]byte(USERS_EMAIL_INDEX))
+					_ = emailIdx.Delete([]byte(U.Email))
+					_ = emailIdx.Delete([]byte(normalizeEmail(U.Email)))
 				}
 				if U.APIKey != "" {
 					_ = tx.Bucket([]byte(USERS_APIKEY_INDEX)).Delete([]byte(U.APIKey))

@@ -183,7 +183,7 @@ func TestUser_RemoveSensitiveInformation(t *testing.T) {
 					Months:  6,
 				},
 			},
-			expectedKeyRedacted: "SINGLEPARTHARDKEY",
+			expectedKeyRedacted: "SINGL…",
 		},
 		{
 			name: "user with empty key",

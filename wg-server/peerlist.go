@@ -176,6 +176,38 @@ func fwClassify(a netip.Addr) (*peer, bool) {
 	return nil, false
 }
 
+func dropPeer(ips ...string) {
+	if fwV4Slots == nil {
+		return
+	}
+	for _, s := range ips {
+		a, err := netip.ParseAddr(s)
+		if err != nil {
+			continue
+		}
+		if a.Is4() {
+			off, ok := v4Offset(a)
+			if !ok {
+				continue
+			}
+			old := fwV4Slots[off].Swap(nil)
+			if old != nil && old.v6.IsValid() {
+				fwMu.Lock()
+				if fwV6[old.v6] == old {
+					delete(fwV6, old.v6)
+				}
+				fwMu.Unlock()
+			}
+			continue
+		}
+		if a.Is6() {
+			fwMu.Lock()
+			delete(fwV6, a)
+			fwMu.Unlock()
+		}
+	}
+}
+
 func resetPeer(ips ...string) {
 	if fwV4Slots == nil {
 		return

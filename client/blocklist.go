@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"sync"
@@ -34,7 +35,10 @@ const customBlockListFileContent = `# Tunnels custom DNS block list
 # malware.example.com
 `
 
-var listHTTPClient = &http.Client{Timeout: 5 * time.Minute}
+var listHTTPClient = &http.Client{
+	Timeout:       5 * time.Minute,
+	CheckRedirect: checkPublicHTTPSRedirect,
+}
 
 func reloadBlockLists(sleep bool) {
 	reloadBlockListsEx(sleep, false)
@@ -339,7 +343,6 @@ func loadDomainSetFromFile(path string, capHint int) (set *DomainSet, count, bad
 	return loadDomainSetFromReader(f, capHint)
 }
 
-
 func loadDomainSetFromReader(r io.Reader, capHint int) (set *DomainSet, count, bad int, err error) {
 	scanner := bufio.NewScanner(r)
 	buf := make([]byte, 0, dnsListScanBuf)
@@ -364,22 +367,32 @@ func loadDomainSetFromReader(r io.Reader, capHint int) (set *DomainSet, count, b
 	return b.Build(), count, bad, nil
 }
 
-
-func downloadListToFile(url, path string) error {
-	defer RecoverAndLog()
-	if !CheckIfURL(url) {
+func validateListURL(raw string) error {
+	if !CheckIfURL(raw) {
 		return fmt.Errorf("invalid list URL")
 	}
+	u, err := url.Parse(raw)
+	if err != nil {
+		return fmt.Errorf("invalid list URL")
+	}
+	return requirePublicHTTPSURL(u)
+}
 
-	DEBUG("Downloading Blocklist: ", url)
+func downloadListToFile(listURL, path string) error {
+	defer RecoverAndLog()
+	if err := validateListURL(listURL); err != nil {
+		return err
+	}
+
+	DEBUG("Downloading Blocklist: ", listURL)
 	start := time.Now()
 	defer func() {
-		DEBUG(url, " : Download time > ", time.Since(start).Seconds(), " seconds")
+		DEBUG(listURL, " : Download time > ", time.Since(start).Seconds(), " seconds")
 	}()
 
 	var tries int
 retry:
-	resp, err := listHTTPClient.Get(url)
+	resp, err := listHTTPClient.Get(listURL)
 	if err != nil || resp == nil || resp.StatusCode != http.StatusOK {
 		if resp != nil {
 			resp.Body.Close()
@@ -388,7 +401,7 @@ retry:
 			time.Sleep(5 * time.Second)
 			tries++
 			if tries < 5 {
-				DEBUG("Unable to load list (retrying): ", url)
+				DEBUG("Unable to load list (retrying): ", listURL)
 				goto retry
 			}
 		}

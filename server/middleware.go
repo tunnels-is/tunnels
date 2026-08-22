@@ -14,6 +14,7 @@ const (
 	contextKeyUser          contextKey = "user"
 	contextKeyIsAdminAPIKey contextKey = "isAdminAPIKey"
 	contextKeyServer        contextKey = "server"
+	contextKeyDeviceToken   contextKey = "deviceToken"
 )
 
 func getUserFromContext(ctx context.Context) *User {
@@ -29,6 +30,11 @@ func isAdminAPIKeyFromContext(ctx context.Context) bool {
 func getServerFromContext(ctx context.Context) *types.Server {
 	user, _ := ctx.Value(contextKeyServer).(*types.Server)
 	return user
+}
+
+func getDeviceTokenFromContext(ctx context.Context) string {
+	v, _ := ctx.Value(contextKeyDeviceToken).(string)
+	return v
 }
 
 func xAdminAPIKeyMiddleware(next http.Handler) http.Handler {
@@ -70,22 +76,23 @@ func adminUIMiddleware(next http.Handler) http.Handler {
 
 		uid, deviceToken, err := decryptAdminCookie(cookie.Value, clientIP(r))
 		if err != nil {
-			senderr(w, 401, err.Error())
+			senderr(w, 401, "Unauthorized")
 			return
 		}
 
 		user, err := authenticateUserFromEmailOrIDAndToken("", uid, deviceToken)
 		if err != nil {
-			senderr(w, 401, err.Error())
+			senderr(w, 401, "Unauthorized")
 			return
 		}
 
 		if !user.IsAdmin {
-			senderr(w, 401, "Admin access required")
+			senderr(w, 401, "Unauthorized")
 			return
 		}
 
 		ctx := context.WithValue(r.Context(), contextKeyUser, user)
+		ctx = context.WithValue(ctx, contextKeyDeviceToken, deviceToken)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
@@ -94,7 +101,7 @@ func clientAuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		deviceToken := r.Header.Get("X-Device-Token")
 		if deviceToken == "" {
-			senderr(w, 401, "Unauthorized - no device token")
+			senderr(w, 401, "Unauthorized")
 			return
 		}
 
@@ -106,18 +113,19 @@ func clientAuthMiddleware(next http.Handler) http.Handler {
 			var err error
 			parsedUID, err = uuid.Parse(uidStr)
 			if err != nil {
-				senderr(w, 401, "Invalid X-UID header")
+				senderr(w, 401, "Unauthorized")
 				return
 			}
 		}
 
 		user, err := authenticateUserFromEmailOrIDAndToken(email, parsedUID, deviceToken)
 		if err != nil {
-			senderr(w, 401, err.Error())
+			senderr(w, 401, "Unauthorized")
 			return
 		}
 
 		ctx := context.WithValue(r.Context(), contextKeyUser, user)
+		ctx = context.WithValue(ctx, contextKeyDeviceToken, deviceToken)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

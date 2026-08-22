@@ -10,6 +10,69 @@ import (
 	"time"
 )
 
+func configRefreshInterval() time.Duration {
+	if s := os.Getenv("TUNNELS_CONFIG_REFRESH_SECONDS"); s != "" {
+		if n, err := strconv.Atoi(s); err == nil && n > 0 {
+			return time.Duration(n) * time.Second
+		}
+	}
+	return 2 * time.Minute
+}
+
+func criticalConfigChanged(old, next *Config) bool {
+	if old == nil || next == nil {
+		return false
+	}
+	return old.WireGuardSubnet != next.WireGuardSubnet ||
+		old.WireGuardSubnet6 != next.WireGuardSubnet6 ||
+		old.WireGuardIface != next.WireGuardIface ||
+		old.InternetIface != next.InternetIface ||
+		old.WireGuardPort != next.WireGuardPort ||
+		old.ServerID != next.ServerID
+}
+
+func refreshControllerConfigLoop(ctx context.Context) {
+	t := time.NewTicker(configRefreshInterval())
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+			refreshControllerConfig()
+		}
+	}
+}
+
+func refreshControllerConfig() {
+	old := activeConfig.Load()
+	if old == nil {
+		return
+	}
+	next, err := fetchConfig(old.ControllerURL, old.APIKey, old.ConfigPath, old.InsecureSkipVerify, false)
+	if err != nil {
+		WARN("controller config refresh failed: ", err)
+		return
+	}
+	if len(next.WireGuardPrivKey) > 0 {
+		zeroBytes(next.WireGuardPrivKey)
+	}
+	next.WireGuardPrivKey = old.WireGuardPrivKey
+	next.InsecureSkipVerify = old.InsecureSkipVerify
+	if criticalConfigChanged(old, next) {
+		ERR("controller config changed (subnet/iface/port); exiting so the process can restart")
+		cleanupNet(old)
+		os.Exit(1)
+	}
+	if old.EnableFirewall != next.EnableFirewall {
+		if d := inspectDevice.Load(); d != nil {
+			d.firewall.Store(next.EnableFirewall)
+		}
+		INFO("firewall flag updated from controller: ", next.EnableFirewall)
+	}
+	activeConfig.Store(next)
+}
+
 func meshReconcileInterval() time.Duration {
 	if s := os.Getenv("TUNNELS_MESH_RECONCILE_SECONDS"); s != "" {
 		if n, err := strconv.Atoi(s); err == nil && n > 0 {
@@ -129,6 +192,8 @@ func Init(ctx context.Context, controllerURL, apiKey, configPath string, insecur
 	}
 
 	INFO("wg-server started")
+
+	go refreshControllerConfigLoop(ctx)
 
 	<-ctx.Done()
 

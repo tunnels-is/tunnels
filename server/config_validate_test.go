@@ -20,6 +20,8 @@ func TestValidateServerConfig(t *testing.T) {
 		{"empty two-factor key", &types.ServerConfig{CookieSigningKey: okKey, TwoFactorKey: ""}, true},
 		{"too-short two-factor key", &types.ServerConfig{CookieSigningKey: okKey, TwoFactorKey: strings.Repeat("a", minSecretLen-1)}, true},
 		{"both valid", &types.ServerConfig{CookieSigningKey: okKey, TwoFactorKey: okKey}, false},
+		{"short admin API key", &types.ServerConfig{CookieSigningKey: okKey, TwoFactorKey: okKey, AdminAPIKey: "short"}, true},
+		{"ok admin API key", &types.ServerConfig{CookieSigningKey: okKey, TwoFactorKey: okKey, AdminAPIKey: strings.Repeat("b", 16)}, false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
