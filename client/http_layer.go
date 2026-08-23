@@ -458,24 +458,15 @@ func HTTP_GetLogs(w http.ResponseWriter, r *http.Request) {
 }
 
 func HTTP_GetDNSStats(w http.ResponseWriter, r *http.Request) {
-	stats := make(map[string]any)
-	DNSStatsMap.Range(func(key string, value any) bool {
-		stats[key] = value
-		return true
-	})
-	JSON(w, r, 200, stats)
+	JSON(w, r, 200, GetDNSStats())
 }
 
 func HTTP_UpdateBlockLists(w http.ResponseWriter, r *http.Request) {
-	forceReloadBlockLists()
-	config := CONFIG.Load()
-	JSON(w, r, 200, config.DNSBlockLists)
+	JSON(w, r, 200, UpdateBlockLists())
 }
 
 func HTTP_UpdateWhiteLists(w http.ResponseWriter, r *http.Request) {
-	forceReloadWhiteLists()
-	config := CONFIG.Load()
-	JSON(w, r, 200, config.DNSWhiteLists)
+	JSON(w, r, 200, UpdateWhiteLists())
 }
 
 func HTTP_GetDNSListContent(w http.ResponseWriter, r *http.Request) {
@@ -485,7 +476,7 @@ func HTTP_GetDNSListContent(w http.ResponseWriter, r *http.Request) {
 		JSON(w, r, 400, err.Error())
 		return
 	}
-	out, err := getCustomDNSListContent(form.Kind)
+	out, err := GetDNSListContent(form.Kind)
 	if err != nil {
 		JSON(w, r, 400, err.Error())
 		return
@@ -500,7 +491,7 @@ func HTTP_SetDNSListContent(w http.ResponseWriter, r *http.Request) {
 		JSON(w, r, 400, err.Error())
 		return
 	}
-	out, err := setCustomDNSListContent(form.Kind, form.Content)
+	out, err := SetDNSListContent(form.Kind, form.Content)
 	if err != nil {
 		JSON(w, r, 400, err.Error())
 		return
@@ -519,7 +510,7 @@ func HTTP_SetUser(w http.ResponseWriter, r *http.Request) {
 		JSON(w, r, 400, err)
 		return
 	}
-	err = saveUser(u)
+	err = SaveUser(u)
 	if err != nil {
 		JSON(w, r, 400, err)
 		return
@@ -534,11 +525,11 @@ func HTTP_DelUser(w http.ResponseWriter, r *http.Request) {
 		JSON(w, r, 400, err)
 		return
 	}
-	JSON(w, r, 200, delUser(u.Hash))
+	JSON(w, r, 200, DeleteUser(u.Hash))
 }
 
 func HTTP_GetUsers(w http.ResponseWriter, r *http.Request) {
-	u, err := getUsers()
+	u, err := GetUsers()
 	if err != nil {
 		JSON(w, r, 400, err)
 		return
@@ -640,25 +631,7 @@ func HTTP_Disconnect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tag := DF.Tag
-	if tag == "" {
-		tunnelMapRange(func(t *TUN) bool {
-			if t.ID == DF.ID {
-				if m := t.meta.Load(); m != nil {
-					tag = m.Tag
-				}
-				return false
-			}
-			return true
-		})
-	}
-	if tag != "" {
-		stopReconnect(tag)
-	} else {
-		stopAllReconnects()
-	}
-
-	err = Disconnect(DF.ID, false)
+	err = DisconnectTunnel(DF.ID, DF.Tag)
 	if err != nil {
 		JSON(w, r, 400, err)
 		return
@@ -684,48 +657,15 @@ func HTTP_SetTunnel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	isConnected := false
-	tunnelMapRange(func(t *TUN) bool {
-		if t.CR != nil {
-			if t.CR.Tag == newForm.Meta.Tag {
-				isConnected = true
-				return false
-			}
-		}
-		return true
-	})
-	if isConnected {
-		JSON(w, r, 400, "tunnel is connected")
-		return
-	}
-
-	errors := validateTunnelMeta(newForm.Meta, newForm.OldTag)
-	if len(errors) > 0 {
-		JSON(w, r, 400, errors)
-		return
-	}
-
-	TunnelMetaMap.Store(newForm.Meta.Tag, newForm.Meta)
-	err = writeTunnelsToDisk(newForm.Meta.Tag)
+	err = SaveTunnel(newForm.Meta, newForm.OldTag)
 	if err != nil {
+		if ve, ok := err.(*ValidationError); ok {
+			JSON(w, r, 400, ve.Messages)
+			return
+		}
 		JSON(w, r, 400, err.Error())
 		return
 	}
-
-	if newForm.OldTag != newForm.Meta.Tag {
-		TunnelMetaMap.Delete(newForm.OldTag)
-		state := STATE.Load()
-		ext := newForm.Meta.ConfigFormat
-		if ext == "" {
-			ext = tunnelFileSuffix
-		}
-		err = os.Remove(state.TunnelsPath + newForm.OldTag + ext)
-		if err != nil {
-			JSON(w, r, 400, err.Error())
-			return
-		}
-	}
-
 	JSON(w, r, 200, nil)
 }
 
@@ -742,48 +682,15 @@ func HTTP_SetTunnelPeers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	meta, ok := TunnelMetaMap.Load(form.Tag)
-	if !ok {
-		JSON(w, r, 404, "tunnel not found")
+	hosts, err := SetTunnelPeers(form.Tag, form.AllowedHosts, form.AllowAll)
+	if err != nil {
+		code := 400
+		if err.Error() == "tunnel not found" {
+			code = 404
+		}
+		JSON(w, r, code, err.Error())
 		return
 	}
-
-	seen := make(map[string]struct{}, len(form.AllowedHosts))
-	hosts := make([]string, 0, len(form.AllowedHosts))
-	for _, h := range form.AllowedHosts {
-		entry, err := NormalizeAllowedHost(h)
-		if err != nil {
-			JSON(w, r, 400, err.Error())
-			return
-		}
-		if _, dup := seen[entry]; dup {
-			continue
-		}
-		seen[entry] = struct{}{}
-		hosts = append(hosts, entry)
-	}
-
-	meta.AllowedHosts = hosts
-	meta.AllowAll = form.AllowAll
-	TunnelMetaMap.Store(meta.Tag, meta)
-	if err := writeTunnelsToDisk(meta.Tag); err != nil {
-		JSON(w, r, 400, err.Error())
-		return
-	}
-
-	tunnelMapRange(func(t *TUN) bool {
-		m := t.meta.Load()
-		if m == nil || m.Tag != form.Tag {
-			return true
-		}
-		if t.GetState() >= TUN_Connected {
-			if err := t.AnnounceAllowedHosts(hosts, form.AllowAll); err != nil {
-				DEBUG("peer list announce failed: ", err)
-			}
-		}
-		return false
-	})
-
 	JSON(w, r, 200, hosts)
 }
 
@@ -819,7 +726,7 @@ func HTTP_GetQRCode(w http.ResponseWriter, r *http.Request) {
 }
 
 func HTTP_CreateTunnel(w http.ResponseWriter, r *http.Request) {
-	tun, err := createRandomTunnel()
+	tun, err := CreateTunnel()
 	if err != nil {
 		JSON(w, r, 400, err)
 		return
@@ -835,28 +742,11 @@ func HTTP_DeleteTunnels(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !safeTunnelTag(form.Tag) {
-		JSON(w, r, 400, "invalid tunnel tag")
+	err = DeleteTunnel(form.Tag)
+	if err != nil {
+		JSON(w, r, 400, err.Error())
 		return
 	}
-
-	state := STATE.Load()
-	ext := tunnelFileSuffix
-	if storedTun, ok := TunnelMetaMap.Load(form.Tag); ok {
-		if storedTun.ConfigFormat != "" {
-			ext = storedTun.ConfigFormat
-		}
-	}
-	_ = os.Remove(state.TunnelsPath + form.Tag + ext)
-
-	tunnelMetaMapRange(func(tun *TunnelMETA) bool {
-		if tun.Tag == form.Tag {
-			TunnelMetaMap.Delete(form.Tag)
-			return false
-		}
-		return true
-	})
-
 	JSON(w, r, 200, nil)
 }
 
@@ -882,24 +772,14 @@ func HTTP_CreateDeviceWithKeys(w http.ResponseWriter, r *http.Request) {
 }
 
 func HTTP_GetLocalDevices(w http.ResponseWriter, r *http.Request) {
-
 	form := struct {
 		UserID string `json:"UserID"`
 	}{}
 	_ = Bind(&form, r)
-	if form.UserID != "" {
-		if err := activateAccountByUserID(form.UserID); err != nil {
-			JSON(w, r, 400, err.Error())
-			return
-		}
-	}
-	list, err := listLocalDeviceInfo()
+	list, err := GetLocalDevices(form.UserID)
 	if err != nil {
-		JSON(w, r, 500, err.Error())
+		JSON(w, r, 400, err.Error())
 		return
-	}
-	if list == nil {
-		list = []LocalDeviceInfo{}
 	}
 	JSON(w, r, 200, list)
 }

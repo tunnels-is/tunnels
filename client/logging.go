@@ -196,6 +196,7 @@ func StartLogQueueProcessor() {
 			PollLogBuf = PollLogBuf[len(PollLogBuf)-5000:]
 		}
 		PollLogMu.Unlock()
+		emitUILog(line)
 
 		if LogFile != nil {
 			_, err := LogFile.WriteString(line + "\n")

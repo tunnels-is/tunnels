@@ -46,7 +46,11 @@ build-client:
 	@cd cmd/main && go build -o ../../builds/tunnels-cli .
 
 build-app:
-	@echo "Building tunnels-app..."
+	@echo "Building tunnels-app (Fyne)..."
+	@./build-fyne.sh linux
+
+build-app-wails:
+	@echo "Building tunnels-app (Wails)..."
 	@./build-wails.sh
 
 build: build-server build-client
