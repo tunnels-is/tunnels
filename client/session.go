@@ -598,10 +598,7 @@ type createDeviceControllerResponse struct {
 	WANCIDR       string        `json:"WANCIDR"`
 }
 
-type createDeviceWithKeysResult struct {
-	WGConfig string        `json:"WGConfig"`
-	Device   *types.Device `json:"Device"`
-}
+type createDeviceWithKeysResult = CreateDeviceResult
 
 func CreateDeviceWithKeys(form *CreateDeviceWithKeysForm) (any, int) {
 	if err := authorizeControlServer(form.Server); err != nil {

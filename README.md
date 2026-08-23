@@ -90,7 +90,7 @@ The goreleaser pipeline builds three artifacts:
 | --- | --- | --- |
 | `tunnels-cli` | `./cmd/main` | Client with embedded browser UI (no Wails) |
 | `tunnels-server` | `./server` | Control plane (Linux) |
-| `tunnels-app` | `./cmd/wails` | Wails desktop app (Windows always; Linux/macOS only on a matching host) |
+| `tunnels-app` | `./cmd/fyne` | Fyne desktop app (native GUI, in-process client; Wails still at `./cmd/wails`) |
 
  - DEV: `./releaser-build-snapshot.sh` (or `make release`)
  - PROD: `./releaser-build-release.sh` (requires `GITHUB_TOKEN`)
@@ -100,17 +100,28 @@ The goreleaser pipeline builds three artifacts:
 $ make build           # tunnels-cli + tunnels-server
 $ make build-server    # tunnels-server only
 $ make build-client    # tunnels-cli only
-$ make build-app       # tunnels-app (via ./build-wails.sh)
+$ make build-app       # tunnels-app (via ./build-fyne.sh)
+$ make build-app-wails # tunnels-app (via ./build-wails.sh)
 
 # Test before building
 $ make pre-commit      # Run tests and linting
 $ make ci              # Run CI checks locally
 ```
 
-### Wails desktop (`tunnels-app`)
-Requires the frontend to be built first (`./build-ui.sh`). Linux needs
-`libgtk-3-dev` + `libwebkit2gtk-4.1-dev`. macOS needs Xcode CLT. Windows
-cross-compiles with `CGO_ENABLED=0` from any host.  
+### Fyne desktop (`tunnels-app`)
+Native GUI in the same binary as the client (`./cmd/fyne`). The window
+calls client functions directly (no HTTP hop for UI actions). Linux needs
+a C compiler plus X11/GL headers (`libgl1-mesa-dev`, `xorg-dev`). macOS
+needs Xcode CLT. Windows needs CGO (MinGW).
+
+```bash
+./build-fyne.sh linux     # or windows|darwin|all
+```
+
+The previous Wails wrapper remains at `./cmd/wails` and can be built with
+`make build-app-wails` / `./build-wails.sh`. That path still embeds the
+React UI and talks to the local HTTP API. Goreleaser still ships the Wails
+binary until the Fyne app is wired into the release pipeline.  
 
 # Special mentiones
 These are the real MVPs:
