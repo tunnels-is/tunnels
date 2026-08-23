@@ -463,73 +463,35 @@ func emailIndexGet(idx *gobolt.Bucket, email string) []byte {
 	if idx == nil {
 		return nil
 	}
-	if email != "" {
-		if v := idx.Get([]byte(email)); v != nil {
-			return v
-		}
-	}
 	n := normalizeEmail(email)
-	if n != "" && n != email {
-		return idx.Get([]byte(n))
+	if n == "" {
+		return nil
 	}
-	return nil
+	return idx.Get([]byte(n))
 }
 
 func emailInUse(tx *gobolt.Tx, email, exceptID string) bool {
-	n := normalizeEmail(email)
-	if n == "" {
-		return false
-	}
-	if v := emailIndexGet(tx.Bucket([]byte(USERS_EMAIL_INDEX)), email); v != nil && string(v) != exceptID {
-		return true
-	}
-	users := tx.Bucket([]byte(USERS_BUCKET))
-	c := users.Cursor()
-	for k, v := c.First(); k != nil; k, v = c.Next() {
-		if exceptID != "" && string(k) == exceptID {
-			continue
-		}
-		U := new(User)
-		if err := bboltUnmarshal(v, U); err != nil {
-			continue
-		}
-		if normalizeEmail(U.Email) == n {
-			return true
-		}
-	}
-	return false
+	v := emailIndexGet(tx.Bucket([]byte(USERS_EMAIL_INDEX)), email)
+	return v != nil && string(v) != exceptID
 }
 
 func BBolt_findUserByEmail(Email string) (*User, error) {
 	var found *User
 	n := normalizeEmail(Email)
+	if n == "" {
+		return nil, nil
+	}
 	err := BBoltDB.View(func(tx *gobolt.Tx) error {
-		uid := emailIndexGet(tx.Bucket([]byte(USERS_EMAIL_INDEX)), Email)
-		users := tx.Bucket([]byte(USERS_BUCKET))
-		if uid != nil {
-			v := users.Get(uid)
-			if v != nil {
-				found = new(User)
-				return bboltUnmarshal(v, found)
-			}
-		}
-		if n == "" {
+		uid := emailIndexGet(tx.Bucket([]byte(USERS_EMAIL_INDEX)), n)
+		if uid == nil {
 			return nil
 		}
-		// Pre-migration mixed-case records: index key may still be the
-		// stored Email. Do not rewrite the index here.
-		c := users.Cursor()
-		for k, v := c.First(); k != nil; k, v = c.Next() {
-			U := new(User)
-			if err := bboltUnmarshal(v, U); err != nil {
-				continue
-			}
-			if normalizeEmail(U.Email) == n {
-				found = U
-				return nil
-			}
+		v := tx.Bucket([]byte(USERS_BUCKET)).Get(uid)
+		if v == nil {
+			return nil
 		}
-		return nil
+		found = new(User)
+		return bboltUnmarshal(v, found)
 	})
 	return found, err
 }
@@ -637,10 +599,7 @@ func BBolt_updateUserAdmin(UF *USER_ADMIN_UPDATE_FORM) error {
 
 		if UF.Email != "" {
 			newEmail := normalizeEmail(UF.Email)
-			oldKey := normalizeEmail(oldEmail)
-			// Case/whitespace-only changes are left for the one-shot
-			// normalize-emails migration; do not rewrite stored Email here.
-			if newEmail != oldKey {
+			if newEmail != U.Email {
 				if emailInUse(tx, newEmail, id) {
 					return errors.New("email already in use by another account")
 				}
@@ -668,9 +627,6 @@ func BBolt_updateUserAdmin(UF *USER_ADMIN_UPDATE_FORM) error {
 			emailIdx := tx.Bucket([]byte(USERS_EMAIL_INDEX))
 			if oldEmail != "" {
 				_ = emailIdx.Delete([]byte(oldEmail))
-			}
-			if oldKey := normalizeEmail(oldEmail); oldKey != "" && oldKey != oldEmail {
-				_ = emailIdx.Delete([]byte(oldKey))
 			}
 			if U.Email != "" {
 				if err := emailIdx.Put([]byte(U.Email), []byte(id)); err != nil {
@@ -1236,9 +1192,7 @@ func BBolt_DeleteUserByID(id string) error {
 			U := new(User)
 			if err := bboltUnmarshal(v, U); err == nil {
 				if U.Email != "" {
-					emailIdx := tx.Bucket([]byte(USERS_EMAIL_INDEX))
-					_ = emailIdx.Delete([]byte(U.Email))
-					_ = emailIdx.Delete([]byte(normalizeEmail(U.Email)))
+					_ = tx.Bucket([]byte(USERS_EMAIL_INDEX)).Delete([]byte(U.Email))
 				}
 				if U.APIKey != "" {
 					_ = tx.Bucket([]byte(USERS_APIKEY_INDEX)).Delete([]byte(U.APIKey))
