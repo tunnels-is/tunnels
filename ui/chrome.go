@@ -7,15 +7,314 @@ import (
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/driver/desktop"
-	"fyne.io/fyne/v2/layout"
+	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 )
 
-const (
-	railWidth    float32 = 56
-	railExpanded float32 = 208
-	cardRadius   float32 = 8
-)
+// ---------------------------------------------------------------- layouts
+
+// insetLayout pads its children by an exact amount on each edge. Preferred over
+// nested container.NewPadded so spacing is a number you can read off the call.
+type insetLayout struct{ t, r, b, l float32 }
+
+func (i insetLayout) Layout(objs []fyne.CanvasObject, size fyne.Size) {
+	inner := fyne.NewSize(size.Width-i.l-i.r, size.Height-i.t-i.b)
+	for _, o := range objs {
+		o.Move(fyne.NewPos(i.l, i.t))
+		o.Resize(inner)
+	}
+}
+
+func (i insetLayout) MinSize(objs []fyne.CanvasObject) fyne.Size {
+	var w, h float32
+	for _, o := range objs {
+		ms := o.MinSize()
+		w = max32(w, ms.Width)
+		h = max32(h, ms.Height)
+	}
+	return fyne.NewSize(w+i.l+i.r, h+i.t+i.b)
+}
+
+func inset(all float32, obj fyne.CanvasObject) *fyne.Container {
+	return container.New(insetLayout{all, all, all, all}, obj)
+}
+
+func insetXY(x, y float32, obj fyne.CanvasObject) *fyne.Container {
+	return container.New(insetLayout{y, x, y, x}, obj)
+}
+
+func insetEach(t, r, b, l float32, obj fyne.CanvasObject) *fyne.Container {
+	return container.New(insetLayout{t, r, b, l}, obj)
+}
+
+// capLayout caps a child's width and pins it to the left. Keeps forms readable
+// instead of stretching inputs across a 1280px window.
+type capLayout struct {
+	max     float32
+	centred bool
+}
+
+func (c capLayout) Layout(objs []fyne.CanvasObject, size fyne.Size) {
+	w := min32(c.max, size.Width)
+	x := float32(0)
+	if c.centred {
+		x = (size.Width - w) / 2
+	}
+	for _, o := range objs {
+		o.Move(fyne.NewPos(x, 0))
+		o.Resize(fyne.NewSize(w, size.Height))
+	}
+}
+
+func (c capLayout) MinSize(objs []fyne.CanvasObject) fyne.Size {
+	var w, h float32
+	for _, o := range objs {
+		ms := o.MinSize()
+		w = max32(w, ms.Width)
+		h = max32(h, ms.Height)
+	}
+	return fyne.NewSize(min32(w, c.max), h)
+}
+
+func capWidth(w float32, obj fyne.CanvasObject) *fyne.Container {
+	return container.New(capLayout{max: w}, obj)
+}
+
+// vstack lays children out top to bottom with one exact gap between them,
+// unlike VBox which uses theme padding.
+type vstackLayout struct{ gap float32 }
+
+func (v vstackLayout) Layout(objs []fyne.CanvasObject, size fyne.Size) {
+	y := float32(0)
+	for _, o := range objs {
+		if !o.Visible() {
+			continue
+		}
+		h := o.MinSize().Height
+		o.Move(fyne.NewPos(0, y))
+		o.Resize(fyne.NewSize(size.Width, h))
+		y += h + v.gap
+	}
+}
+
+func (v vstackLayout) MinSize(objs []fyne.CanvasObject) fyne.Size {
+	var w, h float32
+	n := 0
+	for _, o := range objs {
+		if !o.Visible() {
+			continue
+		}
+		ms := o.MinSize()
+		w = max32(w, ms.Width)
+		h += ms.Height
+		n++
+	}
+	if n > 1 {
+		h += v.gap * float32(n-1)
+	}
+	return fyne.NewSize(w, h)
+}
+
+func vstack(gap float32, objs ...fyne.CanvasObject) *fyne.Container {
+	return container.New(vstackLayout{gap: gap}, objs...)
+}
+
+// hstack lays children out left to right with one exact gap, each at its
+// minimum width, vertically centred.
+type hstackLayout struct{ gap float32 }
+
+func (h hstackLayout) Layout(objs []fyne.CanvasObject, size fyne.Size) {
+	// When the row does not fit, take the overflow off the widest child rather
+	// than letting the tail spill past the edge. That child is the flexible one
+	// in practice (a search box beside icon buttons).
+	over := h.MinSize(objs).Width - size.Width
+	widest := -1
+	if over > 0 {
+		var w float32
+		for i, o := range objs {
+			if o.Visible() && o.MinSize().Width > w {
+				w, widest = o.MinSize().Width, i
+			}
+		}
+	}
+
+	x := float32(0)
+	for i, o := range objs {
+		if !o.Visible() {
+			continue
+		}
+		ms := o.MinSize()
+		if i == widest {
+			ms.Width = max32(z(48), ms.Width-over)
+		}
+		o.Resize(ms)
+		o.Move(fyne.NewPos(x, (size.Height-ms.Height)/2))
+		x += ms.Width + h.gap
+	}
+}
+
+func (h hstackLayout) MinSize(objs []fyne.CanvasObject) fyne.Size {
+	var w, ht float32
+	n := 0
+	for _, o := range objs {
+		if !o.Visible() {
+			continue
+		}
+		ms := o.MinSize()
+		w += ms.Width
+		ht = max32(ht, ms.Height)
+		n++
+	}
+	if n > 1 {
+		w += h.gap * float32(n-1)
+	}
+	return fyne.NewSize(w, ht)
+}
+
+func hstack(gap float32, objs ...fyne.CanvasObject) *fyne.Container {
+	return container.New(hstackLayout{gap: gap}, objs...)
+}
+
+// rightAlign pins content to the trailing edge, vertically centred.
+type rightLayout struct{}
+
+func (rightLayout) Layout(objs []fyne.CanvasObject, size fyne.Size) {
+	for _, o := range objs {
+		ms := o.MinSize()
+		o.Resize(ms)
+		o.Move(fyne.NewPos(size.Width-ms.Width, (size.Height-ms.Height)/2))
+	}
+}
+
+func (rightLayout) MinSize(objs []fyne.CanvasObject) fyne.Size {
+	var w, h float32
+	for _, o := range objs {
+		ms := o.MinSize()
+		w = max32(w, ms.Width)
+		h = max32(h, ms.Height)
+	}
+	return fyne.NewSize(w, h)
+}
+
+func rightAlign(obj fyne.CanvasObject) *fyne.Container {
+	return container.New(rightLayout{}, obj)
+}
+
+// splitRow puts content on the left and actions hard right on one baseline.
+func splitRow(left, right fyne.CanvasObject) fyne.CanvasObject {
+	if right == nil {
+		return left
+	}
+	if left == nil {
+		return rightAlign(right)
+	}
+	return container.New(splitLayout{}, container.New(vCentreLayout{}, left), right)
+}
+
+// splitLayout is Border's left/right pairing with one difference: the actions
+// are capped at 60% of the row. A Border hands the trailing object its full
+// MinSize, so a zoomed action cluster would cover the title instead of
+// compressing.
+type splitLayout struct{}
+
+func (splitLayout) Layout(objs []fyne.CanvasObject, size fyne.Size) {
+	if len(objs) < 2 {
+		return
+	}
+	left, right := objs[0], objs[1]
+	rw := min32(right.MinSize().Width, size.Width*0.6)
+	rh := min32(right.MinSize().Height, size.Height)
+	right.Resize(fyne.NewSize(rw, rh))
+	right.Move(fyne.NewPos(size.Width-rw, (size.Height-rh)/2))
+
+	lw := max32(0, size.Width-rw-sp3)
+	left.Resize(fyne.NewSize(lw, size.Height))
+	left.Move(fyne.NewPos(0, 0))
+}
+
+func (splitLayout) MinSize(objs []fyne.CanvasObject) fyne.Size {
+	var w, h float32
+	for _, o := range objs {
+		ms := o.MinSize()
+		w += ms.Width
+		h = max32(h, ms.Height)
+	}
+	return fyne.NewSize(w+sp3, h)
+}
+
+// vCentreLayout gives a child its full width but only its natural height,
+// centred vertically in whatever space it is handed.
+type vCentreLayout struct{}
+
+func (vCentreLayout) Layout(objs []fyne.CanvasObject, size fyne.Size) {
+	for _, o := range objs {
+		h := min32(o.MinSize().Height, size.Height)
+		o.Resize(fyne.NewSize(size.Width, h))
+		o.Move(fyne.NewPos(0, (size.Height-h)/2))
+	}
+}
+
+func (vCentreLayout) MinSize(objs []fyne.CanvasObject) fyne.Size {
+	var w, h float32
+	for _, o := range objs {
+		ms := o.MinSize()
+		w = max32(w, ms.Width)
+		h = max32(h, ms.Height)
+	}
+	return fyne.NewSize(w, h)
+}
+
+// railLayout puts the sidebar on the leading edge and the page beside it, with
+// the rail capped at a third of the window. Without the cap a zoomed rail
+// squeezes the page into an unusable sliver, since the rail's width scales but
+// the window does not.
+type railLayout struct{}
+
+func (railLayout) Layout(objs []fyne.CanvasObject, size fyne.Size) {
+	if len(objs) < 2 {
+		return
+	}
+	side, content := objs[0], objs[1]
+	var w float32
+	if side.Visible() {
+		w = min32(side.MinSize().Width, size.Width/3)
+	}
+	side.Move(fyne.NewPos(0, 0))
+	side.Resize(fyne.NewSize(w, size.Height))
+	content.Move(fyne.NewPos(w, 0))
+	content.Resize(fyne.NewSize(size.Width-w, size.Height))
+}
+
+// MinSize is deliberately zero: shellLayout owns the window minimum, and
+// letting the scaled rail contribute here would grow the OS window on zoom.
+func (railLayout) MinSize([]fyne.CanvasObject) fyne.Size { return fyne.NewSize(0, 0) }
+
+// elide truncates s with an ellipsis so it fits max, so a long title cannot
+// run underneath the action buttons in a narrow row.
+func elide(s string, max float32, size float32, style fyne.TextStyle) string {
+	if max <= 0 || s == "" {
+		return ""
+	}
+	if fyne.MeasureText(s, size, style).Width <= max {
+		return s
+	}
+	r := []rune(s)
+	for len(r) > 1 {
+		// Drop proportionally to the overshoot, so wide strings converge fast.
+		w := fyne.MeasureText(string(r)+"…", size, style).Width
+		if w <= max {
+			return string(r) + "…"
+		}
+		cut := int(float32(len(r)) * (1 - max/w))
+		if cut < 1 {
+			cut = 1
+		}
+		r = r[:len(r)-cut]
+	}
+	return "…"
+}
+
+// ---------------------------------------------------------------- spacers
 
 func spacer(w, h float32) fyne.CanvasObject {
 	r := canvas.NewRectangle(color.Transparent)
@@ -23,9 +322,27 @@ func spacer(w, h float32) fyne.CanvasObject {
 	return r
 }
 
-func vspace(h float32) fyne.CanvasObject { return spacer(1, h) }
-func hspace(w float32) fyne.CanvasObject { return spacer(w, 1) }
+func vspace(h float32) fyne.CanvasObject { return spacer(0, h) }
+func hspace(w float32) fyne.CanvasObject { return spacer(w, 0) }
 
+// divider is a hairline that spans the width it is given.
+func divider() fyne.CanvasObject {
+	r := canvas.NewRectangle(pal().Divider)
+	r.SetMinSize(fyne.NewSize(0, z(1)))
+	return r
+}
+
+func strongDivider() fyne.CanvasObject {
+	r := canvas.NewRectangle(pal().Base300)
+	r.SetMinSize(fyne.NewSize(0, z(1)))
+	return r
+}
+
+// ---------------------------------------------------------------- text
+
+// text is the low-level primitive for custom renderers, where positioning is
+// handled by hand. Flowing content should use the rich* helpers so every block
+// shares the same internal inset and stays aligned.
 func text(s string, size float32, c color.Color, bold bool) *canvas.Text {
 	t := canvas.NewText(s, c)
 	t.TextSize = size
@@ -33,17 +350,52 @@ func text(s string, size float32, c color.Color, bold bool) *canvas.Text {
 	return t
 }
 
-func caption(s string) fyne.CanvasObject {
-	return text(s, 11, pal().Muted, false)
+func monoText(s string, size float32, c color.Color) *canvas.Text {
+	t := canvas.NewText(s, c)
+	t.TextSize = size
+	t.TextStyle = fyne.TextStyle{Monospace: true}
+	return t
+}
+
+func rich(s string, size fyne.ThemeSizeName, col fyne.ThemeColorName, bold bool) fyne.CanvasObject {
+	seg := &widget.TextSegment{Text: s, Style: widget.RichTextStyle{
+		ColorName: col,
+		SizeName:  size,
+		TextStyle: fyne.TextStyle{Bold: bold},
+		Inline:    true,
+	}}
+	rt := widget.NewRichText(seg)
+	rt.Wrapping = fyne.TextWrapWord
+	return container.New(insetLayout{-rtPad, -rtPad, -rtPad, -rtPad}, rt)
+}
+
+// cardTitle / body / hint form the type hierarchy for flowing content.
+func cardTitle(s string) fyne.CanvasObject {
+	return rich(s, theme.SizeNameSubHeadingText, colContent, true)
+}
+
+func body(s string) fyne.CanvasObject {
+	return rich(s, theme.SizeNameText, colContent, false)
+}
+
+func hint(s string) fyne.CanvasObject {
+	return rich(s, sizeSmall, colMuted, false)
 }
 
 func heading(s string) fyne.CanvasObject {
-	return text(s, 13, pal().Content, true)
+	return text(s, fsLarge, pal().Content, true)
 }
 
-func titleText(s string) fyne.CanvasObject {
-	return text(s, 15, pal().Content, true)
+func fieldLabel(s string) fyne.CanvasObject {
+	return text(s, fsSmall, pal().Muted, false)
 }
+
+// eyebrow is the small uppercase group label used in the sidebar.
+func eyebrow(s string) fyne.CanvasObject {
+	return text(s, fsCaption, pal().Faint, true)
+}
+
+// ---------------------------------------------------------------- tap wrapper
 
 type tapWrap struct {
 	widget.BaseWidget
@@ -69,102 +421,209 @@ func (t *tapWrap) CreateRenderer() fyne.WidgetRenderer {
 	return widget.NewSimpleRenderer(t.obj)
 }
 
-func cardBox(title, desc string, actions fyne.CanvasObject, body fyne.CanvasObject) fyne.CanvasObject {
+// ---------------------------------------------------------------- surfaces
+
+// surface is a rounded panel: the single source of card styling.
+func surface(radius float32, fill, stroke color.Color) *canvas.Rectangle {
+	r := canvas.NewRectangle(fill)
+	r.CornerRadius = radius
+	if stroke != nil {
+		r.StrokeColor = stroke
+		r.StrokeWidth = 1
+	}
+	return r
+}
+
+// cardBox is the standard panel: optional title, description and header
+// actions above a body, all on one 16px inset.
+func cardBox(title, desc string, actions fyne.CanvasObject, content fyne.CanvasObject) fyne.CanvasObject {
 	p := pal()
-	bg := canvas.NewRectangle(p.Base100)
-	bg.CornerRadius = cardRadius
-	bg.StrokeColor = p.Base300
-	bg.StrokeWidth = 1
-
-	var inner []fyne.CanvasObject
-	if title != "" || desc != "" || actions != nil {
-		var head fyne.CanvasObject
-		if title != "" {
-			head = heading(title)
-		}
-		if actions != nil {
-			head = container.NewBorder(nil, nil, head, actions)
-		}
-		if head != nil {
-			inner = append(inner, head)
-		}
-		if desc != "" {
-			d := widget.NewLabel(desc)
-			d.Wrapping = fyne.TextWrapWord
-			d.Importance = widget.LowImportance
-			inner = append(inner, d)
-		}
-		inner = append(inner, vspace(6))
+	rows := make([]fyne.CanvasObject, 0, 4)
+	if title != "" || actions != nil {
+		rows = append(rows, splitRow(nilIfEmpty(title, func() fyne.CanvasObject { return cardTitle(title) }), actions))
 	}
-	if body != nil {
-		inner = append(inner, body)
+	if desc != "" {
+		rows = append(rows, hint(desc))
 	}
-	return container.NewStack(bg, container.NewPadded(container.NewPadded(container.NewVBox(inner...))))
+	if content != nil {
+		if len(rows) > 0 {
+			rows = append(rows, vspace(sp1))
+		}
+		rows = append(rows, content)
+	}
+	inner := vstack(sp2, rows...)
+	return container.NewStack(surface(radLg, p.Base100, p.Base300), inset(sp4, inner))
 }
 
-func primaryBtn(label string, fn func()) *kBtn { return newKBtn(label, kPrimary, fn) }
-func successBtn(label string, fn func()) *kBtn { return newKBtn(label, kSuccess, fn) }
-func dangerBtn(label string, fn func()) *kBtn  { return newKBtn(label, kDanger, fn) }
-func ghostBtn(label string, fn func()) *kBtn   { return newKBtn(label, kGhost, fn) }
-func outlineBtn(label string, fn func()) *kBtn { return newKBtn(label, kOutline, fn) }
-func iconBtn(res fyne.Resource, fn func()) *kBtn {
-	return newIconBtn(res, kGhost, fn)
+func card(title, desc string, content fyne.CanvasObject) fyne.CanvasObject {
+	return cardBox(title, desc, nil, content)
 }
 
-func statusDot(on bool) fyne.CanvasObject {
+func nilIfEmpty(s string, fn func() fyne.CanvasObject) fyne.CanvasObject {
+	if s == "" {
+		return nil
+	}
+	return fn()
+}
+
+// ---------------------------------------------------------------- indicators
+
+type tone int
+
+const (
+	toneNeutral tone = iota
+	toneSuccess
+	toneDanger
+	toneWarning
+	toneInfo
+	tonePrimary
+)
+
+func toneColors(t tone) (fg, bg color.NRGBA) {
 	p := pal()
-	c := color.Color(p.Faint)
-	if on {
-		c = p.Success
+	switch t {
+	case toneSuccess:
+		return p.Success, p.SuccessSoft
+	case toneDanger:
+		return p.Error, p.ErrorSoft
+	case toneWarning:
+		return p.Warning, p.WarningSoft
+	case toneInfo:
+		return p.Info, p.InfoSoft
+	case tonePrimary:
+		return p.Primary, p.PrimarySoft
+	default:
+		return p.Muted, withAlpha(p.Faint, 30)
 	}
-	r := canvas.NewCircle(c)
-	box := spacer(10, 10)
-	return container.NewCenter(container.NewStack(box, r))
 }
 
-func pill(label string, on bool) fyne.CanvasObject {
+// badge is a small rounded status chip.
+func badge(label string, t tone) fyne.CanvasObject {
+	fg, bg := toneColors(t)
+	r := surface(radFull, bg, nil)
+	lbl := text(label, fsCaption, fg, true)
+	return container.NewStack(r, insetXY(sp2, z(3), lbl))
+}
+
+// statTile is a compact metric block for page summaries.
+func statTile(label, value string, t tone) fyne.CanvasObject {
+	fg, _ := toneColors(t)
+	if t == toneNeutral {
+		fg = pal().Content
+	}
+	v := text(value, fsLarge, fg, true)
+	l := text(label, fsCaption, pal().Muted, false)
+	inner := vstack(z(2), v, l)
+	return container.NewStack(surface(radMd, pal().Base100, pal().Base300), insetXY(sp3, sp2, inner))
+}
+
+// kvRow is one label/value line with a trailing hairline. Values that look
+// like identifiers render monospaced so they are easy to compare.
+func kvRow(label, value string, mono bool) fyne.CanvasObject {
+	if value == "" {
+		value = "—"
+	}
 	p := pal()
-	fg := color.Color(p.Faint)
-	bgc := color.Color(p.Hover)
-	if on {
-		fg = p.Success
-		bgc = p.SuccessSoft
+	k := text(label, fsBody, p.Muted, false)
+	var v fyne.CanvasObject
+	if mono {
+		t := monoText(value, fsSmall, p.Content)
+		t.Alignment = fyne.TextAlignTrailing
+		v = t
+	} else {
+		t := text(value, fsBody, p.Content, false)
+		t.Alignment = fyne.TextAlignTrailing
+		v = t
 	}
-	bg := canvas.NewRectangle(bgc)
-	bg.CornerRadius = 999
-	t := text(label, 11, fg, true)
-	return container.NewStack(bg, container.NewPadded(t))
+	row := container.NewBorder(nil, nil, k, nil, v)
+	return vstack(0, insetEach(sp2+1, 0, sp2+1, 0, row), divider())
 }
 
-func fieldLabel(s string) fyne.CanvasObject {
-	return text(s, 12, pal().Muted, true)
+// ---------------------------------------------------------------- empty state
+
+func emptyState(title, desc string) fyne.CanvasObject {
+	items := []fyne.CanvasObject{container.NewCenter(text(title, fsBody, pal().Muted, true))}
+	if desc != "" {
+		items = append(items, container.NewCenter(text(desc, fsSmall, pal().Faint, false)))
+	}
+	return container.NewCenter(vstack(sp2, items...))
 }
 
-func toastBanner(kind, msg string) fyne.CanvasObject {
-	if msg == "" {
-		return spacer(1, 1)
-	}
+func emptyRow(msg string) fyne.CanvasObject {
+	return insetEach(sp2, 0, sp2, 0, rich(msg, sizeSmall, colFaint, false))
+}
+
+// ---------------------------------------------------------------- toast
+
+// toastCard is a self-sizing notification so the shell can place it exactly.
+type toastCard struct {
+	widget.BaseWidget
+	kind string
+	msg  string
+}
+
+func newToast(kind, msg string) *toastCard {
+	t := &toastCard{kind: kind, msg: msg}
+	t.ExtendBaseWidget(t)
+	return t
+}
+
+func (t *toastCard) CreateRenderer() fyne.WidgetRenderer {
 	p := pal()
-	bg := canvas.NewRectangle(p.Base100)
-	bg.CornerRadius = 8
-	bg.StrokeColor = p.Base300
-	bg.StrokeWidth = 1
-	barCol := p.Success
-	if kind == "error" {
-		barCol = p.Error
+	accent := p.Success
+	icon := theme.ConfirmIcon()
+	switch t.kind {
+	case "error":
+		accent, icon = p.Error, theme.ErrorIcon()
+	case "info":
+		accent, icon = p.Primary, theme.InfoIcon()
 	}
-	bar := canvas.NewRectangle(barCol)
-	bar.SetMinSize(fyne.NewSize(4, 1))
-	lbl := widget.NewLabel(msg)
+	bg := surface(radMd, p.Base100, p.Base300)
+	bar := canvas.NewRectangle(accent)
+	bar.CornerRadius = radFull
+	ico := widget.NewIcon(icon)
+	lbl := widget.NewLabel(t.msg)
 	lbl.Wrapping = fyne.TextWrapWord
-	inner := container.NewBorder(nil, nil, bar, nil, container.NewPadded(lbl))
-	card := container.NewStack(bg, inner)
-	card.Resize(fyne.NewSize(320, card.MinSize().Height))
-	return container.NewBorder(nil, nil, nil, nil,
-		container.NewHBox(layout.NewSpacer(), container.NewVBox(card)))
+	return &toastRenderer{t: t, bg: bg, bar: bar, ico: ico, lbl: lbl,
+		objects: []fyne.CanvasObject{bg, bar, ico, lbl}}
 }
 
-// shellLayout: full-window content plus a top-right toast overlay.
+type toastRenderer struct {
+	t       *toastCard
+	bg      *canvas.Rectangle
+	bar     *canvas.Rectangle
+	ico     *widget.Icon
+	lbl     *widget.Label
+	objects []fyne.CanvasObject
+}
+
+func (r *toastRenderer) Destroy()                     {}
+func (r *toastRenderer) Objects() []fyne.CanvasObject { return r.objects }
+
+func (r *toastRenderer) MinSize() fyne.Size {
+	h := max32(z(44), r.lbl.MinSize().Height+sp3)
+	return fyne.NewSize(z(320), h)
+}
+
+func (r *toastRenderer) Layout(size fyne.Size) {
+	r.bg.Resize(size)
+	r.bar.Resize(fyne.NewSize(z(3), size.Height-sp3))
+	r.bar.Move(fyne.NewPos(sp2, sp2-z(1)))
+	r.ico.Resize(fyne.NewSize(iconSize, iconSize))
+	r.ico.Move(fyne.NewPos(sp4, (size.Height-iconSize)/2))
+	lw := size.Width - sp4 - iconSize - sp2 - sp3
+	lh := r.lbl.MinSize().Height
+	r.lbl.Resize(fyne.NewSize(lw, lh))
+	r.lbl.Move(fyne.NewPos(sp4+iconSize+sp1, (size.Height-lh)/2))
+}
+
+func (r *toastRenderer) Refresh() {
+	canvasRefresh(r.t)
+}
+
+// ---------------------------------------------------------------- shell
+
+// shellLayout stacks the app content with a top-right toast overlay.
 type shellLayout struct{}
 
 func (shellLayout) Layout(objs []fyne.CanvasObject, size fyne.Size) {
@@ -173,29 +632,83 @@ func (shellLayout) Layout(objs []fyne.CanvasObject, size fyne.Size) {
 	}
 	objs[0].Move(fyne.NewPos(0, 0))
 	objs[0].Resize(size)
+
+	// Bottom right: the top right is where page actions live, and a toast that
+	// covers the search box or the Connect buttons is worse than no toast.
 	toast := objs[1]
 	ts := toast.MinSize()
 	if ts.Width < 8 || ts.Height < 8 {
-		toast.Move(fyne.NewPos(size.Width, 0))
 		toast.Resize(fyne.NewSize(0, 0))
+		toast.Move(fyne.NewPos(size.Width, size.Height))
 		return
 	}
-	w := min32(360, size.Width-32)
-	h := ts.Height
-	if h < 40 {
-		h = 48
-	}
-	toast.Resize(fyne.NewSize(w, h))
-	toast.Move(fyne.NewPos(size.Width-w-16, 16))
+	w := min32(ts.Width, size.Width-2*sp5)
+	toast.Resize(fyne.NewSize(w, ts.Height))
+	toast.Move(fyne.NewPos(size.Width-w-sp5, size.Height-ts.Height-sp5))
 }
 
 func (shellLayout) MinSize(objs []fyne.CanvasObject) fyne.Size {
-	return fyne.NewSize(960, 640)
+	// Kept deliberately low: this is a logical size, so zoom multiplies it into
+	// physical pixels. At 200% a larger floor would demand a window taller than
+	// a 1080p display can show.
+	return fyne.NewSize(720, 480)
 }
+
+// ---------------------------------------------------------------- brand
+
+// brandMark draws the Tunnels glyph: an upright bar crossed by a primary bar,
+// matching assets/logo.svg without needing a themed raster.
+func brandMark(size float32) fyne.CanvasObject {
+	p := pal()
+	stem := canvas.NewRectangle(p.Content)
+	stem.CornerRadius = size * 0.12
+	bar := canvas.NewRectangle(p.Primary)
+	bar.CornerRadius = size * 0.12
+	return container.NewStack(spacer(size, size), container.New(markLayout{size: size}, stem, bar))
+}
+
+type markLayout struct{ size float32 }
+
+func (m markLayout) Layout(objs []fyne.CanvasObject, size fyne.Size) {
+	if len(objs) < 2 {
+		return
+	}
+	s := min32(size.Width, size.Height)
+	ox, oy := (size.Width-s)/2, (size.Height-s)/2
+	stemW := s * 0.24
+	objs[0].Resize(fyne.NewSize(stemW, s*0.78))
+	objs[0].Move(fyne.NewPos(ox+(s-stemW)/2, oy+s*0.22))
+	barH := s * 0.24
+	objs[1].Resize(fyne.NewSize(s, barH))
+	objs[1].Move(fyne.NewPos(ox, oy+s*0.10))
+}
+
+func (m markLayout) MinSize([]fyne.CanvasObject) fyne.Size {
+	return fyne.NewSize(m.size, m.size)
+}
+
+// ---------------------------------------------------------------- helpers
 
 func min32(a, b float32) float32 {
 	if a < b {
 		return a
 	}
 	return b
+}
+
+func max32(a, b float32) float32 {
+	if a > b {
+		return a
+	}
+	return b
+}
+
+func canvasRefresh(obj fyne.CanvasObject) {
+	if c := fyne.CurrentApp(); c != nil {
+		if drv := c.Driver(); drv != nil {
+			if cv := drv.CanvasForObject(obj); cv != nil {
+				cv.Refresh(obj)
+			}
+		}
+	}
 }

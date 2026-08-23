@@ -8,131 +8,115 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/theme"
-	"fyne.io/fyne/v2/widget"
 	"github.com/tunnels-is/tunnels/client"
+)
+
+var (
+	rePeerWildcard = regexp.MustCompile(`^\*:\d{1,5}$`)
+	rePeerAddress  = regexp.MustCompile(`^[0-9a-fA-F:.[\]]+$`)
 )
 
 func looksLikePeer(s string) bool {
 	s = strings.TrimSpace(s)
-	if regexp.MustCompile(`^\*:\d{1,5}$`).MatchString(s) {
+	if rePeerWildcard.MatchString(s) {
 		return true
 	}
-	if regexp.MustCompile(`^[0-9a-fA-F:.[\]]+$`).MatchString(s) && (strings.Contains(s, ".") || strings.Contains(s, ":")) {
-		return true
-	}
-	return false
+	return rePeerAddress.MatchString(s) && (strings.Contains(s, ".") || strings.Contains(s, ":"))
 }
 
 func (a *App) tunnelPeersPage() fyne.CanvasObject {
+	back := outlineBtn("Back", func() { a.show(pageTunnels) }).withIcon(theme.NavigateBackIcon())
+
 	meta := client.FindTunnel(a.peersTag)
 	if meta == nil {
-		return container.NewVBox(
-			widget.NewButton("Back", func() { a.show(pageTunnels) }),
-			muted(`Tunnel "`+a.peersTag+`" not found.`),
-		)
+		return pageShell("Firewall", a.peersTag, back,
+			emptyState("Tunnel not found", `No tunnel named "`+a.peersTag+`" exists any more.`))
 	}
 	connected := a.activeByTag()[meta.Tag] != nil
 	peers := append([]string(nil), meta.AllowedHosts...)
 	allowAll := meta.AllowAll
 
-	status := "disconnected"
-	if connected {
-		status = "connected"
-	}
-	head := widget.NewLabel(fmt.Sprintf("%s  ·  firewall  ·  %s", meta.Tag, status))
-	head.TextStyle = fyne.TextStyle{Bold: true}
-
-	desc := "Enforcing allowlist"
-	if allowAll {
-		desc = "Firewall disabled for this device — any VPN peer can reach it."
-	} else if len(peers) == 0 {
-		desc = "No devices can reach this device while the server firewall is on."
-	} else {
-		desc = fmt.Sprintf("%d peer(s) allowed to reach this device.", len(peers))
-	}
-
-	toggle := bindCheck("Allow all", allowAll, func(v bool) {
+	apply := func(next []string, all bool) {
 		go func() {
-			_, err := client.SetTunnelPeers(meta.Tag, peers, v)
+			_, err := client.SetTunnelPeers(meta.Tag, next, all)
 			a.uiDo(func() {
 				if err != nil {
 					a.fail(err.Error())
 					return
 				}
 				a.refreshState()
-				a.note("Peer list updated")
+				a.note("Firewall updated")
 				a.rebuild()
 			})
 		}()
-	})
+	}
 
-	entry := widget.NewEntry()
-	entry.SetPlaceHolder("IP, IP:PORT, or *:PORT")
-	add := primaryBtn("Add", func() {
+	desc := fmt.Sprintf("%d peer(s) may reach this device.", len(peers))
+	statusTone := toneSuccess
+	switch {
+	case allowAll:
+		desc = "The firewall is off for this device — any VPN peer can reach it."
+		statusTone = toneWarning
+	case len(peers) == 0:
+		desc = "No peers can reach this device while the firewall is on."
+		statusTone = toneNeutral
+	}
+
+	mode := card("Firewall", desc, settingList(
+		settingRow("Allow all peers",
+			"Turn off allowlisting and accept traffic from every peer on the VPN.",
+			newSwitch(allowAll, func(v bool) { apply(peers, v) })),
+	))
+
+	entry := kEntry("IP, IP:PORT or *:PORT", "")
+	add := primaryBtn("Add peer", func() {
 		ip := strings.TrimSpace(entry.Text)
 		if ip == "" {
 			return
 		}
 		if !looksLikePeer(ip) {
-			a.fail("Peer must be an IP, IP:PORT, or *:PORT")
+			a.fail("A peer must be an IP, IP:PORT or *:PORT")
 			return
 		}
 		for _, p := range peers {
 			if p == ip {
-				a.fail("Peer is already in the list")
+				a.fail("That peer is already in the list")
 				return
 			}
 		}
-		next := append(peers, ip)
-		go func() {
-			_, err := client.SetTunnelPeers(meta.Tag, next, allowAll)
-			a.uiDo(func() {
-				if err != nil {
-					a.fail(err.Error())
-					return
-				}
-				a.refreshState()
-				a.note("Peer list updated")
-				a.rebuild()
-			})
-		}()
+		apply(append(peers, ip), allowAll)
 	})
+	entry.OnSubmitted = func(string) { add.Tapped(nil) }
 
 	rows := []fyne.CanvasObject{}
-	if len(peers) == 0 {
-		rows = append(rows, muted("No peers"))
-	}
 	for _, p := range peers {
 		p := p
-		del := widget.NewButtonWithIcon("", theme.DeleteIcon(), func() {
+		del := newIconBtn(theme.DeleteIcon(), kGhost, func() {
 			next := make([]string, 0, len(peers))
 			for _, x := range peers {
 				if x != p {
 					next = append(next, x)
 				}
 			}
-			go func() {
-				_, err := client.SetTunnelPeers(meta.Tag, next, allowAll)
-				a.uiDo(func() {
-					if err != nil {
-						a.fail(err.Error())
-						return
-					}
-					a.refreshState()
-					a.note("Peer list updated")
-					a.rebuild()
-				})
-			}()
-		})
-		rows = append(rows, container.NewBorder(nil, nil, nil, del, widget.NewLabel(p)))
+			apply(next, allowAll)
+		}).small()
+		rows = append(rows, insetEach(sp2, 0, sp2, 0,
+			splitRow(monoText(p, fsBody, pal().Content), del)))
+	}
+	if len(rows) == 0 {
+		rows = append(rows, emptyRow("No peers allowed."))
 	}
 
-	return pageScroll(
-		toolbar(head, ghostBtn("Back", func() { a.show(pageTunnels) })),
-		card("Firewall", desc, toggle),
-		card("Allowed peers", "", container.NewVBox(
-			container.NewBorder(nil, nil, nil, add, entry),
-			container.NewVBox(rows...),
-		)),
-	)
+	list := cardBox("Allowed peers", "Only these addresses may open connections to this device.", nil,
+		vstack(sp4,
+			capWidth(formWidth, container.NewBorder(nil, nil, nil, hstack(0, hspace(sp2), add), entry)),
+			settingList(rows...),
+		))
+
+	sub := meta.Tag + " · disconnected"
+	if connected {
+		sub = meta.Tag + " · connected"
+	}
+	head := hstack(sp2, badge(map[bool]string{true: "enforcing", false: "open"}[!allowAll], statusTone), back)
+	return pageShell("Firewall", sub, head, scrollBody(mode, list))
 }

@@ -10,14 +10,15 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
-// kRow is the reusable list/table row: status, title, meta, pill, actions.
-// Used as a Fyne List item template so UpdateItem calls Set instead of
-// tearing down widgets.
+// kRow is the reusable list row: status rail, title, meta, badge, actions.
+// Used as a Fyne List item template so UpdateItem calls Set instead of tearing
+// widgets down and rebuilding them.
 type kRow struct {
 	widget.BaseWidget
 	title    string
 	meta     string
 	pillText string
+	pillTone tone
 	on       bool
 	hovered  bool
 	main     *kBtn
@@ -28,10 +29,10 @@ type kRow struct {
 
 func newKRow() *kRow {
 	r := &kRow{
-		main:  newKBtn("Connect", kSuccess, nil),
-		ghost: newKBtn("More", kGhost, nil),
-		iconA: newIconBtn(theme.DocumentCreateIcon(), kGhost, nil),
-		iconB: newIconBtn(theme.DeleteIcon(), kGhost, nil),
+		main:  newKBtn("Connect", kSuccess, nil).small(),
+		ghost: newKBtn("More", kGhost, nil).small(),
+		iconA: newIconBtn(theme.DocumentCreateIcon(), kGhost, nil).small(),
+		iconB: newIconBtn(theme.DeleteIcon(), kGhost, nil).small(),
 	}
 	r.iconA.SetHidden(true)
 	r.iconB.SetHidden(true)
@@ -40,11 +41,17 @@ func newKRow() *kRow {
 	return r
 }
 
-func (r *kRow) SetTitleMeta(title, meta string, on bool, pill string) {
+// SetRow fills the row. tone drives the badge colour independently of the live
+// state, so "This device" reads differently from "Connected".
+func (r *kRow) SetRow(title, meta string, on bool, pill string, t tone) {
 	r.title = title
 	r.meta = meta
 	r.on = on
 	r.pillText = pill
+	r.pillTone = t
+	if on {
+		r.pillTone = toneSuccess
+	}
 	r.Refresh()
 }
 
@@ -55,21 +62,16 @@ func (r *kRow) Cursor() desktop.Cursor         { return desktop.DefaultCursor }
 
 func (r *kRow) CreateRenderer() fyne.WidgetRenderer {
 	p := pal()
-	bg := canvas.NewRectangle(color.Transparent)
-	line := canvas.NewRectangle(p.Base300)
-	dot := canvas.NewCircle(p.Faint)
-	title := canvas.NewText("", p.Content)
-	title.TextSize = 13
-	title.TextStyle.Bold = true
-	meta := canvas.NewText("", p.Muted)
-	meta.TextSize = 11
-	pillBg := canvas.NewRectangle(p.Hover)
-	pillBg.CornerRadius = 999
-	pillTxt := canvas.NewText("", p.Faint)
-	pillTxt.TextSize = 10
-	pillTxt.TextStyle.Bold = true
+	bg := surface(radMd, color.Transparent, nil)
+	rail := canvas.NewRectangle(color.Transparent)
+	rail.CornerRadius = radFull
+	line := canvas.NewRectangle(p.Divider)
+	title := text("", fsBody, p.Content, true)
+	meta := monoText("", fsSmall, p.Muted)
+	pillBg := surface(radFull, color.Transparent, nil)
+	pillTxt := text("", fsCaption, p.Faint, true)
 	rd := &kRowRenderer{
-		r: r, bg: bg, line: line, dot: dot,
+		r: r, bg: bg, rail: rail, line: line,
 		title: title, meta: meta, pillBg: pillBg, pillTxt: pillTxt,
 	}
 	rd.apply()
@@ -79,8 +81,8 @@ func (r *kRow) CreateRenderer() fyne.WidgetRenderer {
 type kRowRenderer struct {
 	r       *kRow
 	bg      *canvas.Rectangle
+	rail    *canvas.Rectangle
 	line    *canvas.Rectangle
-	dot     *canvas.Circle
 	title   *canvas.Text
 	meta    *canvas.Text
 	pillBg  *canvas.Rectangle
@@ -91,30 +93,26 @@ func (d *kRowRenderer) Destroy() {}
 
 func (d *kRowRenderer) Objects() []fyne.CanvasObject {
 	return []fyne.CanvasObject{
-		d.bg, d.line, d.dot, d.title, d.meta, d.pillBg, d.pillTxt,
+		d.bg, d.line, d.rail, d.title, d.meta, d.pillBg, d.pillTxt,
 		d.r.main, d.r.ghost, d.r.iconA, d.r.iconB,
 	}
 }
 
 func (d *kRowRenderer) MinSize() fyne.Size {
-	return fyne.NewSize(480, 56)
+	return fyne.NewSize(z(520), rowHeight)
 }
 
 func (d *kRowRenderer) Layout(size fyne.Size) {
 	d.bg.Resize(size)
-	d.line.Resize(fyne.NewSize(size.Width-24, 1))
-	d.line.Move(fyne.NewPos(12, size.Height-1))
+	d.bg.Move(fyne.NewPos(0, 0))
+	d.line.Resize(fyne.NewSize(size.Width, 1))
+	d.line.Move(fyne.NewPos(0, size.Height-1))
 
-	const pad float32 = 16
-	y := (size.Height - 8) / 2
-	d.dot.Resize(fyne.NewSize(8, 8))
-	d.dot.Move(fyne.NewPos(pad, y))
+	// Live rows get a rounded accent rail on the leading edge.
+	d.rail.Resize(fyne.NewSize(z(3), size.Height-sp4))
+	d.rail.Move(fyne.NewPos(0, sp2))
 
-	textX := pad + 18
-	d.title.Move(fyne.NewPos(textX, 10))
-	d.meta.Move(fyne.NewPos(textX, 28))
-
-	right := size.Width - pad
+	right := size.Width - sp4
 	place := func(b *kBtn) {
 		if b.hidden {
 			b.Resize(fyne.NewSize(0, 0))
@@ -125,30 +123,48 @@ func (d *kRowRenderer) Layout(size fyne.Size) {
 		right -= ms.Width
 		b.Resize(ms)
 		b.Move(fyne.NewPos(right, (size.Height-ms.Height)/2))
-		right -= 6
+		right -= sp1
 	}
 	place(d.r.iconB)
 	place(d.r.iconA)
 	place(d.r.ghost)
+	right -= sp1
 	place(d.r.main)
 
+	// Text is laid out last: it gets whatever the actions left behind, elided
+	// so a long tag cannot slide under the buttons in a narrow window.
+	avail := right - sp4 - sp3
 	if d.r.pillText != "" {
-		pw := d.pillTxt.MinSize().Width + 16
-		ph := float32(20)
-		right -= 8 + pw
+		avail -= d.pillTxt.MinSize().Width + sp2*2 + sp3
+	}
+	d.title.Text = elide(d.r.title, avail, d.title.TextSize, d.title.TextStyle)
+	d.meta.Text = elide(d.r.meta, avail, d.meta.TextSize, d.meta.TextStyle)
+	tms := d.title.MinSize()
+	mms := d.meta.MinSize()
+	block := tms.Height + z(1) + mms.Height
+	top := (size.Height - block) / 2
+	d.title.Move(fyne.NewPos(sp4, top))
+	d.meta.Move(fyne.NewPos(sp4, top+tms.Height+z(1)))
+
+	if d.r.pillText != "" {
+		pw := d.pillTxt.MinSize().Width + sp2*2
+		ph := z(19)
+		right -= sp3 + pw
 		d.pillBg.Resize(fyne.NewSize(pw, ph))
 		d.pillBg.Move(fyne.NewPos(right, (size.Height-ph)/2))
-		d.pillTxt.Move(fyne.NewPos(right+8, (size.Height-d.pillTxt.MinSize().Height)/2))
+		pms := d.pillTxt.MinSize()
+		d.pillTxt.Move(fyne.NewPos(right+sp2, (size.Height-pms.Height)/2))
 	} else {
 		d.pillBg.Resize(fyne.NewSize(0, 0))
+		d.pillTxt.Move(fyne.NewPos(right, 0))
 	}
 }
 
 func (d *kRowRenderer) Refresh() {
 	d.apply()
 	d.bg.Refresh()
+	d.rail.Refresh()
 	d.line.Refresh()
-	d.dot.Refresh()
 	d.title.Refresh()
 	d.meta.Refresh()
 	d.pillBg.Refresh()
@@ -157,37 +173,54 @@ func (d *kRowRenderer) Refresh() {
 	d.r.ghost.Refresh()
 	d.r.iconA.Refresh()
 	d.r.iconB.Refresh()
+	if sz := d.r.Size(); sz.Width > 0 {
+		d.Layout(sz)
+	}
 	canvasRefresh(d.r)
 }
 
 func (d *kRowRenderer) apply() {
 	p := pal()
-	d.title.Text = d.r.title
 	d.title.Color = p.Content
-	d.meta.Text = d.r.meta
 	d.meta.Color = p.Muted
-	d.line.FillColor = p.Base300
-	if d.r.on {
-		d.dot.FillColor = p.Success
+	d.line.FillColor = p.Divider
+
+	switch {
+	case d.r.on:
+		d.rail.FillColor = p.Success
 		if d.r.hovered {
-			d.bg.FillColor = withAlpha(p.Success, 36)
+			d.bg.FillColor = withAlpha(p.Success, 30)
 		} else {
-			d.bg.FillColor = p.SuccessSoft
+			d.bg.FillColor = withAlpha(p.Success, 18)
 		}
-	} else {
-		d.dot.FillColor = p.Faint
+	default:
+		d.rail.FillColor = color.Transparent
 		if d.r.hovered {
 			d.bg.FillColor = p.Hover
 		} else {
 			d.bg.FillColor = color.Transparent
 		}
 	}
+
 	d.pillTxt.Text = d.r.pillText
-	if d.r.on {
-		d.pillTxt.Color = p.Success
-		d.pillBg.FillColor = p.SuccessSoft
-	} else {
-		d.pillTxt.Color = p.Faint
-		d.pillBg.FillColor = p.Hover
-	}
+	fg, bg := toneColors(d.r.pillTone)
+	d.pillTxt.Color = fg
+	d.pillBg.FillColor = bg
+}
+
+// listRows wraps a widget.List so it inherits row metrics from the kit.
+func newRowList(count func() int, bind func(widget.ListItemID, *kRow)) *widget.List {
+	l := widget.NewList(
+		count,
+		func() fyne.CanvasObject { return newKRow() },
+		func(id widget.ListItemID, obj fyne.CanvasObject) {
+			row, ok := obj.(*kRow)
+			if !ok {
+				return
+			}
+			bind(id, row)
+		},
+	)
+	l.HideSeparators = true
+	return l
 }

@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/tunnels-is/tunnels/types"
 )
@@ -24,13 +25,17 @@ func (a *App) serversPage() fyne.CanvasObject {
 	}
 	a.recomputeServerView()
 
-	filter := kSearch("Filter by tag, IP, country…", a.filterServers, func(s string) {
+	_, search := searchField("Filter servers", a.filterServers, func(s string) {
 		a.filterServers = s
 	}, func(s string) {
 		a.filterServers = s
 		a.reloadCurrent()
 	})
-	n := fmt.Sprintf("%d", len(a.serverView))
+	refresh := newIconBtn(theme.ViewRefreshIcon(), kOutline, func() {
+		a.note("Refreshing servers…")
+		a.fetchServers(true)
+	})
+
 	active := 0
 	am := a.activeByServer()
 	for _, s := range a.serverView {
@@ -38,24 +43,34 @@ func (a *App) serversPage() fyne.CanvasObject {
 			active++
 		}
 	}
-	if active > 0 {
-		n = fmt.Sprintf("%d  ·  %d connected", len(a.serverView), active)
-	}
-	head := pageHeader("Servers", n, kSearchBox(filter))
 
-	a.serverList = widget.NewList(
-		func() int { return len(a.serverView) },
-		func() fyne.CanvasObject { return newKRow() },
-		func(id widget.ListItemID, obj fyne.CanvasObject) {
-			row, ok := obj.(*kRow)
-			if !ok {
-				return
+	sub := fmt.Sprintf("%d available", len(a.serverView))
+	switch {
+	case a.serversFetching && len(a.serverView) == 0:
+		sub = "Loading…"
+	case active == 1:
+		sub = fmt.Sprintf("%d available · 1 connected", len(a.serverView))
+	case active > 1:
+		sub = fmt.Sprintf("%d available · %d connected", len(a.serverView), active)
+	}
+
+	if len(a.serverView) == 0 {
+		msg, desc := "No servers", "Nothing matched this filter."
+		if a.filterServers == "" {
+			msg, desc = "No servers available", "Your account has no servers assigned yet."
+			if a.serversFetching {
+				msg, desc = "Loading servers…", ""
 			}
-			a.bindServerRow(id, row)
-		},
+		}
+		return pageShell("Servers", sub, hstack(sp2, search, refresh), emptyState(msg, desc))
+	}
+
+	a.serverList = newRowList(
+		func() int { return len(a.serverView) },
+		a.bindServerRow,
 	)
 
-	return listPage(head, a.serverList)
+	return pageShell("Servers", sub, hstack(sp2, search, refresh), listBody(a.serverList))
 }
 
 func (a *App) bindServerRow(id widget.ListItemID, row *kRow) {
@@ -65,17 +80,23 @@ func (a *App) bindServerRow(id widget.ListItemID, row *kRow) {
 	s := a.serverView[id]
 	at := a.activeByServer()[s.ID.String()]
 	on := at != nil
-	pill := "Idle"
-	if on {
-		pill = "Connected"
+
+	meta := fmt.Sprintf("%s:%s", s.IP, s.Port)
+	if c := countryName(s.Country); c != "" {
+		meta = c + "  ·  " + meta
 	}
-	row.SetTitleMeta(s.Tag, fmt.Sprintf("%s  ·  %s:%s", countryName(s.Country), s.IP, s.Port), on, pill)
+	pill, t := "", toneNeutral
+	if on {
+		pill, t = "Connected", toneSuccess
+		meta = "↓ " + at.IngressString() + "   ↑ " + at.EgressString() + "  ·  " + meta
+	}
+	row.SetRow(s.Tag, meta, on, pill, t)
+
 	row.ghost.SetHidden(true)
 	row.iconA.SetHidden(true)
 	row.iconB.SetHidden(true)
 	if on {
-		tun := at
-		tag := s.Tag
+		tun, tag := at, s.Tag
 		row.main.Set("Disconnect", kDanger, func() {
 			a.confirm("Disconnect", "Disconnect from "+tag+"?", func() { a.disconnectActive(tun) })
 		})

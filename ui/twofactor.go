@@ -6,53 +6,54 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
-	"fyne.io/fyne/v2/widget"
+	"fyne.io/fyne/v2/theme"
 	"github.com/tunnels-is/tunnels/client"
 )
 
 func (a *App) twoFactorPage() fyne.CanvasObject {
 	if a.user == nil {
-		return container.NewCenter(muted("Not logged in"))
+		return pageShell("Two-factor authentication", "", nil,
+			emptyState("Not signed in", "Sign in to configure two-factor authentication."))
 	}
 
-	status := muted("Loading QR code...")
+	back := outlineBtn("Back to account", func() { a.show(pageAccount) }).withIcon(theme.NavigateBackIcon())
+
+	status := text("Loading QR code…", fsSmall, pal().Muted, false)
 	qrBox := container.NewCenter(status)
-	pass := widget.NewPasswordEntry()
-	pass.SetPlaceHolder("Your account password")
-	digits := widget.NewEntry()
-	digits.SetPlaceHolder("6-digit code")
-	recovery := widget.NewEntry()
-	recovery.SetPlaceHolder("Recovery code")
-	codes := widget.NewLabel("")
-	codes.Wrapping = fyne.TextWrapWord
-	codes.Hide()
+	pass := kPassword("Your account password")
+	digits := kEntry("123456", "")
+	recovery := kEntry("Existing recovery code", "")
+
+	codesBox := container.NewStack()
 
 	var qrValue string
 	go func() {
 		qr, err := client.GetQRCode(&client.TWO_FACTOR_CONFIRM{Email: a.user.Email})
 		a.uiDo(func() {
 			if err != nil {
-				status.SetText(err.Error())
+				status.Text = err.Error()
+				status.Color = pal().Error
+				status.Refresh()
 				return
 			}
 			qrValue = qr.Value
-			qrBox.Objects = []fyne.CanvasObject{qrImage(qr.Value, 220)}
+			qrBox.Objects = []fyne.CanvasObject{qrImage(qr.Value, int(z(190)))}
 			qrBox.Refresh()
 		})
 	}()
 
-	confirm := primaryBtn("Confirm", func() {
+	confirm := primaryBtn("Enable two-factor", func() {
 		if pass.Text == "" {
 			a.fail("Please enter your password")
 			return
 		}
 		if len(digits.Text) != 6 {
-			a.fail("Authenticator code must be 6 digits")
+			a.fail("The authenticator code must be 6 digits")
 			return
 		}
 		secret := parseOTPSecret(qrValue)
 		if secret == "" {
-			a.fail("Could not parse authenticator secret")
+			a.fail("Could not read the authenticator secret")
 			return
 		}
 		body := map[string]any{
@@ -70,27 +71,36 @@ func (a *App) twoFactorPage() fyne.CanvasObject {
 				}
 				var resp struct{ Data string }
 				_ = json.Unmarshal(raw, &resp)
-				if resp.Data == "" {
-					_ = json.Unmarshal(raw, &map[string]any{})
+				a.note("Two-factor authentication enabled")
+				codesBox.Objects = []fyne.CanvasObject{
+					card("Recovery codes",
+						"Store these away from your password manager's password entry. Each code works once.",
+						vstack(sp3,
+							notice("Do not store these codes alongside your password.", toneWarning),
+							codeBlock(string(raw), 6),
+							hstack(sp2, a.copyBtn(string(raw))),
+						)),
 				}
-				codes.SetText("DO NOT STORE THESE CODES WITH YOUR PASSWORD\n\n" + string(raw))
-				codes.Show()
+				codesBox.Refresh()
 			})
 		}()
 	})
-	return pageScroll(
-		ghostBtn("Back", func() { a.show(pageAccount) }),
-		card("Two-factor authentication", "Scan the QR code with your authenticator app, then confirm.", container.NewVBox(
+
+	setup := card("Scan the code",
+		"Add the code to your authenticator app, then confirm with a generated code.",
+		capWidth(formWidth, vstack(sp5,
 			qrBox,
-			labeled("Password", pass),
-			labeled("Authenticator code", digits),
-			confirm,
-			widget.NewSeparator(),
-			muted("Have a recovery code? Enter it below to replace existing 2FA."),
-			labeled("Recovery code", recovery),
-			codes,
-		)),
-	)
+			vstack(sp3,
+				field("Account password", pass),
+				field("Authenticator code", digits),
+				fieldWith("Recovery code", "Only needed when replacing existing two-factor setup.", recovery),
+				vspace(sp1),
+				hstack(0, confirm),
+			),
+		)))
+
+	return pageShell("Two-factor authentication", a.user.Email, back,
+		scrollBody(setup, codesBox))
 }
 
 func parseOTPSecret(uri string) string {

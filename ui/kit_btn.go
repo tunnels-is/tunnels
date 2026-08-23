@@ -18,14 +18,24 @@ const (
 	kDanger
 	kGhost
 	kOutline
+	kSubtle
 )
 
-// kBtn is a compact rounded button used everywhere instead of stock Fyne buttons.
+type kSize int
+
+const (
+	kMed kSize = iota
+	kSm
+)
+
+// kBtn is the only button in the app. Stock Fyne buttons are never used, so
+// every clickable surface shares one set of metrics and states.
 type kBtn struct {
 	widget.BaseWidget
 	label    string
 	icon     fyne.Resource
 	kind     kKind
+	size     kSize
 	onTap    func()
 	hovered  bool
 	pressed  bool
@@ -45,8 +55,19 @@ func newIconBtn(res fyne.Resource, kind kKind, tap func()) *kBtn {
 	return b
 }
 
+func (b *kBtn) small() *kBtn {
+	b.size = kSm
+	return b
+}
+
+func (b *kBtn) withIcon(res fyne.Resource) *kBtn {
+	b.icon = res
+	return b
+}
+
 func (b *kBtn) Set(label string, kind kKind, tap func()) {
 	b.label = label
+	b.icon = nil
 	b.kind = kind
 	b.onTap = tap
 	b.hidden = false
@@ -91,23 +112,34 @@ func (b *kBtn) Tapped(*fyne.PointEvent) {
 }
 
 func (b *kBtn) MouseIn(*desktop.MouseEvent) {
+	if b.disabled {
+		return
+	}
 	b.hovered = true
 	b.Refresh()
 }
+
 func (b *kBtn) MouseOut() {
 	b.hovered = false
 	b.pressed = false
 	b.Refresh()
 }
+
 func (b *kBtn) MouseMoved(*desktop.MouseEvent) {}
+
 func (b *kBtn) MouseDown(*desktop.MouseEvent) {
+	if b.disabled {
+		return
+	}
 	b.pressed = true
 	b.Refresh()
 }
+
 func (b *kBtn) MouseUp(*desktop.MouseEvent) {
 	b.pressed = false
 	b.Refresh()
 }
+
 func (b *kBtn) Cursor() desktop.Cursor {
 	if b.disabled {
 		return desktop.DefaultCursor
@@ -115,13 +147,25 @@ func (b *kBtn) Cursor() desktop.Cursor {
 	return desktop.PointerCursor
 }
 
+func (b *kBtn) height() float32 {
+	if b.size == kSm {
+		return z(26)
+	}
+	return ctrlHeight
+}
+
+func (b *kBtn) fontSize() float32 {
+	if b.size == kSm {
+		return fsSmall
+	}
+	return fsBody
+}
+
 func (b *kBtn) CreateRenderer() fyne.WidgetRenderer {
-	bg := canvas.NewRectangle(color.Transparent)
-	bg.CornerRadius = 6
+	bg := surface(radSm, color.Transparent, nil)
 	lab := canvas.NewText(b.label, pal().Content)
-	lab.TextSize = 12
-	lab.TextStyle.Bold = true
-	ico := widget.NewIcon(theme.ConfirmIcon())
+	ico := canvas.NewImageFromResource(b.icon)
+	ico.FillMode = canvas.ImageFillContain
 	r := &kBtnRenderer{b: b, bg: bg, lab: lab, ico: ico}
 	r.apply()
 	return r
@@ -131,7 +175,7 @@ type kBtnRenderer struct {
 	b   *kBtn
 	bg  *canvas.Rectangle
 	lab *canvas.Text
-	ico *widget.Icon
+	ico *canvas.Image
 }
 
 func (r *kBtnRenderer) Destroy() {}
@@ -140,62 +184,73 @@ func (r *kBtnRenderer) Objects() []fyne.CanvasObject {
 	return []fyne.CanvasObject{r.bg, r.ico, r.lab}
 }
 
+func (r *kBtnRenderer) iconSize() float32 {
+	if r.b.size == kSm {
+		return z(13)
+	}
+	return z(15)
+}
+
 func (r *kBtnRenderer) MinSize() fyne.Size {
 	if r.b.hidden {
 		return fyne.NewSize(0, 0)
 	}
-	if r.b.icon != nil && r.b.label == "" {
-		return fyne.NewSize(28, 28)
+	h := r.b.height()
+	if r.b.label == "" {
+		return fyne.NewSize(h, h)
 	}
-	w := r.lab.MinSize().Width + 24
+	pad := sp3
+	if r.b.size == kSm {
+		pad = sp2 + 2
+	}
+	w := r.lab.MinSize().Width + pad*2
 	if r.b.icon != nil {
-		w += 18
+		w += r.iconSize() + sp2
 	}
-	if w < 72 {
-		w = 72
-	}
-	return fyne.NewSize(w, 28)
+	return fyne.NewSize(w, h)
 }
 
 func (r *kBtnRenderer) Layout(size fyne.Size) {
 	r.bg.Resize(size)
 	r.bg.Move(fyne.NewPos(0, 0))
-	if r.b.icon != nil && r.b.label == "" {
-		r.ico.Resize(fyne.NewSize(14, 14))
-		r.ico.Move(fyne.NewPos((size.Width-14)/2, (size.Height-14)/2))
+	is := r.iconSize()
+
+	if r.b.label == "" {
+		if r.b.icon != nil {
+			r.ico.Resize(fyne.NewSize(is, is))
+			r.ico.Move(fyne.NewPos((size.Width-is)/2, (size.Height-is)/2))
+		}
 		r.lab.Move(fyne.NewPos(0, 0))
 		return
 	}
-	lw := r.lab.MinSize().Width
-	lh := r.lab.MinSize().Height
-	if r.b.icon != nil {
-		r.ico.Resize(fyne.NewSize(14, 14))
-		total := 14 + 6 + lw
-		x := (size.Width - total) / 2
-		r.ico.Move(fyne.NewPos(x, (size.Height-14)/2))
-		r.lab.Move(fyne.NewPos(x+20, (size.Height-lh)/2))
+
+	lms := r.lab.MinSize()
+	if r.b.icon == nil {
+		r.ico.Resize(fyne.NewSize(0, 0))
+		r.lab.Move(fyne.NewPos((size.Width-lms.Width)/2, (size.Height-lms.Height)/2))
 		return
 	}
-	r.ico.Resize(fyne.NewSize(0, 0))
-	r.lab.Move(fyne.NewPos((size.Width-lw)/2, (size.Height-lh)/2))
+	total := is + sp2 + lms.Width
+	x := (size.Width - total) / 2
+	r.ico.Resize(fyne.NewSize(is, is))
+	r.ico.Move(fyne.NewPos(x, (size.Height-is)/2))
+	r.lab.Move(fyne.NewPos(x+is+sp2, (size.Height-lms.Height)/2))
 }
 
 func (r *kBtnRenderer) Refresh() {
 	r.apply()
 	r.bg.Refresh()
 	r.lab.Refresh()
+	r.ico.Refresh()
 	canvasRefresh(r.b)
 }
 
 func (r *kBtnRenderer) apply() {
-	p := pal()
 	r.lab.Text = r.b.label
-	r.lab.TextSize = 12
-	r.lab.TextStyle.Bold = true
-	if r.b.icon != nil {
-		r.ico.SetResource(r.b.icon)
-	}
-	bg, fg, stroke := r.colors(p)
+	r.lab.TextSize = r.b.fontSize()
+	r.lab.TextStyle = fyne.TextStyle{Bold: true}
+
+	bg, fg, stroke, fgName := r.colors()
 	r.bg.FillColor = bg
 	r.bg.StrokeColor = stroke
 	if stroke.A == 0 {
@@ -204,61 +259,72 @@ func (r *kBtnRenderer) apply() {
 		r.bg.StrokeWidth = 1
 	}
 	r.lab.Color = fg
+	if r.b.icon != nil {
+		r.ico.Resource = theme.NewColoredResource(r.b.icon, fgName)
+	}
 }
 
-func (r *kBtnRenderer) colors(p palette) (bg, fg, stroke color.NRGBA) {
+func (r *kBtnRenderer) colors() (bg, fg, stroke color.NRGBA, fgName fyne.ThemeColorName) {
+	p := pal()
 	switch r.b.kind {
 	case kPrimary:
-		bg, fg = p.Primary, p.PrimaryContent
+		bg, fg, fgName = p.Primary, p.PrimaryContent, colOnPrimary
+		if r.b.hovered {
+			bg = p.PrimaryHover
+		}
 	case kSuccess:
-		bg, fg = p.Success, hex(0xff, 0xff, 0xff)
+		bg, fg, fgName = p.Success, hex(0xff, 0xff, 0xff), colOnSolid
+		if r.b.hovered {
+			bg = p.SuccessHover
+		}
 	case kDanger:
-		bg = withAlpha(p.Error, 22)
-		fg = p.Error
-		stroke = withAlpha(p.Error, 90)
+		bg, fg, stroke, fgName = p.ErrorSoft, p.Error, withAlpha(p.Error, 70), theme.ColorNameError
+		if r.b.hovered {
+			bg = withAlpha(p.Error, 60)
+		}
 	case kOutline:
-		bg = p.Base100
-		fg = p.Content
-		stroke = p.Base300
-	default: // ghost
-		bg = color.NRGBA{}
-		fg = p.Muted
+		bg, fg, stroke, fgName = p.Base100, p.Content, p.Base300, colContent
+		if r.b.hovered {
+			bg = p.Elevate
+		}
+	case kSubtle:
+		bg, fg, fgName = p.Elevate, p.Content, colContent
 		if r.b.hovered {
 			bg = p.Hover
-			fg = p.Content
+		}
+	default: // ghost
+		bg, fg, fgName = color.NRGBA{}, p.Muted, colMuted
+		if r.b.hovered {
+			bg, fg, fgName = p.Hover, p.Content, colContent
 		}
 	}
 	if r.b.disabled {
-		bg.A = 120
-		fg.A = 160
+		bg = withAlpha(bg, bg.A/3)
+		fg = withAlpha(fg, 110)
+		stroke = withAlpha(stroke, stroke.A/2)
+		fgName = colFaint
 	} else if r.b.pressed {
-		bg = withAlpha(bg, 180)
-	} else if r.b.hovered && r.b.kind != kGhost {
-		bg = lighten(bg, 12)
+		bg = darken(bg, 18)
 	}
 	return
 }
 
-func lighten(c color.NRGBA, d uint8) color.NRGBA {
-	add := func(v uint8) uint8 {
-		if int(v)+int(d) > 255 {
-			return 255
-		}
-		return v + d
-	}
+func darken(c color.NRGBA, d uint8) color.NRGBA {
 	if c.A == 0 {
 		return c
 	}
-	c.R, c.G, c.B = add(c.R), add(c.G), add(c.B)
+	sub := func(v uint8) uint8 {
+		if int(v)-int(d) < 0 {
+			return 0
+		}
+		return v - d
+	}
+	c.R, c.G, c.B = sub(c.R), sub(c.G), sub(c.B)
 	return c
 }
 
-func canvasRefresh(obj fyne.CanvasObject) {
-	if c := fyne.CurrentApp(); c != nil {
-		if drv := c.Driver(); drv != nil {
-			if cv := drv.CanvasForObject(obj); cv != nil {
-				cv.Refresh(obj)
-			}
-		}
-	}
-}
+// Shorthand constructors used across the pages.
+func primaryBtn(label string, fn func()) *kBtn { return newKBtn(label, kPrimary, fn) }
+func dangerBtn(label string, fn func()) *kBtn  { return newKBtn(label, kDanger, fn) }
+func ghostBtn(label string, fn func()) *kBtn   { return newKBtn(label, kGhost, fn) }
+func outlineBtn(label string, fn func()) *kBtn { return newKBtn(label, kOutline, fn) }
