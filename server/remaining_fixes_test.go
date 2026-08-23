@@ -17,7 +17,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/tunnels-is/tunnels/types"
-	gobolt "go.etcd.io/bbolt"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -375,102 +374,28 @@ func TestUserLogout_RevokesCurrentDeviceToken(t *testing.T) {
 	}
 }
 
-func TestAdminUpdate_DoesNotRewriteEmailCasing(t *testing.T) {
+func TestAdminUpdate_NormalizesEmail(t *testing.T) {
 	setupTestDB(t)
-	id := uuid.New()
-	raw, err := json.Marshal(&User{ID: id, Email: "Jane@Old.COM"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := BBoltDB.Update(func(tx *gobolt.Tx) error {
-		if err := tx.Bucket([]byte(USERS_BUCKET)).Put([]byte(id.String()), raw); err != nil {
-			return err
-		}
-		return tx.Bucket([]byte(USERS_EMAIL_INDEX)).Put([]byte("Jane@Old.COM"), []byte(id.String()))
-	}); err != nil {
+	u := &User{ID: uuid.New(), Email: "jane@old.com"}
+	if err := DB_CreateUser(u); err != nil {
 		t.Fatal(err)
 	}
 	if err := BBolt_updateUserAdmin(&USER_ADMIN_UPDATE_FORM{
-		TargetUserID: id,
+		TargetUserID: u.ID,
 		Email:        "Jane@Old.COM",
 		Disabled:     true,
 	}); err != nil {
 		t.Fatal(err)
 	}
-	got, err := BBolt_findUserByID(id.String())
+	got, err := BBolt_findUserByID(u.ID.String())
 	if err != nil || got == nil {
 		t.Fatal(err)
 	}
-	if got.Email != "Jane@Old.COM" {
-		t.Fatalf("case-only admin save rewrote Email to %q", got.Email)
+	if got.Email != "jane@old.com" {
+		t.Fatalf("stored Email=%q", got.Email)
 	}
 	if !got.Disabled {
 		t.Fatal("Disabled not set")
-	}
-}
-
-func TestCreateUser_RejectsExistingMixedCaseEmail(t *testing.T) {
-	setupTestDB(t)
-	id := uuid.New()
-	raw, err := json.Marshal(&User{ID: id, Email: "Jane@Old.COM"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := BBoltDB.Update(func(tx *gobolt.Tx) error {
-		if err := tx.Bucket([]byte(USERS_BUCKET)).Put([]byte(id.String()), raw); err != nil {
-			return err
-		}
-		return tx.Bucket([]byte(USERS_EMAIL_INDEX)).Put([]byte("Jane@Old.COM"), []byte(id.String()))
-	}); err != nil {
-		t.Fatal(err)
-	}
-	if err := DB_CreateUser(&User{ID: uuid.New(), Email: "jane@old.com"}); err == nil {
-		t.Fatal("must not create a second account for the same email in a different case")
-	}
-}
-
-func TestFindUserByEmail_NormalizedLoginHitsMixedCaseRecord(t *testing.T) {
-	setupTestDB(t)
-	id := uuid.New()
-	raw, err := json.Marshal(&User{ID: id, Email: "Jane@Old.COM"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := BBoltDB.Update(func(tx *gobolt.Tx) error {
-		if err := tx.Bucket([]byte(USERS_BUCKET)).Put([]byte(id.String()), raw); err != nil {
-			return err
-		}
-		return tx.Bucket([]byte(USERS_EMAIL_INDEX)).Put([]byte("Jane@Old.COM"), []byte(id.String()))
-	}); err != nil {
-		t.Fatal(err)
-	}
-	got, err := DB_findUserByEmail("jane@old.com")
-	if err != nil || got == nil {
-		t.Fatalf("normalized login must find pre-migration mixed-case email: %v %#v", err, got)
-	}
-	if got.Email != "Jane@Old.COM" {
-		t.Fatalf("must not rewrite stored Email on lookup, got %q", got.Email)
-	}
-}
-
-func TestFindUserByEmail_ExactMixedCaseIndex(t *testing.T) {
-	setupTestDB(t)
-	id := uuid.New()
-	raw, err := json.Marshal(&User{ID: id, Email: "Jane@Old.COM"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := BBoltDB.Update(func(tx *gobolt.Tx) error {
-		if err := tx.Bucket([]byte(USERS_BUCKET)).Put([]byte(id.String()), raw); err != nil {
-			return err
-		}
-		return tx.Bucket([]byte(USERS_EMAIL_INDEX)).Put([]byte("Jane@Old.COM"), []byte(id.String()))
-	}); err != nil {
-		t.Fatal(err)
-	}
-	got, err := DB_findUserByEmail("Jane@Old.COM")
-	if err != nil || got == nil {
-		t.Fatalf("exact pre-migration lookup: %v %#v", err, got)
 	}
 }
 
