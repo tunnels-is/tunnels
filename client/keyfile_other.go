@@ -1,4 +1,4 @@
-//go:build !unix
+//go:build !unix && !windows
 
 package client
 
@@ -14,12 +14,6 @@ func validateUserKeyFile(path string, info os.FileInfo) error {
 	return nil
 }
 
-func warnIfInsecureSecretFile(path string) {
-	info, err := os.Stat(path)
-	if err != nil {
-		return
-	}
-	if err := validateUserKeyFile(path, info); err != nil {
-		SECURITY("insecure secret file permissions (continuing):", path, "—", err)
-	}
+func secureSecretFile(path string) error {
+	return os.Chmod(path, 0o600)
 }

@@ -32,8 +32,12 @@ func TestAccountWorkspace_SaveLoadActivate(t *testing.T) {
 		t.Fatalf("active hash = %q, want %q", s.ActiveAccountHash, u.SaveFileHash)
 	}
 	userFile := accountUserFile(u.SaveFileHash)
-	if _, err := os.Stat(userFile); err != nil {
+	info, err := os.Stat(userFile)
+	if err != nil {
 		t.Fatalf("user file missing: %v", err)
+	}
+	if err := validateUserKeyFile(userFile, info); err != nil {
+		t.Fatalf("account file permissions: %v", err)
 	}
 	if _, err := os.Stat(accountTunnelsPath(u.SaveFileHash)); err != nil {
 		t.Fatalf("tunnels dir missing: %v", err)
@@ -41,7 +45,6 @@ func TestAccountWorkspace_SaveLoadActivate(t *testing.T) {
 	if _, err := os.Stat(accountDevicesPath(u.SaveFileHash)); err != nil {
 		t.Fatalf("devices dir missing: %v", err)
 	}
-
 
 	u2 := &User{
 		ID:    "user-bbb-222",
@@ -57,7 +60,6 @@ func TestAccountWorkspace_SaveLoadActivate(t *testing.T) {
 	if u2.SaveFileHash == u.SaveFileHash {
 		t.Fatal("accounts must have distinct hashes")
 	}
-
 
 	users, err := getUsers()
 	if err != nil {
@@ -77,11 +79,9 @@ func TestAccountWorkspace_SaveLoadActivate(t *testing.T) {
 		t.Fatal("did not decrypt account A via folder hash alone")
 	}
 
-
 	if _, err := os.Stat(filepath.Join(dir, "user.key")); err == nil {
 		t.Fatal("user.key should not be created")
 	}
-
 
 	if err := activateAccountByUserID(u.ID); err != nil {
 		t.Fatalf("activate first: %v", err)

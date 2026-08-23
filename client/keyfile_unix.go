@@ -20,14 +20,6 @@ func validateUserKeyFile(path string, info os.FileInfo) error {
 	return nil
 }
 
-// warnIfInsecureSecretFile logs a SECURITY warning when a secret file is
-// group/other-readable or not owned by the current user. It does not block load.
-func warnIfInsecureSecretFile(path string) {
-	info, err := os.Stat(path)
-	if err != nil {
-		return
-	}
-	if err := validateUserKeyFile(path, info); err != nil {
-		SECURITY("insecure secret file permissions (continuing):", path, "—", err)
-	}
+func secureSecretFile(path string) error {
+	return os.Chmod(path, 0o600)
 }
