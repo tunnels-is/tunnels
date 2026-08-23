@@ -5,19 +5,18 @@ import (
 	"strings"
 
 	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/container"
-	"fyne.io/fyne/v2/widget"
+	"fyne.io/fyne/v2/theme"
 	"github.com/tunnels-is/tunnels/client"
 	"github.com/tunnels-is/tunnels/types"
 )
 
 func (a *App) tunnelEditPage() fyne.CanvasObject {
+	back := outlineBtn("Back", func() { a.show(pageTunnels) }).withIcon(theme.NavigateBackIcon())
+
 	meta := client.FindTunnel(a.editTag)
 	if meta == nil {
-		return container.NewVBox(
-			ghostBtn("Back", func() { a.show(pageTunnels) }),
-			muted(`Tunnel "`+a.editTag+`" not found.`),
-		)
+		return pageShell("Tunnel", a.editTag, back,
+			emptyState("Tunnel not found", `No tunnel named "`+a.editTag+`" exists any more.`))
 	}
 	form := client.CloneTunnelMETA(meta)
 	if form.DNSServers == nil {
@@ -32,14 +31,10 @@ func (a *App) tunnelEditPage() fyne.CanvasObject {
 
 	connected := a.activeByTag()[form.Tag] != nil
 
-	tag := widget.NewEntry()
-	tag.SetText(form.Tag)
-	ifname := widget.NewEntry()
-	ifname.SetText(form.IFName)
-	mtu := widget.NewEntry()
-	mtu.SetText(strconv.Itoa(int(form.MTU)))
-	txq := widget.NewEntry()
-	txq.SetText(strconv.Itoa(int(form.TxQueueLen)))
+	tag := kEntry("tunnel name", form.Tag)
+	ifname := kEntry("interface name", form.IFName)
+	mtu := kEntry("1420", strconv.Itoa(int(form.MTU)))
+	txq := kEntry("3000", strconv.Itoa(int(form.TxQueueLen)))
 
 	srvOpts := []string{"None"}
 	srvIDs := map[string]string{"None": ""}
@@ -52,21 +47,25 @@ func (a *App) tunnelEditPage() fyne.CanvasObject {
 			sel = label
 		}
 	}
-	server := widget.NewSelect(srvOpts, nil)
-	server.SetSelected(sel)
+	server := kSelect(srvOpts, sel, nil)
 
-	checks := map[string]*widget.Check{}
-	addCheck := func(key, label string, v bool) *widget.Check {
-		c := bindCheck(label, v, nil)
-		checks[key] = c
-		return c
+	switches := map[string]*kSwitch{}
+	toggle := func(key, title, desc string, v bool) fyne.CanvasObject {
+		s := newSwitch(v, nil)
+		switches[key] = s
+		return settingRow(title, desc, s)
 	}
+	features := settingList(
+		toggle("AutoConnect", "Auto connect", "Bring this tunnel up when the app starts.", form.AutoConnect),
+		toggle("AutoReconnect", "Auto reconnect", "Re-establish the tunnel if it drops.", form.AutoReconnect),
+		toggle("EnableDefaultRoute", "Default route", "Send all traffic through this tunnel.", form.EnableDefaultRoute),
+		toggle("DNSBlocking", "DNS blocking", "Apply the resolver's block lists on this tunnel.", form.DNSBlocking),
+		toggle("LocalhostNat", "Localhost NAT", "NAT loopback traffic into the tunnel.", form.LocalhostNat),
+		toggle("EnableWAN", "WAN routing", "Allow routing to the tunnel's wider network.", form.EnableWAN),
+	)
 
-	dns := widget.NewMultiLineEntry()
-	dns.SetText(strings.Join(form.DNSServers, "\n"))
-	dns.SetMinRowsVisible(3)
+	dns := kMultiline(strings.Join(form.DNSServers, "\n"), 3)
 
-	routes := widget.NewMultiLineEntry()
 	var rlines []string
 	for _, r := range form.Routes {
 		if r == nil {
@@ -74,10 +73,8 @@ func (a *App) tunnelEditPage() fyne.CanvasObject {
 		}
 		rlines = append(rlines, strings.TrimSpace(r.Address+" "+r.Metric))
 	}
-	routes.SetText(strings.Join(rlines, "\n"))
-	routes.SetMinRowsVisible(3)
+	routes := kMultiline(strings.Join(rlines, "\n"), 4)
 
-	nets := widget.NewMultiLineEntry()
 	var nlines []string
 	for _, n := range form.Networks {
 		if n == nil {
@@ -85,10 +82,9 @@ func (a *App) tunnelEditPage() fyne.CanvasObject {
 		}
 		nlines = append(nlines, strings.TrimSpace(n.Tag+" "+n.Network+" "+n.Nat))
 	}
-	nets.SetText(strings.Join(nlines, "\n"))
-	nets.SetMinRowsVisible(3)
+	nets := kMultiline(strings.Join(nlines, "\n"), 4)
 
-	save := primaryBtn("Save", func() {
+	save := primaryBtn("Save changes", func() {
 		form.Tag = strings.TrimSpace(tag.Text)
 		form.IFName = strings.TrimSpace(ifname.Text)
 		form.ServerID = srvIDs[server.Selected]
@@ -98,13 +94,14 @@ func (a *App) tunnelEditPage() fyne.CanvasObject {
 		if n, err := strconv.Atoi(strings.TrimSpace(txq.Text)); err == nil {
 			form.TxQueueLen = int32(n)
 		}
-		form.DNSBlocking = checks["DNSBlocking"].Checked
-		form.LocalhostNat = checks["LocalhostNat"].Checked
-		form.AutoReconnect = checks["AutoReconnect"].Checked
-		form.AutoConnect = checks["AutoConnect"].Checked
-		form.EnableDefaultRoute = checks["EnableDefaultRoute"].Checked
-		form.EnableWAN = checks["EnableWAN"].Checked
+		form.DNSBlocking = switches["DNSBlocking"].on
+		form.LocalhostNat = switches["LocalhostNat"].on
+		form.AutoReconnect = switches["AutoReconnect"].on
+		form.AutoConnect = switches["AutoConnect"].on
+		form.EnableDefaultRoute = switches["EnableDefaultRoute"].on
+		form.EnableWAN = switches["EnableWAN"].on
 		form.DNSServers = splitLines(dns.Text)
+
 		form.Routes = nil
 		for _, line := range splitLines(routes.Text) {
 			p := strings.Fields(line)
@@ -144,37 +141,29 @@ func (a *App) tunnelEditPage() fyne.CanvasObject {
 		save.Disable()
 	}
 
-	warn := fyne.CanvasObject(widget.NewLabel(""))
+	cards := []fyne.CanvasObject{}
 	if connected {
-		warn = wrapLabel("This tunnel is connected — disconnect it before saving changes.")
+		cards = append(cards, notice("This tunnel is connected. Disconnect it before saving changes.", toneWarning))
 	}
-
-	return pageScroll(
-		toolbar(widget.NewLabel(a.editTag),
-			ghostBtn("Back", func() { a.show(pageTunnels) }),
-			ghostBtn("Cancel", func() { a.show(pageTunnels) }),
-			save,
-		),
-		warn,
-		card("General", "Identity, server and transport settings.", container.NewVBox(
-			labeled("Tag", tag),
-			labeled("Interface", ifname),
-			labeled("Server", server),
-			labeled("MTU", mtu),
-			labeled("TX queue length", txq),
-		)),
-		card("Features", "Behaviour of this tunnel while connected.", container.NewVBox(
-			addCheck("DNSBlocking", "DNS blocking", form.DNSBlocking),
-			addCheck("LocalhostNat", "Localhost NAT", form.LocalhostNat),
-			addCheck("AutoReconnect", "Auto reconnect", form.AutoReconnect),
-			addCheck("AutoConnect", "Auto connect", form.AutoConnect),
-			addCheck("EnableDefaultRoute", "Default route", form.EnableDefaultRoute),
-			addCheck("EnableWAN", "WAN routing", form.EnableWAN),
-		)),
+	cards = append(cards,
+		card("General", "Identity, server and transport.",
+			formRows(
+				formPair(field("Name", tag), field("Interface", ifname)),
+				field("Server", server),
+				formPair(field("MTU", mtu), field("TX queue length", txq)),
+			)),
+		card("Behaviour", "What this tunnel does while connected.", features),
 		card("DNS servers", "One resolver per line.", dns),
-		card("Routes", "One per line: ADDRESS METRIC", routes),
-		card("Networks", "One per line: TAG NETWORK NAT", nets),
+		card("Routes", "One per line, as ADDRESS METRIC.", routes),
+		card("Networks", "One per line, as TAG NETWORK NAT.", nets),
 	)
+
+	actions := hstack(sp2, back, save)
+	sub := "Interface " + form.IFName
+	if connected {
+		sub += "  ·  connected"
+	}
+	return pageShell(form.Tag, sub, actions, scrollBody(cards...))
 }
 
 func splitLines(s string) []string {

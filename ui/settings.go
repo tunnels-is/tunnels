@@ -5,8 +5,6 @@ import (
 	"strings"
 
 	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/container"
-	"fyne.io/fyne/v2/widget"
 	"github.com/tunnels-is/tunnels/client"
 	"github.com/tunnels-is/tunnels/version"
 )
@@ -17,75 +15,74 @@ func (a *App) settingsPage() fyne.CanvasObject {
 		cfg = client.CloneConfig()
 	}
 	ver := version.Version
-	if a.state != nil && a.state.Version != "" {
-		ver = a.state.Version
-	}
-
-	adv := bindCheck("Advanced mode", a.advanced, func(v bool) { a.setAdvanced(v) })
-	bw := bindCheck("Bandwidth graphs", cfg.BandwidthGraphs, func(v bool) { a.toggleConfig("BandwidthGraphs") })
-
-	ks6 := bindCheck("IPv6 kill switch", cfg.KillSwitchIPv6, func(v bool) { a.toggleConfig("KillSwitchIPv6") })
-	ks4 := bindCheck("IPv4 kill switch", cfg.KillSwitchIPv4, func(v bool) { a.toggleConfig("KillSwitchIPv4") })
-
-	logChecks := container.NewVBox()
-	addLog := func(key, label string, v bool) {
-		logChecks.Add(bindCheck(label, v, func(_ bool) { a.toggleConfig(key) }))
-	}
-	addLog("InfoLogging", "Info", cfg.InfoLogging)
-	addLog("ErrorLogging", "Errors", cfg.ErrorLogging)
-	addLog("ConsoleLogging", "Console", cfg.ConsoleLogging)
-	addLog("DebugLogging", "Debug", cfg.DebugLogging)
-	addLog("ConsoleLogOnly", "Terminal only", cfg.ConsoleLogOnly)
-
-	themeNames := []string{"Tunnels Dark", "Tunnels Light", "Suzko"}
-	themeVals := map[string]string{
-		"Tunnels Dark":  themeTunnelsDark,
-		"Tunnels Light": themeTunnels,
-		"Suzko":         themeSuzko,
-	}
-	curLabel := "Tunnels Dark"
-	switch live.name {
-	case themeTunnels:
-		curLabel = "Tunnels Light"
-	case themeSuzko:
-		curLabel = "Suzko"
-	}
-	themeSel := widget.NewSelect(themeNames, func(label string) {
-		if v, ok := themeVals[label]; ok {
-			a.setThemeName(v)
+	api := version.ApiVersion
+	if a.state != nil {
+		if a.state.Version != "" {
+			ver = a.state.Version
 		}
-	})
-	themeSel.SetSelected(curLabel)
+		if a.state.APIVersion != 0 {
+			api = a.state.APIVersion
+		}
+	}
 
-	objs := []fyne.CanvasObject{
-		caption(fmt.Sprintf("App %s  ·  API %d", ver, version.ApiVersion)),
-		card("Appearance", "Select a color theme.", container.NewVBox(
-			kLabeled("Theme", kInput(themeSel)),
-		)),
-		card("Advanced", "Show advanced configuration: API server, DNS and system details.", container.NewVBox(adv, bw)),
-		card("Kill switch", "Blackhole routes stay installed until you turn the switch off — including after disconnect or quitting the app.", container.NewVBox(
-			ks6, muted("On by default. Tunnels does not put IPv6 in the tunnel; this drops ::/0 so AAAA destinations cannot leak to the ISP."),
-			ks4, muted("Off by default. When on, 0.0.0.0/0 is blackholed except the tunnel and pinned controller/VPN endpoints."),
-		)),
-		card("Logging", "Select which event types are captured.", logChecks),
+	themes := newSegmented([]segItem{
+		{themeTunnelsDark, "Dark"},
+		{themeTunnels, "Light"},
+		{themeSuzko, "Suzko"},
+	}, live.name, func(key string) { a.setThemeName(key) })
+
+	cards := []fyne.CanvasObject{
+		card("Appearance", "",
+			settingList(
+				settingRow("Theme", "Colour theme for the whole app.", themes),
+				settingRow("Zoom",
+					fmt.Sprintf("Scales the entire interface. %s+ and %s- also work.", modKeyLabel(), modKeyLabel()),
+					a.zoomStepper()),
+			)),
+
+		card("General", "",
+			settingList(
+				toggleRow("Advanced mode",
+					"Show tunnels, the DNS resolver, statistics and system paths.",
+					a.advanced, func(v bool) { a.setAdvanced(v) }),
+				toggleRow("Bandwidth graphs",
+					"Track per-tunnel throughput while connected.",
+					cfg.BandwidthGraphs, func(bool) { a.toggleConfig("BandwidthGraphs") }),
+			)),
+
+		card("Kill switch",
+			"Blackhole routes stay installed until you turn the switch off — including after disconnect or quitting the app.",
+			settingList(
+				toggleRow("Block IPv6",
+					"On by default. Tunnels does not carry IPv6, so ::/0 is dropped and AAAA destinations cannot leak to your ISP.",
+					cfg.KillSwitchIPv6, func(bool) { a.toggleConfig("KillSwitchIPv6") }),
+				toggleRow("Block IPv4",
+					"Off by default. When on, 0.0.0.0/0 is blackholed except the tunnel and pinned controller endpoints.",
+					cfg.KillSwitchIPv4, func(bool) { a.toggleConfig("KillSwitchIPv4") }),
+			)),
+
+		card("Logging", "Which event types are captured.",
+			settingList(
+				toggleRow("Info", "", cfg.InfoLogging, func(bool) { a.toggleConfig("InfoLogging") }),
+				toggleRow("Errors", "", cfg.ErrorLogging, func(bool) { a.toggleConfig("ErrorLogging") }),
+				toggleRow("Debug", "Verbose internals. Noisy.", cfg.DebugLogging, func(bool) { a.toggleConfig("DebugLogging") }),
+				toggleRow("Console", "Also write log lines to stdout.", cfg.ConsoleLogging, func(bool) { a.toggleConfig("ConsoleLogging") }),
+				toggleRow("Terminal only", "Skip the log file entirely.", cfg.ConsoleLogOnly, func(bool) { a.toggleConfig("ConsoleLogOnly") }),
+			)),
 	}
 
 	if a.advanced {
-		disableDNS := bindCheck("Disable DNS", cfg.DisableDNS, func(v bool) { a.toggleConfig("DisableDNS") })
-		objs = append(objs, card("DNS", "The local DNS resolver is enabled by default.", disableDNS))
+		cards = append(cards, card("DNS", "",
+			toggleRow("Disable resolver",
+				"The bundled DNS resolver is enabled by default.",
+				cfg.DisableDNS, func(bool) { a.toggleConfig("DisableDNS") })))
 
-		apiIP := widget.NewEntry()
-		apiIP.SetText(cfg.APIIP)
-		apiPort := widget.NewEntry()
-		apiPort.SetText(cfg.APIPort)
-		apiCert := widget.NewEntry()
-		apiCert.SetText(cfg.APICert)
-		apiKey := widget.NewEntry()
-		apiKey.SetText(cfg.APIKey)
-		apiDomains := widget.NewEntry()
-		apiDomains.SetText(strings.Join(cfg.APICertDomains, ","))
-		apiIPs := widget.NewEntry()
-		apiIPs.SetText(strings.Join(cfg.APICertIPs, ","))
+		apiIP := kEntry("", cfg.APIIP)
+		apiPort := kEntry("", cfg.APIPort)
+		apiCert := kEntry("", cfg.APICert)
+		apiKey := kEntry("", cfg.APIKey)
+		apiDomains := kEntry("comma separated", strings.Join(cfg.APICertDomains, ","))
+		apiIPs := kEntry("comma separated", strings.Join(cfg.APICertIPs, ","))
 		saveAPI := primaryBtn("Save API server", func() {
 			next := client.CloneConfig()
 			next.APIIP = strings.TrimSpace(apiIP.Text)
@@ -98,13 +95,18 @@ func (a *App) settingsPage() fyne.CanvasObject {
 				a.rebuild()
 			}
 		})
-		objs = append(objs, card("API server", "Address the client listens on, plus optional TLS certificate.", container.NewVBox(
-			kLabeled("IP", kInput(apiIP)), kLabeled("Port", kInput(apiPort)),
-			kLabeled("Cert domains", kInput(apiDomains)), kLabeled("Cert IPs", kInput(apiIPs)),
-			kLabeled("Cert path", kInput(apiCert)), kLabeled("Key path", kInput(apiKey)),
-			vspace(8),
-			saveAPI,
-		)))
+
+		cards = append(cards, card("API server",
+			"Address the client listens on, plus an optional TLS certificate.",
+			formRows(
+				formPair(field("IP", apiIP), field("Port", apiPort)),
+				field("Certificate domains", apiDomains),
+				field("Certificate IPs", apiIPs),
+				field("Certificate path", apiCert),
+				field("Key path", apiKey),
+				vspace(sp1),
+				hstack(0, saveAPI),
+			)))
 
 		base, cfgPath, logPath, logFile := "", "", "", ""
 		if a.state != nil && a.state.State != nil {
@@ -114,15 +116,17 @@ func (a *App) settingsPage() fyne.CanvasObject {
 			logPath = st.LogPath
 			logFile = st.LogFileName
 		}
-		objs = append(objs, card("System", "Paths, files and privileges this app is running with.", container.NewVBox(
-			infoRow("Base path", base),
-			infoRow("Config", cfgPath),
-			infoRow("Log path", logPath),
-			infoRow("Log file", logFile),
-		)))
+		cards = append(cards, card("System", "Paths this instance is running with.",
+			vstack(0,
+				kvRow("Base path", base, true),
+				kvRow("Config file", cfgPath, true),
+				kvRow("Log path", logPath, true),
+				kvRow("Log file", logFile, true),
+			)))
 	}
 
-	return pageScroll(objs...)
+	sub := fmt.Sprintf("Tunnels %s · API v%d", ver, api)
+	return pageShell("Settings", sub, nil, scrollBody(cards...))
 }
 
 func splitCSV(s string) []string {

@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/theme"
@@ -14,35 +13,54 @@ import (
 	"github.com/tunnels-is/tunnels/client"
 )
 
+// Login modes. Kept as the original integers because they map to controller
+// endpoints and preferences already stored on disk.
+const (
+	modeLogin     = 1
+	modeRegister  = 2
+	modeRecovery  = 3
+	modeReset     = 4
+	modeAnonymous = 5
+	modeEnable    = 6
+)
+
+var loginTitles = map[int]struct{ title, sub string }{
+	modeLogin:     {"Welcome back", "Sign in to your Tunnels account."},
+	modeRegister:  {"Create account", "You only need an email and a password."},
+	modeRecovery:  {"Two-factor recovery", "Sign in with a recovery code instead of your authenticator."},
+	modeReset:     {"Reset password", "Request a code, then choose a new password."},
+	modeAnonymous: {"Anonymous account", "No email. Keep the token safe — it is the only way back in."},
+	modeEnable:    {"Enable account", "Confirm the code we emailed you."},
+}
+
 func (a *App) loginPage() fyne.CanvasObject {
 	pref := a.fyneApp.Preferences()
-	email := widget.NewEntry()
-	email.SetPlaceHolder("Email")
-	email.SetText(pref.String("default-email"))
-	pass := widget.NewPasswordEntry()
-	pass.SetPlaceHolder("Password")
-	pass2 := widget.NewPasswordEntry()
-	pass2.SetPlaceHolder("Confirm password")
-	device := widget.NewEntry()
-	device.SetPlaceHolder("Device name")
-	device.SetText(pref.String("default-device-name"))
-	digits := widget.NewEntry()
-	digits.SetPlaceHolder("Authenticator code (if enabled)")
-	recovery := widget.NewEntry()
-	recovery.SetPlaceHolder("Two factor recovery code")
-	code := widget.NewEntry()
-	code.SetPlaceHolder("Code")
-
-	errLabel := muted("")
-	errLabel.Importance = widget.DangerImportance
-
-	remember := bindCheck("Remember", a.loginRemember, func(v bool) { a.loginRemember = v })
-
 	mode := a.loginMode
 	if mode == 0 {
-		mode = 1
+		mode = modeLogin
 	}
 
+	email := kEntry("you@example.com", pref.String("default-email"))
+	pass := kPassword("••••••••••")
+	pass2 := kPassword("Repeat password")
+	device := kEntry("e.g. workstation", pref.String("default-device-name"))
+	digits := kEntry("123456", "")
+	recovery := kEntry("Recovery code", "")
+	code := kEntry("Code", "")
+
+	errBox := container.NewStack()
+	setErr := func(msg string) {
+		if msg == "" {
+			errBox.Objects = nil
+		} else {
+			errBox.Objects = []fyne.CanvasObject{notice(msg, toneDanger)}
+		}
+		errBox.Refresh()
+	}
+
+	remember := newSwitch(a.loginRemember, func(v bool) { a.loginRemember = v })
+
+	// Control server picker.
 	servers := []*client.ControlServer{}
 	if a.config != nil {
 		servers = a.config.ControlServers
@@ -62,6 +80,7 @@ func (a *App) loginPage() fyne.CanvasObject {
 			a.loginServerID = s.ID
 		}
 	})
+	serverSel.PlaceHolder = "No server configured"
 	if len(opts) > 0 {
 		selected := opts[0]
 		for _, s := range servers {
@@ -72,7 +91,6 @@ func (a *App) loginPage() fyne.CanvasObject {
 		}
 		serverSel.SetSelected(selected)
 	}
-
 	activeServer := func() *client.ControlServer {
 		if serverSel.Selected != "" {
 			return optMap[serverSel.Selected]
@@ -83,65 +101,66 @@ func (a *App) loginPage() fyne.CanvasObject {
 		return nil
 	}
 
-	showToken := mode == 5 || (mode == 2 && a.loginToken)
-	showEmail := (mode == 1 || mode == 2 || mode == 4 || mode == 6) && !showToken
-	showPass := mode == 1 || mode == 2 || mode == 3 || mode == 4 || mode == 5
-	showPass2 := mode == 2 || mode == 4 || mode == 5
+	showToken := mode == modeAnonymous || (mode == modeRegister && a.loginToken)
+	showEmail := (mode == modeLogin || mode == modeRegister || mode == modeReset || mode == modeEnable) && !showToken
+	showPass := mode != modeEnable
+	showPass2 := mode == modeRegister || mode == modeReset || mode == modeAnonymous
 
 	fields := []fyne.CanvasObject{}
-	if mode == 5 {
-		fields = append(fields, wrapLabel("Save your login token in a secure place. If you lose it the account is gone."))
-	}
 	if showToken {
 		email.SetPlaceHolder("Token")
-		fields = append(fields, kLabeled("Token", kInput(email)))
+		fields = append(fields, fieldWith("Login token", "Store this somewhere safe before continuing.", email))
 	}
 	if showEmail {
-		fields = append(fields, kLabeled("Email", kInput(email)))
+		fields = append(fields, field("Email", email))
 	}
-	if mode == 1 {
-		fields = append(fields, kLabeled("Device name", kInput(device)))
+	if mode == modeLogin {
+		fields = append(fields, field("Device name", device))
 	}
 	if showPass {
-		fields = append(fields, kLabeled("Password", kInput(pass)))
+		fields = append(fields, field("Password", pass))
 	}
 	if showPass2 {
-		fields = append(fields, kLabeled("Confirm password", kInput(pass2)))
+		fields = append(fields, field("Confirm password", pass2))
 	}
-	if mode == 1 {
-		fields = append(fields, kLabeled("2FA code", kInput(digits)))
+	if mode == modeLogin {
+		fields = append(fields, fieldWith("Two-factor code", "Leave empty if 2FA is off.", digits))
 	}
-	if mode == 3 {
-		fields = append(fields, kLabeled("Recovery code", kInput(recovery)))
+	if mode == modeRecovery {
+		fields = append(fields, field("Recovery code", recovery))
 	}
-	if mode == 6 {
-		fields = append(fields, kLabeled("Code", kInput(code)))
-	}
-	if mode == 4 {
-		fields = append(fields, kLabeled("Reset code", kInput(code)))
+	if mode == modeEnable || mode == modeReset {
+		lbl := "Confirmation code"
+		if mode == modeReset {
+			lbl = "Reset code"
+		}
+		fields = append(fields, field(lbl, code))
 	}
 
-	submitLabel := map[int]string{1: "Login", 2: "Register", 3: "Login", 4: "Reset password", 5: "Register", 6: "Enable account"}[mode]
+	submitLabel := map[int]string{
+		modeLogin: "Sign in", modeRegister: "Create account", modeRecovery: "Sign in",
+		modeReset: "Set new password", modeAnonymous: "Create account", modeEnable: "Enable account",
+	}[mode]
 
 	submit := func() {
-		errLabel.SetText("")
+		setErr("")
 		srv := activeServer()
 		if srv == nil {
-			errLabel.SetText("No control server configured")
+			setErr("No control server configured")
 			return
 		}
 		switch mode {
-		case 1, 3:
+		case modeLogin, modeRecovery:
 			if strings.TrimSpace(email.Text) == "" || pass.Text == "" {
-				errLabel.SetText("Email and password are required")
+				setErr("Email and password are required")
 				return
 			}
-			if mode == 1 && strings.TrimSpace(device.Text) == "" {
-				errLabel.SetText("Device login name missing")
+			if mode == modeLogin && strings.TrimSpace(device.Text) == "" {
+				setErr("Device name is required")
 				return
 			}
-			if mode == 3 && strings.TrimSpace(recovery.Text) == "" {
-				errLabel.SetText("Recovery code missing")
+			if mode == modeRecovery && strings.TrimSpace(recovery.Text) == "" {
+				setErr("Recovery code is required")
 				return
 			}
 			body := map[string]any{
@@ -151,18 +170,17 @@ func (a *App) loginPage() fyne.CanvasObject {
 				"Digits":     digits.Text,
 				"Recovery":   recovery.Text,
 			}
-			a.note("Signing in...")
+			a.note("Signing in…")
 			go func() {
 				raw, _, err := a.callControllerOn(srv, "/client/user/login", body, false)
 				a.uiDo(func() {
 					if err != nil {
-						errLabel.SetText(err.Error())
-						a.fail(err.Error())
+						setErr(err.Error())
 						return
 					}
 					u := new(client.User)
 					if err := json.Unmarshal(raw, u); err != nil {
-						errLabel.SetText("Unable to parse login response")
+						setErr("Unable to parse login response")
 						return
 					}
 					u.ControlServer = srv
@@ -177,13 +195,13 @@ func (a *App) loginPage() fyne.CanvasObject {
 					a.fetchServers(true)
 				})
 			}()
-		case 2, 5:
-			if pass.Text == "" || len(pass.Text) < 10 {
-				errLabel.SetText("Minimum 10 characters")
+		case modeRegister, modeAnonymous:
+			if len(pass.Text) < 10 {
+				setErr("Password must be at least 10 characters")
 				return
 			}
 			if pass.Text != pass2.Text {
-				errLabel.SetText("Passwords do not match")
+				setErr("Passwords do not match")
 				return
 			}
 			body := map[string]any{
@@ -191,18 +209,17 @@ func (a *App) loginPage() fyne.CanvasObject {
 				"Password":  pass.Text,
 				"Password2": pass2.Text,
 			}
-			a.note("Creating account...")
+			a.note("Creating account…")
 			go func() {
 				raw, _, err := a.callControllerOn(srv, "/client/user/create", body, false)
 				a.uiDo(func() {
 					if err != nil {
-						errLabel.SetText(err.Error())
-						a.fail(err.Error())
+						setErr(err.Error())
 						return
 					}
 					u := new(client.User)
 					if err := json.Unmarshal(raw, u); err != nil {
-						errLabel.SetText("Unable to parse register response")
+						setErr("Unable to parse register response")
 						return
 					}
 					u.ControlServer = srv
@@ -211,9 +228,9 @@ func (a *App) loginPage() fyne.CanvasObject {
 					a.show(pageServers)
 				})
 			}()
-		case 4:
-			if pass.Text == "" || len(pass.Text) < 9 || pass.Text != pass2.Text || code.Text == "" {
-				errLabel.SetText("Fill password, confirm, and reset code")
+		case modeReset:
+			if len(pass.Text) < 9 || pass.Text != pass2.Text || code.Text == "" {
+				setErr("Fill in the password, confirmation and reset code")
 				return
 			}
 			body := map[string]any{
@@ -226,39 +243,67 @@ func (a *App) loginPage() fyne.CanvasObject {
 				_, _, err := a.callControllerOn(srv, "/client/user/reset/password", body, false)
 				a.uiDo(func() {
 					if err != nil {
-						errLabel.SetText(err.Error())
+						setErr(err.Error())
 						return
 					}
-					a.loginMode = 1
+					a.loginMode = modeLogin
 					a.note("Password reset")
 					a.rebuild()
 				})
 			}()
-		case 6:
+		case modeEnable:
 			body := map[string]any{"Email": email.Text, "Code": code.Text, "ConfirmCode": code.Text}
 			go func() {
 				_, _, err := a.callControllerOn(srv, "/client/user/enable", body, false)
 				a.uiDo(func() {
 					if err != nil {
-						errLabel.SetText(err.Error())
+						setErr(err.Error())
 						return
 					}
-					a.loginMode = 1
+					a.loginMode = modeLogin
 					a.note("Account enabled")
 					a.rebuild()
 				})
 			}()
 		}
 	}
+	email.OnSubmitted = func(string) { submit() }
+	pass.OnSubmitted = func(string) { submit() }
 
-	submitBtn := primaryBtn(submitLabel, submit)
-
-	actions := []fyne.CanvasObject{submitBtn}
-	if mode == 1 {
-		actions = append(actions, remember)
+	setMode := func(m int) {
+		if m == modeAnonymous {
+			a.loginToken = true
+			email.SetText(uuid.New().String())
+		} else {
+			a.loginToken = false
+		}
+		a.loginMode = m
+		a.rebuild()
 	}
-	if mode == 4 {
-		actions = append(actions, ghostBtn("Send reset code", func() {
+
+	// Primary switch between the two everyday flows; everything else is a link.
+	tabs := newSegmented([]segItem{
+		{"login", "Sign in"},
+		{"register", "Register"},
+	}, map[bool]string{true: "register", false: "login"}[mode == modeRegister],
+		func(key string) {
+			if key == "register" {
+				setMode(modeRegister)
+			} else {
+				setMode(modeLogin)
+			}
+		})
+
+	body := []fyne.CanvasObject{}
+	if mode == modeLogin || mode == modeRegister {
+		body = append(body, container.NewCenter(tabs), vspace(sp1))
+	}
+	body = append(body, vstack(sp3, fields...))
+	body = append(body, errBox)
+
+	actions := []fyne.CanvasObject{primaryBtn(submitLabel, submit)}
+	if mode == modeReset {
+		actions = append(actions, outlineBtn("Email me a code", func() {
 			srv := activeServer()
 			if srv == nil {
 				return
@@ -275,89 +320,80 @@ func (a *App) loginPage() fyne.CanvasObject {
 			}()
 		}))
 	}
-
-	modes := []struct {
-		v int
-		l string
-	}{
-		{1, "Login"}, {2, "Register"}, {5, "Anonymous"}, {4, "Reset"}, {3, "2FA Recovery"}, {6, "Enable"},
+	actionRow := fyne.CanvasObject(hstack(sp2, actions...))
+	if mode == modeLogin {
+		actionRow = splitRow(hstack(sp2, actions...),
+			hstack(sp2, text("Remember me", fsSmall, pal().Muted, false), remember))
 	}
-	modeBtns := []fyne.CanvasObject{}
-	for _, m := range modes {
-		m := m
-		tap := func() {
-			if m.v == 5 {
-				a.loginToken = true
-				email.SetText(uuid.New().String())
-			} else if a.loginToken {
-				a.loginToken = false
-			}
-			a.loginMode = m.v
-			a.rebuild()
+	body = append(body, actionRow)
+
+	// Secondary flows.
+	var links []fyne.CanvasObject
+	switch mode {
+	case modeLogin:
+		links = []fyne.CanvasObject{
+			ghostBtn("Forgot password", func() { setMode(modeReset) }).small(),
+			ghostBtn("Recovery code", func() { setMode(modeRecovery) }).small(),
+			ghostBtn("Anonymous", func() { setMode(modeAnonymous) }).small(),
+			ghostBtn("Enable account", func() { setMode(modeEnable) }).small(),
 		}
-		if m.v == mode {
-			modeBtns = append(modeBtns, primaryBtn(m.l, tap))
-		} else {
-			modeBtns = append(modeBtns, ghostBtn(m.l, tap))
+	case modeRegister:
+		links = []fyne.CanvasObject{
+			ghostBtn("Anonymous instead", func() { setMode(modeAnonymous) }).small(),
+		}
+	default:
+		links = []fyne.CanvasObject{
+			ghostBtn("Back to sign in", func() { setMode(modeLogin) }).small(),
 		}
 	}
 
-	editServer := iconBtn(theme.DocumentCreateIcon(), func() {
+	titles := loginTitles[mode]
+	brand := container.NewCenter(vstack(sp2,
+		container.NewCenter(brandMark(z(40))),
+		container.NewCenter(text(titles.title, fsTitle, pal().Content, true)),
+		container.NewCenter(text(titles.sub, fsSmall, pal().Muted, false)),
+	))
+
+	editServer := newIconBtn(theme.DocumentCreateIcon(), kGhost, func() {
 		s := activeServer()
 		if s == nil {
 			s = &client.ControlServer{ID: uuid.New().String(), ValidateCertificate: true}
 		}
 		a.editAuthServer(s)
-	})
-	addServer := iconBtn(theme.ContentAddIcon(), func() {
+	}).small()
+	addServer := newIconBtn(theme.ContentAddIcon(), kGhost, func() {
 		a.editAuthServer(&client.ControlServer{ID: uuid.New().String(), ValidateCertificate: true})
-	})
+	}).small()
 
-	dot := canvas.NewCircle(pal().Primary)
-	brand := container.NewHBox(titleText("Tunnels"), container.NewCenter(container.NewStack(spacer(6, 6), dot)))
-	sub := text("Sign in to your account", 13, pal().Muted, false)
-
-	serverPanel := cardBox("", "", nil, container.NewBorder(nil, nil,
-		container.NewHBox(hspace(4), caption("Server")),
-		container.NewHBox(addServer, editServer),
-		kInput(serverSel),
+	serverCard := card("", "", splitRow(
+		vstack(2, text("Control server", fsSmall, pal().Muted, false), fixedWidth(z(230), serverSel)),
+		hstack(sp1, addServer, editServer),
 	))
 
-	form := container.NewVBox(
-		vspace(40),
+	return centredBody(z(400),
+		vspace(sp6),
 		brand,
-		sub,
-		vspace(16),
-		container.NewVBox(fields...),
-		errLabel,
-		vspace(8),
-		container.NewHBox(actions...),
-		vspace(12),
-		serverPanel,
-		vspace(12),
-		container.NewHBox(modeBtns...),
+		card("", "", vstack(sp3, body...)),
+		container.NewCenter(hstack(sp1, links...)),
+		serverCard,
+		vspace(sp6),
 	)
-	return pageScroll(form)
 }
 
 func (a *App) editAuthServer(s *client.ControlServer) {
-	host := widget.NewEntry()
-	host.SetText(s.Host)
-	port := widget.NewEntry()
-	port.SetText(s.Port)
-	cert := widget.NewEntry()
-	cert.SetText(s.CertificatePath)
-	validate := bindCheck("Validate certificate", s.ValidateCertificate, nil)
-	warn := muted("Turning verification off lets a man-in-the-middle read login credentials. Only do this for a trusted self-signed server.")
+	host := kEntry("api.tunnels.is", s.Host)
+	port := kEntry("443", s.Port)
+	cert := kEntry("optional", s.CertificatePath)
+	validate := bindCheck("Validate TLS certificate", s.ValidateCertificate, nil)
 
-	form := container.NewVBox(
-		labeled("Host", host),
-		labeled("Port", port),
-		labeled("Certificate path", cert),
+	form := container.New(fixedLayout{w: z(380)}, vstack(sp3,
+		formPair(field("Host", host), field("Port", port)),
+		field("Certificate path", cert),
 		validate,
-		warn,
-	)
-	d := dialog.NewCustomConfirm("Auth server", "Save", "Cancel", form, func(ok bool) {
+		notice("Turning verification off lets a man-in-the-middle read your login credentials. Only do this for a trusted self-signed server.", toneWarning),
+	))
+
+	d := dialog.NewCustomConfirm("Control server", "Save", "Cancel", form, func(ok bool) {
 		if !ok {
 			return
 		}
@@ -386,6 +422,6 @@ func (a *App) editAuthServer(s *client.ControlServer) {
 			a.rebuild()
 		}
 	}, a.win)
-	d.Resize(fyne.NewSize(420, 360))
+	d.Resize(fyne.NewSize(z(440), z(400)))
 	d.Show()
 }

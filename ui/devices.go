@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -31,28 +32,34 @@ func (a *App) devicesPage() fyne.CanvasObject {
 	}
 	a.recomputeDeviceView()
 
-	filter := kSearch("Filter by tag or IP…", a.filterDevices, func(s string) {
+	_, search := searchField("Filter devices", a.filterDevices, func(s string) {
 		a.filterDevices = s
 	}, func(s string) {
 		a.filterDevices = s
 		a.reloadCurrent()
 	})
-	create := primaryBtn("Create", func() { a.createDeviceDialog() })
-	head := pageHeader("Devices", "", kSearchBox(filter), hspace(8), create)
+	create := primaryBtn("New device", func() { a.createDeviceDialog() }).withIcon(theme.ContentAddIcon())
+	actions := hstack(sp2, search, create)
 
-	a.deviceList = widget.NewList(
+	sub := fmt.Sprintf("%d registered", len(a.deviceView))
+	if a.devicesFetching && len(a.deviceView) == 0 {
+		sub = "Loading…"
+	}
+
+	if len(a.deviceView) == 0 {
+		msg, desc := "No devices", "Nothing matched this filter."
+		if a.filterDevices == "" {
+			msg, desc = "No devices yet", "Create a device to get a WireGuard config for it."
+		}
+		return pageShell("Devices", sub, actions, emptyState(msg, desc))
+	}
+
+	a.deviceList = newRowList(
 		func() int { return len(a.deviceView) },
-		func() fyne.CanvasObject { return newKRow() },
-		func(id widget.ListItemID, obj fyne.CanvasObject) {
-			row, ok := obj.(*kRow)
-			if !ok {
-				return
-			}
-			a.bindDeviceRow(id, row)
-		},
+		a.bindDeviceRow,
 	)
 
-	return listPage(head, a.deviceList)
+	return pageShell("Devices", sub, actions, listBody(a.deviceList))
 }
 
 func (a *App) bindDeviceRow(id widget.ListItemID, row *kRow) {
@@ -80,20 +87,23 @@ func (a *App) bindDeviceRow(id widget.ListItemID, row *kRow) {
 	_, isConn := connectedIPs[d.WireGuardIP]
 	_, locID := localIDs[d.ID.String()]
 	_, locPub := localPubs[d.WireGuardKey]
-	badge := "Other machine"
-	if locID || locPub {
-		badge = "This device"
+
+	mine := locID || locPub
+	pill, t := "Remote", toneNeutral
+	if mine {
+		pill, t = "This device", tonePrimary
 	}
-	pill := badge
 	if isConn {
-		pill = "Connected"
+		pill, t = "Connected", toneSuccess
 	}
-	row.SetTitleMeta(d.Tag, d.WireGuardIP+"  ·  "+fmtTime(d.CreatedAt)+"  ·  "+badge, isConn, pill)
+
+	row.SetRow(d.Tag, d.WireGuardIP+"  ·  added "+fmtTime(d.CreatedAt), isConn, pill, t)
 	row.ghost.SetHidden(true)
 	row.iconA.SetHidden(true)
 	row.main.SetHidden(true)
+
 	dev := d
-	row.iconB.SetIconOnly(theme.DeleteIcon(), kDanger, func() {
+	row.iconB.SetIconOnly(theme.DeleteIcon(), kGhost, func() {
 		a.confirm("Delete device", `Delete "`+dev.Tag+`"? This cannot be undone.`, func() {
 			go func() {
 				_, _, err := a.callController("/client/device/delete", map[string]any{"DeviceID": dev.ID.String()}, true)
@@ -102,6 +112,7 @@ func (a *App) bindDeviceRow(id widget.ListItemID, row *kRow) {
 						a.fail(err.Error())
 						return
 					}
+					a.note("Device deleted")
 					a.fetchDevices()
 				})
 			}()
@@ -111,12 +122,14 @@ func (a *App) bindDeviceRow(id widget.ListItemID, row *kRow) {
 
 func (a *App) createDeviceDialog() {
 	a.fetchServers(false)
-	tag := widget.NewEntry()
-	tag.SetPlaceHolder("e.g. my-laptop")
+	tag := kEntry("e.g. my-laptop", "")
 	opts := []string{}
 	ids := map[string]string{}
 	for _, s := range a.servers {
-		label := s.Tag + " (" + countryName(s.Country) + ")"
+		label := s.Tag
+		if c := countryName(s.Country); c != "" {
+			label += " · " + c
+		}
 		opts = append(opts, label)
 		ids[label] = s.ID.String()
 	}
@@ -124,13 +137,16 @@ func (a *App) createDeviceDialog() {
 	if len(opts) > 0 {
 		sel.SetSelected(opts[0])
 	}
-	form := container.NewVBox(labeled("Tag", tag), labeled("Server", sel))
+
+	form := container.New(fixedLayout{w: z(360)},
+		vstack(sp3, field("Device name", tag), field("Server", sel)))
+
 	d := dialog.NewCustomConfirm("New device", "Create", "Cancel", form, func(ok bool) {
 		if !ok {
 			return
 		}
 		if strings.TrimSpace(tag.Text) == "" {
-			a.fail("Please enter a device tag")
+			a.fail("Please enter a device name")
 			return
 		}
 		sid := ids[sel.Selected]
@@ -142,8 +158,8 @@ func (a *App) createDeviceDialog() {
 			a.fail("You are not logged in")
 			return
 		}
-		a.note("Creating device...")
-		form := &client.CreateDeviceWithKeysForm{
+		a.note("Creating device…")
+		req := &client.CreateDeviceWithKeysForm{
 			Server:      a.user.ControlServer,
 			Tag:         strings.TrimSpace(tag.Text),
 			ServerID:    sid,
@@ -151,7 +167,7 @@ func (a *App) createDeviceDialog() {
 			UID:         a.user.ID,
 		}
 		go func() {
-			data, code := client.CreateDeviceWithKeys(form)
+			data, code := client.CreateDeviceWithKeys(req)
 			a.uiDo(func() {
 				if code != 200 {
 					if er, ok := data.(*client.ErrorResponse); ok {
@@ -171,19 +187,19 @@ func (a *App) createDeviceDialog() {
 			})
 		}()
 	}, a.win)
-	d.Resize(fyne.NewSize(400, 280))
+	d.Resize(fyne.NewSize(z(420), z(300)))
 	d.Show()
 }
 
 func (a *App) showDeviceConfig(tag, cfg string) {
-	save := widget.NewButton("Save .conf", func() {
+	save := outlineBtn("Save .conf", func() {
 		fd := dialog.NewFileSave(func(uc fyne.URIWriteCloser, err error) {
 			if err != nil || uc == nil {
 				return
 			}
 			defer uc.Close()
 			_, _ = uc.Write([]byte(cfg))
-			a.note("Saved")
+			a.note("Config saved")
 		}, a.win)
 		fd.SetFileName(tag + ".conf")
 		if home, err := os.UserHomeDir(); err == nil {
@@ -192,14 +208,16 @@ func (a *App) showDeviceConfig(tag, cfg string) {
 			}
 		}
 		fd.Show()
-	})
-	content := container.NewVBox(
-		wrapLabel("Save this config — it cannot be shown again"),
-		qrImage(cfg, 220),
-		widget.NewLabel(cfg),
-		save,
+	}).withIcon(theme.DocumentSaveIcon())
+
+	content := vstack(sp4,
+		notice("Save this config now — it cannot be shown again.", toneWarning),
+		qrImage(cfg, int(z(200))),
+		codeBlock(cfg, 8),
+		hstack(sp2, save, a.copyBtn(cfg)),
 	)
-	d := dialog.NewCustom("Device config", "Done", container.NewVScroll(content), a.win)
-	d.Resize(fyne.NewSize(480, 640))
+	d := dialog.NewCustom("Device config · "+tag, "Done",
+		container.NewVScroll(inset(sp1, content)), a.win)
+	d.Resize(fyne.NewSize(z(480), z(660)))
 	d.Show()
 }

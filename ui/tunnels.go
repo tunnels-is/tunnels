@@ -1,6 +1,8 @@
 package ui
 
 import (
+	"fmt"
+
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
@@ -27,18 +29,19 @@ func (a *App) recomputeTunnelView() {
 
 func (a *App) tunnelsPage() fyne.CanvasObject {
 	if !a.advanced {
-		return emptyState("Enable Advanced mode in Settings to manage tunnels.")
+		return pageShell("Tunnels", "", nil,
+			emptyState("Advanced mode required", "Turn on Advanced mode in Settings to manage tunnels."))
 	}
 	a.fetchServers(false)
 	a.recomputeTunnelView()
 
-	filter := kSearch("Filter by tag, interface, server…", a.filterTunnels, func(s string) {
+	_, search := searchField("Filter tunnels", a.filterTunnels, func(s string) {
 		a.filterTunnels = s
 	}, func(s string) {
 		a.filterTunnels = s
 		a.reloadCurrent()
 	})
-	create := primaryBtn("Create", func() {
+	create := primaryBtn("New tunnel", func() {
 		go func() {
 			_, err := client.CreateTunnel()
 			a.uiDo(func() {
@@ -51,21 +54,34 @@ func (a *App) tunnelsPage() fyne.CanvasObject {
 				a.reloadCurrent()
 			})
 		}()
-	})
-	head := pageHeader("Tunnels", "", kSearchBox(filter), hspace(8), create)
+	}).withIcon(theme.ContentAddIcon())
+	actions := hstack(sp2, search, create)
 
-	a.tunnelList = widget.NewList(
+	live := 0
+	byTag := a.activeByTag()
+	for _, t := range a.tunnelView {
+		if byTag[t.Tag] != nil {
+			live++
+		}
+	}
+	sub := fmt.Sprintf("%d configured", len(a.tunnelView))
+	if live > 0 {
+		sub = fmt.Sprintf("%d configured · %d up", len(a.tunnelView), live)
+	}
+
+	if len(a.tunnelView) == 0 {
+		msg, desc := "No tunnels", "Nothing matched this filter."
+		if a.filterTunnels == "" {
+			msg, desc = "No tunnels yet", "Create a tunnel to configure routes, DNS and a firewall."
+		}
+		return pageShell("Tunnels", sub, actions, emptyState(msg, desc))
+	}
+
+	a.tunnelList = newRowList(
 		func() int { return len(a.tunnelView) },
-		func() fyne.CanvasObject { return newKRow() },
-		func(id widget.ListItemID, obj fyne.CanvasObject) {
-			row, ok := obj.(*kRow)
-			if !ok {
-				return
-			}
-			a.bindTunnelRow(id, row)
-		},
+		a.bindTunnelRow,
 	)
-	return listPage(head, a.tunnelList)
+	return pageShell("Tunnels", sub, actions, listBody(a.tunnelList))
 }
 
 func (a *App) bindTunnelRow(id widget.ListItemID, row *kRow) {
@@ -78,23 +94,24 @@ func (a *App) bindTunnelRow(id widget.ListItemID, row *kRow) {
 	}
 	at := a.activeByTag()[t.Tag]
 	srv := a.serverByID(t.ServerID)
-	srvLabel := "No server"
+	srvLabel := "no server"
 	if srv != nil {
 		srvLabel = srv.Tag + "  ·  " + srv.IP
 	}
 	on := at != nil
-	pill := "Idle"
+	pill, tn := "", toneNeutral
 	meta := srvLabel + "  ·  " + t.IFName
 	if on {
-		pill = "Connected"
-		meta = "↓ " + at.IngressString() + "  ↑ " + at.EgressString() + "  ·  " + meta
+		pill, tn = "Up", toneSuccess
+		meta = "↓ " + at.IngressString() + "   ↑ " + at.EgressString() + "  ·  " + meta
 	}
-	row.SetTitleMeta(t.Tag, meta, on, pill)
+	row.SetRow(t.Tag, meta, on, pill, tn)
+
 	tun := t
 	if on {
-		live := at
+		liveTun := at
 		row.main.Set("Disconnect", kDanger, func() {
-			a.confirm("Disconnect", "Disconnect "+tun.Tag+"?", func() { a.disconnectActive(live) })
+			a.confirm("Disconnect", "Disconnect "+tun.Tag+"?", func() { a.disconnectActive(liveTun) })
 		})
 	} else {
 		row.main.Set("Connect", kSuccess, func() {
@@ -110,8 +127,8 @@ func (a *App) bindTunnelRow(id widget.ListItemID, row *kRow) {
 		a.editTag = tun.Tag
 		a.show(pageTunnelEdit)
 	})
-	row.iconB.SetIconOnly(theme.DeleteIcon(), kDanger, func() {
-		a.confirm("Delete", "Delete tunnel "+tun.Tag+"?", func() {
+	row.iconB.SetIconOnly(theme.DeleteIcon(), kGhost, func() {
+		a.confirm("Delete tunnel", "Delete tunnel "+tun.Tag+"?", func() {
 			if err := client.DeleteTunnel(tun.Tag); err != nil {
 				a.fail(err.Error())
 				return

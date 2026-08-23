@@ -2,13 +2,15 @@ package ui
 
 import (
 	"image/color"
+	"strings"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
-	"fyne.io/fyne/v2/layout"
+	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+	"github.com/tunnels-is/tunnels/version"
 )
 
 type navItem struct {
@@ -22,40 +24,143 @@ type navItem struct {
 func (a *App) navItems() []navItem {
 	logged := a.loggedIn()
 	return []navItem{
-		{pageLogin, "Login", "", theme.LoginIcon(), func(*App) bool { return !logged }},
+		{pageLogin, "Sign in", "", theme.LoginIcon(), func(*App) bool { return !logged }},
 		{pageServers, "Servers", "", theme.StorageIcon(), func(*App) bool { return logged }},
 		{pageTunnels, "Tunnels", "", theme.ListIcon(), func(ap *App) bool { return logged && ap.advanced }},
 		{pageDevices, "Devices", "", theme.ComputerIcon(), func(*App) bool { return logged }},
-		{pageDNS, "Settings", "DNS", theme.SearchIcon(), func(ap *App) bool { return ap.advanced }},
-		{pageDNSStats, "Stats", "DNS", theme.DocumentIcon(), func(ap *App) bool { return ap.advanced }},
+		{pageAccounts, "Accounts", "", theme.AccountIcon(), func(*App) bool { return !logged }},
+		{pageDNS, "Resolver", "DNS", theme.SearchIcon(), func(ap *App) bool { return ap.advanced }},
+		{pageDNSStats, "Statistics", "DNS", theme.DocumentIcon(), func(ap *App) bool { return ap.advanced }},
 		{pageSettings, "Settings", "App", theme.SettingsIcon(), func(*App) bool { return true }},
-		{pageAccounts, "Accounts", "App", theme.AccountIcon(), func(*App) bool { return !logged }},
 		{pageLogs, "Logs", "App", theme.FileTextIcon(), func(*App) bool { return true }},
 		{pageSupport, "Support", "App", theme.HelpIcon(), func(*App) bool { return true }},
 	}
 }
 
+// ---------------------------------------------------------------- nav row
+
+type navRow struct {
+	widget.BaseWidget
+	icon    fyne.Resource
+	label   string
+	active  bool
+	hovered bool
+	tap     func()
+}
+
+func newNavRow(icon fyne.Resource, label string, active bool, tap func()) *navRow {
+	n := &navRow{icon: icon, label: label, active: active, tap: tap}
+	n.ExtendBaseWidget(n)
+	return n
+}
+
+func (n *navRow) Tapped(*fyne.PointEvent) {
+	if n.tap != nil {
+		n.tap()
+	}
+}
+
+func (n *navRow) MouseIn(*desktop.MouseEvent)    { n.hovered = true; n.Refresh() }
+func (n *navRow) MouseOut()                      { n.hovered = false; n.Refresh() }
+func (n *navRow) MouseMoved(*desktop.MouseEvent) {}
+func (n *navRow) Cursor() desktop.Cursor         { return desktop.PointerCursor }
+
+func (n *navRow) CreateRenderer() fyne.WidgetRenderer {
+	bg := surface(radSm, color.Transparent, nil)
+	rail := canvas.NewRectangle(color.Transparent)
+	rail.CornerRadius = radFull
+	ico := canvas.NewImageFromResource(n.icon)
+	ico.FillMode = canvas.ImageFillContain
+	lab := text(n.label, fsBody, pal().Muted, false)
+	r := &navRowRenderer{n: n, bg: bg, rail: rail, ico: ico, lab: lab}
+	r.apply()
+	return r
+}
+
+type navRowRenderer struct {
+	n    *navRow
+	bg   *canvas.Rectangle
+	rail *canvas.Rectangle
+	ico  *canvas.Image
+	lab  *canvas.Text
+}
+
+func (r *navRowRenderer) Destroy() {}
+
+func (r *navRowRenderer) Objects() []fyne.CanvasObject {
+	return []fyne.CanvasObject{r.bg, r.rail, r.ico, r.lab}
+}
+
+func (r *navRowRenderer) MinSize() fyne.Size {
+	return fyne.NewSize(railWidth-sp3*2, navRowH)
+}
+
+func (r *navRowRenderer) Layout(size fyne.Size) {
+	r.bg.Resize(size)
+	r.rail.Resize(fyne.NewSize(z(3), size.Height-z(14)))
+	r.rail.Move(fyne.NewPos(-sp2, z(7)))
+	r.ico.Resize(fyne.NewSize(iconSize, iconSize))
+	r.ico.Move(fyne.NewPos(sp2+z(2), (size.Height-iconSize)/2))
+	lms := r.lab.MinSize()
+	r.lab.Move(fyne.NewPos(sp2+z(2)+iconSize+sp3, (size.Height-lms.Height)/2))
+}
+
+func (r *navRowRenderer) Refresh() {
+	r.apply()
+	r.bg.Refresh()
+	r.rail.Refresh()
+	r.ico.Refresh()
+	r.lab.Refresh()
+	canvasRefresh(r.n)
+}
+
+func (r *navRowRenderer) apply() {
+	p := pal()
+	r.lab.Text = r.n.label
+	switch {
+	case r.n.active:
+		r.bg.FillColor = p.PrimarySoft
+		r.rail.FillColor = p.Primary
+		r.lab.Color = p.Content
+		r.lab.TextStyle = fyne.TextStyle{Bold: true}
+		r.ico.Resource = theme.NewColoredResource(r.n.icon, theme.ColorNamePrimary)
+	case r.n.hovered:
+		r.bg.FillColor = p.Hover
+		r.rail.FillColor = color.Transparent
+		r.lab.Color = p.Content
+		r.lab.TextStyle = fyne.TextStyle{}
+		r.ico.Resource = theme.NewColoredResource(r.n.icon, colContent)
+	default:
+		r.bg.FillColor = color.Transparent
+		r.rail.FillColor = color.Transparent
+		r.lab.Color = p.Muted
+		r.lab.TextStyle = fyne.TextStyle{}
+		r.ico.Resource = theme.NewColoredResource(r.n.icon, colMuted)
+	}
+}
+
+// ---------------------------------------------------------------- sidebar
+
 type sidebar struct {
 	widget.BaseWidget
-	a        *App
-	expanded bool
+	a *App
 }
 
 func newSidebar(a *App) *sidebar {
-	s := &sidebar{a: a, expanded: true}
+	s := &sidebar{a: a}
 	s.ExtendBaseWidget(s)
 	return s
 }
 
 func (s *sidebar) MinSize() fyne.Size {
-	return fyne.NewSize(railExpanded, 200)
+	return fyne.NewSize(railWidth, 320)
 }
 
 func (s *sidebar) CreateRenderer() fyne.WidgetRenderer {
 	r := &sidebarRenderer{s: s}
 	r.bg = canvas.NewRectangle(pal().Base100)
 	r.edge = canvas.NewRectangle(pal().Base300)
-	r.body = container.NewVBox()
+	r.body = container.NewStack()
 	r.objects = []fyne.CanvasObject{r.bg, r.edge, r.body}
 	r.rebuild()
 	return r
@@ -90,87 +195,168 @@ func (r *sidebarRenderer) Refresh() {
 	r.bg.Refresh()
 	r.edge.Refresh()
 	r.body.Refresh()
+	canvasRefresh(r.s)
 }
 
 func (r *sidebarRenderer) rebuild() {
 	a := r.s.a
-	exp := r.s.expanded
-	p := pal()
-	items := []fyne.CanvasObject{vspace(12)}
+
+	rows := []fyne.CanvasObject{}
 	lastGroup := "\x00"
 	for _, it := range a.navItems() {
 		if !it.show(a) {
 			continue
 		}
-		if exp && it.group != "" && it.group != lastGroup {
-			items = append(items, vspace(8),
-				container.NewPadded(text(it.group, 10, p.Faint, true)))
+		if it.group != lastGroup {
+			gap := sp4
+			if lastGroup == "\x00" {
+				gap = sp1
+			}
+			rows = append(rows, vspace(gap))
+			if it.group != "" {
+				rows = append(rows, insetEach(0, 0, sp1, sp2+2, eyebrow(strings.ToUpper(it.group))))
+			}
 			lastGroup = it.group
 		}
-		items = append(items, r.navRow(it, exp, a.current == it.id))
+		item := it
+		rows = append(rows, newNavRow(item.icon, item.label, a.current == item.id, func() {
+			a.navigate(item.id)
+		}))
 	}
-	items = append(items, layout.NewSpacer())
+
+	nav := insetEach(sp2, sp3, sp4, sp3, vstack(2, rows...))
+	top := vstack(0, r.brand(), strongDivider())
+
+	var bottom fyne.CanvasObject
 	if a.loggedIn() {
-		email := a.user.Email
-		if email == "" {
-			email = "anonymous"
-		}
-		avatar := canvas.NewCircle(p.Base300)
-		ico := widget.NewIcon(theme.AccountIcon())
-		av := container.NewStack(spacer(28, 28), avatar, container.NewCenter(ico))
-		var row fyne.CanvasObject
-		if exp {
-			lab := text(email, 12, p.Content, true)
-			row = container.NewHBox(av, lab)
-		} else {
-			row = container.NewCenter(av)
-		}
-		active := a.current == pageAccount
-		items = append(items, r.wrapRow(row, active, func() { a.show(pageAccount) }))
-		items = append(items, vspace(8))
+		bottom = vstack(0, strongDivider(), insetEach(sp2, sp3, sp2, sp3, r.userChip()))
 	}
-	r.body.Objects = items
+
+	// The nav list scrolls: with the brand pinned top and the account chip
+	// pinned bottom, a short window (or a high zoom level) would otherwise
+	// squeeze the Border layout until the two overlapped.
+	scroll := container.NewVScroll(nav)
+	scroll.Direction = container.ScrollVerticalOnly
+	r.body.Objects = []fyne.CanvasObject{container.NewBorder(top, bottom, nil, nil, scroll)}
 }
 
-func (r *sidebarRenderer) navRow(it navItem, exp, active bool) fyne.CanvasObject {
-	ico := widget.NewIcon(it.icon)
-	var inner fyne.CanvasObject
-	if exp {
-		lab := text(it.label, 13, pal().Content, false)
-		if !active {
-			lab.Color = pal().Muted
-		}
-		inner = container.NewPadded(container.NewHBox(hspace(6), ico, lab))
-	} else {
-		inner = container.NewCenter(container.NewPadded(ico))
+func (r *sidebarRenderer) brand() fyne.CanvasObject {
+	ver := version.Version
+	if st := r.s.a.state; st != nil && st.Version != "" {
+		ver = st.Version
 	}
-	return r.wrapRow(inner, active, func() {
-		a := r.s.a
-		if it.id == pageServers {
-			a.fetchServers(false)
-		}
-		if it.id == pageDevices {
-			a.fetchDevices()
-		}
-		if it.id == pageTunnels {
-			a.fetchServers(false)
-		}
-		a.show(it.id)
-	})
+	name := text("Tunnels", fsLarge, pal().Content, true)
+	sub := text(ver, fsCaption, pal().Faint, false)
+	block := hstack(sp3, brandMark(z(20)), vstack(0, name, sub))
+	return insetEach(sp4, sp3, sp4, sp3+2, block)
 }
 
-func (r *sidebarRenderer) wrapRow(inner fyne.CanvasObject, active bool, tap func()) fyne.CanvasObject {
+func (r *sidebarRenderer) userChip() fyne.CanvasObject {
+	a := r.s.a
 	p := pal()
-	bg := canvas.NewRectangle(color.Transparent)
-	if active {
-		bg.FillColor = p.Hover
+	email := a.user.Email
+	if email == "" {
+		email = "Anonymous"
 	}
-	bar := canvas.NewRectangle(color.Transparent)
-	bar.SetMinSize(fyne.NewSize(2, 1))
-	if active {
-		bar.FillColor = p.Primary
+	initial := strings.ToUpper(email[:1])
+
+	ring := canvas.NewCircle(p.PrimarySoft)
+	glyph := text(initial, fsSmall, p.Primary, true)
+	avatar := container.NewStack(spacer(z(26), z(26)), ring, container.NewCenter(glyph))
+
+	name := text(email, fsSmall, p.Content, false)
+	role := text("Manage account", fsCaption, p.Faint, false)
+	chev := canvas.NewImageFromResource(theme.NewColoredResource(theme.NavigateNextIcon(), colFaint))
+	chev.FillMode = canvas.ImageFillContain
+	chevBox := container.New(fixedLayout{w: z(14), h: z(14)}, chev)
+
+	row := container.NewBorder(nil, nil, avatar, chevBox,
+		insetEach(0, 0, 0, sp2, vstack(0, name, role)))
+	return newNavRowWrap(row, a.current == pageAccount, func() { a.navigate(pageAccount) })
+}
+
+// navRowWrap gives arbitrary content the same hover/active surface as a nav row.
+type navRowWrap struct {
+	widget.BaseWidget
+	content fyne.CanvasObject
+	active  bool
+	hovered bool
+	tap     func()
+}
+
+func newNavRowWrap(content fyne.CanvasObject, active bool, tap func()) *navRowWrap {
+	w := &navRowWrap{content: content, active: active, tap: tap}
+	w.ExtendBaseWidget(w)
+	return w
+}
+
+func (w *navRowWrap) Tapped(*fyne.PointEvent) {
+	if w.tap != nil {
+		w.tap()
 	}
-	return newTap(container.NewStack(bg, container.NewBorder(nil, nil, nil, bar, inner)), tap)
+}
+
+func (w *navRowWrap) MouseIn(*desktop.MouseEvent)    { w.hovered = true; w.Refresh() }
+func (w *navRowWrap) MouseOut()                      { w.hovered = false; w.Refresh() }
+func (w *navRowWrap) MouseMoved(*desktop.MouseEvent) {}
+func (w *navRowWrap) Cursor() desktop.Cursor         { return desktop.PointerCursor }
+
+func (w *navRowWrap) CreateRenderer() fyne.WidgetRenderer {
+	bg := surface(radSm, color.Transparent, nil)
+	r := &navWrapRenderer{w: w, bg: bg}
+	r.apply()
+	return r
+}
+
+type navWrapRenderer struct {
+	w  *navRowWrap
+	bg *canvas.Rectangle
+}
+
+func (r *navWrapRenderer) Destroy() {}
+
+func (r *navWrapRenderer) Objects() []fyne.CanvasObject {
+	return []fyne.CanvasObject{r.bg, r.w.content}
+}
+
+func (r *navWrapRenderer) MinSize() fyne.Size {
+	ms := r.w.content.MinSize()
+	return fyne.NewSize(ms.Width+sp2*2, ms.Height+sp2*2)
+}
+
+func (r *navWrapRenderer) Layout(size fyne.Size) {
+	r.bg.Resize(size)
+	r.w.content.Move(fyne.NewPos(sp2, sp2))
+	r.w.content.Resize(fyne.NewSize(size.Width-sp2*2, size.Height-sp2*2))
+}
+
+func (r *navWrapRenderer) Refresh() {
+	r.apply()
+	r.bg.Refresh()
+	canvasRefresh(r.w)
+}
+
+func (r *navWrapRenderer) apply() {
+	p := pal()
+	switch {
+	case r.w.active:
+		r.bg.FillColor = p.PrimarySoft
+	case r.w.hovered:
+		r.bg.FillColor = p.Hover
+	default:
+		r.bg.FillColor = color.Transparent
+	}
+}
+
+// navigate loads a page and kicks off whatever data it needs.
+func (a *App) navigate(id pageID) {
+	switch id {
+	case pageServers, pageTunnels:
+		a.fetchServers(false)
+	case pageDevices:
+		a.fetchDevices()
+	}
+	a.show(id)
 }
 
 func (a *App) refreshNav() {

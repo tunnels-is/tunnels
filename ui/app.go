@@ -36,15 +36,16 @@ type App struct {
 	fyneApp   fyne.App
 	win       fyne.Window
 	content   *fyne.Container
+	pageBox   *fyne.Container
 	side      *sidebar
 	toastBox  *fyne.Container
 	toastKind string
 	toastMsg  string
-	status    *widget.Label
 
 	current  pageID
 	editTag  string
 	peersTag string
+	zoom     float32
 
 	user         *client.User
 	users        []*client.User
@@ -79,7 +80,7 @@ type App struct {
 	tunnelView []*client.TunnelMETA
 	deviceList *widget.List
 	deviceView []types.Device
-	logBox     *widget.Entry
+	logList    *widget.List
 	logView    []string
 
 	serversLoaded   bool
@@ -105,27 +106,30 @@ func newApp(icon []byte) *App {
 		fy.SetIcon(fyne.NewStaticResource("appicon.png", icon))
 	}
 
+	// Apply the saved zoom before anything is built so the first layout is
+	// already at the right scale.
+	zoom := loadZoom(fy)
+
 	w := fy.NewWindow("Tunnels")
-	w.Resize(fyne.NewSize(1280, 800))
+	w.Resize(fyne.NewSize(1200, 780))
 	w.SetMaster()
 
 	a := &App{
 		fyneApp:     fy,
 		win:         w,
-		status:      widget.NewLabel(""),
 		loginMode:   1,
 		dnsStatsTab: "blocked",
 		accountTab:  "account",
 		logs:        client.SnapshotLogs(),
 		advanced:    fy.Preferences().BoolWithFallback("advanced", false),
+		zoom:        zoom,
 	}
-	a.status.Wrapping = fyne.TextWrapOff
 
 	a.content = container.NewStack()
 	a.side = newSidebar(a)
 	a.toastBox = container.NewStack()
-	page := container.NewBorder(nil, nil, a.side, nil, a.content)
-	shell := container.New(shellLayout{}, page, a.toastBox)
+	a.pageBox = container.New(railLayout{}, a.side, a.content)
+	shell := container.New(shellLayout{}, a.pageBox, a.toastBox)
 	w.SetContent(shell)
 
 	w.SetCloseIntercept(func() {
@@ -136,6 +140,7 @@ func newApp(icon []byte) *App {
 		a.fyneApp.Quit()
 	})
 
+	a.registerZoomShortcuts()
 	a.startLogPump()
 	return a
 }
@@ -181,6 +186,20 @@ func (a *App) show(id pageID) {
 	if prev != id {
 		a.dropLiveLists()
 	}
+	// Login is a focused, full-window flow: the rail has nothing to offer yet.
+	// Hiding a child does not re-run the parent layout, so refresh the page
+	// container explicitly or it keeps the rail's gap.
+	if a.side != nil {
+		wasHidden := a.side.Hidden
+		if id == pageLogin {
+			a.side.Hide()
+		} else {
+			a.side.Show()
+		}
+		if wasHidden != a.side.Hidden && a.pageBox != nil {
+			defer a.pageBox.Refresh()
+		}
+	}
 	if a.content != nil {
 		for _, o := range a.content.Objects {
 			if o != nil {
@@ -204,7 +223,7 @@ func (a *App) dropLiveLists() {
 	a.serverList = nil
 	a.tunnelList = nil
 	a.deviceList = nil
-	a.logBox = nil
+	a.logList = nil
 }
 
 func (a *App) buildPage(id pageID) fyne.CanvasObject {

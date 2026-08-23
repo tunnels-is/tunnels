@@ -8,29 +8,25 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/theme"
-	"fyne.io/fyne/v2/widget"
 	"github.com/tunnels-is/tunnels/client"
 	"github.com/tunnels-is/tunnels/types"
 )
 
 func (a *App) dnsPage() fyne.CanvasObject {
 	if !a.advanced {
-		return container.NewCenter(muted("Enable Advanced mode in Settings to manage DNS."))
+		return pageShell("Resolver", "", nil,
+			emptyState("Advanced mode required", "Turn on Advanced mode in Settings to manage DNS."))
 	}
 	cfg := a.config
 	if cfg == nil {
-		return muted("Config not loaded")
+		return pageShell("Resolver", "", nil, emptyState("Config not loaded", ""))
 	}
 
-	ip := widget.NewEntry()
-	ip.SetText(cfg.DNSServerIP)
-	port := widget.NewEntry()
-	port.SetText(cfg.DNSServerPort)
-	dns1 := widget.NewEntry()
-	dns1.SetText(cfg.DNS1Default)
-	dns2 := widget.NewEntry()
-	dns2.SetText(cfg.DNS2Default)
-	saveDNS := widget.NewButton("Save DNS server", func() {
+	ip := kEntry("127.0.0.1", cfg.DNSServerIP)
+	port := kEntry("53", cfg.DNSServerPort)
+	dns1 := kEntry("1.1.1.1", cfg.DNS1Default)
+	dns2 := kEntry("8.8.8.8", cfg.DNS2Default)
+	saveDNS := primaryBtn("Save resolver", func() {
 		next := client.CloneConfig()
 		next.DNSServerIP = strings.TrimSpace(ip.Text)
 		next.DNSServerPort = strings.TrimSpace(port.Text)
@@ -41,67 +37,81 @@ func (a *App) dnsPage() fyne.CanvasObject {
 		}
 	})
 
-	behave := container.NewVBox(
-		bindCheck("Secure DNS", cfg.DNSOverHTTPS, func(v bool) { a.toggleConfig("DNSOverHTTPS") }),
-		bindCheck("Log blocked", cfg.LogBlockedDomains, func(v bool) { a.toggleConfig("LogBlockedDomains") }),
-		bindCheck("Log all", cfg.LogAllDomains, func(v bool) { a.toggleConfig("LogAllDomains") }),
-		bindCheck("Stats", cfg.DNSstats, func(v bool) { a.toggleConfig("DNSstats") }),
-		bindCheck("Dynamic encryption", cfg.DNSHTTPSAutomatic, func(v bool) { a.toggleConfig("DNSHTTPSAutomatic") }),
+	behaviour := settingList(
+		toggleRow("Secure DNS", "Resolve upstream queries over HTTPS.",
+			cfg.DNSOverHTTPS, func(bool) { a.toggleConfig("DNSOverHTTPS") }),
+		toggleRow("Dynamic encryption", "Pick the DoH endpoint automatically.",
+			cfg.DNSHTTPSAutomatic, func(bool) { a.toggleConfig("DNSHTTPSAutomatic") }),
+		toggleRow("Log blocked queries", "",
+			cfg.LogBlockedDomains, func(bool) { a.toggleConfig("LogBlockedDomains") }),
+		toggleRow("Log every query", "Verbose. Records all resolutions, not just blocks.",
+			cfg.LogAllDomains, func(bool) { a.toggleConfig("LogAllDomains") }),
+		toggleRow("Collect statistics", "Needed for the Statistics page.",
+			cfg.DNSstats, func(bool) { a.toggleConfig("DNSstats") }),
 	)
 
-	records := []fyne.CanvasObject{}
+	// Local records.
+	recRows := []fyne.CanvasObject{}
 	for i, r := range cfg.DNSRecords {
 		i, r := i, r
 		if r == nil {
 			continue
 		}
 		name := r.Domain
+		badges := []fyne.CanvasObject{}
 		if r.Wildcard {
-			name += " *"
+			badges = append(badges, badge("wildcard", tonePrimary))
 		}
-		edit := widget.NewButtonWithIcon("", theme.DocumentCreateIcon(), func() { a.editDNSRecord(i, r) })
-		del := widget.NewButtonWithIcon("", theme.DeleteIcon(), func() {
-			next := client.CloneConfig()
-			list := append([]*types.DNSRecord(nil), next.DNSRecords...)
-			if i >= 0 && i < len(list) {
-				list = append(list[:i], list[i+1:]...)
-			}
-			next.DNSRecords = list
-			a.saveConfig(next)
-			a.rebuild()
-		})
-		records = append(records, container.NewBorder(nil, nil, nil, container.NewHBox(edit, del),
-			container.NewVBox(widget.NewLabel(name), muted(strings.Join(r.IP, ", ")))))
-	}
-	if len(records) == 0 {
-		records = append(records, muted("No records configured"))
-	}
+		edit := newIconBtn(theme.DocumentCreateIcon(), kGhost, func() { a.editDNSRecord(i, r) }).small()
+		del := newIconBtn(theme.DeleteIcon(), kGhost, func() {
+			a.confirm("Delete record", "Delete DNS record "+name+"?", func() {
+				next := client.CloneConfig()
+				list := append([]*types.DNSRecord(nil), next.DNSRecords...)
+				if i >= 0 && i < len(list) {
+					list = append(list[:i], list[i+1:]...)
+				}
+				next.DNSRecords = list
+				a.saveConfig(next)
+				a.rebuild()
+			})
+		}).small()
 
-	return pageScroll(
-		card("DNS server", "Address the resolver listens on and upstream fallback resolvers.", container.NewVBox(
-			labeled("Server IP", ip),
-			labeled("Port", port),
-			labeled("Primary DNS", dns1),
-			labeled("Backup DNS", dns2),
-			saveDNS,
-		)),
-		card("Behaviour", "Encryption, logging and statistics for the resolver.", behave),
-		card("Records", "Locally resolved A and TXT records.", container.NewVBox(append([]fyne.CanvasObject{
-			widget.NewButton("Create", func() {
-				a.editDNSRecord(-1, &types.DNSRecord{Domain: "yourdomain.com", IP: []string{"127.0.0.1"}, Wildcard: true})
-			}),
-		}, records...)...)),
-		a.dnsListCard("Block lists", "External lists of domains that will be blocked.", "DNSBlockLists", cfg.DNSBlockLists, "blocklist"),
-		a.dnsListCard("White lists", "Domains here always resolve, even if they appear on a block list.", "DNSWhiteLists", cfg.DNSWhiteLists, "whitelist"),
-	)
+		target := strings.Join(r.IP, ", ")
+		if target == "" {
+			target = strings.Join(r.TXT, ", ")
+		}
+		left := vstack(1,
+			hstack(sp2, append([]fyne.CanvasObject{text(name, fsBody, pal().Content, false)}, badges...)...),
+			monoText(target, fsSmall, pal().Muted),
+		)
+		recRows = append(recRows, insetEach(sp2, 0, sp2, 0, splitRow(left, hstack(sp1, edit, del))))
+	}
+	if len(recRows) == 0 {
+		recRows = append(recRows, emptyRow("No local records configured."))
+	}
+	addRecord := outlineBtn("Add record", func() {
+		a.editDNSRecord(-1, &types.DNSRecord{Domain: "yourdomain.com", IP: []string{"127.0.0.1"}, Wildcard: true})
+	}).withIcon(theme.ContentAddIcon()).small()
+
+	return pageShell("Resolver", "Local DNS resolver, records and filter lists", nil, scrollBody(
+		card("Server", "Where the resolver listens, and the upstream fallbacks.",
+			formRows(
+				formPair(field("Listen IP", ip), field("Port", port)),
+				formPair(field("Primary upstream", dns1), field("Backup upstream", dns2)),
+				vspace(sp1),
+				hstack(0, saveDNS),
+			)),
+		card("Behaviour", "Encryption, logging and statistics.", behaviour),
+		cardBox("Local records", "A and TXT records answered by this client.", addRecord,
+			settingList(recRows...)),
+		a.dnsListCard("Block lists", "Domains from these lists are refused.", "DNSBlockLists", cfg.DNSBlockLists, "blocklist"),
+		a.dnsListCard("Allow lists", "Domains here always resolve, even if a block list contains them.", "DNSWhiteLists", cfg.DNSWhiteLists, "whitelist"),
+	))
 }
 
 func (a *App) dnsListCard(title, desc, key string, lists []*client.BlockList, kind string) fyne.CanvasObject {
-	rows := []fyne.CanvasObject{}
-	enableAll := widget.NewButton("Enable all", func() { a.setAllLists(key, true) })
-	disableAll := widget.NewButton("Disable all", func() { a.setAllLists(key, false) })
-	update := widget.NewButton("Update", func() {
-		a.note("Updating lists...")
+	update := outlineBtn("Update", func() {
+		a.note("Updating lists…")
 		go func() {
 			if kind == "blocklist" {
 				client.UpdateBlockLists()
@@ -114,17 +124,22 @@ func (a *App) dnsListCard(title, desc, key string, lists []*client.BlockList, ki
 				a.rebuild()
 			})
 		}()
-	})
-	create := widget.NewButton("Create", func() {
+	}).small()
+	create := outlineBtn("Add list", func() {
 		a.editDNSList(key, -1, &client.BlockList{Tag: "new-list", URL: "https://example.com/list.txt", Enabled: true})
-	})
+	}).withIcon(theme.ContentAddIcon()).small()
+	enableAll := ghostBtn("All on", func() { a.setAllLists(key, true) }).small()
+	disableAll := ghostBtn("All off", func() { a.setAllLists(key, false) }).small()
+	actions := hstack(sp1, enableAll, disableAll, update, create)
+
+	rows := []fyne.CanvasObject{}
 	for i, l := range lists {
 		i, l := i, l
 		if l == nil {
 			continue
 		}
 		custom := strings.EqualFold(l.Tag, "custom")
-		on := bindCheck("On", l.Enabled, func(v bool) {
+		toggle := newSwitch(l.Enabled, func(v bool) {
 			next := client.CloneConfig()
 			src := next.DNSBlockLists
 			if key == "DNSWhiteLists" {
@@ -143,24 +158,43 @@ func (a *App) dnsListCard(title, desc, key string, lists []*client.BlockList, ki
 			a.saveConfig(next)
 			a.rebuild()
 		})
-		btns := []fyne.CanvasObject{on}
+
+		right := []fyne.CanvasObject{}
 		if custom {
-			btns = append(btns, widget.NewButton("Edit domains", func() { a.editCustomList(kind) }))
+			right = append(right, ghostBtn("Edit domains", func() { a.editCustomList(kind) }).small())
 		} else {
-			btns = append(btns,
-				widget.NewButtonWithIcon("", theme.DocumentCreateIcon(), func() { a.editDNSList(key, i, l) }),
-				widget.NewButtonWithIcon("", theme.DeleteIcon(), func() { a.deleteListItem(key, i) }),
+			right = append(right,
+				newIconBtn(theme.DocumentCreateIcon(), kGhost, func() { a.editDNSList(key, i, l) }).small(),
+				newIconBtn(theme.DeleteIcon(), kGhost, func() {
+					a.confirm("Delete list", "Delete "+l.Tag+"?", func() { a.deleteListItem(key, i) })
+				}).small(),
 			)
 		}
-		rows = append(rows, container.NewBorder(nil, nil, nil, container.NewHBox(btns...),
-			container.NewVBox(widget.NewLabel(l.Tag), muted(fmt.Sprintf("%d domains", l.Count)))))
+		right = append(right, hspace(sp1), toggle)
+
+		sub := fmt.Sprintf("%d domains", l.Count)
+		if !custom && l.URL != "" {
+			sub = fmt.Sprintf("%d domains  ·  %s", l.Count, shortURL(l.URL))
+		}
+		left := vstack(1,
+			text(l.Tag, fsBody, pal().Content, false),
+			text(sub, fsSmall, pal().Faint, false),
+		)
+		rows = append(rows, insetEach(sp2, 0, sp2, 0, splitRow(left, hstack(sp1, right...))))
 	}
 	if len(rows) == 0 {
-		rows = append(rows, muted("None configured"))
+		rows = append(rows, emptyRow("None configured."))
 	}
-	return card(title, desc, container.NewVBox(append([]fyne.CanvasObject{
-		container.NewHBox(enableAll, disableAll, update, create),
-	}, rows...)...))
+	return cardBox(title, desc, actions, settingList(rows...))
+}
+
+// shortURL trims a list URL to something that fits on one line.
+func shortURL(raw string) string {
+	s := strings.TrimPrefix(strings.TrimPrefix(raw, "https://"), "http://")
+	if len(s) > 52 {
+		return s[:49] + "…"
+	}
+	return s
 }
 
 func (a *App) setAllLists(key string, enabled bool) {
@@ -207,13 +241,12 @@ func (a *App) deleteListItem(key string, index int) {
 }
 
 func (a *App) editDNSList(key string, index int, list *client.BlockList) {
-	tag := widget.NewEntry()
-	tag.SetText(list.Tag)
-	url := widget.NewEntry()
-	url.SetText(list.URL)
+	tag := kEntry("list name", list.Tag)
+	url := kEntry("https://…", list.URL)
 	en := bindCheck("Enabled", list.Enabled, nil)
-	form := container.NewVBox(labeled("Tag", tag), labeled("URL", url), en)
-	dialog.ShowCustomConfirm("List", "Save", "Cancel", form, func(ok bool) {
+	form := container.New(fixedLayout{w: z(420)},
+		vstack(sp3, field("Name", tag), field("URL", url), en))
+	d := dialog.NewCustomConfirm("Filter list", "Save", "Cancel", form, func(ok bool) {
 		if !ok {
 			return
 		}
@@ -240,18 +273,22 @@ func (a *App) editDNSList(key string, index int, list *client.BlockList) {
 		a.saveConfig(next)
 		a.rebuild()
 	}, a.win)
+	d.Resize(fyne.NewSize(z(480), z(320)))
+	d.Show()
 }
 
 func (a *App) editDNSRecord(index int, rec *types.DNSRecord) {
-	domain := widget.NewEntry()
-	domain.SetText(rec.Domain)
-	ips := widget.NewMultiLineEntry()
-	ips.SetText(strings.Join(rec.IP, "\n"))
-	txt := widget.NewMultiLineEntry()
-	txt.SetText(strings.Join(rec.TXT, "\n"))
-	wild := bindCheck("Wildcard", rec.Wildcard, nil)
-	form := container.NewVBox(labeled("Domain", domain), labeled("IPs", ips), labeled("TXT", txt), wild)
-	dialog.ShowCustomConfirm("DNS record", "Save", "Cancel", form, func(ok bool) {
+	domain := kEntry("yourdomain.com", rec.Domain)
+	ips := kMultiline(strings.Join(rec.IP, "\n"), 3)
+	txt := kMultiline(strings.Join(rec.TXT, "\n"), 3)
+	wild := bindCheck("Match subdomains (wildcard)", rec.Wildcard, nil)
+	form := container.New(fixedLayout{w: z(420)}, vstack(sp3,
+		field("Domain", domain),
+		fieldWith("IP addresses", "One per line.", ips),
+		fieldWith("TXT records", "One per line.", txt),
+		wild,
+	))
+	d := dialog.NewCustomConfirm("DNS record", "Save", "Cancel", form, func(ok bool) {
 		if !ok {
 			return
 		}
@@ -272,10 +309,12 @@ func (a *App) editDNSRecord(index int, rec *types.DNSRecord) {
 		a.saveConfig(next)
 		a.rebuild()
 	}, a.win)
+	d.Resize(fyne.NewSize(z(480), z(480)))
+	d.Show()
 }
 
 func (a *App) editCustomList(kind string) {
-	a.note("Loading list...")
+	a.note("Loading list…")
 	go func() {
 		data, err := client.GetDNSListContent(kind)
 		a.uiDo(func() {
@@ -283,32 +322,32 @@ func (a *App) editCustomList(kind string) {
 				a.fail(err.Error())
 				return
 			}
-			area := widget.NewMultiLineEntry()
-			area.SetText(data.Content)
-			area.SetMinRowsVisible(16)
-			d := dialog.NewCustomConfirm("Edit custom "+kind, "Save", "Cancel", container.NewScroll(area), func(ok bool) {
-				if !ok {
-					return
-				}
-				a.note("Saving list...")
-				go func() {
-					out, err := client.SetDNSListContent(kind, area.Text)
-					a.uiDo(func() {
-						if err != nil {
-							a.fail(err.Error())
-							return
-						}
-						n := 0
-						if out != nil {
-							n = out.Count
-						}
-						a.refreshState()
-						a.note(fmt.Sprintf("Custom list saved (%d domains)", n))
-						a.rebuild()
-					})
-				}()
-			}, a.win)
-			d.Resize(fyne.NewSize(640, 480))
+			area := kMultiline(data.Content, 18)
+			area.TextStyle = fyne.TextStyle{Monospace: true}
+			d := dialog.NewCustomConfirm("Custom "+kind, "Save", "Cancel",
+				container.NewScroll(area), func(ok bool) {
+					if !ok {
+						return
+					}
+					a.note("Saving list…")
+					go func() {
+						out, err := client.SetDNSListContent(kind, area.Text)
+						a.uiDo(func() {
+							if err != nil {
+								a.fail(err.Error())
+								return
+							}
+							n := 0
+							if out != nil {
+								n = out.Count
+							}
+							a.refreshState()
+							a.note(fmt.Sprintf("Custom list saved (%d domains)", n))
+							a.rebuild()
+						})
+					}()
+				}, a.win)
+			d.Resize(fyne.NewSize(z(680), z(560)))
 			d.Show()
 		})
 	}()

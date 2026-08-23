@@ -5,8 +5,6 @@ import (
 	"strings"
 
 	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/container"
-	"fyne.io/fyne/v2/widget"
 	"github.com/tunnels-is/tunnels/client"
 )
 
@@ -18,9 +16,11 @@ func (a *App) connectionsPage() fyne.CanvasObject {
 		}
 	}
 	if len(mine) == 0 {
-		return pageScroll(card("", "", muted("No active connections")))
+		return pageShell("Connections", "Live tunnels", nil,
+			emptyState("Nothing connected", "Connect to a server to see live connection details here."))
 	}
-	cards := []fyne.CanvasObject{widget.NewLabel("Connections")}
+
+	cards := make([]fyne.CanvasObject, 0, len(mine))
 	for _, ac := range mine {
 		ac := ac
 		var tun *client.TunnelMETA
@@ -29,43 +29,41 @@ func (a *App) connectionsPage() fyne.CanvasObject {
 			tag = ac.CR.Tag
 			tun = client.FindTunnel(tag)
 		}
-		rows := []fyne.CanvasObject{}
-		if tun != nil {
-			rows = append(rows,
-				infoRow("Tag", tun.Tag),
-				infoRow("Interface", tun.IFName),
-				infoRow("MTU", fmt.Sprintf("%d", tun.MTU)),
-				infoRow("DNS blocking", boolOn(tun.DNSBlocking)),
-				infoRow("DNS servers", strings.Join(tun.DNSServers, " ")),
-				infoRow("Auto connect", boolOn(tun.AutoConnect)),
-				infoRow("Auto re-connect", boolOn(tun.AutoReconnect)),
-			)
+
+		rows := []fyne.CanvasObject{
+			kvRow("Download", ac.IngressString(), true),
+			kvRow("Upload", ac.EgressString(), true),
 		}
-		if ac.CR != nil {
-			rows = append(rows, infoRow("User ID", ac.CR.UserID))
-		}
-		rows = append(rows,
-			infoRow("Download", ac.IngressString()),
-			infoRow("Upload", ac.EgressString()),
-		)
 		if ac.ServerResponse != nil {
 			sr := ac.ServerResponse
 			rows = append(rows,
-				infoRow("Public IP", sr.InterfaceIP),
-				infoRow("WireGuard IP", sr.WireGuardIP),
-				infoRow("DNS servers", strings.Join(sr.DNSServers, " ")),
+				kvRow("Public IP", sr.InterfaceIP, true),
+				kvRow("WireGuard IP", sr.WireGuardIP, true),
+				kvRow("DNS servers", strings.Join(sr.DNSServers, " "), true),
 			)
 		}
+		if tun != nil {
+			rows = append(rows,
+				kvRow("Interface", tun.IFName, true),
+				kvRow("MTU", fmt.Sprintf("%d", tun.MTU), true),
+				kvRow("DNS blocking", boolOn(tun.DNSBlocking), false),
+				kvRow("Auto connect", boolOn(tun.AutoConnect), false),
+				kvRow("Auto reconnect", boolOn(tun.AutoReconnect), false),
+			)
+		}
+
 		disc := dangerBtn("Disconnect", func() {
 			a.confirm("Disconnect", "Disconnect "+tag+"?", func() { a.disconnectActive(ac) })
 		})
+
 		title := tag
 		if title == "" {
 			title = ac.ID
 		}
-		cards = append(cards, card(title, "", container.NewVBox(append(rows, disc)...)))
+		cards = append(cards, cardBox(title, "Live tunnel", disc, vstack(0, rows...)))
 	}
-	return pageScroll(cards...)
+
+	return pageShell("Connections", fmtCount(len(mine), "live tunnels"), nil, scrollBody(cards...))
 }
 
 func boolOn(v bool) string {

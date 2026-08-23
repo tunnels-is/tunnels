@@ -14,6 +14,8 @@ import (
 	"github.com/skip2/go-qrcode"
 )
 
+// bindCheck is kept for dialog forms, where a labelled checkbox reads better
+// than a bare switch. Page settings use toggleRow instead.
 func bindCheck(label string, value bool, on func(bool)) *widget.Check {
 	c := widget.NewCheck(label, nil)
 	c.SetChecked(value)
@@ -21,40 +23,19 @@ func bindCheck(label string, value bool, on func(bool)) *widget.Check {
 	return c
 }
 
-func labeled(label string, obj fyne.CanvasObject) fyne.CanvasObject {
-	return kLabeled(label, obj)
-}
-
-func labeledEntry(label, placeholder string, password bool) (*widget.Entry, fyne.CanvasObject) {
-	e := widget.NewEntry()
-	if password {
-		e = widget.NewPasswordEntry()
-	}
-	e.SetPlaceHolder(placeholder)
-	cap := widget.NewLabel(label)
-	cap.TextStyle = fyne.TextStyle{Bold: true}
-	return e, container.NewVBox(cap, e)
-}
-
-func infoRow(label, value string) fyne.CanvasObject {
-	return kInfo(label, value)
-}
-
-func card(title, subtitle string, content fyne.CanvasObject) fyne.CanvasObject {
-	return cardBox(title, subtitle, nil, content)
-}
-
-func wrapLabel(text string) *widget.Label {
-	l := widget.NewLabel(text)
-	l.Wrapping = fyne.TextWrapWord
-	return l
-}
-
-func muted(text string) *widget.Label {
-	l := widget.NewLabel(text)
+func muted(s string) *widget.Label {
+	l := widget.NewLabel(s)
 	l.Importance = widget.LowImportance
 	l.Wrapping = fyne.TextWrapWord
 	return l
+}
+
+// notice is an inline callout for warnings and constraints inside a page.
+func notice(msg string, t tone) fyne.CanvasObject {
+	fg, bg := toneColors(t)
+	box := surface(radMd, bg, withAlpha(fg, 70))
+	lbl := rich(msg, sizeSmall, colContent, false)
+	return container.NewStack(box, insetXY(sp3, sp2+2, lbl))
 }
 
 func (a *App) confirm(title, msg string, fn func()) {
@@ -87,32 +68,26 @@ func qrImage(value string, px int) fyne.CanvasObject {
 	img := canvas.NewImageFromReader(bytes.NewReader(png), "qr")
 	img.FillMode = canvas.ImageFillContain
 	img.SetMinSize(fyne.NewSize(float32(px), float32(px)))
-	return img
+	// A white quiet zone keeps the code scannable on dark themes.
+	frame := surface(radMd, hex(0xff, 0xff, 0xff), nil)
+	return container.NewCenter(container.NewStack(frame, inset(sp3, img)))
 }
 
-func toolbar(left fyne.CanvasObject, right ...fyne.CanvasObject) fyne.CanvasObject {
-	return container.NewBorder(nil, nil, left, container.NewHBox(right...))
+func (a *App) copyBtn(value string) *kBtn {
+	return newIconBtn(theme.ContentCopyIcon(), kGhost, func() {
+		a.win.Clipboard().SetContent(value)
+		a.note("Copied to clipboard")
+	}).small()
 }
 
-func pageScroll(objs ...fyne.CanvasObject) fyne.CanvasObject {
-	col := make([]fyne.CanvasObject, 0, len(objs)*2+2)
-	col = append(col, vspace(8))
-	for i, o := range objs {
-		if i > 0 {
-			col = append(col, vspace(12))
-		}
-		col = append(col, o)
-	}
-	col = append(col, vspace(24))
-	return container.NewBorder(nil, nil, hspace(8), hspace(16),
-		container.NewVScroll(container.NewVBox(col...)))
-}
-
-func copyBtn(a *App, text string) *widget.Button {
-	return widget.NewButtonWithIcon("", theme.ContentCopyIcon(), func() {
-		a.win.Clipboard().SetContent(text)
-		a.note("Copied")
-	})
+// codeBlock shows a long secret in a scrollable monospace panel.
+func codeBlock(value string, rows int) fyne.CanvasObject {
+	e := widget.NewMultiLineEntry()
+	e.SetText(value)
+	e.TextStyle = fyne.TextStyle{Monospace: true}
+	e.Wrapping = fyne.TextWrapOff
+	e.SetMinRowsVisible(rows)
+	return e
 }
 
 func filterMatch(q string, parts ...string) bool {

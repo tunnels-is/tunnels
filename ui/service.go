@@ -15,27 +15,25 @@ func (a *App) note(msg string) { a.pushToast("ok", msg) }
 func (a *App) fail(msg string) { a.pushToast("error", msg) }
 
 func (a *App) pushToast(kind, msg string) {
+	if msg == "" {
+		return
+	}
 	a.toastKind = kind
 	a.toastMsg = msg
-	if a.status != nil {
-		a.status.SetText(msg)
-	}
 	if a.toastBox != nil {
-		a.toastBox.Objects = []fyne.CanvasObject{toastBanner(kind, msg)}
+		a.toastBox.Objects = []fyne.CanvasObject{newToast(kind, msg)}
 		a.toastBox.Refresh()
 	}
 	go func() {
-		time.Sleep(3 * time.Second)
+		time.Sleep(4 * time.Second)
 		a.uiDo(func() {
-			if a.toastMsg == msg {
-				a.toastMsg = ""
-				if a.toastBox != nil {
-					a.toastBox.Objects = nil
-					a.toastBox.Refresh()
-				}
-				if a.status != nil && a.status.Text == msg {
-					a.status.SetText("")
-				}
+			if a.toastMsg != msg {
+				return
+			}
+			a.toastMsg = ""
+			if a.toastBox != nil {
+				a.toastBox.Objects = nil
+				a.toastBox.Refresh()
 			}
 		})
 	}()
@@ -432,7 +430,7 @@ func (a *App) startLogPump() {
 					if len(a.logs) > 1000 {
 						a.logs = append([]string(nil), a.logs[len(a.logs)-800:]...)
 					}
-					if a.current == pageLogs && a.logBox != nil {
+					if a.current == pageLogs {
 						a.paintLogs()
 					}
 				})
@@ -441,24 +439,18 @@ func (a *App) startLogPump() {
 	}()
 }
 
+// paintLogs refreshes the log list in place. The list is virtualised, so the
+// whole buffer can be bound without the old 200-line truncation.
 func (a *App) paintLogs() {
-	if a.logBox == nil {
+	a.recomputeLogView()
+	if a.logList == nil {
+		// The page is showing its empty state; rebuild so the list appears.
+		if len(a.logView) > 0 {
+			a.reloadCurrent()
+		}
 		return
 	}
-	a.recomputeLogView()
-	n := len(a.logView)
-	if n > 200 {
-		a.logView = a.logView[:200]
-		n = 200
-	}
-	buf := make([]byte, 0, n*80)
-	for i, line := range a.logView {
-		if i > 0 {
-			buf = append(buf, '\n')
-		}
-		buf = append(buf, line...)
-	}
-	a.logBox.SetText(string(buf))
+	a.logList.Refresh()
 }
 
 func sameSession(aTok, bTok *client.DEVICE_TOKEN) bool {
