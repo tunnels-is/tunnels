@@ -197,13 +197,37 @@ func TestCreateFolder_AlreadyExists(t *testing.T) {
 	}
 }
 
-func TestCreateFolder_ParentMissing(t *testing.T) {
+func TestCreateFolder_CreatesMissingParents(t *testing.T) {
 	dir := t.TempDir()
 	target := filepath.Join(dir, "no", "such", "parent")
 
-	err := createFolder(target)
-	if err == nil {
-		t.Fatal("createFolder should fail when parent directory does not exist")
+	if err := createFolder(target); err != nil {
+		t.Fatalf("createFolder should create missing parents, got: %v", err)
+	}
+
+	info, err := os.Stat(target)
+	if err != nil {
+		t.Fatalf("directory not created: %v", err)
+	}
+	if !info.IsDir() {
+		t.Fatal("path is not a directory")
+	}
+	if info.Mode().Perm() != 0o700 {
+		t.Errorf("permissions = %o, expected 700", info.Mode().Perm())
+	}
+}
+
+func TestCreateFolder_ReturnsErrorInsteadOfExiting(t *testing.T) {
+	dir := t.TempDir()
+	// A file where a directory is wanted: MkdirAll cannot succeed, so this is
+	// the path that used to call os.Exit(1) and take the whole app down.
+	blocker := filepath.Join(dir, "blocker")
+	if err := os.WriteFile(blocker, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := CreateFolder(filepath.Join(blocker, "child")); err == nil {
+		t.Fatal("CreateFolder should return an error when the path cannot be created")
 	}
 }
 

@@ -52,7 +52,9 @@ func printInfo() {
 func InitService() error {
 	defer RecoverAndLog()
 
-	InitBaseFoldersAndPaths()
+	if err := InitBaseFoldersAndPaths(); err != nil {
+		return err
+	}
 	state := STATE.Load()
 
 	cfgError := loadConfigFromDisk(false)

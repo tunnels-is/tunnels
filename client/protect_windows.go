@@ -5,7 +5,6 @@ package client
 import (
 	"fmt"
 	"net"
-	"os/exec"
 	"strings"
 	"unsafe"
 
@@ -39,7 +38,7 @@ func protectRoutesPresent(ifName string, gw net.IP, ifIndex int, hosts []string)
 	if !ok || agw == nil || !agw.Equal(gw4) {
 		return false
 	}
-	out, err := exec.Command("route", "print", "-4").CombinedOutput()
+	out, err := hiddenCommand("route", "print", "-4").CombinedOutput()
 	if err != nil {
 		return false
 	}

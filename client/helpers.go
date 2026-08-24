@@ -13,7 +13,7 @@ import (
 	"github.com/tunnels-is/tunnels/types"
 )
 
-func InitBaseFoldersAndPaths() {
+func InitBaseFoldersAndPaths() error {
 	defer RecoverAndLog()
 	DEBUG("Creating base folders and paths")
 	s := STATE.Load()
@@ -37,35 +37,44 @@ func InitBaseFoldersAndPaths() {
 	}
 
 	s.BasePath = basePath
-	CreateFolder(s.BasePath)
+	if err := CreateFolder(s.BasePath); err != nil {
+		return err
+	}
 	s.ConfigFileName = s.BasePath + "tunnels" + configFileSuffix
 
-
-
 	s.AccountsPath = s.BasePath + accountsDirName + string(os.PathSeparator)
-	CreateFolder(s.AccountsPath)
+	if err := CreateFolder(s.AccountsPath); err != nil {
+		return err
+	}
 	s.UserPath = s.AccountsPath
 	s.TunnelsPath = ""
 	s.DevicesPath = ""
 	s.ActiveAccountHash = ""
 
 	s.LogPath = s.BasePath + "logs" + string(os.PathSeparator)
-	CreateFolder(s.LogPath)
+	if err := CreateFolder(s.LogPath); err != nil {
+		return err
+	}
 	s.LogFileName = s.LogPath + time.Now().Format("2006-01-02") + ".log"
 
 	s.BlockListPath = s.BasePath + "blocklists" + string(os.PathSeparator)
-	CreateFolder(s.BlockListPath)
+	if err := CreateFolder(s.BlockListPath); err != nil {
+		return err
+	}
 	if err := ensureCustomBlockListFile(s.BlockListPath); err != nil {
 		ERROR("unable to create custom blocklist file: ", err)
 	}
 
 	s.WhiteListPath = s.BasePath + "whitelists" + string(os.PathSeparator)
-	CreateFolder(s.WhiteListPath)
+	if err := CreateFolder(s.WhiteListPath); err != nil {
+		return err
+	}
 	if err := ensureCustomWhiteListFile(s.WhiteListPath); err != nil {
 		ERROR("unable to create custom whitelist file: ", err)
 	}
 
 	STATE.Store(s)
+	return nil
 }
 
 func RenameFile(oldName, newName string) (err error) {
@@ -121,23 +130,22 @@ func writeFileWithBackup(path string, newContent []byte) (err error) {
 	return f.Sync()
 }
 
+// createFolder makes path, including any missing parents. It is a no-op when
+// the directory already exists.
 func createFolder(path string) error {
-	err := os.Mkdir(path, 0o700)
-	if err != nil {
-		if os.IsExist(err) {
-			return nil
-		}
-		return err
-	}
-	return nil
+	return os.MkdirAll(path, 0o700)
 }
 
-func CreateFolder(path string) {
+// CreateFolder makes path and reports why it could not. Callers decide what a
+// failure means; it used to terminate the process, which killed the app with no
+// usable error and made the failure untestable.
+func CreateFolder(path string) error {
 	if err := createFolder(path); err != nil {
 		ERROR("Unable to create folder: ", path, " ", err)
-		os.Exit(1)
+		return fmt.Errorf("unable to create folder %s: %w", path, err)
 	}
 	DEBUG("New directory:", path)
+	return nil
 }
 
 func verifyAndWriteFile(diskPath string, expected []byte) (bool, error) {

@@ -4,10 +4,8 @@ package client
 
 import (
 	"net"
-	"os/exec"
 	"strings"
 	"sync/atomic"
-	"syscall"
 )
 
 var (
@@ -30,8 +28,7 @@ func windowsLoopbackName() string {
 }
 
 func runNetsh(args ...string) (string, error) {
-	cmd := exec.Command("netsh", args...)
-	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+	cmd := hiddenCommand("netsh", args...)
 	out, err := cmd.CombinedOutput()
 	return string(out), err
 }

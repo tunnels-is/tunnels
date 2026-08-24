@@ -49,9 +49,15 @@ func ensureAccountDirs(hash string) error {
 	if !isHexString(hash) {
 		return fmt.Errorf("invalid account hash")
 	}
-	CreateFolder(accountDir(hash))
-	CreateFolder(accountTunnelsPath(hash))
-	CreateFolder(accountDevicesPath(hash))
+	for _, dir := range []string{
+		accountDir(hash),
+		accountTunnelsPath(hash),
+		accountDevicesPath(hash),
+	} {
+		if err := CreateFolder(dir); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

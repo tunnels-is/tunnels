@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"strings"
 	"sync/atomic"
-	"syscall"
 )
 
 type TInterface struct {
@@ -25,7 +24,7 @@ type TInterface struct {
 }
 
 func (t *TInterface) Addr() (err error) {
-	cmd := exec.Command(
+	cmd := hiddenCommand(
 		"netsh",
 		"interface",
 		"ipv4",
@@ -55,7 +54,6 @@ func (t *TInterface) Addr() (err error) {
 		"store=persistent",
 	)
 
-	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
 	ob, err := cmd.Output()
 	if err != nil {
 		ERROR(fmt.Sprintf("%s - out: %s ", ob, err))
@@ -75,7 +73,7 @@ func (t *TInterface) AddrV6() (err error) {
 		ipv6Addr = ipv6Addr + "/64"
 	}
 
-	cmd := exec.Command(
+	cmd := hiddenCommand(
 		"netsh",
 		"interface",
 		"ipv6",
@@ -97,7 +95,6 @@ func (t *TInterface) AddrV6() (err error) {
 		"store=persistent",
 	)
 
-	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
 	ob, err := cmd.Output()
 	if err != nil {
 		if strings.Contains(string(ob), "already exists") || strings.Contains(err.Error(), "already exists") {
@@ -120,7 +117,7 @@ func IP_RouteMetric(network string, ifname string, metric string) (err error) {
 		metric = "1"
 	}
 
-	cmd := exec.Command(
+	cmd := hiddenCommand(
 		"netsh",
 		"interface",
 		"ipv4",
@@ -143,7 +140,6 @@ func IP_RouteMetric(network string, ifname string, metric string) (err error) {
 		"store=active",
 	)
 
-	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
 	ob, cerr := cmd.Output()
 	if cerr != nil {
 		ERROR(fmt.Sprintf("%s - out: %s ", ob, cerr))
@@ -168,7 +164,7 @@ func IP_AddRoute(
 
 	_ = IP_DelRoute(network, gateway, metric)
 
-	cmd := exec.Command(
+	cmd := hiddenCommand(
 		"netsh",
 		"interface",
 		"ipv4",
@@ -194,7 +190,6 @@ func IP_AddRoute(
 		"store=active",
 	)
 
-	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
 	ob, cerr := cmd.Output()
 
 	if cerr != nil {
@@ -205,11 +200,10 @@ func IP_AddRoute(
 }
 
 func IP_DelRoute(network string, _ string, _ string) (err error) {
-	cmd := exec.Command("route", "DELETE", network)
+	cmd := hiddenCommand("route", "DELETE", network)
 
 	DEBUG("route", "DELETE", network)
 
-	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
 	ob, cerr := cmd.Output()
 	if cerr != nil {
 		ERROR(fmt.Sprintf("%s - out: %s ", ob, cerr))
@@ -236,7 +230,7 @@ func IP_AddRouteV6(
 
 	var cmd *exec.Cmd
 	if network == "default" {
-		cmd = exec.Command(
+		cmd = hiddenCommand(
 			"netsh",
 			"interface",
 			"ipv6",
@@ -259,7 +253,7 @@ func IP_AddRouteV6(
 			"store=active",
 		)
 	} else {
-		cmd = exec.Command(
+		cmd = hiddenCommand(
 			"netsh",
 			"interface",
 			"ipv6",
@@ -283,7 +277,6 @@ func IP_AddRouteV6(
 		)
 	}
 
-	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
 	ob, cerr := cmd.Output()
 
 	if cerr != nil {
@@ -300,7 +293,7 @@ func IP_AddRouteV6(
 func IP_DelRouteV6(network string, _ string, _ string) (err error) {
 	var cmd *exec.Cmd
 	if network == "default" {
-		cmd = exec.Command(
+		cmd = hiddenCommand(
 			"netsh",
 			"interface",
 			"ipv6",
@@ -317,7 +310,7 @@ func IP_DelRouteV6(network string, _ string, _ string) (err error) {
 			"::/0",
 		)
 	} else {
-		cmd = exec.Command(
+		cmd = hiddenCommand(
 			"netsh",
 			"interface",
 			"ipv6",
@@ -335,7 +328,6 @@ func IP_DelRouteV6(network string, _ string, _ string) (err error) {
 		)
 	}
 
-	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
 	ob, cerr := cmd.Output()
 	if cerr != nil {
 		ERROR(fmt.Sprintf("IPv6 route delete failed: %s - out: %s", cerr, ob))
@@ -346,7 +338,7 @@ func IP_DelRouteV6(network string, _ string, _ string) (err error) {
 }
 
 func (t *TInterface) SetMTU() error {
-	cmd := exec.Command(
+	cmd := hiddenCommand(
 		"netsh",
 		"interface",
 		"ipv4",
@@ -366,7 +358,6 @@ func (t *TInterface) SetMTU() error {
 		"mtu="+strconv.FormatInt(int64(t.MTU), 10),
 	)
 
-	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
 	ob, cerr := cmd.Output()
 	if cerr != nil {
 		ERROR(fmt.Sprintf("%s - out: %s ", ob, cerr))

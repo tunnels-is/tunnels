@@ -351,7 +351,13 @@ func (r *navWrapRenderer) apply() {
 // navigate loads a page and kicks off whatever data it needs.
 func (a *App) navigate(id pageID) {
 	switch id {
-	case pageServers, pageTunnels:
+	case pageServers:
+		a.fetchServers(false)
+	case pageTunnels:
+		// Tunnels are read from the account workspace, which the CLI or a
+		// previous session may have changed, so re-read rather than trusting
+		// the snapshot taken at startup.
+		a.refreshState()
 		a.fetchServers(false)
 	case pageDevices:
 		a.fetchDevices()
