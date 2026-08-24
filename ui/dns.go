@@ -27,14 +27,15 @@ func (a *App) dnsPage() fyne.CanvasObject {
 	dns1 := kEntry("1.1.1.1", cfg.DNS1Default)
 	dns2 := kEntry("8.8.8.8", cfg.DNS2Default)
 	saveDNS := primaryBtn("Save resolver", func() {
-		next := client.CloneConfig()
-		next.DNSServerIP = strings.TrimSpace(ip.Text)
-		next.DNSServerPort = strings.TrimSpace(port.Text)
-		next.DNS1Default = strings.TrimSpace(dns1.Text)
-		next.DNS2Default = strings.TrimSpace(dns2.Text)
-		if a.saveConfig(next) {
+		ipv, portv := strings.TrimSpace(ip.Text), strings.TrimSpace(port.Text)
+		d1, d2 := strings.TrimSpace(dns1.Text), strings.TrimSpace(dns2.Text)
+		a.updateConfig("Saving resolver", func(c *client.Config) {
+			c.DNSServerIP, c.DNSServerPort = ipv, portv
+			c.DNS1Default, c.DNS2Default = d1, d2
+		}, func() {
+			a.note("Resolver saved")
 			a.rebuild()
-		}
+		})
 	})
 
 	behaviour := settingList(
@@ -65,14 +66,13 @@ func (a *App) dnsPage() fyne.CanvasObject {
 		edit := newIconBtn(theme.DocumentCreateIcon(), kGhost, func() { a.editDNSRecord(i, r) }).small()
 		del := newIconBtn(theme.DeleteIcon(), kGhost, func() {
 			a.confirm("Delete record", "Delete DNS record "+name+"?", func() {
-				next := client.CloneConfig()
-				list := append([]*types.DNSRecord(nil), next.DNSRecords...)
-				if i >= 0 && i < len(list) {
-					list = append(list[:i], list[i+1:]...)
-				}
-				next.DNSRecords = list
-				a.saveConfig(next)
-				a.rebuild()
+				a.updateConfig("Removing record", func(c *client.Config) {
+					list := append([]*types.DNSRecord(nil), c.DNSRecords...)
+					if i >= 0 && i < len(list) {
+						list = append(list[:i], list[i+1:]...)
+					}
+					c.DNSRecords = list
+				}, a.rebuild)
 			})
 		}).small()
 
@@ -139,24 +139,26 @@ func (a *App) dnsListCard(title, desc, key string, lists []*client.BlockList, ki
 			continue
 		}
 		custom := strings.EqualFold(l.Tag, "custom")
+		// No rebuild on success: the switch already shows the new state, and
+		// re-rendering the page under the cursor was half of what made this
+		// feel like an interruption.
 		toggle := newSwitch(l.Enabled, func(v bool) {
-			next := client.CloneConfig()
-			src := next.DNSBlockLists
-			if key == "DNSWhiteLists" {
-				src = next.DNSWhiteLists
-			}
-			if i < len(src) && src[i] != nil {
-				cp := *src[i]
-				cp.Enabled = v
-				src[i] = &cp
-			}
-			if key == "DNSWhiteLists" {
-				next.DNSWhiteLists = src
-			} else {
-				next.DNSBlockLists = src
-			}
-			a.saveConfig(next)
-			a.rebuild()
+			a.updateConfig("Applying list change", func(c *client.Config) {
+				src := c.DNSBlockLists
+				if key == "DNSWhiteLists" {
+					src = c.DNSWhiteLists
+				}
+				if i < len(src) && src[i] != nil {
+					cp := *src[i]
+					cp.Enabled = v
+					src[i] = &cp
+				}
+				if key == "DNSWhiteLists" {
+					c.DNSWhiteLists = src
+				} else {
+					c.DNSBlockLists = src
+				}
+			}, nil)
 		})
 
 		right := []fyne.CanvasObject{}
@@ -198,46 +200,49 @@ func shortURL(raw string) string {
 }
 
 func (a *App) setAllLists(key string, enabled bool) {
-	next := client.CloneConfig()
-	src := next.DNSBlockLists
-	if key == "DNSWhiteLists" {
-		src = next.DNSWhiteLists
+	label := "Enabling lists"
+	if !enabled {
+		label = "Disabling lists"
 	}
-	out := make([]*client.BlockList, len(src))
-	for i, l := range src {
-		if l == nil {
-			continue
+	// Every switch changes here, so this one does rebuild once it lands.
+	a.updateConfig(label, func(c *client.Config) {
+		src := c.DNSBlockLists
+		if key == "DNSWhiteLists" {
+			src = c.DNSWhiteLists
 		}
-		cp := *l
-		cp.Enabled = enabled
-		out[i] = &cp
-	}
-	if key == "DNSWhiteLists" {
-		next.DNSWhiteLists = out
-	} else {
-		next.DNSBlockLists = out
-	}
-	a.saveConfig(next)
-	a.rebuild()
+		out := make([]*client.BlockList, len(src))
+		for i, l := range src {
+			if l == nil {
+				continue
+			}
+			cp := *l
+			cp.Enabled = enabled
+			out[i] = &cp
+		}
+		if key == "DNSWhiteLists" {
+			c.DNSWhiteLists = out
+		} else {
+			c.DNSBlockLists = out
+		}
+	}, a.rebuild)
 }
 
 func (a *App) deleteListItem(key string, index int) {
-	next := client.CloneConfig()
-	src := next.DNSBlockLists
-	if key == "DNSWhiteLists" {
-		src = next.DNSWhiteLists
-	}
-	if index < 0 || index >= len(src) {
-		return
-	}
-	src = append(src[:index], src[index+1:]...)
-	if key == "DNSWhiteLists" {
-		next.DNSWhiteLists = src
-	} else {
-		next.DNSBlockLists = src
-	}
-	a.saveConfig(next)
-	a.rebuild()
+	a.updateConfig("Removing list", func(c *client.Config) {
+		src := c.DNSBlockLists
+		if key == "DNSWhiteLists" {
+			src = c.DNSWhiteLists
+		}
+		if index < 0 || index >= len(src) {
+			return
+		}
+		src = append(src[:index], src[index+1:]...)
+		if key == "DNSWhiteLists" {
+			c.DNSWhiteLists = src
+		} else {
+			c.DNSBlockLists = src
+		}
+	}, a.rebuild)
 }
 
 func (a *App) editDNSList(key string, index int, list *client.BlockList) {
@@ -254,24 +259,23 @@ func (a *App) editDNSList(key string, index int, list *client.BlockList) {
 		cp.Tag = strings.TrimSpace(tag.Text)
 		cp.URL = strings.TrimSpace(url.Text)
 		cp.Enabled = en.Checked
-		next := client.CloneConfig()
-		src := next.DNSBlockLists
-		if key == "DNSWhiteLists" {
-			src = next.DNSWhiteLists
-		}
-		src = append([]*client.BlockList(nil), src...)
-		if index >= 0 && index < len(src) {
-			src[index] = &cp
-		} else {
-			src = append(src, &cp)
-		}
-		if key == "DNSWhiteLists" {
-			next.DNSWhiteLists = src
-		} else {
-			next.DNSBlockLists = src
-		}
-		a.saveConfig(next)
-		a.rebuild()
+		a.updateConfig("Saving list", func(c *client.Config) {
+			src := c.DNSBlockLists
+			if key == "DNSWhiteLists" {
+				src = c.DNSWhiteLists
+			}
+			src = append([]*client.BlockList(nil), src...)
+			if index >= 0 && index < len(src) {
+				src[index] = &cp
+			} else {
+				src = append(src, &cp)
+			}
+			if key == "DNSWhiteLists" {
+				c.DNSWhiteLists = src
+			} else {
+				c.DNSBlockLists = src
+			}
+		}, a.rebuild)
 	}, a.win)
 	d.Resize(fyne.NewSize(z(480), z(320)))
 	d.Show()
@@ -298,16 +302,15 @@ func (a *App) editDNSRecord(index int, rec *types.DNSRecord) {
 			IP:       splitLines(ips.Text),
 			TXT:      splitLines(txt.Text),
 		}
-		next := client.CloneConfig()
-		list := append([]*types.DNSRecord(nil), next.DNSRecords...)
-		if index >= 0 && index < len(list) {
-			list[index] = &cp
-		} else {
-			list = append(list, &cp)
-		}
-		next.DNSRecords = list
-		a.saveConfig(next)
-		a.rebuild()
+		a.updateConfig("Saving record", func(c *client.Config) {
+			list := append([]*types.DNSRecord(nil), c.DNSRecords...)
+			if index >= 0 && index < len(list) {
+				list[index] = &cp
+			} else {
+				list = append(list, &cp)
+			}
+			c.DNSRecords = list
+		}, a.rebuild)
 	}, a.win)
 	d.Resize(fyne.NewSize(z(480), z(480)))
 	d.Show()

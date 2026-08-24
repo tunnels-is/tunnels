@@ -361,21 +361,15 @@ func (a *App) disconnectActive(t *client.TUN) {
 	}()
 }
 
-func (a *App) saveConfig(cfg *client.Config) bool {
-	if cfg == nil {
-		return false
-	}
-	if err := client.SetConfig(cfg); err != nil {
-		a.fail(err.Error())
-		return false
-	}
-	a.refreshState()
-	a.note("Config saved")
-	return true
+// toggleConfig flips a boolean config field in the background. Callers are
+// switches, which already show the new state, so nothing rebuilds on success.
+func (a *App) toggleConfig(key string) {
+	a.updateConfig("Applying setting", func(cfg *client.Config) {
+		toggleConfigField(cfg, key)
+	}, nil)
 }
 
-func (a *App) toggleConfig(key string) {
-	cfg := client.CloneConfig()
+func toggleConfigField(cfg *client.Config, key string) {
 	switch key {
 	case "InfoLogging":
 		cfg.InfoLogging = !cfg.InfoLogging
@@ -405,10 +399,7 @@ func (a *App) toggleConfig(key string) {
 		cfg.DNSstats = !cfg.DNSstats
 	case "DNSHTTPSAutomatic":
 		cfg.DNSHTTPSAutomatic = !cfg.DNSHTTPSAutomatic
-	default:
-		return
 	}
-	a.saveConfig(cfg)
 }
 
 func (a *App) startLogPump() {

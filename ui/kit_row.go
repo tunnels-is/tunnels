@@ -197,7 +197,7 @@ func (r *kRow) CreateRenderer() fyne.WidgetRenderer {
 	p := pal()
 	d := &kRowRenderer{
 		r:       r,
-		bg:      surface(radMd, color.Transparent, nil),
+		bg:      canvas.NewRectangle(color.Transparent),
 		rail:    canvas.NewRectangle(color.Transparent),
 		line:    canvas.NewRectangle(p.Divider),
 		badgeBg: surface(radFull, color.Transparent, nil),
@@ -245,12 +245,23 @@ func (d *kRowRenderer) MinSize() fyne.Size {
 }
 
 func (d *kRowRenderer) Layout(size fyne.Size) {
-	d.bg.Resize(size)
+	// widget.List always inserts SizeNamePadding between items and offers no way
+	// to turn that off, so each row claims the gap *below* it. Growing downwards
+	// rather than in both directions keeps the first row flush with the column
+	// header, and gives every row an identical band.
+	band := size.Height + sp2
+	d.bg.Resize(fyne.NewSize(size.Width, band))
 	d.bg.Move(fyne.NewPos(0, 0))
+
+	// The divider closes the band, so it lands on the real row boundary.
 	d.line.Resize(fyne.NewSize(size.Width, z(1)))
-	d.line.Move(fyne.NewPos(0, size.Height-z(1)))
-	d.rail.Resize(fyne.NewSize(z(3), size.Height-sp4))
-	d.rail.Move(fyne.NewPos(0, sp2))
+	d.line.Move(fyne.NewPos(0, band-z(1)))
+
+	// Content is centred on the band, not on the bare row, or it would sit high.
+	mid := band / 2
+	railH := max32(z(12), band-sp3)
+	d.rail.Resize(fyne.NewSize(z(3), railH))
+	d.rail.Move(fyne.NewPos(0, mid-railH/2))
 
 	// The action cluster owns the trailing edge; the width the spec reserves for
 	// it is what both the cells and the header lay out against.
@@ -264,7 +275,7 @@ func (d *kRowRenderer) Layout(size fyne.Size) {
 		ms := b.MinSize()
 		right -= ms.Width
 		b.Resize(ms)
-		b.Move(fyne.NewPos(right, (size.Height-ms.Height)/2))
+		b.Move(fyne.NewPos(right, mid-ms.Height/2))
 		right -= sp1
 	}
 	place(d.r.iconB)
@@ -286,14 +297,14 @@ func (d *kRowRenderer) Layout(size fyne.Size) {
 		if col.align == fyne.TextAlignTrailing {
 			x = rects[i].x + w - ms.Width
 		}
-		cell.Move(fyne.NewPos(x, (size.Height-ms.Height)/2))
+		cell.Move(fyne.NewPos(x, mid-ms.Height/2))
 
 		if col.badge && d.r.cells[i] != "" {
 			hideBadge = false
 			pw := ms.Width + sp2*2
 			ph := z(19)
 			d.badgeBg.Resize(fyne.NewSize(pw, ph))
-			d.badgeBg.Move(fyne.NewPos(x-sp2, (size.Height-ph)/2))
+			d.badgeBg.Move(fyne.NewPos(x-sp2, mid-ph/2))
 		}
 	}
 	if hideBadge {
@@ -366,6 +377,35 @@ func newRowList(spec *tableSpec, count func() int, bind func(widget.ListItemID, 
 	return l
 }
 
+// headerBodyLayout puts a fixed-height header directly above a filling body.
+//
+// container.NewBorder cannot be used here: it inserts theme padding between the
+// border object and the centre, which left an 8px strip of page background
+// between the column header and the first row that no hover highlight covered.
+type headerBodyLayout struct{}
+
+func (headerBodyLayout) Layout(objs []fyne.CanvasObject, size fyne.Size) {
+	if len(objs) < 2 {
+		return
+	}
+	head, body := objs[0], objs[1]
+	hh := head.MinSize().Height
+	head.Move(fyne.NewPos(0, 0))
+	head.Resize(fyne.NewSize(size.Width, hh))
+	body.Move(fyne.NewPos(0, hh))
+	body.Resize(fyne.NewSize(size.Width, max32(0, size.Height-hh)))
+}
+
+func (headerBodyLayout) MinSize(objs []fyne.CanvasObject) fyne.Size {
+	var w, h float32
+	for _, o := range objs {
+		ms := o.MinSize()
+		w = max32(w, ms.Width)
+		h += ms.Height
+	}
+	return fyne.NewSize(w, h)
+}
+
 // tableBody stacks the column header above the scrolling rows. The header
 // carries its own hairline, which is why table pages drop the page-level rule:
 // two lines a few pixels apart read as a mistake.
@@ -373,5 +413,5 @@ func tableBody(spec *tableSpec, l *widget.List) fyne.CanvasObject {
 	pad := gutter - sp4
 	head := insetEach(0, pad, 0, pad, newTableHeader(spec))
 	rows := insetEach(0, pad, sp3, pad, boostList(l))
-	return container.NewBorder(head, nil, nil, nil, rows)
+	return container.New(headerBodyLayout{}, head, rows)
 }

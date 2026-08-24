@@ -47,6 +47,40 @@ func insetEach(t, r, b, l float32, obj fyne.CanvasObject) *fyne.Container {
 	return container.New(insetLayout{t, r, b, l}, obj)
 }
 
+// dropShadow fakes elevation. Fyne has no shadow primitive, so a few
+// progressively larger, fainter rounded rects sit behind the content, offset
+// downwards so the light reads as coming from above.
+func dropShadow(radius float32, content fyne.CanvasObject) fyne.CanvasObject {
+	p := pal()
+	layers := make([]fyne.CanvasObject, 0, 4)
+	for _, l := range []struct {
+		spread float32
+		alpha  uint8
+	}{{16, 9}, {10, 14}, {5, 20}, {2, 26}} {
+		spread := z(l.spread)
+		r := canvas.NewRectangle(withAlpha(p.Shadow, l.alpha))
+		r.CornerRadius = radius + spread
+		drop := spread * 0.5
+		layers = append(layers, container.New(
+			insetLayout{-spread + drop, -spread, -spread - drop, -spread}, r))
+	}
+	return container.NewStack(append(layers, content)...)
+}
+
+// strictLayout forces an exact size, ignoring what the child asks for.
+type strictLayout struct{ w, h float32 }
+
+func (s strictLayout) Layout(objs []fyne.CanvasObject, _ fyne.Size) {
+	for _, o := range objs {
+		o.Move(fyne.NewPos(0, 0))
+		o.Resize(fyne.NewSize(s.w, s.h))
+	}
+}
+
+func (s strictLayout) MinSize([]fyne.CanvasObject) fyne.Size {
+	return fyne.NewSize(s.w, s.h)
+}
+
 // capLayout caps a child's width and pins it to the left. Keeps forms readable
 // instead of stretching inputs across a 1280px window.
 type capLayout struct {
@@ -780,18 +814,46 @@ func (shellLayout) Layout(objs []fyne.CanvasObject, size fyne.Size) {
 	objs[0].Move(fyne.NewPos(0, 0))
 	objs[0].Resize(size)
 
-	// Bottom right: the top right is where page actions live, and a toast that
-	// covers the search box or the Connect buttons is worse than no toast.
-	toast := objs[1]
-	ts := toast.MinSize()
-	if ts.Width < 8 || ts.Height < 8 {
-		toast.Resize(fyne.NewSize(0, 0))
-		toast.Move(fyne.NewPos(size.Width, size.Height))
+	// Overlays are placed independently: an early return for an empty toast
+	// used to skip the loader entirely, leaving it parked at 0,0 over the
+	// sidebar — which is the normal case, since a toggle shows a loader and no
+	// toast.
+	//
+	// Toast bottom right (the top right is where page actions live, and
+	// covering the search box or Connect buttons is worse than no toast);
+	// loader bottom left, so both can be on screen at once.
+	placeToast(objs[1], size, true)
+
+	// The loader covers the whole window: it carries its own scrim and centres
+	// its card, so it is sized to the shell rather than parked in a corner.
+	if len(objs) > 2 {
+		busy := objs[2]
+		if busy.MinSize().Height < 8 {
+			busy.Resize(fyne.NewSize(0, 0))
+			busy.Move(fyne.NewPos(size.Width, size.Height))
+		} else {
+			busy.Move(fyne.NewPos(0, 0))
+			busy.Resize(size)
+		}
+	}
+}
+
+// placeToast parks an overlay in a bottom corner, or collapses it out of the
+// way when it has no content.
+func placeToast(o fyne.CanvasObject, size fyne.Size, trailing bool) {
+	ms := o.MinSize()
+	if ms.Width < 8 || ms.Height < 8 {
+		o.Resize(fyne.NewSize(0, 0))
+		o.Move(fyne.NewPos(size.Width, size.Height))
 		return
 	}
-	w := min32(ts.Width, size.Width-2*sp5)
-	toast.Resize(fyne.NewSize(w, ts.Height))
-	toast.Move(fyne.NewPos(size.Width-w-sp5, size.Height-ts.Height-sp5))
+	w := min32(ms.Width, size.Width-2*sp5)
+	o.Resize(fyne.NewSize(w, ms.Height))
+	x := sp5
+	if trailing {
+		x = size.Width - w - sp5
+	}
+	o.Move(fyne.NewPos(x, size.Height-ms.Height-sp5))
 }
 
 func (shellLayout) MinSize(objs []fyne.CanvasObject) fyne.Size {
