@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -19,16 +20,6 @@ func (a *App) tunnelEditPage() fyne.CanvasObject {
 			emptyState("Tunnel not found", `No tunnel named "`+a.editTag+`" exists any more.`))
 	}
 	form := client.CloneTunnelMETA(meta)
-	if form.DNSServers == nil {
-		form.DNSServers = []string{}
-	}
-	if form.Routes == nil {
-		form.Routes = []*types.Route{}
-	}
-	if form.Networks == nil {
-		form.Networks = []*types.Network{}
-	}
-
 	connected := a.activeByTag()[form.Tag] != nil
 
 	tag := kEntry("tunnel name", form.Tag)
@@ -59,30 +50,60 @@ func (a *App) tunnelEditPage() fyne.CanvasObject {
 		toggle("AutoConnect", "Auto connect", "Bring this tunnel up when the app starts.", form.AutoConnect),
 		toggle("AutoReconnect", "Auto reconnect", "Re-establish the tunnel if it drops.", form.AutoReconnect),
 		toggle("EnableDefaultRoute", "Default route", "Send all traffic through this tunnel.", form.EnableDefaultRoute),
+		toggle("KillSwitch", "Kill switch", "Blackhole traffic if this tunnel goes down.", form.KillSwitch),
 		toggle("DNSBlocking", "DNS blocking", "Apply the resolver's block lists on this tunnel.", form.DNSBlocking),
 		toggle("LocalhostNat", "Localhost NAT", "NAT loopback traffic into the tunnel.", form.LocalhostNat),
 		toggle("EnableWAN", "WAN routing", "Allow routing to the tunnel's wider network.", form.EnableWAN),
 	)
 
-	dns := kMultiline(strings.Join(form.DNSServers, "\n"), 3)
+	// Row editors need to nudge the page to re-lay out when a row is added or
+	// removed, since a container's own Refresh does not reach its parents.
+	var reflow func()
+	bump := func() {
+		if reflow != nil {
+			reflow()
+		}
+	}
 
-	var rlines []string
+	dnsRows := make([][]string, 0, len(form.DNSServers))
+	for _, s := range form.DNSServers {
+		dnsRows = append(dnsRows, []string{s})
+	}
+	dnsEd := newRowEditor("resolver",
+		[]fieldCol{{label: "Resolver", placeholder: "1.1.1.1", weight: 1}},
+		dnsRows, "No resolvers set — the tunnel keeps the system DNS.", bump)
+
+	routeRows := make([][]string, 0, len(form.Routes))
 	for _, r := range form.Routes {
 		if r == nil {
 			continue
 		}
-		rlines = append(rlines, strings.TrimSpace(r.Address+" "+r.Metric))
+		routeRows = append(routeRows, []string{r.Address, r.Metric, r.Gateway})
 	}
-	routes := kMultiline(strings.Join(rlines, "\n"), 4)
+	routeEd := newRowEditor("route", []fieldCol{
+		{label: "Address", placeholder: "10.0.0.0/24", weight: 2.2},
+		{label: "Metric", placeholder: "1", weight: 1},
+		{label: "Gateway", placeholder: "optional", weight: 1.8},
+	}, routeRows, "No extra routes.", bump)
 
-	var nlines []string
+	netRows := make([][]string, 0, len(form.Networks))
 	for _, n := range form.Networks {
 		if n == nil {
 			continue
 		}
-		nlines = append(nlines, strings.TrimSpace(n.Tag+" "+n.Network+" "+n.Nat))
+		netRows = append(netRows, []string{n.Tag, n.Network, n.Nat})
 	}
-	nets := kMultiline(strings.Join(nlines, "\n"), 4)
+	netEd := newRowEditor("network", []fieldCol{
+		{label: "Tag", placeholder: "lan", weight: 1.2},
+		{label: "Network", placeholder: "192.168.1.0/24", weight: 2},
+		{label: "NAT", placeholder: "optional", weight: 2},
+	}, netRows, "No networks mapped.", bump)
+
+	portStrs := make([]string, 0, len(form.BlockedPorts))
+	for _, p := range form.BlockedPorts {
+		portStrs = append(portStrs, strconv.Itoa(int(p)))
+	}
+	ports := kEntry("e.g. 25, 445, 3389", strings.Join(portStrs, ", "))
 
 	save := primaryBtn("Save changes", func() {
 		form.Tag = strings.TrimSpace(tag.Text)
@@ -94,41 +115,42 @@ func (a *App) tunnelEditPage() fyne.CanvasObject {
 		if n, err := strconv.Atoi(strings.TrimSpace(txq.Text)); err == nil {
 			form.TxQueueLen = int32(n)
 		}
+		form.AutoConnect = switches["AutoConnect"].on
+		form.AutoReconnect = switches["AutoReconnect"].on
+		form.EnableDefaultRoute = switches["EnableDefaultRoute"].on
+		form.KillSwitch = switches["KillSwitch"].on
 		form.DNSBlocking = switches["DNSBlocking"].on
 		form.LocalhostNat = switches["LocalhostNat"].on
-		form.AutoReconnect = switches["AutoReconnect"].on
-		form.AutoConnect = switches["AutoConnect"].on
-		form.EnableDefaultRoute = switches["EnableDefaultRoute"].on
 		form.EnableWAN = switches["EnableWAN"].on
-		form.DNSServers = splitLines(dns.Text)
 
+		form.DNSServers = dnsEd.column(0)
+
+		// Gateway is carried through: the old parser only read Address and
+		// Metric, so saving used to erase it from every route.
 		form.Routes = nil
-		for _, line := range splitLines(routes.Text) {
-			p := strings.Fields(line)
-			r := &types.Route{}
-			if len(p) > 0 {
-				r.Address = p[0]
-			}
-			if len(p) > 1 {
-				r.Metric = p[1]
-			}
-			form.Routes = append(form.Routes, r)
+		for _, r := range routeEd.values() {
+			form.Routes = append(form.Routes, &types.Route{Address: r[0], Metric: r[1], Gateway: r[2]})
 		}
 		form.Networks = nil
-		for _, line := range splitLines(nets.Text) {
-			p := strings.Fields(line)
-			n := &types.Network{}
-			if len(p) > 0 {
-				n.Tag = p[0]
-			}
-			if len(p) > 1 {
-				n.Network = p[1]
-			}
-			if len(p) > 2 {
-				n.Nat = p[2]
-			}
-			form.Networks = append(form.Networks, n)
+		for _, n := range netEd.values() {
+			form.Networks = append(form.Networks, &types.Network{Tag: n[0], Network: n[1], Nat: n[2]})
 		}
+
+		form.BlockedPorts = nil
+		var bad []string
+		for _, p := range splitCSV(ports.Text) {
+			n, err := strconv.ParseUint(p, 10, 16)
+			if err != nil {
+				bad = append(bad, p)
+				continue
+			}
+			form.BlockedPorts = append(form.BlockedPorts, uint16(n))
+		}
+		if len(bad) > 0 {
+			a.fail("Not a valid port: " + strings.Join(bad, ", "))
+			return
+		}
+
 		if err := client.SaveTunnel(form, a.editTag); err != nil {
 			a.fail(err.Error())
 			return
@@ -153,17 +175,33 @@ func (a *App) tunnelEditPage() fyne.CanvasObject {
 				formPair(field("MTU", mtu), field("TX queue length", txq)),
 			)),
 		card("Behaviour", "What this tunnel does while connected.", features),
-		card("DNS servers", "One resolver per line.", dns),
-		card("Routes", "One per line, as ADDRESS METRIC.", routes),
-		card("Networks", "One per line, as TAG NETWORK NAT.", nets),
+		card("DNS servers", "Resolvers handed to the interface, in order.",
+			capWidth(formWidth, dnsEd.object())),
+		card("Routes", "Extra routes installed while the tunnel is up.",
+			capWidth(z(720), routeEd.object())),
+		card("Networks", "Networks reachable through the tunnel, with optional NAT.",
+			capWidth(z(720), netEd.object())),
+		card("Blocked ports", "Outbound TCP and UDP ports dropped on this tunnel.",
+			capWidth(formWidth, field("Ports", ports))),
 	)
+
+	// DNSRecords and the WireGuard key are not editable here, but the form is
+	// cloned from the live tunnel so they survive a save untouched.
+	if n := len(form.DNSRecords); n > 0 {
+		cards = append(cards, card("Local DNS records",
+			fmt.Sprintf("%d record(s) are attached to this tunnel. Edit them on the Resolver page.", n), nil))
+	}
+
+	col := vstack(sp4, cards...)
+	reflow = func() { col.Refresh() }
 
 	actions := hstack(sp2, back, save)
 	sub := "Interface " + form.IFName
 	if connected {
 		sub += "  ·  connected"
 	}
-	return pageShell(form.Tag, sub, actions, scrollBody(cards...))
+	return pageShell(form.Tag, sub, actions,
+		scrollBodyOf(col))
 }
 
 func splitLines(s string) []string {

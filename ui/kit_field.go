@@ -2,6 +2,7 @@ package ui
 
 import (
 	"image/color"
+	"strings"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -130,6 +131,186 @@ func searchField(placeholder, value string, onChange, onSubmit func(string)) (*w
 	e.OnSubmitted = onSubmit
 	return e, fixedWidth(searchWidth, e)
 }
+
+// ---------------------------------------------------------------- row editor
+
+// weightedColsLayout splits its width between children by weight, so the
+// columns of a repeatable row line up with the header above them.
+type weightedColsLayout struct {
+	weights []float32
+	gap     float32
+}
+
+func (w weightedColsLayout) Layout(objs []fyne.CanvasObject, size fyne.Size) {
+	if len(objs) == 0 {
+		return
+	}
+	var total float32
+	for i := range objs {
+		total += w.weight(i)
+	}
+	avail := size.Width - w.gap*float32(len(objs)-1)
+	x := float32(0)
+	for i, o := range objs {
+		cw := avail * w.weight(i) / total
+		o.Move(fyne.NewPos(x, 0))
+		o.Resize(fyne.NewSize(cw, size.Height))
+		x += cw + w.gap
+	}
+}
+
+func (w weightedColsLayout) weight(i int) float32 {
+	if i < len(w.weights) && w.weights[i] > 0 {
+		return w.weights[i]
+	}
+	return 1
+}
+
+func (w weightedColsLayout) MinSize(objs []fyne.CanvasObject) fyne.Size {
+	var width, h float32
+	for _, o := range objs {
+		ms := o.MinSize()
+		width += ms.Width
+		h = max32(h, ms.Height)
+	}
+	if len(objs) > 1 {
+		width += w.gap * float32(len(objs)-1)
+	}
+	return fyne.NewSize(width, h)
+}
+
+// fieldCol describes one column of a rowEditor.
+type fieldCol struct {
+	label       string
+	placeholder string
+	weight      float32
+}
+
+// rowEditor edits a repeatable list of records — one row of entries per record,
+// with add and remove. It replaces the multiline "one per line, space
+// separated" text areas, which hid the record structure and silently dropped
+// any field the parser did not know about.
+//
+// Rows own their entry widgets, so adding or removing a row leaves text already
+// typed in the other rows untouched.
+type rowEditor struct {
+	noun   string
+	cols   []fieldCol
+	rows   [][]*widget.Entry
+	empty  string
+	box    *fyne.Container
+	reflow func()
+}
+
+func newRowEditor(noun string, cols []fieldCol, values [][]string, empty string, reflow func()) *rowEditor {
+	e := &rowEditor{noun: noun, cols: cols, empty: empty, box: container.NewStack(), reflow: reflow}
+	for _, v := range values {
+		e.appendRow(v)
+	}
+	e.render()
+	return e
+}
+
+func (e *rowEditor) appendRow(vals []string) {
+	row := make([]*widget.Entry, len(e.cols))
+	for i, c := range e.cols {
+		v := ""
+		if i < len(vals) {
+			v = vals[i]
+		}
+		row[i] = kEntry(c.placeholder, v)
+	}
+	e.rows = append(e.rows, row)
+}
+
+func (e *rowEditor) removeRow(i int) {
+	if i < 0 || i >= len(e.rows) {
+		return
+	}
+	e.rows = append(e.rows[:i], e.rows[i+1:]...)
+	e.render()
+}
+
+func (e *rowEditor) weights() []float32 {
+	w := make([]float32, len(e.cols))
+	for i, c := range e.cols {
+		w[i] = c.weight
+	}
+	return w
+}
+
+func (e *rowEditor) render() {
+	items := make([]fyne.CanvasObject, 0, len(e.rows)+2)
+
+	// Column headings, only worth showing when a row has several fields.
+	if len(e.cols) > 1 {
+		heads := make([]fyne.CanvasObject, len(e.cols))
+		for i, c := range e.cols {
+			heads[i] = fieldLabel(c.label)
+		}
+		items = append(items, container.NewBorder(nil, nil, nil, hspace(ctrlHeight+sp2),
+			container.New(weightedColsLayout{weights: e.weights(), gap: sp2}, heads...)))
+	}
+
+	for i, row := range e.rows {
+		idx := i
+		cells := make([]fyne.CanvasObject, len(row))
+		for j := range row {
+			cells[j] = row[j]
+		}
+		del := newIconBtn(theme.DeleteIcon(), kGhost, func() { e.removeRow(idx) })
+		items = append(items, container.NewBorder(nil, nil, nil, hstack(0, hspace(sp2), del),
+			container.New(weightedColsLayout{weights: e.weights(), gap: sp2}, cells...)))
+	}
+
+	if len(e.rows) == 0 && e.empty != "" {
+		items = append(items, hint(e.empty))
+	}
+
+	add := outlineBtn("Add "+e.noun, func() {
+		e.appendRow(nil)
+		e.render()
+	}).withIcon(theme.ContentAddIcon()).small()
+	items = append(items, hstack(0, add))
+
+	e.box.Objects = []fyne.CanvasObject{vstack(sp2, items...)}
+	e.box.Refresh()
+	if e.reflow != nil {
+		e.reflow()
+	}
+}
+
+// values returns the trimmed rows, skipping any row left entirely blank.
+func (e *rowEditor) values() [][]string {
+	out := make([][]string, 0, len(e.rows))
+	for _, row := range e.rows {
+		vals := make([]string, len(row))
+		any := false
+		for i, en := range row {
+			vals[i] = strings.TrimSpace(en.Text)
+			if vals[i] != "" {
+				any = true
+			}
+		}
+		if any {
+			out = append(out, vals)
+		}
+	}
+	return out
+}
+
+// column returns column i of every non-blank row.
+func (e *rowEditor) column(i int) []string {
+	var out []string
+	for _, v := range e.values() {
+		if i < len(v) && v[i] != "" {
+			out = append(out, v[i])
+		}
+	}
+	return out
+}
+
+func (e *rowEditor) object() fyne.CanvasObject { return e.box }
 
 // ---------------------------------------------------------------- switch
 
@@ -456,19 +637,27 @@ func pageShell(title, subtitle string, actions fyne.CanvasObject, content fyne.C
 
 // listBody frames a widget.List so row content lines up with the page header
 // and the action column lines up with the header actions.
-func listBody(obj fyne.CanvasObject) fyne.CanvasObject {
-	return insetEach(sp2, sp2, sp3, sp2, obj)
+func listBody(l *widget.List) fyne.CanvasObject {
+	return insetEach(sp2, sp2, sp3, sp2, boostList(l))
 }
 
-// scrollBody is the standard scrolling column of cards. The right inset leaves
-// the scrollbar its own lane outside the cards.
+// scrollBody is the standard page body: cards flowed into as many columns as
+// the window allows, rather than one full-width stack.
 func scrollBody(objs ...fyne.CanvasObject) fyne.CanvasObject {
-	col := vstack(sp4, objs...)
-	return container.NewVScroll(insetEach(sp5, gutter, sp8, gutter, col))
+	flow := container.New(&cardFlowLayout{minCol: z(430), maxCol: 3, gap: sp4}, objs...)
+	return scrollBodyOf(flow)
+}
+
+// scrollBodyOf wraps a column the caller already holds, for pages that need to
+// refresh it directly (row editors changing height, for instance) or that read
+// better as a single column.
+func scrollBodyOf(col fyne.CanvasObject) fyne.CanvasObject {
+	return boostScroll(container.NewVScroll(insetEach(sp5, gutter, sp8, gutter, col)))
 }
 
 // centredBody centres a fixed-width column, for login and other focused flows.
 func centredBody(width float32, objs ...fyne.CanvasObject) fyne.CanvasObject {
 	col := vstack(sp4, objs...)
-	return container.NewVScroll(container.NewCenter(container.New(fixedLayout{w: width}, col)))
+	return boostScroll(container.NewVScroll(
+		container.NewCenter(container.New(fixedLayout{w: width}, col))))
 }

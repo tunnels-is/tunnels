@@ -192,7 +192,7 @@ func (a *App) dnsStatsPage() fyne.CanvasObject {
 		list.HideSeparators = true
 		listing = container.NewStack(
 			surface(radLg, pal().Base100, pal().Base300),
-			insetXY(sp4, sp2, list),
+			insetXY(sp4, sp2, boostList(list)),
 		)
 	}
 

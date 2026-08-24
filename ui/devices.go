@@ -39,7 +39,7 @@ func (a *App) devicesPage() fyne.CanvasObject {
 		a.reloadCurrent()
 	})
 	create := primaryBtn("New device", func() { a.createDeviceDialog() }).withIcon(theme.ContentAddIcon())
-	actions := hstack(sp2, search, create)
+	actions := hstackFlex(sp2, 0, search, create)
 
 	sub := fmt.Sprintf("%d registered", len(a.deviceView))
 	if a.devicesFetching && len(a.deviceView) == 0 {
