@@ -46,20 +46,34 @@ func (a *App) devicesPage() fyne.CanvasObject {
 		sub = "Loading…"
 	}
 
+	spec := deviceTable()
+
 	if len(a.deviceView) == 0 {
 		msg, desc := "No devices", "Nothing matched this filter."
 		if a.filterDevices == "" {
 			msg, desc = "No devices yet", "Create a device to get a WireGuard config for it."
 		}
-		return pageShell("Devices", sub, actions, emptyState(msg, desc))
+		return pageShellFlush("Devices", sub, actions, emptyState(msg, desc))
 	}
 
-	a.deviceList = newRowList(
+	a.deviceList = newRowList(spec,
 		func() int { return len(a.deviceView) },
 		a.bindDeviceRow,
 	)
 
-	return pageShell("Devices", sub, actions, listBody(a.deviceList))
+	return pageShellFlush("Devices", sub, actions, tableBody(spec, a.deviceList))
+}
+
+func deviceTable() *tableSpec {
+	return &tableSpec{
+		actionW: 44,
+		cols: []tableCol{
+			{label: "DEVICE", weight: 2, strong: true},
+			{label: "WIREGUARD IP", weight: 1.6, mono: true},
+			{label: "ADDED", weight: 1.6, mono: true},
+			{label: "STATUS", weight: 1.3, badge: true},
+		},
+	}
 }
 
 func (a *App) bindDeviceRow(id widget.ListItemID, row *kRow) {
@@ -97,7 +111,7 @@ func (a *App) bindDeviceRow(id widget.ListItemID, row *kRow) {
 		pill, t = "Connected", toneSuccess
 	}
 
-	row.SetRow(d.Tag, d.WireGuardIP+"  ·  added "+fmtTime(d.CreatedAt), isConn, pill, t)
+	row.SetCells([]string{d.Tag, d.WireGuardIP, fmtTime(d.CreatedAt), pill}, isConn, t)
 	row.ghost.SetHidden(true)
 	row.iconA.SetHidden(true)
 	row.main.SetHidden(true)

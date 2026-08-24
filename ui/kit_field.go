@@ -626,19 +626,26 @@ func linkRow(a *App, name, dest, href string) fyne.CanvasObject {
 // Page titles are always one line, so canvas.Text is used for exact placement:
 // the title lands on the same x as card edges and list row titles.
 func pageShell(title, subtitle string, actions fyne.CanvasObject, content fyne.CanvasObject) fyne.CanvasObject {
+	return buildShell(title, subtitle, actions, content, true)
+}
+
+// pageShellFlush drops the rule under the header. Table pages use it because
+// the column header supplies its own hairline immediately below.
+func pageShellFlush(title, subtitle string, actions fyne.CanvasObject, content fyne.CanvasObject) fyne.CanvasObject {
+	return buildShell(title, subtitle, actions, content, false)
+}
+
+func buildShell(title, subtitle string, actions, content fyne.CanvasObject, rule bool) fyne.CanvasObject {
 	titleBlock := []fyne.CanvasObject{text(title, fsTitle, pal().Content, true)}
 	if subtitle != "" {
 		titleBlock = append(titleBlock, text(subtitle, fsSmall, pal().Muted, false))
 	}
 	head := splitRow(vstack(sp1+1, titleBlock...), actions)
-	top := vstack(0, insetEach(sp5, gutter, sp5, gutter, head), strongDivider())
-	return container.NewBorder(top, nil, nil, nil, content)
-}
-
-// listBody frames a widget.List so row content lines up with the page header
-// and the action column lines up with the header actions.
-func listBody(l *widget.List) fyne.CanvasObject {
-	return insetEach(sp2, sp2, sp3, sp2, boostList(l))
+	rows := []fyne.CanvasObject{insetEach(sp5, gutter, sp5, gutter, head)}
+	if rule {
+		rows = append(rows, strongDivider())
+	}
+	return container.NewBorder(vstack(0, rows...), nil, nil, nil, content)
 }
 
 // scrollBody is the standard page body: cards flowed into as many columns as
