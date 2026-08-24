@@ -62,7 +62,7 @@ func (a *App) serversPage() fyne.CanvasObject {
 				msg, desc = "Loading servers…", ""
 			}
 		}
-		return pageShell("Servers", sub, hstack(sp2, search, refresh), emptyState(msg, desc))
+		return pageShell("Servers", sub, hstackFlex(sp2, 0, search, refresh), emptyState(msg, desc))
 	}
 
 	a.serverList = newRowList(
@@ -70,7 +70,7 @@ func (a *App) serversPage() fyne.CanvasObject {
 		a.bindServerRow,
 	)
 
-	return pageShell("Servers", sub, hstack(sp2, search, refresh), listBody(a.serverList))
+	return pageShell("Servers", sub, hstackFlex(sp2, 0, search, refresh), listBody(a.serverList))
 }
 
 func (a *App) bindServerRow(id widget.ListItemID, row *kRow) {

@@ -21,6 +21,7 @@ type logRow struct {
 	widget.BaseWidget
 	when  string
 	level string
+	fn    string
 	msg   string
 }
 
@@ -30,8 +31,8 @@ func newLogRow() *logRow {
 	return r
 }
 
-func (r *logRow) set(when, level, msg string) {
-	r.when, r.level, r.msg = when, level, msg
+func (r *logRow) set(when, level, fn, msg string) {
+	r.when, r.level, r.fn, r.msg = when, level, fn, msg
 	r.Refresh()
 }
 
@@ -41,6 +42,7 @@ func (r *logRow) CreateRenderer() fyne.WidgetRenderer {
 		r:     r,
 		when:  monoText("", fsCaption, p.Faint),
 		level: monoText("", fsCaption, p.Muted),
+		fn:    monoText("", fsCaption, p.Muted),
 		msg:   monoText("", fsSmall, p.Content),
 	}
 	d.level.TextStyle = fyne.TextStyle{Monospace: true, Bold: true}
@@ -52,13 +54,14 @@ type logRowRenderer struct {
 	r     *logRow
 	when  *canvas.Text
 	level *canvas.Text
+	fn    *canvas.Text
 	msg   *canvas.Text
 }
 
 func (d *logRowRenderer) Destroy() {}
 
 func (d *logRowRenderer) Objects() []fyne.CanvasObject {
-	return []fyne.CanvasObject{d.when, d.level, d.msg}
+	return []fyne.CanvasObject{d.when, d.level, d.fn, d.msg}
 }
 
 func (d *logRowRenderer) MinSize() fyne.Size {
@@ -67,16 +70,27 @@ func (d *logRowRenderer) MinSize() fyne.Size {
 
 func (d *logRowRenderer) Layout(size fyne.Size) {
 	y := func(t *canvas.Text) float32 { return (size.Height - t.MinSize().Height) / 2 }
-	d.when.Move(fyne.NewPos(0, y(d.when)))
-	wq := d.when.MinSize().Width
-	d.level.Move(fyne.NewPos(wq+sp3, y(d.level)))
-	d.msg.Move(fyne.NewPos(wq+sp3+logLevelCol, y(d.msg)))
+
+	// Fixed columns so timestamps, levels and callers line up down the page.
+	x := float32(0)
+	d.when.Move(fyne.NewPos(x, y(d.when)))
+	x += d.when.MinSize().Width + sp3
+
+	d.level.Move(fyne.NewPos(x, y(d.level)))
+	x += logLevelCol
+
+	d.fn.Text = elide(d.r.fn, logFnCol-sp3, d.fn.TextSize, d.fn.TextStyle)
+	d.fn.Move(fyne.NewPos(x, y(d.fn)))
+	x += logFnCol
+
+	d.msg.Move(fyne.NewPos(x, y(d.msg)))
 }
 
 func (d *logRowRenderer) Refresh() {
 	d.apply()
 	d.when.Refresh()
 	d.level.Refresh()
+	d.fn.Refresh()
 	d.msg.Refresh()
 	if sz := d.r.Size(); sz.Width > 0 {
 		d.Layout(sz)
@@ -90,6 +104,7 @@ func (d *logRowRenderer) apply() {
 	d.when.Color = p.Faint
 	d.level.Text = d.r.level
 	d.level.Color = logLevelColor(d.r.level)
+	d.fn.Color = p.Faint
 	d.msg.Text = d.r.msg
 	d.msg.Color = p.Content
 	if d.r.level == "ERROR" {
@@ -108,25 +123,31 @@ func logLevelColor(level string) color.Color {
 		return p.Muted
 	case "WARN", "WARNING":
 		return p.Warning
+	case "SECURITY":
+		return p.Warning
 	default:
 		return p.Faint
 	}
 }
 
-// splitLogLine pulls "<time> || <LEVEL> || <message>" apart, tolerating lines
-// that do not follow the convention.
-func splitLogLine(line string) (when, level, msg string) {
+// splitLogLine pulls apart the client's log format, which is
+// "<time> || <LEVEL> || <func> || <message>" (see client/logging.go). Shorter
+// lines are tolerated, and any remaining " || " stays in the message so a
+// payload that happens to contain the separator is not truncated.
+func splitLogLine(line string) (when, level, fn, msg string) {
 	parts := strings.Split(line, " || ")
+	for i := range parts {
+		parts[i] = strings.TrimSpace(parts[i])
+	}
 	switch len(parts) {
-	case 0:
-		return "", "", line
 	case 1:
-		return "", "", strings.TrimSpace(parts[0])
+		return "", "", "", parts[0]
 	case 2:
-		return strings.TrimSpace(parts[0]), "", strings.TrimSpace(parts[1])
+		return parts[0], "", "", parts[1]
+	case 3:
+		return parts[0], parts[1], "", parts[2]
 	default:
-		return strings.TrimSpace(parts[0]), strings.TrimSpace(parts[1]),
-			strings.TrimSpace(strings.Join(parts[2:], " || "))
+		return parts[0], parts[1], parts[2], strings.Join(parts[3:], " || ")
 	}
 }
 
@@ -137,7 +158,8 @@ func (a *App) recomputeLogView() {
 }
 
 var logTags = []segItem{
-	{"", "All"}, {"INFO", "Info"}, {"ERROR", "Errors"}, {"DEBUG", "Debug"}, {"ROUTINE", "Routine"},
+	{"", "All"}, {"INFO", "Info"}, {"ERROR", "Errors"},
+	{"SECURITY", "Security"}, {"DEBUG", "Debug"}, {"ROUTINE", "Routine"},
 }
 
 func (a *App) logsPage() fyne.CanvasObject {
@@ -162,7 +184,7 @@ func (a *App) logsPage() fyne.CanvasObject {
 
 	a.recomputeLogView()
 	sub := fmt.Sprintf("%d lines", len(a.logView))
-	actions := hstack(sp2, search, tags, clear)
+	actions := hstackFlex(sp2, 0, search, tags, clear)
 
 	if len(a.logView) == 0 {
 		msg, desc := "Nothing captured yet", "Log lines will appear here as the client runs."
@@ -180,15 +202,15 @@ func (a *App) logsPage() fyne.CanvasObject {
 			if !ok || id < 0 || id >= len(a.logView) {
 				return
 			}
-			when, level, msg := splitLogLine(a.logView[id])
-			row.set(when, level, msg)
+			when, level, fn, msg := splitLogLine(a.logView[id])
+			row.set(when, level, fn, msg)
 		},
 	)
 	a.logList.HideSeparators = true
 
 	panel := container.NewStack(
 		surface(radLg, pal().Base100, pal().Base300),
-		insetXY(sp4, sp3, a.logList),
+		insetXY(sp4, sp3, boostList(a.logList)),
 	)
 	return pageShell("Logs", sub, actions, insetEach(sp4, gutter, gutter, gutter, panel))
 }
@@ -201,7 +223,7 @@ func (a *App) filteredLogs() []string {
 		if q != "" && !strings.Contains(strings.ToLower(line), q) {
 			continue
 		}
-		_, tag, _ := splitLogLine(line)
+		_, tag, _, _ := splitLogLine(line)
 		if a.logTag != "" {
 			if tag != a.logTag {
 				continue

@@ -55,7 +55,7 @@ func (a *App) tunnelsPage() fyne.CanvasObject {
 			})
 		}()
 	}).withIcon(theme.ContentAddIcon())
-	actions := hstack(sp2, search, create)
+	actions := hstackFlex(sp2, 0, search, create)
 
 	live := 0
 	byTag := a.activeByTag()

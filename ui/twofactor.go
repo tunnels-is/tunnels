@@ -100,7 +100,7 @@ func (a *App) twoFactorPage() fyne.CanvasObject {
 		)))
 
 	return pageShell("Two-factor authentication", a.user.Email, back,
-		scrollBody(setup, codesBox))
+		scrollBodyOf(vstack(sp4, setup, codesBox)))
 }
 
 func parseOTPSecret(uri string) string {

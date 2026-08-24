@@ -120,20 +120,29 @@ func vstack(gap float32, objs ...fyne.CanvasObject) *fyne.Container {
 }
 
 // hstack lays children out left to right with one exact gap, each at its
-// minimum width, vertically centred.
-type hstackLayout struct{ gap float32 }
+// minimum width, vertically centred. flex names the child to shrink when the
+// row does not fit; -1 means shrink whichever is widest.
+type hstackLayout struct {
+	gap  float32
+	flex int
+}
 
 func (h hstackLayout) Layout(objs []fyne.CanvasObject, size fyne.Size) {
-	// When the row does not fit, take the overflow off the widest child rather
-	// than letting the tail spill past the edge. That child is the flexible one
-	// in practice (a search box beside icon buttons).
+	// When the row does not fit, take the overflow off one child rather than
+	// letting the tail spill past the edge. Shrinking a text field degrades
+	// gracefully; shrinking a tab strip or a button clips its labels, so
+	// callers can nominate which child gives way.
 	over := h.MinSize(objs).Width - size.Width
-	widest := -1
+	shrink := -1
 	if over > 0 {
-		var w float32
-		for i, o := range objs {
-			if o.Visible() && o.MinSize().Width > w {
-				w, widest = o.MinSize().Width, i
+		if h.flex >= 0 && h.flex < len(objs) && objs[h.flex].Visible() {
+			shrink = h.flex
+		} else {
+			var w float32
+			for i, o := range objs {
+				if o.Visible() && o.MinSize().Width > w {
+					w, shrink = o.MinSize().Width, i
+				}
 			}
 		}
 	}
@@ -144,8 +153,8 @@ func (h hstackLayout) Layout(objs []fyne.CanvasObject, size fyne.Size) {
 			continue
 		}
 		ms := o.MinSize()
-		if i == widest {
-			ms.Width = max32(z(48), ms.Width-over)
+		if i == shrink {
+			ms.Width = max32(z(64), ms.Width-over)
 		}
 		o.Resize(ms)
 		o.Move(fyne.NewPos(x, (size.Height-ms.Height)/2))
@@ -172,7 +181,12 @@ func (h hstackLayout) MinSize(objs []fyne.CanvasObject) fyne.Size {
 }
 
 func hstack(gap float32, objs ...fyne.CanvasObject) *fyne.Container {
-	return container.New(hstackLayout{gap: gap}, objs...)
+	return container.New(hstackLayout{gap: gap, flex: -1}, objs...)
+}
+
+// hstackFlex is hstack with an explicit child to compress when space is tight.
+func hstackFlex(gap float32, flex int, objs ...fyne.CanvasObject) *fyne.Container {
+	return container.New(hstackLayout{gap: gap, flex: flex}, objs...)
 }
 
 // rightAlign pins content to the trailing edge, vertically centred.
@@ -312,6 +326,143 @@ func elide(s string, max float32, size float32, style fyne.TextStyle) string {
 		r = r[:len(r)-cut]
 	}
 	return "…"
+}
+
+// ---------------------------------------------------------------- scrolling
+
+// scrollFactor multiplies wheel deltas. Fyne's per-notch distance is a driver
+// constant (scrollSpeed, 25px on Windows and Linux) which is well under one
+// list row here, so the default feels sluggish.
+const scrollFactor float32 = 3
+
+// scrollBoost amplifies wheel scrolling for the object beneath it.
+//
+// It has to sit on top rather than wrap: the hit test hands a scroll event to
+// the *last* matching object in the tree walk, so a parent never sees it. Being
+// scroll-only is what makes this safe — tap, hover, drag and cursor lookups use
+// their own predicates, so they skip straight past to the real content.
+type scrollBoost struct {
+	widget.BaseWidget
+	scroll *container.Scroll
+	list   *widget.List
+}
+
+func (b *scrollBoost) Scrolled(ev *fyne.ScrollEvent) {
+	dx := ev.Scrolled.DX * scrollFactor
+	dy := ev.Scrolled.DY * scrollFactor
+	switch {
+	case b.scroll != nil:
+		e := *ev
+		e.Scrolled = fyne.NewDelta(dx, dy)
+		b.scroll.Scrolled(&e)
+	case b.list != nil:
+		// Offsets grow downwards while wheel-down is negative, matching
+		// Scroll.updateOffset's use of -delta.
+		b.list.ScrollToOffset(b.list.GetScrollOffset() - dy)
+	}
+}
+
+func (b *scrollBoost) CreateRenderer() fyne.WidgetRenderer {
+	return widget.NewSimpleRenderer(canvas.NewRectangle(color.Transparent))
+}
+
+// boostScroll returns the scroll container with a sensitivity overlay on top.
+func boostScroll(sc *container.Scroll) fyne.CanvasObject {
+	b := &scrollBoost{scroll: sc}
+	b.ExtendBaseWidget(b)
+	return container.NewStack(sc, b)
+}
+
+// boostList does the same for a widget.List, which owns its scroller privately.
+func boostList(l *widget.List) fyne.CanvasObject {
+	b := &scrollBoost{list: l}
+	b.ExtendBaseWidget(b)
+	return container.NewStack(l, b)
+}
+
+// ---------------------------------------------------------------- card flow
+
+// cardFlowLayout arranges cards into as many columns as the width allows,
+// adding each to the shortest column so the columns stay balanced.
+//
+// Fyne ships no flex layout: GridWrap forces one cell size on every child,
+// which cannot work for cards whose height depends on their content.
+type cardFlowLayout struct {
+	minCol float32
+	maxCol int
+	gap    float32
+
+	// Height of the last layout. Cards containing wrapped text only report a
+	// true MinSize once they have a width, so MinSize reuses what Layout
+	// measured rather than guessing.
+	lastH float32
+}
+
+func (c *cardFlowLayout) columns(width float32) int {
+	n := int((width + c.gap) / (c.minCol + c.gap))
+	if n < 1 {
+		n = 1
+	}
+	if c.maxCol > 0 && n > c.maxCol {
+		n = c.maxCol
+	}
+	return n
+}
+
+func (c *cardFlowLayout) Layout(objs []fyne.CanvasObject, size fyne.Size) {
+	n := c.columns(size.Width)
+	colW := (size.Width - c.gap*float32(n-1)) / float32(n)
+
+	// First pass sets the width, so wrapping children can remeasure; the second
+	// reads the settled height and places them.
+	for _, o := range objs {
+		if o.Visible() {
+			o.Resize(fyne.NewSize(colW, o.MinSize().Height))
+		}
+	}
+
+	heights := make([]float32, n)
+	for _, o := range objs {
+		if !o.Visible() {
+			continue
+		}
+		col := 0
+		for i := 1; i < n; i++ {
+			if heights[i] < heights[col] {
+				col = i
+			}
+		}
+		h := o.MinSize().Height
+		o.Move(fyne.NewPos(float32(col)*(colW+c.gap), heights[col]))
+		o.Resize(fyne.NewSize(colW, h))
+		heights[col] += h + c.gap
+	}
+
+	var tallest float32
+	for _, h := range heights {
+		tallest = max32(tallest, h)
+	}
+	c.lastH = max32(0, tallest-c.gap)
+}
+
+func (c *cardFlowLayout) MinSize(objs []fyne.CanvasObject) fyne.Size {
+	if c.lastH > 0 {
+		return fyne.NewSize(c.minCol, c.lastH)
+	}
+	// Before the first layout, assume a single column.
+	var h float32
+	n := 0
+	for _, o := range objs {
+		if !o.Visible() {
+			continue
+		}
+		h += o.MinSize().Height
+		n++
+	}
+	if n > 1 {
+		h += c.gap * float32(n-1)
+	}
+	return fyne.NewSize(c.minCol, h)
 }
 
 // ---------------------------------------------------------------- spacers

@@ -55,6 +55,7 @@ const (
 	baseSegH     float32 = 30
 	baseSegInset float32 = 3
 	baseLogLevel float32 = 62
+	baseLogFn    float32 = 150
 )
 
 // radFull is a radius cap, not a measurement, so it never scales.
@@ -69,6 +70,7 @@ var (
 	ctrlHeight, formWidth, searchWidth, iconSize float32
 	swWidth, swHeight, swKnob                    float32
 	segHeight, segInset, logLevelCol             float32
+	logFnCol                                     float32
 
 	// rtPad cancels the padding widget.RichText bakes around its text; it has
 	// to track SizeNameInnerPadding exactly, which is sp2.
@@ -101,7 +103,7 @@ func applyZoomTokens(f float32) {
 
 	swWidth, swHeight, swKnob = z(baseSwWidth), z(baseSwHeight), z(baseSwKnob)
 	segHeight, segInset = z(baseSegH), z(baseSegInset)
-	logLevelCol = z(baseLogLevel)
+	logLevelCol, logFnCol = z(baseLogLevel), z(baseLogFn)
 
 	rtPad = sp2
 }
@@ -126,6 +128,7 @@ type palette struct {
 	Base300 color.NRGBA // borders
 	Elevate color.NRGBA // hovered/raised surface
 	Divider color.NRGBA // hairlines inside cards
+	Input   color.NRGBA // entry/select fill, inset against Base100
 
 	// Text.
 	Content color.NRGBA
@@ -167,6 +170,7 @@ var palettes = map[string]palette{
 	"tunnels-dark": {
 		Base100: hex(0x12, 0x17, 0x1e), Base200: hex(0x0b, 0x0e, 0x13), Base300: hex(0x23, 0x2b, 0x36),
 		Elevate: hex(0x18, 0x1e, 0x27), Divider: hex(0x1c, 0x23, 0x2d),
+		Input:   hex(0x0a, 0x0d, 0x12),
 		Content: hex(0xe8, 0xeb, 0xf0), Muted: hex(0x98, 0xa2, 0xb3), Faint: hex(0x64, 0x70, 0x7f),
 		Primary: hex(0x4f, 0x8c, 0xff), PrimaryHover: hex(0x6a, 0x9d, 0xff),
 		PrimaryContent: hex(0xff, 0xff, 0xff), PrimarySoft: rgba(0x4f, 0x8c, 0xff, 38),
@@ -179,6 +183,7 @@ var palettes = map[string]palette{
 	"tunnels": {
 		Base100: hex(0xff, 0xff, 0xff), Base200: hex(0xf7, 0xf6, 0xf1), Base300: hex(0xe1, 0xdd, 0xd0),
 		Elevate: hex(0xfa, 0xf8, 0xf3), Divider: hex(0xee, 0xeb, 0xe1),
+		Input:   hex(0xf4, 0xf2, 0xea),
 		Content: hex(0x16, 0x16, 0x14), Muted: hex(0x56, 0x55, 0x4e), Faint: hex(0x86, 0x84, 0x7b),
 		Primary: hex(0x1d, 0x4e, 0xd8), PrimaryHover: hex(0x2b, 0x5d, 0xe8),
 		PrimaryContent: hex(0xff, 0xff, 0xff), PrimarySoft: rgba(0x1d, 0x4e, 0xd8, 28),
@@ -191,6 +196,7 @@ var palettes = map[string]palette{
 	"suzko": {
 		Base100: hex(0x1a, 0x1a, 0x1e), Base200: hex(0x12, 0x12, 0x15), Base300: hex(0x2e, 0x2e, 0x34),
 		Elevate: hex(0x21, 0x21, 0x27), Divider: hex(0x25, 0x25, 0x2b),
+		Input:   hex(0x11, 0x11, 0x14),
 		Content: hex(0xf4, 0xf4, 0xf5), Muted: hex(0xa1, 0xa1, 0xaa), Faint: hex(0x6f, 0x6f, 0x78),
 		Primary: hex(0xd8, 0x2e, 0x2e), PrimaryHover: hex(0xe6, 0x43, 0x43),
 		PrimaryContent: hex(0xff, 0xff, 0xff), PrimarySoft: rgba(0xd8, 0x2e, 0x2e, 42),
@@ -242,7 +248,7 @@ func (t *appTheme) Color(n fyne.ThemeColorName, _ fyne.ThemeVariant) color.Color
 	case theme.ColorNameHyperlink:
 		return p.Primary
 	case theme.ColorNameInputBackground:
-		return p.Base100
+		return p.Input
 	case theme.ColorNameInputBorder:
 		return p.Base300
 	case theme.ColorNameOverlayBackground:
