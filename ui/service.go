@@ -58,10 +58,20 @@ func (a *App) refreshState() {
 	}
 }
 
+// setUser makes u the active account.
+//
+// Tunnels and devices live in a per-account workspace on disk, and the client
+// only reads them when that workspace is activated. This has to happen before
+// refreshState, and synchronously: relying on SaveUser to activate as a side
+// effect left the tunnel list empty for the whole session, because it ran on
+// another goroutine and nothing re-read the state once it finished.
 func (a *App) setUser(u *client.User) {
 	a.user = u
 	if u != nil && u.ID != "" {
 		a.fyneApp.Preferences().SetString("activeUserID", u.ID)
+		if err := client.ActivateAccount(u.ID); err != nil {
+			a.fail("Unable to open the account workspace: " + err.Error())
+		}
 		go func() {
 			_ = client.SaveUser(u)
 		}()
@@ -71,6 +81,8 @@ func (a *App) setUser(u *client.User) {
 	a.localDevices = nil
 	a.serversLoaded = false
 	a.devicesLoaded = false
+	// Pick up the newly activated workspace's tunnels.
+	a.refreshState()
 }
 
 func (a *App) clearSession() {
@@ -78,6 +90,8 @@ func (a *App) clearSession() {
 	a.servers = nil
 	a.devices = nil
 	a.localDevices = nil
+	// Tunnels belong to the account that just went away.
+	a.tunnels = nil
 	a.serversLoaded = false
 	a.devicesLoaded = false
 	a.fyneApp.Preferences().SetString("activeUserID", "")
