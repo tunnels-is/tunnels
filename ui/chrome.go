@@ -533,10 +533,6 @@ func hint(s string) fyne.CanvasObject {
 	return rich(s, sizeSmall, colMuted, false)
 }
 
-func heading(s string) fyne.CanvasObject {
-	return text(s, fsLarge, pal().Content, true)
-}
-
 func fieldLabel(s string) fyne.CanvasObject {
 	return text(s, fsSmall, pal().Muted, false)
 }

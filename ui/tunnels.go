@@ -69,19 +69,34 @@ func (a *App) tunnelsPage() fyne.CanvasObject {
 		sub = fmt.Sprintf("%d configured · %d up", len(a.tunnelView), live)
 	}
 
+	spec := tunnelTable()
+
 	if len(a.tunnelView) == 0 {
 		msg, desc := "No tunnels", "Nothing matched this filter."
 		if a.filterTunnels == "" {
 			msg, desc = "No tunnels yet", "Create a tunnel to configure routes, DNS and a firewall."
 		}
-		return pageShell("Tunnels", sub, actions, emptyState(msg, desc))
+		return pageShellFlush("Tunnels", sub, actions, emptyState(msg, desc))
 	}
 
-	a.tunnelList = newRowList(
+	a.tunnelList = newRowList(spec,
 		func() int { return len(a.tunnelView) },
 		a.bindTunnelRow,
 	)
-	return pageShell("Tunnels", sub, actions, listBody(a.tunnelList))
+	return pageShellFlush("Tunnels", sub, actions, tableBody(spec, a.tunnelList))
+}
+
+func tunnelTable() *tableSpec {
+	return &tableSpec{
+		actionW: 230,
+		cols: []tableCol{
+			{label: "TUNNEL", weight: 1.6, strong: true},
+			{label: "SERVER", weight: 1.8},
+			{label: "INTERFACE", weight: 1.4, mono: true},
+			{label: "TRANSFER", weight: 1.8, mono: true, optional: true},
+			{label: "STATUS", weight: 1.1, badge: true},
+		},
+	}
 }
 
 func (a *App) bindTunnelRow(id widget.ListItemID, row *kRow) {
@@ -94,18 +109,18 @@ func (a *App) bindTunnelRow(id widget.ListItemID, row *kRow) {
 	}
 	at := a.activeByTag()[t.Tag]
 	srv := a.serverByID(t.ServerID)
-	srvLabel := "no server"
+	srvLabel := "No server"
 	if srv != nil {
-		srvLabel = srv.Tag + "  ·  " + srv.IP
+		srvLabel = srv.Tag
 	}
 	on := at != nil
-	pill, tn := "", toneNeutral
-	meta := srvLabel + "  ·  " + t.IFName
+	status, tn := "Down", toneNeutral
+	transfer := "—"
 	if on {
-		pill, tn = "Up", toneSuccess
-		meta = "↓ " + at.IngressString() + "   ↑ " + at.EgressString() + "  ·  " + meta
+		status, tn = "Up", toneSuccess
+		transfer = "↓ " + at.IngressString() + "  ↑ " + at.EgressString()
 	}
-	row.SetRow(t.Tag, meta, on, pill, tn)
+	row.SetCells([]string{t.Tag, srvLabel, t.IFName, transfer, status}, on, tn)
 
 	tun := t
 	if on {

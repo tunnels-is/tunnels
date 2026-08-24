@@ -54,6 +54,8 @@ func (a *App) serversPage() fyne.CanvasObject {
 		sub = fmt.Sprintf("%d available · %d connected", len(a.serverView), active)
 	}
 
+	spec := serverTable()
+
 	if len(a.serverView) == 0 {
 		msg, desc := "No servers", "Nothing matched this filter."
 		if a.filterServers == "" {
@@ -62,15 +64,29 @@ func (a *App) serversPage() fyne.CanvasObject {
 				msg, desc = "Loading servers…", ""
 			}
 		}
-		return pageShell("Servers", sub, hstackFlex(sp2, 0, search, refresh), emptyState(msg, desc))
+		return pageShellFlush("Servers", sub, hstackFlex(sp2, 0, search, refresh), emptyState(msg, desc))
 	}
 
-	a.serverList = newRowList(
+	a.serverList = newRowList(spec,
 		func() int { return len(a.serverView) },
 		a.bindServerRow,
 	)
 
-	return pageShell("Servers", sub, hstackFlex(sp2, 0, search, refresh), listBody(a.serverList))
+	return pageShellFlush("Servers", sub, hstackFlex(sp2, 0, search, refresh),
+		tableBody(spec, a.serverList))
+}
+
+func serverTable() *tableSpec {
+	return &tableSpec{
+		actionW: 120,
+		cols: []tableCol{
+			{label: "SERVER", weight: 2, strong: true},
+			{label: "LOCATION", weight: 1.6},
+			{label: "ADDRESS", weight: 2, mono: true},
+			{label: "TRANSFER", weight: 1.8, mono: true, optional: true},
+			{label: "STATUS", weight: 1.2, badge: true},
+		},
+	}
 }
 
 func (a *App) bindServerRow(id widget.ListItemID, row *kRow) {
@@ -81,16 +97,19 @@ func (a *App) bindServerRow(id widget.ListItemID, row *kRow) {
 	at := a.activeByServer()[s.ID.String()]
 	on := at != nil
 
-	meta := fmt.Sprintf("%s:%s", s.IP, s.Port)
-	if c := countryName(s.Country); c != "" {
-		meta = c + "  ·  " + meta
-	}
-	pill, t := "", toneNeutral
+	status, t := "Idle", toneNeutral
+	transfer := "—"
 	if on {
-		pill, t = "Connected", toneSuccess
-		meta = "↓ " + at.IngressString() + "   ↑ " + at.EgressString() + "  ·  " + meta
+		status, t = "Connected", toneSuccess
+		transfer = "↓ " + at.IngressString() + "  ↑ " + at.EgressString()
 	}
-	row.SetRow(s.Tag, meta, on, pill, t)
+	row.SetCells([]string{
+		s.Tag,
+		countryName(s.Country),
+		s.IP + ":" + s.Port,
+		transfer,
+		status,
+	}, on, t)
 
 	row.ghost.SetHidden(true)
 	row.iconA.SetHidden(true)

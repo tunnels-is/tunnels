@@ -5,52 +5,185 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
+	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 )
 
-// kRow is the reusable list row: status rail, title, meta, badge, actions.
-// Used as a Fyne List item template so UpdateItem calls Set instead of tearing
-// widgets down and rebuilding them.
-type kRow struct {
-	widget.BaseWidget
-	title    string
-	meta     string
-	pillText string
-	pillTone tone
-	on       bool
-	hovered  bool
-	main     *kBtn
-	ghost    *kBtn
-	iconA    *kBtn
-	iconB    *kBtn
+// ---------------------------------------------------------------- table spec
+
+// tableCol describes one column. The same spec drives the header and every row,
+// which is what keeps the two aligned: rows used to position their own text with
+// no header to align to.
+type tableCol struct {
+	label  string
+	weight float32
+	mono   bool // identifiers and addresses, so digits line up
+	strong bool // the primary column: content colour, semibold
+	align  fyne.TextAlign
+	badge  bool // render the value as a status pill instead of plain text
+	// optional columns are dropped when the table is too narrow, so the
+	// columns that matter keep their width instead of everything truncating.
+	optional bool
 }
 
-func newKRow() *kRow {
+type tableSpec struct {
+	cols []tableCol
+	// actionW reserves trailing space for the row's buttons. The header leaves
+	// the same gap, so a column label never sits over the action cluster.
+	actionW float32
+}
+
+func (s *tableSpec) weights() []float32 {
+	w := make([]float32, len(s.cols))
+	for i, c := range s.cols {
+		w[i] = c.weight
+		if w[i] <= 0 {
+			w[i] = 1
+		}
+	}
+	return w
+}
+
+type cellRect struct{ x, w float32 }
+
+// narrowWidth is the content width below which optional columns are dropped.
+var narrowWidth = func() float32 { return z(560) }
+
+// cellRects computes each column's offset and width for a given row width.
+// Dropped columns get zero width, and both the header and the rows render
+// nothing for them.
+func (s *tableSpec) cellRects(width float32) []cellRect {
+	avail := width - z(s.actionW) - sp4*2
+	if avail < 0 {
+		avail = 0
+	}
+	weights := s.weights()
+	drop := avail < narrowWidth()
+
+	var total float32
+	for i, w := range weights {
+		if drop && s.cols[i].optional {
+			continue
+		}
+		total += w
+	}
+	if total == 0 {
+		total = 1
+	}
+
+	out := make([]cellRect, len(s.cols))
+	x := sp4
+	for i, w := range weights {
+		if drop && s.cols[i].optional {
+			out[i] = cellRect{x, 0}
+			continue
+		}
+		cw := avail * w / total
+		out[i] = cellRect{x, max32(0, cw-sp3)}
+		x += cw
+	}
+	return out
+}
+
+// ---------------------------------------------------------------- header
+
+type tableHeadLayout struct{ spec *tableSpec }
+
+func (t *tableHeadLayout) Layout(objs []fyne.CanvasObject, size fyne.Size) {
+	rects := t.spec.cellRects(size.Width)
+	for i, o := range objs {
+		if i >= len(rects) {
+			// Trailing object is the hairline under the labels.
+			o.Resize(fyne.NewSize(size.Width, z(1)))
+			o.Move(fyne.NewPos(0, size.Height-z(1)))
+			continue
+		}
+		txt, ok := o.(*canvas.Text)
+		if !ok {
+			continue
+		}
+		if rects[i].w <= 0 {
+			txt.Text = ""
+			txt.Refresh()
+			continue
+		}
+		txt.Text = t.spec.cols[i].label
+		ms := txt.MinSize()
+		x := rects[i].x
+		if t.spec.cols[i].align == fyne.TextAlignTrailing {
+			x = rects[i].x + rects[i].w - ms.Width
+		}
+		txt.Move(fyne.NewPos(x, (size.Height-ms.Height)/2))
+	}
+}
+
+func (t *tableHeadLayout) MinSize([]fyne.CanvasObject) fyne.Size {
+	return fyne.NewSize(0, z(28))
+}
+
+// newTableHeader builds the column-label strip, including its own hairline.
+func newTableHeader(spec *tableSpec) fyne.CanvasObject {
+	objs := make([]fyne.CanvasObject, 0, len(spec.cols)+1)
+	for _, c := range spec.cols {
+		objs = append(objs, text(c.label, fsCaption, pal().Faint, true))
+	}
+	objs = append(objs, canvas.NewRectangle(pal().Base300))
+	return container.New(&tableHeadLayout{spec: spec}, objs...)
+}
+
+// ---------------------------------------------------------------- row
+
+// kRow is one table row: a cell per column plus an action cluster. Used as a
+// Fyne List item template, so UpdateItem calls SetCells rather than rebuilding.
+type kRow struct {
+	widget.BaseWidget
+	spec      *tableSpec
+	cells     []string
+	badgeTone tone
+	on        bool
+	hovered   bool
+	main      *kBtn
+	ghost     *kBtn
+	iconA     *kBtn
+	iconB     *kBtn
+}
+
+func newKRow(spec *tableSpec) *kRow {
 	r := &kRow{
+		spec:  spec,
+		cells: make([]string, len(spec.cols)),
 		main:  newKBtn("Connect", kSuccess, nil).small(),
 		ghost: newKBtn("More", kGhost, nil).small(),
 		iconA: newIconBtn(theme.DocumentCreateIcon(), kGhost, nil).small(),
 		iconB: newIconBtn(theme.DeleteIcon(), kGhost, nil).small(),
 	}
+	// Every button starts hidden; a page shows only the ones it binds. The main
+	// button used to default to visible, which put a stray Connect on tables
+	// that have no row actions at all.
+	r.main.SetHidden(true)
+	r.ghost.SetHidden(true)
 	r.iconA.SetHidden(true)
 	r.iconB.SetHidden(true)
-	r.ghost.SetHidden(true)
 	r.ExtendBaseWidget(r)
 	return r
 }
 
-// SetRow fills the row. tone drives the badge colour independently of the live
-// state, so "This device" reads differently from "Connected".
-func (r *kRow) SetRow(title, meta string, on bool, pill string, t tone) {
-	r.title = title
-	r.meta = meta
+// SetCells fills the row. on drives the live treatment (accent rail and tint);
+// badgeTone colours whichever column is marked as a badge.
+func (r *kRow) SetCells(cells []string, on bool, badgeTone tone) {
+	for i := range r.cells {
+		if i < len(cells) {
+			r.cells[i] = cells[i]
+		} else {
+			r.cells[i] = ""
+		}
+	}
 	r.on = on
-	r.pillText = pill
-	r.pillTone = t
-	if on {
-		r.pillTone = toneSuccess
+	r.badgeTone = badgeTone
+	if on && badgeTone == toneNeutral {
+		r.badgeTone = toneSuccess
 	}
 	r.Refresh()
 }
@@ -62,20 +195,30 @@ func (r *kRow) Cursor() desktop.Cursor         { return desktop.DefaultCursor }
 
 func (r *kRow) CreateRenderer() fyne.WidgetRenderer {
 	p := pal()
-	bg := surface(radMd, color.Transparent, nil)
-	rail := canvas.NewRectangle(color.Transparent)
-	rail.CornerRadius = radFull
-	line := canvas.NewRectangle(p.Divider)
-	title := text("", fsBody, p.Content, true)
-	meta := monoText("", fsSmall, p.Muted)
-	pillBg := surface(radFull, color.Transparent, nil)
-	pillTxt := text("", fsCaption, p.Faint, true)
-	rd := &kRowRenderer{
-		r: r, bg: bg, rail: rail, line: line,
-		title: title, meta: meta, pillBg: pillBg, pillTxt: pillTxt,
+	d := &kRowRenderer{
+		r:       r,
+		bg:      surface(radMd, color.Transparent, nil),
+		rail:    canvas.NewRectangle(color.Transparent),
+		line:    canvas.NewRectangle(p.Divider),
+		badgeBg: surface(radFull, color.Transparent, nil),
 	}
-	rd.apply()
-	return rd
+	d.rail.CornerRadius = radFull
+	for _, c := range r.spec.cols {
+		var t *canvas.Text
+		switch {
+		case c.badge:
+			t = text("", fsCaption, p.Muted, true)
+		case c.mono:
+			t = monoText("", fsSmall, p.Muted)
+		case c.strong:
+			t = text("", fsBody, p.Content, true)
+		default:
+			t = text("", fsBody, p.Muted, false)
+		}
+		d.cells = append(d.cells, t)
+	}
+	d.apply()
+	return d
 }
 
 type kRowRenderer struct {
@@ -83,19 +226,18 @@ type kRowRenderer struct {
 	bg      *canvas.Rectangle
 	rail    *canvas.Rectangle
 	line    *canvas.Rectangle
-	title   *canvas.Text
-	meta    *canvas.Text
-	pillBg  *canvas.Rectangle
-	pillTxt *canvas.Text
+	cells   []*canvas.Text
+	badgeBg *canvas.Rectangle
 }
 
 func (d *kRowRenderer) Destroy() {}
 
 func (d *kRowRenderer) Objects() []fyne.CanvasObject {
-	return []fyne.CanvasObject{
-		d.bg, d.line, d.rail, d.title, d.meta, d.pillBg, d.pillTxt,
-		d.r.main, d.r.ghost, d.r.iconA, d.r.iconB,
+	out := []fyne.CanvasObject{d.bg, d.line, d.rail, d.badgeBg}
+	for _, c := range d.cells {
+		out = append(out, c)
 	}
+	return append(out, d.r.main, d.r.ghost, d.r.iconA, d.r.iconB)
 }
 
 func (d *kRowRenderer) MinSize() fyne.Size {
@@ -105,13 +247,13 @@ func (d *kRowRenderer) MinSize() fyne.Size {
 func (d *kRowRenderer) Layout(size fyne.Size) {
 	d.bg.Resize(size)
 	d.bg.Move(fyne.NewPos(0, 0))
-	d.line.Resize(fyne.NewSize(size.Width, 1))
-	d.line.Move(fyne.NewPos(0, size.Height-1))
-
-	// Live rows get a rounded accent rail on the leading edge.
+	d.line.Resize(fyne.NewSize(size.Width, z(1)))
+	d.line.Move(fyne.NewPos(0, size.Height-z(1)))
 	d.rail.Resize(fyne.NewSize(z(3), size.Height-sp4))
 	d.rail.Move(fyne.NewPos(0, sp2))
 
+	// The action cluster owns the trailing edge; the width the spec reserves for
+	// it is what both the cells and the header lay out against.
 	right := size.Width - sp4
 	place := func(b *kBtn) {
 		if b.hidden {
@@ -128,51 +270,42 @@ func (d *kRowRenderer) Layout(size fyne.Size) {
 	place(d.r.iconB)
 	place(d.r.iconA)
 	place(d.r.ghost)
-	right -= sp1
 	place(d.r.main)
 
-	// Text is laid out last: it gets whatever the actions left behind, elided
-	// so a long tag cannot slide under the buttons in a narrow window.
-	avail := right - sp4 - sp3
-	if d.r.pillText != "" {
-		avail -= d.pillTxt.MinSize().Width + sp2*2 + sp3
-	}
-	d.title.Text = elide(d.r.title, avail, d.title.TextSize, d.title.TextStyle)
-	d.meta.Text = elide(d.r.meta, avail, d.meta.TextSize, d.meta.TextStyle)
-	tms := d.title.MinSize()
-	mms := d.meta.MinSize()
-	block := tms.Height + z(1) + mms.Height
-	top := (size.Height - block) / 2
-	d.title.Move(fyne.NewPos(sp4, top))
-	d.meta.Move(fyne.NewPos(sp4, top+tms.Height+z(1)))
+	rects := d.r.spec.cellRects(size.Width)
+	hideBadge := true
+	for i, cell := range d.cells {
+		if i >= len(rects) {
+			break
+		}
+		col := d.r.spec.cols[i]
+		w := rects[i].w
+		cell.Text = elide(d.r.cells[i], w, cell.TextSize, cell.TextStyle)
+		ms := cell.MinSize()
+		x := rects[i].x
+		if col.align == fyne.TextAlignTrailing {
+			x = rects[i].x + w - ms.Width
+		}
+		cell.Move(fyne.NewPos(x, (size.Height-ms.Height)/2))
 
-	if d.r.pillText != "" {
-		pw := d.pillTxt.MinSize().Width + sp2*2
-		ph := z(19)
-		right -= sp3 + pw
-		d.pillBg.Resize(fyne.NewSize(pw, ph))
-		d.pillBg.Move(fyne.NewPos(right, (size.Height-ph)/2))
-		pms := d.pillTxt.MinSize()
-		d.pillTxt.Move(fyne.NewPos(right+sp2, (size.Height-pms.Height)/2))
-	} else {
-		d.pillBg.Resize(fyne.NewSize(0, 0))
-		d.pillTxt.Move(fyne.NewPos(right, 0))
+		if col.badge && d.r.cells[i] != "" {
+			hideBadge = false
+			pw := ms.Width + sp2*2
+			ph := z(19)
+			d.badgeBg.Resize(fyne.NewSize(pw, ph))
+			d.badgeBg.Move(fyne.NewPos(x-sp2, (size.Height-ph)/2))
+		}
+	}
+	if hideBadge {
+		d.badgeBg.Resize(fyne.NewSize(0, 0))
 	}
 }
 
 func (d *kRowRenderer) Refresh() {
 	d.apply()
-	d.bg.Refresh()
-	d.rail.Refresh()
-	d.line.Refresh()
-	d.title.Refresh()
-	d.meta.Refresh()
-	d.pillBg.Refresh()
-	d.pillTxt.Refresh()
-	d.r.main.Refresh()
-	d.r.ghost.Refresh()
-	d.r.iconA.Refresh()
-	d.r.iconB.Refresh()
+	for _, o := range d.Objects() {
+		o.Refresh()
+	}
 	if sz := d.r.Size(); sz.Width > 0 {
 		d.Layout(sz)
 	}
@@ -181,9 +314,20 @@ func (d *kRowRenderer) Refresh() {
 
 func (d *kRowRenderer) apply() {
 	p := pal()
-	d.title.Color = p.Content
-	d.meta.Color = p.Muted
 	d.line.FillColor = p.Divider
+
+	badgeFg, badgeBg := toneColors(d.r.badgeTone)
+	d.badgeBg.FillColor = badgeBg
+	for i, cell := range d.cells {
+		switch col := d.r.spec.cols[i]; {
+		case col.badge:
+			cell.Color = badgeFg
+		case col.strong:
+			cell.Color = p.Content
+		default:
+			cell.Color = p.Muted
+		}
+	}
 
 	switch {
 	case d.r.on:
@@ -201,18 +345,15 @@ func (d *kRowRenderer) apply() {
 			d.bg.FillColor = color.Transparent
 		}
 	}
-
-	d.pillTxt.Text = d.r.pillText
-	fg, bg := toneColors(d.r.pillTone)
-	d.pillTxt.Color = fg
-	d.pillBg.FillColor = bg
 }
 
-// listRows wraps a widget.List so it inherits row metrics from the kit.
-func newRowList(count func() int, bind func(widget.ListItemID, *kRow)) *widget.List {
+// ---------------------------------------------------------------- table body
+
+// newRowList builds the virtualised list of rows for a spec.
+func newRowList(spec *tableSpec, count func() int, bind func(widget.ListItemID, *kRow)) *widget.List {
 	l := widget.NewList(
 		count,
-		func() fyne.CanvasObject { return newKRow() },
+		func() fyne.CanvasObject { return newKRow(spec) },
 		func(id widget.ListItemID, obj fyne.CanvasObject) {
 			row, ok := obj.(*kRow)
 			if !ok {
@@ -223,4 +364,14 @@ func newRowList(count func() int, bind func(widget.ListItemID, *kRow)) *widget.L
 	)
 	l.HideSeparators = true
 	return l
+}
+
+// tableBody stacks the column header above the scrolling rows. The header
+// carries its own hairline, which is why table pages drop the page-level rule:
+// two lines a few pixels apart read as a mistake.
+func tableBody(spec *tableSpec, l *widget.List) fyne.CanvasObject {
+	pad := gutter - sp4
+	head := insetEach(0, pad, 0, pad, newTableHeader(spec))
+	rows := insetEach(0, pad, sp3, pad, boostList(l))
+	return container.NewBorder(head, nil, nil, nil, rows)
 }
