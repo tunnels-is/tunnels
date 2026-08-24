@@ -42,7 +42,7 @@ const (
 
 	baseRail        float32 = 224
 	baseGutter      float32 = 24
-	baseRowHeight   float32 = 54
+	baseRowHeight   float32 = 40
 	baseNavRowH     float32 = 36
 	baseCtrlHeight  float32 = 32
 	baseFormWidth   float32 = 460

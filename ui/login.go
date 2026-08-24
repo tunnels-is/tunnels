@@ -401,26 +401,27 @@ func (a *App) editAuthServer(s *client.ControlServer) {
 		s.Port = strings.TrimSpace(port.Text)
 		s.CertificatePath = strings.TrimSpace(cert.Text)
 		s.ValidateCertificate = validate.Checked
-		cfg := client.CloneConfig()
-		list := append([]*client.ControlServer(nil), cfg.ControlServers...)
-		found := false
-		for i, cs := range list {
-			if cs != nil && cs.ID == s.ID {
-				cp := *s
-				list[i] = &cp
-				found = true
-				break
+		a.updateConfig("Saving control server", func(c *client.Config) {
+			list := append([]*client.ControlServer(nil), c.ControlServers...)
+			found := false
+			for i, cs := range list {
+				if cs != nil && cs.ID == s.ID {
+					cp := *s
+					list[i] = &cp
+					found = true
+					break
+				}
 			}
-		}
-		if !found {
-			cp := *s
-			list = append(list, &cp)
-		}
-		cfg.ControlServers = list
-		if a.saveConfig(cfg) {
+			if !found {
+				cp := *s
+				list = append(list, &cp)
+			}
+			c.ControlServers = list
+		}, func() {
 			a.loginServerID = s.ID
+			a.note("Control server saved")
 			a.rebuild()
-		}
+		})
 	}, a.win)
 	d.Resize(fyne.NewSize(z(440), z(400)))
 	d.Show()

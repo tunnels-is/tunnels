@@ -84,16 +84,17 @@ func (a *App) settingsPage() fyne.CanvasObject {
 		apiDomains := kEntry("comma separated", strings.Join(cfg.APICertDomains, ","))
 		apiIPs := kEntry("comma separated", strings.Join(cfg.APICertIPs, ","))
 		saveAPI := primaryBtn("Save API server", func() {
-			next := client.CloneConfig()
-			next.APIIP = strings.TrimSpace(apiIP.Text)
-			next.APIPort = strings.TrimSpace(apiPort.Text)
-			next.APICert = strings.TrimSpace(apiCert.Text)
-			next.APIKey = strings.TrimSpace(apiKey.Text)
-			next.APICertDomains = splitCSV(apiDomains.Text)
-			next.APICertIPs = splitCSV(apiIPs.Text)
-			if a.saveConfig(next) {
+			ip, port := strings.TrimSpace(apiIP.Text), strings.TrimSpace(apiPort.Text)
+			cert, keyPath := strings.TrimSpace(apiCert.Text), strings.TrimSpace(apiKey.Text)
+			domains, ips := splitCSV(apiDomains.Text), splitCSV(apiIPs.Text)
+			a.updateConfig("Saving API server", func(c *client.Config) {
+				c.APIIP, c.APIPort = ip, port
+				c.APICert, c.APIKey = cert, keyPath
+				c.APICertDomains, c.APICertIPs = domains, ips
+			}, func() {
+				a.note("API server saved")
 				a.rebuild()
-			}
+			})
 		})
 
 		cards = append(cards, card("API server",

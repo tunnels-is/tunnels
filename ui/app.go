@@ -39,6 +39,8 @@ type App struct {
 	pageBox   *fyne.Container
 	side      *sidebar
 	toastBox  *fyne.Container
+	busyBox   *fyne.Container
+	busyN     int
 	toastKind string
 	toastMsg  string
 
@@ -128,8 +130,9 @@ func newApp(icon []byte) *App {
 	a.content = container.NewStack()
 	a.side = newSidebar(a)
 	a.toastBox = container.NewStack()
+	a.busyBox = container.NewStack()
 	a.pageBox = container.New(railLayout{}, a.side, a.content)
-	shell := container.New(shellLayout{}, a.pageBox, a.toastBox)
+	shell := container.New(shellLayout{}, a.pageBox, a.toastBox, a.busyBox)
 	w.SetContent(shell)
 	// Fyne pads window content by default, which draws a border of window
 	// background around the whole app. The shell manages its own gutters.
