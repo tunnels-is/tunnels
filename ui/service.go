@@ -194,9 +194,13 @@ func (a *App) fetchServers(force bool) {
 			if len(list) == 0 {
 				a.fail("Unable to find servers")
 			}
-			if a.current == pageServers || a.current == pageTunnels || a.current == pageDevices || a.current == pageTunnelEdit {
+			switch a.current {
+			case pageServers, pageTunnels, pageDevices, pageTunnelEdit, pageDashboard:
 				a.reloadCurrent()
 			}
+			// The dashboard's first probe waits on this: on a cold start the
+			// server list is still in flight when the page is first built.
+			a.maybeAutoProbe()
 		})
 	}()
 }
