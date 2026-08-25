@@ -25,6 +25,7 @@ func (a *App) navItems() []navItem {
 	logged := a.loggedIn()
 	return []navItem{
 		{pageLogin, "Sign in", "", theme.LoginIcon(), func(*App) bool { return !logged }},
+		{pageDashboard, "Dashboard", "", theme.HomeIcon(), func(*App) bool { return logged }},
 		{pageServers, "Servers", "", theme.StorageIcon(), func(*App) bool { return logged }},
 		{pageTunnels, "Tunnels", "", theme.ListIcon(), func(ap *App) bool { return logged && ap.advanced }},
 		{pageDevices, "Devices", "", theme.ComputerIcon(), func(*App) bool { return logged }},
@@ -225,7 +226,9 @@ func (r *sidebarRenderer) rebuild() {
 	}
 
 	nav := insetEach(sp2, sp3, sp4, sp3, vstack(2, rows...))
-	top := vstack(0, r.brand(), strongDivider())
+	// No rule under the brand: the rail already reads as its own surface, so the
+	// line only chopped the logo off from the nav it belongs with.
+	top := r.brand()
 
 	var bottom fyne.CanvasObject
 	if a.loggedIn() {
@@ -351,6 +354,9 @@ func (r *navWrapRenderer) apply() {
 // navigate loads a page and kicks off whatever data it needs.
 func (a *App) navigate(id pageID) {
 	switch id {
+	case pageDashboard:
+		a.refreshState()
+		a.fetchServers(false)
 	case pageServers:
 		a.fetchServers(false)
 	case pageTunnels:

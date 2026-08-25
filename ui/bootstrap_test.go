@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/test"
@@ -24,6 +25,10 @@ func TestSetUserLoadsAccountTunnels(t *testing.T) {
 	}
 	prevBase, prevAccounts := s.BasePath, s.AccountsPath
 	t.Cleanup(func() {
+		// setUser persists the account on a goroutine. Restoring the paths while
+		// that is still in flight makes it write the account workspace into the
+		// package directory instead of the temp dir, so wait for it to land.
+		waitForAccountFile(t, accounts)
 		st := client.STATE.Load()
 		st.BasePath, st.AccountsPath = prevBase, prevAccounts
 		client.STATE.Store(st)
@@ -84,4 +89,26 @@ func TestSetUserLoadsAccountTunnels(t *testing.T) {
 	if !found {
 		t.Errorf("tunnel from disk not visible after setUser; got %d tunnels", len(a.tunnels))
 	}
+}
+
+// waitForAccountFile blocks until the async SaveUser has written the account
+// file under accounts, or gives up. Without this the goroutine can outlive the
+// test and write into the source tree.
+func waitForAccountFile(t *testing.T, accounts string) {
+	t.Helper()
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		found := false
+		_ = filepath.Walk(accounts, func(path string, info os.FileInfo, err error) error {
+			if err == nil && info != nil && !info.IsDir() && filepath.Base(path) == "user" {
+				found = true
+			}
+			return nil
+		})
+		if found {
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Log("timed out waiting for the account file; the save goroutine may still be in flight")
 }

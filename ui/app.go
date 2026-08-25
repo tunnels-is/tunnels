@@ -14,6 +14,7 @@ import (
 type pageID string
 
 const (
+	pageDashboard   pageID = "dashboard"
 	pageLogin       pageID = "login"
 	pageAccounts    pageID = "accounts"
 	pageServers     pageID = "servers"
@@ -61,6 +62,12 @@ type App struct {
 	dnsStats     map[string]*client.DNSStats
 	logs         []string
 	advanced     bool
+
+	probeResults []client.ServerProbe
+	probeAt      time.Time
+	probing      bool
+	probedOnce   bool
+	bwRange      int
 
 	filterServers  string
 	filterTunnels  string
@@ -170,15 +177,25 @@ func (a *App) bootstrap() {
 	switch {
 	case match != nil:
 		a.setUser(match)
-		a.show(pageServers)
+		a.show(pageDashboard)
+		a.startupFetch()
 	case len(users) == 1:
 		a.setUser(users[0])
-		a.show(pageServers)
+		a.show(pageDashboard)
+		a.startupFetch()
 	case len(users) > 1:
 		a.show(pageAccounts)
 	default:
 		a.show(pageLogin)
 	}
+}
+
+// startupFetch loads the server list in the background so the dashboard can
+// probe without waiting for input. bootstrap runs before the window is shown,
+// so nothing here may block: fetchServers hands off to a goroutine and the
+// probe is chained from its completion.
+func (a *App) startupFetch() {
+	a.fetchServers(false)
 }
 
 func (a *App) loggedIn() bool {
@@ -234,6 +251,8 @@ func (a *App) dropLiveLists() {
 
 func (a *App) buildPage(id pageID) fyne.CanvasObject {
 	switch id {
+	case pageDashboard:
+		return a.dashboardPage()
 	case pageLogin:
 		return a.loginPage()
 	case pageAccounts:
