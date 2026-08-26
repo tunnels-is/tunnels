@@ -144,7 +144,7 @@ func (a *App) bindTunnelRow(id widget.ListItemID, row *kRow) {
 		a.editTag = tun.Tag
 		a.show(pageTunnelEdit)
 	})
-	row.iconB.SetIconOnly(theme.DeleteIcon(), kGhost, func() {
+	row.iconB.SetIconOnly(theme.DeleteIcon(), kDanger, func() {
 		a.confirm("Delete tunnel", "Delete tunnel "+tun.Tag+"?", func() {
 			if err := client.DeleteTunnel(tun.Tag); err != nil {
 				a.fail(err.Error())
