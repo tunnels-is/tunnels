@@ -31,6 +31,10 @@ var (
 
 func LaunchAPI() {
 	defer RecoverAndLog()
+	if DisableLocalAPI {
+		DEBUG("local HTTP API disabled")
+		return
+	}
 
 	tokenBytes := make([]byte, 32)
 	_, err := rand.Read(tokenBytes)
@@ -40,13 +44,16 @@ func LaunchAPI() {
 	}
 	sessionToken = hex.EncodeToString(tokenBytes)
 
-	assetHandler := http.FileServer(getFileSystem())
-
 	mux := http.NewServeMux()
 	mux.HandleFunc("/logs", handleWebSocketAuth)
-	mux.Handle("/", withSessionCookie(assetHandler))
-	mux.Handle("/assets/", withSessionCookie(assetHandler))
 	mux.HandleFunc("/v1/method/{method}", HTTPhandler)
+	if fsys, err := fs.Sub(DIST_EMBED, "dist"); err == nil {
+		h := http.FileServer(http.FS(fsys))
+		mux.Handle("/", withSessionCookie(h))
+		mux.Handle("/assets/", withSessionCookie(h))
+	} else {
+		mux.Handle("/", withSessionCookie(http.HandlerFunc(serveNoWebUI)))
+	}
 	if EnablePprof {
 		mux.HandleFunc("/debug/pprof/", localAPIAuth(pprof.Index))
 		mux.HandleFunc("/debug/pprof/cmdline", localAPIAuth(pprof.Cmdline))
@@ -112,13 +119,13 @@ func LaunchAPI() {
 	}
 }
 
-func getFileSystem() http.FileSystem {
-	fsys, err := fs.Sub(DIST_EMBED, "dist")
-	if err != nil {
-		panic(err)
+func serveNoWebUI(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/" {
+		http.NotFound(w, r)
+		return
 	}
-
-	return http.FS(fsys)
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	_, _ = io.WriteString(w, "Tunnels local API. Use the desktop app for the UI.\n")
 }
 
 func makeTLSConfig() (tc *tls.Config) {
@@ -194,7 +201,7 @@ func isLocalRequest(r *http.Request) bool {
 	}
 	host = strings.TrimSuffix(strings.TrimPrefix(host, "["), "]")
 	switch strings.ToLower(host) {
-	case "localhost", "wails.localhost", "wails":
+	case "localhost":
 		return true
 	}
 	ip := net.ParseIP(host)

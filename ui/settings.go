@@ -77,37 +77,39 @@ func (a *App) settingsPage() fyne.CanvasObject {
 				"The bundled DNS resolver is enabled by default.",
 				cfg.DisableDNS, func(bool) { a.toggleConfig("DisableDNS") })))
 
-		apiIP := kEntry("", cfg.APIIP)
-		apiPort := kEntry("", cfg.APIPort)
-		apiCert := kEntry("", cfg.APICert)
-		apiKey := kEntry("", cfg.APIKey)
-		apiDomains := kEntry("comma separated", strings.Join(cfg.APICertDomains, ","))
-		apiIPs := kEntry("comma separated", strings.Join(cfg.APICertIPs, ","))
-		saveAPI := primaryBtn("Save API server", func() {
-			ip, port := strings.TrimSpace(apiIP.Text), strings.TrimSpace(apiPort.Text)
-			cert, keyPath := strings.TrimSpace(apiCert.Text), strings.TrimSpace(apiKey.Text)
-			domains, ips := splitCSV(apiDomains.Text), splitCSV(apiIPs.Text)
-			a.updateConfig("Saving API server", func(c *client.Config) {
-				c.APIIP, c.APIPort = ip, port
-				c.APICert, c.APIKey = cert, keyPath
-				c.APICertDomains, c.APICertIPs = domains, ips
-			}, func() {
-				a.note("API server saved")
-				a.rebuild()
+		if !client.DisableLocalAPI {
+			apiIP := kEntry("", cfg.APIIP)
+			apiPort := kEntry("", cfg.APIPort)
+			apiCert := kEntry("", cfg.APICert)
+			apiKey := kEntry("", cfg.APIKey)
+			apiDomains := kEntry("comma separated", strings.Join(cfg.APICertDomains, ","))
+			apiIPs := kEntry("comma separated", strings.Join(cfg.APICertIPs, ","))
+			saveAPI := primaryBtn("Save API server", func() {
+				ip, port := strings.TrimSpace(apiIP.Text), strings.TrimSpace(apiPort.Text)
+				cert, keyPath := strings.TrimSpace(apiCert.Text), strings.TrimSpace(apiKey.Text)
+				domains, ips := splitCSV(apiDomains.Text), splitCSV(apiIPs.Text)
+				a.updateConfig("Saving API server", func(c *client.Config) {
+					c.APIIP, c.APIPort = ip, port
+					c.APICert, c.APIKey = cert, keyPath
+					c.APICertDomains, c.APICertIPs = domains, ips
+				}, func() {
+					a.note("API server saved")
+					a.rebuild()
+				})
 			})
-		})
 
-		cards = append(cards, card("API server",
-			"Address the client listens on, plus an optional TLS certificate.",
-			formRows(
-				formPair(field("IP", apiIP), field("Port", apiPort)),
-				field("Certificate domains", apiDomains),
-				field("Certificate IPs", apiIPs),
-				field("Certificate path", apiCert),
-				field("Key path", apiKey),
-				vspace(sp1),
-				hstack(0, saveAPI),
-			)))
+			cards = append(cards, card("API server",
+				"Address the client listens on, plus an optional TLS certificate.",
+				formRows(
+					formPair(field("IP", apiIP), field("Port", apiPort)),
+					field("Certificate domains", apiDomains),
+					field("Certificate IPs", apiIPs),
+					field("Certificate path", apiCert),
+					field("Key path", apiKey),
+					vspace(sp1),
+					hstack(0, saveAPI),
+				)))
+		}
 
 		base, cfgPath, logPath, logFile := "", "", "", ""
 		if a.state != nil && a.state.State != nil {

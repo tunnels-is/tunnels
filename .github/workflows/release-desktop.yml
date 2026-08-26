@@ -1,5 +1,4 @@
-# Manual / optional desktop rebuilds. Tag releases use release.yml instead
-# (GoReleaser for CLI/server/Windows/Linux + a native macOS job for Tunnels.app).
+# Manual desktop rebuilds. Tag releases use release.yml.
 name: Build Desktop Client
 
 on:
@@ -20,14 +19,11 @@ jobs:
       matrix:
         include:
           - runner: ubuntu-latest
-            goos: linux
-            goarch: amd64
+            target: linux
           - runner: macos-latest
-            goos: darwin
-            goarch: universal
+            target: darwin
           - runner: windows-latest
-            goos: windows
-            goarch: amd64
+            target: windows
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
@@ -36,18 +32,15 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Install Linux dependencies
-        if: matrix.goos == 'linux'
+      - name: Install Linux desktop deps
+        if: matrix.target == 'linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
+          sudo apt-get install -y gcc libgl1-mesa-dev xorg-dev libxkbcommon-dev pkg-config
+
+      - name: Install MinGW
+        if: matrix.target == 'windows'
+        run: choco install mingw -y
 
       - name: Set version
         shell: bash
@@ -58,69 +51,36 @@ jobs:
             echo "VERSION=dev" >> "$GITHUB_ENV"
           fi
 
-      - name: Build frontend
-        run: ./build-ui.sh
-
-      - name: Build (Linux)
-        if: matrix.goos == 'linux'
-        env:
-          CGO_ENABLED: "1"
-        run: |
-          go build -tags "desktop,production,webkit2_41" -trimpath \
-            -ldflags "-s -w -X github.com/tunnels-is/tunnels/version.Version=${VERSION}" \
-            -o tunnels-app ./cmd/wails
-
-      - name: Build (macOS universal .app)
-        if: matrix.goos == 'darwin'
-        env:
-          CGO_ENABLED: "1"
-          CGO_LDFLAGS: "-framework UniformTypeIdentifiers"
-        run: |
-          set -euo pipefail
-          TAGS="desktop,production"
-          LDFLAGS="-s -w -X github.com/tunnels-is/tunnels/version.Version=${VERSION}"
-
-          GOOS=darwin GOARCH=arm64 go build -tags "$TAGS" -trimpath -ldflags "$LDFLAGS" \
-            -o tunnels-app-arm64 ./cmd/wails
-          GOOS=darwin GOARCH=amd64 go build -tags "$TAGS" -trimpath -ldflags "$LDFLAGS" \
-            -o tunnels-app-amd64 ./cmd/wails
-
-          lipo -create -output tunnels-app tunnels-app-arm64 tunnels-app-amd64
-          ./scripts/package-darwin-app.sh tunnels-app Tunnels.app "$VERSION"
-
-      - name: Build (Windows)
-        if: matrix.goos == 'windows'
-        env:
-          CGO_ENABLED: "0"
+      - name: Build
         shell: bash
-        run: |
-          go build -tags "desktop,production" -trimpath \
-            -ldflags "-s -w -H windowsgui -X github.com/tunnels-is/tunnels/version.Version=${VERSION}" \
-            -o tunnels-app.exe ./cmd/wails
+        env:
+          VERSION: ${{ env.VERSION }}
+        run: ./build-fyne.sh ${{ matrix.target }}
 
       - name: Package (Linux)
-        if: matrix.goos == 'linux'
+        if: matrix.target == 'linux'
         run: |
-          tar czf "tunnels-app_${VERSION}_linux_amd64.tar.gz" tunnels-app
+          tar czf "tunnels-app_${VERSION}_linux_amd64.tar.gz" -C bin tunnels-app-linux-amd64 tunnels.png tunnels.desktop
           echo "ASSET=tunnels-app_${VERSION}_linux_amd64.tar.gz" >> "$GITHUB_ENV"
 
       - name: Package (macOS)
-        if: matrix.goos == 'darwin'
+        if: matrix.target == 'darwin'
         run: |
-          ASSET="tunnels-app_${VERSION}_darwin_universal.zip"
-          ditto -c -k --keepParent Tunnels.app "$ASSET"
+          ASSET="tunnels-app_${VERSION}_darwin.zip"
+          ditto -c -k --keepParent bin/Tunnels-darwin-arm64.app "$ASSET" || \
+            ditto -c -k --keepParent bin/Tunnels-darwin-amd64.app "$ASSET"
           echo "ASSET=$ASSET" >> "$GITHUB_ENV"
 
       - name: Package (Windows)
-        if: matrix.goos == 'windows'
+        if: matrix.target == 'windows'
         shell: bash
         run: |
-          7z a "tunnels-app_${VERSION}_windows_amd64.zip" tunnels-app.exe
+          7z a "tunnels-app_${VERSION}_windows_amd64.zip" ./bin/tunnels-app-windows-amd64.exe
           echo "ASSET=tunnels-app_${VERSION}_windows_amd64.zip" >> "$GITHUB_ENV"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: tunnels-app-${{ matrix.goos }}-${{ matrix.goarch }}
+          name: tunnels-app-${{ matrix.target }}
           path: ${{ env.ASSET }}
           if-no-files-found: error

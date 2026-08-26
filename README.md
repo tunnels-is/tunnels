@@ -5,28 +5,25 @@
  - [Live Development](https://twitch.tv/keyb1nd_)
 
 # Requirements
-### Client Web UI
- - vite
 ### Client Golang App
  - golang (macos: ifconfig, route), (windows: netsh)
+ - Fyne desktop: a C compiler plus X11/GL headers on Linux (`libgl1-mesa-dev`, `xorg-dev`); Xcode CLT on macOS; MinGW/zig CGO on Windows
 ### Server (supports linux and docker)
  - iptables (only needed when running the server)
  - golang
 
-# Starting the golang client
+# Starting the desktop app
 NOTE: The client requires sudo/admin on windows and mac, but only narrow net admin permission on linux.
+```bash
+$ ./build-fyne.sh linux     # or windows|darwin|all
+$ ./bin/tunnels-app-linux-amd64
+```
+
+# Starting the CLI
 ```bash
 $ cd ./cmd/main
 $ go build .
 $ ./main
-```
-
-# Starting the web UI
-NOTE: when opening the dev ui, you must first accept the TLS certificate on port 7777 (https://127.0.0.1:7777)
-```bash
-$ cd ./frontend
-$ pnpm install .
-$ vite dev 
 ```
 
 # Starting the server
@@ -35,6 +32,12 @@ $ cd ./server
 $ go build .
 fresh run: $ ./server --config 
 $ ./server
+```
+
+# Starting the admin UI
+The control-plane admin UI lives in `frontend-admin` and is embedded by the server.
+```bash
+$ ./build-ui-admin.sh
 ```
 
 # Notes about development
@@ -84,13 +87,13 @@ $ make lint
  - linux: setcap 'cap_net_raw,cap_net_bind_service,cap_net_admin+eip' main
 
 ## Building
-The goreleaser pipeline builds three artifacts:
+The goreleaser pipeline builds two artifacts; the desktop app is built separately with Fyne:
 
 | Binary | Path | Notes |
 | --- | --- | --- |
-| `tunnels-cli` | `./cmd/main` | Client with embedded browser UI (no Wails) |
+| `tunnels-cli` | `./cmd/main` | Headless/CLI client (local JSON API, no web UI) |
 | `tunnels-server` | `./server` | Control plane (Linux) |
-| `tunnels-app` | `./cmd/fyne` | Fyne desktop app (native GUI, in-process client; Wails still at `./cmd/wails`) |
+| `tunnels-app` | `./cmd/fyne` | Fyne desktop app (native GUI, in-process client) |
 
  - DEV: `./releaser-build-snapshot.sh` (or `make release`)
  - PROD: `./releaser-build-release.sh` (requires `GITHUB_TOKEN`)
@@ -101,7 +104,6 @@ $ make build           # tunnels-cli + tunnels-server
 $ make build-server    # tunnels-server only
 $ make build-client    # tunnels-cli only
 $ make build-app       # tunnels-app (via ./build-fyne.sh)
-$ make build-app-wails # tunnels-app (via ./build-wails.sh)
 
 # Test before building
 $ make pre-commit      # Run tests and linting
@@ -110,18 +112,11 @@ $ make ci              # Run CI checks locally
 
 ### Fyne desktop (`tunnels-app`)
 Native GUI in the same binary as the client (`./cmd/fyne`). The window
-calls client functions directly (no HTTP hop for UI actions). Linux needs
-a C compiler plus X11/GL headers (`libgl1-mesa-dev`, `xorg-dev`). macOS
-needs Xcode CLT. Windows needs CGO (MinGW).
+calls client functions directly (no HTTP hop for UI actions).
 
 ```bash
 ./build-fyne.sh linux     # or windows|darwin|all
 ```
-
-The previous Wails wrapper remains at `./cmd/wails` and can be built with
-`make build-app-wails` / `./build-wails.sh`. That path still embeds the
-React UI and talks to the local HTTP API. Goreleaser still ships the Wails
-binary until the Fyne app is wired into the release pipeline.  
 
 # Special mentiones
 These are the real MVPs:

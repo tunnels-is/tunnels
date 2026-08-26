@@ -49,10 +49,6 @@ build-app:
 	@echo "Building tunnels-app (Fyne)..."
 	@./build-fyne.sh linux
 
-build-app-wails:
-	@echo "Building tunnels-app (Wails)..."
-	@./build-wails.sh
-
 build: build-server build-client
 	@echo "Build complete"
 

@@ -9,8 +9,6 @@ permissions:
   contents: write
 
 jobs:
-  # Builds CLI, server, Windows app, Linux app via GoReleaser (ubuntu).
-  # Darwin desktop is skipped here (needs a macOS runner) and handled below.
   goreleaser:
     runs-on: ubuntu-latest
     steps:
@@ -24,18 +22,6 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Install Linux desktop build deps
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
-
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
@@ -45,10 +31,19 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # Native macOS build: universal Tunnels.app attached to the same draft release.
-  macos-app:
+  desktop:
     needs: goreleaser
-    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            target: linux
+          - runner: macos-latest
+            target: darwin
+          - runner: windows-latest
+            target: windows
+    runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -58,65 +53,50 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
+      - name: Install Linux desktop deps
+        if: matrix.target == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc libgl1-mesa-dev xorg-dev libxkbcommon-dev pkg-config
+
+      - name: Install MinGW
+        if: matrix.target == 'windows'
+        run: choco install mingw -y
 
       - name: Set version
         shell: bash
         run: |
-          # Tag is v1.2.3 — strip leading v for asset names / Info.plist
           echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
           echo "TAG=${GITHUB_REF_NAME}" >> "$GITHUB_ENV"
 
-      - name: Build frontend
-        run: ./build-ui.sh
-
-      - name: Build universal macOS app
+      - name: Build
+        shell: bash
         env:
-          CGO_ENABLED: "1"
-          CGO_LDFLAGS: "-framework UniformTypeIdentifiers"
+          VERSION: ${{ env.VERSION }}
+        run: ./build-fyne.sh ${{ matrix.target }}
+
+      - name: Package (Linux)
+        if: matrix.target == 'linux'
         run: |
-          set -euo pipefail
-          TAGS="desktop,production"
-          LDFLAGS="-s -w -X github.com/tunnels-is/tunnels/version.Version=${VERSION}"
-          OUT_DIR="${RUNNER_TEMP}/tunnels-macos"
-          mkdir -p "$OUT_DIR"
+          tar czf "tunnels-app_${VERSION}_linux_amd64.tar.gz" -C bin tunnels-app-linux-amd64 tunnels.png tunnels.desktop
+          echo "ASSET=tunnels-app_${VERSION}_linux_amd64.tar.gz" >> "$GITHUB_ENV"
 
-          echo "==> Building darwin/arm64"
-          GOOS=darwin GOARCH=arm64 go build \
-            -tags "$TAGS" -trimpath -ldflags "$LDFLAGS" \
-            -o "$OUT_DIR/tunnels-app-arm64" \
-            ./cmd/wails
-
-          echo "==> Building darwin/amd64"
-          GOOS=darwin GOARCH=amd64 go build \
-            -tags "$TAGS" -trimpath -ldflags "$LDFLAGS" \
-            -o "$OUT_DIR/tunnels-app-amd64" \
-            ./cmd/wails
-
-          echo "==> Creating universal binary"
-          lipo -create -output "$OUT_DIR/tunnels-app" \
-            "$OUT_DIR/tunnels-app-arm64" \
-            "$OUT_DIR/tunnels-app-amd64"
-          lipo -info "$OUT_DIR/tunnels-app"
-
-          echo "==> Packaging Tunnels.app"
-          ./scripts/package-darwin-app.sh \
-            "$OUT_DIR/tunnels-app" \
-            "$OUT_DIR/Tunnels.app" \
-            "$VERSION"
-
-          # ditto preserves .app structure correctly for Finder
+      - name: Package (macOS)
+        if: matrix.target == 'darwin'
+        run: |
           ASSET="tunnels-app_${VERSION}_darwin_universal.zip"
-          ditto -c -k --keepParent "$OUT_DIR/Tunnels.app" "$ASSET"
-          ls -lh "$ASSET"
+          ditto -c -k --keepParent bin/Tunnels-darwin-arm64.app "$ASSET" || \
+            ditto -c -k --keepParent bin/Tunnels-darwin-amd64.app "$ASSET"
           echo "ASSET=$ASSET" >> "$GITHUB_ENV"
 
-      - name: Upload macOS app to release
+      - name: Package (Windows)
+        if: matrix.target == 'windows'
+        shell: bash
+        run: |
+          7z a "tunnels-app_${VERSION}_windows_amd64.zip" ./bin/tunnels-app-windows-amd64.exe
+          echo "ASSET=tunnels-app_${VERSION}_windows_amd64.zip" >> "$GITHUB_ENV"
+
+      - name: Upload desktop app to release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.TAG }}

@@ -11,9 +11,6 @@ import (
 	"github.com/tunnels-is/tunnels/version"
 )
 
-//go:embed dist
-var DIST embed.FS
-
 //go:embed wintun.dll
 var DLL embed.FS
 
@@ -27,7 +24,7 @@ func main() {
 	flag.BoolVar(&s.Debug, "debug", false, "manually enable debug")
 	flag.BoolVar(&s.RequireConfig, "requireConfig", false, "Force tunnels to require disk config to start")
 	flag.BoolVar(&client.EnableTLS, "tls", false, "enable TLS for the local API server")
-	flag.BoolVar(&client.DevMode, "dev", false, "disable API auth and enable CORS for local UI development")
+	flag.BoolVar(&client.DevMode, "dev", false, "disable local API auth (for debugging only)")
 	flag.BoolVar(&client.EnablePprof, "pprof", false, "enable net/http/pprof on the local API server (/debug/pprof/)")
 	flag.Parse()
 	client.STATE.Store(s)
@@ -37,7 +34,6 @@ func main() {
 		os.Exit(0)
 	}
 
-	client.DIST_EMBED = DIST
 	client.DLL_EMBED = DLL
 	service.Start()
 }

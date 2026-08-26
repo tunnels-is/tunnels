@@ -165,7 +165,7 @@ func withAlpha(c color.NRGBA, a uint8) color.NRGBA {
 	return c
 }
 
-// Palettes track frontend/src/app.css daisyUI themes.
+// Palettes match the original daisyUI tunnels / tunnels-dark / suzko themes.
 var palettes = map[string]palette{
 	"tunnels-dark": {
 		Base100: hex(0x12, 0x17, 0x1e), Base200: hex(0x0b, 0x0e, 0x13), Base300: hex(0x23, 0x2b, 0x36),

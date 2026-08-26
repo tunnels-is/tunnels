@@ -17,19 +17,12 @@ mkdir -p "$BIN_DIR"
 if [ ! -f cmd/fyne/wintun.dll ]; then
     if [ -f cmd/main/wintun.dll ]; then
         cp -f cmd/main/wintun.dll cmd/fyne/wintun.dll
-    elif [ -f cmd/wails/wintun.dll ]; then
-        cp -f cmd/wails/wintun.dll cmd/fyne/wintun.dll
     else
         echo "error: cmd/fyne/wintun.dll is missing (copy from cmd/main)"
         exit 1
     fi
 fi
 
-if [ ! -f "$APPICON" ]; then
-    if [ -f cmd/wails/build/appicon.png ]; then
-        cp -f cmd/wails/build/appicon.png "$APPICON"
-    fi
-fi
 if [ ! -f "$APPICON" ]; then
     echo "error: cmd/fyne/appicon.png is missing"
     exit 1
@@ -72,6 +65,10 @@ build_linux() {
 windows_cc() {
     if command -v x86_64-w64-mingw32-gcc >/dev/null 2>&1; then
         echo x86_64-w64-mingw32-gcc
+        return
+    fi
+    if [ "$(go env GOHOSTOS)" = "windows" ] && command -v gcc >/dev/null 2>&1; then
+        echo gcc
         return
     fi
     if command -v zig >/dev/null 2>&1; then

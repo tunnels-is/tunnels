@@ -25,6 +25,11 @@ func printInfo() {
 	reset := "\033[0m"
 	divider := dim + "  ────────────────────────────────────────────" + reset + "\n"
 
+	appLine := ""
+	if !DisableLocalAPI {
+		appLine = fmt.Sprintf("  "+bold+"🌐"+reset+"  APP        %s://%s:%s\n", scheme, conf.APIIP, conf.APIPort)
+	}
+
 	fmt.Printf("\n"+
 		blue+
 		"   _____ _____ _____ _____ _____ __    _____\n"+
@@ -36,7 +41,7 @@ func printInfo() {
 		"\n"+
 		divider+
 		"\n"+
-		"  "+bold+"🌐"+reset+"  APP        %s://%s:%s\n"+
+		appLine+
 		"  "+bold+"📁"+reset+"  BASE PATH  %s\n"+
 		"\n"+
 		divider+
@@ -45,7 +50,7 @@ func printInfo() {
 		"  ·  --basePath to change the config directory\n"+
 		"\n"+
 		"\n",
-		scheme, conf.APIIP, conf.APIPort, s.BasePath,
+		s.BasePath,
 	)
 }
 
@@ -146,7 +151,7 @@ func LaunchTunnels() {
 	})
 	conf := CONFIG.Load()
 
-	if conf.CLIConfig == nil {
+	if conf.CLIConfig == nil && !DisableLocalAPI {
 		newConcurrentSignal("APIServer", CancelContext, func() {
 			LaunchAPI()
 		})
