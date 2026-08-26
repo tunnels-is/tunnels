@@ -91,7 +91,7 @@ The goreleaser pipeline builds two artifacts; the desktop app is built separatel
 
 | Binary | Path | Notes |
 | --- | --- | --- |
-| `tunnels-cli` | `./cmd/main` | Headless/CLI client (local JSON API, no web UI) |
+| `tunnels-cli` | `./cmd/main` | Headless/CLI client |
 | `tunnels-server` | `./server` | Control plane (Linux) |
 | `tunnels-app` | `./cmd/fyne` | Fyne desktop app (native GUI, in-process client) |
 

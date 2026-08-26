@@ -37,17 +37,12 @@ func main() {
 		os.Exit(0)
 	}
 
-	client.DisableLocalAPI = true
 	client.DLL_EMBED = DLL
 
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	if err := client.InitService(); err != nil {
 		log.Fatal("Failed to initialize tunnels: ", err)
 	}
-
-	conf := client.CONFIG.Load()
-	conf.OpenUI = false
-	client.CONFIG.Store(conf)
 
 	go func() {
 		defer func() {
