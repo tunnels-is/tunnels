@@ -2,24 +2,18 @@
 
 package client
 
-import (
-	"fmt"
-	"os"
-)
+import "os"
 
 func validateUserKeyFile(path string, info os.FileInfo) error {
-	if mode := info.Mode().Perm(); mode&0o077 != 0 {
-		return fmt.Errorf("insecure permissions %o (want 0600)", mode)
-	}
+	// Windows (and other non-unix) filesystems do not store Unix permission
+	// bits. os.FileMode.Perm() is typically 0666 even for files we wrote with
+	// 0600, so a unix-style group/other check is a false positive on every
+	// secret file.
+	_ = path
+	_ = info
 	return nil
 }
 
 func warnIfInsecureSecretFile(path string) {
-	info, err := os.Stat(path)
-	if err != nil {
-		return
-	}
-	if err := validateUserKeyFile(path, info); err != nil {
-		SECURITY("insecure secret file permissions (continuing):", path, "—", err)
-	}
+	_ = path
 }
