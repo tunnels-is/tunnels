@@ -193,6 +193,21 @@ func (r *kRow) MouseOut()                      { r.hovered = false; r.Refresh() 
 func (r *kRow) MouseMoved(*desktop.MouseEvent) {}
 func (r *kRow) Cursor() desktop.Cursor         { return desktop.DefaultCursor }
 
+var (
+	_ fyne.Tappable          = (*kRow)(nil)
+	_ fyne.SecondaryTappable = (*kRow)(nil)
+	_ desktop.Hoverable      = (*kRow)(nil)
+)
+
+// Tapped swallows the click so widget.List never selects the row. List draws
+// its selection wash on a wrapper behind the child; Unselect in OnSelected
+// cannot undo the item's own selected flag, and focusing the list then keeps
+// a highlight on currentHighlight. Buttons still receive the tap: they are
+// deeper Tappable objects than the row.
+func (r *kRow) Tapped(*fyne.PointEvent) {}
+
+func (r *kRow) TappedSecondary(*fyne.PointEvent) {}
+
 func (r *kRow) CreateRenderer() fyne.WidgetRenderer {
 	p := pal()
 	d := &kRowRenderer{
@@ -353,7 +368,9 @@ func (d *kRowRenderer) apply() {
 		if d.r.hovered {
 			d.bg.FillColor = p.Hover
 		} else {
-			d.bg.FillColor = color.Transparent
+			// Opaque so widget.List's selection wash, drawn *behind* the
+			// child, cannot show through after a click.
+			d.bg.FillColor = p.Base200
 		}
 	}
 }
@@ -374,9 +391,9 @@ func newRowList(spec *tableSpec, count func() int, bind func(widget.ListItemID, 
 		},
 	)
 	l.HideSeparators = true
-	// These tables are action lists, not selectable records. A click would
-	// otherwise stick Fyne's selection wash on the row until another click.
-	l.OnSelected = func(id widget.ListItemID) { l.Unselect(id) }
+	l.OnSelected = func(id widget.ListItemID) {
+		l.UnselectAll()
+	}
 	return l
 }
 
@@ -415,6 +432,20 @@ func (headerBodyLayout) MinSize(objs []fyne.CanvasObject) fyne.Size {
 func tableBody(spec *tableSpec, l *widget.List) fyne.CanvasObject {
 	pad := gutter - sp4
 	head := insetEach(0, pad, 0, pad, newTableHeader(spec))
-	rows := insetEach(0, pad, sp3, pad, boostList(l))
+	quiet := container.NewThemeOverride(l, listQuietTheme{live})
+	boost := &scrollBoost{list: l}
+	boost.ExtendBaseWidget(boost)
+	rows := insetEach(0, pad, sp3, pad, container.NewStack(quiet, boost))
 	return container.New(headerBodyLayout{}, head, rows)
+}
+
+// listQuietTheme hides Fyne's list selection wash. Table rows are not
+// selectable records; hover and the connected tint are drawn on the row.
+type listQuietTheme struct{ fyne.Theme }
+
+func (t listQuietTheme) Color(n fyne.ThemeColorName, v fyne.ThemeVariant) color.Color {
+	if n == theme.ColorNameSelection {
+		return color.Transparent
+	}
+	return t.Theme.Color(n, v)
 }
