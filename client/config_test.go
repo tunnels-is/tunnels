@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/tunnels-is/tunnels/certs"
 	"github.com/tunnels-is/tunnels/types"
 	"gopkg.in/yaml.v3"
 )
@@ -45,13 +44,6 @@ func TestDefaultConfig(t *testing.T) {
 		t.Errorf("DNS2Default should be 8.8.8.8, got %s", conf.DNS2Default)
 	}
 
-	if conf.APIIP != "127.0.0.1" {
-		t.Errorf("APIIP should be 127.0.0.1, got %s", conf.APIIP)
-	}
-	if conf.APIPort != "7777" {
-		t.Errorf("APIPort should be 7777, got %s", conf.APIPort)
-	}
-
 	if conf.LogBlockedDomains {
 		t.Error("LogBlockedDomains should be false by default")
 	}
@@ -87,100 +79,7 @@ func TestDefaultConfig(t *testing.T) {
 		}
 	}
 
-	if conf.APIKey != "./api.key" {
-		t.Errorf("APIKey should be './api.key', got %s", conf.APIKey)
-	}
-	if conf.APICert != "./api.crt" {
-		t.Errorf("APICert should be './api.crt', got %s", conf.APICert)
-	}
-	if conf.APICertType != certs.RSA {
-		t.Errorf("APICertType should be RSA, got %v", conf.APICertType)
-	}
-
-	if len(conf.APICertIPs) != 2 {
-		t.Errorf("Should have 2 default cert IPs, got %d", len(conf.APICertIPs))
-	} else {
-		if conf.APICertIPs[0] != "127.0.0.1" {
-			t.Errorf("First cert IP should be 127.0.0.1, got %s", conf.APICertIPs[0])
-		}
-		if conf.APICertIPs[1] != "0.0.0.0" {
-			t.Errorf("Second cert IP should be 0.0.0.0, got %s", conf.APICertIPs[1])
-		}
-	}
-
-	if len(conf.APICertDomains) != 2 {
-		t.Errorf("Should have 2 default cert domains, got %d", len(conf.APICertDomains))
-	} else {
-		if conf.APICertDomains[0] != "tunnels.app" {
-			t.Errorf("First cert domain should be tunnels.app, got %s", conf.APICertDomains[0])
-		}
-		if conf.APICertDomains[1] != "app.tunnels.is" {
-			t.Errorf("Second cert domain should be app.tunnels.is, got %s", conf.APICertDomains[1])
-		}
-	}
-
 	t.Logf("Default config validation passed")
-}
-
-func TestApplyCertificateDefaultsToConfig(t *testing.T) {
-
-	cfg := &configV2{}
-	applyCertificateDefaultsToConfig(cfg)
-
-	if cfg.APIKey != "./api.key" {
-		t.Errorf("APIKey should be set to './api.key', got %s", cfg.APIKey)
-	}
-	if cfg.APICert != "./api.crt" {
-		t.Errorf("APICert should be set to './api.crt', got %s", cfg.APICert)
-	}
-	if cfg.APICertType != certs.RSA {
-		t.Errorf("APICertType should be RSA, got %v", cfg.APICertType)
-	}
-	if len(cfg.APICertIPs) != 2 {
-		t.Errorf("Should have 2 cert IPs, got %d", len(cfg.APICertIPs))
-	}
-	if len(cfg.APICertDomains) != 2 {
-		t.Errorf("Should have 2 cert domains, got %d", len(cfg.APICertDomains))
-	}
-
-	cfg2 := &configV2{
-		APIKey:  "/custom/key.pem",
-		APICert: "/custom/cert.pem",
-	}
-	applyCertificateDefaultsToConfig(cfg2)
-
-	if cfg2.APIKey != "/custom/key.pem" {
-		t.Errorf("APIKey should not be overridden, got %s", cfg2.APIKey)
-	}
-	if cfg2.APICert != "/custom/cert.pem" {
-		t.Errorf("APICert should not be overridden, got %s", cfg2.APICert)
-	}
-
-	cfg3 := &configV2{
-		APICertIPs: []string{"192.168.1.1"},
-	}
-	applyCertificateDefaultsToConfig(cfg3)
-
-	if len(cfg3.APICertIPs) != 1 {
-		t.Errorf("APICertIPs should not be overridden, got %d entries", len(cfg3.APICertIPs))
-	}
-	if cfg3.APICertIPs[0] != "192.168.1.1" {
-		t.Errorf("APICertIPs should not be overridden, got %s", cfg3.APICertIPs[0])
-	}
-
-	cfg4 := &configV2{
-		APICertDomains: []string{"custom.domain.com"},
-	}
-	applyCertificateDefaultsToConfig(cfg4)
-
-	if len(cfg4.APICertDomains) != 1 {
-		t.Errorf("APICertDomains should not be overridden, got %d entries", len(cfg4.APICertDomains))
-	}
-	if cfg4.APICertDomains[0] != "custom.domain.com" {
-		t.Errorf("APICertDomains should not be overridden, got %s", cfg4.APICertDomains[0])
-	}
-
-	t.Logf("Certificate defaults application test passed")
 }
 
 func TestWriteConfigToDisk_JSON(t *testing.T) {
@@ -194,8 +93,6 @@ func TestWriteConfigToDisk_JSON(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	testConfig := DefaultConfig()
-	testConfig.APIIP = "192.168.1.100"
-	testConfig.APIPort = "8888"
 
 	tests := []struct {
 		name        string
@@ -255,13 +152,6 @@ func TestWriteConfigToDisk_JSON(t *testing.T) {
 				return
 			}
 
-			if loaded.APIIP != testConfig.APIIP {
-				t.Errorf("APIIP: got %s, expected %s", loaded.APIIP, testConfig.APIIP)
-			}
-			if loaded.APIPort != testConfig.APIPort {
-				t.Errorf("APIPort: got %s, expected %s", loaded.APIPort, testConfig.APIPort)
-			}
-
 			t.Log("JSON config saved successfully ✓")
 		})
 	}
@@ -278,8 +168,6 @@ func TestWriteConfigToDisk_YAML(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	testConfig := DefaultConfig()
-	testConfig.APIIP = "192.168.1.100"
-	testConfig.APIPort = "8888"
 
 	tests := []struct {
 		name        string
@@ -339,13 +227,6 @@ func TestWriteConfigToDisk_YAML(t *testing.T) {
 				return
 			}
 
-			if loaded.APIIP != testConfig.APIIP {
-				t.Errorf("APIIP: got %s, expected %s", loaded.APIIP, testConfig.APIIP)
-			}
-			if loaded.APIPort != testConfig.APIPort {
-				t.Errorf("APIPort: got %s, expected %s", loaded.APIPort, testConfig.APIPort)
-			}
-
 			t.Logf("YAML config (%s) saved successfully ✓", tc.filename)
 		})
 	}
@@ -362,8 +243,6 @@ func TestReadConfigFileFromDisk_JSON(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	testConfig := DefaultConfig()
-	testConfig.APIIP = "10.0.0.1"
-	testConfig.APIPort = "9999"
 
 	tests := []struct {
 		name        string
@@ -414,14 +293,6 @@ func TestReadConfigFileFromDisk_JSON(t *testing.T) {
 				return
 			}
 
-			loaded := CONFIG.Load()
-			if loaded.APIIP != testConfig.APIIP {
-				t.Errorf("APIIP: got %s, expected %s", loaded.APIIP, testConfig.APIIP)
-			}
-			if loaded.APIPort != testConfig.APIPort {
-				t.Errorf("APIPort: got %s, expected %s", loaded.APIPort, testConfig.APIPort)
-			}
-
 			t.Log("JSON config loaded successfully ✓")
 		})
 	}
@@ -438,8 +309,6 @@ func TestReadConfigFileFromDisk_YAML(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	testConfig := DefaultConfig()
-	testConfig.APIIP = "10.0.0.1"
-	testConfig.APIPort = "9999"
 
 	tests := []struct {
 		name        string
@@ -488,14 +357,6 @@ func TestReadConfigFileFromDisk_YAML(t *testing.T) {
 			if err != nil {
 				t.Errorf("Unexpected error: %v", err)
 				return
-			}
-
-			loaded := CONFIG.Load()
-			if loaded.APIIP != testConfig.APIIP {
-				t.Errorf("APIIP: got %s, expected %s", loaded.APIIP, testConfig.APIIP)
-			}
-			if loaded.APIPort != testConfig.APIPort {
-				t.Errorf("APIPort: got %s, expected %s", loaded.APIPort, testConfig.APIPort)
 			}
 
 			t.Logf("YAML config (%s) loaded successfully ✓", tc.filename)
@@ -943,8 +804,6 @@ func TestConfigRoundTrip(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	testConfig := DefaultConfig()
-	testConfig.APIIP = "172.16.0.1"
-	testConfig.APIPort = "12345"
 	testConfig.DNSServerIP = "8.8.8.8"
 	testConfig.DNSServerPort = "5353"
 
@@ -981,12 +840,6 @@ func TestConfigRoundTrip(t *testing.T) {
 			}
 
 			loaded := CONFIG.Load()
-			if loaded.APIIP != testConfig.APIIP {
-				t.Errorf("APIIP: got %s, expected %s", loaded.APIIP, testConfig.APIIP)
-			}
-			if loaded.APIPort != testConfig.APIPort {
-				t.Errorf("APIPort: got %s, expected %s", loaded.APIPort, testConfig.APIPort)
-			}
 			if loaded.DNSServerIP != testConfig.DNSServerIP {
 				t.Errorf("DNSServerIP: got %s, expected %s", loaded.DNSServerIP, testConfig.DNSServerIP)
 			}

@@ -16,7 +16,6 @@ func ValidateAdapterID(meta *TunnelMETA) error {
 	return nil
 }
 
-
 func resolveTUNCreateName(logical string) string {
 	if logical == "utun" {
 		return "utun"

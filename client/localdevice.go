@@ -11,7 +11,6 @@ import (
 	"github.com/google/uuid"
 )
 
-
 type LocalDevice struct {
 	ID               string    `json:"ID"`
 	ServerID         string    `json:"ServerID"`
@@ -21,7 +20,6 @@ type LocalDevice struct {
 	WireGuardIP      string    `json:"WireGuardIP,omitempty"`
 	CreatedAt        time.Time `json:"CreatedAt"`
 }
-
 
 type LocalDeviceInfo struct {
 	ID              string    `json:"ID"`
@@ -166,7 +164,6 @@ func shortDeviceTag() string {
 	return "client-" + strings.ReplaceAll(uuid.NewString(), "-", "")[:12]
 }
 
-
 func createLocalDeviceForServer(cr *ConnectionRequest, serverID, tag string) (*LocalDevice, *wgServerConfig, error) {
 	priv, err := generateWGPrivKey()
 	if err != nil {
@@ -224,7 +221,6 @@ func createLocalDeviceForServer(cr *ConnectionRequest, serverID, tag string) (*L
 	INFO("created local device", local.ID, "for server", serverID, "ip", cfg.WireGuardIP)
 	return local, cfg, nil
 }
-
 
 func resolveLocalDeviceForServer(cr *ConnectionRequest, serverID, tag string) (*LocalDevice, *wgServerConfig, error) {
 	existing, err := findLocalDeviceByServerID(serverID)

@@ -68,7 +68,6 @@ func clearTunnelMetaMap() {
 	})
 }
 
-
 func activateAccountByHash(hash string) error {
 	accountMu.Lock()
 	defer accountMu.Unlock()

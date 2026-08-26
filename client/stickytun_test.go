@@ -83,5 +83,3 @@ func TestWGDeviceAlive_Nil(t *testing.T) {
 		t.Fatal("nil device is not alive")
 	}
 }
-
-
