@@ -174,13 +174,9 @@ func (a *App) dnsListCard(title, desc, key string, lists []*client.BlockList, ki
 		}
 		right = append(right, hspace(sp1), toggle)
 
-		sub := fmt.Sprintf("%d domains", l.Count)
-		if !custom && l.URL != "" {
-			sub = fmt.Sprintf("%d domains  ·  %s", l.Count, shortURL(l.URL))
-		}
 		left := vstack(1,
 			text(l.Tag, fsBody, pal().Content, false),
-			text(sub, fsSmall, pal().Faint, false),
+			text(fmt.Sprintf("%d domains", l.Count), fsSmall, pal().Faint, false),
 		)
 		rows = append(rows, insetEach(sp2, 0, sp2, 0, splitRow(left, hstack(sp1, right...))))
 	}
@@ -188,15 +184,6 @@ func (a *App) dnsListCard(title, desc, key string, lists []*client.BlockList, ki
 		rows = append(rows, emptyRow("None configured."))
 	}
 	return cardBox(title, desc, actions, settingList(rows...))
-}
-
-// shortURL trims a list URL to something that fits on one line.
-func shortURL(raw string) string {
-	s := strings.TrimPrefix(strings.TrimPrefix(raw, "https://"), "http://")
-	if len(s) > 52 {
-		return s[:49] + "…"
-	}
-	return s
 }
 
 func (a *App) setAllLists(key string, enabled bool) {

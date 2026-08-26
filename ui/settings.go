@@ -117,13 +117,13 @@ func (a *App) settingsPage() fyne.CanvasObject {
 			logPath = st.LogPath
 			logFile = st.LogFileName
 		}
-		cards = append(cards, card("System", "Paths this instance is running with.",
+		cards = append(cards, fullRow(card("System", "Paths this instance is running with.",
 			vstack(0,
 				kvRow("Base path", base, true),
 				kvRow("Config file", cfgPath, true),
 				kvRow("Log path", logPath, true),
 				kvRow("Log file", logFile, true),
-			)))
+			))))
 	}
 
 	sub := fmt.Sprintf("Tunnels %s · API v%d", ver, api)

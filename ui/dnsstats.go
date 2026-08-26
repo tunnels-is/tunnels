@@ -27,9 +27,7 @@ func (a *App) dnsStatsPage() fyne.CanvasObject {
 		return pageShell("DNS statistics", "", nil,
 			emptyState("Advanced mode required", "Turn on Advanced mode in Settings to view DNS statistics."))
 	}
-	if a.dnsStats == nil {
-		a.dnsStats = client.GetDNSStats()
-	}
+	a.dnsStats = client.GetDNSStats()
 
 	blocked := a.dnsStatsTab != "resolved"
 	items := a.statItems(blocked)
@@ -48,7 +46,6 @@ func (a *App) dnsStatsPage() fyne.CanvasObject {
 		a.reloadCurrent()
 	})
 	refresh := newIconBtn(theme.ViewRefreshIcon(), kOutline, func() {
-		a.dnsStats = client.GetDNSStats()
 		a.reloadCurrent()
 	})
 	actions := hstackFlex(sp2, 0, search, tabs, refresh)
