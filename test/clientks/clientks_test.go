@@ -6,7 +6,6 @@ import (
 	"bytes"
 	"crypto/tls"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -112,29 +111,55 @@ func ctrlReq(t *testing.T, method, path string, body any, hdr map[string]string,
 	return resp.StatusCode
 }
 
-func cliAPI(t *testing.T, method string, body any) (int, []byte) {
+var cliData string
+
+func controlServers() []map[string]any {
+	return []map[string]any{{
+		"ID": "tunnels", "Host": ctrlIP, "Port": "443", "ValidateCertificate": false,
+	}}
+}
+
+func writeClientConfig(t *testing.T, cfg map[string]any) {
 	t.Helper()
-	payload := "{}"
-	if body != nil {
-		b, err := json.Marshal(body)
-		if err != nil {
-			t.Fatal(err)
-		}
-		payload = string(b)
+	if cfg["ControlServers"] == nil {
+		cfg["ControlServers"] = controlServers()
 	}
-	script := fmt.Sprintf(
-		`curl -sS -m 20 -o /tmp/cli.out -w '%%{http_code}' -H 'Content-Type: application/json' -d %q http://127.0.0.1:7777/v1/method/%s`,
-		payload, method,
-	)
-	out, err := execIn(t, "kcli", script)
+	b, err := json.MarshalIndent(cfg, "", "  ")
 	if err != nil {
-		t.Logf("cliAPI %s: %v\n%s", method, err, out)
-		return 0, nil
+		t.Fatal(err)
 	}
-	codeStr := strings.TrimSpace(out)
-	code, _ := strconv.Atoi(codeStr)
-	raw, _ := execIn(t, "kcli", "cat /tmp/cli.out")
-	return code, []byte(strings.TrimSpace(raw))
+	if err := os.WriteFile(filepath.Join(cliData, "tunnels.conf"), b, 0o666); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func waitClientReady(t *testing.T) {
+	t.Helper()
+	for i := 0; i < 40; i++ {
+		out, _ := sh(t, "podman", "logs", "kcli")
+		if strings.Contains(out, "Tunnels is ready") {
+			t.Log("client ready")
+			return
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+	out, _ := sh(t, "podman", "logs", "kcli")
+	t.Fatalf("client never became ready\n%s", out)
+}
+
+func runClient(t *testing.T) {
+	t.Helper()
+	_, _ = sh(t, "podman", "rm", "-f", "kcli")
+	mustPodman(t, "run", "-d", "--name", "kcli",
+		"--network", netName, "--ip", cliIP,
+		"--cap-add", "NET_ADMIN", "--cap-add", "NET_RAW",
+		"--device", "/dev/net/tun",
+		"--sysctl", "net.ipv6.conf.all.disable_ipv6=0",
+		"--sysctl", "net.ipv6.conf.default.disable_ipv6=0",
+		"--sysctl", "net.ipv4.ip_forward=1",
+		"-v", cliData+":/data",
+		image, "/tunnels", "--debug", "--basePath", "/data", "--tunnelType", "default")
+	waitClientReady(t)
 }
 
 func TestClientKillSwitchAndReuse(t *testing.T) {
@@ -161,7 +186,6 @@ func TestClientKillSwitchAndReuse(t *testing.T) {
 	waitController(t)
 
 	startClient(t)
-	waitClientAPI(t)
 
 	t.Run("ipv6_blackhole_on_startup", func(t *testing.T) {
 		out, err := execIn(t, "kcli", "ip -6 route show type blackhole")
@@ -188,25 +212,11 @@ func TestClientKillSwitchAndReuse(t *testing.T) {
 	})
 
 	t.Run("ipv4_blackhole_after_enable", func(t *testing.T) {
-		code, raw := cliAPI(t, "getState", map[string]any{})
-		if code != 200 {
-			t.Fatalf("getState: %d %s", code, raw)
-		}
-		var st struct {
-			Config map[string]any `json:"Config"`
-		}
-		if err := json.Unmarshal(raw, &st); err != nil {
-			t.Fatalf("decode state: %v\n%s", err, raw)
-		}
-		if st.Config == nil {
-			t.Fatalf("no Config in getState: %s", raw)
-		}
-		st.Config["KillSwitchIPv4"] = true
-		st.Config["KillSwitchIPv6"] = true
-		code, raw = cliAPI(t, "setConfig", st.Config)
-		if code != 200 {
-			t.Fatalf("setConfig: %d %s", code, raw)
-		}
+		writeClientConfig(t, map[string]any{
+			"KillSwitchIPv4": true,
+			"KillSwitchIPv6": true,
+		})
+		runClient(t)
 		out, err := execIn(t, "kcli", "ip -4 route show type blackhole")
 		if err != nil {
 			t.Fatalf("ip -4 route: %v\n%s", err, out)
@@ -216,11 +226,11 @@ func TestClientKillSwitchAndReuse(t *testing.T) {
 		}
 		t.Logf("IPv4 kill switch route:\n%s", out)
 
-		st.Config["KillSwitchIPv4"] = false
-		code, raw = cliAPI(t, "setConfig", st.Config)
-		if code != 200 {
-			t.Fatalf("setConfig disable v4: %d %s", code, raw)
-		}
+		writeClientConfig(t, map[string]any{
+			"KillSwitchIPv4": false,
+			"KillSwitchIPv6": true,
+		})
+		runClient(t)
 	})
 
 	uid, token := registerUser(t)
@@ -345,28 +355,16 @@ func waitController(t *testing.T) {
 
 func startClient(t *testing.T) {
 	t.Helper()
-	mustPodman(t, "run", "-d", "--name", "kcli",
-		"--network", netName, "--ip", cliIP,
-		"--cap-add", "NET_ADMIN", "--cap-add", "NET_RAW",
-		"--device", "/dev/net/tun",
-		"--sysctl", "net.ipv6.conf.all.disable_ipv6=0",
-		"--sysctl", "net.ipv6.conf.default.disable_ipv6=0",
-		"--sysctl", "net.ipv4.ip_forward=1",
-		image, "/tunnels", "--dev", "--debug", "--basePath", "/data", "--tunnelType", "default")
-}
-
-func waitClientAPI(t *testing.T) {
-	t.Helper()
-	for i := 0; i < 40; i++ {
-		out, err := execIn(t, "kcli", "curl -sS -m 2 -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' -d '{}' http://127.0.0.1:7777/v1/method/getState")
-		if err == nil && strings.TrimSpace(out) == "200" {
-			t.Log("client API up")
-			return
-		}
-		time.Sleep(500 * time.Millisecond)
+	cliData = filepath.Join(os.TempDir(), "clientks-cli")
+	_ = os.RemoveAll(cliData)
+	if err := os.MkdirAll(cliData, 0o777); err != nil {
+		t.Fatal(err)
 	}
-	out, _ := sh(t, "podman", "logs", "kcli")
-	t.Fatalf("client API never came up\n%s", out)
+	writeClientConfig(t, map[string]any{
+		"KillSwitchIPv4": false,
+		"KillSwitchIPv6": true,
+	})
+	runClient(t)
 }
 
 func registerUser(t *testing.T) (id, token string) {
@@ -411,56 +409,26 @@ func defaultServerID(t *testing.T, uid, token string) string {
 
 func connect(t *testing.T, uid, token, serverID string) {
 	t.Helper()
-	body := map[string]any{
-		"UserID":      uid,
-		"DeviceToken": token,
-		"ServerID":    serverID,
-		"Tag":         "tunnels",
-		"Server": map[string]any{
-			"ID":                  "tunnels",
-			"Host":                ctrlIP,
-			"Port":                "443",
-			"ValidateCertificate": false,
+	writeClientConfig(t, map[string]any{
+		"KillSwitchIPv4": false,
+		"KillSwitchIPv6": true,
+		"CLIConfig": map[string]any{
+			"ControlServerID": "tunnels",
+			"DeviceToken":     token,
+			"UserID":          uid,
+			"ServerID":        serverID,
 		},
-	}
-	// Control server must be allowlisted on the client first.
-	ensureControlServer(t, ctrlIP, "443")
-	code, raw := cliAPI(t, "connectServer", body)
-	if code != 200 {
-		rt, _ := execIn(t, "kcli", "ip route; echo '---'; ip addr")
-		logs, _ := sh(t, "podman", "logs", "--tail", "40", "kctrl")
-		t.Fatalf("connectServer: %d %s\n%s\n=== kctrl ===\n%s", code, raw, rt, logs)
-	}
-	// Wait for the interface.
-	for i := 0; i < 20; i++ {
+	})
+	runClient(t)
+	for i := 0; i < 40; i++ {
 		if tunnelsIfIndex(t) != 0 {
 			return
 		}
 		time.Sleep(500 * time.Millisecond)
 	}
-	t.Fatal("tunnels interface never appeared")
-}
-
-func ensureControlServer(t *testing.T, host, port string) {
-	t.Helper()
-	code, raw := cliAPI(t, "getState", map[string]any{})
-	if code != 200 {
-		t.Fatalf("getState: %d %s", code, raw)
-	}
-	var st struct {
-		Config map[string]any `json:"Config"`
-	}
-	if err := json.Unmarshal(raw, &st); err != nil {
-		t.Fatal(err)
-	}
-	st.Config["ControlServers"] = []map[string]any{{
-		"ID": "tunnels", "Host": host, "Port": port, "ValidateCertificate": false,
-	}}
-	st.Config["KillSwitchIPv6"] = true
-	code, raw = cliAPI(t, "setConfig", st.Config)
-	if code != 200 {
-		t.Fatalf("setConfig control server: %d %s", code, raw)
-	}
+	rt, _ := execIn(t, "kcli", "ip route; echo '---'; ip addr")
+	logs, _ := sh(t, "podman", "logs", "--tail", "40", "kcli")
+	t.Fatalf("tunnels interface never appeared\n%s\n=== kcli ===\n%s", rt, logs)
 }
 
 func tunnelsIfIndex(t *testing.T) int {
