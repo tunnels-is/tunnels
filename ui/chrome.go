@@ -443,6 +443,21 @@ func (c *cardFlowLayout) columns(width float32) int {
 	return n
 }
 
+// fullWidthCard is a flow child that occupies the whole row instead of one
+// masonry cell, so long content (file paths) is not clipped to a column.
+type fullWidthCard struct{ fyne.CanvasObject }
+
+func fullRow(obj fyne.CanvasObject) fyne.CanvasObject {
+	return &fullWidthCard{CanvasObject: obj}
+}
+
+func flowItemWidth(o fyne.CanvasObject, colW, total float32) float32 {
+	if _, ok := o.(*fullWidthCard); ok {
+		return total
+	}
+	return colW
+}
+
 func (c *cardFlowLayout) Layout(objs []fyne.CanvasObject, size fyne.Size) {
 	n := c.columns(size.Width)
 	colW := (size.Width - c.gap*float32(n-1)) / float32(n)
@@ -451,7 +466,7 @@ func (c *cardFlowLayout) Layout(objs []fyne.CanvasObject, size fyne.Size) {
 	// reads the settled height and places them.
 	for _, o := range objs {
 		if o.Visible() {
-			o.Resize(fyne.NewSize(colW, o.MinSize().Height))
+			o.Resize(fyne.NewSize(flowItemWidth(o, colW, size.Width), o.MinSize().Height))
 		}
 	}
 
@@ -460,13 +475,26 @@ func (c *cardFlowLayout) Layout(objs []fyne.CanvasObject, size fyne.Size) {
 		if !o.Visible() {
 			continue
 		}
+		h := o.MinSize().Height
+		if _, ok := o.(*fullWidthCard); ok {
+			var y float32
+			for _, colH := range heights {
+				y = max32(y, colH)
+			}
+			o.Move(fyne.NewPos(0, y))
+			o.Resize(fyne.NewSize(size.Width, h))
+			next := y + h + c.gap
+			for i := range heights {
+				heights[i] = next
+			}
+			continue
+		}
 		col := 0
 		for i := 1; i < n; i++ {
 			if heights[i] < heights[col] {
 				col = i
 			}
 		}
-		h := o.MinSize().Height
 		o.Move(fyne.NewPos(float32(col)*(colW+c.gap), heights[col]))
 		o.Resize(fyne.NewSize(colW, h))
 		heights[col] += h + c.gap
@@ -698,26 +726,191 @@ func statTile(label, value string, t tone) fyne.CanvasObject {
 	return container.NewStack(surface(radMd, pal().Base100, pal().Base300), insetXY(sp3, sp2, inner))
 }
 
-// kvRow is one label/value line with a trailing hairline. Values that look
-// like identifiers render monospaced so they are easy to compare.
+// kvRow is one label/value line with a trailing hairline. Long values wrap
+// and the row grows with them — canvas.Text in a Border was clipping paths.
 func kvRow(label, value string, mono bool) fyne.CanvasObject {
 	if value == "" {
 		value = "—"
 	}
-	p := pal()
-	k := text(label, fsBody, p.Muted, false)
-	var v fyne.CanvasObject
-	if mono {
-		t := monoText(value, fsSmall, p.Content)
-		t.Alignment = fyne.TextAlignTrailing
-		v = t
-	} else {
-		t := text(value, fsBody, p.Content, false)
-		t.Alignment = fyne.TextAlignTrailing
-		v = t
+	w := &kvLine{label: label, value: value, mono: mono}
+	w.ExtendBaseWidget(w)
+	return vstack(0, insetEach(sp2+1, 0, sp2+1, 0, w), divider())
+}
+
+// kvLine is the wrapping label/value pair inside kvRow.
+type kvLine struct {
+	widget.BaseWidget
+	label string
+	value string
+	mono  bool
+}
+
+func (k *kvLine) CreateRenderer() fyne.WidgetRenderer {
+	r := &kvLineRenderer{k: k, label: text(k.label, fsBody, pal().Muted, false)}
+	r.ensureValues(16)
+	r.apply()
+	return r
+}
+
+type kvLineRenderer struct {
+	k      *kvLine
+	label  *canvas.Text
+	values []*canvas.Text
+}
+
+func (r *kvLineRenderer) Destroy() {}
+
+func (r *kvLineRenderer) Objects() []fyne.CanvasObject {
+	out := make([]fyne.CanvasObject, 0, 1+len(r.values))
+	out = append(out, r.label)
+	for _, v := range r.values {
+		out = append(out, v)
 	}
-	row := container.NewBorder(nil, nil, k, nil, v)
-	return vstack(0, insetEach(sp2+1, 0, sp2+1, 0, row), divider())
+	return out
+}
+
+func (k *kvLine) valueStyle() (fyne.TextStyle, float32) {
+	if k.mono {
+		return fyne.TextStyle{Monospace: true}, fsSmall
+	}
+	return fyne.TextStyle{}, fsBody
+}
+
+func (k *kvLine) minForWidth(width float32) fyne.Size {
+	style, size := k.valueStyle()
+	lw := fyne.MeasureText(k.label, fsBody, fyne.TextStyle{}).Width
+	lh := fyne.MeasureText(k.label, fsBody, fyne.TextStyle{}).Height
+	vw := fyne.MeasureText(k.value, size, style).Width
+	vh := fyne.MeasureText("Ag", size, style).Height
+	gap := sp3
+	if width <= 0 {
+		return fyne.NewSize(lw+gap+vw, max32(lh, vh))
+	}
+	remain := width - lw - gap
+	if remain < z(80) {
+		lines := wrapToWidth(k.value, width, size, style)
+		return fyne.NewSize(width, lh+z(2)+vh*float32(len(lines)))
+	}
+	lines := wrapToWidth(k.value, remain, size, style)
+	return fyne.NewSize(max32(width, lw+gap+z(80)), max32(lh, vh*float32(len(lines))))
+}
+
+func (r *kvLineRenderer) MinSize() fyne.Size {
+	return r.k.minForWidth(r.k.Size().Width)
+}
+
+func (r *kvLineRenderer) ensureValues(n int) {
+	for len(r.values) < n {
+		t := canvas.NewText("", pal().Content)
+		r.values = append(r.values, t)
+	}
+}
+
+func (r *kvLineRenderer) Layout(size fyne.Size) {
+	style, textSize := r.k.valueStyle()
+	lw := r.label.MinSize().Width
+	lh := r.label.MinSize().Height
+	vh := fyne.MeasureText("Ag", textSize, style).Height
+	gap := sp3
+	remain := size.Width - lw - gap
+	stack := remain < z(80)
+
+	var lines []string
+	var valueX float32
+	var valueY float32
+	if stack {
+		lines = wrapToWidth(r.k.value, size.Width, textSize, style)
+		valueX, valueY = 0, lh+z(2)
+		r.label.Move(fyne.NewPos(0, 0))
+	} else {
+		lines = wrapToWidth(r.k.value, remain, textSize, style)
+		valueX, valueY = lw+gap, 0
+		r.label.Move(fyne.NewPos(0, 0))
+	}
+	r.label.Resize(r.label.MinSize())
+
+	r.ensureValues(len(lines))
+	for i, t := range r.values {
+		if i >= len(lines) {
+			t.Text = ""
+			t.Hide()
+			t.Resize(fyne.NewSize(0, 0))
+			continue
+		}
+		t.Show()
+		t.Text = lines[i]
+		t.TextSize = textSize
+		t.TextStyle = style
+		t.Color = pal().Content
+		ms := t.MinSize()
+		x := valueX
+		if !stack && len(lines) == 1 {
+			x = size.Width - ms.Width
+		}
+		t.Move(fyne.NewPos(x, valueY+vh*float32(i)))
+		t.Resize(ms)
+	}
+}
+
+func (r *kvLineRenderer) Refresh() {
+	r.apply()
+	r.label.Refresh()
+	for _, v := range r.values {
+		v.Refresh()
+	}
+	if sz := r.k.Size(); sz.Width > 0 {
+		r.Layout(sz)
+	}
+	canvasRefresh(r.k)
+}
+
+func (r *kvLineRenderer) apply() {
+	p := pal()
+	r.label.Text = r.k.label
+	r.label.TextSize = fsBody
+	r.label.Color = p.Muted
+}
+
+// wrapToWidth breaks s so each line fits maxW. Paths have no spaces, so it
+// wraps on characters and prefers a cut after / or \ when one is nearby.
+func wrapToWidth(s string, maxW, textSize float32, style fyne.TextStyle) []string {
+	if s == "" {
+		return []string{""}
+	}
+	if maxW <= 0 || fyne.MeasureText(s, textSize, style).Width <= maxW {
+		return []string{s}
+	}
+	var lines []string
+	rest := []rune(s)
+	for len(rest) > 0 {
+		lo, hi := 1, len(rest)
+		for lo < hi {
+			mid := (lo + hi + 1) / 2
+			if fyne.MeasureText(string(rest[:mid]), textSize, style).Width <= maxW {
+				lo = mid
+			} else {
+				hi = mid - 1
+			}
+		}
+		cut := lo
+		if cut < len(rest) {
+			pref := rest[:cut]
+			from := len(pref) * 2 / 3
+			for i := len(pref) - 1; i >= from; i-- {
+				switch pref[i] {
+				case '/', '\\', ' ':
+					cut = i + 1
+					i = from - 1
+				}
+			}
+		}
+		if cut < 1 {
+			cut = 1
+		}
+		lines = append(lines, string(rest[:cut]))
+		rest = rest[cut:]
+	}
+	return lines
 }
 
 // ---------------------------------------------------------------- empty state
