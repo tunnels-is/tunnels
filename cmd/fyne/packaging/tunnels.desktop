@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Tunnels
+Comment=Tunnels VPN client
+Exec=tunnels-app
+Icon=tunnels
+Terminal=false
+Categories=Network;Security;
+StartupWMClass=Tunnels
+Keywords=vpn;wireguard;tunnels;

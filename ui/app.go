@@ -111,8 +111,10 @@ func newApp(icon []byte) *App {
 	fy := app.NewWithID("is.tunnels.desktop")
 	name := fy.Preferences().StringWithFallback("ui-theme", defaultThemeName)
 	setLiveTheme(name)
+	var iconRes fyne.Resource
 	if len(icon) > 0 {
-		fy.SetIcon(fyne.NewStaticResource("appicon.png", icon))
+		iconRes = fyne.NewStaticResource("appicon.png", icon)
+		fy.SetIcon(iconRes)
 	}
 
 	// Apply the saved zoom before anything is built so the first layout is
@@ -120,6 +122,9 @@ func newApp(icon []byte) *App {
 	zoom := loadZoom(fy)
 
 	w := fy.NewWindow("Tunnels")
+	if iconRes != nil {
+		w.SetIcon(iconRes)
+	}
 	w.Resize(fyne.NewSize(1200, 780))
 	w.SetMaster()
 
