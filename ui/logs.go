@@ -23,6 +23,8 @@ type logRow struct {
 	level string
 	fn    string
 	msg   string
+	list  *widget.List
+	id    widget.ListItemID
 }
 
 func newLogRow() *logRow {
@@ -31,9 +33,40 @@ func newLogRow() *logRow {
 	return r
 }
 
-func (r *logRow) set(when, level, fn, msg string) {
+func (r *logRow) set(id widget.ListItemID, list *widget.List, when, level, fn, msg string) {
+	r.id, r.list = id, list
 	r.when, r.level, r.fn, r.msg = when, level, fn, msg
 	r.Refresh()
+}
+
+func logMsgStyle() fyne.TextStyle { return fyne.TextStyle{Monospace: true} }
+
+func logLineHeight() float32 {
+	return fyne.MeasureText("Ag", fsSmall, logMsgStyle()).Height
+}
+
+func (r *logRow) prefixWidth() float32 {
+	w := float32(0)
+	if r.when != "" {
+		w += fyne.MeasureText(r.when, fsCaption, fyne.TextStyle{Monospace: true}).Width + sp3
+	}
+	return w + logLevelCol + logFnCol
+}
+
+func (r *logRow) wrapped(width float32) []string {
+	remain := width - r.prefixWidth()
+	if remain < z(64) {
+		remain = z(64)
+	}
+	return wrapToWidth(r.msg, remain, fsSmall, logMsgStyle())
+}
+
+func (r *logRow) heightFor(width float32) float32 {
+	n := len(r.wrapped(width))
+	if n < 1 {
+		n = 1
+	}
+	return logLineHeight()*float32(n) + 2
 }
 
 func (r *logRow) CreateRenderer() fyne.WidgetRenderer {
@@ -43,7 +76,6 @@ func (r *logRow) CreateRenderer() fyne.WidgetRenderer {
 		when:  monoText("", fsCaption, p.Faint),
 		level: monoText("", fsCaption, p.Muted),
 		fn:    monoText("", fsCaption, p.Muted),
-		msg:   monoText("", fsSmall, p.Content),
 	}
 	d.level.TextStyle = fyne.TextStyle{Monospace: true, Bold: true}
 	d.apply()
@@ -55,35 +87,82 @@ type logRowRenderer struct {
 	when  *canvas.Text
 	level *canvas.Text
 	fn    *canvas.Text
-	msg   *canvas.Text
+	msgs  []*canvas.Text
 }
 
 func (d *logRowRenderer) Destroy() {}
 
 func (d *logRowRenderer) Objects() []fyne.CanvasObject {
-	return []fyne.CanvasObject{d.when, d.level, d.fn, d.msg}
+	out := []fyne.CanvasObject{d.when, d.level, d.fn}
+	for _, t := range d.msgs {
+		out = append(out, t)
+	}
+	return out
+}
+
+func (d *logRowRenderer) ensureMsgs(n int) {
+	p := pal()
+	for len(d.msgs) < n {
+		d.msgs = append(d.msgs, monoText("", fsSmall, p.Content))
+	}
 }
 
 func (d *logRowRenderer) MinSize() fyne.Size {
-	return fyne.NewSize(z(400), d.msg.MinSize().Height+sp1)
+	w := d.r.Size().Width
+	h := logLineHeight() + 2
+	if w > 0 {
+		h = d.r.heightFor(w)
+	}
+	return fyne.NewSize(z(400), h)
 }
 
 func (d *logRowRenderer) Layout(size fyne.Size) {
-	y := func(t *canvas.Text) float32 { return (size.Height - t.MinSize().Height) / 2 }
-
-	// Fixed columns so timestamps, levels and callers line up down the page.
-	x := float32(0)
-	d.when.Move(fyne.NewPos(x, y(d.when)))
-	x += d.when.MinSize().Width + sp3
-
-	d.level.Move(fyne.NewPos(x, y(d.level)))
-	x += logLevelCol
-
+	d.when.Text = d.r.when
+	d.level.Text = d.r.level
 	d.fn.Text = elide(d.r.fn, logFnCol-sp3, d.fn.TextSize, d.fn.TextStyle)
-	d.fn.Move(fyne.NewPos(x, y(d.fn)))
+
+	x := float32(0)
+	d.when.Move(fyne.NewPos(x, 0))
+	if d.r.when != "" {
+		x += d.when.MinSize().Width + sp3
+	}
+	d.level.Move(fyne.NewPos(x, 0))
+	x += logLevelCol
+	d.fn.Move(fyne.NewPos(x, 0))
 	x += logFnCol
 
-	d.msg.Move(fyne.NewPos(x, y(d.msg)))
+	remain := size.Width - x
+	if remain < z(64) {
+		remain = z(64)
+	}
+	lines := wrapToWidth(d.r.msg, remain, fsSmall, logMsgStyle())
+	d.ensureMsgs(len(lines))
+	lh := logLineHeight()
+	fg := pal().Content
+	if d.r.level == "ERROR" {
+		fg = pal().Error
+	}
+	for i, t := range d.msgs {
+		if i >= len(lines) {
+			t.Text = ""
+			t.Hide()
+			t.Move(fyne.NewPos(0, 0))
+			t.Resize(fyne.NewSize(0, 0))
+			continue
+		}
+		t.Show()
+		t.Text = lines[i]
+		t.TextSize = fsSmall
+		t.TextStyle = logMsgStyle()
+		t.Color = fg
+		t.Move(fyne.NewPos(x, lh*float32(i)))
+		t.Resize(t.MinSize())
+	}
+
+	want := lh*float32(max(1, len(lines))) + 2
+	if d.r.list != nil && want != size.Height {
+		d.r.list.SetItemHeight(d.r.id, want)
+	}
 }
 
 func (d *logRowRenderer) Refresh() {
@@ -91,7 +170,9 @@ func (d *logRowRenderer) Refresh() {
 	d.when.Refresh()
 	d.level.Refresh()
 	d.fn.Refresh()
-	d.msg.Refresh()
+	for _, t := range d.msgs {
+		t.Refresh()
+	}
 	if sz := d.r.Size(); sz.Width > 0 {
 		d.Layout(sz)
 	}
@@ -105,11 +186,6 @@ func (d *logRowRenderer) apply() {
 	d.level.Text = d.r.level
 	d.level.Color = logLevelColor(d.r.level)
 	d.fn.Color = p.Faint
-	d.msg.Text = d.r.msg
-	d.msg.Color = p.Content
-	if d.r.level == "ERROR" {
-		d.msg.Color = p.Error
-	}
 }
 
 func logLevelColor(level string) color.Color {
@@ -203,14 +279,19 @@ func (a *App) logsPage() fyne.CanvasObject {
 				return
 			}
 			when, level, fn, msg := splitLogLine(a.logView[id])
-			row.set(when, level, fn, msg)
+			row.set(id, a.logList, when, level, fn, msg)
 		},
 	)
 	a.logList.HideSeparators = true
 
+	boost := &scrollBoost{list: a.logList}
+	boost.ExtendBaseWidget(boost)
 	panel := container.NewStack(
 		surface(radLg, pal().Base100, pal().Base300),
-		insetXY(sp4, sp3, boostList(a.logList)),
+		insetXY(sp4, sp2, container.NewStack(
+			container.NewThemeOverride(a.logList, compactLogTheme{live}),
+			boost,
+		)),
 	)
 	return pageShell("Logs", sub, actions, insetEach(sp4, gutter, gutter, gutter, panel))
 }
@@ -234,4 +315,15 @@ func (a *App) filteredLogs() []string {
 		out = append(out, line)
 	}
 	return out
+}
+
+// compactLogTheme drops the theme padding widget.List inserts between items,
+// which is what made log lines look double-spaced.
+type compactLogTheme struct{ fyne.Theme }
+
+func (t compactLogTheme) Size(n fyne.ThemeSizeName) float32 {
+	if n == theme.SizeNamePadding {
+		return 1
+	}
+	return t.Theme.Size(n)
 }

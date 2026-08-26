@@ -496,6 +496,10 @@ func (a *App) bandwidthCard(t *client.TUN) fyne.CanvasObject {
 		where += t.ServerResponse.InterfaceIP
 	}
 
-	return cardBox(tag, where, badge("live", toneSuccess),
+	tun := t
+	disc := dangerBtn("Disconnect", func() {
+		a.confirm("Disconnect", "Disconnect "+tag+"?", func() { a.disconnectActive(tun) })
+	}).small()
+	return cardBox(tag, where, hstack(sp2, badge("live", toneSuccess), disc),
 		container.New(vCentreLayout{}, newBandwidthPanel(t, a.bwRangeSeconds())))
 }
