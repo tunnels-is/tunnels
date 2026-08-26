@@ -5,7 +5,6 @@ import (
 	"embed"
 	"encoding/json"
 	"net"
-	"net/http"
 	"os"
 	"strings"
 	"sync"
@@ -14,7 +13,6 @@ import (
 
 	"github.com/miekg/dns"
 	"github.com/puzpuzpuz/xsync/v3"
-	"github.com/tunnels-is/tunnels/certs"
 	"github.com/tunnels-is/tunnels/types"
 	wgconn "golang.zx2c4.com/wireguard/conn"
 	"golang.zx2c4.com/wireguard/device"
@@ -24,9 +22,6 @@ const (
 	tunnelFileSuffix = ".conf"
 	configFileSuffix = ".conf"
 	backupFileSuffix = ".bak"
-
-	DefaultAPIIP   = "127.0.0.1"
-	DefaultAPIPort = "7777"
 
 	DefaultDNSIP   = "127.0.0.1"
 	DefaultDNSPort = "53"
@@ -58,7 +53,6 @@ var (
 	TunnelMap     *xsync.MapOf[string, *TUN]
 
 	LogQueue      = make(chan string, 1000)
-	APILogQueue   = make(chan string, 1000)
 	logRecordHash *xsync.MapOf[string, bool]
 	PollLogMu     sync.Mutex
 	PollLogBuf    []string
@@ -114,21 +108,11 @@ type ErrorResponse struct {
 }
 
 var (
-	DIST_EMBED  embed.FS
-	DLL_EMBED   embed.FS
-	EnableTLS   bool
-	DevMode     bool
-	EnablePprof bool
-	// DisableLocalAPI skips LaunchAPI. The Fyne desktop UI talks to the
-	// client in-process and does not use the HTTP control plane.
-	// cmd/main still starts the JSON API for scripts and debugging.
-	DisableLocalAPI bool
+	DLL_EMBED embed.FS
 )
 
 var (
 	DNSClient = new(dns.Client)
-
-	API_SERVER http.Server
 
 	TAG_ERROR    = "ERROR"
 	LogFile      *os.File
@@ -297,8 +281,6 @@ type CLIConfig struct {
 }
 
 type configV2 struct {
-	OpenUI bool
-
 	// KillSwitchIPv4 blackholes 0.0.0.0/0 until the user turns it off.
 	// Off by default. When on, controller/VPN endpoints are pinned /32.
 	KillSwitchIPv4 bool
@@ -309,14 +291,6 @@ type configV2 struct {
 	ControlServers    []*ControlServer
 	DisableBlockLists bool
 	CLIConfig         *CLIConfig
-
-	APIIP          string
-	APIPort        string
-	APICert        string
-	APIKey         string
-	APICertDomains []string
-	APICertIPs     []string
-	APICertType    certs.CertType
 
 	LogBlockedPorts  bool
 	DebugLogging     bool

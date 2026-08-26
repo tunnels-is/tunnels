@@ -262,7 +262,6 @@ func deleteDevice(form *AutoConnectForm, device *types.Device) error {
 	return nil
 }
 
-
 func preferLocalServerInCountry(form *AutoConnectForm, country string) (*types.Server, int64, bool) {
 	locals, err := listLocalDevices()
 	if err != nil || len(locals) == 0 {
@@ -329,7 +328,6 @@ func findTunnelMetaByTag(tag string) (meta *TunnelMETA) {
 	})
 	return
 }
-
 
 func discoverBestServer(form *AutoConnectForm) (*types.Server, int64, int, error) {
 	if form.Country != "" {
@@ -406,7 +404,6 @@ func prepareAutoConnectForm(form *AutoConnectForm) (int, error) {
 	return 0, nil
 }
 
-
 func ProbeBestServer(form *AutoConnectForm) (*AutoConnectResponse, int, error) {
 	defer RecoverAndLog()
 	if code, err := prepareAutoConnectForm(form); err != nil {
@@ -439,7 +436,6 @@ func CountryAutoConnect(form *AutoConnectForm) (*AutoConnectResponse, int, error
 		return nil, code, err
 	}
 
-
 	cr := &ConnectionRequest{
 		UserID:      form.UserID,
 		DeviceToken: form.DeviceToken,
@@ -457,7 +453,6 @@ func CountryAutoConnect(form *AutoConnectForm) (*AutoConnectResponse, int, error
 		}, 200, nil
 	}
 	ERROR("auto-connect: failed to connect to best server ", server.Tag, ": ", connErr, " — trying remaining fleet")
-
 
 	allServers, ferr := fetchAllServers(form)
 	if ferr != nil {

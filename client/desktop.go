@@ -4,10 +4,12 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync/atomic"
 
 	"github.com/tunnels-is/tunnels/types"
+	"github.com/tunnels-is/tunnels/version"
 )
 
 // Config is the exported alias for the on-disk client configuration.
@@ -101,8 +103,6 @@ func CloneConfig() *configV2 {
 	}
 	dst := *src
 	dst.ControlServers = append([]*ControlServer(nil), src.ControlServers...)
-	dst.APICertDomains = append([]string(nil), src.APICertDomains...)
-	dst.APICertIPs = append([]string(nil), src.APICertIPs...)
 	dst.DNSBlockLists = append([]*BlockList(nil), src.DNSBlockLists...)
 	dst.DNSWhiteLists = append([]*BlockList(nil), src.DNSWhiteLists...)
 	dst.DNSRecords = append([]*types.DNSRecord(nil), src.DNSRecords...)
@@ -423,4 +423,62 @@ func FindTunnel(tag string) *TunnelMETA {
 		return t
 	}
 	return nil
+}
+
+// StateResponse is the snapshot Fyne (and tests) use for the live client.
+type StateResponse struct {
+	Version       string
+	APIVersion    int
+	Timezone      string
+	Config        *configV2
+	State         *stateV2
+	Tunnels       []*TunnelMETA
+	ActiveTunnels []*TUN
+}
+
+func getSystemTimezone() string {
+	if tz := os.Getenv("TZ"); tz != "" && tz != ":/etc/localtime" {
+		return strings.TrimPrefix(tz, ":")
+	}
+
+	if b, err := os.ReadFile("/etc/timezone"); err == nil {
+		if name := strings.TrimSpace(string(b)); name != "" {
+			return name
+		}
+	}
+	if link, err := os.Readlink("/etc/localtime"); err == nil {
+		if i := strings.Index(link, "zoneinfo/"); i != -1 {
+			return link[i+len("zoneinfo/"):]
+		}
+	}
+
+	if resolved, err := filepath.EvalSymlinks("/etc/localtime"); err == nil {
+		if i := strings.Index(resolved, "zoneinfo/"); i != -1 {
+			return resolved[i+len("zoneinfo/"):]
+		}
+	}
+	return ""
+}
+
+// GetFullState snapshots config, tunnels, and runtime state.
+func GetFullState() (s *StateResponse) {
+	defer RecoverAndLog()
+	state := STATE.Load()
+	s = new(StateResponse)
+	s.Version = version.Version
+	s.APIVersion = version.ApiVersion
+	s.Timezone = getSystemTimezone()
+	s.Config = CONFIG.Load()
+	s.State = state
+
+	tunnelMetaMapRange(func(tun *TunnelMETA) bool {
+		s.Tunnels = append(s.Tunnels, tun)
+		return true
+	})
+
+	tunnelMapRange(func(tun *TUN) bool {
+		s.ActiveTunnels = append(s.ActiveTunnels, tun)
+		return true
+	})
+	return
 }

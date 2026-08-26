@@ -42,7 +42,6 @@ func TestAccountWorkspace_SaveLoadActivate(t *testing.T) {
 		t.Fatalf("devices dir missing: %v", err)
 	}
 
-
 	u2 := &User{
 		ID:    "user-bbb-222",
 		Email: "b@example.com",
@@ -57,7 +56,6 @@ func TestAccountWorkspace_SaveLoadActivate(t *testing.T) {
 	if u2.SaveFileHash == u.SaveFileHash {
 		t.Fatal("accounts must have distinct hashes")
 	}
-
 
 	users, err := getUsers()
 	if err != nil {
@@ -77,11 +75,9 @@ func TestAccountWorkspace_SaveLoadActivate(t *testing.T) {
 		t.Fatal("did not decrypt account A via folder hash alone")
 	}
 
-
 	if _, err := os.Stat(filepath.Join(dir, "user.key")); err == nil {
 		t.Fatal("user.key should not be created")
 	}
-
 
 	if err := activateAccountByUserID(u.ID); err != nil {
 		t.Fatalf("activate first: %v", err)

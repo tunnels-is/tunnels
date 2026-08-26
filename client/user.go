@@ -13,11 +13,9 @@ import (
 	"golang.org/x/crypto/argon2"
 )
 
-
 const (
 	accountCryptoVersion byte = 1
 	accountSaltLen            = 16
-
 
 	accountKDFTime    = 2
 	accountKDFMemory  = 32 * 1024
@@ -35,7 +33,6 @@ func deriveAccountFileKey(folderHash string, salt []byte) []byte {
 		accountKDFKeyLen,
 	)
 }
-
 
 func encryptAccountBlob(plaintext []byte, folderHash string) ([]byte, error) {
 	if !isHexString(folderHash) {
@@ -68,7 +65,6 @@ func encryptAccountBlob(plaintext []byte, folderHash string) ([]byte, error) {
 	copy(out[1+accountSaltLen+len(nonce):], ct)
 	return out, nil
 }
-
 
 func decryptAccountBlob(blob []byte, folderHash string) ([]byte, error) {
 	if !isHexString(folderHash) {
@@ -212,7 +208,6 @@ func getUsers() (ul []*User, err error) {
 
 	return ul, nil
 }
-
 
 func Decrypt(data, key []byte) ([]byte, error) {
 	block, err := aes.NewCipher(key)

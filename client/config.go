@@ -1,17 +1,14 @@
 package client
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 	"sync"
 
-	"github.com/tunnels-is/tunnels/certs"
 	"github.com/tunnels-is/tunnels/types"
 	"gopkg.in/yaml.v3"
 )
@@ -140,8 +137,6 @@ func DefaultConfig() *configV2 {
 		DNSHTTPSAutomatic: true,
 		DNSBlockLists:     GetDefaultBlockLists(),
 		DNSWhiteLists:     GetDefaultWhiteLists(),
-		APIIP:             "127.0.0.1",
-		APIPort:           "7777",
 		KillSwitchIPv4:    false,
 		KillSwitchIPv6:    true,
 	}
@@ -152,27 +147,7 @@ func DefaultConfig() *configV2 {
 		CertificatePath:     "",
 		ValidateCertificate: true,
 	})
-	applyCertificateDefaultsToConfig(conf)
 	return conf
-}
-
-func applyCertificateDefaultsToConfig(cfg *configV2) {
-	if cfg.APIKey == "" {
-		cfg.APIKey = "./api.key"
-	}
-	if cfg.APICert == "" {
-		cfg.APICert = "./api.crt"
-	}
-
-	cfg.APICertType = certs.RSA
-
-	if len(cfg.APICertIPs) < 1 {
-		cfg.APICertIPs = []string{"127.0.0.1", "0.0.0.0"}
-	}
-
-	if len(cfg.APICertDomains) < 1 {
-		cfg.APICertDomains = []string{"tunnels.app", "app.tunnels.is"}
-	}
 }
 
 func writeTunnelsToDisk(tag string) (outErr error) {
@@ -327,17 +302,6 @@ func SetConfig(config *configV2) (err error) {
 	if dnsChange {
 		dnsserver := UDPDNSServer.Load()
 		_ = dnsserver.Shutdown()
-	}
-
-	apiChange := oldConf.APIPort != config.APIPort ||
-		oldConf.APIIP != config.APIIP ||
-		oldConf.APICert != config.APICert ||
-		oldConf.APIKey != config.APIKey ||
-		!slices.Equal(config.APICertDomains, oldConf.APICertDomains) ||
-		!slices.Equal(config.APICertIPs, oldConf.APICertIPs)
-
-	if apiChange {
-		_ = API_SERVER.Shutdown(context.Background())
 	}
 
 	CONFIG.Store(config)

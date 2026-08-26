@@ -11,24 +11,13 @@ import (
 )
 
 func printInfo() {
-	conf := CONFIG.Load()
 	s := STATE.Load()
-
-	scheme := "http"
-	if EnableTLS {
-		scheme = "https"
-	}
 
 	blue := "\033[1;34m"
 	dim := "\033[34m"
 	bold := "\033[1m"
 	reset := "\033[0m"
 	divider := dim + "  ────────────────────────────────────────────" + reset + "\n"
-
-	appLine := ""
-	if !DisableLocalAPI {
-		appLine = fmt.Sprintf("  "+bold+"🌐"+reset+"  APP        %s://%s:%s\n", scheme, conf.APIIP, conf.APIPort)
-	}
 
 	fmt.Printf("\n"+
 		blue+
@@ -41,7 +30,6 @@ func printInfo() {
 		"\n"+
 		divider+
 		"\n"+
-		appLine+
 		"  "+bold+"📁"+reset+"  BASE PATH  %s\n"+
 		"\n"+
 		divider+
@@ -79,17 +67,8 @@ func InitService() error {
 
 	if conf.CLIConfig != nil {
 		DEBUG("cli config loaded")
-		wasChanged := false
-		if conf.OpenUI {
-			conf.OpenUI = false
-			wasChanged = true
-		}
-
 		if !conf.ConsoleLogOnly {
 			conf.ConsoleLogOnly = true
-			wasChanged = true
-		}
-		if wasChanged {
 			CONFIG.Store(conf)
 		}
 	}
@@ -150,12 +129,6 @@ func LaunchTunnels() {
 		StartLogQueueProcessor()
 	})
 	conf := CONFIG.Load()
-
-	if conf.CLIConfig == nil && !DisableLocalAPI {
-		newConcurrentSignal("APIServer", CancelContext, func() {
-			LaunchAPI()
-		})
-	}
 
 	if !conf.DisableDNS {
 		newConcurrentSignal("UDPDNSHandler", CancelContext, func() {

@@ -38,39 +38,10 @@ func AutoConnect() {
 	}()
 	defer RecoverAndLog()
 
-	tunnelMetaMapRange(func(meta *TunnelMETA) bool {
-		if !meta.AutoConnect {
-			return true
+	conf := CONFIG.Load()
+	if conf.CLIConfig != nil {
+		if err := cliPublicConnect(DefaultTunnelName); err != nil {
+			ERROR("Unable to connect using CLI config: ", err)
 		}
-
-		isConnected := false
-		tunnelMapRange(func(tun *TUN) bool {
-			if tun.CR.Tag == meta.Tag {
-				if tun.GetState() >= TUN_Connecting {
-					isConnected = true
-					return false
-				}
-				return false
-			}
-			return true
-		})
-		if isConnected {
-			return true
-		}
-
-		var code int
-		var err error
-
-		conf := CONFIG.Load()
-		cliConf := conf.CLIConfig
-		if cliConf != nil {
-			err = cliPublicConnect(meta.Tag)
-		} else {
-		}
-
-		if err != nil || code != 200 {
-			ERROR("Unable to connect, return code: ", code, " // error: ", err)
-		}
-		return true
-	})
+	}
 }

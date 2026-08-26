@@ -178,18 +178,6 @@ func StartLogQueueProcessor() {
 			continue
 		}
 
-		select {
-		case APILogQueue <- line:
-		default:
-			log.Println("Log queue full, draining first half of the queue")
-			for range len(APILogQueue) / 2 {
-				select {
-				case <-APILogQueue:
-				default:
-				}
-			}
-		}
-
 		PollLogMu.Lock()
 		PollLogBuf = append(PollLogBuf, line)
 		if len(PollLogBuf) > 5000 {

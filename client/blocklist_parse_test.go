@@ -109,7 +109,6 @@ func TestDomainCatalog_PerList(t *testing.T) {
 		t.Fatal("should not match")
 	}
 
-
 	cat2 := NewCatalog([]string{"Ads"}, []*DomainSet{ads})
 	ok, _ = cat2.Has("bad.malware.test")
 	if ok {

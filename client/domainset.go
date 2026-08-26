@@ -7,12 +7,10 @@ import (
 	"sync/atomic"
 )
 
-
 type DomainSet struct {
 	data []byte
 	off  []uint32
 }
-
 
 type DomainCatalog struct {
 	items []domainList
@@ -41,7 +39,6 @@ func (s *DomainSet) domain(i int) []byte {
 	return s.data[start:end]
 }
 
-
 func (s *DomainSet) Has(name string) bool {
 	if s == nil || len(s.off) == 0 || name == "" {
 		return false
@@ -69,7 +66,6 @@ func (s *DomainSet) hasNormalized(name string) bool {
 	}
 	return false
 }
-
 
 func NewCatalog(tags []string, sets []*DomainSet) *DomainCatalog {
 	if len(tags) != len(sets) {
@@ -108,7 +104,6 @@ func (c *DomainCatalog) ListCount() int {
 	return len(c.items)
 }
 
-
 func (c *DomainCatalog) Snapshot() map[string]*DomainSet {
 	if c == nil || len(c.items) == 0 {
 		return nil
@@ -119,7 +114,6 @@ func (c *DomainCatalog) Snapshot() map[string]*DomainSet {
 	}
 	return m
 }
-
 
 func (c *DomainCatalog) Has(name string) (bool, string) {
 	if c == nil || len(c.items) == 0 || name == "" {
@@ -147,7 +141,6 @@ func (c *DomainCatalog) Has(name string) (bool, string) {
 		}
 		return false, ""
 	}
-
 
 	var (
 		wg     sync.WaitGroup
@@ -180,9 +173,8 @@ func (c *DomainCatalog) Has(name string) (bool, string) {
 	return true, tag
 }
 
-
 type domainBuilder struct {
-	buf  []byte
+	buf []byte
 
 	off []uint32
 }
@@ -200,7 +192,6 @@ func newDomainBuilder(capHint int) *domainBuilder {
 	return b
 }
 
-
 func (b *domainBuilder) addNormalized(dom []byte) {
 	if len(dom) == 0 || b == nil {
 		return
@@ -209,7 +200,6 @@ func (b *domainBuilder) addNormalized(dom []byte) {
 	b.buf = append(b.buf, dom...)
 	b.off = append(b.off, start)
 }
-
 
 func (b *domainBuilder) tryAddLine(line []byte) bool {
 	if b == nil {
@@ -265,7 +255,6 @@ func hasASCIISpace(b []byte) bool {
 	return false
 }
 
-
 func splitFields(line []byte) [][]byte {
 
 	hasSpace := false
@@ -302,7 +291,6 @@ func (b *domainBuilder) count() int {
 	return len(b.off)
 }
 
-
 func (b *domainBuilder) Build() *DomainSet {
 	if b == nil || len(b.off) == 0 {
 		return &DomainSet{}
@@ -312,7 +300,6 @@ func (b *domainBuilder) Build() *DomainSet {
 	for i := range idx {
 		idx[i] = i
 	}
-
 
 	ends := make([]uint32, len(b.off))
 	for i := 0; i < len(b.off)-1; i++ {
@@ -327,7 +314,6 @@ func (b *domainBuilder) Build() *DomainSet {
 	sort.Slice(idx, func(i, j int) bool {
 		return bytes.Compare(sliceAt(idx[i]), sliceAt(idx[j])) < 0
 	})
-
 
 	nUnique := 0
 	total := 0
@@ -359,7 +345,6 @@ func (b *domainBuilder) Build() *DomainSet {
 	return out
 }
 
-
 func DomainSetFromDomains(domains []string) *DomainSet {
 	b := newDomainBuilder(len(domains))
 	for _, d := range domains {
@@ -369,7 +354,6 @@ func DomainSetFromDomains(domains []string) *DomainSet {
 	}
 	return b.Build()
 }
-
 
 func MergeDomainSets(sets ...*DomainSet) *DomainSet {
 	total := 0
@@ -496,7 +480,6 @@ func trimASCIISpaceBytes(b []byte) []byte {
 	}
 	return b[start:end]
 }
-
 
 func estimateDomainCapacity(fileSize int64) int {
 	if fileSize <= 0 {
