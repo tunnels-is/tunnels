@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"fyne.io/fyne/v2"
@@ -17,13 +18,52 @@ import (
 )
 
 func (a *App) recomputeDeviceView() {
+	ids, pubs := a.localDeviceIndex()
 	var shown []types.Device
 	for _, d := range a.devices {
 		if filterMatch(a.filterDevices, d.Tag, d.WireGuardIP) {
 			shown = append(shown, d)
 		}
 	}
+	sort.SliceStable(shown, func(i, j int) bool {
+		iLocal := deviceOnThisMachine(shown[i], ids, pubs)
+		jLocal := deviceOnThisMachine(shown[j], ids, pubs)
+		if iLocal != jLocal {
+			return iLocal
+		}
+		ti, tj := shown[i].CreatedAt, shown[j].CreatedAt
+		if !ti.Equal(tj) {
+			return ti.After(tj)
+		}
+		return shown[i].Tag < shown[j].Tag
+	})
 	a.deviceView = shown
+}
+
+func (a *App) localDeviceIndex() (ids, pubs map[string]struct{}) {
+	ids = map[string]struct{}{}
+	pubs = map[string]struct{}{}
+	for _, ld := range a.localDevices {
+		if ld.ID != "" {
+			ids[ld.ID] = struct{}{}
+		}
+		if ld.WireGuardPubKey != "" {
+			pubs[ld.WireGuardPubKey] = struct{}{}
+		}
+	}
+	return ids, pubs
+}
+
+func deviceOnThisMachine(d types.Device, ids, pubs map[string]struct{}) bool {
+	if _, ok := ids[d.ID.String()]; ok {
+		return true
+	}
+	if d.WireGuardKey != "" {
+		if _, ok := pubs[d.WireGuardKey]; ok {
+			return true
+		}
+	}
+	return false
 }
 
 func (a *App) devicesPage() fyne.CanvasObject {
@@ -88,21 +128,9 @@ func (a *App) bindDeviceRow(id widget.ListItemID, row *kRow) {
 			connectedIPs[at.ServerResponse.WireGuardIP] = struct{}{}
 		}
 	}
-	localIDs := map[string]struct{}{}
-	localPubs := map[string]struct{}{}
-	for _, ld := range a.localDevices {
-		if ld.ID != "" {
-			localIDs[ld.ID] = struct{}{}
-		}
-		if ld.WireGuardPubKey != "" {
-			localPubs[ld.WireGuardPubKey] = struct{}{}
-		}
-	}
+	ids, pubs := a.localDeviceIndex()
 	_, isConn := connectedIPs[d.WireGuardIP]
-	_, locID := localIDs[d.ID.String()]
-	_, locPub := localPubs[d.WireGuardKey]
-
-	mine := locID || locPub
+	mine := deviceOnThisMachine(d, ids, pubs)
 	pill, t := "Remote", toneNeutral
 	if mine {
 		pill, t = "This device", tonePrimary

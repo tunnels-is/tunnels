@@ -16,11 +16,11 @@ func (a *App) recomputeTunnelView() {
 			continue
 		}
 		srv := a.serverByID(t.ServerID)
-		srvTag, srvIP := "", ""
+		srvTag, addr := "", ""
 		if srv != nil {
-			srvTag, srvIP = srv.Tag, srv.IP
+			srvTag, addr = srv.Tag, serverWGAddr(srv)
 		}
-		if filterMatch(a.filterTunnels, t.Tag, t.IFName, srvTag, srvIP) {
+		if filterMatch(a.filterTunnels, t.Tag, t.IFName, srvTag, addr) {
 			shown = append(shown, t)
 		}
 	}
@@ -91,10 +91,10 @@ func tunnelTable() *tableSpec {
 		actionW: 230,
 		cols: []tableCol{
 			{label: "TUNNEL", weight: 1.6, strong: true},
-			{label: "SERVER", weight: 1.8},
-			{label: "INTERFACE", weight: 1.4, mono: true},
-			{label: "TRANSFER", weight: 1.8, mono: true, optional: true},
-			{label: "STATUS", weight: 1.1, badge: true},
+			{label: "SERVER", weight: 1.6},
+			{label: "ADDRESS", weight: 2, mono: true},
+			{label: "INTERFACE", weight: 1.4, mono: true, optional: true},
+			{label: "TRANSFER", weight: 1.6, mono: true, optional: true},
 		},
 	}
 }
@@ -110,17 +110,19 @@ func (a *App) bindTunnelRow(id widget.ListItemID, row *kRow) {
 	at := a.activeByTag()[t.Tag]
 	srv := a.serverByID(t.ServerID)
 	srvLabel := "No server"
+	addr := "—"
 	if srv != nil {
 		srvLabel = srv.Tag
+		addr = serverWGAddr(srv)
 	}
 	on := at != nil
-	status, tn := "Down", toneNeutral
+	tn := toneNeutral
 	transfer := "—"
 	if on {
-		status, tn = "Up", toneSuccess
+		tn = toneSuccess
 		transfer = "↓ " + at.IngressString() + "  ↑ " + at.EgressString()
 	}
-	row.SetCells([]string{t.Tag, srvLabel, t.IFName, transfer, status}, on, tn)
+	row.SetCells([]string{t.Tag, srvLabel, addr, t.IFName, transfer}, on, tn)
 
 	tun := t
 	if on {

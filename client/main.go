@@ -59,18 +59,8 @@ func InitService() error {
 	}
 	conf := CONFIG.Load()
 
-	if conf.CLIConfig != nil && conf.CLIConfig.UserID != "" {
-		if err := activateAccountByUserID(conf.CLIConfig.UserID); err != nil {
-			ERROR("unable to activate CLI account workspace:", err)
-		}
-	}
-
-	if conf.CLIConfig != nil {
-		DEBUG("cli config loaded")
-		if !conf.ConsoleLogOnly {
-			conf.ConsoleLogOnly = true
-			CONFIG.Store(conf)
-		}
+	if err := activateSoleAccount(); err != nil {
+		ERROR("unable to activate saved account:", err)
 	}
 
 	INFO("Starting Tunnels")
@@ -151,6 +141,7 @@ func LaunchTunnels() {
 
 	newConcurrentSignal("AutoConnect", CancelContext, func() {
 		AutoConnect()
+		autoConnectRetryWait()
 	})
 
 mainLoop:

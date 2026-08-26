@@ -106,10 +106,6 @@ func CloneConfig() *configV2 {
 	dst.DNSBlockLists = append([]*BlockList(nil), src.DNSBlockLists...)
 	dst.DNSWhiteLists = append([]*BlockList(nil), src.DNSWhiteLists...)
 	dst.DNSRecords = append([]*types.DNSRecord(nil), src.DNSRecords...)
-	if src.CLIConfig != nil {
-		c := *src.CLIConfig
-		dst.CLIConfig = &c
-	}
 	return &dst
 }
 

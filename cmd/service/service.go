@@ -24,5 +24,8 @@ func Start() {
 		fmt.Println("Unable to initialize tunnels:", err)
 		os.Exit(1)
 	}
+	if err := client.ActivateAccountIfNone(); err != nil {
+		fmt.Println("Unable to activate account:", err)
+	}
 	client.LaunchTunnels()
 }
