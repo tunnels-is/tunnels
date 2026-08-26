@@ -119,6 +119,10 @@ var (
 	EnableTLS   bool
 	DevMode     bool
 	EnablePprof bool
+	// DisableLocalAPI skips LaunchAPI. The Fyne desktop UI talks to the
+	// client in-process and does not use the HTTP control plane.
+	// cmd/main still starts the JSON API for scripts and debugging.
+	DisableLocalAPI bool
 )
 
 var (

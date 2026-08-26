@@ -14,9 +14,6 @@ import (
 	"github.com/tunnels-is/tunnels/version"
 )
 
-//go:embed dist
-var DIST embed.FS
-
 //go:embed wintun.dll
 var DLL embed.FS
 
@@ -32,7 +29,6 @@ func main() {
 	flag.StringVar(&s.TunnelType, "tunnelType", "default", "tunnel type: default, strict, iot")
 	flag.BoolVar(&s.Debug, "debug", false, "enable debug logging")
 	flag.BoolVar(&s.RequireConfig, "requireConfig", false, "require config file to start")
-	flag.BoolVar(&client.EnablePprof, "pprof", false, "enable net/http/pprof on the local API server (/debug/pprof/)")
 	flag.Parse()
 	client.STATE.Store(s)
 
@@ -41,7 +37,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	client.DIST_EMBED = DIST
+	client.DisableLocalAPI = true
 	client.DLL_EMBED = DLL
 
 	runtime.GOMAXPROCS(runtime.NumCPU())

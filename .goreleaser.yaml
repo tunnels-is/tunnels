@@ -5,7 +5,6 @@ project_name: tunnels
 before:
   hooks:
     - go mod tidy
-    - ./build-ui.sh
     - ./build-parser.sh
 
 builds:
@@ -42,63 +41,6 @@ builds:
     flags:
       - -trimpath
 
-  - id: tunnels-app-windows
-    main: ./cmd/wails
-    binary: tunnels-app
-    env:
-      - CGO_ENABLED=0
-    goos:
-      - windows
-    goarch:
-      - amd64
-    tags:
-      - desktop
-      - production
-    ldflags:
-      - -s -w -H windowsgui -X github.com/tunnels-is/tunnels/version.Version={{.Version}}
-    flags:
-      - -trimpath
-
-  - id: tunnels-app-linux
-    main: ./cmd/wails
-    binary: tunnels-app
-    skip: '{{ ne .Runtime.Goos "linux" }}'
-    env:
-      - CGO_ENABLED=1
-    goos:
-      - linux
-    goarch:
-      - amd64
-    tags:
-      - desktop
-      - production
-      - webkit2_41
-    ldflags:
-      - -s -w -X github.com/tunnels-is/tunnels/version.Version={{.Version}}
-    flags:
-      - -trimpath
-
-  - id: tunnels-app-darwin
-    main: ./cmd/wails
-    binary: tunnels-app
-    skip: '{{ ne .Runtime.Goos "darwin" }}'
-    env:
-      - CGO_ENABLED=1
-      # Wails UTType file filters need UniformTypeIdentifiers (missing from wails v2.11 cgo LDFLAGS)
-      - CGO_LDFLAGS=-framework UniformTypeIdentifiers
-    goos:
-      - darwin
-    goarch:
-      - amd64
-      - arm64
-    tags:
-      - desktop
-      - production
-    ldflags:
-      - -s -w -X github.com/tunnels-is/tunnels/version.Version={{.Version}}
-    flags:
-      - -trimpath
-
 dist: ./builds
 
 archives:
@@ -127,23 +69,6 @@ archives:
       {{- .Version }}_
       {{- .Os }}_
       {{- .Arch }}
-
-  - id: tunnels-app
-    ids:
-      - tunnels-app-windows
-      - tunnels-app-linux
-      - tunnels-app-darwin
-    formats:
-      - tar.gz
-    name_template: >-
-      tunnels-app_
-      {{- .Version }}_
-      {{- .Os }}_
-      {{- .Arch }}
-    format_overrides:
-      - goos: windows
-        formats:
-          - zip
 
 release:
   draft: true

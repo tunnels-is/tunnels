@@ -4,7 +4,24 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 )
+
+func TestLaunchAPI_DisabledReturnsImmediately(t *testing.T) {
+	prev := DisableLocalAPI
+	DisableLocalAPI = true
+	t.Cleanup(func() { DisableLocalAPI = prev })
+	done := make(chan struct{})
+	go func() {
+		LaunchAPI()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("LaunchAPI blocked while DisableLocalAPI is set")
+	}
+}
 
 func TestAuthorizeLocalAPI_RequiresSessionCookie(t *testing.T) {
 	prevDev := DevMode

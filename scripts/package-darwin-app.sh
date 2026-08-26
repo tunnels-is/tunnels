@@ -5,7 +5,7 @@
 #   ./scripts/package-darwin-app.sh <binary> <out.app> <version> [icon.png]
 #
 # version is used for CFBundleShortVersionString / CFBundleVersion (leading "v" stripped).
-# icon.png defaults to cmd/wails/build/appicon.png relative to the repo root.
+# icon.png defaults to cmd/fyne/appicon.png relative to the repo root.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -14,7 +14,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 BINARY="${1:?usage: package-darwin-app.sh <binary> <out.app> <version> [icon.png]}"
 APP_PATH="${2:?}"
 VERSION="${3:?}"
-APPICON_PNG="${4:-$REPO_ROOT/cmd/wails/build/appicon.png}"
+APPICON_PNG="${4:-$REPO_ROOT/cmd/fyne/appicon.png}"
 
 BUNDLE_VERSION="${VERSION#v}"
 BUNDLE_ID="is.tunnels.app"

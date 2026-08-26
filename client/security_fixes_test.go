@@ -22,7 +22,8 @@ func TestIsLocalRequest(t *testing.T) {
 		{"localhost:7777", true},
 		{"localhost", true},
 		{"[::1]:7777", true},
-		{"wails.localhost", true},
+		{"wails.localhost", false},
+		{"wails", false},
 		{"evil.com:7777", false},
 		{"evil.com", false},
 		{"192.168.1.10:7777", false},
@@ -42,6 +43,9 @@ func TestIsLocalRequest(t *testing.T) {
 	}
 	if isLocalRequest(&http.Request{Host: "evil.com:7777"}) {
 		t.Error("attacker Host must still be rejected under a concrete bind")
+	}
+	if isLocalRequest(&http.Request{Host: "wails.localhost"}) {
+		t.Error("wails.localhost must not be treated as local")
 	}
 
 	CONFIG.Store(&configV2{APIIP: "0.0.0.0", APIPort: "7777"})
