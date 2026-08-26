@@ -4,16 +4,13 @@ import (
 	"errors"
 )
 
+// ServerConnect brings up the default tunnel against the given server.
+// PublicConnect persists ServerID onto that tunnel so AutoConnect can
+// reuse it on the next launch.
 func ServerConnect(cr *ConnectionRequest) (int, error) {
-	if cr.ServerID == "" {
-		ERROR("No server id found when connecting: ", cr)
-		return 400, errors.New("no server id found when connecting")
-	}
-
-	if err := authorizeControlServer(cr.Server); err != nil {
-		return 403, err
+	if cr == nil {
+		return 400, errors.New("connection request required")
 	}
 	cr.Tag = DefaultTunnelName
-
 	return PublicConnect(cr)
 }

@@ -15,6 +15,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/tunnels-is/tunnels/client"
 )
 
 const (
@@ -407,18 +409,59 @@ func defaultServerID(t *testing.T, uid, token string) string {
 	return ""
 }
 
+func seedAccount(t *testing.T, uid, token, serverID string) {
+	t.Helper()
+	prevS := client.STATE.Load()
+	prevC := client.CONFIG.Load()
+	t.Cleanup(func() {
+		client.STATE.Store(prevS)
+		client.CONFIG.Store(prevC)
+	})
+
+	client.STATE.Store(&client.State{
+		BasePath:   cliData + string(os.PathSeparator),
+		TunnelType: "default",
+	})
+	if err := client.InitBaseFoldersAndPaths(); err != nil {
+		t.Fatal(err)
+	}
+
+	u := &client.User{
+		ID:    uid,
+		Email: "ks@test.local",
+		DeviceToken: &client.DEVICE_TOKEN{
+			DT: token,
+			N:  "kcli",
+		},
+		ControlServer: &client.ControlServer{
+			ID:                  "tunnels",
+			Host:                ctrlIP,
+			Port:                "443",
+			ValidateCertificate: false,
+		},
+	}
+	if err := client.SaveUser(u); err != nil {
+		t.Fatal(err)
+	}
+
+	meta := client.FindTunnel(client.DefaultTunnelName)
+	if meta == nil {
+		t.Fatal("expected default tunnel after SaveUser")
+	}
+	meta.AutoConnect = true
+	meta.ServerID = serverID
+	if err := client.SaveTunnel(meta, meta.Tag); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func connect(t *testing.T, uid, token, serverID string) {
 	t.Helper()
 	writeClientConfig(t, map[string]any{
 		"KillSwitchIPv4": false,
 		"KillSwitchIPv6": true,
-		"CLIConfig": map[string]any{
-			"ControlServerID": "tunnels",
-			"DeviceToken":     token,
-			"UserID":          uid,
-			"ServerID":        serverID,
-		},
 	})
+	seedAccount(t, uid, token, serverID)
 	runClient(t)
 	for i := 0; i < 40; i++ {
 		if tunnelsIfIndex(t) != 0 {

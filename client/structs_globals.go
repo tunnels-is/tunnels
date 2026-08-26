@@ -272,14 +272,6 @@ func (c *ControlServer) GetURL(path string) string {
 	return url
 }
 
-type CLIConfig struct {
-	ControlServerID string
-	DeviceToken     string
-	UserID          string
-	ServerID        string
-	SendStats       bool
-}
-
 type configV2 struct {
 	// KillSwitchIPv4 blackholes 0.0.0.0/0 until the user turns it off.
 	// Off by default. When on, controller/VPN endpoints are pinned /32.
@@ -290,7 +282,6 @@ type configV2 struct {
 
 	ControlServers    []*ControlServer
 	DisableBlockLists bool
-	CLIConfig         *CLIConfig
 
 	LogBlockedPorts  bool
 	DebugLogging     bool

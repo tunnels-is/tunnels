@@ -2,6 +2,7 @@ package client
 
 import (
 	"crypto/rand"
+	"errors"
 	"math/big"
 	"time"
 
@@ -44,6 +45,17 @@ func Disconnect(tunID string, switching bool) (err error) {
 	})
 
 	return
+}
+
+func persistTunnelServerID(meta *TunnelMETA, serverID string) error {
+	if meta == nil {
+		return errors.New("tunnel metadata is required")
+	}
+	if serverID == "" || meta.ServerID == serverID {
+		return nil
+	}
+	meta.ServerID = serverID
+	return writeTunnelsToDisk(meta.Tag)
 }
 
 func createRandomTunnel() (m *TunnelMETA, err error) {

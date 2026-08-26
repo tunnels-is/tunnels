@@ -477,7 +477,7 @@ func TestTunnelConfigFormats(t *testing.T) {
 			testTunnel := &TunnelMETA{
 				Tag:           "test-tunnel-" + fmt.name,
 				DNSBlocking:   true,
-				AutoConnect:   false,
+				AutoConnect:   true,
 				AutoReconnect: true,
 				ConfigFormat:  fmt.extension,
 			}
@@ -508,6 +508,9 @@ func TestTunnelConfigFormats(t *testing.T) {
 			}
 			if loaded.AutoReconnect != testTunnel.AutoReconnect {
 				t.Errorf("AutoReconnect: got %v, expected %v", loaded.AutoReconnect, testTunnel.AutoReconnect)
+			}
+			if loaded.AutoConnect != testTunnel.AutoConnect {
+				t.Errorf("AutoConnect: got %v, expected %v", loaded.AutoConnect, testTunnel.AutoConnect)
 			}
 			if loaded.ConfigFormat != fmt.extension {
 				t.Errorf("ConfigFormat: got %s, expected %s", loaded.ConfigFormat, fmt.extension)

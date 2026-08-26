@@ -72,9 +72,8 @@ func (a *App) setUser(u *client.User) {
 		if err := client.ActivateAccount(u.ID); err != nil {
 			a.fail("Unable to open the account workspace: " + err.Error())
 		}
-		go func() {
-			_ = client.SaveUser(u)
-		}()
+		_ = client.SaveUser(u)
+		go client.AutoConnect()
 	}
 	a.servers = nil
 	a.devices = nil

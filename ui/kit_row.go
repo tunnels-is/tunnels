@@ -170,8 +170,8 @@ func newKRow(spec *tableSpec) *kRow {
 	return r
 }
 
-// SetCells fills the row. on drives the live treatment (accent rail and tint);
-// badgeTone colours whichever column is marked as a badge.
+// SetCells fills the row. on drives the live treatment (primary rail and
+// tunnels-blue wash); badgeTone colours whichever column is marked as a badge.
 func (r *kRow) SetCells(cells []string, on bool, badgeTone tone) {
 	for i := range r.cells {
 		if i < len(cells) {
@@ -183,7 +183,7 @@ func (r *kRow) SetCells(cells []string, on bool, badgeTone tone) {
 	r.on = on
 	r.badgeTone = badgeTone
 	if on && badgeTone == toneNeutral {
-		r.badgeTone = toneSuccess
+		r.badgeTone = tonePrimary
 	}
 	r.Refresh()
 }
@@ -342,11 +342,11 @@ func (d *kRowRenderer) apply() {
 
 	switch {
 	case d.r.on:
-		d.rail.FillColor = p.Success
+		d.rail.FillColor = p.Primary
 		if d.r.hovered {
-			d.bg.FillColor = withAlpha(p.Success, 30)
+			d.bg.FillColor = withAlpha(p.Primary, 56)
 		} else {
-			d.bg.FillColor = withAlpha(p.Success, 18)
+			d.bg.FillColor = p.PrimarySoft
 		}
 	default:
 		d.rail.FillColor = color.Transparent
@@ -374,6 +374,9 @@ func newRowList(spec *tableSpec, count func() int, bind func(widget.ListItemID, 
 		},
 	)
 	l.HideSeparators = true
+	// These tables are action lists, not selectable records. A click would
+	// otherwise stick Fyne's selection wash on the row until another click.
+	l.OnSelected = func(id widget.ListItemID) { l.Unselect(id) }
 	return l
 }
 

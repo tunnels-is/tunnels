@@ -104,3 +104,37 @@ func activateAccountByUserID(userID string) error {
 	}
 	return activateAccountByHash(hash)
 }
+
+func activateSoleAccount() error {
+	s := STATE.Load()
+	if s != nil && s.ActiveAccountHash != "" {
+		return nil
+	}
+	users, err := getUsers()
+	if err != nil {
+		return err
+	}
+	if len(users) != 1 || users[0] == nil || users[0].ID == "" {
+		return nil
+	}
+	return activateAccountByUserID(users[0].ID)
+}
+
+// ActivateAccountIfNone activates a saved account when none is active.
+// The headless CLI uses this so AutoConnect has a workspace. The desktop
+// UI picks among several accounts itself; a single saved account is
+// activated earlier in InitService.
+func ActivateAccountIfNone() error {
+	s := STATE.Load()
+	if s != nil && s.ActiveAccountHash != "" {
+		return nil
+	}
+	users, err := getUsers()
+	if err != nil {
+		return err
+	}
+	if len(users) == 0 || users[0] == nil || users[0].ID == "" {
+		return nil
+	}
+	return activateAccountByUserID(users[0].ID)
+}

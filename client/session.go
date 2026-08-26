@@ -95,6 +95,11 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		return 400, errors.New("error fetching connection meta")
 	}
 
+	if err := persistTunnelServerID(meta, ClientCR.ServerID); err != nil {
+		ERROR("unable to write tunnel meta to drive", err)
+		return 400, errors.New("unable to write tunnel meta to drive")
+	}
+
 	code, errm = PreConnectCheck(meta)
 	if errm != nil {
 		ERROR("pre connection check:", errm)
@@ -122,15 +127,6 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	tunnel.CR = ClientCR
 
 	var err error
-
-	if meta.ServerID != ClientCR.ServerID {
-		meta.ServerID = ClientCR.ServerID
-		err = writeTunnelsToDisk(meta.Tag)
-		if err != nil {
-			ERROR("unable to write tunnel meta to drive", err)
-			return 400, errors.New("unable to write tunnel meta to drive")
-		}
-	}
 
 	ifName := state.DefaultInterfaceName.Load()
 	if ifName == nil {

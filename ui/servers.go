@@ -12,7 +12,7 @@ import (
 func (a *App) recomputeServerView() {
 	var shown []types.Server
 	for _, s := range a.servers {
-		if filterMatch(a.filterServers, s.Tag, s.IP, countryName(s.Country), s.Country) {
+		if filterMatch(a.filterServers, s.Tag, s.IP, serverWGAddr(&s), countryName(s.Country), s.Country) {
 			shown = append(shown, s)
 		}
 	}
@@ -84,7 +84,6 @@ func serverTable() *tableSpec {
 			{label: "LOCATION", weight: 1.6},
 			{label: "ADDRESS", weight: 2, mono: true},
 			{label: "TRANSFER", weight: 1.8, mono: true, optional: true},
-			{label: "STATUS", weight: 1.2, badge: true},
 		},
 	}
 }
@@ -97,19 +96,18 @@ func (a *App) bindServerRow(id widget.ListItemID, row *kRow) {
 	at := a.activeByServer()[s.ID.String()]
 	on := at != nil
 
-	status, t := "Idle", toneNeutral
+	tn := toneNeutral
 	transfer := "—"
 	if on {
-		status, t = "Connected", toneSuccess
+		tn = toneSuccess
 		transfer = "↓ " + at.IngressString() + "  ↑ " + at.EgressString()
 	}
 	row.SetCells([]string{
 		s.Tag,
 		countryName(s.Country),
-		s.IP + ":" + s.Port,
+		serverWGAddr(&s),
 		transfer,
-		status,
-	}, on, t)
+	}, on, tn)
 
 	row.ghost.SetHidden(true)
 	row.iconA.SetHidden(true)

@@ -138,3 +138,81 @@ func TestEncryptAccountBlob_UsesFolderHashOnly(t *testing.T) {
 		t.Fatal("expected decrypt failure with wrong hash")
 	}
 }
+
+func TestActivateSoleAccount(t *testing.T) {
+	dir := t.TempDir()
+	prev := STATE.Load()
+	t.Cleanup(func() {
+		STATE.Store(prev)
+		clearTunnelMap()
+	})
+	STATE.Store(&stateV2{BasePath: dir + string(os.PathSeparator)})
+	if err := InitBaseFoldersAndPaths(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := activateSoleAccount(); err != nil {
+		t.Fatalf("no users: %v", err)
+	}
+	if STATE.Load().ActiveAccountHash != "" {
+		t.Fatal("expected no active account with zero users")
+	}
+
+	u := &User{ID: "sole-user-1", Email: "sole@example.com", DeviceToken: &DEVICE_TOKEN{DT: "t"}}
+	if err := saveUser(u); err != nil {
+		t.Fatal(err)
+	}
+	s := STATE.Load()
+	s.ActiveAccountHash = ""
+	s.TunnelsPath = ""
+	STATE.Store(s)
+
+	if err := activateSoleAccount(); err != nil {
+		t.Fatal(err)
+	}
+	if STATE.Load().ActiveAccountHash != u.SaveFileHash {
+		t.Fatalf("sole account hash = %q, want %q", STATE.Load().ActiveAccountHash, u.SaveFileHash)
+	}
+}
+
+func TestActivateAccountIfNone_PicksFirstWhenSeveral(t *testing.T) {
+	dir := t.TempDir()
+	prev := STATE.Load()
+	t.Cleanup(func() {
+		STATE.Store(prev)
+		clearTunnelMap()
+	})
+	STATE.Store(&stateV2{BasePath: dir + string(os.PathSeparator)})
+	if err := InitBaseFoldersAndPaths(); err != nil {
+		t.Fatal(err)
+	}
+
+	u1 := &User{ID: "multi-user-1", Email: "a@example.com", DeviceToken: &DEVICE_TOKEN{DT: "t1"}}
+	u2 := &User{ID: "multi-user-2", Email: "b@example.com", DeviceToken: &DEVICE_TOKEN{DT: "t2"}}
+	if err := saveUser(u1); err != nil {
+		t.Fatal(err)
+	}
+	if err := saveUser(u2); err != nil {
+		t.Fatal(err)
+	}
+
+	s := STATE.Load()
+	s.ActiveAccountHash = ""
+	s.TunnelsPath = ""
+	STATE.Store(s)
+
+	if err := activateSoleAccount(); err != nil {
+		t.Fatal(err)
+	}
+	if STATE.Load().ActiveAccountHash != "" {
+		t.Fatal("desktop must not pick among several accounts")
+	}
+
+	if err := ActivateAccountIfNone(); err != nil {
+		t.Fatal(err)
+	}
+	got := STATE.Load().ActiveAccountHash
+	if got != u1.SaveFileHash && got != u2.SaveFileHash {
+		t.Fatalf("CLI pick hash = %q, want one of the saved accounts", got)
+	}
+}
