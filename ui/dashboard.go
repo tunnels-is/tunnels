@@ -13,7 +13,7 @@ import (
 // ---------------------------------------------------------------- page
 
 func (a *App) dashboardPage() fyne.CanvasObject {
-	probe := outlineBtn("Find closest", func() { a.forceProbe() }).withIcon(theme.ViewRefreshIcon())
+	probe := primaryBtn("Find closest", func() { a.forceProbe() }).withIcon(theme.ViewRefreshIcon())
 
 	// The window selector only means something when a chart is on screen.
 	actions := fyne.CanvasObject(probe)
@@ -75,10 +75,10 @@ func (a *App) dashClosestCard() fyne.CanvasObject {
 			desc = "Run a probe to find the server with the lowest round-trip time."
 		}
 		return cardBox("Closest server", desc,
-			outlineBtn("Probe", func() { a.forceProbe() }).small(), nil)
+			primaryBtn("Probe", func() { a.forceProbe() }).small(), nil)
 	}
 
-	connect := primaryBtn("Connect", func() {
+	connect := successBtn("Connect", func() {
 		if s := a.serverByID(best.ServerID); s != nil {
 			srv := *s
 			a.confirm("Connect", "Connect to "+srv.Tag+"?", func() { a.connectToServer(srv) })

@@ -278,9 +278,9 @@ func (r *kBtnRenderer) colors() (bg, fg, stroke color.NRGBA, fgName fyne.ThemeCo
 			bg = p.SuccessHover
 		}
 	case kDanger:
-		bg, fg, stroke, fgName = p.ErrorSoft, p.Error, withAlpha(p.Error, 70), theme.ColorNameError
+		bg, fg, fgName = p.Error, hex(0xff, 0xff, 0xff), colOnSolid
 		if r.b.hovered {
-			bg = withAlpha(p.Error, 60)
+			bg = p.ErrorHover
 		}
 	case kOutline:
 		bg, fg, stroke, fgName = p.Base100, p.Content, p.Base300, colContent
@@ -325,6 +325,7 @@ func darken(c color.NRGBA, d uint8) color.NRGBA {
 
 // Shorthand constructors used across the pages.
 func primaryBtn(label string, fn func()) *kBtn { return newKBtn(label, kPrimary, fn) }
+func successBtn(label string, fn func()) *kBtn { return newKBtn(label, kSuccess, fn) }
 func dangerBtn(label string, fn func()) *kBtn  { return newKBtn(label, kDanger, fn) }
 func ghostBtn(label string, fn func()) *kBtn   { return newKBtn(label, kGhost, fn) }
 func outlineBtn(label string, fn func()) *kBtn { return newKBtn(label, kOutline, fn) }

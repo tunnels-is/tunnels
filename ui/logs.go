@@ -175,7 +175,7 @@ func (a *App) logsPage() fyne.CanvasObject {
 		a.reloadCurrent()
 	})
 
-	clear := newIconBtn(theme.DeleteIcon(), kOutline, func() {
+	clear := newIconBtn(theme.DeleteIcon(), kDanger, func() {
 		a.confirm("Clear logs", "Remove all captured log lines from this view?", func() {
 			a.logs = nil
 			a.reloadCurrent()

@@ -31,7 +31,7 @@ func (a *App) serversPage() fyne.CanvasObject {
 		a.filterServers = s
 		a.reloadCurrent()
 	})
-	refresh := newIconBtn(theme.ViewRefreshIcon(), kOutline, func() {
+	refresh := newIconBtn(theme.ViewRefreshIcon(), kPrimary, func() {
 		a.note("Refreshing servers…")
 		a.fetchServers(true)
 	})

@@ -110,7 +110,7 @@ func (a *App) dnsPage() fyne.CanvasObject {
 }
 
 func (a *App) dnsListCard(title, desc, key string, lists []*client.BlockList, kind string) fyne.CanvasObject {
-	update := outlineBtn("Update", func() {
+	update := primaryBtn("Update", func() {
 		a.note("Updating lists…")
 		go func() {
 			if kind == "blocklist" {

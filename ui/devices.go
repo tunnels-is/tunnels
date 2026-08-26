@@ -145,7 +145,7 @@ func (a *App) bindDeviceRow(id widget.ListItemID, row *kRow) {
 	row.main.SetHidden(true)
 
 	dev := d
-	row.iconB.SetIconOnly(theme.DeleteIcon(), kGhost, func() {
+	row.iconB.SetIconOnly(theme.DeleteIcon(), kDanger, func() {
 		a.confirm("Delete device", `Delete "`+dev.Tag+`"? This cannot be undone.`, func() {
 			go func() {
 				_, _, err := a.callController("/client/device/delete", map[string]any{"DeviceID": dev.ID.String()}, true)
