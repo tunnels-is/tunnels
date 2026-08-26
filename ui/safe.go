@@ -33,7 +33,10 @@ func (a *App) reloadCurrent() {
 	}
 	a.reloading = true
 	defer func() { a.reloading = false }()
-	a.dropLiveLists()
+	if a.refreshLivePage() {
+		return
+	}
+	a.teardownPage()
 	page := a.buildPage(a.current)
 	for _, o := range a.content.Objects {
 		if o != nil {

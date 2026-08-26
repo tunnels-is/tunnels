@@ -10,6 +10,7 @@ import (
 )
 
 func (a *App) recomputeTunnelView() {
+	a.liveByTag = a.activeByTag()
 	var shown []*client.TunnelMETA
 	for _, t := range a.tunnels {
 		if t == nil {
@@ -58,7 +59,7 @@ func (a *App) tunnelsPage() fyne.CanvasObject {
 	actions := hstackFlex(sp2, 0, search, create)
 
 	live := 0
-	byTag := a.activeByTag()
+	byTag := a.liveByTag
 	for _, t := range a.tunnelView {
 		if byTag[t.Tag] != nil {
 			live++
@@ -107,7 +108,7 @@ func (a *App) bindTunnelRow(id widget.ListItemID, row *kRow) {
 	if t == nil {
 		return
 	}
-	at := a.activeByTag()[t.Tag]
+	at := a.liveByTag[t.Tag]
 	srv := a.serverByID(t.ServerID)
 	srvLabel := "No server"
 	addr := "—"

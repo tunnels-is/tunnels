@@ -98,6 +98,7 @@ func InitService() error {
 	}
 
 	INFO("Tunnels is ready")
+	startPprofIfEnabled()
 	return nil
 }
 

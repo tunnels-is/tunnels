@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"image/color"
 	"strings"
+	"unicode/utf8"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -25,7 +26,13 @@ type logRow struct {
 	msg   string
 	list  *widget.List
 	id    widget.ListItemID
+
+	wrapW     float32
+	wrapLines []string
+	prefixW   float32
 }
+
+const maxLogWrapLines = 8
 
 func newLogRow() *logRow {
 	r := &logRow{}
@@ -34,6 +41,16 @@ func newLogRow() *logRow {
 }
 
 func (r *logRow) set(id widget.ListItemID, list *widget.List, when, level, fn, msg string) {
+	if r.id == id && r.list == list && r.when == when && r.level == level && r.fn == fn && r.msg == msg {
+		return
+	}
+	if r.when != when || r.fn != fn {
+		r.prefixW = 0
+	}
+	if r.msg != msg || r.when != when || r.fn != fn {
+		r.wrapLines = nil
+		r.wrapW = 0
+	}
 	r.id, r.list = id, list
 	r.when, r.level, r.fn, r.msg = when, level, fn, msg
 	r.Refresh()
@@ -42,15 +59,19 @@ func (r *logRow) set(id widget.ListItemID, list *widget.List, when, level, fn, m
 func logMsgStyle() fyne.TextStyle { return fyne.TextStyle{Monospace: true} }
 
 func logLineHeight() float32 {
-	return fyne.MeasureText("Ag", fsSmall, logMsgStyle()).Height
+	return cachedLineHeight(fsSmall, logMsgStyle())
 }
 
 func (r *logRow) prefixWidth() float32 {
+	if r.prefixW > 0 {
+		return r.prefixW
+	}
 	w := float32(0)
 	if r.when != "" {
-		w += fyne.MeasureText(r.when, fsCaption, fyne.TextStyle{Monospace: true}).Width + sp3
+		w += measureWidth(r.when, fsCaption, fyne.TextStyle{Monospace: true}) + sp3
 	}
-	return w + logLevelCol + logFnCol
+	r.prefixW = w + logLevelCol + logFnCol
+	return r.prefixW
 }
 
 func (r *logRow) wrapped(width float32) []string {
@@ -58,7 +79,16 @@ func (r *logRow) wrapped(width float32) []string {
 	if remain < z(64) {
 		remain = z(64)
 	}
-	return wrapToWidth(r.msg, remain, fsSmall, logMsgStyle())
+	if r.wrapLines != nil && r.wrapW == remain {
+		return r.wrapLines
+	}
+	lines := wrapToWidth(r.msg, remain, fsSmall, logMsgStyle())
+	if len(lines) > maxLogWrapLines {
+		lines = lines[:maxLogWrapLines]
+	}
+	r.wrapW = remain
+	r.wrapLines = lines
+	return lines
 }
 
 func (r *logRow) heightFor(width float32) float32 {
@@ -88,22 +118,46 @@ type logRowRenderer struct {
 	level *canvas.Text
 	fn    *canvas.Text
 	msgs  []*canvas.Text
+	objs  []fyne.CanvasObject
+
+	laidW    float32
+	laidWhen string
+	laidMsg  string
+	laidFn   string
+	laidLvl  string
 }
 
 func (d *logRowRenderer) Destroy() {}
 
 func (d *logRowRenderer) Objects() []fyne.CanvasObject {
-	out := []fyne.CanvasObject{d.when, d.level, d.fn}
-	for _, t := range d.msgs {
-		out = append(out, t)
+	if d.objs == nil {
+		d.rebuildObjs()
 	}
-	return out
+	return d.objs
+}
+
+func (d *logRowRenderer) rebuildObjs() {
+	n := 3 + len(d.msgs)
+	if cap(d.objs) < n {
+		d.objs = make([]fyne.CanvasObject, 0, n)
+	} else {
+		d.objs = d.objs[:0]
+	}
+	d.objs = append(d.objs, d.when, d.level, d.fn)
+	for _, t := range d.msgs {
+		d.objs = append(d.objs, t)
+	}
 }
 
 func (d *logRowRenderer) ensureMsgs(n int) {
 	p := pal()
+	grew := false
 	for len(d.msgs) < n {
 		d.msgs = append(d.msgs, monoText("", fsSmall, p.Content))
+		grew = true
+	}
+	if grew || d.objs == nil {
+		d.rebuildObjs()
 	}
 }
 
@@ -117,9 +171,18 @@ func (d *logRowRenderer) MinSize() fyne.Size {
 }
 
 func (d *logRowRenderer) Layout(size fyne.Size) {
-	d.when.Text = d.r.when
-	d.level.Text = d.r.level
-	d.fn.Text = elide(d.r.fn, logFnCol-sp3, d.fn.TextSize, d.fn.TextStyle)
+	same := d.laidW == size.Width && d.laidWhen == d.r.when && d.laidMsg == d.r.msg &&
+		d.laidFn == d.r.fn && d.laidLvl == d.r.level
+	if same {
+		return
+	}
+	d.laidW, d.laidWhen, d.laidMsg = size.Width, d.r.when, d.r.msg
+	d.laidFn, d.laidLvl = d.r.fn, d.r.level
+
+	setCanvasText(d.when, d.r.when, d.when.TextSize, d.when.TextStyle, d.when.Color)
+	setCanvasText(d.level, d.r.level, d.level.TextSize, d.level.TextStyle, d.level.Color)
+	fn := elide(d.r.fn, logFnCol-sp3, d.fn.TextSize, d.fn.TextStyle)
+	setCanvasText(d.fn, fn, d.fn.TextSize, d.fn.TextStyle, d.fn.Color)
 
 	x := d.r.prefixWidth()
 	whenW := x - logLevelCol - logFnCol
@@ -134,37 +197,34 @@ func (d *logRowRenderer) Layout(size fyne.Size) {
 	if d.r.level == "ERROR" {
 		fg = pal().Error
 	}
+	style := logMsgStyle()
+	cw := monoCharWidth(fsSmall, style)
 	for i, t := range d.msgs {
 		if i >= len(lines) {
-			t.Text = ""
-			t.Hide()
+			if t.Text != "" {
+				t.Text = ""
+				t.Hide()
+			}
 			t.Move(fyne.NewPos(0, 0))
 			t.Resize(fyne.NewSize(0, 0))
 			continue
 		}
 		t.Show()
-		t.Text = lines[i]
-		t.TextSize = fsSmall
-		t.TextStyle = logMsgStyle()
-		t.Color = fg
+		setCanvasText(t, lines[i], fsSmall, style, fg)
 		t.Move(fyne.NewPos(x, lh*float32(i)))
-		t.Resize(t.MinSize())
-	}
-
-	want := d.r.heightFor(size.Width)
-	if d.r.list != nil && want != size.Height {
-		d.r.list.SetItemHeight(d.r.id, want)
+		w := t.Size().Width
+		if cw > 0 {
+			w = cw * float32(utf8.RuneCountInString(lines[i]))
+		} else {
+			w = t.MinSize().Width
+		}
+		t.Resize(fyne.NewSize(w, lh))
 	}
 }
 
 func (d *logRowRenderer) Refresh() {
 	d.apply()
-	d.when.Refresh()
-	d.level.Refresh()
-	d.fn.Refresh()
-	for _, t := range d.msgs {
-		t.Refresh()
-	}
+	d.laidW = 0
 	if sz := d.r.Size(); sz.Width > 0 {
 		d.Layout(sz)
 	}
@@ -272,6 +332,7 @@ func (a *App) logsPage() fyne.CanvasObject {
 			}
 			when, level, fn, msg := splitLogLine(a.logView[id])
 			row.set(id, a.logList, when, level, fn, msg)
+			a.queueLogHeight(id, row)
 		},
 	)
 	a.logList.HideSeparators = true
@@ -286,6 +347,52 @@ func (a *App) logsPage() fyne.CanvasObject {
 		)),
 	)
 	return pageShell("Logs", sub, actions, insetEach(sp4, gutter, gutter, gutter, panel))
+}
+
+func (a *App) queueLogHeight(id widget.ListItemID, row *logRow) {
+	if a.settingLogHeight || a.logList == nil || row == nil {
+		return
+	}
+	w := row.Size().Width
+	if w <= 0 {
+		w = a.logList.Size().Width
+	}
+	if w <= 0 {
+		return
+	}
+	want := row.heightFor(w)
+	delta := want - row.Size().Height
+	if delta < 0 {
+		delta = -delta
+	}
+	if delta < 0.5 {
+		return
+	}
+	if a.logHeights == nil {
+		a.logHeights = make(map[widget.ListItemID]float32)
+	}
+	a.logHeights[id] = want
+	if a.logHeightQueued {
+		return
+	}
+	a.logHeightQueued = true
+	fyne.Do(func() {
+		a.flushLogHeights()
+	})
+}
+
+func (a *App) flushLogHeights() {
+	pending := a.logHeights
+	a.logHeights = nil
+	a.logHeightQueued = false
+	if a.logList == nil || a.settingLogHeight || len(pending) == 0 {
+		return
+	}
+	a.settingLogHeight = true
+	defer func() { a.settingLogHeight = false }()
+	for id, h := range pending {
+		a.logList.SetItemHeight(id, h)
+	}
 }
 
 func (a *App) filteredLogs() []string {

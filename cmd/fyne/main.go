@@ -29,6 +29,8 @@ func main() {
 	flag.StringVar(&s.TunnelType, "tunnelType", "default", "tunnel type: default, strict, iot")
 	flag.BoolVar(&s.Debug, "debug", false, "enable debug logging")
 	flag.BoolVar(&s.RequireConfig, "requireConfig", false, "require config file to start")
+	flag.BoolVar(&s.Pprof, "pprof", false, "enable localhost pprof HTTP server (heap profiles include secrets)")
+	flag.StringVar(&s.PprofAddr, "pprofAddr", "127.0.0.1:6060", "pprof listen address (loopback only)")
 	flag.Parse()
 	client.STATE.Store(s)
 

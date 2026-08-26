@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net"
 	"os"
+	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -318,6 +319,8 @@ type stateV2 struct {
 	Debug         bool
 	RequireConfig bool
 	TunnelType    string
+	Pprof         bool
+	PprofAddr     string
 
 	BlockListPath  string
 	WhiteListPath  string
@@ -364,19 +367,40 @@ func (bh *BandwidthHistory) Append(r BandwidthRecord) {
 	bh.mu.Lock()
 	defer bh.mu.Unlock()
 
-	bh.records = append(bh.records, r)
-
-	if len(bh.records) > MaxBandwidthRecords {
-		excess := len(bh.records) - MaxBandwidthRecords
-		bh.records = bh.records[excess:]
+	if bh.records == nil {
+		bh.records = make([]BandwidthRecord, 0, MaxBandwidthRecords)
 	}
+	if len(bh.records) >= MaxBandwidthRecords {
+		copy(bh.records, bh.records[1:])
+		bh.records[MaxBandwidthRecords-1] = r
+		bh.records = bh.records[:MaxBandwidthRecords]
+		return
+	}
+	bh.records = append(bh.records, r)
 }
 
 func (bh *BandwidthHistory) Snapshot() []BandwidthRecord {
+	return bh.SnapshotSince(time.Time{})
+}
+
+// SnapshotSince copies records at or after cutoff. A zero cutoff copies the
+// whole buffer. The returned slice has its own backing array, so the caller
+// can retain it without pinning discarded samples.
+func (bh *BandwidthHistory) SnapshotSince(cutoff time.Time) []BandwidthRecord {
 	bh.mu.RLock()
 	defer bh.mu.RUnlock()
-	out := make([]BandwidthRecord, len(bh.records))
-	copy(out, bh.records)
+	recs := bh.records
+	i := 0
+	if !cutoff.IsZero() {
+		i = sort.Search(len(recs), func(i int) bool {
+			return recs[i].Timestamp.After(cutoff)
+		})
+	}
+	if i > len(recs) {
+		i = len(recs)
+	}
+	out := make([]BandwidthRecord, len(recs)-i)
+	copy(out, recs[i:])
 	return out
 }
 

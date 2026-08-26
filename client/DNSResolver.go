@@ -614,7 +614,8 @@ func IncrementDNSStats(domain string, blocked bool, tag string, answers []dns.RR
 	}
 
 	if len(dnsStats.Answers) > maxDNSStatsAnswers {
-		dnsStats.Answers = dnsStats.Answers[len(dnsStats.Answers)-maxDNSStatsAnswers:]
+		n := copy(dnsStats.Answers, dnsStats.Answers[len(dnsStats.Answers)-maxDNSStatsAnswers:])
+		dnsStats.Answers = dnsStats.Answers[:n]
 	}
 	dnsStats.m.Unlock()
 }

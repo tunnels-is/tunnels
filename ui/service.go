@@ -450,12 +450,20 @@ func (a *App) startLogPump() {
 // paintLogs refreshes the log list in place. The list is virtualised, so the
 // whole buffer can be bound without the old 200-line truncation.
 func (a *App) paintLogs() {
+	prevN := len(a.logView)
+	prevHead := ""
+	if prevN > 0 {
+		prevHead = a.logView[0]
+	}
 	a.recomputeLogView()
 	if a.logList == nil {
 		// The page is showing its empty state; rebuild so the list appears.
 		if len(a.logView) > 0 {
 			a.reloadCurrent()
 		}
+		return
+	}
+	if len(a.logView) == prevN && (prevN == 0 || a.logView[0] == prevHead) {
 		return
 	}
 	a.logList.Refresh()

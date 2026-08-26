@@ -166,27 +166,323 @@ func TestMigrateEmails_ApplyNormalizesAndRebuildsIndex(t *testing.T) {
 	})
 }
 
-func TestMigrateEmails_CollisionAborts(t *testing.T) {
+func putUserWithMeta(t *testing.T, db *gobolt.DB, id, email string, updated, subExp time.Time) {
+	t.Helper()
+	putUserFields(t, db, id, map[string]any{
+		"_id":           id,
+		"Email":         email,
+		"Password":      "hash-keep",
+		"Keep":          "payload",
+		"Disabled":      false,
+		"Updated":       updated,
+		"SubExpiration": subExp,
+	})
+}
+
+func TestPickCollisionWinner(t *testing.T) {
+	now := time.Date(2026, 8, 26, 12, 0, 0, 0, time.UTC)
+	older := now.Add(-48 * time.Hour)
+	newer := now.Add(-1 * time.Hour)
+	valid := now.Add(24 * time.Hour)
+	expired := now.Add(-24 * time.Hour)
+
+	mk := func(id string, updated, sub time.Time) row {
+		return row{id: id, updated: updated, subExp: sub}
+	}
+
+	t.Run("one valid subscription wins even if older", func(t *testing.T) {
+		w, reason := pickCollisionWinner([]row{
+			mk("old-paid", older, valid),
+			mk("new-expired", newer, expired),
+		}, now)
+		if w.id != "old-paid" || reason != "valid subscription" {
+			t.Fatalf("winner=%s reason=%q", w.id, reason)
+		}
+	})
+
+	t.Run("both valid picks most recently created", func(t *testing.T) {
+		w, reason := pickCollisionWinner([]row{
+			mk("old-paid", older, valid),
+			mk("new-paid", newer, valid),
+		}, now)
+		if w.id != "new-paid" || reason != "most recently created" {
+			t.Fatalf("winner=%s reason=%q", w.id, reason)
+		}
+	})
+
+	t.Run("neither valid picks most recently created", func(t *testing.T) {
+		w, reason := pickCollisionWinner([]row{
+			mk("old-expired", older, expired),
+			mk("new-expired", newer, expired),
+		}, now)
+		if w.id != "new-expired" || reason != "most recently created" {
+			t.Fatalf("winner=%s reason=%q", w.id, reason)
+		}
+	})
+
+	t.Run("equal created breaks tie by larger id", func(t *testing.T) {
+		w, reason := pickCollisionWinner([]row{
+			mk("aaa", newer, expired),
+			mk("zzz", newer, expired),
+		}, now)
+		if w.id != "zzz" || reason != "most recently created" {
+			t.Fatalf("winner=%s reason=%q", w.id, reason)
+		}
+	})
+}
+
+func TestMigrateEmails_CollisionPicksValidSubscription(t *testing.T) {
 	db := openTestDB(t)
-	a, b := uuid.NewString(), uuid.NewString()
-	putUser(t, db, a, "Foo@x.com")
-	putUser(t, db, b, "foo@x.com")
+	now := time.Now()
+	oldPaid, newExpired := "user-old-paid", "user-new-expired"
+	putUserWithMeta(t, db, oldPaid, "Foo@x.com", now.Add(-48*time.Hour), now.Add(24*time.Hour))
+	putUserWithMeta(t, db, newExpired, "foo@x.com", now.Add(-1*time.Hour), now.Add(-24*time.Hour))
 
 	rep, err := migrateEmails(db, true)
-	if err == nil {
-		t.Fatal("expected collision error")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rep.Collisions) != 1 {
+		t.Fatalf("collisions=%d", len(rep.Collisions))
+	}
+	c := rep.Collisions[0]
+	if c.Winner != oldPaid || c.Reason != "valid subscription" {
+		t.Fatalf("winner=%s reason=%q", c.Winner, c.Reason)
+	}
+
+	_ = db.View(func(tx *gobolt.Tx) error {
+		idx := tx.Bucket([]byte(emailIndex))
+		if got := string(idx.Get([]byte("foo@x.com"))); got != oldPaid {
+			t.Fatalf("index -> %q want %s", got, oldPaid)
+		}
+		if idx.Get([]byte("Foo@x.com")) != nil {
+			t.Fatal("old mixed-case index key still present")
+		}
+		for _, id := range []string{oldPaid, newExpired} {
+			email, err := emailFromUserJSON(tx.Bucket([]byte(usersBucket)).Get([]byte(id)))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if email != "foo@x.com" {
+				t.Fatalf("user %s Email=%q", id, email)
+			}
+		}
+		return nil
+	})
+}
+
+func TestMigrateEmails_CollisionBothValidPicksNewest(t *testing.T) {
+	db := openTestDB(t)
+	now := time.Now()
+	older, newer := "user-older", "user-newer"
+	putUserWithMeta(t, db, older, "Foo@x.com", now.Add(-48*time.Hour), now.Add(24*time.Hour))
+	putUserWithMeta(t, db, newer, "foo@x.com", now.Add(-1*time.Hour), now.Add(48*time.Hour))
+
+	rep, err := migrateEmails(db, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rep.Collisions) != 1 || rep.Collisions[0].Winner != newer {
+		t.Fatalf("collision=%+v", rep.Collisions)
+	}
+	if rep.Collisions[0].Reason != "most recently created" {
+		t.Fatalf("reason=%q", rep.Collisions[0].Reason)
+	}
+
+	_ = db.View(func(tx *gobolt.Tx) error {
+		got := string(tx.Bucket([]byte(emailIndex)).Get([]byte("foo@x.com")))
+		if got != newer {
+			t.Fatalf("index -> %q want %s", got, newer)
+		}
+		return nil
+	})
+}
+
+func TestMigrateEmails_CollisionNeitherValidPicksNewest(t *testing.T) {
+	db := openTestDB(t)
+	now := time.Now()
+	older, newer := "user-older", "user-newer"
+	putUserWithMeta(t, db, older, "Foo@x.com", now.Add(-48*time.Hour), now.Add(-24*time.Hour))
+	putUserWithMeta(t, db, newer, "foo@x.com", now.Add(-1*time.Hour), time.Time{})
+
+	rep, err := migrateEmails(db, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rep.Collisions) != 1 || rep.Collisions[0].Winner != newer {
+		t.Fatalf("collision=%+v", rep.Collisions)
+	}
+
+	_ = db.View(func(tx *gobolt.Tx) error {
+		got := string(tx.Bucket([]byte(emailIndex)).Get([]byte("foo@x.com")))
+		if got != newer {
+			t.Fatalf("index -> %q want %s", got, newer)
+		}
+		return nil
+	})
+}
+
+func TestMigrateEmails_CollisionDryRunDoesNotWrite(t *testing.T) {
+	db := openTestDB(t)
+	now := time.Now()
+	a, b := uuid.NewString(), uuid.NewString()
+	putUserWithMeta(t, db, a, "Foo@x.com", now.Add(-48*time.Hour), now.Add(24*time.Hour))
+	putUserWithMeta(t, db, b, "foo@x.com", now.Add(-1*time.Hour), now.Add(-24*time.Hour))
+
+	before, err := loadUserBlobs(db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	indexBefore := map[string]string{}
+	_ = db.View(func(tx *gobolt.Tx) error {
+		return tx.Bucket([]byte(emailIndex)).ForEach(func(k, v []byte) error {
+			indexBefore[string(k)] = string(v)
+			return nil
+		})
+	})
+
+	rep, err := migrateEmails(db, false)
+	if err != nil {
+		t.Fatal(err)
 	}
 	if len(rep.Collisions) != 1 {
 		t.Fatalf("collisions=%d", len(rep.Collisions))
 	}
 
+	after, err := loadUserBlobs(db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(before) != len(after) {
+		t.Fatalf("user count changed")
+	}
+	for id, raw := range before {
+		if string(raw) != string(after[id]) {
+			t.Fatalf("dry-run mutated user %s", id)
+		}
+	}
+	indexAfter := map[string]string{}
 	_ = db.View(func(tx *gobolt.Tx) error {
-		email, _ := emailFromUserJSON(tx.Bucket([]byte(usersBucket)).Get([]byte(a)))
-		if email != "Foo@x.com" {
-			t.Fatalf("collision apply mutated user: %q", email)
+		return tx.Bucket([]byte(emailIndex)).ForEach(func(k, v []byte) error {
+			indexAfter[string(k)] = string(v)
+			return nil
+		})
+	})
+	if len(indexBefore) != len(indexAfter) {
+		t.Fatalf("dry-run changed index size: before=%d after=%d", len(indexBefore), len(indexAfter))
+	}
+	for k, v := range indexBefore {
+		if indexAfter[k] != v {
+			t.Fatalf("dry-run mutated index %q", k)
+		}
+	}
+}
+
+func collisionPair(t *testing.T) (oldDB, db *gobolt.DB, winner, loser string) {
+	t.Helper()
+	oldDB = openNamedDB(t, "old.db")
+	db = openNamedDB(t, "new.db")
+	now := time.Now()
+	winner, loser = uuid.NewString(), uuid.NewString()
+	putUserWithMeta(t, oldDB, winner, "Foo@x.com", now.Add(-48*time.Hour), now.Add(24*time.Hour))
+	putUserWithMeta(t, oldDB, loser, "foo@x.com", now.Add(-1*time.Hour), now.Add(-24*time.Hour))
+	cloneUsers(t, oldDB, db)
+	if _, err := migrateEmails(db, true); err != nil {
+		t.Fatal(err)
+	}
+	return oldDB, db, winner, loser
+}
+
+func tamperUserField(t *testing.T, db *gobolt.DB, id, field, value string) {
+	t.Helper()
+	if err := db.Update(func(tx *gobolt.Tx) error {
+		raw := tx.Bucket([]byte(usersBucket)).Get([]byte(id))
+		var m map[string]json.RawMessage
+		if err := json.Unmarshal(raw, &m); err != nil {
+			return err
+		}
+		m[field], _ = json.Marshal(value)
+		next, err := json.Marshal(m)
+		if err != nil {
+			return err
+		}
+		return tx.Bucket([]byte(usersBucket)).Put([]byte(id), next)
+	}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestVerify_CollisionKeepsAllUsersAndIndexesWinner(t *testing.T) {
+	oldDB, db, winner, _ := collisionPair(t)
+
+	mm, err := verifyUsersAgainstOld(db, oldDB)
+	if err != nil {
+		t.Fatal(err)
+	}
+	idxMM, err := verifyEmailIndex(db)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(append(mm, idxMM...)) != 0 {
+		t.Fatalf("mismatches: %v %v", mm, idxMM)
+	}
+
+	_ = db.View(func(tx *gobolt.Tx) error {
+		got := string(tx.Bucket([]byte(emailIndex)).Get([]byte("foo@x.com")))
+		if got != winner {
+			t.Fatalf("index -> %q want %s", got, winner)
 		}
 		return nil
 	})
+}
+
+func TestVerify_CollisionIgnoresLoserChanges(t *testing.T) {
+	oldDB, db, _, loser := collisionPair(t)
+	tamperUserField(t, db, loser, "Password", "tampered-loser")
+
+	mm, err := verifyUsersAgainstOld(db, oldDB)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(mm) != 0 {
+		t.Fatalf("loser changes should be ignored, got %s", strings.Join(mm, "; "))
+	}
+}
+
+func TestVerify_CollisionIgnoresMissingLoser(t *testing.T) {
+	oldDB, db, _, loser := collisionPair(t)
+	if err := db.Update(func(tx *gobolt.Tx) error {
+		return tx.Bucket([]byte(usersBucket)).Delete([]byte(loser))
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	mm, err := verifyUsersAgainstOld(db, oldDB)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(mm) != 0 {
+		t.Fatalf("missing loser should be ignored, got %s", strings.Join(mm, "; "))
+	}
+}
+
+func TestVerify_CollisionDetectsWinnerChanges(t *testing.T) {
+	oldDB, db, winner, _ := collisionPair(t)
+	tamperUserField(t, db, winner, "Password", "tampered-winner")
+
+	mm, err := verifyUsersAgainstOld(db, oldDB)
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, m := range mm {
+		if strings.Contains(m, "Password") && strings.Contains(m, winner) {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("expected winner password mismatch, got %v", mm)
+	}
 }
 
 func TestVerifyUsersAgainstOld_OK(t *testing.T) {

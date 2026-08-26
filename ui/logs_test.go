@@ -33,6 +33,30 @@ func TestLogRowWrapsLongMessage(t *testing.T) {
 	}
 }
 
+func TestLogRowWrapCacheReusesLines(t *testing.T) {
+	a := test.NewApp()
+	t.Cleanup(a.Quit)
+	applyZoomTokens(1)
+
+	row := newLogRow()
+	msg := strings.Repeat("abcdefghij ", 40)
+	row.set(0, nil, "01-02 15:04:05", "INFO", "main", msg)
+	row.Resize(fyne.NewSize(z(320), 10))
+	first := row.wrapped(row.Size().Width)
+	if len(first) < 2 {
+		t.Fatalf("expected wrap, got %d lines", len(first))
+	}
+	second := row.wrapped(row.Size().Width)
+	if len(second) != len(first) || &second[0] != &first[0] {
+		t.Fatal("wrapped() should reuse the cached slice for the same width")
+	}
+	row.set(1, nil, "01-02 15:04:06", "INFO", "main", "short")
+	third := row.wrapped(row.Size().Width)
+	if len(third) != 1 || third[0] != "short" {
+		t.Fatalf("cache must invalidate on message change, got %#v", third)
+	}
+}
+
 func TestLogRowShortMessageStaysOneLine(t *testing.T) {
 	a := test.NewApp()
 	t.Cleanup(a.Quit)

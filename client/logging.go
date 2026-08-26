@@ -179,9 +179,15 @@ func StartLogQueueProcessor() {
 		}
 
 		PollLogMu.Lock()
-		PollLogBuf = append(PollLogBuf, line)
-		if len(PollLogBuf) > 5000 {
-			PollLogBuf = PollLogBuf[len(PollLogBuf)-5000:]
+		if PollLogBuf == nil {
+			PollLogBuf = make([]string, 0, 5000)
+		}
+		if len(PollLogBuf) >= 5000 {
+			copy(PollLogBuf, PollLogBuf[1:])
+			PollLogBuf[4999] = line
+			PollLogBuf = PollLogBuf[:5000]
+		} else {
+			PollLogBuf = append(PollLogBuf, line)
 		}
 		PollLogMu.Unlock()
 		emitUILog(line)

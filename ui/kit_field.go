@@ -364,11 +364,18 @@ type switchRenderer struct {
 	s     *kSwitch
 	track *canvas.Rectangle
 	knob  *canvas.Circle
+	objs  []fyne.CanvasObject
 }
 
-func (r *switchRenderer) Destroy()                     {}
-func (r *switchRenderer) Objects() []fyne.CanvasObject { return []fyne.CanvasObject{r.track, r.knob} }
-func (r *switchRenderer) MinSize() fyne.Size           { return fyne.NewSize(swWidth, swHeight) }
+func (r *switchRenderer) Destroy() {}
+
+func (r *switchRenderer) Objects() []fyne.CanvasObject {
+	if r.objs == nil {
+		r.objs = []fyne.CanvasObject{r.track, r.knob}
+	}
+	return r.objs
+}
+func (r *switchRenderer) MinSize() fyne.Size { return fyne.NewSize(swWidth, swHeight) }
 
 func (r *switchRenderer) Layout(size fyne.Size) {
 	y := (size.Height - swHeight) / 2
@@ -536,20 +543,23 @@ type segRenderer struct {
 	bg     *canvas.Rectangle
 	pills  []*canvas.Rectangle
 	labels []*canvas.Text
+	objs   []fyne.CanvasObject
 }
 
 func (r *segRenderer) Destroy() {}
 
 func (r *segRenderer) Objects() []fyne.CanvasObject {
-	out := make([]fyne.CanvasObject, 0, len(r.pills)*2+1)
-	out = append(out, r.bg)
-	for i := range r.pills {
-		out = append(out, r.pills[i])
+	if r.objs == nil {
+		r.objs = make([]fyne.CanvasObject, 0, len(r.pills)*2+1)
+		r.objs = append(r.objs, r.bg)
+		for i := range r.pills {
+			r.objs = append(r.objs, r.pills[i])
+		}
+		for i := range r.labels {
+			r.objs = append(r.objs, r.labels[i])
+		}
 	}
-	for i := range r.labels {
-		out = append(out, r.labels[i])
-	}
-	return out
+	return r.objs
 }
 
 func (r *segRenderer) MinSize() fyne.Size {
