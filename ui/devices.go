@@ -18,7 +18,14 @@ import (
 )
 
 func (a *App) recomputeDeviceView() {
-	ids, pubs := a.localDeviceIndex()
+	a.deviceLocalIDs, a.deviceLocalPubs = a.localDeviceIndex()
+	ids, pubs := a.deviceLocalIDs, a.deviceLocalPubs
+	a.deviceConnIPs = map[string]struct{}{}
+	for _, at := range a.active {
+		if at != nil && at.ServerResponse != nil && at.ServerResponse.WireGuardIP != "" {
+			a.deviceConnIPs[at.ServerResponse.WireGuardIP] = struct{}{}
+		}
+	}
 	var shown []types.Device
 	for _, d := range a.devices {
 		if filterMatch(a.filterDevices, d.Tag, d.WireGuardIP) {
@@ -121,16 +128,8 @@ func (a *App) bindDeviceRow(id widget.ListItemID, row *kRow) {
 		return
 	}
 	d := a.deviceView[id]
-
-	connectedIPs := map[string]struct{}{}
-	for _, at := range a.active {
-		if at != nil && at.ServerResponse != nil && at.ServerResponse.WireGuardIP != "" {
-			connectedIPs[at.ServerResponse.WireGuardIP] = struct{}{}
-		}
-	}
-	ids, pubs := a.localDeviceIndex()
-	_, isConn := connectedIPs[d.WireGuardIP]
-	mine := deviceOnThisMachine(d, ids, pubs)
+	_, isConn := a.deviceConnIPs[d.WireGuardIP]
+	mine := deviceOnThisMachine(d, a.deviceLocalIDs, a.deviceLocalPubs)
 	pill, t := "Remote", toneNeutral
 	if mine {
 		pill, t = "This device", tonePrimary

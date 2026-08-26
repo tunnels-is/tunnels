@@ -3,6 +3,7 @@ package ui
 import (
 	"image/color"
 	"strings"
+	"unicode/utf8"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -344,23 +345,58 @@ func elide(s string, max float32, size float32, style fyne.TextStyle) string {
 	if max <= 0 || s == "" {
 		return ""
 	}
-	if fyne.MeasureText(s, size, style).Width <= max {
+	if measureWidth(s, size, style) <= max {
 		return s
 	}
-	r := []rune(s)
-	for len(r) > 1 {
-		// Drop proportionally to the overshoot, so wide strings converge fast.
-		w := fyne.MeasureText(string(r)+"…", size, style).Width
-		if w <= max {
-			return string(r) + "…"
+	if style.Monospace {
+		if out, ok := elideMono(s, max, size, style); ok {
+			return out
 		}
-		cut := int(float32(len(r)) * (1 - max/w))
+	}
+	n := utf8.RuneCountInString(s)
+	for n > 1 {
+		w := measureWidth(s[:runeByteOff(s, n)]+"…", size, style)
+		if w <= max {
+			return s[:runeByteOff(s, n)] + "…"
+		}
+		cut := int(float32(n) * (1 - max/w))
 		if cut < 1 {
 			cut = 1
 		}
-		r = r[:len(r)-cut]
+		n -= cut
 	}
 	return "…"
+}
+
+func elideMono(s string, max, size float32, style fyne.TextStyle) (string, bool) {
+	cw := monoCharWidth(size, style)
+	if cw <= 0 {
+		return "", false
+	}
+	dots := measureWidth("…", size, style)
+	remain := max - dots
+	if remain <= 0 {
+		return "…", true
+	}
+	n := int(remain / cw)
+	if n < 1 {
+		return "…", true
+	}
+	off := runeByteOff(s, n)
+	if off > len(s) {
+		off = len(s)
+	}
+	for off > 0 && measureWidth(s[:off], size, style)+dots > max {
+		_, sz := utf8.DecodeLastRuneInString(s[:off])
+		if sz < 1 {
+			break
+		}
+		off -= sz
+	}
+	if off <= 0 {
+		return "…", true
+	}
+	return s[:off] + "…", true
 }
 
 // ---------------------------------------------------------------- scrolling
@@ -557,10 +593,18 @@ func strongDivider() fyne.CanvasObject {
 // text is the low-level primitive for custom renderers, where positioning is
 // handled by hand. Flowing content should use the rich* helpers so every block
 // shares the same internal inset and stays aligned.
+func fontForStyle(style fyne.TextStyle) fyne.Resource {
+	if live == nil {
+		return nil
+	}
+	return live.Font(style)
+}
+
 func text(s string, size float32, c color.Color, bold bool) *canvas.Text {
 	t := canvas.NewText(s, c)
 	t.TextSize = size
 	t.TextStyle = fyne.TextStyle{Bold: bold}
+	t.FontSource = fontForStyle(t.TextStyle)
 	return t
 }
 
@@ -568,6 +612,7 @@ func monoText(s string, size float32, c color.Color) *canvas.Text {
 	t := canvas.NewText(s, c)
 	t.TextSize = size
 	t.TextStyle = fyne.TextStyle{Monospace: true}
+	t.FontSource = fontForStyle(t.TextStyle)
 	return t
 }
 
@@ -744,6 +789,11 @@ type kvLine struct {
 	label string
 	value string
 	mono  bool
+
+	wrapW      float32
+	wrapLines  []string
+	cachedMinW float32
+	cachedMin  fyne.Size
 }
 
 func (k *kvLine) CreateRenderer() fyne.WidgetRenderer {
@@ -757,17 +807,29 @@ type kvLineRenderer struct {
 	k      *kvLine
 	label  *canvas.Text
 	values []*canvas.Text
+	objs   []fyne.CanvasObject
 }
 
 func (r *kvLineRenderer) Destroy() {}
 
 func (r *kvLineRenderer) Objects() []fyne.CanvasObject {
-	out := make([]fyne.CanvasObject, 0, 1+len(r.values))
-	out = append(out, r.label)
-	for _, v := range r.values {
-		out = append(out, v)
+	if r.objs == nil {
+		r.rebuildObjs()
 	}
-	return out
+	return r.objs
+}
+
+func (r *kvLineRenderer) rebuildObjs() {
+	n := 1 + len(r.values)
+	if cap(r.objs) < n {
+		r.objs = make([]fyne.CanvasObject, 0, n)
+	} else {
+		r.objs = r.objs[:0]
+	}
+	r.objs = append(r.objs, r.label)
+	for _, v := range r.values {
+		r.objs = append(r.objs, v)
+	}
 }
 
 func (k *kvLine) valueStyle() (fyne.TextStyle, float32) {
@@ -777,23 +839,42 @@ func (k *kvLine) valueStyle() (fyne.TextStyle, float32) {
 	return fyne.TextStyle{}, fsBody
 }
 
-func (k *kvLine) minForWidth(width float32) fyne.Size {
+func (k *kvLine) wrapped(width float32) []string {
+	if k.wrapLines != nil && k.wrapW == width {
+		return k.wrapLines
+	}
 	style, size := k.valueStyle()
-	lw := fyne.MeasureText(k.label, fsBody, fyne.TextStyle{}).Width
-	lh := fyne.MeasureText(k.label, fsBody, fyne.TextStyle{}).Height
-	vw := fyne.MeasureText(k.value, size, style).Width
-	vh := fyne.MeasureText("Ag", size, style).Height
+	k.wrapW = width
+	k.wrapLines = wrapToWidth(k.value, width, size, style)
+	return k.wrapLines
+}
+
+func (k *kvLine) minForWidth(width float32) fyne.Size {
+	if k.cachedMin.Height > 0 && k.cachedMinW == width {
+		return k.cachedMin
+	}
+	style, size := k.valueStyle()
+	lw := measureWidth(k.label, fsBody, fyne.TextStyle{})
+	lh := cachedLineHeight(fsBody, fyne.TextStyle{})
+	vw := measureWidth(k.value, size, style)
+	vh := cachedLineHeight(size, style)
 	gap := sp3
+	var sz fyne.Size
 	if width <= 0 {
-		return fyne.NewSize(lw+gap+vw, max32(lh, vh))
+		sz = fyne.NewSize(lw+gap+vw, max32(lh, vh))
+	} else {
+		remain := width - lw - gap
+		if remain < z(80) {
+			lines := k.wrapped(width)
+			sz = fyne.NewSize(width, lh+z(2)+vh*float32(len(lines)))
+		} else {
+			lines := k.wrapped(remain)
+			sz = fyne.NewSize(max32(width, lw+gap+z(80)), max32(lh, vh*float32(len(lines))))
+		}
 	}
-	remain := width - lw - gap
-	if remain < z(80) {
-		lines := wrapToWidth(k.value, width, size, style)
-		return fyne.NewSize(width, lh+z(2)+vh*float32(len(lines)))
-	}
-	lines := wrapToWidth(k.value, remain, size, style)
-	return fyne.NewSize(max32(width, lw+gap+z(80)), max32(lh, vh*float32(len(lines))))
+	k.cachedMinW = width
+	k.cachedMin = sz
+	return sz
 }
 
 func (r *kvLineRenderer) MinSize() fyne.Size {
@@ -801,9 +882,19 @@ func (r *kvLineRenderer) MinSize() fyne.Size {
 }
 
 func (r *kvLineRenderer) ensureValues(n int) {
+	grew := false
+	style, size := r.k.valueStyle()
+	src := fontForStyle(style)
 	for len(r.values) < n {
 		t := canvas.NewText("", pal().Content)
+		t.TextSize = size
+		t.TextStyle = style
+		t.FontSource = src
 		r.values = append(r.values, t)
+		grew = true
+	}
+	if grew || r.objs == nil {
+		r.rebuildObjs()
 	}
 }
 
@@ -811,7 +902,7 @@ func (r *kvLineRenderer) Layout(size fyne.Size) {
 	style, textSize := r.k.valueStyle()
 	lw := r.label.MinSize().Width
 	lh := r.label.MinSize().Height
-	vh := fyne.MeasureText("Ag", textSize, style).Height
+	vh := cachedLineHeight(textSize, style)
 	gap := sp3
 	remain := size.Width - lw - gap
 	stack := remain < z(80)
@@ -820,11 +911,11 @@ func (r *kvLineRenderer) Layout(size fyne.Size) {
 	var valueX float32
 	var valueY float32
 	if stack {
-		lines = wrapToWidth(r.k.value, size.Width, textSize, style)
+		lines = r.k.wrapped(size.Width)
 		valueX, valueY = 0, lh+z(2)
 		r.label.Move(fyne.NewPos(0, 0))
 	} else {
-		lines = wrapToWidth(r.k.value, remain, textSize, style)
+		lines = r.k.wrapped(remain)
 		valueX, valueY = lw+gap, 0
 		r.label.Move(fyne.NewPos(0, 0))
 	}
@@ -874,51 +965,194 @@ func (r *kvLineRenderer) apply() {
 
 // wrapToWidth breaks s so each line fits maxW. Paths have no spaces, so it
 // wraps on characters and prefers a cut after / or \ when one is nearby.
+//
+// Cuts are byte offsets into s so substrings share the original backing
+// array. Monospace text is sized from a cached character width instead of
+// MeasureText on every prefix.
 func wrapToWidth(s string, maxW, textSize float32, style fyne.TextStyle) []string {
 	s = strings.TrimRight(s, " \t")
 	if s == "" {
 		return []string{""}
 	}
-	if maxW <= 0 || fyne.MeasureText(s, textSize, style).Width <= maxW {
+	if maxW <= 0 || measureWidth(s, textSize, style) <= maxW {
 		return []string{s}
 	}
 	var lines []string
-	rest := []rune(s)
-	for len(rest) > 0 {
-		if strings.TrimSpace(string(rest)) == "" {
+	rest := s
+	for rest != "" {
+		if isASCIIBlank(rest) {
 			break
 		}
-		lo, hi := 1, len(rest)
-		for lo < hi {
-			mid := (lo + hi + 1) / 2
-			if fyne.MeasureText(string(rest[:mid]), textSize, style).Width <= maxW {
-				lo = mid
-			} else {
-				hi = mid - 1
-			}
-		}
-		cut := lo
-		if cut < len(rest) {
-			pref := rest[:cut]
-			from := len(pref) * 2 / 3
-			for i := len(pref) - 1; i >= from; i-- {
-				switch pref[i] {
-				case '/', '\\', ' ':
-					cut = i + 1
-					i = from - 1
-				}
-			}
-		}
+		cut := findWrapCut(rest, maxW, textSize, style)
 		if cut < 1 {
-			cut = 1
+			_, sz := utf8.DecodeRuneInString(rest)
+			if sz < 1 {
+				sz = 1
+			}
+			cut = sz
 		}
-		lines = append(lines, strings.TrimRight(string(rest[:cut]), " \t"))
+		if cut > len(rest) {
+			cut = len(rest)
+		}
+		lines = append(lines, strings.TrimRight(rest[:cut], " \t"))
 		rest = rest[cut:]
 	}
 	if len(lines) == 0 {
 		return []string{""}
 	}
 	return lines
+}
+
+func isASCIIBlank(s string) bool {
+	for i := 0; i < len(s); i++ {
+		if s[i] != ' ' && s[i] != '\t' {
+			return false
+		}
+	}
+	return true
+}
+
+func findWrapCut(s string, maxW, textSize float32, style fyne.TextStyle) int {
+	cut := 0
+	if style.Monospace {
+		if off, ok := cutMonoBytes(s, maxW, textSize, style); ok {
+			cut = off
+		}
+	}
+	if cut == 0 {
+		cut = cutBinaryBytes(s, maxW, textSize, style)
+	}
+	return preferWrapBreak(s, cut)
+}
+
+func cutMonoBytes(s string, maxW, textSize float32, style fyne.TextStyle) (int, bool) {
+	cw := monoCharWidth(textSize, style)
+	if cw <= 0 {
+		return 0, false
+	}
+	maxN := int(maxW / cw)
+	if maxN < 1 {
+		maxN = 1
+	}
+	n, off := 0, 0
+	for off < len(s) && n < maxN {
+		r, sz := utf8.DecodeRuneInString(s[off:])
+		if r > 127 {
+			return 0, false
+		}
+		off += sz
+		n++
+	}
+	return off, true
+}
+
+func cutBinaryBytes(s string, maxW, textSize float32, style fyne.TextStyle) int {
+	n := utf8.RuneCountInString(s)
+	lo, hi := 1, n
+	for lo < hi {
+		mid := (lo + hi + 1) / 2
+		off := runeByteOff(s, mid)
+		if measureWidth(s[:off], textSize, style) <= maxW {
+			lo = mid
+		} else {
+			hi = mid - 1
+		}
+	}
+	return runeByteOff(s, lo)
+}
+
+func preferWrapBreak(s string, cut int) int {
+	if cut <= 0 || cut >= len(s) {
+		return cut
+	}
+	from := cut * 2 / 3
+	for i := cut - 1; i >= from; i-- {
+		switch s[i] {
+		case '/', '\\', ' ':
+			return i + 1
+		}
+	}
+	return cut
+}
+
+func runeByteOff(s string, runeN int) int {
+	if runeN <= 0 {
+		return 0
+	}
+	off := 0
+	for i := 0; i < runeN && off < len(s); i++ {
+		_, sz := utf8.DecodeRuneInString(s[off:])
+		if sz < 1 {
+			sz = 1
+		}
+		off += sz
+	}
+	return off
+}
+
+func measureSize(s string, size float32, style fyne.TextStyle) fyne.Size {
+	app := fyne.CurrentApp()
+	if app == nil || app.Driver() == nil {
+		return fyne.MeasureText(s, size, style)
+	}
+	sz, _ := app.Driver().RenderedTextSize(s, size, style, fontForStyle(style))
+	return sz
+}
+
+func measureWidth(s string, size float32, style fyne.TextStyle) float32 {
+	return measureSize(s, size, style).Width
+}
+
+func setCanvasText(t *canvas.Text, s string, size float32, style fyne.TextStyle, col color.Color) {
+	if t.Text == s && t.TextSize == size && t.TextStyle == style {
+		t.Color = col
+		return
+	}
+	t.Text = s
+	t.TextSize = size
+	t.TextStyle = style
+	t.Color = col
+	t.Refresh()
+}
+
+type textMetricKey struct {
+	size  float32
+	style fyne.TextStyle
+}
+
+var (
+	monoW   float32
+	monoKey textMetricKey
+	lineH   float32
+	lineKey textMetricKey
+)
+
+func resetTextMetrics() {
+	monoW, lineH = 0, 0
+	monoKey, lineKey = textMetricKey{}, textMetricKey{}
+}
+
+func monoCharWidth(size float32, style fyne.TextStyle) float32 {
+	if monoW > 0 && monoKey.size == size && monoKey.style == style {
+		return monoW
+	}
+	const sample = "0123456789ABCDEF"
+	m := measureSize(sample, size, style)
+	if m.Width <= 0 {
+		return 0
+	}
+	monoW = m.Width / float32(len(sample))
+	monoKey = textMetricKey{size: size, style: style}
+	return monoW
+}
+
+func cachedLineHeight(size float32, style fyne.TextStyle) float32 {
+	if lineH > 0 && lineKey.size == size && lineKey.style == style {
+		return lineH
+	}
+	lineH = measureSize("Ag", size, style).Height
+	lineKey = textMetricKey{size: size, style: style}
+	return lineH
 }
 
 // ---------------------------------------------------------------- empty state

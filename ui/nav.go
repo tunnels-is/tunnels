@@ -84,12 +84,20 @@ type navRowRenderer struct {
 	rail *canvas.Rectangle
 	ico  *canvas.Image
 	lab  *canvas.Text
+
+	icoActive fyne.Resource
+	icoHover  fyne.Resource
+	icoIdle   fyne.Resource
+	objs      []fyne.CanvasObject
 }
 
 func (r *navRowRenderer) Destroy() {}
 
 func (r *navRowRenderer) Objects() []fyne.CanvasObject {
-	return []fyne.CanvasObject{r.bg, r.rail, r.ico, r.lab}
+	if r.objs == nil {
+		r.objs = []fyne.CanvasObject{r.bg, r.rail, r.ico, r.lab}
+	}
+	return r.objs
 }
 
 func (r *navRowRenderer) MinSize() fyne.Size {
@@ -107,10 +115,13 @@ func (r *navRowRenderer) Layout(size fyne.Size) {
 }
 
 func (r *navRowRenderer) Refresh() {
+	old := r.ico.Resource
 	r.apply()
 	r.bg.Refresh()
 	r.rail.Refresh()
-	r.ico.Refresh()
+	if r.ico.Resource != old {
+		r.ico.Refresh()
+	}
 	r.lab.Refresh()
 	canvasRefresh(r.n)
 }
@@ -118,25 +129,30 @@ func (r *navRowRenderer) Refresh() {
 func (r *navRowRenderer) apply() {
 	p := pal()
 	r.lab.Text = r.n.label
+	if r.icoActive == nil {
+		r.icoActive = theme.NewColoredResource(r.n.icon, theme.ColorNamePrimary)
+		r.icoHover = theme.NewColoredResource(r.n.icon, colContent)
+		r.icoIdle = theme.NewColoredResource(r.n.icon, colMuted)
+	}
 	switch {
 	case r.n.active:
 		r.bg.FillColor = p.PrimarySoft
 		r.rail.FillColor = p.Primary
 		r.lab.Color = p.Content
 		r.lab.TextStyle = fyne.TextStyle{Bold: true}
-		r.ico.Resource = theme.NewColoredResource(r.n.icon, theme.ColorNamePrimary)
+		r.ico.Resource = r.icoActive
 	case r.n.hovered:
 		r.bg.FillColor = p.Hover
 		r.rail.FillColor = color.Transparent
 		r.lab.Color = p.Content
 		r.lab.TextStyle = fyne.TextStyle{}
-		r.ico.Resource = theme.NewColoredResource(r.n.icon, colContent)
+		r.ico.Resource = r.icoHover
 	default:
 		r.bg.FillColor = color.Transparent
 		r.rail.FillColor = color.Transparent
 		r.lab.Color = p.Muted
 		r.lab.TextStyle = fyne.TextStyle{}
-		r.ico.Resource = theme.NewColoredResource(r.n.icon, colMuted)
+		r.ico.Resource = r.icoIdle
 	}
 }
 
@@ -312,14 +328,18 @@ func (w *navRowWrap) CreateRenderer() fyne.WidgetRenderer {
 }
 
 type navWrapRenderer struct {
-	w  *navRowWrap
-	bg *canvas.Rectangle
+	w    *navRowWrap
+	bg   *canvas.Rectangle
+	objs []fyne.CanvasObject
 }
 
 func (r *navWrapRenderer) Destroy() {}
 
 func (r *navWrapRenderer) Objects() []fyne.CanvasObject {
-	return []fyne.CanvasObject{r.bg, r.w.content}
+	if r.objs == nil {
+		r.objs = []fyne.CanvasObject{r.bg, r.w.content}
+	}
+	return r.objs
 }
 
 func (r *navWrapRenderer) MinSize() fyne.Size {

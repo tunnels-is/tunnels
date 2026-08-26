@@ -43,6 +43,25 @@ func TestWrapToWidth_LongPathBreaks(t *testing.T) {
 	}
 }
 
+func TestWrapToWidth_MonoASCIIDoesNotExceed(t *testing.T) {
+	a := test.NewApp()
+	t.Cleanup(a.Quit)
+	applyZoomTokens(1)
+
+	style := fyne.TextStyle{Monospace: true}
+	msg := strings.Repeat("failed to resolve host example.internal ", 8)
+	maxW := fyne.MeasureText("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx", fsSmall, style).Width
+	lines := wrapToWidth(msg, maxW, fsSmall, style)
+	if len(lines) < 2 {
+		t.Fatalf("expected wrap, got %d", len(lines))
+	}
+	for i, line := range lines {
+		if fyne.MeasureText(line, fsSmall, style).Width > maxW+1 {
+			t.Fatalf("line %d exceeds width: %q", i, line)
+		}
+	}
+}
+
 func TestWrapToWidth_TrailingSpaceDoesNotMakeBlankLine(t *testing.T) {
 	a := test.NewApp()
 	t.Cleanup(a.Quit)

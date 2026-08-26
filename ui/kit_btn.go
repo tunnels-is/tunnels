@@ -66,26 +66,38 @@ func (b *kBtn) withIcon(res fyne.Resource) *kBtn {
 }
 
 func (b *kBtn) Set(label string, kind kKind, tap func()) {
+	b.onTap = tap
+	same := b.label == label && b.kind == kind && b.icon == nil && !b.hidden
 	b.label = label
 	b.icon = nil
 	b.kind = kind
-	b.onTap = tap
 	b.hidden = false
 	b.Show()
-	b.Refresh()
+	if !same {
+		b.Refresh()
+	}
 }
 
 func (b *kBtn) SetIconOnly(res fyne.Resource, kind kKind, tap func()) {
+	b.onTap = tap
+	same := b.label == "" && b.kind == kind && b.icon == res && !b.hidden
 	b.label = ""
 	b.icon = res
 	b.kind = kind
-	b.onTap = tap
 	b.hidden = false
 	b.Show()
-	b.Refresh()
+	if !same {
+		b.Refresh()
+	}
 }
 
 func (b *kBtn) SetHidden(h bool) {
+	if b.hidden == h {
+		if h {
+			b.Hide()
+		}
+		return
+	}
 	b.hidden = h
 	if h {
 		b.Hide()
@@ -164,24 +176,34 @@ func (b *kBtn) fontSize() float32 {
 func (b *kBtn) CreateRenderer() fyne.WidgetRenderer {
 	bg := surface(radSm, color.Transparent, nil)
 	lab := canvas.NewText(b.label, pal().Content)
+	lab.TextStyle = fyne.TextStyle{Bold: true}
+	lab.FontSource = fontForStyle(lab.TextStyle)
 	ico := canvas.NewImageFromResource(b.icon)
 	ico.FillMode = canvas.ImageFillContain
 	r := &kBtnRenderer{b: b, bg: bg, lab: lab, ico: ico}
-	r.apply()
+	if r.apply() {
+		r.ico.Refresh()
+	}
 	return r
 }
 
 type kBtnRenderer struct {
-	b   *kBtn
-	bg  *canvas.Rectangle
-	lab *canvas.Text
-	ico *canvas.Image
+	b      *kBtn
+	bg     *canvas.Rectangle
+	lab    *canvas.Text
+	ico    *canvas.Image
+	icoSrc fyne.Resource
+	icoFg  fyne.ThemeColorName
+	objs   []fyne.CanvasObject
 }
 
 func (r *kBtnRenderer) Destroy() {}
 
 func (r *kBtnRenderer) Objects() []fyne.CanvasObject {
-	return []fyne.CanvasObject{r.bg, r.ico, r.lab}
+	if r.objs == nil {
+		r.objs = []fyne.CanvasObject{r.bg, r.ico, r.lab}
+	}
+	return r.objs
 }
 
 func (r *kBtnRenderer) iconSize() float32 {
@@ -238,14 +260,16 @@ func (r *kBtnRenderer) Layout(size fyne.Size) {
 }
 
 func (r *kBtnRenderer) Refresh() {
-	r.apply()
+	iconChanged := r.apply()
 	r.bg.Refresh()
 	r.lab.Refresh()
-	r.ico.Refresh()
+	if iconChanged {
+		r.ico.Refresh()
+	}
 	canvasRefresh(r.b)
 }
 
-func (r *kBtnRenderer) apply() {
+func (r *kBtnRenderer) apply() (iconChanged bool) {
 	r.lab.Text = r.b.label
 	r.lab.TextSize = r.b.fontSize()
 	r.lab.TextStyle = fyne.TextStyle{Bold: true}
@@ -259,9 +283,18 @@ func (r *kBtnRenderer) apply() {
 		r.bg.StrokeWidth = 1
 	}
 	r.lab.Color = fg
-	if r.b.icon != nil {
-		r.ico.Resource = theme.NewColoredResource(r.b.icon, fgName)
+	if r.b.icon == nil {
+		r.icoSrc = nil
+		r.icoFg = ""
+		return false
 	}
+	if r.icoSrc == r.b.icon && r.icoFg == fgName {
+		return false
+	}
+	r.ico.Resource = theme.NewColoredResource(r.b.icon, fgName)
+	r.icoSrc = r.b.icon
+	r.icoFg = fgName
+	return true
 }
 
 func (r *kBtnRenderer) colors() (bg, fg, stroke color.NRGBA, fgName fyne.ThemeColorName) {

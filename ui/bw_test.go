@@ -98,6 +98,17 @@ func TestSampleWindowFilter(t *testing.T) {
 }
 
 // The bar count must stay drawable even for the widest window.
+func TestBandwidthPanelStopIsIdempotent(t *testing.T) {
+	p := newBandwidthPanel(nil, 60)
+	p.stop()
+	p.stop()
+	select {
+	case <-p.stopCh:
+	default:
+		t.Fatal("stopCh should be closed")
+	}
+}
+
 func TestDisplayBucketsCapped(t *testing.T) {
 	for _, secs := range []int{60, 300, 900, 3600, 21600, 86400} {
 		recs := make([]client.BandwidthRecord, secs)

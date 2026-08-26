@@ -92,6 +92,18 @@ type App struct {
 	logList    *widget.List
 	logView    []string
 
+	liveByServer    map[string]*client.TUN
+	liveByTag       map[string]*client.TUN
+	deviceConnIPs   map[string]struct{}
+	deviceLocalIDs  map[string]struct{}
+	deviceLocalPubs map[string]struct{}
+
+	bwLive []*bandwidthPanel
+
+	logHeights       map[widget.ListItemID]float32
+	logHeightQueued  bool
+	settingLogHeight bool
+
 	serversLoaded   bool
 	devicesLoaded   bool
 	serversFetching bool
@@ -210,10 +222,8 @@ func (a *App) loggedIn() bool {
 func (a *App) show(id pageID) {
 	defer a.recoverUI("show")
 	prev := a.current
+	a.teardownPage()
 	a.current = id
-	if prev != id {
-		a.dropLiveLists()
-	}
 	// Login is a focused, full-window flow: the rail has nothing to offer yet.
 	// Hiding a child does not re-run the parent layout, so refresh the page
 	// container explicitly or it keeps the rail's gap.
@@ -247,11 +257,63 @@ func (a *App) rebuild() {
 	a.reloadCurrent()
 }
 
+func (a *App) stopBandwidthPanels() {
+	for _, p := range a.bwLive {
+		if p != nil {
+			p.stop()
+		}
+	}
+	a.bwLive = nil
+}
+
+func (a *App) teardownPage() {
+	a.stopBandwidthPanels()
+	a.dropLiveLists()
+}
+
 func (a *App) dropLiveLists() {
 	a.serverList = nil
 	a.tunnelList = nil
 	a.deviceList = nil
 	a.logList = nil
+	a.logHeights = nil
+	a.logHeightQueued = false
+	a.settingLogHeight = false
+	a.dnsStats = nil
+}
+
+func (a *App) refreshLivePage() bool {
+	switch a.current {
+	case pageServers:
+		if a.serverList == nil {
+			return false
+		}
+		a.recomputeServerView()
+		a.serverList.Refresh()
+		return true
+	case pageTunnels:
+		if a.tunnelList == nil {
+			return false
+		}
+		a.recomputeTunnelView()
+		a.tunnelList.Refresh()
+		return true
+	case pageDevices:
+		if a.deviceList == nil {
+			return false
+		}
+		a.recomputeDeviceView()
+		a.deviceList.Refresh()
+		return true
+	case pageLogs:
+		if a.logList == nil {
+			return false
+		}
+		a.paintLogs()
+		return true
+	default:
+		return false
+	}
 }
 
 func (a *App) buildPage(id pageID) fyne.CanvasObject {

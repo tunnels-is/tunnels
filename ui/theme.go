@@ -8,6 +8,9 @@ import (
 	"fyne.io/fyne/v2/theme"
 )
 
+// Inter files are Latin subsets (see fonts/README.md). Full Inter expands to
+// tens of MB of parsed OpenType tables inside go-text.
+//
 //go:embed fonts/Inter-Regular.ttf
 var interRegular []byte
 
@@ -106,6 +109,7 @@ func applyZoomTokens(f float32) {
 	logLevelCol, logFnCol = z(baseLogLevel), z(baseLogFn)
 
 	rtPad = sp2
+	resetTextMetrics()
 }
 
 func init() { applyZoomTokens(1) }
@@ -218,7 +222,7 @@ const (
 
 var live = &appTheme{name: defaultThemeName, pal: palettes[defaultThemeName]}
 
-func pal() palette { return live.pal }
+func pal() *palette { return &live.pal }
 
 type appTheme struct {
 	name string

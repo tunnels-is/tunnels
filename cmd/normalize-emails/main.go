@@ -6,9 +6,17 @@
 //	go run ./cmd/normalize-emails -db tunnels.db -db_old tunnels.db.old
 //	go run ./cmd/normalize-emails -db tunnels.db -db_old tunnels.db.old -apply
 //
-// After -apply, every user in -db is checked against -db_old: Email must be
-// the normalized form of the old Email, and every other stored field must
-// match exactly.
+// After -apply, each users_by_email winner in -db is checked against
+// -db_old: Email must be the normalized form of the old Email, and every
+// other stored field must match exactly. Collision losers are not compared.
+//
+// If two or more users share an email after normalization, every record is
+// kept and the email is still normalized. users_by_email points at one
+// winner: a user whose SubExpiration is in the future, if any; otherwise
+// (or if more than one has a valid subscription) the most recently created.
+// User has no Created field; Updated is written at registration and not
+// changed later, so it is the creation time. Equal Updated times break
+// ties by larger user id.
 package main
 
 import (
@@ -19,6 +27,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -35,8 +44,10 @@ func normalizeEmail(email string) string {
 }
 
 type collision struct {
-	Email string
-	IDs   []string
+	Email  string
+	IDs    []string
+	Winner string
+	Reason string
 }
 
 type report struct {
@@ -111,7 +122,7 @@ func main() {
 		}
 		os.Exit(1)
 	}
-	fmt.Println("verification OK: every user matches -db_old (Email normalized, all other fields unchanged); email index rebuilt")
+	fmt.Println("verification OK: every email-index winner matches -db_old (Email normalized, all other fields unchanged); email index rebuilt")
 }
 
 func samePath(a, b string) bool {
@@ -134,45 +145,30 @@ func printReport(rep *report, apply bool) {
 	fmt.Printf("users=%d already-normalized=%d %s=%d empty-email=%d collisions=%d\n",
 		rep.Users, rep.AlreadyNormalized, action, rep.WouldUpdate, rep.Empty, len(rep.Collisions))
 	for _, c := range rep.Collisions {
-		fmt.Printf("  COLLISION  email=%q  ids=%s\n", c.Email, strings.Join(c.IDs, ","))
+		fmt.Printf("  COLLISION  email=%q  winner=%s  reason=%q  ids=%s\n",
+			c.Email, c.Winner, c.Reason, strings.Join(c.IDs, ","))
 	}
 }
 
+type row struct {
+	id      string
+	raw     []byte
+	email   string
+	norm    string
+	updated time.Time
+	subExp  time.Time
+}
+
 func migrateEmails(db *gobolt.DB, apply bool) (*report, error) {
-	type row struct {
-		id    string
-		raw   []byte
-		email string
-		norm  string
-	}
-
-	var rows []row
-	byNorm := make(map[string][]string)
-
-	err := db.View(func(tx *gobolt.Tx) error {
-		users := tx.Bucket([]byte(usersBucket))
-		if users == nil {
-			return fmt.Errorf("bucket %q missing", usersBucket)
-		}
-		return users.ForEach(func(k, v []byte) error {
-			email, err := emailFromUserJSON(v)
-			if err != nil {
-				return fmt.Errorf("user %s: %w", k, err)
-			}
-			norm := normalizeEmail(email)
-			r := row{id: string(k), raw: append([]byte(nil), v...), email: email, norm: norm}
-			rows = append(rows, r)
-			if norm != "" {
-				byNorm[norm] = append(byNorm[norm], r.id)
-			}
-			return nil
-		})
-	})
+	rows, err := loadUserRows(db)
 	if err != nil {
 		return nil, err
 	}
 
-	rep := &report{Users: len(rows)}
+	now := time.Now()
+	owner, collisions := resolveEmailOwners(rows, now)
+
+	rep := &report{Users: len(rows), Collisions: collisions}
 	for _, r := range rows {
 		if r.norm == "" {
 			rep.Empty++
@@ -184,14 +180,6 @@ func migrateEmails(db *gobolt.DB, apply bool) (*report, error) {
 			continue
 		}
 		rep.WouldUpdate++
-	}
-	for email, ids := range byNorm {
-		if len(ids) > 1 {
-			rep.Collisions = append(rep.Collisions, collision{Email: email, IDs: ids})
-		}
-	}
-	if len(rep.Collisions) > 0 {
-		return rep, errors.New("refusing to migrate: two or more users share the same email after normalization")
 	}
 	if !apply {
 		return rep, nil
@@ -221,17 +209,100 @@ func migrateEmails(db *gobolt.DB, apply bool) (*report, error) {
 		if err != nil {
 			return err
 		}
-		for _, r := range rows {
-			if r.norm == "" {
-				continue
-			}
-			if err := idx.Put([]byte(r.norm), []byte(r.id)); err != nil {
+		for email, id := range owner {
+			if err := idx.Put([]byte(email), []byte(id)); err != nil {
 				return err
 			}
 		}
 		return nil
 	})
 	return rep, err
+}
+
+func loadUserRows(db *gobolt.DB) ([]row, error) {
+	var rows []row
+	err := db.View(func(tx *gobolt.Tx) error {
+		users := tx.Bucket([]byte(usersBucket))
+		if users == nil {
+			return fmt.Errorf("bucket %q missing", usersBucket)
+		}
+		return users.ForEach(func(k, v []byte) error {
+			email, updated, subExp, err := userFieldsFromJSON(v)
+			if err != nil {
+				return fmt.Errorf("user %s: %w", k, err)
+			}
+			rows = append(rows, row{
+				id:      string(k),
+				raw:     append([]byte(nil), v...),
+				email:   email,
+				norm:    normalizeEmail(email),
+				updated: updated,
+				subExp:  subExp,
+			})
+			return nil
+		})
+	})
+	return rows, err
+}
+
+func resolveEmailOwners(rows []row, now time.Time) (map[string]string, []collision) {
+	byNorm := make(map[string][]row)
+	for _, r := range rows {
+		if r.norm == "" {
+			continue
+		}
+		byNorm[r.norm] = append(byNorm[r.norm], r)
+	}
+	owner := make(map[string]string, len(byNorm))
+	var collisions []collision
+	for email, cands := range byNorm {
+		if len(cands) == 1 {
+			owner[email] = cands[0].id
+			continue
+		}
+		w, reason := pickCollisionWinner(cands, now)
+		ids := make([]string, len(cands))
+		for i, c := range cands {
+			ids[i] = c.id
+		}
+		collisions = append(collisions, collision{
+			Email:  email,
+			IDs:    ids,
+			Winner: w.id,
+			Reason: reason,
+		})
+		owner[email] = w.id
+	}
+	sort.Slice(collisions, func(i, j int) bool {
+		return collisions[i].Email < collisions[j].Email
+	})
+	return owner, collisions
+}
+
+func pickCollisionWinner(cands []row, now time.Time) (row, string) {
+	if len(cands) == 0 {
+		return row{}, ""
+	}
+	var withSub []row
+	for _, c := range cands {
+		if c.subExp.After(now) {
+			withSub = append(withSub, c)
+		}
+	}
+	if len(withSub) == 1 {
+		return withSub[0], "valid subscription"
+	}
+	pool := cands
+	if len(withSub) > 1 {
+		pool = withSub
+	}
+	best := pool[0]
+	for _, c := range pool[1:] {
+		if c.updated.After(best.updated) || (c.updated.Equal(best.updated) && c.id > best.id) {
+			best = c
+		}
+	}
+	return best, "most recently created"
 }
 
 func loadUserBlobs(db *gobolt.DB) (map[string][]byte, error) {
@@ -249,62 +320,108 @@ func loadUserBlobs(db *gobolt.DB) (map[string][]byte, error) {
 	return out, err
 }
 
-// verifyUsersAgainstOld checks every user in db against dbOld.
-// Email in db must be normalize(old Email). Every other JSON field must match
-// the old record byte-for-byte.
+// verifyUsersAgainstOld checks email-index winners in db against dbOld.
+// Collision losers are ignored: they may be missing or have other fields
+// changed. For each normalized email, Email in db must be normalize(old
+// Email) and every other JSON field on the winner must match byte-for-byte.
+// Users with an empty email are compared by id.
 func verifyUsersAgainstOld(db, dbOld *gobolt.DB) ([]string, error) {
-	got, err := loadUserBlobs(db)
+	gotRows, err := loadUserRows(db)
 	if err != nil {
 		return nil, fmt.Errorf("read -db: %w", err)
 	}
-	old, err := loadUserBlobs(dbOld)
+	oldRows, err := loadUserRows(dbOld)
 	if err != nil {
 		return nil, fmt.Errorf("read -db_old: %w", err)
 	}
+	now := time.Now()
+	gotOwners, _ := resolveEmailOwners(gotRows, now)
+	oldOwners, _ := resolveEmailOwners(oldRows, now)
+	got := blobsFromRows(gotRows)
+	old := blobsFromRows(oldRows)
+
+	emails := make(map[string]struct{}, len(gotOwners)+len(oldOwners))
+	for email := range oldOwners {
+		emails[email] = struct{}{}
+	}
+	for email := range gotOwners {
+		emails[email] = struct{}{}
+	}
+	keys := make([]string, 0, len(emails))
+	for email := range emails {
+		keys = append(keys, email)
+	}
+	sort.Strings(keys)
+
 	var mismatches []string
-	if len(got) != len(old) {
-		mismatches = append(mismatches, fmt.Sprintf("user count: -db=%d -db_old=%d", len(got), len(old)))
-	}
-	for id := range old {
-		if _, ok := got[id]; !ok {
-			mismatches = append(mismatches, fmt.Sprintf("user %s: present in -db_old, missing from -db", id))
+	for _, email := range keys {
+		oldID, oldOK := oldOwners[email]
+		gotID, gotOK := gotOwners[email]
+		switch {
+		case !oldOK:
+			mismatches = append(mismatches, fmt.Sprintf("email %q: present in -db (user %s), missing from -db_old", email, gotID))
+		case !gotOK:
+			mismatches = append(mismatches, fmt.Sprintf("email %q: present in -db_old (user %s), missing from -db", email, oldID))
+		case oldID != gotID:
+			mismatches = append(mismatches, fmt.Sprintf("email %q: winner -db=%s -db_old=%s", email, gotID, oldID))
+		default:
+			mismatches = append(mismatches, diffUserStoredValues(oldID, old[oldID], got[gotID])...)
 		}
 	}
-	for id := range got {
-		if _, ok := old[id]; !ok {
+
+	oldEmpty := emptyUserIDs(oldRows)
+	gotEmpty := emptyUserIDs(gotRows)
+	emptyIDs := make(map[string]struct{}, len(oldEmpty)+len(gotEmpty))
+	for id := range oldEmpty {
+		emptyIDs[id] = struct{}{}
+	}
+	for id := range gotEmpty {
+		emptyIDs[id] = struct{}{}
+	}
+	emptyKeys := make([]string, 0, len(emptyIDs))
+	for id := range emptyIDs {
+		emptyKeys = append(emptyKeys, id)
+	}
+	sort.Strings(emptyKeys)
+	for _, id := range emptyKeys {
+		_, inOld := oldEmpty[id]
+		_, inGot := gotEmpty[id]
+		switch {
+		case !inOld:
 			mismatches = append(mismatches, fmt.Sprintf("user %s: present in -db, missing from -db_old", id))
+		case !inGot:
+			mismatches = append(mismatches, fmt.Sprintf("user %s: present in -db_old, missing from -db", id))
+		default:
+			mismatches = append(mismatches, diffUserStoredValues(id, old[id], got[id])...)
 		}
-	}
-	for id, oldRaw := range old {
-		newRaw, ok := got[id]
-		if !ok {
-			continue
-		}
-		mismatches = append(mismatches, diffUserStoredValues(id, oldRaw, newRaw)...)
 	}
 	return mismatches, nil
 }
 
+func blobsFromRows(rows []row) map[string][]byte {
+	out := make(map[string][]byte, len(rows))
+	for _, r := range rows {
+		out[r.id] = r.raw
+	}
+	return out
+}
+
+func emptyUserIDs(rows []row) map[string]struct{} {
+	out := make(map[string]struct{})
+	for _, r := range rows {
+		if r.norm == "" {
+			out[r.id] = struct{}{}
+		}
+	}
+	return out
+}
+
 func verifyEmailIndex(db *gobolt.DB) ([]string, error) {
-	blobs, err := loadUserBlobs(db)
+	rows, err := loadUserRows(db)
 	if err != nil {
 		return nil, err
 	}
-	want := make(map[string]string, len(blobs))
-	for id, raw := range blobs {
-		email, err := emailFromUserJSON(raw)
-		if err != nil {
-			return nil, fmt.Errorf("user %s: %w", id, err)
-		}
-		norm := normalizeEmail(email)
-		if norm == "" {
-			continue
-		}
-		if prev, ok := want[norm]; ok {
-			return []string{fmt.Sprintf("index: normalized email %q maps to both %s and %s", norm, prev, id)}, nil
-		}
-		want[norm] = id
-	}
+	want, _ := resolveEmailOwners(rows, time.Now())
 
 	var mismatches []string
 	seen := make(map[string]struct{})
@@ -405,13 +522,31 @@ func jsonString(raw json.RawMessage) (string, error) {
 }
 
 func emailFromUserJSON(raw []byte) (string, error) {
+	email, _, _, err := userFieldsFromJSON(raw)
+	return email, err
+}
+
+func userFieldsFromJSON(raw []byte) (email string, updated, subExp time.Time, err error) {
 	var rec struct {
-		Email string `json:"Email"`
+		Email         string          `json:"Email"`
+		Updated       json.RawMessage `json:"Updated"`
+		SubExpiration json.RawMessage `json:"SubExpiration"`
 	}
 	if err := json.Unmarshal(raw, &rec); err != nil {
-		return "", err
+		return "", time.Time{}, time.Time{}, err
 	}
-	return rec.Email, nil
+	return rec.Email, parseTimeJSON(rec.Updated), parseTimeJSON(rec.SubExpiration), nil
+}
+
+func parseTimeJSON(raw json.RawMessage) time.Time {
+	if len(raw) == 0 || string(raw) == "null" {
+		return time.Time{}
+	}
+	var t time.Time
+	if err := json.Unmarshal(raw, &t); err != nil {
+		return time.Time{}
+	}
+	return t
 }
 
 func setUserEmailJSON(raw []byte, email string) ([]byte, error) {

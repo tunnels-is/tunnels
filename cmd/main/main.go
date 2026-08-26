@@ -23,6 +23,8 @@ func main() {
 	flag.StringVar(&s.TunnelType, "tunnelType", "default", "defines which tunnel type should be automatically generate if no default tunnel/tunnels.conf exists. Available types: default, strict, iot")
 	flag.BoolVar(&s.Debug, "debug", false, "manually enable debug")
 	flag.BoolVar(&s.RequireConfig, "requireConfig", false, "Force tunnels to require disk config to start")
+	flag.BoolVar(&s.Pprof, "pprof", false, "enable localhost pprof HTTP server (heap profiles include secrets)")
+	flag.StringVar(&s.PprofAddr, "pprofAddr", "127.0.0.1:6060", "pprof listen address (loopback only)")
 	flag.Parse()
 	client.STATE.Store(s)
 

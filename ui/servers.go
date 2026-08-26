@@ -10,6 +10,7 @@ import (
 )
 
 func (a *App) recomputeServerView() {
+	a.liveByServer = a.activeByServer()
 	var shown []types.Server
 	for _, s := range a.servers {
 		if filterMatch(a.filterServers, s.Tag, s.IP, serverWGAddr(&s), countryName(s.Country), s.Country) {
@@ -37,7 +38,7 @@ func (a *App) serversPage() fyne.CanvasObject {
 	})
 
 	active := 0
-	am := a.activeByServer()
+	am := a.liveByServer
 	for _, s := range a.serverView {
 		if am[s.ID.String()] != nil {
 			active++
@@ -93,7 +94,7 @@ func (a *App) bindServerRow(id widget.ListItemID, row *kRow) {
 		return
 	}
 	s := a.serverView[id]
-	at := a.activeByServer()[s.ID.String()]
+	at := a.liveByServer[s.ID.String()]
 	on := at != nil
 
 	tn := toneNeutral

@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -174,15 +175,28 @@ type bandwidthPanel struct {
 	widget.BaseWidget
 	tun     *client.TUN
 	seconds int
+
+	stopCh   chan struct{}
+	stopOnce sync.Once
 }
 
 func newBandwidthPanel(t *client.TUN, seconds int) *bandwidthPanel {
-	p := &bandwidthPanel{tun: t, seconds: seconds}
+	p := &bandwidthPanel{
+		tun:     t,
+		seconds: seconds,
+		stopCh:  make(chan struct{}),
+	}
 	p.ExtendBaseWidget(p)
 	return p
 }
 
-// samples returns the records inside the selected window.
+func (p *bandwidthPanel) stop() {
+	p.stopOnce.Do(func() {
+		close(p.stopCh)
+	})
+}
+
+// samples returns a copy of the records inside the selected window.
 func (p *bandwidthPanel) samples() []client.BandwidthRecord {
 	if p.tun == nil {
 		return nil
@@ -191,17 +205,8 @@ func (p *bandwidthPanel) samples() []client.BandwidthRecord {
 	if bh == nil {
 		return nil
 	}
-	all := bh.Snapshot()
 	cutoff := time.Now().Add(-time.Duration(p.seconds) * time.Second)
-	start := 0
-	for i, r := range all {
-		if r.Timestamp.After(cutoff) {
-			start = i
-			break
-		}
-		start = i + 1
-	}
-	return all[start:]
+	return bh.SnapshotSince(cutoff)
 }
 
 var bwStatCols = []string{"NOW", "AVG", "PEAK", "TOTAL"}
@@ -218,8 +223,6 @@ func (p *bandwidthPanel) CreateRenderer() fyne.WidgetRenderer {
 		empty:  text("", fsSmall, pl.Faint, false),
 		dLabel: text("DOWNLOAD", fsCaption, pl.Success, true),
 		uLabel: text("UPLOAD", fsCaption, pl.Primary, true),
-		ticker: time.NewTicker(time.Second),
-		stop:   make(chan struct{}),
 	}
 	for range bwStatCols {
 		r.heads = append(r.heads, text("", fsCaption, pl.Faint, true))
@@ -244,25 +247,28 @@ type bwRenderer struct {
 	dCells, uCells []*canvas.Text
 
 	buckets []client.BandwidthRecord
-	ticker  *time.Ticker
-	stop    chan struct{}
-	closed  bool
+	objs    []fyne.CanvasObject
 }
 
 func (r *bwRenderer) run() {
+	select {
+	case <-r.p.stopCh:
+		return
+	default:
+	}
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
 	for {
 		select {
-		case <-r.stop:
+		case <-r.p.stopCh:
 			return
-		case <-r.ticker.C:
-			// Same guard as the clock: if the widget is detached without
-			// Destroy being called, stop rather than wake the UI forever.
-			app := fyne.CurrentApp()
-			if app == nil || app.Driver() == nil || app.Driver().CanvasForObject(r.p) == nil {
-				r.Destroy()
-				return
-			}
+		case <-ticker.C:
 			fyne.Do(func() {
+				select {
+				case <-r.p.stopCh:
+					return
+				default:
+				}
 				r.refreshData()
 				if sz := r.p.Size(); sz.Width > 0 {
 					r.Layout(sz)
@@ -274,12 +280,7 @@ func (r *bwRenderer) run() {
 }
 
 func (r *bwRenderer) Destroy() {
-	if r.closed {
-		return
-	}
-	r.closed = true
-	r.ticker.Stop()
-	close(r.stop)
+	r.p.stop()
 }
 
 func (r *bwRenderer) refreshData() {
@@ -344,7 +345,11 @@ func (r *bwRenderer) refreshData() {
 }
 
 func (r *bwRenderer) Objects() []fyne.CanvasObject {
-	out := make([]fyne.CanvasObject, 0, len(r.bars)+len(r.heads)*3+8)
+	need := 2 + len(r.bars) + 6 + len(r.heads)*3
+	if cap(r.objs) < need {
+		r.objs = make([]fyne.CanvasObject, 0, need)
+	}
+	out := r.objs[:0]
 	out = append(out, r.mid, r.rule)
 	for _, b := range r.bars {
 		out = append(out, b)
@@ -353,6 +358,7 @@ func (r *bwRenderer) Objects() []fyne.CanvasObject {
 	for i := range r.heads {
 		out = append(out, r.heads[i], r.dCells[i], r.uCells[i])
 	}
+	r.objs = out
 	return out
 }
 
@@ -500,6 +506,8 @@ func (a *App) bandwidthCard(t *client.TUN) fyne.CanvasObject {
 	disc := dangerBtn("Disconnect", func() {
 		a.confirm("Disconnect", "Disconnect "+tag+"?", func() { a.disconnectActive(tun) })
 	}).small()
+	panel := newBandwidthPanel(t, a.bwRangeSeconds())
+	a.bwLive = append(a.bwLive, panel)
 	return cardBox(tag, where, hstack(sp2, badge("live", toneSuccess), disc),
-		container.New(vCentreLayout{}, newBandwidthPanel(t, a.bwRangeSeconds())))
+		container.New(vCentreLayout{}, panel))
 }

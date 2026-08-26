@@ -33,9 +33,17 @@ type tableSpec struct {
 	// actionW reserves trailing space for the row's buttons. The header leaves
 	// the same gap, so a column label never sits over the action cluster.
 	actionW float32
+
+	wcache     []float32
+	rcacheW    float32
+	rcacheDrop bool
+	rcache     []cellRect
 }
 
 func (s *tableSpec) weights() []float32 {
+	if s.wcache != nil {
+		return s.wcache
+	}
 	w := make([]float32, len(s.cols))
 	for i, c := range s.cols {
 		w[i] = c.weight
@@ -43,6 +51,7 @@ func (s *tableSpec) weights() []float32 {
 			w[i] = 1
 		}
 	}
+	s.wcache = w
 	return w
 }
 
@@ -59,8 +68,11 @@ func (s *tableSpec) cellRects(width float32) []cellRect {
 	if avail < 0 {
 		avail = 0
 	}
-	weights := s.weights()
 	drop := avail < narrowWidth()
+	if s.rcache != nil && s.rcacheW == width && s.rcacheDrop == drop {
+		return s.rcache
+	}
+	weights := s.weights()
 
 	var total float32
 	for i, w := range weights {
@@ -84,6 +96,7 @@ func (s *tableSpec) cellRects(width float32) []cellRect {
 		out[i] = cellRect{x, max32(0, cw-sp3)}
 		x += cw
 	}
+	s.rcache, s.rcacheW, s.rcacheDrop = out, width, drop
 	return out
 }
 
@@ -173,19 +186,25 @@ func newKRow(spec *tableSpec) *kRow {
 // SetCells fills the row. on drives the live treatment (primary rail and
 // tunnels-blue wash); badgeTone colours whichever column is marked as a badge.
 func (r *kRow) SetCells(cells []string, on bool, badgeTone tone) {
+	if on && badgeTone == toneNeutral {
+		badgeTone = tonePrimary
+	}
+	changed := r.on != on || r.badgeTone != badgeTone
 	for i := range r.cells {
+		next := ""
 		if i < len(cells) {
-			r.cells[i] = cells[i]
-		} else {
-			r.cells[i] = ""
+			next = cells[i]
+		}
+		if r.cells[i] != next {
+			r.cells[i] = next
+			changed = true
 		}
 	}
 	r.on = on
 	r.badgeTone = badgeTone
-	if on && badgeTone == toneNeutral {
-		r.badgeTone = tonePrimary
+	if changed {
+		r.Refresh()
 	}
-	r.Refresh()
 }
 
 func (r *kRow) MouseIn(*desktop.MouseEvent)    { r.hovered = true; r.Refresh() }
@@ -237,22 +256,29 @@ func (r *kRow) CreateRenderer() fyne.WidgetRenderer {
 }
 
 type kRowRenderer struct {
-	r       *kRow
-	bg      *canvas.Rectangle
-	rail    *canvas.Rectangle
-	line    *canvas.Rectangle
-	cells   []*canvas.Text
-	badgeBg *canvas.Rectangle
+	r         *kRow
+	bg        *canvas.Rectangle
+	rail      *canvas.Rectangle
+	line      *canvas.Rectangle
+	cells     []*canvas.Text
+	badgeBg   *canvas.Rectangle
+	objs      []fyne.CanvasObject
+	laidW     float32
+	laidCells []string
 }
 
 func (d *kRowRenderer) Destroy() {}
 
 func (d *kRowRenderer) Objects() []fyne.CanvasObject {
-	out := []fyne.CanvasObject{d.bg, d.line, d.rail, d.badgeBg}
-	for _, c := range d.cells {
-		out = append(out, c)
+	if d.objs == nil {
+		d.objs = make([]fyne.CanvasObject, 0, 8+len(d.cells))
+		d.objs = append(d.objs, d.bg, d.line, d.rail, d.badgeBg)
+		for _, c := range d.cells {
+			d.objs = append(d.objs, c)
+		}
+		d.objs = append(d.objs, d.r.main, d.r.ghost, d.r.iconA, d.r.iconB)
 	}
-	return append(out, d.r.main, d.r.ghost, d.r.iconA, d.r.iconB)
+	return d.objs
 }
 
 func (d *kRowRenderer) MinSize() fyne.Size {
@@ -300,13 +326,33 @@ func (d *kRowRenderer) Layout(size fyne.Size) {
 
 	rects := d.r.spec.cellRects(size.Width)
 	hideBadge := true
+	skipElide := d.laidW == size.Width && len(d.laidCells) == len(d.r.cells)
+	if skipElide {
+		for i := range d.r.cells {
+			if d.laidCells[i] != d.r.cells[i] {
+				skipElide = false
+				break
+			}
+		}
+	}
+	if !skipElide {
+		if cap(d.laidCells) < len(d.r.cells) {
+			d.laidCells = make([]string, len(d.r.cells))
+		} else {
+			d.laidCells = d.laidCells[:len(d.r.cells)]
+		}
+		copy(d.laidCells, d.r.cells)
+		d.laidW = size.Width
+	}
 	for i, cell := range d.cells {
 		if i >= len(rects) {
 			break
 		}
 		col := d.r.spec.cols[i]
 		w := rects[i].w
-		cell.Text = elide(d.r.cells[i], w, cell.TextSize, cell.TextStyle)
+		if !skipElide {
+			cell.Text = elide(d.r.cells[i], w, cell.TextSize, cell.TextStyle)
+		}
 		ms := cell.MinSize()
 		x := rects[i].x
 		if col.align == fyne.TextAlignTrailing {
