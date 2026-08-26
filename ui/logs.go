@@ -121,21 +121,13 @@ func (d *logRowRenderer) Layout(size fyne.Size) {
 	d.level.Text = d.r.level
 	d.fn.Text = elide(d.r.fn, logFnCol-sp3, d.fn.TextSize, d.fn.TextStyle)
 
-	x := float32(0)
-	d.when.Move(fyne.NewPos(x, 0))
-	if d.r.when != "" {
-		x += d.when.MinSize().Width + sp3
-	}
-	d.level.Move(fyne.NewPos(x, 0))
-	x += logLevelCol
-	d.fn.Move(fyne.NewPos(x, 0))
-	x += logFnCol
+	x := d.r.prefixWidth()
+	whenW := x - logLevelCol - logFnCol
+	d.when.Move(fyne.NewPos(0, 0))
+	d.level.Move(fyne.NewPos(whenW, 0))
+	d.fn.Move(fyne.NewPos(whenW+logLevelCol, 0))
 
-	remain := size.Width - x
-	if remain < z(64) {
-		remain = z(64)
-	}
-	lines := wrapToWidth(d.r.msg, remain, fsSmall, logMsgStyle())
+	lines := d.r.wrapped(size.Width)
 	d.ensureMsgs(len(lines))
 	lh := logLineHeight()
 	fg := pal().Content
@@ -159,7 +151,7 @@ func (d *logRowRenderer) Layout(size fyne.Size) {
 		t.Resize(t.MinSize())
 	}
 
-	want := lh*float32(max(1, len(lines))) + 2
+	want := d.r.heightFor(size.Width)
 	if d.r.list != nil && want != size.Height {
 		d.r.list.SetItemHeight(d.r.id, want)
 	}
