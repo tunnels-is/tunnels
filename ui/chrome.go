@@ -2,6 +2,7 @@ package ui
 
 import (
 	"image/color"
+	"strings"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -874,6 +875,7 @@ func (r *kvLineRenderer) apply() {
 // wrapToWidth breaks s so each line fits maxW. Paths have no spaces, so it
 // wraps on characters and prefers a cut after / or \ when one is nearby.
 func wrapToWidth(s string, maxW, textSize float32, style fyne.TextStyle) []string {
+	s = strings.TrimRight(s, " \t")
 	if s == "" {
 		return []string{""}
 	}
@@ -883,6 +885,9 @@ func wrapToWidth(s string, maxW, textSize float32, style fyne.TextStyle) []strin
 	var lines []string
 	rest := []rune(s)
 	for len(rest) > 0 {
+		if strings.TrimSpace(string(rest)) == "" {
+			break
+		}
 		lo, hi := 1, len(rest)
 		for lo < hi {
 			mid := (lo + hi + 1) / 2
@@ -907,8 +912,11 @@ func wrapToWidth(s string, maxW, textSize float32, style fyne.TextStyle) []strin
 		if cut < 1 {
 			cut = 1
 		}
-		lines = append(lines, string(rest[:cut]))
+		lines = append(lines, strings.TrimRight(string(rest[:cut]), " \t"))
 		rest = rest[cut:]
+	}
+	if len(lines) == 0 {
+		return []string{""}
 	}
 	return lines
 }

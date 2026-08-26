@@ -43,6 +43,21 @@ func TestWrapToWidth_LongPathBreaks(t *testing.T) {
 	}
 }
 
+func TestWrapToWidth_TrailingSpaceDoesNotMakeBlankLine(t *testing.T) {
+	a := test.NewApp()
+	t.Cleanup(a.Quit)
+	applyZoomTokens(1)
+
+	style := fyne.TextStyle{Monospace: true}
+	s := "hello world"
+	fit := fyne.MeasureText(s, fsSmall, style).Width
+	// A trailing space that does not fit must not become a second blank line.
+	lines := wrapToWidth(s+" ", fit, fsSmall, style)
+	if len(lines) != 1 || lines[0] != s {
+		t.Fatalf("got %#v, want %q on one line", lines, s)
+	}
+}
+
 func TestKvRowGrowsForLongPath(t *testing.T) {
 	a := test.NewApp()
 	t.Cleanup(a.Quit)
