@@ -37,6 +37,28 @@ func routeMissing(out string, err error) bool {
 	return strings.Contains(s, "not in table") || strings.Contains(s, "no such process")
 }
 
+// routeGetFlagsBlackhole reports whether `route -n get …` selected a blackhole.
+// On Darwin, `route delete -inet 0.0.0.0/0 -blackhole` can still match the real
+// default gateway when no blackhole exists — wiping internet on every app start
+// when kill switch is off. Only delete when get(default) is actually BLACKHOLE.
+func routeGetFlagsBlackhole(getArgs ...string) bool {
+	out, err := runRoute(append([]string{"-n", "get"}, getArgs...)...)
+	if err != nil {
+		return false
+	}
+	return routeGetOutputHasBlackhole(out)
+}
+
+func routeGetOutputHasBlackhole(out string) bool {
+	for _, line := range strings.Split(out, "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "flags:") && strings.Contains(line, "BLACKHOLE") {
+			return true
+		}
+	}
+	return false
+}
+
 func enableKillSwitchIPv4() error {
 	if !killSwitchIPv4Active.CompareAndSwap(false, true) {
 		return nil
@@ -51,10 +73,16 @@ func enableKillSwitchIPv4() error {
 }
 
 func disableKillSwitchIPv4() {
-	_, _ = runRoute("-n", "delete", "-inet", "0.0.0.0/0", "-blackhole")
-	if killSwitchIPv4Active.CompareAndSwap(true, false) {
-		INFO("IPv4 kill switch off")
+	defer killSwitchIPv4Active.Store(false)
+	if !routeGetFlagsBlackhole("-inet", "default") {
+		return
 	}
+	out, err := runRoute("-n", "delete", "-inet", "0.0.0.0/0", "-blackhole")
+	if err != nil && !routeMissing(out, err) {
+		ERROR("IPv4 kill switch off: ", err, " out: ", out)
+		return
+	}
+	INFO("IPv4 kill switch off")
 }
 
 func enableKillSwitchIPv6() error {
@@ -72,8 +100,14 @@ func enableKillSwitchIPv6() error {
 }
 
 func disableKillSwitchIPv6() {
-	_, _ = runRoute("-n", "delete", "-inet6", "::/0", "-blackhole")
-	if killSwitchIPv6Active.CompareAndSwap(true, false) {
-		INFO("IPv6 kill switch off")
+	defer killSwitchIPv6Active.Store(false)
+	if !routeGetFlagsBlackhole("-inet6", "default") {
+		return
 	}
+	out, err := runRoute("-n", "delete", "-inet6", "::/0", "-blackhole")
+	if err != nil && !routeMissing(out, err) {
+		DEBUG("IPv6 kill switch off: ", err, " out: ", out)
+		return
+	}
+	INFO("IPv6 kill switch off")
 }
