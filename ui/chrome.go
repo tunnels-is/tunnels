@@ -20,8 +20,13 @@ import (
 type insetLayout struct{ t, r, b, l float32 }
 
 func (i insetLayout) Layout(objs []fyne.CanvasObject, size fyne.Size) {
-	inner := fyne.NewSize(size.Width-i.l-i.r, size.Height-i.t-i.b)
+	w := max32(0, size.Width-i.l-i.r)
+	h := max32(0, size.Height-i.t-i.b)
+	inner := fyne.NewSize(w, h)
 	for _, o := range objs {
+		if o == nil {
+			continue
+		}
 		o.Move(fyne.NewPos(i.l, i.t))
 		o.Resize(inner)
 	}
@@ -30,6 +35,9 @@ func (i insetLayout) Layout(objs []fyne.CanvasObject, size fyne.Size) {
 func (i insetLayout) MinSize(objs []fyne.CanvasObject) fyne.Size {
 	var w, h float32
 	for _, o := range objs {
+		if o == nil {
+			continue
+		}
 		ms := o.MinSize()
 		w = max32(w, ms.Width)
 		h = max32(h, ms.Height)
@@ -321,8 +329,14 @@ func (vCentreLayout) MinSize(objs []fyne.CanvasObject) fyne.Size {
 type railLayout struct{}
 
 func (railLayout) Layout(objs []fyne.CanvasObject, size fyne.Size) {
-	if len(objs) < 2 {
+	if len(objs) < 2 || objs[0] == nil || objs[1] == nil {
 		return
+	}
+	if size.Width < 0 {
+		size.Width = 0
+	}
+	if size.Height < 0 {
+		size.Height = 0
 	}
 	side, content := objs[0], objs[1]
 	var w float32
@@ -332,7 +346,7 @@ func (railLayout) Layout(objs []fyne.CanvasObject, size fyne.Size) {
 	side.Move(fyne.NewPos(0, 0))
 	side.Resize(fyne.NewSize(w, size.Height))
 	content.Move(fyne.NewPos(w, 0))
-	content.Resize(fyne.NewSize(size.Width-w, size.Height))
+	content.Resize(fyne.NewSize(max32(0, size.Width-w), size.Height))
 }
 
 // MinSize is deliberately zero: shellLayout owns the window minimum, and
@@ -1243,8 +1257,14 @@ func (r *toastRenderer) Refresh() {
 type shellLayout struct{}
 
 func (shellLayout) Layout(objs []fyne.CanvasObject, size fyne.Size) {
-	if len(objs) < 2 {
+	if len(objs) < 2 || objs[0] == nil || objs[1] == nil {
 		return
+	}
+	if size.Width < 0 {
+		size.Width = 0
+	}
+	if size.Height < 0 {
+		size.Height = 0
 	}
 	objs[0].Move(fyne.NewPos(0, 0))
 	objs[0].Resize(size)
@@ -1261,7 +1281,7 @@ func (shellLayout) Layout(objs []fyne.CanvasObject, size fyne.Size) {
 
 	// The loader covers the whole window: it carries its own scrim and centres
 	// its card, so it is sized to the shell rather than parked in a corner.
-	if len(objs) > 2 {
+	if len(objs) > 2 && objs[2] != nil {
 		busy := objs[2]
 		if busy.MinSize().Height < 8 {
 			busy.Resize(fyne.NewSize(0, 0))
@@ -1276,6 +1296,9 @@ func (shellLayout) Layout(objs []fyne.CanvasObject, size fyne.Size) {
 // placeToast parks an overlay in a bottom corner, or collapses it out of the
 // way when it has no content.
 func placeToast(o fyne.CanvasObject, size fyne.Size, trailing bool) {
+	if o == nil {
+		return
+	}
 	ms := o.MinSize()
 	if ms.Width < 8 || ms.Height < 8 {
 		o.Resize(fyne.NewSize(0, 0))
