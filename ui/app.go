@@ -114,6 +114,8 @@ type App struct {
 
 // Run starts the desktop window. The client service must already be initialized.
 func Run(icon []byte) {
+	defer recoverRun("Run")
+	hardenFyne()
 	a := newApp(icon)
 	a.bootstrap()
 	a.win.ShowAndRun()
@@ -162,13 +164,9 @@ func newApp(icon []byte) *App {
 	// background around the whole app. The shell manages its own gutters.
 	w.SetPadded(false)
 
-	w.SetCloseIntercept(func() {
-		if client.CancelFunc != nil {
-			client.CancelFunc()
-		}
-		client.ResetEverything()
-		a.fyneApp.Quit()
-	})
+	a.keepDisplayAwake()
+	a.installQuitMenu()
+	a.surviveWindowClose()
 
 	a.registerZoomShortcuts()
 	a.startLogPump()
