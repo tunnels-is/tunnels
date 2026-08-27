@@ -10,8 +10,8 @@ func TestDefaultConfig_KillSwitchDefaults(t *testing.T) {
 	if conf.KillSwitchIPv4 {
 		t.Fatal("IPv4 kill switch should be off by default")
 	}
-	if !conf.KillSwitchIPv6 {
-		t.Fatal("IPv6 kill switch should be on by default")
+	if conf.KillSwitchIPv6 {
+		t.Fatal("IPv6 kill switch should be off by default")
 	}
 }
 

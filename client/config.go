@@ -138,7 +138,7 @@ func DefaultConfig() *configV2 {
 		DNSBlockLists:     GetDefaultBlockLists(),
 		DNSWhiteLists:     GetDefaultWhiteLists(),
 		KillSwitchIPv4:    false,
-		KillSwitchIPv6:    true,
+		KillSwitchIPv6:    false,
 	}
 	conf.ControlServers = append(conf.ControlServers, &ControlServer{
 		ID:                  "tunnels",

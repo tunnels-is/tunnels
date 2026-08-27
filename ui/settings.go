@@ -54,7 +54,7 @@ func (a *App) settingsPage() fyne.CanvasObject {
 			"Blackhole routes stay installed until you turn the switch off — including after disconnect or quitting the app.",
 			settingList(
 				toggleRow("Block IPv6",
-					"On by default. Tunnels does not carry IPv6, so ::/0 is dropped and AAAA destinations cannot leak to your ISP.",
+					"Off by default. When on, ::/0 is blackholed so AAAA destinations cannot leak to your ISP (Tunnels does not carry IPv6).",
 					cfg.KillSwitchIPv6, func(bool) { a.toggleConfig("KillSwitchIPv6") }),
 				toggleRow("Block IPv4",
 					"Off by default. When on, 0.0.0.0/0 is blackholed except the tunnel and pinned controller endpoints.",

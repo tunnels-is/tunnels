@@ -278,7 +278,8 @@ type configV2 struct {
 	// Off by default. When on, controller/VPN endpoints are pinned /32.
 	KillSwitchIPv4 bool
 	// KillSwitchIPv6 blackholes ::/0 until the user turns it off.
-	// On by default: the client does not tunnel IPv6.
+	// Off by default in newly generated configs (existing configs that omit
+	// the key are still migrated to on via applyMissingKillSwitchDefaults).
 	KillSwitchIPv6 bool
 
 	ControlServers    []*ControlServer

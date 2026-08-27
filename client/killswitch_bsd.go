@@ -42,10 +42,15 @@ func enableKillSwitchIPv4() error {
 }
 
 func disableKillSwitchIPv4() {
-	_, _ = runRoute("delete", "-inet", "0.0.0.0/0", "-blackhole")
-	if killSwitchIPv4Active.CompareAndSwap(true, false) {
-		INFO("IPv4 kill switch off")
+	defer killSwitchIPv4Active.Store(false)
+	// Same Darwin hazard: unconditional delete of 0.0.0.0/0 can remove the
+	// real default. Only tear down when get(default) is a blackhole.
+	out, err := runRoute("-n", "get", "-inet", "default")
+	if err != nil || !strings.Contains(out, "BLACKHOLE") {
+		return
 	}
+	_, _ = runRoute("delete", "-inet", "0.0.0.0/0", "-blackhole")
+	INFO("IPv4 kill switch off")
 }
 
 func enableKillSwitchIPv6() error {
@@ -63,8 +68,11 @@ func enableKillSwitchIPv6() error {
 }
 
 func disableKillSwitchIPv6() {
-	_, _ = runRoute("delete", "-inet6", "::/0", "-blackhole")
-	if killSwitchIPv6Active.CompareAndSwap(true, false) {
-		INFO("IPv6 kill switch off")
+	defer killSwitchIPv6Active.Store(false)
+	out, err := runRoute("-n", "get", "-inet6", "default")
+	if err != nil || !strings.Contains(out, "BLACKHOLE") {
+		return
 	}
+	_, _ = runRoute("delete", "-inet6", "::/0", "-blackhole")
+	INFO("IPv6 kill switch off")
 }
