@@ -178,8 +178,7 @@ func (b *kBtn) CreateRenderer() fyne.WidgetRenderer {
 	lab := canvas.NewText(b.label, pal().Content)
 	lab.TextStyle = fyne.TextStyle{Bold: true}
 	lab.FontSource = fontForStyle(lab.TextStyle)
-	ico := canvas.NewImageFromResource(b.icon)
-	ico.FillMode = canvas.ImageFillContain
+	ico := iconImage(b.icon)
 	r := &kBtnRenderer{b: b, bg: bg, lab: lab, ico: ico}
 	if r.apply() {
 		r.ico.Refresh()
@@ -208,9 +207,13 @@ func (r *kBtnRenderer) Objects() []fyne.CanvasObject {
 
 func (r *kBtnRenderer) iconSize() float32 {
 	if r.b.size == kSm {
-		return z(13)
+		s := iconSize - 2
+		if s < 12 {
+			return 12
+		}
+		return s
 	}
-	return z(15)
+	return iconSize
 }
 
 func (r *kBtnRenderer) MinSize() fyne.Size {

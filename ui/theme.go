@@ -3,6 +3,7 @@ package ui
 import (
 	_ "embed"
 	"image/color"
+	"math"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/theme"
@@ -86,6 +87,13 @@ var uiZoom float32 = 1
 // z scales a one-off measurement that has no named token.
 func z(n float32) float32 { return n * uiZoom }
 
+// snapDIP rounds a zoomed size to a whole device-independent pixel so
+// coverage-AA text and SVG icons land on the pixel grid instead of being
+// bilinear-filtered between pixels.
+func snapDIP(n float32) float32 {
+	return float32(math.Round(float64(n)))
+}
+
 // applyZoomTokens recomputes every token for a zoom factor. Callers must
 // refresh the theme afterwards so Fyne drops its cached sizes.
 func applyZoomTokens(f float32) {
@@ -96,13 +104,13 @@ func applyZoomTokens(f float32) {
 
 	radSm, radMd, radLg = z(baseRadSm), z(baseRadMd), z(baseRadLg)
 
-	fsCaption, fsSmall = z(baseFsCaption), z(baseFsSmall)
-	fsBody, fsLarge, fsTitle = z(baseFsBody), z(baseFsLarge), z(baseFsTitle)
+	fsCaption, fsSmall = snapDIP(z(baseFsCaption)), snapDIP(z(baseFsSmall))
+	fsBody, fsLarge, fsTitle = snapDIP(z(baseFsBody)), snapDIP(z(baseFsLarge)), snapDIP(z(baseFsTitle))
 
 	railWidth, gutter = z(baseRail), z(baseGutter)
 	rowHeight, navRowH, ctrlHeight = z(baseRowHeight), z(baseNavRowH), z(baseCtrlHeight)
 	formWidth, searchWidth = z(baseFormWidth), z(baseSearchWidth)
-	iconSize = z(baseIcon)
+	iconSize = snapDIP(z(baseIcon))
 
 	swWidth, swHeight, swKnob = z(baseSwWidth), z(baseSwHeight), z(baseSwKnob)
 	segHeight, segInset = z(baseSegH), z(baseSegInset)

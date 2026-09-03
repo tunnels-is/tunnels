@@ -602,6 +602,15 @@ func strongDivider() fyne.CanvasObject {
 	return r
 }
 
+// iconImage loads a theme SVG with nearest-neighbor sampling. The default
+// ImageScaleSmooth filter blurs 16px glyphs.
+func iconImage(res fyne.Resource) *canvas.Image {
+	img := canvas.NewImageFromResource(res)
+	img.FillMode = canvas.ImageFillContain
+	img.ScaleMode = canvas.ImageScalePixels
+	return img
+}
+
 // ---------------------------------------------------------------- text
 
 // text is the low-level primitive for custom renderers, where positioning is
@@ -1211,7 +1220,7 @@ func (t *toastCard) CreateRenderer() fyne.WidgetRenderer {
 	bg := surface(radMd, p.Base100, p.Base300)
 	bar := canvas.NewRectangle(accent)
 	bar.CornerRadius = radFull
-	ico := widget.NewIcon(icon)
+	ico := iconImage(icon)
 	lbl := widget.NewLabel(t.msg)
 	lbl.Wrapping = fyne.TextWrapWord
 	return &toastRenderer{t: t, bg: bg, bar: bar, ico: ico, lbl: lbl,
@@ -1222,7 +1231,7 @@ type toastRenderer struct {
 	t       *toastCard
 	bg      *canvas.Rectangle
 	bar     *canvas.Rectangle
-	ico     *widget.Icon
+	ico     *canvas.Image
 	lbl     *widget.Label
 	objects []fyne.CanvasObject
 }
@@ -1254,9 +1263,13 @@ func (r *toastRenderer) Refresh() {
 // ---------------------------------------------------------------- shell
 
 // shellLayout stacks the app content with a top-right toast overlay.
-type shellLayout struct{}
+type shellLayout struct {
+	win        fyne.Window
+	last       fyne.Size
+	snapQueued bool
+}
 
-func (shellLayout) Layout(objs []fyne.CanvasObject, size fyne.Size) {
+func (s *shellLayout) Layout(objs []fyne.CanvasObject, size fyne.Size) {
 	if len(objs) < 2 || objs[0] == nil || objs[1] == nil {
 		return
 	}
@@ -1291,6 +1304,40 @@ func (shellLayout) Layout(objs []fyne.CanvasObject, size fyne.Size) {
 			busy.Resize(size)
 		}
 	}
+	s.queueSnap(size)
+}
+
+func (s *shellLayout) queueSnap(size fyne.Size) {
+	if s == nil || s.win == nil || s.snapQueued {
+		return
+	}
+	c := s.win.Canvas()
+	if c == nil {
+		return
+	}
+	aligned := alignCanvasSize(c, size, s.last)
+	s.last = size
+	if aligned == size {
+		return
+	}
+	s.snapQueued = true
+	win := s.win
+	go func() {
+		fyne.Do(func() {
+			s.snapQueued = false
+			c := win.Canvas()
+			if c == nil {
+				return
+			}
+			cur := c.Size()
+			next := alignCanvasSize(c, cur, s.last)
+			if next == cur {
+				return
+			}
+			s.last = next
+			win.Resize(next)
+		})
+	}()
 }
 
 // placeToast parks an overlay in a bottom corner, or collapses it out of the
@@ -1314,7 +1361,7 @@ func placeToast(o fyne.CanvasObject, size fyne.Size, trailing bool) {
 	o.Move(fyne.NewPos(x, size.Height-ms.Height-sp5))
 }
 
-func (shellLayout) MinSize(objs []fyne.CanvasObject) fyne.Size {
+func (*shellLayout) MinSize(objs []fyne.CanvasObject) fyne.Size {
 	// Kept deliberately low: this is a logical size, so zoom multiplies it into
 	// physical pixels. At 200% a larger floor would demand a window taller than
 	// a 1080p display can show.
