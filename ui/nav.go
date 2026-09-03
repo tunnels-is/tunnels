@@ -70,8 +70,7 @@ func (n *navRow) CreateRenderer() fyne.WidgetRenderer {
 	bg := surface(radSm, color.Transparent, nil)
 	rail := canvas.NewRectangle(color.Transparent)
 	rail.CornerRadius = radFull
-	ico := canvas.NewImageFromResource(n.icon)
-	ico.FillMode = canvas.ImageFillContain
+	ico := iconImage(n.icon)
 	lab := text(n.label, fsBody, pal().Muted, false)
 	r := &navRowRenderer{n: n, bg: bg, rail: rail, ico: ico, lab: lab}
 	r.apply()
@@ -285,9 +284,8 @@ func (r *sidebarRenderer) userChip() fyne.CanvasObject {
 
 	name := text(email, fsSmall, p.Content, false)
 	role := text("Manage account", fsCaption, p.Faint, false)
-	chev := canvas.NewImageFromResource(theme.NewColoredResource(theme.NavigateNextIcon(), colFaint))
-	chev.FillMode = canvas.ImageFillContain
-	chevBox := container.New(fixedLayout{w: z(14), h: z(14)}, chev)
+	chev := iconImage(theme.NewColoredResource(theme.NavigateNextIcon(), colFaint))
+	chevBox := container.New(fixedLayout{w: iconSize, h: iconSize}, chev)
 
 	row := container.NewBorder(nil, nil, avatar, chevBox,
 		insetEach(0, 0, 0, sp2, vstack(0, name, role)))

@@ -158,7 +158,7 @@ func newApp(icon []byte) *App {
 	a.toastBox = container.NewStack()
 	a.busyBox = container.NewStack()
 	a.pageBox = container.New(railLayout{}, a.side, a.content)
-	shell := container.New(shellLayout{}, a.pageBox, a.toastBox, a.busyBox)
+	shell := container.New(&shellLayout{win: w}, a.pageBox, a.toastBox, a.busyBox)
 	w.SetContent(shell)
 	// Fyne pads window content by default, which draws a border of window
 	// background around the whole app. The shell manages its own gutters.

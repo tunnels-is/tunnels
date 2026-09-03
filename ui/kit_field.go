@@ -122,9 +122,8 @@ func searchField(placeholder, value string, onChange, onSubmit func(string)) (*w
 	e := widget.NewEntry()
 	// ActionItem has to be assigned before anything that can build the
 	// renderer (SetText does), otherwise the icon is never added to it.
-	icon := canvas.NewImageFromResource(theme.NewColoredResource(theme.SearchIcon(), colFaint))
-	icon.FillMode = canvas.ImageFillContain
-	e.ActionItem = fixedWidth(z(18), icon)
+	icon := iconImage(theme.NewColoredResource(theme.SearchIcon(), colFaint))
+	e.ActionItem = fixedWidth(iconSize, icon)
 	e.SetPlaceHolder(placeholder)
 	e.SetText(value)
 	e.OnChanged = onChange

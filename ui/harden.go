@@ -3,6 +3,7 @@ package ui
 import (
 	"fmt"
 	"os"
+	"runtime"
 	"runtime/debug"
 
 	"fyne.io/fyne/v2"
@@ -15,12 +16,36 @@ import (
 // returns nil and Fyne panics on the main thread (see getMonitorScale).
 const fyneDisableDPIEnv = "FYNE_DISABLE_DPI_DETECTION"
 
+// fynePlatformEnv selects GLFW's backend. Fyne otherwise forces X11 on
+// compositors without server-side decorations (GNOME), and the compositor
+// then bilinear-scales that 1× XWayland buffer at 125%/150% — the blur
+// that goes away when display scale is set back to 100%. Native Wayland
+// gets a framebuffer at the compositor scale (texScale) instead.
+const fynePlatformEnv = "FYNE_PLATFORM"
+
 // hardenFyne must run before app.NewWithID / NewWindow. It does not
 // override a value the user already set.
 func hardenFyne() {
-	if os.Getenv(fyneDisableDPIEnv) == "" {
-		_ = os.Setenv(fyneDisableDPIEnv, "1")
+	if runtime.GOOS == "darwin" {
+		if os.Getenv(fyneDisableDPIEnv) == "" {
+			_ = os.Setenv(fyneDisableDPIEnv, "1")
+		}
+		return
 	}
+	preferWayland()
+}
+
+func preferWayland() {
+	if runtime.GOOS != "linux" {
+		return
+	}
+	if os.Getenv(fynePlatformEnv) != "" {
+		return
+	}
+	if os.Getenv("WAYLAND_DISPLAY") == "" {
+		return
+	}
+	_ = os.Setenv(fynePlatformEnv, "wayland")
 }
 
 func recoverRun(where string) {
