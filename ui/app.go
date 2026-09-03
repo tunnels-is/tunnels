@@ -122,7 +122,7 @@ func Run(icon []byte) {
 }
 
 func newApp(icon []byte) *App {
-	fy := app.NewWithID("is.tunnels.desktop")
+	fy := app.NewWithID(appID)
 	name := fy.Preferences().StringWithFallback("ui-theme", defaultThemeName)
 	setLiveTheme(name)
 	var iconRes fyne.Resource
@@ -135,7 +135,10 @@ func newApp(icon []byte) *App {
 	// already at the right scale.
 	zoom := loadZoom(fy)
 
-	w := fy.NewWindow("Tunnels")
+	w := fy.NewWindow(appName)
+	// GLFW is initialized by NewWindow; the native window is created on Show.
+	setLinuxWindowIdentity()
+	registerLinuxDesktop(icon)
 	if iconRes != nil {
 		w.SetIcon(iconRes)
 	}

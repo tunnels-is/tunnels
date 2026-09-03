@@ -2,7 +2,7 @@
 
 - `../appicon.png` — 512×512 window / Linux / macOS source icon.
 - `../winres.json` + `../rsrc_windows_*.syso` — PE icon linked into the Windows `.exe` (Explorer + taskbar).
-- `tunnels.desktop` — Linux launcher. Copy with `tunnels.png` into the icon/applications dirs, or leave them next to the binary.
+- `is.tunnels.desktop` — Linux launcher. The Wayland `app_id` / X11 class is `is.tunnels`, so the file name (minus `.desktop`) and `StartupWMClass` must match. Copy with `tunnels.png` (as `is.tunnels.png`) into the icon/applications dirs. The app also installs this into `~/.local/share` on first run so alt-tab can resolve the name and icon.
 
 ## macOS admin launch
 
