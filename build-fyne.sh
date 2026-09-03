@@ -54,12 +54,16 @@ build_linux() {
         -o "$BIN_DIR/tunnels-app-linux-amd64" \
         ./cmd/fyne
     echo "    -> bin/tunnels-app-linux-amd64"
-    # ELF files cannot embed an icon; ship a themed PNG + .desktop so the
-    # file manager and dock can resolve "tunnels" / StartupWMClass=Tunnels.
+    # ELF files cannot embed an icon. Ship PNG + .desktop whose basename
+    # matches the Wayland app_id (is.tunnels). The running app also copies
+    # these into ~/.local/share so Cosmic/GNOME alt-tab can resolve them.
     cp -f "$APPICON" "$BIN_DIR/tunnels.png"
+    cp -f "$APPICON" "$BIN_DIR/is.tunnels.png"
+    cp -f cmd/fyne/packaging/is.tunnels.desktop "$BIN_DIR/is.tunnels.desktop"
     cp -f cmd/fyne/packaging/tunnels.desktop "$BIN_DIR/tunnels.desktop"
     echo "    -> bin/tunnels.png"
-    echo "    -> bin/tunnels.desktop"
+    echo "    -> bin/is.tunnels.png"
+    echo "    -> bin/is.tunnels.desktop"
 }
 
 windows_cc() {
@@ -144,4 +148,4 @@ esac
 
 echo ""
 echo "==> Done"
-ls -lh "$BIN_DIR"/tunnels-app-* "$BIN_DIR"/tunnels.png "$BIN_DIR"/tunnels.desktop "$BIN_DIR"/Tunnels-*.app 2>/dev/null || true
+ls -lh "$BIN_DIR"/tunnels-app-* "$BIN_DIR"/tunnels.png "$BIN_DIR"/is.tunnels.png "$BIN_DIR"/is.tunnels.desktop "$BIN_DIR"/tunnels.desktop "$BIN_DIR"/Tunnels-*.app 2>/dev/null || true
