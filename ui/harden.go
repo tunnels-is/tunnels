@@ -5,9 +5,11 @@ import (
 	"os"
 	"runtime"
 	"runtime/debug"
+	"strings"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/driver/desktop"
+	"github.com/go-gl/glfw/v3.4/glfw"
 	"github.com/tunnels-is/tunnels/client"
 )
 
@@ -33,6 +35,7 @@ func hardenFyne() {
 		return
 	}
 	preferWayland()
+	preferCompositorDecorations()
 }
 
 func preferWayland() {
@@ -46,6 +49,37 @@ func preferWayland() {
 		return
 	}
 	_ = os.Setenv(fynePlatformEnv, "wayland")
+}
+
+// preferCompositorDecorations drops GLFW's libdecor CSD — the GTK/cairo
+// title bar that ignores Cosmic/KDE/Sway themes — when the compositor
+// can draw its own decorations. Must run before fyne initializes GLFW.
+//
+// GNOME/Mutter has no xdg-decoration, so libdecor stays there.
+func preferCompositorDecorations() {
+	if !shouldDisableLibdecor() {
+		return
+	}
+	glfw.InitHint(glfw.WaylandLibdecor, glfw.WaylandDisableLibdecor)
+}
+
+func shouldDisableLibdecor() bool {
+	if os.Getenv("WAYLAND_DISPLAY") == "" {
+		return false
+	}
+	return !gnomeNeedsLibdecor(os.Getenv("XDG_CURRENT_DESKTOP"))
+}
+
+func gnomeNeedsLibdecor(desktop string) bool {
+	u := strings.ToUpper(desktop)
+	if !strings.Contains(u, "GNOME") {
+		return false
+	}
+	// COSMIC can carry leftover GNOME tokens; it advertises SSD.
+	if strings.Contains(u, "COSMIC") {
+		return false
+	}
+	return true
 }
 
 func recoverRun(where string) {
@@ -85,13 +119,18 @@ func (a *App) surviveWindowClose() {
 	}
 }
 
+// installQuitMenu wires Cmd/Ctrl+Q. On macOS, SetMainMenu lands in the native
+// menu bar. On Linux and Windows it would paint a second in-window File bar
+// on top of the system title bar, so those platforms keep the shortcut only.
 func (a *App) installQuitMenu() {
 	if a.win == nil {
 		return
 	}
-	quit := fyne.NewMenuItem("Quit", a.shutdown)
-	quit.IsQuit = true
-	a.win.SetMainMenu(fyne.NewMainMenu(fyne.NewMenu("File", quit)))
+	if runtime.GOOS == "darwin" {
+		quit := fyne.NewMenuItem("Quit", a.shutdown)
+		quit.IsQuit = true
+		a.win.SetMainMenu(fyne.NewMainMenu(fyne.NewMenu("File", quit)))
+	}
 	if a.win.Canvas() == nil {
 		return
 	}

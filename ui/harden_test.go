@@ -88,3 +88,45 @@ func TestHardenFyneSkipsWaylandWithoutSession(t *testing.T) {
 		t.Fatalf("FYNE_PLATFORM must stay unset without WAYLAND_DISPLAY, got %q", got)
 	}
 }
+
+func TestGnomeNeedsLibdecor(t *testing.T) {
+	cases := []struct {
+		desktop string
+		want    bool
+	}{
+		{"", false},
+		{"KDE", false},
+		{"COSMIC", false},
+		{"pop:COSMIC", false},
+		{"GNOME", true},
+		{"ubuntu:GNOME", true},
+		{"pop:GNOME", true},
+		{"COSMIC:GNOME", false},
+		{"GNOME:COSMIC", false},
+	}
+	for _, tc := range cases {
+		if got := gnomeNeedsLibdecor(tc.desktop); got != tc.want {
+			t.Errorf("gnomeNeedsLibdecor(%q)=%v, want %v", tc.desktop, got, tc.want)
+		}
+	}
+}
+
+func TestShouldDisableLibdecor(t *testing.T) {
+	withEnv(t, "WAYLAND_DISPLAY", "", true)
+	withEnv(t, "XDG_CURRENT_DESKTOP", "COSMIC", false)
+	if shouldDisableLibdecor() {
+		t.Fatal("must keep libdecor unset without WAYLAND_DISPLAY")
+	}
+
+	withEnv(t, "WAYLAND_DISPLAY", "wayland-0", false)
+	withEnv(t, "XDG_CURRENT_DESKTOP", "COSMIC", false)
+	if !shouldDisableLibdecor() {
+		t.Fatal("COSMIC Wayland should disable libdecor")
+	}
+
+	withEnv(t, "WAYLAND_DISPLAY", "wayland-0", false)
+	withEnv(t, "XDG_CURRENT_DESKTOP", "ubuntu:GNOME", false)
+	if shouldDisableLibdecor() {
+		t.Fatal("GNOME Wayland must keep libdecor")
+	}
+}
