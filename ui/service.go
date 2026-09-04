@@ -56,6 +56,7 @@ func (a *App) refreshState() {
 		a.tunnels = st.Tunnels
 		a.active = st.ActiveTunnels
 	}
+	a.syncWindowTitle()
 }
 
 // setUser makes u the active account.
@@ -403,6 +404,18 @@ func toggleConfigField(cfg *client.Config, key string) {
 	case "DNSHTTPSAutomatic":
 		cfg.DNSHTTPSAutomatic = !cfg.DNSHTTPSAutomatic
 	}
+}
+
+func (a *App) startTitlePump() {
+	go func() {
+		tick := time.NewTicker(time.Second)
+		defer tick.Stop()
+		for range tick.C {
+			a.uiDo(func() {
+				a.refreshState()
+			})
+		}
+	}()
 }
 
 func (a *App) startLogPump() {
