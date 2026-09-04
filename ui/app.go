@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"strings"
 	"time"
 
 	"fyne.io/fyne/v2"
@@ -110,6 +111,13 @@ type App struct {
 	devicesFetching bool
 	lastLogPaint    time.Time
 	reloading       bool
+
+	titlePrevIn   int64
+	titlePrevOut  int64
+	titlePrevAt   time.Time
+	titleRx       int64
+	titleTx       int64
+	titleHavePrev bool
 }
 
 // Run starts the desktop window. The client service must already be initialized.
@@ -135,7 +143,7 @@ func newApp(icon []byte) *App {
 	// already at the right scale.
 	zoom := loadZoom(fy)
 
-	w := fy.NewWindow(appName)
+	w := fy.NewWindow("disconnected")
 	// GLFW is initialized by NewWindow; the native window is created on Show.
 	setLinuxWindowIdentity()
 	registerLinuxDesktop(icon)
@@ -173,6 +181,7 @@ func newApp(icon []byte) *App {
 
 	a.registerZoomShortcuts()
 	a.startLogPump()
+	a.startTitlePump()
 	return a
 }
 
@@ -361,4 +370,84 @@ func (a *App) setAdvanced(v bool) {
 	a.fyneApp.Preferences().SetBool("advanced", v)
 	a.refreshNav()
 	a.rebuild()
+}
+
+func (a *App) connectedTunnels() []*client.TUN {
+	var out []*client.TUN
+	for _, t := range a.active {
+		if t != nil && t.GetState() >= client.TUN_Connected {
+			out = append(out, t)
+		}
+	}
+	return out
+}
+
+func (a *App) tunnelLabel(t *client.TUN) string {
+	if t == nil {
+		return "tunnel"
+	}
+	if t.CR != nil {
+		if s := a.serverByID(t.CR.ServerID); s != nil && s.Tag != "" {
+			return s.Tag
+		}
+		if t.CR.Tag != "" {
+			return t.CR.Tag
+		}
+	}
+	if m := t.Meta(); m != nil && m.Tag != "" {
+		return m.Tag
+	}
+	return "tunnel"
+}
+
+func (a *App) syncWindowTitle() {
+	if a.win == nil {
+		return
+	}
+	tuns := a.connectedTunnels()
+	var in, out int64
+	names := make([]string, 0, len(tuns))
+	for _, t := range tuns {
+		in += t.IngressBytes()
+		out += t.EgressBytes()
+		names = append(names, a.tunnelLabel(t))
+	}
+
+	now := time.Now()
+	if len(tuns) == 0 {
+		a.titleHavePrev = false
+		a.titleRx, a.titleTx = 0, 0
+	} else if !a.titleHavePrev {
+		a.titlePrevIn, a.titlePrevOut, a.titlePrevAt = in, out, now
+		a.titleHavePrev = true
+		a.titleRx, a.titleTx = 0, 0
+	} else if dt := now.Sub(a.titlePrevAt).Seconds(); dt >= 0.5 {
+		din, dout := in-a.titlePrevIn, out-a.titlePrevOut
+		if din < 0 {
+			din = 0
+		}
+		if dout < 0 {
+			dout = 0
+		}
+		a.titleRx = int64(float64(din) / dt)
+		a.titleTx = int64(float64(dout) / dt)
+		a.titlePrevIn, a.titlePrevOut, a.titlePrevAt = in, out, now
+	}
+
+	title := formatWindowTitle(len(tuns) > 0, a.titleRx, a.titleTx, names)
+	if a.win.Title() == title {
+		return
+	}
+	a.win.SetTitle(title)
+}
+
+func formatWindowTitle(connected bool, rx, tx int64, names []string) string {
+	if !connected {
+		return "disconnected"
+	}
+	rate := client.BandwidthBytesToString(rx) + "/s - " + client.BandwidthBytesToString(tx) + "/s"
+	if len(names) == 0 {
+		return rate
+	}
+	return rate + " - " + strings.Join(names, " - ")
 }

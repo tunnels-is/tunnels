@@ -348,18 +348,26 @@ func ControllerError(body []byte, fallback string) string {
 	return s
 }
 
-func (t *TUN) IngressString() string {
+func (t *TUN) IngressBytes() int64 {
 	if t == nil {
-		return "0"
+		return 0
 	}
-	return BandwidthBytesToString(t.ingressBytes.Load())
+	return t.ingressBytes.Load()
+}
+
+func (t *TUN) EgressBytes() int64 {
+	if t == nil {
+		return 0
+	}
+	return t.egressBytes.Load()
+}
+
+func (t *TUN) IngressString() string {
+	return BandwidthBytesToString(t.IngressBytes())
 }
 
 func (t *TUN) EgressString() string {
-	if t == nil {
-		return "0"
-	}
-	return BandwidthBytesToString(t.egressBytes.Load())
+	return BandwidthBytesToString(t.EgressBytes())
 }
 
 func (t *TUN) Meta() *TunnelMETA {
