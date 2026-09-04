@@ -386,16 +386,11 @@ func (a *App) tunnelLabel(t *client.TUN) string {
 	if t == nil {
 		return "tunnel"
 	}
-	if t.CR != nil {
-		if s := a.serverByID(t.CR.ServerID); s != nil && s.Tag != "" {
-			return s.Tag
-		}
-		if t.CR.Tag != "" {
-			return t.CR.Tag
-		}
-	}
 	if m := t.Meta(); m != nil && m.Tag != "" {
 		return m.Tag
+	}
+	if t.CR != nil && t.CR.Tag != "" {
+		return t.CR.Tag
 	}
 	return "tunnel"
 }
