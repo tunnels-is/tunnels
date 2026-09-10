@@ -38,7 +38,7 @@ func CleanDNSCache() {
 	}()
 	defer RecoverAndLog()
 
-	INFO("Cleaning DNS cache")
+	DEBUG("Cleaning DNS cache")
 	DNSCache.Range(func(key string, value any) bool {
 		dr, ok := value.(*DNSReply)
 		if !ok {
