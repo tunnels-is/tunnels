@@ -41,7 +41,7 @@ func TestDisablePublicRegistration_RejectsAnonymous(t *testing.T) {
 	if w.Code != http.StatusForbidden {
 		t.Fatalf("got %d %s, want 403", w.Code, w.Body.String())
 	}
-	got, err := DB_findUserByEmail("blocked@example.com")
+	got, err := findUserByEmail("blocked@example.com")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,7 +91,7 @@ func TestDisablePublicRegistration_AdminUIStillWorks(t *testing.T) {
 		IsAdmin: true,
 		Tokens:  []*DeviceToken{tok},
 	}
-	if err := DB_CreateUser(admin); err != nil {
+	if err := createUser(admin); err != nil {
 		t.Fatal(err)
 	}
 
@@ -100,16 +100,16 @@ func TestDisablePublicRegistration_AdminUIStillWorks(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	body, _ := json.Marshal(REGISTER_FORM{Email: "from-admin@example.com", Password: "longenough1"})
+	body, _ := json.Marshal(registerRequest{Email: "from-admin@example.com", Password: "longenough1"})
 	req := httptest.NewRequest(http.MethodPost, "/ui/user/create", bytes.NewReader(body))
 	req.RemoteAddr = "192.0.2.1:12345"
 	req.AddCookie(&http.Cookie{Name: "admin_session", Value: cookie})
 	w := httptest.NewRecorder()
-	adminUIMiddleware(http.HandlerFunc(API_AdminUserCreate)).ServeHTTP(w, req)
+	adminUIMiddleware(http.HandlerFunc(handleAdminUserCreate)).ServeHTTP(w, req)
 	if w.Code != http.StatusOK {
 		t.Fatalf("admin create: %d %s", w.Code, w.Body.String())
 	}
-	got, err := DB_findUserByEmail("from-admin@example.com")
+	got, err := findUserByEmail("from-admin@example.com")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -125,9 +125,9 @@ func postRegister(t *testing.T, email, password string) int {
 
 func postRegisterRec(t *testing.T, email, password string) *httptest.ResponseRecorder {
 	t.Helper()
-	body, _ := json.Marshal(REGISTER_FORM{Email: email, Password: password})
+	body, _ := json.Marshal(registerRequest{Email: email, Password: password})
 	req := httptest.NewRequest(http.MethodPost, "/client/user/create", bytes.NewReader(body))
 	w := httptest.NewRecorder()
-	API_UserCreate(w, req)
+	handleClientUserCreate(w, req)
 	return w
 }

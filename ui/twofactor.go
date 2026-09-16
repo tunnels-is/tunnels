@@ -28,7 +28,7 @@ func (a *App) twoFactorPage() fyne.CanvasObject {
 
 	var qrValue string
 	go func() {
-		qr, err := client.GetQRCode(&client.TWO_FACTOR_CONFIRM{Email: a.user.Email})
+		qr, err := client.GetQRCode(&client.TwoFactorConfirm{Email: a.user.Email})
 		a.uiDo(func() {
 			if err != nil {
 				status.Text = err.Error()

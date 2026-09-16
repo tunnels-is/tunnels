@@ -6,22 +6,22 @@ import (
 	"github.com/google/uuid"
 )
 
-func TestGENERATE_CODE(t *testing.T) {
+func TestGenerateCode(t *testing.T) {
 
 	codes := make(map[string]bool)
 	numCodes := 1000
 
 	for i := 0; i < numCodes; i++ {
-		code := GENERATE_CODE()
+		code := generateCode()
 
 		if len(code) != 16 {
-			t.Errorf("GENERATE_CODE produced code of length %d, expected 16", len(code))
+			t.Errorf("generateCode produced code of length %d, expected 16", len(code))
 		}
 
 		for _, c := range code {
 			valid := (c >= 'A' && c <= 'Z') || (c >= '2' && c <= '7')
 			if !valid {
-				t.Errorf("GENERATE_CODE produced invalid character %c in code %s", c, code)
+				t.Errorf("generateCode produced invalid character %c in code %s", c, code)
 			}
 		}
 
@@ -30,20 +30,20 @@ func TestGENERATE_CODE(t *testing.T) {
 
 	uniqueRatio := float64(len(codes)) / float64(numCodes)
 	if uniqueRatio < 0.99 {
-		t.Errorf("GENERATE_CODE produced too many duplicates: %d unique out of %d (%.2f%%)",
+		t.Errorf("generateCode produced too many duplicates: %d unique out of %d (%.2f%%)",
 			len(codes), numCodes, uniqueRatio*100)
 	}
 
 	t.Logf("Generated %d codes, %d unique (%.2f%% unique) ✓", numCodes, len(codes), uniqueRatio*100)
 }
 
-func TestGENERATE_CODE_CharacterDistribution(t *testing.T) {
+func TestGenerateCode_CharacterDistribution(t *testing.T) {
 
 	validChars := "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"
 	charCount := make(map[rune]int)
 
 	for i := 0; i < 10000; i++ {
-		code := GENERATE_CODE()
+		code := generateCode()
 		for _, c := range code {
 			charCount[c]++
 		}

@@ -219,7 +219,7 @@ func refreshEndpointProtect() {
 	gw4 := gw.To4().String()
 	tunnelMapRange(func(tun *TUN) bool {
 		for _, host := range tun.protectHosts {
-			if rerr := IP_AddRoute(host+"/32", ifName, gw4, "0"); rerr != nil {
+			if rerr := addIPv4Route(host+"/32", ifName, gw4, "0"); rerr != nil {
 				ERROR("protect refresh host route ", host, ": ", rerr)
 			}
 		}

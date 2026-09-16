@@ -83,7 +83,7 @@ func pinControlPlaneIPv4Routes() {
 			return
 		}
 		seen[ip] = struct{}{}
-		if err := IP_AddRoute(ip+"/32", ifName, gw4, "0"); err != nil {
+		if err := addIPv4Route(ip+"/32", ifName, gw4, "0"); err != nil {
 			DEBUG("kill switch: pin ", ip, ": ", err)
 		}
 	}
@@ -115,7 +115,7 @@ func pinControlPlaneIPv4Routes() {
 	}
 }
 
-func applyMissingKillSwitchDefaults(raw []byte, cfg *configV2) {
+func applyMissingKillSwitchDefaults(raw []byte, cfg *Config) {
 	if cfg == nil || len(raw) == 0 {
 		return
 	}

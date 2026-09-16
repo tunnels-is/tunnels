@@ -22,7 +22,7 @@ func setupAutoConnectHome(t *testing.T) *User {
 	clearTunnelMap()
 	clearActiveTunnels()
 
-	STATE.Store(&stateV2{
+	STATE.Store(&State{
 		BasePath:   dir + "/",
 		TunnelType: string(types.DefaultTun),
 	})
@@ -30,12 +30,12 @@ func setupAutoConnectHome(t *testing.T) *User {
 		t.Fatal(err)
 	}
 	cs := &ControlServer{ID: "tunnels", Host: "api.tunnels.is", Port: "443", ValidateCertificate: true}
-	CONFIG.Store(&configV2{ControlServers: []*ControlServer{cs}})
+	CONFIG.Store(&Config{ControlServers: []*ControlServer{cs}})
 
 	u := &User{
 		ID:            "user-auto-connect-1",
 		Email:         "auto@example.com",
-		DeviceToken:   &DEVICE_TOKEN{DT: "device-token", N: "dev"},
+		DeviceToken:   &DeviceToken{DT: "device-token", N: "dev"},
 		ControlServer: cs,
 	}
 	if err := saveUser(u); err != nil {
@@ -108,7 +108,7 @@ func TestAutoConnect_SkipsBusyTunnel(t *testing.T) {
 
 	live := &TUN{ID: "live-1"}
 	live.meta.Store(def)
-	live.SetState(TUN_Connected)
+	live.SetState(TunnelConnected)
 	TunnelMap.Store(live.ID, live)
 
 	called := 0
@@ -129,7 +129,7 @@ func TestAutoConnect_NoAccountIsNoop(t *testing.T) {
 		clearTunnelMap()
 		clearActiveTunnels()
 	})
-	STATE.Store(&stateV2{BasePath: dir + "/"})
+	STATE.Store(&State{BasePath: dir + "/"})
 	if err := InitBaseFoldersAndPaths(); err != nil {
 		t.Fatal(err)
 	}

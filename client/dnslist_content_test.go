@@ -30,13 +30,13 @@ func setupCustomListTestEnv(t *testing.T) (blockDir, whiteDir string) {
 		DNSWhiteList.Store(prevWL)
 	})
 
-	STATE.Store(&stateV2{
+	STATE.Store(&State{
 		BasePath:       root + string(os.PathSeparator),
 		BlockListPath:  blockDir,
 		WhiteListPath:  whiteDir,
 		ConfigFileName: filepath.Join(root, "tunnels.conf"),
 	})
-	CONFIG.Store(&configV2{
+	CONFIG.Store(&Config{
 		DNSBlockLists: GetDefaultBlockLists(),
 		DNSWhiteLists: GetDefaultWhiteLists(),
 	})

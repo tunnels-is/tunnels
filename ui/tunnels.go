@@ -11,7 +11,7 @@ import (
 
 func (a *App) recomputeTunnelView() {
 	a.liveByTag = a.activeByTag()
-	var shown []*client.TunnelMETA
+	var shown []*client.TunnelMeta
 	for _, t := range a.tunnels {
 		if t == nil {
 			continue

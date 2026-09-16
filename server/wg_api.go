@@ -24,7 +24,7 @@ const (
 	wgPeersMaxLimit     = 5000
 )
 
-func API_WGPeers(w http.ResponseWriter, r *http.Request) {
+func handleWGPeers(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 
 	server := getServerFromContext(r.Context())
@@ -33,30 +33,13 @@ func API_WGPeers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	limit := wgPeersDefaultLimit
-	if v := r.URL.Query().Get("limit"); v != "" {
-		n, err := strconv.Atoi(v)
-		if err != nil || n <= 0 {
-			senderr(w, 400, "limit must be a positive integer")
-			return
-		}
-		if n > wgPeersMaxLimit {
-			n = wgPeersMaxLimit
-		}
-		limit = n
+	limit, offset, errMsg := parseWGPeerPage(r)
+	if errMsg != "" {
+		senderr(w, 400, errMsg)
+		return
 	}
 
-	offset := 0
-	if v := r.URL.Query().Get("offset"); v != "" {
-		n, err := strconv.Atoi(v)
-		if err != nil || n < 0 {
-			senderr(w, 400, "offset must be a non-negative integer")
-			return
-		}
-		offset = n
-	}
-
-	devices, err := DB_GetDevices(int64(limit), int64(offset))
+	devices, err := getDevices(int64(limit), int64(offset))
 	if err != nil {
 		senderr(w, 500, "Failed to fetch devices", slog.Any("err", err))
 		return
@@ -71,33 +54,11 @@ func API_WGPeers(w http.ResponseWriter, r *http.Request) {
 	userCache := make(map[uuid.UUID]*User)
 	now := time.Now()
 	for _, d := range devices {
-		if d.WireGuardKey == "" || d.ServerID != server.ID {
-			continue
-		}
-		owner, ok := userCache[d.UserID]
+		peer, ok := wgPeerFromDevice(d, server, userCache, now)
 		if !ok {
-			owner, _ = DB_findUserByID(d.UserID)
-			userCache[d.UserID] = owner
-		}
-		if owner == nil || owner.Disabled {
 			continue
 		}
-		if !owner.SubExpiration.IsZero() && now.After(owner.SubExpiration) {
-			continue
-		}
-		if !hasSharedOrNoGroup(owner.Groups, server.Groups) {
-			continue
-		}
-		hexKey, err := b64KeyToHex(d.WireGuardKey)
-		if err != nil {
-			continue
-		}
-		resp.Peers = append(resp.Peers, types.WGPeer{
-			PublicKeyHex:  hexKey,
-			DeviceID:      d.ID.String(),
-			WireGuardIP:   d.WireGuardIP,
-			WireGuardIPv6: d.WireGuardIPv6,
-		})
+		resp.Peers = append(resp.Peers, peer)
 	}
 
 	if len(devices) < limit {
@@ -109,7 +70,60 @@ func API_WGPeers(w http.ResponseWriter, r *http.Request) {
 	sendObject(w, resp)
 }
 
-func API_WGPeer(w http.ResponseWriter, r *http.Request) {
+func parseWGPeerPage(r *http.Request) (limit, offset int, errMsg string) {
+	limit = wgPeersDefaultLimit
+	if v := r.URL.Query().Get("limit"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n <= 0 {
+			return 0, 0, "limit must be a positive integer"
+		}
+		if n > wgPeersMaxLimit {
+			n = wgPeersMaxLimit
+		}
+		limit = n
+	}
+
+	if v := r.URL.Query().Get("offset"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 0 {
+			return 0, 0, "offset must be a non-negative integer"
+		}
+		offset = n
+	}
+	return limit, offset, ""
+}
+
+func wgPeerFromDevice(d *types.Device, server *types.Server, userCache map[uuid.UUID]*User, now time.Time) (types.WGPeer, bool) {
+	if d.WireGuardKey == "" || d.ServerID != server.ID {
+		return types.WGPeer{}, false
+	}
+	owner, ok := userCache[d.UserID]
+	if !ok {
+		owner, _ = findUserByID(d.UserID)
+		userCache[d.UserID] = owner
+	}
+	if owner == nil || owner.Disabled {
+		return types.WGPeer{}, false
+	}
+	if !owner.SubExpiration.IsZero() && now.After(owner.SubExpiration) {
+		return types.WGPeer{}, false
+	}
+	if !hasSharedOrNoGroup(owner.Groups, server.Groups) {
+		return types.WGPeer{}, false
+	}
+	hexKey, err := b64KeyToHex(d.WireGuardKey)
+	if err != nil {
+		return types.WGPeer{}, false
+	}
+	return types.WGPeer{
+		PublicKeyHex:  hexKey,
+		DeviceID:      d.ID.String(),
+		WireGuardIP:   d.WireGuardIP,
+		WireGuardIPv6: d.WireGuardIPv6,
+	}, true
+}
+
+func handleWGPeer(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 
 	server := getServerFromContext(r.Context())
@@ -129,7 +143,7 @@ func API_WGPeer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	dev, err := DB_FindDeviceByWGKey(pubKeyB64)
+	dev, err := findDeviceByWGKey(pubKeyB64)
 	if err != nil {
 		senderr(w, 500, "Failed to look up device", slog.Any("err", err))
 		return
@@ -144,7 +158,7 @@ func API_WGPeer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := DB_findUserByID(dev.UserID)
+	user, err := findUserByID(dev.UserID)
 	if err != nil {
 		senderr(w, 500, "error looking up user")
 		return
@@ -182,7 +196,7 @@ func API_WGPeer(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func API_WGConfig(w http.ResponseWriter, r *http.Request) {
+func handleWGConfig(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 
 	serverIDStr := r.URL.Query().Get("serverID")
@@ -213,7 +227,7 @@ func API_WGConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	server, err := DB_FindServerByID(serverID)
+	server, err := findServerByID(serverID)
 	if err != nil || server == nil {
 		senderr(w, 404, "Server not found")
 		return
@@ -224,7 +238,7 @@ func API_WGConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	d, err := DB_FindDeviceByWGKey(pubKey)
+	d, err := findDeviceByWGKey(pubKey)
 	if err != nil {
 		senderr(w, 500, "Database error looking up device")
 		return
@@ -259,7 +273,7 @@ func API_WGConfig(w http.ResponseWriter, r *http.Request) {
 }
 
 func assignNextWireGuardIP(serverID uuid.UUID) (string, error) {
-	server, err := DB_FindServerByID(serverID)
+	server, err := findServerByID(serverID)
 	if err != nil || server == nil {
 		return "", fmt.Errorf("server not found")
 	}
@@ -271,7 +285,7 @@ func assignNextWireGuardIP(serverID uuid.UUID) (string, error) {
 		return "", fmt.Errorf("invalid subnet %q: %w", server.WireGuardSubnet, err)
 	}
 
-	devices, err := DB_GetAllDevices()
+	devices, err := getAllDevices()
 	if err != nil {
 		return "", fmt.Errorf("list devices: %w", err)
 	}
@@ -314,7 +328,7 @@ func wgU32ToIP(n uint32) net.IP {
 }
 
 func assignNextWireGuardIPv6(serverID uuid.UUID) (string, error) {
-	server, err := DB_FindServerByID(serverID)
+	server, err := findServerByID(serverID)
 	if err != nil || server == nil {
 		return "", fmt.Errorf("server not found")
 	}
@@ -328,7 +342,7 @@ func assignNextWireGuardIPv6(serverID uuid.UUID) (string, error) {
 
 	prefix = prefix.Masked()
 
-	devices, err := DB_GetAllDevices()
+	devices, err := getAllDevices()
 	if err != nil {
 		return "", fmt.Errorf("list devices: %w", err)
 	}
@@ -361,7 +375,7 @@ func rejectServerWireGuardKey(key string) error {
 	if strings.TrimSpace(key) == "" {
 		return fmt.Errorf("WireGuard key required")
 	}
-	servers, err := DB_FindAllServers(10000, 0)
+	servers, err := findAllServers(10000, 0)
 	if err != nil {
 		return err
 	}
@@ -387,12 +401,12 @@ func b64KeyToHex(b64 string) (string, error) {
 	return fmt.Sprintf("%x", b), nil
 }
 
-func HTTP_validateWGKey(r *http.Request) (*types.Server, bool) {
+func serverFromWGKey(r *http.Request) (*types.Server, bool) {
 	key := r.Header.Get("X-WG-KEY")
 	if key == "" {
 		return nil, false
 	}
-	s, err := DB_FindServerByAPIKey(key)
+	s, err := findServerByAPIKey(key)
 	if err != nil || s == nil {
 		return nil, false
 	}
@@ -407,7 +421,7 @@ func validateCIDR(s string) error {
 	return err
 }
 
-func API_WGServerConfigFetch(w http.ResponseWriter, r *http.Request) {
+func handleWGServerConfigFetch(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 
 	server := getServerFromContext(r.Context())
@@ -445,7 +459,7 @@ func pinWireGuardPubKey(server *types.Server, pubKeyB64 string) error {
 		return nil
 	}
 	if server.WireGuardPubKey == "" {
-		if err := DB_SetServerWireGuardPubKey(server.ID, pubKeyB64); err != nil {
+		if err := setServerWireGuardPubKey(server.ID, pubKeyB64); err != nil {
 			return err
 		}
 		server.WireGuardPubKey = pubKeyB64
@@ -464,7 +478,7 @@ func meshPortForServer(s *types.Server) int {
 	return s.WireGuardPort + 1
 }
 
-func API_WGMesh(w http.ResponseWriter, r *http.Request) {
+func handleWGMesh(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 
 	server := getServerFromContext(r.Context())
@@ -479,7 +493,7 @@ func API_WGMesh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	siblings, err := DB_FindServersByMeshGroup(server.MeshGroupID)
+	siblings, err := findServersByMeshGroup(server.MeshGroupID)
 	if err != nil {
 		senderr(w, 500, "Failed to fetch mesh peers", slog.Any("err", err))
 		return

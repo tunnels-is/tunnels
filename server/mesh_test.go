@@ -25,7 +25,7 @@ func callWGMesh(t *testing.T, server *types.Server) (*httptest.ResponseRecorder,
 	req := httptest.NewRequest(http.MethodGet, "/wg/mesh", nil)
 	req = req.WithContext(context.WithValue(req.Context(), contextKeyServer, server))
 	w := httptest.NewRecorder()
-	API_WGMesh(w, req)
+	handleWGMesh(w, req)
 	var resp types.WGMeshResponse
 	if w.Code == http.StatusOK {
 		_ = json.NewDecoder(w.Body).Decode(&resp)
@@ -33,7 +33,7 @@ func callWGMesh(t *testing.T, server *types.Server) (*httptest.ResponseRecorder,
 	return w, resp
 }
 
-func TestAPI_WGMesh_SiblingSelection(t *testing.T) {
+func TestHandleWGMesh_SiblingSelection(t *testing.T) {
 	setupTestDB(t)
 	if logger == nil {
 		logger = slog.New(slog.NewTextHandler(io.Discard, nil))
@@ -63,7 +63,7 @@ func TestAPI_WGMesh_SiblingSelection(t *testing.T) {
 		WireGuardSubnet: "10.5.0.0/16", WireGuardPort: 51820,
 	}
 	for _, s := range []*types.Server{caller, siblingIn, siblingUnprov, siblingOther} {
-		if err := BBolt_CreateServer(s); err != nil {
+		if err := createServer(s); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -84,13 +84,13 @@ func TestAPI_WGMesh_SiblingSelection(t *testing.T) {
 	}
 }
 
-func TestAPI_WGMesh_NoMeshGroup(t *testing.T) {
+func TestHandleWGMesh_NoMeshGroup(t *testing.T) {
 	setupTestDB(t)
 	if logger == nil {
 		logger = slog.New(slog.NewTextHandler(io.Discard, nil))
 	}
 	caller := &types.Server{ID: uuid.New(), APIKey: uuid.NewString()}
-	if err := BBolt_CreateServer(caller); err != nil {
+	if err := createServer(caller); err != nil {
 		t.Fatal(err)
 	}
 	w, resp := callWGMesh(t, caller)
@@ -122,14 +122,14 @@ func TestValidateServerMesh(t *testing.T) {
 	}
 
 	mg := &types.MeshGroup{ID: uuid.New(), Tag: "g"}
-	if err := DB_CreateMeshGroup(mg); err != nil {
+	if err := createMeshGroup(mg); err != nil {
 		t.Fatal(err)
 	}
 	sib := &types.Server{
 		ID: uuid.New(), APIKey: uuid.NewString(), MeshGroupID: mg.ID.String(),
 		WireGuardSubnet: "10.3.0.0/16", WireGuardPort: 51820,
 	}
-	if err := BBolt_CreateServer(sib); err != nil {
+	if err := createServer(sib); err != nil {
 		t.Fatal(err)
 	}
 
@@ -153,28 +153,28 @@ func TestMeshGroupDelete_ClearsMembers(t *testing.T) {
 	meshTestLogger()
 
 	mg := &types.MeshGroup{ID: uuid.New(), Tag: "g"}
-	if err := DB_CreateMeshGroup(mg); err != nil {
+	if err := createMeshGroup(mg); err != nil {
 		t.Fatal(err)
 	}
 	s1 := &types.Server{ID: uuid.New(), APIKey: uuid.NewString(), MeshGroupID: mg.ID.String(), WireGuardSubnet: "10.3.0.0/16", WireGuardPort: 51820}
 	s2 := &types.Server{ID: uuid.New(), APIKey: uuid.NewString(), MeshGroupID: mg.ID.String(), WireGuardSubnet: "10.4.0.0/16", WireGuardPort: 51820}
-	if err := BBolt_CreateServer(s1); err != nil {
+	if err := createServer(s1); err != nil {
 		t.Fatal(err)
 	}
-	if err := BBolt_CreateServer(s2); err != nil {
+	if err := createServer(s2); err != nil {
 		t.Fatal(err)
 	}
 
 	req := httptest.NewRequest(http.MethodPost, "/ui/meshgroup/delete",
 		strings.NewReader(`{"MeshGroupID":"`+mg.ID.String()+`"}`))
 	w := httptest.NewRecorder()
-	API_AdminMeshGroupDelete(w, req)
+	handleAdminMeshGroupDelete(w, req)
 	if w.Code != http.StatusOK {
 		t.Fatalf("delete returned %d", w.Code)
 	}
 
 	for _, id := range []uuid.UUID{s1.ID, s2.ID} {
-		got, err := DB_FindServerByID(id)
+		got, err := findServerByID(id)
 		if err != nil || got == nil {
 			t.Fatalf("server %s lookup: %v", id, err)
 		}

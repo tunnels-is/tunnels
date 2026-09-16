@@ -234,7 +234,7 @@ func TestCreateFolder_ReturnsErrorInsteadOfExiting(t *testing.T) {
 func TestInitBaseFoldersAndPaths_CreatesAllSubdirs(t *testing.T) {
 	dir := t.TempDir()
 
-	s := &stateV2{BasePath: dir}
+	s := &State{BasePath: dir}
 	STATE.Store(s)
 
 	InitBaseFoldersAndPaths()
@@ -274,7 +274,7 @@ func TestInitBaseFoldersAndPaths_TrailingSeparator(t *testing.T) {
 	dir := t.TempDir()
 	withTrailing := dir + string(os.PathSeparator)
 
-	s := &stateV2{BasePath: withTrailing}
+	s := &State{BasePath: withTrailing}
 	STATE.Store(s)
 
 	InitBaseFoldersAndPaths()
@@ -289,7 +289,7 @@ func TestInitBaseFoldersAndPaths_TrailingSeparator(t *testing.T) {
 func TestInitBaseFoldersAndPaths_SetsConfigFileName(t *testing.T) {
 	dir := t.TempDir()
 
-	s := &stateV2{BasePath: dir}
+	s := &State{BasePath: dir}
 	STATE.Store(s)
 
 	InitBaseFoldersAndPaths()

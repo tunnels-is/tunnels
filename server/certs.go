@@ -53,7 +53,7 @@ func generateSelfSignedCerts(ipOverride string) error {
 	if err != nil {
 		return err
 	}
-	_, err = certs.MakeCertV2(
+	_, err = certs.MakeCertificate(
 		certs.ECDSA,
 		filepath.Join(dir, "cert.pem"),
 		filepath.Join(dir, "key.pem"),

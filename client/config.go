@@ -60,7 +60,7 @@ func ReadConfigFileFromDisk() (err error) {
 		return err
 	}
 
-	Conf := new(configV2)
+	Conf := new(Config)
 	ext := strings.ToLower(filepath.Ext(state.ConfigFileName))
 
 	switch ext {
@@ -120,8 +120,8 @@ func loadConfigFromDisk(newConfig bool) error {
 	return writeConfigToDisk()
 }
 
-func DefaultConfig() *configV2 {
-	conf := &configV2{
+func DefaultConfig() *Config {
+	conf := &Config{
 		DebugLogging:      false,
 		InfoLogging:       false,
 		ErrorLogging:      false,
@@ -156,7 +156,7 @@ func writeTunnelsToDisk(tag string) (outErr error) {
 		DEBUG("writeTunnelsToDisk: no tunnels path (no active account), skip")
 		return nil
 	}
-	TunnelMetaMap.Range(func(key string, value *TunnelMETA) bool {
+	TunnelMetaMap.Range(func(key string, value *TunnelMeta) bool {
 		t := value
 		if tag != "" {
 			if t.Tag != tag {
@@ -238,7 +238,7 @@ func loadTunnelsFromDisk() (err error) {
 			return ferr
 		}
 
-		tunnel := new(TunnelMETA)
+		tunnel := new(TunnelMeta)
 		var merr error
 
 		switch ext {
@@ -287,7 +287,7 @@ func loadTunnelsFromDisk() (err error) {
 	return nil
 }
 
-func SetConfig(config *configV2) (err error) {
+func SetConfig(config *Config) (err error) {
 	defer RecoverAndLog()
 
 	if err := validateDNSListConfig(config); err != nil {
@@ -318,7 +318,7 @@ func SetConfig(config *configV2) (err error) {
 
 // validateDNSListConfig rejects blocklist/whitelist tags that could escape the
 // list directories on disk (path traversal via Tag).
-func validateDNSListConfig(config *configV2) error {
+func validateDNSListConfig(config *Config) error {
 	if config == nil {
 		return nil
 	}

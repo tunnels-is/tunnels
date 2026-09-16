@@ -98,19 +98,9 @@ func Init(ctx context.Context, controllerURL, apiKey, configPath string, insecur
 
 	INFO("fetching config from controller at ", controllerURL)
 
-	var cfg *Config
-	for {
-		var err error
-		cfg, err = FetchConfig(controllerURL, apiKey, configPath, insecureSkipVerify)
-		if err == nil {
-			break
-		}
-		INFO("failed to fetch config from controller: ", err, " (retrying in 5s)")
-		select {
-		case <-ctx.Done():
-			return
-		case <-time.After(5 * time.Second):
-		}
+	cfg, err := waitForControllerConfig(ctx, controllerURL, apiKey, configPath, insecureSkipVerify)
+	if err != nil {
+		return
 	}
 
 	subnet6Log := ""
@@ -121,20 +111,7 @@ func Init(ctx context.Context, controllerURL, apiKey, configPath string, insecur
 		" subnet=", cfg.WireGuardSubnet, subnet6Log, " iface=", cfg.WireGuardIface)
 
 	if showNewRules {
-		fmt.Println("=== wg-server --showNewRules: rules that would be installed ===")
-		fmt.Printf("Config: serverID=%s subnet=%s subnet6=%s iface=%s port=%d publicIP=%s internetIface=%s\n",
-			cfg.ServerID,
-			cfg.WireGuardSubnet,
-			cfgOrDash(cfg.WireGuardSubnet6),
-			cfg.WireGuardIface,
-			cfg.WireGuardPort,
-			cfgOrDash(cfg.PublicIP),
-			cfgOrDash(cfg.InternetIface),
-		)
-		for _, line := range PreviewRules(cfg) {
-			fmt.Println("  " + line)
-		}
-		os.Exit(0)
+		printNewRulesAndExit(cfg)
 	}
 
 	flushWGRules(cfg)
@@ -144,10 +121,64 @@ func Init(ctx context.Context, controllerURL, apiKey, configPath string, insecur
 		return
 	}
 
-	peerStore = NewPeerStore(cfg.WireGuardSubnet, cfg.WireGuardSubnet6)
+	peerStore = newPeerStore(cfg.WireGuardSubnet, cfg.WireGuardSubnet6)
 	activeConfig.Store(cfg)
 	initSyncClient(cfg)
 
+	if err := startDataPlane(cfg, logLevel); err != nil {
+		return
+	}
+
+	if err := setupMesh(cfg, logLevel); err != nil {
+		ERR("mesh setup failed (continuing without mesh): ", err)
+	} else {
+		startMeshLoop(ctx)
+	}
+
+	INFO("wg-server started")
+
+	go refreshControllerConfigLoop(ctx)
+
+	<-ctx.Done()
+
+	INFO("wg-server shutting down...")
+	shutdownDataPlane(cfg)
+	INFO("wg-server shutdown complete")
+}
+
+func waitForControllerConfig(ctx context.Context, controllerURL, apiKey, configPath string, insecureSkipVerify bool) (*Config, error) {
+	for {
+		cfg, err := fetchConfig(controllerURL, apiKey, configPath, insecureSkipVerify, true)
+		if err == nil {
+			return cfg, nil
+		}
+		INFO("failed to fetch config from controller: ", err, " (retrying in 5s)")
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(5 * time.Second):
+		}
+	}
+}
+
+func printNewRulesAndExit(cfg *Config) {
+	fmt.Println("=== wg-server --showNewRules: rules that would be installed ===")
+	fmt.Printf("Config: serverID=%s subnet=%s subnet6=%s iface=%s port=%d publicIP=%s internetIface=%s\n",
+		cfg.ServerID,
+		cfg.WireGuardSubnet,
+		cfgOrDash(cfg.WireGuardSubnet6),
+		cfg.WireGuardIface,
+		cfg.WireGuardPort,
+		cfgOrDash(cfg.PublicIP),
+		cfgOrDash(cfg.InternetIface),
+	)
+	for _, line := range PreviewRules(cfg) {
+		fmt.Println("  " + line)
+	}
+	os.Exit(0)
+}
+
+func startDataPlane(cfg *Config, logLevel string) error {
 	if err := setupWireGuard(cfg, logLevel); err != nil {
 		ERR("wireguard setup failed: ", err)
 
@@ -155,7 +186,7 @@ func Init(ctx context.Context, controllerURL, apiKey, configPath string, insecur
 		if wgDevice != nil {
 			wgDevice.Close()
 		}
-		return
+		return err
 	}
 
 	if err := setupNet(cfg); err != nil {
@@ -170,35 +201,28 @@ func Init(ctx context.Context, controllerURL, apiKey, configPath string, insecur
 			wgDevice.Close()
 			wgLazyBind.WipeKeys()
 		}
-		return
+		return err
 	}
+	return nil
+}
 
-	if err := setupMesh(cfg, logLevel); err != nil {
-		ERR("mesh setup failed (continuing without mesh): ", err)
-	} else {
-		go func() {
-			reconcileMesh()
-			t := time.NewTicker(meshReconcileInterval())
-			defer t.Stop()
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				case <-t.C:
-					reconcileMesh()
-				}
+func startMeshLoop(ctx context.Context) {
+	go func() {
+		reconcileMesh()
+		t := time.NewTicker(meshReconcileInterval())
+		defer t.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-t.C:
+				reconcileMesh()
 			}
-		}()
-	}
+		}
+	}()
+}
 
-	INFO("wg-server started")
-
-	go refreshControllerConfigLoop(ctx)
-
-	<-ctx.Done()
-
-	INFO("wg-server shutting down...")
-
+func shutdownDataPlane(cfg *Config) {
 	if wgLazyBind != nil {
 		wgLazyBind.Shutdown()
 	}
@@ -212,5 +236,4 @@ func Init(ctx context.Context, controllerURL, apiKey, configPath string, insecur
 	stopFlowCleaner()
 	cleanupMesh(cfg)
 	cleanupNet(cfg)
-	INFO("wg-server shutdown complete")
 }

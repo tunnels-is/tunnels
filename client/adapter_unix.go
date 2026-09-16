@@ -1,0 +1,632 @@
+//go:build freebsd || linux || openbsd
+
+package client
+
+import (
+	"errors"
+	"io"
+	"net"
+	"os"
+	"os/exec"
+	"strconv"
+	"strings"
+	"sync/atomic"
+	"syscall"
+	"unsafe"
+
+	"github.com/vishvananda/netlink"
+)
+
+type adapter struct {
+	tunnel atomic.Pointer[*TUN]
+
+	Name        string
+	IPv4Address string
+	IPv6Address string
+	NetMask     string
+	TxQueuelen  int32
+	MTU         int32
+	Gateway     string
+
+	Multiqueue bool
+	User       uint
+	Group      uint
+	TunnelFile string
+	RWC        io.ReadWriteCloser
+	FD         uintptr
+}
+
+func (t *adapter) Close() error {
+	if t.RWC != nil {
+		return t.RWC.Close()
+	}
+	return nil
+}
+
+type syscallCreateIF struct {
+	Name  [0x10]byte
+	Flags uint16
+	pad   [0x28 - 0x10 - 2]byte
+}
+
+func (t *adapter) Create() (err error) {
+	if t.TunnelFile == "" {
+		t.TunnelFile = "/dev/net/tun"
+	}
+
+	INFO("about to open device: ", t.TunnelFile)
+	fd, err := syscall.Open(t.TunnelFile, os.O_RDWR|syscall.O_NONBLOCK, 0)
+	if err != nil {
+		ERROR("erro opening device: ", t.TunnelFile, " || err: ", err)
+		return err
+	}
+
+	t.FD = uintptr(fd)
+
+	var flags uint16 = 0x1000
+	flags |= 0x0001
+	if t.Multiqueue {
+		flags |= 0x0100
+	}
+
+	var req syscallCreateIF
+	req.Flags = flags
+	copy(req.Name[:], []byte(t.Name))
+
+	if err = tunnelCtl(t.FD, syscall.TUNSETIFF, uintptr(unsafe.Pointer(&req))); err != nil {
+		return err
+	}
+
+	if t.User != 0 {
+		if err = tunnelCtl(t.FD, syscall.TUNSETOWNER, uintptr(t.User)); err != nil {
+			return err
+		}
+	}
+
+	if t.Group != 0 {
+		if err = tunnelCtl(t.FD, syscall.TUNSETGROUP, uintptr(t.Group)); err != nil {
+			return err
+		}
+	}
+
+	t.RWC = os.NewFile(t.FD, "tun_"+t.Name)
+
+	return
+}
+
+type syscallSetFlags struct {
+	Name  [16]byte
+	Flags int16
+}
+
+type syscallAddAddrV4 struct {
+	Name [16]byte
+	syscall.RawSockaddrInet4
+}
+
+func (t *adapter) Addr() (err error) {
+	var ifr syscallAddAddrV4
+	ifr.Port = 0
+	ifr.Family = syscall.AF_INET
+
+	copy(ifr.Name[:], []byte(t.Name))
+	copy(ifr.Addr[:], net.ParseIP(t.IPv4Address).To4())
+
+	if err = socketCtl(
+		syscall.SIOCSIFADDR,
+		uintptr(unsafe.Pointer(&ifr)),
+	); err != nil {
+		return
+	}
+
+	return
+}
+
+func (t *adapter) AddrV6() (err error) {
+	link, err := netlink.LinkByName(t.Name)
+	if err != nil {
+		return err
+	}
+
+	ipv6, ipv6Net, err := net.ParseCIDR(t.IPv6Address + "/64")
+	if err != nil {
+		ipv6 = net.ParseIP(t.IPv6Address)
+		if ipv6 == nil {
+			return errors.New("invalid IPv6 address")
+		}
+		_, ipv6Net, _ = net.ParseCIDR(t.IPv6Address + "/64")
+	}
+
+	addr := &netlink.Addr{
+		IPNet: &net.IPNet{
+			IP:   ipv6,
+			Mask: ipv6Net.Mask,
+		},
+	}
+
+	err = netlink.AddrAdd(link, addr)
+	if err != nil && !strings.Contains(err.Error(), "exists") && !strings.Contains(err.Error(), "permission denied") {
+		return err
+	}
+
+	DEBUG("Added IPv6 address ", t.IPv6Address, " to interface ", t.Name)
+
+	return nil
+}
+
+func (t *adapter) Up() (err error) {
+	var ifr syscallSetFlags
+
+	copy(ifr.Name[:], []byte(t.Name))
+	ifr.Flags |= 0x1
+
+	if err = socketCtl(
+		syscall.SIOCSIFFLAGS,
+		uintptr(unsafe.Pointer(&ifr)),
+	); err != nil {
+		return
+	}
+
+	return
+}
+
+type syscallChangeMTU struct {
+	Name [16]byte
+	MTU  int32
+}
+
+func (t *adapter) SetMTU() (err error) {
+	var ifr syscallChangeMTU
+	copy(ifr.Name[:], []byte(t.Name))
+	ifr.MTU = t.MTU
+
+	if err = socketCtl(
+		syscall.SIOCSIFMTU,
+		uintptr(unsafe.Pointer(&ifr)),
+	); err != nil {
+		return
+	}
+
+	return
+}
+
+type syscallChangeTXQueueLen struct {
+	Name       [16]byte
+	TxQueueLen int32
+}
+
+func (t *adapter) SetTXQueueLen() (err error) {
+	var ifr syscallChangeTXQueueLen
+	copy(ifr.Name[:], []byte(t.Name))
+	ifr.TxQueueLen = t.TxQueuelen
+
+	if err = socketCtl(
+		syscall.SIOCSIFTXQLEN,
+		uintptr(unsafe.Pointer(&ifr)),
+	); err != nil {
+		return
+	}
+
+	return
+}
+
+func (t *adapter) Delete() (err error) {
+	var ifr syscallSetFlags
+	DOR := 1 << 17
+
+	copy(ifr.Name[:], []byte(t.Name))
+	ifr.Flags |= 0x0
+	ifr.Flags = int16(DOR)
+
+	if err = socketCtl(
+		syscall.SIOCSIFFLAGS,
+		uintptr(unsafe.Pointer(&ifr)),
+	); err != nil {
+		return
+	}
+
+	_ = exec.Command("ip", "link", "delete", t.Name).Run()
+
+	return
+}
+
+func (t *adapter) configureAdapter() (err error) {
+	err = t.Addr()
+	if err != nil {
+		return
+	}
+
+	if t.IPv6Address != "" {
+		err = t.AddrV6()
+		if err != nil {
+			DEBUG("Unable to add IPv6 address, maybe IPv6 is turned off ?, err : ", err)
+			return
+		}
+	}
+
+	err = t.Up()
+	if err != nil {
+		return
+	}
+	err = t.SetMTU()
+	if err != nil {
+		return
+	}
+
+	if txErr := t.SetTXQueueLen(); txErr != nil {
+		ERROR("unable to set tx queue length (continuing): ", txErr)
+	}
+
+	return
+}
+
+func (t *adapter) applyTunnelRoutes(tun *TUN) (err error) {
+	meta := tun.meta.Load()
+	if meta.EnableDefaultRoute {
+		err = addIPv4Route("default", "", t.IPv4Address, "0")
+		if err != nil {
+			return err
+		}
+
+		if t.IPv6Address != "" {
+			iperr := addIPv6Route("default", t.Name, t.IPv6Address, "0")
+			if iperr != nil {
+				DEBUG("Unable to add IPv6 route, maybe IPv6 is turned off ?, err : ", err)
+			}
+		}
+	}
+
+	if sub := tun.ServerResponse.WireGuardSubnet; sub != "" {
+		err = addIPv4Route(sub, "", t.IPv4Address, "0")
+		if err != nil {
+			return err
+		}
+	}
+	if sub6 := tun.ServerResponse.WireGuardSubnet6; sub6 != "" && t.IPv6Address != "" {
+		iperr := addIPv6Route(sub6, t.Name, t.IPv6Address, "0")
+		if iperr != nil {
+			DEBUG("Unable to add IPv6 WireGuard subnet route, err : ", iperr)
+		}
+	}
+
+	if meta.EnableWAN {
+		if wan := tun.ServerResponse.WANCIDR; wan != "" {
+			err = addIPv4Route(wan, "", t.IPv4Address, "0")
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	for _, n := range tun.ServerResponse.Networks {
+		if n.Nat != "" {
+			err = addIPv4Route(n.Nat, "", t.IPv4Address, "0")
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	for _, v := range tun.ServerResponse.Routes {
+		err = addIPv4Route(v.Address, "", t.IPv4Address, v.Metric)
+		if err != nil {
+			return err
+		}
+	}
+
+	return
+}
+
+func (t *adapter) Connect(tun *TUN) (err error) {
+	err = t.configureAdapter()
+	if err != nil {
+		return
+	}
+
+	return t.applyTunnelRoutes(tun)
+}
+
+func (t *adapter) Disconnect(tun *TUN) (err error) {
+	defer RecoverAndLog()
+	if tun.wgDevice != nil {
+		tun.wgDevice.Close()
+	}
+
+	err = t.Close()
+	if err != nil {
+		ERROR("unable to close the interface", err)
+	}
+
+	_ = t.Delete()
+
+	return
+}
+
+func tunnelCtl(fd uintptr, request uintptr, argp uintptr) error {
+	_, _, errno := syscall.Syscall(syscall.SYS_IOCTL, fd, uintptr(request), argp)
+	if errno != 0 {
+		return os.NewSyscallError("ioctl", errno)
+	}
+	return nil
+}
+
+func socketCtl(request uintptr, argp uintptr) error {
+	fd, err := syscall.Socket(
+		syscall.AF_INET,
+		syscall.SOCK_DGRAM,
+		syscall.IPPROTO_IP,
+	)
+	defer syscall.Close(fd)
+	if err != nil {
+		return err
+	}
+
+	_, _, errno := syscall.Syscall(syscall.SYS_IOCTL, uintptr(fd), uintptr(request), argp)
+	if errno != 0 {
+		return os.NewSyscallError("ioctl", errno)
+	}
+	return nil
+}
+
+// ipv4HostOnLink reports whether dest is already covered by a connected
+// IPv4 prefix. A via-gateway /32 for an on-link peer (same podman/LAN
+// subnet) breaks reachability: traffic hairpins through the default
+// gateway instead of going L2.
+func ipv4HostOnLink(network string) bool {
+	if network == "" || network == "default" {
+		return false
+	}
+	var host net.IP
+	if _, dst, err := net.ParseCIDR(network); err == nil && dst != nil {
+		ones, bits := dst.Mask.Size()
+		if bits != 32 || ones == 0 {
+			return false
+		}
+		host = dst.IP.To4()
+	} else {
+		host = net.ParseIP(network).To4()
+	}
+	if host == nil {
+		return false
+	}
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		return false
+	}
+	for _, iface := range ifaces {
+		addrs, err := iface.Addrs()
+		if err != nil {
+			continue
+		}
+		for _, a := range addrs {
+			n, ok := a.(*net.IPNet)
+			if !ok || n.IP.To4() == nil {
+				continue
+			}
+			ones, bits := n.Mask.Size()
+			if bits != 32 || ones == 0 || ones >= 32 {
+				continue
+			}
+			if n.Contains(host) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func addIPv4Route(
+	network string,
+	ifName string,
+	gateway string,
+	metric string,
+) (err error) {
+	if ipv4HostOnLink(network) {
+		DEBUG("skip route add, dest on-link: ", network)
+		return nil
+	}
+
+	mInt, err := strconv.Atoi(metric)
+	if err != nil {
+		return err
+	}
+
+	r := new(netlink.Route)
+	if network == "default" {
+		_, r.Dst, _ = net.ParseCIDR("0.0.0.0/0")
+	} else {
+		_, r.Dst, err = net.ParseCIDR(network)
+		if err != nil {
+			return err
+		}
+	}
+
+	r.Priority = mInt
+	if gw := net.ParseIP(gateway); gw != nil {
+		r.Gw = gw.To4()
+	}
+
+	if ifName != "" {
+		link, lerr := netlink.LinkByName(ifName)
+		if lerr != nil {
+			return lerr
+		}
+		r.LinkIndex = link.Attrs().Index
+		if r.Dst != nil {
+			ones, bits := r.Dst.Mask.Size()
+			if ones == bits {
+				existing, _ := netlink.RouteListFiltered(netlink.FAMILY_V4, &netlink.Route{Dst: r.Dst}, netlink.RT_FILTER_DST)
+				if len(existing) == 1 && existing[0].LinkIndex == r.LinkIndex &&
+					existing[0].Gw != nil && r.Gw != nil && existing[0].Gw.Equal(r.Gw) {
+					return nil
+				}
+				for i := range existing {
+					_ = netlink.RouteDel(&existing[i])
+				}
+			} else {
+				_ = delIPv4Route(network, gateway, metric)
+			}
+		}
+	} else {
+		_ = delIPv4Route(network, gateway, metric)
+	}
+
+	err = netlink.RouteReplace(r)
+	if err != nil {
+		if strings.Contains(err.Error(), "exists") {
+			DEBUG("IPv4 route already exists")
+			return nil
+		}
+		return err
+	}
+
+	DEBUG(
+		"ip ",
+		"route ",
+		"add ",
+		network,
+		" via ",
+		gateway,
+		" dev ",
+		ifName,
+		" metric ",
+		metric,
+	)
+	return
+}
+
+func addIPv6Route(
+	network string,
+	ifName string,
+	gateway string,
+	metric string,
+) (err error) {
+	_ = delIPv6Route(network, gateway, metric)
+
+	link, err := netlink.LinkByName(ifName)
+	if err != nil {
+		return err
+	}
+
+	mInt, err := strconv.Atoi(metric)
+	if err != nil {
+		return err
+	}
+
+	r := new(netlink.Route)
+	r.LinkIndex = link.Attrs().Index
+	r.Priority = mInt
+	if network == "default" {
+		_, r.Dst, _ = net.ParseCIDR("::/0")
+	} else {
+		_, r.Dst, err = net.ParseCIDR(network)
+		if err != nil {
+			return err
+		}
+
+	}
+
+	err = netlink.RouteAdd(r)
+	if err != nil {
+		if strings.Contains(err.Error(), "exists") {
+			DEBUG("default ipv6 route already exists")
+			return nil
+		}
+		if strings.Contains(err.Error(), "permission denied") {
+			DEBUG("missing permission or ipv6 disabled when adding ipv6 route")
+			return nil
+		}
+		return err
+	}
+
+	DEBUG(
+		"ip ",
+		"-6 ",
+		"route ",
+		"add ",
+		network,
+		" via ",
+		gateway,
+		" metric ",
+		metric,
+	)
+
+	return
+}
+
+func delIPv4Route(network string, gateway string, metric string) (err error) {
+	mInt, err := strconv.Atoi(metric)
+	if err != nil {
+		return err
+	}
+
+	r := new(netlink.Route)
+	if network == "default" {
+		_, r.Dst, _ = net.ParseCIDR("0.0.0.0/0")
+	} else {
+		_, r.Dst, err = net.ParseCIDR(network)
+		if err != nil {
+			return err
+		}
+	}
+
+	r.Priority = mInt
+	r.Gw = net.ParseIP(gateway).To4()
+
+	DEBUG("DEL ROUTE: ", r)
+	err = netlink.RouteDel(r)
+	if err != nil {
+		return err
+	}
+
+	return
+}
+
+func delIPv6Route(network string, gateway string, metric string) (err error) {
+	mInt, err := strconv.Atoi(metric)
+	if err != nil {
+		return err
+	}
+
+	r := new(netlink.Route)
+	if network == "default" {
+		_, r.Dst, _ = net.ParseCIDR("::/0")
+	} else {
+		_, r.Dst, err = net.ParseCIDR(network)
+		if err != nil {
+			return err
+		}
+	}
+
+	r.Priority = mInt
+	r.Gw = net.ParseIP(gateway).To16()
+
+	DEBUG("DEL IPv6 ROUTE: ", r)
+	err = netlink.RouteDel(r)
+	if err != nil {
+		return err
+	}
+
+	return
+}
+
+func AdjustRoutersForTunneling() (err error) {
+	defer RecoverAndLog()
+
+	links, _ := netlink.LinkList()
+	for _, v := range links {
+
+		routes, _ := netlink.RouteList(v, netlink.FAMILY_V4)
+		for i := range routes {
+			r := routes[i]
+			if r.Dst == nil && r.Priority < 2 {
+				DEBUG("Adjusting Default Route: ", r)
+				_ = netlink.RouteDel(&r)
+				r.Priority = 100
+				_ = netlink.RouteAdd(&r)
+			}
+		}
+	}
+
+	return
+}

@@ -53,7 +53,7 @@ type LazyBind struct {
 	deniedKeys map[string]time.Time
 }
 
-func NewLazyBind(inner conn.Bind, serverPriv, serverPub []byte, bufferSize, ratePerIP int) *LazyBind {
+func newLazyBind(inner conn.Bind, serverPriv, serverPub []byte, bufferSize, ratePerIP int) *LazyBind {
 	return &LazyBind{
 		inner:        inner,
 		requeueCh:    make(chan *bufferedPkt, bufferSize),
@@ -278,8 +278,8 @@ func (b *LazyBind) handleInitiation(pkt *bufferedPkt) {
 		b.noteDenied(pubKeyB64)
 		INFO("LazyBind: peer no longer authorized, removing → ", pubKeyB64[:12], "…")
 		if hexKey, err := b64ToHex(pubKeyB64); err == nil {
-			_ = RemovePeer(hexKey)
-			addedPeerKeys.Delete(hexKey)
+			_ = removePeer(hexKey)
+			installedPeerAddrs.Delete(hexKey)
 			peerStore.DeleteByPubKey(pubKeyB64)
 		}
 

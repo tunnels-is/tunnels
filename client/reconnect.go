@@ -46,7 +46,7 @@ func watchWGDevice(tunnel *TUN) {
 			tag = m.Tag
 		}
 		DEBUG("WireGuard device closed:", tag, tunnel.ID)
-		if tunnel.GetState() >= TUN_Connected {
+		if tunnel.GetState() >= TunnelConnected {
 			tunnelMonitor <- tunnel
 		}
 	}()

@@ -3,8 +3,6 @@ package main
 import (
 	"context"
 	"crypto/tls"
-	"encoding/json"
-	"errors"
 	"flag"
 	"fmt"
 	"log/slog"
@@ -12,7 +10,6 @@ import (
 	"net"
 	"os"
 	sig "os/signal"
-	"path/filepath"
 	"runtime"
 	"strings"
 	"sync/atomic"
@@ -22,13 +19,11 @@ import (
 	"github.com/NdoleStudio/lemonsqueezy-go"
 	"github.com/google/uuid"
 	"github.com/jackpal/gateway"
-	"github.com/tunnels-is/tunnels/crypt"
 	"github.com/tunnels-is/tunnels/signal"
 	"github.com/tunnels-is/tunnels/types"
 	"github.com/tunnels-is/tunnels/version"
 	wgserver "github.com/tunnels-is/tunnels/wg-server"
 	"golang.org/x/crypto/bcrypt"
-	"gopkg.in/yaml.v3"
 )
 
 var (
@@ -101,64 +96,19 @@ func main() {
 	}
 	skipWGVerify := wgBootstrapSkipVerify(*createCert)
 	if configRequested || *allTheThings {
-		switch configMode {
-		case "all", "auth", "wg":
-			logger.Info("generating config", "mode", configMode)
-			if err := makeConfig(*ipOverride, configMode, skipWGVerify); err != nil {
-				logger.Error("unable to create config", "error", err)
-				os.Exit(1)
-			}
-		case "":
-		default:
-			logger.Error("invalid -createConfig value (allowed: '', 'all', 'auth', 'wg')", "value", *createConfig)
-			os.Exit(1)
-		}
+		runCreateConfig(*ipOverride, configMode, skipWGVerify, *createConfig)
 	}
 
 	if *createAdmin || *allTheThings {
-		err := ConnectToBBoltDB("tunnels.db")
-		if err != nil {
-			logger.Error("unable to connect to bbolt", slog.Any("err", err))
-			os.Exit(1)
-		}
-		if err := initializeAdminUser(); err != nil {
-			logger.Error("unable to create admin user", slog.Any("err", err))
-			os.Exit(1)
-		}
-		BBoltDB.Close()
+		runCreateAdmin()
 	}
 
 	if *createServer || *allTheThings {
-		err := ConnectToBBoltDB("tunnels.db")
-		if err != nil {
-			logger.Error("unable to connect to bbolt", slog.Any("err", err))
-			os.Exit(1)
-		}
-		if err := initializeDefaultServer(); err != nil {
-			logger.Error("unable to create default server", slog.Any("err", err))
-			os.Exit(1)
-		}
-		BBoltDB.Close()
+		runCreateServer()
 	}
 
 	if *createCert != "" || *allTheThings {
-		certValue := strings.TrimSpace(*createCert)
-		if certValue == "selfsign" {
-			logger.Info("generating self-signed certificates")
-			if err := generateSelfSignedCerts(*ipOverride); err != nil {
-				logger.Error("unable to create self-signed certificates", "error", err)
-				os.Exit(1)
-			}
-		} else {
-			logger.Info("requesting Let's Encrypt certificate", "domain", certValue)
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-			err := generateLetsEncryptCerts(ctx, certValue)
-			cancel()
-			if err != nil {
-				logger.Error("unable to obtain Let's Encrypt certificate", "error", err)
-				os.Exit(1)
-			}
-		}
+		runCreateCert(*createCert, *ipOverride)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -166,82 +116,156 @@ func main() {
 	Cancel.Store(&cancel)
 
 	if *authServerEnabled || *allTheThings {
-		err := ConnectToBBoltDB("tunnels.db")
-		if err != nil {
-			logger.Error("unable to connect to bbolt", slog.Any("err", err))
-			os.Exit(1)
-		}
-
-		err = LoadServerConfig(serverConfigPath)
-		if err != nil {
-			panic(err)
-		}
-
-		if err := validateServerConfig(Config.Load()); err != nil {
-			logger.Error("invalid server config, refusing to start", slog.Any("err", err))
-			os.Exit(1)
-		}
-
-		err = loadCertificatesAndTLSSettings()
-		if err != nil {
-			panic(err)
-		}
-
-		if loadSecret("PayKey") != "" {
-			lemonClient := lemonsqueezy.New(lemonsqueezy.WithAPIKey(loadSecret("PayKey")))
-			if lemonClient == nil {
-				logger.Error("Unable to initialize lemon queezy client", slog.Any("err", err))
-				os.Exit(1)
-			}
-			lc.Store(lemonClient)
-			go signal.NewSignal("SUBSCANNER", ctx, 12*time.Hour, goroutineLogger, scanSubs)
-		}
-
-		go signal.NewSignal("API", ctx, 1*time.Second, goroutineLogger, launchAPIServer)
-
-		go signal.NewSignal("PWRESET-CLEAN", ctx, passwordResetCleanEvery, goroutineLogger, cleanPasswordResetAttempts)
-
-		go signal.NewSignal("CONFIG", ctx, 30*time.Second, goroutineLogger, func() {
-			C, err := parseServerConfig(serverConfigPath)
-			if err != nil {
-				logger.Error("config could not be loaded", "path", serverConfigPath, slog.Any("err", err))
-				return
-			}
-			if err := validateServerConfig(C); err != nil {
-				logger.Error("reloaded config failed validation; keeping previous config", slog.Any("err", err))
-				return
-			}
-			Config.Store(C)
-		})
+		startAuthServer(ctx)
 	}
 
 	var wgDone chan struct{}
 	if *wgServerEnabled || *allTheThings {
-		if err := LoadWGConfig(wgConfigPath); err != nil {
-			logger.Error("WG feature enabled but wg config could not be loaded", "path", wgConfigPath, slog.Any("err", err))
-			os.Exit(1)
-		}
-		wgCfg := WGConfig.Load()
-		if wgCfg.APIKey == "" {
-			logger.Error("WG feature enabled but wg config has no APIKey", "path", wgConfigPath)
-			os.Exit(1)
-		}
-		ctrlURL := wgCfg.ControllerURL
-		if ctrlURL == "" {
-			latestCfg := Config.Load()
-			ctrlURL = "https://" + latestCfg.APIIP + ":" + latestCfg.APIPort
-		}
-
-		wgDone = make(chan struct{})
-		go wgserver.Init(ctx, ctrlURL, wgCfg.APIKey, wgConfigPath, wgCfg.InsecureSkipVerify, *logLevel, *showNewRules, wgDone)
-
-		go signal.NewSignal("WG-CONFIG", ctx, 30*time.Second, goroutineLogger, func() {
-			if err := LoadWGConfig(wgConfigPath); err != nil {
-				logger.Error("WG feature enabled but wg config could not be loaded", "path", wgConfigPath, slog.Any("err", err))
-			}
-		})
+		wgDone = startWGServer(ctx, *logLevel, *showNewRules)
 	}
 
+	waitForShutdown(cancel, wgDone)
+}
+
+func runCreateConfig(ipOverride, configMode string, skipWGVerify bool, rawCreateConfig string) {
+	switch configMode {
+	case "all", "auth", "wg":
+		logger.Info("generating config", "mode", configMode)
+		if err := makeConfig(ipOverride, configMode, skipWGVerify); err != nil {
+			logger.Error("unable to create config", "error", err)
+			os.Exit(1)
+		}
+	case "":
+	default:
+		logger.Error("invalid -createConfig value (allowed: '', 'all', 'auth', 'wg')", "value", rawCreateConfig)
+		os.Exit(1)
+	}
+}
+
+func runCreateAdmin() {
+	err := openDB("tunnels.db")
+	if err != nil {
+		logger.Error("unable to connect to bbolt", slog.Any("err", err))
+		os.Exit(1)
+	}
+	if err := initializeAdminUser(); err != nil {
+		logger.Error("unable to create admin user", slog.Any("err", err))
+		os.Exit(1)
+	}
+	db.Close()
+}
+
+func runCreateServer() {
+	err := openDB("tunnels.db")
+	if err != nil {
+		logger.Error("unable to connect to bbolt", slog.Any("err", err))
+		os.Exit(1)
+	}
+	if err := initializeDefaultServer(); err != nil {
+		logger.Error("unable to create default server", slog.Any("err", err))
+		os.Exit(1)
+	}
+	db.Close()
+}
+
+func runCreateCert(createCert, ipOverride string) {
+	certValue := strings.TrimSpace(createCert)
+	if certValue == "selfsign" {
+		logger.Info("generating self-signed certificates")
+		if err := generateSelfSignedCerts(ipOverride); err != nil {
+			logger.Error("unable to create self-signed certificates", "error", err)
+			os.Exit(1)
+		}
+	} else {
+		logger.Info("requesting Let's Encrypt certificate", "domain", certValue)
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		err := generateLetsEncryptCerts(ctx, certValue)
+		cancel()
+		if err != nil {
+			logger.Error("unable to obtain Let's Encrypt certificate", "error", err)
+			os.Exit(1)
+		}
+	}
+}
+
+func startAuthServer(ctx context.Context) {
+	err := openDB("tunnels.db")
+	if err != nil {
+		logger.Error("unable to connect to bbolt", slog.Any("err", err))
+		os.Exit(1)
+	}
+
+	err = LoadServerConfig(serverConfigPath)
+	if err != nil {
+		panic(err)
+	}
+
+	if err := validateServerConfig(Config.Load()); err != nil {
+		logger.Error("invalid server config, refusing to start", slog.Any("err", err))
+		os.Exit(1)
+	}
+
+	err = loadCertificatesAndTLSSettings()
+	if err != nil {
+		panic(err)
+	}
+
+	if loadSecret("PayKey") != "" {
+		lemonClient := lemonsqueezy.New(lemonsqueezy.WithAPIKey(loadSecret("PayKey")))
+		if lemonClient == nil {
+			logger.Error("Unable to initialize lemon queezy client", slog.Any("err", err))
+			os.Exit(1)
+		}
+		lc.Store(lemonClient)
+		go signal.NewSignal("SUBSCANNER", ctx, 12*time.Hour, goroutineLogger, scanSubs)
+	}
+
+	go signal.NewSignal("API", ctx, 1*time.Second, goroutineLogger, launchAPIServer)
+
+	go signal.NewSignal("PWRESET-CLEAN", ctx, passwordResetCleanEvery, goroutineLogger, cleanPasswordResetAttempts)
+
+	go signal.NewSignal("CONFIG", ctx, 30*time.Second, goroutineLogger, func() {
+		C, err := parseServerConfig(serverConfigPath)
+		if err != nil {
+			logger.Error("config could not be loaded", "path", serverConfigPath, slog.Any("err", err))
+			return
+		}
+		if err := validateServerConfig(C); err != nil {
+			logger.Error("reloaded config failed validation; keeping previous config", slog.Any("err", err))
+			return
+		}
+		Config.Store(C)
+	})
+}
+
+func startWGServer(ctx context.Context, logLevel string, showNewRules bool) chan struct{} {
+	if err := LoadWGConfig(wgConfigPath); err != nil {
+		logger.Error("WG feature enabled but wg config could not be loaded", "path", wgConfigPath, slog.Any("err", err))
+		os.Exit(1)
+	}
+	wgCfg := WGConfig.Load()
+	if wgCfg.APIKey == "" {
+		logger.Error("WG feature enabled but wg config has no APIKey", "path", wgConfigPath)
+		os.Exit(1)
+	}
+	ctrlURL := wgCfg.ControllerURL
+	if ctrlURL == "" {
+		latestCfg := Config.Load()
+		ctrlURL = "https://" + latestCfg.APIIP + ":" + latestCfg.APIPort
+	}
+
+	wgDone := make(chan struct{})
+	go wgserver.Init(ctx, ctrlURL, wgCfg.APIKey, wgConfigPath, wgCfg.InsecureSkipVerify, logLevel, showNewRules, wgDone)
+
+	go signal.NewSignal("WG-CONFIG", ctx, 30*time.Second, goroutineLogger, func() {
+		if err := LoadWGConfig(wgConfigPath); err != nil {
+			logger.Error("WG feature enabled but wg config could not be loaded", "path", wgConfigPath, slog.Any("err", err))
+		}
+	})
+	return wgDone
+}
+
+func waitForShutdown(cancel context.CancelFunc, wgDone chan struct{}) {
 	logger.Info("Tunnels ready")
 	quit := make(chan os.Signal, 1)
 	sig.Notify(quit, os.Interrupt, syscall.SIGTERM)
@@ -265,277 +289,8 @@ func goroutineLogger(msg string) {
 	}
 }
 
-const minSecretLen = 32
-
-func validateServerConfig(c *types.ServerConfig) error {
-	if c == nil {
-		return errors.New("server config is nil")
-	}
-	if len(c.CookieSigningKey) < minSecretLen {
-		return fmt.Errorf("CookieSigningKey must be set and at least %d characters: it seeds the AES-256 key that seals admin session cookies; generate a config with -createConfig or set a strong random value", minSecretLen)
-	}
-	if len(c.TwoFactorKey) < minSecretLen {
-		return fmt.Errorf("TwoFactorKey must be set and at least %d characters: it seeds the AES-256 key that encrypts 2FA and recovery codes at rest; generate a config with -createConfig or set a strong random value", minSecretLen)
-	}
-	if c.AdminAPIKey != "" && len(c.AdminAPIKey) < 16 {
-		return fmt.Errorf("AdminAPIKey must be at least 16 characters when set")
-	}
-	return nil
-}
-
-func parseServerConfig(path string) (*types.ServerConfig, error) {
-	nb, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-	C := new(types.ServerConfig)
-
-	ext := strings.ToLower(filepath.Ext(path))
-	switch ext {
-	case ".yaml", ".yml":
-		err = yaml.Unmarshal(nb, &C)
-	case ".json", "":
-		err = json.Unmarshal(nb, &C)
-	default:
-		return nil, fmt.Errorf("unsupported config file format: %s (supported: .json, .yaml, .yml)", ext)
-	}
-	if err != nil {
-		return nil, err
-	}
-	return C, nil
-}
-
-func LoadServerConfig(path string) (err error) {
-	C, err := parseServerConfig(path)
-	if err != nil {
-		return err
-	}
-	Config.Store(C)
-	return nil
-}
-
-func SaveServerConfig(path string) (err error) {
-	C := Config.Load()
-
-	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		_ = f.Close()
-	}()
-
-	ext := strings.ToLower(filepath.Ext(path))
-	switch ext {
-	case ".yaml", ".yml":
-		encoder := yaml.NewEncoder(f)
-		encoder.SetIndent(2)
-		if err := encoder.Encode(C); err != nil {
-			return err
-		}
-		_ = encoder.Close()
-	case ".json", "":
-		encoder := json.NewEncoder(f)
-		encoder.SetIndent("", "    ")
-		if err := encoder.Encode(C); err != nil {
-			return err
-		}
-	default:
-		return fmt.Errorf("unsupported config file format: %s (supported: .json, .yaml, .yml)", ext)
-	}
-
-	return nil
-}
-
-func LoadWGConfig(path string) error {
-	nb, err := os.ReadFile(path)
-	if err != nil {
-		return err
-	}
-	W := new(types.WGBootstrap)
-	ext := strings.ToLower(filepath.Ext(path))
-	switch ext {
-	case ".yaml", ".yml":
-		err = yaml.Unmarshal(nb, W)
-	case ".json", "":
-		err = json.Unmarshal(nb, W)
-	default:
-		return fmt.Errorf("unsupported wg config file format: %s (supported: .json, .yaml, .yml)", ext)
-	}
-	if err != nil {
-		return err
-	}
-	WGConfig.Store(W)
-	return nil
-}
-
-func SaveWGConfig(path string) error {
-	W := WGConfig.Load()
-	if W == nil {
-		return fmt.Errorf("no wg config loaded")
-	}
-
-	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = f.Close() }()
-
-	ext := strings.ToLower(filepath.Ext(path))
-	switch ext {
-	case ".yaml", ".yml":
-		encoder := yaml.NewEncoder(f)
-		encoder.SetIndent(2)
-		if err := encoder.Encode(W); err != nil {
-			return err
-		}
-		_ = encoder.Close()
-	case ".json", "":
-		encoder := json.NewEncoder(f)
-		encoder.SetIndent("", "    ")
-		if err := encoder.Encode(W); err != nil {
-			return err
-		}
-	default:
-		return fmt.Errorf("unsupported wg config file format: %s (supported: .json, .yaml, .yml)", ext)
-	}
-	return nil
-}
-
-func secretFileWorldAccessible(path string) bool {
-	info, err := os.Stat(path)
-	if err != nil {
-		return false
-	}
-	return info.Mode().Perm()&0o007 != 0
-}
-
-func loadKeyPair(key, cert string) (c tls.Certificate, err error) {
-	if err := crypt.CheckKeyFilePermissions(key); err != nil {
-		if secretFileWorldAccessible(key) {
-			return c, err
-		}
-		logger.Warn("TLS private key is group-accessible (continuing)", "path", key, "err", err)
-	}
-	_, priv, err := crypt.LoadPrivateKey(key)
-	if err != nil {
-		return c, err
-	}
-	_, pub, err := crypt.LoadPublicKey(cert)
-	if err != nil {
-		return c, err
-	}
-	c, err = tls.X509KeyPair(pub, priv)
-	if err != nil {
-		return c, err
-	}
-
-	return c, nil
-}
-
-func loadCertificatesAndTLSSettings() (err error) {
-	keyPem := loadSecret("KeyPem")
-	if err := crypt.CheckKeyFilePermissions(keyPem); err != nil {
-		if secretFileWorldAccessible(keyPem) {
-			return err
-		}
-		logger.Warn("TLS private key is group-accessible (continuing)", "path", keyPem, "err", err)
-	}
-	_, privB, err := crypt.LoadPrivateKey(keyPem)
-	if err != nil {
-		return err
-	}
-	_, pubB, err := crypt.LoadPublicKey(loadSecret("CertPem"))
-	if err != nil {
-		return err
-	}
-	tlscert, err := tls.X509KeyPair(pubB, privB)
-	if err != nil {
-		return err
-	}
-	KeyPair.Store(&tlscert)
-
-	apiCerts := []tls.Certificate{}
-	keyPems := loadStringSliceKey("KeyPems")
-	CertPems := loadStringSliceKey("CertPems")
-	if len(keyPems) != len(CertPems) {
-		return fmt.Errorf("config KeyPems (%d) and CertPems (%d) must have the same length", len(keyPems), len(CertPems))
-	}
-	for i := range keyPems {
-		tlsc, err := loadKeyPair(keyPems[i], CertPems[i])
-		if err != nil {
-			return err
-		}
-		apiCerts = append(apiCerts, tlsc)
-	}
-
-	apiCerts = append(apiCerts, *KeyPair.Load())
-
-	APITLSConfig.Store(&tls.Config{
-		MinVersion:       tls.VersionTLS13,
-		CurvePreferences: []tls.CurveID{tls.X25519MLKEM768},
-		Certificates:     apiCerts,
-	})
-
-	return nil
-}
-
-func makeConfig(ipOverride string, mode string, skipWGVerify bool) error {
-	writeServer := mode == "all" || mode == "auth"
-	writeWG := mode == "all" || mode == "wg"
-
-	if writeServer {
-		if err := writeServerConfig(ipOverride, mode); err != nil {
-			return err
-		}
-	}
-	if writeWG {
-		if err := writeWGConfig(skipWGVerify); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func writeServerConfig(ipOverride, mode string) error {
-	if err := LoadServerConfig(serverConfigPath); err == nil {
-		return nil
-	}
-
-	interfaceIP, err := resolveInterfaceIP(ipOverride)
-	if err != nil {
-		return err
-	}
-
-	newConfig := &types.ServerConfig{
-		APIIP:            interfaceIP,
-		APIPort:          "443",
-		DBurl:            "",
-		AdminAPIKey:      uuid.NewString(),
-		TwoFactorKey:     strings.ReplaceAll(uuid.NewString(), "-", ""),
-		CookieSigningKey: strings.ReplaceAll(uuid.NewString(), "-", ""),
-		CertPem:          "./cert.pem",
-		KeyPem:           "./key.pem",
-	}
-	Config.Store(newConfig)
-	return SaveServerConfig(serverConfigPath)
-}
-
-func wgBootstrapSkipVerify(createCert string) bool {
-	return strings.EqualFold(strings.TrimSpace(createCert), "selfsign")
-}
-
-func writeWGConfig(skipVerify bool) error {
-	if err := LoadWGConfig(wgConfigPath); err == nil {
-		return nil
-	}
-
-	WGConfig.Store(&types.WGBootstrap{InsecureSkipVerify: skipVerify})
-	return SaveWGConfig(wgConfigPath)
-}
-
 func initializeAdminUser() error {
-	user, err := DB_findUserByEmail("admin")
+	user, err := findUserByEmail("admin")
 	if err != nil {
 		return err
 	}
@@ -545,7 +300,7 @@ func initializeAdminUser() error {
 		}
 		return nil
 	}
-	pw := GENERATE_CODE()
+	pw := generateCode()
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(pw), 13)
 	if err != nil {
@@ -563,7 +318,7 @@ func initializeAdminUser() error {
 	newUser.SubExpiration = time.Now().AddDate(100, 0, 0)
 	newUser.Groups = make([]uuid.UUID, 0)
 	newUser.Tokens = make([]*DeviceToken, 0)
-	if err := DB_CreateUser(newUser); err != nil {
+	if err := createUser(newUser); err != nil {
 		return err
 	}
 
@@ -576,7 +331,7 @@ const defaultWGSubnet = "10.0.0.0/22"
 func initializeDefaultServer() error {
 	cfg := Config.Load()
 
-	servers, err := DB_FindAllServers(math.MaxInt64, 0)
+	servers, err := findAllServers(math.MaxInt64, 0)
 	if err != nil {
 		return fmt.Errorf("find servers: %w", err)
 	}
@@ -611,7 +366,7 @@ func initializeDefaultServer() error {
 		InternetIface:      internetIface,
 		InsecureSkipVerify: wgCfg.InsecureSkipVerify,
 	}
-	if err := DB_CreateServer(server); err != nil {
+	if err := createServer(server); err != nil {
 		return fmt.Errorf("create default server: %w", err)
 	}
 

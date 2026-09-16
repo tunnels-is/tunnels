@@ -57,14 +57,14 @@ func TestListFilePath(t *testing.T) {
 }
 
 func TestValidateDNSListConfig_RejectsTraversalTags(t *testing.T) {
-	err := validateDNSListConfig(&configV2{
+	err := validateDNSListConfig(&Config{
 		DNSBlockLists: []*BlockList{{Tag: "../evil", URL: "https://example.com/list"}},
 	})
 	if err == nil {
 		t.Fatal("expected error for traversal blocklist tag")
 	}
 
-	err = validateDNSListConfig(&configV2{
+	err = validateDNSListConfig(&Config{
 		DNSWhiteLists: []*BlockList{{Tag: "ok-list"}},
 	})
 	if err != nil {
@@ -76,7 +76,7 @@ func TestProcessBlockList_RejectsBadTag(t *testing.T) {
 	prev := STATE.Load()
 	t.Cleanup(func() { STATE.Store(prev) })
 	dir := t.TempDir()
-	STATE.Store(&stateV2{BlockListPath: dir + string(os.PathSeparator)})
+	STATE.Store(&State{BlockListPath: dir + string(os.PathSeparator)})
 
 	r := processBlockList(&BlockList{
 		Tag:     "../escape",

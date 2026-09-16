@@ -30,23 +30,23 @@ func TestLoginLockout_AfterFiveFailures(t *testing.T) {
 		t.Fatal(err)
 	}
 	u := &User{ID: uuid.New(), Email: "lockme@test.local", Password: string(hash)}
-	if err := DB_CreateUser(u); err != nil {
+	if err := createUser(u); err != nil {
 		t.Fatal(err)
 	}
 
 	for i := 0; i < passwordResetMaxTries; i++ {
-		body, _ := json.Marshal(LOGIN_FORM{Email: u.Email, Password: "wrongpassword1"})
+		body, _ := json.Marshal(loginRequest{Email: u.Email, Password: "wrongpassword1"})
 		req := httptest.NewRequest(http.MethodPost, "/client/user/login", bytes.NewReader(body))
 		w := httptest.NewRecorder()
-		API_UserLogin(w, req)
+		handleClientLogin(w, req)
 		if w.Code != http.StatusUnauthorized {
 			t.Fatalf("attempt %d: %d %s", i+1, w.Code, w.Body.String())
 		}
 	}
-	body, _ := json.Marshal(LOGIN_FORM{Email: u.Email, Password: "longenough1"})
+	body, _ := json.Marshal(loginRequest{Email: u.Email, Password: "longenough1"})
 	req := httptest.NewRequest(http.MethodPost, "/client/user/login", bytes.NewReader(body))
 	w := httptest.NewRecorder()
-	API_UserLogin(w, req)
+	handleClientLogin(w, req)
 	if w.Code != http.StatusUnauthorized {
 		t.Fatalf("locked login: %d %s, want 401", w.Code, w.Body.String())
 	}
@@ -91,7 +91,7 @@ func TestRegister_NormalizesEmail(t *testing.T) {
 	if postRegister(t, "Case.User@Example.COM", "longenough1") != http.StatusOK {
 		t.Fatal("mixed-case register")
 	}
-	got, err := DB_findUserByEmail("case.user@example.com")
+	got, err := findUserByEmail("case.user@example.com")
 	if err != nil || got == nil {
 		t.Fatalf("normalized lookup failed: %v %#v", err, got)
 	}
@@ -173,7 +173,7 @@ func TestAdminLogout_RevokesCookieToken(t *testing.T) {
 		ID: uuid.New(), Email: "admin-out@test.local", IsAdmin: true,
 		Tokens: []*DeviceToken{keep, sess},
 	}
-	if err := DB_CreateUser(u); err != nil {
+	if err := createUser(u); err != nil {
 		t.Fatal(err)
 	}
 
@@ -182,11 +182,11 @@ func TestAdminLogout_RevokesCookieToken(t *testing.T) {
 	ctx = context.WithValue(ctx, contextKeyDeviceToken, sess.DT)
 	req = req.WithContext(ctx)
 	w := httptest.NewRecorder()
-	API_AdminUILogout(w, req)
+	handleAdminLogout(w, req)
 	if w.Code != 200 {
 		t.Fatalf("logout %d", w.Code)
 	}
-	got, err := DB_findUserByID(u.ID)
+	got, err := findUserByID(u.ID)
 	if err != nil || got == nil {
 		t.Fatal(err)
 	}
@@ -199,7 +199,7 @@ func TestInitializeAdminUser_FailsIfNonAdminExists(t *testing.T) {
 	setupTestDB(t)
 	securityReviewLogger()
 	u := &User{ID: uuid.New(), Email: "admin", IsAdmin: false}
-	if err := DB_CreateUser(u); err != nil {
+	if err := createUser(u); err != nil {
 		t.Fatal(err)
 	}
 	if err := initializeAdminUser(); err == nil {
@@ -213,7 +213,7 @@ func TestAssignNextWireGuardIP_SkipsBroadcast(t *testing.T) {
 		ID: uuid.New(), Tag: "small", APIKey: uuid.NewString(),
 		WireGuardSubnet: "10.9.9.0/30",
 	}
-	if err := DB_CreateServer(s); err != nil {
+	if err := createServer(s); err != nil {
 		t.Fatal(err)
 	}
 	ip, err := assignNextWireGuardIP(s.ID)
@@ -224,7 +224,7 @@ func TestAssignNextWireGuardIP_SkipsBroadcast(t *testing.T) {
 		t.Fatalf("first usable = %s, want 10.9.9.2", ip)
 	}
 	d := &types.Device{ID: uuid.New(), ServerID: s.ID, WireGuardIP: ip, Tag: "a"}
-	if err := DB_CreateDevice(d); err != nil {
+	if err := createDevice(d); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := assignNextWireGuardIP(s.ID); err == nil {
@@ -238,23 +238,23 @@ func TestUpdateDevice_RejectsDuplicateAndReservedIP(t *testing.T) {
 		ID: uuid.New(), Tag: "dup", APIKey: uuid.NewString(),
 		WireGuardSubnet: "10.0.0.0/24",
 	}
-	if err := DB_CreateServer(s); err != nil {
+	if err := createServer(s); err != nil {
 		t.Fatal(err)
 	}
 	a := &types.Device{ID: uuid.New(), ServerID: s.ID, WireGuardIP: "10.0.0.10", Tag: "a"}
 	b := &types.Device{ID: uuid.New(), ServerID: s.ID, WireGuardIP: "10.0.0.11", Tag: "b"}
-	if err := DB_CreateDevice(a); err != nil {
+	if err := createDevice(a); err != nil {
 		t.Fatal(err)
 	}
-	if err := DB_CreateDevice(b); err != nil {
+	if err := createDevice(b); err != nil {
 		t.Fatal(err)
 	}
 	b.WireGuardIP = "10.0.0.10"
-	if err := DB_UpdateDevice(b); !errors.Is(err, errDeviceIPInUse) {
+	if err := updateDevice(b); !errors.Is(err, errDeviceIPInUse) {
 		t.Fatalf("duplicate IP: %v", err)
 	}
 	b.WireGuardIP = "10.0.0.1"
-	if err := DB_UpdateDevice(b); !errors.Is(err, errDeviceIPReserved) {
+	if err := updateDevice(b); !errors.Is(err, errDeviceIPReserved) {
 		t.Fatalf("reserved IP: %v", err)
 	}
 }
@@ -274,7 +274,7 @@ func TestRejectServerWireGuardKey(t *testing.T) {
 		ID: uuid.New(), Tag: "k", APIKey: uuid.NewString(),
 		WireGuardPubKey: "server-pub-key",
 	}
-	if err := DB_CreateServer(s); err != nil {
+	if err := createServer(s); err != nil {
 		t.Fatal(err)
 	}
 	if err := rejectServerWireGuardKey("server-pub-key"); err == nil {
@@ -289,29 +289,29 @@ func TestWGConfig_HidesForeignKeyAndExpiredSub(t *testing.T) {
 	setupTestDB(t)
 	securityReviewLogger()
 	s := &types.Server{ID: uuid.New(), Tag: "c", APIKey: uuid.NewString(), WireGuardSubnet: "10.0.0.0/24"}
-	if err := DB_CreateServer(s); err != nil {
+	if err := createServer(s); err != nil {
 		t.Fatal(err)
 	}
 	owner := &User{ID: uuid.New(), Email: "own@test.local", SubExpiration: time.Now().Add(time.Hour)}
 	other := &User{ID: uuid.New(), Email: "oth@test.local", SubExpiration: time.Now().Add(time.Hour)}
-	if err := DB_CreateUser(owner); err != nil {
+	if err := createUser(owner); err != nil {
 		t.Fatal(err)
 	}
-	if err := DB_CreateUser(other); err != nil {
+	if err := createUser(other); err != nil {
 		t.Fatal(err)
 	}
 	d := &types.Device{
 		ID: uuid.New(), UserID: owner.ID, ServerID: s.ID,
 		WireGuardKey: "foreign-key", WireGuardIP: "10.0.0.9", Tag: "d",
 	}
-	if err := DB_CreateDevice(d); err != nil {
+	if err := createDevice(d); err != nil {
 		t.Fatal(err)
 	}
 
 	req := httptest.NewRequest(http.MethodGet, "/client/wg/config?serverID="+s.ID.String()+"&pubKey=foreign-key", nil)
 	req = req.WithContext(context.WithValue(req.Context(), contextKeyUser, other))
 	w := httptest.NewRecorder()
-	API_WGConfig(w, req)
+	handleWGConfig(w, req)
 	if w.Code != 200 {
 		t.Fatalf("occupancy: %d %s", w.Code, w.Body.String())
 	}
@@ -323,7 +323,7 @@ func TestWGConfig_HidesForeignKeyAndExpiredSub(t *testing.T) {
 	req2 := httptest.NewRequest(http.MethodGet, "/client/wg/config?serverID="+s.ID.String()+"&pubKey=x", nil)
 	req2 = req2.WithContext(context.WithValue(req2.Context(), contextKeyUser, other))
 	w2 := httptest.NewRecorder()
-	API_WGConfig(w2, req2)
+	handleWGConfig(w2, req2)
 	if w2.Code != http.StatusForbidden {
 		t.Fatalf("expired sub: %d %s", w2.Code, w2.Body.String())
 	}
@@ -355,20 +355,20 @@ func TestUserLogout_RevokesCurrentDeviceToken(t *testing.T) {
 	keep := &DeviceToken{DT: uuid.NewString(), N: "keep"}
 	sess := &DeviceToken{DT: uuid.NewString(), N: "sess"}
 	u := &User{ID: uuid.New(), Email: "out@test.local", Tokens: []*DeviceToken{keep, sess}}
-	if err := DB_CreateUser(u); err != nil {
+	if err := createUser(u); err != nil {
 		t.Fatal(err)
 	}
-	body, _ := json.Marshal(LOGOUT_FORM{})
+	body, _ := json.Marshal(logoutRequest{})
 	req := httptest.NewRequest(http.MethodPost, "/client/user/logout", bytes.NewReader(body))
 	ctx := context.WithValue(req.Context(), contextKeyUser, u)
 	ctx = context.WithValue(ctx, contextKeyDeviceToken, sess.DT)
 	req = req.WithContext(ctx)
 	w := httptest.NewRecorder()
-	API_UserLogout(w, req)
+	handleClientLogout(w, req)
 	if w.Code != 200 {
 		t.Fatalf("logout %d %s", w.Code, w.Body.String())
 	}
-	got, _ := DB_findUserByID(u.ID)
+	got, _ := findUserByID(u.ID)
 	if len(got.Tokens) != 1 || got.Tokens[0].DT != keep.DT {
 		t.Fatalf("tokens %+v", got.Tokens)
 	}
@@ -377,17 +377,17 @@ func TestUserLogout_RevokesCurrentDeviceToken(t *testing.T) {
 func TestAdminUpdate_NormalizesEmail(t *testing.T) {
 	setupTestDB(t)
 	u := &User{ID: uuid.New(), Email: "jane@old.com"}
-	if err := DB_CreateUser(u); err != nil {
+	if err := createUser(u); err != nil {
 		t.Fatal(err)
 	}
-	if err := BBolt_updateUserAdmin(&USER_ADMIN_UPDATE_FORM{
+	if err := updateUserAdmin(&adminUserUpdateRequest{
 		TargetUserID: u.ID,
 		Email:        "Jane@Old.COM",
 		Disabled:     true,
 	}); err != nil {
 		t.Fatal(err)
 	}
-	got, err := BBolt_findUserByID(u.ID.String())
+	got, err := findUserByID(u.ID)
 	if err != nil || got == nil {
 		t.Fatal(err)
 	}
@@ -402,11 +402,11 @@ func TestAdminUpdate_NormalizesEmail(t *testing.T) {
 func TestCreateUser_RejectsDuplicateNormalizedEmail(t *testing.T) {
 	setupTestDB(t)
 	a := &User{ID: uuid.New(), Email: "Foo@Example.COM"}
-	if err := DB_CreateUser(a); err != nil {
+	if err := createUser(a); err != nil {
 		t.Fatal(err)
 	}
 	b := &User{ID: uuid.New(), Email: "foo@example.com"}
-	if err := DB_CreateUser(b); err == nil {
+	if err := createUser(b); err == nil {
 		t.Fatal("second create with same email different case must fail")
 	}
 }
@@ -414,20 +414,20 @@ func TestCreateUser_RejectsDuplicateNormalizedEmail(t *testing.T) {
 func TestCreateUser_StoresNormalizedEmail(t *testing.T) {
 	setupTestDB(t)
 	u := &User{ID: uuid.New(), Email: "  Mixed.Case@Example.COM "}
-	if err := DB_CreateUser(u); err != nil {
+	if err := createUser(u); err != nil {
 		t.Fatal(err)
 	}
 	if u.Email != "mixed.case@example.com" {
 		t.Fatalf("in-memory Email=%q", u.Email)
 	}
-	got, err := DB_findUserByID(u.ID)
+	got, err := findUserByID(u.ID)
 	if err != nil || got == nil {
 		t.Fatal(err)
 	}
 	if got.Email != "mixed.case@example.com" {
 		t.Fatalf("stored Email=%q", got.Email)
 	}
-	got, err = DB_findUserByEmail("MIXED.CASE@EXAMPLE.COM")
+	got, err = findUserByEmail("MIXED.CASE@EXAMPLE.COM")
 	if err != nil || got == nil {
 		t.Fatalf("normalized lookup: %v %#v", err, got)
 	}
@@ -436,48 +436,48 @@ func TestCreateUser_StoresNormalizedEmail(t *testing.T) {
 func TestEmailIndex_NormalizedLookupAndSubTime(t *testing.T) {
 	setupTestDB(t)
 	u := &User{ID: uuid.New(), Email: "Mixed.Case@Example.COM"}
-	if err := DB_CreateUser(u); err != nil {
+	if err := createUser(u); err != nil {
 		t.Fatal(err)
 	}
-	got, err := DB_findUserByEmail("mixed.case@example.com")
+	got, err := findUserByEmail("mixed.case@example.com")
 	if err != nil || got == nil {
 		t.Fatalf("lowercase lookup: %v %#v", err, got)
 	}
-	got, err = DB_findUserByEmail("MIXED.CASE@EXAMPLE.COM")
+	got, err = findUserByEmail("MIXED.CASE@EXAMPLE.COM")
 	if err != nil || got == nil {
 		t.Fatalf("upper lookup: %v %#v", err, got)
 	}
 
 	exp := time.Now().Add(30 * 24 * time.Hour).Truncate(time.Second)
-	if err := BBolt_updateUserSubTime(&User{Email: "Mixed.Case@Example.COM", SubExpiration: exp}); err != nil {
+	if err := updateUserSubTime(&User{Email: "Mixed.Case@Example.COM", SubExpiration: exp}); err != nil {
 		t.Fatalf("sub time by mixed-case email: %v", err)
 	}
-	found, _ := BBolt_findUserByID(u.ID.String())
+	found, _ := findUserByID(u.ID)
 	if !found.SubExpiration.Truncate(time.Second).Equal(exp) {
 		t.Fatalf("sub expiration mismatch: %v vs %v", found.SubExpiration, exp)
 	}
 
-	if err := BBolt_updateUserAdmin(&USER_ADMIN_UPDATE_FORM{
+	if err := updateUserAdmin(&adminUserUpdateRequest{
 		TargetUserID: u.ID,
 		Email:        "New.Mixed@Example.COM",
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if got, _ = DB_findUserByEmail("new.mixed@example.com"); got == nil {
+	if got, _ = findUserByEmail("new.mixed@example.com"); got == nil {
 		t.Fatal("renamed email should resolve normalized")
 	}
-	if got, _ = DB_findUserByEmail("Mixed.Case@Example.COM"); got != nil {
+	if got, _ = findUserByEmail("Mixed.Case@Example.COM"); got != nil {
 		t.Fatal("old mixed-case email should not resolve")
 	}
 }
 
-func TestConnectToBBoltDB_RejectsWorldReadable(t *testing.T) {
+func TestOpenDB_RejectsWorldReadable(t *testing.T) {
 	dir := t.TempDir()
 	path := dir + "/tunnels.db"
 	if err := os.WriteFile(path, []byte("not a db"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := ConnectToBBoltDB(path); err == nil {
+	if err := openDB(path); err == nil {
 		t.Fatal("world-readable DB must be rejected")
 	}
 }

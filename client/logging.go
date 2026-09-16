@@ -30,7 +30,7 @@ func CleanUniqueLogMap() {
 	logRecordHash.Clear()
 }
 
-func GET_FUNC(skip int) string {
+func callerName(skip int) string {
 	pc := make([]uintptr, 10)
 	runtime.Callers(skip, pc)
 	f := runtime.FuncForPC(pc[0])
@@ -60,7 +60,7 @@ func DEBUG(Line ...any) {
 	case LogQueue <- fmt.Sprintf(
 		"%s || DEBUG || %s || %s",
 		time.Now().Format("01-02 15:04:05"),
-		GET_FUNC(3),
+		callerName(3),
 		fmt.Sprint(x),
 	):
 	default:
@@ -87,7 +87,7 @@ func ERROR(Line ...any) {
 	case LogQueue <- fmt.Sprintf(
 		"%s || ERROR || %s || %s",
 		time.Now().Format("01-02 15:04:05"),
-		GET_FUNC(3),
+		callerName(3),
 		fmt.Sprint(x),
 	):
 	default:
@@ -101,7 +101,7 @@ func SECURITY(Line ...any) {
 		x += fmt.Sprintf("%v ", v)
 	}
 	msg := fmt.Sprintf("%s || SECURITY || %s || %s",
-		time.Now().Format("01-02 15:04:05"), GET_FUNC(3), x)
+		time.Now().Format("01-02 15:04:05"), callerName(3), x)
 	log.Println(msg)
 	select {
 	case LogQueue <- msg:
@@ -127,7 +127,7 @@ func INFO(Line ...any) {
 	case LogQueue <- fmt.Sprintf(
 		"%s || INFO  || %s || %s",
 		time.Now().Format("01-02 15:04:05"),
-		GET_FUNC(3),
+		callerName(3),
 		fmt.Sprint(x),
 	):
 	default:
@@ -153,7 +153,7 @@ func ROUTINE(Line ...any) {
 	case LogQueue <- fmt.Sprintf(
 		"%s || ROUTINE || %s || %s",
 		time.Now().Format("01-02 15:04:05"),
-		GET_FUNC(3),
+		callerName(3),
 		fmt.Sprint(x),
 	):
 	default:
@@ -202,7 +202,7 @@ func StartLogQueueProcessor() {
 }
 
 func ErrorLog(err any, msgs ...any) {
-	log.Println(TAG_ERROR+" || ", fmt.Sprint(msgs...), " >> system error: ", err)
+	log.Println(tagError+" || ", fmt.Sprint(msgs...), " >> system error: ", err)
 }
 
 var wgInfoPatterns = []string{

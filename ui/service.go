@@ -306,7 +306,7 @@ func (a *App) connectToServer(s types.Server) {
 	}()
 }
 
-func (a *App) connectTunnel(meta *client.TunnelMETA) {
+func (a *App) connectTunnel(meta *client.TunnelMeta) {
 	if a.user == nil || a.user.DeviceToken == nil {
 		a.fail("You are not logged in")
 		return
@@ -482,7 +482,7 @@ func (a *App) paintLogs() {
 	a.logList.Refresh()
 }
 
-func sameSession(aTok, bTok *client.DEVICE_TOKEN) bool {
+func sameSession(aTok, bTok *client.DeviceToken) bool {
 	if aTok == nil || bTok == nil {
 		return false
 	}

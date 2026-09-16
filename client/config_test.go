@@ -115,7 +115,7 @@ func TestWriteConfigToDisk_JSON(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			configPath := filepath.Join(tmpDir, tc.filename)
 
-			testState := &stateV2{
+			testState := &State{
 				ConfigFileName: configPath,
 			}
 			STATE.Store(testState)
@@ -146,7 +146,7 @@ func TestWriteConfigToDisk_JSON(t *testing.T) {
 				return
 			}
 
-			var loaded configV2
+			var loaded Config
 			if err := json.Unmarshal(data, &loaded); err != nil {
 				t.Errorf("Failed to unmarshal saved config: %v", err)
 				return
@@ -190,7 +190,7 @@ func TestWriteConfigToDisk_YAML(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			configPath := filepath.Join(tmpDir, tc.filename)
 
-			testState := &stateV2{
+			testState := &State{
 				ConfigFileName: configPath,
 			}
 			STATE.Store(testState)
@@ -221,7 +221,7 @@ func TestWriteConfigToDisk_YAML(t *testing.T) {
 				return
 			}
 
-			var loaded configV2
+			var loaded Config
 			if err := yaml.Unmarshal(data, &loaded); err != nil {
 				t.Errorf("Failed to unmarshal saved config: %v", err)
 				return
@@ -274,7 +274,7 @@ func TestReadConfigFileFromDisk_JSON(t *testing.T) {
 				t.Fatalf("Failed to write test config: %v", err)
 			}
 
-			testState := &stateV2{
+			testState := &State{
 				ConfigFileName: configPath,
 			}
 			STATE.Store(testState)
@@ -340,7 +340,7 @@ func TestReadConfigFileFromDisk_YAML(t *testing.T) {
 				t.Fatalf("Failed to write test config: %v", err)
 			}
 
-			testState := &stateV2{
+			testState := &State{
 				ConfigFileName: configPath,
 			}
 			STATE.Store(testState)
@@ -420,7 +420,7 @@ func TestConfigFileErrors(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			configPath := tc.setupFunc()
 
-			testState := &stateV2{
+			testState := &State{
 				ConfigFileName: configPath,
 			}
 			STATE.Store(testState)
@@ -468,13 +468,13 @@ func TestTunnelConfigFormats(t *testing.T) {
 				t.Fatalf("Failed to create tunnels directory: %v", err)
 			}
 
-			testState := &stateV2{
+			testState := &State{
 				TunnelsPath: tunnelsPath,
 				TunnelType:  string(types.DefaultTun),
 			}
 			STATE.Store(testState)
 
-			testTunnel := &TunnelMETA{
+			testTunnel := &TunnelMeta{
 				Tag:           "test-tunnel-" + fmt.name,
 				DNSBlocking:   true,
 				AutoConnect:   true,
@@ -535,13 +535,13 @@ func TestTunnelConfigFormatPreservation(t *testing.T) {
 				t.Fatalf("Failed to create tunnels directory: %v", err)
 			}
 
-			testState := &stateV2{
+			testState := &State{
 				TunnelsPath: tunnelsPath,
 				TunnelType:  string(types.DefaultTun),
 			}
 			STATE.Store(testState)
 
-			testTunnel := &TunnelMETA{
+			testTunnel := &TunnelMeta{
 				Tag:          "format-test",
 				ConfigFormat: ext,
 			}
@@ -597,7 +597,7 @@ func TestTunnelSkipsInvalidExtensions(t *testing.T) {
 		t.Fatalf("Failed to create tunnels directory: %v", err)
 	}
 
-	testState := &stateV2{
+	testState := &State{
 		TunnelsPath: tunnelsPath,
 		TunnelType:  string(types.DefaultTun),
 	}
@@ -623,7 +623,7 @@ func TestTunnelSkipsInvalidExtensions(t *testing.T) {
 		}
 	}
 
-	validTunnel := &TunnelMETA{Tag: "valid-tunnel"}
+	validTunnel := &TunnelMeta{Tag: "valid-tunnel"}
 	data, _ := json.Marshal(validTunnel)
 	if err := os.WriteFile(filepath.Join(tunnelsPath, "valid-tunnel.json"), data, 0o644); err != nil {
 		t.Fatalf("Failed to write valid tunnel: %v", err)
@@ -658,19 +658,19 @@ func TestTunnelSkipsEmptyTag(t *testing.T) {
 		t.Fatalf("Failed to create tunnels directory: %v", err)
 	}
 
-	testState := &stateV2{
+	testState := &State{
 		TunnelsPath: tunnelsPath,
 		TunnelType:  string(types.DefaultTun),
 	}
 	STATE.Store(testState)
 
-	emptyTagTunnel := &TunnelMETA{Tag: ""}
+	emptyTagTunnel := &TunnelMeta{Tag: ""}
 	data, _ := json.Marshal(emptyTagTunnel)
 	if err := os.WriteFile(filepath.Join(tunnelsPath, "empty-tag.json"), data, 0o644); err != nil {
 		t.Fatalf("Failed to write file: %v", err)
 	}
 
-	validTunnel := &TunnelMETA{Tag: "valid-tag"}
+	validTunnel := &TunnelMeta{Tag: "valid-tag"}
 	data, _ = json.Marshal(validTunnel)
 	if err := os.WriteFile(filepath.Join(tunnelsPath, "valid-tag.json"), data, 0o644); err != nil {
 		t.Fatalf("Failed to write file: %v", err)
@@ -702,7 +702,7 @@ func TestTunnelInvalidContent(t *testing.T) {
 		t.Fatalf("Failed to create tunnels directory: %v", err)
 	}
 
-	testState := &stateV2{
+	testState := &State{
 		TunnelsPath: tunnelsPath,
 		TunnelType:  string(types.DefaultTun),
 	}
@@ -731,7 +731,7 @@ func TestTunnelInvalidYAMLContent(t *testing.T) {
 		t.Fatalf("Failed to create tunnels directory: %v", err)
 	}
 
-	testState := &stateV2{
+	testState := &State{
 		TunnelsPath: tunnelsPath,
 		TunnelType:  string(types.DefaultTun),
 	}
@@ -765,13 +765,13 @@ func TestTunnelDirectoriesAreSkipped(t *testing.T) {
 		t.Fatalf("Failed to create subdirectory: %v", err)
 	}
 
-	testState := &stateV2{
+	testState := &State{
 		TunnelsPath: tunnelsPath,
 		TunnelType:  string(types.DefaultTun),
 	}
 	STATE.Store(testState)
 
-	validTunnel := &TunnelMETA{Tag: "valid"}
+	validTunnel := &TunnelMeta{Tag: "valid"}
 	data, _ := json.Marshal(validTunnel)
 	if err := os.WriteFile(filepath.Join(tunnelsPath, "valid.json"), data, 0o644); err != nil {
 		t.Fatalf("Failed to write file: %v", err)
@@ -790,7 +790,7 @@ func TestTunnelDirectoriesAreSkipped(t *testing.T) {
 }
 
 func clearTunnelMap() {
-	TunnelMetaMap.Range(func(key string, value *TunnelMETA) bool {
+	TunnelMetaMap.Range(func(key string, value *TunnelMeta) bool {
 		TunnelMetaMap.Delete(key)
 		return true
 	})
@@ -828,7 +828,7 @@ func TestConfigRoundTrip(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			configPath := filepath.Join(tmpDir, tc.filename)
 
-			testState := &stateV2{
+			testState := &State{
 				ConfigFileName: configPath,
 			}
 			STATE.Store(testState)

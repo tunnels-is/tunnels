@@ -33,6 +33,6 @@ func main() {
 		os.Exit(0)
 	}
 
-	client.DLL_EMBED = DLL
+	client.WintunDLL = DLL
 	service.Start()
 }

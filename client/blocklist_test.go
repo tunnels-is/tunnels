@@ -246,7 +246,7 @@ func TestEnsureCustomDNSListFiles(t *testing.T) {
 
 func TestEnsureCustomDNSListInConfig(t *testing.T) {
 	t.Run("whitelist", func(t *testing.T) {
-		cfg := &configV2{}
+		cfg := &Config{}
 		if !ensureCustomWhiteListInConfig(cfg) {
 			t.Fatal("expected config change when custom whitelist missing")
 		}
@@ -268,14 +268,14 @@ func TestEnsureCustomDNSListInConfig(t *testing.T) {
 			t.Fatalf("should not duplicate custom, got %d entries", len(cfg.DNSWhiteLists))
 		}
 
-		cfg2 := &configV2{DNSWhiteLists: []*BlockList{{Tag: "CUSTOM", Enabled: false}}}
+		cfg2 := &Config{DNSWhiteLists: []*BlockList{{Tag: "CUSTOM", Enabled: false}}}
 		if ensureCustomWhiteListInConfig(cfg2) {
 			t.Fatal("CUSTOM should count as the custom tag")
 		}
 	})
 
 	t.Run("blocklist", func(t *testing.T) {
-		cfg := &configV2{}
+		cfg := &Config{}
 		if !ensureCustomBlockListInConfig(cfg) {
 			t.Fatal("expected config change when custom blocklist missing")
 		}
@@ -294,14 +294,14 @@ func TestEnsureCustomDNSListInConfig(t *testing.T) {
 			t.Fatal("should not re-enable a user-disabled custom blocklist")
 		}
 
-		cfg2 := &configV2{DNSBlockLists: []*BlockList{{Tag: "Custom", Enabled: false}}}
+		cfg2 := &Config{DNSBlockLists: []*BlockList{{Tag: "Custom", Enabled: false}}}
 		if ensureCustomBlockListInConfig(cfg2) {
 			t.Fatal("Custom should count as the custom tag")
 		}
 	})
 
 	t.Run("custom moved to front", func(t *testing.T) {
-		cfg := &configV2{
+		cfg := &Config{
 			DNSBlockLists: []*BlockList{
 				{Tag: "Ads", Enabled: true},
 				{Tag: "custom", Enabled: false},
@@ -330,7 +330,7 @@ func TestEnsureCustomDNSListInConfig(t *testing.T) {
 	})
 
 	t.Run("custom prepended before existing lists", func(t *testing.T) {
-		cfg := &configV2{
+		cfg := &Config{
 			DNSBlockLists: []*BlockList{{Tag: "Ads", Enabled: true}},
 		}
 		if !ensureCustomBlockListInConfig(cfg) {

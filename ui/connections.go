@@ -23,7 +23,7 @@ func (a *App) connectionsPage() fyne.CanvasObject {
 	cards := make([]fyne.CanvasObject, 0, len(mine))
 	for _, ac := range mine {
 		ac := ac
-		var tun *client.TunnelMETA
+		var tun *client.TunnelMeta
 		tag := ""
 		if ac.CR != nil {
 			tag = ac.CR.Tag

@@ -28,7 +28,7 @@ func TestGenerateSelfSigned_MatchesAPILoader(t *testing.T) {
 	ip := "10.99.7.2"
 
 	// Same call generateSelfSignedCerts uses (empty DNS SAN, IP override).
-	_, err := certs.MakeCertV2(
+	_, err := certs.MakeCertificate(
 		certs.ECDSA,
 		certPath,
 		keyPath,
@@ -39,7 +39,7 @@ func TestGenerateSelfSigned_MatchesAPILoader(t *testing.T) {
 		true,
 	)
 	if err != nil {
-		t.Fatalf("MakeCertV2: %v", err)
+		t.Fatalf("MakeCertificate: %v", err)
 	}
 
 	_, privB, err := crypt.LoadPrivateKey(keyPath)
@@ -100,19 +100,19 @@ func TestGenerateLetsEncrypt_RejectsInvalidDomain(t *testing.T) {
 	}
 }
 
-func TestMakeCertV2_DoesNotOverwriteExisting(t *testing.T) {
+func TestMakeCertificate_DoesNotOverwriteExisting(t *testing.T) {
 	dir := t.TempDir()
 	certPath := filepath.Join(dir, "cert.pem")
 	keyPath := filepath.Join(dir, "key.pem")
 	if err := os.WriteFile(certPath, []byte("keep-me"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	_, err := certs.MakeCertV2(certs.ECDSA, certPath, keyPath, []string{"127.0.0.1"}, nil, "", time.Time{}, true)
+	_, err := certs.MakeCertificate(certs.ECDSA, certPath, keyPath, []string{"127.0.0.1"}, nil, "", time.Time{}, true)
 	if err != nil {
 		t.Fatal(err)
 	}
 	got, _ := os.ReadFile(certPath)
 	if string(got) != "keep-me" {
-		t.Fatal("MakeCertV2 overwrote an existing cert.pem")
+		t.Fatal("MakeCertificate overwrote an existing cert.pem")
 	}
 }

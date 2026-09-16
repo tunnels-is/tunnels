@@ -12,32 +12,43 @@ type ErrorResponse struct {
 	Error string
 }
 
-type USER_ENABLE_QUERY struct {
+type getServerRequest struct {
+	DeviceToken string    `json:"DeviceToken"`
+	DeviceKey   string    `json:"DeviceKey"`
+	UID         uuid.UUID `json:"UID"`
+	ServerID    uuid.UUID `json:"ServerID"`
+}
+
+type getDeviceRequest struct {
+	DeviceID uuid.UUID
+}
+
+type userEnableQuery struct {
 	Email string
 	Code  string
 	OrgID uuid.UUID
 }
 
-type KEY_ACTIVATE_FORM struct {
+type licenseActivateRequest struct {
 	UID         uuid.UUID `json:"UID"`
 	DeviceToken string    `json:"DeviceToken"`
 	Key         string
 }
 
-type REGISTER_FORM struct {
+type registerRequest struct {
 	Email                 string
 	Password              string
 	Password2             string
 	AdditionalInformation string
 }
 
-type FORM_GET_GROUP struct {
+type getGroupRequest struct {
 	DeviceToken string    `json:"DeviceToken"`
 	UID         uuid.UUID `json:"UID"`
 	GID         uuid.UUID `json:"GID"`
 }
 
-type FORM_GET_GROUP_ENTITIES struct {
+type getGroupEntitiesRequest struct {
 	DeviceToken string    `json:"DeviceToken"`
 	UID         uuid.UUID `json:"UID"`
 	GID         uuid.UUID `json:"GID"`
@@ -46,103 +57,103 @@ type FORM_GET_GROUP_ENTITIES struct {
 	Offset      int       `json:"Offset"`
 }
 
-type FORM_DELETE_GROUP struct {
+type deleteGroupRequest struct {
 	DeviceToken string    `json:"DeviceToken"`
 	UID         uuid.UUID `json:"UID"`
 	GID         uuid.UUID `json:"GID"`
 }
 
-type FORM_DELETE_DEVICE struct {
+type deleteDeviceRequest struct {
 	DeviceToken string    `json:"DeviceToken"`
 	UID         uuid.UUID `json:"UID"`
 	DID         uuid.UUID `json:"DID"`
 }
 
-type FORM_DELETE_USER struct {
+type deleteUserRequest struct {
 	DeviceToken  string    `json:"DeviceToken"`
 	UID          uuid.UUID `json:"UID"`
 	TargetUserID uuid.UUID `json:"TargetUserID"`
 }
 
-type FORM_DELETE_SERVER struct {
+type deleteServerRequest struct {
 	DeviceToken string    `json:"DeviceToken"`
 	UID         uuid.UUID `json:"UID"`
 	ServerID    uuid.UUID `json:"ServerID"`
 }
 
-type FORM_LIST_GROUP struct {
+type listGroupsRequest struct {
 	DeviceToken string    `json:"DeviceToken"`
 	UID         uuid.UUID `json:"UID"`
 	Limit       int       `json:"Limit"`
 	Offset      int       `json:"Offset"`
 }
 
-type FORM_LIST_USERS struct {
+type listUsersRequest struct {
 	DeviceToken string    `json:"DeviceToken"`
 	UID         uuid.UUID `json:"UID"`
 	Limit       int       `json:"Limit"`
 	Offset      int       `json:"Offset"`
 }
 
-type USER_LATEST_RESPONSE struct {
+type userLatestResponse struct {
 	Users             []*User `json:"Users"`
 	Total             int64   `json:"Total"`
 	Trial             int64   `json:"Trial"`
 	ActiveSubscribers int64   `json:"ActiveSubscribers"`
 }
 
-type FORM_ADMIN_USER_SEARCH struct {
+type adminUserSearchRequest struct {
 	Email string `json:"Email"`
 }
 
-type FORM_ADMIN_USER_GET struct {
+type adminUserGetRequest struct {
 	TargetUserID uuid.UUID `json:"TargetUserID"`
 }
 
-type FORM_LIST_DEVICE struct {
+type listDevicesRequest struct {
 	DeviceToken string    `json:"DeviceToken"`
 	UID         uuid.UUID `json:"UID"`
 	Limit       int       `json:"Limit"`
 	Offset      int       `json:"Offset"`
 }
 
-type FORM_CREATE_GROUP struct {
+type createGroupRequest struct {
 	DeviceToken string    `json:"DeviceToken"`
 	UID         uuid.UUID `json:"UID"`
 	Group       *Group    `json:"Group"`
 }
 
-type FORM_CREATE_DEVICE struct {
+type createDeviceRequest struct {
 	DeviceToken string        `json:"DeviceToken"`
 	UID         uuid.UUID     `json:"UID"`
 	Device      *types.Device `json:"Device"`
 }
 
-type FORM_UPDATE_SERVER struct {
+type updateServerRequest struct {
 	DeviceToken string        `json:"DeviceToken"`
 	UID         uuid.UUID     `json:"UID"`
 	Server      *types.Server `json:"Server"`
 }
 
-type FORM_CREATE_SERVER struct {
+type createServerRequest struct {
 	DeviceToken string        `json:"DeviceToken"`
 	UID         uuid.UUID     `json:"UID"`
 	Server      *types.Server `json:"Server"`
 }
 
-type FORM_UPDATE_GROUP struct {
+type updateGroupRequest struct {
 	DeviceToken string    `json:"DeviceToken"`
 	UID         uuid.UUID `json:"UID"`
 	Group       *Group    `json:"Group"`
 }
 
-type FORM_UPDATE_DEVICE struct {
+type updateDeviceRequest struct {
 	DeviceToken string        `json:"DeviceToken"`
 	UID         uuid.UUID     `json:"UID"`
 	Device      *types.Device `json:"Device"`
 }
 
-type FORM_GROUP_ADD struct {
+type groupAddRequest struct {
 	DeviceToken string    `json:"DeviceToken"`
 	UID         uuid.UUID `json:"UID"`
 	GroupID     uuid.UUID `json:"GroupID"`
@@ -151,7 +162,7 @@ type FORM_GROUP_ADD struct {
 	TypeTag     string    `json:"TypeTag"`
 }
 
-type FORM_GROUP_REMOVE struct {
+type groupRemoveRequest struct {
 	DeviceToken string    `json:"DeviceToken"`
 	UID         uuid.UUID `json:"UID"`
 	GroupID     uuid.UUID `json:"GroupID"`
@@ -159,12 +170,12 @@ type FORM_GROUP_REMOVE struct {
 	TypeID      uuid.UUID `json:"TypeID"`
 }
 
-type TWO_FACTOR_CREATE struct {
+type twoFactorCreateRequest struct {
 	DeviceToken string    `json:"DeviceToken"`
 	UID         uuid.UUID `json:"UID"`
 }
 
-type TWO_FACTOR_FORM struct {
+type twoFactorRequest struct {
 	DeviceToken string    `json:"DeviceToken"`
 	UID         uuid.UUID `json:"UID"`
 	Code        string
@@ -173,14 +184,14 @@ type TWO_FACTOR_FORM struct {
 	Recovery    string
 }
 
-type USER_UPDATE_FORM struct {
+type userUpdateRequest struct {
 	UID                   uuid.UUID
 	DeviceToken           string
 	APIKey                string
 	AdditionalInformation string
 }
 
-type USER_ADMIN_UPDATE_FORM struct {
+type adminUserUpdateRequest struct {
 	DeviceToken   string    `json:"DeviceToken"`
 	UID           uuid.UUID `json:"UID"`
 	TargetUserID  uuid.UUID `json:"TargetUserID"`
@@ -190,38 +201,38 @@ type USER_ADMIN_UPDATE_FORM struct {
 	SubExpiration time.Time `json:"SubExpiration,omitempty"`
 }
 
-type TWO_FACTOR_DB_PACKAGE struct {
+type twoFactorUpdate struct {
 	UID      uuid.UUID
 	Code     []byte
 	Recovery []byte
 }
 
-type PASSWORD_RESET_FORM struct {
+type passwordResetRequest struct {
 	Email        string
 	Password     string
 	ResetCode    string
 	UseTwoFactor bool
 }
 
-type FORM_GET_SERVERS struct {
+type listServersRequest struct {
 	DeviceToken string    `json:"DeviceToken"`
 	UID         uuid.UUID `json:"UID"`
 	StartIndex  int
 }
 
-type FORM_GET_SERVERS_BY_COUNTRY struct {
+type serversByCountryRequest struct {
 	DeviceToken string    `json:"DeviceToken"`
 	UID         uuid.UUID `json:"UID"`
 	Country     string
 }
 
-type USER_UPDATE_SUB_FORM struct {
+type userSubUpdateRequest struct {
 	Email       string
 	DeviceToken string
 	Disable     bool
 }
 
-type LOGIN_FORM struct {
+type loginRequest struct {
 	Email       string
 	Password    string
 	DeviceName  string
@@ -231,7 +242,7 @@ type LOGIN_FORM struct {
 	Version     string
 }
 
-type LOGOUT_FORM struct {
+type logoutRequest struct {
 	UID           uuid.UUID
 	DeviceToken   string
 	LogoutToken   string
@@ -240,7 +251,7 @@ type LOGOUT_FORM struct {
 	All           bool
 }
 
-type UPDATE_USER_TOKENS struct {
+type userTokensUpdate struct {
 	ID      uuid.UUID      `json:"_id"`
 	Tokens  []*DeviceToken `json:"Tokens"`
 	Version string         `json:"version"`

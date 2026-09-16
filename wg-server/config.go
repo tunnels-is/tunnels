@@ -118,7 +118,7 @@ func validIfaceName(name string) bool {
 	return types.ValidIfaceName(name)
 }
 
-func setPKPathFromConfig(configPath string) {
+func setPrivateKeyPath(configPath string) {
 	dir := "."
 	if configPath != "" {
 		dir = filepath.Dir(configPath)
@@ -131,7 +131,7 @@ func setPKPathFromConfig(configPath string) {
 	localPrivKeyPath = p
 }
 
-func pkPath() string {
+func privateKeyPath() string {
 	if localPrivKeyPath != "" {
 		return localPrivKeyPath
 	}
@@ -143,7 +143,7 @@ func pkPath() string {
 }
 
 func loadOrGenerateLocalPrivKey(allowGenerate bool) ([]byte, error) {
-	path := pkPath()
+	path := privateKeyPath()
 	data, err := os.ReadFile(path)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return nil, fmt.Errorf("read pk from %s: %w", path, err)
@@ -152,26 +152,7 @@ func loadOrGenerateLocalPrivKey(allowGenerate bool) ([]byte, error) {
 		return nil, fmt.Errorf("%s missing; refusing to mint a new WireGuard key", path)
 	}
 	if len(data) != 0 {
-		info, statErr := os.Stat(path)
-		if statErr != nil {
-			return nil, fmt.Errorf("stat %s: %w", path, statErr)
-		}
-		if mode := info.Mode().Perm(); mode&0o077 != 0 {
-			return nil, fmt.Errorf("%s has insecure permissions %o (want 0600); refusing to start", path, mode)
-		}
-		if ownErr := checkKeyFileOwner(path, info); ownErr != nil {
-			return nil, fmt.Errorf("%s: %w", path, ownErr)
-		}
-		priv, err := base64.StdEncoding.DecodeString(strings.TrimSpace(string(data)))
-		if err != nil {
-			zeroBytes(priv)
-			return nil, fmt.Errorf("decode PrivateKey: %w", err)
-		}
-		if len(priv) != 32 {
-			zeroBytes(priv)
-			return nil, fmt.Errorf("PrivateKey has wrong length: got %d, want 32", len(priv))
-		}
-		return priv, nil
+		return readLocalPrivKey(path, data)
 	}
 
 	priv, err := generateWGPrivKey()
@@ -180,28 +161,52 @@ func loadOrGenerateLocalPrivKey(allowGenerate bool) ([]byte, error) {
 		return nil, err
 	}
 
-	pk := base64.StdEncoding.EncodeToString(priv)
-
-	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
-	if err != nil {
+	if err := writeLocalPrivKey(path, priv); err != nil {
 		zeroBytes(priv)
-		return nil, fmt.Errorf("create .pk file %q: %w", path, err)
-	}
-	if _, err := f.WriteString(pk); err != nil {
-		f.Close()
-		zeroBytes(priv)
-		return nil, fmt.Errorf("write .pk file %q: %w", path, err)
-	}
-	if err := f.Close(); err != nil {
-		zeroBytes(priv)
-		return nil, fmt.Errorf("close .pk file %q: %w", path, err)
+		return nil, err
 	}
 
 	return priv, nil
 }
 
-func FetchConfig(controllerURL, apiKey, configPath string, insecureSkipVerify bool) (*Config, error) {
-	return fetchConfig(controllerURL, apiKey, configPath, insecureSkipVerify, true)
+func readLocalPrivKey(path string, data []byte) ([]byte, error) {
+	info, statErr := os.Stat(path)
+	if statErr != nil {
+		return nil, fmt.Errorf("stat %s: %w", path, statErr)
+	}
+	if mode := info.Mode().Perm(); mode&0o077 != 0 {
+		return nil, fmt.Errorf("%s has insecure permissions %o (want 0600); refusing to start", path, mode)
+	}
+	if ownErr := checkKeyFileOwner(path, info); ownErr != nil {
+		return nil, fmt.Errorf("%s: %w", path, ownErr)
+	}
+	priv, err := base64.StdEncoding.DecodeString(strings.TrimSpace(string(data)))
+	if err != nil {
+		zeroBytes(priv)
+		return nil, fmt.Errorf("decode PrivateKey: %w", err)
+	}
+	if len(priv) != 32 {
+		zeroBytes(priv)
+		return nil, fmt.Errorf("PrivateKey has wrong length: got %d, want 32", len(priv))
+	}
+	return priv, nil
+}
+
+func writeLocalPrivKey(path string, priv []byte) error {
+	pk := base64.StdEncoding.EncodeToString(priv)
+
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
+	if err != nil {
+		return fmt.Errorf("create .pk file %q: %w", path, err)
+	}
+	if _, err := f.WriteString(pk); err != nil {
+		f.Close()
+		return fmt.Errorf("write .pk file %q: %w", path, err)
+	}
+	if err := f.Close(); err != nil {
+		return fmt.Errorf("close .pk file %q: %w", path, err)
+	}
+	return nil
 }
 
 func fetchConfig(controllerURL, apiKey, configPath string, insecureSkipVerify bool, generateKey bool) (*Config, error) {
@@ -209,7 +214,7 @@ func fetchConfig(controllerURL, apiKey, configPath string, insecureSkipVerify bo
 		return nil, err
 	}
 
-	setPKPathFromConfig(configPath)
+	setPrivateKeyPath(configPath)
 	privKey, err := loadOrGenerateLocalPrivKey(generateKey)
 	if err != nil {
 		return nil, fmt.Errorf("load wg private key: %w", err)
@@ -220,12 +225,21 @@ func fetchConfig(controllerURL, apiKey, configPath string, insecureSkipVerify bo
 		return nil, fmt.Errorf("derive wg public key: %w", err)
 	}
 
+	r, err := fetchServerConfigResponse(controllerURL, apiKey, pubKeyB64, insecureSkipVerify)
+	if err != nil {
+		zeroBytes(privKey)
+		return nil, err
+	}
+
+	return configFromResponse(r, privKey, controllerURL, apiKey, configPath, insecureSkipVerify)
+}
+
+func fetchServerConfigResponse(controllerURL, apiKey, pubKeyB64 string, insecureSkipVerify bool) (*types.WGServerConfigResponse, error) {
 	client := newControllerHTTPClient(insecureSkipVerify)
 
 	fetchURL := strings.TrimRight(controllerURL, "/") + "/wg/server-config/fetch"
 	req, err := http.NewRequest(http.MethodGet, fetchURL, nil)
 	if err != nil {
-		zeroBytes(privKey)
 		return nil, fmt.Errorf("build request: %w", err)
 	}
 	req.Header.Set("X-WG-KEY", apiKey)
@@ -233,22 +247,22 @@ func fetchConfig(controllerURL, apiKey, configPath string, insecureSkipVerify bo
 
 	resp, err := client.Do(req)
 	if err != nil {
-		zeroBytes(privKey)
 		return nil, fmt.Errorf("fetch config: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		zeroBytes(privKey)
 		return nil, fmt.Errorf("controller returned %d", resp.StatusCode)
 	}
 
 	var r types.WGServerConfigResponse
 	if err := json.NewDecoder(resp.Body).Decode(&r); err != nil {
-		zeroBytes(privKey)
 		return nil, fmt.Errorf("decode response: %w", err)
 	}
+	return &r, nil
+}
 
+func configFromResponse(r *types.WGServerConfigResponse, privKey []byte, controllerURL, apiKey, configPath string, insecureSkipVerify bool) (*Config, error) {
 	cfg := &Config{
 		ControllerURL:     controllerURL,
 		APIKey:            apiKey,

@@ -242,7 +242,7 @@ func ensureCustomWhiteListFile(whiteListDir string) error {
 // ensureCustomWhiteListInConfig adds the "custom" whitelist (Enabled) when
 // no entry with that tag is present. Existing entries are not modified, so a
 // user who disabled "custom" stays disabled.
-func ensureCustomWhiteListInConfig(config *configV2) bool {
+func ensureCustomWhiteListInConfig(config *Config) bool {
 	if config == nil {
 		return false
 	}

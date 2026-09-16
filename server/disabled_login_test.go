@@ -27,19 +27,19 @@ func TestDisabledUser_CannotLoginOrMintTokens(t *testing.T) {
 		Disabled: true,
 		Tokens:   []*DeviceToken{keep},
 	}
-	if err := DB_CreateUser(u); err != nil {
+	if err := createUser(u); err != nil {
 		t.Fatal(err)
 	}
 
-	body, _ := json.Marshal(LOGIN_FORM{Email: u.Email, Password: "longenough1", DeviceName: "attacker"})
+	body, _ := json.Marshal(loginRequest{Email: u.Email, Password: "longenough1", DeviceName: "attacker"})
 	req := httptest.NewRequest(http.MethodPost, "/client/user/login", bytes.NewReader(body))
 	w := httptest.NewRecorder()
-	API_UserLogin(w, req)
+	handleClientLogin(w, req)
 	if w.Code != http.StatusForbidden {
 		t.Fatalf("login: %d %s, want 403", w.Code, w.Body.String())
 	}
 
-	got, err := DB_findUserByEmail(u.Email)
+	got, err := findUserByEmail(u.Email)
 	if err != nil || got == nil {
 		t.Fatal(err)
 	}
@@ -63,14 +63,14 @@ func TestDisabledAdmin_CannotUILogin(t *testing.T) {
 		Disabled: true,
 		IsAdmin:  true,
 	}
-	if err := DB_CreateUser(u); err != nil {
+	if err := createUser(u); err != nil {
 		t.Fatal(err)
 	}
 
-	body, _ := json.Marshal(LOGIN_FORM{Email: u.Email, Password: "longenough1"})
+	body, _ := json.Marshal(loginRequest{Email: u.Email, Password: "longenough1"})
 	req := httptest.NewRequest(http.MethodPost, "/ui/user/login", bytes.NewReader(body))
 	w := httptest.NewRecorder()
-	API_AdminUILogin(w, req)
+	handleAdminLogin(w, req)
 	if w.Code != http.StatusForbidden {
 		t.Fatalf("admin login: %d %s, want 403", w.Code, w.Body.String())
 	}
@@ -95,21 +95,21 @@ func TestDisabledUser_CannotResetPassword(t *testing.T) {
 		Disabled: true,
 		Tokens:   []*DeviceToken{keep},
 	}
-	if err := DB_CreateUser(u); err != nil {
+	if err := createUser(u); err != nil {
 		t.Fatal(err)
 	}
 
-	body, _ := json.Marshal(PASSWORD_RESET_FORM{
+	body, _ := json.Marshal(passwordResetRequest{
 		Email: u.Email, Password: "newpassword1", ResetCode: "000000",
 	})
 	req := httptest.NewRequest(http.MethodPost, "/client/user/reset/password", bytes.NewReader(body))
 	w := httptest.NewRecorder()
-	API_UserResetPassword(w, req)
+	handleClientResetPassword(w, req)
 	if w.Code != http.StatusUnauthorized {
 		t.Fatalf("reset: %d %s, want 401", w.Code, w.Body.String())
 	}
 
-	got, err := DB_findUserByEmail(u.Email)
+	got, err := findUserByEmail(u.Email)
 	if err != nil || got == nil {
 		t.Fatal(err)
 	}

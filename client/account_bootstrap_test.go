@@ -21,7 +21,7 @@ func TestBootstrapSeesTunnelsOnlyAfterActivation(t *testing.T) {
 	// No pre-creation: ensureAccountDirs creates missing parents itself.
 	accounts := filepath.Join(base, "accounts") + string(os.PathSeparator)
 
-	s := &stateV2{
+	s := &State{
 		BasePath:     base + string(os.PathSeparator),
 		AccountsPath: accounts,
 		TunnelType:   string(types.DefaultTun),
@@ -39,7 +39,7 @@ func TestBootstrapSeesTunnelsOnlyAfterActivation(t *testing.T) {
 
 	// A tunnel file exists on disk for this account, as it would after the user
 	// has created one in a previous session.
-	meta := &TunnelMETA{Tag: "default", IFName: "tunnels", MTU: 1420, ConfigFormat: ".json"}
+	meta := &TunnelMeta{Tag: "default", IFName: "tunnels", MTU: 1420, ConfigFormat: ".json"}
 	blob, err := json.Marshal(meta)
 	if err != nil {
 		t.Fatal(err)

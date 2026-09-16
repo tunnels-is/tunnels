@@ -62,7 +62,7 @@ func ensureAccountDirs(hash string) error {
 }
 
 func clearTunnelMetaMap() {
-	TunnelMetaMap.Range(func(key string, _ *TunnelMETA) bool {
+	TunnelMetaMap.Range(func(key string, _ *TunnelMeta) bool {
 		TunnelMetaMap.Delete(key)
 		return true
 	})

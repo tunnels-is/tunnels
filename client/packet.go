@@ -12,7 +12,7 @@ func ipv4FragInfo(packet []byte) (isFragmented, isTrailing bool) {
 	return
 }
 
-func (V *TUN) ProcessEgressPacket(p *[]byte) (sendRemote bool) {
+func (t *TUN) ProcessEgressPacket(p *[]byte) (sendRemote bool) {
 	packet := *p
 
 	if len(packet) < 1 {
@@ -26,70 +26,70 @@ func (V *TUN) ProcessEgressPacket(p *[]byte) (sendRemote bool) {
 		return false
 	}
 
-	V.EP_Protocol = packet[9]
-	if V.EP_Protocol != 17 && V.EP_Protocol != 6 {
+	t.EP_Protocol = packet[9]
+	if t.EP_Protocol != 17 && t.EP_Protocol != 6 {
 		return false
 	}
 
-	V.EP_IPv4HeaderLength = (packet[0] & 0x0F) * 4
-	if int(V.EP_IPv4HeaderLength) < 20 || int(V.EP_IPv4HeaderLength) > len(packet) {
+	t.EP_IPv4HeaderLength = (packet[0] & 0x0F) * 4
+	if int(t.EP_IPv4HeaderLength) < 20 || int(t.EP_IPv4HeaderLength) > len(packet) {
 		return false
 	}
-	V.EP_IPv4Header = packet[:V.EP_IPv4HeaderLength]
-	V.EP_TPHeader = packet[V.EP_IPv4HeaderLength:]
+	t.EP_IPv4Header = packet[:t.EP_IPv4HeaderLength]
+	t.EP_TPHeader = packet[t.EP_IPv4HeaderLength:]
 
 	isFragmented, isTrailing := ipv4FragInfo(packet)
 
 	if !isTrailing {
-		if V.EP_Protocol == 17 && len(V.EP_TPHeader) < 8 {
+		if t.EP_Protocol == 17 && len(t.EP_TPHeader) < 8 {
 			return false
-		} else if V.EP_Protocol == 6 && len(V.EP_TPHeader) < 20 {
+		} else if t.EP_Protocol == 6 && len(t.EP_TPHeader) < 20 {
 			return false
 		}
 
-		V.EP_DstPort[0] = V.EP_TPHeader[2]
-		V.EP_DstPort[1] = V.EP_TPHeader[3]
-		if V.blockedPortsSet[V.EP_DstPort] != 0 {
+		t.EP_DstPort[0] = t.EP_TPHeader[2]
+		t.EP_DstPort[1] = t.EP_TPHeader[3]
+		if t.blockedPortsSet[t.EP_DstPort] != 0 {
 			if CONFIG.Load().LogBlockedPorts {
-				INFO("PORT BLOCKED: ", V.blockedPortsSet[V.EP_DstPort])
+				INFO("PORT BLOCKED: ", t.blockedPortsSet[t.EP_DstPort])
 			}
 			return false
 		}
 	}
 
-	V.EP_DstIP[0] = packet[16]
-	V.EP_DstIP[1] = packet[17]
-	V.EP_DstIP[2] = packet[18]
-	V.EP_DstIP[3] = packet[19]
+	t.EP_DstIP[0] = packet[16]
+	t.EP_DstIP[1] = packet[17]
+	t.EP_DstIP[2] = packet[18]
+	t.EP_DstIP[3] = packet[19]
 
-	if V.wgEndpointSet && V.EP_Protocol == 17 && V.EP_DstIP == V.serverInterfaceIP4bytes {
-		if V.wgLoopDropLogged.CompareAndSwap(false, true) {
+	if t.wgEndpointSet && t.EP_Protocol == 17 && t.EP_DstIP == t.serverInterfaceIP4bytes {
+		if t.wgLoopDropLogged.CompareAndSwap(false, true) {
 			SECURITY("dropping UDP to WireGuard endpoint on the tunnel interface — packets to ",
-				net.IP(V.serverInterfaceIP4bytes[:]).String(),
+				net.IP(t.serverInterfaceIP4bytes[:]).String(),
 				" must leave on the physical interface, not through the tunnel")
 		}
 		return false
 	}
 
-	V.EP_NAT_IP, V.EP_NAT_OK = V.TransLateIP(V.EP_DstIP)
+	t.EP_NAT_IP, t.EP_NAT_OK = t.translateIP(t.EP_DstIP)
 
-	if V.EP_NAT_OK {
-		V.EP_IPv4Header[16] = V.EP_NAT_IP[0]
-		V.EP_IPv4Header[17] = V.EP_NAT_IP[1]
-		V.EP_IPv4Header[18] = V.EP_NAT_IP[2]
-		V.EP_IPv4Header[19] = V.EP_NAT_IP[3]
+	if t.EP_NAT_OK {
+		t.EP_IPv4Header[16] = t.EP_NAT_IP[0]
+		t.EP_IPv4Header[17] = t.EP_NAT_IP[1]
+		t.EP_IPv4Header[18] = t.EP_NAT_IP[2]
+		t.EP_IPv4Header[19] = t.EP_NAT_IP[3]
 	}
 
-	RecalculateIPv4HeaderChecksum(V.EP_IPv4Header)
+	RecalculateIPv4HeaderChecksum(t.EP_IPv4Header)
 
 	if !isFragmented {
-		RecalculateTransportChecksum(V.EP_IPv4Header, V.EP_TPHeader)
+		RecalculateTransportChecksum(t.EP_IPv4Header, t.EP_TPHeader)
 	}
 
 	return true
 }
 
-func (V *TUN) ProcessIngressPacket(packet []byte) bool {
+func (t *TUN) ProcessIngressPacket(packet []byte) bool {
 	if len(packet) < 1 {
 		return false
 	}
@@ -101,43 +101,43 @@ func (V *TUN) ProcessIngressPacket(packet []byte) bool {
 		return false
 	}
 
-	V.IP_SrcIP[0] = packet[12]
-	V.IP_SrcIP[1] = packet[13]
-	V.IP_SrcIP[2] = packet[14]
-	V.IP_SrcIP[3] = packet[15]
+	t.IP_SrcIP[0] = packet[12]
+	t.IP_SrcIP[1] = packet[13]
+	t.IP_SrcIP[2] = packet[14]
+	t.IP_SrcIP[3] = packet[15]
 
-	V.IP_IPv4HeaderLength = (packet[0] & 0x0F) * 4
+	t.IP_IPv4HeaderLength = (packet[0] & 0x0F) * 4
 
-	if int(V.IP_IPv4HeaderLength) < 20 || int(V.IP_IPv4HeaderLength) > len(packet) {
+	if int(t.IP_IPv4HeaderLength) < 20 || int(t.IP_IPv4HeaderLength) > len(packet) {
 		return false
 	}
-	V.IP_IPv4Header = packet[:V.IP_IPv4HeaderLength]
-	V.IP_TPHeader = packet[V.IP_IPv4HeaderLength:]
+	t.IP_IPv4Header = packet[:t.IP_IPv4HeaderLength]
+	t.IP_TPHeader = packet[t.IP_IPv4HeaderLength:]
 
 	isFragmented, isTrailing := ipv4FragInfo(packet)
 
 	proto := packet[9]
 	if !isTrailing {
-		if proto == 17 && len(V.IP_TPHeader) < 8 {
+		if proto == 17 && len(t.IP_TPHeader) < 8 {
 			return false
-		} else if proto == 6 && len(V.IP_TPHeader) < 20 {
+		} else if proto == 6 && len(t.IP_TPHeader) < 20 {
 			return false
 		}
 	}
 
-	V.natMu.RLock()
-	V.IP_NAT_IP, V.IP_NAT_OK = V.NATIngress[V.IP_SrcIP]
-	V.natMu.RUnlock()
-	if V.IP_NAT_OK {
-		V.IP_IPv4Header[12] = V.IP_NAT_IP[0]
-		V.IP_IPv4Header[13] = V.IP_NAT_IP[1]
-		V.IP_IPv4Header[14] = V.IP_NAT_IP[2]
-		V.IP_IPv4Header[15] = V.IP_NAT_IP[3]
+	t.natMu.RLock()
+	t.IP_NAT_IP, t.IP_NAT_OK = t.NATIngress[t.IP_SrcIP]
+	t.natMu.RUnlock()
+	if t.IP_NAT_OK {
+		t.IP_IPv4Header[12] = t.IP_NAT_IP[0]
+		t.IP_IPv4Header[13] = t.IP_NAT_IP[1]
+		t.IP_IPv4Header[14] = t.IP_NAT_IP[2]
+		t.IP_IPv4Header[15] = t.IP_NAT_IP[3]
 	}
 
-	RecalculateIPv4HeaderChecksum(V.IP_IPv4Header)
+	RecalculateIPv4HeaderChecksum(t.IP_IPv4Header)
 	if !isFragmented {
-		RecalculateTransportChecksum(V.IP_IPv4Header, V.IP_TPHeader)
+		RecalculateTransportChecksum(t.IP_IPv4Header, t.IP_TPHeader)
 	}
 
 	return true

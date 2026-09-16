@@ -3,7 +3,7 @@ package wgserver
 import "testing"
 
 func TestNextIP_SkipsBroadcast(t *testing.T) {
-	ps := NewPeerStore("10.9.9.0/30", "")
+	ps := newPeerStore("10.9.9.0/30", "")
 	ip, _, err := ps.GetOrAssign("devA", "keyA")
 	if err != nil {
 		t.Fatal(err)
@@ -17,7 +17,7 @@ func TestNextIP_SkipsBroadcast(t *testing.T) {
 }
 
 func TestNextIP_ReusesFreedAddress(t *testing.T) {
-	ps := NewPeerStore("10.0.0.0/24", "")
+	ps := newPeerStore("10.0.0.0/24", "")
 
 	ipA, _, err := ps.GetOrAssign("devA", "keyA")
 	if err != nil {
