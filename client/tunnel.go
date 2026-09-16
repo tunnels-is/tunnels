@@ -9,6 +9,17 @@ import (
 	"github.com/tunnels-is/tunnels/types"
 )
 
+func ResetEverything() {
+	defer RecoverAndLog()
+	tunnelMapRange(func(tun *TUN) bool {
+		tunnel := tun.tunnel.Load()
+		if tunnel != nil {
+			_ = tunnel.Disconnect(tun)
+		}
+		return true
+	})
+}
+
 func announceClearAndFlush(tun *TUN) {
 	if err := tun.AnnounceAllowedHosts(nil, false); err == nil {
 		time.Sleep(200 * time.Millisecond)
@@ -19,7 +30,7 @@ func Disconnect(tunID string, switching bool) (err error) {
 	DEBUG("disconnecting from", tunID, switching)
 	tunnelMapRange(func(tun *TUN) bool {
 		if tun.ID == tunID {
-			tun.SetState(TUN_Disconnecting)
+			tun.SetState(TunnelDisconnecting)
 			tunnel := tun.tunnel.Load()
 			if !switching {
 
@@ -32,7 +43,7 @@ func Disconnect(tunID string, switching bool) (err error) {
 			}
 			TunnelMap.Delete(tun.ID)
 			m := tun.meta.Load()
-			tun.SetState(TUN_Disconnected)
+			tun.SetState(TunnelDisconnected)
 			if m != nil {
 				DEBUG("disconnected from ", m.Tag, tun.ID)
 			} else {
@@ -47,7 +58,7 @@ func Disconnect(tunID string, switching bool) (err error) {
 	return
 }
 
-func persistTunnelServerID(meta *TunnelMETA, serverID string) error {
+func persistTunnelServerID(meta *TunnelMeta, serverID string) error {
 	if meta == nil {
 		return errors.New("tunnel metadata is required")
 	}
@@ -58,15 +69,15 @@ func persistTunnelServerID(meta *TunnelMETA, serverID string) error {
 	return writeTunnelsToDisk(meta.Tag)
 }
 
-func createRandomTunnel() (m *TunnelMETA, err error) {
+func createRandomTunnel() (m *TunnelMeta, err error) {
 	m = createTunnel()
 	TunnelMetaMap.Store(m.Tag, m)
 	err = writeTunnelsToDisk(m.Tag)
 	return
 }
 
-func createTunnel() (T *TunnelMETA) {
-	T = new(TunnelMETA)
+func createTunnel() (T *TunnelMeta) {
+	T = new(TunnelMeta)
 	b := make([]rune, 8)
 	for i := range b {
 		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(letterRunes))))
@@ -93,7 +104,7 @@ func createTunnel() (T *TunnelMETA) {
 	return
 }
 
-func createDefaultTunnelMeta(t types.TunnelType) (M *TunnelMETA) {
+func createDefaultTunnelMeta(t types.TunnelType) (M *TunnelMeta) {
 	M = createTunnel()
 	M.ConfigFormat = tunnelFileSuffix
 

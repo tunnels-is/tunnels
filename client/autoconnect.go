@@ -318,8 +318,8 @@ func fetchServerByID(form *AutoConnectForm, serverID uuid.UUID) (*types.Server, 
 	return server, nil
 }
 
-func findTunnelMetaByTag(tag string) (meta *TunnelMETA) {
-	tunnelMetaMapRange(func(tun *TunnelMETA) bool {
+func findTunnelMetaByTag(tag string) (meta *TunnelMeta) {
+	tunnelMetaMapRange(func(tun *TunnelMeta) bool {
 		if tun.Tag == tag {
 			meta = tun
 			return false

@@ -26,7 +26,7 @@ func setupWGPeerTest(t *testing.T) *types.Server {
 		Tag:    "wg-authz-test",
 		APIKey: "test-wg-key",
 	}
-	if err := BBolt_CreateServer(s); err != nil {
+	if err := createServer(s); err != nil {
 		t.Fatal(err)
 	}
 	return s
@@ -34,7 +34,7 @@ func setupWGPeerTest(t *testing.T) *types.Server {
 
 func seedUserWithDevice(t *testing.T, server *types.Server, u *User) string {
 	t.Helper()
-	if err := BBolt_CreateUser(u); err != nil {
+	if err := createUser(u); err != nil {
 		t.Fatal(err)
 	}
 	wgKey := makeWGKey()
@@ -45,7 +45,7 @@ func seedUserWithDevice(t *testing.T, server *types.Server, u *User) string {
 		WireGuardKey: wgKey,
 		WireGuardIP:  "10.0.0.5",
 	}
-	if err := BBolt_CreateDevice(d); err != nil {
+	if err := createDevice(d); err != nil {
 		t.Fatal(err)
 	}
 	return wgKey
@@ -56,7 +56,7 @@ func callWGPeerAuthz(t *testing.T, server *types.Server, pubKey string) *httptes
 	req := httptest.NewRequest(http.MethodGet, "/wg/peer?pubkey="+url.QueryEscape(pubKey), nil)
 	req = req.WithContext(context.WithValue(req.Context(), contextKeyServer, server))
 	w := httptest.NewRecorder()
-	API_WGPeer(w, req)
+	handleWGPeer(w, req)
 	return w
 }
 
@@ -66,11 +66,11 @@ func callWGConfig(t *testing.T, user *User, serverID uuid.UUID, pubKey string) *
 		"/client/wg/config?serverID="+serverID.String()+"&pubKey="+url.QueryEscape(pubKey), nil)
 	req = req.WithContext(context.WithValue(req.Context(), contextKeyUser, user))
 	w := httptest.NewRecorder()
-	API_WGConfig(w, req)
+	handleWGConfig(w, req)
 	return w
 }
 
-func TestAPI_WGConfig_GroupACL(t *testing.T) {
+func TestHandleWGConfig_GroupACL(t *testing.T) {
 	setupTestDB(t)
 	if logger == nil {
 		logger = slog.New(slog.NewTextHandler(io.Discard, nil))
@@ -79,10 +79,10 @@ func TestAPI_WGConfig_GroupACL(t *testing.T) {
 
 	groupedServer := &types.Server{ID: uuid.New(), Tag: "grouped", APIKey: uuid.NewString(), Groups: []uuid.UUID{group}}
 	publicServer := &types.Server{ID: uuid.New(), Tag: "public", APIKey: uuid.NewString(), Groups: []uuid.UUID{}}
-	if err := BBolt_CreateServer(groupedServer); err != nil {
+	if err := createServer(groupedServer); err != nil {
 		t.Fatal(err)
 	}
-	if err := BBolt_CreateServer(publicServer); err != nil {
+	if err := createServer(publicServer); err != nil {
 		t.Fatal(err)
 	}
 
@@ -101,7 +101,7 @@ func TestAPI_WGConfig_GroupACL(t *testing.T) {
 	}
 }
 
-func TestAPI_WGConfig_NoDeviceReturnsEmptyIP(t *testing.T) {
+func TestHandleWGConfig_NoDeviceReturnsEmptyIP(t *testing.T) {
 	setupTestDB(t)
 	if logger == nil {
 		logger = slog.New(slog.NewTextHandler(io.Discard, nil))
@@ -115,12 +115,11 @@ func TestAPI_WGConfig_NoDeviceReturnsEmptyIP(t *testing.T) {
 		WireGuardPubKey: makeWGKey(),
 		WireGuardSubnet: "10.7.0.0/24",
 	}
-	if err := BBolt_CreateServer(server); err != nil {
+	if err := createServer(server); err != nil {
 		t.Fatal(err)
 	}
 
 	user := &User{ID: uuid.New()}
-
 
 	w := callWGConfig(t, user, server.ID, makeWGKey())
 	if w.Code != http.StatusOK {
@@ -135,7 +134,7 @@ func TestAPI_WGConfig_NoDeviceReturnsEmptyIP(t *testing.T) {
 	}
 }
 
-func TestAPI_WGPeer_ActiveUserAuthorized(t *testing.T) {
+func TestHandleWGPeer_ActiveUserAuthorized(t *testing.T) {
 	server := setupWGPeerTest(t)
 	pubKey := seedUserWithDevice(t, server, &User{
 		ID:            uuid.New(),
@@ -148,7 +147,7 @@ func TestAPI_WGPeer_ActiveUserAuthorized(t *testing.T) {
 	}
 }
 
-func TestAPI_WGPeer_DisabledUserRejected(t *testing.T) {
+func TestHandleWGPeer_DisabledUserRejected(t *testing.T) {
 	server := setupWGPeerTest(t)
 	pubKey := seedUserWithDevice(t, server, &User{
 		ID:            uuid.New(),
@@ -162,7 +161,7 @@ func TestAPI_WGPeer_DisabledUserRejected(t *testing.T) {
 	}
 }
 
-func TestAPI_WGPeer_ExpiredSubscriptionRejected(t *testing.T) {
+func TestHandleWGPeer_ExpiredSubscriptionRejected(t *testing.T) {
 	server := setupWGPeerTest(t)
 	pubKey := seedUserWithDevice(t, server, &User{
 		ID:            uuid.New(),
@@ -175,7 +174,7 @@ func TestAPI_WGPeer_ExpiredSubscriptionRejected(t *testing.T) {
 	}
 }
 
-func TestAPI_WGPeer_ZeroSubExpirationAllowed(t *testing.T) {
+func TestHandleWGPeer_ZeroSubExpirationAllowed(t *testing.T) {
 	server := setupWGPeerTest(t)
 	pubKey := seedUserWithDevice(t, server, &User{
 		ID:    uuid.New(),

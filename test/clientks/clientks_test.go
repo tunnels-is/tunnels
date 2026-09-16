@@ -429,7 +429,7 @@ func seedAccount(t *testing.T, uid, token, serverID string) {
 	u := &client.User{
 		ID:    uid,
 		Email: "ks@test.local",
-		DeviceToken: &client.DEVICE_TOKEN{
+		DeviceToken: &client.DeviceToken{
 			DT: token,
 			N:  "kcli",
 		},

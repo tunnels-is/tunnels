@@ -4,21 +4,21 @@ import (
 	"net"
 )
 
-func (V *TUN) TransLateIP(ip [4]byte) ([4]byte, bool) {
-	V.natMu.RLock()
-	xxx, ok := V.NATEgress[ip]
-	V.natMu.RUnlock()
+func (t *TUN) translateIP(ip [4]byte) ([4]byte, bool) {
+	t.natMu.RLock()
+	mapped, ok := t.NATEgress[ip]
+	t.natMu.RUnlock()
 	if ok {
-		return xxx, true
+		return mapped, true
 	}
 
-	if len(V.ServerResponse.Networks) == 0 {
+	if len(t.ServerResponse.Networks) == 0 {
 		return ip, true
 	}
 
 	var newIP [4]byte
 	matched := false
-	for _, v := range V.ServerResponse.Networks {
+	for _, v := range t.ServerResponse.Networks {
 		if v.Nat == "" {
 			continue
 		}
@@ -35,10 +35,10 @@ func (V *TUN) TransLateIP(ip [4]byte) ([4]byte, bool) {
 			newIP[i] = net4[i]&v.NetIPNet.Mask[i] | ip[i]&^v.NetIPNet.Mask[i]
 		}
 
-		V.natMu.Lock()
-		V.NATEgress[ip] = newIP
-		V.NATIngress[newIP] = ip
-		V.natMu.Unlock()
+		t.natMu.Lock()
+		t.NATEgress[ip] = newIP
+		t.NATIngress[newIP] = ip
+		t.natMu.Unlock()
 		matched = true
 		break
 	}

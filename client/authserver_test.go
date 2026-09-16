@@ -3,7 +3,7 @@ package client
 import "testing"
 
 func TestAuthorizeControlServer_MultiPort(t *testing.T) {
-	conf := &configV2{
+	conf := &Config{
 		ControlServers: []*ControlServer{
 			{Host: "api.tunnels.is", Port: "443", ValidateCertificate: true},
 			{Host: "api.tunnels.is", Port: "444", ValidateCertificate: false},

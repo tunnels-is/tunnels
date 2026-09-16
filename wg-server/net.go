@@ -32,41 +32,9 @@ func tunnelsFwdChainName(iface string) string {
 }
 
 func setupNet(cfg *Config) error {
-	link, err := netlink.LinkByName(cfg.WireGuardIface)
+	serverIP, prefixLen, err := assignWGAddresses(cfg)
 	if err != nil {
-		return fmt.Errorf("interface %q not found: %w", cfg.WireGuardIface, err)
-	}
-
-	_, ipNet, err := net.ParseCIDR(cfg.WireGuardSubnet)
-	if err != nil {
-		return fmt.Errorf("invalid WireGuardSubnet %q: %w", cfg.WireGuardSubnet, err)
-	}
-
-	serverIP := firstHost(ipNet)
-	addr := &netlink.Addr{
-		IPNet: &net.IPNet{IP: serverIP, Mask: ipNet.Mask},
-	}
-	if err := netlink.AddrAdd(link, addr); err != nil {
-		return fmt.Errorf("AddrAdd %s: %w", serverIP, err)
-	}
-
-	if cfg.WireGuardSubnet6 != "" {
-		_, ipNet6, err := net.ParseCIDR(cfg.WireGuardSubnet6)
-		if err != nil {
-			return fmt.Errorf("invalid WireGuardSubnet6 %q: %w", cfg.WireGuardSubnet6, err)
-		}
-		serverIPv6 := firstHost6(ipNet6)
-		addr6 := &netlink.Addr{
-			IPNet: &net.IPNet{IP: serverIPv6, Mask: ipNet6.Mask},
-		}
-		if err := netlink.AddrAdd(link, addr6); err != nil {
-			return fmt.Errorf("AddrAdd IPv6 %s: %w", serverIPv6, err)
-		}
-		INFO("IPv6 address assigned: ", serverIPv6.String(), "/", maskBits(ipNet6.Mask))
-	}
-
-	if err := netlink.LinkSetUp(link); err != nil {
-		return fmt.Errorf("LinkSetUp: %w", err)
+		return err
 	}
 
 	flushWGRules(cfg)
@@ -98,8 +66,48 @@ func setupNet(cfg *Config) error {
 		}
 	}
 
-	INFO("network setup complete, server IP=", serverIP.String(), "/", maskBits(ipNet.Mask))
+	INFO("network setup complete, server IP=", serverIP.String(), "/", prefixLen)
 	return nil
+}
+
+func assignWGAddresses(cfg *Config) (net.IP, int, error) {
+	link, err := netlink.LinkByName(cfg.WireGuardIface)
+	if err != nil {
+		return nil, 0, fmt.Errorf("interface %q not found: %w", cfg.WireGuardIface, err)
+	}
+
+	_, ipNet, err := net.ParseCIDR(cfg.WireGuardSubnet)
+	if err != nil {
+		return nil, 0, fmt.Errorf("invalid WireGuardSubnet %q: %w", cfg.WireGuardSubnet, err)
+	}
+
+	serverIP := firstHost(ipNet)
+	addr := &netlink.Addr{
+		IPNet: &net.IPNet{IP: serverIP, Mask: ipNet.Mask},
+	}
+	if err := netlink.AddrAdd(link, addr); err != nil {
+		return nil, 0, fmt.Errorf("AddrAdd %s: %w", serverIP, err)
+	}
+
+	if cfg.WireGuardSubnet6 != "" {
+		_, ipNet6, err := net.ParseCIDR(cfg.WireGuardSubnet6)
+		if err != nil {
+			return nil, 0, fmt.Errorf("invalid WireGuardSubnet6 %q: %w", cfg.WireGuardSubnet6, err)
+		}
+		serverIPv6 := firstHost6(ipNet6)
+		addr6 := &netlink.Addr{
+			IPNet: &net.IPNet{IP: serverIPv6, Mask: ipNet6.Mask},
+		}
+		if err := netlink.AddrAdd(link, addr6); err != nil {
+			return nil, 0, fmt.Errorf("AddrAdd IPv6 %s: %w", serverIPv6, err)
+		}
+		INFO("IPv6 address assigned: ", serverIPv6.String(), "/", maskBits(ipNet6.Mask))
+	}
+
+	if err := netlink.LinkSetUp(link); err != nil {
+		return nil, 0, fmt.Errorf("LinkSetUp: %w", err)
+	}
+	return serverIP, maskBits(ipNet.Mask), nil
 }
 
 func cleanupNet(cfg *Config) {
@@ -110,63 +118,79 @@ func cleanupNet(cfg *Config) {
 func flushWGRules(cfg *Config) {
 	portStr := fmt.Sprintf("%d", cfg.WireGuardPort)
 	wg := cfg.WireGuardIface
-	net := cfg.InternetIface
+	internetIface := cfg.InternetIface
 
 	for _, bin := range []string{"iptables", "ip6tables"} {
-
-		drainRule(bin, "-D", "INPUT", "-p", "udp", "--dport", portStr, "-j", "ACCEPT")
-		drainRule(bin, "-D", "INPUT", "-i", wg, "-j", "DROP")
-
-		chain := tunnelsFwdChainName(wg)
-		drainRule(bin, "-D", "FORWARD", "-j", chain)
-		_ = exec.Command(bin, "-F", chain).Run()
-		_ = exec.Command(bin, "-X", chain).Run()
-		// Previous builds used a shared TUNNELS_FWD name.
-		drainRule(bin, "-D", "FORWARD", "-j", tunnelsFwdChainPrefix)
-		_ = exec.Command(bin, "-F", tunnelsFwdChainPrefix).Run()
-		_ = exec.Command(bin, "-X", tunnelsFwdChainPrefix).Run()
-
-		drainRule(bin, "-D", "FORWARD", "-i", wg, "-o", wg, "-j", "ACCEPT")
-
-		drainRule(bin, "-D", "FORWARD", "-i", wg, "-o", net, "-j", "ACCEPT")
-
-		drainRule(bin, "-D", "FORWARD",
-			"-i", net, "-o", wg,
-			"-m", "state", "--state", "RELATED,ESTABLISHED",
-			"-j", "ACCEPT")
-
-		drainRule(bin, "-D", "FORWARD", "-i", net, "-o", wg, "-j", "DROP")
+		drainInputRules(bin, portStr, wg)
+		drainForwardRules(bin, wg, internetIface)
 	}
 
+	drainNATRules(cfg, internetIface)
+
+	drainRule("ip6tables", "-D", "FORWARD", "-i", wg, "-j", "DROP")
+	drainRule("ip6tables", "-D", "FORWARD", "-o", wg, "-j", "DROP")
+
+	drainMeshRules(cfg)
+}
+
+func drainInputRules(bin, portStr, wg string) {
+	drainRule(bin, "-D", "INPUT", "-p", "udp", "--dport", portStr, "-j", "ACCEPT")
+	drainRule(bin, "-D", "INPUT", "-i", wg, "-j", "DROP")
+}
+
+func drainForwardRules(bin, wg, internetIface string) {
+	chain := tunnelsFwdChainName(wg)
+	drainRule(bin, "-D", "FORWARD", "-j", chain)
+	_ = exec.Command(bin, "-F", chain).Run()
+	_ = exec.Command(bin, "-X", chain).Run()
+	// Previous builds used a shared TUNNELS_FWD name.
+	drainRule(bin, "-D", "FORWARD", "-j", tunnelsFwdChainPrefix)
+	_ = exec.Command(bin, "-F", tunnelsFwdChainPrefix).Run()
+	_ = exec.Command(bin, "-X", tunnelsFwdChainPrefix).Run()
+
+	drainRule(bin, "-D", "FORWARD", "-i", wg, "-o", wg, "-j", "ACCEPT")
+
+	drainRule(bin, "-D", "FORWARD", "-i", wg, "-o", internetIface, "-j", "ACCEPT")
+
+	drainRule(bin, "-D", "FORWARD",
+		"-i", internetIface, "-o", wg,
+		"-m", "state", "--state", "RELATED,ESTABLISHED",
+		"-j", "ACCEPT")
+
+	drainRule(bin, "-D", "FORWARD", "-i", internetIface, "-o", wg, "-j", "DROP")
+}
+
+func drainNATRules(cfg *Config, internetIface string) {
 	if cfg.WireGuardSubnet != "" {
-		drainRule("iptables", masqueradeArgs("-D", cfg.WireGuardSubnet, net)...)
+		drainRule("iptables", masqueradeArgs("-D", cfg.WireGuardSubnet, internetIface)...)
 		if cfg.PublicIP != "" {
 			drainRule("iptables", "-t", "nat", "-D", "POSTROUTING",
-				"-s", cfg.WireGuardSubnet, "-o", net, "-j", "SNAT", "--to-source", cfg.PublicIP)
+				"-s", cfg.WireGuardSubnet, "-o", internetIface, "-j", "SNAT", "--to-source", cfg.PublicIP)
 		}
 	}
 
 	if cfg.WireGuardSubnet6 != "" {
 		drainRule("ip6tables",
 			"-t", "nat", "-D", "POSTROUTING",
-			"-s", cfg.WireGuardSubnet6, "-o", net, "-j", "MASQUERADE")
+			"-s", cfg.WireGuardSubnet6, "-o", internetIface, "-j", "MASQUERADE")
 	}
+}
 
-	drainRule("ip6tables", "-D", "FORWARD", "-i", wg, "-j", "DROP")
-	drainRule("ip6tables", "-D", "FORWARD", "-o", wg, "-j", "DROP")
-
-	if cfg.WireGuardMeshPort > 0 {
-		meshPort := fmt.Sprintf("%d", cfg.WireGuardMeshPort)
-		mesh := meshIface(cfg)
-		for _, bin := range []string{"iptables", "ip6tables"} {
-			drainRule(bin, "-D", "INPUT", "-p", "udp", "--dport", meshPort, "-j", "ACCEPT")
-			drainRule(bin, "-D", "INPUT", "-i", mesh, "-j", "DROP")
-		}
-		drainRule("iptables", "-D", "FORWARD", "-i", mesh, "-o", wg, "-j", "ACCEPT")
-		drainRule("iptables", "-D", "FORWARD", "-i", wg, "-o", mesh, "-j", "ACCEPT")
-		drainRule("iptables", "-t", "mangle", "-D", "FORWARD", "-o", mesh,
-			"-p", "tcp", "--tcp-flags", "SYN,RST", "SYN", "-j", "TCPMSS", "--clamp-mss-to-pmtu")
+func drainMeshRules(cfg *Config) {
+	if cfg.WireGuardMeshPort <= 0 {
+		return
 	}
+	meshPort := fmt.Sprintf("%d", cfg.WireGuardMeshPort)
+	mesh := meshIface(cfg)
+	wg := cfg.WireGuardIface
+	for _, bin := range []string{"iptables", "ip6tables"} {
+		drainRule(bin, "-D", "INPUT", "-p", "udp", "--dport", meshPort, "-j", "ACCEPT")
+		drainRule(bin, "-D", "INPUT", "-i", mesh, "-j", "DROP")
+	}
+	drainRule("iptables", "-D", "FORWARD", "-i", mesh, "-o", wg, "-j", "ACCEPT")
+	drainRule("iptables", "-D", "FORWARD", "-i", wg, "-o", mesh, "-j", "ACCEPT")
+	drainRule("iptables", "-t", "mangle", "-D", "FORWARD", "-o", mesh,
+		"-p", "tcp", "--tcp-flags", "SYN,RST", "SYN", "-j", "TCPMSS", "--clamp-mss-to-pmtu")
 }
 
 func addMeshRules(cfg *Config) error {
@@ -294,9 +318,16 @@ func ensureTunnelsFwdChain(bin func(...string) error, chain string) error {
 
 func PreviewRules(cfg *Config) []string {
 	var lines []string
+	lines = append(lines, previewInputLines(cfg)...)
+	lines = append(lines, previewForwardLines(cfg)...)
+	lines = append(lines, previewNATLines(cfg)...)
+	return lines
+}
+
+func previewInputLines(cfg *Config) []string {
+	var lines []string
 	portStr := fmt.Sprintf("%d", cfg.WireGuardPort)
 	wg := cfg.WireGuardIface
-	net := cfg.InternetIface
 
 	for _, bin := range []string{"iptables", "ip6tables"} {
 		lines = append(lines,
@@ -312,7 +343,13 @@ func PreviewRules(cfg *Config) []string {
 			)
 		}
 	}
+	return lines
+}
 
+func previewForwardLines(cfg *Config) []string {
+	var lines []string
+	wg := cfg.WireGuardIface
+	internetIface := cfg.InternetIface
 	chain := tunnelsFwdChainName(wg)
 	drop4, drop6, dropErr := egressDropCIDRs(cfg)
 	if dropErr != nil {
@@ -326,8 +363,8 @@ func PreviewRules(cfg *Config) []string {
 		lines = append(lines, fmt.Sprintf("%s -I FORWARD 1 -j %s", bin, chain))
 		lines = append(lines,
 			fmt.Sprintf("%s -A %s -i %s -o %s -j ACCEPT", bin, chain, wg, wg),
-			fmt.Sprintf("%s -A %s -i %s -o %s -m state --state RELATED,ESTABLISHED -j ACCEPT", bin, chain, net, wg),
-			fmt.Sprintf("%s -A %s -i %s -o %s -j DROP", bin, chain, net, wg),
+			fmt.Sprintf("%s -A %s -i %s -o %s -m state --state RELATED,ESTABLISHED -j ACCEPT", bin, chain, internetIface, wg),
+			fmt.Sprintf("%s -A %s -i %s -o %s -j DROP", bin, chain, internetIface, wg),
 		)
 		if cfg.WireGuardMeshPort > 0 {
 			mesh := meshIface(cfg)
@@ -342,28 +379,33 @@ func PreviewRules(cfg *Config) []string {
 			cidrs = drop6
 		}
 		for _, d := range cidrs {
-			lines = append(lines, fmt.Sprintf("%s %s", bin, strings.Join(destDropArgs(chain, net, d), " ")))
+			lines = append(lines, fmt.Sprintf("%s %s", bin, strings.Join(destDropArgs(chain, internetIface, d), " ")))
 		}
 		lines = append(lines,
-			fmt.Sprintf("%s -A %s -i %s -o %s -j ACCEPT", bin, chain, wg, net),
+			fmt.Sprintf("%s -A %s -i %s -o %s -j ACCEPT", bin, chain, wg, internetIface),
 			fmt.Sprintf("%s -A %s -i %s -j DROP", bin, chain, wg),
 		)
 	}
+	return lines
+}
 
+func previewNATLines(cfg *Config) []string {
+	var lines []string
+	wg := cfg.WireGuardIface
+	internetIface := cfg.InternetIface
 	if cfg.WireGuardSubnet != "" {
-		lines = append(lines, "iptables "+strings.Join(masqueradeArgs("-A", cfg.WireGuardSubnet, net), " "))
+		lines = append(lines, "iptables "+strings.Join(masqueradeArgs("-A", cfg.WireGuardSubnet, internetIface), " "))
 	}
 
 	if cfg.WireGuardSubnet6 != "" {
 		lines = append(lines,
-			fmt.Sprintf("ip6tables -t nat -A POSTROUTING -s %s -o %s -j MASQUERADE", cfg.WireGuardSubnet6, net))
+			fmt.Sprintf("ip6tables -t nat -A POSTROUTING -s %s -o %s -j MASQUERADE", cfg.WireGuardSubnet6, internetIface))
 	} else {
 		lines = append(lines,
 			fmt.Sprintf("ip6tables -A FORWARD -i %s -j DROP", wg),
 			fmt.Sprintf("ip6tables -A FORWARD -o %s -j DROP", wg),
 		)
 	}
-
 	return lines
 }
 

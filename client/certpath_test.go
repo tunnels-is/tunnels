@@ -60,7 +60,7 @@ func TestTLSConfigForController_CustomRootVerifiesSelfSigned(t *testing.T) {
 	dir := t.TempDir()
 	certPath := filepath.Join(dir, "cert.pem")
 	keyPath := filepath.Join(dir, "key.pem")
-	if _, err := certs.MakeCertV2(certs.ECDSA, certPath, keyPath, []string{"127.0.0.1"}, []string{"localhost"}, "", time.Time{}, true); err != nil {
+	if _, err := certs.MakeCertificate(certs.ECDSA, certPath, keyPath, []string{"127.0.0.1"}, []string{"localhost"}, "", time.Time{}, true); err != nil {
 		t.Fatal(err)
 	}
 	pair, err := tls.LoadX509KeyPair(certPath, keyPath)

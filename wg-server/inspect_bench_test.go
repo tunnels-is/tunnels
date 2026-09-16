@@ -67,7 +67,7 @@ func rules(ss ...string) []aclEntry {
 }
 
 func newBenchInspector(firewall bool) *inspectingTUN {
-	if err := initPeerList("10.0.0.0/24", "fd00::/64"); err != nil {
+	if err := initFirewall("10.0.0.0/24", "fd00::/64"); err != nil {
 		panic(err)
 	}
 	insp, err := newInspectingTUN(benchDevice{}, &Config{

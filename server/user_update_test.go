@@ -13,14 +13,14 @@ import (
 	"github.com/google/uuid"
 )
 
-func TestAPI_UserUpdate_APIKeyServerGenerated(t *testing.T) {
+func TestHandleClientUserUpdate_APIKeyServerGenerated(t *testing.T) {
 	setupTestDB(t)
 	if logger == nil {
 		logger = slog.New(slog.NewTextHandler(io.Discard, nil))
 	}
 
 	u := &User{ID: uuid.New(), Email: "u@example.com", Groups: []uuid.UUID{}, Tokens: []*DeviceToken{}}
-	if err := BBolt_CreateUser(u); err != nil {
+	if err := createUser(u); err != nil {
 		t.Fatal(err)
 	}
 
@@ -28,7 +28,7 @@ func TestAPI_UserUpdate_APIKeyServerGenerated(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/client/user/update", strings.NewReader(body))
 		req = req.WithContext(context.WithValue(req.Context(), contextKeyUser, u))
 		w := httptest.NewRecorder()
-		API_UserUpdate(w, req)
+		handleClientUserUpdate(w, req)
 		return w
 	}
 

@@ -141,7 +141,7 @@ func TestProcess_IPv6PassThrough(t *testing.T) {
 	}
 }
 
-func TestTransLateIP_Slash25(t *testing.T) {
+func TestTranslateIP_Slash25(t *testing.T) {
 	tun := newBareTUN()
 	_, natNet, _ := net.ParseCIDR("192.168.9.0/24")
 	_, targetNet, _ := net.ParseCIDR("10.10.10.128/25")
@@ -150,7 +150,7 @@ func TestTransLateIP_Slash25(t *testing.T) {
 		NatIPNet: natNet, NetIPNet: targetNet,
 	}}
 
-	got, ok := tun.TransLateIP([4]byte{192, 168, 9, 5})
+	got, ok := tun.translateIP([4]byte{192, 168, 9, 5})
 	if !ok {
 		t.Fatal("expected translation")
 	}
@@ -160,7 +160,7 @@ func TestTransLateIP_Slash25(t *testing.T) {
 	}
 }
 
-func TestTransLateIP_Slash24And32(t *testing.T) {
+func TestTranslateIP_Slash24And32(t *testing.T) {
 	tun := newBareTUN()
 	_, n24, _ := net.ParseCIDR("192.168.9.0/24")
 	_, t24, _ := net.ParseCIDR("10.0.5.0/24")
@@ -170,10 +170,10 @@ func TestTransLateIP_Slash24And32(t *testing.T) {
 		{Nat: "192.168.9.0/24", Network: "10.0.5.0/24", NatIPNet: n24, NetIPNet: t24},
 		{Nat: "172.16.0.7/32", Network: "10.9.9.9/32", NatIPNet: n32, NetIPNet: t32},
 	}
-	if got, _ := tun.TransLateIP([4]byte{192, 168, 9, 42}); got != [4]byte{10, 0, 5, 42} {
+	if got, _ := tun.translateIP([4]byte{192, 168, 9, 42}); got != [4]byte{10, 0, 5, 42} {
 		t.Fatalf("/24 NAT wrong: got %v", got)
 	}
-	if got, _ := tun.TransLateIP([4]byte{172, 16, 0, 7}); got != [4]byte{10, 9, 9, 9} {
+	if got, _ := tun.translateIP([4]byte{172, 16, 0, 7}); got != [4]byte{10, 9, 9, 9} {
 		t.Fatalf("/32 NAT wrong: got %v", got)
 	}
 }

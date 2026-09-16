@@ -121,7 +121,7 @@ func (a *App) accountInfoTab(u *client.User) fyne.CanvasObject {
 }
 
 func (a *App) accountLoginsTab(u *client.User) fyne.CanvasObject {
-	tokens := append([]*client.DEVICE_TOKEN(nil), u.Tokens...)
+	tokens := append([]*client.DeviceToken(nil), u.Tokens...)
 	sort.Slice(tokens, func(i, j int) bool { return tokens[i].Created.After(tokens[j].Created) })
 
 	if len(tokens) == 0 {
@@ -171,7 +171,7 @@ func (a *App) accountLoginsTab(u *client.User) fyne.CanvasObject {
 						a.show(pageLogin)
 						return
 					}
-					next := []*client.DEVICE_TOKEN{}
+					next := []*client.DeviceToken{}
 					for _, x := range u.Tokens {
 						if !sameSession(x, t) {
 							next = append(next, x)

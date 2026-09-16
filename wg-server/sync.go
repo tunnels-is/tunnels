@@ -71,7 +71,7 @@ func reconcilePeer(pubKeyB64 string) authResult {
 	}
 
 	applyPeerFirewallSlot(hexKey, ip, ipv6)
-	if err := AddPeer(hexKey, peerAllowedIPs(ip, ipv6)...); err != nil {
+	if err := addPeer(hexKey, peerAllowedIPs(ip, ipv6)...); err != nil {
 		WARN("reconcilePeer: AddPeer failed: ", err)
 		return authUnknown
 	}
@@ -85,10 +85,10 @@ type peerAddrs struct {
 
 func applyPeerFirewallSlot(hexKey, ip, ipv6 string) {
 	next := peerAddrs{ip: ip, ipv6: ipv6}
-	prev, loaded := addedPeerKeys.Load(hexKey)
+	prev, loaded := installedPeerAddrs.Load(hexKey)
 	if !loaded {
 		resetPeer(ip, ipv6)
-		addedPeerKeys.Store(hexKey, next)
+		installedPeerAddrs.Store(hexKey, next)
 		return
 	}
 	old, _ := prev.(peerAddrs)
@@ -97,7 +97,7 @@ func applyPeerFirewallSlot(hexKey, ip, ipv6 string) {
 	}
 	dropPeer(old.ip, old.ipv6)
 	resetPeer(ip, ipv6)
-	addedPeerKeys.Store(hexKey, next)
+	installedPeerAddrs.Store(hexKey, next)
 }
 
 func peerAllowedIPs(ip, ipv6 string) []string {

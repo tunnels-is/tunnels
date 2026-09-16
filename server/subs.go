@@ -10,7 +10,7 @@ func scanSubs() {
 	var limit int64 = 100
 	var offset int64 = 0
 	for {
-		users, err := DB_getUsers(limit, offset)
+		users, err := getUsers(limit, offset)
 		if err != nil {
 			return
 		}
@@ -52,7 +52,7 @@ func checkIfUserSubIsActive(u *User) {
 		return
 	}
 	u.SubExpiration = newExp
-	_ = DB_updateUserSubTime(u)
+	_ = updateUserSubTime(u)
 }
 
 func licensePaidThrough(u *User) time.Time {

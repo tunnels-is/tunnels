@@ -95,7 +95,7 @@ func (t *TUN) announceAllowedHostsWithRetry() {
 	defer RecoverAndLog()
 	for _, delay := range []time.Duration{0, 2 * time.Second, 5 * time.Second} {
 		time.Sleep(delay)
-		if t.GetState() < TUN_Connected {
+		if t.GetState() < TunnelConnected {
 			return
 		}
 		m := t.meta.Load()

@@ -12,33 +12,8 @@ import (
 	"github.com/tunnels-is/tunnels/version"
 )
 
-// Config is the exported alias for the on-disk client configuration.
-type Config = configV2
-
-// State is the exported alias for runtime client state.
-type State = stateV2
-
 // ErrTunnelConnected is returned when a tunnel cannot be modified while up.
 var ErrTunnelConnected = errors.New("tunnel is connected")
-
-// ValidationError is a set of field-level problems (tunnel save, etc.).
-type ValidationError struct {
-	Messages []string
-}
-
-func (e *ValidationError) Error() string {
-	if e == nil {
-		return ""
-	}
-	return strings.Join(e.Messages, "; ")
-}
-
-// CreateDeviceResult is the one-shot WireGuard config returned when creating
-// a remote device from this machine.
-type CreateDeviceResult struct {
-	WGConfig string        `json:"WGConfig"`
-	Device   *types.Device `json:"Device"`
-}
 
 var uiLogHandler atomic.Value // func(string)
 
@@ -96,10 +71,10 @@ func ActivateAccount(userID string) error {
 // CloneConfig returns a shallow copy of the live config with copied slices.
 // Nested pointer elements (servers, lists, records) are still shared; copy
 // those before mutating an individual item.
-func CloneConfig() *configV2 {
+func CloneConfig() *Config {
 	src := CONFIG.Load()
 	if src == nil {
-		return &configV2{}
+		return &Config{}
 	}
 	dst := *src
 	dst.ControlServers = append([]*ControlServer(nil), src.ControlServers...)
@@ -110,13 +85,13 @@ func CloneConfig() *configV2 {
 }
 
 // CreateTunnel allocates a new random tunnel and persists it.
-func CreateTunnel() (*TunnelMETA, error) {
+func CreateTunnel() (*TunnelMeta, error) {
 	return createRandomTunnel()
 }
 
 // SaveTunnel validates and writes tunnel metadata. oldTag is the previous
 // identifier when renaming.
-func SaveTunnel(meta *TunnelMETA, oldTag string) error {
+func SaveTunnel(meta *TunnelMeta, oldTag string) error {
 	if meta == nil {
 		return errors.New("tunnel metadata is required")
 	}
@@ -208,7 +183,7 @@ func SetTunnelPeers(tag string, allowedHosts []string, allowAll bool) ([]string,
 		if m == nil || m.Tag != tag {
 			return true
 		}
-		if t.GetState() >= TUN_Connected {
+		if t.GetState() >= TunnelConnected {
 			if err := t.AnnounceAllowedHosts(hosts, allowAll); err != nil {
 				DEBUG("peer list announce failed: ", err)
 			}
@@ -370,15 +345,15 @@ func (t *TUN) EgressString() string {
 	return BandwidthBytesToString(t.EgressBytes())
 }
 
-func (t *TUN) Meta() *TunnelMETA {
+func (t *TUN) Meta() *TunnelMeta {
 	if t == nil {
 		return nil
 	}
 	return t.meta.Load()
 }
 
-// CloneTunnelMETA deep-copies list fields used by the editor.
-func CloneTunnelMETA(src *TunnelMETA) *TunnelMETA {
+// CloneTunnelMeta deep-copies list fields used by the editor.
+func CloneTunnelMeta(src *TunnelMeta) *TunnelMeta {
 	if src == nil {
 		return nil
 	}
@@ -422,7 +397,7 @@ func CloneTunnelMETA(src *TunnelMETA) *TunnelMETA {
 }
 
 // FindTunnel returns tunnel metadata by tag.
-func FindTunnel(tag string) *TunnelMETA {
+func FindTunnel(tag string) *TunnelMeta {
 	if t, ok := TunnelMetaMap.Load(tag); ok {
 		return t
 	}
@@ -434,9 +409,9 @@ type StateResponse struct {
 	Version       string
 	APIVersion    int
 	Timezone      string
-	Config        *configV2
-	State         *stateV2
-	Tunnels       []*TunnelMETA
+	Config        *Config
+	State         *State
+	Tunnels       []*TunnelMeta
 	ActiveTunnels []*TUN
 }
 
@@ -475,7 +450,7 @@ func GetFullState() (s *StateResponse) {
 	s.Config = CONFIG.Load()
 	s.State = state
 
-	tunnelMetaMapRange(func(tun *TunnelMETA) bool {
+	tunnelMetaMapRange(func(tun *TunnelMeta) bool {
 		s.Tunnels = append(s.Tunnels, tun)
 		return true
 	})

@@ -28,7 +28,7 @@ func setupWGTest(t *testing.T) (string, uuid.UUID) {
 		Tag:    "wg-test",
 		APIKey: apiKey,
 	}
-	if err := BBolt_CreateServer(s); err != nil {
+	if err := createServer(s); err != nil {
 		t.Fatal(err)
 	}
 	return apiKey, s.ID
@@ -45,7 +45,7 @@ func seedEnabledUser(t *testing.T) uuid.UUID {
 		Email:         uuid.NewString() + "@test.local",
 		SubExpiration: time.Now().Add(24 * time.Hour),
 	}
-	if err := BBolt_CreateUser(u); err != nil {
+	if err := createUser(u); err != nil {
 		t.Fatal(err)
 	}
 	return u.ID
@@ -63,7 +63,7 @@ func seedDevice(t *testing.T, wgKey string, serverID uuid.UUID) *types.Device {
 		WireGuardKey: wgKey,
 		WireGuardIP:  fmt.Sprintf("10.0.0.%d", 10+n%200),
 	}
-	if err := BBolt_CreateDevice(d); err != nil {
+	if err := createDevice(d); err != nil {
 		t.Fatal(err)
 	}
 	return d
@@ -77,7 +77,7 @@ func callWGPeers(t *testing.T, apiKey, query string) (*httptest.ResponseRecorder
 	}
 	w := httptest.NewRecorder()
 
-	wireGuardServerKeyCheck(http.HandlerFunc(API_WGPeers)).ServeHTTP(w, req)
+	wireGuardServerKeyCheck(http.HandlerFunc(handleWGPeers)).ServeHTTP(w, req)
 
 	var resp types.WGPeersResponse
 	if w.Code == http.StatusOK {
@@ -95,7 +95,7 @@ func uniqueWGKey(i int) string {
 	return base64.StdEncoding.EncodeToString(raw)
 }
 
-func TestAPI_WGPeers_Unauthorized(t *testing.T) {
+func TestHandleWGPeers_Unauthorized(t *testing.T) {
 	setupWGTest(t)
 	w, _ := callWGPeers(t, "", "")
 	if w.Code != http.StatusUnauthorized {
@@ -103,7 +103,7 @@ func TestAPI_WGPeers_Unauthorized(t *testing.T) {
 	}
 }
 
-func TestAPI_WGPeers_BadLimit(t *testing.T) {
+func TestHandleWGPeers_BadLimit(t *testing.T) {
 	apiKey, _ := setupWGTest(t)
 	for _, bad := range []string{"?limit=abc", "?limit=0", "?limit=-3"} {
 		w, _ := callWGPeers(t, apiKey, bad)
@@ -113,7 +113,7 @@ func TestAPI_WGPeers_BadLimit(t *testing.T) {
 	}
 }
 
-func TestAPI_WGPeers_BadOffset(t *testing.T) {
+func TestHandleWGPeers_BadOffset(t *testing.T) {
 	apiKey, _ := setupWGTest(t)
 	for _, bad := range []string{"?offset=abc", "?offset=-1"} {
 		w, _ := callWGPeers(t, apiKey, bad)
@@ -123,7 +123,7 @@ func TestAPI_WGPeers_BadOffset(t *testing.T) {
 	}
 }
 
-func TestAPI_WGPeers_EmptyDB(t *testing.T) {
+func TestHandleWGPeers_EmptyDB(t *testing.T) {
 	apiKey, _ := setupWGTest(t)
 	w, resp := callWGPeers(t, apiKey, "?limit=10")
 	if w.Code != http.StatusOK {
@@ -140,7 +140,7 @@ func TestAPI_WGPeers_EmptyDB(t *testing.T) {
 	}
 }
 
-func TestAPI_WGPeers_DefaultLimit(t *testing.T) {
+func TestHandleWGPeers_DefaultLimit(t *testing.T) {
 	apiKey, _ := setupWGTest(t)
 	w, resp := callWGPeers(t, apiKey, "")
 	if w.Code != http.StatusOK {
@@ -151,7 +151,7 @@ func TestAPI_WGPeers_DefaultLimit(t *testing.T) {
 	}
 }
 
-func TestAPI_WGPeers_MaxLimitCap(t *testing.T) {
+func TestHandleWGPeers_MaxLimitCap(t *testing.T) {
 	apiKey, _ := setupWGTest(t)
 	_, resp := callWGPeers(t, apiKey, "?limit=99999")
 	if resp.Limit != wgPeersMaxLimit {
@@ -159,7 +159,7 @@ func TestAPI_WGPeers_MaxLimitCap(t *testing.T) {
 	}
 }
 
-func TestAPI_WGPeers_SinglePage(t *testing.T) {
+func TestHandleWGPeers_SinglePage(t *testing.T) {
 	apiKey, srvID := setupWGTest(t)
 	for i := 0; i < 5; i++ {
 		seedDevice(t, uniqueWGKey(i), srvID)
@@ -174,7 +174,7 @@ func TestAPI_WGPeers_SinglePage(t *testing.T) {
 	}
 }
 
-func TestAPI_WGPeers_Pagination(t *testing.T) {
+func TestHandleWGPeers_Pagination(t *testing.T) {
 	apiKey, srvID := setupWGTest(t)
 	for i := 0; i < 7; i++ {
 		seedDevice(t, uniqueWGKey(i), srvID)
@@ -219,16 +219,16 @@ func TestAPI_WGPeers_Pagination(t *testing.T) {
 	}
 }
 
-func TestAPI_WGPeers_SkipsEmptyAndInvalidKeys(t *testing.T) {
+func TestHandleWGPeers_SkipsEmptyAndInvalidKeys(t *testing.T) {
 	apiKey, srvID := setupWGTest(t)
 
 	good := seedDevice(t, uniqueWGKey(1), srvID)
 
-	if err := BBolt_CreateDevice(&types.Device{ID: uuid.New(), UserID: seedEnabledUser(t), ServerID: srvID}); err != nil {
+	if err := createDevice(&types.Device{ID: uuid.New(), UserID: seedEnabledUser(t), ServerID: srvID}); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := BBolt_CreateDevice(&types.Device{
+	if err := createDevice(&types.Device{
 		ID: uuid.New(), UserID: seedEnabledUser(t), ServerID: srvID,
 		WireGuardKey: base64.StdEncoding.EncodeToString([]byte("too-short")),
 	}); err != nil {
@@ -248,7 +248,7 @@ func TestAPI_WGPeers_SkipsEmptyAndInvalidKeys(t *testing.T) {
 	}
 }
 
-func TestAPI_WGPeers_PartialPageEndsPagination(t *testing.T) {
+func TestHandleWGPeers_PartialPageEndsPagination(t *testing.T) {
 	apiKey, srvID := setupWGTest(t)
 
 	for i := 0; i < 3; i++ {
@@ -301,11 +301,11 @@ func callWGConfigFetch(t *testing.T, apiKey, pubKey string) *httptest.ResponseRe
 		req.Header.Set("X-WG-PubKey", pubKey)
 	}
 	w := httptest.NewRecorder()
-	wireGuardServerKeyCheck(http.HandlerFunc(API_WGServerConfigFetch)).ServeHTTP(w, req)
+	wireGuardServerKeyCheck(http.HandlerFunc(handleWGServerConfigFetch)).ServeHTTP(w, req)
 	return w
 }
 
-func TestAPI_WGServerConfigFetch_PinsThenRejectsReplacement(t *testing.T) {
+func TestHandleWGServerConfigFetch_PinsThenRejectsReplacement(t *testing.T) {
 	apiKey, id := setupWGTest(t)
 	first := makeWGKey()
 	second := uniqueWGKey(99)
@@ -314,7 +314,7 @@ func TestAPI_WGServerConfigFetch_PinsThenRejectsReplacement(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("first pin: %d %s", w.Code, w.Body.String())
 	}
-	got, err := BBolt_FindServerByID(id.String())
+	got, err := findServerByID(id)
 	if err != nil || got == nil || got.WireGuardPubKey != first {
 		t.Fatalf("stored pubkey=%q want %q err=%v", got.WireGuardPubKey, first, err)
 	}
@@ -328,22 +328,22 @@ func TestAPI_WGServerConfigFetch_PinsThenRejectsReplacement(t *testing.T) {
 	if w.Code != http.StatusConflict {
 		t.Fatalf("replacement: %d %s, want 409", w.Code, w.Body.String())
 	}
-	got, _ = BBolt_FindServerByID(id.String())
+	got, _ = findServerByID(id)
 	if got.WireGuardPubKey != first {
 		t.Fatalf("pin changed to %q", got.WireGuardPubKey)
 	}
 }
 
-func TestAPI_WGServerConfigFetch_NewAPIKeyAllowsNewPubKey(t *testing.T) {
+func TestHandleWGServerConfigFetch_NewAPIKeyAllowsNewPubKey(t *testing.T) {
 	apiKey, id := setupWGTest(t)
 	first := makeWGKey()
 	if w := callWGConfigFetch(t, apiKey, first); w.Code != http.StatusOK {
 		t.Fatalf("pin: %d", w.Code)
 	}
 
-	s, _ := BBolt_FindServerByID(id.String())
+	s, _ := findServerByID(id)
 	s.APIKey = "rotated-key"
-	if _, err := BBolt_UpdateServer(s); err != nil {
+	if _, err := updateServer(s); err != nil {
 		t.Fatal(err)
 	}
 
@@ -352,7 +352,7 @@ func TestAPI_WGServerConfigFetch_NewAPIKeyAllowsNewPubKey(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("rebind after rotate: %d %s", w.Code, w.Body.String())
 	}
-	got, _ := BBolt_FindServerByID(id.String())
+	got, _ := findServerByID(id)
 	if got.WireGuardPubKey != second {
 		t.Fatalf("pubkey=%q want %q", got.WireGuardPubKey, second)
 	}

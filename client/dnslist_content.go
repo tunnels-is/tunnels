@@ -32,7 +32,7 @@ func normalizeDNSListKind(kind string) (string, error) {
 	}
 }
 
-func customDNSListDirAndEnsure(kind string) (dir string, starter string, ensureCfg func(*configV2) bool, err error) {
+func customDNSListDirAndEnsure(kind string) (dir string, starter string, ensureCfg func(*Config) bool, err error) {
 	state := STATE.Load()
 	if state == nil {
 		return "", "", nil, fmt.Errorf("state not initialized")
@@ -158,7 +158,7 @@ func setCustomDNSListContent(kind, content string) (*DNSListContent, error) {
 
 // applyCustomListToCatalog replaces the custom entry in the live catalog while
 // keeping other already-loaded lists (no remote re-download).
-func applyCustomListToCatalog(kind string, config *configV2, customSet *DomainSet) error {
+func applyCustomListToCatalog(kind string, config *Config, customSet *DomainSet) error {
 	var lists []*BlockList
 	var prev *DomainCatalog
 	var store func(*DomainCatalog)

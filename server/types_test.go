@@ -376,20 +376,20 @@ func TestDeviceTokenMatchesLogout(t *testing.T) {
 	created := time.Date(2026, 3, 1, 12, 0, 0, 123456789, time.UTC)
 	dt := &DeviceToken{DT: "secret-dt", N: "laptop", Created: created}
 
-	if !deviceTokenMatchesLogout(dt, &LOGOUT_FORM{LogoutToken: "secret-dt"}) {
+	if !deviceTokenMatchesLogout(dt, &logoutRequest{LogoutToken: "secret-dt"}) {
 		t.Error("should match by LogoutToken")
 	}
-	if deviceTokenMatchesLogout(dt, &LOGOUT_FORM{LogoutToken: "wrong"}) {
+	if deviceTokenMatchesLogout(dt, &logoutRequest{LogoutToken: "wrong"}) {
 		t.Error("should not match wrong LogoutToken")
 	}
 	// Sub-second noise in JSON round-trip: match on Unix seconds.
-	if !deviceTokenMatchesLogout(dt, &LOGOUT_FORM{
+	if !deviceTokenMatchesLogout(dt, &logoutRequest{
 		LogoutName:    "laptop",
 		LogoutCreated: time.Unix(created.Unix(), 0).UTC(),
 	}) {
 		t.Error("should match by name + created (second resolution)")
 	}
-	if deviceTokenMatchesLogout(dt, &LOGOUT_FORM{LogoutName: "laptop"}) {
+	if deviceTokenMatchesLogout(dt, &logoutRequest{LogoutName: "laptop"}) {
 		t.Error("name alone must not match without created")
 	}
 }
@@ -399,17 +399,17 @@ func TestRevokeUserDeviceTokens(t *testing.T) {
 	t2 := &DeviceToken{DT: "b", N: "two", Created: time.Unix(200, 0)}
 	tokens := []*DeviceToken{t1, t2}
 
-	out := revokeUserDeviceTokens(tokens, &LOGOUT_FORM{All: true})
+	out := revokeUserDeviceTokens(tokens, &logoutRequest{All: true})
 	if len(out) != 0 {
 		t.Fatalf("All should clear tokens, got %d", len(out))
 	}
 
-	out = revokeUserDeviceTokens([]*DeviceToken{t1, t2}, &LOGOUT_FORM{LogoutToken: "b"})
+	out = revokeUserDeviceTokens([]*DeviceToken{t1, t2}, &logoutRequest{LogoutToken: "b"})
 	if len(out) != 1 || out[0].DT != "a" {
 		t.Fatalf("LogoutToken revoke failed: %#v", out)
 	}
 
-	out = revokeUserDeviceTokens([]*DeviceToken{t1, t2}, &LOGOUT_FORM{
+	out = revokeUserDeviceTokens([]*DeviceToken{t1, t2}, &logoutRequest{
 		LogoutName:    "one",
 		LogoutCreated: time.Unix(100, 0),
 	})

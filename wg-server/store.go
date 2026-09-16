@@ -23,7 +23,7 @@ type PeerStore struct {
 	subnet6  string
 }
 
-func NewPeerStore(subnet, subnet6 string) *PeerStore {
+func newPeerStore(subnet, subnet6 string) *PeerStore {
 	return &PeerStore{
 		records:  make(map[string]PeerRecord),
 		byPubKey: make(map[string]string),

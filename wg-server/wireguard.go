@@ -19,7 +19,7 @@ var (
 	wgDevice   *device.Device
 	wgLazyBind *LazyBind
 
-	addedPeerKeys sync.Map
+	installedPeerAddrs sync.Map
 )
 
 func wgDeviceLogLevel(level string) int {
@@ -43,22 +43,9 @@ func setupWireGuard(cfg *Config, logLevel string) error {
 		return fmt.Errorf("CreateTUN %q: %w", cfg.WireGuardIface, err)
 	}
 
-	if err := initPeerList(cfg.WireGuardSubnet, cfg.WireGuardSubnet6); err != nil {
-		return fmt.Errorf("init peer list: %w", err)
-	}
-	startFlowCleaner()
-
-	tunInterface, err := newInspectingTUN(tunDev, cfg)
+	tunInterface, err := attachInspectingTUN(tunDev, cfg)
 	if err != nil {
-		return fmt.Errorf("inspector setup: %w", err)
-	}
-	inspectDevice.Store(tunInterface)
-	if cfg.EnableFirewall {
-		INFO("firewall enabled on ", cfg.WireGuardIface,
-			" — peer-to-peer ingress denied by default, control port udp/", aclControlPort)
-	} else {
-		INFO("firewall disabled on ", cfg.WireGuardIface,
-			" — peer-to-peer traffic unrestricted, server WG IP blocked for peers")
+		return err
 	}
 
 	if len(cfg.WireGuardPrivKey) != 32 {
@@ -72,7 +59,7 @@ func setupWireGuard(cfg *Config, logLevel string) error {
 	privCopy := make([]byte, 32)
 	copy(privCopy, cfg.WireGuardPrivKey)
 
-	wgLazyBind = NewLazyBind(conn.NewDefaultBind(), privCopy, pubBytes, cfg.HandshakeBufferSize, cfg.HandshakeRatePerIP)
+	wgLazyBind = newLazyBind(conn.NewDefaultBind(), privCopy, pubBytes, cfg.HandshakeBufferSize, cfg.HandshakeRatePerIP)
 	wgDevice = device.NewDevice(tunInterface, wgLazyBind, wgLogger)
 
 	privKeyHex := make([]byte, hex.EncodedLen(32))
@@ -102,13 +89,34 @@ func setupWireGuard(cfg *Config, logLevel string) error {
 	return nil
 }
 
+func attachInspectingTUN(tunDev tun.Device, cfg *Config) (*inspectingTUN, error) {
+	if err := initFirewall(cfg.WireGuardSubnet, cfg.WireGuardSubnet6); err != nil {
+		return nil, fmt.Errorf("init peer list: %w", err)
+	}
+	startFlowCleaner()
+
+	tunInterface, err := newInspectingTUN(tunDev, cfg)
+	if err != nil {
+		return nil, fmt.Errorf("inspector setup: %w", err)
+	}
+	inspectDevice.Store(tunInterface)
+	if cfg.EnableFirewall {
+		INFO("firewall enabled on ", cfg.WireGuardIface,
+			" — peer-to-peer ingress denied by default, control port udp/", aclControlPort)
+	} else {
+		INFO("firewall disabled on ", cfg.WireGuardIface,
+			" — peer-to-peer traffic unrestricted, server WG IP blocked for peers")
+	}
+	return tunInterface, nil
+}
+
 func sanitizeIPC(s string) string {
 	s = strings.ReplaceAll(s, "\n", "")
 	s = strings.ReplaceAll(s, "\r", "")
 	return s
 }
 
-func AddPeer(pubKeyHex string, allowedIPs ...string) error {
+func addPeer(pubKeyHex string, allowedIPs ...string) error {
 	conf := fmt.Sprintf("public_key=%s\nreplace_allowed_ips=true\n", sanitizeIPC(pubKeyHex))
 	for _, aip := range allowedIPs {
 		conf += fmt.Sprintf("allowed_ip=%s\n", sanitizeIPC(aip))
@@ -117,7 +125,7 @@ func AddPeer(pubKeyHex string, allowedIPs ...string) error {
 	return ipcSet(conf)
 }
 
-func RemovePeer(pubKeyHex string) error {
+func removePeer(pubKeyHex string) error {
 	conf := fmt.Sprintf("public_key=%s\nremove=true\n\n", sanitizeIPC(pubKeyHex))
 	return ipcSet(conf)
 }

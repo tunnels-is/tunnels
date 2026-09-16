@@ -9,13 +9,13 @@ import (
 
 func TestAccountWorkspace_SaveLoadActivate(t *testing.T) {
 	dir := t.TempDir()
-	STATE.Store(&stateV2{BasePath: dir + string(os.PathSeparator)})
+	STATE.Store(&State{BasePath: dir + string(os.PathSeparator)})
 	InitBaseFoldersAndPaths()
 
 	u := &User{
 		ID:    "user-aaa-111",
 		Email: "a@example.com",
-		DeviceToken: &DEVICE_TOKEN{
+		DeviceToken: &DeviceToken{
 			DT: "token-a",
 			N:  "dev",
 		},
@@ -45,7 +45,7 @@ func TestAccountWorkspace_SaveLoadActivate(t *testing.T) {
 	u2 := &User{
 		ID:    "user-bbb-222",
 		Email: "b@example.com",
-		DeviceToken: &DEVICE_TOKEN{
+		DeviceToken: &DeviceToken{
 			DT: "token-b",
 			N:  "dev",
 		},
@@ -146,7 +146,7 @@ func TestActivateSoleAccount(t *testing.T) {
 		STATE.Store(prev)
 		clearTunnelMap()
 	})
-	STATE.Store(&stateV2{BasePath: dir + string(os.PathSeparator)})
+	STATE.Store(&State{BasePath: dir + string(os.PathSeparator)})
 	if err := InitBaseFoldersAndPaths(); err != nil {
 		t.Fatal(err)
 	}
@@ -158,7 +158,7 @@ func TestActivateSoleAccount(t *testing.T) {
 		t.Fatal("expected no active account with zero users")
 	}
 
-	u := &User{ID: "sole-user-1", Email: "sole@example.com", DeviceToken: &DEVICE_TOKEN{DT: "t"}}
+	u := &User{ID: "sole-user-1", Email: "sole@example.com", DeviceToken: &DeviceToken{DT: "t"}}
 	if err := saveUser(u); err != nil {
 		t.Fatal(err)
 	}
@@ -182,13 +182,13 @@ func TestActivateAccountIfNone_PicksFirstWhenSeveral(t *testing.T) {
 		STATE.Store(prev)
 		clearTunnelMap()
 	})
-	STATE.Store(&stateV2{BasePath: dir + string(os.PathSeparator)})
+	STATE.Store(&State{BasePath: dir + string(os.PathSeparator)})
 	if err := InitBaseFoldersAndPaths(); err != nil {
 		t.Fatal(err)
 	}
 
-	u1 := &User{ID: "multi-user-1", Email: "a@example.com", DeviceToken: &DEVICE_TOKEN{DT: "t1"}}
-	u2 := &User{ID: "multi-user-2", Email: "b@example.com", DeviceToken: &DEVICE_TOKEN{DT: "t2"}}
+	u1 := &User{ID: "multi-user-1", Email: "a@example.com", DeviceToken: &DeviceToken{DT: "t1"}}
+	u2 := &User{ID: "multi-user-2", Email: "b@example.com", DeviceToken: &DeviceToken{DT: "t2"}}
 	if err := saveUser(u1); err != nil {
 		t.Fatal(err)
 	}

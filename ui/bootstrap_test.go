@@ -45,7 +45,7 @@ func TestSetUserLoadsAccountTunnels(t *testing.T) {
 		t.Fatal(err)
 	}
 	tunnelsDir := client.STATE.Load().TunnelsPath
-	meta := &client.TunnelMETA{Tag: "from-disk", IFName: "tunnels", MTU: 1420, ConfigFormat: ".json"}
+	meta := &client.TunnelMeta{Tag: "from-disk", IFName: "tunnels", MTU: 1420, ConfigFormat: ".json"}
 	blob, err := json.Marshal(meta)
 	if err != nil {
 		t.Fatal(err)
@@ -61,7 +61,7 @@ func TestSetUserLoadsAccountTunnels(t *testing.T) {
 	cold.ActiveAccountHash = ""
 	cold.TunnelsPath = ""
 	client.STATE.Store(cold)
-	client.TunnelMetaMap.Range(func(k string, _ *client.TunnelMETA) bool {
+	client.TunnelMetaMap.Range(func(k string, _ *client.TunnelMeta) bool {
 		client.TunnelMetaMap.Delete(k)
 		return true
 	})

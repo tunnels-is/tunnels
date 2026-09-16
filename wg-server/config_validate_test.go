@@ -41,8 +41,8 @@ func TestCriticalConfigChanged(t *testing.T) {
 
 func TestLoadOrGenerateLocalPrivKey_RefusesInsecurePerms(t *testing.T) {
 	dir := t.TempDir()
-	setPKPathFromConfig(filepath.Join(dir, "wg-config.json"))
-	path := pkPath()
+	setPrivateKeyPath(filepath.Join(dir, "wg-config.json"))
+	path := privateKeyPath()
 	if err := os.WriteFile(path, []byte(base64.StdEncoding.EncodeToString(make([]byte, 32))), 0o644); err != nil {
 		t.Fatal(err)
 	}

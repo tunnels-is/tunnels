@@ -11,7 +11,7 @@ func handleControl(t *inspectingTUN, pkt []byte) bool {
 	return t.handleControlParsed(src, dst, proto, l4, frag, ok)
 }
 
-func peerListSnapshot() map[netip.Addr][]netip.Addr {
+func firewallSnapshot() map[netip.Addr][]netip.Addr {
 	out := make(map[netip.Addr][]netip.Addr)
 	for i := range fwV4Slots {
 		p := fwV4Slots[i].Load()
@@ -672,7 +672,7 @@ func TestHandleControl_SrcOutsideWGSubnet(t *testing.T) {
 	if !handleControl(insp, pkt) {
 		t.Fatal("matching dst+port should be consumed even if src is invalid")
 	}
-	if len(peerListSnapshot()) != 0 {
+	if len(firewallSnapshot()) != 0 {
 		t.Fatal("no policy must be stored for an outside-subnet src")
 	}
 }
@@ -684,7 +684,7 @@ func TestHandleControl_BadJSON(t *testing.T) {
 	if !handleControl(insp, pkt) {
 		t.Fatal("malformed payload should still be consumed (not forwarded)")
 	}
-	if len(peerListSnapshot()) != 0 {
+	if len(firewallSnapshot()) != 0 {
 		t.Fatal("no policy should be stored after a bad payload")
 	}
 }
@@ -708,14 +708,14 @@ func TestHandleControl_EmptyListClearsPolicy(t *testing.T) {
 	if !handleControl(insp, set) {
 		t.Fatal("expected consume")
 	}
-	if len(peerListSnapshot()) != 1 {
+	if len(firewallSnapshot()) != 1 {
 		t.Fatal("setup: policy should be stored")
 	}
 	clear := buildIPv4UDP(t, "10.0.0.5", insp.serverIPv4.String(), 1, aclControlPort, []byte(`{"Allowed":[]}`))
 	if !handleControl(insp, clear) {
 		t.Fatal("expected consume")
 	}
-	if len(peerListSnapshot()) != 0 {
+	if len(firewallSnapshot()) != 0 {
 		t.Fatal("empty allowlist must clear the stored policy")
 	}
 }
@@ -740,7 +740,7 @@ func TestHandleControl_AnnounceWithoutEntryDropped(t *testing.T) {
 	if !handleControl(insp, pkt) {
 		t.Fatal("expected consume")
 	}
-	if len(peerListSnapshot()) != 0 {
+	if len(firewallSnapshot()) != 0 {
 		t.Fatal("announce without an installed entry must not store a policy")
 	}
 }

@@ -39,7 +39,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	client.DLL_EMBED = DLL
+	client.WintunDLL = DLL
 
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	if err := client.InitService(); err != nil {

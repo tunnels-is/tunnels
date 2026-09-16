@@ -26,7 +26,7 @@ func TestInsertUserByUpdatedDesc(t *testing.T) {
 	}
 }
 
-func TestBBolt_getUsersLatest(t *testing.T) {
+func TestGetUsersLatest(t *testing.T) {
 	setupTestDB(t)
 	now := time.Now()
 	for i := 0; i < 15; i++ {
@@ -38,12 +38,12 @@ func TestBBolt_getUsersLatest(t *testing.T) {
 		} else {
 			u.SubExpiration = now.Add(-24 * time.Hour)
 		}
-		if err := BBolt_CreateUser(u); err != nil {
+		if err := createUser(u); err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	users, total, trial, active, err := BBolt_getUsersLatest(5, 4)
+	users, total, trial, active, err := getUsersLatest(5, 4)
 	if err != nil {
 		t.Fatal(err)
 	}

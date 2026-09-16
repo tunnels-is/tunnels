@@ -55,7 +55,7 @@ type App struct {
 	users        []*client.User
 	config       *client.Config
 	state        *client.StateResponse
-	tunnels      []*client.TunnelMETA
+	tunnels      []*client.TunnelMeta
 	active       []*client.TUN
 	servers      []types.Server
 	devices      []types.Device
@@ -87,7 +87,7 @@ type App struct {
 	serverList *widget.List
 	serverView []types.Server
 	tunnelList *widget.List
-	tunnelView []*client.TunnelMETA
+	tunnelView []*client.TunnelMeta
 	deviceList *widget.List
 	deviceView []types.Device
 	logList    *widget.List
@@ -375,7 +375,7 @@ func (a *App) setAdvanced(v bool) {
 func (a *App) connectedTunnels() []*client.TUN {
 	var out []*client.TUN
 	for _, t := range a.active {
-		if t != nil && t.GetState() >= client.TUN_Connected {
+		if t != nil && t.GetState() >= client.TunnelConnected {
 			out = append(out, t)
 		}
 	}

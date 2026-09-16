@@ -7,10 +7,10 @@ import (
 
 func TestLocalDevice_SaveLoadByServerID(t *testing.T) {
 	dir := t.TempDir()
-	STATE.Store(&stateV2{BasePath: dir + string(os.PathSeparator)})
+	STATE.Store(&State{BasePath: dir + string(os.PathSeparator)})
 	InitBaseFoldersAndPaths()
 
-	u := &User{ID: "dev-user-1", Email: "d@example.com", DeviceToken: &DEVICE_TOKEN{DT: "t", N: "n"}}
+	u := &User{ID: "dev-user-1", Email: "d@example.com", DeviceToken: &DeviceToken{DT: "t", N: "n"}}
 	if err := saveUser(u); err != nil {
 		t.Fatal(err)
 	}

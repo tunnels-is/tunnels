@@ -19,7 +19,7 @@ func (a *App) tunnelEditPage() fyne.CanvasObject {
 		return pageShell("Tunnel", a.editTag, back,
 			emptyState("Tunnel not found", `No tunnel named "`+a.editTag+`" exists any more.`))
 	}
-	form := client.CloneTunnelMETA(meta)
+	form := client.CloneTunnelMeta(meta)
 	connected := a.activeByTag()[form.Tag] != nil
 
 	tag := kEntry("tunnel name", form.Tag)

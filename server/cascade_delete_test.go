@@ -10,19 +10,19 @@ import (
 func TestDeleteUser_CascadesDevices(t *testing.T) {
 	setupTestDB(t)
 	u := testUser("cascade@example.com", "")
-	if err := BBolt_CreateUser(u); err != nil {
+	if err := createUser(u); err != nil {
 		t.Fatal(err)
 	}
 	dev := &types.Device{ID: uuid.New(), UserID: u.ID, ServerID: uuid.New(), WireGuardKey: "wgkey-cascade-user"}
-	if err := BBolt_CreateDevice(dev); err != nil {
+	if err := createDevice(dev); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := BBolt_DeleteUserByID(u.ID.String()); err != nil {
+	if err := deleteUserByID(u.ID); err != nil {
 		t.Fatal(err)
 	}
 
-	devs, err := BBolt_GetDevicesByUserID(u.ID)
+	devs, err := getDevicesByUserID(u.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -30,7 +30,7 @@ func TestDeleteUser_CascadesDevices(t *testing.T) {
 		t.Fatalf("expected 0 devices after user delete, got %d", len(devs))
 	}
 
-	if d, _ := BBolt_FindDeviceByWGKey("wgkey-cascade-user"); d != nil {
+	if d, _ := findDeviceByWGKey("wgkey-cascade-user"); d != nil {
 		t.Fatal("wgkey index still reserved after user delete")
 	}
 }
@@ -38,28 +38,28 @@ func TestDeleteUser_CascadesDevices(t *testing.T) {
 func TestDeleteServer_CascadesDevices(t *testing.T) {
 	setupTestDB(t)
 	srv := &types.Server{ID: uuid.New(), Tag: "s", APIKey: "srvkey"}
-	if err := BBolt_CreateServer(srv); err != nil {
+	if err := createServer(srv); err != nil {
 		t.Fatal(err)
 	}
 	owner := uuid.New()
 	dev := &types.Device{ID: uuid.New(), UserID: owner, ServerID: srv.ID, WireGuardKey: "wgkey-cascade-srv"}
-	if err := BBolt_CreateDevice(dev); err != nil {
+	if err := createDevice(dev); err != nil {
 		t.Fatal(err)
 	}
 
 	other := &types.Device{ID: uuid.New(), UserID: owner, ServerID: uuid.New(), WireGuardKey: "wgkey-other"}
-	if err := BBolt_CreateDevice(other); err != nil {
+	if err := createDevice(other); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := BBolt_DeleteServerByID(srv.ID.String()); err != nil {
+	if err := deleteServerByID(srv.ID); err != nil {
 		t.Fatal(err)
 	}
 
-	if d, _ := BBolt_FindDeviceByWGKey("wgkey-cascade-srv"); d != nil {
+	if d, _ := findDeviceByWGKey("wgkey-cascade-srv"); d != nil {
 		t.Fatal("device bound to deleted server was not removed")
 	}
-	if d, _ := BBolt_FindDeviceByWGKey("wgkey-other"); d == nil {
+	if d, _ := findDeviceByWGKey("wgkey-other"); d == nil {
 		t.Fatal("device on a different server must survive")
 	}
 }
@@ -67,23 +67,23 @@ func TestDeleteServer_CascadesDevices(t *testing.T) {
 func TestDeleteGroup_ScrubsMembership(t *testing.T) {
 	setupTestDB(t)
 	g := &Group{ID: uuid.New(), Tag: "g"}
-	if err := BBolt_CreateGroup(g); err != nil {
+	if err := createGroup(g); err != nil {
 		t.Fatal(err)
 	}
 	u := &User{ID: uuid.New(), Email: "grp@example.com", Groups: []uuid.UUID{g.ID}}
-	if err := BBolt_CreateUser(u); err != nil {
+	if err := createUser(u); err != nil {
 		t.Fatal(err)
 	}
 	srv := &types.Server{ID: uuid.New(), Tag: "gs", APIKey: "gsk", Groups: []uuid.UUID{g.ID}}
-	if err := BBolt_CreateServer(srv); err != nil {
+	if err := createServer(srv); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := BBolt_DeleteGroupByID(g.ID.String()); err != nil {
+	if err := deleteGroupByID(g.ID); err != nil {
 		t.Fatal(err)
 	}
 
-	gotU, _ := BBolt_findUserByID(u.ID.String())
+	gotU, _ := findUserByID(u.ID)
 	if gotU == nil {
 		t.Fatal("user vanished")
 	}
@@ -92,7 +92,7 @@ func TestDeleteGroup_ScrubsMembership(t *testing.T) {
 			t.Fatal("group ID still on user after group delete")
 		}
 	}
-	gotS, _ := BBolt_FindServerByID(srv.ID.String())
+	gotS, _ := findServerByID(srv.ID)
 	if gotS == nil {
 		t.Fatal("server vanished")
 	}

@@ -36,9 +36,8 @@ func MakeCert(ct CertType, certPath string, keyPath string, ips []string, domain
 
 	var privateKey any
 	var publicKey any
-	key := make([]byte, 0)
-	kb := bytes.NewBuffer(key)
-	var gg []byte
+	keyPEM := bytes.NewBuffer(make([]byte, 0))
+	var keyDER []byte
 	var keyFile *os.File
 
 	if saveToDisk {
@@ -57,10 +56,10 @@ func MakeCert(ct CertType, certPath string, keyPath string, ips []string, domain
 		}
 		privateKey = pk
 		publicKey = &pk.PublicKey
-		gg, err = x509.MarshalPKCS8PrivateKey(pk)
-		pem.Encode(kb, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: gg})
+		keyDER, err = x509.MarshalPKCS8PrivateKey(pk)
+		pem.Encode(keyPEM, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: keyDER})
 		if saveToDisk && keyFile != nil {
-			pem.Encode(keyFile, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: gg})
+			pem.Encode(keyFile, &pem.Block{Type: "RSA PRIVATE KEY", Bytes: keyDER})
 		}
 
 	case ECDSA:
@@ -70,10 +69,10 @@ func MakeCert(ct CertType, certPath string, keyPath string, ips []string, domain
 		}
 		privateKey = pk
 		publicKey = &pk.PublicKey
-		gg, err = x509.MarshalPKCS8PrivateKey(pk)
-		pem.Encode(kb, &pem.Block{Type: "EC PRIVATE KEY", Bytes: gg})
+		keyDER, err = x509.MarshalPKCS8PrivateKey(pk)
+		pem.Encode(keyPEM, &pem.Block{Type: "EC PRIVATE KEY", Bytes: keyDER})
 		if saveToDisk && keyFile != nil {
-			pem.Encode(keyFile, &pem.Block{Type: "EC PRIVATE KEY", Bytes: gg})
+			pem.Encode(keyFile, &pem.Block{Type: "EC PRIVATE KEY", Bytes: keyDER})
 		}
 	}
 
@@ -117,9 +116,8 @@ func MakeCert(ct CertType, certPath string, keyPath string, ips []string, domain
 		return c, err
 	}
 
-	cert := make([]byte, 0)
-	cb := bytes.NewBuffer(cert)
-	pem.Encode(cb, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
+	certPEM := bytes.NewBuffer(make([]byte, 0))
+	pem.Encode(certPEM, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
 
 	if saveToDisk {
 		certFile, err := os.Create(certPath)
@@ -130,7 +128,7 @@ func MakeCert(ct CertType, certPath string, keyPath string, ips []string, domain
 		pem.Encode(certFile, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
 	}
 
-	return tls.X509KeyPair(cb.Bytes(), kb.Bytes())
+	return tls.X509KeyPair(certPEM.Bytes(), keyPEM.Bytes())
 }
 
 type Certs struct {
@@ -143,7 +141,7 @@ type Certs struct {
 	CertBytes   []byte
 }
 
-func MakeCertV2(ct CertType, certPath string, keyPath string, ips []string, domains []string, org string, expirationDate time.Time, saveToDisk bool) (CR *Certs, err error) {
+func MakeCertificate(ct CertType, certPath string, keyPath string, ips []string, domains []string, org string, expirationDate time.Time, saveToDisk bool) (CR *Certs, err error) {
 	defer func() {
 		r := recover()
 		if r != nil {

@@ -1,0 +1,339 @@
+package client
+
+import (
+	"fmt"
+	"net"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/miekg/dns"
+	"github.com/tunnels-is/tunnels/types"
+)
+
+const (
+	maxDNSCacheEntries = 50_000
+	maxDNSStatsEntries = 50_000
+
+	maxDNSStatsAnswers = 100
+
+	maxDNSCacheTTL = 6 * time.Hour
+
+	maxDoHResponseSize = 65536
+)
+
+func FullCleanDNSCache() {
+	defer RecoverAndLog()
+	INFO("Dumping DNS cache")
+	DNSCache.Clear()
+}
+
+func CleanDNSCache() {
+	defer func() {
+		time.Sleep(30 * time.Second)
+	}()
+	defer RecoverAndLog()
+
+	DEBUG("Cleaning DNS cache")
+	DNSCache.Range(func(key string, value any) bool {
+		dr, ok := value.(*DNSReply)
+		if !ok {
+			return true
+		}
+
+		if time.Since(dr.Expires).Seconds() > 1 {
+			DNSCache.Delete(key)
+		}
+
+		return true
+	})
+}
+
+func InitDNSHandler() {
+	DEBUG("Starting DNS Handler")
+	DNSClient.Dialer = new(net.Dialer)
+	DNSClient.Dialer.Resolver = new(net.Resolver)
+	DNSClient.Dialer.Resolver.PreferGo = false
+	DNSClient.Timeout = time.Second * 5
+	DNSClient.Dialer.Timeout = 5 * time.Second
+	DNSClient.WriteTimeout = 5 * time.Second
+	DNSClient.ReadTimeout = 5 * time.Second
+}
+
+func StartUDPDNSHandler() {
+	defer RecoverAndLog()
+
+	udpHandler := dns.NewServeMux()
+	udpHandler.HandleFunc(".", DNSQuery)
+
+	conf := CONFIG.Load()
+	ip := conf.DNSServerIP
+	if ip == "" {
+		ip = DefaultDNSIP
+	}
+
+	port := conf.DNSServerPort
+	if port == "" {
+		port = DefaultDNSPort
+	}
+
+	UDPDNSServer.Store(&dns.Server{
+		Addr:         ip + ":" + port,
+		Net:          "udp4",
+		Handler:      udpHandler,
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 15 * time.Second,
+	})
+
+	err := UDPDNSServer.Load().ListenAndServe()
+	if err != nil {
+		ERROR("DNS SERVER SHUTDOWN: ", err)
+	}
+}
+
+func writeEmptyDNS(w dns.ResponseWriter, m *dns.Msg) {
+	err := w.WriteMsg(m)
+	if err != nil {
+		ERROR("Unable to  write dns reply:", err)
+	}
+	w.Close()
+}
+
+func serveBlockedDNS(w dns.ResponseWriter, m *dns.Msg, tag string, conf *Config) {
+	if conf.DNSstats {
+		IncrementDNSStats(m.Question[0].Name, true, tag, nil)
+	}
+
+	if conf.LogBlockedDomains {
+		INFO("DNS BLOCKED: ", m.Question[0].Name)
+	}
+
+	writeEmptyDNS(w, m)
+}
+
+func serveLocalDNSRecord(w dns.ResponseWriter, m *dns.Msg, ServerDNS *types.DNSRecord, DNSTunnel *TUN, tag string, conf *Config) {
+	hasInfo := false
+	if len(ServerDNS.IP) > 0 {
+		hasInfo = true
+	} else if len(ServerDNS.TXT) > 0 {
+		hasInfo = true
+	}
+
+	if !hasInfo {
+		if DNSTunnel != nil {
+			DEBUG("Redirect DNS to VPN: ", m.Question[0].Name)
+			ResolveDomainLocal(DNSTunnel, m, w)
+			return
+		}
+	}
+
+	if conf.LogAllDomains {
+		if DNSTunnel != nil {
+			meta := DNSTunnel.meta.Load()
+			INFO("DNS @ server:", meta.Tag, " >> ", m.Question[0].Name, " >> local record found")
+		} else {
+			INFO("DNS @ local:", m.Question[0].Name, " >> local record found")
+		}
+	}
+
+	outMsg := ProcessDNSMsg(m, ServerDNS)
+	err := w.WriteMsg(outMsg)
+	if err != nil {
+		ERROR("Unable to  write dns reply:", err)
+	}
+
+	w.Close()
+	if conf.DNSstats {
+		IncrementDNSStats(m.Question[0].Name, false, tag, outMsg.Answer)
+	}
+}
+
+func forwardDNS(m *dns.Msg, w dns.ResponseWriter, defaultRouteConnected bool, conf *Config) {
+	if conf.DNSOverHTTPS {
+		err := ResolveDNSAsHTTPS(m, w)
+		if err != nil {
+			_ = w.WriteMsg(m)
+		}
+		return
+	}
+
+	if conf.DNSHTTPSAutomatic && !defaultRouteConnected {
+		err := ResolveDNSAsHTTPS(m, w)
+		if err != nil {
+			_ = w.WriteMsg(m)
+		}
+		return
+	}
+
+	err := ResolveDomain(m, w)
+	if err != nil {
+		_ = w.WriteMsg(m)
+	}
+}
+
+func DNSQuery(w dns.ResponseWriter, m *dns.Msg) {
+	defer RecoverAndLog()
+
+	if len(m.Question) == 0 {
+		_ = w.WriteMsg(m)
+		w.Close()
+		return
+	}
+
+	if DNSCacheCheck(m, w) {
+		return
+	}
+
+	// Whitelist always wins: a domain on any enabled whitelist is allowed even
+	// if it also appears on a block list (block check is skipped entirely).
+	blocked, tag := dnsListDecision(m)
+
+	var DNSTunnel *TUN
+	var ServerDNS *types.DNSRecord
+	var defaultRouteConnected bool
+	tunnelMapRange(func(tun *TUN) bool {
+		if tun.GetState() != TunnelConnected {
+			return true
+		}
+
+		meta := tun.meta.Load()
+		if meta == nil {
+			return true
+		}
+
+		if meta.EnableDefaultRoute {
+			defaultRouteConnected = true
+		}
+
+		if meta.DNSBlocking && blocked {
+			return true
+		}
+
+		if tun.ServerResponse == nil {
+			return true
+		}
+
+		ServerDNS = DNSAMapping(tun.ServerResponse.DNSRecords, m.Question[0].Name)
+		if ServerDNS != nil {
+			DNSTunnel = tun
+			return false
+		}
+
+		return true
+	})
+
+	conf := CONFIG.Load()
+	if ServerDNS == nil {
+		ServerDNS = DNSAMapping(conf.DNSRecords, m.Question[0].Name)
+	}
+
+	if blocked && ServerDNS == nil {
+		serveBlockedDNS(w, m, tag, conf)
+		return
+	}
+
+	if ServerDNS != nil {
+		serveLocalDNSRecord(w, m, ServerDNS, DNSTunnel, tag, conf)
+		return
+
+	}
+
+	if strings.HasSuffix(m.Question[0].Name, ".lan.") {
+		INFO("Dropping query for: ", m.Question[0].Name)
+		writeEmptyDNS(w, m)
+		return
+	}
+
+	forwardDNS(m, w, defaultRouteConnected, conf)
+}
+
+func cacheDNSReply(reply *dns.Msg) {
+	if len(reply.Answer) == 0 || len(reply.Question) == 0 {
+		return
+	}
+
+	name := reply.Question[0].Name + strconv.FormatUint(uint64(reply.Question[0].Qtype), 10)
+	if _, exists := DNSCache.Load(name); !exists && DNSCache.Size() >= maxDNSCacheEntries {
+		return
+	}
+	RP := new(DNSReply)
+	RP.A = make([]dns.RR, len(reply.Answer))
+	copy(RP.A, reply.Answer)
+	ttl := time.Duration(reply.Answer[0].Header().Ttl) * time.Second
+	if ttl > maxDNSCacheTTL {
+		ttl = maxDNSCacheTTL
+	}
+	RP.Expires = time.Now().Add(ttl)
+	DNSCache.Store(name, RP)
+}
+
+func DNSCacheCheck(m *dns.Msg, w dns.ResponseWriter) bool {
+	nameAndType := m.Question[0].Name + strconv.FormatUint(uint64(m.Question[0].Qtype), 10)
+
+	value, ok := DNSCache.Load(nameAndType)
+	if !ok {
+		return false
+	}
+	cachedReply, ok := value.(*DNSReply)
+	if !ok {
+		return false
+	}
+
+	if time.Since(cachedReply.Expires) > 1 {
+		return false
+	}
+
+	m.Answer = cachedReply.A
+	m.Response = true
+	m.Authoritative = true
+	m.RecursionAvailable = false
+
+	_ = w.WriteMsg(m)
+	w.Close()
+	conf := CONFIG.Load()
+	if conf.LogAllDomains {
+		INFO(
+			"DNS CACHE: ",
+			m.Question[0].Name,
+			" | TYPE: ",
+			strconv.FormatUint(uint64(m.Question[0].Qtype), 10),
+			" | Expires(seconds): ",
+			fmt.Sprintf("%.2f", time.Until(cachedReply.Expires).Seconds()),
+		)
+	}
+
+	IncrementDNSStats(m.Question[0].Name, false, "", cachedReply.A)
+	return true
+}
+
+// dnsListDecision applies whitelist-over-blocklist priority.
+// If the name is whitelisted, blocked is always false.
+func dnsListDecision(m *dns.Msg) (blocked bool, tag string) {
+	if isWhitelisted(m) {
+		return false, ""
+	}
+	return isBlocked(m)
+}
+
+func isBlocked(m *dns.Msg) (ok bool, tag string) {
+	name := strings.TrimSuffix(m.Question[0].Name, ".")
+	bl := DNSBlockList.Load()
+	if bl == nil {
+		return false, ""
+	}
+	ok, tag = bl.Has(name)
+	if ok && tag == "" {
+		tag = "blocked"
+	}
+	return ok, tag
+}
+
+func isWhitelisted(m *dns.Msg) bool {
+	name := strings.TrimSuffix(m.Question[0].Name, ".")
+	wl := DNSWhiteList.Load()
+	if wl == nil {
+		return false
+	}
+	ok, _ := wl.Has(name)
+	return ok
+}

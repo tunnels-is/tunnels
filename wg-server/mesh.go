@@ -197,26 +197,7 @@ func reconcileMesh() {
 		return
 	}
 
-	desired := make(map[string]types.WGMeshPeer, len(resp.Peers))
-	for _, p := range resp.Peers {
-		if p.PublicKeyHex == "" {
-			continue
-		}
-		subnets := make([]string, 0, len(p.AllowedSubnets))
-		for _, s := range p.AllowedSubnets {
-			if !validMeshSubnet(s) {
-				WARN("mesh: rejecting invalid/overbroad subnet ", s, " from peer ", short(p.PublicKeyHex))
-				continue
-			}
-			subnets = append(subnets, s)
-		}
-		if len(subnets) == 0 {
-			WARN("mesh: peer ", short(p.PublicKeyHex), " has no valid subnets, skipping")
-			continue
-		}
-		p.AllowedSubnets = subnets
-		desired[p.PublicKeyHex] = p
-	}
+	desired := desiredMeshPeers(resp)
 
 	meshMu.Lock()
 	defer meshMu.Unlock()
@@ -225,6 +206,35 @@ func reconcileMesh() {
 		return
 	}
 
+	removeStaleMeshPeers(cfg, desired)
+	addMissingMeshPeers(cfg, desired)
+}
+
+func desiredMeshPeers(resp *types.WGMeshResponse) map[string]types.WGMeshPeer {
+	desired := make(map[string]types.WGMeshPeer, len(resp.Peers))
+	for _, p := range resp.Peers {
+		if p.PublicKeyHex == "" {
+			continue
+		}
+		subnets := make([]string, 0, len(p.AllowedSubnets))
+		for _, s := range p.AllowedSubnets {
+			if !validMeshSubnet(s) {
+				WARN("mesh: rejecting invalid/overbroad subnet ", s, " from peer ", shortPubHex(p.PublicKeyHex))
+				continue
+			}
+			subnets = append(subnets, s)
+		}
+		if len(subnets) == 0 {
+			WARN("mesh: peer ", shortPubHex(p.PublicKeyHex), " has no valid subnets, skipping")
+			continue
+		}
+		p.AllowedSubnets = subnets
+		desired[p.PublicKeyHex] = p
+	}
+	return desired
+}
+
+func removeStaleMeshPeers(cfg *Config, desired map[string]types.WGMeshPeer) {
 	for key, inst := range meshPeers {
 		if want, ok := desired[key]; ok && sameMeshPeer(inst, want) {
 			continue
@@ -234,9 +244,11 @@ func reconcileMesh() {
 			delMeshRoute(cfg, s)
 		}
 		delete(meshPeers, key)
-		INFO("mesh: removed peer ", short(key))
+		INFO("mesh: removed peer ", shortPubHex(key))
 	}
+}
 
+func addMissingMeshPeers(cfg *Config, desired map[string]types.WGMeshPeer) {
 	for key, want := range desired {
 		if _, ok := meshPeers[key]; ok {
 			continue
@@ -251,7 +263,7 @@ func reconcileMesh() {
 			}
 		}
 		meshPeers[key] = installedMeshPeer{PublicKeyHex: key, Endpoint: want.Endpoint, Subnets: want.AllowedSubnets}
-		INFO("mesh: added peer ", short(key), " endpoint=", want.Endpoint)
+		INFO("mesh: added peer ", shortPubHex(key), " endpoint=", want.Endpoint)
 	}
 }
 
@@ -290,7 +302,7 @@ func cleanupMesh(cfg *Config) {
 	}
 }
 
-func short(hexKey string) string {
+func shortPubHex(hexKey string) string {
 	if len(hexKey) <= 12 {
 		return hexKey
 	}

@@ -313,7 +313,7 @@ func ensureCustomDNSListInSlice(lists *[]*BlockList) bool {
 	return true
 }
 
-func ensureCustomBlockListInConfig(config *configV2) bool {
+func ensureCustomBlockListInConfig(config *Config) bool {
 	if config == nil {
 		return false
 	}

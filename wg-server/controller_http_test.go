@@ -72,9 +72,9 @@ func TestControllerHTTPClient_NoRedirects(t *testing.T) {
 }
 
 func TestFetchConfig_RequiresHTTPS(t *testing.T) {
-	_, err := FetchConfig("http://127.0.0.1:1", "key", "", false)
+	_, err := fetchConfig("http://127.0.0.1:1", "key", "", false, true)
 	if err == nil {
-		t.Fatal("FetchConfig must reject http://")
+		t.Fatal("fetchConfig must reject http://")
 	}
 	if !strings.Contains(err.Error(), "https") {
 		t.Fatalf("error should mention https, got %v", err)

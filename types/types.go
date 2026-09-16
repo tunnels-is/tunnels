@@ -39,9 +39,9 @@ type ServerConfig struct {
 	// DisablePublicRegistration rejects unauthenticated POST /client/user/create.
 	// Admin UI create (/ui/user/create) is unaffected. Off by default.
 	DisablePublicRegistration bool
-	PayKey           string
-	CertPem          string
-	KeyPem           string
+	PayKey                    string
+	CertPem                   string
+	KeyPem                    string
 
 	CertPems []string
 	KeyPems  []string
@@ -67,13 +67,6 @@ type Device struct {
 	WireGuardIP string `json:"WireGuardIP,omitempty"`
 
 	WireGuardIPv6 string `json:"WireGuardIPv6,omitempty"`
-}
-
-type FORM_GET_SERVER struct {
-	DeviceToken string    `json:"DeviceToken"`
-	DeviceKey   string    `json:"DeviceKey"`
-	UID         uuid.UUID `json:"UID"`
-	ServerID    uuid.UUID `json:"ServerID"`
 }
 
 type WAN struct {
@@ -191,10 +184,6 @@ type ServerConnectResponse struct {
 	WANCIDR string `json:"WANCIDR,omitempty"`
 
 	EnableFirewall bool `json:"EnableFirewall,omitempty"`
-}
-
-type FORM_GET_DEVICE struct {
-	DeviceID uuid.UUID
 }
 
 type WGPeer struct {
