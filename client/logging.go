@@ -64,7 +64,7 @@ func DEBUG(Line ...any) {
 		fmt.Sprint(x),
 	):
 	default:
-		ErrorLog(false, "COULD NOT PLACE LOG IN THE LOG QUEUE")
+		logDirect(false, "COULD NOT PLACE LOG IN THE LOG QUEUE")
 	}
 }
 
@@ -91,7 +91,7 @@ func ERROR(Line ...any) {
 		fmt.Sprint(x),
 	):
 	default:
-		ErrorLog(false, "COULD NOT PLACE LOG IN THE LOG QUEUE")
+		logDirect(false, "COULD NOT PLACE LOG IN THE LOG QUEUE")
 	}
 }
 
@@ -131,7 +131,7 @@ func INFO(Line ...any) {
 		fmt.Sprint(x),
 	):
 	default:
-		ErrorLog(false, "COULD NOT PLACE LOG IN THE LOG QUEUE")
+		logDirect(false, "COULD NOT PLACE LOG IN THE LOG QUEUE")
 	}
 }
 
@@ -157,7 +157,7 @@ func ROUTINE(Line ...any) {
 		fmt.Sprint(x),
 	):
 	default:
-		ErrorLog(false, "COULD NOT PLACE LOG IN THE LOG QUEUE")
+		logDirect(false, "COULD NOT PLACE LOG IN THE LOG QUEUE")
 	}
 }
 
@@ -195,13 +195,13 @@ func StartLogQueueProcessor() {
 		if LogFile != nil {
 			_, err := LogFile.WriteString(line + "\n")
 			if err != nil {
-				ErrorLog(err)
+				logDirect(err)
 			}
 		}
 	}
 }
 
-func ErrorLog(err any, msgs ...any) {
+func logDirect(err any, msgs ...any) {
 	log.Println(tagError+" || ", fmt.Sprint(msgs...), " >> system error: ", err)
 }
 
@@ -245,7 +245,7 @@ func wgLog(level, format string, args ...any) {
 		msg,
 	):
 	default:
-		ErrorLog(false, "COULD NOT PLACE LOG IN THE LOG QUEUE")
+		logDirect(false, "COULD NOT PLACE LOG IN THE LOG QUEUE")
 	}
 }
 

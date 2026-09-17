@@ -32,44 +32,44 @@ type listWANsRequest struct {
 
 func handleAdminWANCreate(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
-	F := new(createWANRequest)
-	if err := decodeBody(r, F); err != nil {
+	form := new(createWANRequest)
+	if err := decodeBody(r, form); err != nil {
 		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
-	if err := validateWAN(F.WAN); err != nil {
+	if err := validateWAN(form.WAN); err != nil {
 		sendError(w, 400, err.Error())
 		return
 	}
 
-	F.WAN.ID = uuid.New()
+	form.WAN.ID = uuid.New()
 
-	if err := createWAN(F.WAN); err != nil {
+	if err := createWAN(form.WAN); err != nil {
 		ERR(err)
 		sendError(w, 500, "Unable to create WAN, please try again later")
 		return
 	}
 
-	sendObject(w, F.WAN)
+	sendObject(w, form.WAN)
 }
 
 func handleAdminWANUpdate(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
-	F := new(updateWANRequest)
-	if err := decodeBody(r, F); err != nil {
+	form := new(updateWANRequest)
+	if err := decodeBody(r, form); err != nil {
 		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
-	if F.WAN == nil || F.WAN.ID == uuid.Nil {
+	if form.WAN == nil || form.WAN.ID == uuid.Nil {
 		sendError(w, 400, "WAN id is required")
 		return
 	}
-	if err := validateWAN(F.WAN); err != nil {
+	if err := validateWAN(form.WAN); err != nil {
 		sendError(w, 400, err.Error())
 		return
 	}
 
-	if err := updateWAN(F.WAN); err != nil {
+	if err := updateWAN(form.WAN); err != nil {
 		ERR(err)
 		sendError(w, 500, "Unknown error, please try again in a moment")
 		return
@@ -80,13 +80,13 @@ func handleAdminWANUpdate(w http.ResponseWriter, r *http.Request) {
 
 func handleAdminWANDelete(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
-	F := new(deleteWANRequest)
-	if err := decodeBody(r, F); err != nil {
+	form := new(deleteWANRequest)
+	if err := decodeBody(r, form); err != nil {
 		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
 
-	if err := deleteWANByID(F.WANID); err != nil {
+	if err := deleteWANByID(form.WANID); err != nil {
 		sendError(w, 500, "Unknown error, please try again in a moment")
 		return
 	}
@@ -96,13 +96,13 @@ func handleAdminWANDelete(w http.ResponseWriter, r *http.Request) {
 
 func handleAdminWANGet(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
-	F := new(getWANRequest)
-	if err := decodeBody(r, F); err != nil {
+	form := new(getWANRequest)
+	if err := decodeBody(r, form); err != nil {
 		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
 
-	wan, err := findWANByID(F.WANID)
+	wan, err := findWANByID(form.WANID)
 	if err != nil {
 		sendError(w, 500, "Unknown error, please try again in a moment")
 		return
@@ -117,18 +117,18 @@ func handleAdminWANGet(w http.ResponseWriter, r *http.Request) {
 
 func handleAdminWANList(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
-	F := new(listWANsRequest)
-	if err := decodeBody(r, F); err != nil {
+	form := new(listWANsRequest)
+	if err := decodeBody(r, form); err != nil {
 		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
 
-	limit := F.Limit
+	limit := form.Limit
 	if limit <= 0 {
 		limit = 1000
 	}
 
-	wans, err := listWANs(int64(limit), int64(F.Offset))
+	wans, err := listWANs(int64(limit), int64(form.Offset))
 	if err != nil {
 		sendError(w, 500, "Unknown error, please try again in a moment")
 		return

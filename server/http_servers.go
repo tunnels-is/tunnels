@@ -13,14 +13,14 @@ import (
 
 func handleAdminServerGet(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
-	F := new(getServerRequest)
-	err := decodeBody(r, F)
+	form := new(getServerRequest)
+	err := decodeBody(r, form)
 	if err != nil {
 		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
 
-	server, err := findServerByID(F.ServerID)
+	server, err := findServerByID(form.ServerID)
 	if err != nil {
 		sendError(w, 500, "Unknown error, please try again in a moment", slog.Any("error", err))
 		return
@@ -36,14 +36,14 @@ func handleAdminServerGet(w http.ResponseWriter, r *http.Request) {
 
 func handleAdminServerList(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
-	F := new(listServersRequest)
-	err := decodeBody(r, F)
+	form := new(listServersRequest)
+	err := decodeBody(r, form)
 	if err != nil {
 		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
 
-	servers, err := findAllServers(100, int64(F.StartIndex))
+	servers, err := findAllServers(100, int64(form.StartIndex))
 	if err != nil {
 		sendError(w, 500, "Unknown error, please try again in a moment")
 		return
@@ -55,14 +55,14 @@ func handleAdminServerList(w http.ResponseWriter, r *http.Request) {
 
 func handleAdminServerDelete(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
-	F := new(deleteServerRequest)
-	err := decodeBody(r, F)
+	form := new(deleteServerRequest)
+	err := decodeBody(r, form)
 	if err != nil {
 		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
 
-	err = deleteServerByID(F.ServerID)
+	err = deleteServerByID(form.ServerID)
 	if err != nil {
 		sendError(w, 500, "Unknown error, please try again in a moment")
 		return
@@ -94,13 +94,13 @@ func findServersForUser(user *User, offset int64) ([]*types.Server, error) {
 
 func handleClientServersByCountry(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
-	F := new(serversByCountryRequest)
-	err := decodeBody(r, F)
+	form := new(serversByCountryRequest)
+	err := decodeBody(r, form)
 	if err != nil {
 		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
-	if F.Country == "" {
+	if form.Country == "" {
 		sendError(w, 400, "Country is required")
 		return
 	}
@@ -119,7 +119,7 @@ func handleClientServersByCountry(w http.ResponseWriter, r *http.Request) {
 
 	matched := make([]*types.Server, 0)
 	for _, s := range all {
-		if strings.EqualFold(s.Country, F.Country) {
+		if strings.EqualFold(s.Country, form.Country) {
 			matched = append(matched, s)
 		}
 	}
@@ -141,8 +141,8 @@ func handleClientServersByCountry(w http.ResponseWriter, r *http.Request) {
 
 func handleClientServers(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
-	F := new(listServersRequest)
-	err := decodeBody(r, F)
+	form := new(listServersRequest)
+	err := decodeBody(r, form)
 	if err != nil {
 		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
@@ -155,7 +155,7 @@ func handleClientServers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	servers := make([]*types.Server, 0)
-	pservers, err := findServersWithoutGroups(100, int64(F.StartIndex))
+	pservers, err := findServersWithoutGroups(100, int64(form.StartIndex))
 	if err != nil {
 		sendError(w, 500, "Unknown error, please try again in a moment")
 		return
@@ -163,7 +163,7 @@ func handleClientServers(w http.ResponseWriter, r *http.Request) {
 	servers = append(servers, pservers...)
 
 	if len(user.Groups) > 0 {
-		puservers, err := findServersByGroups(user.Groups, 100, int64(F.StartIndex))
+		puservers, err := findServersByGroups(user.Groups, 100, int64(form.StartIndex))
 		if err != nil {
 			sendError(w, 500, "Unknown error, please try again in a moment")
 			return
@@ -213,28 +213,28 @@ func validateServerWGFields(s *types.Server) error {
 func handleAdminServerUpdate(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 
-	F := new(updateServerRequest)
-	err := decodeBody(r, F)
+	form := new(updateServerRequest)
+	err := decodeBody(r, form)
 	if err != nil {
 		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
 
-	if F.Server == nil {
+	if form.Server == nil {
 		sendError(w, 400, "Server is required")
 		return
 	}
-	if err := validateServerWGFields(F.Server); err != nil {
+	if err := validateServerWGFields(form.Server); err != nil {
 		sendError(w, 400, err.Error())
 		return
 	}
-	applyWGDefaults(F.Server)
-	if err := validateServerMesh(F.Server); err != nil {
+	applyWGDefaults(form.Server)
+	if err := validateServerMesh(form.Server); err != nil {
 		sendError(w, 400, err.Error())
 		return
 	}
 
-	_, err = updateServer(F.Server)
+	_, err = updateServer(form.Server)
 	if err != nil {
 		sendError(w, 500, "Unknown error, please try again in a moment")
 		return
@@ -245,47 +245,47 @@ func handleAdminServerUpdate(w http.ResponseWriter, r *http.Request) {
 
 func handleAdminServerCreate(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
-	F := new(createServerRequest)
-	err := decodeBody(r, F)
+	form := new(createServerRequest)
+	err := decodeBody(r, form)
 	if err != nil {
 		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
 
-	if F.Server == nil {
+	if form.Server == nil {
 		sendError(w, 400, "Server is required")
 		return
 	}
-	if err := validateServerWGFields(F.Server); err != nil {
+	if err := validateServerWGFields(form.Server); err != nil {
 		sendError(w, 400, err.Error())
 		return
 	}
-	applyWGDefaults(F.Server)
-	F.Server.ID = uuid.New()
-	if err := validateServerMesh(F.Server); err != nil {
+	applyWGDefaults(form.Server)
+	form.Server.ID = uuid.New()
+	if err := validateServerMesh(form.Server); err != nil {
 		sendError(w, 400, err.Error())
 		return
 	}
 
-	F.Server.Groups = make([]uuid.UUID, 0)
-	err = createServer(F.Server)
+	form.Server.Groups = make([]uuid.UUID, 0)
+	err = createServer(form.Server)
 	if err != nil {
 		sendError(w, 500, "Uknown error, please try again in a moment", slog.Any("err", err))
 		return
 	}
 
-	sendObject(w, F.Server)
+	sendObject(w, form.Server)
 }
 
 func handleClientServerGet(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
-	F := new(getServerRequest)
-	err := decodeBody(r, F)
+	form := new(getServerRequest)
+	err := decodeBody(r, form)
 	if err != nil {
 		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
-	server, err := findServerByID(F.ServerID)
+	server, err := findServerByID(form.ServerID)
 	if err != nil {
 		sendError(w, 500, "Unknown error, please try again in a moment", slog.Any("error", err))
 		return

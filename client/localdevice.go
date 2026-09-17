@@ -187,19 +187,7 @@ func createLocalDeviceForServer(cr *ConnectionRequest, serverID, tag string) (*L
 	}
 
 	if full, e := getServerWGConfig(cr, serverID, pub); e == nil && full != nil {
-		cfg.EnableFirewall = full.EnableFirewall
-		if full.WireGuardPubKey != "" {
-			cfg.WireGuardPubKey = full.WireGuardPubKey
-		}
-		if full.WireGuardSubnet != "" {
-			cfg.WireGuardSubnet = full.WireGuardSubnet
-		}
-		if full.WireGuardSubnet6 != "" {
-			cfg.WireGuardSubnet6 = full.WireGuardSubnet6
-		}
-		if full.WANCIDR != "" {
-			cfg.WANCIDR = full.WANCIDR
-		}
+		mergeWGServerConfig(cfg, full)
 	}
 
 	id := uuid.NewString()
@@ -220,6 +208,22 @@ func createLocalDeviceForServer(cr *ConnectionRequest, serverID, tag string) (*L
 	}
 	INFO("created local device", local.ID, "for server", serverID, "ip", cfg.WireGuardIP)
 	return local, cfg, nil
+}
+
+func mergeWGServerConfig(cfg, full *wgServerConfig) {
+	cfg.EnableFirewall = full.EnableFirewall
+	if full.WireGuardPubKey != "" {
+		cfg.WireGuardPubKey = full.WireGuardPubKey
+	}
+	if full.WireGuardSubnet != "" {
+		cfg.WireGuardSubnet = full.WireGuardSubnet
+	}
+	if full.WireGuardSubnet6 != "" {
+		cfg.WireGuardSubnet6 = full.WireGuardSubnet6
+	}
+	if full.WANCIDR != "" {
+		cfg.WANCIDR = full.WANCIDR
+	}
 }
 
 func resolveLocalDeviceForServer(cr *ConnectionRequest, serverID, tag string) (*LocalDevice, *wgServerConfig, error) {

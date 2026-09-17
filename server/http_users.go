@@ -182,14 +182,14 @@ func handleAdminUserUpdate(w http.ResponseWriter, r *http.Request) {
 
 func handleAdminUserList(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
-	F := new(listUsersRequest)
-	err := decodeBody(r, F)
+	form := new(listUsersRequest)
+	err := decodeBody(r, form)
 	if err != nil {
 		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
 
-	users, err := getUsers(int64(clampListLimit(F.Limit)), int64(F.Offset))
+	users, err := getUsers(int64(clampListLimit(form.Limit)), int64(form.Offset))
 	if err != nil {
 		sendError(w, 500, "Unknown error, please try again in a moment")
 		return
@@ -208,13 +208,13 @@ func handleAdminUserList(w http.ResponseWriter, r *http.Request) {
 
 func handleAdminUserSearch(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
-	F := new(adminUserSearchRequest)
-	err := decodeBody(r, F)
+	form := new(adminUserSearchRequest)
+	err := decodeBody(r, form)
 	if err != nil {
 		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
-	email := strings.TrimSpace(F.Email)
+	email := strings.TrimSpace(form.Email)
 	if email == "" {
 		sendError(w, 400, "Email is required")
 		return
@@ -235,18 +235,18 @@ func handleAdminUserSearch(w http.ResponseWriter, r *http.Request) {
 
 func handleAdminUserGet(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
-	F := new(adminUserGetRequest)
-	err := decodeBody(r, F)
+	form := new(adminUserGetRequest)
+	err := decodeBody(r, form)
 	if err != nil {
 		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
-	if F.TargetUserID == uuid.Nil {
+	if form.TargetUserID == uuid.Nil {
 		sendError(w, 400, "TargetUserID is required")
 		return
 	}
 
-	user, err := findUserByID(F.TargetUserID)
+	user, err := findUserByID(form.TargetUserID)
 	if err != nil {
 		sendError(w, 500, "Unknown error, please try again in a moment")
 		return
@@ -284,20 +284,20 @@ func handleAdminUserLatest(w http.ResponseWriter, r *http.Request) {
 
 func handleAdminUserDelete(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
-	F := new(deleteUserRequest)
-	err := decodeBody(r, F)
+	form := new(deleteUserRequest)
+	err := decodeBody(r, form)
 	if err != nil {
 		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
 
 	caller := getUserFromContext(r.Context())
-	if caller != nil && caller.ID == F.TargetUserID {
+	if caller != nil && caller.ID == form.TargetUserID {
 		sendError(w, 400, "Cannot delete your own account")
 		return
 	}
 
-	err = deleteUserByID(F.TargetUserID)
+	err = deleteUserByID(form.TargetUserID)
 	if err != nil {
 		sendError(w, 500, "Unknown error, please try again in a moment")
 		return

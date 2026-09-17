@@ -12,35 +12,35 @@ import (
 
 func handleAdminGroupCreate(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
-	F := new(createGroupRequest)
-	err := decodeBody(r, F)
+	form := new(createGroupRequest)
+	err := decodeBody(r, form)
 	if err != nil {
 		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
 
-	if F.Group == nil || F.Group.Tag == "" {
+	if form.Group == nil || form.Group.Tag == "" {
 		sendError(w, 400, "Invalid group format")
 		return
 	}
 
-	F.Group.ID = uuid.New()
-	F.Group.CreatedAt = time.Now()
+	form.Group.ID = uuid.New()
+	form.Group.CreatedAt = time.Now()
 
-	err = createGroup(F.Group)
+	err = createGroup(form.Group)
 	if err != nil {
 		ERR(err)
 		sendError(w, 500, "Unable to create group, please try again later")
 		return
 	}
 
-	sendObject(w, F.Group)
+	sendObject(w, form.Group)
 }
 
 func handleAdminGroupAdd(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
-	F := new(groupAddRequest)
-	err := decodeBody(r, F)
+	form := new(groupAddRequest)
+	err := decodeBody(r, form)
 	if err != nil {
 		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
@@ -49,9 +49,9 @@ func handleAdminGroupAdd(w http.ResponseWriter, r *http.Request) {
 	var u *User
 	var s *types.Server
 
-	switch F.Type {
+	switch form.Type {
 	case "server":
-		s, err = findServerByID(F.TypeID)
+		s, err = findServerByID(form.TypeID)
 		if err != nil {
 			sendError(w, 400, err.Error())
 			return
@@ -62,10 +62,10 @@ func handleAdminGroupAdd(w http.ResponseWriter, r *http.Request) {
 		}
 	case "user":
 
-		if F.TypeID == uuid.Nil && F.TypeTag != "" {
-			u, err = findUserByEmail(F.TypeTag)
+		if form.TypeID == uuid.Nil && form.TypeTag != "" {
+			u, err = findUserByEmail(form.TypeTag)
 		} else {
-			u, err = findUserByID(F.TypeID)
+			u, err = findUserByID(form.TypeID)
 		}
 		if err != nil {
 			sendError(w, 400, err.Error())
@@ -75,10 +75,10 @@ func handleAdminGroupAdd(w http.ResponseWriter, r *http.Request) {
 			sendError(w, 204, "user not found")
 			return
 		}
-		F.TypeID = u.ID
+		form.TypeID = u.ID
 	}
 
-	err = addToGroup(F.GroupID, F.TypeID, F.Type)
+	err = addToGroup(form.GroupID, form.TypeID, form.Type)
 	if err != nil {
 		sendError(w, 500, "Unknown error, please try again in a moment")
 		return
@@ -96,14 +96,14 @@ func handleAdminGroupAdd(w http.ResponseWriter, r *http.Request) {
 
 func handleAdminGroupRemove(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
-	F := new(groupRemoveRequest)
-	err := decodeBody(r, F)
+	form := new(groupRemoveRequest)
+	err := decodeBody(r, form)
 	if err != nil {
 		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
 
-	err = removeFromGroup(F.GroupID, F.TypeID, F.Type)
+	err = removeFromGroup(form.GroupID, form.TypeID, form.Type)
 	if err != nil {
 		sendError(w, 500, "Unknown error, please try again in a moment")
 		return
@@ -114,14 +114,14 @@ func handleAdminGroupRemove(w http.ResponseWriter, r *http.Request) {
 
 func handleAdminGroupUpdate(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
-	F := new(updateGroupRequest)
-	err := decodeBody(r, F)
+	form := new(updateGroupRequest)
+	err := decodeBody(r, form)
 	if err != nil {
 		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
 
-	err = updateGroup(F.Group)
+	err = updateGroup(form.Group)
 	if err != nil {
 		ERR(err)
 		sendError(w, 500, "Unknown error, please try again in a moment")
@@ -133,14 +133,14 @@ func handleAdminGroupUpdate(w http.ResponseWriter, r *http.Request) {
 
 func handleAdminGroupDelete(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
-	F := new(deleteGroupRequest)
-	err := decodeBody(r, F)
+	form := new(deleteGroupRequest)
+	err := decodeBody(r, form)
 	if err != nil {
 		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
 
-	err = deleteGroupByID(F.GID)
+	err = deleteGroupByID(form.GID)
 	if err != nil {
 		sendError(w, 500, "Unknown error, please try again in a moment")
 		return
@@ -151,14 +151,14 @@ func handleAdminGroupDelete(w http.ResponseWriter, r *http.Request) {
 
 func handleAdminGroupGet(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
-	F := new(getGroupRequest)
-	err := decodeBody(r, F)
+	form := new(getGroupRequest)
+	err := decodeBody(r, form)
 	if err != nil {
 		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
 
-	group, err := findGroupByID(F.GID)
+	group, err := findGroupByID(form.GID)
 	if err != nil {
 		sendError(w, 500, "Unknown error, please try again in a moment")
 		return
@@ -174,20 +174,20 @@ func handleAdminGroupGet(w http.ResponseWriter, r *http.Request) {
 
 func handleAdminGroupGetEntities(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
-	F := new(getGroupEntitiesRequest)
-	err := decodeBody(r, F)
+	form := new(getGroupEntitiesRequest)
+	err := decodeBody(r, form)
 	if err != nil {
 		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
 
-	entities, err := findEntitiesByGroupID(F.GID, F.Type, int64(F.Limit), int64(F.Offset))
+	entities, err := findEntitiesByGroupID(form.GID, form.Type, int64(form.Limit), int64(form.Offset))
 	if err != nil {
 		sendError(w, 500, "Unknown error, please try again in a moment")
 		return
 	}
 
-	if F.Type == "user" {
+	if form.Type == "user" {
 		ul := make([]MinifiedUser, 0)
 		for _, v := range entities {
 			us, ok := v.(*User)
@@ -205,19 +205,19 @@ func handleAdminGroupGetEntities(w http.ResponseWriter, r *http.Request) {
 
 func handleAdminGroupList(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
-	F := new(listGroupsRequest)
-	err := decodeBody(r, F)
+	form := new(listGroupsRequest)
+	err := decodeBody(r, form)
 	if err != nil {
 		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
 
-	limit := F.Limit
+	limit := form.Limit
 	if limit <= 0 {
 		limit = 100
 	}
 
-	groups, err := listGroups(int64(limit), int64(F.Offset))
+	groups, err := listGroups(int64(limit), int64(form.Offset))
 	if err != nil {
 		sendError(w, 500, "Unknown error, please try again in a moment")
 		return

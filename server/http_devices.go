@@ -13,15 +13,15 @@ import (
 
 func handleAdminDeviceUpdate(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
-	F := new(updateDeviceRequest)
-	err := decodeBody(r, F)
+	form := new(updateDeviceRequest)
+	err := decodeBody(r, form)
 	if err != nil {
 		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
 
 	wgIPAllocMu.Lock()
-	err = updateDevice(F.Device)
+	err = updateDevice(form.Device)
 	wgIPAllocMu.Unlock()
 	if err != nil {
 		ERR(err)
@@ -38,14 +38,14 @@ func handleAdminDeviceUpdate(w http.ResponseWriter, r *http.Request) {
 
 func handleAdminDeviceDelete(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
-	F := new(deleteDeviceRequest)
-	err := decodeBody(r, F)
+	form := new(deleteDeviceRequest)
+	err := decodeBody(r, form)
 	if err != nil {
 		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
 
-	err = deleteDeviceByID(F.DID)
+	err = deleteDeviceByID(form.DID)
 	if err != nil {
 		sendError(w, 500, "Unknown error, please try again in a moment")
 		return
@@ -56,8 +56,8 @@ func handleAdminDeviceDelete(w http.ResponseWriter, r *http.Request) {
 
 func handleClientDeviceDelete(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
-	F := new(getDeviceRequest)
-	if err := decodeBody(r, F); err != nil {
+	form := new(getDeviceRequest)
+	if err := decodeBody(r, form); err != nil {
 		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
@@ -68,7 +68,7 @@ func handleClientDeviceDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	device, err := findDeviceByID(F.DeviceID)
+	device, err := findDeviceByID(form.DeviceID)
 	if err != nil || device == nil {
 		sendError(w, 404, "Device not found")
 		return
@@ -79,7 +79,7 @@ func handleClientDeviceDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := deleteDeviceByID(F.DeviceID); err != nil {
+	if err := deleteDeviceByID(form.DeviceID); err != nil {
 		sendError(w, 500, "Unknown error, please try again in a moment")
 		return
 	}
@@ -89,14 +89,14 @@ func handleClientDeviceDelete(w http.ResponseWriter, r *http.Request) {
 
 func handleAdminDeviceList(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
-	F := new(listDevicesRequest)
-	err := decodeBody(r, F)
+	form := new(listDevicesRequest)
+	err := decodeBody(r, form)
 	if err != nil {
 		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
 
-	devices, err := getDevices(int64(clampListLimit(F.Limit)), int64(F.Offset))
+	devices, err := getDevices(int64(clampListLimit(form.Limit)), int64(form.Offset))
 	if err != nil {
 		sendError(w, 500, "Unknown error, please try again in a moment")
 		return
@@ -123,8 +123,8 @@ func clampListLimit(n int) int {
 
 func handleClientDeviceList(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
-	F := new(listDevicesRequest)
-	err := decodeBody(r, F)
+	form := new(listDevicesRequest)
+	err := decodeBody(r, form)
 	if err != nil {
 		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
@@ -181,14 +181,14 @@ func deviceCreatePayload(device *types.Device, wgServer *types.Server) any {
 func handleClientDeviceCreate(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 
-	F := new(createDeviceRequest)
-	err := decodeBody(r, F)
+	form := new(createDeviceRequest)
+	err := decodeBody(r, form)
 	if err != nil {
 		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
 
-	if F.Device == nil || F.Device.Tag == "" {
+	if form.Device == nil || form.Device.Tag == "" {
 		sendError(w, 400, "Invalid device format")
 		return
 	}
@@ -204,11 +204,11 @@ func handleClientDeviceCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	F.Device.UserID = user.ID
-	F.Device.ID = uuid.New()
-	F.Device.CreatedAt = time.Now()
+	form.Device.UserID = user.ID
+	form.Device.ID = uuid.New()
+	form.Device.CreatedAt = time.Now()
 
-	wgServer, srvErr := findServerByID(F.Device.ServerID)
+	wgServer, srvErr := findServerByID(form.Device.ServerID)
 	if srvErr != nil || wgServer == nil {
 		sendError(w, 404, "Server not found")
 		return
@@ -219,7 +219,7 @@ func handleClientDeviceCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := rejectServerWireGuardKey(F.Device.WireGuardKey); err != nil {
+	if err := rejectServerWireGuardKey(form.Device.WireGuardKey); err != nil {
 		sendError(w, 400, "invalid WireGuard key")
 		return
 	}
@@ -237,7 +237,7 @@ func handleClientDeviceCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err, isIPv6 := assignDeviceWireGuardIPs(F.Device); err != nil {
+	if err, isIPv6 := assignDeviceWireGuardIPs(form.Device); err != nil {
 		if isIPv6 {
 			sendError(w, 400, "WireGuard IPv6 assignment failed", slog.Any("err", err))
 			return
@@ -246,45 +246,45 @@ func handleClientDeviceCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = createDevice(F.Device)
+	err = createDevice(form.Device)
 	if err != nil {
 		ERR(err)
 		sendError(w, 500, "Unable to create device, please try again later")
 		return
 	}
 
-	sendObject(w, deviceCreatePayload(F.Device, wgServer))
+	sendObject(w, deviceCreatePayload(form.Device, wgServer))
 }
 
 func handleAdminDeviceCreate(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 
-	F := new(createDeviceRequest)
-	err := decodeBody(r, F)
+	form := new(createDeviceRequest)
+	err := decodeBody(r, form)
 	if err != nil {
 		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
 
-	if F.Device == nil {
+	if form.Device == nil {
 		sendError(w, 400, "No device given")
 		return
 	}
 
-	if F.Device.Tag == "" {
+	if form.Device.Tag == "" {
 		sendError(w, 400, "Missing device tag")
 		return
 	}
 
-	if F.Device.UserID == uuid.Nil {
+	if form.Device.UserID == uuid.Nil {
 		sendError(w, 400, "Device UserID is required")
 		return
 	}
 
-	F.Device.ID = uuid.New()
-	F.Device.CreatedAt = time.Now()
+	form.Device.ID = uuid.New()
+	form.Device.CreatedAt = time.Now()
 
-	if err := rejectServerWireGuardKey(F.Device.WireGuardKey); err != nil {
+	if err := rejectServerWireGuardKey(form.Device.WireGuardKey); err != nil {
 		sendError(w, 400, "invalid WireGuard key")
 		return
 	}
@@ -293,8 +293,8 @@ func handleAdminDeviceCreate(w http.ResponseWriter, r *http.Request) {
 	defer wgIPAllocMu.Unlock()
 
 	var wgServer *types.Server
-	if F.Device.ServerID != uuid.Nil {
-		if err, isIPv6 := assignDeviceWireGuardIPs(F.Device); err != nil {
+	if form.Device.ServerID != uuid.Nil {
+		if err, isIPv6 := assignDeviceWireGuardIPs(form.Device); err != nil {
 			if isIPv6 {
 				sendError(w, 400, "WireGuard IPv6 assignment failed", slog.Any("err", err))
 				return
@@ -304,33 +304,33 @@ func handleAdminDeviceCreate(w http.ResponseWriter, r *http.Request) {
 		}
 
 		var srvErr error
-		wgServer, srvErr = findServerByID(F.Device.ServerID)
+		wgServer, srvErr = findServerByID(form.Device.ServerID)
 		if srvErr != nil || wgServer == nil {
 			sendError(w, 404, "Server not found")
 			return
 		}
 	}
 
-	err = createDevice(F.Device)
+	err = createDevice(form.Device)
 	if err != nil {
 		ERR(err)
 		sendError(w, 500, "Unable to create device, please try again later")
 		return
 	}
 
-	sendObject(w, deviceCreatePayload(F.Device, wgServer))
+	sendObject(w, deviceCreatePayload(form.Device, wgServer))
 }
 
 func handleAdminDeviceGet(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
-	F := new(getDeviceRequest)
-	err := decodeBody(r, F)
+	form := new(getDeviceRequest)
+	err := decodeBody(r, form)
 	if err != nil {
 		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
 
-	device, err := findDeviceByID(F.DeviceID)
+	device, err := findDeviceByID(form.DeviceID)
 	if err != nil {
 		sendError(w, 400, "device not found", slog.Any("err", err))
 		return
@@ -345,8 +345,8 @@ func handleAdminDeviceGet(w http.ResponseWriter, r *http.Request) {
 
 func handleClientDeviceGet(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
-	F := new(getDeviceRequest)
-	err := decodeBody(r, F)
+	form := new(getDeviceRequest)
+	err := decodeBody(r, form)
 	if err != nil {
 		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
@@ -358,7 +358,7 @@ func handleClientDeviceGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	device, err := findDeviceByID(F.DeviceID)
+	device, err := findDeviceByID(form.DeviceID)
 	if err != nil || device == nil {
 		if err != nil {
 			sendError(w, 400, "device  not found", slog.Any("err", err))

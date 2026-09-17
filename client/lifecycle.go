@@ -89,10 +89,10 @@ func InitService() error {
 	if !conf.DisableDNS {
 		InitDNSHandler()
 		INFO("Starting DNS Proxy")
-		doEvent(highPriorityChannel, func() {
+		enqueueEvent(highPriorityChannel, func() {
 			reloadBlockLists(false)
 		})
-		doEvent(highPriorityChannel, func() {
+		enqueueEvent(highPriorityChannel, func() {
 			reloadWhiteLists(false)
 		})
 	}
@@ -111,31 +111,31 @@ func registerBackgroundSignals() {
 		syscall.SIGILL,
 	)
 
-	newConcurrentSignal("LogProcessor", CancelContext, func() {
+	startBackgroundTask("LogProcessor", CancelContext, func() {
 		StartLogQueueProcessor()
 	})
 	conf := CONFIG.Load()
 
 	if !conf.DisableDNS {
-		newConcurrentSignal("UDPDNSHandler", CancelContext, func() {
+		startBackgroundTask("UDPDNSHandler", CancelContext, func() {
 			StartUDPDNSHandler()
 		})
-		newConcurrentSignal("BlockListUpdater", CancelContext, func() {
+		startBackgroundTask("BlockListUpdater", CancelContext, func() {
 			reloadBlockLists(true)
 		})
-		newConcurrentSignal("WhiteListUpdater", CancelContext, func() {
+		startBackgroundTask("WhiteListUpdater", CancelContext, func() {
 			reloadWhiteLists(true)
 		})
-		newConcurrentSignal("CleanDNSCache", CancelContext, func() {
+		startBackgroundTask("CleanDNSCache", CancelContext, func() {
 			CleanDNSCache()
 		})
 	}
 
-	newConcurrentSignal("LogMapCleaner", CancelContext, func() {
+	startBackgroundTask("LogMapCleaner", CancelContext, func() {
 		CleanUniqueLogMap()
 	})
 
-	newConcurrentSignal("AutoConnect", CancelContext, func() {
+	startBackgroundTask("AutoConnect", CancelContext, func() {
 		AutoConnect()
 		autoConnectRetryWait()
 	})
