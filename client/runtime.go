@@ -37,7 +37,7 @@ var (
 	PollLogMu     sync.Mutex
 	PollLogBuf    []string
 
-	concurrencyMonitor = make(chan *goSignal, 1000)
+	concurrencyMonitor = make(chan *backgroundTask, 1000)
 	tunnelMonitor      = make(chan *TUN, 1000)
 
 	highPriorityChannel   = make(chan *event, 100)
@@ -86,14 +86,14 @@ type DNSReply struct {
 	Expires time.Time
 }
 
-var letterRunes = []rune("ABCDEFGHIJKLMNOPQRSTUVWXYZ234567")
+var totpAlphabet = []rune("ABCDEFGHIJKLMNOPQRSTUVWXYZ234567")
 
 type event struct {
 	method func()
 }
 
-type goSignal struct {
-	monitor chan *goSignal
+type backgroundTask struct {
+	monitor chan *backgroundTask
 	ctx     context.Context
 
 	method func()

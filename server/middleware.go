@@ -43,7 +43,7 @@ func getDeviceTokenFromContext(ctx context.Context) string {
 func xAdminAPIKeyMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !adminAPIKeyValid(r) {
-			senderr(w, 401, "Unauthorized")
+			sendError(w, 401, "Unauthorized")
 			return
 		}
 		ctx := context.WithValue(r.Context(), contextKeyIsAdminAPIKey, true)
@@ -55,7 +55,7 @@ func wireGuardServerKeyCheck(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		server, ok := serverFromWGKey(r)
 		if !ok {
-			senderr(w, 401, "Unauthorized")
+			sendError(w, 401, "Unauthorized")
 			return
 		}
 
@@ -73,24 +73,24 @@ func adminUIMiddleware(next http.Handler) http.Handler {
 
 		cookie, err := r.Cookie("admin_session")
 		if err != nil {
-			senderr(w, 401, "Unauthorized")
+			sendError(w, 401, "Unauthorized")
 			return
 		}
 
 		uid, deviceToken, err := decryptAdminCookie(cookie.Value, clientIP(r))
 		if err != nil {
-			senderr(w, 401, "Unauthorized")
+			sendError(w, 401, "Unauthorized")
 			return
 		}
 
 		user, err := authenticateUserFromEmailOrIDAndToken("", uid, deviceToken)
 		if err != nil {
-			senderr(w, 401, "Unauthorized")
+			sendError(w, 401, "Unauthorized")
 			return
 		}
 
 		if !user.IsAdmin {
-			senderr(w, 401, "Unauthorized")
+			sendError(w, 401, "Unauthorized")
 			return
 		}
 
@@ -104,7 +104,7 @@ func clientAuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		deviceToken := r.Header.Get("X-Device-Token")
 		if deviceToken == "" {
-			senderr(w, 401, "Unauthorized")
+			sendError(w, 401, "Unauthorized")
 			return
 		}
 
@@ -116,14 +116,14 @@ func clientAuthMiddleware(next http.Handler) http.Handler {
 			var err error
 			parsedUID, err = uuid.Parse(uidStr)
 			if err != nil {
-				senderr(w, 401, "Unauthorized")
+				sendError(w, 401, "Unauthorized")
 				return
 			}
 		}
 
 		user, err := authenticateUserFromEmailOrIDAndToken(email, parsedUID, deviceToken)
 		if err != nil {
-			senderr(w, 401, "Unauthorized")
+			sendError(w, 401, "Unauthorized")
 			return
 		}
 

@@ -65,26 +65,7 @@ func reloadWhiteListsEx(sleep bool, force bool) {
 		return
 	}
 
-	if len(config.DNSWhiteLists) == 0 {
-		config.DNSWhiteLists = GetDefaultWhiteLists()
-		configChanged = true
-	}
-	badList := false
-	for _, v := range config.DNSWhiteLists {
-		if v == nil {
-			badList = true
-			break
-		}
-		if v.URL == "" && v.Tag == "" {
-			badList = true
-		}
-	}
-	if badList {
-		config.DNSWhiteLists = GetDefaultWhiteLists()
-		configChanged = true
-	}
-	// Re-ensure after any full replacement of the list slice.
-	if ensureCustomWhiteListInConfig(config) {
+	if sanitizeWhiteListConfig(config) {
 		configChanged = true
 	}
 
@@ -143,6 +124,33 @@ func reloadWhiteListsEx(sleep bool, force bool) {
 	if err != nil {
 		ERROR("unable to write config to disk post whitelist update", err)
 	}
+}
+
+func sanitizeWhiteListConfig(config *Config) bool {
+	changed := false
+	if len(config.DNSWhiteLists) == 0 {
+		config.DNSWhiteLists = GetDefaultWhiteLists()
+		changed = true
+	}
+	badList := false
+	for _, v := range config.DNSWhiteLists {
+		if v == nil {
+			badList = true
+			break
+		}
+		if v.URL == "" && v.Tag == "" {
+			badList = true
+		}
+	}
+	if badList {
+		config.DNSWhiteLists = GetDefaultWhiteLists()
+		changed = true
+	}
+	// Re-ensure after any full replacement of the list slice.
+	if ensureCustomWhiteListInConfig(config) {
+		changed = true
+	}
+	return changed
 }
 
 func processWhiteList(wl *BlockList, force bool, prevByTag map[string]*DomainSet) listLoadResult {

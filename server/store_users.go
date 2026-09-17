@@ -196,10 +196,10 @@ func findUserByEmail(Email string) (*User, error) {
 	return found, err
 }
 
-func updateUserDeviceTokens(TU *userTokensUpdate) error {
+func updateUserDeviceTokens(update *userTokensUpdate) error {
 	return db.Update(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(bucketUsers))
-		id := TU.ID.String()
+		id := update.ID.String()
 		v := b.Get([]byte(id))
 		if v == nil {
 			return errors.New("user not found")
@@ -208,7 +208,7 @@ func updateUserDeviceTokens(TU *userTokensUpdate) error {
 		if err := bboltUnmarshal(v, U); err != nil {
 			return err
 		}
-		U.Tokens = TU.Tokens
+		U.Tokens = update.Tokens
 		data, err := bboltMarshal(U)
 		if err != nil {
 			return err
@@ -245,10 +245,10 @@ func updateUserSubTime(u *User) error {
 	})
 }
 
-func updateUser(UF *userUpdateRequest) error {
+func updateUser(form *userUpdateRequest) error {
 	return db.Update(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(bucketUsers))
-		id := UF.UID.String()
+		id := form.UID.String()
 		v := b.Get([]byte(id))
 		if v == nil {
 			return errors.New("user not found")
@@ -258,7 +258,7 @@ func updateUser(UF *userUpdateRequest) error {
 			return err
 		}
 		oldAPIKey := U.APIKey
-		U.APIKey = UF.APIKey
+		U.APIKey = form.APIKey
 		data, err := bboltMarshal(U)
 		if err != nil {
 			return err
@@ -272,8 +272,8 @@ func updateUser(UF *userUpdateRequest) error {
 				return err
 			}
 		}
-		if UF.APIKey != "" {
-			if err := apikeyIdx.Put([]byte(UF.APIKey), []byte(id)); err != nil {
+		if form.APIKey != "" {
+			if err := apikeyIdx.Put([]byte(form.APIKey), []byte(id)); err != nil {
 				return err
 			}
 		}
@@ -281,10 +281,10 @@ func updateUser(UF *userUpdateRequest) error {
 	})
 }
 
-func updateUserAdmin(UF *adminUserUpdateRequest) error {
+func updateUserAdmin(form *adminUserUpdateRequest) error {
 	return db.Update(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(bucketUsers))
-		id := UF.TargetUserID.String()
+		id := form.TargetUserID.String()
 		v := b.Get([]byte(id))
 		if v == nil {
 			return errors.New("user not found")
@@ -297,8 +297,8 @@ func updateUserAdmin(UF *adminUserUpdateRequest) error {
 		oldEmail := U.Email
 		emailChanged := false
 
-		if UF.Email != "" {
-			newEmail := normalizeEmail(UF.Email)
+		if form.Email != "" {
+			newEmail := normalizeEmail(form.Email)
 			if newEmail != U.Email {
 				if emailInUse(tx, newEmail, id) {
 					return errors.New("email already in use by another account")
@@ -308,12 +308,12 @@ func updateUserAdmin(UF *adminUserUpdateRequest) error {
 			}
 		}
 
-		if !UF.SubExpiration.IsZero() {
-			U.SubExpiration = UF.SubExpiration
+		if !form.SubExpiration.IsZero() {
+			U.SubExpiration = form.SubExpiration
 		}
 
-		U.Disabled = UF.Disabled
-		U.Trial = UF.Trial
+		U.Disabled = form.Disabled
+		U.Trial = form.Trial
 
 		data, err := bboltMarshal(U)
 		if err != nil {

@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
-	"net/netip"
 	"strconv"
 	"strings"
 	"sync"
@@ -29,19 +28,19 @@ func handleWGPeers(w http.ResponseWriter, r *http.Request) {
 
 	server := getServerFromContext(r.Context())
 	if server == nil {
-		senderr(w, 401, "Unauthorized")
+		sendError(w, 401, "Unauthorized")
 		return
 	}
 
 	limit, offset, errMsg := parseWGPeerPage(r)
 	if errMsg != "" {
-		senderr(w, 400, errMsg)
+		sendError(w, 400, errMsg)
 		return
 	}
 
 	devices, err := getDevices(int64(limit), int64(offset))
 	if err != nil {
-		senderr(w, 500, "Failed to fetch devices", slog.Any("err", err))
+		sendError(w, 500, "Failed to fetch devices", slog.Any("err", err))
 		return
 	}
 
@@ -128,63 +127,63 @@ func handleWGPeer(w http.ResponseWriter, r *http.Request) {
 
 	server := getServerFromContext(r.Context())
 	if server == nil {
-		senderr(w, 401, "Unauthorized")
+		sendError(w, 401, "Unauthorized")
 		return
 	}
 
 	pubKeyB64 := r.URL.Query().Get("pubkey")
 	if pubKeyB64 == "" {
-		senderr(w, 400, "pubkey query parameter is required")
+		sendError(w, 400, "pubkey query parameter is required")
 		return
 	}
 	raw, err := base64.StdEncoding.DecodeString(pubKeyB64)
 	if err != nil || len(raw) != 32 {
-		senderr(w, 400, "pubkey must be a base64-encoded 32-byte key")
+		sendError(w, 400, "pubkey must be a base64-encoded 32-byte key")
 		return
 	}
 
 	dev, err := findDeviceByWGKey(pubKeyB64)
 	if err != nil {
-		senderr(w, 500, "Failed to look up device", slog.Any("err", err))
+		sendError(w, 500, "Failed to look up device", slog.Any("err", err))
 		return
 	}
 	if dev == nil {
-		senderr(w, 404, "device not found")
+		sendError(w, 404, "device not found")
 		return
 	}
 
 	if dev.ServerID != server.ID {
-		senderr(w, 401, "device not allowed on this server")
+		sendError(w, 401, "device not allowed on this server")
 		return
 	}
 
 	user, err := findUserByID(dev.UserID)
 	if err != nil {
-		senderr(w, 500, "error looking up user")
+		sendError(w, 500, "error looking up user")
 		return
 	}
 	if user == nil {
-		senderr(w, 401, "user/device not allowed to connect")
+		sendError(w, 401, "user/device not allowed to connect")
 		return
 	}
 	if user.Disabled {
-		senderr(w, 403, "user account is disabled")
+		sendError(w, 403, "user account is disabled")
 		return
 	}
 
 	if !user.SubExpiration.IsZero() && time.Now().After(user.SubExpiration) {
-		senderr(w, 403, "user subscription has expired")
+		sendError(w, 403, "user subscription has expired")
 		return
 	}
 
 	if !hasSharedOrNoGroup(user.Groups, server.Groups) {
-		senderr(w, 401, "user/device not allowed to connect")
+		sendError(w, 401, "user/device not allowed to connect")
 		return
 	}
 
 	hexKey, err := b64KeyToHex(dev.WireGuardKey)
 	if err != nil {
-		senderr(w, 500, "Failed to encode device key", slog.Any("err", err))
+		sendError(w, 500, "Failed to encode device key", slog.Any("err", err))
 		return
 	}
 
@@ -201,46 +200,46 @@ func handleWGConfig(w http.ResponseWriter, r *http.Request) {
 
 	serverIDStr := r.URL.Query().Get("serverID")
 	if serverIDStr == "" {
-		senderr(w, 400, "serverID query parameter is required")
+		sendError(w, 400, "serverID query parameter is required")
 		return
 	}
 	serverID, err := uuid.Parse(serverIDStr)
 	if err != nil {
-		senderr(w, 400, "Invalid serverID")
+		sendError(w, 400, "Invalid serverID")
 		return
 	}
 
 	pubKey := r.URL.Query().Get("pubKey")
 	if pubKey == "" {
-		senderr(w, 400, "No pubkey given")
+		sendError(w, 400, "No pubkey given")
 		return
 	}
 
 	user := getUserFromContext(r.Context())
 	if user == nil {
-		senderr(w, 401, "Unauthorized - no user in context")
+		sendError(w, 401, "Unauthorized - no user in context")
 		return
 	}
 
 	if !user.SubExpiration.IsZero() && time.Now().After(user.SubExpiration) {
-		senderr(w, 403, "subscription expired")
+		sendError(w, 403, "subscription expired")
 		return
 	}
 
 	server, err := findServerByID(serverID)
 	if err != nil || server == nil {
-		senderr(w, 404, "Server not found")
+		sendError(w, 404, "Server not found")
 		return
 	}
 
 	if !hasSharedOrNoGroup(user.Groups, server.Groups) {
-		senderr(w, 401, "Unauthorized - no group access")
+		sendError(w, 401, "Unauthorized - no group access")
 		return
 	}
 
 	d, err := findDeviceByWGKey(pubKey)
 	if err != nil {
-		senderr(w, 500, "Database error looking up device")
+		sendError(w, 500, "Database error looking up device")
 		return
 	}
 
@@ -270,105 +269,6 @@ func handleWGConfig(w http.ResponseWriter, r *http.Request) {
 		"WANCIDR":          wanCIDRForServer(server),
 		"EnableFirewall":   server.EnableFirewall,
 	})
-}
-
-func assignNextWireGuardIP(serverID uuid.UUID) (string, error) {
-	server, err := findServerByID(serverID)
-	if err != nil || server == nil {
-		return "", fmt.Errorf("server not found")
-	}
-	if server.WireGuardSubnet == "" {
-		return "", fmt.Errorf("server has no WireGuard subnet configured")
-	}
-	_, ipNet, err := net.ParseCIDR(server.WireGuardSubnet)
-	if err != nil {
-		return "", fmt.Errorf("invalid subnet %q: %w", server.WireGuardSubnet, err)
-	}
-
-	devices, err := getAllDevices()
-	if err != nil {
-		return "", fmt.Errorf("list devices: %w", err)
-	}
-
-	used := make(map[uint32]bool)
-	for _, d := range devices {
-		if d.WireGuardIP == "" {
-			continue
-		}
-		ip4 := net.ParseIP(d.WireGuardIP).To4()
-		if ip4 != nil && ipNet.Contains(ip4) {
-			used[wgIPToU32(ip4)] = true
-		}
-	}
-
-	base := wgIPToU32(ipNet.IP.To4()) + 2
-	for {
-		next := wgU32ToIP(base)
-		if !ipNet.Contains(next) {
-			return "", fmt.Errorf("WireGuard subnet %s is exhausted", server.WireGuardSubnet)
-		}
-		if types.IsReservedWireGuardIPv4(ipNet, next) {
-			base++
-			continue
-		}
-		if !used[base] {
-			return next.String(), nil
-		}
-		base++
-	}
-}
-
-func wgIPToU32(ip net.IP) uint32 {
-	ip = ip.To4()
-	return uint32(ip[0])<<24 | uint32(ip[1])<<16 | uint32(ip[2])<<8 | uint32(ip[3])
-}
-
-func wgU32ToIP(n uint32) net.IP {
-	return net.IP{byte(n >> 24), byte(n >> 16), byte(n >> 8), byte(n)}
-}
-
-func assignNextWireGuardIPv6(serverID uuid.UUID) (string, error) {
-	server, err := findServerByID(serverID)
-	if err != nil || server == nil {
-		return "", fmt.Errorf("server not found")
-	}
-	if server.WireGuardSubnet6 == "" {
-		return "", nil
-	}
-	prefix, err := netip.ParsePrefix(server.WireGuardSubnet6)
-	if err != nil {
-		return "", fmt.Errorf("invalid IPv6 subnet %q: %w", server.WireGuardSubnet6, err)
-	}
-
-	prefix = prefix.Masked()
-
-	devices, err := getAllDevices()
-	if err != nil {
-		return "", fmt.Errorf("list devices: %w", err)
-	}
-
-	used := make(map[netip.Addr]bool)
-	for _, d := range devices {
-		if d.WireGuardIPv6 == "" {
-			continue
-		}
-		if addr, parseErr := netip.ParseAddr(d.WireGuardIPv6); parseErr == nil && prefix.Contains(addr) {
-			used[addr] = true
-		}
-	}
-
-	candidate := prefix.Addr().Next().Next()
-	for prefix.Contains(candidate) {
-		if types.IsReservedWireGuardIPv6(prefix, candidate) {
-			candidate = candidate.Next()
-			continue
-		}
-		if !used[candidate] {
-			return candidate.String(), nil
-		}
-		candidate = candidate.Next()
-	}
-	return "", fmt.Errorf("WireGuard IPv6 subnet %s is exhausted", server.WireGuardSubnet6)
 }
 
 func rejectServerWireGuardKey(key string) error {
@@ -426,13 +326,13 @@ func handleWGServerConfigFetch(w http.ResponseWriter, r *http.Request) {
 
 	server := getServerFromContext(r.Context())
 	if server == nil {
-		senderr(w, 401, "Unauthorized")
+		sendError(w, 401, "Unauthorized")
 		return
 	}
 
 	pubKeyB64 := r.Header.Get("X-WG-PubKey")
 	if err := pinWireGuardPubKey(server, pubKeyB64); err != nil {
-		senderr(w, http.StatusConflict, err.Error())
+		sendError(w, http.StatusConflict, err.Error())
 		return
 	}
 
@@ -483,7 +383,7 @@ func handleWGMesh(w http.ResponseWriter, r *http.Request) {
 
 	server := getServerFromContext(r.Context())
 	if server == nil {
-		senderr(w, 401, "Unauthorized")
+		sendError(w, 401, "Unauthorized")
 		return
 	}
 
@@ -495,7 +395,7 @@ func handleWGMesh(w http.ResponseWriter, r *http.Request) {
 
 	siblings, err := findServersByMeshGroup(server.MeshGroupID)
 	if err != nil {
-		senderr(w, 500, "Failed to fetch mesh peers", slog.Any("err", err))
+		sendError(w, 500, "Failed to fetch mesh peers", slog.Any("err", err))
 		return
 	}
 

@@ -53,7 +53,7 @@ func writeConfigToDisk() (err error) {
 	return
 }
 
-func ReadConfigFileFromDisk() (err error) {
+func parseConfigFile() (err error) {
 	state := STATE.Load()
 	config, err := os.ReadFile(state.ConfigFileName)
 	if err != nil {
@@ -107,9 +107,9 @@ func loadConfigFromDisk(newConfig bool) error {
 	defer RecoverAndLog()
 	DEBUG("Loading configurations from file")
 	if !newConfig {
-		return ReadConfigFileFromDisk()
+		return parseConfigFile()
 	} else {
-		err := ReadConfigFileFromDisk()
+		err := parseConfigFile()
 		if err == nil {
 			return nil
 		}
@@ -232,39 +232,14 @@ func loadTunnelsFromDisk() (err error) {
 			return nil
 		}
 
-		tb, ferr := os.ReadFile(path)
+		tunnel, ferr := parseTunnelFile(path, ext)
 		if ferr != nil {
-			ERROR("Unable to read tunnel file:", ferr)
 			return ferr
 		}
-
-		tunnel := new(TunnelMeta)
-		var merr error
-
-		switch ext {
-		case ".yaml", ".yml":
-			merr = yaml.Unmarshal(tb, tunnel)
-			if merr != nil {
-				ERROR("Unable to unmarshal YAML tunnel file:", merr)
-				return merr
-			}
-		case ".json", ".conf", "":
-			merr = json.Unmarshal(tb, tunnel)
-			if merr != nil {
-				ERROR("Unable to unmarshal JSON tunnel file:", merr)
-				return merr
-			}
-		default:
-			ERROR("Unsupported tunnel file format:", ext)
-			return fmt.Errorf("unsupported tunnel file format: %s", ext)
-		}
-
-		if tunnel.Tag == "" {
-			ERROR("Skipping tunnel file with empty Tag:", path)
+		if tunnel == nil {
 			return nil
 		}
 
-		tunnel.ConfigFormat = ext
 		TunnelMetaMap.Store(tunnel.Tag, tunnel)
 		DEBUG("Loaded tunnel:", tunnel.Tag)
 		if tunnel.Tag == DefaultTunnelName {
@@ -285,6 +260,43 @@ func loadTunnelsFromDisk() (err error) {
 		_ = writeTunnelsToDisk(newTun.Tag)
 	}
 	return nil
+}
+
+func parseTunnelFile(path, ext string) (*TunnelMeta, error) {
+	tb, ferr := os.ReadFile(path)
+	if ferr != nil {
+		ERROR("Unable to read tunnel file:", ferr)
+		return nil, ferr
+	}
+
+	tunnel := new(TunnelMeta)
+	var merr error
+
+	switch ext {
+	case ".yaml", ".yml":
+		merr = yaml.Unmarshal(tb, tunnel)
+		if merr != nil {
+			ERROR("Unable to unmarshal YAML tunnel file:", merr)
+			return nil, merr
+		}
+	case ".json", ".conf", "":
+		merr = json.Unmarshal(tb, tunnel)
+		if merr != nil {
+			ERROR("Unable to unmarshal JSON tunnel file:", merr)
+			return nil, merr
+		}
+	default:
+		ERROR("Unsupported tunnel file format:", ext)
+		return nil, fmt.Errorf("unsupported tunnel file format: %s", ext)
+	}
+
+	if tunnel.Tag == "" {
+		ERROR("Skipping tunnel file with empty Tag:", path)
+		return nil, nil
+	}
+
+	tunnel.ConfigFormat = ext
+	return tunnel, nil
 }
 
 func SetConfig(config *Config) (err error) {

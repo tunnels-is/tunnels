@@ -73,26 +73,7 @@ func reloadBlockListsEx(sleep bool, force bool) {
 		return
 	}
 
-	if len(config.DNSBlockLists) == 0 {
-		config.DNSBlockLists = GetDefaultBlockLists()
-		configChanged = true
-	}
-	badList := false
-	for _, v := range config.DNSBlockLists {
-		if v == nil {
-			badList = true
-			break
-		}
-		if v.URL == "" && v.Tag == "" {
-			badList = true
-		}
-	}
-	if badList {
-		config.DNSBlockLists = GetDefaultBlockLists()
-		configChanged = true
-	}
-	// Re-ensure after any full replacement of the list slice.
-	if ensureCustomBlockListInConfig(config) {
+	if sanitizeBlockListConfig(config) {
 		configChanged = true
 	}
 
@@ -167,6 +148,33 @@ func reloadBlockListsEx(sleep bool, force bool) {
 	if err != nil {
 		ERROR("unable to write config to disk post blocklist update", err)
 	}
+}
+
+func sanitizeBlockListConfig(config *Config) bool {
+	changed := false
+	if len(config.DNSBlockLists) == 0 {
+		config.DNSBlockLists = GetDefaultBlockLists()
+		changed = true
+	}
+	badList := false
+	for _, v := range config.DNSBlockLists {
+		if v == nil {
+			badList = true
+			break
+		}
+		if v.URL == "" && v.Tag == "" {
+			badList = true
+		}
+	}
+	if badList {
+		config.DNSBlockLists = GetDefaultBlockLists()
+		changed = true
+	}
+	// Re-ensure after any full replacement of the list slice.
+	if ensureCustomBlockListInConfig(config) {
+		changed = true
+	}
+	return changed
 }
 
 func processBlockList(bl *BlockList, force bool, prevByTag map[string]*DomainSet) listLoadResult {

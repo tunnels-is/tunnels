@@ -16,11 +16,11 @@ func GetQRCode(LF *TwoFactorConfirm) (QR *QRCode, err error) {
 
 	b := make([]rune, 16)
 	for i := range b {
-		n, cerr := rand.Int(rand.Reader, big.NewInt(int64(len(letterRunes))))
+		n, cerr := rand.Int(rand.Reader, big.NewInt(int64(len(totpAlphabet))))
 		if cerr != nil {
 			return nil, cerr
 		}
-		b[i] = letterRunes[n.Int64()]
+		b[i] = totpAlphabet[n.Int64()]
 	}
 
 	TOTP := strings.ToUpper(string(b))

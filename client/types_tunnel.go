@@ -285,3 +285,76 @@ func (t *TUN) InitBlockedPorts(ports []uint16) {
 		t.blockedPortsSet[portBytes] = port
 	}
 }
+
+func (t *TUN) IngressBytes() int64 {
+	if t == nil {
+		return 0
+	}
+	return t.ingressBytes.Load()
+}
+
+func (t *TUN) EgressBytes() int64 {
+	if t == nil {
+		return 0
+	}
+	return t.egressBytes.Load()
+}
+
+func (t *TUN) IngressString() string {
+	return BandwidthBytesToString(t.IngressBytes())
+}
+
+func (t *TUN) EgressString() string {
+	return BandwidthBytesToString(t.EgressBytes())
+}
+
+func (t *TUN) Meta() *TunnelMeta {
+	if t == nil {
+		return nil
+	}
+	return t.meta.Load()
+}
+
+// CloneTunnelMeta deep-copies list fields used by the editor.
+func CloneTunnelMeta(src *TunnelMeta) *TunnelMeta {
+	if src == nil {
+		return nil
+	}
+	dst := *src
+	dst.DNSServers = append([]string(nil), src.DNSServers...)
+	dst.AllowedHosts = append([]string(nil), src.AllowedHosts...)
+	dst.BlockedPorts = append([]uint16(nil), src.BlockedPorts...)
+	if len(src.Routes) > 0 {
+		dst.Routes = make([]*types.Route, len(src.Routes))
+		for i, r := range src.Routes {
+			if r == nil {
+				continue
+			}
+			cp := *r
+			dst.Routes[i] = &cp
+		}
+	}
+	if len(src.Networks) > 0 {
+		dst.Networks = make([]*types.Network, len(src.Networks))
+		for i, n := range src.Networks {
+			if n == nil {
+				continue
+			}
+			cp := *n
+			dst.Networks[i] = &cp
+		}
+	}
+	if len(src.DNSRecords) > 0 {
+		dst.DNSRecords = make([]*types.DNSRecord, len(src.DNSRecords))
+		for i, rec := range src.DNSRecords {
+			if rec == nil {
+				continue
+			}
+			cp := *rec
+			cp.IP = append([]string(nil), rec.IP...)
+			cp.TXT = append([]string(nil), rec.TXT...)
+			dst.DNSRecords[i] = &cp
+		}
+	}
+	return &dst
+}
