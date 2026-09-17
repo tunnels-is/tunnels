@@ -35,45 +35,45 @@ type listMeshGroupsRequest struct {
 
 func handleAdminMeshGroupCreate(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
-	F := new(createMeshGroupRequest)
-	if err := decodeBody(r, F); err != nil {
+	form := new(createMeshGroupRequest)
+	if err := decodeBody(r, form); err != nil {
 		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
-	if err := validateMeshGroup(F.MeshGroup); err != nil {
+	if err := validateMeshGroup(form.MeshGroup); err != nil {
 		sendError(w, 400, err.Error())
 		return
 	}
 
-	F.MeshGroup.ID = uuid.New()
-	F.MeshGroup.CreatedAt = time.Now()
+	form.MeshGroup.ID = uuid.New()
+	form.MeshGroup.CreatedAt = time.Now()
 
-	if err := createMeshGroup(F.MeshGroup); err != nil {
+	if err := createMeshGroup(form.MeshGroup); err != nil {
 		ERR(err)
 		sendError(w, 500, "Unable to create mesh group, please try again later")
 		return
 	}
 
-	sendObject(w, F.MeshGroup)
+	sendObject(w, form.MeshGroup)
 }
 
 func handleAdminMeshGroupUpdate(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
-	F := new(updateMeshGroupRequest)
-	if err := decodeBody(r, F); err != nil {
+	form := new(updateMeshGroupRequest)
+	if err := decodeBody(r, form); err != nil {
 		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
-	if F.MeshGroup == nil || F.MeshGroup.ID == uuid.Nil {
+	if form.MeshGroup == nil || form.MeshGroup.ID == uuid.Nil {
 		sendError(w, 400, "MeshGroup id is required")
 		return
 	}
-	if err := validateMeshGroup(F.MeshGroup); err != nil {
+	if err := validateMeshGroup(form.MeshGroup); err != nil {
 		sendError(w, 400, err.Error())
 		return
 	}
 
-	if err := updateMeshGroup(F.MeshGroup); err != nil {
+	if err := updateMeshGroup(form.MeshGroup); err != nil {
 		ERR(err)
 		sendError(w, 500, "Unknown error, please try again in a moment")
 		return
@@ -84,13 +84,13 @@ func handleAdminMeshGroupUpdate(w http.ResponseWriter, r *http.Request) {
 
 func handleAdminMeshGroupDelete(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
-	F := new(deleteMeshGroupRequest)
-	if err := decodeBody(r, F); err != nil {
+	form := new(deleteMeshGroupRequest)
+	if err := decodeBody(r, form); err != nil {
 		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
 
-	if servers, err := findServersByMeshGroup(F.MeshGroupID.String()); err == nil {
+	if servers, err := findServersByMeshGroup(form.MeshGroupID.String()); err == nil {
 		for _, s := range servers {
 			s.MeshGroupID = ""
 			if _, uerr := updateServer(s); uerr != nil {
@@ -99,7 +99,7 @@ func handleAdminMeshGroupDelete(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if err := deleteMeshGroupByID(F.MeshGroupID); err != nil {
+	if err := deleteMeshGroupByID(form.MeshGroupID); err != nil {
 		sendError(w, 500, "Unknown error, please try again in a moment")
 		return
 	}
@@ -158,13 +158,13 @@ func cidrsOverlap(a, b string) bool {
 
 func handleAdminMeshGroupGet(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
-	F := new(getMeshGroupRequest)
-	if err := decodeBody(r, F); err != nil {
+	form := new(getMeshGroupRequest)
+	if err := decodeBody(r, form); err != nil {
 		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
 
-	mg, err := findMeshGroupByID(F.MeshGroupID)
+	mg, err := findMeshGroupByID(form.MeshGroupID)
 	if err != nil {
 		sendError(w, 500, "Unknown error, please try again in a moment")
 		return
@@ -179,18 +179,18 @@ func handleAdminMeshGroupGet(w http.ResponseWriter, r *http.Request) {
 
 func handleAdminMeshGroupList(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
-	F := new(listMeshGroupsRequest)
-	if err := decodeBody(r, F); err != nil {
+	form := new(listMeshGroupsRequest)
+	if err := decodeBody(r, form); err != nil {
 		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
 
-	limit := F.Limit
+	limit := form.Limit
 	if limit <= 0 {
 		limit = 1000
 	}
 
-	mgs, err := listMeshGroups(int64(limit), int64(F.Offset))
+	mgs, err := listMeshGroups(int64(limit), int64(form.Offset))
 	if err != nil {
 		sendError(w, 500, "Unknown error, please try again in a moment")
 		return

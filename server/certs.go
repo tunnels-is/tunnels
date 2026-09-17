@@ -77,20 +77,9 @@ func generateLetsEncryptCerts(ctx context.Context, domain string) error {
 	certPath := filepath.Join(dir, "cert.pem")
 	keyPath := filepath.Join(dir, "key.pem")
 
-	accountKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	client, err := registerACMEClient(ctx)
 	if err != nil {
-		return fmt.Errorf("generate ACME account key: %w", err)
-	}
-
-	client := &acme.Client{
-		Key:          accountKey,
-		DirectoryURL: letsEncryptDirectoryURL,
-	}
-
-	if _, err := client.Register(ctx, &acme.Account{}, acme.AcceptTOS); err != nil {
-		if !errors.Is(err, acme.ErrAccountAlreadyExists) {
-			return fmt.Errorf("ACME account registration: %w", err)
-		}
+		return err
 	}
 
 	order, err := client.AuthorizeOrder(ctx, acme.DomainIDs(domain))
@@ -152,6 +141,25 @@ func generateLetsEncryptCerts(ctx context.Context, domain string) error {
 
 	logger.Info("Let's Encrypt certificate issued", "domain", domain, "cert", certPath, "key", keyPath)
 	return nil
+}
+
+func registerACMEClient(ctx context.Context) (*acme.Client, error) {
+	accountKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		return nil, fmt.Errorf("generate ACME account key: %w", err)
+	}
+
+	client := &acme.Client{
+		Key:          accountKey,
+		DirectoryURL: letsEncryptDirectoryURL,
+	}
+
+	if _, err := client.Register(ctx, &acme.Account{}, acme.AcceptTOS); err != nil {
+		if !errors.Is(err, acme.ErrAccountAlreadyExists) {
+			return nil, fmt.Errorf("ACME account registration: %w", err)
+		}
+	}
+	return client, nil
 }
 
 func startHTTP01Server(client *acme.Client, order *acme.Order) (*http.Server, chan error, error) {

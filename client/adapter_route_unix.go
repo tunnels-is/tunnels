@@ -94,20 +94,12 @@ func addIPv4Route(
 			return lerr
 		}
 		r.LinkIndex = link.Attrs().Index
-		if r.Dst != nil {
-			ones, bits := r.Dst.Mask.Size()
-			if ones == bits {
-				existing, _ := netlink.RouteListFiltered(netlink.FAMILY_V4, &netlink.Route{Dst: r.Dst}, netlink.RT_FILTER_DST)
-				if len(existing) == 1 && existing[0].LinkIndex == r.LinkIndex &&
-					existing[0].Gw != nil && r.Gw != nil && existing[0].Gw.Equal(r.Gw) {
-					return nil
-				}
-				for i := range existing {
-					_ = netlink.RouteDel(&existing[i])
-				}
-			} else {
-				_ = delIPv4Route(network, gateway, metric)
-			}
+		already, err := replaceConflictingIPv4Route(r, network, gateway, metric)
+		if err != nil {
+			return err
+		}
+		if already {
+			return nil
 		}
 	} else {
 		_ = delIPv4Route(network, gateway, metric)
@@ -135,6 +127,26 @@ func addIPv4Route(
 		metric,
 	)
 	return
+}
+
+func replaceConflictingIPv4Route(r *netlink.Route, network, gateway, metric string) (alreadyPresent bool, err error) {
+	if r.Dst == nil {
+		return false, nil
+	}
+	ones, bits := r.Dst.Mask.Size()
+	if ones == bits {
+		existing, _ := netlink.RouteListFiltered(netlink.FAMILY_V4, &netlink.Route{Dst: r.Dst}, netlink.RT_FILTER_DST)
+		if len(existing) == 1 && existing[0].LinkIndex == r.LinkIndex &&
+			existing[0].Gw != nil && r.Gw != nil && existing[0].Gw.Equal(r.Gw) {
+			return true, nil
+		}
+		for i := range existing {
+			_ = netlink.RouteDel(&existing[i])
+		}
+		return false, nil
+	}
+	_ = delIPv4Route(network, gateway, metric)
+	return false, nil
 }
 
 func addIPv6Route(

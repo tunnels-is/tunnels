@@ -2,6 +2,8 @@
 
 package client
 
+import "os/exec"
+
 func setIPv4RouteMetric(network string, ifname string, metric string) (err error) {
 	if err = validateRouteArgs(network, "", metric); err != nil {
 		return err
@@ -121,54 +123,22 @@ func addIPv6Route(
 
 	_ = delIPv6Route(network, gateway, metric)
 
-	var cmd *exec.Cmd
+	dest := network
 	if network == "default" {
-		cmd = hiddenCommand(
-			"netsh",
-			"interface",
-			"ipv6",
-			"add",
-			"route",
-			"::/0",
-			`interface="`+ifName+`"`,
-			"metric="+metric,
-			"store=active",
-		)
-		DEBUG(
-			"netsh",
-			"interface",
-			"ipv6",
-			"add",
-			"route",
-			"::/0",
-			`interface="`+ifName+`"`,
-			"metric="+metric,
-			"store=active",
-		)
-	} else {
-		cmd = hiddenCommand(
-			"netsh",
-			"interface",
-			"ipv6",
-			"add",
-			"route",
-			network,
-			`interface="`+ifName+`"`,
-			"metric="+metric,
-			"store=active",
-		)
-		DEBUG(
-			"netsh",
-			"interface",
-			"ipv6",
-			"add",
-			"route",
-			network,
-			`interface="`+ifName+`"`,
-			"metric="+metric,
-			"store=active",
-		)
+		dest = "::/0"
 	}
+	cmd := netshAddIPv6RouteCmd(dest, ifName, metric)
+	DEBUG(
+		"netsh",
+		"interface",
+		"ipv6",
+		"add",
+		"route",
+		dest,
+		`interface="`+ifName+`"`,
+		"metric="+metric,
+		"store=active",
+	)
 
 	ob, cerr := cmd.Output()
 
@@ -181,6 +151,20 @@ func addIPv6Route(
 	}
 
 	return
+}
+
+func netshAddIPv6RouteCmd(dest, ifName, metric string) *exec.Cmd {
+	return hiddenCommand(
+		"netsh",
+		"interface",
+		"ipv6",
+		"add",
+		"route",
+		dest,
+		`interface="`+ifName+`"`,
+		"metric="+metric,
+		"store=active",
+	)
 }
 
 func delIPv6Route(network string, _ string, _ string) (err error) {

@@ -231,20 +231,8 @@ func PublicConnect(cr *ConnectionRequest) (code int, errm error) {
 		return 502, err
 	}
 
-	err = addIPv4Route(cr.ServerIP+"/32", *ifName, gw4, "0")
-	if err != nil {
-		return 502, errors.New("unable to initialize routes")
-	}
-	registerProtectHost(tunnel, cr.ServerIP)
-	if wgCfg.ServerIP != "" && wgCfg.ServerIP != cr.ServerIP {
-		if rerr := addIPv4Route(wgCfg.ServerIP+"/32", *ifName, gw4, "0"); rerr != nil {
-			ERROR("unable to add extra server IP route: ", rerr)
-		}
-		registerProtectHost(tunnel, wgCfg.ServerIP)
-	}
-
-	if protErr := applyEndpointProtect(*ifName, gateway.To4()); protErr != nil {
-		ERROR("unable to install WireGuard socket protect route: ", protErr)
+	if err = pinServerProtectRoutes(cr, tunnel, wgCfg, *ifName, gateway.To4()); err != nil {
+		return 502, err
 	}
 	startProtectWatcher()
 	success := false
@@ -254,15 +242,10 @@ func PublicConnect(cr *ConnectionRequest) (code int, errm error) {
 		}
 	}()
 
-	privHex, hexErr := wgB64ToHex(wgPrivKeyB64)
+	ipcConf, hexErr := encodeWGSessionIPC(wgPrivKeyB64, serverResp.WireGuardPubKey, cr.ServerIP, serverResp.WireGuardPort)
 	if hexErr != nil {
-		return 502, errors.New("unable to encode WireGuard private key")
+		return 502, hexErr
 	}
-	serverPubHex, hexErr := wgB64ToHex(serverResp.WireGuardPubKey)
-	if hexErr != nil {
-		return 502, errors.New("unable to encode WireGuard server public key")
-	}
-	ipcConf := buildWGIPC(privHex, serverPubHex, cr.ServerIP, serverResp.WireGuardPort)
 
 	if handled, code, err := tryReplaceLiveWG(oldTunnel, tunnel, wgCfg, meta, ipcConf, state); handled {
 		if err == nil {
@@ -295,6 +278,36 @@ func PublicConnect(cr *ConnectionRequest) (code int, errm error) {
 
 	success = true
 	return 200, nil
+}
+
+func pinServerProtectRoutes(cr *ConnectionRequest, tunnel *TUN, wgCfg *wgServerConfig, ifName string, gw4ip net.IP) error {
+	gw4 := gw4ip.String()
+	if err := addIPv4Route(cr.ServerIP+"/32", ifName, gw4, "0"); err != nil {
+		return errors.New("unable to initialize routes")
+	}
+	registerProtectHost(tunnel, cr.ServerIP)
+	if wgCfg.ServerIP != "" && wgCfg.ServerIP != cr.ServerIP {
+		if rerr := addIPv4Route(wgCfg.ServerIP+"/32", ifName, gw4, "0"); rerr != nil {
+			ERROR("unable to add extra server IP route: ", rerr)
+		}
+		registerProtectHost(tunnel, wgCfg.ServerIP)
+	}
+	if protErr := applyEndpointProtect(ifName, gw4ip); protErr != nil {
+		ERROR("unable to install WireGuard socket protect route: ", protErr)
+	}
+	return nil
+}
+
+func encodeWGSessionIPC(privB64, pubB64, serverIP, port string) (string, error) {
+	privHex, err := wgB64ToHex(privB64)
+	if err != nil {
+		return "", errors.New("unable to encode WireGuard private key")
+	}
+	serverPubHex, err := wgB64ToHex(pubB64)
+	if err != nil {
+		return "", errors.New("unable to encode WireGuard server public key")
+	}
+	return buildWGIPC(privHex, serverPubHex, serverIP, port), nil
 }
 
 func refreshAdapterFromSession(inter *adapter, wgCfg *wgServerConfig, meta *TunnelMeta) {

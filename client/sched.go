@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-func doEvent(channel chan *event, method func()) {
+func enqueueEvent(channel chan *event, method func()) {
 	defer RecoverAndLog()
 	select {
 	case channel <- &event{
@@ -16,7 +16,7 @@ func doEvent(channel chan *event, method func()) {
 	}
 }
 
-func newConcurrentSignal(tag string, ctx context.Context, method func()) {
+func startBackgroundTask(tag string, ctx context.Context, method func()) {
 	defer RecoverAndLog()
 	select {
 	case concurrencyMonitor <- &backgroundTask{
