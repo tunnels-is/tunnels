@@ -19,7 +19,7 @@ func doEvent(channel chan *event, method func()) {
 func newConcurrentSignal(tag string, ctx context.Context, method func()) {
 	defer RecoverAndLog()
 	select {
-	case concurrencyMonitor <- &goSignal{
+	case concurrencyMonitor <- &backgroundTask{
 		monitor: concurrencyMonitor,
 		tag:     tag,
 		ctx:     ctx,
@@ -30,7 +30,7 @@ func newConcurrentSignal(tag string, ctx context.Context, method func()) {
 	}
 }
 
-func (s *goSignal) execute() {
+func (s *backgroundTask) execute() {
 	defer RecoverAndLog()
 	s.method()
 	time.Sleep(1 * time.Second)

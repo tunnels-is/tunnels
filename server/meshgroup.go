@@ -37,11 +37,11 @@ func handleAdminMeshGroupCreate(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 	F := new(createMeshGroupRequest)
 	if err := decodeBody(r, F); err != nil {
-		senderr(w, 400, "Invalid request body", slog.Any("error", err))
+		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
 	if err := validateMeshGroup(F.MeshGroup); err != nil {
-		senderr(w, 400, err.Error())
+		sendError(w, 400, err.Error())
 		return
 	}
 
@@ -50,7 +50,7 @@ func handleAdminMeshGroupCreate(w http.ResponseWriter, r *http.Request) {
 
 	if err := createMeshGroup(F.MeshGroup); err != nil {
 		ERR(err)
-		senderr(w, 500, "Unable to create mesh group, please try again later")
+		sendError(w, 500, "Unable to create mesh group, please try again later")
 		return
 	}
 
@@ -61,21 +61,21 @@ func handleAdminMeshGroupUpdate(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 	F := new(updateMeshGroupRequest)
 	if err := decodeBody(r, F); err != nil {
-		senderr(w, 400, "Invalid request body", slog.Any("error", err))
+		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
 	if F.MeshGroup == nil || F.MeshGroup.ID == uuid.Nil {
-		senderr(w, 400, "MeshGroup id is required")
+		sendError(w, 400, "MeshGroup id is required")
 		return
 	}
 	if err := validateMeshGroup(F.MeshGroup); err != nil {
-		senderr(w, 400, err.Error())
+		sendError(w, 400, err.Error())
 		return
 	}
 
 	if err := updateMeshGroup(F.MeshGroup); err != nil {
 		ERR(err)
-		senderr(w, 500, "Unknown error, please try again in a moment")
+		sendError(w, 500, "Unknown error, please try again in a moment")
 		return
 	}
 
@@ -86,7 +86,7 @@ func handleAdminMeshGroupDelete(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 	F := new(deleteMeshGroupRequest)
 	if err := decodeBody(r, F); err != nil {
-		senderr(w, 400, "Invalid request body", slog.Any("error", err))
+		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
 
@@ -100,7 +100,7 @@ func handleAdminMeshGroupDelete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := deleteMeshGroupByID(F.MeshGroupID); err != nil {
-		senderr(w, 500, "Unknown error, please try again in a moment")
+		sendError(w, 500, "Unknown error, please try again in a moment")
 		return
 	}
 
@@ -160,13 +160,13 @@ func handleAdminMeshGroupGet(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 	F := new(getMeshGroupRequest)
 	if err := decodeBody(r, F); err != nil {
-		senderr(w, 400, "Invalid request body", slog.Any("error", err))
+		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
 
 	mg, err := findMeshGroupByID(F.MeshGroupID)
 	if err != nil {
-		senderr(w, 500, "Unknown error, please try again in a moment")
+		sendError(w, 500, "Unknown error, please try again in a moment")
 		return
 	}
 	if mg == nil {
@@ -181,7 +181,7 @@ func handleAdminMeshGroupList(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 	F := new(listMeshGroupsRequest)
 	if err := decodeBody(r, F); err != nil {
-		senderr(w, 400, "Invalid request body", slog.Any("error", err))
+		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
 
@@ -192,7 +192,7 @@ func handleAdminMeshGroupList(w http.ResponseWriter, r *http.Request) {
 
 	mgs, err := listMeshGroups(int64(limit), int64(F.Offset))
 	if err != nil {
-		senderr(w, 500, "Unknown error, please try again in a moment")
+		sendError(w, 500, "Unknown error, please try again in a moment")
 		return
 	}
 

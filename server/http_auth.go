@@ -18,37 +18,37 @@ import (
 func authenticatePasswordLogin(w http.ResponseWriter, lf *loginRequest) (user *User, email string) {
 	email = normalizeEmail(lf.Email)
 	if email == "" || !passwordResetAllowed(email) {
-		senderr(w, 401, "Invalid login credentials")
+		sendError(w, 401, "Invalid login credentials")
 		return nil, email
 	}
 
 	user, err := findUserByEmail(email)
 	if err != nil {
-		senderr(w, 500, "Unknown error, please try again in a moment")
+		sendError(w, 500, "Unknown error, please try again in a moment")
 		return nil, email
 	}
 	if user == nil {
 		recordPasswordResetFailure(email)
-		senderr(w, 401, "Invalid login credentials")
+		sendError(w, 401, "Invalid login credentials")
 		return nil, email
 	}
 
 	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(lf.Password))
 	if err != nil {
 		recordPasswordResetFailure(email)
-		senderr(w, 401, "Invalid login credentials")
+		sendError(w, 401, "Invalid login credentials")
 		return nil, email
 	}
 
 	err = validateUserTwoFactor(user, lf)
 	if err != nil {
 		recordPasswordResetFailure(email)
-		senderr(w, 401, "Invalid login credentials")
+		sendError(w, 401, "Invalid login credentials")
 		return nil, email
 	}
 
 	if user.Disabled {
-		senderr(w, 403, "This account has been disabled, please contact customer support")
+		sendError(w, 403, "This account has been disabled, please contact customer support")
 		return nil, email
 	}
 	return user, email
@@ -63,27 +63,27 @@ func handleAdminLogin(w http.ResponseWriter, r *http.Request) {
 
 	defer BasicRecover()
 
-	LF := new(loginRequest)
-	err := decodeBody(r, LF)
+	form := new(loginRequest)
+	err := decodeBody(r, form)
 	if err != nil {
-		senderr(w, 400, "Invalid request body", slog.Any("error", err))
+		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
 
-	user, email := authenticatePasswordLogin(w, LF)
+	user, email := authenticatePasswordLogin(w, form)
 	if user == nil {
 		return
 	}
 
 	if !user.IsAdmin {
-		senderr(w, 401, "Admin or Manager access required")
+		sendError(w, 401, "Admin or Manager access required")
 		return
 	}
 
-	userLoginUpdate := handleUserDeviceToken(user, LF)
+	userLoginUpdate := handleUserDeviceToken(user, form)
 	err = updateUserDeviceTokens(userLoginUpdate)
 	if err != nil {
-		senderr(w, 500, "Database error, please try again in a moment")
+		sendError(w, 500, "Database error, please try again in a moment")
 		return
 	}
 
@@ -91,7 +91,7 @@ func handleAdminLogin(w http.ResponseWriter, r *http.Request) {
 
 	cookieValue, err := encryptAdminCookie(user.ID.String(), user.DeviceToken.DT, clientIP(r))
 	if err != nil {
-		senderr(w, 500, "Failed to create session")
+		sendError(w, 500, "Failed to create session")
 		return
 	}
 	http.SetCookie(w, &http.Cookie{
@@ -113,19 +113,19 @@ func handleAdminLogout(w http.ResponseWriter, r *http.Request) {
 
 	user := getUserFromContext(r.Context())
 	if user != nil {
-		LF := new(logoutRequest)
-		_ = decodeBody(r, LF)
-		if !LF.All && LF.LogoutToken == "" {
-			LF.LogoutToken = getDeviceTokenFromContext(r.Context())
+		form := new(logoutRequest)
+		_ = decodeBody(r, form)
+		if !form.All && form.LogoutToken == "" {
+			form.LogoutToken = getDeviceTokenFromContext(r.Context())
 		}
 
-		user.Tokens = revokeUserDeviceTokens(user.Tokens, LF)
+		user.Tokens = revokeUserDeviceTokens(user.Tokens, form)
 
 		update := new(userTokensUpdate)
 		update.ID = user.ID
 		update.Tokens = user.Tokens
 		if err := updateUserDeviceTokens(update); err != nil {
-			senderr(w, 500, "Database error, please try again in a moment")
+			sendError(w, 500, "Database error, please try again in a moment")
 			return
 		}
 	}
@@ -146,22 +146,22 @@ func handleClientLogin(w http.ResponseWriter, r *http.Request) {
 	defer randomAuthDelay()
 	defer BasicRecover()
 
-	LF := new(loginRequest)
-	err := decodeBody(r, LF)
+	form := new(loginRequest)
+	err := decodeBody(r, form)
 	if err != nil {
-		senderr(w, 400, "Invalid request body", slog.Any("error", err))
+		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
 
-	user, email := authenticatePasswordLogin(w, LF)
+	user, email := authenticatePasswordLogin(w, form)
 	if user == nil {
 		return
 	}
 
-	userLoginUpdate := handleUserDeviceToken(user, LF)
+	userLoginUpdate := handleUserDeviceToken(user, form)
 	err = updateUserDeviceTokens(userLoginUpdate)
 	if err != nil {
-		senderr(w, 500, "Database error, please try again in a moment")
+		sendError(w, 500, "Database error, please try again in a moment")
 		return
 	}
 
@@ -173,28 +173,28 @@ func handleClientLogin(w http.ResponseWriter, r *http.Request) {
 
 func handleClientLogout(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
-	LF := new(logoutRequest)
-	err := decodeBody(r, LF)
+	form := new(logoutRequest)
+	err := decodeBody(r, form)
 	if err != nil {
-		senderr(w, 400, "Invalid request body", slog.Any("error", err))
+		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
 
 	user := getUserFromContext(r.Context())
 	if user == nil {
-		senderr(w, 204, "User not found")
+		sendError(w, 204, "User not found")
 		return
 	}
 
-	if !LF.All && LF.LogoutToken == "" {
-		if LF.DeviceToken != "" {
-			LF.LogoutToken = LF.DeviceToken
+	if !form.All && form.LogoutToken == "" {
+		if form.DeviceToken != "" {
+			form.LogoutToken = form.DeviceToken
 		} else {
-			LF.LogoutToken = getDeviceTokenFromContext(r.Context())
+			form.LogoutToken = getDeviceTokenFromContext(r.Context())
 		}
 	}
 
-	user.Tokens = revokeUserDeviceTokens(user.Tokens, LF)
+	user.Tokens = revokeUserDeviceTokens(user.Tokens, form)
 
 	userTokenUpdate := new(userTokensUpdate)
 	userTokenUpdate.ID = user.ID
@@ -202,7 +202,7 @@ func handleClientLogout(w http.ResponseWriter, r *http.Request) {
 
 	err = updateUserDeviceTokens(userTokenUpdate)
 	if err != nil {
-		senderr(w, 500, "Database error, please try again in a moment")
+		sendError(w, 500, "Database error, please try again in a moment")
 		return
 	}
 
@@ -213,65 +213,55 @@ func handleClientTwoFactorConfirm(w http.ResponseWriter, r *http.Request) {
 	defer randomAuthDelay()
 	defer BasicRecover()
 
-	LF := new(twoFactorRequest)
-	err := decodeBody(r, LF)
+	form := new(twoFactorRequest)
+	err := decodeBody(r, form)
 	if err != nil {
-		senderr(w, 400, "Invalid request body", slog.Any("error", err))
+		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
 
 	user := getUserFromContext(r.Context())
 	if user == nil {
-		senderr(w, 401, "Unauthorized")
+		sendError(w, 401, "Unauthorized")
 		return
 	}
 
-	if LF.Recovery != "" {
-		recoveryFound := false
-		recoveryUpper := strings.ToUpper(LF.Recovery)
-		rc, err := Decrypt(user.RecoveryCodes, []byte(loadSecret("TwoFactorKey")))
-		if err != nil {
-			ADMIN(err)
-			senderr(w, 500, "Encryption error")
+	if form.Recovery != "" {
+		ok, recErr := recoveryCodePresent(user.RecoveryCodes, form.Recovery)
+		if recErr != nil {
+			ADMIN(recErr)
+			sendError(w, 500, "Encryption error")
 			return
 		}
-
-		rcs := strings.SplitSeq(rc, " ")
-		for v := range rcs {
-			if v == recoveryUpper {
-				recoveryFound = true
-			}
-		}
-
-		if !recoveryFound {
-			senderr(w, 401, "Invalid Recovery code")
+		if !ok {
+			sendError(w, 401, "Invalid Recovery code")
 			return
 		}
 	} else {
 		if user.TwoFactorEnabled {
-			senderr(w, 401, "This account already has two factor authentication enabled")
+			sendError(w, 401, "This account already has two factor authentication enabled")
 			return
 		}
 	}
 
-	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(LF.Password))
+	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(form.Password))
 	if err != nil {
-		senderr(w, 401, "Credentials missing or invalid")
+		sendError(w, 401, "Credentials missing or invalid")
 		return
 	}
 
-	otp := gotp.NewDefaultTOTP(LF.Code).Now()
-	if otp != LF.Digits {
-		senderr(w, 400, "Authenticator code was incorrect")
+	otp := gotp.NewDefaultTOTP(form.Code).Now()
+	if otp != form.Digits {
+		sendError(w, 400, "Authenticator code was incorrect")
 		return
 	}
 
 	updatePackage := new(twoFactorUpdate)
 	updatePackage.UID = user.ID
-	updatePackage.Code, err = Encrypt(LF.Code, []byte(loadSecret("TwoFactorKey")))
+	updatePackage.Code, err = Encrypt(form.Code, []byte(loadSecret("TwoFactorKey")))
 	if err != nil {
 		ADMIN(err)
-		senderr(w, 500, "Encryption error")
+		sendError(w, 500, "Encryption error")
 		return
 	}
 
@@ -280,13 +270,13 @@ func handleClientTwoFactorConfirm(w http.ResponseWriter, r *http.Request) {
 	updatePackage.Recovery, err = Encrypt(recoveryByte, []byte(loadSecret("TwoFactorKey")))
 	if err != nil {
 		ADMIN(err)
-		senderr(w, 500, "Encryption error")
+		sendError(w, 500, "Encryption error")
 		return
 	}
 
 	err = updateUserTwoFactorCodes(updatePackage)
 	if err != nil {
-		senderr(w, 500, "Database error, please try again in a moment")
+		sendError(w, 500, "Database error, please try again in a moment")
 		return
 	}
 
@@ -297,177 +287,155 @@ func handleClientTwoFactorConfirm(w http.ResponseWriter, r *http.Request) {
 	sendObject(w, out)
 }
 
+func recoveryCodePresent(blob []byte, recovery string) (bool, error) {
+	recoveryUpper := strings.ToUpper(recovery)
+	rc, err := Decrypt(blob, []byte(loadSecret("TwoFactorKey")))
+	if err != nil {
+		return false, err
+	}
+	for v := range strings.SplitSeq(rc, " ") {
+		if v == recoveryUpper {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 func handleClientResetPassword(w http.ResponseWriter, r *http.Request) {
 	defer randomAuthDelay()
 	defer BasicRecover()
 
 	var user *User
-	RF := new(passwordResetRequest)
-	err := decodeBody(r, RF)
+	form := new(passwordResetRequest)
+	err := decodeBody(r, form)
 	if err != nil {
-		senderr(w, 400, "Invalid request body", slog.Any("error", err))
+		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
 
-	if len(RF.Password) < 10 {
-		senderr(w, 400, "password smaller then 10 characters")
+	if len(form.Password) < 10 {
+		sendError(w, 400, "password smaller then 10 characters")
 		return
 	}
-	if len(RF.Password) > 72 {
-		senderr(w, 400, "Password is too long, maximum 72 characters")
+	if len(form.Password) > 72 {
+		sendError(w, 400, "Password is too long, maximum 72 characters")
 		return
 	}
 
 	const genericAuthErr = "invalid email or reset code"
 	const rateLimitErr = "too many attempts, try again later"
 
-	RF.Email = normalizeEmail(RF.Email)
-	if RF.Email == "" {
-		senderr(w, 401, genericAuthErr)
+	form.Email = normalizeEmail(form.Email)
+	if form.Email == "" {
+		sendError(w, 401, genericAuthErr)
 		return
 	}
 
-	if !passwordResetAllowed(RF.Email) {
-		senderr(w, 429, rateLimitErr)
+	if !passwordResetAllowed(form.Email) {
+		sendError(w, 429, rateLimitErr)
 		return
 	}
 
-	user, err = findUserByEmail(RF.Email)
+	user, err = findUserByEmail(form.Email)
 	if err != nil {
-		senderr(w, 500, "Unknown error, please try again in a moment")
+		sendError(w, 500, "Unknown error, please try again in a moment")
 		return
 	}
 	if user == nil {
-		recordPasswordResetFailure(RF.Email)
-		senderr(w, 401, genericAuthErr)
+		recordPasswordResetFailure(form.Email)
+		sendError(w, 401, genericAuthErr)
 		return
 	}
 	if user.Disabled {
-		recordPasswordResetFailure(RF.Email)
-		senderr(w, 401, genericAuthErr)
+		recordPasswordResetFailure(form.Email)
+		sendError(w, 401, genericAuthErr)
 		return
 	}
 
 	code, err := Decrypt(user.TwoFactorCode, []byte(loadSecret("TwoFactorKey")))
 	if err != nil {
 		ADMIN(err)
-		recordPasswordResetFailure(RF.Email)
-		senderr(w, 401, genericAuthErr)
+		recordPasswordResetFailure(form.Email)
+		sendError(w, 401, genericAuthErr)
 		return
 	}
 
 	otp := gotp.NewDefaultTOTP(code).Now()
-	if otp != RF.ResetCode {
-		recordPasswordResetFailure(RF.Email)
-		senderr(w, 401, genericAuthErr)
+	if otp != form.ResetCode {
+		recordPasswordResetFailure(form.Email)
+		sendError(w, 401, genericAuthErr)
 		return
 	}
 
-	hash, err := bcrypt.GenerateFromPassword([]byte(RF.Password), 13)
+	hash, err := bcrypt.GenerateFromPassword([]byte(form.Password), 13)
 	if err != nil {
-		senderr(w, 500, "Unable to generate a secure password, please contact customer support")
+		sendError(w, 500, "Unable to generate a secure password, please contact customer support")
 		return
 	}
 	user.Password = string(hash)
 
 	err = resetUserPassword(user)
 	if err != nil {
-		senderr(w, 401, "Database error, please try again in a moment")
+		sendError(w, 401, "Database error, please try again in a moment")
 		return
 	}
 
-	clearPasswordResetAttempts(RF.Email)
+	clearPasswordResetAttempts(form.Email)
 	w.WriteHeader(200)
 }
 
 func handleClientActivateLicense(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 
-	AF := new(licenseActivateRequest)
-	err := decodeBody(r, AF)
+	form := new(licenseActivateRequest)
+	err := decodeBody(r, form)
 	if err != nil {
-		senderr(w, 400, err.Error())
+		sendError(w, 400, err.Error())
 		return
 	}
 
 	user := getUserFromContext(r.Context())
 	if user == nil {
-		senderr(w, 401, "Unauthorized")
+		sendError(w, 401, "Unauthorized")
 		return
 	}
 
-	INFO("KEY attempt:", redactKey(AF.Key))
+	INFO("KEY attempt:", redactKey(form.Key))
 
 	lemonClient := lc.Load()
-	key, resp, err := lemonClient.Licenses.Validate(context.Background(), AF.Key, "")
+	key, resp, err := lemonClient.Licenses.Validate(context.Background(), form.Key, "")
 	if err != nil {
 		if resp != nil && resp.Body != nil {
-			senderr(w, 500, "unexpected error, please try again")
+			sendError(w, 500, "unexpected error, please try again")
 			return
 		}
-		senderr(w, 500, "unexpected error, please try again")
+		sendError(w, 500, "unexpected error, please try again")
 		return
 	}
 
 	if key.LicenseKey.ActivationUsage > 0 {
-		senderr(w, 400, "key is already in use, please contact customer support")
+		sendError(w, 400, "key is already in use, please contact customer support")
 		return
 	}
 
-	if strings.Contains(strings.ToLower(key.Meta.ProductName), "anonymous") {
-
-		base := user.SubExpiration
-		if base.Before(time.Now()) {
-			base = time.Now()
-		}
-		jitter, _ := rand.Int(rand.Reader, big.NewInt(60))
-		user.SubExpiration = base.AddDate(0, 1, 0).Add(time.Duration(jitter.Int64()+60) * time.Minute)
-		INFO("KEY +1:", redactKey(key.LicenseKey.Key), " - check activation in lemon")
-
-		user.Key = &LicenseKey{
-			Created: key.LicenseKey.CreatedAt,
-			Months:  1,
-			Key:     "unknown",
-		}
-	} else {
-		ns := strings.Split(key.Meta.ProductName, " ")
-		months, err := strconv.Atoi(ns[0])
-		if err != nil {
-			ADMIN("unable to parse license key name:", err)
-			senderr(w, 500, "Something went wrong, please contact customer support")
-			return
-		}
-
-		base := user.SubExpiration
-		if base.Before(time.Now()) {
-			base = time.Now()
-		}
-		jitter2, _ := rand.Int(rand.Reader, big.NewInt(600))
-		user.SubExpiration = base.AddDate(0, months, 0).Add(time.Duration(jitter2.Int64()+60) * time.Minute)
-		INFO("KEY +", months, ":", redactKey(key.LicenseKey.Key), " - check activate in lemon")
-
-		user.Key = &LicenseKey{
-			Created: key.LicenseKey.CreatedAt,
-			Months:  months,
-			Key:     key.LicenseKey.Key,
-		}
-	}
-	if key.LicenseKey.ExpiresAt != nil && !key.LicenseKey.ExpiresAt.IsZero() {
-		user.SubExpiration = key.LicenseKey.ExpiresAt.UTC()
+	if err := applyLemonLicense(user, key.Meta.ProductName, key.LicenseKey.Key, key.LicenseKey.CreatedAt, key.LicenseKey.ExpiresAt); err != nil {
+		ADMIN("unable to parse license key name:", err)
+		sendError(w, 500, "Something went wrong, please contact customer support")
+		return
 	}
 
-	activeKey, resp, err := lemonClient.Licenses.Activate(context.Background(), AF.Key, "tunnels")
+	activeKey, resp, err := lemonClient.Licenses.Activate(context.Background(), form.Key, "tunnels")
 	if err != nil {
 		if resp != nil && resp.Body != nil {
-			senderr(w, 500, "unexpected error, please try again")
+			sendError(w, 500, "unexpected error, please try again")
 			return
 		}
-		senderr(w, 500, "unexpected error, please try again")
+		sendError(w, 500, "unexpected error, please try again")
 		return
 	}
 
 	if activeKey.Error != "" {
-		senderr(w, 400, activeKey.Error)
+		sendError(w, 400, activeKey.Error)
 		return
 	}
 
@@ -475,7 +443,7 @@ func handleClientActivateLicense(w http.ResponseWriter, r *http.Request) {
 	user.Disabled = false
 	err = activateUserKey(user.SubExpiration, user.Key, user.ID)
 	if err != nil {
-		senderr(w, 500, "unexpected error, please contact support")
+		sendError(w, 500, "unexpected error, please contact support")
 		return
 	}
 
@@ -484,4 +452,46 @@ func handleClientActivateLicense(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(200)
+}
+
+func applyLemonLicense(user *User, productName, licenseKey string, created time.Time, expiresAt *time.Time) error {
+	if strings.Contains(strings.ToLower(productName), "anonymous") {
+		base := user.SubExpiration
+		if base.Before(time.Now()) {
+			base = time.Now()
+		}
+		jitter, _ := rand.Int(rand.Reader, big.NewInt(60))
+		user.SubExpiration = base.AddDate(0, 1, 0).Add(time.Duration(jitter.Int64()+60) * time.Minute)
+		INFO("KEY +1:", redactKey(licenseKey), " - check activation in lemon")
+
+		user.Key = &LicenseKey{
+			Created: created,
+			Months:  1,
+			Key:     "unknown",
+		}
+	} else {
+		ns := strings.Split(productName, " ")
+		months, err := strconv.Atoi(ns[0])
+		if err != nil {
+			return err
+		}
+
+		base := user.SubExpiration
+		if base.Before(time.Now()) {
+			base = time.Now()
+		}
+		jitter2, _ := rand.Int(rand.Reader, big.NewInt(600))
+		user.SubExpiration = base.AddDate(0, months, 0).Add(time.Duration(jitter2.Int64()+60) * time.Minute)
+		INFO("KEY +", months, ":", redactKey(licenseKey), " - check activate in lemon")
+
+		user.Key = &LicenseKey{
+			Created: created,
+			Months:  months,
+			Key:     licenseKey,
+		}
+	}
+	if expiresAt != nil && !expiresAt.IsZero() {
+		user.SubExpiration = expiresAt.UTC()
+	}
+	return nil
 }

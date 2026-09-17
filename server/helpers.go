@@ -27,17 +27,17 @@ func redactKey(k string) string {
 	return k[:show] + "…"
 }
 
-var letterRunes = []rune("ABCDEFGHIJKLMNOPQRSTUVWXYZ234567")
+var totpAlphabet = []rune("ABCDEFGHIJKLMNOPQRSTUVWXYZ234567")
 
 func generateCode() string {
 	defer BasicRecover()
 	b := make([]rune, 16)
 	for i := range b {
-		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(letterRunes))))
+		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(totpAlphabet))))
 		if err != nil {
 			panic(err)
 		}
-		b[i] = letterRunes[n.Int64()]
+		b[i] = totpAlphabet[n.Int64()]
 	}
 
 	return strings.ToUpper(string(b))

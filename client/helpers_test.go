@@ -114,7 +114,7 @@ func TestCheckIfPlainDomain(t *testing.T) {
 	}
 }
 
-func TestIsDefaultConnection(t *testing.T) {
+func TestIsDefaultTunnelName(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    string
@@ -154,9 +154,9 @@ func TestIsDefaultConnection(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			result := IsDefaultConnection(tc.input)
+			result := isDefaultTunnelName(tc.input)
 			if result != tc.expected {
-				t.Errorf("IsDefaultConnection(%q) = %v, expected %v", tc.input, result, tc.expected)
+				t.Errorf("isDefaultTunnelName(%q) = %v, expected %v", tc.input, result, tc.expected)
 			}
 		})
 	}

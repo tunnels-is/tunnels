@@ -167,25 +167,25 @@ func authorizeControlServer(s *ControlServer) error {
 	return errors.New("host not in configured control servers")
 }
 
-func ForwardToController(FR *ForwardRequest) (any, int) {
+func ForwardToController(req *ForwardRequest) (any, int) {
 	defer RecoverAndLog()
 
-	if err := authorizeControlServer(FR.Server); err != nil {
+	if err := authorizeControlServer(req.Server); err != nil {
 		er := new(ErrorResponse)
 		er.Error = err.Error()
 		return er, 403
 	}
 
-	url := FR.Server.GetURL(FR.Path)
+	url := req.Server.GetURL(req.Path)
 	responseBytes, code, err := SendRequestToURL(
 		nil,
-		FR.Method,
+		req.Method,
 		url,
-		FR.JSONData,
-		FR.Timeout,
-		FR.Server.ValidateCertificate,
-		FR.Server.CertificatePath,
-		FR.Headers,
+		req.JSONData,
+		req.Timeout,
+		req.Server.ValidateCertificate,
+		req.Server.CertificatePath,
+		req.Headers,
 	)
 
 	er := new(ErrorResponse)
@@ -205,7 +205,7 @@ func ForwardToController(FR *ForwardRequest) (any, int) {
 	if len(responseBytes) != 0 {
 		err = json.Unmarshal(responseBytes, &respObj)
 		if err != nil {
-			ERROR("Could not parse response data from ", FR.Server.Host, ":", FR.Server.Port, " err:", err)
+			ERROR("Could not parse response data from ", req.Server.Host, ":", req.Server.Port, " err:", err)
 			er.Error = "Unable to open response from controller"
 			return er, code
 		}

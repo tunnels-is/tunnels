@@ -142,31 +142,47 @@ func connectInLatencyOrder(form *AutoConnectForm, servers []*types.Server) (*Aut
 	return nil, lastCode, fmt.Errorf("unable to connect to any server: %w", lastErr)
 }
 
-func pingICMP(server *types.Server) (time.Duration, bool) {
+func resolveAutoConnectIPv4(server *types.Server) net.IP {
 	ip := net.ParseIP(server.IP)
 	if ip == nil {
 		addrs, err := net.LookupIP(server.IP)
 		if err != nil || len(addrs) == 0 {
 			ERROR("auto-connect: ping failed for ", server.Tag, ": unable to resolve ", server.IP)
-			return 0, false
+			return nil
 		}
 		ip = addrs[0]
 	}
 	ip = ip.To4()
 	if ip == nil {
 		ERROR("auto-connect: ping failed for ", server.Tag, ": not an IPv4 address: ", server.IP)
-		return 0, false
+		return nil
 	}
+	return ip
+}
 
-	var dst net.Addr = &net.IPAddr{IP: ip}
-	conn, err := icmp.ListenPacket("ip4:icmp", "0.0.0.0")
+func openICMPConn(ip net.IP) (conn *icmp.PacketConn, dst net.Addr, err error) {
+	dst = &net.IPAddr{IP: ip}
+	conn, err = icmp.ListenPacket("ip4:icmp", "0.0.0.0")
 	if err != nil {
 		conn, err = icmp.ListenPacket("udp4", "0.0.0.0")
 		if err != nil {
-			ERROR("auto-connect: unable to open ICMP socket: ", err)
-			return 0, false
+			return nil, nil, err
 		}
 		dst = &net.UDPAddr{IP: ip}
+	}
+	return conn, dst, nil
+}
+
+func pingICMP(server *types.Server) (time.Duration, bool) {
+	ip := resolveAutoConnectIPv4(server)
+	if ip == nil {
+		return 0, false
+	}
+
+	conn, dst, err := openICMPConn(ip)
+	if err != nil {
+		ERROR("auto-connect: unable to open ICMP socket: ", err)
+		return 0, false
 	}
 	defer conn.Close()
 

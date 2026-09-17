@@ -279,7 +279,7 @@ func TestReadConfigFileFromDisk_JSON(t *testing.T) {
 			}
 			STATE.Store(testState)
 
-			err = ReadConfigFileFromDisk()
+			err = parseConfigFile()
 
 			if tc.expectError {
 				if err == nil {
@@ -345,7 +345,7 @@ func TestReadConfigFileFromDisk_YAML(t *testing.T) {
 			}
 			STATE.Store(testState)
 
-			err = ReadConfigFileFromDisk()
+			err = parseConfigFile()
 
 			if tc.expectError {
 				if err == nil {
@@ -425,7 +425,7 @@ func TestConfigFileErrors(t *testing.T) {
 			}
 			STATE.Store(testState)
 
-			err := ReadConfigFileFromDisk()
+			err := parseConfigFile()
 
 			if tc.expectError {
 				if err == nil {
@@ -838,7 +838,7 @@ func TestConfigRoundTrip(t *testing.T) {
 				t.Fatalf("Failed to write config: %v", err)
 			}
 
-			if err := ReadConfigFileFromDisk(); err != nil {
+			if err := parseConfigFile(); err != nil {
 				t.Fatalf("Failed to load config: %v", err)
 			}
 

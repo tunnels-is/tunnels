@@ -80,11 +80,11 @@ func createTunnel() (T *TunnelMeta) {
 	T = new(TunnelMeta)
 	b := make([]rune, 8)
 	for i := range b {
-		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(letterRunes))))
+		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(totpAlphabet))))
 		if err != nil {
 			return nil
 		}
-		b[i] = letterRunes[n.Int64()]
+		b[i] = totpAlphabet[n.Int64()]
 	}
 	ifAndTag := string(b)
 	T.Tag = ifAndTag
@@ -147,4 +147,22 @@ func CleanupOnClose() {
 	if LogFile != nil {
 		_ = LogFile.Close()
 	}
+}
+
+func FindTunnel(tag string) *TunnelMeta {
+	if t, ok := TunnelMetaMap.Load(tag); ok {
+		return t
+	}
+	return nil
+}
+
+// StateResponse is the snapshot Fyne (and tests) use for the live client.
+type StateResponse struct {
+	Version       string
+	APIVersion    int
+	Timezone      string
+	Config        *Config
+	State         *State
+	Tunnels       []*TunnelMeta
+	ActiveTunnels []*TUN
 }

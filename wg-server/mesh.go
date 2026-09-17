@@ -116,10 +116,7 @@ func ipcSetMesh(conf []byte) error {
 }
 
 func ipcSetMeshStr(conf string) error {
-	if wgMeshDevice == nil {
-		return fmt.Errorf("mesh device not initialized")
-	}
-	return wgMeshDevice.IpcSetOperation(bufio.NewReader(strings.NewReader(conf)))
+	return ipcSetMesh([]byte(conf))
 }
 
 func addMeshPeer(pubKeyHex, endpoint string, allowedIPs []string) error {

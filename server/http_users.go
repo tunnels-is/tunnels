@@ -27,7 +27,7 @@ func handleClientUserCreate(w http.ResponseWriter, r *http.Request) {
 	defer randomAuthDelay()
 	defer BasicRecover()
 	if publicRegistrationDisabled() {
-		senderr(w, 403, "public registration is disabled")
+		sendError(w, 403, "public registration is disabled")
 		return
 	}
 	createUserFromRequest(w, r)
@@ -91,40 +91,40 @@ func newRegisteredUser(rf *registerRequest) (*User, error) {
 }
 
 func createUserFromRequest(w http.ResponseWriter, r *http.Request) {
-	RF := new(registerRequest)
-	err := decodeBody(r, RF)
+	form := new(registerRequest)
+	err := decodeBody(r, form)
 	if err != nil {
-		senderr(w, 400, "Invalid request body", slog.Any("error", err))
+		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
 
-	if code, msg := validateRegisterForm(RF); code != 0 {
-		senderr(w, code, msg)
+	if code, msg := validateRegisterForm(form); code != 0 {
+		sendError(w, code, msg)
 		return
 	}
 
-	newUser, err := findUserByEmail(RF.Email)
+	newUser, err := findUserByEmail(form.Email)
 	if newUser != nil {
-		senderr(w, 400, "Unable to complete registration")
+		sendError(w, 400, "Unable to complete registration")
 		return
 	}
 	if err != nil {
-		senderr(w, 500, "Unexpected error, please try again in a moment")
+		sendError(w, 500, "Unexpected error, please try again in a moment")
 		return
 	}
 
-	newUser, err = newRegisteredUser(RF)
+	newUser, err = newRegisteredUser(form)
 	if err != nil {
-		senderr(w, 500, "Unable to generate a secure password, please contact customer support")
+		sendError(w, 500, "Unable to generate a secure password, please contact customer support")
 		return
 	}
 	err = createUser(newUser)
 	if err != nil {
 		if errors.Is(err, errEmailRegistered) {
-			senderr(w, 400, "Unable to complete registration")
+			sendError(w, 400, "Unable to complete registration")
 			return
 		}
-		senderr(w, 500, "Unexpected error, please try again in a moment")
+		sendError(w, 500, "Unexpected error, please try again in a moment")
 		return
 	}
 
@@ -134,46 +134,46 @@ func createUserFromRequest(w http.ResponseWriter, r *http.Request) {
 func handleClientUserUpdate(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 
-	UF := new(userUpdateRequest)
-	err := decodeBody(r, UF)
+	form := new(userUpdateRequest)
+	err := decodeBody(r, form)
 	if err != nil {
-		senderr(w, 400, "Invalid request body", slog.Any("error", err))
+		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
 
 	user := getUserFromContext(r.Context())
 	if user == nil {
-		senderr(w, 401, "Unauthorized")
+		sendError(w, 401, "Unauthorized")
 		return
 	}
 
-	if UF.APIKey != "" {
-		UF.APIKey = uuid.NewString()
+	if form.APIKey != "" {
+		form.APIKey = uuid.NewString()
 	}
 
-	UF.UID = user.ID
-	err = updateUser(UF)
+	form.UID = user.ID
+	err = updateUser(form)
 	if err != nil {
-		senderr(w, 500, "Unable to update users, please try again in a moment")
+		sendError(w, 500, "Unable to update users, please try again in a moment")
 		return
 	}
 
-	sendObject(w, map[string]string{"APIKey": UF.APIKey})
+	sendObject(w, map[string]string{"APIKey": form.APIKey})
 }
 
 func handleAdminUserUpdate(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
 
-	UF := new(adminUserUpdateRequest)
-	err := decodeBody(r, UF)
+	form := new(adminUserUpdateRequest)
+	err := decodeBody(r, form)
 	if err != nil {
-		senderr(w, 400, "Invalid request body", slog.Any("error", err))
+		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
 
-	err = updateUserAdmin(UF)
+	err = updateUserAdmin(form)
 	if err != nil {
-		senderr(w, 500, "Unable to admin update user, please try again in a moment")
+		sendError(w, 500, "Unable to admin update user, please try again in a moment")
 		return
 	}
 
@@ -185,13 +185,13 @@ func handleAdminUserList(w http.ResponseWriter, r *http.Request) {
 	F := new(listUsersRequest)
 	err := decodeBody(r, F)
 	if err != nil {
-		senderr(w, 400, "Invalid request body", slog.Any("error", err))
+		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
 
 	users, err := getUsers(int64(clampListLimit(F.Limit)), int64(F.Offset))
 	if err != nil {
-		senderr(w, 500, "Unknown error, please try again in a moment")
+		sendError(w, 500, "Unknown error, please try again in a moment")
 		return
 	}
 
@@ -211,18 +211,18 @@ func handleAdminUserSearch(w http.ResponseWriter, r *http.Request) {
 	F := new(adminUserSearchRequest)
 	err := decodeBody(r, F)
 	if err != nil {
-		senderr(w, 400, "Invalid request body", slog.Any("error", err))
+		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
 	email := strings.TrimSpace(F.Email)
 	if email == "" {
-		senderr(w, 400, "Email is required")
+		sendError(w, 400, "Email is required")
 		return
 	}
 
 	user, err := findUserByEmail(email)
 	if err != nil {
-		senderr(w, 500, "Unknown error, please try again in a moment")
+		sendError(w, 500, "Unknown error, please try again in a moment")
 		return
 	}
 	if user == nil {
@@ -238,21 +238,21 @@ func handleAdminUserGet(w http.ResponseWriter, r *http.Request) {
 	F := new(adminUserGetRequest)
 	err := decodeBody(r, F)
 	if err != nil {
-		senderr(w, 400, "Invalid request body", slog.Any("error", err))
+		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
 	if F.TargetUserID == uuid.Nil {
-		senderr(w, 400, "TargetUserID is required")
+		sendError(w, 400, "TargetUserID is required")
 		return
 	}
 
 	user, err := findUserByID(F.TargetUserID)
 	if err != nil {
-		senderr(w, 500, "Unknown error, please try again in a moment")
+		sendError(w, 500, "Unknown error, please try again in a moment")
 		return
 	}
 	if user == nil {
-		senderr(w, 404, "user not found")
+		sendError(w, 404, "user not found")
 		return
 	}
 	user.RemoveSensitiveInformation()
@@ -268,7 +268,7 @@ func handleAdminUserLatest(w http.ResponseWriter, r *http.Request) {
 	const batchSize = 100
 	users, total, trial, active, err := getUsersLatest(topN, batchSize)
 	if err != nil {
-		senderr(w, 500, "Unknown error, please try again in a moment")
+		sendError(w, 500, "Unknown error, please try again in a moment")
 		return
 	}
 	for i := range users {
@@ -287,19 +287,19 @@ func handleAdminUserDelete(w http.ResponseWriter, r *http.Request) {
 	F := new(deleteUserRequest)
 	err := decodeBody(r, F)
 	if err != nil {
-		senderr(w, 400, "Invalid request body", slog.Any("error", err))
+		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
 
 	caller := getUserFromContext(r.Context())
 	if caller != nil && caller.ID == F.TargetUserID {
-		senderr(w, 400, "Cannot delete your own account")
+		sendError(w, 400, "Cannot delete your own account")
 		return
 	}
 
 	err = deleteUserByID(F.TargetUserID)
 	if err != nil {
-		senderr(w, 500, "Unknown error, please try again in a moment")
+		sendError(w, 500, "Unknown error, please try again in a moment")
 		return
 	}
 

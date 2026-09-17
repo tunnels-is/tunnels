@@ -25,7 +25,7 @@ import (
 
 var recoveryConsumeMu sync.Mutex
 
-// deviceTokenMatchesLogout reports whether dt should be revoked for LF.
+// deviceTokenMatchesLogout reports whether dt should be revoked for form.
 // Prefer LogoutToken (raw session secret). When Tokens[].DT is redacted in API
 // responses, clients revoke other sessions by LogoutName + LogoutCreated.
 func deviceTokenMatchesLogout(dt *DeviceToken, lf *logoutRequest) bool {
@@ -57,16 +57,16 @@ func revokeUserDeviceTokens(tokens []*DeviceToken, lf *logoutRequest) []*DeviceT
 	})
 }
 
-func handleUserDeviceToken(user *User, LF *loginRequest) (userTokenUpdate *userTokensUpdate) {
+func handleUserDeviceToken(user *User, form *loginRequest) (userTokenUpdate *userTokensUpdate) {
 	defer BasicRecover()
 
 	tokenExists := false
-	if LF.DeviceToken != "" {
+	if form.DeviceToken != "" {
 		for i, v := range user.Tokens {
-			if v.DT == LF.DeviceToken {
+			if v.DT == form.DeviceToken {
 				tokenExists = true
 				user.Tokens[i].DT = uuid.NewString()
-				user.Tokens[i].N = LF.DeviceName
+				user.Tokens[i].N = form.DeviceName
 				user.Tokens[i].Created = time.Now()
 				user.DeviceToken = user.Tokens[i]
 			}
@@ -75,7 +75,7 @@ func handleUserDeviceToken(user *User, LF *loginRequest) (userTokenUpdate *userT
 
 	if !tokenExists {
 		T := new(DeviceToken)
-		T.N = LF.DeviceName
+		T.N = form.DeviceName
 		T.DT = uuid.NewString()
 		T.Created = time.Now()
 
@@ -93,7 +93,7 @@ func handleUserDeviceToken(user *User, LF *loginRequest) (userTokenUpdate *userT
 	userTokenUpdate = new(userTokensUpdate)
 	userTokenUpdate.ID = user.ID
 	userTokenUpdate.Tokens = user.Tokens
-	userTokenUpdate.Version = LF.Version
+	userTokenUpdate.Version = form.Version
 
 	return userTokenUpdate
 }
@@ -137,7 +137,7 @@ func consumeRecoveryCode(user *User, recovery string) error {
 	return nil
 }
 
-func validateUserTwoFactor(user *User, LF *loginRequest) (err error) {
+func validateUserTwoFactor(user *User, form *loginRequest) (err error) {
 	defer func() {
 		r := recover()
 		if r != nil {
@@ -146,12 +146,12 @@ func validateUserTwoFactor(user *User, LF *loginRequest) (err error) {
 	}()
 	recoveryEnabled := false
 	if user.TwoFactorEnabled {
-		if LF.Recovery != "" {
+		if form.Recovery != "" {
 
 			recoveryConsumeMu.Lock()
 			defer recoveryConsumeMu.Unlock()
 
-			if err := consumeRecoveryCode(user, LF.Recovery); err != nil {
+			if err := consumeRecoveryCode(user, form.Recovery); err != nil {
 				return err
 			}
 			recoveryEnabled = true
@@ -165,7 +165,7 @@ func validateUserTwoFactor(user *User, LF *loginRequest) (err error) {
 			}
 
 			otp := gotp.NewDefaultTOTP(code).Now()
-			if otp != LF.Digits {
+			if otp != form.Digits {
 				return errors.New("Authenticator code was incorrect")
 			}
 		}

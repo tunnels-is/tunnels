@@ -159,7 +159,7 @@ func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
 	enc.Encode(rs)
 }
 
-func senderr(w http.ResponseWriter, code int, msg string, slogArgs ...any) {
+func sendError(w http.ResponseWriter, code int, msg string, slogArgs ...any) {
 	logger.Error(msg, slogArgs...)
 	responsePayload := map[string]string{"Error": msg}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
@@ -193,7 +193,7 @@ func sendObject(w http.ResponseWriter, obj any) {
 		err = enc.Encode(obj)
 	}
 	if err != nil {
-		senderr(w, 500, "unable to encode response object")
+		sendError(w, 500, "unable to encode response object")
 		return
 	}
 }

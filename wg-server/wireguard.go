@@ -131,10 +131,7 @@ func removePeer(pubKeyHex string) error {
 }
 
 func ipcSet(conf string) error {
-	if wgDevice == nil {
-		return fmt.Errorf("wireguard device not initialized")
-	}
-	return wgDevice.IpcSetOperation(bufio.NewReader(strings.NewReader(conf)))
+	return ipcSetBytes([]byte(conf))
 }
 
 func ipcSetBytes(conf []byte) error {

@@ -15,12 +15,12 @@ func handleAdminGroupCreate(w http.ResponseWriter, r *http.Request) {
 	F := new(createGroupRequest)
 	err := decodeBody(r, F)
 	if err != nil {
-		senderr(w, 400, "Invalid request body", slog.Any("error", err))
+		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
 
 	if F.Group == nil || F.Group.Tag == "" {
-		senderr(w, 400, "Invalid group format")
+		sendError(w, 400, "Invalid group format")
 		return
 	}
 
@@ -30,7 +30,7 @@ func handleAdminGroupCreate(w http.ResponseWriter, r *http.Request) {
 	err = createGroup(F.Group)
 	if err != nil {
 		ERR(err)
-		senderr(w, 500, "Unable to create group, please try again later")
+		sendError(w, 500, "Unable to create group, please try again later")
 		return
 	}
 
@@ -42,7 +42,7 @@ func handleAdminGroupAdd(w http.ResponseWriter, r *http.Request) {
 	F := new(groupAddRequest)
 	err := decodeBody(r, F)
 	if err != nil {
-		senderr(w, 400, "Invalid request body", slog.Any("error", err))
+		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
 
@@ -53,11 +53,11 @@ func handleAdminGroupAdd(w http.ResponseWriter, r *http.Request) {
 	case "server":
 		s, err = findServerByID(F.TypeID)
 		if err != nil {
-			senderr(w, 400, err.Error())
+			sendError(w, 400, err.Error())
 			return
 		}
 		if s == nil {
-			senderr(w, 404, "server not found")
+			sendError(w, 404, "server not found")
 			return
 		}
 	case "user":
@@ -68,11 +68,11 @@ func handleAdminGroupAdd(w http.ResponseWriter, r *http.Request) {
 			u, err = findUserByID(F.TypeID)
 		}
 		if err != nil {
-			senderr(w, 400, err.Error())
+			sendError(w, 400, err.Error())
 			return
 		}
 		if u == nil {
-			senderr(w, 204, "user not found")
+			sendError(w, 204, "user not found")
 			return
 		}
 		F.TypeID = u.ID
@@ -80,7 +80,7 @@ func handleAdminGroupAdd(w http.ResponseWriter, r *http.Request) {
 
 	err = addToGroup(F.GroupID, F.TypeID, F.Type)
 	if err != nil {
-		senderr(w, 500, "Unknown error, please try again in a moment")
+		sendError(w, 500, "Unknown error, please try again in a moment")
 		return
 	}
 
@@ -90,7 +90,7 @@ func handleAdminGroupAdd(w http.ResponseWriter, r *http.Request) {
 	case s != nil:
 		sendObject(w, s)
 	default:
-		senderr(w, 500, "Unknown error, please try again in a moment")
+		sendError(w, 500, "Unknown error, please try again in a moment")
 	}
 }
 
@@ -99,13 +99,13 @@ func handleAdminGroupRemove(w http.ResponseWriter, r *http.Request) {
 	F := new(groupRemoveRequest)
 	err := decodeBody(r, F)
 	if err != nil {
-		senderr(w, 400, "Invalid request body", slog.Any("error", err))
+		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
 
 	err = removeFromGroup(F.GroupID, F.TypeID, F.Type)
 	if err != nil {
-		senderr(w, 500, "Unknown error, please try again in a moment")
+		sendError(w, 500, "Unknown error, please try again in a moment")
 		return
 	}
 
@@ -117,14 +117,14 @@ func handleAdminGroupUpdate(w http.ResponseWriter, r *http.Request) {
 	F := new(updateGroupRequest)
 	err := decodeBody(r, F)
 	if err != nil {
-		senderr(w, 400, "Invalid request body", slog.Any("error", err))
+		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
 
 	err = updateGroup(F.Group)
 	if err != nil {
 		ERR(err)
-		senderr(w, 500, "Unknown error, please try again in a moment")
+		sendError(w, 500, "Unknown error, please try again in a moment")
 		return
 	}
 
@@ -136,13 +136,13 @@ func handleAdminGroupDelete(w http.ResponseWriter, r *http.Request) {
 	F := new(deleteGroupRequest)
 	err := decodeBody(r, F)
 	if err != nil {
-		senderr(w, 400, "Invalid request body", slog.Any("error", err))
+		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
 
 	err = deleteGroupByID(F.GID)
 	if err != nil {
-		senderr(w, 500, "Unknown error, please try again in a moment")
+		sendError(w, 500, "Unknown error, please try again in a moment")
 		return
 	}
 
@@ -154,13 +154,13 @@ func handleAdminGroupGet(w http.ResponseWriter, r *http.Request) {
 	F := new(getGroupRequest)
 	err := decodeBody(r, F)
 	if err != nil {
-		senderr(w, 400, "Invalid request body", slog.Any("error", err))
+		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
 
 	group, err := findGroupByID(F.GID)
 	if err != nil {
-		senderr(w, 500, "Unknown error, please try again in a moment")
+		sendError(w, 500, "Unknown error, please try again in a moment")
 		return
 	}
 
@@ -177,13 +177,13 @@ func handleAdminGroupGetEntities(w http.ResponseWriter, r *http.Request) {
 	F := new(getGroupEntitiesRequest)
 	err := decodeBody(r, F)
 	if err != nil {
-		senderr(w, 400, "Invalid request body", slog.Any("error", err))
+		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
 
 	entities, err := findEntitiesByGroupID(F.GID, F.Type, int64(F.Limit), int64(F.Offset))
 	if err != nil {
-		senderr(w, 500, "Unknown error, please try again in a moment")
+		sendError(w, 500, "Unknown error, please try again in a moment")
 		return
 	}
 
@@ -208,7 +208,7 @@ func handleAdminGroupList(w http.ResponseWriter, r *http.Request) {
 	F := new(listGroupsRequest)
 	err := decodeBody(r, F)
 	if err != nil {
-		senderr(w, 400, "Invalid request body", slog.Any("error", err))
+		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
 
@@ -219,7 +219,7 @@ func handleAdminGroupList(w http.ResponseWriter, r *http.Request) {
 
 	groups, err := listGroups(int64(limit), int64(F.Offset))
 	if err != nil {
-		senderr(w, 500, "Unknown error, please try again in a moment")
+		sendError(w, 500, "Unknown error, please try again in a moment")
 		return
 	}
 

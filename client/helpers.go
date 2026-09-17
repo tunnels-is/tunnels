@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-func IsDefaultConnection(IFName string) bool {
+func isDefaultTunnelName(IFName string) bool {
 	return strings.EqualFold(IFName, DefaultTunnelName)
 }
 

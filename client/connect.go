@@ -99,13 +99,13 @@ func startLiveSession(tunnel *TUN) {
 	watchWGDevice(tunnel)
 }
 
-func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
-	if ClientCR.ServerID == "" {
-		ERROR("No Server id found when connecting: ", ClientCR)
+func PublicConnect(cr *ConnectionRequest) (code int, errm error) {
+	if cr.ServerID == "" {
+		ERROR("No Server id found when connecting: ", cr)
 		return 400, errors.New("no server id found when connecting")
 	}
 
-	if err := authorizeControlServer(ClientCR.Server); err != nil {
+	if err := authorizeControlServer(cr.Server); err != nil {
 		return 403, err
 	}
 
@@ -122,8 +122,8 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	}()
 	defer RecoverAndLog()
 
-	if ClientCR.UserID != "" {
-		if err := activateAccountByUserID(ClientCR.UserID); err != nil {
+	if cr.UserID != "" {
+		if err := activateAccountByUserID(cr.UserID); err != nil {
 			ERROR("unable to activate account workspace:", err)
 			return 500, errors.New("unable to activate account workspace")
 		}
@@ -141,18 +141,18 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		return 502, errors.New("no default gateway, check your connection settings")
 	}
 
-	if ClientCR.Tag == "" {
-		ClientCR.Tag = DefaultTunnelName
+	if cr.Tag == "" {
+		cr.Tag = DefaultTunnelName
 	}
 
-	meta := lookupTunnelMeta(ClientCR.Tag)
+	meta := lookupTunnelMeta(cr.Tag)
 
 	if meta == nil {
-		ERROR("vpn connection metadata not found for tag: ", ClientCR.Tag)
+		ERROR("vpn connection metadata not found for tag: ", cr.Tag)
 		return 400, errors.New("error fetching connection meta")
 	}
 
-	if err := persistTunnelServerID(meta, ClientCR.ServerID); err != nil {
+	if err := persistTunnelServerID(meta, cr.ServerID); err != nil {
 		ERROR("unable to write tunnel meta to drive", err)
 		return 400, errors.New("unable to write tunnel meta to drive")
 	}
@@ -167,7 +167,7 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 
 	tunnel := new(TUN)
 	tunnel.meta.Store(meta)
-	tunnel.CR = ClientCR
+	tunnel.CR = cr
 
 	var err error
 
@@ -177,12 +177,12 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	}
 
 	gw4 := gateway.To4().String()
-	err = pinControllerHostRoute(ClientCR, tunnel, *ifName, gw4)
+	err = pinControllerHostRoute(cr, tunnel, *ifName, gw4)
 	if err != nil {
 		return 502, err
 	}
 
-	localDev, wgCfg, wgErr := resolveLocalDeviceForServer(ClientCR, ClientCR.ServerID, meta.Tag)
+	localDev, wgCfg, wgErr := resolveLocalDeviceForServer(cr, cr.ServerID, meta.Tag)
 	if wgErr != nil {
 		ERROR("unable to resolve local device for server: ", wgErr)
 		return 502, fmt.Errorf("unable to resolve local device for server: %w", wgErr)
@@ -197,11 +197,11 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		_ = writeTunnelsToDisk(meta.Tag)
 	}
 
-	if ClientCR.ServerIP == "" {
-		ClientCR.ServerIP = wgCfg.ServerIP
+	if cr.ServerIP == "" {
+		cr.ServerIP = wgCfg.ServerIP
 	}
 
-	if valErr := validateWGServerConfig(wgCfg.WireGuardIP, ClientCR.ServerIP,
+	if valErr := validateWGServerConfig(wgCfg.WireGuardIP, cr.ServerIP,
 		wgCfg.WireGuardSubnet, wgCfg.WireGuardSubnet6, wgCfg.WANCIDR); valErr != nil {
 		return 502, valErr
 	}
@@ -211,7 +211,7 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	}
 
 	serverResp := &types.ServerConnectResponse{
-		InterfaceIP:      ClientCR.ServerIP,
+		InterfaceIP:      cr.ServerIP,
 		WireGuardIP:      wgCfg.WireGuardIP,
 		WireGuardPubKey:  wgCfg.WireGuardPubKey,
 		WireGuardPort:    wgCfg.WireGuardPort,
@@ -223,7 +223,7 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	tunnel.ServerResponse = serverResp
 
 	if !wgCfg.EnableFirewall && (len(meta.AllowedHosts) > 0 || !meta.AllowAll) {
-		SECURITY("server ", ClientCR.ServerID, " has its peer firewall DISABLED — this tunnel's allowed-hosts policy is NOT enforced")
+		SECURITY("server ", cr.ServerID, " has its peer firewall DISABLED — this tunnel's allowed-hosts policy is NOT enforced")
 	}
 
 	err = InitializeTunnelFromCRR(tunnel)
@@ -231,12 +231,12 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		return 502, err
 	}
 
-	err = addIPv4Route(ClientCR.ServerIP+"/32", *ifName, gw4, "0")
+	err = addIPv4Route(cr.ServerIP+"/32", *ifName, gw4, "0")
 	if err != nil {
 		return 502, errors.New("unable to initialize routes")
 	}
-	registerProtectHost(tunnel, ClientCR.ServerIP)
-	if wgCfg.ServerIP != "" && wgCfg.ServerIP != ClientCR.ServerIP {
+	registerProtectHost(tunnel, cr.ServerIP)
+	if wgCfg.ServerIP != "" && wgCfg.ServerIP != cr.ServerIP {
 		if rerr := addIPv4Route(wgCfg.ServerIP+"/32", *ifName, gw4, "0"); rerr != nil {
 			ERROR("unable to add extra server IP route: ", rerr)
 		}
@@ -262,79 +262,20 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 	if hexErr != nil {
 		return 502, errors.New("unable to encode WireGuard server public key")
 	}
-	ipcConf := buildWGIPC(privHex, serverPubHex, ClientCR.ServerIP, serverResp.WireGuardPort)
+	ipcConf := buildWGIPC(privHex, serverPubHex, cr.ServerIP, serverResp.WireGuardPort)
 
-	if oldTunnel != nil && wgDeviceAlive(oldTunnel.wgDevice) {
-		if ipcErr := applyWGIPC(oldTunnel.wgDevice, ipcConf); ipcErr != nil {
-			ERROR("in-place WireGuard IPC failed, keeping existing session: ", ipcErr)
-			return 502, fmt.Errorf("WireGuard IPC configuration failed: %w", ipcErr)
+	if handled, code, err := tryReplaceLiveWG(oldTunnel, tunnel, wgCfg, meta, ipcConf, state); handled {
+		if err == nil {
+			success = true
 		}
-		oldTunnel.SetState(TunnelDisconnecting)
-		tunnel.wgDevice = oldTunnel.wgDevice
-		tunnel.wgBind = oldTunnel.wgBind
-		tunnel.osTUN = oldTunnel.osTUN
-		tunnel.procTUN = oldTunnel.procTUN
-		if tunnel.procTUN != nil {
-			tunnel.procTUN.bindTunnel(tunnel)
-		}
-		inter := oldTunnel.tunnel.Load()
-		if inter == nil {
-			return 502, errors.New("existing tunnel has no interface")
-		}
-		inter.IPv4Address = wgCfg.WireGuardIP
-		inter.Gateway = wgCfg.WireGuardIP
-		inter.MTU = meta.MTU
-		inter.TxQueuelen = meta.TxQueueLen
-		tunnel.tunnel.Store(inter)
-		inter.tunnel.Store(&tunnel)
-		if err = inter.Connect(tunnel); err != nil {
-			ERROR("unable to refresh tunnel interface after in-place replace: ", err)
-			return 502, errors.New("unable to connect to tunnel interface")
-		}
-		startLiveSession(tunnel)
-		Disconnect(oldTunnel.ID, true)
-		if id := state.DefaultInterfaceID.Load(); id > 0 {
-			if pinErr := pinProtectBind(tunnel.wgBind, uint32(id)); pinErr != nil {
-				ERROR("unable to refresh WireGuard socket pin after in-place replace: ", pinErr)
-			}
-		}
-		DEBUG("replaced WireGuard session in place (no TUN recreate)")
-		success = true
-		return 200, nil
+		return code, err
 	}
 
-	if oldTunnel != nil && oldTunnel.osTUN != nil && oldTunnel.osTUN.CanReuse() {
-		oldTunnel.SetState(TunnelDisconnecting)
-		if oldTunnel.wgDevice != nil {
-			oldTunnel.wgDevice.Close()
+	if replaced, code, err := tryReuseStickyTUN(oldTunnel, tunnel, wgCfg, meta, ipcConf); replaced {
+		if err == nil {
+			success = true
 		}
-		if err := oldTunnel.osTUN.ResetForReuse(); err != nil {
-			ERROR("sticky TUN reset failed: ", err)
-			destroyReusablePath(oldTunnel)
-		} else {
-			tunnel.osTUN = oldTunnel.osTUN
-			tunnel.procTUN = oldTunnel.procTUN
-			if tunnel.procTUN != nil {
-				tunnel.procTUN.bindTunnel(tunnel)
-			}
-			inter := oldTunnel.tunnel.Load()
-			if inter != nil {
-				inter.IPv4Address = wgCfg.WireGuardIP
-				inter.Gateway = wgCfg.WireGuardIP
-				inter.MTU = meta.MTU
-				inter.TxQueuelen = meta.TxQueueLen
-				if err := attachWGDevice(tunnel, inter, tunnel.procTUN, ipcConf); err != nil {
-					ERROR("reuse TUN attach failed: ", err)
-					destroyReusablePath(oldTunnel)
-				} else {
-					startLiveSession(tunnel)
-					Disconnect(oldTunnel.ID, true)
-					DEBUG("reused OS TUN after WireGuard device death")
-					success = true
-					return 200, nil
-				}
-			}
-		}
+		return code, err
 	}
 
 	if oldTunnel != nil {
@@ -342,9 +283,103 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		destroyReusablePath(oldTunnel)
 	}
 
+	if err := createFreshWG(tunnel, wgCfg, meta, ipcConf); err != nil {
+		return 502, err
+	}
+
+	startLiveSession(tunnel)
+
+	if oldTunnel != nil {
+		Disconnect(oldTunnel.ID, true)
+	}
+
+	success = true
+	return 200, nil
+}
+
+func refreshAdapterFromSession(inter *adapter, wgCfg *wgServerConfig, meta *TunnelMeta) {
+	inter.IPv4Address = wgCfg.WireGuardIP
+	inter.Gateway = wgCfg.WireGuardIP
+	inter.MTU = meta.MTU
+	inter.TxQueuelen = meta.TxQueueLen
+}
+
+func tryReplaceLiveWG(oldTunnel, tunnel *TUN, wgCfg *wgServerConfig, meta *TunnelMeta, ipcConf string, state *State) (handled bool, code int, err error) {
+	if oldTunnel == nil || !wgDeviceAlive(oldTunnel.wgDevice) {
+		return false, 0, nil
+	}
+	if ipcErr := applyWGIPC(oldTunnel.wgDevice, ipcConf); ipcErr != nil {
+		ERROR("in-place WireGuard IPC failed, keeping existing session: ", ipcErr)
+		return true, 502, fmt.Errorf("WireGuard IPC configuration failed: %w", ipcErr)
+	}
+	oldTunnel.SetState(TunnelDisconnecting)
+	tunnel.wgDevice = oldTunnel.wgDevice
+	tunnel.wgBind = oldTunnel.wgBind
+	tunnel.osTUN = oldTunnel.osTUN
+	tunnel.procTUN = oldTunnel.procTUN
+	if tunnel.procTUN != nil {
+		tunnel.procTUN.bindTunnel(tunnel)
+	}
+	inter := oldTunnel.tunnel.Load()
+	if inter == nil {
+		return true, 502, errors.New("existing tunnel has no interface")
+	}
+	refreshAdapterFromSession(inter, wgCfg, meta)
+	tunnel.tunnel.Store(inter)
+	inter.tunnel.Store(&tunnel)
+	if err = inter.Connect(tunnel); err != nil {
+		ERROR("unable to refresh tunnel interface after in-place replace: ", err)
+		return true, 502, errors.New("unable to connect to tunnel interface")
+	}
+	startLiveSession(tunnel)
+	Disconnect(oldTunnel.ID, true)
+	if id := state.DefaultInterfaceID.Load(); id > 0 {
+		if pinErr := pinProtectBind(tunnel.wgBind, uint32(id)); pinErr != nil {
+			ERROR("unable to refresh WireGuard socket pin after in-place replace: ", pinErr)
+		}
+	}
+	DEBUG("replaced WireGuard session in place (no TUN recreate)")
+	return true, 200, nil
+}
+
+func tryReuseStickyTUN(oldTunnel, tunnel *TUN, wgCfg *wgServerConfig, meta *TunnelMeta, ipcConf string) (replaced bool, code int, err error) {
+	if oldTunnel == nil || oldTunnel.osTUN == nil || !oldTunnel.osTUN.CanReuse() {
+		return false, 0, nil
+	}
+	oldTunnel.SetState(TunnelDisconnecting)
+	if oldTunnel.wgDevice != nil {
+		oldTunnel.wgDevice.Close()
+	}
+	if err := oldTunnel.osTUN.ResetForReuse(); err != nil {
+		ERROR("sticky TUN reset failed: ", err)
+		destroyReusablePath(oldTunnel)
+		return false, 0, nil
+	}
+	tunnel.osTUN = oldTunnel.osTUN
+	tunnel.procTUN = oldTunnel.procTUN
+	if tunnel.procTUN != nil {
+		tunnel.procTUN.bindTunnel(tunnel)
+	}
+	inter := oldTunnel.tunnel.Load()
+	if inter == nil {
+		return false, 0, nil
+	}
+	refreshAdapterFromSession(inter, wgCfg, meta)
+	if err := attachWGDevice(tunnel, inter, tunnel.procTUN, ipcConf); err != nil {
+		ERROR("reuse TUN attach failed: ", err)
+		destroyReusablePath(oldTunnel)
+		return false, 0, nil
+	}
+	startLiveSession(tunnel)
+	Disconnect(oldTunnel.ID, true)
+	DEBUG("reused OS TUN after WireGuard device death")
+	return true, 200, nil
+}
+
+func createFreshWG(tunnel *TUN, wgCfg *wgServerConfig, meta *TunnelMeta, ipcConf string) error {
 	osTun, tunErr := wgtun.CreateTUN(resolveTUNCreateName(meta.IFName), int(meta.MTU))
 	if tunErr != nil {
-		return 502, fmt.Errorf("unable to create TUN interface: %w", tunErr)
+		return fmt.Errorf("unable to create TUN interface: %w", tunErr)
 	}
 	tunIfName, _ := osTun.Name()
 
@@ -363,17 +398,9 @@ func PublicConnect(ClientCR *ConnectionRequest) (code int, errm error) {
 		} else {
 			_ = osTun.Close()
 		}
-		return 502, err
+		return err
 	}
-
-	startLiveSession(tunnel)
-
-	if oldTunnel != nil {
-		Disconnect(oldTunnel.ID, true)
-	}
-
-	success = true
-	return 200, nil
+	return nil
 }
 
 func bindLocalDNSClient(t *TUN) {

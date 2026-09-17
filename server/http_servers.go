@@ -16,17 +16,17 @@ func handleAdminServerGet(w http.ResponseWriter, r *http.Request) {
 	F := new(getServerRequest)
 	err := decodeBody(r, F)
 	if err != nil {
-		senderr(w, 400, "Invalid request body", slog.Any("error", err))
+		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
 
 	server, err := findServerByID(F.ServerID)
 	if err != nil {
-		senderr(w, 500, "Unknown error, please try again in a moment", slog.Any("error", err))
+		sendError(w, 500, "Unknown error, please try again in a moment", slog.Any("error", err))
 		return
 	}
 	if server == nil {
-		senderr(w, 404, "server not found")
+		sendError(w, 404, "server not found")
 		return
 	}
 
@@ -39,13 +39,13 @@ func handleAdminServerList(w http.ResponseWriter, r *http.Request) {
 	F := new(listServersRequest)
 	err := decodeBody(r, F)
 	if err != nil {
-		senderr(w, 400, "Invalid request body", slog.Any("error", err))
+		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
 
 	servers, err := findAllServers(100, int64(F.StartIndex))
 	if err != nil {
-		senderr(w, 500, "Unknown error, please try again in a moment")
+		sendError(w, 500, "Unknown error, please try again in a moment")
 		return
 	}
 
@@ -58,13 +58,13 @@ func handleAdminServerDelete(w http.ResponseWriter, r *http.Request) {
 	F := new(deleteServerRequest)
 	err := decodeBody(r, F)
 	if err != nil {
-		senderr(w, 400, "Invalid request body", slog.Any("error", err))
+		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
 
 	err = deleteServerByID(F.ServerID)
 	if err != nil {
-		senderr(w, 500, "Unknown error, please try again in a moment")
+		sendError(w, 500, "Unknown error, please try again in a moment")
 		return
 	}
 
@@ -97,23 +97,23 @@ func handleClientServersByCountry(w http.ResponseWriter, r *http.Request) {
 	F := new(serversByCountryRequest)
 	err := decodeBody(r, F)
 	if err != nil {
-		senderr(w, 400, "Invalid request body", slog.Any("error", err))
+		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
 	if F.Country == "" {
-		senderr(w, 400, "Country is required")
+		sendError(w, 400, "Country is required")
 		return
 	}
 
 	user := getUserFromContext(r.Context())
 	if user == nil {
-		senderr(w, 401, "Unauthorized")
+		sendError(w, 401, "Unauthorized")
 		return
 	}
 
 	all, err := findServersForUser(user, 0)
 	if err != nil {
-		senderr(w, 500, "Unknown error, please try again in a moment")
+		sendError(w, 500, "Unknown error, please try again in a moment")
 		return
 	}
 
@@ -144,20 +144,20 @@ func handleClientServers(w http.ResponseWriter, r *http.Request) {
 	F := new(listServersRequest)
 	err := decodeBody(r, F)
 	if err != nil {
-		senderr(w, 400, "Invalid request body", slog.Any("error", err))
+		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
 
 	user := getUserFromContext(r.Context())
 	if user == nil {
-		senderr(w, 401, "Unauthorized")
+		sendError(w, 401, "Unauthorized")
 		return
 	}
 
 	servers := make([]*types.Server, 0)
 	pservers, err := findServersWithoutGroups(100, int64(F.StartIndex))
 	if err != nil {
-		senderr(w, 500, "Unknown error, please try again in a moment")
+		sendError(w, 500, "Unknown error, please try again in a moment")
 		return
 	}
 	servers = append(servers, pservers...)
@@ -165,7 +165,7 @@ func handleClientServers(w http.ResponseWriter, r *http.Request) {
 	if len(user.Groups) > 0 {
 		puservers, err := findServersByGroups(user.Groups, 100, int64(F.StartIndex))
 		if err != nil {
-			senderr(w, 500, "Unknown error, please try again in a moment")
+			sendError(w, 500, "Unknown error, please try again in a moment")
 			return
 		}
 		servers = append(servers, puservers...)
@@ -216,27 +216,27 @@ func handleAdminServerUpdate(w http.ResponseWriter, r *http.Request) {
 	F := new(updateServerRequest)
 	err := decodeBody(r, F)
 	if err != nil {
-		senderr(w, 400, "Invalid request body", slog.Any("error", err))
+		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
 
 	if F.Server == nil {
-		senderr(w, 400, "Server is required")
+		sendError(w, 400, "Server is required")
 		return
 	}
 	if err := validateServerWGFields(F.Server); err != nil {
-		senderr(w, 400, err.Error())
+		sendError(w, 400, err.Error())
 		return
 	}
 	applyWGDefaults(F.Server)
 	if err := validateServerMesh(F.Server); err != nil {
-		senderr(w, 400, err.Error())
+		sendError(w, 400, err.Error())
 		return
 	}
 
 	_, err = updateServer(F.Server)
 	if err != nil {
-		senderr(w, 500, "Unknown error, please try again in a moment")
+		sendError(w, 500, "Unknown error, please try again in a moment")
 		return
 	}
 
@@ -248,29 +248,29 @@ func handleAdminServerCreate(w http.ResponseWriter, r *http.Request) {
 	F := new(createServerRequest)
 	err := decodeBody(r, F)
 	if err != nil {
-		senderr(w, 400, "Invalid request body", slog.Any("error", err))
+		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
 
 	if F.Server == nil {
-		senderr(w, 400, "Server is required")
+		sendError(w, 400, "Server is required")
 		return
 	}
 	if err := validateServerWGFields(F.Server); err != nil {
-		senderr(w, 400, err.Error())
+		sendError(w, 400, err.Error())
 		return
 	}
 	applyWGDefaults(F.Server)
 	F.Server.ID = uuid.New()
 	if err := validateServerMesh(F.Server); err != nil {
-		senderr(w, 400, err.Error())
+		sendError(w, 400, err.Error())
 		return
 	}
 
 	F.Server.Groups = make([]uuid.UUID, 0)
 	err = createServer(F.Server)
 	if err != nil {
-		senderr(w, 500, "Uknown error, please try again in a moment", slog.Any("err", err))
+		sendError(w, 500, "Uknown error, please try again in a moment", slog.Any("err", err))
 		return
 	}
 
@@ -282,27 +282,27 @@ func handleClientServerGet(w http.ResponseWriter, r *http.Request) {
 	F := new(getServerRequest)
 	err := decodeBody(r, F)
 	if err != nil {
-		senderr(w, 400, "Invalid request body", slog.Any("error", err))
+		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
 	server, err := findServerByID(F.ServerID)
 	if err != nil {
-		senderr(w, 500, "Unknown error, please try again in a moment", slog.Any("error", err))
+		sendError(w, 500, "Unknown error, please try again in a moment", slog.Any("error", err))
 		return
 	}
 	if server == nil {
-		senderr(w, 404, "Server not found")
+		sendError(w, 404, "Server not found")
 		return
 	}
 
 	user := getUserFromContext(r.Context())
 	if user == nil {
-		senderr(w, 401, "Unauthorized")
+		sendError(w, 401, "Unauthorized")
 		return
 	}
 
 	if !hasSharedOrNoGroup(user.Groups, server.Groups) {
-		senderr(w, 401, "unauthorized")
+		sendError(w, 401, "unauthorized")
 		return
 	}
 
