@@ -4,6 +4,7 @@ package client
 
 import (
 	"os/exec"
+	"strings"
 )
 
 func addDefaultIPv4Route(gateway string) (err error) {
