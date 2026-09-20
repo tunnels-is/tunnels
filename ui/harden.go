@@ -14,8 +14,10 @@ import (
 )
 
 // fyneDisableDPIEnv is Fyne's switch to skip glfw.GetVideoMode() while
-// resolving window scale. During a macOS display reconfigure that call
-// returns nil and Fyne panics on the main thread (see getMonitorScale).
+// resolving window scale. During a display reconfigure that call returns
+// nil; Fyne 2.8.0 and earlier panics in getMonitorScale (#6467). 2.8.1+
+// nil-checks it. Darwin still sets this so detectScale never walks the
+// monitor list mid-reconfigure. Linux keeps DPI detection for HiDPI X11.
 const fyneDisableDPIEnv = "FYNE_DISABLE_DPI_DETECTION"
 
 // fynePlatformEnv selects GLFW's backend. Fyne otherwise forces X11 on
