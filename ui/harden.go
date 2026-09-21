@@ -20,6 +20,11 @@ import (
 // monitor list mid-reconfigure. Linux keeps DPI detection for HiDPI X11.
 const fyneDisableDPIEnv = "FYNE_DISABLE_DPI_DETECTION"
 
+// fyneDisableLibdecorEnv is re-read by Fyne after glfw.Terminate/Init.
+// GLFW resets InitHints on Terminate; without this the KVM rebind would
+// bring back libdecor CSD on compositors that draw their own decorations.
+const fyneDisableLibdecorEnv = "FYNE_DISABLE_LIBDECOR"
+
 // fynePlatformEnv selects GLFW's backend. Fyne otherwise forces X11 on
 // compositors without server-side decorations (GNOME), and the compositor
 // then bilinear-scales that 1× XWayland buffer at 125%/150% — the blur
@@ -62,6 +67,7 @@ func preferCompositorDecorations() {
 	if !shouldDisableLibdecor() {
 		return
 	}
+	_ = os.Setenv(fyneDisableLibdecorEnv, "1")
 	glfw.InitHint(glfw.WaylandLibdecor, glfw.WaylandDisableLibdecor)
 }
 
