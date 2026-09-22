@@ -10,7 +10,7 @@ import (
 )
 
 func getUsers(limit, offset int64) ([]*User, error) {
-	UL := make([]*User, 0)
+	users := make([]*User, 0)
 	err := db.View(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(bucketUsers))
 		c := b.Cursor()
@@ -20,17 +20,17 @@ func getUsers(limit, offset int64) ([]*User, error) {
 				skipped++
 				continue
 			}
-			if int64(len(UL)) >= limit {
+			if int64(len(users)) >= limit {
 				break
 			}
-			U := new(User)
-			if err := bboltUnmarshal(v, U); err == nil {
-				UL = append(UL, U)
+			user := new(User)
+			if err := bboltUnmarshal(v, user); err == nil {
+				users = append(users, user)
 			}
 		}
 		return nil
 	})
-	return UL, err
+	return users, err
 }
 
 func getUsersLatest(topN, batchSize int) (users []*User, total, trial, active int64, err error) {
@@ -69,11 +69,11 @@ func getUsersLatest(topN, batchSize int) (users []*User, total, trial, active in
 		}
 		c := b.Cursor()
 		for k, v := c.First(); k != nil; k, v = c.Next() {
-			U := new(User)
-			if err := bboltUnmarshal(v, U); err != nil {
+			user := new(User)
+			if err := bboltUnmarshal(v, user); err != nil {
 				continue
 			}
-			batch = append(batch, U)
+			batch = append(batch, user)
 			if len(batch) >= batchSize {
 				flushBatch()
 			}
@@ -113,45 +113,45 @@ func insertUserByUpdatedDesc(list []*User, u *User, n int) []*User {
 	return list
 }
 
-func findUserByID(UID uuid.UUID) (*User, error) {
-	idStr := UID.String()
-	var U *User
+func findUserByID(id uuid.UUID) (*User, error) {
+	idStr := id.String()
+	var user *User
 	err := db.View(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(bucketUsers))
 		v := b.Get([]byte(idStr))
 		if v == nil {
 			return nil
 		}
-		U = new(User)
-		return bboltUnmarshal(v, U)
+		user = new(User)
+		return bboltUnmarshal(v, user)
 	})
-	return U, err
+	return user, err
 }
 
-func createUser(U *User) error {
+func createUser(user *User) error {
 	return db.Update(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(bucketUsers))
-		id := U.ID.String()
+		id := user.ID.String()
 
 		emailIdx := tx.Bucket([]byte(bucketUsersEmailIndex))
-		U.Email = normalizeEmail(U.Email)
-		if U.Email != "" && emailInUse(tx, U.Email, id) {
+		user.Email = normalizeEmail(user.Email)
+		if user.Email != "" && emailInUse(tx, user.Email, id) {
 			return errEmailRegistered
 		}
-		data, err := bboltMarshal(U)
+		data, err := bboltMarshal(user)
 		if err != nil {
 			return err
 		}
 		if err := b.Put([]byte(id), data); err != nil {
 			return err
 		}
-		if U.Email != "" {
-			if err := emailIdx.Put([]byte(U.Email), []byte(id)); err != nil {
+		if user.Email != "" {
+			if err := emailIdx.Put([]byte(user.Email), []byte(id)); err != nil {
 				return err
 			}
 		}
-		if U.APIKey != "" {
-			if err := tx.Bucket([]byte(bucketUsersAPIKeyIndex)).Put([]byte(U.APIKey), []byte(id)); err != nil {
+		if user.APIKey != "" {
+			if err := tx.Bucket([]byte(bucketUsersAPIKeyIndex)).Put([]byte(user.APIKey), []byte(id)); err != nil {
 				return err
 			}
 		}
@@ -175,9 +175,9 @@ func emailInUse(tx *gobolt.Tx, email, exceptID string) bool {
 	return v != nil && string(v) != exceptID
 }
 
-func findUserByEmail(Email string) (*User, error) {
+func findUserByEmail(email string) (*User, error) {
 	var found *User
-	n := normalizeEmail(Email)
+	n := normalizeEmail(email)
 	if n == "" {
 		return nil, nil
 	}
@@ -204,12 +204,12 @@ func updateUserDeviceTokens(update *userTokensUpdate) error {
 		if v == nil {
 			return errors.New("user not found")
 		}
-		U := new(User)
-		if err := bboltUnmarshal(v, U); err != nil {
+		user := new(User)
+		if err := bboltUnmarshal(v, user); err != nil {
 			return err
 		}
-		U.Tokens = update.Tokens
-		data, err := bboltMarshal(U)
+		user.Tokens = update.Tokens
+		data, err := bboltMarshal(user)
 		if err != nil {
 			return err
 		}
@@ -232,12 +232,12 @@ func updateUserSubTime(u *User) error {
 		if v == nil {
 			return errors.New("user not found")
 		}
-		U := new(User)
-		if err := bboltUnmarshal(v, U); err != nil {
+		user := new(User)
+		if err := bboltUnmarshal(v, user); err != nil {
 			return err
 		}
-		U.SubExpiration = u.SubExpiration
-		data, err := bboltMarshal(U)
+		user.SubExpiration = u.SubExpiration
+		data, err := bboltMarshal(user)
 		if err != nil {
 			return err
 		}
@@ -253,13 +253,13 @@ func updateUser(form *userUpdateRequest) error {
 		if v == nil {
 			return errors.New("user not found")
 		}
-		U := new(User)
-		if err := bboltUnmarshal(v, U); err != nil {
+		user := new(User)
+		if err := bboltUnmarshal(v, user); err != nil {
 			return err
 		}
-		oldAPIKey := U.APIKey
-		U.APIKey = form.APIKey
-		data, err := bboltMarshal(U)
+		oldAPIKey := user.APIKey
+		user.APIKey = form.APIKey
+		data, err := bboltMarshal(user)
 		if err != nil {
 			return err
 		}
@@ -289,33 +289,33 @@ func updateUserAdmin(form *adminUserUpdateRequest) error {
 		if v == nil {
 			return errors.New("user not found")
 		}
-		U := new(User)
-		if err := bboltUnmarshal(v, U); err != nil {
+		user := new(User)
+		if err := bboltUnmarshal(v, user); err != nil {
 			return err
 		}
 
-		oldEmail := U.Email
+		oldEmail := user.Email
 		emailChanged := false
 
 		if form.Email != "" {
 			newEmail := normalizeEmail(form.Email)
-			if newEmail != U.Email {
+			if newEmail != user.Email {
 				if emailInUse(tx, newEmail, id) {
 					return errors.New("email already in use by another account")
 				}
-				U.Email = newEmail
+				user.Email = newEmail
 				emailChanged = true
 			}
 		}
 
 		if !form.SubExpiration.IsZero() {
-			U.SubExpiration = form.SubExpiration
+			user.SubExpiration = form.SubExpiration
 		}
 
-		U.Disabled = form.Disabled
-		U.Trial = form.Trial
+		user.Disabled = form.Disabled
+		user.Trial = form.Trial
 
-		data, err := bboltMarshal(U)
+		data, err := bboltMarshal(user)
 		if err != nil {
 			return err
 		}
@@ -328,8 +328,8 @@ func updateUserAdmin(form *adminUserUpdateRequest) error {
 			if oldEmail != "" {
 				_ = emailIdx.Delete([]byte(oldEmail))
 			}
-			if U.Email != "" {
-				if err := emailIdx.Put([]byte(U.Email), []byte(id)); err != nil {
+			if user.Email != "" {
+				if err := emailIdx.Put([]byte(user.Email), []byte(id)); err != nil {
 					return err
 				}
 			}
@@ -347,12 +347,12 @@ func updateUserRecoveryCodes(uid uuid.UUID, codes []byte) error {
 		if v == nil {
 			return errors.New("user not found")
 		}
-		U := new(User)
-		if err := bboltUnmarshal(v, U); err != nil {
+		user := new(User)
+		if err := bboltUnmarshal(v, user); err != nil {
 			return err
 		}
-		U.RecoveryCodes = codes
-		data, err := bboltMarshal(U)
+		user.RecoveryCodes = codes
+		data, err := bboltMarshal(user)
 		if err != nil {
 			return err
 		}
@@ -360,25 +360,25 @@ func updateUserRecoveryCodes(uid uuid.UUID, codes []byte) error {
 	})
 }
 
-func updateUserTwoFactorCodes(TFP *twoFactorUpdate) error {
+func updateUserTwoFactorCodes(upd *twoFactorUpdate) error {
 	return db.Update(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(bucketUsers))
-		v := b.Get([]byte(TFP.UID.String()))
+		v := b.Get([]byte(upd.UID.String()))
 		if v == nil {
 			return errors.New("user not found")
 		}
-		U := new(User)
-		if err := bboltUnmarshal(v, U); err != nil {
+		user := new(User)
+		if err := bboltUnmarshal(v, user); err != nil {
 			return err
 		}
-		U.TwoFactorCode = TFP.Code
-		U.RecoveryCodes = TFP.Recovery
-		U.TwoFactorEnabled = true
-		data, err := bboltMarshal(U)
+		user.TwoFactorCode = upd.Code
+		user.RecoveryCodes = upd.Recovery
+		user.TwoFactorEnabled = true
+		data, err := bboltMarshal(user)
 		if err != nil {
 			return err
 		}
-		return b.Put([]byte(U.ID.String()), data)
+		return b.Put([]byte(user.ID.String()), data)
 	})
 }
 
@@ -389,17 +389,17 @@ func resetUserPassword(user *User) error {
 		if v == nil {
 			return errors.New("user not found")
 		}
-		U := new(User)
-		if err := bboltUnmarshal(v, U); err != nil {
+		stored := new(User)
+		if err := bboltUnmarshal(v, stored); err != nil {
 			return err
 		}
-		U.Password = user.Password
-		U.Tokens = []*DeviceToken{}
-		data, err := bboltMarshal(U)
+		stored.Password = user.Password
+		stored.Tokens = []*DeviceToken{}
+		data, err := bboltMarshal(stored)
 		if err != nil {
 			return err
 		}
-		return b.Put([]byte(U.ID.String()), data)
+		return b.Put([]byte(stored.ID.String()), data)
 	})
 }
 
@@ -409,13 +409,13 @@ func deleteUserByID(id uuid.UUID) error {
 		b := tx.Bucket([]byte(bucketUsers))
 		v := b.Get([]byte(idStr))
 		if v != nil {
-			U := new(User)
-			if err := bboltUnmarshal(v, U); err == nil {
-				if U.Email != "" {
-					_ = tx.Bucket([]byte(bucketUsersEmailIndex)).Delete([]byte(U.Email))
+			user := new(User)
+			if err := bboltUnmarshal(v, user); err == nil {
+				if user.Email != "" {
+					_ = tx.Bucket([]byte(bucketUsersEmailIndex)).Delete([]byte(user.Email))
 				}
-				if U.APIKey != "" {
-					_ = tx.Bucket([]byte(bucketUsersAPIKeyIndex)).Delete([]byte(U.APIKey))
+				if user.APIKey != "" {
+					_ = tx.Bucket([]byte(bucketUsersAPIKeyIndex)).Delete([]byte(user.APIKey))
 				}
 			}
 		}
@@ -427,7 +427,7 @@ func deleteUserByID(id uuid.UUID) error {
 	})
 }
 
-func activateUserKey(SubExpiration time.Time, Key *LicenseKey, userID uuid.UUID) error {
+func activateUserKey(subExpiration time.Time, key *LicenseKey, userID uuid.UUID) error {
 	idStr := userID.String()
 	return db.Update(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(bucketUsers))
@@ -435,19 +435,19 @@ func activateUserKey(SubExpiration time.Time, Key *LicenseKey, userID uuid.UUID)
 		if v == nil {
 			return errors.New("user not found")
 		}
-		U := new(User)
-		if err := bboltUnmarshal(v, U); err != nil {
+		user := new(User)
+		if err := bboltUnmarshal(v, user); err != nil {
 			return err
 		}
-		U.Disabled = false
-		U.Trial = false
-		U.SubExpiration = SubExpiration
-		U.Key = Key
-		data, err := bboltMarshal(U)
+		user.Disabled = false
+		user.Trial = false
+		user.SubExpiration = subExpiration
+		user.Key = key
+		data, err := bboltMarshal(user)
 		if err != nil {
 			return err
 		}
-		id := U.ID.String()
+		id := user.ID.String()
 		return b.Put([]byte(id), data)
 	})
 }

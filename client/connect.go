@@ -15,6 +15,20 @@ import (
 	wgtun "golang.zx2c4.com/wireguard/tun"
 )
 
+func requirePhysicalGateway() (state *State, gateway net.IP, err error) {
+	loadDefaultGateway()
+	loadDefaultInterface()
+	state = STATE.Load()
+	gwPtr := state.DefaultGateway.Load()
+	if gwPtr == nil {
+		return state, nil, errors.New("no default gateway, check your connection settings")
+	}
+	if isInterfaceATunnel(*gwPtr) {
+		return state, nil, errors.New("default gateway is a tunnel, please retry in a moment")
+	}
+	return state, *gwPtr, nil
+}
+
 func PreConnectCheck(meta *TunnelMeta) (int, error) {
 	s := STATE.Load()
 	if !s.adminState {
@@ -129,16 +143,9 @@ func PublicConnect(cr *ConnectionRequest) (code int, errm error) {
 		}
 	}
 
-	loadDefaultGateway()
-	loadDefaultInterface()
-	state := STATE.Load()
-	gateway := state.DefaultGateway.Load()
-	if gateway != nil {
-		if isInterfaceATunnel(*gateway) {
-			return 502, errors.New("default gateway is a tunnel, please retry in a moment")
-		}
-	} else {
-		return 502, errors.New("no default gateway, check your connection settings")
+	state, gateway, err := requirePhysicalGateway()
+	if err != nil {
+		return 502, err
 	}
 
 	if cr.Tag == "" {
@@ -169,15 +176,14 @@ func PublicConnect(cr *ConnectionRequest) (code int, errm error) {
 	tunnel.meta.Store(meta)
 	tunnel.CR = cr
 
-	var err error
-
-	ifName := state.DefaultInterfaceName.Load()
-	if ifName == nil {
+	ifNamePtr := state.DefaultInterfaceName.Load()
+	if ifNamePtr == nil {
 		return 502, errors.New("no default interface, please check try again")
 	}
+	ifName := *ifNamePtr
 
 	gw4 := gateway.To4().String()
-	err = pinControllerHostRoute(cr, tunnel, *ifName, gw4)
+	err = pinControllerHostRoute(cr, tunnel, ifName, gw4)
 	if err != nil {
 		return 502, err
 	}
@@ -231,7 +237,7 @@ func PublicConnect(cr *ConnectionRequest) (code int, errm error) {
 		return 502, err
 	}
 
-	if err = pinServerProtectRoutes(cr, tunnel, wgCfg, *ifName, gateway.To4()); err != nil {
+	if err = pinServerProtectRoutes(cr, tunnel, wgCfg, ifName, gateway.To4()); err != nil {
 		return 502, err
 	}
 	startProtectWatcher()

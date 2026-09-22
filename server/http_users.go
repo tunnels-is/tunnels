@@ -38,34 +38,34 @@ func handleAdminUserCreate(w http.ResponseWriter, r *http.Request) {
 	createUserFromRequest(w, r)
 }
 
-func validateRegisterForm(rf *registerRequest) (int, string) {
-	if rf.Password == "" {
+func validateRegisterForm(form *registerRequest) (int, string) {
+	if form.Password == "" {
 		return 400, "Missing Password"
 	}
 
-	if len(rf.Password) > 72 {
+	if len(form.Password) > 72 {
 		return 400, "Password is too long, maximum 72 characters"
 	}
 
-	if len(rf.Password) < 10 {
+	if len(form.Password) < 10 {
 		return 400, "Password is too short, minimum 10 characters"
 	}
 
-	rf.Email = normalizeEmail(rf.Email)
-	if rf.Email == "" {
+	form.Email = normalizeEmail(form.Email)
+	if form.Email == "" {
 		return 400, "Email/Username is required"
 	}
-	if len(rf.Email) > 320 {
+	if len(form.Email) > 320 {
 		return 400, "Email/Username is too long, maximum 320 characters"
 	}
-	if isReservedAccountEmail(rf.Email) {
+	if isReservedAccountEmail(form.Email) {
 		return 400, "Unable to complete registration"
 	}
 	return 0, ""
 }
 
-func newRegisteredUser(rf *registerRequest) (*User, error) {
-	hash, err := bcrypt.GenerateFromPassword([]byte(rf.Password), 13)
+func newRegisteredUser(form *registerRequest) (*User, error) {
+	hash, err := bcrypt.GenerateFromPassword([]byte(form.Password), 13)
 	if err != nil {
 		return nil, err
 	}
@@ -73,7 +73,7 @@ func newRegisteredUser(rf *registerRequest) (*User, error) {
 	newUser := new(User)
 	newUser.Password = string(hash)
 	newUser.ID = uuid.New()
-	newUser.Email = rf.Email
+	newUser.Email = form.Email
 	newUser.Updated = time.Now()
 	newUser.Trial = true
 	newUser.SubExpiration = time.Now().AddDate(0, 0, 1)

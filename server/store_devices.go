@@ -16,14 +16,14 @@ func deleteDeviceByID(id uuid.UUID) error {
 		b := tx.Bucket([]byte(bucketDevices))
 		v := b.Get([]byte(idStr))
 		if v != nil {
-			D := new(types.Device)
-			if err := bboltUnmarshal(v, D); err == nil {
-				uid := D.UserID.String()
+			device := new(types.Device)
+			if err := bboltUnmarshal(v, device); err == nil {
+				uid := device.UserID.String()
 				if uid != "00000000-0000-0000-0000-000000000000" {
 					_ = tx.Bucket([]byte(bucketDevicesUserIDIndex)).Delete([]byte(uid + "/" + idStr))
 				}
-				if D.WireGuardKey != "" {
-					_ = tx.Bucket([]byte(bucketDevicesWGKeyIndex)).Delete([]byte(D.WireGuardKey))
+				if device.WireGuardKey != "" {
+					_ = tx.Bucket([]byte(bucketDevicesWGKeyIndex)).Delete([]byte(device.WireGuardKey))
 				}
 			}
 		}
@@ -31,38 +31,38 @@ func deleteDeviceByID(id uuid.UUID) error {
 	})
 }
 
-func updateDevice(D *types.Device) error {
+func updateDevice(device *types.Device) error {
 	return db.Update(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(bucketDevices))
-		id := D.ID.String()
+		id := device.ID.String()
 		devUserIdx := tx.Bucket([]byte(bucketDevicesUserIDIndex))
 		wgIdx := tx.Bucket([]byte(bucketDevicesWGKeyIndex))
 
 		var oldWGKey string
 		if old := b.Get([]byte(id)); old != nil {
-			oldD := new(types.Device)
-			if err := bboltUnmarshal(old, oldD); err == nil {
-				if oldD.UserID != D.UserID {
-					oldUID := oldD.UserID.String()
+			oldDevice := new(types.Device)
+			if err := bboltUnmarshal(old, oldDevice); err == nil {
+				if oldDevice.UserID != device.UserID {
+					oldUID := oldDevice.UserID.String()
 					if oldUID != "00000000-0000-0000-0000-000000000000" {
 						_ = devUserIdx.Delete([]byte(oldUID + "/" + id))
 					}
 				}
-				oldWGKey = oldD.WireGuardKey
+				oldWGKey = oldDevice.WireGuardKey
 			}
 		}
 
-		if D.WireGuardKey != "" && D.WireGuardKey != oldWGKey {
-			if existing := wgIdx.Get([]byte(D.WireGuardKey)); existing != nil && string(existing) != id {
+		if device.WireGuardKey != "" && device.WireGuardKey != oldWGKey {
+			if existing := wgIdx.Get([]byte(device.WireGuardKey)); existing != nil && string(existing) != id {
 				return errors.New("WireGuard key already in use")
 			}
 		}
 
-		if err := deviceAddressConflicts(tx, D); err != nil {
+		if err := deviceAddressConflicts(tx, device); err != nil {
 			return err
 		}
 
-		data, err := bboltMarshal(D)
+		data, err := bboltMarshal(device)
 		if err != nil {
 			return err
 		}
@@ -70,18 +70,18 @@ func updateDevice(D *types.Device) error {
 			return err
 		}
 
-		uid := D.UserID.String()
+		uid := device.UserID.String()
 		if uid != "00000000-0000-0000-0000-000000000000" {
 			if err := devUserIdx.Put([]byte(uid+"/"+id), nil); err != nil {
 				return err
 			}
 		}
 
-		if oldWGKey != "" && oldWGKey != D.WireGuardKey {
+		if oldWGKey != "" && oldWGKey != device.WireGuardKey {
 			_ = wgIdx.Delete([]byte(oldWGKey))
 		}
-		if D.WireGuardKey != "" {
-			if err := wgIdx.Put([]byte(D.WireGuardKey), []byte(id)); err != nil {
+		if device.WireGuardKey != "" {
+			if err := wgIdx.Put([]byte(device.WireGuardKey), []byte(id)); err != nil {
 				return err
 			}
 		}
@@ -89,27 +89,27 @@ func updateDevice(D *types.Device) error {
 	})
 }
 
-func deviceAddressConflicts(tx *gobolt.Tx, D *types.Device) error {
-	if D == nil {
+func deviceAddressConflicts(tx *gobolt.Tx, device *types.Device) error {
+	if device == nil {
 		return nil
 	}
-	if D.ServerID != uuid.Nil && (D.WireGuardIP != "" || D.WireGuardIPv6 != "") {
-		sv := tx.Bucket([]byte(bucketServers)).Get([]byte(D.ServerID.String()))
+	if device.ServerID != uuid.Nil && (device.WireGuardIP != "" || device.WireGuardIPv6 != "") {
+		sv := tx.Bucket([]byte(bucketServers)).Get([]byte(device.ServerID.String()))
 		if sv != nil {
 			s := new(types.Server)
 			if err := bboltUnmarshal(sv, s); err == nil {
 				if s.WireGuardSubnet != "" || s.WireGuardSubnet6 != "" {
-					if err := types.ValidateDeviceWireGuardAddrs(s.WireGuardSubnet, s.WireGuardSubnet6, D.WireGuardIP, D.WireGuardIPv6); err != nil {
+					if err := types.ValidateDeviceWireGuardAddrs(s.WireGuardSubnet, s.WireGuardSubnet6, device.WireGuardIP, device.WireGuardIPv6); err != nil {
 						return fmt.Errorf("%w: %s", errDeviceIPReserved, err.Error())
 					}
 				}
 			}
 		}
 	}
-	if D.WireGuardIP == "" && D.WireGuardIPv6 == "" {
+	if device.WireGuardIP == "" && device.WireGuardIPv6 == "" {
 		return nil
 	}
-	id := D.ID.String()
+	id := device.ID.String()
 	b := tx.Bucket([]byte(bucketDevices))
 	c := b.Cursor()
 	for k, v := c.First(); k != nil; k, v = c.Next() {
@@ -120,13 +120,13 @@ func deviceAddressConflicts(tx *gobolt.Tx, D *types.Device) error {
 		if err := bboltUnmarshal(v, other); err != nil {
 			continue
 		}
-		if other.ServerID != D.ServerID {
+		if other.ServerID != device.ServerID {
 			continue
 		}
-		if D.WireGuardIP != "" && other.WireGuardIP == D.WireGuardIP {
+		if device.WireGuardIP != "" && other.WireGuardIP == device.WireGuardIP {
 			return errDeviceIPInUse
 		}
-		if D.WireGuardIPv6 != "" && other.WireGuardIPv6 == D.WireGuardIPv6 {
+		if device.WireGuardIPv6 != "" && other.WireGuardIPv6 == device.WireGuardIPv6 {
 			return errDeviceIPv6InUse
 		}
 	}
@@ -134,7 +134,7 @@ func deviceAddressConflicts(tx *gobolt.Tx, D *types.Device) error {
 }
 
 func getDevices(limit, offset int64) ([]*types.Device, error) {
-	DL := make([]*types.Device, 0)
+	devices := make([]*types.Device, 0)
 	err := db.View(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(bucketDevices))
 		c := b.Cursor()
@@ -144,89 +144,89 @@ func getDevices(limit, offset int64) ([]*types.Device, error) {
 				skipped++
 				continue
 			}
-			if int64(len(DL)) >= limit {
+			if int64(len(devices)) >= limit {
 				break
 			}
-			D := new(types.Device)
-			if err := bboltUnmarshal(v, D); err == nil {
-				DL = append(DL, D)
+			device := new(types.Device)
+			if err := bboltUnmarshal(v, device); err == nil {
+				devices = append(devices, device)
 			}
 		}
 		return nil
 	})
-	return DL, err
+	return devices, err
 }
 
 func getAllDevices() ([]*types.Device, error) {
-	DL := make([]*types.Device, 0)
+	devices := make([]*types.Device, 0)
 	err := db.View(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(bucketDevices))
 		c := b.Cursor()
 		for k, v := c.First(); k != nil; k, v = c.Next() {
-			D := new(types.Device)
-			if err := bboltUnmarshal(v, D); err == nil {
-				DL = append(DL, D)
+			device := new(types.Device)
+			if err := bboltUnmarshal(v, device); err == nil {
+				devices = append(devices, device)
 			}
 		}
 		return nil
 	})
-	return DL, err
+	return devices, err
 }
 
 func getDevicesByUserID(userID uuid.UUID) ([]*types.Device, error) {
-	DL := make([]*types.Device, 0)
+	devices := make([]*types.Device, 0)
 	err := db.View(func(tx *gobolt.Tx) error {
-		devices := tx.Bucket([]byte(bucketDevices))
+		b := tx.Bucket([]byte(bucketDevices))
 		idx := tx.Bucket([]byte(bucketDevicesUserIDIndex))
 		prefix := []byte(userID.String() + "/")
 		c := idx.Cursor()
 		for k, _ := c.Seek(prefix); k != nil && bytes.HasPrefix(k, prefix); k, _ = c.Next() {
 			devID := k[len(prefix):]
-			v := devices.Get(devID)
+			v := b.Get(devID)
 			if v == nil {
 				continue
 			}
-			D := new(types.Device)
-			if err := bboltUnmarshal(v, D); err == nil {
-				DL = append(DL, D)
+			device := new(types.Device)
+			if err := bboltUnmarshal(v, device); err == nil {
+				devices = append(devices, device)
 			}
 		}
 		return nil
 	})
-	return DL, err
+	return devices, err
 }
 
-func createDevice(D *types.Device) error {
+func createDevice(device *types.Device) error {
 	return db.Update(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(bucketDevices))
-		id := D.ID.String()
+		id := device.ID.String()
 
-		if D.WireGuardKey != "" {
+		if device.WireGuardKey != "" {
 			wgIdx := tx.Bucket([]byte(bucketDevicesWGKeyIndex))
-			if existing := wgIdx.Get([]byte(D.WireGuardKey)); existing != nil && string(existing) != id {
+			if existing := wgIdx.Get([]byte(device.WireGuardKey)); existing != nil && string(existing) != id {
 				return errors.New("WireGuard key already in use")
 			}
 		}
 
-		if err := deviceAddressConflicts(tx, D); err != nil {
+		if err := deviceAddressConflicts(tx, device); err != nil {
 			return err
 		}
 
-		data, err := bboltMarshal(D)
+		data, err := bboltMarshal(device)
 		if err != nil {
 			return err
 		}
 		if err := b.Put([]byte(id), data); err != nil {
 			return err
 		}
-		uid := D.UserID.String()
+		uid := device.UserID.String()
 		if uid != "00000000-0000-0000-0000-000000000000" {
 			if err := tx.Bucket([]byte(bucketDevicesUserIDIndex)).Put([]byte(uid+"/"+id), nil); err != nil {
 				return err
 			}
 		}
-		if D.WireGuardKey != "" {
-			if err := tx.Bucket([]byte(bucketDevicesWGKeyIndex)).Put([]byte(D.WireGuardKey), []byte(id)); err != nil {
+		if device.WireGuardKey != "" {
+			if err := tx.Bucket([]byte(bucketDevicesWGKeyIndex)).Put([]byte(device.WireGuardKey), []byte(id)); err != nil {
 				return err
 			}
 		}
@@ -279,15 +279,15 @@ func deleteDevicesTx(tx *gobolt.Tx, pred func(devID string, d *types.Device) boo
 	var matches []match
 	c := devB.Cursor()
 	for k, v := c.First(); k != nil; k, v = c.Next() {
-		D := new(types.Device)
-		if err := bboltUnmarshal(v, D); err != nil {
+		device := new(types.Device)
+		if err := bboltUnmarshal(v, device); err != nil {
 			continue
 		}
 		devID := string(k)
-		if !pred(devID, D) {
+		if !pred(devID, device) {
 			continue
 		}
-		matches = append(matches, match{devID: devID, wgKey: D.WireGuardKey, userID: D.UserID.String()})
+		matches = append(matches, match{devID: devID, wgKey: device.WireGuardKey, userID: device.UserID.String()})
 	}
 	for _, m := range matches {
 		if m.wgKey != "" {

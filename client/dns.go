@@ -235,7 +235,6 @@ func DNSQuery(w dns.ResponseWriter, m *dns.Msg) {
 	if ServerDNS != nil {
 		serveLocalDNSRecord(w, m, ServerDNS, DNSTunnel, tag, conf)
 		return
-
 	}
 
 	if strings.HasSuffix(m.Question[0].Name, ".lan.") {

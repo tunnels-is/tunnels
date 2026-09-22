@@ -10,33 +10,33 @@ import (
 )
 
 func findServersWithoutGroups(limit, offset int64) ([]*types.Server, error) {
-	DL := make([]*types.Server, 0)
+	servers := make([]*types.Server, 0)
 	err := db.View(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(bucketServers))
 		c := b.Cursor()
 		var skipped int64
 		for k, v := c.First(); k != nil; k, v = c.Next() {
-			S := new(types.Server)
-			if err := bboltUnmarshal(v, S); err == nil {
-				if len(S.Groups) == 0 {
+			server := new(types.Server)
+			if err := bboltUnmarshal(v, server); err == nil {
+				if len(server.Groups) == 0 {
 					if skipped < offset {
 						skipped++
 						continue
 					}
-					if int64(len(DL)) >= limit {
+					if int64(len(servers)) >= limit {
 						break
 					}
-					DL = append(DL, S)
+					servers = append(servers, server)
 				}
 			}
 		}
 		return nil
 	})
-	return DL, err
+	return servers, err
 }
 
 func findServersByGroups(groups []uuid.UUID, limit, offset int64) ([]*types.Server, error) {
-	DL := make([]*types.Server, 0)
+	servers := make([]*types.Server, 0)
 	groupSet := make(map[uuid.UUID]struct{})
 	for _, g := range groups {
 		groupSet[g] = struct{}{}
@@ -46,18 +46,18 @@ func findServersByGroups(groups []uuid.UUID, limit, offset int64) ([]*types.Serv
 		c := b.Cursor()
 		var skipped int64
 		for k, v := c.First(); k != nil; k, v = c.Next() {
-			S := new(types.Server)
-			if err := bboltUnmarshal(v, S); err == nil {
-				for _, gid := range S.Groups {
+			server := new(types.Server)
+			if err := bboltUnmarshal(v, server); err == nil {
+				for _, gid := range server.Groups {
 					if _, ok := groupSet[gid]; ok {
 						if skipped < offset {
 							skipped++
 							continue
 						}
-						if int64(len(DL)) >= limit {
+						if int64(len(servers)) >= limit {
 							break
 						}
-						DL = append(DL, S)
+						servers = append(servers, server)
 						break
 					}
 				}
@@ -65,69 +65,69 @@ func findServersByGroups(groups []uuid.UUID, limit, offset int64) ([]*types.Serv
 		}
 		return nil
 	})
-	return DL, err
+	return servers, err
 }
 
-func updateServer(S *types.Server) (*types.Server, error) {
-	var RS *types.Server
+func updateServer(server *types.Server) (*types.Server, error) {
+	var result *types.Server
 	err := db.Update(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(bucketServers))
 		apikeyIdx := tx.Bucket([]byte(bucketServersAPIKeyIndex))
-		id := S.ID.String()
+		id := server.ID.String()
 		v := b.Get([]byte(id))
 		if v == nil {
 			return errors.New("server not found")
 		}
-		SS := new(types.Server)
-		if err := bboltUnmarshal(v, SS); err != nil {
+		existing := new(types.Server)
+		if err := bboltUnmarshal(v, existing); err != nil {
 			return err
 		}
-		oldAPIKey := SS.APIKey
-		SS.Tag = S.Tag
-		SS.InfraTag = S.InfraTag
-		SS.Country = S.Country
-		SS.IP = S.IP
-		SS.Port = S.Port
-		SS.APIKey = S.APIKey
-		SS.WireGuardPort = S.WireGuardPort
-		if oldAPIKey != S.APIKey {
-			SS.WireGuardPubKey = ""
+		oldAPIKey := existing.APIKey
+		existing.Tag = server.Tag
+		existing.InfraTag = server.InfraTag
+		existing.Country = server.Country
+		existing.IP = server.IP
+		existing.Port = server.Port
+		existing.APIKey = server.APIKey
+		existing.WireGuardPort = server.WireGuardPort
+		if oldAPIKey != server.APIKey {
+			existing.WireGuardPubKey = ""
 		}
-		SS.WireGuardIface = S.WireGuardIface
-		SS.WireGuardSubnet = S.WireGuardSubnet
-		SS.WireGuardSubnet6 = S.WireGuardSubnet6
-		SS.InternetIface = S.InternetIface
-		SS.InsecureSkipVerify = S.InsecureSkipVerify
-		SS.EnableFirewall = S.EnableFirewall
-		SS.WANID = S.WANID
-		SS.MeshGroupID = S.MeshGroupID
-		SS.WireGuardMeshPort = S.WireGuardMeshPort
+		existing.WireGuardIface = server.WireGuardIface
+		existing.WireGuardSubnet = server.WireGuardSubnet
+		existing.WireGuardSubnet6 = server.WireGuardSubnet6
+		existing.InternetIface = server.InternetIface
+		existing.InsecureSkipVerify = server.InsecureSkipVerify
+		existing.EnableFirewall = server.EnableFirewall
+		existing.WANID = server.WANID
+		existing.MeshGroupID = server.MeshGroupID
+		existing.WireGuardMeshPort = server.WireGuardMeshPort
 
-		if S.APIKey != "" && S.APIKey != oldAPIKey {
-			if existing := apikeyIdx.Get([]byte(S.APIKey)); existing != nil && string(existing) != id {
+		if server.APIKey != "" && server.APIKey != oldAPIKey {
+			if existing := apikeyIdx.Get([]byte(server.APIKey)); existing != nil && string(existing) != id {
 				return errors.New("APIKey already in use")
 			}
 		}
 
-		data, err := bboltMarshal(SS)
+		data, err := bboltMarshal(existing)
 		if err != nil {
 			return err
 		}
 		if err := b.Put([]byte(id), data); err != nil {
 			return err
 		}
-		if oldAPIKey != "" && oldAPIKey != S.APIKey {
+		if oldAPIKey != "" && oldAPIKey != server.APIKey {
 			_ = apikeyIdx.Delete([]byte(oldAPIKey))
 		}
-		if S.APIKey != "" {
-			if err := apikeyIdx.Put([]byte(S.APIKey), []byte(id)); err != nil {
+		if server.APIKey != "" {
+			if err := apikeyIdx.Put([]byte(server.APIKey), []byte(id)); err != nil {
 				return err
 			}
 		}
-		RS = SS
+		result = existing
 		return nil
 	})
-	return RS, err
+	return result, err
 }
 
 func setServerWireGuardPubKey(id uuid.UUID, pubKey string) error {
@@ -138,12 +138,12 @@ func setServerWireGuardPubKey(id uuid.UUID, pubKey string) error {
 		if v == nil {
 			return errors.New("server not found")
 		}
-		SS := new(types.Server)
-		if err := bboltUnmarshal(v, SS); err != nil {
+		existing := new(types.Server)
+		if err := bboltUnmarshal(v, existing); err != nil {
 			return err
 		}
-		SS.WireGuardPubKey = pubKey
-		data, err := bboltMarshal(SS)
+		existing.WireGuardPubKey = pubKey
+		data, err := bboltMarshal(existing)
 		if err != nil {
 			return err
 		}
@@ -151,27 +151,27 @@ func setServerWireGuardPubKey(id uuid.UUID, pubKey string) error {
 	})
 }
 
-func createServer(S *types.Server) error {
+func createServer(server *types.Server) error {
 	return db.Update(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(bucketServers))
 
-		S.WAN = nil
-		id := S.ID.String()
-		if S.APIKey != "" {
+		server.WAN = nil
+		id := server.ID.String()
+		if server.APIKey != "" {
 			apikeyIdx := tx.Bucket([]byte(bucketServersAPIKeyIndex))
-			if existing := apikeyIdx.Get([]byte(S.APIKey)); existing != nil && string(existing) != id {
+			if existing := apikeyIdx.Get([]byte(server.APIKey)); existing != nil && string(existing) != id {
 				return errors.New("APIKey already in use")
 			}
 		}
-		data, err := bboltMarshal(S)
+		data, err := bboltMarshal(server)
 		if err != nil {
 			return err
 		}
 		if err := b.Put([]byte(id), data); err != nil {
 			return err
 		}
-		if S.APIKey != "" {
-			if err := tx.Bucket([]byte(bucketServersAPIKeyIndex)).Put([]byte(S.APIKey), []byte(id)); err != nil {
+		if server.APIKey != "" {
+			if err := tx.Bucket([]byte(bucketServersAPIKeyIndex)).Put([]byte(server.APIKey), []byte(id)); err != nil {
 				return err
 			}
 		}
@@ -190,14 +190,14 @@ func findServerByAPIKey(apiKey string) (*types.Server, error) {
 		if v == nil {
 			return nil
 		}
-		S := new(types.Server)
-		if err := bboltUnmarshal(v, S); err != nil {
+		server := new(types.Server)
+		if err := bboltUnmarshal(v, server); err != nil {
 			return nil
 		}
-		if subtle.ConstantTimeCompare([]byte(S.APIKey), []byte(apiKey)) != 1 {
+		if subtle.ConstantTimeCompare([]byte(server.APIKey), []byte(apiKey)) != 1 {
 			return nil
 		}
-		found = S
+		found = server
 		return nil
 	})
 	return found, err
@@ -217,30 +217,30 @@ func findAllServers(limit, offset int64) ([]*types.Server, error) {
 			if int64(len(out)) >= limit {
 				break
 			}
-			S := new(types.Server)
-			if err := bboltUnmarshal(v, S); err != nil {
+			server := new(types.Server)
+			if err := bboltUnmarshal(v, server); err != nil {
 				return err
 			}
-			out = append(out, S)
+			out = append(out, server)
 		}
 		return nil
 	})
 	return out, err
 }
 
-func findServerByID(ID uuid.UUID) (*types.Server, error) {
-	idStr := ID.String()
-	var S *types.Server
+func findServerByID(id uuid.UUID) (*types.Server, error) {
+	idStr := id.String()
+	var server *types.Server
 	err := db.View(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(bucketServers))
 		v := b.Get([]byte(idStr))
 		if v == nil {
 			return nil
 		}
-		S = new(types.Server)
-		return bboltUnmarshal(v, S)
+		server = new(types.Server)
+		return bboltUnmarshal(v, server)
 	})
-	return S, err
+	return server, err
 }
 
 func deleteServerByID(id uuid.UUID) error {
@@ -249,10 +249,10 @@ func deleteServerByID(id uuid.UUID) error {
 		b := tx.Bucket([]byte(bucketServers))
 		v := b.Get([]byte(idStr))
 		if v != nil {
-			S := new(types.Server)
-			if err := bboltUnmarshal(v, S); err == nil {
-				if S.APIKey != "" {
-					_ = tx.Bucket([]byte(bucketServersAPIKeyIndex)).Delete([]byte(S.APIKey))
+			server := new(types.Server)
+			if err := bboltUnmarshal(v, server); err == nil {
+				if server.APIKey != "" {
+					_ = tx.Bucket([]byte(bucketServersAPIKeyIndex)).Delete([]byte(server.APIKey))
 				}
 			}
 		}
