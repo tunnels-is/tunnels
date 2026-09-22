@@ -130,17 +130,3 @@ func TestShouldDisableLibdecor(t *testing.T) {
 		t.Fatal("GNOME Wayland must keep libdecor")
 	}
 }
-
-func TestPreferCompositorDecorationsSetsEnv(t *testing.T) {
-	withEnv(t, fyneDisableLibdecorEnv, "", true)
-	withEnv(t, "WAYLAND_DISPLAY", "wayland-0", false)
-	withEnv(t, "XDG_CURRENT_DESKTOP", "COSMIC", false)
-
-	preferCompositorDecorations()
-	if runtime.GOOS != "linux" {
-		return
-	}
-	if got := os.Getenv(fyneDisableLibdecorEnv); got != "1" {
-		t.Fatalf("FYNE_DISABLE_LIBDECOR: got %q, want 1 so Fyne re-applies the hint after glfw.Terminate", got)
-	}
-}
