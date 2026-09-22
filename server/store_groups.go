@@ -72,21 +72,21 @@ func findEntitiesByGroupID(id uuid.UUID, objType string, limit, offset int64) ([
 	return IL, err
 }
 
-func updateGroup(G *Group) error {
+func updateGroup(group *Group) error {
 	return db.Update(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(bucketGroups))
-		id := G.ID.String()
+		id := group.ID.String()
 		v := b.Get([]byte(id))
 		if v == nil {
 			return errors.New("group not found")
 		}
-		GG := new(Group)
-		if err := bboltUnmarshal(v, GG); err != nil {
+		stored := new(Group)
+		if err := bboltUnmarshal(v, stored); err != nil {
 			return err
 		}
-		GG.Tag = G.Tag
-		GG.Description = G.Description
-		data, err := bboltMarshal(GG)
+		stored.Tag = group.Tag
+		stored.Description = group.Description
+		data, err := bboltMarshal(stored)
 		if err != nil {
 			return err
 		}
@@ -94,11 +94,11 @@ func updateGroup(G *Group) error {
 	})
 }
 
-func createGroup(G *Group) error {
+func createGroup(group *Group) error {
 	return db.Update(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(bucketGroups))
-		id := G.ID.String()
-		data, err := bboltMarshal(G)
+		id := group.ID.String()
+		data, err := bboltMarshal(group)
 		if err != nil {
 			return err
 		}
@@ -108,17 +108,17 @@ func createGroup(G *Group) error {
 
 func findGroupByID(id uuid.UUID) (*Group, error) {
 	idStr := id.String()
-	var G *Group
+	var group *Group
 	err := db.View(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(bucketGroups))
 		v := b.Get([]byte(idStr))
 		if v == nil {
 			return nil
 		}
-		G = new(Group)
-		return bboltUnmarshal(v, G)
+		group = new(Group)
+		return bboltUnmarshal(v, group)
 	})
-	return G, err
+	return group, err
 }
 
 func deleteGroupByID(id uuid.UUID) error {
@@ -158,32 +158,32 @@ func deleteGroupByID(id uuid.UUID) error {
 
 		if err := scrub(bucketUsers,
 			func(v []byte) ([]string, any, error) {
-				U := new(User)
-				if err := bboltUnmarshal(v, U); err != nil {
+				user := new(User)
+				if err := bboltUnmarshal(v, user); err != nil {
 					return nil, nil, err
 				}
-				return uuidSliceToString(U.Groups), U, nil
+				return uuidSliceToString(user.Groups), user, nil
 			},
 			func(obj any, g []string) ([]byte, error) {
-				U := obj.(*User)
-				U.Groups = stringSliceToUUID(g)
-				return bboltMarshal(U)
+				user := obj.(*User)
+				user.Groups = stringSliceToUUID(g)
+				return bboltMarshal(user)
 			}); err != nil {
 			return err
 		}
 
 		if err := scrub(bucketServers,
 			func(v []byte) ([]string, any, error) {
-				S := new(types.Server)
-				if err := bboltUnmarshal(v, S); err != nil {
+				server := new(types.Server)
+				if err := bboltUnmarshal(v, server); err != nil {
 					return nil, nil, err
 				}
-				return uuidSliceToString(S.Groups), S, nil
+				return uuidSliceToString(server.Groups), server, nil
 			},
 			func(obj any, g []string) ([]byte, error) {
-				S := obj.(*types.Server)
-				S.Groups = stringSliceToUUID(g)
-				return bboltMarshal(S)
+				server := obj.(*types.Server)
+				server.Groups = stringSliceToUUID(g)
+				return bboltMarshal(server)
 			}); err != nil {
 			return err
 		}
@@ -213,23 +213,23 @@ func addToGroup(groupID, typeID uuid.UUID, objType string) error {
 		var err error
 		switch objType {
 		case "user":
-			U := new(User)
-			_ = bboltUnmarshal(v, U)
-			groups := uuidSliceToString(U.Groups)
+			user := new(User)
+			_ = bboltUnmarshal(v, user)
+			groups := uuidSliceToString(user.Groups)
 			if !contains(groups, groupIDStr) {
 				groups = append(groups, groupIDStr)
-				U.Groups = stringSliceToUUID(groups)
+				user.Groups = stringSliceToUUID(groups)
 			}
-			v, err = bboltMarshal(U)
+			v, err = bboltMarshal(user)
 		case "server":
-			S := new(types.Server)
-			_ = bboltUnmarshal(v, S)
-			groups := uuidSliceToString(S.Groups)
+			server := new(types.Server)
+			_ = bboltUnmarshal(v, server)
+			groups := uuidSliceToString(server.Groups)
 			if !contains(groups, groupIDStr) {
 				groups = append(groups, groupIDStr)
-				S.Groups = stringSliceToUUID(groups)
+				server.Groups = stringSliceToUUID(groups)
 			}
-			v, err = bboltMarshal(S)
+			v, err = bboltMarshal(server)
 		}
 		if err != nil {
 			return err
@@ -259,19 +259,19 @@ func removeFromGroup(groupID, typeID uuid.UUID, objType string) error {
 		var err error
 		switch objType {
 		case "user":
-			U := new(User)
-			_ = bboltUnmarshal(v, U)
-			groups := uuidSliceToString(U.Groups)
+			user := new(User)
+			_ = bboltUnmarshal(v, user)
+			groups := uuidSliceToString(user.Groups)
 			groups = removeString(groups, groupIDStr)
-			U.Groups = stringSliceToUUID(groups)
-			v, err = bboltMarshal(U)
+			user.Groups = stringSliceToUUID(groups)
+			v, err = bboltMarshal(user)
 		case "server":
-			S := new(types.Server)
-			_ = bboltUnmarshal(v, S)
-			groups := uuidSliceToString(S.Groups)
+			server := new(types.Server)
+			_ = bboltUnmarshal(v, server)
+			groups := uuidSliceToString(server.Groups)
 			groups = removeString(groups, groupIDStr)
-			S.Groups = stringSliceToUUID(groups)
-			v, err = bboltMarshal(S)
+			server.Groups = stringSliceToUUID(groups)
+			v, err = bboltMarshal(server)
 		}
 		if err != nil {
 			return err
@@ -294,9 +294,9 @@ func listGroups(limit, offset int64) ([]*Group, error) {
 			if int64(len(gl)) >= limit {
 				break
 			}
-			D := new(Group)
-			if err := bboltUnmarshal(v, D); err == nil {
-				gl = append(gl, D)
+			group := new(Group)
+			if err := bboltUnmarshal(v, group); err == nil {
+				gl = append(gl, group)
 			}
 		}
 		return nil

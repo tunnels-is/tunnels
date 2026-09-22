@@ -24,13 +24,10 @@ func CloneConfig() *Config {
 }
 
 // CreateTunnel allocates a new random tunnel and persists it.
-// CreateTunnel allocates a new random tunnel and persists it.
 func CreateTunnel() (*TunnelMeta, error) {
 	return createRandomTunnel()
 }
 
-// SaveTunnel validates and writes tunnel metadata. oldTag is the previous
-// identifier when renaming.
 // SaveTunnel validates and writes tunnel metadata. oldTag is the previous
 // identifier when renaming.
 func SaveTunnel(meta *TunnelMeta, oldTag string) error {
@@ -75,7 +72,6 @@ func SaveTunnel(meta *TunnelMeta, oldTag string) error {
 }
 
 // DeleteTunnel removes a tunnel from disk and memory.
-// DeleteTunnel removes a tunnel from disk and memory.
 func DeleteTunnel(tag string) error {
 	if !safeTunnelTag(tag) {
 		return errors.New("invalid tunnel tag")
@@ -92,8 +88,6 @@ func DeleteTunnel(tag string) error {
 	return nil
 }
 
-// SetTunnelPeers replaces the allow-list for a tunnel and announces it if
-// the tunnel is currently connected.
 // SetTunnelPeers replaces the allow-list for a tunnel and announces it if
 // the tunnel is currently connected.
 func SetTunnelPeers(tag string, allowedHosts []string, allowAll bool) ([]string, error) {
@@ -140,7 +134,6 @@ func SetTunnelPeers(tag string, allowedHosts []string, allowAll bool) ([]string,
 }
 
 // DisconnectTunnel stops reconnects and tears down the tunnel.
-// DisconnectTunnel stops reconnects and tears down the tunnel.
 func DisconnectTunnel(id, tag string) error {
 	if tag == "" {
 		tunnelMapRange(func(t *TUN) bool {
@@ -160,5 +153,3 @@ func DisconnectTunnel(id, tag string) error {
 	}
 	return Disconnect(id, false)
 }
-
-// UpdateBlockLists re-downloads every configured DNS block list.

@@ -41,13 +41,13 @@ func updateMeshGroup(mg *types.MeshGroup) error {
 		if v == nil {
 			return errors.New("mesh group not found")
 		}
-		MG := new(types.MeshGroup)
-		if err := bboltUnmarshal(v, MG); err != nil {
+		meshGroup := new(types.MeshGroup)
+		if err := bboltUnmarshal(v, meshGroup); err != nil {
 			return err
 		}
-		MG.Tag = mg.Tag
-		MG.Description = mg.Description
-		data, err := bboltMarshal(MG)
+		meshGroup.Tag = mg.Tag
+		meshGroup.Description = mg.Description
+		data, err := bboltMarshal(meshGroup)
 		if err != nil {
 			return err
 		}

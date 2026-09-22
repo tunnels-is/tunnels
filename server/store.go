@@ -88,17 +88,17 @@ func backfillUserIndexes(tx *gobolt.Tx) error {
 	apikeyIdx := tx.Bucket([]byte(bucketUsersAPIKeyIndex))
 	uc := users.Cursor()
 	for k, v := uc.First(); k != nil; k, v = uc.Next() {
-		U := new(User)
-		if err := bboltUnmarshal(v, U); err != nil {
+		user := new(User)
+		if err := bboltUnmarshal(v, user); err != nil {
 			continue
 		}
-		if U.Email != "" {
-			if err := emailIdx.Put([]byte(U.Email), k); err != nil {
+		if user.Email != "" {
+			if err := emailIdx.Put([]byte(user.Email), k); err != nil {
 				return err
 			}
 		}
-		if U.APIKey != "" {
-			if err := apikeyIdx.Put([]byte(U.APIKey), k); err != nil {
+		if user.APIKey != "" {
+			if err := apikeyIdx.Put([]byte(user.APIKey), k); err != nil {
 				return err
 			}
 		}
@@ -111,11 +111,11 @@ func backfillDeviceIndexes(tx *gobolt.Tx) error {
 	devUserIdx := tx.Bucket([]byte(bucketDevicesUserIDIndex))
 	dc := devices.Cursor()
 	for k, v := dc.First(); k != nil; k, v = dc.Next() {
-		D := new(types.Device)
-		if err := bboltUnmarshal(v, D); err != nil {
+		device := new(types.Device)
+		if err := bboltUnmarshal(v, device); err != nil {
 			continue
 		}
-		uid := D.UserID.String()
+		uid := device.UserID.String()
 		if uid != "00000000-0000-0000-0000-000000000000" {
 			compositeKey := []byte(uid + "/" + string(k))
 			if err := devUserIdx.Put(compositeKey, nil); err != nil {
@@ -131,12 +131,12 @@ func backfillServerIndexes(tx *gobolt.Tx) error {
 	srvApikeyIdx := tx.Bucket([]byte(bucketServersAPIKeyIndex))
 	sc := servers.Cursor()
 	for k, v := sc.First(); k != nil; k, v = sc.Next() {
-		S := new(types.Server)
-		if err := bboltUnmarshal(v, S); err != nil {
+		server := new(types.Server)
+		if err := bboltUnmarshal(v, server); err != nil {
 			continue
 		}
-		if S.APIKey != "" {
-			if err := srvApikeyIdx.Put([]byte(S.APIKey), k); err != nil {
+		if server.APIKey != "" {
+			if err := srvApikeyIdx.Put([]byte(server.APIKey), k); err != nil {
 				return err
 			}
 		}
