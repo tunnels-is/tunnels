@@ -74,13 +74,14 @@ func handleUserDeviceToken(user *User, form *loginRequest) (userTokenUpdate *use
 	}
 
 	if !tokenExists {
-		T := new(DeviceToken)
-		T.N = form.DeviceName
-		T.DT = uuid.NewString()
-		T.Created = time.Now()
+		token := &DeviceToken{
+			N:       form.DeviceName,
+			DT:      uuid.NewString(),
+			Created: time.Now(),
+		}
 
-		user.DeviceToken = T
-		user.Tokens = append(user.Tokens, T)
+		user.DeviceToken = token
+		user.Tokens = append(user.Tokens, token)
 	}
 
 	if len(user.Tokens) > 20 {

@@ -9,26 +9,22 @@ import (
 	"github.com/xlzd/gotp"
 )
 
-func GetQRCode(LF *TwoFactorConfirm) (QR *QRCode, err error) {
-	if LF.Email == "" {
+func GetQRCode(form *TwoFactorConfirm) (*QRCode, error) {
+	if form.Email == "" {
 		return nil, errors.New("email missing")
 	}
 
-	b := make([]rune, 16)
-	for i := range b {
-		n, cerr := rand.Int(rand.Reader, big.NewInt(int64(len(totpAlphabet))))
-		if cerr != nil {
-			return nil, cerr
+	secret := make([]rune, 16)
+	for i := range secret {
+		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(totpAlphabet))))
+		if err != nil {
+			return nil, err
 		}
-		b[i] = totpAlphabet[n.Int64()]
+		secret[i] = totpAlphabet[n.Int64()]
 	}
 
-	TOTP := strings.ToUpper(string(b))
-
-	authenticatorAppURL := gotp.NewDefaultTOTP(TOTP).ProvisioningUri(LF.Email, "Tunnels")
-
-	QR = new(QRCode)
-	QR.Value = authenticatorAppURL
-
-	return QR, nil
+	totpSecret := strings.ToUpper(string(secret))
+	return &QRCode{
+		Value: gotp.NewDefaultTOTP(totpSecret).ProvisioningUri(form.Email, "Tunnels"),
+	}, nil
 }

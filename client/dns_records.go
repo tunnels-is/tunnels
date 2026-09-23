@@ -6,14 +6,14 @@ import (
 	"github.com/tunnels-is/tunnels/types"
 )
 
-func GetDomainAndSubDomain(domain string) (d, s string) {
-	parts := strings.Split(domain, ".")
+func GetDomainAndSubDomain(name string) (domain, subdomain string) {
+	parts := strings.Split(name, ".")
 
 	if len(parts) == 2 {
-		d = strings.Join(parts[len(parts)-2:], ".")
+		domain = strings.Join(parts[len(parts)-2:], ".")
 	} else if len(parts) > 2 {
-		d = strings.Join(parts[len(parts)-3:], ".")
-		s = strings.Join(parts[:len(parts)-3], ".")
+		domain = strings.Join(parts[len(parts)-3:], ".")
+		subdomain = strings.Join(parts[:len(parts)-3], ".")
 	} else {
 		return "", ""
 	}
@@ -21,32 +21,30 @@ func GetDomainAndSubDomain(domain string) (d, s string) {
 	return
 }
 
-func DNSAMapping(DNS []*types.DNSRecord, fullDomain string) *types.DNSRecord {
+func DNSAMapping(records []*types.DNSRecord, fullDomain string) *types.DNSRecord {
 	domain, subdomain := GetDomainAndSubDomain(fullDomain)
 	if domain == "" {
 		return nil
 	}
 	domain = strings.TrimSuffix(domain, ".")
 
-	for i, record := range DNS {
-
+	for i, record := range records {
 		if record == nil {
 			continue
 		}
 		if subdomain != "" {
 			if record.Domain == subdomain+"."+domain {
-				return DNS[i]
+				return records[i]
 			}
 		}
 
 		if record.Domain == domain {
 			if subdomain == "" {
-				return DNS[i]
+				return records[i]
 			} else if record.Wildcard {
-				return DNS[i]
+				return records[i]
 			}
 		}
-
 	}
 
 	return nil

@@ -36,34 +36,34 @@ func parseServerConfig(path string) (*types.ServerConfig, error) {
 	if err != nil {
 		return nil, err
 	}
-	C := new(types.ServerConfig)
+	cfg := new(types.ServerConfig)
 
 	ext := strings.ToLower(filepath.Ext(path))
 	switch ext {
 	case ".yaml", ".yml":
-		err = yaml.Unmarshal(nb, &C)
+		err = yaml.Unmarshal(nb, &cfg)
 	case ".json", "":
-		err = json.Unmarshal(nb, &C)
+		err = json.Unmarshal(nb, &cfg)
 	default:
 		return nil, fmt.Errorf("unsupported config file format: %s (supported: .json, .yaml, .yml)", ext)
 	}
 	if err != nil {
 		return nil, err
 	}
-	return C, nil
+	return cfg, nil
 }
 
 func LoadServerConfig(path string) (err error) {
-	C, err := parseServerConfig(path)
+	cfg, err := parseServerConfig(path)
 	if err != nil {
 		return err
 	}
-	Config.Store(C)
+	Config.Store(cfg)
 	return nil
 }
 
 func SaveServerConfig(path string) (err error) {
-	C := Config.Load()
+	cfg := Config.Load()
 
 	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
@@ -78,14 +78,14 @@ func SaveServerConfig(path string) (err error) {
 	case ".yaml", ".yml":
 		encoder := yaml.NewEncoder(f)
 		encoder.SetIndent(2)
-		if err := encoder.Encode(C); err != nil {
+		if err := encoder.Encode(cfg); err != nil {
 			return err
 		}
 		_ = encoder.Close()
 	case ".json", "":
 		encoder := json.NewEncoder(f)
 		encoder.SetIndent("", "    ")
-		if err := encoder.Encode(C); err != nil {
+		if err := encoder.Encode(cfg); err != nil {
 			return err
 		}
 	default:
@@ -100,26 +100,26 @@ func LoadWGConfig(path string) error {
 	if err != nil {
 		return err
 	}
-	W := new(types.WGBootstrap)
+	bootstrap := new(types.WGBootstrap)
 	ext := strings.ToLower(filepath.Ext(path))
 	switch ext {
 	case ".yaml", ".yml":
-		err = yaml.Unmarshal(nb, W)
+		err = yaml.Unmarshal(nb, bootstrap)
 	case ".json", "":
-		err = json.Unmarshal(nb, W)
+		err = json.Unmarshal(nb, bootstrap)
 	default:
 		return fmt.Errorf("unsupported wg config file format: %s (supported: .json, .yaml, .yml)", ext)
 	}
 	if err != nil {
 		return err
 	}
-	WGConfig.Store(W)
+	WGConfig.Store(bootstrap)
 	return nil
 }
 
 func SaveWGConfig(path string) error {
-	W := WGConfig.Load()
-	if W == nil {
+	bootstrap := WGConfig.Load()
+	if bootstrap == nil {
 		return fmt.Errorf("no wg config loaded")
 	}
 
@@ -134,14 +134,14 @@ func SaveWGConfig(path string) error {
 	case ".yaml", ".yml":
 		encoder := yaml.NewEncoder(f)
 		encoder.SetIndent(2)
-		if err := encoder.Encode(W); err != nil {
+		if err := encoder.Encode(bootstrap); err != nil {
 			return err
 		}
 		_ = encoder.Close()
 	case ".json", "":
 		encoder := json.NewEncoder(f)
 		encoder.SetIndent("", "    ")
-		if err := encoder.Encode(W); err != nil {
+		if err := encoder.Encode(bootstrap); err != nil {
 			return err
 		}
 	default:

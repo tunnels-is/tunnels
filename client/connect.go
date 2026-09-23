@@ -113,7 +113,7 @@ func startLiveSession(tunnel *TUN) {
 	watchWGDevice(tunnel)
 }
 
-func PublicConnect(cr *ConnectionRequest) (code int, errm error) {
+func PublicConnect(cr *ConnectionRequest) (code int, connectErr error) {
 	if cr.ServerID == "" {
 		ERROR("No Server id found when connecting: ", cr)
 		return 400, errors.New("no server id found when connecting")
@@ -164,10 +164,10 @@ func PublicConnect(cr *ConnectionRequest) (code int, errm error) {
 		return 400, errors.New("unable to write tunnel meta to drive")
 	}
 
-	code, errm = PreConnectCheck(meta)
-	if errm != nil {
-		ERROR("pre connection check:", errm)
-		return code, errm
+	code, connectErr = PreConnectCheck(meta)
+	if connectErr != nil {
+		ERROR("pre connection check:", connectErr)
+		return code, connectErr
 	}
 
 	oldTunnel := findReplaceableTunnel(meta.Tag)
@@ -198,10 +198,7 @@ func PublicConnect(cr *ConnectionRequest) (code int, errm error) {
 	}
 	wgPrivKeyB64 := localDev.WireGuardPrivKey
 
-	if meta.WireGuardPrivKey != "" {
-		meta.WireGuardPrivKey = ""
-		_ = writeTunnelsToDisk(meta.Tag)
-	}
+	clearStoredPrivKey(meta)
 
 	if cr.ServerIP == "" {
 		cr.ServerIP = wgCfg.ServerIP
@@ -216,16 +213,7 @@ func PublicConnect(cr *ConnectionRequest) (code int, errm error) {
 		return 502, valErr
 	}
 
-	serverResp := &types.ServerConnectResponse{
-		InterfaceIP:      cr.ServerIP,
-		WireGuardIP:      wgCfg.WireGuardIP,
-		WireGuardPubKey:  wgCfg.WireGuardPubKey,
-		WireGuardPort:    wgCfg.WireGuardPort,
-		WireGuardSubnet:  wgCfg.WireGuardSubnet,
-		WireGuardSubnet6: wgCfg.WireGuardSubnet6,
-		WANCIDR:          wgCfg.WANCIDR,
-		EnableFirewall:   wgCfg.EnableFirewall,
-	}
+	serverResp := serverResponseFromWG(cr, wgCfg)
 	tunnel.ServerResponse = serverResp
 
 	if !wgCfg.EnableFirewall && (len(meta.AllowedHosts) > 0 || !meta.AllowAll) {
@@ -422,6 +410,27 @@ func createFreshWG(tunnel *TUN, wgCfg *wgServerConfig, meta *TunnelMeta, ipcConf
 	return nil
 }
 
+func clearStoredPrivKey(meta *TunnelMeta) {
+	if meta.WireGuardPrivKey == "" {
+		return
+	}
+	meta.WireGuardPrivKey = ""
+	_ = writeTunnelsToDisk(meta.Tag)
+}
+
+func serverResponseFromWG(cr *ConnectionRequest, wgCfg *wgServerConfig) *types.ServerConnectResponse {
+	return &types.ServerConnectResponse{
+		InterfaceIP:      cr.ServerIP,
+		WireGuardIP:      wgCfg.WireGuardIP,
+		WireGuardPubKey:  wgCfg.WireGuardPubKey,
+		WireGuardPort:    wgCfg.WireGuardPort,
+		WireGuardSubnet:  wgCfg.WireGuardSubnet,
+		WireGuardSubnet6: wgCfg.WireGuardSubnet6,
+		WANCIDR:          wgCfg.WANCIDR,
+		EnableFirewall:   wgCfg.EnableFirewall,
+	}
+}
+
 func bindLocalDNSClient(t *TUN) {
 	if DNSClient.Dialer == nil {
 		return
@@ -438,10 +447,11 @@ func bindLocalDNSClient(t *TUN) {
 
 func applyTunnelMetaOverlays(t *TUN, meta *TunnelMeta) {
 	if meta.LocalhostNat {
-		NN := new(types.Network)
-		NN.Network = "127.0.0.1/32"
-		NN.Nat = t.serverInterfaceNetIP.String() + "/32"
-		t.ServerResponse.Networks = append(t.ServerResponse.Networks, NN)
+		localhostNet := &types.Network{
+			Network: "127.0.0.1/32",
+			Nat:     t.serverInterfaceNetIP.String() + "/32",
+		}
+		t.ServerResponse.Networks = append(t.ServerResponse.Networks, localhostNet)
 	}
 
 	if len(meta.Networks) > 0 {

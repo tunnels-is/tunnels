@@ -80,13 +80,14 @@ func newRegisteredUser(form *registerRequest) (*User, error) {
 	newUser.Groups = make([]uuid.UUID, 0)
 	newUser.Tokens = make([]*DeviceToken, 0)
 
-	T := new(DeviceToken)
-	T.N = "registration"
-	T.DT = uuid.NewString()
-	T.Created = time.Now()
+	token := &DeviceToken{
+		N:       "registration",
+		DT:      uuid.NewString(),
+		Created: time.Now(),
+	}
 
-	newUser.DeviceToken = T
-	newUser.Tokens = append(newUser.Tokens, T)
+	newUser.DeviceToken = token
+	newUser.Tokens = append(newUser.Tokens, token)
 	return newUser, nil
 }
 

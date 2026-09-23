@@ -162,22 +162,8 @@ func handleWGPeer(w http.ResponseWriter, r *http.Request) {
 		sendError(w, 500, "error looking up user")
 		return
 	}
-	if user == nil {
-		sendError(w, 401, "user/device not allowed to connect")
-		return
-	}
-	if user.Disabled {
-		sendError(w, 403, "user account is disabled")
-		return
-	}
-
-	if !user.SubExpiration.IsZero() && time.Now().After(user.SubExpiration) {
-		sendError(w, 403, "user subscription has expired")
-		return
-	}
-
-	if !hasSharedOrNoGroup(user.Groups, server.Groups) {
-		sendError(w, 401, "user/device not allowed to connect")
+	if code, msg := wgUserConnectStatus(user, server); code != 0 {
+		sendError(w, code, msg)
 		return
 	}
 
@@ -243,20 +229,8 @@ func handleWGConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	deviceIP := ""
-	deviceIPv6 := ""
-	if d != nil && d.UserID != user.ID {
-		// Occupancy oracle: do not distinguish "someone else's key"
-		// from an unknown key.
-		d = nil
-	}
-	if d != nil {
-
-		if d.ServerID == serverID {
-			deviceIP = d.WireGuardIP
-			deviceIPv6 = d.WireGuardIPv6
-		}
-	}
+	// Occupancy oracle: someone else's key looks the same as an unknown key.
+	deviceIP, deviceIPv6 := ownedDeviceIPs(d, user.ID, serverID)
 
 	sendObject(w, map[string]any{
 		"WireGuardPubKey":  server.WireGuardPubKey,
@@ -269,6 +243,29 @@ func handleWGConfig(w http.ResponseWriter, r *http.Request) {
 		"WANCIDR":          wanCIDRForServer(server),
 		"EnableFirewall":   server.EnableFirewall,
 	})
+}
+
+func wgUserConnectStatus(user *User, server *types.Server) (int, string) {
+	if user == nil {
+		return 401, "user/device not allowed to connect"
+	}
+	if user.Disabled {
+		return 403, "user account is disabled"
+	}
+	if !user.SubExpiration.IsZero() && time.Now().After(user.SubExpiration) {
+		return 403, "user subscription has expired"
+	}
+	if !hasSharedOrNoGroup(user.Groups, server.Groups) {
+		return 401, "user/device not allowed to connect"
+	}
+	return 0, ""
+}
+
+func ownedDeviceIPs(d *types.Device, userID, serverID uuid.UUID) (ip, ipv6 string) {
+	if d == nil || d.UserID != userID || d.ServerID != serverID {
+		return "", ""
+	}
+	return d.WireGuardIP, d.WireGuardIPv6
 }
 
 func rejectServerWireGuardKey(key string) error {

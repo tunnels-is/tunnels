@@ -27,14 +27,14 @@ func updateWAN(wan *types.WAN) error {
 		if v == nil {
 			return errors.New("WAN not found")
 		}
-		WW := new(types.WAN)
-		if err := bboltUnmarshal(v, WW); err != nil {
+		stored := new(types.WAN)
+		if err := bboltUnmarshal(v, stored); err != nil {
 			return err
 		}
-		WW.Tag = wan.Tag
-		WW.CIDR = wan.CIDR
-		WW.Description = wan.Description
-		data, err := bboltMarshal(WW)
+		stored.Tag = wan.Tag
+		stored.CIDR = wan.CIDR
+		stored.Description = wan.Description
+		data, err := bboltMarshal(stored)
 		if err != nil {
 			return err
 		}
