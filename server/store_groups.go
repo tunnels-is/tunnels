@@ -12,7 +12,7 @@ import (
 
 func findEntitiesByGroupID(id uuid.UUID, objType string, limit, offset int64) ([]any, error) {
 	idStr := id.String()
-	IL := make([]any, 0)
+	items := make([]any, 0)
 	bucket := ""
 	switch objType {
 	case "user":
@@ -32,9 +32,9 @@ func findEntitiesByGroupID(id uuid.UUID, objType string, limit, offset int64) ([
 			var match bool
 			switch objType {
 			case "server":
-				E := new(types.Server)
-				if err := bboltUnmarshal(v, E); err == nil {
-					if slices.Contains(uuidSliceToString(E.Groups), idStr) {
+				server := new(types.Server)
+				if err := bboltUnmarshal(v, server); err == nil {
+					if slices.Contains(uuidSliceToString(server.Groups), idStr) {
 						match = true
 					}
 					if match {
@@ -42,16 +42,16 @@ func findEntitiesByGroupID(id uuid.UUID, objType string, limit, offset int64) ([
 							skipped++
 							continue
 						}
-						if int64(len(IL)) >= limit {
+						if int64(len(items)) >= limit {
 							break cursorLoop
 						}
-						IL = append(IL, E)
+						items = append(items, server)
 					}
 				}
 			case "user":
-				E := new(User)
-				if err := bboltUnmarshal(v, E); err == nil {
-					if slices.Contains(uuidSliceToString(E.Groups), idStr) {
+				user := new(User)
+				if err := bboltUnmarshal(v, user); err == nil {
+					if slices.Contains(uuidSliceToString(user.Groups), idStr) {
 						match = true
 					}
 					if match {
@@ -59,17 +59,17 @@ func findEntitiesByGroupID(id uuid.UUID, objType string, limit, offset int64) ([
 							skipped++
 							continue
 						}
-						if int64(len(IL)) >= limit {
+						if int64(len(items)) >= limit {
 							break cursorLoop
 						}
-						IL = append(IL, E)
+						items = append(items, user)
 					}
 				}
 			}
 		}
 		return nil
 	})
-	return IL, err
+	return items, err
 }
 
 func updateGroup(group *Group) error {

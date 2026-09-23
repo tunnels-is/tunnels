@@ -255,15 +255,16 @@ func cacheDNSReply(reply *dns.Msg) {
 	if _, exists := DNSCache.Load(name); !exists && DNSCache.Size() >= maxDNSCacheEntries {
 		return
 	}
-	RP := new(DNSReply)
-	RP.A = make([]dns.RR, len(reply.Answer))
-	copy(RP.A, reply.Answer)
+	cached := &DNSReply{
+		A: make([]dns.RR, len(reply.Answer)),
+	}
+	copy(cached.A, reply.Answer)
 	ttl := time.Duration(reply.Answer[0].Header().Ttl) * time.Second
 	if ttl > maxDNSCacheTTL {
 		ttl = maxDNSCacheTTL
 	}
-	RP.Expires = time.Now().Add(ttl)
-	DNSCache.Store(name, RP)
+	cached.Expires = time.Now().Add(ttl)
+	DNSCache.Store(name, cached)
 }
 
 func DNSCacheCheck(m *dns.Msg, w dns.ResponseWriter) bool {
