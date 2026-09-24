@@ -79,4 +79,4 @@ require (
 	rsc.io/qr v0.2.0 // indirect
 )
 
-replace fyne.io/fyne/v2 => ../fyne-fork
+replace fyne.io/fyne/v2 => github.com/zveinn/fyne/v2 v2.8.2-wayland.1
