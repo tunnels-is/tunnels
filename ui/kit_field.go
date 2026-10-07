@@ -657,16 +657,20 @@ func buildShell(title, subtitle string, actions, content fyne.CanvasObject, rule
 	return container.NewBorder(vstack(0, rows...), nil, nil, nil, content)
 }
 
+// scrollFlow is the card masonry scrollBody scrolls. A page that must refresh
+// the flow when a card changes height keeps this container.
+func scrollFlow(objs ...fyne.CanvasObject) *fyne.Container {
+	return container.New(&cardFlowLayout{minCol: z(430), maxCol: 3, gap: sp4}, objs...)
+}
+
 // scrollBody is the standard page body: cards flowed into as many columns as
 // the window allows, rather than one full-width stack.
 func scrollBody(objs ...fyne.CanvasObject) fyne.CanvasObject {
-	flow := container.New(&cardFlowLayout{minCol: z(430), maxCol: 3, gap: sp4}, objs...)
-	return scrollBodyOf(flow)
+	return scrollBodyOf(scrollFlow(objs...))
 }
 
-// scrollBodyOf wraps a column the caller already holds, for pages that need to
-// refresh it directly (row editors changing height, for instance) or that read
-// better as a single column.
+// scrollBodyOf wraps content the caller already holds, for pages that need to
+// refresh it directly when a card changes height.
 func scrollBodyOf(col fyne.CanvasObject) fyne.CanvasObject {
 	return boostScroll(container.NewVScroll(insetEach(sp5, gutter, sp8, gutter, col)))
 }
