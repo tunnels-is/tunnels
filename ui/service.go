@@ -57,6 +57,7 @@ func (a *App) refreshState() {
 		a.active = st.ActiveTunnels
 	}
 	a.syncWindowTitle()
+	a.syncTray()
 }
 
 // setUser makes u the active account.
@@ -336,6 +337,60 @@ func (a *App) connectTunnel(meta *client.TunnelMeta) {
 			a.reloadCurrent()
 		})
 	}()
+}
+
+// disconnectAll tears down every tunnel the tray can still disconnect.
+// One tunnel keeps the same toast as disconnectActive. Several share one toast.
+func (a *App) disconnectAll() {
+	tunnels := append([]*client.TUN(nil), disconnectableTunnels(a.active)...)
+	if len(tunnels) == 0 {
+		return
+	}
+	a.note("Disconnecting...")
+	go func() {
+		var firstErr error
+		var lastTag string
+		n := 0
+		for _, tun := range tunnels {
+			tag := tunnelDisconnectTag(tun)
+			err := client.DisconnectTunnel(tun.ID, tag)
+			if err != nil {
+				if firstErr == nil {
+					firstErr = err
+				}
+				continue
+			}
+			n++
+			if tag != "" {
+				lastTag = tag
+			}
+		}
+		a.uiDo(func() {
+			switch {
+			case firstErr != nil:
+				a.fail(firstErr.Error())
+			case n == 1 && lastTag != "":
+				a.note("Disconnected from " + lastTag)
+			case n > 0:
+				a.note("Disconnected")
+			}
+			a.refreshState()
+			a.reloadCurrent()
+		})
+	}()
+}
+
+func tunnelDisconnectTag(tun *client.TUN) string {
+	if tun == nil {
+		return ""
+	}
+	if tun.CR != nil && tun.CR.Tag != "" {
+		return tun.CR.Tag
+	}
+	if m := tun.Meta(); m != nil {
+		return m.Tag
+	}
+	return ""
 }
 
 func (a *App) disconnectActive(t *client.TUN) {
