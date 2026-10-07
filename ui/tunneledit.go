@@ -1,11 +1,12 @@
 package ui
 
 import (
-	"fmt"
 	"strconv"
 	"strings"
 
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/theme"
 	"github.com/tunnels-is/tunnels/client"
 	"github.com/tunnels-is/tunnels/types"
@@ -104,6 +105,40 @@ func (a *App) tunnelEditPage() fyne.CanvasObject {
 	}
 	ports := kEntry("e.g. 25, 445, 3389", strings.Join(portStrs, ", "))
 
+	// Records stay on the cloned form until Save changes. reflow is assigned
+	// once the scroll exists, so the first render skips it.
+	recBody := container.NewStack()
+	var renderRecords func()
+	renderRecords = func() {
+		rows := tunnelDNSRows(form.DNSRecords, func(i int, rec *types.DNSRecord) {
+			a.editTunnelDNSRecord(rec, func(cp types.DNSRecord) {
+				if i >= 0 && i < len(form.DNSRecords) {
+					form.DNSRecords[i] = &cp
+				}
+				renderRecords()
+			})
+		}, func(i int, name string) {
+			a.confirm("Delete record", "Delete DNS record "+name+"?", func() {
+				if i >= 0 && i < len(form.DNSRecords) {
+					form.DNSRecords = append(form.DNSRecords[:i], form.DNSRecords[i+1:]...)
+				}
+				renderRecords()
+			})
+		})
+		recBody.Objects = []fyne.CanvasObject{settingList(rows...)}
+		recBody.Refresh()
+		if reflow != nil {
+			reflow()
+		}
+	}
+	renderRecords()
+	addRecord := outlineBtn("Add record", func() {
+		a.editTunnelDNSRecord(&types.DNSRecord{Domain: "yourdomain.com", IP: []string{"127.0.0.1"}, Wildcard: true}, func(cp types.DNSRecord) {
+			form.DNSRecords = append(form.DNSRecords, &cp)
+			renderRecords()
+		})
+	}).withIcon(theme.ContentAddIcon()).small()
+
 	save := primaryBtn("Save changes", func() {
 		form.Tag = strings.TrimSpace(tag.Text)
 		form.IFName = strings.TrimSpace(ifname.Text)
@@ -163,7 +198,7 @@ func (a *App) tunnelEditPage() fyne.CanvasObject {
 
 	cards := []fyne.CanvasObject{}
 	if connected {
-		cards = append(cards, notice("This tunnel is connected. Disconnect it before saving changes.", toneWarning))
+		cards = append(cards, fullRow(notice("This tunnel is connected. Disconnect it before saving changes.", toneWarning)))
 	}
 	cards = append(cards,
 		card("General", "Identity, server and transport.",
@@ -175,6 +210,9 @@ func (a *App) tunnelEditPage() fyne.CanvasObject {
 		card("Behaviour", "What this tunnel does while connected.", features),
 		card("DNS servers", "Resolvers handed to the interface, in order.",
 			capWidth(formWidth, dnsEd.object())),
+		cardBox("DNS records",
+			"Answered while this tunnel is up, before the resolver's global records. Saved with the tunnel.",
+			addRecord, recBody),
 		card("Routes", "Extra routes installed while the tunnel is up.",
 			capWidth(z(720), routeEd.object())),
 		card("Networks", "Networks reachable through the tunnel, with optional NAT.",
@@ -183,23 +221,97 @@ func (a *App) tunnelEditPage() fyne.CanvasObject {
 			capWidth(formWidth, field("Ports", ports))),
 	)
 
-	// DNSRecords and the WireGuard key are not editable here, but the form is
-	// cloned from the live tunnel so they survive a save untouched.
-	if n := len(form.DNSRecords); n > 0 {
-		cards = append(cards, card("Local DNS records",
-			fmt.Sprintf("%d record(s) are attached to this tunnel. Edit them on the Resolver page.", n), nil))
+	flow := scrollFlow(cards...)
+	body := scrollBodyOf(flow)
+	// Refresh the scroll too: the flow's height changes when a row is added,
+	// and the scroller only remeasures when it is refreshed itself.
+	reflow = func() {
+		flow.Refresh()
+		body.Refresh()
 	}
-
-	col := vstack(sp4, cards...)
-	reflow = func() { col.Refresh() }
 
 	actions := hstack(sp2, back, save)
 	sub := "Interface " + form.IFName
 	if connected {
 		sub += "  ·  connected"
 	}
-	return pageShell(form.Tag, sub, actions,
-		scrollBodyOf(col))
+	return pageShell(form.Tag, sub, actions, body)
+}
+
+// tunnelDNSRows is the list body for a tunnel's own DNS records.
+// index is the slot in the form slice, so a nil hole is not shown and is
+// not renumbered out from under edit and delete.
+func tunnelDNSRows(records []*types.DNSRecord, onEdit func(int, *types.DNSRecord), onDelete func(int, string)) []fyne.CanvasObject {
+	rows := make([]fyne.CanvasObject, 0, len(records))
+	for i, r := range records {
+		i, r := i, r
+		if r == nil {
+			continue
+		}
+		name := r.Domain
+		if name == "" {
+			name = "unnamed"
+		}
+		title := []fyne.CanvasObject{text(name, fsBody, pal().Content, false)}
+		if r.Wildcard {
+			title = append(title, badge("wildcard", tonePrimary))
+		}
+		target := strings.Join(r.IP, ", ")
+		if txt := strings.Join(r.TXT, ", "); txt != "" {
+			if target != "" {
+				target += "  ·  " + txt
+			} else {
+				target = txt
+			}
+		}
+		if target == "" {
+			target = "No address — resolved through the tunnel"
+		}
+		left := vstack(1, hstack(sp2, title...), monoText(target, fsSmall, pal().Muted))
+		edit := newIconBtn(theme.DocumentCreateIcon(), kGhost, func() { onEdit(i, r) }).small()
+		del := newIconBtn(theme.DeleteIcon(), kGhost, func() { onDelete(i, name) }).small()
+		rows = append(rows, insetEach(sp2, 0, sp2, 0, splitRow(left, hstack(sp1, edit, del))))
+	}
+	if len(rows) == 0 {
+		rows = append(rows, emptyRow("No records on this tunnel."))
+	}
+	return rows
+}
+
+// editTunnelDNSRecord edits one record in memory. The tunnel file is written
+// only when the page's Save changes button runs.
+func (a *App) editTunnelDNSRecord(rec *types.DNSRecord, onSave func(types.DNSRecord)) {
+	if rec == nil {
+		rec = &types.DNSRecord{}
+	}
+	domain := kEntry("yourdomain.com", rec.Domain)
+	ips := kMultiline(strings.Join(rec.IP, "\n"), 3)
+	txt := kMultiline(strings.Join(rec.TXT, "\n"), 3)
+	wild := bindCheck("Match subdomains (wildcard)", rec.Wildcard, nil)
+	form := container.New(fixedLayout{w: z(420)}, vstack(sp3,
+		field("Domain", domain),
+		fieldWith("IP addresses", "One per line.", ips),
+		fieldWith("TXT records", "One per line.", txt),
+		wild,
+	))
+	d := dialog.NewCustomConfirm("DNS record", "Save", "Cancel", form, func(ok bool) {
+		if !ok || onSave == nil {
+			return
+		}
+		cp := types.DNSRecord{
+			Domain:   strings.TrimSpace(domain.Text),
+			Wildcard: wild.Checked,
+			IP:       splitLines(ips.Text),
+			TXT:      splitLines(txt.Text),
+		}
+		if cp.Domain == "" {
+			a.fail("A domain is required")
+			return
+		}
+		onSave(cp)
+	}, a.win)
+	d.Resize(fyne.NewSize(z(480), z(480)))
+	d.Show()
 }
 
 func splitLines(s string) []string {
