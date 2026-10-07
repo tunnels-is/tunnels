@@ -79,12 +79,12 @@ func (a *App) dashClosestCard() fyne.CanvasObject {
 	}
 
 	connect := successBtn("Connect", func() {
-		if s := a.serverByID(best.ServerID); s != nil {
-			srv := *s
-			a.confirm("Connect", "Connect to "+srv.Tag+"?", func() { a.connectToServer(srv) })
+		srv, ok := a.closestServer()
+		if !ok {
+			a.fail("That server is no longer in your list")
 			return
 		}
-		a.fail("That server is no longer in your list")
+		a.confirm("Connect", "Connect to "+srv.Tag+"?", func() { a.connectToServer(srv) })
 	})
 
 	title := text(best.Tag, fsTitle, pal().Content, true)
@@ -185,4 +185,18 @@ func (a *App) bestProbe() (client.ServerProbe, bool) {
 		}
 	}
 	return client.ServerProbe{}, false
+}
+
+// closestServer is the server the dashboard Connect button would use:
+// the fastest probe result that is still in the server list.
+func (a *App) closestServer() (types.Server, bool) {
+	best, ok := a.bestProbe()
+	if !ok {
+		return types.Server{}, false
+	}
+	s := a.serverByID(best.ServerID)
+	if s == nil {
+		return types.Server{}, false
+	}
+	return *s, true
 }

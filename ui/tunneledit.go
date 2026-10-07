@@ -50,7 +50,6 @@ func (a *App) tunnelEditPage() fyne.CanvasObject {
 		toggle("AutoConnect", "Auto connect", "Bring this tunnel up when the app starts.", form.AutoConnect),
 		toggle("AutoReconnect", "Auto reconnect", "Re-establish the tunnel if it drops.", form.AutoReconnect),
 		toggle("EnableDefaultRoute", "Default route", "Send all traffic through this tunnel.", form.EnableDefaultRoute),
-		toggle("KillSwitch", "Kill switch", "Blackhole traffic if this tunnel goes down.", form.KillSwitch),
 		toggle("DNSBlocking", "DNS blocking", "Apply the resolver's block lists on this tunnel.", form.DNSBlocking),
 		toggle("LocalhostNat", "Localhost NAT", "NAT loopback traffic into the tunnel.", form.LocalhostNat),
 		toggle("EnableWAN", "WAN routing", "Allow routing to the tunnel's wider network.", form.EnableWAN),
@@ -118,7 +117,6 @@ func (a *App) tunnelEditPage() fyne.CanvasObject {
 		form.AutoConnect = switches["AutoConnect"].on
 		form.AutoReconnect = switches["AutoReconnect"].on
 		form.EnableDefaultRoute = switches["EnableDefaultRoute"].on
-		form.KillSwitch = switches["KillSwitch"].on
 		form.DNSBlocking = switches["DNSBlocking"].on
 		form.LocalhostNat = switches["LocalhostNat"].on
 		form.EnableWAN = switches["EnableWAN"].on
