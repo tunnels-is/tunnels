@@ -130,6 +130,7 @@ func Run(icon []byte) {
 }
 
 func newApp(icon []byte) *App {
+	migrateLegacyFyneConfig()
 	fy := app.NewWithID(appID)
 	name := fy.Preferences().StringWithFallback("ui-theme", defaultThemeName)
 	setLiveTheme(name)

@@ -13,9 +13,9 @@ import (
 )
 
 func setLinuxWindowIdentity() {
-	glfw.WindowHintString(glfw.WaylandAppID, linuxAppID)
-	glfw.WindowHintString(glfw.X11ClassName, linuxAppID)
-	glfw.WindowHintString(glfw.X11InstanceName, linuxAppID)
+	glfw.WindowHintString(glfw.WaylandAppID, appID)
+	glfw.WindowHintString(glfw.X11ClassName, appID)
+	glfw.WindowHintString(glfw.X11InstanceName, appID)
 }
 
 func registerLinuxDesktop(icon []byte) {
@@ -40,10 +40,10 @@ func registerLinuxDesktop(icon []byte) {
 		return
 	}
 
-	desktopPath := filepath.Join(apps, linuxAppID+".desktop")
+	desktopPath := filepath.Join(apps, appID+".desktop")
 	_ = writeFileIfChanged(desktopPath, []byte(linuxDesktopEntry(execPath)), 0o644)
 	if len(icon) > 0 {
-		_ = writeFileIfChanged(filepath.Join(icons, linuxAppID+".png"), icon, 0o644)
+		_ = writeFileIfChanged(filepath.Join(icons, appID+".png"), icon, 0o644)
 	}
 }
 
@@ -59,10 +59,10 @@ func linuxDesktopEntry(execPath string) string {
 		lines = append(lines, "TryExec="+execPath)
 	}
 	lines = append(lines,
-		"Icon="+linuxAppID,
+		"Icon="+appID,
 		"Terminal=false",
 		"Categories=Network;Security;",
-		"StartupWMClass="+linuxAppID,
+		"StartupWMClass="+appID,
 		"StartupNotify=true",
 		"Keywords=vpn;wireguard;tunnels;",
 		"",
