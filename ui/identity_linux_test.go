@@ -12,8 +12,8 @@ func TestLinuxDesktopEntryIdentifiesApp(t *testing.T) {
 	for _, want := range []string{
 		"Name=Tunnels",
 		`Exec="/opt/tunnels/tunnels-app"`,
-		"Icon=" + linuxAppID,
-		"StartupWMClass=" + linuxAppID,
+		"Icon=" + appID,
+		"StartupWMClass=" + appID,
 	} {
 		if !strings.Contains(got, want) {
 			t.Errorf("desktop entry missing %q\n%s", want, got)
