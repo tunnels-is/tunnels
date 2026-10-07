@@ -35,16 +35,18 @@ const (
 
 // App is the Fyne desktop UI. It talks to the client package in-process.
 type App struct {
-	fyneApp   fyne.App
-	win       fyne.Window
-	content   *fyne.Container
-	pageBox   *fyne.Container
-	side      *sidebar
-	toastBox  *fyne.Container
-	busyBox   *fyne.Container
-	busyN     int
-	toastKind string
-	toastMsg  string
+	fyneApp        fyne.App
+	win            fyne.Window
+	trayMenu       *fyne.Menu
+	trayDisconnect *fyne.MenuItem
+	content        *fyne.Container
+	pageBox        *fyne.Container
+	side           *sidebar
+	toastBox       *fyne.Container
+	busyBox        *fyne.Container
+	busyN          int
+	toastKind      string
+	toastMsg       string
 
 	current  pageID
 	editTag  string
@@ -178,6 +180,7 @@ func newApp(icon []byte) *App {
 
 	a.keepDisplayAwake()
 	a.installQuitMenu()
+	a.installTray()
 	a.surviveWindowClose()
 
 	a.registerZoomShortcuts()

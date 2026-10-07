@@ -102,9 +102,13 @@ func (a *App) shutdown() {
 	}
 }
 
-// surviveWindowClose keeps the Fyne run loop up when GLFW delivers a close
-// because the display went away. App.Quit() still destroys the window
-// (Close bypasses the intercept).
+// surviveWindowClose hides the window instead of quitting. The title-bar
+// close button leaves the process in the tray (installTray). The same hide
+// keeps the run loop up when GLFW delivers a close because the display went
+// away. App.Quit() still destroys the window (Close bypasses the intercept).
+//
+// Runs after installTray. SetSystemTrayWindow installs its own hide intercept,
+// and this one replaces it so the display-loss path stays in this function.
 func (a *App) surviveWindowClose() {
 	if a.win == nil {
 		return
