@@ -106,36 +106,59 @@ func (a *App) tunnelEditPage() fyne.CanvasObject {
 	ports := kEntry("e.g. 25, 445, 3389", strings.Join(portStrs, ", "))
 
 	// Records stay on the cloned form until Save changes. reflow is assigned
-	// once the scroll exists, so the first render skips it.
+	// once the scroll exists, so the first render skips it. A domain with no
+	// address is a route; the two cards are two views of the same list.
 	recBody := container.NewStack()
-	var renderRecords func()
-	renderRecords = func() {
-		rows := tunnelDNSRows(form.DNSRecords, func(i int, rec *types.DNSRecord) {
+	routeBody := container.NewStack()
+	var renderDNS func()
+	renderDNS = func() {
+		recBody.Objects = []fyne.CanvasObject{settingList(tunnelDNSRows(form.DNSRecords, func(i int, rec *types.DNSRecord) {
 			a.editTunnelDNSRecord(rec, func(cp types.DNSRecord) {
 				if i >= 0 && i < len(form.DNSRecords) {
 					form.DNSRecords[i] = &cp
 				}
-				renderRecords()
+				renderDNS()
 			})
 		}, func(i int, name string) {
 			a.confirm("Delete record", "Delete DNS record "+name+"?", func() {
 				if i >= 0 && i < len(form.DNSRecords) {
 					form.DNSRecords = append(form.DNSRecords[:i], form.DNSRecords[i+1:]...)
 				}
-				renderRecords()
+				renderDNS()
 			})
-		})
-		recBody.Objects = []fyne.CanvasObject{settingList(rows...)}
+		})...)}
+		routeBody.Objects = []fyne.CanvasObject{settingList(tunnelDNSRouteRows(form.DNSRecords, func(i int, rec *types.DNSRecord) {
+			a.editTunnelDNSRoute(rec, func(cp types.DNSRecord) {
+				if i >= 0 && i < len(form.DNSRecords) {
+					form.DNSRecords[i] = &cp
+				}
+				renderDNS()
+			})
+		}, func(i int, name string) {
+			a.confirm("Remove domain", "Stop routing "+name+" through this tunnel?", func() {
+				if i >= 0 && i < len(form.DNSRecords) {
+					form.DNSRecords = append(form.DNSRecords[:i], form.DNSRecords[i+1:]...)
+				}
+				renderDNS()
+			})
+		})...)}
 		recBody.Refresh()
+		routeBody.Refresh()
 		if reflow != nil {
 			reflow()
 		}
 	}
-	renderRecords()
+	renderDNS()
+	addRoute := outlineBtn("Add domain", func() {
+		a.editTunnelDNSRoute(nil, func(cp types.DNSRecord) {
+			form.DNSRecords = append(form.DNSRecords, &cp)
+			renderDNS()
+		})
+	}).withIcon(theme.ContentAddIcon()).small()
 	addRecord := outlineBtn("Add record", func() {
 		a.editTunnelDNSRecord(&types.DNSRecord{Domain: "yourdomain.com", IP: []string{"127.0.0.1"}, Wildcard: true}, func(cp types.DNSRecord) {
 			form.DNSRecords = append(form.DNSRecords, &cp)
-			renderRecords()
+			renderDNS()
 		})
 	}).withIcon(theme.ContentAddIcon()).small()
 
@@ -210,8 +233,11 @@ func (a *App) tunnelEditPage() fyne.CanvasObject {
 		card("Behaviour", "What this tunnel does while connected.", features),
 		card("DNS servers", "Resolvers handed to the interface, in order.",
 			capWidth(formWidth, dnsEd.object())),
+		cardBox("DNS routing",
+			"Send lookups for specific domains through this tunnel. Saved with the tunnel.",
+			addRoute, routeBody),
 		cardBox("DNS records",
-			"Answered while this tunnel is up, before the resolver's global records. Saved with the tunnel.",
+			"Fixed answers for names on this tunnel. Saved with the tunnel.",
 			addRecord, recBody),
 		card("Routes", "Extra routes installed while the tunnel is up.",
 			capWidth(z(720), routeEd.object())),
@@ -238,14 +264,21 @@ func (a *App) tunnelEditPage() fyne.CanvasObject {
 	return pageShell(form.Tag, sub, actions, body)
 }
 
-// tunnelDNSRows is the list body for a tunnel's own DNS records.
+// dnsRecordIsRoute is a domain sent through the tunnel. An address or TXT
+// value makes it a fixed answer instead.
+func dnsRecordIsRoute(r *types.DNSRecord) bool {
+	return r != nil && len(r.IP) == 0 && len(r.TXT) == 0
+}
+
+// tunnelDNSRows is the list body for a tunnel's fixed DNS answers.
 // index is the slot in the form slice, so a nil hole is not shown and is
-// not renumbered out from under edit and delete.
+// not renumbered out from under edit and delete. Routes are left out; they
+// have their own list.
 func tunnelDNSRows(records []*types.DNSRecord, onEdit func(int, *types.DNSRecord), onDelete func(int, string)) []fyne.CanvasObject {
 	rows := make([]fyne.CanvasObject, 0, len(records))
 	for i, r := range records {
 		i, r := i, r
-		if r == nil {
+		if r == nil || dnsRecordIsRoute(r) {
 			continue
 		}
 		name := r.Domain
@@ -264,9 +297,6 @@ func tunnelDNSRows(records []*types.DNSRecord, onEdit func(int, *types.DNSRecord
 				target = txt
 			}
 		}
-		if target == "" {
-			target = "No address — resolved through the tunnel"
-		}
 		left := vstack(1, hstack(sp2, title...), monoText(target, fsSmall, pal().Muted))
 		edit := newIconBtn(theme.DocumentCreateIcon(), kGhost, func() { onEdit(i, r) }).small()
 		del := newIconBtn(theme.DeleteIcon(), kGhost, func() { onDelete(i, name) }).small()
@@ -278,8 +308,59 @@ func tunnelDNSRows(records []*types.DNSRecord, onEdit func(int, *types.DNSRecord
 	return rows
 }
 
-// editTunnelDNSRecord edits one record in memory. The tunnel file is written
-// only when the page's Save changes button runs.
+// tunnelDNSRouteRows lists domains whose lookups are forwarded through the
+// tunnel. index matches the shared DNSRecords slice.
+func tunnelDNSRouteRows(records []*types.DNSRecord, onEdit func(int, *types.DNSRecord), onDelete func(int, string)) []fyne.CanvasObject {
+	rows := make([]fyne.CanvasObject, 0, len(records))
+	for i, r := range records {
+		i, r := i, r
+		if !dnsRecordIsRoute(r) {
+			continue
+		}
+		name := r.Domain
+		if name == "" {
+			name = "unnamed"
+		}
+		edit := newIconBtn(theme.DocumentCreateIcon(), kGhost, func() { onEdit(i, r) }).small()
+		del := newIconBtn(theme.DeleteIcon(), kGhost, func() { onDelete(i, name) }).small()
+		row := splitRow(text(name, fsBody, pal().Content, false), hstack(sp1, edit, del))
+		rows = append(rows, insetEach(sp2, 0, sp2, 0, row))
+	}
+	if len(rows) == 0 {
+		rows = append(rows, emptyRow("No domains are routed through this tunnel."))
+	}
+	return rows
+}
+
+// editTunnelDNSRoute asks for a domain and stores it as a route: no address,
+// wildcard on, so the name and everything under it is forwarded.
+func (a *App) editTunnelDNSRoute(rec *types.DNSRecord, onSave func(types.DNSRecord)) {
+	current := ""
+	if rec != nil {
+		current = rec.Domain
+	}
+	domain := kEntry("example.com", current)
+	form := container.New(fixedLayout{w: z(420)}, vstack(sp3,
+		hint("Lookups for this domain, and any name under it, are sent through this tunnel. The query goes to the tunnel's DNS servers from the tunnel address, so the lookup travels inside the tunnel."),
+		field("Domain", domain),
+	))
+	d := dialog.NewCustomConfirm("Route domain", "Save", "Cancel", form, func(ok bool) {
+		if !ok || onSave == nil {
+			return
+		}
+		name := strings.TrimSuffix(strings.TrimSpace(domain.Text), ".")
+		if name == "" {
+			a.fail("A domain is required")
+			return
+		}
+		onSave(types.DNSRecord{Domain: name, Wildcard: true})
+	}, a.win)
+	d.Resize(fyne.NewSize(z(460), z(320)))
+	d.Show()
+}
+
+// editTunnelDNSRecord edits one fixed answer in memory. The tunnel file is
+// written only when the page's Save changes button runs.
 func (a *App) editTunnelDNSRecord(rec *types.DNSRecord, onSave func(types.DNSRecord)) {
 	if rec == nil {
 		rec = &types.DNSRecord{}
