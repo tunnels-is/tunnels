@@ -1,41 +1,132 @@
 package ui
 
 import (
+	"strings"
 	"testing"
 
+	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/test"
 	"github.com/tunnels-is/tunnels/client"
 )
 
-func TestTrayMenuIdleDisablesDisconnect(t *testing.T) {
+func trayLabels(items []*fyne.MenuItem) []string {
+	out := make([]string, 0, len(items))
+	for _, item := range items {
+		if item.IsSeparator {
+			out = append(out, "---")
+			continue
+		}
+		mark := ""
+		if item.Disabled {
+			mark = " (off)"
+		}
+		out = append(out, item.Label+mark)
+	}
+	return out
+}
+
+func liveTun(id, tag string, state client.TunnelState) *client.TUN {
+	tun := &client.TUN{ID: id, CR: &client.ConnectionRequest{Tag: tag}}
+	tun.SetState(state)
+	return tun
+}
+
+func TestTrayMenuIdle(t *testing.T) {
 	a := &App{}
 	menu := a.newTrayMenu()
-	if len(menu.Items) != 2 {
-		t.Fatalf("items: got %d, want Disconnect and Exit", len(menu.Items))
+	got := trayLabels(menu.Items)
+	want := []string{"Auto-connect", "Exit"}
+	if strings.Join(got, "|") != strings.Join(want, "|") {
+		t.Fatalf("menu: %v", got)
 	}
-	disc, exit := menu.Items[0], menu.Items[1]
-	if disc.Label != trayDisconnectLabel || !disc.Disabled || disc.Action == nil {
-		t.Fatalf("Disconnect: label %q disabled %v action %v", disc.Label, disc.Disabled, disc.Action != nil)
+	exit := menu.Items[len(menu.Items)-1]
+	if !exit.IsQuit || exit.Action == nil || exit.Label != trayExitLabel {
+		t.Fatalf("Exit: label %q quit %v", exit.Label, exit.IsQuit)
 	}
-	if exit.Label != trayExitLabel || !exit.IsQuit || exit.Action == nil {
-		t.Fatalf("Exit: label %q quit %v action %v", exit.Label, exit.IsQuit, exit.Action != nil)
-	}
-	if menu.Items[len(menu.Items)-1] != exit {
-		t.Fatal("Exit must stay last so Fyne does not append its own Quit")
+	auto := menu.Items[len(menu.Items)-2]
+	if auto.Label != trayAutoConnectLabel || auto.Disabled || auto.Action == nil {
+		t.Fatalf("Auto-connect: label %q disabled %v", auto.Label, auto.Disabled)
 	}
 }
 
-func TestTrayMenuEnablesDisconnectWhileLive(t *testing.T) {
-	connected := &client.TUN{ID: "up"}
-	connected.SetState(client.TunnelConnected)
-	connecting := &client.TUN{ID: "soon"}
-	connecting.SetState(client.TunnelConnecting)
-
-	a := &App{active: []*client.TUN{connected, connecting}}
-	menu := a.newTrayMenu()
-	if menu.Items[0].Disabled {
-		t.Fatal("Disconnect must be enabled while a tunnel is up or connecting")
+func TestTrayMenuOnlineRowDisconnectsAndDownRowConnects(t *testing.T) {
+	home := liveTun("2", "home", client.TunnelConnected)
+	work := liveTun("1", "work", client.TunnelConnecting)
+	a := &App{
+		active: []*client.TUN{work, home, liveTun("3", "extra", client.TunnelConnected)},
+		tunnels: []*client.TunnelMeta{
+			{Tag: "office", ServerID: "srv-office"},
+			{Tag: "home", ServerID: "srv-home"},
+			{Tag: "lab", ServerID: "srv-lab"},
+			{Tag: "draft"},
+		},
 	}
+	menu := a.newTrayMenu()
+	got := trayLabels(menu.Items)
+	want := []string{
+		"draft",
+		"extra - ONLINE",
+		"home - ONLINE",
+		"lab",
+		"office",
+		"work - ONLINE",
+		"---",
+		"Auto-connect",
+		"Exit",
+	}
+	if strings.Join(got, "|") != strings.Join(want, "|") {
+		t.Fatalf("menu:\n got %v\nwant %v", got, want)
+	}
+	for _, item := range menu.Items {
+		if item.IsSeparator {
+			continue
+		}
+		if item.Action == nil || item.Disabled {
+			t.Fatalf("%q must be clickable", item.Label)
+		}
+	}
+}
+
+func TestSyncTrayRebuildsWhenTunnelsChange(t *testing.T) {
+	fy := test.NewApp()
+	t.Cleanup(fy.Quit)
+
+	a := &App{}
+	a.trayMenu = a.newTrayMenu()
+	firstExit := a.trayMenu.Items[len(a.trayMenu.Items)-1]
+	a.syncTray()
+	if a.trayMenu.Items[len(a.trayMenu.Items)-1] != firstExit {
+		t.Fatal("unchanged state rebuilt the menu")
+	}
+
+	a.tunnels = []*client.TunnelMeta{{Tag: "office", ServerID: "srv"}}
+	a.syncTray()
+	got := trayLabels(a.trayMenu.Items)
+	want := []string{"office", "---", "Auto-connect", "Exit"}
+	if strings.Join(got, "|") != strings.Join(want, "|") {
+		t.Fatalf("menu: %v", got)
+	}
+	if a.trayMenu.Items[len(a.trayMenu.Items)-1] == firstExit {
+		t.Fatal("changed state kept the old Exit item")
+	}
+	if !a.trayMenu.Items[len(a.trayMenu.Items)-1].IsQuit {
+		t.Fatal("Exit must stay the quit item after a rebuild")
+	}
+}
+
+func TestInstallTraySkipsWithoutDesktopSupport(t *testing.T) {
+	fy := test.NewApp()
+	t.Cleanup(fy.Quit)
+	a := &App{fyneApp: fy, win: fy.NewWindow("t")}
+	a.installTray()
+	if a.trayMenu != nil {
+		t.Fatal("the test driver has no system tray")
+	}
+}
+
+func TestTrayAutoConnectIdleReturns(t *testing.T) {
+	a := &App{}
+	a.trayAutoConnect()
 }
 
 func TestDisconnectableTunnelsSkipsTeardown(t *testing.T) {
@@ -53,51 +144,4 @@ func TestDisconnectableTunnelsSkipsTeardown(t *testing.T) {
 	if len(disconnectableTunnels(nil)) != 0 {
 		t.Fatal("nil active list must be idle")
 	}
-}
-
-func TestSyncTrayTogglesDisconnectWithoutGrowing(t *testing.T) {
-	fy := test.NewApp()
-	t.Cleanup(fy.Quit)
-
-	a := &App{}
-	a.trayMenu = a.newTrayMenu()
-	up := &client.TUN{ID: "up"}
-	up.SetState(client.TunnelConnected)
-	a.active = []*client.TUN{up}
-	a.syncTray()
-	if a.trayDisconnect.Disabled {
-		t.Fatal("Disconnect must enable when a tunnel is up")
-	}
-	if len(a.trayMenu.Items) != 2 {
-		t.Fatalf("menu grew to %d items", len(a.trayMenu.Items))
-	}
-
-	a.active = nil
-	a.syncTray()
-	if !a.trayDisconnect.Disabled {
-		t.Fatal("Disconnect must disable when nothing is up")
-	}
-	if len(a.trayMenu.Items) != 2 {
-		t.Fatalf("menu grew to %d items", len(a.trayMenu.Items))
-	}
-
-	a.syncTray()
-	if len(a.trayMenu.Items) != 2 {
-		t.Fatalf("unchanged sync grew the menu to %d items", len(a.trayMenu.Items))
-	}
-}
-
-func TestInstallTraySkipsWithoutDesktopSupport(t *testing.T) {
-	fy := test.NewApp()
-	t.Cleanup(fy.Quit)
-	a := &App{fyneApp: fy, win: fy.NewWindow("t")}
-	a.installTray()
-	if a.trayMenu != nil || a.trayDisconnect != nil {
-		t.Fatal("the test driver has no system tray")
-	}
-}
-
-func TestDisconnectAllIdleReturns(t *testing.T) {
-	a := &App{}
-	a.disconnectAll()
 }

@@ -35,18 +35,18 @@ const (
 
 // App is the Fyne desktop UI. It talks to the client package in-process.
 type App struct {
-	fyneApp        fyne.App
-	win            fyne.Window
-	trayMenu       *fyne.Menu
-	trayDisconnect *fyne.MenuItem
-	content        *fyne.Container
-	pageBox        *fyne.Container
-	side           *sidebar
-	toastBox       *fyne.Container
-	busyBox        *fyne.Container
-	busyN          int
-	toastKind      string
-	toastMsg       string
+	fyneApp   fyne.App
+	win       fyne.Window
+	trayMenu  *fyne.Menu
+	traySig   string
+	content   *fyne.Container
+	pageBox   *fyne.Container
+	side      *sidebar
+	toastBox  *fyne.Container
+	busyBox   *fyne.Container
+	busyN     int
+	toastKind string
+	toastMsg  string
 
 	current  pageID
 	editTag  string

@@ -42,7 +42,6 @@ type TunnelMeta struct {
 	LocalhostNat  bool
 	AutoReconnect bool
 	AutoConnect   bool
-	KillSwitch    bool
 
 	TxQueueLen int32
 	MTU        int32

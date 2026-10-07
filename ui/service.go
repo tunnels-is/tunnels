@@ -164,6 +164,18 @@ func (a *App) callControllerOn(server *client.ControlServer, path string, body a
 	return raw, code, nil
 }
 
+func (a *App) fetchServerList() ([]types.Server, error) {
+	raw, _, err := a.callController("/client/servers", map[string]any{"StartIndex": 0}, true)
+	if err != nil {
+		return nil, errors.New("Unable to find servers")
+	}
+	var list []types.Server
+	if err := json.Unmarshal(raw, &list); err != nil {
+		return nil, errors.New("Unable to parse servers")
+	}
+	return list, nil
+}
+
 func (a *App) fetchServers(force bool) {
 	if a.user == nil {
 		return
@@ -283,6 +295,9 @@ func (a *App) serverByID(id string) *types.Server {
 func (a *App) connectToServer(s types.Server) {
 	if a.user == nil || a.user.DeviceToken == nil {
 		a.fail("You are not logged in")
+		if a.win != nil {
+			a.win.Show()
+		}
 		a.show(pageLogin)
 		return
 	}
@@ -339,45 +354,16 @@ func (a *App) connectTunnel(meta *client.TunnelMeta) {
 	}()
 }
 
-// disconnectAll tears down every tunnel the tray can still disconnect.
-// One tunnel keeps the same toast as disconnectActive. Several share one toast.
-func (a *App) disconnectAll() {
-	tunnels := append([]*client.TUN(nil), disconnectableTunnels(a.active)...)
-	if len(tunnels) == 0 {
-		return
-	}
-	a.note("Disconnecting...")
-	go func() {
-		var firstErr error
-		var lastTag string
-		n := 0
-		for _, tun := range tunnels {
-			tag := tunnelDisconnectTag(tun)
-			err := client.DisconnectTunnel(tun.ID, tag)
-			if err != nil {
-				if firstErr == nil {
-					firstErr = err
-				}
-				continue
-			}
-			n++
-			if tag != "" {
-				lastTag = tag
-			}
+// connectTunnelByTag connects the saved tunnel with this tag. The tray menu
+// keeps the tag, not the meta pointer, because refreshState replaces the slice.
+func (a *App) connectTunnelByTag(tag string) {
+	for _, meta := range a.tunnels {
+		if meta != nil && meta.Tag == tag {
+			a.connectTunnel(meta)
+			return
 		}
-		a.uiDo(func() {
-			switch {
-			case firstErr != nil:
-				a.fail(firstErr.Error())
-			case n == 1 && lastTag != "":
-				a.note("Disconnected from " + lastTag)
-			case n > 0:
-				a.note("Disconnected")
-			}
-			a.refreshState()
-			a.reloadCurrent()
-		})
-	}()
+	}
+	a.fail("Unable to find tunnel " + tag)
 }
 
 func tunnelDisconnectTag(tun *client.TUN) string {
