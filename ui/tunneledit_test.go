@@ -7,6 +7,16 @@ import (
 	"github.com/tunnels-is/tunnels/types"
 )
 
+func TestParseBlockedPorts(t *testing.T) {
+	ports, bad := parseBlockedPorts([]string{"25", "443", "25", "0", "65536", "nope", "80"})
+	if len(bad) != 3 || bad[0] != "0" || bad[1] != "65536" || bad[2] != "nope" {
+		t.Fatalf("bad = %#v", bad)
+	}
+	if len(ports) != 3 || ports[0] != 25 || ports[1] != 443 || ports[2] != 80 {
+		t.Fatalf("ports = %#v", ports)
+	}
+}
+
 func TestTunnelDNSRowsSkipsNil(t *testing.T) {
 	a := test.NewApp()
 	t.Cleanup(a.Quit)
