@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/test"
 )
@@ -89,6 +90,87 @@ func TestKvRowGrowsForLongPath(t *testing.T) {
 	got := row.MinSize()
 	if got.Height <= natural.Height {
 		t.Fatalf("narrow kvRow should grow; natural=%v after=%v", natural, got)
+	}
+}
+
+func TestHugCardStaysContentWidth(t *testing.T) {
+	a := test.NewApp()
+	t.Cleanup(a.Quit)
+	applyZoomTokens(1)
+	setLiveTheme(themeTunnelsDark)
+
+	sys := hug(card("System", "Paths this instance is running with.",
+		packedKVRows([][2]string{
+			{"Base path", "/tmp/tunnels"},
+			{"Log file", "tunnels.log"},
+		})))
+	flow := container.New(&cardFlowLayout{minCol: z(300), maxCol: 3, gap: sp4}, sys)
+
+	width := z(900)
+	flow.Resize(fyne.NewSize(width, flow.MinSize().Height))
+	flow.Resize(fyne.NewSize(width, flow.MinSize().Height))
+
+	if sys.Size().Width >= width-1 {
+		t.Fatalf("system card stretched to %v, window is %v", sys.Size().Width, width)
+	}
+	natural := sys.MinSize().Width
+	if sys.Size().Width > natural+1 {
+		t.Fatalf("system card width %v exceeds content %v", sys.Size().Width, natural)
+	}
+}
+
+func TestSectionHeadPaintsTitleAndRule(t *testing.T) {
+	a := test.NewApp()
+	t.Cleanup(a.Quit)
+	applyZoomTokens(1)
+	setLiveTheme(themeTunnelsDark)
+
+	head := sectionHead("DNS").(fyne.Widget)
+	var sawText, sawRule bool
+	var walk func(fyne.CanvasObject)
+	walk = func(o fyne.CanvasObject) {
+		switch co := o.(type) {
+		case *canvas.Text:
+			if co.Text == "DNS" {
+				sawText = true
+			}
+		case *canvas.Rectangle:
+			sawRule = true
+		case *fyne.Container:
+			for _, child := range co.Objects {
+				walk(child)
+			}
+		case fyne.Widget:
+			for _, child := range co.CreateRenderer().Objects() {
+				walk(child)
+			}
+		}
+	}
+	walk(head)
+	if !sawText || !sawRule {
+		t.Fatalf("section head visible to the renderer: title=%v rule=%v", sawText, sawRule)
+	}
+}
+
+func TestSectionHeadSpansAllColumns(t *testing.T) {
+	a := test.NewApp()
+	t.Cleanup(a.Quit)
+	applyZoomTokens(1)
+	setLiveTheme(themeTunnelsDark)
+
+	head := sectionHead("DNS")
+	aCard := card("A", "", vspace(z(40)))
+	flow := container.New(&cardFlowLayout{minCol: z(300), maxCol: 3, gap: sp4}, aCard, head)
+
+	width := z(800)
+	flow.Resize(fyne.NewSize(width, flow.MinSize().Height))
+	flow.Resize(fyne.NewSize(width, flow.MinSize().Height))
+
+	if head.Size().Width < width-1 {
+		t.Fatalf("section head width = %v, want full row %v", head.Size().Width, width)
+	}
+	if head.Position().Y < aCard.Size().Height {
+		t.Fatalf("section head should sit below the card, y=%v card h=%v", head.Position().Y, aCard.Size().Height)
 	}
 }
 

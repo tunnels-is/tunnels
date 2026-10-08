@@ -94,6 +94,7 @@ func (a *App) dnsPage() fyne.CanvasObject {
 	}).withIcon(theme.ContentAddIcon()).small()
 
 	return pageShell("Resolver", "Local DNS resolver, records and filter lists", nil, scrollBody(
+		sectionHead("Resolver"),
 		card("Server", "Where the resolver listens, and the upstream fallbacks.",
 			formRows(
 				formPair(field("Listen IP", ip), field("Port", port)),
@@ -102,8 +103,10 @@ func (a *App) dnsPage() fyne.CanvasObject {
 				hstack(0, saveDNS),
 			)),
 		card("Behaviour", "Encryption, logging and statistics.", behaviour),
+		sectionHead("Records"),
 		cardBox("Local records", "A and TXT records answered by this client.", addRecord,
 			settingList(recRows...)),
+		sectionHead("Filtering"),
 		a.dnsListCard("Block lists", "Domains from these lists are refused.", "DNSBlockLists", cfg.DNSBlockLists, "blocklist"),
 		a.dnsListCard("Allow lists", "Domains here always resolve, even if a block list contains them.", "DNSWhiteLists", cfg.DNSWhiteLists, "whitelist"),
 	))
