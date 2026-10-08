@@ -99,11 +99,13 @@ func (a *App) tunnelEditPage() fyne.CanvasObject {
 		{label: "NAT", placeholder: "optional", weight: 2},
 	}, netRows, "No networks mapped.", bump)
 
-	portStrs := make([]string, 0, len(form.BlockedPorts))
+	portRows := make([][]string, 0, len(form.BlockedPorts))
 	for _, p := range form.BlockedPorts {
-		portStrs = append(portStrs, strconv.Itoa(int(p)))
+		portRows = append(portRows, []string{strconv.Itoa(int(p))})
 	}
-	ports := kEntry("e.g. 25, 445, 3389", strings.Join(portStrs, ", "))
+	portEd := newRowEditor("port",
+		[]fieldCol{{label: "Port", placeholder: "443", weight: 1}},
+		portRows, "No ports blocked.", bump)
 
 	// Records stay on the cloned form until Save changes. reflow is assigned
 	// once the scroll exists, so the first render skips it. A domain with no
@@ -192,20 +194,12 @@ func (a *App) tunnelEditPage() fyne.CanvasObject {
 			form.Networks = append(form.Networks, &types.Network{Tag: n[0], Network: n[1], Nat: n[2]})
 		}
 
-		form.BlockedPorts = nil
-		var bad []string
-		for _, p := range splitCSV(ports.Text) {
-			n, err := strconv.ParseUint(p, 10, 16)
-			if err != nil {
-				bad = append(bad, p)
-				continue
-			}
-			form.BlockedPorts = append(form.BlockedPorts, uint16(n))
-		}
+		parsed, bad := parseBlockedPorts(portEd.column(0))
 		if len(bad) > 0 {
 			a.fail("Not a valid port: " + strings.Join(bad, ", "))
 			return
 		}
+		form.BlockedPorts = parsed
 
 		if err := client.SaveTunnel(form, a.editTag); err != nil {
 			a.fail(err.Error())
@@ -243,8 +237,8 @@ func (a *App) tunnelEditPage() fyne.CanvasObject {
 			capWidth(z(720), routeEd.object())),
 		card("Networks", "Networks reachable through the tunnel, with optional NAT.",
 			capWidth(z(720), netEd.object())),
-		card("Blocked ports", "Outbound TCP and UDP ports dropped on this tunnel.",
-			capWidth(formWidth, field("Ports", ports))),
+		card("Blocked ports", "TCP and UDP packets to these destination ports are dropped on the way out.",
+			capWidth(formWidth, portEd.object())),
 	)
 
 	flow := scrollFlow(cards...)
@@ -393,6 +387,26 @@ func (a *App) editTunnelDNSRecord(rec *types.DNSRecord, onSave func(types.DNSRec
 	}, a.win)
 	d.Resize(fyne.NewSize(z(480), z(480)))
 	d.Show()
+}
+
+// parseBlockedPorts keeps ports in 1..65535, in order, without duplicates.
+// Anything else is returned so the save can name it.
+func parseBlockedPorts(vals []string) (ports []uint16, bad []string) {
+	seen := make(map[uint16]struct{}, len(vals))
+	for _, p := range vals {
+		n, err := strconv.ParseUint(p, 10, 16)
+		if err != nil || n == 0 {
+			bad = append(bad, p)
+			continue
+		}
+		port := uint16(n)
+		if _, ok := seen[port]; ok {
+			continue
+		}
+		seen[port] = struct{}{}
+		ports = append(ports, port)
+	}
+	return ports, bad
 }
 
 func splitLines(s string) []string {

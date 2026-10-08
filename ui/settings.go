@@ -2,7 +2,6 @@ package ui
 
 import (
 	"fmt"
-	"strings"
 
 	"fyne.io/fyne/v2"
 	"github.com/tunnels-is/tunnels/client"
@@ -96,19 +95,4 @@ func (a *App) settingsPage() fyne.CanvasObject {
 
 	sub := fmt.Sprintf("Tunnels %s · API v%d", ver, api)
 	return pageShell("Settings", sub, nil, scrollBody(cards...))
-}
-
-func splitCSV(s string) []string {
-	if strings.TrimSpace(s) == "" {
-		return nil
-	}
-	parts := strings.Split(s, ",")
-	out := make([]string, 0, len(parts))
-	for _, p := range parts {
-		p = strings.TrimSpace(p)
-		if p != "" {
-			out = append(out, p)
-		}
-	}
-	return out
 }
