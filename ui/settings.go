@@ -31,6 +31,7 @@ func (a *App) settingsPage() fyne.CanvasObject {
 	}, live.name, func(key string) { a.setThemeName(key) })
 
 	cards := []fyne.CanvasObject{
+		sectionHead("General"),
 		card("Appearance", "",
 			settingList(
 				settingRow("Theme", "Colour theme for the whole app.", themes),
@@ -48,7 +49,28 @@ func (a *App) settingsPage() fyne.CanvasObject {
 					"Track per-tunnel throughput while connected.",
 					cfg.BandwidthGraphs, func(bool) { a.toggleConfig("BandwidthGraphs") }),
 			)),
+	}
 
+	if a.advanced {
+		base, cfgPath, logPath, logFile := "", "", "", ""
+		if a.state != nil && a.state.State != nil {
+			st := a.state.State
+			base = st.BasePath
+			cfgPath = st.ConfigFileName
+			logPath = st.LogPath
+			logFile = st.LogFileName
+		}
+		cards = append(cards, hug(card("System", "Paths this instance is running with.",
+			packedKVRows([][2]string{
+				{"Base path", base},
+				{"Config file", cfgPath},
+				{"Log path", logPath},
+				{"Log file", logFile},
+			}))))
+	}
+
+	cards = append(cards,
+		sectionHead("Network"),
 		card("Kill switch",
 			"Blackhole routes stay installed until you turn the switch off — including after disconnect or quitting the app.",
 			settingList(
@@ -59,7 +81,16 @@ func (a *App) settingsPage() fyne.CanvasObject {
 					"Off by default. When on, 0.0.0.0/0 is blackholed except the tunnel and pinned controller endpoints.",
 					cfg.KillSwitchIPv4, func(bool) { a.toggleConfig("KillSwitchIPv4") }),
 			)),
+	)
+	if a.advanced {
+		cards = append(cards, card("DNS", "",
+			toggleRow("Disable resolver",
+				"The bundled DNS resolver is enabled by default.",
+				cfg.DisableDNS, func(bool) { a.toggleConfig("DisableDNS") })))
+	}
 
+	cards = append(cards,
+		sectionHead("Logging"),
 		card("Logging", "Which event types are captured.",
 			settingList(
 				toggleRow("Info", "", cfg.InfoLogging, func(bool) { a.toggleConfig("InfoLogging") }),
@@ -68,30 +99,7 @@ func (a *App) settingsPage() fyne.CanvasObject {
 				toggleRow("Console", "Also write log lines to stdout.", cfg.ConsoleLogging, func(bool) { a.toggleConfig("ConsoleLogging") }),
 				toggleRow("Terminal only", "Skip the log file entirely.", cfg.ConsoleLogOnly, func(bool) { a.toggleConfig("ConsoleLogOnly") }),
 			)),
-	}
-
-	if a.advanced {
-		cards = append(cards, card("DNS", "",
-			toggleRow("Disable resolver",
-				"The bundled DNS resolver is enabled by default.",
-				cfg.DisableDNS, func(bool) { a.toggleConfig("DisableDNS") })))
-
-		base, cfgPath, logPath, logFile := "", "", "", ""
-		if a.state != nil && a.state.State != nil {
-			st := a.state.State
-			base = st.BasePath
-			cfgPath = st.ConfigFileName
-			logPath = st.LogPath
-			logFile = st.LogFileName
-		}
-		cards = append(cards, fullRow(card("System", "Paths this instance is running with.",
-			vstack(0,
-				kvRow("Base path", base, true),
-				kvRow("Config file", cfgPath, true),
-				kvRow("Log path", logPath, true),
-				kvRow("Log file", logFile, true),
-			))))
-	}
+	)
 
 	sub := fmt.Sprintf("Tunnels %s · API v%d", ver, api)
 	return pageShell("Settings", sub, nil, scrollBody(cards...))

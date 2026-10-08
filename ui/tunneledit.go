@@ -218,6 +218,7 @@ func (a *App) tunnelEditPage() fyne.CanvasObject {
 		cards = append(cards, fullRow(notice("This tunnel is connected. Disconnect it before saving changes.", toneWarning)))
 	}
 	cards = append(cards,
+		sectionHead("General"),
 		card("General", "Identity, server and transport.",
 			formRows(
 				formPair(field("Name", tag), field("Interface", ifname)),
@@ -225,6 +226,7 @@ func (a *App) tunnelEditPage() fyne.CanvasObject {
 				formPair(field("MTU", mtu), field("TX queue length", txq)),
 			)),
 		card("Behaviour", "What this tunnel does while connected.", features),
+		sectionHead("DNS"),
 		card("DNS servers", "Resolvers handed to the interface, in order.",
 			capWidth(formWidth, dnsEd.object())),
 		cardBox("DNS routing",
@@ -233,6 +235,7 @@ func (a *App) tunnelEditPage() fyne.CanvasObject {
 		cardBox("DNS records",
 			"Fixed answers for names on this tunnel. Saved with the tunnel.",
 			addRecord, recBody),
+		sectionHead("Network"),
 		card("Routes", "Extra routes installed while the tunnel is up.",
 			capWidth(z(720), routeEd.object())),
 		card("Networks", "Networks reachable through the tunnel, with optional NAT.",

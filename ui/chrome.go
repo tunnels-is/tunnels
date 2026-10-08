@@ -496,15 +496,61 @@ func (c *cardFlowLayout) columns(width float32) int {
 
 // fullWidthCard is a flow child that occupies the whole row instead of one
 // masonry cell, so long content (file paths) is not clipped to a column.
-type fullWidthCard struct{ fyne.CanvasObject }
+//
+// It has to be a widget. Fyne only paints *fyne.Container and fyne.Widget
+// children, so a struct that merely embeds the content is laid out and then
+// never drawn.
+type fullWidthCard struct {
+	widget.BaseWidget
+	obj fyne.CanvasObject
+}
 
 func fullRow(obj fyne.CanvasObject) fyne.CanvasObject {
-	return &fullWidthCard{CanvasObject: obj}
+	f := &fullWidthCard{obj: obj}
+	f.ExtendBaseWidget(f)
+	return f
+}
+
+func (f *fullWidthCard) CreateRenderer() fyne.WidgetRenderer {
+	return widget.NewSimpleRenderer(f.obj)
+}
+
+// hugCard is a flow child sized to its content, capped at one column. A
+// full-width row stretches key/value lines so the value sits on the far edge.
+type hugCard struct {
+	widget.BaseWidget
+	obj fyne.CanvasObject
+}
+
+func hug(obj fyne.CanvasObject) fyne.CanvasObject {
+	h := &hugCard{obj: obj}
+	h.ExtendBaseWidget(h)
+	return h
+}
+
+func (h *hugCard) CreateRenderer() fyne.WidgetRenderer {
+	return widget.NewSimpleRenderer(h.obj)
+}
+
+// sectionHead splits a card flow into groups. It is a title and a hairline
+// across the whole row, the same rhythm as the page header, with no panel.
+func sectionHead(title string) fyne.CanvasObject {
+	return fullRow(vstack(sp2,
+		text(title, fsLarge, pal().Content, true),
+		strongDivider(),
+	))
 }
 
 func flowItemWidth(o fyne.CanvasObject, colW, total float32) float32 {
 	if _, ok := o.(*fullWidthCard); ok {
 		return total
+	}
+	if h, ok := o.(*hugCard); ok {
+		w := h.MinSize().Width
+		if w > colW {
+			w = colW
+		}
+		return w
 	}
 	return colW
 }
@@ -547,7 +593,7 @@ func (c *cardFlowLayout) Layout(objs []fyne.CanvasObject, size fyne.Size) {
 			}
 		}
 		o.Move(fyne.NewPos(float32(col)*(colW+c.gap), heights[col]))
-		o.Resize(fyne.NewSize(colW, h))
+		o.Resize(fyne.NewSize(flowItemWidth(o, colW, size.Width), h))
 		heights[col] += h + c.gap
 	}
 
@@ -793,6 +839,175 @@ func statTile(label, value string, t tone) fyne.CanvasObject {
 	l := text(label, fsCaption, pal().Muted, false)
 	inner := vstack(z(2), v, l)
 	return container.NewStack(surface(radMd, pal().Base100, pal().Base300), insetXY(sp3, sp2, inner))
+}
+
+// packedKVRows is a key/value list sized to its text. Keys share one column
+// and each value starts a fixed gap after that column, instead of being
+// pushed to the far edge of a stretched row. A value wraps when the row is
+// narrower than the text.
+func packedKVRows(rows [][2]string) fyne.CanvasObject {
+	var col float32
+	cleaned := make([][2]string, len(rows))
+	for i, r := range rows {
+		v := strings.TrimSpace(r[1])
+		if v == "" {
+			v = "—"
+		}
+		cleaned[i] = [2]string{r[0], v}
+		col = max32(col, measureWidth(r[0], fsBody, fyne.TextStyle{}))
+	}
+	lines := make([]fyne.CanvasObject, 0, len(cleaned)*2)
+	for i, r := range cleaned {
+		if i > 0 {
+			lines = append(lines, divider())
+		}
+		lines = append(lines, insetEach(sp2+1, 0, sp2+1, 0, newPackedKV(r[0], r[1], col)))
+	}
+	return vstack(0, lines...)
+}
+
+type packedKV struct {
+	widget.BaseWidget
+	label string
+	value string
+	col   float32
+
+	wrapW float32
+	lines []string
+}
+
+func newPackedKV(label, value string, col float32) *packedKV {
+	k := &packedKV{label: label, value: value, col: col}
+	k.ExtendBaseWidget(k)
+	return k
+}
+
+func (k *packedKV) valueStyle() fyne.TextStyle { return fyne.TextStyle{Monospace: true} }
+
+func (k *packedKV) naturalWidth() float32 {
+	return k.col + sp4 + measureWidth(k.value, fsSmall, k.valueStyle())
+}
+
+func (k *packedKV) valueLines(width float32) []string {
+	remain := width - k.col - sp4
+	if remain < z(40) {
+		remain = width
+	}
+	if k.lines != nil && k.wrapW == remain {
+		return k.lines
+	}
+	k.wrapW = remain
+	k.lines = wrapToWidth(k.value, remain, fsSmall, k.valueStyle())
+	return k.lines
+}
+
+func (k *packedKV) CreateRenderer() fyne.WidgetRenderer {
+	r := &packedKVRenderer{
+		k:     k,
+		label: text(k.label, fsBody, pal().Muted, false),
+	}
+	r.ensure(1)
+	return r
+}
+
+type packedKVRenderer struct {
+	k      *packedKV
+	label  *canvas.Text
+	values []*canvas.Text
+	objs   []fyne.CanvasObject
+}
+
+func (r *packedKVRenderer) Destroy() {}
+
+func (r *packedKVRenderer) Objects() []fyne.CanvasObject {
+	if r.objs == nil {
+		r.rebuild()
+	}
+	return r.objs
+}
+
+func (r *packedKVRenderer) rebuild() {
+	r.objs = r.objs[:0]
+	r.objs = append(r.objs, r.label)
+	for _, t := range r.values {
+		r.objs = append(r.objs, t)
+	}
+}
+
+func (r *packedKVRenderer) ensure(n int) {
+	style := r.k.valueStyle()
+	src := fontForStyle(style)
+	grew := false
+	for len(r.values) < n {
+		t := canvas.NewText("", pal().Content)
+		t.TextSize = fsSmall
+		t.TextStyle = style
+		t.FontSource = src
+		r.values = append(r.values, t)
+		grew = true
+	}
+	if grew || r.objs == nil {
+		r.rebuild()
+	}
+}
+
+func (r *packedKVRenderer) MinSize() fyne.Size {
+	k := r.k
+	lh := cachedLineHeight(fsBody, fyne.TextStyle{})
+	vh := cachedLineHeight(fsSmall, k.valueStyle())
+	w := k.Size().Width
+	if w <= 0 || w+0.5 >= k.naturalWidth() {
+		return fyne.NewSize(k.naturalWidth(), max32(lh, vh))
+	}
+	lines := k.valueLines(w)
+	remain := w - k.col - sp4
+	if remain < z(40) {
+		return fyne.NewSize(w, lh+z(2)+vh*float32(len(lines)))
+	}
+	return fyne.NewSize(w, max32(lh, vh*float32(len(lines))))
+}
+
+func (r *packedKVRenderer) Layout(size fyne.Size) {
+	k := r.k
+	lh := r.label.MinSize().Height
+	vh := cachedLineHeight(fsSmall, k.valueStyle())
+	lines := k.valueLines(size.Width)
+	remain := size.Width - k.col - sp4
+	stack := remain < z(40)
+	r.label.Move(fyne.NewPos(0, 0))
+	r.label.Resize(r.label.MinSize())
+	valueX, valueY := k.col+sp4, float32(0)
+	if stack {
+		valueX, valueY = 0, lh+z(2)
+	}
+	r.ensure(len(lines))
+	for i, t := range r.values {
+		if i >= len(lines) {
+			t.Hide()
+			continue
+		}
+		t.Show()
+		t.Text = lines[i]
+		t.TextSize = fsSmall
+		t.TextStyle = k.valueStyle()
+		t.Color = pal().Content
+		t.Move(fyne.NewPos(valueX, valueY+vh*float32(i)))
+		t.Resize(t.MinSize())
+	}
+}
+
+func (r *packedKVRenderer) Refresh() {
+	r.label.Text = r.k.label
+	r.label.TextSize = fsBody
+	r.label.Color = pal().Muted
+	r.label.Refresh()
+	if sz := r.k.Size(); sz.Width > 0 {
+		r.Layout(sz)
+	}
+	for _, t := range r.values {
+		t.Refresh()
+	}
+	canvasRefresh(r.k)
 }
 
 // kvRow is one label/value line with a trailing hairline. Long values wrap
