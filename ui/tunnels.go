@@ -84,7 +84,7 @@ func (a *App) tunnelsPage() fyne.CanvasObject {
 		}
 		cards = append(cards, a.tunnelCard(t))
 	}
-	return pageShell("Tunnels", sub, actions, scrollBody(cards...))
+	return pageShell("Tunnels", sub, actions, wrapBody(cards...))
 }
 
 func (a *App) tunnelCard(t *client.TunnelMeta) fyne.CanvasObject {
@@ -139,18 +139,17 @@ func (a *App) tunnelCard(t *client.TunnelMeta) fyne.CanvasObject {
 		})
 	}
 
-	rows := []fyne.CanvasObject{
-		kvRow("Server", srvLabel, false),
-		kvRow("Address", addr, true),
-		kvRow("Interface", t.IFName, true),
+	facts := []fact{
+		{label: "Server", value: srvLabel},
+		{label: "Address", value: addr, mono: true},
+		{label: "Interface", value: t.IFName, mono: true},
 	}
 	if on {
-		rows = append(rows,
-			kvRow("Download", at.IngressString(), true),
-			kvRow("Upload", at.EgressString(), true),
+		facts = append(facts,
+			fact{label: "Download", value: at.IngressString(), mono: true},
+			fact{label: "Upload", value: at.EgressString(), mono: true},
 		)
 	}
 
-	return cardBox(title, "", hstack(sp2, badge(pill, toneName), edit, del),
-		vstack(sp4, vstack(0, rows...), hstack(sp2, connect, firewall)))
+	return detailCard(title, hstack(sp2, badge(pill, toneName), edit, del), facts, connect, firewall)
 }

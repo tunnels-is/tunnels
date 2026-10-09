@@ -71,7 +71,7 @@ func (a *App) serversPage() fyne.CanvasObject {
 	for _, s := range a.serverView {
 		cards = append(cards, a.serverCard(s))
 	}
-	return pageShell("Servers", sub, actions, scrollBody(cards...))
+	return pageShell("Servers", sub, actions, wrapBody(cards...))
 }
 
 func (a *App) serverCard(s types.Server) fyne.CanvasObject {
@@ -99,17 +99,16 @@ func (a *App) serverCard(s types.Server) fyne.CanvasObject {
 		})
 	}
 
-	rows := []fyne.CanvasObject{
-		kvRow("Location", countryName(s.Country), false),
-		kvRow("Address", serverWGAddr(&s), true),
+	facts := []fact{
+		{label: "Location", value: countryName(s.Country)},
+		{label: "Address", value: serverWGAddr(&s), mono: true},
 	}
 	if on {
-		rows = append(rows,
-			kvRow("Download", at.IngressString(), true),
-			kvRow("Upload", at.EgressString(), true),
+		facts = append(facts,
+			fact{label: "Download", value: at.IngressString(), mono: true},
+			fact{label: "Upload", value: at.EgressString(), mono: true},
 		)
 	}
 
-	return cardBox(title, "", badge(pill, status),
-		vstack(sp4, vstack(0, rows...), hstack(sp2, action)))
+	return detailCard(title, badge(pill, status), facts, action)
 }
