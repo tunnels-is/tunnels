@@ -90,7 +90,6 @@ type App struct {
 	serverView []types.Server
 	tunnelList *widget.List
 	tunnelView []*client.TunnelMeta
-	deviceList *widget.List
 	deviceView []types.Device
 	logList    *widget.List
 	logView    []string
@@ -288,7 +287,6 @@ func (a *App) teardownPage() {
 func (a *App) dropLiveLists() {
 	a.serverList = nil
 	a.tunnelList = nil
-	a.deviceList = nil
 	a.logList = nil
 	a.logHeights = nil
 	a.logHeightQueued = false
@@ -311,13 +309,6 @@ func (a *App) refreshLivePage() bool {
 		}
 		a.recomputeTunnelView()
 		a.tunnelList.Refresh()
-		return true
-	case pageDevices:
-		if a.deviceList == nil {
-			return false
-		}
-		a.recomputeDeviceView()
-		a.deviceList.Refresh()
 		return true
 	case pageLogs:
 		if a.logList == nil {

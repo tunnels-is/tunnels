@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"fyne.io/fyne/v2/test"
 	"github.com/google/uuid"
 	"github.com/tunnels-is/tunnels/client"
 	"github.com/tunnels-is/tunnels/types"
@@ -70,6 +71,60 @@ func TestDeviceView_SeveralLocalStayOnTop(t *testing.T) {
 		if got[i] != want[i] {
 			t.Fatalf("order = %v, want %v", got, want)
 		}
+	}
+}
+
+func TestDeviceStatus_ConnectedWinsOverLocal(t *testing.T) {
+	id := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	d := types.Device{ID: id, WireGuardIP: "10.9.0.2", WireGuardKey: "pub"}
+	ids := map[string]struct{}{id.String(): {}}
+	pubs := map[string]struct{}{"pub": {}}
+	conn := map[string]struct{}{"10.9.0.2": {}}
+
+	label, got := deviceStatus(d, ids, pubs, conn)
+	if label != "Connected" || got != toneSuccess {
+		t.Fatalf("connected local = %q %v", label, got)
+	}
+
+	label, got = deviceStatus(d, ids, pubs, nil)
+	if label != "This device" || got != tonePrimary {
+		t.Fatalf("local = %q %v", label, got)
+	}
+
+	label, got = deviceStatus(d, nil, nil, nil)
+	if label != "Remote" || got != toneNeutral {
+		t.Fatalf("remote = %q %v", label, got)
+	}
+}
+
+func TestDeviceStatus_EmptyIPIsNotConnected(t *testing.T) {
+	d := types.Device{ID: uuid.New()}
+	conn := map[string]struct{}{"": {}}
+	label, got := deviceStatus(d, nil, nil, conn)
+	if label != "Remote" || got != toneNeutral {
+		t.Fatalf("blank ip = %q %v", label, got)
+	}
+}
+
+func TestDevicesPage_BuildsCards(t *testing.T) {
+	fy := test.NewApp()
+	t.Cleanup(fy.Quit)
+	applyZoomTokens(1)
+
+	now := time.Date(2026, 8, 26, 12, 0, 0, 0, time.UTC)
+	a := &App{
+		devicesLoaded: true,
+		devices: []types.Device{
+			{ID: uuid.New(), Tag: "laptop", WireGuardIP: "10.9.0.2", WireGuardIPv6: "fd00::2", CreatedAt: now},
+			{ID: uuid.New(), Tag: "phone", WireGuardIP: "10.9.0.3", CreatedAt: now.Add(-time.Hour)},
+		},
+	}
+	page := a.devicesPage()
+	if page == nil {
+		t.Fatal("nil page")
+	}
+	if len(a.deviceView) != 2 {
+		t.Fatalf("view = %d", len(a.deviceView))
 	}
 }
 
