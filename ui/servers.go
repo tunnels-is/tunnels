@@ -5,7 +5,6 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/theme"
-	"fyne.io/fyne/v2/widget"
 	"github.com/tunnels-is/tunnels/types"
 )
 
@@ -55,7 +54,7 @@ func (a *App) serversPage() fyne.CanvasObject {
 		sub = fmt.Sprintf("%d available · %d connected", len(a.serverView), active)
 	}
 
-	spec := serverTable()
+	actions := hstackFlex(sp2, 0, search, refresh)
 
 	if len(a.serverView) == 0 {
 		msg, desc := "No servers", "Nothing matched this filter."
@@ -65,63 +64,52 @@ func (a *App) serversPage() fyne.CanvasObject {
 				msg, desc = "Loading servers…", ""
 			}
 		}
-		return pageShellFlush("Servers", sub, hstackFlex(sp2, 0, search, refresh), emptyState(msg, desc))
+		return pageShell("Servers", sub, actions, emptyState(msg, desc))
 	}
 
-	a.serverList = newRowList(spec,
-		func() int { return len(a.serverView) },
-		a.bindServerRow,
-	)
-
-	return pageShellFlush("Servers", sub, hstackFlex(sp2, 0, search, refresh),
-		tableBody(spec, a.serverList))
+	cards := make([]fyne.CanvasObject, 0, len(a.serverView))
+	for _, s := range a.serverView {
+		cards = append(cards, a.serverCard(s))
+	}
+	return pageShell("Servers", sub, actions, scrollBody(cards...))
 }
 
-func serverTable() *tableSpec {
-	return &tableSpec{
-		actionW: 120,
-		cols: []tableCol{
-			{label: "SERVER", weight: 2, strong: true},
-			{label: "LOCATION", weight: 1.6},
-			{label: "ADDRESS", weight: 2, mono: true},
-			{label: "TRANSFER", weight: 1.8, mono: true, optional: true},
-		},
-	}
-}
-
-func (a *App) bindServerRow(id widget.ListItemID, row *kRow) {
-	if id < 0 || id >= len(a.serverView) {
-		return
-	}
-	s := a.serverView[id]
+func (a *App) serverCard(s types.Server) fyne.CanvasObject {
 	at := a.liveByServer[s.ID.String()]
 	on := at != nil
-
-	tn := toneNeutral
-	transfer := "—"
+	pill, status := "Available", toneNeutral
 	if on {
-		tn = toneSuccess
-		transfer = "↓ " + at.IngressString() + "  ↑ " + at.EgressString()
+		pill, status = "Connected", toneSuccess
 	}
-	row.SetCells([]string{
-		s.Tag,
-		countryName(s.Country),
-		serverWGAddr(&s),
-		transfer,
-	}, on, tn)
+	title := s.Tag
+	if title == "" {
+		title = "Server"
+	}
 
-	row.ghost.SetHidden(true)
-	row.iconA.SetHidden(true)
-	row.iconB.SetHidden(true)
+	srv := s
+	var action *kBtn
 	if on {
 		tun, tag := at, s.Tag
-		row.main.Set("Disconnect", kDanger, func() {
+		action = dangerBtn("Disconnect", func() {
 			a.confirm("Disconnect", "Disconnect from "+tag+"?", func() { a.disconnectActive(tun) })
 		})
 	} else {
-		srv := s
-		row.main.Set("Connect", kSuccess, func() {
+		action = successBtn("Connect", func() {
 			a.confirm("Connect", "Connect to "+srv.Tag+"?", func() { a.connectToServer(srv) })
 		})
 	}
+
+	rows := []fyne.CanvasObject{
+		kvRow("Location", countryName(s.Country), false),
+		kvRow("Address", serverWGAddr(&s), true),
+	}
+	if on {
+		rows = append(rows,
+			kvRow("Download", at.IngressString(), true),
+			kvRow("Upload", at.EgressString(), true),
+		)
+	}
+
+	return cardBox(title, "", badge(pill, status),
+		vstack(sp4, vstack(0, rows...), hstack(sp2, action)))
 }
