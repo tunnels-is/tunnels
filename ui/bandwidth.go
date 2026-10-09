@@ -480,22 +480,27 @@ func (r *bwRenderer) Refresh() {
 	}
 }
 
-// bandwidthCard wraps the panel with the tunnel's identity.
-func (a *App) bandwidthCard(t *client.TUN) fyne.CanvasObject {
-	tag := "tunnel"
+// bandwidthBlock is one live tunnel's chart, drawn on the page rather than
+// inside a card. headed adds the tunnel name above the graph when several
+// tunnels are up; a single tunnel is already named by the page hero.
+func (a *App) bandwidthBlock(t *client.TUN, headed bool) fyne.CanvasObject {
+	tag := "Tunnel"
+	where := ""
 	if t.CR != nil && t.CR.Tag != "" {
 		tag = t.CR.Tag
 	}
-	where := ""
-	if t.CR != nil {
+	if headed && t.CR != nil {
 		if s := a.serverByID(t.CR.ServerID); s != nil {
 			where = s.Tag
 			if c := countryName(s.Country); c != "" {
-				where += "  ·  " + c
+				if where != "" {
+					where += "  ·  "
+				}
+				where += c
 			}
 		}
 	}
-	if t.ServerResponse != nil && t.ServerResponse.InterfaceIP != "" {
+	if headed && t.ServerResponse != nil && t.ServerResponse.InterfaceIP != "" {
 		if where != "" {
 			where += "  ·  "
 		}
@@ -505,9 +510,17 @@ func (a *App) bandwidthCard(t *client.TUN) fyne.CanvasObject {
 	tun := t
 	disc := dangerBtn("Disconnect", func() {
 		a.confirm("Disconnect", "Disconnect "+tag+"?", func() { a.disconnectActive(tun) })
-	}).small()
+	})
 	panel := newBandwidthPanel(t, a.bwRangeSeconds())
 	a.bwLive = append(a.bwLive, panel)
-	return cardBox(tag, where, hstack(sp2, badge("live", toneSuccess), disc),
-		container.New(vCentreLayout{}, panel))
+
+	lines := []fyne.CanvasObject{}
+	if headed {
+		lines = append(lines, container.NewCenter(text(tag, fsLarge, pal().Content, true)))
+		if where != "" {
+			lines = append(lines, container.NewCenter(text(where, fsLarge, pal().Muted, false)))
+		}
+	}
+	lines = append(lines, panel, container.NewCenter(disc))
+	return vstack(sp3, lines...)
 }

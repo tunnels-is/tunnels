@@ -2,13 +2,23 @@ package ui
 
 import (
 	"fmt"
+	"image/color"
 	"time"
 
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/canvas"
+	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/theme"
 	"github.com/tunnels-is/tunnels/client"
 	"github.com/tunnels-is/tunnels/types"
 )
+
+// dashNameSize is the server name on the dashboard. It is larger than the
+// page title so the name reads as the screen, not a label inside a card.
+func dashNameSize() float32 { return snapDIP(z(34)) }
+
+// dashLatencySize is the round-trip figure above that name.
+func dashLatencySize() float32 { return snapDIP(z(22)) }
 
 // ---------------------------------------------------------------- page
 
@@ -25,14 +35,20 @@ func (a *App) dashboardPage() fyne.CanvasObject {
 	// server fetch instead, so it also fires when the list is still in flight.
 	a.maybeAutoProbe()
 
-	cards := []fyne.CanvasObject{a.dashClosestCard()}
-	// Live throughput, one card per active tunnel.
-	for _, t := range a.myTunnels() {
-		cards = append(cards, a.bandwidthCard(t))
-	}
+	return pageShell("Dashboard", "", actions, stage(z(520), a.dashBody()))
+}
 
-	sub := "Closest server and live throughput"
-	return pageShell("Dashboard", sub, actions, scrollBody(cards...))
+// dashBody is the centred column: the server you would connect to, or the
+// one you are on, with a chart under each live tunnel.
+func (a *App) dashBody() fyne.CanvasObject {
+	if mine := a.myTunnels(); len(mine) > 0 {
+		parts := []fyne.CanvasObject{a.dashLiveHero(mine[0])}
+		for _, t := range mine {
+			parts = append(parts, a.bandwidthBlock(t, len(mine) > 1))
+		}
+		return vstack(sp8, parts...)
+	}
+	return a.dashClosest()
 }
 
 // myTunnels is the signed-in user's active tunnels.
@@ -46,36 +62,28 @@ func (a *App) myTunnels() []*client.TUN {
 	return mine
 }
 
-// dashClosestCard highlights the fastest server the probe found.
-func (a *App) dashClosestCard() fyne.CanvasObject {
-	// Already connected: the server in use is the relevant one, and the web UI
-	// takes the same view rather than probing the fleet again.
-	if mine := a.myTunnels(); len(mine) > 0 {
-		if s := a.serverByID(mine[0].CR.ServerID); s != nil {
-			return cardBox("Current server", "", badge("in use", toneSuccess),
-				vstack(sp4,
-					vstack(1,
-						text(s.Tag, fsTitle, pal().Content, true),
-						text(countryName(s.Country), fsSmall, pal().Muted, false),
-					),
-					vstack(0,
-						kvRow("Address", s.IP+":"+s.Port, true),
-						kvRow("Tunnel", mine[0].CR.Tag, false),
-					),
-				))
-		}
-	}
+// dashClosest is the centred closest-server prompt. Nothing here sits on a card.
+func (a *App) dashClosest() fyne.CanvasObject {
 	if a.probing && a.probeResults == nil {
-		return card("Closest server", "Measuring round-trip time to every server…", nil)
+		return vstack(sp3,
+			dashCenter("Finding the closest server", dashNameSize(), pal().Content, true, false),
+			dashCenter("Measuring round-trip time.", fsLarge, pal().Muted, false, false),
+		)
 	}
 	best, ok := a.bestProbe()
 	if !ok {
-		desc := "No server answered a ping."
+		msg := "No server answered."
+		hint := "Run a probe to measure round-trip time."
 		if len(a.probeResults) == 0 {
-			desc = "Run a probe to find the server with the lowest round-trip time."
+			msg = "Find the closest server"
+			hint = "A probe measures round-trip time to every server."
 		}
-		return cardBox("Closest server", desc,
-			primaryBtn("Probe", func() { a.forceProbe() }).small(), nil)
+		probe := primaryBtn("Probe", func() { a.forceProbe() }).withIcon(theme.ViewRefreshIcon())
+		return vstack(sp4,
+			dashCenter(msg, dashNameSize(), pal().Content, true, false),
+			dashCenter(hint, fsLarge, pal().Muted, false, false),
+			container.NewCenter(probe),
+		)
 	}
 
 	connect := successBtn("Connect", func() {
@@ -87,18 +95,68 @@ func (a *App) dashClosestCard() fyne.CanvasObject {
 		a.confirm("Connect", "Connect to "+srv.Tag+"?", func() { a.connectToServer(srv) })
 	})
 
-	title := text(best.Tag, fsTitle, pal().Content, true)
-	where := text(countryName(best.Country), fsSmall, pal().Muted, false)
+	lines := []fyne.CanvasObject{
+		dashCenter("Closest server", fsLarge, pal().Muted, false, false),
+		dashCenter(fmt.Sprintf("%d ms", best.LatencyMS()), dashLatencySize(), pal().Success, true, true),
+		dashCenter(best.Tag, dashNameSize(), pal().Content, true, false),
+	}
+	if c := countryName(best.Country); c != "" {
+		lines = append(lines, dashCenter(c, fsLarge, pal().Muted, false, false))
+	}
+	if best.IP != "" {
+		lines = append(lines, dashCenter(best.IP, fsLarge, pal().Content, false, true))
+	}
+	lines = append(lines, vspace(sp2), container.NewCenter(connect))
+	return vstack(sp2, lines...)
+}
 
-	return cardBox("Closest server", "", badge(fmt.Sprintf("%d ms", best.LatencyMS()), toneSuccess),
-		vstack(sp4,
-			vstack(1, title, where),
-			vstack(0,
-				kvRow("Address", best.IP, true),
-				kvRow("Round trip", fmt.Sprintf("%d ms", best.LatencyMS()), true),
-			),
-			hstack(sp2, connect),
-		))
+// dashLiveHero names the server a live tunnel is using.
+func (a *App) dashLiveHero(t *client.TUN) fyne.CanvasObject {
+	title := "Connected"
+	where := ""
+	addr := ""
+	tunnel := ""
+	if t != nil && t.CR != nil {
+		tunnel = t.CR.Tag
+		if s := a.serverByID(t.CR.ServerID); s != nil {
+			if s.Tag != "" {
+				title = s.Tag
+			}
+			where = countryName(s.Country)
+			if s.IP != "" {
+				addr = s.IP
+				if s.Port != "" {
+					addr += ":" + s.Port
+				}
+			}
+		}
+	}
+	lines := []fyne.CanvasObject{
+		dashCenter(title, dashNameSize(), pal().Content, true, false),
+	}
+	if where != "" {
+		lines = append(lines, dashCenter(where, fsLarge, pal().Muted, false, false))
+	}
+	if addr != "" {
+		lines = append(lines, dashCenter(addr, fsLarge, pal().Content, false, true))
+	}
+	if tunnel != "" && tunnel != title {
+		lines = append(lines, dashCenter(tunnel, fsLarge, pal().Muted, false, false))
+	}
+	lines = append(lines, dashCenter("in use", fsLarge, pal().Success, true, false))
+	return vstack(sp2, lines...)
+}
+
+// dashCenter is one centred line. mono is for addresses and timings.
+func dashCenter(s string, size float32, c color.Color, bold, mono bool) fyne.CanvasObject {
+	var label *canvas.Text
+	if mono {
+		label = monoText(s, size, c)
+		label.TextStyle.Bold = bold
+	} else {
+		label = text(s, size, c, bold)
+	}
+	return container.NewCenter(label)
 }
 
 // ---------------------------------------------------------------- actions
