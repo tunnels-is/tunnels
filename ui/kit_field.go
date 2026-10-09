@@ -669,6 +669,13 @@ func scrollBody(objs ...fyne.CanvasObject) fyne.CanvasObject {
 	return scrollBodyOf(scrollFlow(objs...))
 }
 
+// wrapBody packs cards at their content width, wrapping to the next row
+// when the next card does not fit. List pages use it so a card is only as
+// wide as its text and buttons.
+func wrapBody(objs ...fyne.CanvasObject) fyne.CanvasObject {
+	return scrollBodyOf(wrapFlow(objs...))
+}
+
 // scrollBodyOf wraps content the caller already holds, for pages that need to
 // refresh it directly when a card changes height.
 func scrollBodyOf(col fyne.CanvasObject) fyne.CanvasObject {

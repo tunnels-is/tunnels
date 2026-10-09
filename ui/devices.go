@@ -105,7 +105,7 @@ func (a *App) devicesPage() fyne.CanvasObject {
 	for _, d := range a.deviceView {
 		cards = append(cards, a.deviceCard(d))
 	}
-	return pageShell("Devices", sub, actions, scrollBody(cards...))
+	return pageShell("Devices", sub, actions, wrapBody(cards...))
 }
 
 // deviceStatus is the badge on a device card. A live tunnel wins over a
@@ -128,7 +128,7 @@ func (a *App) deviceCard(d types.Device) fyne.CanvasObject {
 		title = "Device"
 	}
 	dev := d
-	del := newIconBtn(theme.DeleteIcon(), kGhost, func() {
+	del := newIconBtn(theme.DeleteIcon(), kDanger, func() {
 		a.confirm("Delete device", `Delete "`+dev.Tag+`"? This cannot be undone.`, func() {
 			go func() {
 				_, _, err := a.callController("/client/device/delete", map[string]any{"DeviceID": dev.ID.String()}, true)
@@ -144,15 +144,15 @@ func (a *App) deviceCard(d types.Device) fyne.CanvasObject {
 		})
 	})
 
-	rows := []fyne.CanvasObject{
-		kvRow("WireGuard IP", d.WireGuardIP, true),
+	facts := []fact{
+		{label: "WireGuard IP", value: d.WireGuardIP, mono: true},
 	}
 	if d.WireGuardIPv6 != "" {
-		rows = append(rows, kvRow("WireGuard IPv6", d.WireGuardIPv6, true))
+		facts = append(facts, fact{label: "WireGuard IPv6", value: d.WireGuardIPv6, mono: true})
 	}
-	rows = append(rows, kvRow("Added", fmtTime(d.CreatedAt), true))
+	facts = append(facts, fact{label: "Added", value: fmtTime(d.CreatedAt), mono: true})
 
-	return cardBox(title, "", hstack(sp2, badge(pill, t), del), vstack(0, rows...))
+	return detailCard(title, hstack(sp2, badge(pill, t), del), facts)
 }
 
 func (a *App) createDeviceDialog() {
