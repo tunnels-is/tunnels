@@ -624,6 +624,76 @@ func (c *cardFlowLayout) MinSize(objs []fyne.CanvasObject) fyne.Size {
 	return fyne.NewSize(c.minCol, h)
 }
 
+// wrapFlowLayout places children left to right at their own width and wraps
+// when the next child does not fit. Unlike cardFlowLayout, a child is never
+// stretched to a column.
+type wrapFlowLayout struct {
+	gap   float32
+	lastH float32
+}
+
+func (w *wrapFlowLayout) Layout(objs []fyne.CanvasObject, size fyne.Size) {
+	type item struct {
+		o    fyne.CanvasObject
+		w, h float32
+	}
+	items := make([]item, 0, len(objs))
+	for _, o := range objs {
+		if o == nil || !o.Visible() {
+			continue
+		}
+		natural := o.MinSize()
+		width := natural.Width
+		if size.Width > 0 && width > size.Width {
+			width = size.Width
+		}
+		o.Resize(fyne.NewSize(width, natural.Height))
+		items = append(items, item{o: o, w: width, h: o.MinSize().Height})
+	}
+
+	x, y, rowH := float32(0), float32(0), float32(0)
+	for _, it := range items {
+		if x > 0 && x+it.w > size.Width+0.5 {
+			x = 0
+			y += rowH + w.gap
+			rowH = 0
+		}
+		it.o.Move(fyne.NewPos(x, y))
+		it.o.Resize(fyne.NewSize(it.w, it.h))
+		x += it.w + w.gap
+		rowH = max32(rowH, it.h)
+	}
+	if len(items) == 0 {
+		w.lastH = 0
+		return
+	}
+	w.lastH = y + rowH
+}
+
+func (w *wrapFlowLayout) MinSize(objs []fyne.CanvasObject) fyne.Size {
+	var widest, h float32
+	n := 0
+	for _, o := range objs {
+		if o == nil || !o.Visible() {
+			continue
+		}
+		ms := o.MinSize()
+		widest = max32(widest, ms.Width)
+		h += ms.Height
+		n++
+	}
+	if w.lastH > 0 {
+		h = w.lastH
+	} else if n > 1 {
+		h += w.gap * float32(n-1)
+	}
+	return fyne.NewSize(widest, h)
+}
+
+func wrapFlow(objs ...fyne.CanvasObject) *fyne.Container {
+	return container.New(&wrapFlowLayout{gap: sp4}, objs...)
+}
+
 // ---------------------------------------------------------------- spacers
 
 func spacer(w, h float32) fyne.CanvasObject {
@@ -781,6 +851,85 @@ func cardBox(title, desc string, actions fyne.CanvasObject, content fyne.CanvasO
 
 func card(title, desc string, content fyne.CanvasObject) fyne.CanvasObject {
 	return cardBox(title, desc, nil, content)
+}
+
+// detailGap is the space under a detail card's title and above its buttons.
+// Both gaps use it so the header and the footer sit the same distance from
+// the facts.
+func detailGap() float32 { return sp5 }
+
+// detailCard is a content-sized record card: a title, trailing header actions,
+// fact rows, and optional buttons. The header keeps every action inside the
+// card and gives the title its own line instead of squeezing it beside them.
+func detailCard(title string, actions fyne.CanvasObject, facts []fact, buttons ...fyne.CanvasObject) fyne.CanvasObject {
+	rows := []fyne.CanvasObject{cardHead(title, actions)}
+	if list := factList(facts); list != nil {
+		rows = append(rows, list)
+	}
+	if len(buttons) > 0 {
+		rows = append(rows, hstack(sp2, buttons...))
+	}
+	inner := vstack(detailGap(), rows...)
+	return container.NewStack(surface(radLg, pal().Base100, pal().Base300), inset(sp4, inner))
+}
+
+// cardHead lays the title on the left and actions on the right. Actions keep
+// their natural width, so an icon button cannot be pushed past the card edge.
+// The title's minimum is the whole name on one line.
+func cardHead(title string, actions fyne.CanvasObject) fyne.CanvasObject {
+	label := text(title, fsLarge, pal().Content, true)
+	if actions == nil {
+		return label
+	}
+	return container.New(&headLayout{}, label, actions)
+}
+
+// headLayout is splitRow without the 60% action cap. That cap was shrinking
+// a badge-and-icons cluster on a content-sized card and painting the last
+// icon outside the panel, while the title wrapped into the leftover strip.
+type headLayout struct{}
+
+func (headLayout) Layout(objs []fyne.CanvasObject, size fyne.Size) {
+	if len(objs) == 0 || objs[0] == nil {
+		return
+	}
+	title := objs[0]
+	if len(objs) < 2 || objs[1] == nil {
+		title.Move(fyne.NewPos(0, 0))
+		title.Resize(size)
+		return
+	}
+	actions := objs[1]
+	am := actions.MinSize()
+	aw := am.Width
+	if aw > size.Width {
+		aw = size.Width
+	}
+	ah := min32(am.Height, size.Height)
+	actions.Resize(fyne.NewSize(aw, ah))
+	actions.Move(fyne.NewPos(size.Width-aw, (size.Height-ah)/2))
+
+	lw := max32(0, size.Width-aw-sp3)
+	th := min32(title.MinSize().Height, size.Height)
+	title.Resize(fyne.NewSize(lw, th))
+	title.Move(fyne.NewPos(0, (size.Height-th)/2))
+}
+
+func (headLayout) MinSize(objs []fyne.CanvasObject) fyne.Size {
+	var tw, th, aw, ah float32
+	if len(objs) > 0 && objs[0] != nil {
+		ms := objs[0].MinSize()
+		tw, th = ms.Width, ms.Height
+	}
+	if len(objs) > 1 && objs[1] != nil {
+		ms := objs[1].MinSize()
+		aw, ah = ms.Width, ms.Height
+	}
+	w := tw
+	if aw > 0 {
+		w += sp3 + aw
+	}
+	return fyne.NewSize(w, max32(th, ah))
 }
 
 func nilIfEmpty(s string, fn func() fyne.CanvasObject) fyne.CanvasObject {
@@ -1008,6 +1157,190 @@ func (r *packedKVRenderer) Refresh() {
 		t.Refresh()
 	}
 	canvasRefresh(r.k)
+}
+
+// fact is one label/value pair in a detail card. mono sets the value face.
+type fact struct {
+	label string
+	value string
+	mono  bool
+}
+
+// factList is a compact label/value block. Labels share one column and each
+// value starts just after it. Rows have no rules; a long value wraps inside
+// the width the card was given.
+func factList(rows []fact) fyne.CanvasObject {
+	if len(rows) == 0 {
+		return nil
+	}
+	cleaned := make([]fact, len(rows))
+	var col float32
+	for i, r := range rows {
+		v := strings.TrimSpace(r.value)
+		if v == "" {
+			v = "—"
+		}
+		cleaned[i] = fact{label: r.label, value: v, mono: r.mono}
+		col = max32(col, measureWidth(r.label, fsSmall, fyne.TextStyle{}))
+	}
+	lines := make([]fyne.CanvasObject, len(cleaned))
+	for i, r := range cleaned {
+		lines[i] = newFactLine(r, col)
+	}
+	return vstack(sp2, lines...)
+}
+
+type factLine struct {
+	widget.BaseWidget
+	label string
+	value string
+	mono  bool
+	col   float32
+
+	wrapW float32
+	lines []string
+}
+
+func newFactLine(f fact, col float32) *factLine {
+	k := &factLine{label: f.label, value: f.value, mono: f.mono, col: col}
+	k.ExtendBaseWidget(k)
+	return k
+}
+
+func (f *factLine) valueStyle() fyne.TextStyle {
+	if f.mono {
+		return fyne.TextStyle{Monospace: true}
+	}
+	return fyne.TextStyle{}
+}
+
+func (f *factLine) naturalWidth() float32 {
+	return f.col + sp3 + measureWidth(f.value, fsSmall, f.valueStyle())
+}
+
+func (f *factLine) valueLines(width float32) []string {
+	remain := width - f.col - sp3
+	if remain < z(48) {
+		remain = width
+	}
+	if f.lines != nil && f.wrapW == remain {
+		return f.lines
+	}
+	f.wrapW = remain
+	f.lines = wrapToWidth(f.value, remain, fsSmall, f.valueStyle())
+	return f.lines
+}
+
+func (f *factLine) CreateRenderer() fyne.WidgetRenderer {
+	r := &factLineRenderer{
+		f:     f,
+		label: text(f.label, fsSmall, pal().Muted, false),
+	}
+	r.ensure(1)
+	return r
+}
+
+type factLineRenderer struct {
+	f      *factLine
+	label  *canvas.Text
+	values []*canvas.Text
+	objs   []fyne.CanvasObject
+}
+
+func (r *factLineRenderer) Destroy() {}
+
+func (r *factLineRenderer) Objects() []fyne.CanvasObject {
+	if r.objs == nil {
+		r.rebuild()
+	}
+	return r.objs
+}
+
+func (r *factLineRenderer) rebuild() {
+	r.objs = r.objs[:0]
+	r.objs = append(r.objs, r.label)
+	for _, t := range r.values {
+		r.objs = append(r.objs, t)
+	}
+}
+
+func (r *factLineRenderer) ensure(n int) {
+	style := r.f.valueStyle()
+	src := fontForStyle(style)
+	grew := false
+	for len(r.values) < n {
+		t := canvas.NewText("", pal().Content)
+		t.TextSize = fsSmall
+		t.TextStyle = style
+		t.FontSource = src
+		r.values = append(r.values, t)
+		grew = true
+	}
+	if grew || r.objs == nil {
+		r.rebuild()
+	}
+}
+
+func (r *factLineRenderer) MinSize() fyne.Size {
+	f := r.f
+	lh := cachedLineHeight(fsSmall, fyne.TextStyle{})
+	vh := cachedLineHeight(fsSmall, f.valueStyle())
+	natural := f.naturalWidth()
+	w := f.Size().Width
+	if w <= 0 || w+0.5 >= natural {
+		return fyne.NewSize(natural, max32(lh, vh))
+	}
+	lines := f.valueLines(w)
+	remain := w - f.col - sp3
+	if remain < z(48) {
+		return fyne.NewSize(w, lh+z(2)+vh*float32(len(lines)))
+	}
+	return fyne.NewSize(w, max32(lh, vh*float32(len(lines))))
+}
+
+func (r *factLineRenderer) Layout(size fyne.Size) {
+	f := r.f
+	lh := r.label.MinSize().Height
+	vh := cachedLineHeight(fsSmall, f.valueStyle())
+	lines := f.valueLines(size.Width)
+	remain := size.Width - f.col - sp3
+	stack := remain < z(48)
+	r.label.Move(fyne.NewPos(0, 0))
+	r.label.Resize(r.label.MinSize())
+	valueX, valueY := f.col+sp3, float32(0)
+	if stack {
+		valueX, valueY = 0, lh+z(2)
+	} else if lh > vh {
+		valueY = (lh - vh) / 2
+	}
+	r.ensure(len(lines))
+	for i, t := range r.values {
+		if i >= len(lines) {
+			t.Hide()
+			continue
+		}
+		t.Show()
+		t.Text = lines[i]
+		t.TextSize = fsSmall
+		t.TextStyle = f.valueStyle()
+		t.Color = pal().Content
+		t.Move(fyne.NewPos(valueX, valueY+vh*float32(i)))
+		t.Resize(t.MinSize())
+	}
+}
+
+func (r *factLineRenderer) Refresh() {
+	r.label.Text = r.f.label
+	r.label.TextSize = fsSmall
+	r.label.Color = pal().Muted
+	r.label.Refresh()
+	if sz := r.f.Size(); sz.Width > 0 {
+		r.Layout(sz)
+	}
+	for _, t := range r.values {
+		t.Refresh()
+	}
+	canvasRefresh(r.f)
 }
 
 // kvRow is one label/value line with a trailing hairline. Long values wrap

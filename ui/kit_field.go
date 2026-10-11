@@ -669,6 +669,13 @@ func scrollBody(objs ...fyne.CanvasObject) fyne.CanvasObject {
 	return scrollBodyOf(scrollFlow(objs...))
 }
 
+// wrapBody packs cards at their content width, wrapping to the next row
+// when the next card does not fit. List pages use it so a card is only as
+// wide as its text and buttons.
+func wrapBody(objs ...fyne.CanvasObject) fyne.CanvasObject {
+	return scrollBodyOf(wrapFlow(objs...))
+}
+
 // scrollBodyOf wraps content the caller already holds, for pages that need to
 // refresh it directly when a card changes height.
 func scrollBodyOf(col fyne.CanvasObject) fyne.CanvasObject {
@@ -680,4 +687,48 @@ func centredBody(width float32, objs ...fyne.CanvasObject) fyne.CanvasObject {
 	col := vstack(sp4, objs...)
 	return boostScroll(container.NewVScroll(
 		container.NewCenter(container.New(fixedLayout{w: width}, col))))
+}
+
+// stage centres a column in the page body. The scroll grows to the viewport,
+// so a short column sits in the middle of the screen. A column taller than
+// the viewport starts at the top and scrolls.
+type stageLayout struct{ w float32 }
+
+func (s stageLayout) Layout(objs []fyne.CanvasObject, size fyne.Size) {
+	w := s.w
+	if size.Width > 0 && w > size.Width {
+		w = size.Width
+	}
+	for _, o := range objs {
+		if o == nil || !o.Visible() {
+			continue
+		}
+		o.Resize(fyne.NewSize(w, o.MinSize().Height))
+		h := o.MinSize().Height
+		y := float32(0)
+		if h < size.Height {
+			y = (size.Height - h) / 2
+		}
+		x := float32(0)
+		if w < size.Width {
+			x = (size.Width - w) / 2
+		}
+		o.Move(fyne.NewPos(x, y))
+		o.Resize(fyne.NewSize(w, h))
+	}
+}
+
+func (s stageLayout) MinSize(objs []fyne.CanvasObject) fyne.Size {
+	var h float32
+	for _, o := range objs {
+		if o == nil || !o.Visible() {
+			continue
+		}
+		h = max32(h, o.MinSize().Height)
+	}
+	return fyne.NewSize(s.w, h)
+}
+
+func stage(width float32, obj fyne.CanvasObject) fyne.CanvasObject {
+	return boostScroll(container.NewVScroll(container.New(&stageLayout{w: width}, obj)))
 }
