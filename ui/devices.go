@@ -93,58 +93,42 @@ func (a *App) devicesPage() fyne.CanvasObject {
 		sub = "Loading…"
 	}
 
-	spec := deviceTable()
-
 	if len(a.deviceView) == 0 {
 		msg, desc := "No devices", "Nothing matched this filter."
 		if a.filterDevices == "" {
 			msg, desc = "No devices yet", "Create a device to get a WireGuard config for it."
 		}
-		return pageShellFlush("Devices", sub, actions, emptyState(msg, desc))
+		return pageShell("Devices", sub, actions, emptyState(msg, desc))
 	}
 
-	a.deviceList = newRowList(spec,
-		func() int { return len(a.deviceView) },
-		a.bindDeviceRow,
-	)
-
-	return pageShellFlush("Devices", sub, actions, tableBody(spec, a.deviceList))
+	cards := make([]fyne.CanvasObject, 0, len(a.deviceView))
+	for _, d := range a.deviceView {
+		cards = append(cards, a.deviceCard(d))
+	}
+	return pageShell("Devices", sub, actions, wrapBody(cards...))
 }
 
-func deviceTable() *tableSpec {
-	return &tableSpec{
-		actionW: 44,
-		cols: []tableCol{
-			{label: "DEVICE", weight: 2, strong: true},
-			{label: "WIREGUARD IP", weight: 1.6, mono: true},
-			{label: "ADDED", weight: 1.6, mono: true},
-			{label: "STATUS", weight: 1.3, badge: true},
-		},
-	}
-}
-
-func (a *App) bindDeviceRow(id widget.ListItemID, row *kRow) {
-	if id < 0 || id >= len(a.deviceView) {
-		return
-	}
-	d := a.deviceView[id]
-	_, isConn := a.deviceConnIPs[d.WireGuardIP]
-	mine := deviceOnThisMachine(d, a.deviceLocalIDs, a.deviceLocalPubs)
+// deviceStatus is the badge on a device card. A live tunnel wins over a
+// device that merely lives on this machine.
+func deviceStatus(d types.Device, ids, pubs map[string]struct{}, conn map[string]struct{}) (string, tone) {
 	pill, t := "Remote", toneNeutral
-	if mine {
+	if deviceOnThisMachine(d, ids, pubs) {
 		pill, t = "This device", tonePrimary
 	}
-	if isConn {
+	if _, ok := conn[d.WireGuardIP]; ok && d.WireGuardIP != "" {
 		pill, t = "Connected", toneSuccess
 	}
+	return pill, t
+}
 
-	row.SetCells([]string{d.Tag, d.WireGuardIP, fmtTime(d.CreatedAt), pill}, isConn, t)
-	row.ghost.SetHidden(true)
-	row.iconA.SetHidden(true)
-	row.main.SetHidden(true)
-
+func (a *App) deviceCard(d types.Device) fyne.CanvasObject {
+	pill, t := deviceStatus(d, a.deviceLocalIDs, a.deviceLocalPubs, a.deviceConnIPs)
+	title := d.Tag
+	if title == "" {
+		title = "Device"
+	}
 	dev := d
-	row.iconB.SetIconOnly(theme.DeleteIcon(), kDanger, func() {
+	del := newIconBtn(theme.DeleteIcon(), kDanger, func() {
 		a.confirm("Delete device", `Delete "`+dev.Tag+`"? This cannot be undone.`, func() {
 			go func() {
 				_, _, err := a.callController("/client/device/delete", map[string]any{"DeviceID": dev.ID.String()}, true)
@@ -159,6 +143,16 @@ func (a *App) bindDeviceRow(id widget.ListItemID, row *kRow) {
 			}()
 		})
 	})
+
+	facts := []fact{
+		{label: "WireGuard IP", value: d.WireGuardIP, mono: true},
+	}
+	if d.WireGuardIPv6 != "" {
+		facts = append(facts, fact{label: "WireGuard IPv6", value: d.WireGuardIPv6, mono: true})
+	}
+	facts = append(facts, fact{label: "Added", value: fmtTime(d.CreatedAt), mono: true})
+
+	return detailCard(title, hstack(sp2, badge(pill, t), del), facts)
 }
 
 func (a *App) createDeviceDialog() {
