@@ -172,6 +172,17 @@ func parseRouteGetGateway(out string) net.IP {
 	return nil
 }
 
+// hostProtectRouteRequired reports whether a protect host still needs a
+// via-gateway /32. On-link destinations are skipped by addIPv4Route; the
+// 5s watcher must treat those as already satisfied or it will reinstall
+// every tick.
+func hostProtectRouteRequired(host string) bool {
+	if host == "" {
+		return false
+	}
+	return !ipv4HostOnLink(host + "/32")
+}
+
 func collectProtectHosts() []string {
 	seen := make(map[string]struct{})
 	var hosts []string
