@@ -2,7 +2,15 @@
 
 package client
 
-import "os/exec"
+import (
+	"fmt"
+	"net"
+	"os/exec"
+	"strings"
+	"unsafe"
+
+	"golang.org/x/sys/windows"
+)
 
 func setIPv4RouteMetric(network string, ifname string, metric string) (err error) {
 	if err = validateRouteArgs(network, "", metric); err != nil {
@@ -53,11 +61,21 @@ func addIPv4Route(
 	if err = validateRouteArgs(network, gateway, metric); err != nil {
 		return err
 	}
+	if ipv4HostOnLink(network) {
+		DEBUG("skip route add, dest on-link: ", network)
+		return nil
+	}
 	if metric == "0" {
 		metric = "1"
 	}
 
-	_ = delIPv4Route(network, gateway, metric)
+	if ifName != "" {
+		if replaceConflictingIPv4Route(network, ifName, gateway, metric) {
+			return nil
+		}
+	} else {
+		_ = delIPv4Route(network, gateway, metric)
+	}
 
 	cmd := hiddenCommand(
 		"netsh",
@@ -92,6 +110,49 @@ func addIPv4Route(
 	}
 
 	return
+}
+
+func replaceConflictingIPv4Route(network, ifName, gateway, metric string) (alreadyPresent bool) {
+	host := ipv4HostFromNetwork(network)
+	if host != nil && ipv4HostRoutePresent(host, ifName, net.ParseIP(gateway)) {
+		return true
+	}
+	_ = delIPv4Route(network, gateway, metric)
+	return false
+}
+
+func ipv4HostRoutePresent(host net.IP, ifName string, gw net.IP) bool {
+	gw4 := gw.To4()
+	if host == nil || gw4 == nil {
+		return false
+	}
+	iface, err := net.InterfaceByName(ifName)
+	if err != nil {
+		return false
+	}
+	var table *windows.MibIpForwardTable2
+	if err := windows.GetIpForwardTable2(windows.AF_INET, &table); err != nil {
+		return false
+	}
+	defer windows.FreeMibTable(unsafe.Pointer(table))
+
+	var matches int
+	present := false
+	for _, r := range table.Rows() {
+		if r.DestinationPrefix.PrefixLength != 32 {
+			continue
+		}
+		dst := (*windows.RawSockaddrInet4)(unsafe.Pointer(&r.DestinationPrefix.Prefix))
+		if !net.IP(dst.Addr[:]).Equal(host) {
+			continue
+		}
+		matches++
+		nh := (*windows.RawSockaddrInet4)(unsafe.Pointer(&r.NextHop))
+		if r.InterfaceIndex == uint32(iface.Index) && net.IP(nh.Addr[:]).Equal(gw4) {
+			present = true
+		}
+	}
+	return present && matches == 1
 }
 
 func delIPv4Route(network string, _ string, _ string) (err error) {

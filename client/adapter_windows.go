@@ -4,7 +4,6 @@ package client
 
 import (
 	"fmt"
-	"os/exec"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -148,6 +147,7 @@ func (t *adapter) configureAdapter() (err error) {
 		err = t.AddrV6()
 		if err != nil {
 			DEBUG("Unable to add IPv6 address, maybe IPv6 is turned off ?, err : ", err)
+			return
 		}
 	}
 
@@ -245,7 +245,9 @@ func (t *adapter) Disconnect(tun *TUN) (err error) {
 
 	meta := tun.meta.Load()
 	if isDefaultTunnelName(meta.IFName) || meta.EnableDefaultRoute {
-		err = delIPv4Route("default", t.IPv4Address, "0")
+		if delErr := delIPv4Route("default", t.IPv4Address, "0"); delErr != nil {
+			DEBUG("Unable to delete default route, err : ", delErr)
+		}
 
 		if t.IPv6Address != "" {
 			iperr := delIPv6Route("default", t.IPv6Address, "0")
@@ -266,19 +268,27 @@ func (t *adapter) Disconnect(tun *TUN) (err error) {
 		}
 	}
 
-	for _, n := range tun.ServerResponse.Networks {
-		if n.Nat != "" {
-			err = delIPv4Route(n.Nat, t.IPv4Address, "0")
-			if err != nil {
-				return err
+	if meta.EnableWAN {
+		if wan := tun.ServerResponse.WANCIDR; wan != "" {
+			if delErr := delIPv4Route(wan, t.IPv4Address, "0"); delErr != nil {
+				DEBUG("Unable to delete WAN route, err : ", delErr)
 			}
 		}
 	}
-	for _, r := range tun.ServerResponse.Routes {
-		err = delIPv4Route(r.Address, t.IPv4Address, r.Metric)
-		if err != nil {
-			return err
+
+	for _, n := range tun.ServerResponse.Networks {
+		if n.Nat != "" {
+			if delErr := delIPv4Route(n.Nat, t.IPv4Address, "0"); delErr != nil && err == nil {
+				err = delErr
+			}
 		}
 	}
-	return
+
+	for _, r := range tun.ServerResponse.Routes {
+		if delErr := delIPv4Route(r.Address, t.IPv4Address, r.Metric); delErr != nil && err == nil {
+			err = delErr
+		}
+	}
+
+	return err
 }
