@@ -1,0 +1,135 @@
+# Fyne desktop app for Linux, Windows, and macOS.
+# Called from test.yml (pull requests and branch pushes), release.yml (v* tags),
+# and release-desktop.yml (manual).
+name: Desktop
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: "Version embedded in the binary. Empty uses the tag (leading v stripped) or dev."
+        required: false
+        type: string
+        default: ""
+      upload_release:
+        description: "Attach the packaged apps to the GitHub release for this tag."
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  build:
+    name: ${{ matrix.target }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            target: linux
+          - runner: macos-latest
+            target: darwin
+          - runner: windows-latest
+            target: windows
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Install Linux desktop deps
+        if: matrix.target == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            gcc pkg-config libgl1-mesa-dev libwayland-dev libxkbcommon-dev xorg-dev
+
+      - name: Install MinGW
+        if: matrix.target == 'windows'
+        uses: egor-tensin/setup-mingw@v3
+        with:
+          platform: x64
+
+      - name: Check Windows compiler
+        if: matrix.target == 'windows'
+        shell: bash
+        run: |
+          if command -v x86_64-w64-mingw32-gcc >/dev/null 2>&1; then
+            x86_64-w64-mingw32-gcc --version
+          elif command -v gcc >/dev/null 2>&1; then
+            gcc --version
+          else
+            echo "error: no Windows C compiler on PATH"
+            exit 1
+          fi
+
+      - name: Set version
+        shell: bash
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          if [ -n "$INPUT_VERSION" ]; then
+            ver="${INPUT_VERSION#v}"
+          elif [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            ver="${GITHUB_REF_NAME#v}"
+          else
+            ver="dev"
+          fi
+          case "$ver" in
+            ""|*[!A-Za-z0-9._-]*)
+              echo "error: version must be a token of letters, numbers, dots, underscores, or dashes: [$ver]"
+              exit 1
+              ;;
+          esac
+          echo "VERSION=$ver" >> "$GITHUB_ENV"
+
+      - name: Build
+        shell: bash
+        run: ./build-fyne.sh ${{ matrix.target }}
+
+      - name: Package (Linux)
+        if: matrix.target == 'linux'
+        run: |
+          set -euo pipefail
+          tar czf "tunnels-app_${VERSION}_linux_amd64.tar.gz" -C bin \
+            tunnels-app-linux-amd64 \
+            tunnels.png is.tunnels.png \
+            tunnels.desktop is.tunnels.desktop
+          echo "ASSET=tunnels-app_${VERSION}_linux_amd64.tar.gz" >> "$GITHUB_ENV"
+
+      - name: Package (macOS)
+        if: matrix.target == 'darwin'
+        run: |
+          set -euo pipefail
+          ASSET="tunnels-app_${VERSION}_darwin_universal.zip"
+          ditto -c -k --keepParent bin/Tunnels.app "$ASSET"
+          echo "ASSET=$ASSET" >> "$GITHUB_ENV"
+
+      - name: Package (Windows)
+        if: matrix.target == 'windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          7z a "tunnels-app_${VERSION}_windows_amd64.zip" ./bin/tunnels-app-windows-amd64.exe
+          echo "ASSET=tunnels-app_${VERSION}_windows_amd64.zip" >> "$GITHUB_ENV"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tunnels-app-${{ matrix.target }}
+          path: ${{ env.ASSET }}
+          if-no-files-found: error
+
+      - name: Upload desktop app to release
+        if: inputs.upload_release && startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          draft: true
+          files: ${{ env.ASSET }}
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

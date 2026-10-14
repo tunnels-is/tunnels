@@ -14,7 +14,7 @@ Go 1.26 (`go.mod`).
 
 ### Fyne desktop
 A C compiler, plus:
- - Linux: `gcc`, `pkg-config`, `libgl1-mesa-dev`, `xorg-dev`, and `libxkbcommon-dev`. `./build-fyne.sh linux` only builds on a Linux host.
+ - Linux: `gcc`, `pkg-config`, `libgl1-mesa-dev`, `xorg-dev`, `libxkbcommon-dev`, and `libwayland-dev`. `./build-fyne.sh linux` only builds on a Linux host.
  - macOS: Xcode command line tools. `./build-fyne.sh darwin` only builds on a Mac.
  - Windows: `x86_64-w64-mingw32-gcc` or `zig` (`zig cc -target x86_64-windows-gnu`).
 
@@ -30,7 +30,7 @@ $ ./build-fyne.sh linux     # or windows|darwin|all
 $ ./bin/tunnels-app-linux-amd64
 ```
 
-Windows output is `bin/tunnels-app-windows-amd64.exe`. macOS output is `bin/Tunnels-darwin-arm64.app` and `bin/Tunnels-darwin-amd64.app`.
+Windows output is `bin/tunnels-app-windows-amd64.exe`. macOS output is a universal `bin/Tunnels.app` (arm64 and amd64).
 
 To set the Linux capabilities by hand:
 
@@ -134,7 +134,7 @@ Goreleaser builds two binaries. The desktop app is built separately with Fyne.
 | --- | --- | --- |
 | `tunnels-cli` | `./cmd/main` | Headless client. Linux, Windows, and macOS (amd64 and arm64). |
 | `tunnels-server` | `./server` | Control plane. Linux only (amd64, arm64, arm). |
-| `tunnels-app` | `./cmd/fyne` | Fyne desktop app. Not built by goreleaser. |
+| `tunnels-app` | `./cmd/fyne` | Fyne desktop app. Linux amd64, Windows amd64, and universal macOS. GitHub Actions builds it. Goreleaser does not. |
 
  - Snapshot binaries, no GitHub release: `./releaser-build-snapshot.sh` (`goreleaser build --snapshot`)
  - Local snapshot release: `make release` (`goreleaser release --snapshot`)
@@ -159,6 +159,9 @@ calls client functions directly (no HTTP hop for UI actions).
 ```bash
 ./build-fyne.sh linux     # or windows|darwin|all
 ```
+
+Pull requests and pushes to `main`, `master`, and `develop` build all three in the Tests workflow. A `v*` tag attaches the same three packages to the draft release. Actions → Build Desktop Client rebuilds them by hand.
+
 
 # Special mentions
 These are the real MVPs:

@@ -9,78 +9,12 @@ on:
         required: false
         default: "dev"
 
-permissions:
-  contents: write
-
 jobs:
-  build-desktop:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - runner: ubuntu-latest
-            target: linux
-          - runner: macos-latest
-            target: darwin
-          - runner: windows-latest
-            target: windows
-    runs-on: ${{ matrix.runner }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-
-      - name: Install Linux desktop deps
-        if: matrix.target == 'linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y gcc libgl1-mesa-dev xorg-dev libxkbcommon-dev pkg-config
-
-      - name: Install MinGW
-        if: matrix.target == 'windows'
-        run: choco install mingw -y
-
-      - name: Set version
-        shell: bash
-        run: |
-          if [ -n "${{ inputs.version }}" ]; then
-            echo "VERSION=${{ inputs.version }}" >> "$GITHUB_ENV"
-          else
-            echo "VERSION=dev" >> "$GITHUB_ENV"
-          fi
-
-      - name: Build
-        shell: bash
-        env:
-          VERSION: ${{ env.VERSION }}
-        run: ./build-fyne.sh ${{ matrix.target }}
-
-      - name: Package (Linux)
-        if: matrix.target == 'linux'
-        run: |
-          tar czf "tunnels-app_${VERSION}_linux_amd64.tar.gz" -C bin tunnels-app-linux-amd64 tunnels.png tunnels.desktop
-          echo "ASSET=tunnels-app_${VERSION}_linux_amd64.tar.gz" >> "$GITHUB_ENV"
-
-      - name: Package (macOS)
-        if: matrix.target == 'darwin'
-        run: |
-          ASSET="tunnels-app_${VERSION}_darwin.zip"
-          ditto -c -k --keepParent bin/Tunnels-darwin-arm64.app "$ASSET" || \
-            ditto -c -k --keepParent bin/Tunnels-darwin-amd64.app "$ASSET"
-          echo "ASSET=$ASSET" >> "$GITHUB_ENV"
-
-      - name: Package (Windows)
-        if: matrix.target == 'windows'
-        shell: bash
-        run: |
-          7z a "tunnels-app_${VERSION}_windows_amd64.zip" ./bin/tunnels-app-windows-amd64.exe
-          echo "ASSET=tunnels-app_${VERSION}_windows_amd64.zip" >> "$GITHUB_ENV"
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: tunnels-app-${{ matrix.target }}
-          path: ${{ env.ASSET }}
-          if-no-files-found: error
+  desktop:
+    uses: ./.github/workflows/desktop.yml
+    with:
+      version: ${{ inputs.version }}
+      upload_release: false
+    permissions:
+      contents: read
+      actions: write

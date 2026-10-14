@@ -21,8 +21,21 @@ jobs:
           go-version-file: go.mod
           cache-dependency-path: go.sum
 
+      - name: Install Linux desktop deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            gcc pkg-config libgl1-mesa-dev libwayland-dev libxkbcommon-dev xorg-dev
+
       - name: Download dependencies
         run: go mod download
 
       - name: Run tests
         run: go test -v -race ./...
+
+  # Fyne app: linux, windows, and macOS. Same workflow as tag releases.
+  desktop:
+    uses: ./.github/workflows/desktop.yml
+    permissions:
+      contents: read
+      actions: write
