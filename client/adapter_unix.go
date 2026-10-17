@@ -270,7 +270,7 @@ func (t *adapter) applyTunnelRoutes(tun *TUN) (err error) {
 		if t.IPv6Address != "" {
 			iperr := addIPv6Route("default", t.Name, t.IPv6Address, "0")
 			if iperr != nil {
-				DEBUG("Unable to add IPv6 route, maybe IPv6 is turned off ?, err : ", err)
+				DEBUG("Unable to add IPv6 route, maybe IPv6 is turned off ?, err : ", iperr)
 			}
 		}
 	}
@@ -366,8 +366,3 @@ func socketCtl(request uintptr, argp uintptr) error {
 	}
 	return nil
 }
-
-// ipv4HostOnLink reports whether dest is already covered by a connected
-// IPv4 prefix. A via-gateway /32 for an on-link peer (same podman/LAN
-// subnet) breaks reachability: traffic hairpins through the default
-// gateway instead of going L2.

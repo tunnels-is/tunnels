@@ -3,6 +3,7 @@
 package client
 
 import (
+	"net"
 	"os/exec"
 	"strings"
 )
@@ -41,7 +42,18 @@ func addIPv4Route(
 	if err = validateRouteArgs(network, gateway, metric); err != nil {
 		return err
 	}
-	_ = delIPv4Route(network, "", metric)
+	if ipv4HostOnLink(network) {
+		DEBUG("skip route add, dest on-link: ", network)
+		return nil
+	}
+
+	if ifName != "" {
+		if replaceConflictingIPv4Route(network, ifName, gateway, metric) {
+			return nil
+		}
+	} else {
+		_ = delIPv4Route(network, gateway, metric)
+	}
 
 	args := []string{"-n", "add"}
 	if ifName != "" {
@@ -57,6 +69,51 @@ func addIPv4Route(
 	}
 
 	return
+}
+
+func replaceConflictingIPv4Route(network, ifName, gateway, metric string) (alreadyPresent bool) {
+	host := ipv4HostFromNetwork(network)
+	if host == nil {
+		_ = delIPv4Route(network, gateway, metric)
+		return false
+	}
+	if ipv4HostRoutePresent(host, ifName, net.ParseIP(gateway)) {
+		return true
+	}
+	_ = exec.Command("route", "-n", "delete", "-ifscope", ifName, "-net", network).Run()
+	_ = exec.Command("route", "-n", "delete", "-net", network).Run()
+	return false
+}
+
+func ipv4HostRoutePresent(host net.IP, ifName string, gw net.IP) bool {
+	gw4 := gw.To4()
+	if host == nil || gw4 == nil {
+		return false
+	}
+	out, err := exec.Command("route", "-n", "get", "-ifscope", ifName, host.String()).CombinedOutput()
+	if err != nil {
+		return false
+	}
+	dst := net.ParseIP(routeGetField(string(out), "destination:"))
+	if dst == nil || !dst.Equal(host) {
+		return false
+	}
+	if routeGetField(string(out), "interface:") != ifName {
+		return false
+	}
+	got := parseRouteGetGateway(string(out))
+	return got != nil && got.Equal(gw4)
+}
+
+func routeGetField(out, key string) string {
+	for _, line := range strings.Split(out, "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, key) {
+			continue
+		}
+		return strings.TrimSpace(strings.TrimPrefix(line, key))
+	}
+	return ""
 }
 
 func delIPv4Route(network string, gateway string, metric string) (err error) {
