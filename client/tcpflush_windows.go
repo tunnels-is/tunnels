@@ -105,15 +105,14 @@ func closeAllOpenTCPConnections() (err error) {
 
 	tcpTable := (*MIB_TCPTABLE_OWNER_PID)(unsafe.Pointer(&buffer[0]))
 
-	tableEntryPtr := uintptr(unsafe.Pointer(&buffer[0])) + unsafe.Offsetof(tcpTable.DwNumEntries)
-	entrySize := unsafe.Sizeof(MIB_TCPROW_OWNER_PID{})
+	rows := unsafe.Slice(&tcpTable.Table[0], tcpTable.DwNumEntries)
 
 	log.Printf("Found %d IPv4 TCP connections.\n", tcpTable.DwNumEntries)
 
 	closedCount := 0
 	for i := uint32(0); i < tcpTable.DwNumEntries; i++ {
 
-		entry := (*MIB_TCPROW_OWNER_PID)(unsafe.Pointer(tableEntryPtr + uintptr(i)*entrySize))
+		entry := &rows[i]
 
 		if entry.DwState == 2 {
 			continue

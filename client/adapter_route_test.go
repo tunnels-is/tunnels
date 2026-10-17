@@ -1,5 +1,3 @@
-//go:build freebsd || linux || openbsd
-
 package client
 
 import "testing"

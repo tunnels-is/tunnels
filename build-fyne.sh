@@ -43,11 +43,16 @@ ensure_windows_icon() {
     exit 1
 }
 
-build_linux() {
-    if [ "$HOST_OS" != "linux" ]; then
-        echo "==> Skipping linux (requires native Linux host, current: $HOST_OS)"
-        return
+require_host() {
+    local want="$1"
+    if [ "$HOST_OS" != "$want" ]; then
+        echo "error: $want Fyne build requires a native $want host (current: $HOST_OS)"
+        exit 1
     fi
+}
+
+build_linux() {
+    require_host linux
     echo "==> Building linux/amd64 (Fyne)"
     CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build \
         -trimpath -ldflags "$LDFLAGS" \
@@ -109,25 +114,31 @@ package_darwin() {
 }
 
 build_darwin() {
-    if [ "$HOST_OS" != "darwin" ]; then
-        echo "==> Skipping darwin (requires native macOS host, current: $HOST_OS)"
-        return
-    fi
+    require_host darwin
+    # External link so the Mach-O gets an LC_UUID (current macOS rejects binaries without one).
+    local ldflags="$LDFLAGS -linkmode=external"
+
     echo "==> Building darwin/arm64 (Fyne)"
     CGO_ENABLED=1 GOOS=darwin GOARCH=arm64 go build \
-        -trimpath -ldflags "$LDFLAGS" \
+        -trimpath -ldflags "$ldflags" \
         -o "$BIN_DIR/tunnels-app-darwin-arm64" \
         ./cmd/fyne
     echo "    -> bin/tunnels-app-darwin-arm64"
-    package_darwin "$BIN_DIR/tunnels-app-darwin-arm64" "$BIN_DIR/Tunnels-darwin-arm64.app"
 
     echo "==> Building darwin/amd64 (Fyne)"
     CGO_ENABLED=1 GOOS=darwin GOARCH=amd64 go build \
-        -trimpath -ldflags "$LDFLAGS" \
+        -trimpath -ldflags "$ldflags" \
         -o "$BIN_DIR/tunnels-app-darwin-amd64" \
         ./cmd/fyne
     echo "    -> bin/tunnels-app-darwin-amd64"
-    package_darwin "$BIN_DIR/tunnels-app-darwin-amd64" "$BIN_DIR/Tunnels-darwin-amd64.app"
+
+    echo "==> Creating darwin universal binary"
+    lipo -create -output "$BIN_DIR/tunnels-app-darwin-universal" \
+        "$BIN_DIR/tunnels-app-darwin-arm64" \
+        "$BIN_DIR/tunnels-app-darwin-amd64"
+    lipo -info "$BIN_DIR/tunnels-app-darwin-universal"
+    echo "    -> bin/tunnels-app-darwin-universal"
+    package_darwin "$BIN_DIR/tunnels-app-darwin-universal" "$BIN_DIR/Tunnels.app"
 }
 
 case "$TARGET" in
@@ -136,8 +147,16 @@ case "$TARGET" in
     darwin)  build_darwin ;;
     all)
         build_windows
-        build_linux
-        build_darwin
+        if [ "$HOST_OS" = "linux" ]; then
+            build_linux
+        else
+            echo "==> Skipping linux (requires native Linux host, current: $HOST_OS)"
+        fi
+        if [ "$HOST_OS" = "darwin" ]; then
+            build_darwin
+        else
+            echo "==> Skipping darwin (requires native macOS host, current: $HOST_OS)"
+        fi
         ;;
     *)
         echo "Unknown target: $TARGET"
@@ -148,4 +167,4 @@ esac
 
 echo ""
 echo "==> Done"
-ls -lh "$BIN_DIR"/tunnels-app-* "$BIN_DIR"/tunnels.png "$BIN_DIR"/is.tunnels.png "$BIN_DIR"/is.tunnels.desktop "$BIN_DIR"/tunnels.desktop "$BIN_DIR"/Tunnels-*.app 2>/dev/null || true
+ls -lhd "$BIN_DIR"/tunnels-app-* "$BIN_DIR"/tunnels.png "$BIN_DIR"/is.tunnels.png "$BIN_DIR"/is.tunnels.desktop "$BIN_DIR"/tunnels.desktop "$BIN_DIR"/Tunnels.app 2>/dev/null || true

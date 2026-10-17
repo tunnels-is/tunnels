@@ -44,6 +44,9 @@ func protectRoutesPresent(ifName string, gw net.IP, ifIndex int, hosts []string)
 	}
 	table := string(out)
 	for _, host := range hosts {
+		if !hostProtectRouteRequired(host) {
+			continue
+		}
 		if !strings.Contains(table, host) {
 			return false
 		}

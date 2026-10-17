@@ -32,12 +32,10 @@ func protectRoutesPresent(ifName string, gw net.IP, ifIndex int, hosts []string)
 		return false
 	}
 	for _, host := range hosts {
-		out, err := exec.Command("route", "-n", "get", "-ifscope", ifName, host).CombinedOutput()
-		if err != nil {
-			return false
+		if !hostProtectRouteRequired(host) {
+			continue
 		}
-		got := parseRouteGetGateway(string(out))
-		if got == nil || !got.Equal(gw4) {
+		if !ipv4HostRoutePresent(net.ParseIP(host).To4(), ifName, gw4) {
 			return false
 		}
 	}
