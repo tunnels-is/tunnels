@@ -67,6 +67,15 @@ type Device struct {
 	WireGuardIP string `json:"WireGuardIP,omitempty"`
 
 	WireGuardIPv6 string `json:"WireGuardIPv6,omitempty"`
+
+	// DiscoKey is the device's punch public key. It is not the WireGuard key.
+	DiscoKey string `json:"DiscoKey,omitempty"`
+
+	// P2PAllowAll and P2PAllowIPs are the full-IP allows last announced to
+	// the device's wg-server. Port-specific rules are not stored here; those
+	// flows stay on the server firewall and are never punched.
+	P2PAllowAll bool     `json:"P2PAllowAll,omitempty"`
+	P2PAllowIPs []string `json:"P2PAllowIPs,omitempty"`
 }
 
 type WAN struct {
@@ -107,6 +116,10 @@ type Server struct {
 
 	EnableFirewall bool `json:"EnableFirewall"`
 
+	// DiscoKey is the wg-server's punch public key, pinned the same way as
+	// WireGuardPubKey. Clients seal reflex requests to it.
+	DiscoKey string `json:"DiscoKey,omitempty"`
+
 	InsecureSkipVerify bool `json:"InsecureSkipVerify,omitempty"`
 }
 
@@ -123,8 +136,9 @@ type WGServerConfigResponse struct {
 
 	InternetIface string `json:"InternetIface"`
 
-	EnableFirewall     bool `json:"EnableFirewall"`
-	InsecureSkipVerify bool `json:"InsecureSkipVerify"`
+	EnableFirewall     bool   `json:"EnableFirewall"`
+	DiscoKey           string `json:"DiscoKey,omitempty"`
+	InsecureSkipVerify bool   `json:"InsecureSkipVerify"`
 }
 
 type MeshGroup struct {
@@ -191,6 +205,26 @@ type WGPeer struct {
 	DeviceID      string `json:"DeviceID"`
 	WireGuardIP   string `json:"WireGuardIP,omitempty"`
 	WireGuardIPv6 string `json:"WireGuardIPv6,omitempty"`
+}
+
+// P2PPeer is one device a client is allowed to punch. The controller only
+// returns a peer when both firewalls already admit the other's tunnel IP
+// on every port.
+type P2PPeer struct {
+	DeviceID     string `json:"DeviceID"`
+	DiscoKey     string `json:"DiscoKey"`
+	WireGuardKey string `json:"WireGuardKey"`
+	WireGuardIP  string `json:"WireGuardIP"`
+}
+
+// P2PLocate is where a wg-server should forward a rendezvous.
+type P2PLocate struct {
+	DeviceID    string `json:"DeviceID"`
+	DiscoKey    string `json:"DiscoKey,omitempty"`
+	WireGuardIP string `json:"WireGuardIP"`
+	HomeIP      string `json:"HomeIP"`
+	HomePort    int    `json:"HomePort"`
+	Local       bool   `json:"Local"`
 }
 
 type WGPeersResponse struct {

@@ -223,6 +223,10 @@ func handleClientDeviceCreate(w http.ResponseWriter, r *http.Request) {
 		sendError(w, 400, "invalid WireGuard key")
 		return
 	}
+	if err := normalizeDiscoKey(form.Device.DiscoKey); err != nil {
+		sendError(w, 400, "invalid disco key")
+		return
+	}
 
 	wgIPAllocMu.Lock()
 	defer wgIPAllocMu.Unlock()
@@ -286,6 +290,10 @@ func handleAdminDeviceCreate(w http.ResponseWriter, r *http.Request) {
 
 	if err := rejectServerWireGuardKey(form.Device.WireGuardKey); err != nil {
 		sendError(w, 400, "invalid WireGuard key")
+		return
+	}
+	if err := normalizeDiscoKey(form.Device.DiscoKey); err != nil {
+		sendError(w, 400, "invalid disco key")
 		return
 	}
 

@@ -196,6 +196,7 @@ func PublicConnect(cr *ConnectionRequest) (code int, connectErr error) {
 	if localDev == nil || wgCfg == nil || localDev.WireGuardPrivKey == "" {
 		return 502, errors.New("no local device identity for server")
 	}
+	tunnel.deviceID = localDev.ID
 	wgPrivKeyB64 := localDev.WireGuardPrivKey
 
 	clearStoredPrivKey(meta)
@@ -322,6 +323,17 @@ func tryReplaceLiveWG(oldTunnel, tunnel *TUN, wgCfg *wgServerConfig, meta *Tunne
 	oldTunnel.SetState(TunnelDisconnecting)
 	tunnel.wgDevice = oldTunnel.wgDevice
 	tunnel.wgBind = oldTunnel.wgBind
+	if tunnel.deviceID == "" {
+		tunnel.deviceID = oldTunnel.deviceID
+	}
+	tunnel.punchIn = oldTunnel.punchIn
+	tunnel.punchWant = oldTunnel.punchWant
+	tunnel.punchPending = oldTunnel.punchPending
+	tunnel.punchDirect = oldTunnel.punchDirect
+	if pb, ok := tunnel.wgBind.(*punchBind); ok {
+		pb.tun.Store(tunnel)
+	}
+	tunnel.reinstallDirectPeers()
 	tunnel.osTUN = oldTunnel.osTUN
 	tunnel.procTUN = oldTunnel.procTUN
 	if tunnel.procTUN != nil {

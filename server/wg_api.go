@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/tunnels-is/tunnels/punch"
 	"github.com/tunnels-is/tunnels/types"
 )
 
@@ -242,6 +243,7 @@ func handleWGConfig(w http.ResponseWriter, r *http.Request) {
 		"WireGuardSubnet6": server.WireGuardSubnet6,
 		"WANCIDR":          wanCIDRForServer(server),
 		"EnableFirewall":   server.EnableFirewall,
+		"DiscoKey":         server.DiscoKey,
 	})
 }
 
@@ -332,6 +334,10 @@ func handleWGServerConfigFetch(w http.ResponseWriter, r *http.Request) {
 		sendError(w, http.StatusConflict, err.Error())
 		return
 	}
+	if err := pinServerDiscoKey(server, r.Header.Get("X-WG-Disco")); err != nil {
+		sendError(w, http.StatusConflict, err.Error())
+		return
+	}
 
 	resp := &types.WGServerConfigResponse{
 		ServerID:          server.ID.String(),
@@ -343,6 +349,7 @@ func handleWGServerConfigFetch(w http.ResponseWriter, r *http.Request) {
 		WireGuardIface:    server.WireGuardIface,
 		InternetIface:     server.InternetIface,
 		EnableFirewall:    server.EnableFirewall,
+		DiscoKey:          server.DiscoKey,
 	}
 
 	sendObject(w, resp)
@@ -366,6 +373,26 @@ func pinWireGuardPubKey(server *types.Server, pubKeyB64 string) error {
 		return nil
 	}
 	return fmt.Errorf("WireGuard public key is pinned; rotate the server API key to replace it")
+}
+
+func pinServerDiscoKey(server *types.Server, disco string) error {
+	if disco == "" {
+		return nil
+	}
+	if _, err := punch.DecodeKey(disco); err != nil {
+		return fmt.Errorf("invalid disco key")
+	}
+	if server.DiscoKey == "" {
+		if err := setServerDiscoKey(server.ID, disco); err != nil {
+			return err
+		}
+		server.DiscoKey = disco
+		return nil
+	}
+	if disco == server.DiscoKey {
+		return nil
+	}
+	return fmt.Errorf("disco key is pinned; rotate the server API key to replace it")
 }
 
 func meshPortForServer(s *types.Server) int {

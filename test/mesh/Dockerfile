@@ -4,4 +4,6 @@ RUN apk add --no-cache iptables ip6tables iproute2 curl iputils \
 COPY server /server
 COPY meshpeer /meshpeer
 COPY dummyhttp /dummyhttp
+COPY punchpeer /punchpeer
+COPY conenat /conenat
 WORKDIR /data

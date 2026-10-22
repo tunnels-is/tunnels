@@ -49,6 +49,13 @@ func updateDevice(device *types.Device) error {
 					}
 				}
 				oldWGKey = oldDevice.WireGuardKey
+				if device.DiscoKey == "" {
+					device.DiscoKey = oldDevice.DiscoKey
+				}
+				if !device.P2PAllowAll && len(device.P2PAllowIPs) == 0 {
+					device.P2PAllowAll = oldDevice.P2PAllowAll
+					device.P2PAllowIPs = oldDevice.P2PAllowIPs
+				}
 			}
 		}
 
@@ -231,6 +238,55 @@ func createDevice(device *types.Device) error {
 			}
 		}
 		return nil
+	})
+}
+
+func setDevicePunchPolicy(id uuid.UUID, allowAll bool, ips []string) error {
+	return db.Update(func(tx *gobolt.Tx) error {
+		b := tx.Bucket([]byte(bucketDevices))
+		key := []byte(id.String())
+		v := b.Get(key)
+		if v == nil {
+			return errors.New("device not found")
+		}
+		device := new(types.Device)
+		if err := bboltUnmarshal(v, device); err != nil {
+			return err
+		}
+		device.P2PAllowAll = allowAll
+		if ips == nil {
+			ips = []string{}
+		}
+		device.P2PAllowIPs = ips
+		data, err := bboltMarshal(device)
+		if err != nil {
+			return err
+		}
+		return b.Put(key, data)
+	})
+}
+
+func setDeviceDiscoKey(id uuid.UUID, disco string) error {
+	return db.Update(func(tx *gobolt.Tx) error {
+		b := tx.Bucket([]byte(bucketDevices))
+		key := []byte(id.String())
+		v := b.Get(key)
+		if v == nil {
+			return errors.New("device not found")
+		}
+		device := new(types.Device)
+		if err := bboltUnmarshal(v, device); err != nil {
+			return err
+		}
+		if device.DiscoKey != "" && device.DiscoKey != disco {
+			return errors.New("disco key is pinned")
+		}
+		device.DiscoKey = disco
+		data, err := bboltMarshal(device)
+		if err != nil {
+			return err
+		}
+		return b.Put(key, data)
 	})
 }
 

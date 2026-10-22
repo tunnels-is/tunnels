@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/tunnels-is/tunnels/punch"
 	"golang.zx2c4.com/wireguard/conn"
 )
 
@@ -191,6 +192,16 @@ func (b *LazyBind) wrapReceive(inner conn.ReceiveFunc) conn.ReceiveFunc {
 		out := 0
 		for i := 0; i < n; i++ {
 			data := bufs[i][:sizes[i]]
+			if punch.Is(data) {
+				pkt := make([]byte, len(data))
+				copy(pkt, data)
+				from := ""
+				if eps[i] != nil {
+					from = eps[i].DstToString()
+				}
+				enqueuePunch(from, pkt)
+				continue
+			}
 			if isHandshakeInit(data) {
 
 				if !validMAC1(data, b.serverPub) {

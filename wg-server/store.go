@@ -66,6 +66,24 @@ func (ps *PeerStore) GetOrAssign(deviceID, pubKeyB64 string) (string, string, er
 	return ip, ipv6, nil
 }
 
+func (ps *PeerStore) Get(deviceID string) (PeerRecord, bool) {
+	ps.mu.RLock()
+	defer ps.mu.RUnlock()
+	rec, ok := ps.records[deviceID]
+	return rec, ok
+}
+
+func (ps *PeerStore) DeviceIDByIP(ip string) (string, bool) {
+	ps.mu.RLock()
+	defer ps.mu.RUnlock()
+	for id, rec := range ps.records {
+		if rec.IP == ip {
+			return id, true
+		}
+	}
+	return "", false
+}
+
 func (ps *PeerStore) Set(deviceID, ip, ipv6, pubKeyB64 string) {
 	ps.mu.Lock()
 	defer ps.mu.Unlock()

@@ -65,6 +65,9 @@ func registerWGRoutes(mux *http.ServeMux) {
 	mux.Handle("GET /wg/peers", wgServerMW(handleWGPeers))
 	mux.Handle("GET /wg/peer", wgServerMW(handleWGPeer))
 	mux.Handle("GET /wg/mesh", wgServerMW(handleWGMesh))
+	mux.Handle("GET /wg/p2p/local", wgServerMW(handleWGP2PLocal))
+	mux.Handle("GET /wg/p2p/locate", wgServerMW(handleWGP2PLocate))
+	mux.Handle("POST /wg/p2p/policy", wgServerMW(handleWGP2PPolicy))
 }
 
 func registerClientRoutes(mux *http.ServeMux) {
@@ -86,6 +89,8 @@ func registerClientRoutes(mux *http.ServeMux) {
 	mux.Handle("POST /client/servers/country", clientMW(handleClientServersByCountry))
 	mux.Handle("POST /client/server", clientMW(handleClientServerGet))
 	mux.Handle("GET /client/wg/config", clientMW(handleWGConfig))
+	mux.Handle("GET /client/p2p/peers", clientMW(handleClientP2PPeers))
+	mux.Handle("POST /client/device/disco", clientMW(handleClientP2PDisco))
 
 	if loadSecret("PayKey") != "" {
 		mux.Handle("POST /client/key/activate", clientMW(handleClientActivateLicense))

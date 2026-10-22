@@ -178,7 +178,7 @@ func createLocalDeviceForServer(cr *ConnectionRequest, serverID, tag string) (*L
 		deviceTag = shortDeviceTag()
 	}
 
-	cfg, device, err := createServerDeviceFull(cr, serverID, pub, deviceTag)
+	cfg, device, err := createServerDeviceFull(cr, serverID, pub, deviceTag, discoPublicB64(priv))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -224,6 +224,9 @@ func mergeWGServerConfig(cfg, full *wgServerConfig) {
 	if full.WANCIDR != "" {
 		cfg.WANCIDR = full.WANCIDR
 	}
+	if full.DiscoKey != "" {
+		cfg.DiscoKey = full.DiscoKey
+	}
 }
 
 func resolveLocalDeviceForServer(cr *ConnectionRequest, serverID, tag string) (*LocalDevice, *wgServerConfig, error) {
@@ -247,7 +250,7 @@ func resolveLocalDeviceForServer(cr *ConnectionRequest, serverID, tag string) (*
 		}
 		if cfg.WireGuardIP == "" {
 			INFO("re-registering local device on controller:", existing.ID)
-			cfg, _, cfgErr = createServerDeviceFull(cr, serverID, pub, existing.Tag)
+			cfg, _, cfgErr = createServerDeviceFull(cr, serverID, pub, existing.Tag, discoPublicB64(existing.WireGuardPrivKey))
 			if cfgErr != nil {
 				return nil, nil, cfgErr
 			}

@@ -72,6 +72,9 @@ func pinProtectBind(b wgconn.Bind, ifIndex uint32) error {
 	if b == nil || ifIndex == 0 {
 		return nil
 	}
+	if punch, ok := b.(*punchBind); ok && punch != nil {
+		b = punch.inner
+	}
 	if wrapped, ok := b.(*ifaceProtectBind); ok {
 		wrapped.ifIndex = ifIndex
 		return bindProtectToInterface(wrapped.Bind, ifIndex)

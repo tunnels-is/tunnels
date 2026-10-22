@@ -86,6 +86,11 @@ func (t *TUN) ProcessEgressPacket(p *[]byte) (sendRemote bool) {
 		RecalculateTransportChecksum(t.EP_IPv4Header, t.EP_TPHeader)
 	}
 
+	dst := t.EP_DstIP
+	if t.EP_NAT_OK {
+		dst = t.EP_NAT_IP
+	}
+	t.notePunchWant(dst)
 	return true
 }
 
@@ -109,6 +114,9 @@ func (t *TUN) ProcessIngressPacket(packet []byte) bool {
 	t.IP_IPv4HeaderLength = (packet[0] & 0x0F) * 4
 
 	if int(t.IP_IPv4HeaderLength) < 20 || int(t.IP_IPv4HeaderLength) > len(packet) {
+		return false
+	}
+	if !t.punchAllowsIngress(t.IP_SrcIP) {
 		return false
 	}
 	t.IP_IPv4Header = packet[:t.IP_IPv4HeaderLength]

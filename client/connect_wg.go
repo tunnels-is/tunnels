@@ -17,7 +17,7 @@ func attachWGDevice(tunnel *TUN, inter *adapter, pt wgtun.Device, ipcConf string
 	} else {
 		ERROR("no physical interface index; WireGuard socket will not be pinned to the NIC")
 	}
-	bind := newProtectBind(ifIndex)
+	bind := newPunchBind(newProtectBind(ifIndex), tunnel)
 	tunnel.wgBind = bind
 	startProtectWatcher()
 	wgDev := wgdevice.NewDevice(pt, bind, NewWGLogger())
@@ -49,6 +49,7 @@ type wgServerConfig struct {
 	WireGuardSubnet6 string `json:"WireGuardSubnet6"`
 	WANCIDR          string `json:"WANCIDR"`
 	EnableFirewall   bool   `json:"EnableFirewall"`
+	DiscoKey         string `json:"DiscoKey,omitempty"`
 }
 
 func getServerWGConfig(cr *ConnectionRequest, serverID string, pubKey string) (*wgServerConfig, error) {
