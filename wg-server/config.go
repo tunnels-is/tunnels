@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/tunnels-is/tunnels/punch"
 	"github.com/tunnels-is/tunnels/types"
 	"golang.org/x/crypto/curve25519"
 )
@@ -224,8 +225,13 @@ func fetchConfig(controllerURL, apiKey, configPath string, insecureSkipVerify bo
 		zeroBytes(privKey)
 		return nil, fmt.Errorf("derive wg public key: %w", err)
 	}
+	discoPub, err := loadOrGenerateDiscoPub(generateKey)
+	if err != nil {
+		zeroBytes(privKey)
+		return nil, fmt.Errorf("load punch disco key: %w", err)
+	}
 
-	r, err := fetchServerConfigResponse(controllerURL, apiKey, pubKeyB64, insecureSkipVerify)
+	r, err := fetchServerConfigResponse(controllerURL, apiKey, pubKeyB64, discoPub, insecureSkipVerify)
 	if err != nil {
 		zeroBytes(privKey)
 		return nil, err
@@ -234,7 +240,46 @@ func fetchConfig(controllerURL, apiKey, configPath string, insecureSkipVerify bo
 	return configFromResponse(r, privKey, controllerURL, apiKey, configPath, insecureSkipVerify)
 }
 
-func fetchServerConfigResponse(controllerURL, apiKey, pubKeyB64 string, insecureSkipVerify bool) (*types.WGServerConfigResponse, error) {
+func loadOrGenerateDiscoPub(allowGenerate bool) (string, error) {
+	path := privateKeyPath() + ".disco"
+	data, err := os.ReadFile(path)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return "", err
+	}
+	var priv []byte
+	if len(data) == 0 {
+		if !allowGenerate {
+			return "", fmt.Errorf("%s missing", path)
+		}
+		k, err := punch.NewPrivate()
+		if err != nil {
+			return "", err
+		}
+		priv = k[:]
+		if err := writeLocalPrivKey(path, priv); err != nil {
+			return "", err
+		}
+	} else {
+		priv, err = readLocalPrivKey(path, data)
+		if err != nil {
+			return "", err
+		}
+	}
+	if len(priv) != 32 {
+		return "", fmt.Errorf("punch disco key has wrong length")
+	}
+	var key [32]byte
+	copy(key[:], priv)
+	zeroBytes(priv)
+	pub, err := punch.Public(key)
+	if err != nil {
+		return "", err
+	}
+	setPunchDisco(key, pub)
+	return punch.EncodeKey(pub), nil
+}
+
+func fetchServerConfigResponse(controllerURL, apiKey, pubKeyB64, discoPub string, insecureSkipVerify bool) (*types.WGServerConfigResponse, error) {
 	client := newControllerHTTPClient(insecureSkipVerify)
 
 	fetchURL := strings.TrimRight(controllerURL, "/") + "/wg/server-config/fetch"
@@ -244,6 +289,9 @@ func fetchServerConfigResponse(controllerURL, apiKey, pubKeyB64 string, insecure
 	}
 	req.Header.Set("X-WG-KEY", apiKey)
 	req.Header.Set("X-WG-PubKey", pubKeyB64)
+	if discoPub != "" {
+		req.Header.Set("X-WG-Disco", discoPub)
+	}
 
 	resp, err := client.Do(req)
 	if err != nil {

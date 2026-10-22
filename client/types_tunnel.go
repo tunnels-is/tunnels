@@ -186,6 +186,13 @@ type TUN struct {
 	IP_TPHeader         []byte
 	IP_NAT_IP           [4]byte
 	IP_NAT_OK           bool
+
+	deviceID     string
+	punchIn      chan punchDatagram
+	punchWant    chan [4]byte
+	punchPending map[[4]byte]struct{}
+	punchMu      sync.Mutex
+	punchDirect  map[[4]byte]punchInstall
 }
 
 func (t *TUN) GetState() TunnelState {

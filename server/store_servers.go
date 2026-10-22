@@ -92,6 +92,7 @@ func updateServer(server *types.Server) (*types.Server, error) {
 		existing.WireGuardPort = server.WireGuardPort
 		if oldAPIKey != server.APIKey {
 			existing.WireGuardPubKey = ""
+			existing.DiscoKey = ""
 		}
 		existing.WireGuardIface = server.WireGuardIface
 		existing.WireGuardSubnet = server.WireGuardSubnet
@@ -128,6 +129,27 @@ func updateServer(server *types.Server) (*types.Server, error) {
 		return nil
 	})
 	return result, err
+}
+
+func setServerDiscoKey(id uuid.UUID, discoKey string) error {
+	return db.Update(func(tx *gobolt.Tx) error {
+		b := tx.Bucket([]byte(bucketServers))
+		key := []byte(id.String())
+		v := b.Get(key)
+		if v == nil {
+			return errors.New("server not found")
+		}
+		existing := new(types.Server)
+		if err := bboltUnmarshal(v, existing); err != nil {
+			return err
+		}
+		existing.DiscoKey = discoKey
+		data, err := bboltMarshal(existing)
+		if err != nil {
+			return err
+		}
+		return b.Put(key, data)
+	})
 }
 
 func setServerWireGuardPubKey(id uuid.UUID, pubKey string) error {

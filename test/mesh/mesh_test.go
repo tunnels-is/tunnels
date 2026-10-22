@@ -56,9 +56,22 @@ func sh(t *testing.T, name string, args ...string) (string, error) {
 	return out.String(), err
 }
 
+func containerCLI() string {
+	if v := os.Getenv("MESH_RUNTIME"); v != "" {
+		return v
+	}
+	if _, err := exec.LookPath("podman"); err == nil {
+		return "podman"
+	}
+	if _, err := exec.LookPath("docker"); err == nil {
+		return "docker"
+	}
+	return "podman"
+}
+
 func podman(t *testing.T, args ...string) (string, error) {
 	t.Helper()
-	return sh(t, "podman", args...)
+	return sh(t, containerCLI(), args...)
 }
 
 func mustPodman(t *testing.T, args ...string) string {
@@ -72,15 +85,17 @@ func mustPodman(t *testing.T, args ...string) string {
 
 func execIn(t *testing.T, ctr, script string) (string, error) {
 	t.Helper()
-	return sh(t, "podman", "exec", ctr, "sh", "-c", script)
+	return sh(t, containerCLI(), "exec", ctr, "sh", "-c", script)
 }
 
 func cleanup(t *testing.T) {
 	t.Helper()
-	for _, c := range []string{"mctrl", "mwgA", "mwgB", "mcliA", "mcliB"} {
+	for _, c := range []string{"mctrl", "mwgA", "mwgB", "mcliA", "mcliB", "mnatA", "mnatB"} {
 		_, _ = podman(t, "rm", "-f", c)
 	}
-	_, _ = podman(t, "network", "rm", netName)
+	for _, n := range []string{netName, "tnata", "tnatb"} {
+		_, _ = podman(t, "network", "rm", n)
+	}
 }
 
 func genKeypair(t *testing.T) (privB64, pubB64 string) {
@@ -158,8 +173,8 @@ func (x *ctrl) req(method, path string, body any, hdr map[string]string, out any
 }
 
 func TestMesh(t *testing.T) {
-	if _, err := exec.LookPath("podman"); err != nil {
-		t.Skip("podman not available")
+	if _, err := exec.LookPath(containerCLI()); err != nil {
+		t.Skip("podman or docker not available")
 	}
 	cleanup(t)
 	t.Cleanup(func() {
@@ -204,8 +219,8 @@ func TestMesh(t *testing.T) {
 	}
 	t.Logf("wan=%s meshgroup=%s", wan.ID, mg.ID)
 
-	srvA := createServer(t, c, "serverA", wgAIP, subnetA, wan.ID, mg.ID)
-	srvB := createServer(t, c, "serverB", wgBIP, subnetB, wan.ID, mg.ID)
+	srvA := createServer(t, c, "serverA", wgAIP, subnetA, wan.ID, mg.ID, false)
+	srvB := createServer(t, c, "serverB", wgBIP, subnetB, wan.ID, mg.ID, false)
 	t.Logf("serverA id=%s apikey=%s", srvA.ID, srvA.APIKey)
 	t.Logf("serverB id=%s apikey=%s", srvB.ID, srvB.APIKey)
 
@@ -307,6 +322,8 @@ func buildArtifacts(t *testing.T) {
 	build(filepath.Join(dir, "server"), "./server")
 	build(filepath.Join(dir, "meshpeer"), "./test/mesh/meshpeer")
 	build(filepath.Join(dir, "dummyhttp"), "./test/mesh/dummyhttp")
+	build(filepath.Join(dir, "punchpeer"), "./test/mesh/punchpeer")
+	build(filepath.Join(dir, "conenat"), "./test/mesh/conenat")
 	if out, err := podman(t, "build", "-t", image, dir); err != nil {
 		t.Fatalf("image build: %v\n%s", err, out)
 	}
@@ -385,13 +402,13 @@ type serverInfo struct {
 	APIKey string `json:"APIKey"`
 }
 
-func createServer(t *testing.T, c *ctrl, tag, ip, subnet, wanID, mgID string) serverInfo {
+func createServer(t *testing.T, c *ctrl, tag, ip, subnet, wanID, mgID string, firewall bool) serverInfo {
 	t.Helper()
 	body := map[string]any{"Server": map[string]any{
 		"Tag": tag, "Country": "test", "IP": ip, "Port": "443",
 		"WireGuardSubnet": subnet, "WireGuardPort": wgPort, "WireGuardMeshPort": meshPort,
 		"WireGuardIface": "wg0", "InternetIface": "eth0",
-		"WANID": wanID, "MeshGroupID": mgID, "EnableFirewall": false,
+		"WANID": wanID, "MeshGroupID": mgID, "EnableFirewall": firewall,
 	}}
 	var si serverInfo
 	if code := c.req("POST", "/ui/server/create", body, nil, &si); code != 200 || si.ID == "" || si.APIKey == "" {
@@ -441,9 +458,11 @@ func waitServersProvisioned(t *testing.T, c *ctrl, id string) string {
 func waitMeshRoutes(t *testing.T) {
 	t.Helper()
 	var lastA, lastB string
+	var errA, errB error
 	for i := 0; i < 40; i++ {
-		a, _ := execIn(t, "mwgA", "ip route show "+subnetB)
-		b, _ := execIn(t, "mwgB", "ip route show "+subnetA)
+		var a, b string
+		a, errA = execIn(t, "mwgA", "ip route show "+subnetB)
+		b, errB = execIn(t, "mwgB", "ip route show "+subnetA)
 		lastA, lastB = strings.TrimSpace(a), strings.TrimSpace(b)
 		if strings.Contains(lastA, "wg0mesh") && strings.Contains(lastB, "wg0mesh") {
 			t.Logf("mwgA route: %s", lastA)
@@ -453,7 +472,7 @@ func waitMeshRoutes(t *testing.T) {
 		time.Sleep(2 * time.Second)
 	}
 	dumpDiag(t)
-	t.Fatalf("mesh routes never appeared. mwgA=%q mwgB=%q", lastA, lastB)
+	t.Fatalf("mesh routes never appeared. mwgA=%q errA=%v mwgB=%q errB=%v", lastA, errA, lastB, errB)
 }
 
 type deviceInfo struct {
