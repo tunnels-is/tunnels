@@ -1,6 +1,7 @@
 package client
 
 import (
+	"bytes"
 	"encoding/binary"
 	"net"
 	"testing"
@@ -175,5 +176,93 @@ func TestTranslateIP_Slash24And32(t *testing.T) {
 	}
 	if got, _ := tun.translateIP([4]byte{172, 16, 0, 7}); got != [4]byte{10, 9, 9, 9} {
 		t.Fatalf("/32 NAT wrong: got %v", got)
+	}
+}
+
+func TestTranslateIP_UnchangedIsFalse(t *testing.T) {
+	tun := newBareTUN()
+	got, ok := tun.translateIP([4]byte{10, 0, 0, 3})
+	if ok || got != [4]byte{10, 0, 0, 3} {
+		t.Fatalf("empty networks: got %v ok %v", got, ok)
+	}
+	_, natNet, _ := net.ParseCIDR("192.168.9.0/24")
+	_, targetNet, _ := net.ParseCIDR("10.0.5.0/24")
+	tun.ServerResponse.Networks = []*types.Network{{
+		Nat: "192.168.9.0/24", Network: "10.0.5.0/24",
+		NatIPNet: natNet, NetIPNet: targetNet,
+	}}
+	got, ok = tun.translateIP([4]byte{10, 0, 0, 9})
+	if ok || got != [4]byte{10, 0, 0, 9} {
+		t.Fatalf("no match: got %v ok %v", got, ok)
+	}
+	_, same, _ := net.ParseCIDR("10.0.0.0/24")
+	tun.ServerResponse.Networks = []*types.Network{{
+		Nat: "10.0.0.0/24", Network: "10.0.0.0/24",
+		NatIPNet: same, NetIPNet: same,
+	}}
+	got, ok = tun.translateIP([4]byte{10, 0, 0, 3})
+	if ok || got != [4]byte{10, 0, 0, 3} {
+		t.Fatalf("identity nat: got %v ok %v", got, ok)
+	}
+}
+
+func checksumsMatch(pkt []byte) bool {
+	cp := append([]byte(nil), pkt...)
+	iphl := int(cp[0]&0x0F) * 4
+	RecalculateIPv4HeaderChecksum(cp[:iphl])
+	RecalculateTransportChecksum(cp[:iphl], cp[iphl:])
+	return bytes.Equal(cp, pkt)
+}
+
+func TestProcessEgress_NoNATLeavesChecksums(t *testing.T) {
+	tun := newBareTUN()
+	l4 := make([]byte, 20)
+	pkt := buildV4(6, [4]byte{10, 0, 0, 3}, [4]byte{10, 0, 1, 3}, 0, l4)
+	binary.BigEndian.PutUint16(pkt[10:12], 0xABCD)
+	binary.BigEndian.PutUint16(pkt[36:38], 0x1234)
+	before := append([]byte(nil), pkt...)
+	p := pkt
+	if !tun.ProcessEgressPacket(&p) {
+		t.Fatal("packet dropped")
+	}
+	if !bytes.Equal(pkt, before) {
+		t.Fatalf("unchanged flow was rewritten")
+	}
+}
+
+func TestProcessIngress_NoNATLeavesChecksums(t *testing.T) {
+	tun := newBareTUN()
+	l4 := make([]byte, 20)
+	pkt := buildV4(6, [4]byte{10, 0, 1, 3}, [4]byte{10, 0, 0, 3}, 0, l4)
+	binary.BigEndian.PutUint16(pkt[10:12], 0xABCD)
+	binary.BigEndian.PutUint16(pkt[36:38], 0x1234)
+	before := append([]byte(nil), pkt...)
+	if !tun.ProcessIngressPacket(pkt) {
+		t.Fatal("packet dropped")
+	}
+	if !bytes.Equal(pkt, before) {
+		t.Fatalf("unchanged flow was rewritten")
+	}
+}
+
+func TestProcessEgress_NATRewritesChecksum(t *testing.T) {
+	tun := newBareTUN()
+	_, natNet, _ := net.ParseCIDR("192.168.9.0/24")
+	_, targetNet, _ := net.ParseCIDR("10.0.5.0/24")
+	tun.ServerResponse.Networks = []*types.Network{{
+		Nat: "192.168.9.0/24", Network: "10.0.5.0/24",
+		NatIPNet: natNet, NetIPNet: targetNet,
+	}}
+	l4 := make([]byte, 20)
+	pkt := buildV4(6, [4]byte{10, 0, 0, 2}, [4]byte{192, 168, 9, 42}, 0, l4)
+	p := pkt
+	if !tun.ProcessEgressPacket(&p) {
+		t.Fatal("packet dropped")
+	}
+	if pkt[16] != 10 || pkt[17] != 0 || pkt[18] != 5 || pkt[19] != 42 {
+		t.Fatalf("dest not translated: %v", pkt[16:20])
+	}
+	if !checksumsMatch(pkt) {
+		t.Fatal("translated packet checksum does not verify")
 	}
 }

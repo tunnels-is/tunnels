@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/netip"
 	neturl "net/url"
+	"runtime/debug"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -38,6 +39,12 @@ type punchBind struct {
 	fwOff   atomic.Bool
 	retryMu sync.Mutex
 	retry   map[uuid.UUID]punchInstall
+
+	// loopMu guards looping. WireGuard rebinds by Close then Open on the
+	// same Bind. Close must not retire the punch loop, and Open must
+	// bring it back if a rebind won the race and the loop had exited.
+	loopMu  sync.Mutex
+	looping bool
 }
 
 func newPunchBind(inner wgconn.Bind, tun *TUN) wgconn.Bind {
@@ -49,7 +56,6 @@ func newPunchBind(inner wgconn.Bind, tun *TUN) wgconn.Bind {
 	}
 	b := &punchBind{inner: inner}
 	b.tun.Store(tun)
-	go b.loop()
 	return b
 }
 
@@ -58,11 +64,23 @@ func (b *punchBind) Open(port uint16) ([]wgconn.ReceiveFunc, uint16, error) {
 	if err != nil {
 		return nil, 0, err
 	}
+	b.closed.Store(false)
+	b.ensureLoop()
 	out := make([]wgconn.ReceiveFunc, len(fns))
 	for i, fn := range fns {
 		out[i] = b.wrap(fn)
 	}
 	return out, actual, nil
+}
+
+func (b *punchBind) ensureLoop() {
+	b.loopMu.Lock()
+	defer b.loopMu.Unlock()
+	if b.looping {
+		return
+	}
+	b.looping = true
+	go b.loop()
 }
 
 func (b *punchBind) wrap(inner wgconn.ReceiveFunc) wgconn.ReceiveFunc {
@@ -100,6 +118,9 @@ func (b *punchBind) wrap(inner wgconn.ReceiveFunc) wgconn.ReceiveFunc {
 }
 
 func (b *punchBind) Close() error {
+	// Pause only. The userspace WireGuard device calls Close before every
+	// Open, including the first Up and every route rebind. A later Open
+	// clears this and keeps the same loop.
 	b.closed.Store(true)
 	return b.inner.Close()
 }
@@ -113,11 +134,27 @@ func (b *punchBind) ParseEndpoint(s string) (wgconn.Endpoint, error) {
 func (b *punchBind) BatchSize() int { return b.inner.BatchSize() }
 
 func (b *punchBind) loop() {
-	defer RecoverAndLog()
+	panicked := false
+	defer func() {
+		b.loopMu.Lock()
+		b.looping = false
+		again := !panicked && !b.closed.Load()
+		b.loopMu.Unlock()
+		if again {
+			b.ensureLoop()
+		}
+	}()
+	defer func() {
+		if r := recover(); r != nil {
+			panicked = true
+			ERROR("punch loop: ", r, "\n", string(debug.Stack()))
+		}
+	}()
 	tick := time.NewTicker(time.Second)
 	defer tick.Stop()
 	var eng *punch.Engine
 	var refreshed time.Time
+	DEBUG("punch: loop started")
 	for !b.closed.Load() {
 		tun := b.tun.Load()
 		if tun == nil || tun.punchIn == nil || tun.punchWant == nil {
@@ -126,6 +163,9 @@ func (b *punchBind) loop() {
 		}
 		if eng == nil {
 			eng = b.buildEngine(tun)
+			if eng != nil {
+				DEBUG("punch: engine ready for ", tun.deviceID)
+			}
 		}
 		select {
 		case pkt := <-tun.punchIn:
@@ -252,6 +292,7 @@ func (b *punchBind) fetchWG(tun *TUN) *wgServerConfig {
 	url := cr.Server.GetURL("/client/wg/config") + "?serverID=" + neturl.QueryEscape(tun.metaServer()) + "&pubKey=" + neturl.QueryEscape(dev.WireGuardPubKey)
 	body, code, err := SendRequestToURL(nil, "GET", url, nil, 8000, cr.Server.ValidateCertificate, cr.Server.CertificatePath, authHeaders(cr))
 	if err != nil || code != 200 {
+		DEBUG("punch: wg config ", code, " ", err)
 		return nil
 	}
 	cfg := new(wgServerConfig)
@@ -266,6 +307,7 @@ func (b *punchBind) fetchPeers(tun *TUN) []punch.Peer {
 	url := cr.Server.GetURL("/client/p2p/peers") + "?deviceID=" + tun.deviceID
 	body, code, err := SendRequestToURL(nil, "GET", url, nil, 8000, cr.Server.ValidateCertificate, cr.Server.CertificatePath, authHeaders(cr))
 	if err != nil || code != 200 {
+		DEBUG("punch: peers ", code, " ", err)
 		return nil
 	}
 	var resp struct {
@@ -338,13 +380,17 @@ func (b *punchBind) apply(tun *TUN, res punch.Result) {
 			to = serverAddr
 		}
 		if to == "" {
+			DEBUG("punch: drop send, no address")
 			continue
 		}
 		ep, err := b.ParseEndpoint(to)
 		if err != nil {
+			DEBUG("punch: bad endpoint ", to, ": ", err)
 			continue
 		}
-		_ = b.Send([][]byte{d.Data}, ep)
+		if err := b.Send([][]byte{d.Data}, ep); err != nil {
+			DEBUG("punch: send to ", to, ": ", err)
+		}
 	}
 	if tun.wgDevice == nil {
 		return
