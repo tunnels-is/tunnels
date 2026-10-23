@@ -158,7 +158,7 @@ type TUN struct {
 	serverInterfaceNetIP    net.IP
 	serverInterfaceIP4bytes [4]byte
 	wgEndpointSet           bool
-	wgLoopDropLogged        atomic.Bool
+	wgLoopDropLogAt         atomic.Int64
 	protectHosts            []string
 
 	natMu      sync.RWMutex        `json:"-"`

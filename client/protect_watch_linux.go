@@ -77,6 +77,31 @@ func tunnelLinkIndexes() (idxs map[int]struct{}, gws map[string]struct{}) {
 	return idxs, gws
 }
 
+func routePrefixEqual(r *netlink.Route, dst *net.IPNet) bool {
+	if r == nil || dst == nil || r.Dst == nil || r.Dst.IP == nil || dst.IP == nil {
+		return false
+	}
+	if !r.Dst.IP.Equal(dst.IP) {
+		return false
+	}
+	ones, bits := r.Dst.Mask.Size()
+	wantOnes, wantBits := dst.Mask.Size()
+	return ones == wantOnes && bits == wantBits
+}
+
+func protectRulePresent() bool {
+	rules, err := netlink.RuleList(netlink.FAMILY_V4)
+	if err != nil {
+		return false
+	}
+	for i := range rules {
+		if rules[i].Table == wgProtectTable && rules[i].Priority == wgProtectPrio {
+			return true
+		}
+	}
+	return false
+}
+
 func ipv4RouteMatches(r *netlink.Route, ifIndex int, gw net.IP) bool {
 	if r == nil || r.LinkIndex != ifIndex || r.Gw == nil || gw == nil {
 		return false
@@ -109,7 +134,7 @@ func protectRoutesPresent(ifName string, gw net.IP, ifIndex int, hosts []string)
 			break
 		}
 	}
-	if !haveProtect {
+	if !haveProtect || !protectRulePresent() {
 		return false
 	}
 
@@ -127,7 +152,7 @@ func protectRoutesPresent(ifName string, gw net.IP, ifIndex int, hosts []string)
 		}
 		ok := false
 		for i := range existing {
-			if ipv4RouteMatches(&existing[i], ifIndex, gw4) {
+			if ipv4RouteMatches(&existing[i], ifIndex, gw4) && routePrefixEqual(&existing[i], dst) {
 				ok = true
 				break
 			}

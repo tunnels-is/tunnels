@@ -13,6 +13,8 @@ import (
 	wgconn "golang.zx2c4.com/wireguard/conn"
 )
 
+func protectBindWraps() bool { return true }
+
 func applyEndpointProtect(string, net.IP) error { return nil }
 
 func removeEndpointProtect() {}

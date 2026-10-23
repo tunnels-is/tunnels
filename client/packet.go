@@ -3,7 +3,14 @@ package client
 import (
 	"encoding/binary"
 	"net"
+	"time"
 )
+
+const wgLoopDropLogEvery = int64(30 * time.Second)
+
+func wgLoopDropDue(prev, now int64) bool {
+	return prev == 0 || now-prev >= wgLoopDropLogEvery
+}
 
 func ipv4FragInfo(packet []byte) (isFragmented, isTrailing bool) {
 	f := binary.BigEndian.Uint16(packet[6:8])
@@ -63,7 +70,9 @@ func (t *TUN) ProcessEgressPacket(p *[]byte) (sendRemote bool) {
 	t.EP_DstIP[3] = packet[19]
 
 	if t.wgEndpointSet && t.EP_Protocol == 17 && t.EP_DstIP == t.serverInterfaceIP4bytes {
-		if t.wgLoopDropLogged.CompareAndSwap(false, true) {
+		now := time.Now().UnixNano()
+		prev := t.wgLoopDropLogAt.Load()
+		if wgLoopDropDue(prev, now) && t.wgLoopDropLogAt.CompareAndSwap(prev, now) {
 			SECURITY("dropping UDP to WireGuard endpoint on the tunnel interface — packets to ",
 				net.IP(t.serverInterfaceIP4bytes[:]).String(),
 				" must leave on the physical interface, not through the tunnel")

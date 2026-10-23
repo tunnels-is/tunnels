@@ -3,6 +3,7 @@
 package client
 
 import (
+	"encoding/binary"
 	"net"
 	"testing"
 
@@ -62,6 +63,31 @@ func TestHostProtectRouteRequired_SkipsOnLink(t *testing.T) {
 	}
 }
 
+func TestRoutePrefixEqual(t *testing.T) {
+	_, host := mustCIDR2("74.63.223.157/32")
+	_, other := mustCIDR2("89.147.109.61/32")
+	def := &netlink.Route{Gw: net.ParseIP("192.168.1.1"), LinkIndex: 2}
+	if routePrefixEqual(def, host) {
+		t.Fatal("a default route must not satisfy a host /32")
+	}
+	match := &netlink.Route{Dst: host, Gw: net.ParseIP("192.168.1.1"), LinkIndex: 2}
+	if !routePrefixEqual(match, host) {
+		t.Fatal("expected the host /32 to match")
+	}
+	if routePrefixEqual(match, other) {
+		t.Fatal("a different host must not match")
+	}
+}
+
+func TestIPv4UnicastIfIndexNetworkOrder(t *testing.T) {
+	got := ipv4UnicastIfIndex(2)
+	var b [4]byte
+	binary.NativeEndian.PutUint32(b[:], uint32(got))
+	if binary.BigEndian.Uint32(b[:]) != 2 {
+		t.Fatalf("IP_UNICAST_IF value %#x is not network-order ifindex 2", got)
+	}
+}
+
 func TestIsIPv4DefaultRoute(t *testing.T) {
 	if !isIPv4DefaultRoute(&netlink.Route{}) {
 		t.Fatal("nil Dst should be default")
@@ -75,9 +101,14 @@ func TestIsIPv4DefaultRoute(t *testing.T) {
 }
 
 func mustCIDR(s string) *net.IPNet {
-	_, n, err := net.ParseCIDR(s)
+	_, n := mustCIDR2(s)
+	return n
+}
+
+func mustCIDR2(s string) (net.IP, *net.IPNet) {
+	ip, n, err := net.ParseCIDR(s)
 	if err != nil {
 		panic(err)
 	}
-	return n
+	return ip, n
 }

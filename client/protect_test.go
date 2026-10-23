@@ -2,8 +2,10 @@ package client
 
 import (
 	"fmt"
+	"net"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestNewProtectBindWrapsWhenIfIndexSet(t *testing.T) {
@@ -11,13 +13,44 @@ func TestNewProtectBindWrapsWhenIfIndexSet(t *testing.T) {
 	if _, ok := plain.(*ifaceProtectBind); ok {
 		t.Fatal("ifIndex 0 should not wrap the default bind")
 	}
-	wrapped := newProtectBind(7)
-	b, ok := wrapped.(*ifaceProtectBind)
+	got := newProtectBind(7)
+	if !protectBindWraps() {
+		if _, ok := got.(*ifaceProtectBind); ok {
+			t.Fatal("linux must pass the raw bind so the wireguard route listener starts")
+		}
+		return
+	}
+	b, ok := got.(*ifaceProtectBind)
 	if !ok {
 		t.Fatal("ifIndex > 0 should wrap the bind")
 	}
 	if b.ifIndex != 7 {
 		t.Fatalf("ifIndex = %d, want 7", b.ifIndex)
+	}
+}
+
+func TestPhysicalIfaceUsableRequiresCarrier(t *testing.T) {
+	if physicalIfaceUsable(net.FlagUp) {
+		t.Fatal("admin-up without carrier is not usable during suspend")
+	}
+	if !physicalIfaceUsable(net.FlagUp | net.FlagRunning) {
+		t.Fatal("up and running interface should be usable")
+	}
+	if physicalIfaceUsable(net.FlagRunning) {
+		t.Fatal("running without admin-up is not usable")
+	}
+}
+
+func TestWGLoopDropDueRepeats(t *testing.T) {
+	if !wgLoopDropDue(0, 1) {
+		t.Fatal("first drop should be logged")
+	}
+	start := int64(1_000_000_000)
+	if wgLoopDropDue(start, start+int64(time.Second)) {
+		t.Fatal("a second drop inside the interval should stay quiet")
+	}
+	if !wgLoopDropDue(start, start+wgLoopDropLogEvery) {
+		t.Fatal("a drop after the interval should be logged again")
 	}
 }
 

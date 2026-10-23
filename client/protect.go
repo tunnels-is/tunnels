@@ -5,12 +5,18 @@ import (
 	"net"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	wgconn "golang.zx2c4.com/wireguard/conn"
+	wgdevice "golang.zx2c4.com/wireguard/device"
 )
 
 var protectWatchOnce sync.Once
+
+// protectPinnedIndex is the physical ifindex last applied to the WireGuard
+// sockets. Zero means the sockets still need a pin (or a sticky-source clear).
+var protectPinnedIndex atomic.Uint32
 
 // wgProtectMark is applied to the userspace WireGuard UDP socket (UAPI fwmark).
 // Packets with this mark look up wgProtectTable, which holds the original
@@ -49,7 +55,11 @@ type ifaceProtectBind struct {
 
 func newProtectBind(ifIndex uint32) wgconn.Bind {
 	inner := wgconn.NewDefaultBind()
-	if ifIndex == 0 {
+	// Linux must pass *conn.StdNetBind through. wireguard-go starts the
+	// route listener that clears the sticky source only for that concrete
+	// type. A wrapper makes every later send keep the pre-suspend ifindex,
+	// and that PKTINFO overrides IP_UNICAST_IF. The socket is pinned after Up.
+	if ifIndex == 0 || !protectBindWraps() {
 		return inner
 	}
 	return &ifaceProtectBind{Bind: inner, ifIndex: ifIndex}
@@ -86,7 +96,6 @@ func startProtectWatcher() {
 }
 
 func protectTickerLoop() {
-	defer RecoverAndLog()
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 	var stop <-chan struct{}
@@ -100,7 +109,10 @@ func protectTickerLoop() {
 		case <-stop:
 			return
 		case <-ticker.C:
-			refreshEndpointProtect()
+			func() {
+				defer RecoverAndLog()
+				refreshEndpointProtect()
+			}()
 		}
 	}
 }
@@ -141,14 +153,19 @@ func fallbackPhysicalFromState() (ifName string, gw net.IP, ifIndex int, err err
 	if err != nil {
 		return "", nil, 0, err
 	}
-	if iface.Flags&net.FlagUp == 0 {
-		return "", nil, 0, fmt.Errorf("stored physical interface %s is down", *nameP)
+	if !physicalIfaceUsable(iface.Flags) {
+		return "", nil, 0, fmt.Errorf("stored physical interface %s is not running", *nameP)
 	}
-	idx := iface.Index
-	if id := s.DefaultInterfaceID.Load(); id > 0 {
-		idx = int(id)
-	}
-	return *nameP, append(net.IP(nil), (*gwP).To4()...), idx, nil
+	// Use the live index. The stored id goes stale if the NIC is recreated
+	// across suspend, and pinning that id sends WireGuard at the wrong device.
+	return *nameP, append(net.IP(nil), (*gwP).To4()...), iface.Index, nil
+}
+
+// physicalIfaceUsable requires carrier, not only admin-up. During suspend
+// the NIC stays IFF_UP while NetworkManager has already deleted its routes;
+// installing against it returns ENETUNREACH.
+func physicalIfaceUsable(flags net.Flags) bool {
+	return flags&net.FlagUp != 0 && flags&net.FlagRunning != 0
 }
 
 func parseRouteGetGateway(out string) net.IP {
@@ -206,6 +223,7 @@ func refreshEndpointProtect() {
 		return false
 	})
 	if !hasTunnel {
+		protectPinnedIndex.Store(0)
 		return
 	}
 
@@ -217,28 +235,31 @@ func refreshEndpointProtect() {
 			return
 		}
 	}
-
-	hosts := collectProtectHosts()
-	if protectRoutesPresent(ifName, gw, ifIndex, hosts) {
+	if gw.To4() == nil || ifIndex <= 0 {
+		DEBUG("protect refresh: physical default is not usable")
 		return
 	}
 
-	if protErr := applyEndpointProtect(ifName, gw); protErr != nil {
-		ERROR("protect refresh: ", protErr)
+	hosts := collectProtectHosts()
+	installed := false
+	if !protectRoutesPresent(ifName, gw, ifIndex, hosts) {
+		if installErr := installEndpointProtectRoutes(ifName, gw); installErr == nil {
+			installed = true
+		}
 	}
 
-	gw4 := gw.To4().String()
-	tunnelMapRange(func(tun *TUN) bool {
-		for _, host := range tun.protectHosts {
-			if rerr := addIPv4Route(host+"/32", ifName, gw4, "0"); rerr != nil {
-				ERROR("protect refresh host route ", host, ": ", rerr)
-			}
-		}
-		if pinErr := pinProtectBind(tun.wgBind, uint32(ifIndex)); pinErr != nil {
-			ERROR("protect refresh bind: ", pinErr)
-		}
-		return true
-	})
+	pinErr := pinAllProtectBinds(ifIndex)
+	pinned := pinErr == nil
+	// Clear the sticky source only after the socket is bound to the physical
+	// NIC. IP_PKTINFO from the last receive overrides that bind, so a source
+	// learned while the default route was the tunnel keeps sending into it.
+	if pinned && (installed || protectPinnedIndex.Load() != uint32(ifIndex)) {
+		clearAllWGSticky()
+		protectPinnedIndex.Store(uint32(ifIndex))
+	}
+	if !installed {
+		return
+	}
 
 	s := STATE.Load()
 	gwCopy := append(net.IP(nil), gw.To4()...)
@@ -246,5 +267,67 @@ func refreshEndpointProtect() {
 	name := ifName
 	s.DefaultInterfaceName.Store(&name)
 	s.DefaultInterfaceID.Store(int32(ifIndex))
-	DEBUG("protect refresh: restored pin via ", gw4, " dev ", ifName, " idx ", ifIndex)
+	if !pinned {
+		return
+	}
+	DEBUG("protect refresh: restored pin via ", gw.To4().String(), " dev ", ifName, " idx ", ifIndex)
+}
+
+func installEndpointProtectRoutes(ifName string, gw net.IP) error {
+	if err := applyEndpointProtect(ifName, gw); err != nil {
+		ERROR("protect refresh: ", err)
+		return err
+	}
+	gw4 := gw.To4().String()
+	var failed error
+	tunnelMapRange(func(tun *TUN) bool {
+		for _, host := range tun.protectHosts {
+			if !hostProtectRouteRequired(host) {
+				continue
+			}
+			if rerr := addIPv4Route(host+"/32", ifName, gw4, "0"); rerr != nil {
+				ERROR("protect refresh host route ", host, ": ", rerr)
+				failed = rerr
+			}
+		}
+		return true
+	})
+	return failed
+}
+
+func pinAllProtectBinds(ifIndex int) error {
+	if ifIndex <= 0 {
+		return fmt.Errorf("interface index is 0")
+	}
+	var failed error
+	tunnelMapRange(func(tun *TUN) bool {
+		if pinErr := pinProtectBind(tun.wgBind, uint32(ifIndex)); pinErr != nil {
+			ERROR("protect refresh bind: ", pinErr)
+			failed = pinErr
+		}
+		return true
+	})
+	return failed
+}
+
+func clearAllWGSticky() {
+	tunnelMapRange(func(tun *TUN) bool {
+		clearWGStickySrc(tun.wgDevice)
+		return true
+	})
+}
+
+// clearWGStickySrc drops the cached PKTINFO source. BindSetMark clears it
+// only when the mark changes, so the mark is toggled and put back.
+func clearWGStickySrc(dev *wgdevice.Device) {
+	if dev == nil {
+		return
+	}
+	if err := dev.BindSetMark(0); err != nil {
+		DEBUG("clear wireguard sticky source: ", err)
+		return
+	}
+	if err := dev.BindSetMark(uint32(wgProtectMark)); err != nil {
+		ERROR("restore wireguard fwmark after sticky clear: ", err)
+	}
 }

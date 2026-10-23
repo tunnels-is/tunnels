@@ -29,6 +29,14 @@ func attachWGDevice(tunnel *TUN, inter *adapter, pt wgtun.Device, ipcConf string
 		wgDev.Close()
 		return fmt.Errorf("WireGuard device Up failed: %w", upErr)
 	}
+	if ifIndex != 0 {
+		if pinErr := pinProtectBind(bind, ifIndex); pinErr != nil {
+			ERROR("unable to pin WireGuard socket to physical interface: ", pinErr)
+		} else {
+			clearWGStickySrc(wgDev)
+			protectPinnedIndex.Store(ifIndex)
+		}
+	}
 	tunnel.wgDevice = wgDev
 	tunnel.tunnel.Store(inter)
 	inter.tunnel.Store(&tunnel)
