@@ -165,8 +165,9 @@ func bindProtectToInterface(b wgconn.Bind, ifIndex uint32) error {
 	if err := bsi.BindSocketToInterface4(ifIndex, false); err != nil {
 		return fmt.Errorf("IPv4 IP_UNICAST_IF: %w", err)
 	}
-	if err := bsi.BindSocketToInterface6(ifIndex, false); err != nil {
-		DEBUG("IPv6 IP_UNICAST_IF skipped: ", err)
-	}
+	// IPV6 is not support yet, will enable this ones it is
+	// if err := bsi.BindSocketToInterface6(ifIndex, false); err != nil {
+	// 	DEBUG("IPv6 IP_UNICAST_IF skipped: ", err)
+	// }
 	return nil
 }
