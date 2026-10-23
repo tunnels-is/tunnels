@@ -78,12 +78,12 @@ func (t *TUN) ProcessEgressPacket(p *[]byte) (sendRemote bool) {
 		t.EP_IPv4Header[17] = t.EP_NAT_IP[1]
 		t.EP_IPv4Header[18] = t.EP_NAT_IP[2]
 		t.EP_IPv4Header[19] = t.EP_NAT_IP[3]
-	}
-
-	RecalculateIPv4HeaderChecksum(t.EP_IPv4Header)
-
-	if !isFragmented {
-		RecalculateTransportChecksum(t.EP_IPv4Header, t.EP_TPHeader)
+		// The kernel and the TUN offload path already checksummed this packet.
+		// Recompute only after NAT rewrites an address.
+		RecalculateIPv4HeaderChecksum(t.EP_IPv4Header)
+		if !isFragmented {
+			RecalculateTransportChecksum(t.EP_IPv4Header, t.EP_TPHeader)
+		}
 	}
 
 	dst := t.EP_DstIP
@@ -141,11 +141,10 @@ func (t *TUN) ProcessIngressPacket(packet []byte) bool {
 		t.IP_IPv4Header[13] = t.IP_NAT_IP[1]
 		t.IP_IPv4Header[14] = t.IP_NAT_IP[2]
 		t.IP_IPv4Header[15] = t.IP_NAT_IP[3]
-	}
-
-	RecalculateIPv4HeaderChecksum(t.IP_IPv4Header)
-	if !isFragmented {
-		RecalculateTransportChecksum(t.IP_IPv4Header, t.IP_TPHeader)
+		RecalculateIPv4HeaderChecksum(t.IP_IPv4Header)
+		if !isFragmented {
+			RecalculateTransportChecksum(t.IP_IPv4Header, t.IP_TPHeader)
+		}
 	}
 
 	return true
