@@ -91,6 +91,9 @@ func (t *TUN) ProcessEgressPacket(p *[]byte) (sendRemote bool) {
 		dst = t.EP_NAT_IP
 	}
 	t.notePunchWant(dst)
+	if !t.fitPeerMTU(packet, dst, isFragmented) {
+		return false
+	}
 	return true
 }
 

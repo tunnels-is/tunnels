@@ -242,14 +242,18 @@ func PublicConnect(cr *ConnectionRequest) (code int, connectErr error) {
 		return 502, hexErr
 	}
 
-	if handled, code, err := tryReplaceLiveWG(oldTunnel, tunnel, wgCfg, meta, ipcConf, state); handled {
+	// Resolve once, after the server /32 is pinned to the physical gateway.
+	// A non-zero config MTU is used as-is. Zero discovers and is not saved back.
+	linkMTU := resolvedMTU(meta, cr.ServerIP, serverResp.WireGuardPort)
+
+	if handled, code, err := tryReplaceLiveWG(oldTunnel, tunnel, wgCfg, meta, ipcConf, state, linkMTU); handled {
 		if err == nil {
 			success = true
 		}
 		return code, err
 	}
 
-	if replaced, code, err := tryReuseStickyTUN(oldTunnel, tunnel, wgCfg, meta, ipcConf); replaced {
+	if replaced, code, err := tryReuseStickyTUN(oldTunnel, tunnel, wgCfg, meta, ipcConf, linkMTU); replaced {
 		if err == nil {
 			success = true
 		}
@@ -261,7 +265,7 @@ func PublicConnect(cr *ConnectionRequest) (code int, connectErr error) {
 		destroyReusablePath(oldTunnel)
 	}
 
-	if err := createFreshWG(tunnel, wgCfg, meta, ipcConf); err != nil {
+	if err := createFreshWG(tunnel, wgCfg, meta, ipcConf, linkMTU); err != nil {
 		return 502, err
 	}
 
@@ -305,14 +309,14 @@ func encodeWGSessionIPC(privB64, pubB64, serverIP, port string) (string, error) 
 	return buildWGIPC(privHex, serverPubHex, serverIP, port), nil
 }
 
-func refreshAdapterFromSession(inter *adapter, wgCfg *wgServerConfig, meta *TunnelMeta) {
+func refreshAdapterFromSession(inter *adapter, wgCfg *wgServerConfig, meta *TunnelMeta, linkMTU int32) {
 	inter.IPv4Address = wgCfg.WireGuardIP
 	inter.Gateway = wgCfg.WireGuardIP
-	inter.MTU = meta.MTU
+	inter.MTU = linkMTU
 	inter.TxQueuelen = meta.TxQueueLen
 }
 
-func tryReplaceLiveWG(oldTunnel, tunnel *TUN, wgCfg *wgServerConfig, meta *TunnelMeta, ipcConf string, state *State) (handled bool, code int, err error) {
+func tryReplaceLiveWG(oldTunnel, tunnel *TUN, wgCfg *wgServerConfig, meta *TunnelMeta, ipcConf string, state *State, linkMTU int32) (handled bool, code int, err error) {
 	if oldTunnel == nil || !wgDeviceAlive(oldTunnel.wgDevice) {
 		return false, 0, nil
 	}
@@ -330,6 +334,7 @@ func tryReplaceLiveWG(oldTunnel, tunnel *TUN, wgCfg *wgServerConfig, meta *Tunne
 	tunnel.punchWant = oldTunnel.punchWant
 	tunnel.punchPending = oldTunnel.punchPending
 	tunnel.punchDirect = oldTunnel.punchDirect
+	tunnel.punchMTU = oldTunnel.punchMTU
 	if pb, ok := tunnel.wgBind.(*punchBind); ok {
 		pb.tun.Store(tunnel)
 	}
@@ -343,7 +348,7 @@ func tryReplaceLiveWG(oldTunnel, tunnel *TUN, wgCfg *wgServerConfig, meta *Tunne
 	if inter == nil {
 		return true, 502, errors.New("existing tunnel has no interface")
 	}
-	refreshAdapterFromSession(inter, wgCfg, meta)
+	refreshAdapterFromSession(inter, wgCfg, meta, linkMTU)
 	tunnel.tunnel.Store(inter)
 	inter.tunnel.Store(&tunnel)
 	if err = inter.Connect(tunnel); err != nil {
@@ -361,7 +366,7 @@ func tryReplaceLiveWG(oldTunnel, tunnel *TUN, wgCfg *wgServerConfig, meta *Tunne
 	return true, 200, nil
 }
 
-func tryReuseStickyTUN(oldTunnel, tunnel *TUN, wgCfg *wgServerConfig, meta *TunnelMeta, ipcConf string) (replaced bool, code int, err error) {
+func tryReuseStickyTUN(oldTunnel, tunnel *TUN, wgCfg *wgServerConfig, meta *TunnelMeta, ipcConf string, linkMTU int32) (replaced bool, code int, err error) {
 	if oldTunnel == nil || oldTunnel.osTUN == nil || !oldTunnel.osTUN.CanReuse() {
 		return false, 0, nil
 	}
@@ -383,7 +388,7 @@ func tryReuseStickyTUN(oldTunnel, tunnel *TUN, wgCfg *wgServerConfig, meta *Tunn
 	if inter == nil {
 		return false, 0, nil
 	}
-	refreshAdapterFromSession(inter, wgCfg, meta)
+	refreshAdapterFromSession(inter, wgCfg, meta, linkMTU)
 	if err := attachWGDevice(tunnel, inter, tunnel.procTUN, ipcConf); err != nil {
 		ERROR("reuse TUN attach failed: ", err)
 		destroyReusablePath(oldTunnel)
@@ -395,8 +400,8 @@ func tryReuseStickyTUN(oldTunnel, tunnel *TUN, wgCfg *wgServerConfig, meta *Tunn
 	return true, 200, nil
 }
 
-func createFreshWG(tunnel *TUN, wgCfg *wgServerConfig, meta *TunnelMeta, ipcConf string) error {
-	osTun, tunErr := wgtun.CreateTUN(resolveTUNCreateName(meta.IFName), int(meta.MTU))
+func createFreshWG(tunnel *TUN, wgCfg *wgServerConfig, meta *TunnelMeta, ipcConf string, linkMTU int32) error {
+	osTun, tunErr := wgtun.CreateTUN(resolveTUNCreateName(meta.IFName), int(linkMTU))
 	if tunErr != nil {
 		return fmt.Errorf("unable to create TUN interface: %w", tunErr)
 	}
@@ -406,7 +411,7 @@ func createFreshWG(tunnel *TUN, wgCfg *wgServerConfig, meta *TunnelMeta, ipcConf
 		Name:        tunIfName,
 		IPv4Address: wgCfg.WireGuardIP,
 		NetMask:     "255.255.255.255",
-		MTU:         meta.MTU,
+		MTU:         linkMTU,
 		TxQueuelen:  meta.TxQueueLen,
 		Gateway:     wgCfg.WireGuardIP,
 	}

@@ -12,6 +12,20 @@ import (
 	"github.com/tunnels-is/tunnels/types"
 )
 
+// parseMTUText reads the MTU field. An empty field is automatic discovery.
+// A negative or non-numeric value leaves the previous MTU in place.
+func parseMTUText(text string, current int32) int32 {
+	raw := strings.TrimSpace(text)
+	if raw == "" {
+		return 0
+	}
+	n, err := strconv.Atoi(raw)
+	if err != nil || n < 0 {
+		return current
+	}
+	return int32(n)
+}
+
 func (a *App) tunnelEditPage() fyne.CanvasObject {
 	back := outlineBtn("Back", func() { a.show(pageTunnels) }).withIcon(theme.NavigateBackIcon())
 
@@ -168,9 +182,7 @@ func (a *App) tunnelEditPage() fyne.CanvasObject {
 		form.Tag = strings.TrimSpace(tag.Text)
 		form.IFName = strings.TrimSpace(ifname.Text)
 		form.ServerID = srvIDs[server.Selected]
-		if n, err := strconv.Atoi(strings.TrimSpace(mtu.Text)); err == nil {
-			form.MTU = int32(n)
-		}
+		form.MTU = parseMTUText(mtu.Text, form.MTU)
 		if n, err := strconv.Atoi(strings.TrimSpace(txq.Text)); err == nil {
 			form.TxQueueLen = int32(n)
 		}
@@ -223,7 +235,7 @@ func (a *App) tunnelEditPage() fyne.CanvasObject {
 			formRows(
 				formPair(field("Name", tag), field("Interface", ifname)),
 				field("Server", server),
-				formPair(field("MTU", mtu), field("TX queue length", txq)),
+				formPair(fieldWith("MTU", "0 = automatic MTU discovery", mtu), field("TX queue length", txq)),
 			)),
 		card("Behaviour", "What this tunnel does while connected.", features),
 		sectionHead("DNS"),

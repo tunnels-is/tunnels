@@ -19,6 +19,10 @@ const (
 	TypePong       byte = 5
 	TypeTeardown   byte = 6
 	TypeForward    byte = 7
+	// TypeMTUProbe is an unencrypted datagram padded to an exact UDP length.
+	// The wg-server answers with TypeMTUAck only when the probe arrived whole.
+	TypeMTUProbe byte = 8
+	TypeMTUAck   byte = 9
 )
 
 var magic = [4]byte{'T', 'N', 'L', 'P'}
@@ -248,23 +252,70 @@ func OpenRendezvous(dstPriv, srcPub [32]byte, pkt []byte) (Rendezvous, error) {
 	return r, nil
 }
 
-// BuildPing seals a probe. txid is echoed by the pong.
+// BuildPing seals a trust-building probe. The body is exactly 8 bytes.
+// Older peers reject any other size, so this shape must not grow.
 func BuildPing(srcPriv, dstPub [32]byte, src, dst uuid.UUID, txid uint64) ([]byte, error) {
 	var plain [8]byte
 	binary.BigEndian.PutUint64(plain[:], txid)
 	return sealDirect(TypePing, srcPriv, dstPub, src, dst, plain[:])
 }
 
+// BuildPingPad seals a path-MTU probe. plainLen includes the 8-byte txid
+// and trailing padding. Send it only after the path is already trusted.
+func BuildPingPad(srcPriv, dstPub [32]byte, src, dst uuid.UUID, txid uint64, plainLen int) ([]byte, error) {
+	if plainLen < 8 {
+		return nil, fmt.Errorf("short ping")
+	}
+	if directPacketLen(plainLen) > MaxPacket {
+		return nil, fmt.Errorf("ping too large")
+	}
+	plain := make([]byte, plainLen)
+	binary.BigEndian.PutUint64(plain[:8], txid)
+	return sealDirect(TypePing, srcPriv, dstPub, src, dst, plain)
+}
+
 // OpenPing opens a ping and returns its txid.
+// A body longer than 8 bytes is a path-MTU probe; the txid stays in the first 8.
 func OpenPing(dstPriv, srcPub [32]byte, pkt []byte) (src, dst uuid.UUID, txid uint64, err error) {
 	plain, src, dst, err := openDirect(TypePing, dstPriv, srcPub, pkt)
 	if err != nil {
 		return src, dst, 0, err
 	}
-	if len(plain) != 8 {
+	if len(plain) < 8 {
 		return src, dst, 0, fmt.Errorf("bad ping body")
 	}
-	return src, dst, binary.BigEndian.Uint64(plain), nil
+	return src, dst, binary.BigEndian.Uint64(plain[:8]), nil
+}
+
+// directPacketLen is the UDP payload length of a sealed ping with plainLen bytes.
+func directPacketLen(plainLen int) int {
+	return headerLen + idLen*2 + nonceLen + plainLen + 16
+}
+
+// BuildMTUProbe builds an unencrypted probe whose UDP payload is payloadLen bytes.
+func BuildMTUProbe(payloadLen int) ([]byte, error) {
+	if payloadLen < headerLen || payloadLen > MaxPacket {
+		return nil, fmt.Errorf("bad mtu probe length")
+	}
+	return frame(TypeMTUProbe, make([]byte, payloadLen-headerLen)), nil
+}
+
+// BuildMTUAck is the small reply to a probe that arrived intact.
+func BuildMTUAck() []byte {
+	return frame(TypeMTUAck, nil)
+}
+
+// IsMTUAck reports whether pkt is a header-only MTU acknowledgement.
+func IsMTUAck(pkt []byte) bool {
+	return len(pkt) == headerLen && TypeOf(pkt) == TypeMTUAck
+}
+
+// MTUAckFor returns an ack when pkt is a probe of an acceptable size.
+func MTUAckFor(pkt []byte) []byte {
+	if TypeOf(pkt) != TypeMTUProbe || len(pkt) < headerLen || len(pkt) > MaxPacket {
+		return nil
+	}
+	return BuildMTUAck()
 }
 
 // BuildPong seals a probe reply. observed is the address the ping arrived from.
