@@ -250,7 +250,7 @@ func (a *App) fetchDevices() {
 			} else {
 				a.localDevices = local
 			}
-			if a.current == pageDevices {
+			if a.current == pageDevices || a.current == pageDashboard {
 				a.reloadCurrent()
 			}
 		})

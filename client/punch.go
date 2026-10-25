@@ -8,6 +8,7 @@ import (
 	"net/netip"
 	neturl "net/url"
 	"runtime/debug"
+	"sort"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -22,6 +23,41 @@ import (
 type punchDatagram struct {
 	from string
 	data []byte
+}
+
+// DirectPeer is one hole-punched WireGuard peer on this tunnel. It is a
+// snapshot for the UI: the public key stays on the install record.
+type DirectPeer struct {
+	DeviceID string
+	TunnelIP string
+	Endpoint string
+}
+
+// DirectPeers copies the direct paths currently installed on t.
+func (t *TUN) DirectPeers() []DirectPeer {
+	if t == nil {
+		return nil
+	}
+	t.punchMu.Lock()
+	defer t.punchMu.Unlock()
+	if len(t.punchDirect) == 0 {
+		return nil
+	}
+	out := make([]DirectPeer, 0, len(t.punchDirect))
+	for ip, inst := range t.punchDirect {
+		out = append(out, DirectPeer{
+			DeviceID: inst.id.String(),
+			TunnelIP: netip.AddrFrom4(ip).String(),
+			Endpoint: inst.via.String(),
+		})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].TunnelIP == out[j].TunnelIP {
+			return out[i].DeviceID < out[j].DeviceID
+		}
+		return out[i].TunnelIP < out[j].TunnelIP
+	})
+	return out
 }
 
 // punchInstall is one direct WireGuard peer this tunnel added. The public
