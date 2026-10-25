@@ -8,8 +8,9 @@ import (
 	"github.com/tunnels-is/tunnels/types"
 )
 
-// TestAutoProbeDecision covers the rules the web UI uses for the first probe:
-// signed in, exactly once, and never while a tunnel is already up.
+// TestAutoProbeDecision covers the first probe: signed in, exactly once.
+// A tunnel that is already up still needs a measurement, because the
+// dashboard keeps the closest server on screen above the live tunnels.
 func TestAutoProbeDecision(t *testing.T) {
 	cs := &client.ControlServer{ID: "cs-1", Host: "api.tunnels.is", Port: "443"}
 	sid := uuid.MustParse("11111111-1111-1111-1111-111111111111")
@@ -54,11 +55,11 @@ func TestAutoProbeDecision(t *testing.T) {
 			want: autoProbeSkip,
 		},
 		{
-			name: "already connected, so the server in use is the answer",
+			name: "already connected, closest server still measured",
 			app: &App{user: user(), servers: srv, active: []*client.TUN{
 				{ID: "t1", CR: &client.ConnectionRequest{UserID: "u1", Tag: "default", ServerID: sid.String()}},
 			}},
-			want: autoProbeSkip,
+			want: autoProbeRun,
 		},
 		{
 			name: "another user's tunnel does not count as connected",

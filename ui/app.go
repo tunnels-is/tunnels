@@ -98,7 +98,8 @@ type App struct {
 	deviceLocalIDs  map[string]struct{}
 	deviceLocalPubs map[string]struct{}
 
-	bwLive []*bandwidthPanel
+	bwLive    []*bandwidthPanel
+	dashWatch chan struct{}
 
 	logHeights       map[widget.ListItemID]float32
 	logHeightQueued  bool
@@ -278,6 +279,7 @@ func (a *App) stopBandwidthPanels() {
 }
 
 func (a *App) teardownPage() {
+	a.stopDashWatch()
 	a.stopBandwidthPanels()
 	a.dropLiveLists()
 }

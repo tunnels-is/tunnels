@@ -7,7 +7,6 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
-	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
 	"github.com/tunnels-is/tunnels/client"
 )
@@ -478,49 +477,4 @@ func (r *bwRenderer) Refresh() {
 	for _, o := range r.Objects() {
 		o.Refresh()
 	}
-}
-
-// bandwidthBlock is one live tunnel's chart, drawn on the page rather than
-// inside a card. headed adds the tunnel name above the graph when several
-// tunnels are up; a single tunnel is already named by the page hero.
-func (a *App) bandwidthBlock(t *client.TUN, headed bool) fyne.CanvasObject {
-	tag := "Tunnel"
-	where := ""
-	if t.CR != nil && t.CR.Tag != "" {
-		tag = t.CR.Tag
-	}
-	if headed && t.CR != nil {
-		if s := a.serverByID(t.CR.ServerID); s != nil {
-			where = s.Tag
-			if c := countryName(s.Country); c != "" {
-				if where != "" {
-					where += "  ·  "
-				}
-				where += c
-			}
-		}
-	}
-	if headed && t.ServerResponse != nil && t.ServerResponse.InterfaceIP != "" {
-		if where != "" {
-			where += "  ·  "
-		}
-		where += t.ServerResponse.InterfaceIP
-	}
-
-	tun := t
-	disc := dangerBtn("Disconnect", func() {
-		a.confirm("Disconnect", "Disconnect "+tag+"?", func() { a.disconnectActive(tun) })
-	})
-	panel := newBandwidthPanel(t, a.bwRangeSeconds())
-	a.bwLive = append(a.bwLive, panel)
-
-	lines := []fyne.CanvasObject{}
-	if headed {
-		lines = append(lines, container.NewCenter(text(tag, fsLarge, pal().Content, true)))
-		if where != "" {
-			lines = append(lines, container.NewCenter(text(where, fsLarge, pal().Muted, false)))
-		}
-	}
-	lines = append(lines, panel, container.NewCenter(disc))
-	return vstack(sp3, lines...)
 }
