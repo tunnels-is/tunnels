@@ -85,6 +85,11 @@ func dispatchPunch(fromStr string, pkt []byte) {
 		handleRendezvous(from, pkt)
 	case punch.TypeForward:
 		handleForward(from, pkt)
+	case punch.TypeMTUProbe:
+		// The probe is unencrypted and padded. Answering means this size fit.
+		if ack := punch.MTUAckFor(pkt); ack != nil {
+			sendPunch(from, ack)
+		}
 	}
 }
 

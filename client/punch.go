@@ -212,7 +212,7 @@ func (b *punchBind) loop() {
 			if err != nil {
 				continue
 			}
-			b.apply(tun, eng.OnPacket(from, pkt.data, time.Now()))
+			b.apply(tun, eng, eng.OnPacket(from, pkt.data, time.Now()))
 		case <-tun.punchWant:
 			if eng != nil {
 				tun = b.tun.Load()
@@ -225,15 +225,15 @@ func (b *punchBind) loop() {
 			if tun == nil || eng == nil {
 				continue
 			}
-			b.apply(tun, b.pushLocalPolicy(tun, eng))
+			b.apply(tun, eng, b.pushLocalPolicy(tun, eng))
 			if refreshed.IsZero() || time.Since(refreshed) > 15*time.Second {
 				b.refreshDirectory(tun, eng)
-				b.apply(tun, b.pushLocalPolicy(tun, eng))
+				b.apply(tun, eng, b.pushLocalPolicy(tun, eng))
 				refreshed = time.Now()
 			}
 			tun.drainPunchWants(eng)
 			if tun.wgDevice != nil {
-				b.apply(tun, eng.Poll(time.Now()))
+				b.apply(tun, eng, eng.Poll(time.Now()))
 				b.retryRemoves(tun)
 			}
 		}
@@ -280,7 +280,10 @@ func (b *punchBind) buildEngine(tun *TUN) *punch.Engine {
 		return nil
 	}
 	b.registerDisco(tun, punch.EncodeKey(pub))
-	return punch.NewEngine(id, disco, wgPub, ip)
+	eng := punch.NewEngine(id, disco, wgPub, ip)
+	meta := tun.meta.Load()
+	eng.SetDiscoverMTU(meta == nil || meta.MTU == 0)
+	return eng
 }
 
 func (b *punchBind) pushLocalPolicy(tun *TUN, eng *punch.Engine) punch.Result {
@@ -315,7 +318,7 @@ func (b *punchBind) refreshDirectory(tun *TUN, eng *punch.Engine) {
 	}
 	peers := b.fetchPeers(tun)
 	if peers != nil {
-		b.apply(tun, eng.SetPeers(peers))
+		b.apply(tun, eng, eng.SetPeers(peers))
 	}
 }
 
@@ -401,7 +404,7 @@ func (t *TUN) metaServer() string {
 	return ""
 }
 
-func (b *punchBind) apply(tun *TUN, res punch.Result) {
+func (b *punchBind) apply(tun *TUN, eng *punch.Engine, res punch.Result) {
 	if tun == nil {
 		return
 	}
@@ -424,7 +427,13 @@ func (b *punchBind) apply(tun *TUN, res punch.Result) {
 			DEBUG("punch: bad endpoint ", to, ": ", err)
 			continue
 		}
-		if err := b.Send([][]byte{d.Data}, ep); err != nil {
+		err = b.sendOne(d.Data, ep, d.MTU)
+		if err != nil && d.MTU && eng != nil && isMsgTooBig(err) {
+			// The local stack refused this size. Treat it as too big immediately.
+			b.apply(tun, eng, eng.MTUUnsent(d.Peer, time.Now()))
+			continue
+		}
+		if err != nil {
 			DEBUG("punch: send to ", to, ": ", err)
 		}
 	}
@@ -453,6 +462,20 @@ func (b *punchBind) apply(tun *TUN, res punch.Result) {
 	for _, id := range res.Down {
 		b.removeDirect(tun, id)
 	}
+	for _, m := range res.MTU {
+		tun.notePeerMTU(m)
+	}
+}
+
+// sendOne sends one punch datagram. df is set only around a path-MTU probe
+// and restored before returning, so a configured MTU never leaves DF on and
+// a probe does not keep DF on the WireGuard data path.
+func (b *punchBind) sendOne(data []byte, ep wgconn.Endpoint, df bool) error {
+	if df {
+		restore := setBindDontFrag(b.inner)
+		defer restore()
+	}
+	return b.inner.Send([][]byte{data}, ep)
 }
 
 func applyDirectIPC(dev *wgdevice.Device, ip [4]byte, inst punchInstall) error {
@@ -485,11 +508,16 @@ func (b *punchBind) removeDirect(tun *TUN, id uuid.UUID) {
 	if dev != nil {
 		conf := fmt.Sprintf("public_key=%s\nremove=true\n\n", hex.EncodeToString(inst.wgPub[:]))
 		if err := applyWGIPC(dev, conf); err == nil {
+			deleted := false
 			tun.punchMu.Lock()
 			if cur, ok := tun.punchDirect[ip]; ok && cur.id == id {
 				delete(tun.punchDirect, ip)
+				deleted = true
 			}
 			tun.punchMu.Unlock()
+			if deleted {
+				tun.clearPeerMTU(ip)
+			}
 			b.clearRetry(id)
 			INFO("punch: direct path down ", netip.AddrFrom4(ip).String())
 			return

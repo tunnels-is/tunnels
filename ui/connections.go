@@ -43,9 +43,13 @@ func (a *App) connectionsPage() fyne.CanvasObject {
 			)
 		}
 		if tun != nil {
+			mtu := ac.LinkMTU()
+			if mtu <= 0 {
+				mtu = tun.MTU
+			}
 			rows = append(rows,
 				kvRow("Interface", tun.IFName, true),
-				kvRow("MTU", fmt.Sprintf("%d", tun.MTU), true),
+				kvRow("MTU", fmt.Sprintf("%d", mtu), true),
 				kvRow("DNS blocking", boolOn(tun.DNSBlocking), false),
 				kvRow("Auto connect", boolOn(tun.AutoConnect), false),
 				kvRow("Auto reconnect", boolOn(tun.AutoReconnect), false),

@@ -31,11 +31,14 @@ type Peer struct {
 }
 
 // Datagram is one punch packet to send. Server is set when it goes to the
-// wg-server instead of a peer address.
+// wg-server instead of a peer address. MTU marks a padded path-MTU probe;
+// Peer is the device the probe measures.
 type Datagram struct {
 	Server bool
 	To     netip.AddrPort
 	Data   []byte
+	MTU    bool
+	Peer   uuid.UUID
 }
 
 // Path is a direct address that has answered twice.
@@ -49,6 +52,8 @@ type Result struct {
 	Sends []Datagram
 	Up    []Path
 	Down  []uuid.UUID
+	// MTU is set when a trusted path's send direction has a measured inner MTU.
+	MTU []PathMTU
 }
 
 // Engine is the client punch state machine. It does not own a socket.
@@ -66,6 +71,7 @@ type Engine struct {
 
 	allowAll bool
 	allow    []string
+	discover bool
 
 	peers map[uuid.UUID]*session
 	byIP  map[netip.Addr]uuid.UUID
@@ -84,6 +90,18 @@ type session struct {
 	lastEpoch  uint64
 	repliedFor uint64
 	txid       uint64
+
+	mtuActive  bool
+	mtuDone    bool
+	mtuV6      bool
+	mtuLo      int
+	mtuHi      int
+	mtuOuter   int
+	mtuTx      uint64
+	mtuSent    time.Time
+	mtuFit     int
+	mtuRetried bool
+	mtuSteps   int
 }
 
 // NewEngine returns an engine for this device. discoPriv is the punch key.
@@ -237,6 +255,7 @@ func (e *Engine) Poll(now time.Time) Result {
 		if !e.admitsLocked(s.peer.WGIP) {
 			r.Down = append(r.Down, id)
 			s.directUp = false
+			s.resetMTU()
 			continue
 		}
 		if now.Sub(s.lastPong) > DirectTimeout {
@@ -246,6 +265,7 @@ func (e *Engine) Poll(now time.Time) Result {
 			}
 			s.directUp = false
 			s.pongs = make(map[netip.AddrPort]int)
+			s.resetMTU()
 			continue
 		}
 		if now.Sub(s.lastProbe) >= Keepalive {
@@ -254,6 +274,7 @@ func (e *Engine) Poll(now time.Time) Result {
 				s.lastProbe = now
 			}
 		}
+		e.pollMTULocked(s, &r, now)
 	}
 	return r
 }
@@ -356,7 +377,7 @@ func (e *Engine) onPongLocked(r *Result, from netip.AddrPort, pkt []byte, now ti
 	if s == nil || !e.admitsLocked(s.peer.WGIP) {
 		return
 	}
-	src, dst, _, observed, err := OpenPong(e.disco, s.peer.DiscoPub, pkt)
+	src, dst, txid, observed, err := OpenPong(e.disco, s.peer.DiscoPub, pkt)
 	if err != nil || src != claimed || dst != e.self {
 		return
 	}
@@ -366,6 +387,9 @@ func (e *Engine) onPongLocked(r *Result, from netip.AddrPort, pkt []byte, now ti
 		// differ from the mapping toward the wg-server. Keep their view.
 		_ = observed
 	}
+	// Match a padded probe before the "already direct" return. An ignored
+	// padded ping must not be what keeps or drops the path; keepalives do that.
+	e.onMTUPongLocked(s, txid, r, now)
 	s.pongs[via]++
 	s.lastPong = now
 	if s.pongs[via] == 1 {
@@ -380,10 +404,12 @@ func (e *Engine) onPongLocked(r *Result, from netip.AddrPort, pkt []byte, now ti
 	if s.directUp && s.direct == best {
 		return
 	}
+	changed := s.directUp && s.direct != best
 	s.direct = best
 	s.directUp = true
 	s.lastProbe = now
 	r.Up = append(r.Up, Path{Peer: s.peer, Via: best})
+	e.armMTULocked(s, r, now, !s.mtuActive || changed)
 }
 
 func (e *Engine) onTeardownLocked(r *Result, pkt []byte) {
@@ -405,6 +431,7 @@ func (e *Engine) onTeardownLocked(r *Result, pkt []byte) {
 	}
 	s.directUp = false
 	s.pongs = make(map[netip.AddrPort]int)
+	s.resetMTU()
 }
 
 func (e *Engine) advertiseLocked(s *session, now time.Time) ([]byte, bool) {
