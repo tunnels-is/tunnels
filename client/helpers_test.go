@@ -39,9 +39,15 @@ func TestGetDomainAndSubDomain(t *testing.T) {
 			expectedSubdomain: "a.b.c",
 		},
 		{
-			name:              "single word (invalid)",
-			input:             "localhost",
-			expectedDomain:    "",
+			name:              "single label local domain",
+			input:             "loganisgay",
+			expectedDomain:    "loganisgay",
+			expectedSubdomain: "",
+		},
+		{
+			name:              "single label with trailing dot",
+			input:             "loganisgay.",
+			expectedDomain:    "loganisgay",
 			expectedSubdomain: "",
 		},
 		{

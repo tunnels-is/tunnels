@@ -196,7 +196,7 @@ func TestDNSAMapping(t *testing.T) {
 			shouldFind: false,
 		},
 		{
-			name:       "single word (invalid)",
+			name:       "single word with no record",
 			fullDomain: "localhost",
 			shouldFind: false,
 		},
@@ -413,5 +413,93 @@ func TestDNSAMappingComplexDomains(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestDNSAMappingSingleLabel(t *testing.T) {
+	records := []*types.DNSRecord{
+		{
+			Domain:   "loganisgay",
+			Wildcard: true,
+			IP:       []string{"10.0.1.3"},
+		},
+		{
+			Domain:   "Example.COM",
+			Wildcard: true,
+			IP:       []string{"192.0.2.1"},
+		},
+	}
+
+	tests := []struct {
+		name           string
+		fullDomain     string
+		expectedDomain string
+		shouldFind     bool
+	}{
+		{
+			name:           "exact single label",
+			fullDomain:     "loganisgay",
+			expectedDomain: "loganisgay",
+			shouldFind:     true,
+		},
+		{
+			name:           "exact single label with trailing dot",
+			fullDomain:     "loganisgay.",
+			expectedDomain: "loganisgay",
+			shouldFind:     true,
+		},
+		{
+			name:           "https service name under single label",
+			fullDomain:     "_8080._https.loganisgay.",
+			expectedDomain: "loganisgay",
+			shouldFind:     true,
+		},
+		{
+			name:           "case insensitive public name",
+			fullDomain:     "WWW.Example.COM.",
+			expectedDomain: "Example.COM",
+			shouldFind:     true,
+		},
+		{
+			name:       "different single label",
+			fullDomain: "notthis",
+			shouldFind: false,
+		},
+		{
+			name:       "suffix without a label boundary",
+			fullDomain: "notloganisgay.",
+			shouldFind: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result := DNSAMapping(records, tc.fullDomain)
+			if !tc.shouldFind {
+				if result != nil {
+					t.Errorf("Expected nil for %q, got %+v", tc.fullDomain, result)
+				}
+				return
+			}
+			if result == nil {
+				t.Errorf("Expected record for %q", tc.fullDomain)
+				return
+			}
+			if result.Domain != tc.expectedDomain {
+				t.Errorf("Expected domain %q, got %q", tc.expectedDomain, result.Domain)
+			}
+		})
+	}
+
+	exact := []*types.DNSRecord{{
+		Domain:   "loganisgay",
+		Wildcard: false,
+		IP:       []string{"10.0.1.3"},
+	}}
+	if got := DNSAMapping(exact, "_8080._https.loganisgay."); got != nil {
+		t.Fatalf("subdomain must not match a single-label record without wildcard, got %+v", got)
+	}
+	if got := DNSAMapping(exact, "loganisgay."); got == nil {
+		t.Fatal("apex of a single-label record must match without wildcard")
 	}
 }
