@@ -151,7 +151,9 @@ func TestUpdateUserDeviceTokens(t *testing.T) {
 		{DT: "t1", N: "d1", Created: time.Now()},
 		{DT: "t2", N: "d2", Created: time.Now()},
 	}
-	if err := updateUserDeviceTokens(&userTokensUpdate{ID: u.ID, Tokens: tokens}); err != nil {
+	if _, err := updateUserDeviceTokens(u.ID, func([]*DeviceToken) []*DeviceToken {
+		return tokens
+	}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -163,7 +165,9 @@ func TestUpdateUserDeviceTokens(t *testing.T) {
 
 func TestUpdateUserDeviceTokens_NotFound(t *testing.T) {
 	setupTestDB(t)
-	err := updateUserDeviceTokens(&userTokensUpdate{ID: uuid.New()})
+	_, err := updateUserDeviceTokens(uuid.New(), func(current []*DeviceToken) []*DeviceToken {
+		return current
+	})
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -357,7 +361,7 @@ func TestUpdateUserTwoFactorCodes_NotFound(t *testing.T) {
 
 func TestResetUserPassword(t *testing.T) {
 	setupTestDB(t)
-	u := testUser("reset@example.com", "")
+	u := testUser("reset@example.com", "reset-api-key")
 	u.Password = "old"
 	u.Tokens = []*DeviceToken{{DT: "t", N: "n"}}
 	createUser(u)
@@ -372,6 +376,76 @@ func TestResetUserPassword(t *testing.T) {
 	}
 	if len(found.Tokens) != 0 {
 		t.Fatalf("expected 0 tokens, got %d", len(found.Tokens))
+	}
+	if found.APIKey != "" {
+		t.Fatalf("APIKey still set: %q", found.APIKey)
+	}
+	if apiKeyIndexHas(t, "reset-api-key") {
+		t.Fatal("API key index still contains the reset key")
+	}
+}
+
+func apiKeyIndexHas(t *testing.T, key string) bool {
+	t.Helper()
+	var found bool
+	if err := db.View(func(tx *gobolt.Tx) error {
+		found = tx.Bucket([]byte(bucketUsersAPIKeyIndex)).Get([]byte(key)) != nil
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	return found
+}
+
+func TestLogoutAll_ClearsAPIKey(t *testing.T) {
+	setupTestDB(t)
+	keep := &DeviceToken{DT: "keep", N: "k"}
+	sess := &DeviceToken{DT: "sess", N: "s"}
+	u := testUser("logout-all@example.com", "logout-api-key")
+	u.Tokens = []*DeviceToken{keep, sess}
+	if err := createUser(u); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := saveLogoutDeviceTokens(u.ID, &logoutRequest{LogoutToken: sess.DT}); err != nil {
+		t.Fatal(err)
+	}
+	found, _ := findUserByID(u.ID)
+	if found.APIKey != "logout-api-key" || len(found.Tokens) != 1 {
+		t.Fatalf("single logout changed credentials: key %q tokens %+v", found.APIKey, found.Tokens)
+	}
+
+	if err := saveLogoutDeviceTokens(u.ID, &logoutRequest{All: true}); err != nil {
+		t.Fatal(err)
+	}
+	found, _ = findUserByID(u.ID)
+	if found.APIKey != "" || len(found.Tokens) != 0 {
+		t.Fatalf("logout-all left credentials: key %q tokens %+v", found.APIKey, found.Tokens)
+	}
+	if apiKeyIndexHas(t, "logout-api-key") {
+		t.Fatal("API key index still contains the logged-out key")
+	}
+}
+
+func TestDisableUser_ClearsTokensAndAPIKey(t *testing.T) {
+	setupTestDB(t)
+	u := testUser("disable@example.com", "disable-api-key")
+	u.Tokens = []*DeviceToken{{DT: "t", N: "n"}}
+	if err := createUser(u); err != nil {
+		t.Fatal(err)
+	}
+	if err := updateUserAdmin(&adminUserUpdateRequest{
+		TargetUserID: u.ID,
+		Disabled:     true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	found, _ := findUserByID(u.ID)
+	if !found.Disabled || found.APIKey != "" || len(found.Tokens) != 0 {
+		t.Fatalf("disabled user: %+v", found)
+	}
+	if apiKeyIndexHas(t, "disable-api-key") {
+		t.Fatal("API key index still contains the disabled key")
 	}
 }
 

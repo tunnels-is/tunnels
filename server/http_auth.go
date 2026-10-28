@@ -11,10 +11,15 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-func authenticatePasswordLogin(w http.ResponseWriter, form *loginRequest) (user *User, email string) {
+func authenticatePasswordLogin(w http.ResponseWriter, r *http.Request, form *loginRequest) (user *User, email string) {
 	email = normalizeEmail(form.Email)
-	if email == "" || !passwordResetAllowed(email) {
+	if email == "" {
 		sendError(w, 401, "Invalid login credentials")
+		return nil, email
+	}
+	ip := clientIP(r)
+	if !takeAuthSlot(authLimitLogin, email, ip) {
+		sendError(w, 429, "too many attempts, try again later")
 		return nil, email
 	}
 
@@ -24,21 +29,18 @@ func authenticatePasswordLogin(w http.ResponseWriter, form *loginRequest) (user 
 		return nil, email
 	}
 	if user == nil {
-		recordPasswordResetFailure(email)
 		sendError(w, 401, "Invalid login credentials")
 		return nil, email
 	}
 
 	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(form.Password))
 	if err != nil {
-		recordPasswordResetFailure(email)
 		sendError(w, 401, "Invalid login credentials")
 		return nil, email
 	}
 
 	err = validateUserTwoFactor(user, form)
 	if err != nil {
-		recordPasswordResetFailure(email)
 		sendError(w, 401, "Invalid login credentials")
 		return nil, email
 	}
@@ -47,6 +49,7 @@ func authenticatePasswordLogin(w http.ResponseWriter, form *loginRequest) (user 
 		sendError(w, 403, "This account has been disabled, please contact customer support")
 		return nil, email
 	}
+	clearAuthSlot(authLimitLogin, email, ip)
 	return user, email
 }
 
@@ -66,7 +69,7 @@ func handleAdminLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, email := authenticatePasswordLogin(w, form)
+	user, _ := authenticatePasswordLogin(w, r, form)
 	if user == nil {
 		return
 	}
@@ -76,14 +79,10 @@ func handleAdminLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userLoginUpdate := handleUserDeviceToken(user, form)
-	err = updateUserDeviceTokens(userLoginUpdate)
-	if err != nil {
+	if err := issueLoginDeviceToken(user, form); err != nil {
 		sendError(w, 500, "Database error, please try again in a moment")
 		return
 	}
-
-	clearPasswordResetAttempts(email)
 
 	cookieValue, err := encryptAdminCookie(user.ID.String(), user.DeviceToken.DT, clientIP(r))
 	if err != nil {
@@ -115,12 +114,7 @@ func handleAdminLogout(w http.ResponseWriter, r *http.Request) {
 			form.LogoutToken = getDeviceTokenFromContext(r.Context())
 		}
 
-		user.Tokens = revokeUserDeviceTokens(user.Tokens, form)
-
-		update := new(userTokensUpdate)
-		update.ID = user.ID
-		update.Tokens = user.Tokens
-		if err := updateUserDeviceTokens(update); err != nil {
+		if err := saveLogoutDeviceTokens(user.ID, form); err != nil {
 			sendError(w, 500, "Database error, please try again in a moment")
 			return
 		}
@@ -149,19 +143,15 @@ func handleClientLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, email := authenticatePasswordLogin(w, form)
+	user, _ := authenticatePasswordLogin(w, r, form)
 	if user == nil {
 		return
 	}
 
-	userLoginUpdate := handleUserDeviceToken(user, form)
-	err = updateUserDeviceTokens(userLoginUpdate)
-	if err != nil {
+	if err := issueLoginDeviceToken(user, form); err != nil {
 		sendError(w, 500, "Database error, please try again in a moment")
 		return
 	}
-
-	clearPasswordResetAttempts(email)
 
 	user.RemoveSensitiveInformation()
 	sendObject(w, user)
@@ -190,14 +180,7 @@ func handleClientLogout(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	user.Tokens = revokeUserDeviceTokens(user.Tokens, form)
-
-	userTokenUpdate := new(userTokensUpdate)
-	userTokenUpdate.ID = user.ID
-	userTokenUpdate.Tokens = user.Tokens
-
-	err = updateUserDeviceTokens(userTokenUpdate)
-	if err != nil {
+	if err := saveLogoutDeviceTokens(user.ID, form); err != nil {
 		sendError(w, 500, "Database error, please try again in a moment")
 		return
 	}

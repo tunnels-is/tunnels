@@ -34,9 +34,10 @@ func TestLoginLockout_AfterFiveFailures(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for i := 0; i < passwordResetMaxTries; i++ {
+	for i := 0; i < authLoginMax; i++ {
 		body, _ := json.Marshal(loginRequest{Email: u.Email, Password: "wrongpassword1"})
 		req := httptest.NewRequest(http.MethodPost, "/client/user/login", bytes.NewReader(body))
+		req.RemoteAddr = "192.0.2.50:1234"
 		w := httptest.NewRecorder()
 		handleClientLogin(w, req)
 		if w.Code != http.StatusUnauthorized {
@@ -45,10 +46,11 @@ func TestLoginLockout_AfterFiveFailures(t *testing.T) {
 	}
 	body, _ := json.Marshal(loginRequest{Email: u.Email, Password: "longenough1"})
 	req := httptest.NewRequest(http.MethodPost, "/client/user/login", bytes.NewReader(body))
+	req.RemoteAddr = "192.0.2.50:1234"
 	w := httptest.NewRecorder()
 	handleClientLogin(w, req)
-	if w.Code != http.StatusUnauthorized {
-		t.Fatalf("locked login: %d %s, want 401", w.Code, w.Body.String())
+	if w.Code != http.StatusTooManyRequests {
+		t.Fatalf("locked login: %d %s, want 429", w.Code, w.Body.String())
 	}
 }
 
@@ -285,6 +287,34 @@ func TestRejectServerWireGuardKey(t *testing.T) {
 	}
 }
 
+func TestRejectServerWireGuardKey_NonCanonicalEncoding(t *testing.T) {
+	setupTestDB(t)
+	raw := bytes.Repeat([]byte{0xab}, 32)
+	canon := base64.StdEncoding.EncodeToString(raw)
+	alias := canon[:8] + "\n" + canon[8:]
+	decoded, err := base64.StdEncoding.DecodeString(alias)
+	if err != nil || !bytes.Equal(decoded, raw) {
+		t.Fatalf("alias must decode to the server key: %v", err)
+	}
+	s := &types.Server{
+		ID: uuid.New(), Tag: "k", APIKey: uuid.NewString(),
+		WireGuardPubKey: canon,
+	}
+	if err := createServer(s); err != nil {
+		t.Fatal(err)
+	}
+	if err := rejectServerWireGuardKey(alias); err == nil {
+		t.Fatal("non-canonical encoding of the server public key must be rejected")
+	}
+	if err := rejectServerWireGuardKey(canon); err == nil {
+		t.Fatal("canonical server public key must be rejected")
+	}
+	other := base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{0xcd}, 32))
+	if err := rejectServerWireGuardKey(other); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestWGConfig_HidesForeignKeyAndExpiredSub(t *testing.T) {
 	setupTestDB(t)
 	securityReviewLogger()
@@ -346,6 +376,92 @@ func TestNextSubExpirationFromLemon_DoesNotStack(t *testing.T) {
 	}
 	if _, ok := nextSubExpirationFromLemon(u, "expired", nil); ok {
 		t.Fatal("expired status must not renew")
+	}
+}
+
+func TestTokenUpdate_DoesNotRestoreListClearedByReset(t *testing.T) {
+	setupTestDB(t)
+	securityReviewLogger()
+	stolen := &DeviceToken{DT: uuid.NewString(), N: "stolen", Created: time.Now().Add(-time.Hour)}
+	other := &DeviceToken{DT: uuid.NewString(), N: "other", Created: time.Now().Add(-2 * time.Hour)}
+	u := &User{
+		ID: uuid.New(), Email: "race@test.local", Password: "hash",
+		Tokens: []*DeviceToken{stolen, other},
+	}
+	if err := createUser(u); err != nil {
+		t.Fatal(err)
+	}
+	stale := *u
+	stale.Tokens = []*DeviceToken{stolen, other}
+
+	if err := resetUserPassword(u); err != nil {
+		t.Fatal(err)
+	}
+
+	body, _ := json.Marshal(logoutRequest{All: true})
+	req := httptest.NewRequest(http.MethodPost, "/client/user/logout", bytes.NewReader(body))
+	ctx := context.WithValue(req.Context(), contextKeyUser, &stale)
+	req = req.WithContext(ctx)
+	w := httptest.NewRecorder()
+	handleClientLogout(w, req)
+	if w.Code != 200 {
+		t.Fatalf("logout %d %s", w.Code, w.Body.String())
+	}
+	got, err := findUserByID(u.ID)
+	if err != nil || got == nil {
+		t.Fatal(err)
+	}
+	if len(got.Tokens) != 0 {
+		t.Fatalf("stale logout restored tokens: %+v", got.Tokens)
+	}
+
+	if err := issueLoginDeviceToken(&stale, &loginRequest{DeviceToken: stolen.DT, DeviceName: "phone"}); err != nil {
+		t.Fatal(err)
+	}
+	got, err = findUserByID(u.ID)
+	if err != nil || got == nil {
+		t.Fatal(err)
+	}
+	if len(got.Tokens) != 1 || got.Tokens[0].DT == stolen.DT || got.Tokens[0].DT == other.DT {
+		t.Fatalf("stale login restored or reused a revoked token: %+v", got.Tokens)
+	}
+	if got.Tokens[0].N != "phone" || stale.DeviceToken == nil || stale.DeviceToken.DT != got.Tokens[0].DT {
+		t.Fatalf("issued token: stored %+v caller %#v", got.Tokens[0], stale.DeviceToken)
+	}
+}
+
+func TestLoginDeviceToken_RotatesOnlyThePresentedToken(t *testing.T) {
+	setupTestDB(t)
+	keep := &DeviceToken{DT: uuid.NewString(), N: "keep", Created: time.Now().Add(-time.Hour)}
+	old := &DeviceToken{DT: uuid.NewString(), N: "old", Created: time.Now().Add(-2 * time.Hour)}
+	u := &User{ID: uuid.New(), Email: "rot@test.local", Tokens: []*DeviceToken{keep, old}}
+	if err := createUser(u); err != nil {
+		t.Fatal(err)
+	}
+	if err := issueLoginDeviceToken(u, &loginRequest{DeviceToken: old.DT, DeviceName: "renamed"}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := findUserByID(u.ID)
+	if err != nil || got == nil {
+		t.Fatal(err)
+	}
+	if len(got.Tokens) != 2 {
+		t.Fatalf("tokens %+v", got.Tokens)
+	}
+	var kept, rotated *DeviceToken
+	for _, tok := range got.Tokens {
+		switch tok.N {
+		case "keep":
+			kept = tok
+		case "renamed":
+			rotated = tok
+		}
+	}
+	if kept == nil || kept.DT != keep.DT || rotated == nil || rotated.DT == old.DT {
+		t.Fatalf("tokens %+v", got.Tokens)
+	}
+	if u.DeviceToken == nil || u.DeviceToken.DT != rotated.DT {
+		t.Fatalf("caller token %#v", u.DeviceToken)
 	}
 }
 

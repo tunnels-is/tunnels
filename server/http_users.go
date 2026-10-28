@@ -30,12 +30,12 @@ func handleClientUserCreate(w http.ResponseWriter, r *http.Request) {
 		sendError(w, 403, "public registration is disabled")
 		return
 	}
-	createUserFromRequest(w, r)
+	createUserFromRequest(w, r, true)
 }
 
 func handleAdminUserCreate(w http.ResponseWriter, r *http.Request) {
 	defer BasicRecover()
-	createUserFromRequest(w, r)
+	createUserFromRequest(w, r, false)
 }
 
 func validateRegisterForm(form *registerRequest) (int, string) {
@@ -91,7 +91,7 @@ func newRegisteredUser(form *registerRequest) (*User, error) {
 	return newUser, nil
 }
 
-func createUserFromRequest(w http.ResponseWriter, r *http.Request) {
+func createUserFromRequest(w http.ResponseWriter, r *http.Request, limit bool) {
 	form := new(registerRequest)
 	err := decodeBody(r, form)
 	if err != nil {
@@ -111,6 +111,11 @@ func createUserFromRequest(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		sendError(w, 500, "Unexpected error, please try again in a moment")
+		return
+	}
+
+	if limit && !takeAuthSlot(authLimitRegister, "", clientIP(r)) {
+		sendError(w, 429, "too many attempts, try again later")
 		return
 	}
 
