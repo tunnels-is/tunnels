@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -18,6 +19,12 @@ func handleAdminDeviceUpdate(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
+	}
+	if form.Device != nil && strings.TrimSpace(form.Device.WireGuardKey) != "" {
+		if err := rejectServerWireGuardKey(form.Device.WireGuardKey); err != nil {
+			sendError(w, 400, "invalid WireGuard key")
+			return
+		}
 	}
 
 	wgIPAllocMu.Lock()

@@ -28,7 +28,7 @@ var loginTitles = map[int]struct{ title, sub string }{
 	modeLogin:     {"Welcome back", "Sign in to your Tunnels account."},
 	modeRegister:  {"Create account", "You only need an email and a password."},
 	modeRecovery:  {"Two-factor recovery", "Sign in with a recovery code instead of your authenticator."},
-	modeReset:     {"Reset password", "Request a code, then choose a new password."},
+	modeReset:     {"Reset password", "Use your authenticator code and a recovery code."},
 	modeAnonymous: {"Anonymous account", "No email. Keep the token safe — it is the only way back in."},
 	modeEnable:    {"Enable account", "Confirm the code we emailed you."},
 }
@@ -129,12 +129,14 @@ func (a *App) loginPage() fyne.CanvasObject {
 	if mode == modeRecovery {
 		fields = append(fields, field("Recovery code", recovery))
 	}
-	if mode == modeEnable || mode == modeReset {
-		lbl := "Confirmation code"
-		if mode == modeReset {
-			lbl = "Reset code"
-		}
-		fields = append(fields, field(lbl, code))
+	if mode == modeReset {
+		fields = append(fields,
+			field("Authenticator code", code),
+			field("Recovery code", recovery),
+		)
+	}
+	if mode == modeEnable {
+		fields = append(fields, field("Confirmation code", code))
 	}
 
 	submitLabel := map[int]string{
@@ -229,15 +231,15 @@ func (a *App) loginPage() fyne.CanvasObject {
 				})
 			}()
 		case modeReset:
-			if len(pass.Text) < 9 || pass.Text != pass2.Text || code.Text == "" {
-				setErr("Fill in the password, confirmation and reset code")
+			if len(pass.Text) < 10 || pass.Text != pass2.Text || strings.TrimSpace(code.Text) == "" || strings.TrimSpace(recovery.Text) == "" {
+				setErr("Fill in the password, confirmation, authenticator code, and recovery code")
 				return
 			}
 			body := map[string]any{
-				"Email":        email.Text,
-				"Password":     pass.Text,
-				"ResetCode":    code.Text,
-				"UseTwoFactor": false,
+				"Email":     email.Text,
+				"Password":  pass.Text,
+				"ResetCode": strings.TrimSpace(code.Text),
+				"Recovery":  strings.TrimSpace(recovery.Text),
 			}
 			go func() {
 				_, _, err := a.callControllerOn(srv, "/client/user/reset/password", body, false)
@@ -302,24 +304,6 @@ func (a *App) loginPage() fyne.CanvasObject {
 	body = append(body, errBox)
 
 	actions := []fyne.CanvasObject{primaryBtn(submitLabel, submit)}
-	if mode == modeReset {
-		actions = append(actions, outlineBtn("Email me a code", func() {
-			srv := activeServer()
-			if srv == nil {
-				return
-			}
-			go func() {
-				_, _, err := a.callControllerOn(srv, "/client/user/reset/code", map[string]any{"Email": email.Text}, false)
-				a.uiDo(func() {
-					if err != nil {
-						a.fail(err.Error())
-						return
-					}
-					a.note("Reset code sent")
-				})
-			}()
-		}))
-	}
 	actionRow := fyne.CanvasObject(hstack(sp2, actions...))
 	if mode == modeLogin {
 		actionRow = splitRow(hstack(sp2, actions...),

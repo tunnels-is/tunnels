@@ -57,46 +57,66 @@ func revokeUserDeviceTokens(tokens []*DeviceToken, lf *logoutRequest) []*DeviceT
 	})
 }
 
-func handleUserDeviceToken(user *User, form *loginRequest) (userTokenUpdate *userTokensUpdate) {
-	defer BasicRecover()
-
-	tokenExists := false
-	if form.DeviceToken != "" {
-		for i, v := range user.Tokens {
-			if v.DT == form.DeviceToken {
-				tokenExists = true
-				user.Tokens[i].DT = uuid.NewString()
-				user.Tokens[i].N = form.DeviceName
-				user.Tokens[i].Created = time.Now()
-				user.DeviceToken = user.Tokens[i]
+func applyLoginDeviceToken(tokens []*DeviceToken, deviceToken, deviceName string) ([]*DeviceToken, *DeviceToken) {
+	if deviceToken != "" {
+		var issued *DeviceToken
+		for i, v := range tokens {
+			if v == nil {
+				continue
 			}
+			if subtle.ConstantTimeCompare([]byte(v.DT), []byte(deviceToken)) != 1 {
+				continue
+			}
+			tokens[i].DT = uuid.NewString()
+			tokens[i].N = deviceName
+			tokens[i].Created = time.Now()
+			issued = tokens[i]
+		}
+		if issued != nil {
+			return capDeviceTokens(tokens), issued
 		}
 	}
 
-	if !tokenExists {
-		token := &DeviceToken{
-			N:       form.DeviceName,
-			DT:      uuid.NewString(),
-			Created: time.Now(),
+	token := &DeviceToken{
+		N:       deviceName,
+		DT:      uuid.NewString(),
+		Created: time.Now(),
+	}
+	return capDeviceTokens(append(tokens, token)), token
+}
+
+func capDeviceTokens(tokens []*DeviceToken) []*DeviceToken {
+	if len(tokens) <= 20 {
+		return tokens
+	}
+	slices.SortFunc(tokens, func(a, b *DeviceToken) int {
+		if a == nil || b == nil {
+			return 0
 		}
+		return b.Created.Compare(a.Created)
+	})
+	return tokens[:20]
+}
 
-		user.DeviceToken = token
-		user.Tokens = append(user.Tokens, token)
+// issueLoginDeviceToken rotates the presented token, or appends one new
+// token, on the list stored in the database. A list held by the caller is
+// not written back.
+func issueLoginDeviceToken(user *User, form *loginRequest) error {
+	if user == nil || form == nil {
+		return errors.New("missing login")
 	}
-
-	if len(user.Tokens) > 20 {
-		slices.SortFunc(user.Tokens, func(a, b *DeviceToken) int {
-			return b.Created.Compare(a.Created)
-		})
-		user.Tokens = user.Tokens[:20]
+	var issued *DeviceToken
+	tokens, err := updateUserDeviceTokens(user.ID, func(current []*DeviceToken) []*DeviceToken {
+		next, tok := applyLoginDeviceToken(current, form.DeviceToken, form.DeviceName)
+		issued = tok
+		return next
+	})
+	if err != nil {
+		return err
 	}
-
-	userTokenUpdate = new(userTokensUpdate)
-	userTokenUpdate.ID = user.ID
-	userTokenUpdate.Tokens = user.Tokens
-	userTokenUpdate.Version = form.Version
-
-	return userTokenUpdate
+	user.Tokens = tokens
+	user.DeviceToken = issued
+	return nil
 }
 
 func consumeRecoveryCode(user *User, recovery string) error {

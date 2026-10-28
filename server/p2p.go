@@ -3,6 +3,7 @@ package main
 import (
 	"net/http"
 	"net/netip"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/tunnels-is/tunnels/punch"
@@ -40,6 +41,10 @@ func handleClientP2PPeers(w http.ResponseWriter, r *http.Request) {
 	home, err := findServerByID(self.ServerID)
 	if err != nil || home == nil {
 		sendError(w, 404, "server not found")
+		return
+	}
+	if code, msg := wgUserConnectStatus(user, home); code != 0 {
+		sendError(w, code, msg)
 		return
 	}
 	peers, err := punchPeersFor(self, home)
@@ -132,9 +137,14 @@ func handleWGP2PLocal(w http.ResponseWriter, r *http.Request) {
 		sendError(w, 500, "Failed to list devices")
 		return
 	}
+	users := map[uuid.UUID]*User{}
+	now := time.Now()
 	out := make([]types.P2PPeer, 0)
 	for _, d := range devices {
 		if d == nil || d.ServerID != server.ID || d.DiscoKey == "" || d.WireGuardIP == "" || d.WireGuardKey == "" {
+			continue
+		}
+		if !p2pOwnerAllowed(d, server, users, now) {
 			continue
 		}
 		out = append(out, types.P2PPeer{
@@ -169,6 +179,10 @@ func handleWGP2PLocate(w http.ResponseWriter, r *http.Request) {
 		sendError(w, 404, "device not found")
 		return
 	}
+	if !p2pOwnerAllowed(dev, home, map[uuid.UUID]*User{}, time.Now()) {
+		sendError(w, 404, "device not found")
+		return
+	}
 	sendObject(w, types.P2PLocate{
 		DeviceID:    dev.ID.String(),
 		DiscoKey:    dev.DiscoKey,
@@ -198,6 +212,8 @@ func punchPeersFor(self *types.Device, home *types.Server) ([]types.P2PPeer, err
 	if err != nil {
 		return nil, err
 	}
+	users := map[uuid.UUID]*User{}
+	now := time.Now()
 	out := make([]types.P2PPeer, 0)
 	for _, d := range devices {
 		if d == nil || d.ID == self.ID || d.DiscoKey == "" || d.WireGuardKey == "" || d.WireGuardIP == "" {
@@ -205,6 +221,9 @@ func punchPeersFor(self *types.Device, home *types.Server) ([]types.P2PPeer, err
 		}
 		peerSrv := byID[d.ServerID]
 		if peerSrv == nil || !serversSharePunch(home, peerSrv) {
+			continue
+		}
+		if !p2pOwnerAllowed(d, peerSrv, users, now) {
 			continue
 		}
 		peerIP, err := netip.ParseAddr(d.WireGuardIP)
@@ -222,6 +241,18 @@ func punchPeersFor(self *types.Device, home *types.Server) ([]types.P2PPeer, err
 		})
 	}
 	return out, nil
+}
+
+func p2pOwnerAllowed(d *types.Device, server *types.Server, users map[uuid.UUID]*User, now time.Time) bool {
+	if d == nil || users == nil {
+		return false
+	}
+	owner, ok := users[d.UserID]
+	if !ok {
+		owner, _ = findUserByID(d.UserID)
+		users[d.UserID] = owner
+	}
+	return userMayConnect(owner, server, now)
 }
 
 func serversSharePunch(a, b *types.Server) bool {

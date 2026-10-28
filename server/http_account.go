@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"crypto/rand"
+	"crypto/subtle"
 	"log/slog"
 	"math/big"
 	"net/http"
@@ -40,7 +41,8 @@ func handleClientResetPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !passwordResetAllowed(form.Email) {
+	ip := clientIP(r)
+	if !takeAuthSlot(authLimitReset, form.Email, ip) {
 		sendError(w, 429, rateLimitErr)
 		return
 	}
@@ -51,12 +53,10 @@ func handleClientResetPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if user == nil {
-		recordPasswordResetFailure(form.Email)
 		sendError(w, 401, genericAuthErr)
 		return
 	}
 	if user.Disabled {
-		recordPasswordResetFailure(form.Email)
 		sendError(w, 401, genericAuthErr)
 		return
 	}
@@ -64,14 +64,20 @@ func handleClientResetPassword(w http.ResponseWriter, r *http.Request) {
 	code, err := Decrypt(user.TwoFactorCode, []byte(loadSecret("TwoFactorKey")))
 	if err != nil {
 		ADMIN(err)
-		recordPasswordResetFailure(form.Email)
 		sendError(w, 401, genericAuthErr)
 		return
 	}
 
 	otp := gotp.NewDefaultTOTP(code).Now()
-	if otp != form.ResetCode {
-		recordPasswordResetFailure(form.Email)
+	if subtle.ConstantTimeCompare([]byte(otp), []byte(form.ResetCode)) != 1 {
+		sendError(w, 401, genericAuthErr)
+		return
+	}
+
+	recoveryConsumeMu.Lock()
+	recErr := consumeRecoveryCode(user, form.Recovery)
+	recoveryConsumeMu.Unlock()
+	if recErr != nil {
 		sendError(w, 401, genericAuthErr)
 		return
 	}
@@ -89,7 +95,7 @@ func handleClientResetPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	clearPasswordResetAttempts(form.Email)
+	clearAuthSlot(authLimitReset, form.Email, ip)
 	w.WriteHeader(200)
 }
 

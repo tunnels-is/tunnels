@@ -196,11 +196,18 @@ func findUserByEmail(email string) (*User, error) {
 	return found, err
 }
 
-func updateUserDeviceTokens(update *userTokensUpdate) error {
-	return db.Update(func(tx *gobolt.Tx) error {
+// updateUserDeviceTokens loads the user inside the write transaction and
+// saves whatever mutate returns. Callers must change that fresh list.
+// Assigning a list built before the transaction puts revoked tokens back.
+func updateUserDeviceTokens(id uuid.UUID, mutate func([]*DeviceToken) []*DeviceToken) ([]*DeviceToken, error) {
+	if mutate == nil {
+		return nil, errors.New("missing token update")
+	}
+	var stored []*DeviceToken
+	err := db.Update(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(bucketUsers))
-		id := update.ID.String()
-		v := b.Get([]byte(id))
+		key := []byte(id.String())
+		v := b.Get(key)
 		if v == nil {
 			return errors.New("user not found")
 		}
@@ -208,13 +215,18 @@ func updateUserDeviceTokens(update *userTokensUpdate) error {
 		if err := bboltUnmarshal(v, user); err != nil {
 			return err
 		}
-		user.Tokens = update.Tokens
+		user.Tokens = mutate(user.Tokens)
+		stored = user.Tokens
 		data, err := bboltMarshal(user)
 		if err != nil {
 			return err
 		}
-		return b.Put([]byte(id), data)
+		return b.Put(key, data)
 	})
+	if err != nil {
+		return nil, err
+	}
+	return stored, nil
 }
 
 func updateUserSubTime(u *User) error {
@@ -242,6 +254,43 @@ func updateUserSubTime(u *User) error {
 			return err
 		}
 		return b.Put([]byte(id), data)
+	})
+}
+
+func dropUserAPIKey(tx *gobolt.Tx, user *User) error {
+	if user == nil || user.APIKey == "" {
+		return nil
+	}
+	if err := tx.Bucket([]byte(bucketUsersAPIKeyIndex)).Delete([]byte(user.APIKey)); err != nil {
+		return err
+	}
+	user.APIKey = ""
+	return nil
+}
+
+func saveLogoutDeviceTokens(id uuid.UUID, form *logoutRequest) error {
+	return db.Update(func(tx *gobolt.Tx) error {
+		b := tx.Bucket([]byte(bucketUsers))
+		key := []byte(id.String())
+		v := b.Get(key)
+		if v == nil {
+			return errors.New("user not found")
+		}
+		user := new(User)
+		if err := bboltUnmarshal(v, user); err != nil {
+			return err
+		}
+		user.Tokens = revokeUserDeviceTokens(user.Tokens, form)
+		if form != nil && form.All {
+			if err := dropUserAPIKey(tx, user); err != nil {
+				return err
+			}
+		}
+		data, err := bboltMarshal(user)
+		if err != nil {
+			return err
+		}
+		return b.Put(key, data)
 	})
 }
 
@@ -314,6 +363,12 @@ func updateUserAdmin(form *adminUserUpdateRequest) error {
 
 		user.Disabled = form.Disabled
 		user.Trial = form.Trial
+		if user.Disabled {
+			user.Tokens = []*DeviceToken{}
+			if err := dropUserAPIKey(tx, user); err != nil {
+				return err
+			}
+		}
 
 		data, err := bboltMarshal(user)
 		if err != nil {
@@ -395,6 +450,9 @@ func resetUserPassword(user *User) error {
 		}
 		stored.Password = user.Password
 		stored.Tokens = []*DeviceToken{}
+		if err := dropUserAPIKey(tx, stored); err != nil {
+			return err
+		}
 		data, err := bboltMarshal(stored)
 		if err != nil {
 			return err

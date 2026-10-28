@@ -102,13 +102,7 @@ func wgPeerFromDevice(d *types.Device, server *types.Server, userCache map[uuid.
 		owner, _ = findUserByID(d.UserID)
 		userCache[d.UserID] = owner
 	}
-	if owner == nil || owner.Disabled {
-		return types.WGPeer{}, false
-	}
-	if !owner.SubExpiration.IsZero() && now.After(owner.SubExpiration) {
-		return types.WGPeer{}, false
-	}
-	if !hasSharedOrNoGroup(owner.Groups, server.Groups) {
+	if !userMayConnect(owner, server, now) {
 		return types.WGPeer{}, false
 	}
 	hexKey, err := b64KeyToHex(d.WireGuardKey)
@@ -247,6 +241,18 @@ func handleWGConfig(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// userMayConnect is the shared gate for hub peers and the P2P directory.
+// A zero subscription time means no expiry is stored.
+func userMayConnect(owner *User, server *types.Server, now time.Time) bool {
+	if owner == nil || server == nil || owner.Disabled {
+		return false
+	}
+	if !owner.SubExpiration.IsZero() && now.After(owner.SubExpiration) {
+		return false
+	}
+	return hasSharedOrNoGroup(owner.Groups, server.Groups)
+}
+
 func wgUserConnectStatus(user *User, server *types.Server) (int, string) {
 	if user == nil {
 		return 401, "user/device not allowed to connect"
@@ -270,10 +276,22 @@ func ownedDeviceIPs(d *types.Device, userID, serverID uuid.UUID) (ip, ipv6 strin
 	return d.WireGuardIP, d.WireGuardIPv6
 }
 
+// wgPublicKeyBytes decodes a WireGuard public key. StdEncoding accepts
+// spellings that are not identical as text (a newline, or spare bits in the
+// last character) and still yield the same 32 bytes.
+func wgPublicKeyBytes(key string) ([]byte, bool) {
+	b, err := base64.StdEncoding.DecodeString(strings.TrimSpace(key))
+	if err != nil || len(b) != 32 {
+		return nil, false
+	}
+	return b, true
+}
+
 func rejectServerWireGuardKey(key string) error {
 	if strings.TrimSpace(key) == "" {
 		return fmt.Errorf("WireGuard key required")
 	}
+	keyBytes, keyOK := wgPublicKeyBytes(key)
 	servers, err := findAllServers(10000, 0)
 	if err != nil {
 		return err
@@ -283,6 +301,10 @@ func rejectServerWireGuardKey(key string) error {
 			continue
 		}
 		if subtle.ConstantTimeCompare([]byte(s.WireGuardPubKey), []byte(key)) == 1 {
+			return fmt.Errorf("WireGuard key is reserved")
+		}
+		srvBytes, srvOK := wgPublicKeyBytes(s.WireGuardPubKey)
+		if keyOK && srvOK && subtle.ConstantTimeCompare(keyBytes, srvBytes) == 1 {
 			return fmt.Errorf("WireGuard key is reserved")
 		}
 	}

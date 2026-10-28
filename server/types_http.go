@@ -199,6 +199,7 @@ type passwordResetRequest struct {
 	Email        string
 	Password     string
 	ResetCode    string
+	Recovery     string
 	UseTwoFactor bool
 }
 
@@ -231,10 +232,4 @@ type logoutRequest struct {
 	LogoutName    string    `json:"LogoutName,omitempty"`
 	LogoutCreated time.Time `json:"LogoutCreated,omitempty"`
 	All           bool
-}
-
-type userTokensUpdate struct {
-	ID      uuid.UUID      `json:"_id"`
-	Tokens  []*DeviceToken `json:"Tokens"`
-	Version string         `json:"version"`
 }
