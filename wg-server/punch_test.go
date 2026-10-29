@@ -19,7 +19,7 @@ func TestReflexEchoesSourceAndDropsRendezvous(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	setPunchDisco(priv, pub)
+	setPunchDisco(priv)
 
 	cli, err := punch.NewPrivate()
 	if err != nil {

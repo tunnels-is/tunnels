@@ -34,7 +34,7 @@ func TestPairAdmitted(t *testing.T) {
 	}
 }
 
-func TestReflexAndRendezvousRoundTrip(t *testing.T) {
+func TestReflexRoundTrip(t *testing.T) {
 	srvPriv, err := NewPrivate()
 	if err != nil {
 		t.Fatal(err)
@@ -67,40 +67,11 @@ func TestReflexAndRendezvousRoundTrip(t *testing.T) {
 	if _, _, err := OpenReflexReq(srvPriv, req, now.Add(5*time.Minute)); err == nil {
 		t.Fatal("stale reflex must fail")
 	}
-
-	otherPriv, _ := NewPrivate()
-	otherPub, _ := Public(otherPriv)
-	var wgPub [32]byte
-	wgPub[0] = 7
-	msg := Rendezvous{
-		Src:        dev,
-		Dst:        uuid.New(),
-		Epoch:      3,
-		WGPub:      wgPub,
-		WGIP:       netip.MustParseAddr("10.0.0.5"),
-		Candidates: []netip.AddrPort{netip.MustParseAddrPort("203.0.113.8:40000")},
-	}
-	pkt, err := BuildRendezvous(cliPriv, otherPub, msg)
-	if err != nil {
-		t.Fatal(err)
-	}
-	opened, err := OpenRendezvous(otherPriv, wantPub, pkt)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if opened.Epoch != 3 || opened.WGIP != msg.WGIP || len(opened.Candidates) != 1 {
-		t.Fatalf("rendezvous %+v", opened)
-	}
-	if _, err := OpenRendezvous(otherPriv, srvPub, pkt); err == nil {
-		t.Fatal("wrong sender key must fail")
-	}
 }
 
 func TestEnginePunchesAndRefuses(t *testing.T) {
 	aPriv, _ := NewPrivate()
 	bPriv, _ := NewPrivate()
-	aPub, _ := Public(aPriv)
-	bPub, _ := Public(bPriv)
 	srvPriv, _ := NewPrivate()
 	srvPub, _ := Public(srvPriv)
 	var aWG, bWG [32]byte
@@ -115,13 +86,11 @@ func TestEnginePunchesAndRefuses(t *testing.T) {
 	b.SetServerDisco(srvPub)
 	a.SetLocalPolicy(false, false, []string{bIP.String()})
 	b.SetLocalPolicy(false, false, []string{aIP.String()})
-	a.SetPeers([]Peer{{DeviceID: bID, DiscoPub: bPub, WGPub: bWG, WGIP: bIP}})
-	b.SetPeers([]Peer{{DeviceID: aID, DiscoPub: aPub, WGPub: aWG, WGIP: aIP}})
 
 	now := time.Now()
 	aReflex := netip.MustParseAddrPort("198.51.100.10:41000")
 	bReflex := netip.MustParseAddrPort("198.51.100.20:42000")
-	deliverReflex := func(eng *Engine, id uuid.UUID, priv [32]byte, ap netip.AddrPort, res Result) Result {
+	deliverReflex := func(eng *Engine, id uuid.UUID, ap netip.AddrPort, res Result) {
 		for _, d := range res.Sends {
 			if !d.Server || TypeOf(d.Data) != TypeReflexReq {
 				continue
@@ -129,14 +98,14 @@ func TestEnginePunchesAndRefuses(t *testing.T) {
 			if _, _, err := OpenReflexReq(srvPriv, d.Data, now); err != nil {
 				t.Fatal(err)
 			}
-			return eng.OnPacket(netip.AddrPort{}, BuildReflexResp(id, ap), now)
+			eng.OnPacket(netip.AddrPort{}, BuildReflexResp(id, ap), now)
+			return
 		}
-		return Result{}
 	}
 	ar := a.Poll(now)
 	br := b.Poll(now)
-	deliverReflex(a, aID, aPriv, aReflex, ar)
-	deliverReflex(b, bID, bPriv, bReflex, br)
+	deliverReflex(a, aID, aReflex, ar)
+	deliverReflex(b, bID, bReflex, br)
 
 	a.NoteTraffic(bIP)
 	b.NoteTraffic(aIP)
@@ -162,7 +131,7 @@ func TestEnginePunchesAndRefuses(t *testing.T) {
 	for steps := 0; steps < 64 && len(q) > 0; steps++ {
 		item := q[0]
 		q = q[1:]
-		if item.d.Server && TypeOf(item.d.Data) != TypeRendezvous {
+		if item.d.Server {
 			continue
 		}
 		res := other[item.from].OnPacket(selfAddr[item.from], item.d.Data, now)

@@ -19,12 +19,11 @@ var (
 	deliverPunch   = deliverPunchOnBind
 )
 
-func setPunchDisco(priv, pub [32]byte) {
+func setPunchDisco(priv [32]byte) {
 	punchMu.Lock()
 	punchDiscoPriv = priv
 	punchDiscoOK = true
 	punchMu.Unlock()
-	_ = pub
 }
 
 func enqueuePunch(from string, pkt []byte) {
