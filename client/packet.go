@@ -101,6 +101,9 @@ func (t *TUN) ProcessIngressPacket(packet []byte) bool {
 	if len(packet) < 1 {
 		return false
 	}
+	if t.takePunchIntro(packet) {
+		return false
+	}
 
 	if (packet[0] >> 4) == 6 {
 		return true

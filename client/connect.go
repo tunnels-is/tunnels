@@ -332,6 +332,8 @@ func tryReplaceLiveWG(oldTunnel, tunnel *TUN, wgCfg *wgServerConfig, meta *Tunne
 	}
 	tunnel.punchIn = oldTunnel.punchIn
 	tunnel.punchWant = oldTunnel.punchWant
+	tunnel.punchInject = oldTunnel.punchInject
+	tunnel.punchPoke = oldTunnel.punchPoke
 	tunnel.punchPending = oldTunnel.punchPending
 	tunnel.punchDirect = oldTunnel.punchDirect
 	tunnel.punchMTU = oldTunnel.punchMTU

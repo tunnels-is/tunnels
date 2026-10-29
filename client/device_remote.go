@@ -10,7 +10,7 @@ import (
 	"github.com/tunnels-is/tunnels/types"
 )
 
-func createServerDeviceFull(cr *ConnectionRequest, serverID string, pubKey string, tag string, discoKey string) (*wgServerConfig, *types.Device, error) {
+func createServerDeviceFull(cr *ConnectionRequest, serverID string, pubKey string, tag string) (*wgServerConfig, *types.Device, error) {
 	serverOID, err := uuid.Parse(serverID)
 	if err != nil {
 		return nil, nil, fmt.Errorf("invalid ServerID: %w", err)
@@ -31,7 +31,6 @@ func createServerDeviceFull(cr *ConnectionRequest, serverID string, pubKey strin
 		Device: &types.Device{
 			Tag:          deviceTag,
 			WireGuardKey: pubKey,
-			DiscoKey:     discoKey,
 			ServerID:     serverOID,
 		},
 	}
@@ -122,7 +121,6 @@ func CreateDeviceWithKeys(form *CreateDeviceWithKeysForm) (any, int) {
 		Device: &types.Device{
 			Tag:          form.Tag,
 			WireGuardKey: pubKey,
-			DiscoKey:     discoPublicB64(privKey),
 			ServerID:     serverOID,
 		},
 	}

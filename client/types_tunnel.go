@@ -190,6 +190,8 @@ type TUN struct {
 	deviceID       string
 	punchIn        chan punchDatagram
 	punchWant      chan [4]byte
+	punchInject chan []byte
+	punchPoke   chan struct{}
 	punchPending   map[[4]byte]struct{}
 	punchMu        sync.Mutex
 	punchDirect    map[[4]byte]punchInstall
