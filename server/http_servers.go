@@ -234,12 +234,24 @@ func handleAdminServerUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	prev, err := findServerByID(form.Server.ID)
+	if err != nil {
+		sendError(w, 500, "Unknown error, please try again in a moment")
+		return
+	}
+	plainKey := form.Server.APIKey
+	rotated := prev == nil || apiKeyRotated(prev.APIKey, plainKey)
+
 	_, err = updateServer(form.Server)
 	if err != nil {
 		sendError(w, 500, "Unknown error, please try again in a moment")
 		return
 	}
 
+	if rotated {
+		sendObject(w, map[string]string{"APIKey": plainKey})
+		return
+	}
 	w.WriteHeader(200)
 }
 

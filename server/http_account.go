@@ -75,7 +75,7 @@ func handleClientResetPassword(w http.ResponseWriter, r *http.Request) {
 	}
 
 	recoveryConsumeMu.Lock()
-	recErr := consumeRecoveryCode(user, form.Recovery)
+	recErr := acceptResetAuth(user.ID, otp, form.Recovery)
 	recoveryConsumeMu.Unlock()
 	if recErr != nil {
 		sendError(w, 401, genericAuthErr)
@@ -165,7 +165,6 @@ func handleClientActivateLicense(w http.ResponseWriter, r *http.Request) {
 	}
 
 	user.Trial = false
-	user.Disabled = false
 	err = activateUserKey(user.SubExpiration, user.Key, user.ID)
 	if err != nil {
 		sendError(w, 500, "unexpected error, please contact support")

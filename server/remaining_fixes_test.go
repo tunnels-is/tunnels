@@ -99,6 +99,58 @@ func TestRegister_NormalizesEmail(t *testing.T) {
 	}
 }
 
+func TestClientAuthMiddleware_RejectsExpiredSubscription(t *testing.T) {
+	setupTestDB(t)
+	securityReviewLogger()
+
+	token := "device-token-value"
+	active := &User{
+		ID: uuid.New(), Email: "active-token@test.local",
+		SubExpiration: time.Now().Add(time.Hour),
+		Tokens:        []*DeviceToken{{DT: token, N: "phone"}},
+	}
+	expired := &User{
+		ID: uuid.New(), Email: "expired-token@test.local",
+		SubExpiration: time.Now().Add(-time.Hour),
+		Tokens:        []*DeviceToken{{DT: token, N: "phone"}},
+	}
+	unset := &User{
+		ID: uuid.New(), Email: "unset-token@test.local",
+		Tokens: []*DeviceToken{{DT: token, N: "phone"}},
+	}
+	for _, u := range []*User{active, expired, unset} {
+		if err := createUser(u); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	called := false
+	h := clientAuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		w.WriteHeader(http.StatusOK)
+	}))
+	call := func(email string) *httptest.ResponseRecorder {
+		t.Helper()
+		called = false
+		req := httptest.NewRequest(http.MethodPost, "/client/device/list/user", nil)
+		req.Header.Set("X-Email", email)
+		req.Header.Set("X-Device-Token", token)
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, req)
+		return w
+	}
+
+	if w := call(active.Email); w.Code != http.StatusOK || !called {
+		t.Fatalf("active: %d %s called=%v", w.Code, w.Body.String(), called)
+	}
+	if w := call(unset.Email); w.Code != http.StatusOK || !called {
+		t.Fatalf("unset: %d %s called=%v", w.Code, w.Body.String(), called)
+	}
+	if w := call(expired.Email); w.Code != http.StatusForbidden || called || !strings.Contains(w.Body.String(), "subscription expired") {
+		t.Fatalf("expired: %d %s called=%v", w.Code, w.Body.String(), called)
+	}
+}
+
 func TestClientAuthMiddleware_GenericUnauthorized(t *testing.T) {
 	setupTestDB(t)
 	securityReviewLogger()
@@ -192,7 +244,7 @@ func TestAdminLogout_RevokesCookieToken(t *testing.T) {
 	if err != nil || got == nil {
 		t.Fatal(err)
 	}
-	if len(got.Tokens) != 1 || got.Tokens[0].DT != keep.DT {
+	if len(got.Tokens) != 1 || !secretMatches(got.Tokens[0].DT, keep.DT) {
 		t.Fatalf("tokens after logout: %+v", got.Tokens)
 	}
 }
@@ -422,10 +474,10 @@ func TestTokenUpdate_DoesNotRestoreListClearedByReset(t *testing.T) {
 	if err != nil || got == nil {
 		t.Fatal(err)
 	}
-	if len(got.Tokens) != 1 || got.Tokens[0].DT == stolen.DT || got.Tokens[0].DT == other.DT {
+	if len(got.Tokens) != 1 || secretMatches(got.Tokens[0].DT, stolen.DT) || secretMatches(got.Tokens[0].DT, other.DT) {
 		t.Fatalf("stale login restored or reused a revoked token: %+v", got.Tokens)
 	}
-	if got.Tokens[0].N != "phone" || stale.DeviceToken == nil || stale.DeviceToken.DT != got.Tokens[0].DT {
+	if got.Tokens[0].N != "phone" || stale.DeviceToken == nil || !secretMatches(got.Tokens[0].DT, stale.DeviceToken.DT) || stale.DeviceToken.DT == got.Tokens[0].DT {
 		t.Fatalf("issued token: stored %+v caller %#v", got.Tokens[0], stale.DeviceToken)
 	}
 }
@@ -457,11 +509,11 @@ func TestLoginDeviceToken_RotatesOnlyThePresentedToken(t *testing.T) {
 			rotated = tok
 		}
 	}
-	if kept == nil || kept.DT != keep.DT || rotated == nil || rotated.DT == old.DT {
+	if kept == nil || !secretMatches(kept.DT, keep.DT) || rotated == nil || secretMatches(rotated.DT, old.DT) {
 		t.Fatalf("tokens %+v", got.Tokens)
 	}
-	if u.DeviceToken == nil || u.DeviceToken.DT != rotated.DT {
-		t.Fatalf("caller token %#v", u.DeviceToken)
+	if u.DeviceToken == nil || storedSecretIsHash(u.DeviceToken.DT) || !secretMatches(rotated.DT, u.DeviceToken.DT) {
+		t.Fatalf("caller token %#v stored %#v", u.DeviceToken, rotated)
 	}
 }
 
@@ -485,7 +537,7 @@ func TestUserLogout_RevokesCurrentDeviceToken(t *testing.T) {
 		t.Fatalf("logout %d %s", w.Code, w.Body.String())
 	}
 	got, _ := findUserByID(u.ID)
-	if len(got.Tokens) != 1 || got.Tokens[0].DT != keep.DT {
+	if len(got.Tokens) != 1 || !secretMatches(got.Tokens[0].DT, keep.DT) {
 		t.Fatalf("tokens %+v", got.Tokens)
 	}
 }

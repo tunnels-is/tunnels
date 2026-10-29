@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, RefreshCw, ChevronLeft, ChevronRight, Copy } from 'lucide-react';
 import { apiPost } from '../api';
 
 const PAGE_SIZE = 100;
@@ -32,6 +32,7 @@ export default function Servers() {
   const [createForm, setCreateForm] = useState(emptyForm());
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState('');
+  const [createdKey, setCreatedKey] = useState('');
   const [startIndex, setStartIndex] = useState(0);
   const [hasMore, setHasMore] = useState(false);
   const [wans, setWans] = useState([]);
@@ -81,8 +82,10 @@ export default function Servers() {
         Server: { ...createForm, WireGuardPort: Number(createForm.WireGuardPort) || 0 },
       });
       if (resp.status === 200) {
+        const data = await resp.json().catch(() => ({}));
         setShowCreate(false);
         setCreateForm(emptyForm());
+        setCreatedKey(data.APIKey || '');
         load(startIndex);
       } else {
         const data = await resp.json().catch(() => ({}));
@@ -180,6 +183,29 @@ export default function Servers() {
           </button>
         </div>
       </div>
+
+      {createdKey && (
+        <Modal title="Copy the API key" onClose={() => setCreatedKey('')}>
+          <p className="text-[12px] text-[#525252] mb-3">
+            Copy this key into the WireGuard server config. It is shown only this once. The server stores a hash and will not show the key again.
+          </p>
+          <div className="flex items-center gap-2 mb-4">
+            <code className="font-mono text-[12px] text-[#262626] break-all flex-1">{createdKey}</code>
+            <button
+              type="button"
+              onClick={() => navigator.clipboard.writeText(createdKey).catch(() => {})}
+              className="flex items-center gap-1 px-2 py-0.5 rounded text-[11px] text-[#a3a3a3] hover:text-[#262626] hover:bg-black/[0.05] shrink-0"
+            >
+              <Copy className="w-3 h-3" /> Copy
+            </button>
+          </div>
+          <div className="flex justify-end">
+            <button type="button" onClick={() => setCreatedKey('')} className="px-4 py-1.5 text-[12px] bg-[#0a0a0a] hover:bg-[#262626] text-white rounded">
+              Done
+            </button>
+          </div>
+        </Modal>
+      )}
 
       {showCreate && (
         <Modal title="New Server" onClose={() => setShowCreate(false)}>

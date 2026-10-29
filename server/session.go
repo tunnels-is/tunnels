@@ -33,7 +33,7 @@ func deviceTokenMatchesLogout(dt *DeviceToken, lf *logoutRequest) bool {
 		return false
 	}
 	if lf.LogoutToken != "" {
-		return subtle.ConstantTimeCompare([]byte(dt.DT), []byte(lf.LogoutToken)) == 1
+		return secretMatches(dt.DT, lf.LogoutToken)
 	}
 	if lf.LogoutName == "" || lf.LogoutCreated.IsZero() {
 		return false
@@ -61,28 +61,36 @@ func applyLoginDeviceToken(tokens []*DeviceToken, deviceToken, deviceName string
 	if deviceToken != "" {
 		var issued *DeviceToken
 		for i, v := range tokens {
-			if v == nil {
+			if v == nil || !secretMatches(v.DT, deviceToken) {
 				continue
 			}
-			if subtle.ConstantTimeCompare([]byte(v.DT), []byte(deviceToken)) != 1 {
-				continue
-			}
-			tokens[i].DT = uuid.NewString()
+			raw := uuid.NewString()
+			now := time.Now()
+			tokens[i].DT = hashSecret(raw)
 			tokens[i].N = deviceName
-			tokens[i].Created = time.Now()
-			issued = tokens[i]
+			tokens[i].Created = now
+			cp := *tokens[i]
+			cp.DT = raw
+			issued = &cp
 		}
 		if issued != nil {
 			return capDeviceTokens(tokens), issued
 		}
 	}
 
-	token := &DeviceToken{
+	raw := uuid.NewString()
+	now := time.Now()
+	stored := &DeviceToken{
 		N:       deviceName,
-		DT:      uuid.NewString(),
-		Created: time.Now(),
+		DT:      hashSecret(raw),
+		Created: now,
 	}
-	return capDeviceTokens(append(tokens, token)), token
+	issued := &DeviceToken{
+		N:       deviceName,
+		DT:      raw,
+		Created: now,
+	}
+	return capDeviceTokens(append(tokens, stored)), issued
 }
 
 func capDeviceTokens(tokens []*DeviceToken) []*DeviceToken {
@@ -160,9 +168,9 @@ func consumeRecoveryCode(user *User, recovery string) error {
 
 func validateUserTwoFactor(user *User, form *loginRequest) (err error) {
 	defer func() {
-		r := recover()
-		if r != nil {
+		if r := recover(); r != nil {
 			log.Println(r, string(debug.Stack()))
+			err = errors.New("two-factor check failed")
 		}
 	}()
 	recoveryEnabled := false
@@ -186,7 +194,10 @@ func validateUserTwoFactor(user *User, form *loginRequest) (err error) {
 			}
 
 			otp := gotp.NewDefaultTOTP(code).Now()
-			if otp != form.Digits {
+			if subtle.ConstantTimeCompare([]byte(otp), []byte(form.Digits)) != 1 {
+				return errors.New("Authenticator code was incorrect")
+			}
+			if err := acceptTOTPCode(user.ID, otp); err != nil {
 				return errors.New("Authenticator code was incorrect")
 			}
 		}
@@ -217,23 +228,33 @@ func authenticateUserFromEmailOrIDAndToken(email string, id uuid.UUID, token str
 	}
 
 	allowed := false
+	legacy := false
 	for _, d := range user.Tokens {
-		if subtle.ConstantTimeCompare([]byte(d.DT), []byte(token)) == 1 {
-			allowed = true
+		if d == nil || !secretMatches(d.DT, token) {
+			continue
+		}
+		allowed = true
+		if !storedSecretIsHash(d.DT) {
+			legacy = true
+		}
+	}
+
+	if !allowed && secretMatches(user.APIKey, token) {
+		allowed = true
+		if !storedSecretIsHash(user.APIKey) {
+			legacy = true
 		}
 	}
 
 	if !allowed {
-		if subtle.ConstantTimeCompare([]byte(user.APIKey), []byte(token)) == 1 {
-			allowed = true
+		return nil, errors.New("unauthorized")
+	}
+	if legacy {
+		if err = upgradeLegacyUserSecrets(user.ID, token); err != nil {
+			return nil, errors.New("Database error, please try again in a moment")
 		}
 	}
-
-	if allowed {
-		return user, err
-	}
-
-	return nil, errors.New("unauthorized")
+	return user, nil
 }
 
 func clientIP(r *http.Request) string {

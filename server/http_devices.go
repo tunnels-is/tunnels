@@ -20,16 +20,62 @@ func handleAdminDeviceUpdate(w http.ResponseWriter, r *http.Request) {
 		sendError(w, 400, "Invalid request body", slog.Any("error", err))
 		return
 	}
-	if form.Device != nil && strings.TrimSpace(form.Device.WireGuardKey) != "" {
-		if err := rejectServerWireGuardKey(form.Device.WireGuardKey); err != nil {
+	if form.Device == nil || form.Device.ID == uuid.Nil {
+		sendError(w, 400, "Invalid device format")
+		return
+	}
+
+	// Tag, WireGuard key, and server are the mutable fields. Identity,
+	// assigned addresses, and punch policy stay on the stored record.
+	var wgKey string
+	if key := strings.TrimSpace(form.Device.WireGuardKey); key != "" {
+		canon, keyErr := acceptDeviceWireGuardKey(key)
+		if keyErr != nil {
 			sendError(w, 400, "invalid WireGuard key")
+			return
+		}
+		wgKey = canon
+	}
+
+	wgIPAllocMu.Lock()
+	defer wgIPAllocMu.Unlock()
+
+	stored, err := findDeviceByID(form.Device.ID)
+	if err != nil {
+		ERR(err)
+		sendError(w, 500, "Unknown error, please try again in a moment")
+		return
+	}
+	if stored == nil {
+		sendError(w, 404, "device not found")
+		return
+	}
+
+	next := *stored
+	if tag := strings.TrimSpace(form.Device.Tag); tag != "" {
+		next.Tag = tag
+	}
+	if wgKey != "" {
+		next.WireGuardKey = wgKey
+	}
+	if form.Device.ServerID != uuid.Nil && form.Device.ServerID != stored.ServerID {
+		srv, srvErr := findServerByID(form.Device.ServerID)
+		if srvErr != nil || srv == nil {
+			sendError(w, 404, "Server not found")
+			return
+		}
+		next.ServerID = form.Device.ServerID
+		if assignErr, isIPv6 := assignDeviceWireGuardIPs(&next); assignErr != nil {
+			if isIPv6 {
+				sendError(w, 400, "WireGuard IPv6 assignment failed", slog.Any("err", assignErr))
+				return
+			}
+			sendError(w, 400, "WireGuard IP assignment failed", slog.Any("err", assignErr))
 			return
 		}
 	}
 
-	wgIPAllocMu.Lock()
-	err = updateDevice(form.Device)
-	wgIPAllocMu.Unlock()
+	err = updateDevice(&next)
 	if err != nil {
 		ERR(err)
 		if errors.Is(err, errDeviceIPInUse) || errors.Is(err, errDeviceIPReserved) || errors.Is(err, errDeviceIPv6InUse) {
@@ -195,7 +241,7 @@ func handleClientDeviceCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if form.Device == nil || form.Device.Tag == "" {
+	if form.Device == nil || strings.TrimSpace(form.Device.Tag) == "" {
 		sendError(w, 400, "Invalid device format")
 		return
 	}
@@ -211,10 +257,6 @@ func handleClientDeviceCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	form.Device.UserID = user.ID
-	form.Device.ID = uuid.New()
-	form.Device.CreatedAt = time.Now()
-
 	wgServer, srvErr := findServerByID(form.Device.ServerID)
 	if srvErr != nil || wgServer == nil {
 		sendError(w, 404, "Server not found")
@@ -226,13 +268,21 @@ func handleClientDeviceCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := rejectServerWireGuardKey(form.Device.WireGuardKey); err != nil {
+	wgKey, keyErr := acceptDeviceWireGuardKey(form.Device.WireGuardKey)
+	if keyErr != nil {
 		sendError(w, 400, "invalid WireGuard key")
 		return
 	}
-	if err := normalizeDiscoKey(form.Device.DiscoKey); err != nil {
-		sendError(w, 400, "invalid disco key")
-		return
+
+	// Tag, server, and WireGuard key are the only caller fields. The owner,
+	// id, addresses, and punch policy come from the server.
+	device := &types.Device{
+		ID:           uuid.New(),
+		CreatedAt:    time.Now(),
+		Tag:          strings.TrimSpace(form.Device.Tag),
+		UserID:       user.ID,
+		ServerID:     form.Device.ServerID,
+		WireGuardKey: wgKey,
 	}
 
 	wgIPAllocMu.Lock()
@@ -248,7 +298,7 @@ func handleClientDeviceCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err, isIPv6 := assignDeviceWireGuardIPs(form.Device); err != nil {
+	if err, isIPv6 := assignDeviceWireGuardIPs(device); err != nil {
 		if isIPv6 {
 			sendError(w, 400, "WireGuard IPv6 assignment failed", slog.Any("err", err))
 			return
@@ -257,14 +307,14 @@ func handleClientDeviceCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = createDevice(form.Device)
+	err = createDevice(device)
 	if err != nil {
 		ERR(err)
 		sendError(w, 500, "Unable to create device, please try again later")
 		return
 	}
 
-	sendObject(w, deviceCreatePayload(form.Device, wgServer))
+	sendObject(w, deviceCreatePayload(device, wgServer))
 }
 
 func handleAdminDeviceCreate(w http.ResponseWriter, r *http.Request) {
@@ -282,7 +332,7 @@ func handleAdminDeviceCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if form.Device.Tag == "" {
+	if strings.TrimSpace(form.Device.Tag) == "" {
 		sendError(w, 400, "Missing device tag")
 		return
 	}
@@ -292,24 +342,27 @@ func handleAdminDeviceCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	form.Device.ID = uuid.New()
-	form.Device.CreatedAt = time.Now()
-
-	if err := rejectServerWireGuardKey(form.Device.WireGuardKey); err != nil {
+	wgKey, keyErr := acceptDeviceWireGuardKey(form.Device.WireGuardKey)
+	if keyErr != nil {
 		sendError(w, 400, "invalid WireGuard key")
 		return
 	}
-	if err := normalizeDiscoKey(form.Device.DiscoKey); err != nil {
-		sendError(w, 400, "invalid disco key")
-		return
+
+	device := &types.Device{
+		ID:           uuid.New(),
+		CreatedAt:    time.Now(),
+		Tag:          strings.TrimSpace(form.Device.Tag),
+		UserID:       form.Device.UserID,
+		ServerID:     form.Device.ServerID,
+		WireGuardKey: wgKey,
 	}
 
 	wgIPAllocMu.Lock()
 	defer wgIPAllocMu.Unlock()
 
 	var wgServer *types.Server
-	if form.Device.ServerID != uuid.Nil {
-		if err, isIPv6 := assignDeviceWireGuardIPs(form.Device); err != nil {
+	if device.ServerID != uuid.Nil {
+		if err, isIPv6 := assignDeviceWireGuardIPs(device); err != nil {
 			if isIPv6 {
 				sendError(w, 400, "WireGuard IPv6 assignment failed", slog.Any("err", err))
 				return
@@ -319,21 +372,21 @@ func handleAdminDeviceCreate(w http.ResponseWriter, r *http.Request) {
 		}
 
 		var srvErr error
-		wgServer, srvErr = findServerByID(form.Device.ServerID)
+		wgServer, srvErr = findServerByID(device.ServerID)
 		if srvErr != nil || wgServer == nil {
 			sendError(w, 404, "Server not found")
 			return
 		}
 	}
 
-	err = createDevice(form.Device)
+	err = createDevice(device)
 	if err != nil {
 		ERR(err)
 		sendError(w, 500, "Unable to create device, please try again later")
 		return
 	}
 
-	sendObject(w, deviceCreatePayload(form.Device, wgServer))
+	sendObject(w, deviceCreatePayload(device, wgServer))
 }
 
 func handleAdminDeviceGet(w http.ResponseWriter, r *http.Request) {

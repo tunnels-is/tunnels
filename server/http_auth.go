@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"log/slog"
 	mrand "math/rand/v2"
 	"net/http"
@@ -39,14 +40,17 @@ func authenticatePasswordLogin(w http.ResponseWriter, r *http.Request, form *log
 		return nil, email
 	}
 
-	err = validateUserTwoFactor(user, form)
-	if err != nil {
+	// A disabled account pays the same bcrypt cost and returns the same 401
+	// as a wrong password. The check is before 2FA so a correct password does
+	// not add a decrypt on this path.
+	if user.Disabled {
 		sendError(w, 401, "Invalid login credentials")
 		return nil, email
 	}
 
-	if user.Disabled {
-		sendError(w, 403, "This account has been disabled, please contact customer support")
+	err = validateUserTwoFactor(user, form)
+	if err != nil {
+		sendError(w, 401, "Invalid login credentials")
 		return nil, email
 	}
 	clearAuthSlot(authLimitLogin, email, ip)
@@ -205,22 +209,10 @@ func handleClientTwoFactorConfirm(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if form.Recovery != "" {
-		ok, recErr := recoveryCodePresent(user.RecoveryCodes, form.Recovery)
-		if recErr != nil {
-			ADMIN(recErr)
-			sendError(w, 500, "Encryption error")
-			return
-		}
-		if !ok {
-			sendError(w, 401, "Invalid Recovery code")
-			return
-		}
-	} else {
-		if user.TwoFactorEnabled {
-			sendError(w, 401, "This account already has two factor authentication enabled")
-			return
-		}
+	secret := strings.TrimSpace(form.Code)
+	if !validTOTPSecret(secret) {
+		sendError(w, 400, "invalid two-factor secret")
+		return
 	}
 
 	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(form.Password))
@@ -229,7 +221,7 @@ func handleClientTwoFactorConfirm(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	otp := gotp.NewDefaultTOTP(form.Code).Now()
+	otp := gotp.NewDefaultTOTP(secret).Now()
 	if otp != form.Digits {
 		sendError(w, 400, "Authenticator code was incorrect")
 		return
@@ -237,7 +229,9 @@ func handleClientTwoFactorConfirm(w http.ResponseWriter, r *http.Request) {
 
 	updatePackage := new(twoFactorUpdate)
 	updatePackage.UID = user.ID
-	updatePackage.Code, err = Encrypt(form.Code, []byte(loadSecret("TwoFactorKey")))
+	updatePackage.ConsumeRecovery = strings.TrimSpace(form.Recovery)
+	updatePackage.AcceptedTOTP = otp
+	updatePackage.Code, err = Encrypt(secret, []byte(loadSecret("TwoFactorKey")))
 	if err != nil {
 		ADMIN(err)
 		sendError(w, 500, "Encryption error")
@@ -253,8 +247,23 @@ func handleClientTwoFactorConfirm(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	recoveryConsumeMu.Lock()
 	err = updateUserTwoFactorCodes(updatePackage)
+	recoveryConsumeMu.Unlock()
 	if err != nil {
+		if errors.Is(err, errRecoveryNotFound) {
+			sendError(w, 401, "Invalid Recovery code")
+			return
+		}
+		if errors.Is(err, errTwoFactorAlreadyEnabled) {
+			sendError(w, 401, "This account already has two factor authentication enabled")
+			return
+		}
+		if errors.Is(err, errRecoveryDecrypt) {
+			ADMIN(err)
+			sendError(w, 500, "Encryption error")
+			return
+		}
 		sendError(w, 500, "Database error, please try again in a moment")
 		return
 	}
@@ -266,16 +275,12 @@ func handleClientTwoFactorConfirm(w http.ResponseWriter, r *http.Request) {
 	sendObject(w, out)
 }
 
-func recoveryCodePresent(blob []byte, recovery string) (bool, error) {
-	recoveryUpper := strings.ToUpper(recovery)
-	rc, err := Decrypt(blob, []byte(loadSecret("TwoFactorKey")))
-	if err != nil {
-		return false, err
+// validTOTPSecret reports whether secret is base32 that gotp can decode.
+// An empty secret decodes, and NewDefaultTOTP would still panic later, so
+// empty is rejected here. The check matches secrets the client already issues.
+func validTOTPSecret(secret string) bool {
+	if secret == "" {
+		return false
 	}
-	for v := range strings.SplitSeq(rc, " ") {
-		if v == recoveryUpper {
-			return true, nil
-		}
-	}
-	return false, nil
+	return gotp.IsSecretValid(secret)
 }

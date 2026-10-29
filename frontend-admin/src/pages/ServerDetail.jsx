@@ -30,6 +30,7 @@ export default function ServerDetail() {
   const [confirmingRegen, setConfirmingRegen] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
   const [keyError, setKeyError] = useState('');
+  const [revealedKey, setRevealedKey] = useState('');
   const [wans, setWans] = useState([]);
 
   const load = async () => {
@@ -52,6 +53,7 @@ export default function ServerDetail() {
   };
 
   useEffect(() => {
+    setRevealedKey('');
     load();
     loadWans();
   }, [id]);
@@ -108,8 +110,13 @@ export default function ServerDetail() {
         Server: { ...server, APIKey: '' },
       });
       if (resp.status === 200) {
+        const data = await resp.json().catch(() => ({}));
+        setRevealedKey(data.APIKey || '');
         setConfirmingRegen(false);
         await load();
+        if (!data.APIKey) {
+          setKeyError('The new key was saved, but the response did not include it. Generate another key and copy it.');
+        }
       } else {
         const data = await resp.json().catch(() => ({}));
         setKeyError(data.Error || 'Failed to generate key');
@@ -256,10 +263,26 @@ export default function ServerDetail() {
       <div className="bg-white border border-[#e7e3d7] rounded-lg overflow-hidden card-shadow">
           <Row label="API Key (--key)">
             <div className="flex items-center gap-2 min-w-0">
-              <span className="font-mono text-[12px] text-[#262626] truncate flex-1">{server.APIKey}</span>
-              <button onClick={() => copy(server.APIKey)} className="flex items-center gap-1 px-2 py-0.5 rounded text-[11px] text-[#a3a3a3] hover:text-[#262626] hover:bg-black/[0.05] shrink-0">
-                <Copy className="w-3 h-3" /> Copy
-              </button>
+              {(() => {
+                const stored = server.APIKey || '';
+                const hidden = !stored || stored.startsWith('h1:');
+                const shown = revealedKey || (hidden ? '' : stored);
+                if (!shown) {
+                  return (
+                    <span className="text-[12px] text-[#525252] flex-1">
+                      Stored as a hash. Generate a new key and copy it. The plaintext is not kept.
+                    </span>
+                  );
+                }
+                return (
+                  <>
+                    <span className="font-mono text-[12px] text-[#262626] truncate flex-1">{shown}</span>
+                    <button onClick={() => copy(shown)} className="flex items-center gap-1 px-2 py-0.5 rounded text-[11px] text-[#a3a3a3] hover:text-[#262626] hover:bg-black/[0.05] shrink-0">
+                      <Copy className="w-3 h-3" /> Copy
+                    </button>
+                  </>
+                );
+              })()}
               {confirmingRegen ? (
                 <div className="flex items-center gap-1 shrink-0">
                   <button onClick={() => setConfirmingRegen(false)} disabled={regenerating} className="px-2 py-0.5 rounded text-[11px] text-[#525252] hover:text-[#0a0a0a]">
@@ -276,6 +299,11 @@ export default function ServerDetail() {
               )}
             </div>
           </Row>
+          {revealedKey && (
+            <div className="px-4 py-2 text-[12px] text-[#525252] border-b border-[#e7e3d7]/50">
+              Copy this key now. It is shown only this once and cannot be loaded again.
+            </div>
+          )}
           {keyError && (
             <div className="px-4 py-2 text-[12px] text-[#dc2626] border-b border-[#e7e3d7]/50">{keyError}</div>
           )}

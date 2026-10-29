@@ -23,14 +23,16 @@ type User struct {
 	DeviceToken *DeviceToken `json:"DeviceToken,omitempty"`
 	APIKey      string       `json:"APIKey"`
 
-	Password         string         `json:"Password"`
-	Password2        string         `json:"-"`
-	ConfirmCode      string         `json:"ConfirmCode"`
-	LastResetRequest time.Time      `json:"-"`
-	RecoveryCodes    []byte         `json:"RecoveryCodes"`
-	TwoFactorCode    []byte         `json:"TwoFactorCode"`
-	TwoFactorEnabled bool           `json:"TwoFactorEnabled"`
-	Tokens           []*DeviceToken `json:"Tokens"`
+	Password         string    `json:"Password"`
+	Password2        string    `json:"-"`
+	ConfirmCode      string    `json:"ConfirmCode"`
+	LastResetRequest time.Time `json:"-"`
+	RecoveryCodes    []byte    `json:"RecoveryCodes"`
+	TwoFactorCode    []byte    `json:"TwoFactorCode"`
+	TwoFactorEnabled bool      `json:"TwoFactorEnabled"`
+	// LastTOTP is the last authenticator code accepted for this account.
+	LastTOTP string         `json:"LastTOTP,omitempty"`
+	Tokens   []*DeviceToken `json:"Tokens"`
 
 	IsAdmin bool        `json:"IsAdmin"`
 	Groups  []uuid.UUID `json:"Groups"`
@@ -72,6 +74,7 @@ func (u *User) RemoveSensitiveInformation() {
 	u.ConfirmCode = ""
 	u.RecoveryCodes = nil
 	u.TwoFactorCode = nil
+	u.LastTOTP = ""
 	u.APIKey = ""
 
 	// Session secrets: keep only the current DeviceToken.DT (needed by the
