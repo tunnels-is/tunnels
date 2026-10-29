@@ -230,7 +230,7 @@ func (b *punchBind) loop() {
 			}
 			b.apply(tun, eng, b.pushLocalPolicy(tun, eng))
 			if refreshed.IsZero() || time.Since(refreshed) > 15*time.Second {
-				b.refreshDirectory(tun, eng)
+				b.refreshWG(tun, eng)
 				b.apply(tun, eng, b.pushLocalPolicy(tun, eng))
 				refreshed = time.Now()
 			}
@@ -298,7 +298,7 @@ func (b *punchBind) pushLocalPolicy(tun *TUN, eng *punch.Engine) punch.Result {
 	return eng.SetLocalPolicy(b.fwOff.Load(), allowAll, entries)
 }
 
-func (b *punchBind) refreshDirectory(tun *TUN, eng *punch.Engine) {
+func (b *punchBind) refreshWG(tun *TUN, eng *punch.Engine) {
 	cr := tun.CR
 	if cr == nil || cr.Server == nil || tun.deviceID == "" {
 		return

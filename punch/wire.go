@@ -14,6 +14,9 @@ const (
 
 	TypeReflexReq  byte = 1
 	TypeReflexResp byte = 2
+	// TypeRendezvous and TypeForward were the old controller mailbox.
+	// Nothing parses them. The numbers stay so an old packet is recognized
+	// and ignored.
 	TypeRendezvous byte = 3
 	TypePing       byte = 4
 	TypePong       byte = 5
@@ -292,80 +295,6 @@ func ParseReflexResp(pkt []byte) (uuid.UUID, netip.AddrPort, error) {
 	return getID(body), getAddrPort(body[idLen:]), nil
 }
 
-// Rendezvous is the candidate advertisement sealed to one peer.
-type Rendezvous struct {
-	Src, Dst   uuid.UUID
-	Epoch      uint64
-	WGPub      [32]byte
-	WGIP       netip.Addr
-	Candidates []netip.AddrPort
-}
-
-// BuildRendezvous seals r to the destination disco key.
-func BuildRendezvous(srcPriv, dstPub [32]byte, r Rendezvous) ([]byte, error) {
-	if len(r.Candidates) > 16 {
-		return nil, fmt.Errorf("too many candidates")
-	}
-	plain := make([]byte, 8+keyLen+addrLen+1+(addrLen+2)*len(r.Candidates))
-	binary.BigEndian.PutUint64(plain[:8], r.Epoch)
-	copy(plain[8:8+keyLen], r.WGPub[:])
-	putAddr(plain[8+keyLen:], r.WGIP)
-	plain[8+keyLen+addrLen] = byte(len(r.Candidates))
-	off := 8 + keyLen + addrLen + 1
-	for _, c := range r.Candidates {
-		putAddrPort(plain[off:], c)
-		off += addrLen + 2
-	}
-	box, err := Seal(srcPriv, dstPub, plain)
-	if err != nil {
-		return nil, err
-	}
-	body := make([]byte, idLen*2+len(box))
-	putID(body, r.Src)
-	putID(body[idLen:], r.Dst)
-	copy(body[idLen*2:], box)
-	return frame(TypeRendezvous, body), nil
-}
-
-// OpenRendezvous opens a rendezvous addressed to dstPriv.
-// srcPub is the sender's registered disco key, not a value read from the box.
-func OpenRendezvous(dstPriv, srcPub [32]byte, pkt []byte) (Rendezvous, error) {
-	var r Rendezvous
-	body, err := bodyOf(pkt, TypeRendezvous)
-	if err != nil {
-		return r, err
-	}
-	if len(body) < idLen*2+nonceLen+16 {
-		return r, fmt.Errorf("short rendezvous")
-	}
-	r.Src = getID(body)
-	r.Dst = getID(body[idLen:])
-	plain, err := Open(dstPriv, srcPub, body[idLen*2:])
-	if err != nil {
-		return r, err
-	}
-	need := 8 + keyLen + addrLen + 1
-	if len(plain) < need {
-		return r, fmt.Errorf("short rendezvous body")
-	}
-	r.Epoch = binary.BigEndian.Uint64(plain[:8])
-	copy(r.WGPub[:], plain[8:8+keyLen])
-	r.WGIP = getAddr(plain[8+keyLen:])
-	n := int(plain[8+keyLen+addrLen])
-	plain = plain[need:]
-	if len(plain) != n*(addrLen+2) {
-		return r, fmt.Errorf("bad candidate list")
-	}
-	r.Candidates = make([]netip.AddrPort, 0, n)
-	for i := 0; i < n; i++ {
-		ap := getAddrPort(plain[i*(addrLen+2):])
-		if ap.IsValid() {
-			r.Candidates = append(r.Candidates, ap)
-		}
-	}
-	return r, nil
-}
-
 // BuildPing seals a trust-building probe. The body is exactly 8 bytes.
 // Older peers reject any other size, so this shape must not grow.
 func BuildPing(srcPriv, dstPub [32]byte, src, dst uuid.UUID, txid uint64) ([]byte, error) {
@@ -490,37 +419,6 @@ func openDirect(typ byte, dstPriv, srcPub [32]byte, pkt []byte) ([]byte, uuid.UU
 		return nil, src, dst, err
 	}
 	return plain, src, dst, nil
-}
-
-// BuildForward wraps a client rendezvous for the peer's home wg-server.
-// srcIP is the sender's tunnel address, taken from the home server's peer
-// table, so the far server can apply that device's firewall policy.
-func BuildForward(src, dst uuid.UUID, srcIP netip.Addr, rendezvous []byte) []byte {
-	body := make([]byte, idLen*2+addrLen+len(rendezvous))
-	putID(body, src)
-	putID(body[idLen:], dst)
-	putAddr(body[idLen*2:], srcIP)
-	copy(body[idLen*2+addrLen:], rendezvous)
-	return frame(TypeForward, body)
-}
-
-// ParseForward unwraps a server-to-server rendezvous.
-func ParseForward(pkt []byte) (src, dst uuid.UUID, srcIP netip.Addr, rendezvous []byte, err error) {
-	body, err := bodyOf(pkt, TypeForward)
-	if err != nil {
-		return uuid.UUID{}, uuid.UUID{}, netip.Addr{}, nil, err
-	}
-	if len(body) < idLen*2+addrLen+headerLen {
-		return uuid.UUID{}, uuid.UUID{}, netip.Addr{}, nil, fmt.Errorf("short forward")
-	}
-	src = getID(body)
-	dst = getID(body[idLen:])
-	srcIP = getAddr(body[idLen*2:])
-	rendezvous = append([]byte(nil), body[idLen*2+addrLen:]...)
-	if !Is(rendezvous) || rendezvous[5] != TypeRendezvous {
-		return uuid.UUID{}, uuid.UUID{}, netip.Addr{}, nil, fmt.Errorf("forward payload is not a rendezvous")
-	}
-	return src, dst, srcIP, rendezvous, nil
 }
 
 // TypeOf returns the punch type byte, or 0 when pkt is not a punch frame.

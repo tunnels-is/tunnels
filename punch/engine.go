@@ -14,7 +14,7 @@ const (
 	Keepalive = 10 * time.Second
 	// DirectTimeout drops a direct path that has not ponged.
 	DirectTimeout = 25 * time.Second
-	// RendezvousEvery limits how often candidates are re-advertised.
+	// RendezvousEvery limits how often an introduction is repeated.
 	RendezvousEvery = 5 * time.Second
 	// ReflexEvery refreshes the mapping measured at the wg-server.
 	ReflexEvery = 15 * time.Second
@@ -22,7 +22,7 @@ const (
 	PongsToTrust = 2
 )
 
-// Peer is one device the controller says we may punch.
+// Peer is one device learned from an introduction.
 type Peer struct {
 	DeviceID uuid.UUID
 	DiscoPub [32]byte
@@ -83,17 +83,15 @@ type Engine struct {
 }
 
 type session struct {
-	peer       Peer
-	cands      []netip.AddrPort
-	pongs      map[netip.AddrPort]int
-	direct     netip.AddrPort
-	directUp   bool
-	lastPong   time.Time
-	lastProbe  time.Time
-	lastAdv    time.Time
-	lastEpoch  uint64
-	repliedFor uint64
-	txid       uint64
+	peer      Peer
+	cands     []netip.AddrPort
+	pongs     map[netip.AddrPort]int
+	direct    netip.AddrPort
+	directUp  bool
+	lastPong  time.Time
+	lastProbe time.Time
+	lastAdv   time.Time
+	txid      uint64
 
 	mtuActive  bool
 	mtuDone    bool
@@ -166,45 +164,6 @@ func (e *Engine) admitsLocked(peer netip.Addr) bool {
 
 func (e *Engine) punchableLocked(ip netip.Addr) bool {
 	return ip.Is4() && ip.IsPrivate() && e.admitsLocked(ip)
-}
-
-// SetPeers installs peers the caller already knows. The live client does not
-// use it: a peer is learned from the introduction that arrives on its tunnel
-// IP. Peers that disappear are dropped.
-func (e *Engine) SetPeers(peers []Peer) Result {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-	var r Result
-	next := make(map[uuid.UUID]Peer, len(peers))
-	for _, p := range peers {
-		if p.DeviceID == e.self || !p.WGIP.IsValid() || !p.WGIP.Is4() {
-			continue
-		}
-		next[p.DeviceID] = p
-	}
-	for id, s := range e.peers {
-		p, ok := next[id]
-		if !ok || p.WGPub != s.peer.WGPub || p.DiscoPub != s.peer.DiscoPub || p.WGIP != s.peer.WGIP {
-			if s.directUp {
-				r.Down = append(r.Down, id)
-				if pkt, err := BuildTeardown(e.disco, s.peer.DiscoPub, e.self, id); err == nil && s.direct.IsValid() {
-					r.Sends = append(r.Sends, Datagram{To: s.direct, Data: pkt})
-				}
-			}
-			delete(e.peers, id)
-			delete(e.byIP, s.peer.WGIP)
-		}
-	}
-	e.byIP = make(map[netip.Addr]uuid.UUID, len(next))
-	for id, p := range next {
-		e.byIP[p.WGIP] = id
-		if s, ok := e.peers[id]; ok {
-			s.peer = p
-			continue
-		}
-		e.peers[id] = &session{peer: p, pongs: make(map[netip.AddrPort]int)}
-	}
-	return r
 }
 
 // NoteTraffic asks the engine to punch the device that owns this tunnel IP.
@@ -326,8 +285,6 @@ func (e *Engine) OnPacket(from netip.AddrPort, pkt []byte, now time.Time) Result
 		e.reflexAt = now
 	case TypeIntro:
 		e.onIntroLocked(&r, pkt, now)
-	case TypeRendezvous:
-		e.onRendezvousLocked(&r, pkt, now)
 	case TypePing:
 		e.onPingLocked(&r, from, pkt)
 	case TypePong:
@@ -394,39 +351,6 @@ func (e *Engine) onIntroLocked(r *Result, pkt []byte, now time.Time) {
 	}
 }
 
-func (e *Engine) onRendezvousLocked(r *Result, pkt []byte, now time.Time) {
-	body := pkt
-	if len(body) < headerLen+idLen*2 {
-		return
-	}
-	src := uuid.UUID{}
-	copy(src[:], body[headerLen:headerLen+idLen])
-	s := e.peers[src]
-	if s == nil || !e.admitsLocked(s.peer.WGIP) {
-		return
-	}
-	msg, err := OpenRendezvous(e.disco, s.peer.DiscoPub, pkt)
-	if err != nil || msg.Dst != e.self || msg.WGPub != s.peer.WGPub || msg.WGIP != s.peer.WGIP {
-		return
-	}
-	if msg.Epoch < s.lastEpoch {
-		return
-	}
-	s.lastEpoch = msg.Epoch
-	s.cands = append([]netip.AddrPort(nil), msg.Candidates...)
-	for _, c := range s.cands {
-		if pkt, err := e.pingLocked(s, c); err == nil {
-			r.Sends = append(r.Sends, Datagram{To: c, Data: pkt})
-		}
-	}
-	if s.lastAdv.IsZero() || now.Sub(s.lastAdv) >= RendezvousEvery {
-		if adv, ok := e.advertiseLocked(s, now); ok {
-			r.Sends = append(r.Sends, Datagram{Server: true, Data: adv})
-			s.repliedFor = msg.Epoch
-		}
-	}
-}
-
 func (e *Engine) onPingLocked(r *Result, from netip.AddrPort, pkt []byte) {
 	if len(pkt) < headerLen+idLen {
 		return
@@ -467,16 +391,11 @@ func (e *Engine) onPongLocked(r *Result, from netip.AddrPort, pkt []byte, now ti
 	if s == nil || !e.admitsLocked(s.peer.WGIP) {
 		return
 	}
-	src, dst, txid, observed, err := OpenPong(e.disco, s.peer.DiscoPub, pkt)
+	src, dst, txid, _, err := OpenPong(e.disco, s.peer.DiscoPub, pkt)
 	if err != nil || src != claimed || dst != e.self {
 		return
 	}
 	via := from
-	if observed.IsValid() && observed.Addr().IsValid() {
-		// The peer saw us at observed. Our own NAT mapping toward them can
-		// differ from the mapping toward the wg-server. Keep their view.
-		_ = observed
-	}
 	// Match a padded probe before the "already direct" return. An ignored
 	// padded ping must not be what keeps or drops the path; keepalives do that.
 	e.onMTUPongLocked(s, txid, r, now)
@@ -522,27 +441,6 @@ func (e *Engine) onTeardownLocked(r *Result, pkt []byte) {
 	s.directUp = false
 	s.pongs = make(map[netip.AddrPort]int)
 	s.resetMTU()
-}
-
-func (e *Engine) advertiseLocked(s *session, now time.Time) ([]byte, bool) {
-	if !e.reflex.IsValid() {
-		return nil, false
-	}
-	var cands []netip.AddrPort
-	cands = append(cands, e.reflex)
-	pkt, err := BuildRendezvous(e.disco, s.peer.DiscoPub, Rendezvous{
-		Src:        e.self,
-		Dst:        s.peer.DeviceID,
-		Epoch:      uint64(now.UnixNano()),
-		WGPub:      e.wgPub,
-		WGIP:       e.wgIP,
-		Candidates: cands,
-	})
-	if err != nil {
-		return nil, false
-	}
-	s.lastAdv = now
-	return pkt, true
 }
 
 func (e *Engine) pingLocked(s *session, to netip.AddrPort) ([]byte, error) {

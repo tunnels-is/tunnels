@@ -137,8 +137,6 @@ func newMTUPair(t *testing.T) (a, b *Engine, now time.Time) {
 	t.Helper()
 	aPriv, _ := NewPrivate()
 	bPriv, _ := NewPrivate()
-	aPub, _ := Public(aPriv)
-	bPub, _ := Public(bPriv)
 	srvPriv, _ := NewPrivate()
 	srvPub, _ := Public(srvPriv)
 	var aWG, bWG [32]byte
@@ -153,8 +151,6 @@ func newMTUPair(t *testing.T) (a, b *Engine, now time.Time) {
 	b.SetServerDisco(srvPub)
 	a.SetLocalPolicy(false, false, []string{bIP.String()})
 	b.SetLocalPolicy(false, false, []string{aIP.String()})
-	a.SetPeers([]Peer{{DeviceID: bID, DiscoPub: bPub, WGPub: bWG, WGIP: bIP}})
-	b.SetPeers([]Peer{{DeviceID: aID, DiscoPub: aPub, WGPub: aWG, WGIP: aIP}})
 	now = time.Now()
 	aReflex := netip.MustParseAddrPort("198.51.100.10:41000")
 	bReflex := netip.MustParseAddrPort("198.51.100.20:42000")
@@ -211,7 +207,7 @@ func runMTUExchange(t *testing.T, a, b *Engine, now time.Time, accept func([]byt
 	for steps := 0; steps < 80 && len(q) > 0; steps++ {
 		item := q[0]
 		q = q[1:]
-		if item.d.Server && TypeOf(item.d.Data) != TypeRendezvous {
+		if item.d.Server {
 			continue
 		}
 		res := other[item.from].OnPacket(selfAddr[item.from], item.d.Data, now)

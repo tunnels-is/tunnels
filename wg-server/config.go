@@ -275,7 +275,7 @@ func loadOrGenerateDiscoPub(allowGenerate bool) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	setPunchDisco(key, pub)
+	setPunchDisco(key)
 	return punch.EncodeKey(pub), nil
 }
 
