@@ -123,8 +123,8 @@ func TestMeshPunch(t *testing.T) {
 	waitClientUp(t, "mcliB", devB.WGIP)
 	waitPeerAuthorized(t, "mwgA", devA.WGIP)
 	waitPeerAuthorized(t, "mwgB", devB.WGIP)
-	waitLog(t, "mcliA", "disco registered", 30)
-	waitLog(t, "mcliB", "disco registered", 30)
+	waitLog(t, "mcliA", "punch ready", 30)
+	waitLog(t, "mcliB", "punch ready", 30)
 
 	url := fmt.Sprintf("http://%s:%d/", devB.WGIP, dummyPort)
 	waitDummyLocal(t, "mcliB", devB.WGIP)

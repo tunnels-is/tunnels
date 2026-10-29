@@ -16,7 +16,6 @@ func (t *inspectingTUN) applyControl(src netip.Addr, payload []byte) {
 		return
 	}
 	p.setAllowed(entries, allowAll)
-	publishPunchPolicy(src, entries, allowAll)
 }
 
 func parseACLPayload(payload []byte) (entries []aclEntry, allowAll bool, ok bool) {

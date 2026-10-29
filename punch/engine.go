@@ -31,10 +31,13 @@ type Peer struct {
 }
 
 // Datagram is one punch packet to send. Server is set when it goes to the
-// wg-server instead of a peer address. MTU marks a padded path-MTU probe;
-// Peer is the device the probe measures.
+// wg-server instead of a peer address. Tunnel is set when it goes through
+// the existing WireGuard tunnel to To, which is the other client's tunnel
+// address. MTU marks a padded path-MTU probe; Peer is the device the probe
+// measures.
 type Datagram struct {
 	Server bool
+	Tunnel bool
 	To     netip.AddrPort
 	Data   []byte
 	MTU    bool
@@ -73,9 +76,10 @@ type Engine struct {
 	allow    []string
 	discover bool
 
-	peers map[uuid.UUID]*session
-	byIP  map[netip.Addr]uuid.UUID
-	want  map[netip.Addr]struct{}
+	peers   map[uuid.UUID]*session
+	byIP    map[netip.Addr]uuid.UUID
+	want    map[netip.Addr]struct{}
+	introAt map[netip.Addr]time.Time
 }
 
 type session struct {
@@ -107,13 +111,14 @@ type session struct {
 // NewEngine returns an engine for this device. discoPriv is the punch key.
 func NewEngine(self uuid.UUID, discoPriv, wgPub [32]byte, wgIP netip.Addr) *Engine {
 	return &Engine{
-		self:  self,
-		disco: discoPriv,
-		wgPub: wgPub,
-		wgIP:  wgIP,
-		peers: make(map[uuid.UUID]*session),
-		byIP:  make(map[netip.Addr]uuid.UUID),
-		want:  make(map[netip.Addr]struct{}),
+		self:    self,
+		disco:   discoPriv,
+		wgPub:   wgPub,
+		wgIP:    wgIP,
+		peers:   make(map[uuid.UUID]*session),
+		byIP:    make(map[netip.Addr]uuid.UUID),
+		want:    make(map[netip.Addr]struct{}),
+		introAt: make(map[netip.Addr]time.Time),
 	}
 }
 
@@ -159,7 +164,13 @@ func (e *Engine) admitsLocked(peer netip.Addr) bool {
 	return AdmitsAllPorts(false, e.allowAll, e.allow, peer)
 }
 
-// SetPeers replaces the controller directory. Peers that disappear are dropped.
+func (e *Engine) punchableLocked(ip netip.Addr) bool {
+	return ip.Is4() && ip.IsPrivate() && e.admitsLocked(ip)
+}
+
+// SetPeers installs peers the caller already knows. The live client does not
+// use it: a peer is learned from the introduction that arrives on its tunnel
+// IP. Peers that disappear are dropped.
 func (e *Engine) SetPeers(peers []Peer) Result {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -197,8 +208,10 @@ func (e *Engine) SetPeers(peers []Peer) Result {
 }
 
 // NoteTraffic asks the engine to punch the device that owns this tunnel IP.
+// Only private IPv4 is a candidate. A public destination is WAN traffic, and
+// an introduction must not be sent there.
 func (e *Engine) NoteTraffic(ip netip.Addr) {
-	if !ip.IsValid() {
+	if !ip.Is4() || !ip.IsPrivate() {
 		return
 	}
 	e.mu.Lock()
@@ -221,7 +234,7 @@ func (e *Engine) Direct(ip netip.Addr) (netip.AddrPort, bool) {
 	return s.direct, true
 }
 
-// Poll sends reflex requests, rendezvous advertisements, and direct keepalives.
+// Poll sends reflex requests, tunnel introductions, and direct keepalives.
 func (e *Engine) Poll(now time.Time) Result {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -233,19 +246,38 @@ func (e *Engine) Poll(now time.Time) Result {
 		}
 	}
 	for ip := range e.want {
+		if !e.punchableLocked(ip) {
+			continue
+		}
 		id, ok := e.byIP[ip]
-		if !ok || !e.admitsLocked(ip) {
+		if !ok {
+			if at, seen := e.introAt[ip]; seen && now.Sub(at) < RendezvousEvery {
+				continue
+			}
+			if pkt, ok := e.introPacketLocked(); ok {
+				r.Sends = append(r.Sends, Datagram{Tunnel: true, To: netip.AddrPortFrom(ip, IntroPort), Data: pkt})
+				e.introAt[ip] = now
+			}
 			continue
 		}
 		s := e.peers[id]
 		if s == nil || s.directUp {
 			continue
 		}
+		if len(s.cands) > 0 && (s.lastProbe.IsZero() || now.Sub(s.lastProbe) >= Keepalive) {
+			for _, c := range s.cands {
+				if ping, err := e.pingLocked(s, c); err == nil {
+					r.Sends = append(r.Sends, Datagram{To: c, Data: ping})
+				}
+			}
+			s.lastProbe = now
+		}
 		if !s.lastAdv.IsZero() && now.Sub(s.lastAdv) < RendezvousEvery {
 			continue
 		}
-		if pkt, ok := e.advertiseLocked(s, now); ok {
-			r.Sends = append(r.Sends, Datagram{Server: true, Data: pkt})
+		if pkt, ok := e.introPacketLocked(); ok {
+			r.Sends = append(r.Sends, Datagram{Tunnel: true, To: netip.AddrPortFrom(ip, IntroPort), Data: pkt})
+			s.lastAdv = now
 		}
 	}
 	for id, s := range e.peers {
@@ -292,6 +324,8 @@ func (e *Engine) OnPacket(from netip.AddrPort, pkt []byte, now time.Time) Result
 		}
 		e.reflex = ap
 		e.reflexAt = now
+	case TypeIntro:
+		e.onIntroLocked(&r, pkt, now)
 	case TypeRendezvous:
 		e.onRendezvousLocked(&r, pkt, now)
 	case TypePing:
@@ -302,6 +336,62 @@ func (e *Engine) OnPacket(from netip.AddrPort, pkt []byte, now time.Time) Result
 		e.onTeardownLocked(&r, pkt)
 	}
 	return r
+}
+
+func (e *Engine) introPacketLocked() ([]byte, bool) {
+	pub, err := Public(e.disco)
+	if err != nil {
+		return nil, false
+	}
+	var cands []netip.AddrPort
+	if e.reflex.IsValid() {
+		cands = append(cands, e.reflex)
+	}
+	pkt, err := BuildIntro(e.self, pub, e.wgPub, e.wgIP, cands)
+	if err != nil {
+		return nil, false
+	}
+	return pkt, true
+}
+
+func (e *Engine) onIntroLocked(r *Result, pkt []byte, now time.Time) {
+	msg, err := ParseIntro(pkt)
+	if err != nil || msg.Src == e.self || !e.punchableLocked(msg.WGIP) {
+		return
+	}
+	s := e.peers[msg.Src]
+	if s == nil || s.peer.WGPub != msg.WGPub || s.peer.DiscoPub != msg.DiscoPub || s.peer.WGIP != msg.WGIP {
+		if s != nil && s.directUp {
+			r.Down = append(r.Down, msg.Src)
+		}
+		if s != nil {
+			delete(e.byIP, s.peer.WGIP)
+		}
+		s = &session{
+			peer:  Peer{DeviceID: msg.Src, DiscoPub: msg.DiscoPub, WGPub: msg.WGPub, WGIP: msg.WGIP},
+			pongs: make(map[netip.AddrPort]int),
+		}
+		e.peers[msg.Src] = s
+		e.byIP[msg.WGIP] = msg.Src
+	}
+	s.cands = append([]netip.AddrPort(nil), msg.Candidates...)
+	for _, c := range s.cands {
+		if !c.IsValid() {
+			continue
+		}
+		if ping, err := e.pingLocked(s, c); err == nil {
+			r.Sends = append(r.Sends, Datagram{To: c, Data: ping})
+		}
+	}
+	if len(s.cands) > 0 {
+		s.lastProbe = now
+	}
+	if s.lastAdv.IsZero() || now.Sub(s.lastAdv) >= RendezvousEvery {
+		if reply, ok := e.introPacketLocked(); ok {
+			r.Sends = append(r.Sends, Datagram{Tunnel: true, To: netip.AddrPortFrom(msg.WGIP, IntroPort), Data: reply})
+			s.lastAdv = now
+		}
+	}
 }
 
 func (e *Engine) onRendezvousLocked(r *Result, pkt []byte, now time.Time) {

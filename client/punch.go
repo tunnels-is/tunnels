@@ -15,7 +15,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/tunnels-is/tunnels/punch"
-	"github.com/tunnels-is/tunnels/types"
 	wgconn "golang.zx2c4.com/wireguard/conn"
 	wgdevice "golang.zx2c4.com/wireguard/device"
 )
@@ -90,6 +89,10 @@ func newPunchBind(inner wgconn.Bind, tun *TUN) wgconn.Bind {
 	if tun.punchWant == nil {
 		tun.punchWant = make(chan [4]byte, 16)
 	}
+	if tun.punchInject == nil {
+		tun.punchInject = make(chan []byte, 16)
+	}
+	ensurePunchWake(tun)
 	b := &punchBind{inner: inner}
 	b.tun.Store(tun)
 	return b
@@ -255,8 +258,7 @@ func (b *punchBind) buildEngine(tun *TUN) *punch.Engine {
 	var wgPriv, wgPub, disco [32]byte
 	copy(wgPriv[:], raw)
 	disco = punch.DiscoPrivateFor(wgPriv)
-	pub, err := punch.Public(disco)
-	if err != nil {
+	if _, err = punch.Public(disco); err != nil {
 		return nil
 	}
 	wgRaw, err := base64.StdEncoding.DecodeString(dev.WireGuardPubKey)
@@ -279,7 +281,6 @@ func (b *punchBind) buildEngine(tun *TUN) *punch.Engine {
 	if err != nil {
 		return nil
 	}
-	b.registerDisco(tun, punch.EncodeKey(pub))
 	eng := punch.NewEngine(id, disco, wgPub, ip)
 	meta := tun.meta.Load()
 	eng.SetDiscoverMTU(meta == nil || meta.MTU == 0)
@@ -302,11 +303,6 @@ func (b *punchBind) refreshDirectory(tun *TUN, eng *punch.Engine) {
 	if cr == nil || cr.Server == nil || tun.deviceID == "" {
 		return
 	}
-	if dev, err := loadLocalDevice(tun.deviceID); err == nil && dev != nil {
-		if disco := discoPublicB64(dev.WireGuardPrivKey); disco != "" {
-			b.registerDisco(tun, disco)
-		}
-	}
 	cfg := b.fetchWG(tun)
 	if cfg != nil {
 		b.fwOff.Store(!cfg.EnableFirewall)
@@ -315,10 +311,6 @@ func (b *punchBind) refreshDirectory(tun *TUN, eng *punch.Engine) {
 				eng.SetServerDisco(key)
 			}
 		}
-	}
-	peers := b.fetchPeers(tun)
-	if peers != nil {
-		b.apply(tun, eng, eng.SetPeers(peers))
 	}
 }
 
@@ -339,52 +331,6 @@ func (b *punchBind) fetchWG(tun *TUN) *wgServerConfig {
 		return nil
 	}
 	return cfg
-}
-
-func (b *punchBind) fetchPeers(tun *TUN) []punch.Peer {
-	cr := tun.CR
-	url := cr.Server.GetURL("/client/p2p/peers") + "?deviceID=" + tun.deviceID
-	body, code, err := SendRequestToURL(nil, "GET", url, nil, 8000, cr.Server.ValidateCertificate, cr.Server.CertificatePath, authHeaders(cr))
-	if err != nil || code != 200 {
-		DEBUG("punch: peers ", code, " ", err)
-		return nil
-	}
-	var resp struct {
-		Peers []types.P2PPeer `json:"Peers"`
-	}
-	if json.Unmarshal(body, &resp) != nil {
-		return nil
-	}
-	out := make([]punch.Peer, 0, len(resp.Peers))
-	for _, p := range resp.Peers {
-		id, err := uuid.Parse(p.DeviceID)
-		if err != nil {
-			continue
-		}
-		disco, err := punch.DecodeKey(p.DiscoKey)
-		if err != nil {
-			continue
-		}
-		wg, err := punch.DecodeKey(p.WireGuardKey)
-		if err != nil {
-			continue
-		}
-		ip, err := netip.ParseAddr(p.WireGuardIP)
-		if err != nil {
-			continue
-		}
-		out = append(out, punch.Peer{DeviceID: id, DiscoPub: disco, WGPub: wg, WGIP: ip})
-	}
-	return out
-}
-
-func (b *punchBind) registerDisco(tun *TUN, disco string) {
-	cr := tun.CR
-	if cr == nil || cr.Server == nil {
-		return
-	}
-	body := map[string]string{"DeviceID": tun.deviceID, "DiscoKey": disco}
-	_, _, _ = SendRequestToURL(nil, "POST", cr.Server.GetURL("/client/device/disco"), body, 8000, cr.Server.ValidateCertificate, cr.Server.CertificatePath, authHeaders(cr))
 }
 
 func authHeaders(cr *ConnectionRequest) map[string]string {
@@ -414,6 +360,10 @@ func (b *punchBind) apply(tun *TUN, eng *punch.Engine, res punch.Result) {
 		serverAddr = cr.ServerIP + ":" + tun.ServerResponse.WireGuardPort
 	}
 	for _, d := range res.Sends {
+		if d.Tunnel {
+			b.injectIntro(tun, d)
+			continue
+		}
 		to := d.To.String()
 		if d.Server {
 			to = serverAddr
@@ -582,6 +532,78 @@ func (b *punchBind) retryRemoves(tun *TUN) {
 	}
 }
 
+func (b *punchBind) injectIntro(tun *TUN, d punch.Datagram) {
+	msg, err := punch.ParseIntro(d.Data)
+	if err != nil || !msg.WGIP.Is4() || !d.To.Addr().Is4() {
+		return
+	}
+	pkt, err := punch.WrapIPv4UDP(msg.WGIP, d.To.Addr(), punch.IntroPort, punch.IntroPort, d.Data)
+	if err != nil || tun.punchInject == nil {
+		return
+	}
+	select {
+	case tun.punchInject <- pkt:
+		signalPunchInject(tun)
+	default:
+		DEBUG("punch: intro queue full")
+	}
+}
+
+func (t *TUN) takePunchIntro(packet []byte) bool {
+	if t == nil || t.punchIn == nil {
+		return false
+	}
+	src, srcPort, payload, ok := punch.UnwrapIPv4UDP(packet, punch.IntroPort)
+	if !ok || punch.TypeOf(payload) != punch.TypeIntro {
+		return false
+	}
+	from := netip.AddrPortFrom(src, srcPort)
+	select {
+	case t.punchIn <- punchDatagram{from: from.String(), data: append([]byte(nil), payload...)}:
+	default:
+	}
+	return true
+}
+
+func ensurePunchWake(tun *TUN) {
+	if tun == nil || tun.punchPoke != nil {
+		return
+	}
+	tun.punchPoke = make(chan struct{}, 1)
+}
+
+func signalPunchInject(tun *TUN) {
+	if tun == nil || tun.punchPoke == nil {
+		return
+	}
+	select {
+	case tun.punchPoke <- struct{}{}:
+	default:
+	}
+}
+
+func (t *TUN) drainInject(bufs [][]byte, sizes []int, offset int) int {
+	if t == nil || t.punchInject == nil {
+		return 0
+	}
+	n := 0
+	for n < len(bufs) {
+		var pkt []byte
+		select {
+		case pkt = <-t.punchInject:
+		default:
+			return n
+		}
+		if offset+len(pkt) > len(bufs[n]) {
+			continue
+		}
+		copy(bufs[n][offset:], pkt)
+		sizes[n] = len(pkt)
+		n++
+	}
+	return n
+}
+
 func (t *TUN) notePunchWant(ip [4]byte) {
 	if t.punchWant == nil {
 		return
@@ -613,20 +635,6 @@ func (t *TUN) drainPunchWants(eng *punch.Engine) {
 	for ip := range pending {
 		eng.NoteTraffic(netip.AddrFrom4(ip))
 	}
-}
-
-func discoPublicB64(wgPrivB64 string) string {
-	raw, err := base64.StdEncoding.DecodeString(wgPrivB64)
-	if err != nil || len(raw) != 32 {
-		return ""
-	}
-	var priv [32]byte
-	copy(priv[:], raw)
-	pub, err := punch.Public(punch.DiscoPrivateFor(priv))
-	if err != nil {
-		return ""
-	}
-	return punch.EncodeKey(pub)
 }
 
 func (t *TUN) punchAllowsIngress(src [4]byte) bool {

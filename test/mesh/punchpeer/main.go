@@ -1,7 +1,9 @@
 // Command punchpeer is the mesh e2e client. It brings up userspace WireGuard
 // the same way meshpeer does, then runs the punch engine on that socket.
-// The allow file is the firewall announcement: empty denies, IP:port stays
-// on the servers, and a bare IP permits a direct path.
+// The allow file is this client's firewall: empty denies, IP:port stays on
+// the servers, and a bare IP permits a direct path. A peer is introduced
+// through the tunnel when traffic is sent to its tunnel IP. The controller
+// is used only to learn the wg-server disco key for the reflex echo.
 package main
 
 import (
@@ -24,7 +26,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/tunnels-is/tunnels/punch"
-	"github.com/tunnels-is/tunnels/types"
 	"golang.org/x/crypto/curve25519"
 	"golang.zx2c4.com/wireguard/conn"
 	"golang.zx2c4.com/wireguard/device"
@@ -75,13 +76,21 @@ func main() {
 		fatalf("gateway: %v", err)
 	}
 
-	tunDev, err := tun.CreateTUN(*iface, *mtu)
+	rawTUN, err := tun.CreateTUN(*iface, *mtu)
 	if err != nil {
 		fatalf("CreateTUN: %v", err)
 	}
 	logger := device.NewLogger(device.LogLevelError, "["+*iface+"] ")
 	pb := newPunchBind(conn.NewDefaultBind())
-	dev := device.NewDevice(tunDev, pb, logger)
+	disco := punch.DiscoPrivateFor(wgPriv)
+	eng := punch.NewEngine(self, disco, wgPub, ip)
+	it, err := wrapIntroTUN(rawTUN, func(dst netip.Addr) {
+		eng.NoteTraffic(dst)
+	})
+	if err != nil {
+		fatalf("intro tun: %v", err)
+	}
+	dev := device.NewDevice(it, pb, logger)
 	privHex := hex.EncodeToString(wgPriv[:])
 	serverHex, err := b64ToHex(*serverPubB64)
 	if err != nil {
@@ -108,8 +117,6 @@ func main() {
 	}
 	fmt.Printf("punchpeer up: iface=%s ip=%s endpoint=%s allowed=%s\n", *iface, *wgIP, *endpoint, *allowed)
 
-	disco := punch.DiscoPrivateFor(wgPriv)
-	eng := punch.NewEngine(self, disco, wgPub, ip)
 	api := &api{
 		base:   strings.TrimRight(*controller, "/"),
 		token:  *token,
@@ -123,38 +130,24 @@ func main() {
 			},
 		},
 	}
-	go func() {
-		pub, err := punch.Public(disco)
-		if err != nil {
-			fmt.Printf("disco public: %v\n", err)
-			return
-		}
-		for {
-			if err := api.registerDisco(*deviceID, punch.EncodeKey(pub)); err != nil {
-				fmt.Printf("register disco: %v\n", err)
-				time.Sleep(time.Second)
-				continue
-			}
-			fmt.Println("disco registered")
-			return
-		}
-	}()
-
 	inst := map[uuid.UUID]installed{}
 	var instMu sync.Mutex
 	tick := time.NewTicker(time.Second)
 	defer tick.Stop()
 	var lastAllow string
 	var haveAllow bool
-	var lastDirectory time.Time
+	var ready bool
+	var complained bool
 	for {
 		select {
+		case payload := <-it.intros:
+			apply(dev, it, &instMu, inst, eng.OnPacket(netip.AddrPort{}, payload, time.Now()), *endpoint, pb)
 		case pkt := <-pb.in:
 			from, err := netip.ParseAddrPort(pkt.from)
 			if err != nil {
 				continue
 			}
-			apply(dev, &instMu, inst, eng.OnPacket(from, pkt.data, time.Now()), *endpoint, pb)
+			apply(dev, it, &instMu, inst, eng.OnPacket(from, pkt.data, time.Now()), *endpoint, pb)
 		case <-tick.C:
 			allowAll, entries, text := readAllow(*allowPath)
 			if !haveAllow || text != lastAllow {
@@ -169,25 +162,24 @@ func main() {
 				_ = announce(*wgIP, gw, allowAll, entries)
 			}
 			fwOff := false
-			if cfg, err := api.wgConfig(); err == nil && cfg.DiscoKey != "" {
+			cfg, err := api.wgConfig()
+			if err != nil {
+				if !complained {
+					fmt.Printf("wg config: %v\n", err)
+					complained = true
+				}
+			} else if cfg.DiscoKey != "" {
 				if key, err := punch.DecodeKey(cfg.DiscoKey); err == nil {
 					eng.SetServerDisco(key)
+					if !ready {
+						fmt.Println("punch ready")
+						ready = true
+					}
 				}
 				fwOff = !cfg.EnableFirewall
 			}
-			apply(dev, &instMu, inst, eng.SetLocalPolicy(fwOff, allowAll, entries), *endpoint, pb)
-			if lastDirectory.IsZero() || time.Since(lastDirectory) >= 2*time.Second {
-				lastDirectory = time.Now()
-				if peers, err := api.peers(*deviceID); err != nil {
-					fmt.Printf("peers: %v\n", err)
-				} else {
-					apply(dev, &instMu, inst, eng.SetPeers(peers), *endpoint, pb)
-					for _, p := range peers {
-						eng.NoteTraffic(p.WGIP)
-					}
-				}
-			}
-			apply(dev, &instMu, inst, eng.Poll(time.Now()), *endpoint, pb)
+			apply(dev, it, &instMu, inst, eng.SetLocalPolicy(fwOff, allowAll, entries), *endpoint, pb)
+			apply(dev, it, &instMu, inst, eng.Poll(time.Now()), *endpoint, pb)
 		}
 	}
 }
@@ -197,8 +189,20 @@ type installed struct {
 	ip    netip.Addr
 }
 
-func apply(dev *device.Device, mu *sync.Mutex, inst map[uuid.UUID]installed, res punch.Result, server string, pb *punchBind) {
+func apply(dev *device.Device, it *introTUN, mu *sync.Mutex, inst map[uuid.UUID]installed, res punch.Result, server string, pb *punchBind) {
 	for _, d := range res.Sends {
+		if d.Tunnel {
+			msg, err := punch.ParseIntro(d.Data)
+			if err != nil || !msg.WGIP.Is4() || !d.To.Addr().Is4() {
+				continue
+			}
+			pkt, err := punch.WrapIPv4UDP(msg.WGIP, d.To.Addr(), punch.IntroPort, punch.IntroPort, d.Data)
+			if err != nil {
+				continue
+			}
+			it.queue(pkt)
+			continue
+		}
 		to := d.To.String()
 		if d.Server {
 			to = server
@@ -296,10 +300,6 @@ type api struct {
 	http                          *http.Client
 }
 
-func (a *api) registerDisco(deviceID, disco string) error {
-	return a.post("/client/device/disco", map[string]string{"DeviceID": deviceID, "DiscoKey": disco})
-}
-
 func (a *api) wgConfig() (*wgServer, error) {
 	u := a.base + "/client/wg/config?serverID=" + neturl.QueryEscape(a.server) + "&pubKey=" + neturl.QueryEscape(a.pub)
 	body, code, err := a.do("GET", u, nil)
@@ -319,54 +319,6 @@ func (a *api) wgConfig() (*wgServer, error) {
 type wgServer struct {
 	EnableFirewall bool   `json:"EnableFirewall"`
 	DiscoKey       string `json:"DiscoKey"`
-}
-
-func (a *api) peers(deviceID string) ([]punch.Peer, error) {
-	body, code, err := a.do("GET", a.base+"/client/p2p/peers?deviceID="+neturl.QueryEscape(deviceID), nil)
-	if err != nil {
-		return nil, err
-	}
-	if code != 200 {
-		return nil, fmt.Errorf("peers %d: %s", code, body)
-	}
-	var resp struct {
-		Peers []types.P2PPeer `json:"Peers"`
-	}
-	if err := json.Unmarshal(body, &resp); err != nil {
-		return nil, err
-	}
-	out := make([]punch.Peer, 0, len(resp.Peers))
-	for _, p := range resp.Peers {
-		id, err := uuid.Parse(p.DeviceID)
-		if err != nil {
-			continue
-		}
-		disco, err := punch.DecodeKey(p.DiscoKey)
-		if err != nil {
-			continue
-		}
-		wg, err := punch.DecodeKey(p.WireGuardKey)
-		if err != nil {
-			continue
-		}
-		ip, err := netip.ParseAddr(p.WireGuardIP)
-		if err != nil || !ip.Is4() {
-			continue
-		}
-		out = append(out, punch.Peer{DeviceID: id, DiscoPub: disco, WGPub: wg, WGIP: ip})
-	}
-	return out, nil
-}
-
-func (a *api) post(path string, body any) error {
-	b, code, err := a.do("POST", a.base+path, body)
-	if err != nil {
-		return err
-	}
-	if code != 200 {
-		return fmt.Errorf("%s %d: %s", path, code, b)
-	}
-	return nil
 }
 
 func (a *api) do(method, url string, body any) ([]byte, int, error) {

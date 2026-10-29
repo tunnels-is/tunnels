@@ -23,7 +23,14 @@ const (
 	// The wg-server answers with TypeMTUAck only when the probe arrived whole.
 	TypeMTUProbe byte = 8
 	TypeMTUAck   byte = 9
+	// TypeIntro is the first contact. It travels inside the existing tunnel,
+	// addressed to the other client's tunnel IP, and carries this device's
+	// public keys. It is not sealed: the sender does not know the peer yet.
+	TypeIntro byte = 10
 )
+
+// IntroPort is the UDP port of an introduction inside the tunnel.
+const IntroPort uint16 = 47318
 
 var magic = [4]byte{'T', 'N', 'L', 'P'}
 
@@ -109,9 +116,117 @@ func getAddrPort(b []byte) netip.AddrPort {
 	return netip.AddrPortFrom(addr, binary.BigEndian.Uint16(b[addrLen:addrLen+2]))
 }
 
+// Intro is one device's public identity and the UDP addresses it can be reached on.
+type Intro struct {
+	Src        uuid.UUID
+	DiscoPub   [32]byte
+	WGPub      [32]byte
+	WGIP       netip.Addr
+	Candidates []netip.AddrPort
+}
+
+// BuildIntro encodes an introduction. The keys are public; the hub can see them.
+func BuildIntro(src uuid.UUID, discoPub, wgPub [32]byte, wgIP netip.Addr, cands []netip.AddrPort) ([]byte, error) {
+	if !wgIP.IsValid() || len(cands) > 16 {
+		return nil, fmt.Errorf("bad intro")
+	}
+	body := make([]byte, idLen+keyLen+keyLen+addrLen+1+(addrLen+2)*len(cands))
+	putID(body, src)
+	copy(body[idLen:], discoPub[:])
+	copy(body[idLen+keyLen:], wgPub[:])
+	putAddr(body[idLen+keyLen*2:], wgIP)
+	off := idLen + keyLen*2 + addrLen
+	body[off] = byte(len(cands))
+	off++
+	for _, c := range cands {
+		putAddrPort(body[off:], c)
+		off += addrLen + 2
+	}
+	return frame(TypeIntro, body), nil
+}
+
+// ParseIntro reads an introduction.
+func ParseIntro(pkt []byte) (Intro, error) {
+	var in Intro
+	body, err := bodyOf(pkt, TypeIntro)
+	if err != nil {
+		return in, err
+	}
+	if len(body) < idLen+keyLen*2+addrLen+1 {
+		return in, fmt.Errorf("short intro")
+	}
+	in.Src = getID(body)
+	copy(in.DiscoPub[:], body[idLen:idLen+keyLen])
+	copy(in.WGPub[:], body[idLen+keyLen:idLen+keyLen*2])
+	in.WGIP = getAddr(body[idLen+keyLen*2:])
+	n := int(body[idLen+keyLen*2+addrLen])
+	off := idLen + keyLen*2 + addrLen + 1
+	if n > 16 || len(body) != off+(addrLen+2)*n || !in.WGIP.IsValid() {
+		return Intro{}, fmt.Errorf("bad intro")
+	}
+	for i := 0; i < n; i++ {
+		in.Candidates = append(in.Candidates, getAddrPort(body[off:]))
+		off += addrLen + 2
+	}
+	return in, nil
+}
+
+// WrapIPv4UDP builds an IPv4 UDP datagram. The UDP checksum is left at zero.
+func WrapIPv4UDP(src, dst netip.Addr, srcPort, dstPort uint16, payload []byte) ([]byte, error) {
+	if !src.Is4() || !dst.Is4() {
+		return nil, fmt.Errorf("ipv4 only")
+	}
+	pkt := make([]byte, 20+8+len(payload))
+	pkt[0] = 0x45
+	binary.BigEndian.PutUint16(pkt[2:4], uint16(len(pkt)))
+	pkt[8] = 64
+	pkt[9] = 17
+	src4 := src.As4()
+	dst4 := dst.As4()
+	copy(pkt[12:16], src4[:])
+	copy(pkt[16:20], dst4[:])
+	checksumIPv4(pkt[:20])
+	binary.BigEndian.PutUint16(pkt[20:22], srcPort)
+	binary.BigEndian.PutUint16(pkt[22:24], dstPort)
+	binary.BigEndian.PutUint16(pkt[24:26], uint16(8+len(payload)))
+	copy(pkt[28:], payload)
+	return pkt, nil
+}
+
+// UnwrapIPv4UDP returns the payload of an IPv4 UDP datagram addressed to dstPort.
+func UnwrapIPv4UDP(pkt []byte, dstPort uint16) (src netip.Addr, srcPort uint16, payload []byte, ok bool) {
+	if len(pkt) < 28 || pkt[0]>>4 != 4 {
+		return netip.Addr{}, 0, nil, false
+	}
+	ihl := int(pkt[0]&0x0f) * 4
+	if ihl < 20 || pkt[9] != 17 || len(pkt) < ihl+8 {
+		return netip.Addr{}, 0, nil, false
+	}
+	if binary.BigEndian.Uint16(pkt[ihl+2:ihl+4]) != dstPort {
+		return netip.Addr{}, 0, nil, false
+	}
+	src = netip.AddrFrom4([4]byte{pkt[12], pkt[13], pkt[14], pkt[15]})
+	srcPort = binary.BigEndian.Uint16(pkt[ihl : ihl+2])
+	return src, srcPort, pkt[ihl+8:], true
+}
+
+func checksumIPv4(hdr []byte) {
+	hdr[10] = 0
+	hdr[11] = 0
+	var csum uint32
+	for i := 0; i+1 < len(hdr); i += 2 {
+		csum += uint32(hdr[i])<<8 | uint32(hdr[i+1])
+	}
+	for csum > 0xFFFF {
+		csum = (csum >> 16) + (csum & 0xFFFF)
+	}
+	hdr[10] = byte(^csum >> 8)
+	hdr[11] = byte(^csum & 0xFF)
+}
+
 // BuildReflexReq seals a timestamp for the wg-server's disco key.
 // The device id and disco public key travel in the clear so the server can
-// select the right key before it opens the box.
+// open the box. The server does not store them.
 func BuildReflexReq(device uuid.UUID, discoPriv, serverPub [32]byte, now time.Time) ([]byte, error) {
 	pub, err := Public(discoPriv)
 	if err != nil {
@@ -131,8 +246,7 @@ func BuildReflexReq(device uuid.UUID, discoPriv, serverPub [32]byte, now time.Ti
 }
 
 // OpenReflexReq opens a reflex request with the server's disco private key.
-// The caller must check that the returned public key is the one registered
-// for the device.
+// The returned public key is the one that sealed the packet. Nothing is stored.
 func OpenReflexReq(serverPriv [32]byte, pkt []byte, now time.Time) (uuid.UUID, [32]byte, error) {
 	var pub [32]byte
 	body, err := bodyOf(pkt, TypeReflexReq)

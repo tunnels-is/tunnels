@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -37,6 +38,10 @@ type processingTUN struct {
 	free         [][]byte
 	flushing     bool
 	armed        bool
+
+	readOnce sync.Once
+	devCh    chan []byte
+	devErr   chan error
 }
 
 func newProcessingTUN(d tun.Device, t *TUN) *processingTUN {
@@ -55,16 +60,36 @@ func (p *processingTUN) tun() *TUN {
 
 func (p *processingTUN) Read(bufs [][]byte, sizes []int, offset int) (int, error) {
 	defer RecoverAndLog()
+	t := p.tun()
+	// Punch introductions have to reach WireGuard while this read is idle.
+	// Polling the TUN fd and then calling Device.Read loses that wake: the
+	// runtime poller and a second poll share the fd, and a blocking Read
+	// ignores the poke until the next real packet. A background reader owns
+	// Device.Read; this side waits on the poke channel.
+	if t != nil && t.punchPoke != nil {
+		return p.readWithoutFile(bufs, sizes, offset)
+	}
+	if t != nil {
+		if n := t.drainInject(bufs, sizes, offset); n > 0 {
+			return n, nil
+		}
+	}
+	return p.readDevice(bufs, sizes, offset)
+}
+
+func (p *processingTUN) readDevice(bufs [][]byte, sizes []int, offset int) (int, error) {
 	n, err := p.Device.Read(bufs, sizes, offset)
 	if err != nil || n == 0 {
 		return n, err
 	}
+	return p.filterEgress(bufs, sizes, offset, n)
+}
 
+func (p *processingTUN) filterEgress(bufs [][]byte, sizes []int, offset, n int) (int, error) {
 	t := p.tun()
 	if t == nil {
 		return 0, nil
 	}
-
 	p.egressMu.Lock()
 	defer p.egressMu.Unlock()
 
@@ -88,8 +113,86 @@ func (p *processingTUN) Read(bufs [][]byte, sizes []int, offset int) (int, error
 		}
 		t.egressBytes.Add(total)
 	}
-
 	return kept, nil
+}
+
+func (p *processingTUN) ensureDevReader() {
+	p.readOnce.Do(func() {
+		p.devCh = make(chan []byte, 256)
+		p.devErr = make(chan error, 1)
+		go func() {
+			batch := p.Device.BatchSize()
+			if batch < 1 {
+				batch = 1
+			}
+			bufs := make([][]byte, batch)
+			sizes := make([]int, batch)
+			for i := range bufs {
+				bufs[i] = make([]byte, 65535)
+			}
+			for {
+				n, err := p.Device.Read(bufs, sizes, 0)
+				for i := 0; i < n; i++ {
+					if sizes[i] < 1 {
+						continue
+					}
+					p.devCh <- append([]byte(nil), bufs[i][:sizes[i]]...)
+				}
+				if err != nil {
+					if errors.Is(err, tun.ErrTooManySegments) {
+						continue
+					}
+					select {
+					case p.devErr <- err:
+					default:
+					}
+					return
+				}
+			}
+		}()
+	})
+}
+
+func (p *processingTUN) readWithoutFile(bufs [][]byte, sizes []int, offset int) (int, error) {
+	p.ensureDevReader()
+	t := p.tun()
+	for {
+		if t != nil {
+			if n := t.drainInject(bufs, sizes, offset); n > 0 {
+				return n, nil
+			}
+		}
+		var poke <-chan struct{}
+		if t != nil {
+			poke = t.punchPoke
+		}
+		select {
+		case pkt := <-p.devCh:
+			if offset+len(pkt) > len(bufs[0]) {
+				continue
+			}
+			copy(bufs[0][offset:], pkt)
+			sizes[0] = len(pkt)
+			n := 1
+			for n < len(bufs) {
+				select {
+				case more := <-p.devCh:
+					if offset+len(more) > len(bufs[n]) {
+						continue
+					}
+					copy(bufs[n][offset:], more)
+					sizes[n] = len(more)
+					n++
+				default:
+					return p.filterEgress(bufs, sizes, offset, n)
+				}
+			}
+			return p.filterEgress(bufs, sizes, offset, n)
+		case err := <-p.devErr:
+			return 0, err
+		case <-poke:
+		}
+	}
 }
 
 func (p *processingTUN) Write(bufs [][]byte, offset int) (int, error) {
