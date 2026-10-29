@@ -42,7 +42,7 @@ importers:
         version: 18.0.6
       '@vitejs/plugin-react':
         specifier: 4.7.0
-        version: 4.7.0(vite@6.4.3(jiti@2.6.1)(lightningcss@1.31.1))
+        version: 4.7.0(vite@6.4.5(jiti@2.6.1)(lightningcss@1.31.1))
       postcss:
         specifier: 8.5.30
         version: 8.5.30
@@ -50,8 +50,8 @@ importers:
         specifier: 4.1.17
         version: 4.1.17
       vite:
-        specifier: 6.4.3
-        version: 6.4.3(jiti@2.6.1)(lightningcss@1.31.1)
+        specifier: 6.4.5
+        version: 6.4.5(jiti@2.6.1)(lightningcss@1.31.1)
 
 packages:
 
@@ -870,8 +870,8 @@ packages:
     peerDependencies:
       browserslist: '>= 4.21.0'
 
-  vite@6.4.3:
-    resolution: {integrity: sha512-NTKlcQjlAK7MlQoyb6LgaqHc8sso/pVyUJYWMws3jg21uTJw/LddqIFPcPqP6PzpgbIcZyKI85sFE4HBrQDA8A==}
+  vite@6.4.5:
+    resolution: {integrity: sha512-4enwjFfi4IwtEh0w+jPzpLVOFQiPHmmzPxcHXQOyEur47o6u0jE573DmGpjA+7irXoMLYRZD5ZaFUEneS3abPg==}
     engines: {node: ^18.0.0 || ^20.0.0 || >=22.0.0}
     hasBin: true
     peerDependencies:
@@ -1334,7 +1334,7 @@ snapshots:
 
   '@types/scheduler@0.26.0': {}
 
-  '@vitejs/plugin-react@4.7.0(vite@6.4.3(jiti@2.6.1)(lightningcss@1.31.1))':
+  '@vitejs/plugin-react@4.7.0(vite@6.4.5(jiti@2.6.1)(lightningcss@1.31.1))':
     dependencies:
       '@babel/core': 7.29.7
       '@babel/plugin-transform-react-jsx-self': 7.29.7(@babel/core@7.29.7)
@@ -1342,7 +1342,7 @@ snapshots:
       '@rolldown/pluginutils': 1.0.0-beta.27
       '@types/babel__core': 7.20.5
       react-refresh: 0.17.0
-      vite: 6.4.3(jiti@2.6.1)(lightningcss@1.31.1)
+      vite: 6.4.5(jiti@2.6.1)(lightningcss@1.31.1)
     transitivePeerDependencies:
       - supports-color
 
@@ -1608,7 +1608,7 @@ snapshots:
       escalade: 3.2.0
       picocolors: 1.1.1
 
-  vite@6.4.3(jiti@2.6.1)(lightningcss@1.31.1):
+  vite@6.4.5(jiti@2.6.1)(lightningcss@1.31.1):
     dependencies:
       esbuild: 0.25.12
       fdir: 6.5.0(picomatch@4.0.5)
