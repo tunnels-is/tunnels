@@ -4,12 +4,26 @@ import (
 	"bytes"
 	"encoding/json"
 	"net"
+	"strings"
 	"sync"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
 
+const (
+	// killSwitchMetric is the sink default. A lower metric wins, so the
+	// tunnel default (metric 0 or 1) stays ahead of it and a physical
+	// default is moved above it.
+	killSwitchMetric = 50
+	// killSwitchDemotedMetric is where a physical default sits while the
+	// switch is on. It is worse than killSwitchMetric.
+	killSwitchDemotedMetric = 100
+)
+
 var killSwitchMu sync.Mutex
+
+var killSwitchWatchOnce sync.Once
 
 // applyConfiguredKillSwitch installs or removes IPv4/IPv6 blackhole
 // defaults to match CONFIG. Routes stay until the matching setting is
@@ -23,6 +37,9 @@ func applyConfiguredKillSwitch() error {
 }
 
 func syncKillSwitch(want4, want6 bool) error {
+	if want4 || want6 {
+		startKillSwitchWatcher()
+	}
 	killSwitchMu.Lock()
 	defer killSwitchMu.Unlock()
 
@@ -53,6 +70,163 @@ func syncKillSwitch(want4, want6 bool) error {
 	// stale default after demoteLowMetricDefaults.
 	refreshEndpointProtect()
 	return first
+}
+
+func startKillSwitchWatcher() {
+	killSwitchWatchOnce.Do(func() {
+		go killSwitchWatchLoop()
+	})
+}
+
+func killSwitchWatchLoop() {
+	defer RecoverAndLog()
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+	var stop <-chan struct{}
+	if CancelContext != nil {
+		stop = CancelContext.Done()
+	} else {
+		stop = make(chan struct{})
+	}
+	for {
+		select {
+		case <-stop:
+			return
+		case <-ticker.C:
+			cfg := CONFIG.Load()
+			if cfg == nil {
+				continue
+			}
+			_ = syncKillSwitch(cfg.KillSwitchIPv4, cfg.KillSwitchIPv6)
+		}
+	}
+}
+
+// demotePhysicalDefault reports whether a default route should be moved
+// above the kill-switch sink. Narrower prefixes never reach this check.
+// Tunnel defaults, the protect table, and the sink itself stay put.
+func demotePhysicalDefault(isDefault, blackhole, tunnelLink, tunnelGateway, protectTable bool, priority int) bool {
+	if !isDefault || blackhole || tunnelLink || tunnelGateway || protectTable {
+		return false
+	}
+	return priority < killSwitchMetric
+}
+
+type defaultRouteChoice int
+
+const (
+	defaultChoiceNone defaultRouteChoice = iota
+	defaultChoiceBlackhole
+	defaultChoiceTunnel
+	defaultChoicePhysical
+)
+
+// classifyDefaultRoute reads `route -n get default` output. A physical
+// default is the only one the kill switch removes. A tunnel default and a
+// blackhole stay.
+func classifyDefaultRoute(out string, tunnels, gateways map[string]struct{}) defaultRouteChoice {
+	if routeGetOutputHasBlackhole(out) {
+		return defaultChoiceBlackhole
+	}
+	iface := routeGetValue(out, "interface:")
+	gw := routeGetGateway(out)
+	if iface == "" && gw == nil {
+		return defaultChoiceNone
+	}
+	if _, ok := tunnels[iface]; ok {
+		return defaultChoiceTunnel
+	}
+	if gw != nil {
+		if _, ok := gateways[gw.String()]; ok {
+			return defaultChoiceTunnel
+		}
+	}
+	if gw == nil {
+		return defaultChoiceNone
+	}
+	return defaultChoicePhysical
+}
+
+func routeGetOutputHasBlackhole(out string) bool {
+	for _, line := range strings.Split(out, "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "flags:") && strings.Contains(line, "BLACKHOLE") {
+			return true
+		}
+	}
+	return false
+}
+
+func routeGetValue(out, key string) string {
+	for _, line := range strings.Split(out, "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, key) {
+			continue
+		}
+		return strings.TrimSpace(strings.TrimPrefix(line, key))
+	}
+	return ""
+}
+
+// netstatHasBlackholeDefault reports a blackhole default in netstat -rn
+// output. The B flag is RTF_BLACKHOLE.
+func netstatHasBlackholeDefault(out string) bool {
+	for _, line := range strings.Split(out, "\n") {
+		fields := strings.Fields(line)
+		if len(fields) < 3 {
+			continue
+		}
+		switch fields[0] {
+		case "default", "0.0.0.0/0", "::/0", "0.0.0.0", "::":
+		default:
+			continue
+		}
+		for _, field := range fields[1:] {
+			if routeFlagField(field) && strings.Contains(field, "B") {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func routeFlagField(s string) bool {
+	if len(s) < 2 {
+		return false
+	}
+	for _, c := range s {
+		if (c < 'A' || c > 'Z') && (c < 'a' || c > 'z') {
+			return false
+		}
+	}
+	return true
+}
+
+func routeGetGateway(out string) net.IP {
+	raw := routeGetValue(out, "gateway:")
+	if raw == "" {
+		return nil
+	}
+	token := strings.Fields(raw)[0]
+	token, _, _ = strings.Cut(token, "%")
+	ip := net.ParseIP(token)
+	if ip == nil {
+		return nil
+	}
+	if v4 := ip.To4(); v4 != nil {
+		return append(net.IP(nil), v4...)
+	}
+	return append(net.IP(nil), ip...)
+}
+
+// raisePhysicalDefault reports whether a Windows default route should be
+// moved above the loopback sink. Prefix length 0 is the default. Loopback
+// and tunnel defaults stay.
+func raisePhysicalDefault(prefixLen, metric int, loopback, tunnel bool) bool {
+	if prefixLen != 0 || loopback || tunnel {
+		return false
+	}
+	return metric < killSwitchMetric
 }
 
 func pinControlPlaneIPv4Routes() {
