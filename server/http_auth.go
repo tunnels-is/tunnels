@@ -89,8 +89,10 @@ func handleAdminLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// A valid password for a non-admin gets the same 401 as a wrong password.
+	// There is no manager role on this server.
 	if !user.IsAdmin {
-		sendError(w, 401, "Admin or Manager access required")
+		sendError(w, 401, "Invalid login credentials")
 		return
 	}
 
