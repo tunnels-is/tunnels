@@ -87,6 +87,12 @@ func backfillUserIndexes(tx *gobolt.Tx) error {
 	emailIdx := tx.Bucket([]byte(bucketUsersEmailIndex))
 	apikeyIdx := tx.Bucket([]byte(bucketUsersAPIKeyIndex))
 	uc := users.Cursor()
+	type hashedUser struct {
+		id     []byte
+		user   *User
+		oldKey string
+	}
+	var rewritten []hashedUser
 	for k, v := uc.First(); k != nil; k, v = uc.Next() {
 		user := new(User)
 		if err := bboltUnmarshal(v, user); err != nil {
@@ -97,13 +103,38 @@ func backfillUserIndexes(tx *gobolt.Tx) error {
 				return err
 			}
 		}
+		oldKey, changed := hashUserSecrets(user)
+		if changed {
+			id := append([]byte(nil), k...)
+			rewritten = append(rewritten, hashedUser{id: id, user: user, oldKey: oldKey})
+			continue
+		}
 		if user.APIKey != "" {
 			if err := apikeyIdx.Put([]byte(user.APIKey), k); err != nil {
 				return err
 			}
 		}
 	}
-	return nil
+	for _, item := range rewritten {
+		data, err := bboltMarshal(item.user)
+		if err != nil {
+			return err
+		}
+		if err := users.Put(item.id, data); err != nil {
+			return err
+		}
+		if item.oldKey != "" {
+			if err := apikeyIdx.Delete([]byte(item.oldKey)); err != nil {
+				return err
+			}
+		}
+		if item.user.APIKey != "" {
+			if err := apikeyIdx.Put([]byte(item.user.APIKey), item.id); err != nil {
+				return err
+			}
+		}
+	}
+	return sweepPlainAPIKeyIndex(tx, apikeyIdx, bucketUsers, func(u *User) string { return u.APIKey })
 }
 
 func backfillDeviceIndexes(tx *gobolt.Tx) error {
@@ -130,15 +161,76 @@ func backfillServerIndexes(tx *gobolt.Tx) error {
 	servers := tx.Bucket([]byte(bucketServers))
 	srvApikeyIdx := tx.Bucket([]byte(bucketServersAPIKeyIndex))
 	sc := servers.Cursor()
+	type hashedServer struct {
+		id     []byte
+		server *types.Server
+		oldKey string
+	}
+	var rewritten []hashedServer
 	for k, v := sc.First(); k != nil; k, v = sc.Next() {
 		server := new(types.Server)
 		if err := bboltUnmarshal(v, server); err != nil {
+			continue
+		}
+		if server.APIKey != "" && !storedSecretIsHash(server.APIKey) {
+			id := append([]byte(nil), k...)
+			rewritten = append(rewritten, hashedServer{id: id, server: server, oldKey: server.APIKey})
 			continue
 		}
 		if server.APIKey != "" {
 			if err := srvApikeyIdx.Put([]byte(server.APIKey), k); err != nil {
 				return err
 			}
+		}
+	}
+	for _, item := range rewritten {
+		item.server.APIKey = hashSecret(item.oldKey)
+		data, err := bboltMarshal(item.server)
+		if err != nil {
+			return err
+		}
+		if err := servers.Put(item.id, data); err != nil {
+			return err
+		}
+		if err := srvApikeyIdx.Delete([]byte(item.oldKey)); err != nil {
+			return err
+		}
+		if err := srvApikeyIdx.Put([]byte(item.server.APIKey), item.id); err != nil {
+			return err
+		}
+	}
+	return sweepPlainAPIKeyIndex(tx, srvApikeyIdx, bucketServers, func(s *types.Server) string { return s.APIKey })
+}
+
+// sweepPlainAPIKeyIndex drops an index entry whose key is still the raw secret
+// after the record itself stores the hash.
+func sweepPlainAPIKeyIndex[T any](tx *gobolt.Tx, idx *gobolt.Bucket, recordBucket string, apiKey func(*T) string) error {
+	if idx == nil {
+		return nil
+	}
+	records := tx.Bucket([]byte(recordBucket))
+	var stale [][]byte
+	c := idx.Cursor()
+	for k, v := c.First(); k != nil; k, v = c.Next() {
+		if storedSecretIsHash(string(k)) || len(v) == 0 {
+			continue
+		}
+		raw := records.Get(v)
+		if raw == nil {
+			continue
+		}
+		item := new(T)
+		if err := bboltUnmarshal(raw, item); err != nil {
+			continue
+		}
+		stored := apiKey(item)
+		if stored != "" && stored != string(k) && secretMatches(stored, string(k)) {
+			stale = append(stale, append([]byte(nil), k...))
+		}
+	}
+	for _, k := range stale {
+		if err := idx.Delete(k); err != nil {
+			return err
 		}
 	}
 	return nil

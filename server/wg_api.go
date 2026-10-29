@@ -287,6 +287,38 @@ func wgPublicKeyBytes(key string) ([]byte, bool) {
 	return b, true
 }
 
+// canonicalWireGuardPublicKey accepts only the standard base64 spelling of
+// 32 bytes. The decoder also accepts a newline or non-zero unused bits, and
+// those spellings are rejected here.
+func canonicalWireGuardPublicKey(key string) (string, error) {
+	key = strings.TrimSpace(key)
+	if key == "" {
+		return "", fmt.Errorf("WireGuard key required")
+	}
+	raw, err := base64.StdEncoding.DecodeString(key)
+	if err != nil || len(raw) != 32 {
+		return "", fmt.Errorf("WireGuard key must be 32-byte base64")
+	}
+	canon := base64.StdEncoding.EncodeToString(raw)
+	if canon != key {
+		return "", fmt.Errorf("WireGuard key must be canonical base64")
+	}
+	return canon, nil
+}
+
+// acceptDeviceWireGuardKey requires a canonical device key that is not a
+// server public key.
+func acceptDeviceWireGuardKey(key string) (string, error) {
+	canon, err := canonicalWireGuardPublicKey(key)
+	if err != nil {
+		return "", err
+	}
+	if err := rejectServerWireGuardKey(canon); err != nil {
+		return "", err
+	}
+	return canon, nil
+}
+
 func rejectServerWireGuardKey(key string) error {
 	if strings.TrimSpace(key) == "" {
 		return fmt.Errorf("WireGuard key required")

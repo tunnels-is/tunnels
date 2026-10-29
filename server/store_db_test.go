@@ -51,6 +51,12 @@ func TestCreateUser(t *testing.T) {
 	if found == nil || found.Email != "test@example.com" {
 		t.Fatal("user not found by ID or email mismatch")
 	}
+	if u.APIKey != "apikey123" {
+		t.Fatalf("createUser changed the caller's key: %q", u.APIKey)
+	}
+	if !storedSecretIsHash(found.APIKey) || !secretMatches(found.APIKey, "apikey123") {
+		t.Fatalf("stored API key = %q", found.APIKey)
+	}
 
 	found, err = findUserByEmail("test@example.com")
 	if err != nil {
@@ -61,7 +67,7 @@ func TestCreateUser(t *testing.T) {
 	}
 
 	if err := db.View(func(tx *gobolt.Tx) error {
-		uid := tx.Bucket([]byte(bucketUsersAPIKeyIndex)).Get([]byte("apikey123"))
+		uid := tx.Bucket([]byte(bucketUsersAPIKeyIndex)).Get([]byte(hashSecret("apikey123")))
 		if uid == nil {
 			t.Fatal("apikey index missing")
 		}
@@ -211,15 +217,20 @@ func TestUpdateUser(t *testing.T) {
 	}
 
 	if err := db.View(func(tx *gobolt.Tx) error {
-		if tx.Bucket([]byte(bucketUsersAPIKeyIndex)).Get([]byte("oldkey")) != nil {
+		idx := tx.Bucket([]byte(bucketUsersAPIKeyIndex))
+		if idx.Get([]byte("oldkey")) != nil || idx.Get([]byte(hashSecret("oldkey"))) != nil {
 			t.Fatal("old key should not resolve")
 		}
-		if tx.Bucket([]byte(bucketUsersAPIKeyIndex)).Get([]byte("newkey")) == nil {
+		if idx.Get([]byte(hashSecret("newkey"))) == nil {
 			t.Fatal("new key should resolve")
 		}
 		return nil
 	}); err != nil {
 		t.Fatal(err)
+	}
+	found, _ := findUserByID(u.ID)
+	if found == nil || !storedSecretIsHash(found.APIKey) || !secretMatches(found.APIKey, "newkey") {
+		t.Fatalf("stored API key = %+v", found)
 	}
 }
 
@@ -230,13 +241,8 @@ func TestUpdateUser_ClearAPIKey(t *testing.T) {
 
 	updateUser(&userUpdateRequest{UID: u.ID, APIKey: ""})
 
-	if err := db.View(func(tx *gobolt.Tx) error {
-		if tx.Bucket([]byte(bucketUsersAPIKeyIndex)).Get([]byte("mykey")) != nil {
-			t.Fatal("cleared key should not resolve")
-		}
-		return nil
-	}); err != nil {
-		t.Fatal(err)
+	if apiKeyIndexHas(t, "mykey") {
+		t.Fatal("cleared key should not resolve")
 	}
 }
 
@@ -389,7 +395,8 @@ func apiKeyIndexHas(t *testing.T, key string) bool {
 	t.Helper()
 	var found bool
 	if err := db.View(func(tx *gobolt.Tx) error {
-		found = tx.Bucket([]byte(bucketUsersAPIKeyIndex)).Get([]byte(key)) != nil
+		idx := tx.Bucket([]byte(bucketUsersAPIKeyIndex))
+		found = idx.Get([]byte(key)) != nil || idx.Get([]byte(hashSecret(key))) != nil
 		return nil
 	}); err != nil {
 		t.Fatal(err)
@@ -411,7 +418,7 @@ func TestLogoutAll_ClearsAPIKey(t *testing.T) {
 		t.Fatal(err)
 	}
 	found, _ := findUserByID(u.ID)
-	if found.APIKey != "logout-api-key" || len(found.Tokens) != 1 {
+	if !secretMatches(found.APIKey, "logout-api-key") || len(found.Tokens) != 1 {
 		t.Fatalf("single logout changed credentials: key %q tokens %+v", found.APIKey, found.Tokens)
 	}
 
@@ -471,8 +478,8 @@ func TestActivateUserKey(t *testing.T) {
 	}
 
 	found, _ := findUserByID(u.ID)
-	if found.Disabled || found.Trial {
-		t.Fatal("Disabled/Trial should be false")
+	if !found.Disabled || found.Trial {
+		t.Fatalf("Disabled=%v Trial=%v, license activation must leave Disabled set", found.Disabled, found.Trial)
 	}
 	if found.Key == nil || found.Key.Key != "LIC-KEY" {
 		t.Fatal("license key not set")
@@ -1446,7 +1453,7 @@ func TestOpenDB_BackfillIndexes(t *testing.T) {
 		t.Fatal("user email index not backfilled")
 	}
 	if err := db.View(func(tx *gobolt.Tx) error {
-		if tx.Bucket([]byte(bucketUsersAPIKeyIndex)).Get([]byte("bf-key")) == nil {
+		if tx.Bucket([]byte(bucketUsersAPIKeyIndex)).Get([]byte(hashSecret("bf-key"))) == nil {
 			t.Fatal("user apikey index not backfilled")
 		}
 		return nil

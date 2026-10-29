@@ -1,7 +1,6 @@
 package main
 
 import (
-	"crypto/subtle"
 	"errors"
 
 	"github.com/google/uuid"
@@ -83,14 +82,21 @@ func updateServer(server *types.Server) (*types.Server, error) {
 			return err
 		}
 		oldAPIKey := existing.APIKey
+		rotated := apiKeyRotated(oldAPIKey, server.APIKey)
+		newAPIKey := oldAPIKey
+		if server.APIKey == "" {
+			newAPIKey = ""
+		} else if rotated {
+			newAPIKey = storeSecret(server.APIKey)
+		}
 		existing.Tag = server.Tag
 		existing.InfraTag = server.InfraTag
 		existing.Country = server.Country
 		existing.IP = server.IP
 		existing.Port = server.Port
-		existing.APIKey = server.APIKey
+		existing.APIKey = newAPIKey
 		existing.WireGuardPort = server.WireGuardPort
-		if oldAPIKey != server.APIKey {
+		if rotated {
 			existing.WireGuardPubKey = ""
 			existing.DiscoKey = ""
 		}
@@ -104,10 +110,8 @@ func updateServer(server *types.Server) (*types.Server, error) {
 		existing.MeshGroupID = server.MeshGroupID
 		existing.WireGuardMeshPort = server.WireGuardMeshPort
 
-		if server.APIKey != "" && server.APIKey != oldAPIKey {
-			if existing := apikeyIdx.Get([]byte(server.APIKey)); existing != nil && string(existing) != id {
-				return errors.New("APIKey already in use")
-			}
+		if rotated && newAPIKey != "" && apiKeyIndexTaken(apikeyIdx, server.APIKey, id) {
+			return errors.New("APIKey already in use")
 		}
 
 		data, err := bboltMarshal(existing)
@@ -117,11 +121,11 @@ func updateServer(server *types.Server) (*types.Server, error) {
 		if err := b.Put([]byte(id), data); err != nil {
 			return err
 		}
-		if oldAPIKey != "" && oldAPIKey != server.APIKey {
+		if oldAPIKey != "" && oldAPIKey != newAPIKey {
 			_ = apikeyIdx.Delete([]byte(oldAPIKey))
 		}
-		if server.APIKey != "" {
-			if err := apikeyIdx.Put([]byte(server.APIKey), []byte(id)); err != nil {
+		if newAPIKey != "" {
+			if err := apikeyIdx.Put([]byte(newAPIKey), []byte(id)); err != nil {
 				return err
 			}
 		}
@@ -173,27 +177,50 @@ func setServerWireGuardPubKey(id uuid.UUID, pubKey string) error {
 	})
 }
 
+func apiKeyIndexTaken(idx *gobolt.Bucket, rawOrStored, exceptID string) bool {
+	if idx == nil || rawOrStored == "" {
+		return false
+	}
+	keys := []string{storeSecret(rawOrStored)}
+	if !storedSecretIsHash(rawOrStored) {
+		keys = append(keys, rawOrStored)
+	}
+	seen := make(map[string]struct{}, len(keys))
+	for _, key := range keys {
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		if existing := idx.Get([]byte(key)); existing != nil && string(existing) != exceptID {
+			return true
+		}
+	}
+	return false
+}
+
 func createServer(server *types.Server) error {
 	return db.Update(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(bucketServers))
 
 		server.WAN = nil
+		stored := *server
+		stored.APIKey = storeSecret(server.APIKey)
 		id := server.ID.String()
 		if server.APIKey != "" {
 			apikeyIdx := tx.Bucket([]byte(bucketServersAPIKeyIndex))
-			if existing := apikeyIdx.Get([]byte(server.APIKey)); existing != nil && string(existing) != id {
+			if apiKeyIndexTaken(apikeyIdx, server.APIKey, id) {
 				return errors.New("APIKey already in use")
 			}
 		}
-		data, err := bboltMarshal(server)
+		data, err := bboltMarshal(&stored)
 		if err != nil {
 			return err
 		}
 		if err := b.Put([]byte(id), data); err != nil {
 			return err
 		}
-		if server.APIKey != "" {
-			if err := tx.Bucket([]byte(bucketServersAPIKeyIndex)).Put([]byte(server.APIKey), []byte(id)); err != nil {
+		if stored.APIKey != "" {
+			if err := tx.Bucket([]byte(bucketServersAPIKeyIndex)).Put([]byte(stored.APIKey), []byte(id)); err != nil {
 				return err
 			}
 		}
@@ -202,27 +229,85 @@ func createServer(server *types.Server) error {
 }
 
 func findServerByAPIKey(apiKey string) (*types.Server, error) {
+	if apiKey == "" {
+		return nil, nil
+	}
+	found, legacy, err := lookupServerByAPIKey(apiKey)
+	if err != nil || found == nil || !legacy {
+		return found, err
+	}
+	if err := upgradeServerAPIKey(found.ID, apiKey); err != nil {
+		return nil, err
+	}
+	found.APIKey = hashSecret(apiKey)
+	return found, nil
+}
+
+func lookupServerByAPIKey(apiKey string) (*types.Server, bool, error) {
 	var found *types.Server
 	err := db.View(func(tx *gobolt.Tx) error {
-		id := tx.Bucket([]byte(bucketServersAPIKeyIndex)).Get([]byte(apiKey))
-		if id == nil {
+		idx := tx.Bucket([]byte(bucketServersAPIKeyIndex))
+		load := func(id []byte) (*types.Server, bool) {
+			if id == nil {
+				return nil, false
+			}
+			v := tx.Bucket([]byte(bucketServers)).Get(id)
+			if v == nil {
+				return nil, false
+			}
+			server := new(types.Server)
+			if err := bboltUnmarshal(v, server); err != nil {
+				return nil, false
+			}
+			if !secretMatches(server.APIKey, apiKey) {
+				return nil, false
+			}
+			return server, true
+		}
+		if server, ok := load(idx.Get([]byte(hashSecret(apiKey)))); ok {
+			found = server
 			return nil
 		}
-		v := tx.Bucket([]byte(bucketServers)).Get(id)
+		if server, ok := load(idx.Get([]byte(apiKey))); ok {
+			found = server
+			return nil
+		}
+		return nil
+	})
+	if found == nil {
+		return nil, false, err
+	}
+	return found, !storedSecretIsHash(found.APIKey), err
+}
+
+func upgradeServerAPIKey(id uuid.UUID, presented string) error {
+	return db.Update(func(tx *gobolt.Tx) error {
+		b := tx.Bucket([]byte(bucketServers))
+		key := []byte(id.String())
+		v := b.Get(key)
 		if v == nil {
 			return nil
 		}
-		server := new(types.Server)
-		if err := bboltUnmarshal(v, server); err != nil {
+		existing := new(types.Server)
+		if err := bboltUnmarshal(v, existing); err != nil {
+			return err
+		}
+		if storedSecretIsHash(existing.APIKey) || !secretMatches(existing.APIKey, presented) {
 			return nil
 		}
-		if subtle.ConstantTimeCompare([]byte(server.APIKey), []byte(apiKey)) != 1 {
-			return nil
+		old := existing.APIKey
+		existing.APIKey = hashSecret(presented)
+		data, err := bboltMarshal(existing)
+		if err != nil {
+			return err
 		}
-		found = server
-		return nil
+		if err := b.Put(key, data); err != nil {
+			return err
+		}
+		idx := tx.Bucket([]byte(bucketServersAPIKeyIndex))
+		_ = idx.Delete([]byte(old))
+		return idx.Put([]byte(existing.APIKey), key)
 	})
-	return found, err
 }
 
 func findAllServers(limit, offset int64) ([]*types.Server, error) {

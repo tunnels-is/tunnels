@@ -126,6 +126,12 @@ func clientAuthMiddleware(next http.Handler) http.Handler {
 			sendError(w, 401, "Unauthorized")
 			return
 		}
+		// A zero subscription time means no expiry is stored. The token itself
+		// does not expire.
+		if !user.SubExpiration.IsZero() && time.Now().After(user.SubExpiration) {
+			sendError(w, 403, "subscription expired")
+			return
+		}
 
 		ctx := context.WithValue(r.Context(), contextKeyUser, user)
 		ctx = context.WithValue(ctx, contextKeyDeviceToken, deviceToken)

@@ -46,6 +46,13 @@ func TestHandleClientUserUpdate_APIKeyServerGenerated(t *testing.T) {
 	if _, err := uuid.Parse(resp.APIKey); err != nil {
 		t.Fatalf("server-generated APIKey is not a valid UUID: %q", resp.APIKey)
 	}
+	stored, err := findUserByID(u.ID)
+	if err != nil || stored == nil {
+		t.Fatal(err)
+	}
+	if stored.APIKey == resp.APIKey || !storedSecretIsHash(stored.APIKey) || !secretMatches(stored.APIKey, resp.APIKey) {
+		t.Fatalf("database kept the plaintext key: %q", stored.APIKey)
+	}
 
 	if w := call(`{"APIKey":""}`); w.Code != http.StatusOK {
 		t.Fatalf("empty APIKey should be allowed (clears the key), got %d", w.Code)

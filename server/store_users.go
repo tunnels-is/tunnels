@@ -1,7 +1,10 @@
 package main
 
 import (
+	"crypto/subtle"
 	"errors"
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -138,7 +141,8 @@ func createUser(user *User) error {
 		if user.Email != "" && emailInUse(tx, user.Email, id) {
 			return errEmailRegistered
 		}
-		data, err := bboltMarshal(user)
+		stored := userRecordForStore(user)
+		data, err := bboltMarshal(stored)
 		if err != nil {
 			return err
 		}
@@ -150,8 +154,8 @@ func createUser(user *User) error {
 				return err
 			}
 		}
-		if user.APIKey != "" {
-			if err := tx.Bucket([]byte(bucketUsersAPIKeyIndex)).Put([]byte(user.APIKey), []byte(id)); err != nil {
+		if stored.APIKey != "" {
+			if err := tx.Bucket([]byte(bucketUsersAPIKeyIndex)).Put([]byte(stored.APIKey), []byte(id)); err != nil {
 				return err
 			}
 		}
@@ -257,6 +261,58 @@ func updateUserSubTime(u *User) error {
 	})
 }
 
+// upgradeLegacyUserSecrets hashes a plaintext API key or device token that
+// just authenticated. The write re-reads the user so a newer key is left alone.
+func upgradeLegacyUserSecrets(id uuid.UUID, presented string) error {
+	if presented == "" {
+		return nil
+	}
+	return db.Update(func(tx *gobolt.Tx) error {
+		b := tx.Bucket([]byte(bucketUsers))
+		key := []byte(id.String())
+		v := b.Get(key)
+		if v == nil {
+			return nil
+		}
+		user := new(User)
+		if err := bboltUnmarshal(v, user); err != nil {
+			return err
+		}
+		changed := false
+		if user.APIKey != "" && !storedSecretIsHash(user.APIKey) && secretMatches(user.APIKey, presented) {
+			old := user.APIKey
+			user.APIKey = hashSecret(presented)
+			idx := tx.Bucket([]byte(bucketUsersAPIKeyIndex))
+			if err := idx.Delete([]byte(old)); err != nil {
+				return err
+			}
+			if err := idx.Put([]byte(user.APIKey), key); err != nil {
+				return err
+			}
+			changed = true
+		}
+		for _, d := range user.Tokens {
+			if d == nil || d.DT == "" || storedSecretIsHash(d.DT) || !secretMatches(d.DT, presented) {
+				continue
+			}
+			d.DT = hashSecret(presented)
+			changed = true
+		}
+		if user.DeviceToken != nil && user.DeviceToken.DT != "" && !storedSecretIsHash(user.DeviceToken.DT) && secretMatches(user.DeviceToken.DT, presented) {
+			user.DeviceToken.DT = hashSecret(presented)
+			changed = true
+		}
+		if !changed {
+			return nil
+		}
+		data, err := bboltMarshal(user)
+		if err != nil {
+			return err
+		}
+		return b.Put(key, data)
+	})
+}
+
 func dropUserAPIKey(tx *gobolt.Tx, user *User) error {
 	if user == nil || user.APIKey == "" {
 		return nil
@@ -307,7 +363,7 @@ func updateUser(form *userUpdateRequest) error {
 			return err
 		}
 		oldAPIKey := user.APIKey
-		user.APIKey = form.APIKey
+		user.APIKey = storeSecret(form.APIKey)
 		data, err := bboltMarshal(user)
 		if err != nil {
 			return err
@@ -316,13 +372,13 @@ func updateUser(form *userUpdateRequest) error {
 			return err
 		}
 		apikeyIdx := tx.Bucket([]byte(bucketUsersAPIKeyIndex))
-		if oldAPIKey != "" {
+		if oldAPIKey != "" && oldAPIKey != user.APIKey {
 			if err := apikeyIdx.Delete([]byte(oldAPIKey)); err != nil {
 				return err
 			}
 		}
-		if form.APIKey != "" {
-			if err := apikeyIdx.Put([]byte(form.APIKey), []byte(id)); err != nil {
+		if user.APIKey != "" {
+			if err := apikeyIdx.Put([]byte(user.APIKey), []byte(id)); err != nil {
 				return err
 			}
 		}
@@ -415,6 +471,12 @@ func updateUserRecoveryCodes(uid uuid.UUID, codes []byte) error {
 	})
 }
 
+var (
+	errRecoveryNotFound        = errors.New("invalid recovery code")
+	errTwoFactorAlreadyEnabled = errors.New("two factor already enabled")
+	errRecoveryDecrypt         = errors.New("recovery decrypt")
+)
+
 func updateUserTwoFactorCodes(upd *twoFactorUpdate) error {
 	return db.Update(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(bucketUsers))
@@ -426,14 +488,119 @@ func updateUserTwoFactorCodes(upd *twoFactorUpdate) error {
 		if err := bboltUnmarshal(v, user); err != nil {
 			return err
 		}
+		// The presented recovery code is checked on the stored record in this
+		// write. A second re-enroll cannot pass on a code this write consumes.
+		if code := strings.ToUpper(strings.TrimSpace(upd.ConsumeRecovery)); code != "" {
+			plain, err := Decrypt(user.RecoveryCodes, []byte(loadSecret("TwoFactorKey")))
+			if err != nil {
+				return fmt.Errorf("%w: %w", errRecoveryDecrypt, err)
+			}
+			found := false
+			for _, v := range strings.Fields(plain) {
+				if v == code {
+					found = true
+					break
+				}
+			}
+			if !found {
+				return errRecoveryNotFound
+			}
+		} else if user.TwoFactorEnabled {
+			return errTwoFactorAlreadyEnabled
+		}
 		user.TwoFactorCode = upd.Code
 		user.RecoveryCodes = upd.Recovery
 		user.TwoFactorEnabled = true
+		if upd.AcceptedTOTP != "" {
+			user.LastTOTP = upd.AcceptedTOTP
+		}
 		data, err := bboltMarshal(user)
 		if err != nil {
 			return err
 		}
 		return b.Put([]byte(user.ID.String()), data)
+	})
+}
+
+var errTOTPReused = errors.New("authenticator code already used")
+
+// acceptTOTPCode records otp on the stored user. A second accept of the same
+// code fails. Old records have an empty LastTOTP and still accept the first code.
+func acceptTOTPCode(userID uuid.UUID, otp string) error {
+	if otp == "" {
+		return errTOTPReused
+	}
+	return db.Update(func(tx *gobolt.Tx) error {
+		b := tx.Bucket([]byte(bucketUsers))
+		key := []byte(userID.String())
+		v := b.Get(key)
+		if v == nil {
+			return errors.New("user not found")
+		}
+		user := new(User)
+		if err := bboltUnmarshal(v, user); err != nil {
+			return err
+		}
+		if subtle.ConstantTimeCompare([]byte(user.LastTOTP), []byte(otp)) == 1 {
+			return errTOTPReused
+		}
+		user.LastTOTP = otp
+		data, err := bboltMarshal(user)
+		if err != nil {
+			return err
+		}
+		return b.Put(key, data)
+	})
+}
+
+// acceptResetAuth consumes one recovery code and records the authenticator
+// code in the same write. A reused code does not remove a recovery code.
+func acceptResetAuth(userID uuid.UUID, otp, recovery string) error {
+	if otp == "" {
+		return errTOTPReused
+	}
+	return db.Update(func(tx *gobolt.Tx) error {
+		b := tx.Bucket([]byte(bucketUsers))
+		key := []byte(userID.String())
+		v := b.Get(key)
+		if v == nil {
+			return errors.New("user not found")
+		}
+		user := new(User)
+		if err := bboltUnmarshal(v, user); err != nil {
+			return err
+		}
+		if subtle.ConstantTimeCompare([]byte(user.LastTOTP), []byte(otp)) == 1 {
+			return errTOTPReused
+		}
+		recoveryUpper := strings.ToUpper(strings.TrimSpace(recovery))
+		plain, err := Decrypt(user.RecoveryCodes, []byte(loadSecret("TwoFactorKey")))
+		if err != nil {
+			return fmt.Errorf("%w: %w", errRecoveryDecrypt, err)
+		}
+		found := false
+		remaining := make([]string, 0)
+		for _, part := range strings.Fields(plain) {
+			if part == recoveryUpper {
+				found = true
+				continue
+			}
+			remaining = append(remaining, part)
+		}
+		if !found {
+			return errRecoveryNotFound
+		}
+		blob, err := Encrypt(strings.Join(remaining, " "), []byte(loadSecret("TwoFactorKey")))
+		if err != nil {
+			return fmt.Errorf("%w: %w", errRecoveryDecrypt, err)
+		}
+		user.RecoveryCodes = blob
+		user.LastTOTP = otp
+		data, err := bboltMarshal(user)
+		if err != nil {
+			return err
+		}
+		return b.Put(key, data)
 	})
 }
 
@@ -497,7 +664,7 @@ func activateUserKey(subExpiration time.Time, key *LicenseKey, userID uuid.UUID)
 		if err := bboltUnmarshal(v, user); err != nil {
 			return err
 		}
-		user.Disabled = false
+		// Disabled is set only by an admin update. A license must not clear it.
 		user.Trial = false
 		user.SubExpiration = subExpiration
 		user.Key = key

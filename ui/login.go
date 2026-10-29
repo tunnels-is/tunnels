@@ -13,6 +13,25 @@ import (
 	"github.com/tunnels-is/tunnels/client"
 )
 
+// keepLocalAPIKey copies a key saved on this device when the server omits it.
+// Login responses do not include the API key. The plaintext is only returned
+// when the key is created.
+func keepLocalAPIKey(u *client.User) {
+	if u == nil || u.ID == "" || u.APIKey != "" {
+		return
+	}
+	saved, err := client.GetUsers()
+	if err != nil {
+		return
+	}
+	for _, prev := range saved {
+		if prev != nil && prev.ID == u.ID && prev.APIKey != "" && !strings.HasPrefix(prev.APIKey, "h1:") {
+			u.APIKey = prev.APIKey
+			return
+		}
+	}
+}
+
 // Login modes. Kept as the original integers because they map to controller
 // endpoints and preferences already stored on disk.
 const (
@@ -185,6 +204,7 @@ func (a *App) loginPage() fyne.CanvasObject {
 						setErr("Unable to parse login response")
 						return
 					}
+					keepLocalAPIKey(u)
 					u.ControlServer = srv
 					pref.SetString("default-email", email.Text)
 					pref.SetString("default-device-name", device.Text)

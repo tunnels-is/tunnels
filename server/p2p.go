@@ -279,11 +279,3 @@ func listAllDevices() ([]*types.Device, error) {
 	}
 	return all, nil
 }
-
-func normalizeDiscoKey(s string) error {
-	if s == "" {
-		return nil
-	}
-	_, err := punch.DecodeKey(s)
-	return err
-}

@@ -39,15 +39,18 @@ func TestDisabledUser_CannotLoginOrMintTokens(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/client/user/login", bytes.NewReader(body))
 	w := httptest.NewRecorder()
 	handleClientLogin(w, req)
-	if w.Code != http.StatusForbidden {
-		t.Fatalf("login: %d %s, want 403", w.Code, w.Body.String())
+	if w.Code != http.StatusUnauthorized || !strings.Contains(w.Body.String(), "Invalid login credentials") {
+		t.Fatalf("login: %d %s, want 401", w.Code, w.Body.String())
+	}
+	if strings.Contains(strings.ToLower(w.Body.String()), "disabled") {
+		t.Fatalf("login names the disabled state: %s", w.Body.String())
 	}
 
 	got, err := findUserByEmail(u.Email)
 	if err != nil || got == nil {
 		t.Fatal(err)
 	}
-	if len(got.Tokens) != 1 || got.Tokens[0].DT != keep.DT {
+	if len(got.Tokens) != 1 || !secretMatches(got.Tokens[0].DT, keep.DT) {
 		t.Fatalf("tokens mutated: %+v", got.Tokens)
 	}
 }
@@ -75,11 +78,82 @@ func TestDisabledAdmin_CannotUILogin(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/ui/user/login", bytes.NewReader(body))
 	w := httptest.NewRecorder()
 	handleAdminLogin(w, req)
-	if w.Code != http.StatusForbidden {
-		t.Fatalf("admin login: %d %s, want 403", w.Code, w.Body.String())
+	if w.Code != http.StatusUnauthorized || !strings.Contains(w.Body.String(), "Invalid login credentials") {
+		t.Fatalf("admin login: %d %s, want 401", w.Code, w.Body.String())
+	}
+	if strings.Contains(strings.ToLower(w.Body.String()), "disabled") {
+		t.Fatalf("admin login names the disabled state: %s", w.Body.String())
 	}
 	if c := w.Result().Cookies(); len(c) > 0 {
 		t.Fatal("must not set admin_session")
+	}
+}
+
+func TestDisabledLogin_MatchesBadPassword(t *testing.T) {
+	setupTestDB(t)
+	securityReviewLogger()
+
+	hash, err := bcrypt.GenerateFromPassword([]byte("longenough1"), 4)
+	if err != nil {
+		t.Fatal(err)
+	}
+	enabled := &User{
+		ID: uuid.New(), Email: "enabled-login@test.local", Password: string(hash),
+	}
+	disabled := &User{
+		ID: uuid.New(), Email: "disabled-login@test.local", Password: string(hash),
+		Disabled: true, TwoFactorEnabled: true, TwoFactorCode: []byte("not-a-real-secret"),
+		Tokens: []*DeviceToken{{DT: "keep-me", N: "phone"}},
+	}
+	admin := &User{
+		ID: uuid.New(), Email: "disabled-admin-login@test.local", Password: string(hash),
+		Disabled: true, IsAdmin: true,
+	}
+	for _, u := range []*User{enabled, disabled, admin} {
+		if err := createUser(u); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	login := func(handler http.HandlerFunc, email, password string) *httptest.ResponseRecorder {
+		t.Helper()
+		body, _ := json.Marshal(loginRequest{Email: email, Password: password, DeviceName: "phone"})
+		req := httptest.NewRequest(http.MethodPost, "/login", bytes.NewReader(body))
+		w := httptest.NewRecorder()
+		handler(w, req)
+		return w
+	}
+
+	bad := login(handleClientLogin, enabled.Email, "wrongpassword1")
+	banned := login(handleClientLogin, disabled.Email, "longenough1")
+	if bad.Code != http.StatusUnauthorized || banned.Code != bad.Code {
+		t.Fatalf("client status bad=%d banned=%d", bad.Code, banned.Code)
+	}
+	if bad.Body.String() != banned.Body.String() {
+		t.Fatalf("client body differs\nbad: %s\nbanned: %s", bad.Body.String(), banned.Body.String())
+	}
+	if strings.Contains(strings.ToLower(banned.Body.String()), "disabled") {
+		t.Fatalf("body names the disabled state: %s", banned.Body.String())
+	}
+
+	got, err := findUserByEmail(disabled.Email)
+	if err != nil || got == nil {
+		t.Fatal(err)
+	}
+	if len(got.Tokens) != 1 || !secretMatches(got.Tokens[0].DT, "keep-me") {
+		t.Fatalf("tokens mutated: %+v", got.Tokens)
+	}
+
+	adminBad := login(handleAdminLogin, enabled.Email, "wrongpassword1")
+	adminBanned := login(handleAdminLogin, admin.Email, "longenough1")
+	if adminBad.Code != http.StatusUnauthorized || adminBanned.Code != adminBad.Code {
+		t.Fatalf("admin status bad=%d banned=%d", adminBad.Code, adminBanned.Code)
+	}
+	if adminBad.Body.String() != adminBanned.Body.String() {
+		t.Fatalf("admin body differs\nbad: %s\nbanned: %s", adminBad.Body.String(), adminBanned.Body.String())
+	}
+	if len(adminBanned.Result().Cookies()) != 0 {
+		t.Fatal("disabled admin login set a cookie")
 	}
 }
 
@@ -120,7 +194,7 @@ func TestDisabledUser_CannotResetPassword(t *testing.T) {
 	if err := bcrypt.CompareHashAndPassword([]byte(got.Password), []byte("oldpassword1")); err != nil {
 		t.Fatal("password must not change")
 	}
-	if len(got.Tokens) != 1 || got.Tokens[0].DT != keep.DT {
+	if len(got.Tokens) != 1 || !secretMatches(got.Tokens[0].DT, keep.DT) {
 		t.Fatalf("tokens wiped: %+v", got.Tokens)
 	}
 }

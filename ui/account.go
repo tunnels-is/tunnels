@@ -63,35 +63,9 @@ func (a *App) accountInfoTab(u *client.User) fyne.CanvasObject {
 	))
 
 	apiKey := cardBox("API key",
-		"Used by the CLI and the local API. Regenerating invalidates the old key immediately.",
-		a.copyBtn(u.APIKey),
-		vstack(sp3,
-			container.NewStack(surface(radSm, pal().Elevate, pal().Base300),
-				insetXY(sp3, sp2+2, monoText(u.APIKey, fsSmall, pal().Content))),
-			hstack(sp2, outlineBtn("Regenerate key", func() {
-				a.confirm("Regenerate API key", "The current key stops working immediately. Continue?", func() {
-					go func() {
-						raw, _, err := a.callController("/client/user/update", map[string]any{"APIKey": "generate"}, true)
-						a.uiDo(func() {
-							if err != nil {
-								a.fail(err.Error())
-								return
-							}
-							var resp struct{ APIKey string }
-							_ = json.Unmarshal(raw, &resp)
-							if resp.APIKey == "" {
-								a.fail("Key refresh returned no key")
-								return
-							}
-							u.APIKey = resp.APIKey
-							a.setUser(u)
-							a.note("API key regenerated")
-							a.rebuild()
-						})
-					}()
-				})
-			})),
-		))
+		"Used by the CLI and the local API. Regenerating replaces the old key immediately. The server stores only a hash, so copy the key when it is shown.",
+		apiKeyActions(a, u),
+		vstack(sp3, apiKeyBody(a, u)...))
 
 	security := card("Security", "",
 		settingList(
@@ -118,6 +92,54 @@ func (a *App) accountInfoTab(u *client.User) fyne.CanvasObject {
 		))
 
 	return scrollBody(details, apiKey, security, danger)
+}
+
+func apiKeyVisible(key string) bool {
+	return key != "" && !strings.HasPrefix(key, "h1:")
+}
+
+func apiKeyActions(a *App, u *client.User) fyne.CanvasObject {
+	if !apiKeyVisible(u.APIKey) {
+		return nil
+	}
+	return a.copyBtn(u.APIKey)
+}
+
+func apiKeyBody(a *App, u *client.User) []fyne.CanvasObject {
+	rows := make([]fyne.CanvasObject, 0, 3)
+	if apiKeyVisible(u.APIKey) {
+		rows = append(rows,
+			hint("Copy this key if you need it outside this device. Signing in again does not fetch it from the server."),
+			container.NewStack(surface(radSm, pal().Elevate, pal().Base300),
+				insetXY(sp3, sp2+2, monoText(u.APIKey, fsSmall, pal().Content))),
+		)
+	} else {
+		rows = append(rows, hint("No API key is saved on this device. Generate one and copy it now. The server cannot show it again."))
+	}
+	rows = append(rows, hstack(sp2, outlineBtn("Regenerate key", func() {
+		a.confirm("Regenerate API key", "The current key stops working immediately. The new key is shown once, so copy it before you leave. Continue?", func() {
+			go func() {
+				raw, _, err := a.callController("/client/user/update", map[string]any{"APIKey": "generate"}, true)
+				a.uiDo(func() {
+					if err != nil {
+						a.fail(err.Error())
+						return
+					}
+					var resp struct{ APIKey string }
+					_ = json.Unmarshal(raw, &resp)
+					if resp.APIKey == "" {
+						a.fail("Key refresh returned no key")
+						return
+					}
+					u.APIKey = resp.APIKey
+					a.setUser(u)
+					a.note("Copy the new API key now. The server will not show it again.")
+					a.rebuild()
+				})
+			}()
+		})
+	})))
+	return rows
 }
 
 func (a *App) accountLoginsTab(u *client.User) fyne.CanvasObject {
