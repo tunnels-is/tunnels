@@ -38,6 +38,11 @@ func handleAdminUserCreate(w http.ResponseWriter, r *http.Request) {
 	createUserFromRequest(w, r, false)
 }
 
+// registrationDenied is the public answer for a reserved name, a name that is
+// already registered, and the lost race to create that name. It is not used
+// for a missing or short password, which stay fast.
+const registrationDenied = "Unable to complete registration"
+
 func validateRegisterForm(form *registerRequest) (int, string) {
 	if form.Password == "" {
 		return 400, "Missing Password"
@@ -59,7 +64,7 @@ func validateRegisterForm(form *registerRequest) (int, string) {
 		return 400, "Email/Username is too long, maximum 320 characters"
 	}
 	if isReservedAccountEmail(form.Email) {
-		return 400, "Unable to complete registration"
+		return 400, registrationDenied
 	}
 	return 0, ""
 }
@@ -100,17 +105,21 @@ func createUserFromRequest(w http.ResponseWriter, r *http.Request, limit bool) {
 	}
 
 	if code, msg := validateRegisterForm(form); code != 0 {
+		if msg == registrationDenied {
+			rejectRegistration(w, r, limit, form.Password)
+			return
+		}
 		sendError(w, code, msg)
 		return
 	}
 
 	newUser, err := findUserByEmail(form.Email)
-	if newUser != nil {
-		sendError(w, 400, "Unable to complete registration")
-		return
-	}
 	if err != nil {
 		sendError(w, 500, "Unexpected error, please try again in a moment")
+		return
+	}
+	if newUser != nil {
+		rejectRegistration(w, r, limit, form.Password)
 		return
 	}
 
@@ -127,7 +136,8 @@ func createUserFromRequest(w http.ResponseWriter, r *http.Request, limit bool) {
 	err = createUser(newUser)
 	if err != nil {
 		if errors.Is(err, errEmailRegistered) {
-			sendError(w, 400, "Unable to complete registration")
+			// newRegisteredUser already paid for a cost-13 hash.
+			sendError(w, 400, registrationDenied)
 			return
 		}
 		sendError(w, 500, "Unexpected error, please try again in a moment")
@@ -135,6 +145,18 @@ func createUserFromRequest(w http.ResponseWriter, r *http.Request, limit bool) {
 	}
 
 	sendObject(w, newUser)
+}
+
+// rejectRegistration spends one password compare, then returns the generic
+// registration error. Public registration counts that compare against the
+// same per-IP limit as account creation. Over the limit, the compare is skipped.
+func rejectRegistration(w http.ResponseWriter, r *http.Request, limit bool, password string) {
+	if limit && !takeAuthSlot(authLimitRegister, "", clientIP(r)) {
+		sendError(w, 429, "too many attempts, try again later")
+		return
+	}
+	equalizePasswordCost(password)
+	sendError(w, 400, registrationDenied)
 }
 
 func handleClientUserUpdate(w http.ResponseWriter, r *http.Request) {

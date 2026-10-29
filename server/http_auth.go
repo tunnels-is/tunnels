@@ -12,6 +12,16 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+// dummyPasswordHash is a cost-13 bcrypt hash. A missing-user login and a
+// registration that returns "Unable to complete registration" compare against
+// it and ignore the result, so those answers take about as long as a real
+// password check. The plaintext is not a credential. A match still fails.
+const dummyPasswordHash = "$2a$13$a7TIGconfU4iJBKBkJlQhOHyKAgbGOKmibCU2B88En4cM2hVFQOmO"
+
+func equalizePasswordCost(password string) {
+	_ = bcrypt.CompareHashAndPassword([]byte(dummyPasswordHash), []byte(password))
+}
+
 func authenticatePasswordLogin(w http.ResponseWriter, r *http.Request, form *loginRequest) (user *User, email string) {
 	email = normalizeEmail(form.Email)
 	if email == "" {
@@ -30,6 +40,7 @@ func authenticatePasswordLogin(w http.ResponseWriter, r *http.Request, form *log
 		return nil, email
 	}
 	if user == nil {
+		equalizePasswordCost(form.Password)
 		sendError(w, 401, "Invalid login credentials")
 		return nil, email
 	}
