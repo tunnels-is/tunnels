@@ -10,7 +10,7 @@ Go 1.26 (`go.mod`).
 ### Client
  - macOS: `ifconfig` and `route`. The client must run as root. The packaged desktop app asks for sudo.
  - Windows: `netsh`. Run the client as administrator.
- - Linux: `ip` (iproute2). The client does not need full root. It needs `cap_net_raw`, `cap_net_bind_service`, and `cap_net_admin`. If those are missing it asks for a sudo password and runs `setcap` on its own binary.
+ - Linux: `ip` (iproute2). The client does not need full root. It needs `cap_net_raw`, `cap_net_bind_service`, and `cap_net_admin`. If those are missing, and the binary and its directory are owned by root and not writable by other users, it asks for a sudo password and runs `setcap` on the resolved binary. Otherwise set the capabilities by hand.
 
 ### Fyne desktop
 A C compiler, plus:
