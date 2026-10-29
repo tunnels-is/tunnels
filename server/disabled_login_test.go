@@ -157,6 +157,75 @@ func TestDisabledLogin_MatchesBadPassword(t *testing.T) {
 	}
 }
 
+func TestAdminLogin_NonAdminMatchesBadPassword(t *testing.T) {
+	setupTestDB(t)
+	securityReviewLogger()
+	resetPasswordResetAttemptsForTest()
+	okKey := strings.Repeat("c", minSecretLen)
+	prev := Config.Load()
+	t.Cleanup(func() { Config.Store(prev) })
+	Config.Store(&types.ServerConfig{CookieSigningKey: okKey, TwoFactorKey: okKey})
+
+	hash, err := bcrypt.GenerateFromPassword([]byte("longenough1"), 4)
+	if err != nil {
+		t.Fatal(err)
+	}
+	keep := &DeviceToken{DT: "keep-me", N: "phone"}
+	member := &User{
+		ID: uuid.New(), Email: "member-login@test.local", Password: string(hash),
+		Tokens: []*DeviceToken{keep},
+	}
+	admin := &User{
+		ID: uuid.New(), Email: "real-admin-login@test.local", Password: string(hash),
+		IsAdmin: true,
+	}
+	for _, u := range []*User{member, admin} {
+		if err := createUser(u); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	login := func(email, password string) *httptest.ResponseRecorder {
+		t.Helper()
+		body, _ := json.Marshal(loginRequest{Email: email, Password: password, DeviceName: "phone"})
+		req := httptest.NewRequest(http.MethodPost, "/ui/user/login", bytes.NewReader(body))
+		w := httptest.NewRecorder()
+		handleAdminLogin(w, req)
+		return w
+	}
+
+	bad := login(member.Email, "wrongpassword1")
+	good := login(member.Email, "longenough1")
+	if bad.Code != http.StatusUnauthorized || good.Code != bad.Code {
+		t.Fatalf("status bad=%d good=%d", bad.Code, good.Code)
+	}
+	if bad.Body.String() != good.Body.String() {
+		t.Fatalf("body differs\nbad: %s\ngood: %s", bad.Body.String(), good.Body.String())
+	}
+	body := strings.ToLower(good.Body.String())
+	if strings.Contains(body, "admin") || strings.Contains(body, "manager") {
+		t.Fatalf("body names the role: %s", good.Body.String())
+	}
+	if len(good.Result().Cookies()) != 0 {
+		t.Fatal("non-admin login set a cookie")
+	}
+	got, err := findUserByEmail(member.Email)
+	if err != nil || got == nil {
+		t.Fatal(err)
+	}
+	if len(got.Tokens) != 1 || !secretMatches(got.Tokens[0].DT, keep.DT) {
+		t.Fatalf("tokens mutated: %+v", got.Tokens)
+	}
+
+	ok := login(admin.Email, "longenough1")
+	if ok.Code != http.StatusOK {
+		t.Fatalf("admin login: %d %s", ok.Code, ok.Body.String())
+	}
+	if c := ok.Result().Cookies(); len(c) != 1 || c[0].Name != "admin_session" {
+		t.Fatalf("admin cookie: %+v", ok.Result().Cookies())
+	}
+}
+
 func TestDisabledUser_CannotResetPassword(t *testing.T) {
 	setupTestDB(t)
 	securityReviewLogger()
