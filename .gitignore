@@ -57,6 +57,17 @@ server/server
 server/tunnels
 server/tunnels-server
 
+# Local build outputs and profiles
+/alloc.pprof
+/heap.pprof
+wg-server/wg-server
+wg-server/wg-server-linux
+certcheck/certcheck
+cmd/user-migrate/user-migrate
+client/wintun.dll
+client/wintun-amd64.dll
+client/wintun-x86.dll
+
 certcheck/.env
 **/.env
 **/.env.*
