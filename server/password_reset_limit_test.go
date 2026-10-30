@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -142,6 +143,105 @@ func TestCleanPasswordResetAttempts(t *testing.T) {
 	}
 	if _, ok := authLimits[newKey]; !ok {
 		t.Fatal("fresh entry should remain")
+	}
+}
+
+// TestAuthSlot_EmailBudgetBlocksAcrossAddresses ...
+func TestAuthSlot_EmailBudgetBlocksAcrossAddresses(t *testing.T) {
+	resetPasswordResetAttemptsForTest()
+	email := "spread@example.com"
+	for i := 0; i < authEmailMax; i++ {
+		ip := fmt.Sprintf("198.51.100.%d", i+1)
+		if !takeAuthSlot(authLimitLogin, email, ip) {
+			t.Fatalf("attempt %d from %s should be allowed", i+1, ip)
+		}
+	}
+	if takeAuthSlot(authLimitLogin, email, "198.51.100.200") {
+		t.Fatal("email budget should block a fresh address")
+	}
+	if takeAuthSlot(authLimitLogin, email, "198.51.100.1") {
+		t.Fatal("email budget should block an address that still has room")
+	}
+	if !takeAuthSlot(authLimitLogin, "other@example.com", "198.51.100.200") {
+		t.Fatal("another account should keep its own email budget")
+	}
+	if !takeAuthSlot(authLimitReset, email, "198.51.100.200") {
+		t.Fatal("reset should not share the login email budget")
+	}
+}
+
+// TestAuthSlot_ResetEmailBudget ...
+func TestAuthSlot_ResetEmailBudget(t *testing.T) {
+	resetPasswordResetAttemptsForTest()
+	email := "spread-reset@example.com"
+	for i := 0; i < authEmailMax; i++ {
+		ip := fmt.Sprintf("198.51.101.%d", i+1)
+		if !takeAuthSlot(authLimitReset, email, ip) {
+			t.Fatalf("reset %d from %s should be allowed", i+1, ip)
+		}
+	}
+	if takeAuthSlot(authLimitReset, email, "198.51.101.200") {
+		t.Fatal("reset email budget should block a fresh address")
+	}
+}
+
+// TestAuthSlot_ClearResetsEmailBudget ...
+func TestAuthSlot_ClearResetsEmailBudget(t *testing.T) {
+	resetPasswordResetAttemptsForTest()
+	email := "cleared-spread@example.com"
+	var lastIP string
+	for i := 0; i < authEmailMax; i++ {
+		lastIP = fmt.Sprintf("198.51.102.%d", i+1)
+		if !takeAuthSlot(authLimitLogin, email, lastIP) {
+			t.Fatalf("attempt %d", i+1)
+		}
+	}
+	if takeAuthSlot(authLimitLogin, email, "198.51.102.200") {
+		t.Fatal("expected the email budget to be spent")
+	}
+	clearAuthSlot(authLimitLogin, email, lastIP)
+	if !takeAuthSlot(authLimitLogin, email, "198.51.102.200") {
+		t.Fatal("a successful login should clear the email budget")
+	}
+}
+
+// TestAuthSlot_EmailWindowExpiry ...
+func TestAuthSlot_EmailWindowExpiry(t *testing.T) {
+	resetPasswordResetAttemptsForTest()
+	email := "email-expire@example.com"
+	ip := "198.51.102.9"
+	key, max := authEmailKey(authLimitLogin, email)
+	authLimitMu.Lock()
+	authLimits[key] = &authWindow{count: max, start: time.Now().Add(-authLimitWindow - time.Second)}
+	authLimitMu.Unlock()
+	if !takeAuthSlot(authLimitLogin, email, ip) {
+		t.Fatal("expired email window should allow attempts again")
+	}
+}
+
+// TestAuthSlot_EmailBudgetConcurrent ...
+func TestAuthSlot_EmailBudgetConcurrent(t *testing.T) {
+	resetPasswordResetAttemptsForTest()
+	email := "spread-race@example.com"
+	const attempts = 40
+	var wg sync.WaitGroup
+	var allowed int
+	var mu sync.Mutex
+	for i := 0; i < attempts; i++ {
+		ip := fmt.Sprintf("198.51.103.%d", (i%20)+1)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if takeAuthSlot(authLimitLogin, email, ip) {
+				mu.Lock()
+				allowed++
+				mu.Unlock()
+			}
+		}()
+	}
+	wg.Wait()
+	if allowed != authEmailMax {
+		t.Fatalf("allowed %d, want %d", allowed, authEmailMax)
 	}
 }
 
