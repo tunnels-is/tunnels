@@ -14,14 +14,6 @@ const (
 	IoTTun     TunnelType = "iot"
 )
 
-var Uptime = time.Now()
-
-type HealthResponse struct {
-	ServerVersion string
-	ClientVersion string
-	Uptime        time.Time
-}
-
 type ServerConfig struct {
 	LogAPIHosts bool
 

@@ -7,9 +7,6 @@ import (
 	"log/slog"
 	"net/http"
 	"time"
-
-	"github.com/tunnels-is/tunnels/types"
-	"github.com/tunnels-is/tunnels/version"
 )
 
 func launchAPIServer() {
@@ -153,15 +150,7 @@ func registerAdminRoutes(mux *http.ServeMux) {
 }
 
 func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	rs := new(types.HealthResponse)
-	rs.ServerVersion = version.Version
-	cfg := Config.Load()
-	rs.ClientVersion = cfg.ClientVersion
-	rs.Uptime = types.Uptime
-	enc := json.NewEncoder(w)
-	enc.Encode(rs)
 }
 
 func sendError(w http.ResponseWriter, code int, msg string, slogArgs ...any) {
