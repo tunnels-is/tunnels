@@ -20,6 +20,9 @@ const (
 	ingressBatchWait    = time.Millisecond
 	ingressBufCap       = 65535 + 64
 	ingressFreeMax      = 96
+
+	egressQueueDefault = 2000
+	egressQueueMax     = 65535
 )
 
 type processingTUN struct {
@@ -109,9 +112,46 @@ func (p *processingTUN) filterEgress(bufs [][]byte, sizes []int, offset, n int) 
 	return kept, nil
 }
 
+func egressQueueLen(n int32) int {
+	if n <= 0 {
+		return egressQueueDefault
+	}
+	if int(n) > egressQueueMax {
+		return egressQueueMax
+	}
+	return int(n)
+}
+
+func egressQueueCap(t *TUN) int {
+	if t == nil {
+		return egressQueueDefault
+	}
+	meta := t.meta.Load()
+	if meta == nil {
+		return egressQueueDefault
+	}
+	return egressQueueLen(meta.TxQueueLen)
+}
+
+func enqueueEgress(ch chan []byte, pkt []byte) {
+	select {
+	case ch <- pkt:
+		return
+	default:
+	}
+	select {
+	case <-ch:
+	default:
+	}
+	select {
+	case ch <- pkt:
+	default:
+	}
+}
+
 func (p *processingTUN) ensureDevReader() {
 	p.readOnce.Do(func() {
-		p.devCh = make(chan []byte, 256)
+		p.devCh = make(chan []byte, egressQueueCap(p.tun()))
 		p.devErr = make(chan error, 1)
 		go func() {
 			batch := p.Device.BatchSize()
@@ -129,7 +169,7 @@ func (p *processingTUN) ensureDevReader() {
 					if sizes[i] < 1 {
 						continue
 					}
-					p.devCh <- append([]byte(nil), bufs[i][:sizes[i]]...)
+					enqueueEgress(p.devCh, append([]byte(nil), bufs[i][:sizes[i]]...))
 				}
 				if err != nil {
 					if errors.Is(err, tun.ErrTooManySegments) {

@@ -226,7 +226,7 @@ func (a *App) tunnelEditPage() fyne.CanvasObject {
 			formRows(
 				formPair(field("Name", tag), field("Interface", ifname)),
 				field("Server", server),
-				formPair(fieldWith("MTU", "0 = automatic MTU discovery", mtu), field("TX queue length", txq)),
+				formPair(fieldWith("MTU", "0 = automatic MTU discovery", mtu), fieldWith("TX queue length", "Interface queue, and the hole-punch buffer. The oldest packet is dropped when full.", txq)),
 			)),
 		card("Behaviour", "What this tunnel does while connected.", features),
 		sectionHead("DNS"),
