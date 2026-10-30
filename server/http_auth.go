@@ -117,6 +117,14 @@ func handleAdminLogin(w http.ResponseWriter, r *http.Request) {
 	})
 
 	user.RemoveSensitiveInformation()
+	// The session cookie already holds this token. The admin page does not
+	// read it, and the raw value authenticates to the client API from any IP.
+	user.DeviceToken = nil
+	for _, t := range user.Tokens {
+		if t != nil {
+			t.DT = ""
+		}
+	}
 	sendObject(w, user)
 }
 
