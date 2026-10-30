@@ -14,20 +14,14 @@ import (
 type contextKey string
 
 const (
-	contextKeyUser          contextKey = "user"
-	contextKeyIsAdminAPIKey contextKey = "isAdminAPIKey"
-	contextKeyServer        contextKey = "server"
-	contextKeyDeviceToken   contextKey = "deviceToken"
+	contextKeyUser        contextKey = "user"
+	contextKeyServer      contextKey = "server"
+	contextKeyDeviceToken contextKey = "deviceToken"
 )
 
 func getUserFromContext(ctx context.Context) *User {
 	user, _ := ctx.Value(contextKeyUser).(*User)
 	return user
-}
-
-func isAdminAPIKeyFromContext(ctx context.Context) bool {
-	v, _ := ctx.Value(contextKeyIsAdminAPIKey).(bool)
-	return v
 }
 
 func getServerFromContext(ctx context.Context) *types.Server {
@@ -46,8 +40,7 @@ func xAdminAPIKeyMiddleware(next http.Handler) http.Handler {
 			sendError(w, 401, "Unauthorized")
 			return
 		}
-		ctx := context.WithValue(r.Context(), contextKeyIsAdminAPIKey, true)
-		next.ServeHTTP(w, r.WithContext(ctx))
+		next.ServeHTTP(w, r)
 	})
 }
 
@@ -66,11 +59,6 @@ func wireGuardServerKeyCheck(next http.Handler) http.Handler {
 
 func adminUIMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if isAdminAPIKeyFromContext(r.Context()) {
-			next.ServeHTTP(w, r)
-			return
-		}
-
 		cookie, err := r.Cookie("admin_session")
 		if err != nil {
 			sendError(w, 401, "Unauthorized")
