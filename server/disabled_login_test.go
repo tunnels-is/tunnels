@@ -224,6 +224,36 @@ func TestAdminLogin_NonAdminMatchesBadPassword(t *testing.T) {
 	if c := ok.Result().Cookies(); len(c) != 1 || c[0].Name != "admin_session" {
 		t.Fatalf("admin cookie: %+v", ok.Result().Cookies())
 	}
+	var adminBody User
+	if err := json.Unmarshal(ok.Body.Bytes(), &adminBody); err != nil {
+		t.Fatal(err)
+	}
+	if adminBody.DeviceToken != nil && adminBody.DeviceToken.DT != "" {
+		t.Fatalf("admin login returned a device token: %#v", adminBody.DeviceToken)
+	}
+	for _, tok := range adminBody.Tokens {
+		if tok != nil && tok.DT != "" {
+			t.Fatalf("admin login returned token secret %q", tok.DT)
+		}
+	}
+
+	clientReqBody, _ := json.Marshal(loginRequest{Email: admin.Email, Password: "longenough1", DeviceName: "desktop"})
+	clientReq := httptest.NewRequest(http.MethodPost, "/client/user/login", bytes.NewReader(clientReqBody))
+	clientW := httptest.NewRecorder()
+	handleClientLogin(clientW, clientReq)
+	if clientW.Code != http.StatusOK {
+		t.Fatalf("client login: %d %s", clientW.Code, clientW.Body.String())
+	}
+	var clientBody User
+	if err := json.Unmarshal(clientW.Body.Bytes(), &clientBody); err != nil {
+		t.Fatal(err)
+	}
+	if clientBody.DeviceToken == nil || clientBody.DeviceToken.DT == "" || storedSecretIsHash(clientBody.DeviceToken.DT) {
+		t.Fatalf("client login omitted the device token: %#v", clientBody.DeviceToken)
+	}
+	if _, err := authenticateUserFromEmailOrIDAndToken(admin.Email, uuid.Nil, clientBody.DeviceToken.DT); err != nil {
+		t.Fatalf("client token does not authenticate: %v", err)
+	}
 }
 
 func TestDisabledUser_CannotResetPassword(t *testing.T) {
