@@ -10,8 +10,7 @@ import (
 
 var ifaceNameRe = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]{0,14}$`)
 
-// ValidIfaceName is the iptables-safe interface name we accept from
-// controller records and local config (no trailing +, max 15 chars).
+// ValidIfaceName ...
 func ValidIfaceName(name string) bool {
 	if name == "" || strings.HasSuffix(name, "+") {
 		return false
@@ -19,8 +18,7 @@ func ValidIfaceName(name string) bool {
 	return ifaceNameRe.MatchString(name)
 }
 
-// IPv4Gateway returns the first host address in n (network + 1), using the
-// masked prefix so a subnet written as 10.0.0.5/22 still yields 10.0.0.1.
+// IPv4Gateway ...
 func IPv4Gateway(n *net.IPNet) net.IP {
 	if n == nil {
 		return nil
@@ -40,7 +38,7 @@ func IPv4Gateway(n *net.IPNet) net.IP {
 	return ip
 }
 
-// IPv4Broadcast returns the directed broadcast address of n.
+// IPv4Broadcast ...
 func IPv4Broadcast(n *net.IPNet) net.IP {
 	if n == nil {
 		return nil
@@ -60,9 +58,7 @@ func IPv4Broadcast(n *net.IPNet) net.IP {
 	return out
 }
 
-// IsReservedWireGuardIPv4 reports whether ip must not be assigned to a peer.
-// Network, gateway (first host), directed broadcast, and the .0/.255 address
-// in each /24 inside a larger prefix are reserved.
+// IsReservedWireGuardIPv4 ...
 func IsReservedWireGuardIPv4(ipNet *net.IPNet, ip net.IP) bool {
 	if ipNet == nil {
 		return true
@@ -90,8 +86,7 @@ func IsReservedWireGuardIPv4(ipNet *net.IPNet, ip net.IP) bool {
 	return false
 }
 
-// IsReservedWireGuardIPv6 reports whether addr must not be assigned to a peer
-// (network and network+1 / server address).
+// IsReservedWireGuardIPv6 ...
 func IsReservedWireGuardIPv6(prefix netip.Prefix, addr netip.Addr) bool {
 	if !prefix.IsValid() || !addr.IsValid() || !addr.Is6() {
 		return true
@@ -104,8 +99,7 @@ func IsReservedWireGuardIPv6(prefix netip.Prefix, addr netip.Addr) bool {
 	return addr == netAddr || addr == netAddr.Next()
 }
 
-// ValidateDeviceWireGuardAddrs rejects empty-ok addresses that are reserved
-// or outside the server prefix.
+// ValidateDeviceWireGuardAddrs ...
 func ValidateDeviceWireGuardAddrs(subnet, subnet6, ip, ipv6 string) error {
 	if ip != "" {
 		if subnet == "" {

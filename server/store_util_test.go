@@ -6,6 +6,7 @@ import (
 	"github.com/google/uuid"
 )
 
+// Test_contains ...
 func Test_contains(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -92,6 +93,7 @@ func Test_contains(t *testing.T) {
 	}
 }
 
+// Test_removeString ...
 func Test_removeString(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -169,6 +171,7 @@ func Test_removeString(t *testing.T) {
 	}
 }
 
+// Test_uuidToString ...
 func Test_uuidToString(t *testing.T) {
 	id := uuid.New()
 
@@ -200,6 +203,7 @@ func Test_uuidToString(t *testing.T) {
 	}
 }
 
+// Test_uuidSliceToString ...
 func Test_uuidSliceToString(t *testing.T) {
 	id1 := uuid.New()
 	id2 := uuid.New()
@@ -252,6 +256,7 @@ func Test_uuidSliceToString(t *testing.T) {
 	}
 }
 
+// Test_stringSliceToUUID ...
 func Test_stringSliceToUUID(t *testing.T) {
 	id1 := uuid.New()
 	id2 := uuid.New()
@@ -330,6 +335,7 @@ func Test_stringSliceToUUID(t *testing.T) {
 	}
 }
 
+// Test_stringSliceToUUID_Formats ...
 func Test_stringSliceToUUID_Formats(t *testing.T) {
 	validUUID := uuid.New().String()
 

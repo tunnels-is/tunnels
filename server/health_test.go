@@ -6,6 +6,7 @@ import (
 	"testing"
 )
 
+// TestHealth_EmptyOK ...
 func TestHealth_EmptyOK(t *testing.T) {
 	for _, path := range []string{"/health", "/"} {
 		req := httptest.NewRequest(http.MethodGet, path, nil)

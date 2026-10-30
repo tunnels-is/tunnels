@@ -9,6 +9,7 @@ import (
 	"github.com/tunnels-is/tunnels/types"
 )
 
+// ResetEverything ...
 func ResetEverything() {
 	defer RecoverAndLog()
 	tunnelMapRange(func(tun *TUN) bool {
@@ -26,6 +27,7 @@ func announceClearAndFlush(tun *TUN) {
 	}
 }
 
+// Disconnect ...
 func Disconnect(tunID string, switching bool) (err error) {
 	DEBUG("disconnecting from", tunID, switching)
 	tunnelMapRange(func(tun *TUN) bool {
@@ -125,6 +127,7 @@ func createDefaultTunnelMeta(t types.TunnelType) (M *TunnelMeta) {
 	return
 }
 
+// CleanupOnClose ...
 func CleanupOnClose() {
 	defer RecoverAndLog()
 
@@ -149,6 +152,7 @@ func CleanupOnClose() {
 	}
 }
 
+// FindTunnel ...
 func FindTunnel(tag string) *TunnelMeta {
 	if t, ok := TunnelMetaMap.Load(tag); ok {
 		return t
@@ -156,7 +160,6 @@ func FindTunnel(tag string) *TunnelMeta {
 	return nil
 }
 
-// StateResponse is the snapshot Fyne (and tests) use for the live client.
 type StateResponse struct {
 	Version       string
 	APIVersion    int

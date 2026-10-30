@@ -7,7 +7,6 @@ import (
 	"github.com/tunnels-is/tunnels/client"
 )
 
-// bwTunnel builds a tunnel with `secs` seconds of history.
 func bwTunnel(tag, serverID string, secs int, seed int64) *client.TUN {
 	tn := &client.TUN{ID: "t-" + tag, CR: &client.ConnectionRequest{
 		UserID: "u1", Tag: tag, ServerID: serverID}}
@@ -29,6 +28,7 @@ func bwTunnel(tag, serverID string, secs int, seed int64) *client.TUN {
 	return tn
 }
 
+// TestBucketSizeFor ...
 func TestBucketSizeFor(t *testing.T) {
 	for _, c := range []struct {
 		secs, want int
@@ -42,12 +42,11 @@ func TestBucketSizeFor(t *testing.T) {
 	}
 }
 
-// Stats must come from the raw samples: bucketing first would report a
-// peak-of-averages and hide real spikes.
+// TestSummariseUsesRawSamples ...
 func TestSummariseUsesRawSamples(t *testing.T) {
 	recs := []client.BandwidthRecord{
 		{IngressBytes: 10, EgressBytes: 1},
-		{IngressBytes: 1000, EgressBytes: 2}, // the spike
+		{IngressBytes: 1000, EgressBytes: 2},
 		{IngressBytes: 10, EgressBytes: 3},
 		{IngressBytes: 20, EgressBytes: 4},
 	}
@@ -65,7 +64,6 @@ func TestSummariseUsesRawSamples(t *testing.T) {
 		t.Errorf("up.avg = %d, want 2", up.avg)
 	}
 
-	// Bucketing all four together would flatten the peak to the mean.
 	b := bucket(recs, 4)
 	if len(b) != 1 {
 		t.Fatalf("bucket produced %d entries, want 1", len(b))
@@ -78,10 +76,10 @@ func TestSummariseUsesRawSamples(t *testing.T) {
 	}
 }
 
-// The window filter must drop samples older than the range.
+// TestSampleWindowFilter ...
 func TestSampleWindowFilter(t *testing.T) {
 	sid := "11111111-1111-1111-1111-111111111111"
-	tn := bwTunnel("default", sid, 600, 3) // 10 minutes of history
+	tn := bwTunnel("default", sid, 600, 3)
 
 	p := newBandwidthPanel(tn, 60)
 	if got := len(p.samples()); got < 55 || got > 65 {
@@ -97,7 +95,7 @@ func TestSampleWindowFilter(t *testing.T) {
 	}
 }
 
-// The bar count must stay drawable even for the widest window.
+// TestBandwidthPanelStopIsIdempotent ...
 func TestBandwidthPanelStopIsIdempotent(t *testing.T) {
 	p := newBandwidthPanel(nil, 60)
 	p.stop()
@@ -109,6 +107,7 @@ func TestBandwidthPanelStopIsIdempotent(t *testing.T) {
 	}
 }
 
+// TestDisplayBucketsCapped ...
 func TestDisplayBucketsCapped(t *testing.T) {
 	for _, secs := range []int{60, 300, 900, 3600, 21600, 86400} {
 		recs := make([]client.BandwidthRecord, secs)
@@ -123,7 +122,6 @@ func TestDisplayBucketsCapped(t *testing.T) {
 			t.Errorf("range %ds produced no bars", secs)
 		}
 	}
-	// A short window must not be thinned at all.
 	recs := make([]client.BandwidthRecord, 60)
 	if got := len(displayBuckets(recs, 60)); got != 60 {
 		t.Errorf("1m window thinned to %d bars, expected all 60", got)

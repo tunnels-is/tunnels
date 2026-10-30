@@ -10,6 +10,7 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+// TestPickPhysicalIPv4Default_SkipsTunnelAndBlackhole ...
 func TestPickPhysicalIPv4Default_SkipsTunnelAndBlackhole(t *testing.T) {
 	tunIdx, wifiIdx := 8, 2
 	routes := []netlink.Route{
@@ -26,6 +27,7 @@ func TestPickPhysicalIPv4Default_SkipsTunnelAndBlackhole(t *testing.T) {
 	}
 }
 
+// TestPickPhysicalIPv4Default_EmptyWhenOnlyTunnel ...
 func TestPickPhysicalIPv4Default_EmptyWhenOnlyTunnel(t *testing.T) {
 	routes := []netlink.Route{
 		{LinkIndex: 8, Gw: net.ParseIP("10.0.0.13"), Priority: 0},
@@ -36,6 +38,7 @@ func TestPickPhysicalIPv4Default_EmptyWhenOnlyTunnel(t *testing.T) {
 	}
 }
 
+// TestIPv4RouteMatches ...
 func TestIPv4RouteMatches(t *testing.T) {
 	gw := net.ParseIP("192.168.2.1").To4()
 	r := &netlink.Route{LinkIndex: 2, Gw: gw}
@@ -50,6 +53,7 @@ func TestIPv4RouteMatches(t *testing.T) {
 	}
 }
 
+// TestHostProtectRouteRequired_SkipsOnLink ...
 func TestHostProtectRouteRequired_SkipsOnLink(t *testing.T) {
 	if hostProtectRouteRequired("127.0.0.1") {
 		t.Fatal("loopback is on-link; watcher must not demand a /32")
@@ -62,6 +66,7 @@ func TestHostProtectRouteRequired_SkipsOnLink(t *testing.T) {
 	}
 }
 
+// TestIsIPv4DefaultRoute ...
 func TestIsIPv4DefaultRoute(t *testing.T) {
 	if !isIPv4DefaultRoute(&netlink.Route{}) {
 		t.Fatal("nil Dst should be default")

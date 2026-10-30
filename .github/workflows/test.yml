@@ -33,7 +33,6 @@ jobs:
       - name: Run tests
         run: go test -v -race ./...
 
-  # Fyne app: linux, windows, and macOS. Same workflow as tag releases.
   desktop:
     uses: ./.github/workflows/desktop.yml
     permissions:

@@ -7,6 +7,7 @@ import (
 	"testing"
 )
 
+// TestLoadDomainSetFromReader ...
 func TestLoadDomainSetFromReader(t *testing.T) {
 	input := strings.Join([]string{
 		"example.com",
@@ -47,6 +48,7 @@ func TestLoadDomainSetFromReader(t *testing.T) {
 	}
 }
 
+// TestLoadDomainSetFromFile ...
 func TestLoadDomainSetFromFile(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "ads")
@@ -66,6 +68,7 @@ func TestLoadDomainSetFromFile(t *testing.T) {
 	}
 }
 
+// TestDomainSet_HasBinarySearch ...
 func TestDomainSet_HasBinarySearch(t *testing.T) {
 	set := DomainSetFromDomains([]string{
 		"zeta.example",
@@ -86,6 +89,7 @@ func TestDomainSet_HasBinarySearch(t *testing.T) {
 	}
 }
 
+// TestDomainCatalog_PerList ...
 func TestDomainCatalog_PerList(t *testing.T) {
 	ads := DomainSetFromDomains([]string{"ads.example.com", "tracker.example.com"})
 	mal := DomainSetFromDomains([]string{"bad.malware.test"})
@@ -121,6 +125,7 @@ func TestDomainCatalog_PerList(t *testing.T) {
 	}
 }
 
+// TestDomainCatalog_ParallelHas ...
 func TestDomainCatalog_ParallelHas(t *testing.T) {
 
 	tags := make([]string, 5)
@@ -143,6 +148,7 @@ func TestDomainCatalog_ParallelHas(t *testing.T) {
 	}
 }
 
+// TestMergeDomainSets ...
 func TestMergeDomainSets(t *testing.T) {
 	a := DomainSetFromDomains([]string{"a.example.com"})
 	b := DomainSetFromDomains([]string{"b.example.com", "a.example.com"})
@@ -155,6 +161,7 @@ func TestMergeDomainSets(t *testing.T) {
 	}
 }
 
+// TestDomainSet_Empty ...
 func TestDomainSet_Empty(t *testing.T) {
 	var s *DomainSet
 	if s.Has("x.com") || s.Len() != 0 {

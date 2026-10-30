@@ -20,6 +20,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+// TestLoginLockout_AfterFiveFailures ...
 func TestLoginLockout_AfterFiveFailures(t *testing.T) {
 	setupTestDB(t)
 	securityReviewLogger()
@@ -54,6 +55,7 @@ func TestLoginLockout_AfterFiveFailures(t *testing.T) {
 	}
 }
 
+// TestRegister_GenericErrorOnDuplicateAndReserved ...
 func TestRegister_GenericErrorOnDuplicateAndReserved(t *testing.T) {
 	setupTestDB(t)
 	securityReviewLogger()
@@ -83,6 +85,7 @@ func TestRegister_GenericErrorOnDuplicateAndReserved(t *testing.T) {
 	}
 }
 
+// TestRegister_NormalizesEmail ...
 func TestRegister_NormalizesEmail(t *testing.T) {
 	setupTestDB(t)
 	securityReviewLogger()
@@ -99,6 +102,7 @@ func TestRegister_NormalizesEmail(t *testing.T) {
 	}
 }
 
+// TestClientAuthMiddleware_RejectsExpiredSubscription ...
 func TestClientAuthMiddleware_RejectsExpiredSubscription(t *testing.T) {
 	setupTestDB(t)
 	securityReviewLogger()
@@ -151,6 +155,7 @@ func TestClientAuthMiddleware_RejectsExpiredSubscription(t *testing.T) {
 	}
 }
 
+// TestClientAuthMiddleware_GenericUnauthorized ...
 func TestClientAuthMiddleware_GenericUnauthorized(t *testing.T) {
 	setupTestDB(t)
 	securityReviewLogger()
@@ -171,6 +176,7 @@ func TestClientAuthMiddleware_GenericUnauthorized(t *testing.T) {
 	}
 }
 
+// TestAdminCookie_ExpiresAndGenericDecryptError ...
 func TestAdminCookie_ExpiresAndGenericDecryptError(t *testing.T) {
 	setupTestDB(t)
 	okKey := strings.Repeat("c", minSecretLen)
@@ -213,6 +219,7 @@ func TestAdminCookie_ExpiresAndGenericDecryptError(t *testing.T) {
 	}
 }
 
+// TestAdminLogout_RevokesCookieToken ...
 func TestAdminLogout_RevokesCookieToken(t *testing.T) {
 	setupTestDB(t)
 	securityReviewLogger()
@@ -249,6 +256,7 @@ func TestAdminLogout_RevokesCookieToken(t *testing.T) {
 	}
 }
 
+// TestInitializeAdminUser_FailsIfNonAdminExists ...
 func TestInitializeAdminUser_FailsIfNonAdminExists(t *testing.T) {
 	setupTestDB(t)
 	securityReviewLogger()
@@ -261,6 +269,7 @@ func TestInitializeAdminUser_FailsIfNonAdminExists(t *testing.T) {
 	}
 }
 
+// TestAssignNextWireGuardIP_SkipsBroadcast ...
 func TestAssignNextWireGuardIP_SkipsBroadcast(t *testing.T) {
 	setupTestDB(t)
 	s := &types.Server{
@@ -286,6 +295,7 @@ func TestAssignNextWireGuardIP_SkipsBroadcast(t *testing.T) {
 	}
 }
 
+// TestUpdateDevice_RejectsDuplicateAndReservedIP ...
 func TestUpdateDevice_RejectsDuplicateAndReservedIP(t *testing.T) {
 	setupTestDB(t)
 	s := &types.Server{
@@ -313,6 +323,7 @@ func TestUpdateDevice_RejectsDuplicateAndReservedIP(t *testing.T) {
 	}
 }
 
+// TestRejectServerWireGuardKey_EmptyRejected ...
 func TestRejectServerWireGuardKey_EmptyRejected(t *testing.T) {
 	if err := rejectServerWireGuardKey(""); err == nil {
 		t.Fatal("empty WireGuard key must be rejected")
@@ -322,6 +333,7 @@ func TestRejectServerWireGuardKey_EmptyRejected(t *testing.T) {
 	}
 }
 
+// TestRejectServerWireGuardKey ...
 func TestRejectServerWireGuardKey(t *testing.T) {
 	setupTestDB(t)
 	s := &types.Server{
@@ -339,6 +351,7 @@ func TestRejectServerWireGuardKey(t *testing.T) {
 	}
 }
 
+// TestRejectServerWireGuardKey_NonCanonicalEncoding ...
 func TestRejectServerWireGuardKey_NonCanonicalEncoding(t *testing.T) {
 	setupTestDB(t)
 	raw := bytes.Repeat([]byte{0xab}, 32)
@@ -367,6 +380,7 @@ func TestRejectServerWireGuardKey_NonCanonicalEncoding(t *testing.T) {
 	}
 }
 
+// TestWGConfig_HidesForeignKeyAndExpiredSub ...
 func TestWGConfig_HidesForeignKeyAndExpiredSub(t *testing.T) {
 	setupTestDB(t)
 	securityReviewLogger()
@@ -411,6 +425,7 @@ func TestWGConfig_HidesForeignKeyAndExpiredSub(t *testing.T) {
 	}
 }
 
+// TestNextSubExpirationFromLemon_DoesNotStack ...
 func TestNextSubExpirationFromLemon_DoesNotStack(t *testing.T) {
 	created := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 	u := &User{
@@ -431,6 +446,7 @@ func TestNextSubExpirationFromLemon_DoesNotStack(t *testing.T) {
 	}
 }
 
+// TestTokenUpdate_DoesNotRestoreListClearedByReset ...
 func TestTokenUpdate_DoesNotRestoreListClearedByReset(t *testing.T) {
 	setupTestDB(t)
 	securityReviewLogger()
@@ -482,6 +498,7 @@ func TestTokenUpdate_DoesNotRestoreListClearedByReset(t *testing.T) {
 	}
 }
 
+// TestLoginDeviceToken_RotatesOnlyThePresentedToken ...
 func TestLoginDeviceToken_RotatesOnlyThePresentedToken(t *testing.T) {
 	setupTestDB(t)
 	keep := &DeviceToken{DT: uuid.NewString(), N: "keep", Created: time.Now().Add(-time.Hour)}
@@ -517,6 +534,7 @@ func TestLoginDeviceToken_RotatesOnlyThePresentedToken(t *testing.T) {
 	}
 }
 
+// TestUserLogout_RevokesCurrentDeviceToken ...
 func TestUserLogout_RevokesCurrentDeviceToken(t *testing.T) {
 	setupTestDB(t)
 	securityReviewLogger()
@@ -542,6 +560,7 @@ func TestUserLogout_RevokesCurrentDeviceToken(t *testing.T) {
 	}
 }
 
+// TestAdminUpdate_NormalizesEmail ...
 func TestAdminUpdate_NormalizesEmail(t *testing.T) {
 	setupTestDB(t)
 	u := &User{ID: uuid.New(), Email: "jane@old.com"}
@@ -567,6 +586,7 @@ func TestAdminUpdate_NormalizesEmail(t *testing.T) {
 	}
 }
 
+// TestCreateUser_RejectsDuplicateNormalizedEmail ...
 func TestCreateUser_RejectsDuplicateNormalizedEmail(t *testing.T) {
 	setupTestDB(t)
 	a := &User{ID: uuid.New(), Email: "Foo@Example.COM"}
@@ -579,6 +599,7 @@ func TestCreateUser_RejectsDuplicateNormalizedEmail(t *testing.T) {
 	}
 }
 
+// TestCreateUser_StoresNormalizedEmail ...
 func TestCreateUser_StoresNormalizedEmail(t *testing.T) {
 	setupTestDB(t)
 	u := &User{ID: uuid.New(), Email: "  Mixed.Case@Example.COM "}
@@ -601,6 +622,7 @@ func TestCreateUser_StoresNormalizedEmail(t *testing.T) {
 	}
 }
 
+// TestEmailIndex_NormalizedLookupAndSubTime ...
 func TestEmailIndex_NormalizedLookupAndSubTime(t *testing.T) {
 	setupTestDB(t)
 	u := &User{ID: uuid.New(), Email: "Mixed.Case@Example.COM"}
@@ -639,6 +661,7 @@ func TestEmailIndex_NormalizedLookupAndSubTime(t *testing.T) {
 	}
 }
 
+// TestOpenDB_RejectsWorldReadable ...
 func TestOpenDB_RejectsWorldReadable(t *testing.T) {
 	dir := t.TempDir()
 	path := dir + "/tunnels.db"

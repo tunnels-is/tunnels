@@ -21,8 +21,6 @@ const (
 	authLimitRegister
 )
 
-// authWindow is the attempt count for one limiter key. The clock starts on
-// the first attempt in the window and is not extended by later attempts.
 type authWindow struct {
 	count int
 	start time.Time
@@ -47,8 +45,6 @@ func authLimitKey(kind authLimitKind, email, ip string) (string, int) {
 	}
 }
 
-// takeAuthSlot records one attempt and reports whether it may proceed.
-// The check and the increment happen together, before bcrypt or PBKDF2.
 func takeAuthSlot(kind authLimitKind, email, ip string) bool {
 	if kind != authLimitRegister && normalizeEmail(email) == "" {
 		return false
@@ -69,8 +65,6 @@ func takeAuthSlot(kind authLimitKind, email, ip string) bool {
 	return true
 }
 
-// clearAuthSlot forgets the login or reset counter after a success.
-// Registration attempts stay until the window expires.
 func clearAuthSlot(kind authLimitKind, email, ip string) {
 	if kind == authLimitRegister {
 		return
@@ -81,8 +75,6 @@ func clearAuthSlot(kind authLimitKind, email, ip string) {
 	authLimitMu.Unlock()
 }
 
-// cleanPasswordResetAttempts drops windows that have expired.
-// The background signal worker calls this once a minute.
 func cleanPasswordResetAttempts() {
 	now := time.Now()
 	authLimitMu.Lock()

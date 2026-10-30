@@ -60,13 +60,6 @@ func (a *App) refreshState() {
 	a.syncTray()
 }
 
-// setUser makes u the active account.
-//
-// Tunnels and devices live in a per-account workspace on disk, and the client
-// only reads them when that workspace is activated. This has to happen before
-// refreshState, and synchronously: relying on SaveUser to activate as a side
-// effect left the tunnel list empty for the whole session, because it ran on
-// another goroutine and nothing re-read the state once it finished.
 func (a *App) setUser(u *client.User) {
 	a.user = u
 	if u != nil && u.ID != "" {
@@ -82,7 +75,6 @@ func (a *App) setUser(u *client.User) {
 	a.localDevices = nil
 	a.serversLoaded = false
 	a.devicesLoaded = false
-	// Pick up the newly activated workspace's tunnels.
 	a.refreshState()
 }
 
@@ -91,7 +83,6 @@ func (a *App) clearSession() {
 	a.servers = nil
 	a.devices = nil
 	a.localDevices = nil
-	// Tunnels belong to the account that just went away.
 	a.tunnels = nil
 	a.serversLoaded = false
 	a.devicesLoaded = false
@@ -211,8 +202,6 @@ func (a *App) fetchServers(force bool) {
 			case pageServers, pageTunnels, pageDevices, pageTunnelEdit, pageDashboard:
 				a.reloadCurrent()
 			}
-			// The dashboard's first probe waits on this: on a cold start the
-			// server list is still in flight when the page is first built.
 			a.maybeAutoProbe()
 		})
 	}()
@@ -354,8 +343,6 @@ func (a *App) connectTunnel(meta *client.TunnelMeta) {
 	}()
 }
 
-// connectTunnelByTag connects the saved tunnel with this tag. The tray menu
-// keeps the tag, not the meta pointer, because refreshState replaces the slice.
 func (a *App) connectTunnelByTag(tag string) {
 	for _, meta := range a.tunnels {
 		if meta != nil && meta.Tag == tag {
@@ -406,8 +393,6 @@ func (a *App) disconnectActive(t *client.TUN) {
 	}()
 }
 
-// toggleConfig flips a boolean config field in the background. Callers are
-// switches, which already show the new state, so nothing rebuilds on success.
 func (a *App) toggleConfig(key string) {
 	a.updateConfig("Applying setting", func(cfg *client.Config) {
 		toggleConfigField(cfg, key)
@@ -501,8 +486,6 @@ func (a *App) startLogPump() {
 	}()
 }
 
-// paintLogs refreshes the log list in place. The list is virtualised, so the
-// whole buffer can be bound without the old 200-line truncation.
 func (a *App) paintLogs() {
 	prevN := len(a.logView)
 	prevHead := ""
@@ -511,7 +494,6 @@ func (a *App) paintLogs() {
 	}
 	a.recomputeLogView()
 	if a.logList == nil {
-		// The page is showing its empty state; rebuild so the list appears.
 		if len(a.logView) > 0 {
 			a.reloadCurrent()
 		}

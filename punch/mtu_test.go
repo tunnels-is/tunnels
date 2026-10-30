@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 )
 
+// TestPingPlainForOuter1500 ...
 func TestPingPlainForOuter1500(t *testing.T) {
 	plain, ok := PingPlainForOuter(1500, false)
 	if !ok {
@@ -35,6 +36,7 @@ func TestPingPlainForOuter1500(t *testing.T) {
 	}
 }
 
+// TestOpenPingStillAcceptsEightBytes ...
 func TestOpenPingStillAcceptsEightBytes(t *testing.T) {
 	a, _ := NewPrivate()
 	b, _ := NewPrivate()
@@ -56,6 +58,7 @@ func TestOpenPingStillAcceptsEightBytes(t *testing.T) {
 	}
 }
 
+// TestMTUProbeAck ...
 func TestMTUProbeAck(t *testing.T) {
 	payload := ProbePayloadLen(1500, false)
 	pkt, err := BuildMTUProbe(payload)
@@ -77,6 +80,7 @@ func TestMTUProbeAck(t *testing.T) {
 	}
 }
 
+// TestEngineDiscoversFullPath ...
 func TestEngineDiscoversFullPath(t *testing.T) {
 	a, b, now := newMTUPair(t)
 	a.SetDiscoverMTU(true)
@@ -87,17 +91,16 @@ func TestEngineDiscoversFullPath(t *testing.T) {
 	}
 }
 
+// TestEngineIgnoredProbeLeavesPathUp ...
 func TestEngineIgnoredProbeLeavesPathUp(t *testing.T) {
 	a, b, now := newMTUPair(t)
 	a.SetDiscoverMTU(true)
-	// B behaves like an older peer: padded pings get no pong. Trust pings stay small.
 	runMTUExchange(t, a, b, now, func(pkt []byte) bool {
 		return TypeOf(pkt) != TypePing || len(pkt) < 200
 	})
 	if _, ok := a.Direct(netip.MustParseAddr("10.0.1.8")); !ok {
 		t.Fatal("ignored mtu probe took the direct path down")
 	}
-	// Drain the search. Keepalives and small pings still flow.
 	deadline := now.Add(40 * time.Second)
 	for now.Before(deadline) {
 		now = now.Add(MTUProbeTimeout)

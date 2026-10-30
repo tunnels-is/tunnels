@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 )
 
+// TestPairAdmitted ...
 func TestPairAdmitted(t *testing.T) {
 	a := netip.MustParseAddr("10.0.0.5")
 	b := netip.MustParseAddr("10.0.1.8")
@@ -34,6 +35,7 @@ func TestPairAdmitted(t *testing.T) {
 	}
 }
 
+// TestReflexRoundTrip ...
 func TestReflexRoundTrip(t *testing.T) {
 	srvPriv, err := NewPrivate()
 	if err != nil {
@@ -69,6 +71,7 @@ func TestReflexRoundTrip(t *testing.T) {
 	}
 }
 
+// TestEnginePunchesAndRefuses ...
 func TestEnginePunchesAndRefuses(t *testing.T) {
 	aPriv, _ := NewPrivate()
 	bPriv, _ := NewPrivate()

@@ -22,6 +22,7 @@ func checkLogUniqueness(log *string) (shouldLog bool) {
 	return false
 }
 
+// CleanUniqueLogMap ...
 func CleanUniqueLogMap() {
 	defer func() {
 		time.Sleep(10 * time.Second)
@@ -42,6 +43,7 @@ func callerName(skip int) string {
 	return sn[len(sn)-1]
 }
 
+// DEBUG ...
 func DEBUG(Line ...any) {
 	conf := CONFIG.Load()
 	state := STATE.Load()
@@ -68,6 +70,7 @@ func DEBUG(Line ...any) {
 	}
 }
 
+// ERROR ...
 func ERROR(Line ...any) {
 	conf := CONFIG.Load()
 	state := STATE.Load()
@@ -95,6 +98,7 @@ func ERROR(Line ...any) {
 	}
 }
 
+// SECURITY ...
 func SECURITY(Line ...any) {
 	x := ""
 	for _, v := range Line {
@@ -109,6 +113,7 @@ func SECURITY(Line ...any) {
 	}
 }
 
+// INFO ...
 func INFO(Line ...any) {
 	conf := CONFIG.Load()
 	state := STATE.Load()
@@ -135,6 +140,7 @@ func INFO(Line ...any) {
 	}
 }
 
+// ROUTINE ...
 func ROUTINE(Line ...any) {
 	conf := CONFIG.Load()
 	state := STATE.Load()
@@ -161,6 +167,7 @@ func ROUTINE(Line ...any) {
 	}
 }
 
+// StartLogQueueProcessor ...
 func StartLogQueueProcessor() {
 	defer RecoverAndLog()
 	DEBUG("Starting the log processor")
@@ -249,6 +256,7 @@ func wgLog(level, format string, args ...any) {
 	}
 }
 
+// NewWGLogger ...
 func NewWGLogger() *wgdevice.Logger {
 	return &wgdevice.Logger{
 		Verbosef: func(format string, args ...any) {

@@ -12,10 +12,9 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
-// ---------------------------------------------------------------- sizing
-
 type fixedLayout struct{ w, h float32 }
 
+// Layout ...
 func (f fixedLayout) Layout(objs []fyne.CanvasObject, size fyne.Size) {
 	for _, o := range objs {
 		o.Move(fyne.NewPos(0, 0))
@@ -23,6 +22,7 @@ func (f fixedLayout) Layout(objs []fyne.CanvasObject, size fyne.Size) {
 	}
 }
 
+// MinSize ...
 func (f fixedLayout) MinSize(objs []fyne.CanvasObject) fyne.Size {
 	var h float32 = f.h
 	for _, o := range objs {
@@ -35,10 +35,6 @@ func fixedWidth(w float32, obj fyne.CanvasObject) *fyne.Container {
 	return container.New(fixedLayout{w: w}, obj)
 }
 
-// ---------------------------------------------------------------- fields
-
-// Entries are left unwrapped: the theme supplies input background, border and
-// radius, so a bare Entry already matches the rest of the kit.
 func kEntry(placeholder, value string) *widget.Entry {
 	e := widget.NewEntry()
 	e.SetPlaceHolder(placeholder)
@@ -62,28 +58,25 @@ func kMultiline(value string, rows int) *widget.Entry {
 	return e
 }
 
-// field stacks a small label above its control.
 func field(label string, obj fyne.CanvasObject) fyne.CanvasObject {
 	return vstack(sp1+2, fieldLabel(label), obj)
 }
 
-// fieldWith adds a one-line explanation under the control.
 func fieldWith(label, note string, obj fyne.CanvasObject) fyne.CanvasObject {
 	return vstack(sp1+2, fieldLabel(label), obj, hint(note))
 }
 
-// formRows lays out fields in a single readable column.
 func formRows(objs ...fyne.CanvasObject) fyne.CanvasObject {
 	return capWidth(formWidth, vstack(sp3, objs...))
 }
 
-// formPair puts two fields side by side for short values like IP and port.
 func formPair(a, b fyne.CanvasObject) fyne.CanvasObject {
 	return container.New(equalColsLayout{gap: sp3}, a, b)
 }
 
 type equalColsLayout struct{ gap float32 }
 
+// Layout ...
 func (e equalColsLayout) Layout(objs []fyne.CanvasObject, size fyne.Size) {
 	if len(objs) == 0 {
 		return
@@ -98,6 +91,7 @@ func (e equalColsLayout) Layout(objs []fyne.CanvasObject, size fyne.Size) {
 	}
 }
 
+// MinSize ...
 func (e equalColsLayout) MinSize(objs []fyne.CanvasObject) fyne.Size {
 	var w, h float32
 	for _, o := range objs {
@@ -116,12 +110,8 @@ func kSelect(opts []string, selected string, onChange func(string)) *widget.Sele
 	return s
 }
 
-// searchField is a fixed-width filter box. Fixed width matters: in a header
-// row a growing entry pushes the action buttons off the edge.
 func searchField(placeholder, value string, onChange, onSubmit func(string)) (*widget.Entry, fyne.CanvasObject) {
 	e := widget.NewEntry()
-	// ActionItem has to be assigned before anything that can build the
-	// renderer (SetText does), otherwise the icon is never added to it.
 	icon := iconImage(theme.NewColoredResource(theme.SearchIcon(), colFaint))
 	e.ActionItem = fixedWidth(iconSize, icon)
 	e.SetPlaceHolder(placeholder)
@@ -131,15 +121,12 @@ func searchField(placeholder, value string, onChange, onSubmit func(string)) (*w
 	return e, fixedWidth(searchWidth, e)
 }
 
-// ---------------------------------------------------------------- row editor
-
-// weightedColsLayout splits its width between children by weight, so the
-// columns of a repeatable row line up with the header above them.
 type weightedColsLayout struct {
 	weights []float32
 	gap     float32
 }
 
+// Layout ...
 func (w weightedColsLayout) Layout(objs []fyne.CanvasObject, size fyne.Size) {
 	if len(objs) == 0 {
 		return
@@ -165,6 +152,7 @@ func (w weightedColsLayout) weight(i int) float32 {
 	return 1
 }
 
+// MinSize ...
 func (w weightedColsLayout) MinSize(objs []fyne.CanvasObject) fyne.Size {
 	var width, h float32
 	for _, o := range objs {
@@ -178,20 +166,12 @@ func (w weightedColsLayout) MinSize(objs []fyne.CanvasObject) fyne.Size {
 	return fyne.NewSize(width, h)
 }
 
-// fieldCol describes one column of a rowEditor.
 type fieldCol struct {
 	label       string
 	placeholder string
 	weight      float32
 }
 
-// rowEditor edits a repeatable list of records — one row of entries per record,
-// with add and remove. It replaces the multiline "one per line, space
-// separated" text areas, which hid the record structure and silently dropped
-// any field the parser did not know about.
-//
-// Rows own their entry widgets, so adding or removing a row leaves text already
-// typed in the other rows untouched.
 type rowEditor struct {
 	noun   string
 	cols   []fieldCol
@@ -241,7 +221,6 @@ func (e *rowEditor) weights() []float32 {
 func (e *rowEditor) render() {
 	items := make([]fyne.CanvasObject, 0, len(e.rows)+2)
 
-	// Column headings, only worth showing when a row has several fields.
 	if len(e.cols) > 1 {
 		heads := make([]fyne.CanvasObject, len(e.cols))
 		for i, c := range e.cols {
@@ -279,7 +258,6 @@ func (e *rowEditor) render() {
 	}
 }
 
-// values returns the trimmed rows, skipping any row left entirely blank.
 func (e *rowEditor) values() [][]string {
 	out := make([][]string, 0, len(e.rows))
 	for _, row := range e.rows {
@@ -298,7 +276,6 @@ func (e *rowEditor) values() [][]string {
 	return out
 }
 
-// column returns column i of every non-blank row.
 func (e *rowEditor) column(i int) []string {
 	var out []string
 	for _, v := range e.values() {
@@ -311,10 +288,6 @@ func (e *rowEditor) column(i int) []string {
 
 func (e *rowEditor) object() fyne.CanvasObject { return e.box }
 
-// ---------------------------------------------------------------- switch
-
-// kSwitch replaces widget.Check for on/off settings. Stock checkboxes are the
-// one control that never matched the rest of the kit.
 type kSwitch struct {
 	widget.BaseWidget
 	on       bool
@@ -329,6 +302,7 @@ func newSwitch(on bool, onChange func(bool)) *kSwitch {
 	return s
 }
 
+// Tapped ...
 func (s *kSwitch) Tapped(*fyne.PointEvent) {
 	if s.disabled {
 		return
@@ -340,10 +314,16 @@ func (s *kSwitch) Tapped(*fyne.PointEvent) {
 	}
 }
 
-func (s *kSwitch) MouseIn(*desktop.MouseEvent)    { s.hovered = true; s.Refresh() }
-func (s *kSwitch) MouseOut()                      { s.hovered = false; s.Refresh() }
+// MouseIn ...
+func (s *kSwitch) MouseIn(*desktop.MouseEvent) { s.hovered = true; s.Refresh() }
+
+// MouseOut ...
+func (s *kSwitch) MouseOut() { s.hovered = false; s.Refresh() }
+
+// MouseMoved ...
 func (s *kSwitch) MouseMoved(*desktop.MouseEvent) {}
 
+// Cursor ...
 func (s *kSwitch) Cursor() desktop.Cursor {
 	if s.disabled {
 		return desktop.DefaultCursor
@@ -351,6 +331,7 @@ func (s *kSwitch) Cursor() desktop.Cursor {
 	return desktop.PointerCursor
 }
 
+// CreateRenderer ...
 func (s *kSwitch) CreateRenderer() fyne.WidgetRenderer {
 	track := surface(radFull, color.Transparent, nil)
 	knob := canvas.NewCircle(color.White)
@@ -366,16 +347,21 @@ type switchRenderer struct {
 	objs  []fyne.CanvasObject
 }
 
+// Destroy ...
 func (r *switchRenderer) Destroy() {}
 
+// Objects ...
 func (r *switchRenderer) Objects() []fyne.CanvasObject {
 	if r.objs == nil {
 		r.objs = []fyne.CanvasObject{r.track, r.knob}
 	}
 	return r.objs
 }
+
+// MinSize ...
 func (r *switchRenderer) MinSize() fyne.Size { return fyne.NewSize(swWidth, swHeight) }
 
+// Layout ...
 func (r *switchRenderer) Layout(size fyne.Size) {
 	y := (size.Height - swHeight) / 2
 	r.track.Resize(fyne.NewSize(swWidth, swHeight))
@@ -389,6 +375,7 @@ func (r *switchRenderer) Layout(size fyne.Size) {
 	r.knob.Move(fyne.NewPos(x, y+off))
 }
 
+// Refresh ...
 func (r *switchRenderer) Refresh() {
 	r.apply()
 	r.Layout(r.s.Size())
@@ -429,8 +416,6 @@ func toNRGBA(c color.Color) color.NRGBA {
 	return color.NRGBA{R: uint8(r >> 8), G: uint8(g >> 8), B: uint8(b >> 8), A: uint8(a >> 8)}
 }
 
-// settingRow is title + explanation on the left, control hard right. Used for
-// every toggle in Settings and DNS.
 func settingRow(title, desc string, control fyne.CanvasObject) fyne.CanvasObject {
 	left := []fyne.CanvasObject{body(title)}
 	if desc != "" {
@@ -440,7 +425,6 @@ func settingRow(title, desc string, control fyne.CanvasObject) fyne.CanvasObject
 	return insetEach(sp3, 0, sp3, 0, row)
 }
 
-// settingList interleaves hairlines between setting rows.
 func settingList(rows ...fyne.CanvasObject) fyne.CanvasObject {
 	out := make([]fyne.CanvasObject, 0, len(rows)*2)
 	for i, r := range rows {
@@ -452,20 +436,15 @@ func settingList(rows ...fyne.CanvasObject) fyne.CanvasObject {
 	return vstack(0, out...)
 }
 
-// toggleRow is the common case: a switch bound to a config key.
 func toggleRow(title, desc string, on bool, onChange func(bool)) fyne.CanvasObject {
 	return settingRow(title, desc, newSwitch(on, onChange))
 }
-
-// ---------------------------------------------------------------- segmented
 
 type segItem struct {
 	key   string
 	label string
 }
 
-// segControl is a pill tab strip. It replaces both stock AppTabs and the rows
-// of highlighted buttons that used to serve as tabs.
 type segControl struct {
 	widget.BaseWidget
 	items    []segItem
@@ -477,7 +456,6 @@ type segControl struct {
 
 func newSegmented(items []segItem, active string, onSelect func(string)) *segControl {
 	s := &segControl{items: items, active: active, hover: -1, onSelect: onSelect}
-	// Labels never change, so measure once instead of on every mouse move.
 	s.widths = make([]float32, len(items))
 	for i, it := range items {
 		s.widths[i] = text(it.label, fsSmall, color.Black, true).MinSize().Width + sp3*2
@@ -505,6 +483,7 @@ func (s *segControl) itemWidth(i int) float32 {
 	return s.widths[i]
 }
 
+// Tapped ...
 func (s *segControl) Tapped(e *fyne.PointEvent) {
 	if i := s.index(e.Position.X); i >= 0 {
 		s.active = s.items[i].key
@@ -515,9 +494,13 @@ func (s *segControl) Tapped(e *fyne.PointEvent) {
 	}
 }
 
+// MouseIn ...
 func (s *segControl) MouseIn(e *desktop.MouseEvent) { s.MouseMoved(e) }
-func (s *segControl) MouseOut()                     { s.hover = -1; s.Refresh() }
 
+// MouseOut ...
+func (s *segControl) MouseOut() { s.hover = -1; s.Refresh() }
+
+// MouseMoved ...
 func (s *segControl) MouseMoved(e *desktop.MouseEvent) {
 	if i := s.index(e.Position.X); i != s.hover {
 		s.hover = i
@@ -525,8 +508,10 @@ func (s *segControl) MouseMoved(e *desktop.MouseEvent) {
 	}
 }
 
+// Cursor ...
 func (s *segControl) Cursor() desktop.Cursor { return desktop.PointerCursor }
 
+// CreateRenderer ...
 func (s *segControl) CreateRenderer() fyne.WidgetRenderer {
 	r := &segRenderer{s: s, bg: surface(radMd, pal().Elevate, pal().Base300)}
 	for range s.items {
@@ -545,8 +530,10 @@ type segRenderer struct {
 	objs   []fyne.CanvasObject
 }
 
+// Destroy ...
 func (r *segRenderer) Destroy() {}
 
+// Objects ...
 func (r *segRenderer) Objects() []fyne.CanvasObject {
 	if r.objs == nil {
 		r.objs = make([]fyne.CanvasObject, 0, len(r.pills)*2+1)
@@ -561,6 +548,7 @@ func (r *segRenderer) Objects() []fyne.CanvasObject {
 	return r.objs
 }
 
+// MinSize ...
 func (r *segRenderer) MinSize() fyne.Size {
 	var w float32
 	for i := range r.s.items {
@@ -569,6 +557,7 @@ func (r *segRenderer) MinSize() fyne.Size {
 	return fyne.NewSize(w+segInset*2, segHeight)
 }
 
+// Layout ...
 func (r *segRenderer) Layout(size fyne.Size) {
 	r.bg.Resize(size)
 	x := segInset
@@ -582,6 +571,7 @@ func (r *segRenderer) Layout(size fyne.Size) {
 	}
 }
 
+// Refresh ...
 func (r *segRenderer) Refresh() {
 	r.apply()
 	r.bg.Refresh()
@@ -616,9 +606,6 @@ func (r *segRenderer) apply() {
 	}
 }
 
-// ---------------------------------------------------------------- link row
-
-// linkRow is a name plus destination that opens a URL, used on the support page.
 func linkRow(a *App, name, dest, href string) fyne.CanvasObject {
 	p := pal()
 	title := text(name, fsBody, p.Content, false)
@@ -628,18 +615,10 @@ func linkRow(a *App, name, dest, href string) fyne.CanvasObject {
 	return newTap(insetEach(sp2, 0, sp2, 0, row), func() { a.openURL(href) })
 }
 
-// ---------------------------------------------------------------- page shell
-
-// pageShell is the frame every page uses: title block, hairline, then body.
-// One implementation means every page has the same gutters and header rhythm.
-// Page titles are always one line, so canvas.Text is used for exact placement:
-// the title lands on the same x as card edges and list row titles.
 func pageShell(title, subtitle string, actions fyne.CanvasObject, content fyne.CanvasObject) fyne.CanvasObject {
 	return buildShell(title, subtitle, actions, content, true)
 }
 
-// pageShellFlush drops the rule under the header. Table pages use it because
-// the column header supplies its own hairline immediately below.
 func pageShellFlush(title, subtitle string, actions fyne.CanvasObject, content fyne.CanvasObject) fyne.CanvasObject {
 	return buildShell(title, subtitle, actions, content, false)
 }
@@ -657,43 +636,31 @@ func buildShell(title, subtitle string, actions, content fyne.CanvasObject, rule
 	return container.NewBorder(vstack(0, rows...), nil, nil, nil, content)
 }
 
-// scrollFlow is the card masonry scrollBody scrolls. A page that must refresh
-// the flow when a card changes height keeps this container.
 func scrollFlow(objs ...fyne.CanvasObject) *fyne.Container {
 	return container.New(&cardFlowLayout{minCol: z(430), maxCol: 3, gap: sp4}, objs...)
 }
 
-// scrollBody is the standard page body: cards flowed into as many columns as
-// the window allows, rather than one full-width stack.
 func scrollBody(objs ...fyne.CanvasObject) fyne.CanvasObject {
 	return scrollBodyOf(scrollFlow(objs...))
 }
 
-// wrapBody packs cards at their content width, wrapping to the next row
-// when the next card does not fit. List pages use it so a card is only as
-// wide as its text and buttons.
 func wrapBody(objs ...fyne.CanvasObject) fyne.CanvasObject {
 	return scrollBodyOf(wrapFlow(objs...))
 }
 
-// scrollBodyOf wraps content the caller already holds, for pages that need to
-// refresh it directly when a card changes height.
 func scrollBodyOf(col fyne.CanvasObject) fyne.CanvasObject {
 	return boostScroll(container.NewVScroll(insetEach(sp5, gutter, sp8, gutter, col)))
 }
 
-// centredBody centres a fixed-width column, for login and other focused flows.
 func centredBody(width float32, objs ...fyne.CanvasObject) fyne.CanvasObject {
 	col := vstack(sp4, objs...)
 	return boostScroll(container.NewVScroll(
 		container.NewCenter(container.New(fixedLayout{w: width}, col))))
 }
 
-// stage centres a column in the page body. The scroll grows to the viewport,
-// so a short column sits in the middle of the screen. A column taller than
-// the viewport starts at the top and scrolls.
 type stageLayout struct{ w float32 }
 
+// Layout ...
 func (s stageLayout) Layout(objs []fyne.CanvasObject, size fyne.Size) {
 	w := s.w
 	if size.Width > 0 && w > size.Width {
@@ -718,6 +685,7 @@ func (s stageLayout) Layout(objs []fyne.CanvasObject, size fyne.Size) {
 	}
 }
 
+// MinSize ...
 func (s stageLayout) MinSize(objs []fyne.CanvasObject) fyne.Size {
 	var h float32
 	for _, o := range objs {

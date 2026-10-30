@@ -5,6 +5,7 @@ import (
 	"testing"
 )
 
+// TestEncryptDecryptRoundTrip ...
 func TestEncryptDecryptRoundTrip(t *testing.T) {
 
 	testCases := []struct {
@@ -81,6 +82,7 @@ func TestEncryptDecryptRoundTrip(t *testing.T) {
 	}
 }
 
+// TestEncryptProducesUniqueOutputs ...
 func TestEncryptProducesUniqueOutputs(t *testing.T) {
 	plaintext := []byte("The same plaintext encrypted twice")
 	key := make([]byte, 32)
@@ -117,6 +119,7 @@ func TestEncryptProducesUniqueOutputs(t *testing.T) {
 	}
 }
 
+// TestDecryptWithWrongKey ...
 func TestDecryptWithWrongKey(t *testing.T) {
 	plaintext := []byte("Secret message")
 	correctKey := make([]byte, 32)
@@ -138,6 +141,7 @@ func TestDecryptWithWrongKey(t *testing.T) {
 	}
 }
 
+// TestDecryptTamperedCiphertext ...
 func TestDecryptTamperedCiphertext(t *testing.T) {
 	plaintext := []byte("Another secret message")
 	key := make([]byte, 32)
@@ -160,6 +164,7 @@ func TestDecryptTamperedCiphertext(t *testing.T) {
 	}
 }
 
+// TestDecryptTooShort ...
 func TestDecryptTooShort(t *testing.T) {
 	key := make([]byte, 32)
 	for i := range key {
@@ -172,6 +177,7 @@ func TestDecryptTooShort(t *testing.T) {
 	}
 }
 
+// TestEncryptWithInvalidKeySize ...
 func TestEncryptWithInvalidKeySize(t *testing.T) {
 	plaintext := []byte("Test message")
 	invalidKey := []byte{0x01, 0x02, 0x03}
@@ -184,6 +190,7 @@ func TestEncryptWithInvalidKeySize(t *testing.T) {
 	t.Logf("Encrypt correctly rejected invalid key size: %v", err)
 }
 
+// TestDecryptWithInvalidKeySize ...
 func TestDecryptWithInvalidKeySize(t *testing.T) {
 
 	encrypted := make([]byte, 28)

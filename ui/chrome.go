@@ -13,12 +13,9 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
-// ---------------------------------------------------------------- layouts
-
-// insetLayout pads its children by an exact amount on each edge. Preferred over
-// nested container.NewPadded so spacing is a number you can read off the call.
 type insetLayout struct{ t, r, b, l float32 }
 
+// Layout ...
 func (i insetLayout) Layout(objs []fyne.CanvasObject, size fyne.Size) {
 	w := max32(0, size.Width-i.l-i.r)
 	h := max32(0, size.Height-i.t-i.b)
@@ -32,6 +29,7 @@ func (i insetLayout) Layout(objs []fyne.CanvasObject, size fyne.Size) {
 	}
 }
 
+// MinSize ...
 func (i insetLayout) MinSize(objs []fyne.CanvasObject) fyne.Size {
 	var w, h float32
 	for _, o := range objs {
@@ -57,9 +55,6 @@ func insetEach(t, r, b, l float32, obj fyne.CanvasObject) *fyne.Container {
 	return container.New(insetLayout{t, r, b, l}, obj)
 }
 
-// dropShadow fakes elevation. Fyne has no shadow primitive, so a few
-// progressively larger, fainter rounded rects sit behind the content, offset
-// downwards so the light reads as coming from above.
 func dropShadow(radius float32, content fyne.CanvasObject) fyne.CanvasObject {
 	p := pal()
 	layers := make([]fyne.CanvasObject, 0, 4)
@@ -77,9 +72,9 @@ func dropShadow(radius float32, content fyne.CanvasObject) fyne.CanvasObject {
 	return container.NewStack(append(layers, content)...)
 }
 
-// strictLayout forces an exact size, ignoring what the child asks for.
 type strictLayout struct{ w, h float32 }
 
+// Layout ...
 func (s strictLayout) Layout(objs []fyne.CanvasObject, _ fyne.Size) {
 	for _, o := range objs {
 		o.Move(fyne.NewPos(0, 0))
@@ -87,17 +82,17 @@ func (s strictLayout) Layout(objs []fyne.CanvasObject, _ fyne.Size) {
 	}
 }
 
+// MinSize ...
 func (s strictLayout) MinSize([]fyne.CanvasObject) fyne.Size {
 	return fyne.NewSize(s.w, s.h)
 }
 
-// capLayout caps a child's width and pins it to the left. Keeps forms readable
-// instead of stretching inputs across a 1280px window.
 type capLayout struct {
 	max     float32
 	centred bool
 }
 
+// Layout ...
 func (c capLayout) Layout(objs []fyne.CanvasObject, size fyne.Size) {
 	w := min32(c.max, size.Width)
 	x := float32(0)
@@ -110,6 +105,7 @@ func (c capLayout) Layout(objs []fyne.CanvasObject, size fyne.Size) {
 	}
 }
 
+// MinSize ...
 func (c capLayout) MinSize(objs []fyne.CanvasObject) fyne.Size {
 	var w, h float32
 	for _, o := range objs {
@@ -124,10 +120,9 @@ func capWidth(w float32, obj fyne.CanvasObject) *fyne.Container {
 	return container.New(capLayout{max: w}, obj)
 }
 
-// vstack lays children out top to bottom with one exact gap between them,
-// unlike VBox which uses theme padding.
 type vstackLayout struct{ gap float32 }
 
+// Layout ...
 func (v vstackLayout) Layout(objs []fyne.CanvasObject, size fyne.Size) {
 	y := float32(0)
 	for _, o := range objs {
@@ -141,6 +136,7 @@ func (v vstackLayout) Layout(objs []fyne.CanvasObject, size fyne.Size) {
 	}
 }
 
+// MinSize ...
 func (v vstackLayout) MinSize(objs []fyne.CanvasObject) fyne.Size {
 	var w, h float32
 	n := 0
@@ -163,19 +159,13 @@ func vstack(gap float32, objs ...fyne.CanvasObject) *fyne.Container {
 	return container.New(vstackLayout{gap: gap}, objs...)
 }
 
-// hstack lays children out left to right with one exact gap, each at its
-// minimum width, vertically centred. flex names the child to shrink when the
-// row does not fit; -1 means shrink whichever is widest.
 type hstackLayout struct {
 	gap  float32
 	flex int
 }
 
+// Layout ...
 func (h hstackLayout) Layout(objs []fyne.CanvasObject, size fyne.Size) {
-	// When the row does not fit, take the overflow off one child rather than
-	// letting the tail spill past the edge. Shrinking a text field degrades
-	// gracefully; shrinking a tab strip or a button clips its labels, so
-	// callers can nominate which child gives way.
 	over := h.MinSize(objs).Width - size.Width
 	shrink := -1
 	if over > 0 {
@@ -206,6 +196,7 @@ func (h hstackLayout) Layout(objs []fyne.CanvasObject, size fyne.Size) {
 	}
 }
 
+// MinSize ...
 func (h hstackLayout) MinSize(objs []fyne.CanvasObject) fyne.Size {
 	var w, ht float32
 	n := 0
@@ -228,14 +219,13 @@ func hstack(gap float32, objs ...fyne.CanvasObject) *fyne.Container {
 	return container.New(hstackLayout{gap: gap, flex: -1}, objs...)
 }
 
-// hstackFlex is hstack with an explicit child to compress when space is tight.
 func hstackFlex(gap float32, flex int, objs ...fyne.CanvasObject) *fyne.Container {
 	return container.New(hstackLayout{gap: gap, flex: flex}, objs...)
 }
 
-// rightAlign pins content to the trailing edge, vertically centred.
 type rightLayout struct{}
 
+// Layout ...
 func (rightLayout) Layout(objs []fyne.CanvasObject, size fyne.Size) {
 	for _, o := range objs {
 		ms := o.MinSize()
@@ -244,6 +234,7 @@ func (rightLayout) Layout(objs []fyne.CanvasObject, size fyne.Size) {
 	}
 }
 
+// MinSize ...
 func (rightLayout) MinSize(objs []fyne.CanvasObject) fyne.Size {
 	var w, h float32
 	for _, o := range objs {
@@ -258,7 +249,6 @@ func rightAlign(obj fyne.CanvasObject) *fyne.Container {
 	return container.New(rightLayout{}, obj)
 }
 
-// splitRow puts content on the left and actions hard right on one baseline.
 func splitRow(left, right fyne.CanvasObject) fyne.CanvasObject {
 	if right == nil {
 		return left
@@ -269,12 +259,9 @@ func splitRow(left, right fyne.CanvasObject) fyne.CanvasObject {
 	return container.New(splitLayout{}, container.New(vCentreLayout{}, left), right)
 }
 
-// splitLayout is Border's left/right pairing with one difference: the actions
-// are capped at 60% of the row. A Border hands the trailing object its full
-// MinSize, so a zoomed action cluster would cover the title instead of
-// compressing.
 type splitLayout struct{}
 
+// Layout ...
 func (splitLayout) Layout(objs []fyne.CanvasObject, size fyne.Size) {
 	if len(objs) < 2 {
 		return
@@ -290,6 +277,7 @@ func (splitLayout) Layout(objs []fyne.CanvasObject, size fyne.Size) {
 	left.Move(fyne.NewPos(0, 0))
 }
 
+// MinSize ...
 func (splitLayout) MinSize(objs []fyne.CanvasObject) fyne.Size {
 	var w, h float32
 	for _, o := range objs {
@@ -300,10 +288,9 @@ func (splitLayout) MinSize(objs []fyne.CanvasObject) fyne.Size {
 	return fyne.NewSize(w+sp3, h)
 }
 
-// vCentreLayout gives a child its full width but only its natural height,
-// centred vertically in whatever space it is handed.
 type vCentreLayout struct{}
 
+// Layout ...
 func (vCentreLayout) Layout(objs []fyne.CanvasObject, size fyne.Size) {
 	for _, o := range objs {
 		h := min32(o.MinSize().Height, size.Height)
@@ -312,6 +299,7 @@ func (vCentreLayout) Layout(objs []fyne.CanvasObject, size fyne.Size) {
 	}
 }
 
+// MinSize ...
 func (vCentreLayout) MinSize(objs []fyne.CanvasObject) fyne.Size {
 	var w, h float32
 	for _, o := range objs {
@@ -322,12 +310,9 @@ func (vCentreLayout) MinSize(objs []fyne.CanvasObject) fyne.Size {
 	return fyne.NewSize(w, h)
 }
 
-// railLayout puts the sidebar on the leading edge and the page beside it, with
-// the rail capped at a third of the window. Without the cap a zoomed rail
-// squeezes the page into an unusable sliver, since the rail's width scales but
-// the window does not.
 type railLayout struct{}
 
+// Layout ...
 func (railLayout) Layout(objs []fyne.CanvasObject, size fyne.Size) {
 	if len(objs) < 2 || objs[0] == nil || objs[1] == nil {
 		return
@@ -349,12 +334,9 @@ func (railLayout) Layout(objs []fyne.CanvasObject, size fyne.Size) {
 	content.Resize(fyne.NewSize(max32(0, size.Width-w), size.Height))
 }
 
-// MinSize is deliberately zero: shellLayout owns the window minimum, and
-// letting the scaled rail contribute here would grow the OS window on zoom.
+// MinSize ...
 func (railLayout) MinSize([]fyne.CanvasObject) fyne.Size { return fyne.NewSize(0, 0) }
 
-// elide truncates s with an ellipsis so it fits max, so a long title cannot
-// run underneath the action buttons in a narrow row.
 func elide(s string, max float32, size float32, style fyne.TextStyle) string {
 	if max <= 0 || s == "" {
 		return ""
@@ -413,25 +395,15 @@ func elideMono(s string, max, size float32, style fyne.TextStyle) (string, bool)
 	return s[:off] + "…", true
 }
 
-// ---------------------------------------------------------------- scrolling
-
-// scrollFactor multiplies wheel deltas. Fyne's per-notch distance is a driver
-// constant (scrollSpeed, 25px on Windows and Linux) which is well under one
-// list row here, so the default feels sluggish.
 const scrollFactor float32 = 3
 
-// scrollBoost amplifies wheel scrolling for the object beneath it.
-//
-// It has to sit on top rather than wrap: the hit test hands a scroll event to
-// the *last* matching object in the tree walk, so a parent never sees it. Being
-// scroll-only is what makes this safe — tap, hover, drag and cursor lookups use
-// their own predicates, so they skip straight past to the real content.
 type scrollBoost struct {
 	widget.BaseWidget
 	scroll *container.Scroll
 	list   *widget.List
 }
 
+// Scrolled ...
 func (b *scrollBoost) Scrolled(ev *fyne.ScrollEvent) {
 	dx := ev.Scrolled.DX * scrollFactor
 	dy := ev.Scrolled.DY * scrollFactor
@@ -441,45 +413,32 @@ func (b *scrollBoost) Scrolled(ev *fyne.ScrollEvent) {
 		e.Scrolled = fyne.NewDelta(dx, dy)
 		b.scroll.Scrolled(&e)
 	case b.list != nil:
-		// Offsets grow downwards while wheel-down is negative, matching
-		// Scroll.updateOffset's use of -delta.
 		b.list.ScrollToOffset(b.list.GetScrollOffset() - dy)
 	}
 }
 
+// CreateRenderer ...
 func (b *scrollBoost) CreateRenderer() fyne.WidgetRenderer {
 	return widget.NewSimpleRenderer(canvas.NewRectangle(color.Transparent))
 }
 
-// boostScroll returns the scroll container with a sensitivity overlay on top.
 func boostScroll(sc *container.Scroll) fyne.CanvasObject {
 	b := &scrollBoost{scroll: sc}
 	b.ExtendBaseWidget(b)
 	return container.NewStack(sc, b)
 }
 
-// boostList does the same for a widget.List, which owns its scroller privately.
 func boostList(l *widget.List) fyne.CanvasObject {
 	b := &scrollBoost{list: l}
 	b.ExtendBaseWidget(b)
 	return container.NewStack(l, b)
 }
 
-// ---------------------------------------------------------------- card flow
-
-// cardFlowLayout arranges cards into as many columns as the width allows,
-// adding each to the shortest column so the columns stay balanced.
-//
-// Fyne ships no flex layout: GridWrap forces one cell size on every child,
-// which cannot work for cards whose height depends on their content.
 type cardFlowLayout struct {
 	minCol float32
 	maxCol int
 	gap    float32
 
-	// Height of the last layout. Cards containing wrapped text only report a
-	// true MinSize once they have a width, so MinSize reuses what Layout
-	// measured rather than guessing.
 	lastH float32
 }
 
@@ -494,12 +453,6 @@ func (c *cardFlowLayout) columns(width float32) int {
 	return n
 }
 
-// fullWidthCard is a flow child that occupies the whole row instead of one
-// masonry cell, so long content (file paths) is not clipped to a column.
-//
-// It has to be a widget. Fyne only paints *fyne.Container and fyne.Widget
-// children, so a struct that merely embeds the content is laid out and then
-// never drawn.
 type fullWidthCard struct {
 	widget.BaseWidget
 	obj fyne.CanvasObject
@@ -511,12 +464,11 @@ func fullRow(obj fyne.CanvasObject) fyne.CanvasObject {
 	return f
 }
 
+// CreateRenderer ...
 func (f *fullWidthCard) CreateRenderer() fyne.WidgetRenderer {
 	return widget.NewSimpleRenderer(f.obj)
 }
 
-// hugCard is a flow child sized to its content, capped at one column. A
-// full-width row stretches key/value lines so the value sits on the far edge.
 type hugCard struct {
 	widget.BaseWidget
 	obj fyne.CanvasObject
@@ -528,12 +480,11 @@ func hug(obj fyne.CanvasObject) fyne.CanvasObject {
 	return h
 }
 
+// CreateRenderer ...
 func (h *hugCard) CreateRenderer() fyne.WidgetRenderer {
 	return widget.NewSimpleRenderer(h.obj)
 }
 
-// sectionHead splits a card flow into groups. It is a title and a hairline
-// across the whole row, the same rhythm as the page header, with no panel.
 func sectionHead(title string) fyne.CanvasObject {
 	return fullRow(vstack(sp2,
 		text(title, fsLarge, pal().Content, true),
@@ -555,12 +506,11 @@ func flowItemWidth(o fyne.CanvasObject, colW, total float32) float32 {
 	return colW
 }
 
+// Layout ...
 func (c *cardFlowLayout) Layout(objs []fyne.CanvasObject, size fyne.Size) {
 	n := c.columns(size.Width)
 	colW := (size.Width - c.gap*float32(n-1)) / float32(n)
 
-	// First pass sets the width, so wrapping children can remeasure; the second
-	// reads the settled height and places them.
 	for _, o := range objs {
 		if o.Visible() {
 			o.Resize(fyne.NewSize(flowItemWidth(o, colW, size.Width), o.MinSize().Height))
@@ -604,11 +554,11 @@ func (c *cardFlowLayout) Layout(objs []fyne.CanvasObject, size fyne.Size) {
 	c.lastH = max32(0, tallest-c.gap)
 }
 
+// MinSize ...
 func (c *cardFlowLayout) MinSize(objs []fyne.CanvasObject) fyne.Size {
 	if c.lastH > 0 {
 		return fyne.NewSize(c.minCol, c.lastH)
 	}
-	// Before the first layout, assume a single column.
 	var h float32
 	n := 0
 	for _, o := range objs {
@@ -624,14 +574,12 @@ func (c *cardFlowLayout) MinSize(objs []fyne.CanvasObject) fyne.Size {
 	return fyne.NewSize(c.minCol, h)
 }
 
-// wrapFlowLayout places children left to right at their own width and wraps
-// when the next child does not fit. Unlike cardFlowLayout, a child is never
-// stretched to a column.
 type wrapFlowLayout struct {
 	gap   float32
 	lastH float32
 }
 
+// Layout ...
 func (w *wrapFlowLayout) Layout(objs []fyne.CanvasObject, size fyne.Size) {
 	type item struct {
 		o    fyne.CanvasObject
@@ -670,6 +618,7 @@ func (w *wrapFlowLayout) Layout(objs []fyne.CanvasObject, size fyne.Size) {
 	w.lastH = y + rowH
 }
 
+// MinSize ...
 func (w *wrapFlowLayout) MinSize(objs []fyne.CanvasObject) fyne.Size {
 	var widest, h float32
 	n := 0
@@ -694,8 +643,6 @@ func wrapFlow(objs ...fyne.CanvasObject) *fyne.Container {
 	return container.New(&wrapFlowLayout{gap: sp4}, objs...)
 }
 
-// ---------------------------------------------------------------- spacers
-
 func spacer(w, h float32) fyne.CanvasObject {
 	r := canvas.NewRectangle(color.Transparent)
 	r.SetMinSize(fyne.NewSize(w, h))
@@ -705,7 +652,6 @@ func spacer(w, h float32) fyne.CanvasObject {
 func vspace(h float32) fyne.CanvasObject { return spacer(0, h) }
 func hspace(w float32) fyne.CanvasObject { return spacer(w, 0) }
 
-// divider is a hairline that spans the width it is given.
 func divider() fyne.CanvasObject {
 	r := canvas.NewRectangle(pal().Divider)
 	r.SetMinSize(fyne.NewSize(0, z(1)))
@@ -718,8 +664,6 @@ func strongDivider() fyne.CanvasObject {
 	return r
 }
 
-// iconImage loads a theme SVG with nearest-neighbor sampling. The default
-// ImageScaleSmooth filter blurs 16px glyphs.
 func iconImage(res fyne.Resource) *canvas.Image {
 	img := canvas.NewImageFromResource(res)
 	img.FillMode = canvas.ImageFillContain
@@ -727,11 +671,6 @@ func iconImage(res fyne.Resource) *canvas.Image {
 	return img
 }
 
-// ---------------------------------------------------------------- text
-
-// text is the low-level primitive for custom renderers, where positioning is
-// handled by hand. Flowing content should use the rich* helpers so every block
-// shares the same internal inset and stays aligned.
 func fontForStyle(style fyne.TextStyle) fyne.Resource {
 	if live == nil {
 		return nil
@@ -767,7 +706,6 @@ func rich(s string, size fyne.ThemeSizeName, col fyne.ThemeColorName, bold bool)
 	return container.New(insetLayout{-rtPad, -rtPad, -rtPad, -rtPad}, rt)
 }
 
-// cardTitle / body / hint form the type hierarchy for flowing content.
 func cardTitle(s string) fyne.CanvasObject {
 	return rich(s, theme.SizeNameSubHeadingText, colContent, true)
 }
@@ -784,12 +722,9 @@ func fieldLabel(s string) fyne.CanvasObject {
 	return text(s, fsSmall, pal().Muted, false)
 }
 
-// eyebrow is the small uppercase group label used in the sidebar.
 func eyebrow(s string) fyne.CanvasObject {
 	return text(s, fsCaption, pal().Faint, true)
 }
-
-// ---------------------------------------------------------------- tap wrapper
 
 type tapWrap struct {
 	widget.BaseWidget
@@ -803,21 +738,21 @@ func newTap(obj fyne.CanvasObject, tapped func()) *tapWrap {
 	return t
 }
 
+// Tapped ...
 func (t *tapWrap) Tapped(*fyne.PointEvent) {
 	if t.tapped != nil {
 		t.tapped()
 	}
 }
 
+// Cursor ...
 func (t *tapWrap) Cursor() desktop.Cursor { return desktop.PointerCursor }
 
+// CreateRenderer ...
 func (t *tapWrap) CreateRenderer() fyne.WidgetRenderer {
 	return widget.NewSimpleRenderer(t.obj)
 }
 
-// ---------------------------------------------------------------- surfaces
-
-// surface is a rounded panel: the single source of card styling.
 func surface(radius float32, fill, stroke color.Color) *canvas.Rectangle {
 	r := canvas.NewRectangle(fill)
 	r.CornerRadius = radius
@@ -828,8 +763,6 @@ func surface(radius float32, fill, stroke color.Color) *canvas.Rectangle {
 	return r
 }
 
-// cardBox is the standard panel: optional title, description and header
-// actions above a body, all on one 16px inset.
 func cardBox(title, desc string, actions fyne.CanvasObject, content fyne.CanvasObject) fyne.CanvasObject {
 	p := pal()
 	rows := make([]fyne.CanvasObject, 0, 4)
@@ -853,14 +786,8 @@ func card(title, desc string, content fyne.CanvasObject) fyne.CanvasObject {
 	return cardBox(title, desc, nil, content)
 }
 
-// detailGap is the space under a detail card's title and above its buttons.
-// Both gaps use it so the header and the footer sit the same distance from
-// the facts.
 func detailGap() float32 { return sp5 }
 
-// detailCard is a content-sized record card: a title, trailing header actions,
-// fact rows, and optional buttons. The header keeps every action inside the
-// card and gives the title its own line instead of squeezing it beside them.
 func detailCard(title string, actions fyne.CanvasObject, facts []fact, buttons ...fyne.CanvasObject) fyne.CanvasObject {
 	rows := []fyne.CanvasObject{cardHead(title, actions)}
 	if list := factList(facts); list != nil {
@@ -873,9 +800,6 @@ func detailCard(title string, actions fyne.CanvasObject, facts []fact, buttons .
 	return container.NewStack(surface(radLg, pal().Base100, pal().Base300), inset(sp4, inner))
 }
 
-// cardHead lays the title on the left and actions on the right. Actions keep
-// their natural width, so an icon button cannot be pushed past the card edge.
-// The title's minimum is the whole name on one line.
 func cardHead(title string, actions fyne.CanvasObject) fyne.CanvasObject {
 	label := text(title, fsLarge, pal().Content, true)
 	if actions == nil {
@@ -884,11 +808,9 @@ func cardHead(title string, actions fyne.CanvasObject) fyne.CanvasObject {
 	return container.New(&headLayout{}, label, actions)
 }
 
-// headLayout is splitRow without the 60% action cap. That cap was shrinking
-// a badge-and-icons cluster on a content-sized card and painting the last
-// icon outside the panel, while the title wrapped into the leftover strip.
 type headLayout struct{}
 
+// Layout ...
 func (headLayout) Layout(objs []fyne.CanvasObject, size fyne.Size) {
 	if len(objs) == 0 || objs[0] == nil {
 		return
@@ -915,6 +837,7 @@ func (headLayout) Layout(objs []fyne.CanvasObject, size fyne.Size) {
 	title.Move(fyne.NewPos(0, (size.Height-th)/2))
 }
 
+// MinSize ...
 func (headLayout) MinSize(objs []fyne.CanvasObject) fyne.Size {
 	var tw, th, aw, ah float32
 	if len(objs) > 0 && objs[0] != nil {
@@ -938,8 +861,6 @@ func nilIfEmpty(s string, fn func() fyne.CanvasObject) fyne.CanvasObject {
 	}
 	return fn()
 }
-
-// ---------------------------------------------------------------- indicators
 
 type tone int
 
@@ -970,7 +891,6 @@ func toneColors(t tone) (fg, bg color.NRGBA) {
 	}
 }
 
-// badge is a small rounded status chip.
 func badge(label string, t tone) fyne.CanvasObject {
 	fg, bg := toneColors(t)
 	r := surface(radFull, bg, nil)
@@ -978,7 +898,6 @@ func badge(label string, t tone) fyne.CanvasObject {
 	return container.NewStack(r, insetXY(sp2, z(3), lbl))
 }
 
-// statTile is a compact metric block for page summaries.
 func statTile(label, value string, t tone) fyne.CanvasObject {
 	fg, _ := toneColors(t)
 	if t == toneNeutral {
@@ -990,10 +909,6 @@ func statTile(label, value string, t tone) fyne.CanvasObject {
 	return container.NewStack(surface(radMd, pal().Base100, pal().Base300), insetXY(sp3, sp2, inner))
 }
 
-// packedKVRows is a key/value list sized to its text. Keys share one column
-// and each value starts a fixed gap after that column, instead of being
-// pushed to the far edge of a stretched row. A value wraps when the row is
-// narrower than the text.
 func packedKVRows(rows [][2]string) fyne.CanvasObject {
 	var col float32
 	cleaned := make([][2]string, len(rows))
@@ -1050,6 +965,7 @@ func (k *packedKV) valueLines(width float32) []string {
 	return k.lines
 }
 
+// CreateRenderer ...
 func (k *packedKV) CreateRenderer() fyne.WidgetRenderer {
 	r := &packedKVRenderer{
 		k:     k,
@@ -1066,8 +982,10 @@ type packedKVRenderer struct {
 	objs   []fyne.CanvasObject
 }
 
+// Destroy ...
 func (r *packedKVRenderer) Destroy() {}
 
+// Objects ...
 func (r *packedKVRenderer) Objects() []fyne.CanvasObject {
 	if r.objs == nil {
 		r.rebuild()
@@ -1100,6 +1018,7 @@ func (r *packedKVRenderer) ensure(n int) {
 	}
 }
 
+// MinSize ...
 func (r *packedKVRenderer) MinSize() fyne.Size {
 	k := r.k
 	lh := cachedLineHeight(fsBody, fyne.TextStyle{})
@@ -1116,6 +1035,7 @@ func (r *packedKVRenderer) MinSize() fyne.Size {
 	return fyne.NewSize(w, max32(lh, vh*float32(len(lines))))
 }
 
+// Layout ...
 func (r *packedKVRenderer) Layout(size fyne.Size) {
 	k := r.k
 	lh := r.label.MinSize().Height
@@ -1145,6 +1065,7 @@ func (r *packedKVRenderer) Layout(size fyne.Size) {
 	}
 }
 
+// Refresh ...
 func (r *packedKVRenderer) Refresh() {
 	r.label.Text = r.k.label
 	r.label.TextSize = fsBody
@@ -1159,16 +1080,12 @@ func (r *packedKVRenderer) Refresh() {
 	canvasRefresh(r.k)
 }
 
-// fact is one label/value pair in a detail card. mono sets the value face.
 type fact struct {
 	label string
 	value string
 	mono  bool
 }
 
-// factList is a compact label/value block. Labels share one column and each
-// value starts just after it. Rows have no rules; a long value wraps inside
-// the width the card was given.
 func factList(rows []fact) fyne.CanvasObject {
 	if len(rows) == 0 {
 		return nil
@@ -1231,6 +1148,7 @@ func (f *factLine) valueLines(width float32) []string {
 	return f.lines
 }
 
+// CreateRenderer ...
 func (f *factLine) CreateRenderer() fyne.WidgetRenderer {
 	r := &factLineRenderer{
 		f:     f,
@@ -1247,8 +1165,10 @@ type factLineRenderer struct {
 	objs   []fyne.CanvasObject
 }
 
+// Destroy ...
 func (r *factLineRenderer) Destroy() {}
 
+// Objects ...
 func (r *factLineRenderer) Objects() []fyne.CanvasObject {
 	if r.objs == nil {
 		r.rebuild()
@@ -1281,6 +1201,7 @@ func (r *factLineRenderer) ensure(n int) {
 	}
 }
 
+// MinSize ...
 func (r *factLineRenderer) MinSize() fyne.Size {
 	f := r.f
 	lh := cachedLineHeight(fsSmall, fyne.TextStyle{})
@@ -1298,6 +1219,7 @@ func (r *factLineRenderer) MinSize() fyne.Size {
 	return fyne.NewSize(w, max32(lh, vh*float32(len(lines))))
 }
 
+// Layout ...
 func (r *factLineRenderer) Layout(size fyne.Size) {
 	f := r.f
 	lh := r.label.MinSize().Height
@@ -1329,6 +1251,7 @@ func (r *factLineRenderer) Layout(size fyne.Size) {
 	}
 }
 
+// Refresh ...
 func (r *factLineRenderer) Refresh() {
 	r.label.Text = r.f.label
 	r.label.TextSize = fsSmall
@@ -1343,8 +1266,6 @@ func (r *factLineRenderer) Refresh() {
 	canvasRefresh(r.f)
 }
 
-// kvRow is one label/value line with a trailing hairline. Long values wrap
-// and the row grows with them — canvas.Text in a Border was clipping paths.
 func kvRow(label, value string, mono bool) fyne.CanvasObject {
 	if value == "" {
 		value = "—"
@@ -1354,7 +1275,6 @@ func kvRow(label, value string, mono bool) fyne.CanvasObject {
 	return vstack(0, insetEach(sp2+1, 0, sp2+1, 0, w), divider())
 }
 
-// kvLine is the wrapping label/value pair inside kvRow.
 type kvLine struct {
 	widget.BaseWidget
 	label string
@@ -1367,6 +1287,7 @@ type kvLine struct {
 	cachedMin  fyne.Size
 }
 
+// CreateRenderer ...
 func (k *kvLine) CreateRenderer() fyne.WidgetRenderer {
 	r := &kvLineRenderer{k: k, label: text(k.label, fsBody, pal().Muted, false)}
 	r.ensureValues(16)
@@ -1381,8 +1302,10 @@ type kvLineRenderer struct {
 	objs   []fyne.CanvasObject
 }
 
+// Destroy ...
 func (r *kvLineRenderer) Destroy() {}
 
+// Objects ...
 func (r *kvLineRenderer) Objects() []fyne.CanvasObject {
 	if r.objs == nil {
 		r.rebuildObjs()
@@ -1448,6 +1371,7 @@ func (k *kvLine) minForWidth(width float32) fyne.Size {
 	return sz
 }
 
+// MinSize ...
 func (r *kvLineRenderer) MinSize() fyne.Size {
 	return r.k.minForWidth(r.k.Size().Width)
 }
@@ -1469,6 +1393,7 @@ func (r *kvLineRenderer) ensureValues(n int) {
 	}
 }
 
+// Layout ...
 func (r *kvLineRenderer) Layout(size fyne.Size) {
 	style, textSize := r.k.valueStyle()
 	lw := r.label.MinSize().Width
@@ -1515,6 +1440,7 @@ func (r *kvLineRenderer) Layout(size fyne.Size) {
 	}
 }
 
+// Refresh ...
 func (r *kvLineRenderer) Refresh() {
 	r.apply()
 	r.label.Refresh()
@@ -1534,12 +1460,6 @@ func (r *kvLineRenderer) apply() {
 	r.label.Color = p.Muted
 }
 
-// wrapToWidth breaks s so each line fits maxW. Paths have no spaces, so it
-// wraps on characters and prefers a cut after / or \ when one is nearby.
-//
-// Cuts are byte offsets into s so substrings share the original backing
-// array. Monospace text is sized from a cached character width instead of
-// MeasureText on every prefix.
 func wrapToWidth(s string, maxW, textSize float32, style fyne.TextStyle) []string {
 	s = strings.TrimRight(s, " \t")
 	if s == "" {
@@ -1726,8 +1646,6 @@ func cachedLineHeight(size float32, style fyne.TextStyle) float32 {
 	return lineH
 }
 
-// ---------------------------------------------------------------- empty state
-
 func emptyState(title, desc string) fyne.CanvasObject {
 	items := []fyne.CanvasObject{container.NewCenter(text(title, fsBody, pal().Muted, true))}
 	if desc != "" {
@@ -1740,9 +1658,6 @@ func emptyRow(msg string) fyne.CanvasObject {
 	return insetEach(sp2, 0, sp2, 0, rich(msg, sizeSmall, colFaint, false))
 }
 
-// ---------------------------------------------------------------- toast
-
-// toastCard is a self-sizing notification so the shell can place it exactly.
 type toastCard struct {
 	widget.BaseWidget
 	kind string
@@ -1755,6 +1670,7 @@ func newToast(kind, msg string) *toastCard {
 	return t
 }
 
+// CreateRenderer ...
 func (t *toastCard) CreateRenderer() fyne.WidgetRenderer {
 	p := pal()
 	accent := p.Success
@@ -1784,14 +1700,19 @@ type toastRenderer struct {
 	objects []fyne.CanvasObject
 }
 
-func (r *toastRenderer) Destroy()                     {}
+// Destroy ...
+func (r *toastRenderer) Destroy() {}
+
+// Objects ...
 func (r *toastRenderer) Objects() []fyne.CanvasObject { return r.objects }
 
+// MinSize ...
 func (r *toastRenderer) MinSize() fyne.Size {
 	h := max32(z(44), r.lbl.MinSize().Height+sp3)
 	return fyne.NewSize(z(320), h)
 }
 
+// Layout ...
 func (r *toastRenderer) Layout(size fyne.Size) {
 	r.bg.Resize(size)
 	r.bar.Resize(fyne.NewSize(z(3), size.Height-sp3))
@@ -1804,19 +1725,18 @@ func (r *toastRenderer) Layout(size fyne.Size) {
 	r.lbl.Move(fyne.NewPos(sp4+iconSize+sp1, (size.Height-lh)/2))
 }
 
+// Refresh ...
 func (r *toastRenderer) Refresh() {
 	canvasRefresh(r.t)
 }
 
-// ---------------------------------------------------------------- shell
-
-// shellLayout stacks the app content with a top-right toast overlay.
 type shellLayout struct {
 	win        fyne.Window
 	last       fyne.Size
 	snapQueued bool
 }
 
+// Layout ...
 func (s *shellLayout) Layout(objs []fyne.CanvasObject, size fyne.Size) {
 	if len(objs) < 2 || objs[0] == nil || objs[1] == nil {
 		return
@@ -1830,18 +1750,8 @@ func (s *shellLayout) Layout(objs []fyne.CanvasObject, size fyne.Size) {
 	objs[0].Move(fyne.NewPos(0, 0))
 	objs[0].Resize(size)
 
-	// Overlays are placed independently: an early return for an empty toast
-	// used to skip the loader entirely, leaving it parked at 0,0 over the
-	// sidebar — which is the normal case, since a toggle shows a loader and no
-	// toast.
-	//
-	// Toast bottom right (the top right is where page actions live, and
-	// covering the search box or Connect buttons is worse than no toast);
-	// loader bottom left, so both can be on screen at once.
 	placeToast(objs[1], size, true)
 
-	// The loader covers the whole window: it carries its own scrim and centres
-	// its card, so it is sized to the shell rather than parked in a corner.
 	if len(objs) > 2 && objs[2] != nil {
 		busy := objs[2]
 		if busy.MinSize().Height < 8 {
@@ -1888,8 +1798,6 @@ func (s *shellLayout) queueSnap(size fyne.Size) {
 	}()
 }
 
-// placeToast parks an overlay in a bottom corner, or collapses it out of the
-// way when it has no content.
 func placeToast(o fyne.CanvasObject, size fyne.Size, trailing bool) {
 	if o == nil {
 		return
@@ -1909,17 +1817,11 @@ func placeToast(o fyne.CanvasObject, size fyne.Size, trailing bool) {
 	o.Move(fyne.NewPos(x, size.Height-ms.Height-sp5))
 }
 
+// MinSize ...
 func (*shellLayout) MinSize(objs []fyne.CanvasObject) fyne.Size {
-	// Kept deliberately low: this is a logical size, so zoom multiplies it into
-	// physical pixels. At 200% a larger floor would demand a window taller than
-	// a 1080p display can show.
 	return fyne.NewSize(720, 480)
 }
 
-// ---------------------------------------------------------------- brand
-
-// brandMark draws the Tunnels glyph: an upright bar crossed by a primary bar,
-// matching assets/logo.svg without needing a themed raster.
 func brandMark(size float32) fyne.CanvasObject {
 	p := pal()
 	stem := canvas.NewRectangle(p.Content)
@@ -1931,6 +1833,7 @@ func brandMark(size float32) fyne.CanvasObject {
 
 type markLayout struct{ size float32 }
 
+// Layout ...
 func (m markLayout) Layout(objs []fyne.CanvasObject, size fyne.Size) {
 	if len(objs) < 2 {
 		return
@@ -1945,11 +1848,10 @@ func (m markLayout) Layout(objs []fyne.CanvasObject, size fyne.Size) {
 	objs[1].Move(fyne.NewPos(ox, oy+s*0.10))
 }
 
+// MinSize ...
 func (m markLayout) MinSize([]fyne.CanvasObject) fyne.Size {
 	return fyne.NewSize(m.size, m.size)
 }
-
-// ---------------------------------------------------------------- helpers
 
 func min32(a, b float32) float32 {
 	if a < b {

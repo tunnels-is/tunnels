@@ -49,7 +49,6 @@ func setUDPDontFrag(c *net.UDPConn, v6 bool) func() {
 	}
 }
 
-// setExtraBindDontFrag covers WinRingBind, which keeps raw sockets instead of net.UDPConn.
 func setExtraBindDontFrag(b wgconn.Bind) func() {
 	b = unwrapBind(b)
 	if b == nil {

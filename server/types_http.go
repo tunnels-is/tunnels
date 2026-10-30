@@ -190,14 +190,11 @@ type adminUserUpdateRequest struct {
 }
 
 type twoFactorUpdate struct {
-	UID      uuid.UUID
-	Code     []byte
-	Recovery []byte
-	// ConsumeRecovery is the recovery code that must still be stored on the
-	// user. Empty means first enrollment. It is not written to the database.
+	UID             uuid.UUID
+	Code            []byte
+	Recovery        []byte
 	ConsumeRecovery string
-	// AcceptedTOTP is the authenticator code proved during confirm.
-	AcceptedTOTP string
+	AcceptedTOTP    string
 }
 
 type passwordResetRequest struct {

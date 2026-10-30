@@ -6,6 +6,7 @@ import (
 	"github.com/google/uuid"
 )
 
+// TestGenerateCode ...
 func TestGenerateCode(t *testing.T) {
 
 	codes := make(map[string]bool)
@@ -37,6 +38,7 @@ func TestGenerateCode(t *testing.T) {
 	t.Logf("Generated %d codes, %d unique (%.2f%% unique) ✓", numCodes, len(codes), uniqueRatio*100)
 }
 
+// TestGenerateCode_CharacterDistribution ...
 func TestGenerateCode_CharacterDistribution(t *testing.T) {
 
 	validChars := "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"
@@ -76,6 +78,7 @@ func abs(x int) int {
 	return x
 }
 
+// TestHasSharedOrNoGroup ...
 func TestHasSharedOrNoGroup(t *testing.T) {
 	g1 := uuid.New()
 	g2 := uuid.New()

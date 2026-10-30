@@ -9,6 +9,7 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+// TestSetUDPDontFragRestores ...
 func TestSetUDPDontFragRestores(t *testing.T) {
 	conn, err := net.DialUDP("udp4", nil, &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 9})
 	if err != nil {

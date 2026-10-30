@@ -21,6 +21,7 @@ type domainList struct {
 	set *DomainSet
 }
 
+// Len ...
 func (s *DomainSet) Len() int {
 	if s == nil {
 		return 0
@@ -39,6 +40,7 @@ func (s *DomainSet) domain(i int) []byte {
 	return s.data[start:end]
 }
 
+// Has ...
 func (s *DomainSet) Has(name string) bool {
 	if s == nil || len(s.off) == 0 || name == "" {
 		return false
@@ -67,6 +69,7 @@ func (s *DomainSet) hasNormalized(name string) bool {
 	return false
 }
 
+// NewCatalog ...
 func NewCatalog(tags []string, sets []*DomainSet) *DomainCatalog {
 	if len(tags) != len(sets) {
 		panic("NewCatalog: len(tags) != len(sets)")
@@ -82,10 +85,12 @@ func NewCatalog(tags []string, sets []*DomainSet) *DomainCatalog {
 	return &DomainCatalog{items: items}
 }
 
+// EmptyCatalog ...
 func EmptyCatalog() *DomainCatalog {
 	return &DomainCatalog{}
 }
 
+// Len ...
 func (c *DomainCatalog) Len() int {
 	if c == nil {
 		return 0
@@ -97,6 +102,7 @@ func (c *DomainCatalog) Len() int {
 	return n
 }
 
+// ListCount ...
 func (c *DomainCatalog) ListCount() int {
 	if c == nil {
 		return 0
@@ -104,6 +110,7 @@ func (c *DomainCatalog) ListCount() int {
 	return len(c.items)
 }
 
+// Snapshot ...
 func (c *DomainCatalog) Snapshot() map[string]*DomainSet {
 	if c == nil || len(c.items) == 0 {
 		return nil
@@ -115,6 +122,7 @@ func (c *DomainCatalog) Snapshot() map[string]*DomainSet {
 	return m
 }
 
+// Has ...
 func (c *DomainCatalog) Has(name string) (bool, string) {
 	if c == nil || len(c.items) == 0 || name == "" {
 		return false, ""
@@ -291,6 +299,7 @@ func (b *domainBuilder) count() int {
 	return len(b.off)
 }
 
+// Build ...
 func (b *domainBuilder) Build() *DomainSet {
 	if b == nil || len(b.off) == 0 {
 		return &DomainSet{}
@@ -345,6 +354,7 @@ func (b *domainBuilder) Build() *DomainSet {
 	return out
 }
 
+// DomainSetFromDomains ...
 func DomainSetFromDomains(domains []string) *DomainSet {
 	b := newDomainBuilder(len(domains))
 	for _, d := range domains {
@@ -355,6 +365,7 @@ func DomainSetFromDomains(domains []string) *DomainSet {
 	return b.Build()
 }
 
+// MergeDomainSets ...
 func MergeDomainSets(sets ...*DomainSet) *DomainSet {
 	total := 0
 	for _, s := range sets {

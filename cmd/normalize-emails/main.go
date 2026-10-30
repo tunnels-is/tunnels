@@ -1,22 +1,3 @@
-// One-shot migration: lowercase/trim User.Email and rebuild users_by_email.
-// This does not run when the controller opens the database.
-//
-// Copy tunnels.db first, then:
-//
-//	go run ./cmd/normalize-emails -db tunnels.db -db_old tunnels.db.old
-//	go run ./cmd/normalize-emails -db tunnels.db -db_old tunnels.db.old -apply
-//
-// After -apply, each users_by_email winner in -db is checked against
-// -db_old: Email must be the normalized form of the old Email, and every
-// other stored field must match exactly. Collision losers are not compared.
-//
-// If two or more users share an email after normalization, every record is
-// kept and the email is still normalized. users_by_email points at one
-// winner: a user whose SubExpiration is in the future, if any; otherwise
-// (or if more than one has a valid subscription) the most recently created.
-// User has no Created field; Updated is written at registration and not
-// changed later, so it is the creation time. Equal Updated times break
-// ties by larger user id.
 package main
 
 import (
@@ -320,11 +301,6 @@ func loadUserBlobs(db *gobolt.DB) (map[string][]byte, error) {
 	return out, err
 }
 
-// verifyUsersAgainstOld checks email-index winners in db against dbOld.
-// Collision losers are ignored: they may be missing or have other fields
-// changed. For each normalized email, Email in db must be normalize(old
-// Email) and every other JSON field on the winner must match byte-for-byte.
-// Users with an empty email are compared by id.
 func verifyUsersAgainstOld(db, dbOld *gobolt.DB) ([]string, error) {
 	gotRows, err := loadUserRows(db)
 	if err != nil {

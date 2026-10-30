@@ -8,10 +8,12 @@ import (
 	"os/exec"
 )
 
+// OSSpecificInit ...
 func OSSpecificInit() error {
 	return nil
 }
 
+// ValidateAdapterID ...
 func ValidateAdapterID(meta *TunnelMeta) error {
 	return nil
 }
@@ -27,6 +29,7 @@ func resolveTUNCreateName(logical string) string {
 	return "utun"
 }
 
+// AdminCheck ...
 func AdminCheck() {
 	DEBUG("Admin check")
 	s := STATE.Load()

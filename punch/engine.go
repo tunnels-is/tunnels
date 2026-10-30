@@ -9,20 +9,13 @@ import (
 )
 
 const (
-	// Keepalive is how often a direct path is re-probed. Short enough that
-	// a carrier NAT does not forget the mapping between WireGuard keepalives.
-	Keepalive = 10 * time.Second
-	// DirectTimeout drops a direct path that has not ponged.
-	DirectTimeout = 25 * time.Second
-	// RendezvousEvery limits how often an introduction is repeated.
+	Keepalive       = 10 * time.Second
+	DirectTimeout   = 25 * time.Second
 	RendezvousEvery = 5 * time.Second
-	// ReflexEvery refreshes the mapping measured at the wg-server.
-	ReflexEvery = 15 * time.Second
-	// PongsToTrust is how many pongs from one address promote it.
-	PongsToTrust = 2
+	ReflexEvery     = 15 * time.Second
+	PongsToTrust    = 2
 )
 
-// Peer is one device learned from an introduction.
 type Peer struct {
 	DeviceID uuid.UUID
 	DiscoPub [32]byte
@@ -30,11 +23,6 @@ type Peer struct {
 	WGIP     netip.Addr
 }
 
-// Datagram is one punch packet to send. Server is set when it goes to the
-// wg-server instead of a peer address. Tunnel is set when it goes through
-// the existing WireGuard tunnel to To, which is the other client's tunnel
-// address. MTU marks a padded path-MTU probe; Peer is the device the probe
-// measures.
 type Datagram struct {
 	Server bool
 	Tunnel bool
@@ -44,22 +32,18 @@ type Datagram struct {
 	Peer   uuid.UUID
 }
 
-// Path is a direct address that has answered twice.
 type Path struct {
 	Peer Peer
 	Via  netip.AddrPort
 }
 
-// Result is what an engine step wants the caller to do.
 type Result struct {
 	Sends []Datagram
 	Up    []Path
 	Down  []uuid.UUID
-	// MTU is set when a trusted path's send direction has a measured inner MTU.
-	MTU []PathMTU
+	MTU   []PathMTU
 }
 
-// Engine is the client punch state machine. It does not own a socket.
 type Engine struct {
 	mu sync.Mutex
 
@@ -106,7 +90,7 @@ type session struct {
 	mtuSteps   int
 }
 
-// NewEngine returns an engine for this device. discoPriv is the punch key.
+// NewEngine ...
 func NewEngine(self uuid.UUID, discoPriv, wgPub [32]byte, wgIP netip.Addr) *Engine {
 	return &Engine{
 		self:    self,
@@ -120,7 +104,7 @@ func NewEngine(self uuid.UUID, discoPriv, wgPub [32]byte, wgIP netip.Addr) *Engi
 	}
 }
 
-// SetServerDisco records the wg-server disco key used to seal reflex requests.
+// SetServerDisco ...
 func (e *Engine) SetServerDisco(pub [32]byte) {
 	e.mu.Lock()
 	e.server = pub
@@ -128,9 +112,7 @@ func (e *Engine) SetServerDisco(pub [32]byte) {
 	e.mu.Unlock()
 }
 
-// SetLocalPolicy records which tunnel IPs this device admits on every port.
-// firewallOff admits every peer. Peers that stop qualifying are dropped and,
-// when a direct path was up, told to drop it too.
+// SetLocalPolicy ...
 func (e *Engine) SetLocalPolicy(firewallOff, allowAll bool, entries []string) Result {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -166,9 +148,6 @@ func (e *Engine) punchableLocked(ip netip.Addr) bool {
 	return ip.Is4() && ip.IsPrivate() && e.admitsLocked(ip)
 }
 
-// publicPunchTarget reports whether an address named in an introduction is a
-// public IPv4 endpoint we will punch. Loopback, link-local, multicast, and
-// private ranges are dropped. A ping we actually receive is not checked here.
 func publicPunchTarget(ap netip.AddrPort) bool {
 	if !ap.IsValid() || ap.Port() == 0 {
 		return false
@@ -187,9 +166,7 @@ func publicPunchTargets(in []netip.AddrPort) []netip.AddrPort {
 	return out
 }
 
-// NoteTraffic asks the engine to punch the device that owns this tunnel IP.
-// Only private IPv4 is a candidate. A public destination is WAN traffic, and
-// an introduction must not be sent there.
+// NoteTraffic ...
 func (e *Engine) NoteTraffic(ip netip.Addr) {
 	if !ip.Is4() || !ip.IsPrivate() {
 		return
@@ -199,7 +176,7 @@ func (e *Engine) NoteTraffic(ip netip.Addr) {
 	e.mu.Unlock()
 }
 
-// Direct reports the current direct address for a tunnel IP, if any.
+// Direct ...
 func (e *Engine) Direct(ip netip.Addr) (netip.AddrPort, bool) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -214,7 +191,7 @@ func (e *Engine) Direct(ip netip.Addr) (netip.AddrPort, bool) {
 	return s.direct, true
 }
 
-// Poll sends reflex requests, tunnel introductions, and direct keepalives.
+// Poll ...
 func (e *Engine) Poll(now time.Time) Result {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -291,7 +268,7 @@ func (e *Engine) Poll(now time.Time) Result {
 	return r
 }
 
-// OnPacket handles one datagram from from.
+// OnPacket ...
 func (e *Engine) OnPacket(from netip.AddrPort, pkt []byte, now time.Time) Result {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -414,8 +391,6 @@ func (e *Engine) onPongLocked(r *Result, from netip.AddrPort, pkt []byte, now ti
 		return
 	}
 	via := from
-	// Match a padded probe before the "already direct" return. An ignored
-	// padded ping must not be what keeps or drops the path; keepalives do that.
 	e.onMTUPongLocked(s, txid, r, now)
 	s.pongs[via]++
 	s.lastPong = now

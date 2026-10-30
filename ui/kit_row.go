@@ -11,27 +11,18 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
-// ---------------------------------------------------------------- table spec
-
-// tableCol describes one column. The same spec drives the header and every row,
-// which is what keeps the two aligned: rows used to position their own text with
-// no header to align to.
 type tableCol struct {
-	label  string
-	weight float32
-	mono   bool // identifiers and addresses, so digits line up
-	strong bool // the primary column: content colour, semibold
-	align  fyne.TextAlign
-	badge  bool // render the value as a status pill instead of plain text
-	// optional columns are dropped when the table is too narrow, so the
-	// columns that matter keep their width instead of everything truncating.
+	label    string
+	weight   float32
+	mono     bool
+	strong   bool
+	align    fyne.TextAlign
+	badge    bool
 	optional bool
 }
 
 type tableSpec struct {
-	cols []tableCol
-	// actionW reserves trailing space for the row's buttons. The header leaves
-	// the same gap, so a column label never sits over the action cluster.
+	cols    []tableCol
 	actionW float32
 
 	wcache     []float32
@@ -57,12 +48,8 @@ func (s *tableSpec) weights() []float32 {
 
 type cellRect struct{ x, w float32 }
 
-// narrowWidth is the content width below which optional columns are dropped.
 var narrowWidth = func() float32 { return z(560) }
 
-// cellRects computes each column's offset and width for a given row width.
-// Dropped columns get zero width, and both the header and the rows render
-// nothing for them.
 func (s *tableSpec) cellRects(width float32) []cellRect {
 	avail := width - z(s.actionW) - sp4*2
 	if avail < 0 {
@@ -100,15 +87,13 @@ func (s *tableSpec) cellRects(width float32) []cellRect {
 	return out
 }
 
-// ---------------------------------------------------------------- header
-
 type tableHeadLayout struct{ spec *tableSpec }
 
+// Layout ...
 func (t *tableHeadLayout) Layout(objs []fyne.CanvasObject, size fyne.Size) {
 	rects := t.spec.cellRects(size.Width)
 	for i, o := range objs {
 		if i >= len(rects) {
-			// Trailing object is the hairline under the labels.
 			o.Resize(fyne.NewSize(size.Width, z(1)))
 			o.Move(fyne.NewPos(0, size.Height-z(1)))
 			continue
@@ -132,11 +117,11 @@ func (t *tableHeadLayout) Layout(objs []fyne.CanvasObject, size fyne.Size) {
 	}
 }
 
+// MinSize ...
 func (t *tableHeadLayout) MinSize([]fyne.CanvasObject) fyne.Size {
 	return fyne.NewSize(0, z(28))
 }
 
-// newTableHeader builds the column-label strip, including its own hairline.
 func newTableHeader(spec *tableSpec) fyne.CanvasObject {
 	objs := make([]fyne.CanvasObject, 0, len(spec.cols)+1)
 	for _, c := range spec.cols {
@@ -146,10 +131,6 @@ func newTableHeader(spec *tableSpec) fyne.CanvasObject {
 	return container.New(&tableHeadLayout{spec: spec}, objs...)
 }
 
-// ---------------------------------------------------------------- row
-
-// kRow is one table row: a cell per column plus an action cluster. Used as a
-// Fyne List item template, so UpdateItem calls SetCells rather than rebuilding.
 type kRow struct {
 	widget.BaseWidget
 	spec      *tableSpec
@@ -172,9 +153,6 @@ func newKRow(spec *tableSpec) *kRow {
 		iconA: newIconBtn(theme.DocumentCreateIcon(), kGhost, nil).small(),
 		iconB: newIconBtn(theme.DeleteIcon(), kGhost, nil).small(),
 	}
-	// Every button starts hidden; a page shows only the ones it binds. The main
-	// button used to default to visible, which put a stray Connect on tables
-	// that have no row actions at all.
 	r.main.SetHidden(true)
 	r.ghost.SetHidden(true)
 	r.iconA.SetHidden(true)
@@ -183,8 +161,7 @@ func newKRow(spec *tableSpec) *kRow {
 	return r
 }
 
-// SetCells fills the row. on drives the live treatment (primary rail and
-// tunnels-blue wash); badgeTone colours whichever column is marked as a badge.
+// SetCells ...
 func (r *kRow) SetCells(cells []string, on bool, badgeTone tone) {
 	if on && badgeTone == toneNeutral {
 		badgeTone = tonePrimary
@@ -207,10 +184,17 @@ func (r *kRow) SetCells(cells []string, on bool, badgeTone tone) {
 	}
 }
 
-func (r *kRow) MouseIn(*desktop.MouseEvent)    { r.hovered = true; r.Refresh() }
-func (r *kRow) MouseOut()                      { r.hovered = false; r.Refresh() }
+// MouseIn ...
+func (r *kRow) MouseIn(*desktop.MouseEvent) { r.hovered = true; r.Refresh() }
+
+// MouseOut ...
+func (r *kRow) MouseOut() { r.hovered = false; r.Refresh() }
+
+// MouseMoved ...
 func (r *kRow) MouseMoved(*desktop.MouseEvent) {}
-func (r *kRow) Cursor() desktop.Cursor         { return desktop.DefaultCursor }
+
+// Cursor ...
+func (r *kRow) Cursor() desktop.Cursor { return desktop.DefaultCursor }
 
 var (
 	_ fyne.Tappable          = (*kRow)(nil)
@@ -218,15 +202,13 @@ var (
 	_ desktop.Hoverable      = (*kRow)(nil)
 )
 
-// Tapped swallows the click so widget.List never selects the row. List draws
-// its selection wash on a wrapper behind the child; Unselect in OnSelected
-// cannot undo the item's own selected flag, and focusing the list then keeps
-// a highlight on currentHighlight. Buttons still receive the tap: they are
-// deeper Tappable objects than the row.
+// Tapped ...
 func (r *kRow) Tapped(*fyne.PointEvent) {}
 
+// TappedSecondary ...
 func (r *kRow) TappedSecondary(*fyne.PointEvent) {}
 
+// CreateRenderer ...
 func (r *kRow) CreateRenderer() fyne.WidgetRenderer {
 	p := pal()
 	d := &kRowRenderer{
@@ -267,8 +249,10 @@ type kRowRenderer struct {
 	laidCells []string
 }
 
+// Destroy ...
 func (d *kRowRenderer) Destroy() {}
 
+// Objects ...
 func (d *kRowRenderer) Objects() []fyne.CanvasObject {
 	if d.objs == nil {
 		d.objs = make([]fyne.CanvasObject, 0, 8+len(d.cells))
@@ -281,31 +265,25 @@ func (d *kRowRenderer) Objects() []fyne.CanvasObject {
 	return d.objs
 }
 
+// MinSize ...
 func (d *kRowRenderer) MinSize() fyne.Size {
 	return fyne.NewSize(z(520), rowHeight)
 }
 
+// Layout ...
 func (d *kRowRenderer) Layout(size fyne.Size) {
-	// widget.List always inserts SizeNamePadding between items and offers no way
-	// to turn that off, so each row claims the gap *below* it. Growing downwards
-	// rather than in both directions keeps the first row flush with the column
-	// header, and gives every row an identical band.
 	band := size.Height + sp2
 	d.bg.Resize(fyne.NewSize(size.Width, band))
 	d.bg.Move(fyne.NewPos(0, 0))
 
-	// The divider closes the band, so it lands on the real row boundary.
 	d.line.Resize(fyne.NewSize(size.Width, z(1)))
 	d.line.Move(fyne.NewPos(0, band-z(1)))
 
-	// Content is centred on the band, not on the bare row, or it would sit high.
 	mid := band / 2
 	railH := max32(z(12), band-sp3)
 	d.rail.Resize(fyne.NewSize(z(3), railH))
 	d.rail.Move(fyne.NewPos(0, mid-railH/2))
 
-	// The action cluster owns the trailing edge; the width the spec reserves for
-	// it is what both the cells and the header lay out against.
 	right := size.Width - sp4
 	place := func(b *kBtn) {
 		if b.hidden {
@@ -373,6 +351,7 @@ func (d *kRowRenderer) Layout(size fyne.Size) {
 	}
 }
 
+// Refresh ...
 func (d *kRowRenderer) Refresh() {
 	d.apply()
 	for _, o := range d.Objects() {
@@ -414,16 +393,11 @@ func (d *kRowRenderer) apply() {
 		if d.r.hovered {
 			d.bg.FillColor = p.Hover
 		} else {
-			// Opaque so widget.List's selection wash, drawn *behind* the
-			// child, cannot show through after a click.
 			d.bg.FillColor = p.Base200
 		}
 	}
 }
 
-// ---------------------------------------------------------------- table body
-
-// newRowList builds the virtualised list of rows for a spec.
 func newRowList(spec *tableSpec, count func() int, bind func(widget.ListItemID, *kRow)) *widget.List {
 	l := widget.NewList(
 		count,
@@ -443,13 +417,9 @@ func newRowList(spec *tableSpec, count func() int, bind func(widget.ListItemID, 
 	return l
 }
 
-// headerBodyLayout puts a fixed-height header directly above a filling body.
-//
-// container.NewBorder cannot be used here: it inserts theme padding between the
-// border object and the centre, which left an 8px strip of page background
-// between the column header and the first row that no hover highlight covered.
 type headerBodyLayout struct{}
 
+// Layout ...
 func (headerBodyLayout) Layout(objs []fyne.CanvasObject, size fyne.Size) {
 	if len(objs) < 2 {
 		return
@@ -462,6 +432,7 @@ func (headerBodyLayout) Layout(objs []fyne.CanvasObject, size fyne.Size) {
 	body.Resize(fyne.NewSize(size.Width, max32(0, size.Height-hh)))
 }
 
+// MinSize ...
 func (headerBodyLayout) MinSize(objs []fyne.CanvasObject) fyne.Size {
 	var w, h float32
 	for _, o := range objs {
@@ -472,9 +443,6 @@ func (headerBodyLayout) MinSize(objs []fyne.CanvasObject) fyne.Size {
 	return fyne.NewSize(w, h)
 }
 
-// tableBody stacks the column header above the scrolling rows. The header
-// carries its own hairline, which is why table pages drop the page-level rule:
-// two lines a few pixels apart read as a mistake.
 func tableBody(spec *tableSpec, l *widget.List) fyne.CanvasObject {
 	pad := gutter - sp4
 	head := insetEach(0, pad, 0, pad, newTableHeader(spec))
@@ -485,10 +453,9 @@ func tableBody(spec *tableSpec, l *widget.List) fyne.CanvasObject {
 	return container.New(headerBodyLayout{}, head, rows)
 }
 
-// listQuietTheme hides Fyne's list selection wash. Table rows are not
-// selectable records; hover and the connected tint are drawn on the row.
 type listQuietTheme struct{ fyne.Theme }
 
+// Color ...
 func (t listQuietTheme) Color(n fyne.ThemeColorName, v fyne.ThemeVariant) color.Color {
 	if n == theme.ColorNameSelection {
 		return color.Transparent

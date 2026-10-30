@@ -5,6 +5,7 @@ import (
 	"time"
 )
 
+// TestBandwidthHistoryAppendDoesNotGrowCap ...
 func TestBandwidthHistoryAppendDoesNotGrowCap(t *testing.T) {
 	bh := &BandwidthHistory{}
 	now := time.Now()
@@ -29,6 +30,7 @@ func TestBandwidthHistoryAppendDoesNotGrowCap(t *testing.T) {
 	}
 }
 
+// TestBandwidthHistorySnapshotSinceCopiesWindow ...
 func TestBandwidthHistorySnapshotSinceCopiesWindow(t *testing.T) {
 	bh := &BandwidthHistory{}
 	now := time.Now()

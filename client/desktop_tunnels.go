@@ -7,9 +7,7 @@ import (
 	"github.com/tunnels-is/tunnels/types"
 )
 
-// CloneConfig returns a shallow copy of the live config with copied slices.
-// Nested pointer elements (servers, lists, records) are still shared; copy
-// those before mutating an individual item.
+// CloneConfig ...
 func CloneConfig() *Config {
 	src := CONFIG.Load()
 	if src == nil {
@@ -23,13 +21,12 @@ func CloneConfig() *Config {
 	return &dst
 }
 
-// CreateTunnel allocates a new random tunnel and persists it.
+// CreateTunnel ...
 func CreateTunnel() (*TunnelMeta, error) {
 	return createRandomTunnel()
 }
 
-// SaveTunnel validates and writes tunnel metadata. oldTag is the previous
-// identifier when renaming.
+// SaveTunnel ...
 func SaveTunnel(meta *TunnelMeta, oldTag string) error {
 	if meta == nil {
 		return errors.New("tunnel metadata is required")
@@ -71,7 +68,7 @@ func SaveTunnel(meta *TunnelMeta, oldTag string) error {
 	return nil
 }
 
-// DeleteTunnel removes a tunnel from disk and memory.
+// DeleteTunnel ...
 func DeleteTunnel(tag string) error {
 	if !safeTunnelTag(tag) {
 		return errors.New("invalid tunnel tag")
@@ -88,8 +85,7 @@ func DeleteTunnel(tag string) error {
 	return nil
 }
 
-// SetTunnelPeers replaces the allow-list for a tunnel and announces it if
-// the tunnel is currently connected.
+// SetTunnelPeers ...
 func SetTunnelPeers(tag string, allowedHosts []string, allowAll bool) ([]string, error) {
 	meta, ok := TunnelMetaMap.Load(tag)
 	if !ok {
@@ -133,7 +129,7 @@ func SetTunnelPeers(tag string, allowedHosts []string, allowAll bool) ([]string,
 	return hosts, nil
 }
 
-// DisconnectTunnel stops reconnects and tears down the tunnel.
+// DisconnectTunnel ...
 func DisconnectTunnel(id, tag string) error {
 	if tag == "" {
 		tunnelMapRange(func(t *TUN) bool {

@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 )
 
+// TestUser_ToMinifiedUser ...
 func TestUser_ToMinifiedUser(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -117,6 +118,7 @@ func TestUser_ToMinifiedUser(t *testing.T) {
 	}
 }
 
+// TestUser_ToMinifiedUser_DoesNotIncludeSensitiveData ...
 func TestUser_ToMinifiedUser_DoesNotIncludeSensitiveData(t *testing.T) {
 	user := &User{
 		ID:            uuid.New(),
@@ -143,6 +145,7 @@ func TestUser_ToMinifiedUser_DoesNotIncludeSensitiveData(t *testing.T) {
 	t.Log("ToMinifiedUser() correctly excludes sensitive data ✓")
 }
 
+// TestUser_RemoveSensitiveInformation ...
 func TestUser_RemoveSensitiveInformation(t *testing.T) {
 	tests := []struct {
 		name                string
@@ -288,6 +291,7 @@ func TestUser_RemoveSensitiveInformation(t *testing.T) {
 	}
 }
 
+// TestUser_RemoveSensitiveInformation_PreservesNonSensitiveData ...
 func TestUser_RemoveSensitiveInformation_PreservesNonSensitiveData(t *testing.T) {
 	originalID := uuid.New()
 	originalEmail := "preserve@example.com"
@@ -324,6 +328,7 @@ func TestUser_RemoveSensitiveInformation_PreservesNonSensitiveData(t *testing.T)
 	t.Log("RemoveSensitiveInformation() correctly preserves non-sensitive data ✓")
 }
 
+// TestUser_RemoveSensitiveInformation_RedactsOtherSessionTokens ...
 func TestUser_RemoveSensitiveInformation_RedactsOtherSessionTokens(t *testing.T) {
 	current := &DeviceToken{DT: "current-secret", N: "this-device", Created: time.Now()}
 	other := &DeviceToken{DT: "other-secret", N: "other-device", Created: time.Now().Add(-time.Hour)}
@@ -356,6 +361,7 @@ func TestUser_RemoveSensitiveInformation_RedactsOtherSessionTokens(t *testing.T)
 	}
 }
 
+// TestUser_RemoveSensitiveInformation_AdminListNoDeviceToken ...
 func TestUser_RemoveSensitiveInformation_AdminListNoDeviceToken(t *testing.T) {
 	user := &User{
 		Email: "admin-view@example.com",
@@ -372,6 +378,7 @@ func TestUser_RemoveSensitiveInformation_AdminListNoDeviceToken(t *testing.T) {
 	}
 }
 
+// TestDeviceTokenMatchesLogout ...
 func TestDeviceTokenMatchesLogout(t *testing.T) {
 	created := time.Date(2026, 3, 1, 12, 0, 0, 123456789, time.UTC)
 	dt := &DeviceToken{DT: "secret-dt", N: "laptop", Created: created}
@@ -382,7 +389,6 @@ func TestDeviceTokenMatchesLogout(t *testing.T) {
 	if deviceTokenMatchesLogout(dt, &logoutRequest{LogoutToken: "wrong"}) {
 		t.Error("should not match wrong LogoutToken")
 	}
-	// Sub-second noise in JSON round-trip: match on Unix seconds.
 	if !deviceTokenMatchesLogout(dt, &logoutRequest{
 		LogoutName:    "laptop",
 		LogoutCreated: time.Unix(created.Unix(), 0).UTC(),
@@ -394,6 +400,7 @@ func TestDeviceTokenMatchesLogout(t *testing.T) {
 	}
 }
 
+// TestRevokeUserDeviceTokens ...
 func TestRevokeUserDeviceTokens(t *testing.T) {
 	t1 := &DeviceToken{DT: "a", N: "one", Created: time.Unix(100, 0)}
 	t2 := &DeviceToken{DT: "b", N: "two", Created: time.Unix(200, 0)}

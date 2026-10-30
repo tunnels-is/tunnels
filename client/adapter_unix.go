@@ -35,6 +35,7 @@ type adapter struct {
 	FD         uintptr
 }
 
+// Close ...
 func (t *adapter) Close() error {
 	if t.RWC != nil {
 		return t.RWC.Close()
@@ -48,6 +49,7 @@ type syscallCreateIF struct {
 	pad   [0x28 - 0x10 - 2]byte
 }
 
+// Create ...
 func (t *adapter) Create() (err error) {
 	if t.TunnelFile == "" {
 		t.TunnelFile = "/dev/net/tun"
@@ -103,6 +105,7 @@ type syscallAddAddrV4 struct {
 	syscall.RawSockaddrInet4
 }
 
+// Addr ...
 func (t *adapter) Addr() (err error) {
 	var ifr syscallAddAddrV4
 	ifr.Port = 0
@@ -121,6 +124,7 @@ func (t *adapter) Addr() (err error) {
 	return
 }
 
+// AddrV6 ...
 func (t *adapter) AddrV6() (err error) {
 	link, err := netlink.LinkByName(t.Name)
 	if err != nil {
@@ -153,6 +157,7 @@ func (t *adapter) AddrV6() (err error) {
 	return nil
 }
 
+// Up ...
 func (t *adapter) Up() (err error) {
 	var ifr syscallSetFlags
 
@@ -174,6 +179,7 @@ type syscallChangeMTU struct {
 	MTU  int32
 }
 
+// SetMTU ...
 func (t *adapter) SetMTU() (err error) {
 	var ifr syscallChangeMTU
 	copy(ifr.Name[:], []byte(t.Name))
@@ -194,6 +200,7 @@ type syscallChangeTXQueueLen struct {
 	TxQueueLen int32
 }
 
+// SetTXQueueLen ...
 func (t *adapter) SetTXQueueLen() (err error) {
 	var ifr syscallChangeTXQueueLen
 	copy(ifr.Name[:], []byte(t.Name))
@@ -209,6 +216,7 @@ func (t *adapter) SetTXQueueLen() (err error) {
 	return
 }
 
+// Delete ...
 func (t *adapter) Delete() (err error) {
 	var ifr syscallSetFlags
 	DOR := 1 << 17
@@ -316,6 +324,7 @@ func (t *adapter) applyTunnelRoutes(tun *TUN) (err error) {
 	return
 }
 
+// Connect ...
 func (t *adapter) Connect(tun *TUN) (err error) {
 	err = t.configureAdapter()
 	if err != nil {
@@ -325,6 +334,7 @@ func (t *adapter) Connect(tun *TUN) (err error) {
 	return t.applyTunnelRoutes(tun)
 }
 
+// Disconnect ...
 func (t *adapter) Disconnect(tun *TUN) (err error) {
 	defer RecoverAndLog()
 	if tun.wgDevice != nil {

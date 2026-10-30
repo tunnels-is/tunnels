@@ -16,9 +16,6 @@ var (
 	killSwitchIPv4Active atomic.Bool
 	killSwitchIPv6Active atomic.Bool
 
-	// windowsDemoted remembers the metric a physical default had before the
-	// kill switch moved it to killSwitchDemotedMetric. Key is "4:<ifindex>"
-	// or "6:<ifindex>".
 	windowsDemoted = map[string]uint32{}
 )
 

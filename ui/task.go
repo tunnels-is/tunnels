@@ -10,27 +10,8 @@ import (
 	"github.com/tunnels-is/tunnels/client"
 )
 
-// Saving the config is expensive: client.SetConfig re-parses every block and
-// allow list, re-applies the kill switch (which spawns netsh on Windows) and
-// writes to disk. Doing that on the UI goroutine froze the window on every
-// toggle, so it runs as a task with a loader instead.
-
-// taskMu serialises tasks. Config updates are read-modify-write over shared
-// state, so overlapping them would silently lose one of the changes.
 var taskMu sync.Mutex
 
-// ---------------------------------------------------------------- loader
-
-// busyCard is the loader: a label over an indeterminate bar, centred on a
-// dimmed page.
-//
-// The scrim is a canvas rectangle, not a widget, so it darkens the page without
-// capturing input — the window stays responsive while the task runs, which
-// matters because tasks are serialised rather than blocking.
-//
-// A progress bar rather than widget.Activity: Activity draws nothing until its
-// animation ticks, so if the animation never runs the loader would show no
-// indicator at all. The bar is visible at rest and animates when it can.
 func busyCard(label string) fyne.CanvasObject {
 	p := pal()
 
@@ -50,8 +31,6 @@ func busyCard(label string) fyne.CanvasObject {
 	return container.NewStack(scrim, container.NewCenter(dropShadow(radLg, card)))
 }
 
-// showBusy displays the loader. Calls nest: the label of the most recent task
-// wins and the loader stays up until the last one finishes.
 func (a *App) showBusy(label string) {
 	a.busyN++
 	if a.busyBox == nil {
@@ -72,10 +51,6 @@ func (a *App) hideBusy() {
 	a.busyBox.Refresh()
 }
 
-// ---------------------------------------------------------------- tasks
-
-// runTask runs work off the UI goroutine with the loader showing, then calls
-// after on the UI goroutine. Tasks run one at a time.
 func (a *App) runTask(label string, work func() error, after func(error)) {
 	a.showBusy(label)
 	go func() {
@@ -92,15 +67,6 @@ func (a *App) runTask(label string, work func() error, after func(error)) {
 	}()
 }
 
-// updateConfig mutates the config and persists it in the background.
-//
-// The clone happens inside the task, under the same lock as the write, so two
-// quick toggles cannot each clone the original and clobber one another.
-//
-// after runs only on success. Most callers pass nil: a switch already shows its
-// new state, and rebuilding the page underneath the user's cursor was half of
-// what made toggling feel like an interruption. A failure always rebuilds, so
-// the control snaps back to what was actually saved.
 func (a *App) updateConfig(label string, mutate func(*client.Config), after func()) {
 	a.runTask(label, func() error {
 		next := client.CloneConfig()

@@ -7,8 +7,6 @@ import (
 	"time"
 )
 
-// customWhiteListFileContent is written when whitelists/custom is missing.
-// Comments keep the file non-empty so local load does not treat it as absent.
 const customWhiteListFileContent = `# Tunnels custom DNS whitelist
 # Domains listed here always resolve, even if they appear on a block list.
 # One domain per line. Lines starting with # are ignored.
@@ -146,7 +144,6 @@ func sanitizeWhiteListConfig(config *Config) bool {
 		config.DNSWhiteLists = GetDefaultWhiteLists()
 		changed = true
 	}
-	// Re-ensure after any full replacement of the list slice.
 	if ensureCustomWhiteListInConfig(config) {
 		changed = true
 	}
@@ -171,7 +168,6 @@ func processWhiteList(wl *BlockList, force bool, prevByTag map[string]*DomainSet
 	}
 	lowerTag := strings.ToLower(wl.Tag)
 
-	// Local custom list: recreate the starter file if someone deleted it.
 	if wl.URL == "" && strings.EqualFold(wl.Tag, customDNSListTag) {
 		if err := ensureCustomWhiteListFile(state.WhiteListPath); err != nil {
 			ERROR("unable to create custom whitelist file: ", err)
@@ -247,9 +243,6 @@ func ensureCustomWhiteListFile(whiteListDir string) error {
 	return ensureCustomDNSListFile(whiteListDir, customWhiteListFileContent)
 }
 
-// ensureCustomWhiteListInConfig adds the "custom" whitelist (Enabled) when
-// no entry with that tag is present. Existing entries are not modified, so a
-// user who disabled "custom" stays disabled.
 func ensureCustomWhiteListInConfig(config *Config) bool {
 	if config == nil {
 		return false
@@ -257,6 +250,7 @@ func ensureCustomWhiteListInConfig(config *Config) bool {
 	return ensureCustomDNSListInSlice(&config.DNSWhiteLists)
 }
 
+// GetDefaultWhiteLists ...
 func GetDefaultWhiteLists() []*BlockList {
 	return []*BlockList{newCustomDNSList()}
 }

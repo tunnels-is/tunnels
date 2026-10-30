@@ -21,6 +21,7 @@ type adapter struct {
 	Gateway     string
 }
 
+// Up ...
 func (t *adapter) Up() (err error) {
 	DEBUG("ifconfig", t.Name, t.IPv4Address, t.Gateway, "up")
 
@@ -33,6 +34,7 @@ func (t *adapter) Up() (err error) {
 	return
 }
 
+// SetMTU ...
 func (t *adapter) SetMTU() (err error) {
 	DEBUG("ifconfig", t.Name, "mtu", strconv.FormatInt(int64(t.MTU), 10))
 	out, err := exec.Command("ifconfig", t.Name, "mtu", strconv.FormatInt(int64(t.MTU), 10)).CombinedOutput()
@@ -43,6 +45,7 @@ func (t *adapter) SetMTU() (err error) {
 	return
 }
 
+// AddrV6 ...
 func (t *adapter) AddrV6() (err error) {
 	if t.IPv6Address == "" {
 		return nil
@@ -147,6 +150,7 @@ func (t *adapter) applyTunnelRoutes(tun *TUN) (err error) {
 	return nil
 }
 
+// Connect ...
 func (t *adapter) Connect(tun *TUN) (err error) {
 	err = t.configureAdapter()
 	if err != nil {
@@ -156,8 +160,10 @@ func (t *adapter) Connect(tun *TUN) (err error) {
 	return t.applyTunnelRoutes(tun)
 }
 
+// Delete ...
 func (t *adapter) Delete() error { return nil }
 
+// Disconnect ...
 func (t *adapter) Disconnect(tun *TUN) (err error) {
 	defer RecoverAndLog()
 	if tun.wgDevice != nil {

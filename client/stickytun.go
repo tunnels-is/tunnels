@@ -9,11 +9,6 @@ import (
 	"golang.zx2c4.com/wireguard/tun"
 )
 
-// stickyTUN keeps the OS TUN open when wireguard-go Device.Close() calls
-// tun.Close(). Read is unblocked with a deadline so Close() does not deadlock.
-// Release() is the real teardown (manual disconnect).
-//
-// Windows NativeTun.File() is nil, so we do not wrap those devices.
 type stickyTUN struct {
 	inner tun.Device
 
@@ -68,15 +63,27 @@ func (s *stickyTUN) eventsChan() <-chan tun.Event {
 	return s.ev
 }
 
-func (s *stickyTUN) File() *os.File           { return s.inner.File() }
-func (s *stickyTUN) MTU() (int, error)        { return s.inner.MTU() }
-func (s *stickyTUN) Name() (string, error)    { return s.inner.Name() }
-func (s *stickyTUN) BatchSize() int           { return s.inner.BatchSize() }
+// File ...
+func (s *stickyTUN) File() *os.File { return s.inner.File() }
+
+// MTU ...
+func (s *stickyTUN) MTU() (int, error) { return s.inner.MTU() }
+
+// Name ...
+func (s *stickyTUN) Name() (string, error) { return s.inner.Name() }
+
+// BatchSize ...
+func (s *stickyTUN) BatchSize() int { return s.inner.BatchSize() }
+
+// Events ...
 func (s *stickyTUN) Events() <-chan tun.Event { return s.eventsChan() }
+
+// Write ...
 func (s *stickyTUN) Write(bufs [][]byte, off int) (int, error) {
 	return s.inner.Write(bufs, off)
 }
 
+// Read ...
 func (s *stickyTUN) Read(bufs [][]byte, sizes []int, offset int) (int, error) {
 	n, err := s.inner.Read(bufs, sizes, offset)
 	if s.stopped.Load() || s.released.Load() {
@@ -85,6 +92,7 @@ func (s *stickyTUN) Read(bufs [][]byte, sizes []int, offset int) (int, error) {
 	return n, err
 }
 
+// Close ...
 func (s *stickyTUN) Close() error {
 	if s.released.Load() {
 		return nil
@@ -106,6 +114,7 @@ func (s *stickyTUN) Close() error {
 	return nil
 }
 
+// ResetForReuse ...
 func (s *stickyTUN) ResetForReuse() error {
 	if s.released.Load() {
 		return os.ErrClosed
@@ -122,6 +131,7 @@ func (s *stickyTUN) ResetForReuse() error {
 	return nil
 }
 
+// Release ...
 func (s *stickyTUN) Release() error {
 	if !s.released.CompareAndSwap(false, true) {
 		return nil
@@ -130,6 +140,7 @@ func (s *stickyTUN) Release() error {
 	return s.inner.Close()
 }
 
+// CanReuse ...
 func (s *stickyTUN) CanReuse() bool {
 	if s == nil || s.released.Load() {
 		return false

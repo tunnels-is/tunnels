@@ -9,6 +9,7 @@ import (
 	"github.com/tunnels-is/tunnels/punch"
 )
 
+// TestResolvedMTUKeepsConfigured ...
 func TestResolvedMTUKeepsConfigured(t *testing.T) {
 	meta := &TunnelMeta{MTU: 1320}
 	if got := resolvedMTU(meta, "192.0.2.1", "51820"); got != 1320 {
@@ -19,6 +20,7 @@ func TestResolvedMTUKeepsConfigured(t *testing.T) {
 	}
 }
 
+// TestDiscoverPathMTULoopback ...
 func TestDiscoverPathMTULoopback(t *testing.T) {
 	pc, err := net.ListenUDP("udp4", &net.UDPAddr{IP: net.IPv4(127, 0, 0, 1)})
 	if err != nil {
@@ -47,6 +49,7 @@ func TestDiscoverPathMTULoopback(t *testing.T) {
 	}
 }
 
+// TestPeerMTUClampsSYNAndDropsUDP ...
 func TestPeerMTUClampsSYNAndDropsUDP(t *testing.T) {
 	tun := newBareTUN()
 	peer := [4]byte{10, 0, 1, 8}

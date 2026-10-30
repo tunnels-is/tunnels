@@ -27,6 +27,7 @@ func baseCfg() *Config {
 	}
 }
 
+// TestPreflight_CleanHost ...
 func TestPreflight_CleanHost(t *testing.T) {
 	dump := fakeDumper{}
 	if err := preflightIPTablesWith(baseCfg(), dump.dump); err != nil {
@@ -34,6 +35,7 @@ func TestPreflight_CleanHost(t *testing.T) {
 	}
 }
 
+// TestPreflight_StaleSNATWithDifferentPublicIP ...
 func TestPreflight_StaleSNATWithDifferentPublicIP(t *testing.T) {
 
 	dump := fakeDumper{
@@ -51,6 +53,7 @@ func TestPreflight_StaleSNATWithDifferentPublicIP(t *testing.T) {
 	}
 }
 
+// TestPreflight_ConflictingWireGuardIface ...
 func TestPreflight_ConflictingWireGuardIface(t *testing.T) {
 	dump := fakeDumper{
 		"iptables|filter|FORWARD": "-A FORWARD -i wg0 -o eth0 -j ACCEPT\n",
@@ -61,6 +64,7 @@ func TestPreflight_ConflictingWireGuardIface(t *testing.T) {
 	}
 }
 
+// TestPreflight_ConflictingPort ...
 func TestPreflight_ConflictingPort(t *testing.T) {
 	dump := fakeDumper{
 		"iptables|filter|INPUT": "-A INPUT -p udp -m udp --dport 51820 -j ACCEPT\n",
@@ -71,6 +75,7 @@ func TestPreflight_ConflictingPort(t *testing.T) {
 	}
 }
 
+// TestPreflight_PortMatchRequiresUDP ...
 func TestPreflight_PortMatchRequiresUDP(t *testing.T) {
 
 	dump := fakeDumper{
@@ -81,6 +86,7 @@ func TestPreflight_PortMatchRequiresUDP(t *testing.T) {
 	}
 }
 
+// TestPreflight_NonWGForwardIsAllowed ...
 func TestPreflight_NonWGForwardIsAllowed(t *testing.T) {
 
 	dump := fakeDumper{
@@ -95,6 +101,7 @@ func TestPreflight_NonWGForwardIsAllowed(t *testing.T) {
 	}
 }
 
+// TestPreflight_IPv6Subnet ...
 func TestPreflight_IPv6Subnet(t *testing.T) {
 	dump := fakeDumper{
 		"ip6tables|nat|POSTROUTING": "-A POSTROUTING -s fd00::/64 -o eth0 -j MASQUERADE\n",
@@ -105,6 +112,7 @@ func TestPreflight_IPv6Subnet(t *testing.T) {
 	}
 }
 
+// TestPreflight_ReportsAllConflicts ...
 func TestPreflight_ReportsAllConflicts(t *testing.T) {
 
 	dump := fakeDumper{
@@ -132,6 +140,7 @@ func TestPreflight_ReportsAllConflicts(t *testing.T) {
 	}
 }
 
+// TestPreflight_PropagatesDumpError ...
 func TestPreflight_PropagatesDumpError(t *testing.T) {
 	failing := func(bin, table, chain string) (string, error) {
 		return "", errors.New("iptables: command not found")
@@ -142,6 +151,7 @@ func TestPreflight_PropagatesDumpError(t *testing.T) {
 	}
 }
 
+// TestHasFlagValue_TokenBoundary ...
 func TestHasFlagValue_TokenBoundary(t *testing.T) {
 	rule := "-A POSTROUTING -s 10.0.0.0/22 -o eth0 -j SNAT --to-source 74.63.223.157"
 
@@ -163,6 +173,7 @@ func TestHasFlagValue_TokenBoundary(t *testing.T) {
 	}
 }
 
+// TestPreflight_ErrorPinpointsLocation ...
 func TestPreflight_ErrorPinpointsLocation(t *testing.T) {
 
 	dump := fakeDumper{
@@ -196,6 +207,7 @@ func TestPreflight_ErrorPinpointsLocation(t *testing.T) {
 	}
 }
 
+// TestPreflight_PositionCountsOnlyAppendRules ...
 func TestPreflight_PositionCountsOnlyAppendRules(t *testing.T) {
 
 	dump := fakeDumper{
@@ -211,6 +223,7 @@ func TestPreflight_PositionCountsOnlyAppendRules(t *testing.T) {
 	}
 }
 
+// TestShowActiveRules_CatchesAllShapes ...
 func TestShowActiveRules_CatchesAllShapes(t *testing.T) {
 
 	dump := fakeDumper{
@@ -263,6 +276,7 @@ func TestShowActiveRules_CatchesAllShapes(t *testing.T) {
 	}
 }
 
+// TestShowActiveRules_EmitsDrainCommands ...
 func TestShowActiveRules_EmitsDrainCommands(t *testing.T) {
 
 	dump := fakeDumper{
@@ -278,6 +292,7 @@ func TestShowActiveRules_EmitsDrainCommands(t *testing.T) {
 	}
 }
 
+// TestShowActiveRules_NoMatchingRules ...
 func TestShowActiveRules_NoMatchingRules(t *testing.T) {
 
 	dump := fakeDumper{
@@ -292,6 +307,7 @@ func TestShowActiveRules_NoMatchingRules(t *testing.T) {
 	}
 }
 
+// TestShowActiveRules_PropagatesDumpError ...
 func TestShowActiveRules_PropagatesDumpError(t *testing.T) {
 	failing := func(bin, table, chain string) (string, error) {
 		return "", errors.New("iptables: command not found")
@@ -303,6 +319,7 @@ func TestShowActiveRules_PropagatesDumpError(t *testing.T) {
 	}
 }
 
+// TestWGRuleHeuristic_PerChain ...
 func TestWGRuleHeuristic_PerChain(t *testing.T) {
 	cases := []struct {
 		name, rule, chain string
@@ -330,6 +347,7 @@ func TestWGRuleHeuristic_PerChain(t *testing.T) {
 	}
 }
 
+// TestPreflight_IgnoresPolicyAndComments ...
 func TestPreflight_IgnoresPolicyAndComments(t *testing.T) {
 
 	dump := fakeDumper{

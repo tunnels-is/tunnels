@@ -38,8 +38,6 @@ func (a *App) navItems() []navItem {
 	}
 }
 
-// ---------------------------------------------------------------- nav row
-
 type navRow struct {
 	widget.BaseWidget
 	icon    fyne.Resource
@@ -55,17 +53,26 @@ func newNavRow(icon fyne.Resource, label string, active bool, tap func()) *navRo
 	return n
 }
 
+// Tapped ...
 func (n *navRow) Tapped(*fyne.PointEvent) {
 	if n.tap != nil {
 		n.tap()
 	}
 }
 
-func (n *navRow) MouseIn(*desktop.MouseEvent)    { n.hovered = true; n.Refresh() }
-func (n *navRow) MouseOut()                      { n.hovered = false; n.Refresh() }
-func (n *navRow) MouseMoved(*desktop.MouseEvent) {}
-func (n *navRow) Cursor() desktop.Cursor         { return desktop.PointerCursor }
+// MouseIn ...
+func (n *navRow) MouseIn(*desktop.MouseEvent) { n.hovered = true; n.Refresh() }
 
+// MouseOut ...
+func (n *navRow) MouseOut() { n.hovered = false; n.Refresh() }
+
+// MouseMoved ...
+func (n *navRow) MouseMoved(*desktop.MouseEvent) {}
+
+// Cursor ...
+func (n *navRow) Cursor() desktop.Cursor { return desktop.PointerCursor }
+
+// CreateRenderer ...
 func (n *navRow) CreateRenderer() fyne.WidgetRenderer {
 	bg := surface(radSm, color.Transparent, nil)
 	rail := canvas.NewRectangle(color.Transparent)
@@ -90,8 +97,10 @@ type navRowRenderer struct {
 	objs      []fyne.CanvasObject
 }
 
+// Destroy ...
 func (r *navRowRenderer) Destroy() {}
 
+// Objects ...
 func (r *navRowRenderer) Objects() []fyne.CanvasObject {
 	if r.objs == nil {
 		r.objs = []fyne.CanvasObject{r.bg, r.rail, r.ico, r.lab}
@@ -99,10 +108,12 @@ func (r *navRowRenderer) Objects() []fyne.CanvasObject {
 	return r.objs
 }
 
+// MinSize ...
 func (r *navRowRenderer) MinSize() fyne.Size {
 	return fyne.NewSize(railWidth-sp3*2, navRowH)
 }
 
+// Layout ...
 func (r *navRowRenderer) Layout(size fyne.Size) {
 	r.bg.Resize(size)
 	r.rail.Resize(fyne.NewSize(z(3), size.Height-z(14)))
@@ -113,6 +124,7 @@ func (r *navRowRenderer) Layout(size fyne.Size) {
 	r.lab.Move(fyne.NewPos(sp2+z(2)+iconSize+sp3, (size.Height-lms.Height)/2))
 }
 
+// Refresh ...
 func (r *navRowRenderer) Refresh() {
 	old := r.ico.Resource
 	r.apply()
@@ -155,8 +167,6 @@ func (r *navRowRenderer) apply() {
 	}
 }
 
-// ---------------------------------------------------------------- sidebar
-
 type sidebar struct {
 	widget.BaseWidget
 	a *App
@@ -168,10 +178,12 @@ func newSidebar(a *App) *sidebar {
 	return s
 }
 
+// MinSize ...
 func (s *sidebar) MinSize() fyne.Size {
 	return fyne.NewSize(railWidth, 320)
 }
 
+// CreateRenderer ...
 func (s *sidebar) CreateRenderer() fyne.WidgetRenderer {
 	r := &sidebarRenderer{s: s}
 	r.bg = canvas.NewRectangle(pal().Base100)
@@ -190,8 +202,10 @@ type sidebarRenderer struct {
 	objects []fyne.CanvasObject
 }
 
+// Destroy ...
 func (r *sidebarRenderer) Destroy() {}
 
+// Layout ...
 func (r *sidebarRenderer) Layout(size fyne.Size) {
 	r.bg.Resize(size)
 	r.edge.Resize(fyne.NewSize(1, size.Height))
@@ -199,10 +213,13 @@ func (r *sidebarRenderer) Layout(size fyne.Size) {
 	r.body.Resize(size)
 }
 
+// MinSize ...
 func (r *sidebarRenderer) MinSize() fyne.Size { return r.s.MinSize() }
 
+// Objects ...
 func (r *sidebarRenderer) Objects() []fyne.CanvasObject { return r.objects }
 
+// Refresh ...
 func (r *sidebarRenderer) Refresh() {
 	p := pal()
 	r.bg.FillColor = p.Base100
@@ -241,8 +258,6 @@ func (r *sidebarRenderer) rebuild() {
 	}
 
 	nav := insetEach(sp2, sp3, sp4, sp3, vstack(2, rows...))
-	// No rule under the brand: the rail already reads as its own surface, so the
-	// line only chopped the logo off from the nav it belongs with.
 	top := r.brand()
 
 	var bottom fyne.CanvasObject
@@ -250,9 +265,6 @@ func (r *sidebarRenderer) rebuild() {
 		bottom = vstack(0, strongDivider(), insetEach(sp2, sp3, sp2, sp3, r.userChip()))
 	}
 
-	// The nav list scrolls: with the brand pinned top and the account chip
-	// pinned bottom, a short window (or a high zoom level) would otherwise
-	// squeeze the Border layout until the two overlapped.
 	scroll := container.NewVScroll(nav)
 	scroll.Direction = container.ScrollVerticalOnly
 	r.body.Objects = []fyne.CanvasObject{container.NewBorder(top, bottom, nil, nil, scroll)}
@@ -292,7 +304,6 @@ func (r *sidebarRenderer) userChip() fyne.CanvasObject {
 	return newNavRowWrap(row, a.current == pageAccount, func() { a.navigate(pageAccount) })
 }
 
-// navRowWrap gives arbitrary content the same hover/active surface as a nav row.
 type navRowWrap struct {
 	widget.BaseWidget
 	content fyne.CanvasObject
@@ -307,17 +318,26 @@ func newNavRowWrap(content fyne.CanvasObject, active bool, tap func()) *navRowWr
 	return w
 }
 
+// Tapped ...
 func (w *navRowWrap) Tapped(*fyne.PointEvent) {
 	if w.tap != nil {
 		w.tap()
 	}
 }
 
-func (w *navRowWrap) MouseIn(*desktop.MouseEvent)    { w.hovered = true; w.Refresh() }
-func (w *navRowWrap) MouseOut()                      { w.hovered = false; w.Refresh() }
-func (w *navRowWrap) MouseMoved(*desktop.MouseEvent) {}
-func (w *navRowWrap) Cursor() desktop.Cursor         { return desktop.PointerCursor }
+// MouseIn ...
+func (w *navRowWrap) MouseIn(*desktop.MouseEvent) { w.hovered = true; w.Refresh() }
 
+// MouseOut ...
+func (w *navRowWrap) MouseOut() { w.hovered = false; w.Refresh() }
+
+// MouseMoved ...
+func (w *navRowWrap) MouseMoved(*desktop.MouseEvent) {}
+
+// Cursor ...
+func (w *navRowWrap) Cursor() desktop.Cursor { return desktop.PointerCursor }
+
+// CreateRenderer ...
 func (w *navRowWrap) CreateRenderer() fyne.WidgetRenderer {
 	bg := surface(radSm, color.Transparent, nil)
 	r := &navWrapRenderer{w: w, bg: bg}
@@ -331,8 +351,10 @@ type navWrapRenderer struct {
 	objs []fyne.CanvasObject
 }
 
+// Destroy ...
 func (r *navWrapRenderer) Destroy() {}
 
+// Objects ...
 func (r *navWrapRenderer) Objects() []fyne.CanvasObject {
 	if r.objs == nil {
 		r.objs = []fyne.CanvasObject{r.bg, r.w.content}
@@ -340,17 +362,20 @@ func (r *navWrapRenderer) Objects() []fyne.CanvasObject {
 	return r.objs
 }
 
+// MinSize ...
 func (r *navWrapRenderer) MinSize() fyne.Size {
 	ms := r.w.content.MinSize()
 	return fyne.NewSize(ms.Width+sp2*2, ms.Height+sp2*2)
 }
 
+// Layout ...
 func (r *navWrapRenderer) Layout(size fyne.Size) {
 	r.bg.Resize(size)
 	r.w.content.Move(fyne.NewPos(sp2, sp2))
 	r.w.content.Resize(fyne.NewSize(size.Width-sp2*2, size.Height-sp2*2))
 }
 
+// Refresh ...
 func (r *navWrapRenderer) Refresh() {
 	r.apply()
 	r.bg.Refresh()
@@ -369,7 +394,6 @@ func (r *navWrapRenderer) apply() {
 	}
 }
 
-// navigate loads a page and kicks off whatever data it needs.
 func (a *App) navigate(id pageID) {
 	switch id {
 	case pageDashboard:
@@ -378,9 +402,6 @@ func (a *App) navigate(id pageID) {
 	case pageServers:
 		a.fetchServers(false)
 	case pageTunnels:
-		// Tunnels are read from the account workspace, which the CLI or a
-		// previous session may have changed, so re-read rather than trusting
-		// the snapshot taken at startup.
 		a.refreshState()
 		a.fetchServers(false)
 	case pageDevices:

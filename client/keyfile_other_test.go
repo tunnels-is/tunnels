@@ -8,6 +8,7 @@ import (
 	"testing"
 )
 
+// TestValidateUserKeyFile_IgnoresUnixModeBits ...
 func TestValidateUserKeyFile_IgnoresUnixModeBits(t *testing.T) {
 	dir := t.TempDir()
 	p := filepath.Join(dir, "user")

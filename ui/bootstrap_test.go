@@ -12,9 +12,7 @@ import (
 	"github.com/tunnels-is/tunnels/client"
 )
 
-// TestSetUserLoadsAccountTunnels covers the startup path that left the Tunnels
-// page empty: tunnels live in a per-account workspace, so selecting the user has
-// to activate that workspace and re-read state before the page is built.
+// TestSetUserLoadsAccountTunnels ...
 func TestSetUserLoadsAccountTunnels(t *testing.T) {
 	base := t.TempDir()
 	accounts := filepath.Join(base, "accounts") + string(os.PathSeparator)
@@ -25,9 +23,6 @@ func TestSetUserLoadsAccountTunnels(t *testing.T) {
 	}
 	prevBase, prevAccounts := s.BasePath, s.AccountsPath
 	t.Cleanup(func() {
-		// setUser persists the account on a goroutine. Restoring the paths while
-		// that is still in flight makes it write the account workspace into the
-		// package directory instead of the temp dir, so wait for it to land.
 		waitForAccountFile(t, accounts)
 		st := client.STATE.Load()
 		st.BasePath, st.AccountsPath = prevBase, prevAccounts
@@ -39,8 +34,6 @@ func TestSetUserLoadsAccountTunnels(t *testing.T) {
 
 	const userID = "6f2a91c4e8b7d3a501f9c62b"
 
-	// Create the workspace and drop a tunnel file in it, as a previous session
-	// would have left behind.
 	if err := client.ActivateAccount(userID); err != nil {
 		t.Fatal(err)
 	}
@@ -54,9 +47,6 @@ func TestSetUserLoadsAccountTunnels(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Model a fresh process: no workspace activated yet and nothing cached.
-	// activateAccountByHash early-returns when the hash is already active, so
-	// the hash has to be cleared as well as the map.
 	cold := client.STATE.Load()
 	cold.ActiveAccountHash = ""
 	cold.TunnelsPath = ""
@@ -69,7 +59,6 @@ func TestSetUserLoadsAccountTunnels(t *testing.T) {
 	fy := test.NewApp()
 	a := &App{fyneApp: fy, win: fy.NewWindow("t"), toastBox: container.NewStack()}
 
-	// What bootstrap does: snapshot state, then pick the saved user.
 	a.refreshState()
 	if len(a.tunnels) != 0 {
 		t.Fatalf("precondition: expected an empty cold-start snapshot, got %d", len(a.tunnels))
@@ -91,9 +80,6 @@ func TestSetUserLoadsAccountTunnels(t *testing.T) {
 	}
 }
 
-// waitForAccountFile blocks until the async SaveUser has written the account
-// file under accounts, or gives up. Without this the goroutine can outlive the
-// test and write into the source tree.
 func waitForAccountFile(t *testing.T, accounts string) {
 	t.Helper()
 	deadline := time.Now().Add(3 * time.Second)

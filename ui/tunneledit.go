@@ -12,8 +12,6 @@ import (
 	"github.com/tunnels-is/tunnels/types"
 )
 
-// parseMTUText reads the MTU field. An empty field is automatic discovery.
-// A negative or non-numeric value leaves the previous MTU in place.
 func parseMTUText(text string, current int32) int32 {
 	raw := strings.TrimSpace(text)
 	if raw == "" {
@@ -70,8 +68,6 @@ func (a *App) tunnelEditPage() fyne.CanvasObject {
 		toggle("EnableWAN", "WAN routing", "Allow routing to the tunnel's wider network.", form.EnableWAN),
 	)
 
-	// Row editors need to nudge the page to re-lay out when a row is added or
-	// removed, since a container's own Refresh does not reach its parents.
 	var reflow func()
 	bump := func() {
 		if reflow != nil {
@@ -121,9 +117,6 @@ func (a *App) tunnelEditPage() fyne.CanvasObject {
 		[]fieldCol{{label: "Port", placeholder: "443", weight: 1}},
 		portRows, "No ports blocked.", bump)
 
-	// Records stay on the cloned form until Save changes. reflow is assigned
-	// once the scroll exists, so the first render skips it. A domain with no
-	// address is a route; the two cards are two views of the same list.
 	recBody := container.NewStack()
 	routeBody := container.NewStack()
 	var renderDNS func()
@@ -195,8 +188,6 @@ func (a *App) tunnelEditPage() fyne.CanvasObject {
 
 		form.DNSServers = dnsEd.column(0)
 
-		// Gateway is carried through: the old parser only read Address and
-		// Metric, so saving used to erase it from every route.
 		form.Routes = nil
 		for _, r := range routeEd.values() {
 			form.Routes = append(form.Routes, &types.Route{Address: r[0], Metric: r[1], Gateway: r[2]})
@@ -258,8 +249,6 @@ func (a *App) tunnelEditPage() fyne.CanvasObject {
 
 	flow := scrollFlow(cards...)
 	body := scrollBodyOf(flow)
-	// Refresh the scroll too: the flow's height changes when a row is added,
-	// and the scroller only remeasures when it is refreshed itself.
 	reflow = func() {
 		flow.Refresh()
 		body.Refresh()
@@ -273,16 +262,10 @@ func (a *App) tunnelEditPage() fyne.CanvasObject {
 	return pageShell(form.Tag, sub, actions, body)
 }
 
-// dnsRecordIsRoute is a domain sent through the tunnel. An address or TXT
-// value makes it a fixed answer instead.
 func dnsRecordIsRoute(r *types.DNSRecord) bool {
 	return r != nil && len(r.IP) == 0 && len(r.TXT) == 0
 }
 
-// tunnelDNSRows is the list body for a tunnel's fixed DNS answers.
-// index is the slot in the form slice, so a nil hole is not shown and is
-// not renumbered out from under edit and delete. Routes are left out; they
-// have their own list.
 func tunnelDNSRows(records []*types.DNSRecord, onEdit func(int, *types.DNSRecord), onDelete func(int, string)) []fyne.CanvasObject {
 	rows := make([]fyne.CanvasObject, 0, len(records))
 	for i, r := range records {
@@ -317,8 +300,6 @@ func tunnelDNSRows(records []*types.DNSRecord, onEdit func(int, *types.DNSRecord
 	return rows
 }
 
-// tunnelDNSRouteRows lists domains whose lookups are forwarded through the
-// tunnel. index matches the shared DNSRecords slice.
 func tunnelDNSRouteRows(records []*types.DNSRecord, onEdit func(int, *types.DNSRecord), onDelete func(int, string)) []fyne.CanvasObject {
 	rows := make([]fyne.CanvasObject, 0, len(records))
 	for i, r := range records {
@@ -341,8 +322,6 @@ func tunnelDNSRouteRows(records []*types.DNSRecord, onEdit func(int, *types.DNSR
 	return rows
 }
 
-// editTunnelDNSRoute asks for a domain and stores it as a route: no address,
-// wildcard on, so the name and everything under it is forwarded.
 func (a *App) editTunnelDNSRoute(rec *types.DNSRecord, onSave func(types.DNSRecord)) {
 	current := ""
 	if rec != nil {
@@ -368,8 +347,6 @@ func (a *App) editTunnelDNSRoute(rec *types.DNSRecord, onSave func(types.DNSReco
 	d.Show()
 }
 
-// editTunnelDNSRecord edits one fixed answer in memory. The tunnel file is
-// written only when the page's Save changes button runs.
 func (a *App) editTunnelDNSRecord(rec *types.DNSRecord, onSave func(types.DNSRecord)) {
 	if rec == nil {
 		rec = &types.DNSRecord{}
@@ -404,8 +381,6 @@ func (a *App) editTunnelDNSRecord(rec *types.DNSRecord, onSave func(types.DNSRec
 	d.Show()
 }
 
-// parseBlockedPorts keeps ports in 1..65535, in order, without duplicates.
-// Anything else is returned so the save can name it.
 func parseBlockedPorts(vals []string) (ports []uint16, bad []string) {
 	seen := make(map[uint16]struct{}, len(vals))
 	for _, p := range vals {

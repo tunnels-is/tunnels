@@ -7,6 +7,7 @@ import (
 	"github.com/tunnels-is/tunnels/types"
 )
 
+// TestValidateServerConfig ...
 func TestValidateServerConfig(t *testing.T) {
 	okKey := strings.Repeat("a", minSecretLen)
 	cases := []struct {

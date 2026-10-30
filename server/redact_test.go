@@ -2,6 +2,7 @@ package main
 
 import "testing"
 
+// TestRedactKey ...
 func TestRedactKey(t *testing.T) {
 	cases := map[string]string{
 		"":                        "…",

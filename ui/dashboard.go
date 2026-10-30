@@ -12,21 +12,12 @@ import (
 	"github.com/tunnels-is/tunnels/types"
 )
 
-// dashNameSize is the closest server's name. It stays larger than a card
-// title so the name is the first thing you read.
 func dashNameSize() float32 { return snapDIP(z(34)) }
 
-// dashLatencySize is the round-trip figure above that name.
 func dashLatencySize() float32 { return snapDIP(z(22)) }
 
-// ---------------------------------------------------------------- page
-
 func (a *App) dashboardPage() fyne.CanvasObject {
-	// Building a page must not start work. The first probe is chained off the
-	// server fetch instead, so it also fires when the list is still in flight.
 	a.maybeAutoProbe()
-	// Device tags name the direct paths. Skip this in tests, which build the
-	// page without an app and must not open a controller request.
 	if a.fyneApp != nil && a.loggedIn() && !a.devicesLoaded {
 		a.fetchDevices()
 	}
@@ -36,7 +27,6 @@ func (a *App) dashboardPage() fyne.CanvasObject {
 	return pageShell("Dashboard", "", nil, scrollBodyOf(capWidth(z(880), col)))
 }
 
-// myTunnels is the signed-in user's active tunnels.
 func (a *App) myTunnels() []*client.TUN {
 	var mine []*client.TUN
 	for _, t := range a.active {
@@ -47,14 +37,11 @@ func (a *App) myTunnels() []*client.TUN {
 	return mine
 }
 
-// dashPanel is the dashboard card: the same surface as every other panel,
-// with a little more air so the hero and the tunnel cards share one rhythm.
 func dashPanel(content fyne.CanvasObject) fyne.CanvasObject {
 	p := pal()
 	return container.NewStack(surface(radLg, p.Base100, p.Base300), inset(sp5, content))
 }
 
-// dashHero is the closest server and the one-step connect action.
 func (a *App) dashHero() fyne.CanvasObject {
 	best, ok := a.bestProbe()
 	if a.probing && !ok {
@@ -132,7 +119,6 @@ func (a *App) dashHero() fyne.CanvasObject {
 	return dashPanel(splitRow(vstack(sp2, lines...), actions))
 }
 
-// dashTunnelSection is every tunnel this account has up on this computer.
 func (a *App) dashTunnelSection() fyne.CanvasObject {
 	mine := a.myTunnels()
 	sub := "Connect above to bring one up"
@@ -278,18 +264,11 @@ func probeAge(t time.Time) string {
 	return "Measured " + d.Round(time.Minute).String() + " ago"
 }
 
-// ---------------------------------------------------------------- actions
-
-// maybeAutoProbe runs the first probe on its own: only when signed in, and
-// only once. A tunnel that is already up still gets measured, because the
-// closest server stays on screen above the live tunnels. Safe to call
-// repeatedly; every guard is cheap.
 func (a *App) maybeAutoProbe() {
 	switch a.autoProbeState() {
 	case autoProbeRun:
 		a.runProbe()
 	case autoProbeNeedServers:
-		// fetchServers calls back here once the list lands.
 		a.fetchServers(false)
 	}
 }
@@ -302,8 +281,6 @@ const (
 	autoProbeRun
 )
 
-// autoProbeState is the decision on its own so the guards can be tested without
-// sending a single packet.
 func (a *App) autoProbeState() autoProbeDecision {
 	if a.probedOnce || a.probing {
 		return autoProbeSkip
@@ -317,8 +294,6 @@ func (a *App) autoProbeState() autoProbeDecision {
 	return autoProbeRun
 }
 
-// forceProbe is the button: re-measure even if a probe already ran, and
-// re-fetch the server list first if it is empty, as the web UI does.
 func (a *App) forceProbe() {
 	if len(a.servers) == 0 {
 		a.fetchServers(true)
@@ -328,7 +303,6 @@ func (a *App) forceProbe() {
 	a.runProbe()
 }
 
-// runProbe measures every server in the background.
 func (a *App) runProbe() {
 	if a.probing {
 		return
@@ -361,8 +335,6 @@ func (a *App) bestProbe() (client.ServerProbe, bool) {
 	return client.ServerProbe{}, false
 }
 
-// closestServer is the server the dashboard Connect button would use:
-// the fastest probe result that is still in the server list.
 func (a *App) closestServer() (types.Server, bool) {
 	best, ok := a.bestProbe()
 	if !ok {
@@ -375,8 +347,6 @@ func (a *App) closestServer() (types.Server, bool) {
 	return *s, true
 }
 
-// armDashWatch rebuilds the dashboard when a direct path comes up or drops.
-// The bandwidth chart updates itself; this only watches the peer list.
 func (a *App) armDashWatch() {
 	if a.fyneApp == nil || a.dashWatch != nil {
 		return

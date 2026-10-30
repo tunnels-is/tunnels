@@ -1,8 +1,3 @@
-// Command speedtest is a TCP bandwidth probe for the lab clients.
-// Ping does not cross the tunnel, so this sends a real stream.
-//
-//	speedtest server -listen 10.0.1.3:5201
-//	speedtest client -server 10.0.1.3:5201 -time 10 -dir both
 package main
 
 import (
@@ -313,10 +308,6 @@ func tune(conn net.Conn) {
 	if !ok {
 		return
 	}
-	// Leave the socket buffers alone. On Linux, SO_RCVBUF disables
-	// autotuning and is capped by rmem_max (208 KiB on these VMs).
-	// That froze the receive window at about 42 KiB. At 130 ms that
-	// is 2.6 Mbit/s, while the same path with autotuning does ~800.
 	_ = tc.SetNoDelay(true)
 }
 

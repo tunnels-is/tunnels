@@ -6,6 +6,7 @@ import (
 	"time"
 )
 
+// TestInsertUserByUpdatedDesc ...
 func TestInsertUserByUpdatedDesc(t *testing.T) {
 	mk := func(email string, hoursAgo int) *User {
 		return &User{
@@ -26,6 +27,7 @@ func TestInsertUserByUpdatedDesc(t *testing.T) {
 	}
 }
 
+// TestGetUsersLatest ...
 func TestGetUsersLatest(t *testing.T) {
 	setupTestDB(t)
 	now := time.Now()

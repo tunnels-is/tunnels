@@ -19,12 +19,8 @@ import (
 	"golang.org/x/crypto/curve25519"
 )
 
-// errControllerRedirect is returned by the controller HTTP client when the
-// server answers with a redirect. Redirects are refused so X-WG-KEY is never
-// re-sent to a different Location (Go does not strip custom auth headers).
 var errControllerRedirect = errors.New("refusing to follow controller redirect (X-WG-KEY must not leave the configured controller URL)")
 
-// requireHTTPSControllerURL rejects non-https controller base URLs.
 func requireHTTPSControllerURL(raw string) error {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
@@ -43,9 +39,6 @@ func requireHTTPSControllerURL(raw string) error {
 	return nil
 }
 
-// newControllerHTTPClient builds the client used for all controller calls that
-// carry X-WG-KEY. Redirects are never followed. InsecureSkipVerify remains a
-// supported local option for self-signed controllers.
 func newControllerHTTPClient(insecureSkipVerify bool) *http.Client {
 	return &http.Client{
 		Timeout: 15 * time.Second,
@@ -54,7 +47,7 @@ func newControllerHTTPClient(insecureSkipVerify bool) *http.Client {
 		},
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: insecureSkipVerify, //nolint:gosec // intentional for self-signed deployments
+				InsecureSkipVerify: insecureSkipVerify,
 			},
 		},
 	}
@@ -326,8 +319,6 @@ func configFromResponse(r *types.WGServerConfigResponse, privKey []byte, control
 		EnableFirewall:    r.EnableFirewall,
 		ConfigPath:        configPath,
 
-		// Local wg-config.json / CLI only. The controller must not remotely
-		// disable TLS verification for X-WG-KEY calls.
 		InsecureSkipVerify: insecureSkipVerify,
 	}
 

@@ -5,6 +5,7 @@ import (
 	"testing"
 )
 
+// TestEncryptDecryptRoundTrip ...
 func TestEncryptDecryptRoundTrip(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -85,6 +86,7 @@ func TestEncryptDecryptRoundTrip(t *testing.T) {
 	}
 }
 
+// TestEncryptProducesUniqueOutputs ...
 func TestEncryptProducesUniqueOutputs(t *testing.T) {
 	plaintext := "The same plaintext encrypted twice"
 	password := []byte("test-password")
@@ -120,6 +122,7 @@ func TestEncryptProducesUniqueOutputs(t *testing.T) {
 	t.Log("Encrypt produces unique outputs with random salt/nonce ✓")
 }
 
+// TestDecryptWithWrongPassword ...
 func TestDecryptWithWrongPassword(t *testing.T) {
 	plaintext := "Secret message"
 	correctPassword := []byte("correct-password")
@@ -144,6 +147,7 @@ func TestDecryptWithWrongPassword(t *testing.T) {
 	t.Log("Decryption with wrong password correctly failed ✓")
 }
 
+// TestEncryptWithEmptyPassword ...
 func TestEncryptWithEmptyPassword(t *testing.T) {
 	plaintext := "Test message"
 	emptyPassword := []byte{}
@@ -160,6 +164,7 @@ func TestEncryptWithEmptyPassword(t *testing.T) {
 	t.Logf("Encrypt correctly rejected empty password: %v ✓", err)
 }
 
+// TestEncryptWithEmptyPlaintext ...
 func TestEncryptWithEmptyPlaintext(t *testing.T) {
 	plaintext := ""
 	password := []byte("test-password")
@@ -176,6 +181,7 @@ func TestEncryptWithEmptyPlaintext(t *testing.T) {
 	t.Logf("Encrypt correctly rejected empty plaintext: %v ✓", err)
 }
 
+// TestDecryptWithEmptyPassword ...
 func TestDecryptWithEmptyPassword(t *testing.T) {
 
 	fakeEncrypted := make([]byte, 100)
@@ -193,6 +199,7 @@ func TestDecryptWithEmptyPassword(t *testing.T) {
 	t.Logf("Decrypt correctly rejected empty password: %v ✓", err)
 }
 
+// TestDecryptWithTooShortData ...
 func TestDecryptWithTooShortData(t *testing.T) {
 
 	shortData := make([]byte, 20)
@@ -210,6 +217,7 @@ func TestDecryptWithTooShortData(t *testing.T) {
 	t.Logf("Decrypt correctly rejected too short data: %v ✓", err)
 }
 
+// TestDecryptWithCorruptedData ...
 func TestDecryptWithCorruptedData(t *testing.T) {
 	plaintext := "Test message"
 	password := []byte("test-password")
@@ -231,6 +239,7 @@ func TestDecryptWithCorruptedData(t *testing.T) {
 	t.Logf("Decrypt correctly detected corrupted data: %v ✓", err)
 }
 
+// TestEncryptDecryptWithDifferentPasswordLengths ...
 func TestEncryptDecryptWithDifferentPasswordLengths(t *testing.T) {
 	plaintext := "Test message for different password lengths"
 

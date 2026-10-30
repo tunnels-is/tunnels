@@ -1,4 +1,3 @@
-# Manual desktop rebuilds. Tag releases use release.yml.
 name: Build Desktop Client
 
 on:

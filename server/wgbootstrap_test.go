@@ -9,6 +9,7 @@ import (
 	"github.com/tunnels-is/tunnels/types"
 )
 
+// TestWgBootstrapSkipVerify ...
 func TestWgBootstrapSkipVerify(t *testing.T) {
 	if !wgBootstrapSkipVerify("selfsign") || !wgBootstrapSkipVerify("SelfSign") {
 		t.Fatal("selfsign must skip verify")
@@ -20,6 +21,7 @@ func TestWgBootstrapSkipVerify(t *testing.T) {
 	}
 }
 
+// TestWriteWGConfig_SkipVerifyFromCertMode ...
 func TestWriteWGConfig_SkipVerifyFromCertMode(t *testing.T) {
 	dir := t.TempDir()
 	prev := wgConfigPath
@@ -41,7 +43,6 @@ func TestWriteWGConfig_SkipVerifyFromCertMode(t *testing.T) {
 		t.Fatal("selfsign bootstrap must set InsecureSkipVerify")
 	}
 
-	// Existing file is not rewritten.
 	if err := writeWGConfig(false); err != nil {
 		t.Fatal(err)
 	}
@@ -54,6 +55,7 @@ func TestWriteWGConfig_SkipVerifyFromCertMode(t *testing.T) {
 	}
 }
 
+// TestWriteWGConfig_VerifyByDefault ...
 func TestWriteWGConfig_VerifyByDefault(t *testing.T) {
 	dir := t.TempDir()
 	prev := wgConfigPath

@@ -9,6 +9,7 @@ import (
 	"time"
 )
 
+// InitBaseFoldersAndPaths ...
 func InitBaseFoldersAndPaths() error {
 	defer RecoverAndLog()
 	DEBUG("Creating base folders and paths")
@@ -73,6 +74,7 @@ func InitBaseFoldersAndPaths() error {
 	return nil
 }
 
+// RenameFile ...
 func RenameFile(oldName, newName string) (err error) {
 	_, err = os.Stat(oldName)
 	if err != nil {
@@ -126,15 +128,11 @@ func writeFileWithBackup(path string, newContent []byte) (err error) {
 	return f.Sync()
 }
 
-// createFolder makes path, including any missing parents. It is a no-op when
-// the directory already exists.
 func createFolder(path string) error {
 	return os.MkdirAll(path, 0o700)
 }
 
-// CreateFolder makes path and reports why it could not. Callers decide what a
-// failure means; it used to terminate the process, which killed the app with no
-// usable error and made the failure untestable.
+// CreateFolder ...
 func CreateFolder(path string) error {
 	if err := createFolder(path); err != nil {
 		ERROR("Unable to create folder: ", path, " ", err)

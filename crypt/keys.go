@@ -8,8 +8,7 @@ import (
 	"os"
 )
 
-// CheckKeyFilePermissions reports whether a private key file is group/other-readable.
-// Callers should log a warning and continue (or fail closed) based on policy.
+// CheckKeyFilePermissions ...
 func CheckKeyFilePermissions(path string) error {
 	info, err := os.Stat(path)
 	if err != nil {
@@ -21,6 +20,7 @@ func CheckKeyFilePermissions(path string) error {
 	return nil
 }
 
+// LoadPrivateKey ...
 func LoadPrivateKey(filePath string) (any, []byte, error) {
 	keyBytes, err := os.ReadFile(filePath)
 	if err != nil {
@@ -46,6 +46,7 @@ func LoadPrivateKey(filePath string) (any, []byte, error) {
 	return keyInterface, keyBytes, nil
 }
 
+// LoadPublicKey ...
 func LoadPublicKey(filePath string) (any, []byte, error) {
 	keyBytes, err := os.ReadFile(filePath)
 	if err != nil {

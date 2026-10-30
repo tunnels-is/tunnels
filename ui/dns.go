@@ -51,7 +51,6 @@ func (a *App) dnsPage() fyne.CanvasObject {
 			cfg.DNSstats, func(bool) { a.toggleConfig("DNSstats") }),
 	)
 
-	// Local records.
 	recRows := []fyne.CanvasObject{}
 	for i, r := range cfg.DNSRecords {
 		i, r := i, r
@@ -142,9 +141,6 @@ func (a *App) dnsListCard(title, desc, key string, lists []*client.BlockList, ki
 			continue
 		}
 		custom := strings.EqualFold(l.Tag, "custom")
-		// No rebuild on success: the switch already shows the new state, and
-		// re-rendering the page under the cursor was half of what made this
-		// feel like an interruption.
 		toggle := newSwitch(l.Enabled, func(v bool) {
 			a.updateConfig("Applying list change", func(c *client.Config) {
 				src := c.DNSBlockLists
@@ -194,7 +190,6 @@ func (a *App) setAllLists(key string, enabled bool) {
 	if !enabled {
 		label = "Disabling lists"
 	}
-	// Every switch changes here, so this one does rebuild once it lands.
 	a.updateConfig(label, func(c *client.Config) {
 		src := c.DNSBlockLists
 		if key == "DNSWhiteLists" {

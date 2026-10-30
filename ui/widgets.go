@@ -14,8 +14,6 @@ import (
 	"github.com/skip2/go-qrcode"
 )
 
-// bindCheck is kept for dialog forms, where a labelled checkbox reads better
-// than a bare switch. Page settings use toggleRow instead.
 func bindCheck(label string, value bool, on func(bool)) *widget.Check {
 	c := widget.NewCheck(label, nil)
 	c.SetChecked(value)
@@ -30,7 +28,6 @@ func muted(s string) *widget.Label {
 	return l
 }
 
-// notice is an inline callout for warnings and constraints inside a page.
 func notice(msg string, t tone) fyne.CanvasObject {
 	fg, bg := toneColors(t)
 	box := surface(radMd, bg, withAlpha(fg, 70))
@@ -68,7 +65,6 @@ func qrImage(value string, px int) fyne.CanvasObject {
 	img := canvas.NewImageFromReader(bytes.NewReader(png), "qr")
 	img.FillMode = canvas.ImageFillContain
 	img.SetMinSize(fyne.NewSize(float32(px), float32(px)))
-	// A white quiet zone keeps the code scannable on dark themes.
 	frame := surface(radMd, hex(0xff, 0xff, 0xff), nil)
 	return container.NewCenter(container.NewStack(frame, inset(sp3, img)))
 }
@@ -80,7 +76,6 @@ func (a *App) copyBtn(value string) *kBtn {
 	}).small()
 }
 
-// codeBlock shows a long secret in a scrollable monospace panel.
 func codeBlock(value string, rows int) fyne.CanvasObject {
 	e := widget.NewMultiLineEntry()
 	e.SetText(value)

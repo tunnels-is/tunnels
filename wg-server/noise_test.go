@@ -7,6 +7,7 @@ import (
 	"golang.org/x/crypto/blake2s"
 )
 
+// TestValidMAC1 ...
 func TestValidMAC1(t *testing.T) {
 	serverPub := make([]byte, 32)
 	if _, err := rand.Read(serverPub); err != nil {

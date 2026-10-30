@@ -6,6 +6,7 @@ import (
 	"testing"
 )
 
+// TestIPv4Gateway_MasksThenIncrements ...
 func TestIPv4Gateway_MasksThenIncrements(t *testing.T) {
 	_, n, err := net.ParseCIDR("10.0.0.5/22")
 	if err != nil {
@@ -25,6 +26,7 @@ func TestIPv4Gateway_MasksThenIncrements(t *testing.T) {
 	}
 }
 
+// TestIPv4Broadcast ...
 func TestIPv4Broadcast(t *testing.T) {
 	_, n, err := net.ParseCIDR("10.9.9.0/30")
 	if err != nil {
@@ -42,17 +44,18 @@ func TestIPv4Broadcast(t *testing.T) {
 	}
 }
 
+// TestIsReservedWireGuardIPv4 ...
 func TestIsReservedWireGuardIPv4(t *testing.T) {
 	_, n, err := net.ParseCIDR("10.9.9.0/30")
 	if err != nil {
 		t.Fatal(err)
 	}
 	cases := map[string]bool{
-		"10.9.9.0": true,  // network
-		"10.9.9.1": true,  // gateway
-		"10.9.9.2": false, // only usable host
-		"10.9.9.3": true,  // broadcast
-		"8.8.8.8":  true,  // outside
+		"10.9.9.0": true,
+		"10.9.9.1": true,
+		"10.9.9.2": false,
+		"10.9.9.3": true,
+		"8.8.8.8":  true,
 	}
 	for ip, want := range cases {
 		if got := IsReservedWireGuardIPv4(n, net.ParseIP(ip)); got != want {
@@ -74,6 +77,7 @@ func TestIsReservedWireGuardIPv4(t *testing.T) {
 	}
 }
 
+// TestIsReservedWireGuardIPv6 ...
 func TestIsReservedWireGuardIPv6(t *testing.T) {
 	p := netip.MustParsePrefix("fd00::/64")
 	if !IsReservedWireGuardIPv6(p, netip.MustParseAddr("fd00::")) {
@@ -87,6 +91,7 @@ func TestIsReservedWireGuardIPv6(t *testing.T) {
 	}
 }
 
+// TestValidIfaceName ...
 func TestValidIfaceName(t *testing.T) {
 	if !ValidIfaceName("eth0") || !ValidIfaceName("wg0") {
 		t.Fatal("common names")
@@ -96,6 +101,7 @@ func TestValidIfaceName(t *testing.T) {
 	}
 }
 
+// TestValidateDeviceWireGuardAddrs ...
 func TestValidateDeviceWireGuardAddrs(t *testing.T) {
 	if err := ValidateDeviceWireGuardAddrs("10.0.0.0/24", "", "10.0.0.1", ""); err == nil {
 		t.Fatal("server IP must be rejected")

@@ -18,6 +18,7 @@ func resetPasswordResetAttemptsForTest() {
 	authLimitMu.Unlock()
 }
 
+// TestAuthSlot_FirstAttempt ...
 func TestAuthSlot_FirstAttempt(t *testing.T) {
 	resetPasswordResetAttemptsForTest()
 	if !takeAuthSlot(authLimitLogin, "user@example.com", "192.0.2.1") {
@@ -25,6 +26,7 @@ func TestAuthSlot_FirstAttempt(t *testing.T) {
 	}
 }
 
+// TestAuthSlot_LoginAndResetAreSeparate ...
 func TestAuthSlot_LoginAndResetAreSeparate(t *testing.T) {
 	resetPasswordResetAttemptsForTest()
 	email := "split@example.com"
@@ -45,6 +47,7 @@ func TestAuthSlot_LoginAndResetAreSeparate(t *testing.T) {
 	}
 }
 
+// TestAuthSlot_LoginBlocksAtTen ...
 func TestAuthSlot_LoginBlocksAtTen(t *testing.T) {
 	resetPasswordResetAttemptsForTest()
 	email := "login@example.com"
@@ -59,6 +62,7 @@ func TestAuthSlot_LoginBlocksAtTen(t *testing.T) {
 	}
 }
 
+// TestAuthSlot_RegisterBlocksAtFiftyAndIgnoresClear ...
 func TestAuthSlot_RegisterBlocksAtFiftyAndIgnoresClear(t *testing.T) {
 	resetPasswordResetAttemptsForTest()
 	ip := "192.0.2.5"
@@ -73,6 +77,7 @@ func TestAuthSlot_RegisterBlocksAtFiftyAndIgnoresClear(t *testing.T) {
 	}
 }
 
+// TestAuthSlot_WindowExpiry ...
 func TestAuthSlot_WindowExpiry(t *testing.T) {
 	resetPasswordResetAttemptsForTest()
 	key, _ := authLimitKey(authLimitReset, "expire@example.com", "192.0.2.6")
@@ -85,6 +90,7 @@ func TestAuthSlot_WindowExpiry(t *testing.T) {
 	}
 }
 
+// TestAuthSlot_ClearOnSuccess ...
 func TestAuthSlot_ClearOnSuccess(t *testing.T) {
 	resetPasswordResetAttemptsForTest()
 	email := "clear@example.com"
@@ -103,6 +109,7 @@ func TestAuthSlot_ClearOnSuccess(t *testing.T) {
 	}
 }
 
+// TestAuthSlot_EmailNormalization ...
 func TestAuthSlot_EmailNormalization(t *testing.T) {
 	resetPasswordResetAttemptsForTest()
 	ip := "192.0.2.8"
@@ -116,6 +123,7 @@ func TestAuthSlot_EmailNormalization(t *testing.T) {
 	}
 }
 
+// TestCleanPasswordResetAttempts ...
 func TestCleanPasswordResetAttempts(t *testing.T) {
 	resetPasswordResetAttemptsForTest()
 	oldKey, _ := authLimitKey(authLimitLogin, "old@example.com", "192.0.2.9")
@@ -137,6 +145,7 @@ func TestCleanPasswordResetAttempts(t *testing.T) {
 	}
 }
 
+// TestAuthSlot_ConcurrentRecords ...
 func TestAuthSlot_ConcurrentRecords(t *testing.T) {
 	resetPasswordResetAttemptsForTest()
 	email := "race@example.com"
@@ -162,6 +171,7 @@ func TestAuthSlot_ConcurrentRecords(t *testing.T) {
 	}
 }
 
+// TestRegister_LimitedBeforeBcrypt ...
 func TestRegister_LimitedBeforeBcrypt(t *testing.T) {
 	setupTestDB(t)
 	securityReviewLogger()

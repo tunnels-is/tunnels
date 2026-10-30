@@ -4,6 +4,7 @@ package client
 
 import "testing"
 
+// TestRouteGetOutputHasBlackhole ...
 func TestRouteGetOutputHasBlackhole(t *testing.T) {
 	normal := `   route to: default
 destination: default

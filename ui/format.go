@@ -23,13 +23,10 @@ func fmtTimeShort(t time.Time) string {
 	return t.Local().Format("01-02 15:04")
 }
 
-// fmtCount renders "3 accounts saved" style subtitles.
 func fmtCount(n int, suffix string) string {
 	return fmt.Sprintf("%d %s", n, suffix)
 }
 
-// serverWGAddr is the WireGuard endpoint: public IP and WireGuard port,
-// not the controller API port.
 func serverWGAddr(s *types.Server) string {
 	if s == nil || s.IP == "" {
 		return "—"

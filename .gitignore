@@ -3,7 +3,6 @@ TODOS.md
 HOLEPUNCH.md
 HOLEPUNCH-IMPLEMENTATION.md
 
-# Local security-review writeups
 security-review/
 
 frontend-admin/dist/
@@ -16,7 +15,6 @@ bin/
 build/*
 builds/
 
-# Local runtime secrets / state (never commit)
 **/.pk
 **/wg-config.json
 *.pem
@@ -57,7 +55,6 @@ server/server
 server/tunnels
 server/tunnels-server
 
-# Local build outputs and profiles
 /alloc.pprof
 /heap.pprof
 wg-server/wg-server
@@ -83,6 +80,5 @@ new_server/new_server
 api.crt
 api.key
 
-# Coverage / local test artifacts
 coverage.txt
 coverage.html

@@ -2,6 +2,7 @@ package client
 
 import "testing"
 
+// TestIPv4HostOnLink ...
 func TestIPv4HostOnLink(t *testing.T) {
 	if !ipv4HostOnLink("127.0.0.1/32") {
 		t.Fatal("loopback /32 should be on-link")

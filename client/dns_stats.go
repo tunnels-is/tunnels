@@ -6,6 +6,7 @@ import (
 	"github.com/miekg/dns"
 )
 
+// IncrementDNSStats ...
 func IncrementDNSStats(domain string, blocked bool, tag string, answers []dns.RR) {
 	defer RecoverAndLog()
 
@@ -22,7 +23,6 @@ func IncrementDNSStats(domain string, blocked bool, tag string, answers []dns.RR
 	}
 	if blocked {
 		dnsStats.LastBlocked = tn
-		// Keep the block-list tag; do not clear it on later successful resolves.
 		if tag != "" {
 			dnsStats.Tag = tag
 		}

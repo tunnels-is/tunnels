@@ -17,13 +17,28 @@ type pipeTUN struct {
 	r *os.File
 }
 
-func (p *pipeTUN) File() *os.File                   { return p.r }
+// File ...
+func (p *pipeTUN) File() *os.File { return p.r }
+
+// Write ...
 func (p *pipeTUN) Write([][]byte, int) (int, error) { return 0, nil }
-func (p *pipeTUN) MTU() (int, error)                { return 1420, nil }
-func (p *pipeTUN) Name() (string, error)            { return "pipe", nil }
-func (p *pipeTUN) Events() <-chan tun.Event         { return nil }
-func (p *pipeTUN) Close() error                     { return p.r.Close() }
-func (p *pipeTUN) BatchSize() int                   { return 1 }
+
+// MTU ...
+func (p *pipeTUN) MTU() (int, error) { return 1420, nil }
+
+// Name ...
+func (p *pipeTUN) Name() (string, error) { return "pipe", nil }
+
+// Events ...
+func (p *pipeTUN) Events() <-chan tun.Event { return nil }
+
+// Close ...
+func (p *pipeTUN) Close() error { return p.r.Close() }
+
+// BatchSize ...
+func (p *pipeTUN) BatchSize() int { return 1 }
+
+// Read ...
 func (p *pipeTUN) Read(bufs [][]byte, sizes []int, offset int) (int, error) {
 	n, err := p.r.Read(bufs[0][offset:])
 	if err != nil {
@@ -36,6 +51,7 @@ func (p *pipeTUN) Read(bufs [][]byte, sizes []int, offset int) (int, error) {
 	return 1, nil
 }
 
+// TestInjectWakesIdleRead ...
 func TestInjectWakesIdleRead(t *testing.T) {
 	pr, pw, err := os.Pipe()
 	if err != nil {
@@ -74,6 +90,7 @@ func TestInjectWakesIdleRead(t *testing.T) {
 	}
 }
 
+// TestDevicePacketWhilePunchAwake ...
 func TestDevicePacketWhilePunchAwake(t *testing.T) {
 	pr, pw, err := os.Pipe()
 	if err != nil {

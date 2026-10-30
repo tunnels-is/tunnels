@@ -2,6 +2,7 @@ package client
 
 import "testing"
 
+// TestAuthorizeControlServer_MultiPort ...
 func TestAuthorizeControlServer_MultiPort(t *testing.T) {
 	conf := &Config{
 		ControlServers: []*ControlServer{

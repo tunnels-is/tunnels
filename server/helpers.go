@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 )
 
+// BasicRecover ...
 func BasicRecover() {
 	if r := recover(); r != nil {
 		ERR(r, string(debug.Stack()))

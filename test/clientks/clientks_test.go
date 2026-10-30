@@ -164,6 +164,7 @@ func runClient(t *testing.T) {
 	waitClientReady(t)
 }
 
+// TestClientKillSwitchAndReuse ...
 func TestClientKillSwitchAndReuse(t *testing.T) {
 	if _, err := exec.LookPath("podman"); err != nil {
 		t.Skip("podman not available")
@@ -310,9 +311,6 @@ func startController(t *testing.T) {
 	if err := os.MkdirAll(dir, 0o777); err != nil {
 		t.Fatal(err)
 	}
-	// APIIP is also the default WG server's advertised endpoint
-	// (initializeDefaultServer copies it). Certs are written next to
-	// the /server binary, not under /data.
 	cfg := map[string]any{
 		"APIIP": ctrlIP, "APIPort": "443",
 		"AdminAPIKey": adminAPI, "TwoFactorKey": twoFAKey, "CookieSigningKey": cookieKey,
@@ -393,8 +391,6 @@ func defaultServerID(t *testing.T, uid, token string) string {
 		WireGuardPubKey string `json:"WireGuardPubKey"`
 		IP              string `json:"IP"`
 	}
-	// wg-server retries fetch every 5s until the API is up, then
-	// writes its pubkey onto the default server record.
 	var lastCode int
 	for i := 0; i < 40; i++ {
 		lastCode = ctrlReq(t, "POST", "/client/servers", map[string]any{"StartIndex": 0}, hdr, &servers)

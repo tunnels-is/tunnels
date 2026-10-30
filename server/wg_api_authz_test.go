@@ -70,6 +70,7 @@ func callWGConfig(t *testing.T, user *User, serverID uuid.UUID, pubKey string) *
 	return w
 }
 
+// TestHandleWGConfig_GroupACL ...
 func TestHandleWGConfig_GroupACL(t *testing.T) {
 	setupTestDB(t)
 	if logger == nil {
@@ -101,6 +102,7 @@ func TestHandleWGConfig_GroupACL(t *testing.T) {
 	}
 }
 
+// TestHandleWGConfig_NoDeviceReturnsEmptyIP ...
 func TestHandleWGConfig_NoDeviceReturnsEmptyIP(t *testing.T) {
 	setupTestDB(t)
 	if logger == nil {
@@ -134,6 +136,7 @@ func TestHandleWGConfig_NoDeviceReturnsEmptyIP(t *testing.T) {
 	}
 }
 
+// TestHandleWGPeer_ActiveUserAuthorized ...
 func TestHandleWGPeer_ActiveUserAuthorized(t *testing.T) {
 	server := setupWGPeerTest(t)
 	pubKey := seedUserWithDevice(t, server, &User{
@@ -147,6 +150,7 @@ func TestHandleWGPeer_ActiveUserAuthorized(t *testing.T) {
 	}
 }
 
+// TestPunchPeersFor_SkipsInactiveOwners ...
 func TestPunchPeersFor_SkipsInactiveOwners(t *testing.T) {
 	setupTestDB(t)
 	mesh := uuid.NewString()
@@ -239,6 +243,7 @@ func TestPunchPeersFor_SkipsInactiveOwners(t *testing.T) {
 	}
 }
 
+// TestHandleWGPeer_DisabledUserRejected ...
 func TestHandleWGPeer_DisabledUserRejected(t *testing.T) {
 	server := setupWGPeerTest(t)
 	pubKey := seedUserWithDevice(t, server, &User{
@@ -253,6 +258,7 @@ func TestHandleWGPeer_DisabledUserRejected(t *testing.T) {
 	}
 }
 
+// TestHandleWGPeer_ExpiredSubscriptionRejected ...
 func TestHandleWGPeer_ExpiredSubscriptionRejected(t *testing.T) {
 	server := setupWGPeerTest(t)
 	pubKey := seedUserWithDevice(t, server, &User{
@@ -266,6 +272,7 @@ func TestHandleWGPeer_ExpiredSubscriptionRejected(t *testing.T) {
 	}
 }
 
+// TestHandleWGPeer_ZeroSubExpirationAllowed ...
 func TestHandleWGPeer_ZeroSubExpirationAllowed(t *testing.T) {
 	server := setupWGPeerTest(t)
 	pubKey := seedUserWithDevice(t, server, &User{

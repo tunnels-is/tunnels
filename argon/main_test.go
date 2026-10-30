@@ -5,6 +5,7 @@ import (
 	"testing"
 )
 
+// TestKey_DeterministicWhenSkipSalt ...
 func TestKey_DeterministicWhenSkipSalt(t *testing.T) {
 	a := &Argon{
 		Memory:      20 * 1024,
@@ -33,6 +34,7 @@ func TestKey_DeterministicWhenSkipSalt(t *testing.T) {
 	}
 }
 
+// TestGenerateUserFolderHash ...
 func TestGenerateUserFolderHash(t *testing.T) {
 	k1, err := GenerateUserFolderHash("abc")
 	if err != nil {

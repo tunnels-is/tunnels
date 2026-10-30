@@ -9,6 +9,7 @@ func isDefaultTunnelName(IFName string) bool {
 	return strings.EqualFold(IFName, DefaultTunnelName)
 }
 
+// RecoverAndLog ...
 func RecoverAndLog() {
 	if r := recover(); r != nil {
 		ERROR(r, string(debug.Stack()))

@@ -10,6 +10,7 @@ import (
 	"github.com/tunnels-is/tunnels/client"
 )
 
+// Start ...
 func Start() {
 	defer func() {
 		if r := recover(); r != nil {

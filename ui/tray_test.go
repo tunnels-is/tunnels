@@ -31,6 +31,7 @@ func liveTun(id, tag string, state client.TunnelState) *client.TUN {
 	return tun
 }
 
+// TestTrayMenuIdle ...
 func TestTrayMenuIdle(t *testing.T) {
 	a := &App{}
 	menu := a.newTrayMenu()
@@ -49,6 +50,7 @@ func TestTrayMenuIdle(t *testing.T) {
 	}
 }
 
+// TestTrayMenuOnlineRowDisconnectsAndDownRowConnects ...
 func TestTrayMenuOnlineRowDisconnectsAndDownRowConnects(t *testing.T) {
 	home := liveTun("2", "home", client.TunnelConnected)
 	work := liveTun("1", "work", client.TunnelConnecting)
@@ -87,6 +89,7 @@ func TestTrayMenuOnlineRowDisconnectsAndDownRowConnects(t *testing.T) {
 	}
 }
 
+// TestSyncTrayRebuildsWhenTunnelsChange ...
 func TestSyncTrayRebuildsWhenTunnelsChange(t *testing.T) {
 	fy := test.NewApp()
 	t.Cleanup(fy.Quit)
@@ -114,6 +117,7 @@ func TestSyncTrayRebuildsWhenTunnelsChange(t *testing.T) {
 	}
 }
 
+// TestInstallTraySkipsWithoutDesktopSupport ...
 func TestInstallTraySkipsWithoutDesktopSupport(t *testing.T) {
 	fy := test.NewApp()
 	t.Cleanup(fy.Quit)
@@ -124,11 +128,13 @@ func TestInstallTraySkipsWithoutDesktopSupport(t *testing.T) {
 	}
 }
 
+// TestTrayAutoConnectIdleReturns ...
 func TestTrayAutoConnectIdleReturns(t *testing.T) {
 	a := &App{}
 	a.trayAutoConnect()
 }
 
+// TestDisconnectableTunnelsSkipsTeardown ...
 func TestDisconnectableTunnelsSkipsTeardown(t *testing.T) {
 	up := &client.TUN{ID: "up"}
 	up.SetState(client.TunnelConnected)

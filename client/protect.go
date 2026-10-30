@@ -12,11 +12,8 @@ import (
 
 var protectWatchOnce sync.Once
 
-// wgProtectMark is applied to the userspace WireGuard UDP socket (UAPI fwmark).
-// Packets with this mark look up wgProtectTable, which holds the original
-// default route, so handshake/data packets never re-enter the TUN.
 const (
-	wgProtectMark  = 0x7475 // 29813
+	wgProtectMark  = 0x7475
 	wgProtectTable = 21820
 	wgProtectPrio  = 21820
 )
@@ -55,6 +52,7 @@ func newProtectBind(ifIndex uint32) wgconn.Bind {
 	return &ifaceProtectBind{Bind: inner, ifIndex: ifIndex}
 }
 
+// Open ...
 func (b *ifaceProtectBind) Open(port uint16) (fns []wgconn.ReceiveFunc, actualPort uint16, err error) {
 	fns, actualPort, err = b.Bind.Open(port)
 	if err != nil {
@@ -175,10 +173,6 @@ func parseRouteGetGateway(out string) net.IP {
 	return nil
 }
 
-// hostProtectRouteRequired reports whether a protect host still needs a
-// via-gateway /32. On-link destinations are skipped by addIPv4Route; the
-// 5s watcher must treat those as already satisfied or it will reinstall
-// every tick.
 func hostProtectRouteRequired(host string) bool {
 	if host == "" {
 		return false

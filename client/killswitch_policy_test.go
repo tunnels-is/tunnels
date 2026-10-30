@@ -2,6 +2,7 @@ package client
 
 import "testing"
 
+// TestDemotePhysicalDefault ...
 func TestDemotePhysicalDefault(t *testing.T) {
 	cases := []struct {
 		name           string
@@ -29,6 +30,7 @@ func TestDemotePhysicalDefault(t *testing.T) {
 	}
 }
 
+// TestClassifyDefaultRoute ...
 func TestClassifyDefaultRoute(t *testing.T) {
 	tunnels := map[string]struct{}{"utun4": {}}
 	gateways := map[string]struct{}{"10.0.0.1": {}}
@@ -77,6 +79,7 @@ destination: default
 	}
 }
 
+// TestNetstatHasBlackholeDefault ...
 func TestNetstatHasBlackholeDefault(t *testing.T) {
 	table := "default            192.168.1.1        UGScg           en0\n" +
 		"default                                 UGScB           lo0\n" +
@@ -90,6 +93,7 @@ func TestNetstatHasBlackholeDefault(t *testing.T) {
 	}
 }
 
+// TestRaisePhysicalDefault ...
 func TestRaisePhysicalDefault(t *testing.T) {
 	if !raisePhysicalDefault(0, 25, false, false) {
 		t.Fatal("physical default should be raised")

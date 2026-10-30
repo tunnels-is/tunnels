@@ -95,6 +95,7 @@ func cloneUsers(t *testing.T, src, dst *gobolt.DB) {
 	}
 }
 
+// TestMigrateEmails_DryRunDoesNotWrite ...
 func TestMigrateEmails_DryRunDoesNotWrite(t *testing.T) {
 	db := openTestDB(t)
 	id := uuid.NewString()
@@ -126,6 +127,7 @@ func TestMigrateEmails_DryRunDoesNotWrite(t *testing.T) {
 	})
 }
 
+// TestMigrateEmails_ApplyNormalizesAndRebuildsIndex ...
 func TestMigrateEmails_ApplyNormalizesAndRebuildsIndex(t *testing.T) {
 	db := openTestDB(t)
 	id := uuid.NewString()
@@ -179,6 +181,7 @@ func putUserWithMeta(t *testing.T, db *gobolt.DB, id, email string, updated, sub
 	})
 }
 
+// TestPickCollisionWinner ...
 func TestPickCollisionWinner(t *testing.T) {
 	now := time.Date(2026, 8, 26, 12, 0, 0, 0, time.UTC)
 	older := now.Add(-48 * time.Hour)
@@ -231,6 +234,7 @@ func TestPickCollisionWinner(t *testing.T) {
 	})
 }
 
+// TestMigrateEmails_CollisionPicksValidSubscription ...
 func TestMigrateEmails_CollisionPicksValidSubscription(t *testing.T) {
 	db := openTestDB(t)
 	now := time.Now()
@@ -271,6 +275,7 @@ func TestMigrateEmails_CollisionPicksValidSubscription(t *testing.T) {
 	})
 }
 
+// TestMigrateEmails_CollisionBothValidPicksNewest ...
 func TestMigrateEmails_CollisionBothValidPicksNewest(t *testing.T) {
 	db := openTestDB(t)
 	now := time.Now()
@@ -298,6 +303,7 @@ func TestMigrateEmails_CollisionBothValidPicksNewest(t *testing.T) {
 	})
 }
 
+// TestMigrateEmails_CollisionNeitherValidPicksNewest ...
 func TestMigrateEmails_CollisionNeitherValidPicksNewest(t *testing.T) {
 	db := openTestDB(t)
 	now := time.Now()
@@ -322,6 +328,7 @@ func TestMigrateEmails_CollisionNeitherValidPicksNewest(t *testing.T) {
 	})
 }
 
+// TestMigrateEmails_CollisionDryRunDoesNotWrite ...
 func TestMigrateEmails_CollisionDryRunDoesNotWrite(t *testing.T) {
 	db := openTestDB(t)
 	now := time.Now()
@@ -412,6 +419,7 @@ func tamperUserField(t *testing.T, db *gobolt.DB, id, field, value string) {
 	}
 }
 
+// TestVerify_CollisionKeepsAllUsersAndIndexesWinner ...
 func TestVerify_CollisionKeepsAllUsersAndIndexesWinner(t *testing.T) {
 	oldDB, db, winner, _ := collisionPair(t)
 
@@ -436,6 +444,7 @@ func TestVerify_CollisionKeepsAllUsersAndIndexesWinner(t *testing.T) {
 	})
 }
 
+// TestVerify_CollisionIgnoresLoserChanges ...
 func TestVerify_CollisionIgnoresLoserChanges(t *testing.T) {
 	oldDB, db, _, loser := collisionPair(t)
 	tamperUserField(t, db, loser, "Password", "tampered-loser")
@@ -449,6 +458,7 @@ func TestVerify_CollisionIgnoresLoserChanges(t *testing.T) {
 	}
 }
 
+// TestVerify_CollisionIgnoresMissingLoser ...
 func TestVerify_CollisionIgnoresMissingLoser(t *testing.T) {
 	oldDB, db, _, loser := collisionPair(t)
 	if err := db.Update(func(tx *gobolt.Tx) error {
@@ -466,6 +476,7 @@ func TestVerify_CollisionIgnoresMissingLoser(t *testing.T) {
 	}
 }
 
+// TestVerify_CollisionDetectsWinnerChanges ...
 func TestVerify_CollisionDetectsWinnerChanges(t *testing.T) {
 	oldDB, db, winner, _ := collisionPair(t)
 	tamperUserField(t, db, winner, "Password", "tampered-winner")
@@ -485,6 +496,7 @@ func TestVerify_CollisionDetectsWinnerChanges(t *testing.T) {
 	}
 }
 
+// TestVerifyUsersAgainstOld_OK ...
 func TestVerifyUsersAgainstOld_OK(t *testing.T) {
 	oldDB := openNamedDB(t, "old.db")
 	db := openNamedDB(t, "new.db")
@@ -504,6 +516,7 @@ func TestVerifyUsersAgainstOld_OK(t *testing.T) {
 	}
 }
 
+// TestVerifyUsersAgainstOld_DetectsChangedField ...
 func TestVerifyUsersAgainstOld_DetectsChangedField(t *testing.T) {
 	oldDB := openNamedDB(t, "old.db")
 	db := openNamedDB(t, "new.db")
@@ -548,6 +561,7 @@ func TestVerifyUsersAgainstOld_DetectsChangedField(t *testing.T) {
 	}
 }
 
+// TestVerifyUsersAgainstOld_DetectsMissingUser ...
 func TestVerifyUsersAgainstOld_DetectsMissingUser(t *testing.T) {
 	oldDB := openNamedDB(t, "old.db")
 	db := openNamedDB(t, "new.db")
@@ -586,6 +600,7 @@ func productionUser(id, email string) map[string]any {
 	}
 }
 
+// TestVerify_ProductionShapedUserAllFields ...
 func TestVerify_ProductionShapedUserAllFields(t *testing.T) {
 	oldDB := openNamedDB(t, "old.db")
 	db := openNamedDB(t, "new.db")
@@ -619,6 +634,7 @@ func TestVerify_ProductionShapedUserAllFields(t *testing.T) {
 	}
 }
 
+// TestVerify_IdempotentSecondApply ...
 func TestVerify_IdempotentSecondApply(t *testing.T) {
 	oldDB := openNamedDB(t, "old.db")
 	db := openNamedDB(t, "new.db")
@@ -645,6 +661,7 @@ func TestVerify_IdempotentSecondApply(t *testing.T) {
 	}
 }
 
+// TestMigrate_WhitespaceEmailIsAnUpdate ...
 func TestMigrate_WhitespaceEmailIsAnUpdate(t *testing.T) {
 	oldDB := openNamedDB(t, "old.db")
 	db := openNamedDB(t, "new.db")
@@ -673,6 +690,7 @@ func TestMigrate_WhitespaceEmailIsAnUpdate(t *testing.T) {
 	}
 }
 
+// TestMigrate_MixedAlreadyNormalizedAndMixedCase ...
 func TestMigrate_MixedAlreadyNormalizedAndMixedCase(t *testing.T) {
 	oldDB := openNamedDB(t, "old.db")
 	db := openNamedDB(t, "new.db")
@@ -701,6 +719,7 @@ func TestMigrate_MixedAlreadyNormalizedAndMixedCase(t *testing.T) {
 	}
 }
 
+// TestVerify_DetectsUnnormalizedEmail ...
 func TestVerify_DetectsUnnormalizedEmail(t *testing.T) {
 	oldDB := openNamedDB(t, "old.db")
 	db := openNamedDB(t, "new.db")
@@ -723,6 +742,7 @@ func TestVerify_DetectsUnnormalizedEmail(t *testing.T) {
 	}
 }
 
+// TestVerify_DetectsExtraField ...
 func TestVerify_DetectsExtraField(t *testing.T) {
 	oldDB := openNamedDB(t, "old.db")
 	db := openNamedDB(t, "new.db")
@@ -762,6 +782,7 @@ func TestVerify_DetectsExtraField(t *testing.T) {
 	}
 }
 
+// TestVerifyEmailIndex_DetectsStaleKey ...
 func TestVerifyEmailIndex_DetectsStaleKey(t *testing.T) {
 	db := openNamedDB(t, "new.db")
 	id := uuid.NewString()
@@ -783,6 +804,7 @@ func TestVerifyEmailIndex_DetectsStaleKey(t *testing.T) {
 	}
 }
 
+// TestSamePath ...
 func TestSamePath(t *testing.T) {
 	if !samePath("tunnels.db", "tunnels.db") {
 		t.Fatal("same relative path")

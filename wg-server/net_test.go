@@ -8,6 +8,7 @@ import (
 	"testing"
 )
 
+// TestMasqueradeArgs_AlwaysMASQUERADE ...
 func TestMasqueradeArgs_AlwaysMASQUERADE(t *testing.T) {
 	got := masqueradeArgs("-A", "10.0.0.0/24", "eth0")
 	want := []string{
@@ -20,6 +21,7 @@ func TestMasqueradeArgs_AlwaysMASQUERADE(t *testing.T) {
 	}
 }
 
+// TestMasqueradeArgs_DrainShape ...
 func TestMasqueradeArgs_DrainShape(t *testing.T) {
 
 	install := masqueradeArgs("-A", "10.0.0.0/24", "eth0")
@@ -41,6 +43,7 @@ func TestMasqueradeArgs_DrainShape(t *testing.T) {
 	}
 }
 
+// TestPreviewRules_MASQUERADEEvenWithPublicIP ...
 func TestPreviewRules_MASQUERADEEvenWithPublicIP(t *testing.T) {
 
 	cfg := &Config{
@@ -91,6 +94,7 @@ func TestPreviewRules_MASQUERADEEvenWithPublicIP(t *testing.T) {
 	mustPreviewDropCover(t, got, "ip6tables", "TUNNELS_FWD_wg0", "eth0", "fe80::a9fe:a9fe")
 }
 
+// TestPreviewRules_HostInputDrop ...
 func TestPreviewRules_HostInputDrop(t *testing.T) {
 	cfg := &Config{
 		WireGuardSubnet:   "10.0.0.0/22",
@@ -117,6 +121,7 @@ func TestPreviewRules_HostInputDrop(t *testing.T) {
 	}
 }
 
+// TestPreviewRules_MASQUERADEWhenNoPublicIP ...
 func TestPreviewRules_MASQUERADEWhenNoPublicIP(t *testing.T) {
 	cfg := &Config{
 		WireGuardSubnet: "10.0.0.0/22",
@@ -132,6 +137,7 @@ func TestPreviewRules_MASQUERADEWhenNoPublicIP(t *testing.T) {
 	}
 }
 
+// TestPreviewRules_NoSubnet6_EmitsDropRules ...
 func TestPreviewRules_NoSubnet6_EmitsDropRules(t *testing.T) {
 	cfg := &Config{
 		WireGuardSubnet: "10.0.0.0/22",
@@ -157,6 +163,7 @@ func TestPreviewRules_NoSubnet6_EmitsDropRules(t *testing.T) {
 	}
 }
 
+// TestTunnelsFwdChainName_PerIface ...
 func TestTunnelsFwdChainName_PerIface(t *testing.T) {
 	a := tunnelsFwdChainName("wg0")
 	b := tunnelsFwdChainName("wg1")
@@ -168,6 +175,7 @@ func TestTunnelsFwdChainName_PerIface(t *testing.T) {
 	}
 }
 
+// TestFirstHost_MasksUnalignedPrefix ...
 func TestFirstHost_MasksUnalignedPrefix(t *testing.T) {
 	_, n, err := net.ParseCIDR("10.0.0.5/22")
 	if err != nil {
@@ -178,6 +186,7 @@ func TestFirstHost_MasksUnalignedPrefix(t *testing.T) {
 	}
 }
 
+// TestPreviewRules_IMDSAndDefaultDeny ...
 func TestPreviewRules_IMDSAndDefaultDeny(t *testing.T) {
 	cfg := &Config{
 		WireGuardSubnet: "10.0.0.0/22",

@@ -14,25 +14,16 @@ const (
 
 	TypeReflexReq  byte = 1
 	TypeReflexResp byte = 2
-	// TypeRendezvous and TypeForward were the old controller mailbox.
-	// Nothing parses them. The numbers stay so an old packet is recognized
-	// and ignored.
 	TypeRendezvous byte = 3
 	TypePing       byte = 4
 	TypePong       byte = 5
 	TypeTeardown   byte = 6
 	TypeForward    byte = 7
-	// TypeMTUProbe is an unencrypted datagram padded to an exact UDP length.
-	// The wg-server answers with TypeMTUAck only when the probe arrived whole.
-	TypeMTUProbe byte = 8
-	TypeMTUAck   byte = 9
-	// TypeIntro is the first contact. It travels inside the existing tunnel,
-	// addressed to the other client's tunnel IP, and carries this device's
-	// public keys. It is not sealed: the sender does not know the peer yet.
-	TypeIntro byte = 10
+	TypeMTUProbe   byte = 8
+	TypeMTUAck     byte = 9
+	TypeIntro      byte = 10
 )
 
-// IntroPort is the UDP port of an introduction inside the tunnel.
 const IntroPort uint16 = 47318
 
 var magic = [4]byte{'T', 'N', 'L', 'P'}
@@ -45,13 +36,11 @@ const (
 	addrLen   = 16
 )
 
-// MaxPacket is the largest punch datagram we will parse.
 const MaxPacket = 2048
 
-// ReflexSkew is how far a reflex timestamp may be from the receiver's clock.
 const ReflexSkew = 2 * time.Minute
 
-// Is reports whether pkt is a punch frame of the current version.
+// Is ...
 func Is(pkt []byte) bool {
 	return len(pkt) >= headerLen && [4]byte(pkt[:4]) == magic && pkt[4] == Version
 }
@@ -119,7 +108,6 @@ func getAddrPort(b []byte) netip.AddrPort {
 	return netip.AddrPortFrom(addr, binary.BigEndian.Uint16(b[addrLen:addrLen+2]))
 }
 
-// Intro is one device's public identity and the UDP addresses it can be reached on.
 type Intro struct {
 	Src        uuid.UUID
 	DiscoPub   [32]byte
@@ -128,7 +116,7 @@ type Intro struct {
 	Candidates []netip.AddrPort
 }
 
-// BuildIntro encodes an introduction. The keys are public; the hub can see them.
+// BuildIntro ...
 func BuildIntro(src uuid.UUID, discoPub, wgPub [32]byte, wgIP netip.Addr, cands []netip.AddrPort) ([]byte, error) {
 	if !wgIP.IsValid() || len(cands) > 16 {
 		return nil, fmt.Errorf("bad intro")
@@ -148,7 +136,7 @@ func BuildIntro(src uuid.UUID, discoPub, wgPub [32]byte, wgIP netip.Addr, cands 
 	return frame(TypeIntro, body), nil
 }
 
-// ParseIntro reads an introduction.
+// ParseIntro ...
 func ParseIntro(pkt []byte) (Intro, error) {
 	var in Intro
 	body, err := bodyOf(pkt, TypeIntro)
@@ -174,7 +162,7 @@ func ParseIntro(pkt []byte) (Intro, error) {
 	return in, nil
 }
 
-// WrapIPv4UDP builds an IPv4 UDP datagram. The UDP checksum is left at zero.
+// WrapIPv4UDP ...
 func WrapIPv4UDP(src, dst netip.Addr, srcPort, dstPort uint16, payload []byte) ([]byte, error) {
 	if !src.Is4() || !dst.Is4() {
 		return nil, fmt.Errorf("ipv4 only")
@@ -196,7 +184,7 @@ func WrapIPv4UDP(src, dst netip.Addr, srcPort, dstPort uint16, payload []byte) (
 	return pkt, nil
 }
 
-// UnwrapIPv4UDP returns the payload of an IPv4 UDP datagram addressed to dstPort.
+// UnwrapIPv4UDP ...
 func UnwrapIPv4UDP(pkt []byte, dstPort uint16) (src netip.Addr, srcPort uint16, payload []byte, ok bool) {
 	if len(pkt) < 28 || pkt[0]>>4 != 4 {
 		return netip.Addr{}, 0, nil, false
@@ -227,9 +215,7 @@ func checksumIPv4(hdr []byte) {
 	hdr[11] = byte(^csum & 0xFF)
 }
 
-// BuildReflexReq seals a timestamp for the wg-server's disco key.
-// The device id and disco public key travel in the clear so the server can
-// open the box. The server does not store them.
+// BuildReflexReq ...
 func BuildReflexReq(device uuid.UUID, discoPriv, serverPub [32]byte, now time.Time) ([]byte, error) {
 	pub, err := Public(discoPriv)
 	if err != nil {
@@ -248,8 +234,7 @@ func BuildReflexReq(device uuid.UUID, discoPriv, serverPub [32]byte, now time.Ti
 	return frame(TypeReflexReq, body), nil
 }
 
-// OpenReflexReq opens a reflex request with the server's disco private key.
-// The returned public key is the one that sealed the packet. Nothing is stored.
+// OpenReflexReq ...
 func OpenReflexReq(serverPriv [32]byte, pkt []byte, now time.Time) (uuid.UUID, [32]byte, error) {
 	var pub [32]byte
 	body, err := bodyOf(pkt, TypeReflexReq)
@@ -275,7 +260,7 @@ func OpenReflexReq(serverPriv [32]byte, pkt []byte, now time.Time) (uuid.UUID, [
 	return id, pub, nil
 }
 
-// BuildReflexResp reports the address the server observed for device.
+// BuildReflexResp ...
 func BuildReflexResp(device uuid.UUID, observed netip.AddrPort) []byte {
 	body := make([]byte, idLen+addrLen+2)
 	putID(body, device)
@@ -283,7 +268,7 @@ func BuildReflexResp(device uuid.UUID, observed netip.AddrPort) []byte {
 	return frame(TypeReflexResp, body)
 }
 
-// ParseReflexResp reads a reflex response.
+// ParseReflexResp ...
 func ParseReflexResp(pkt []byte) (uuid.UUID, netip.AddrPort, error) {
 	body, err := bodyOf(pkt, TypeReflexResp)
 	if err != nil {
@@ -295,16 +280,14 @@ func ParseReflexResp(pkt []byte) (uuid.UUID, netip.AddrPort, error) {
 	return getID(body), getAddrPort(body[idLen:]), nil
 }
 
-// BuildPing seals a trust-building probe. The body is exactly 8 bytes.
-// Older peers reject any other size, so this shape must not grow.
+// BuildPing ...
 func BuildPing(srcPriv, dstPub [32]byte, src, dst uuid.UUID, txid uint64) ([]byte, error) {
 	var plain [8]byte
 	binary.BigEndian.PutUint64(plain[:], txid)
 	return sealDirect(TypePing, srcPriv, dstPub, src, dst, plain[:])
 }
 
-// BuildPingPad seals a path-MTU probe. plainLen includes the 8-byte txid
-// and trailing padding. Send it only after the path is already trusted.
+// BuildPingPad ...
 func BuildPingPad(srcPriv, dstPub [32]byte, src, dst uuid.UUID, txid uint64, plainLen int) ([]byte, error) {
 	if plainLen < 8 {
 		return nil, fmt.Errorf("short ping")
@@ -317,8 +300,7 @@ func BuildPingPad(srcPriv, dstPub [32]byte, src, dst uuid.UUID, txid uint64, pla
 	return sealDirect(TypePing, srcPriv, dstPub, src, dst, plain)
 }
 
-// OpenPing opens a ping and returns its txid.
-// A body longer than 8 bytes is a path-MTU probe; the txid stays in the first 8.
+// OpenPing ...
 func OpenPing(dstPriv, srcPub [32]byte, pkt []byte) (src, dst uuid.UUID, txid uint64, err error) {
 	plain, src, dst, err := openDirect(TypePing, dstPriv, srcPub, pkt)
 	if err != nil {
@@ -330,12 +312,11 @@ func OpenPing(dstPriv, srcPub [32]byte, pkt []byte) (src, dst uuid.UUID, txid ui
 	return src, dst, binary.BigEndian.Uint64(plain[:8]), nil
 }
 
-// directPacketLen is the UDP payload length of a sealed ping with plainLen bytes.
 func directPacketLen(plainLen int) int {
 	return headerLen + idLen*2 + nonceLen + plainLen + 16
 }
 
-// BuildMTUProbe builds an unencrypted probe whose UDP payload is payloadLen bytes.
+// BuildMTUProbe ...
 func BuildMTUProbe(payloadLen int) ([]byte, error) {
 	if payloadLen < headerLen || payloadLen > MaxPacket {
 		return nil, fmt.Errorf("bad mtu probe length")
@@ -343,17 +324,17 @@ func BuildMTUProbe(payloadLen int) ([]byte, error) {
 	return frame(TypeMTUProbe, make([]byte, payloadLen-headerLen)), nil
 }
 
-// BuildMTUAck is the small reply to a probe that arrived intact.
+// BuildMTUAck ...
 func BuildMTUAck() []byte {
 	return frame(TypeMTUAck, nil)
 }
 
-// IsMTUAck reports whether pkt is a header-only MTU acknowledgement.
+// IsMTUAck ...
 func IsMTUAck(pkt []byte) bool {
 	return len(pkt) == headerLen && TypeOf(pkt) == TypeMTUAck
 }
 
-// MTUAckFor returns an ack when pkt is a probe of an acceptable size.
+// MTUAckFor ...
 func MTUAckFor(pkt []byte) []byte {
 	if TypeOf(pkt) != TypeMTUProbe || len(pkt) < headerLen || len(pkt) > MaxPacket {
 		return nil
@@ -361,7 +342,7 @@ func MTUAckFor(pkt []byte) []byte {
 	return BuildMTUAck()
 }
 
-// BuildPong seals a probe reply. observed is the address the ping arrived from.
+// BuildPong ...
 func BuildPong(srcPriv, dstPub [32]byte, src, dst uuid.UUID, txid uint64, observed netip.AddrPort) ([]byte, error) {
 	plain := make([]byte, 8+addrLen+2)
 	binary.BigEndian.PutUint64(plain[:8], txid)
@@ -369,7 +350,7 @@ func BuildPong(srcPriv, dstPub [32]byte, src, dst uuid.UUID, txid uint64, observ
 	return sealDirect(TypePong, srcPriv, dstPub, src, dst, plain)
 }
 
-// OpenPong opens a pong.
+// OpenPong ...
 func OpenPong(dstPriv, srcPub [32]byte, pkt []byte) (src, dst uuid.UUID, txid uint64, observed netip.AddrPort, err error) {
 	plain, src, dst, err := openDirect(TypePong, dstPriv, srcPub, pkt)
 	if err != nil {
@@ -381,12 +362,12 @@ func OpenPong(dstPriv, srcPub [32]byte, pkt []byte) (src, dst uuid.UUID, txid ui
 	return src, dst, binary.BigEndian.Uint64(plain[:8]), getAddrPort(plain[8:]), nil
 }
 
-// BuildTeardown tells peer to drop the direct path.
+// BuildTeardown ...
 func BuildTeardown(srcPriv, dstPub [32]byte, src, dst uuid.UUID) ([]byte, error) {
 	return sealDirect(TypeTeardown, srcPriv, dstPub, src, dst, []byte{1})
 }
 
-// OpenTeardown opens a teardown.
+// OpenTeardown ...
 func OpenTeardown(dstPriv, srcPub [32]byte, pkt []byte) (src, dst uuid.UUID, err error) {
 	_, src, dst, err = openDirect(TypeTeardown, dstPriv, srcPub, pkt)
 	return src, dst, err
@@ -421,7 +402,7 @@ func openDirect(typ byte, dstPriv, srcPub [32]byte, pkt []byte) ([]byte, uuid.UU
 	return plain, src, dst, nil
 }
 
-// TypeOf returns the punch type byte, or 0 when pkt is not a punch frame.
+// TypeOf ...
 func TypeOf(pkt []byte) byte {
 	if !Is(pkt) {
 		return 0

@@ -22,6 +22,7 @@ const (
 	nonceLength = 12
 )
 
+// Encrypt ...
 func Encrypt(plaintext string, password []byte) ([]byte, error) {
 	if len(password) == 0 {
 		return nil, errors.New("password cannot be empty")
@@ -59,6 +60,7 @@ func Encrypt(plaintext string, password []byte) ([]byte, error) {
 	return encryptedData, nil
 }
 
+// Decrypt ...
 func Decrypt(encryptedData []byte, password []byte) (string, error) {
 	if len(password) == 0 {
 		return "", errors.New("password cannot be empty")

@@ -12,10 +12,6 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// dummyPasswordHash is a cost-13 bcrypt hash. A missing-user login and a
-// registration that returns "Unable to complete registration" compare against
-// it and ignore the result, so those answers take about as long as a real
-// password check. The plaintext is not a credential. A match still fails.
 const dummyPasswordHash = "$2a$13$a7TIGconfU4iJBKBkJlQhOHyKAgbGOKmibCU2B88En4cM2hVFQOmO"
 
 func equalizePasswordCost(password string) {
@@ -51,9 +47,6 @@ func authenticatePasswordLogin(w http.ResponseWriter, r *http.Request, form *log
 		return nil, email
 	}
 
-	// A disabled account pays the same bcrypt cost and returns the same 401
-	// as a wrong password. The check is before 2FA so a correct password does
-	// not add a decrypt on this path.
 	if user.Disabled {
 		sendError(w, 401, "Invalid login credentials")
 		return nil, email
@@ -89,8 +82,6 @@ func handleAdminLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// A valid password for a non-admin gets the same 401 as a wrong password.
-	// There is no manager role on this server.
 	if !user.IsAdmin {
 		sendError(w, 401, "Invalid login credentials")
 		return
@@ -117,8 +108,6 @@ func handleAdminLogin(w http.ResponseWriter, r *http.Request) {
 	})
 
 	user.RemoveSensitiveInformation()
-	// The session cookie already holds this token. The admin page does not
-	// read it, and the raw value authenticates to the client API from any IP.
 	user.DeviceToken = nil
 	for _, t := range user.Tokens {
 		if t != nil {
@@ -296,9 +285,6 @@ func handleClientTwoFactorConfirm(w http.ResponseWriter, r *http.Request) {
 	sendObject(w, out)
 }
 
-// validTOTPSecret reports whether secret is base32 that gotp can decode.
-// An empty secret decodes, and NewDefaultTOTP would still panic later, so
-// empty is rejected here. The check matches secrets the client already issues.
 func validTOTPSecret(secret string) bool {
 	if secret == "" {
 		return false

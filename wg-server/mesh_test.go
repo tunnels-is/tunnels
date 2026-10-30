@@ -9,6 +9,7 @@ import (
 	"github.com/tunnels-is/tunnels/types"
 )
 
+// TestSameMeshPeer ...
 func TestSameMeshPeer(t *testing.T) {
 	base := installedMeshPeer{
 		PublicKeyHex: "aa",
@@ -59,6 +60,7 @@ func TestSameMeshPeer(t *testing.T) {
 	}
 }
 
+// TestValidMeshSubnet ...
 func TestValidMeshSubnet(t *testing.T) {
 	cases := map[string]bool{
 		"10.3.0.0/16": true,
@@ -77,6 +79,7 @@ func TestValidMeshSubnet(t *testing.T) {
 	}
 }
 
+// TestFetchMesh ...
 func TestFetchMesh(t *testing.T) {
 	want := types.WGMeshResponse{Peers: []types.WGMeshPeer{
 		{PublicKeyHex: "deadbeef", Endpoint: "2.2.2.2:51821", AllowedSubnets: []string{"10.3.0.0/16"}},
@@ -104,6 +107,7 @@ func TestFetchMesh(t *testing.T) {
 	}
 }
 
+// TestFetchMesh_HTTPRejected ...
 func TestFetchMesh_HTTPRejected(t *testing.T) {
 	cfg := &Config{ControllerURL: "http://127.0.0.1:1", APIKey: "k"}
 	if _, err := fetchMesh(cfg); err == nil {

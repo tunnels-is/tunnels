@@ -14,11 +14,22 @@ type fakeInfo struct {
 	sys  any
 }
 
-func (f fakeInfo) Name() string       { return "tunnels" }
-func (f fakeInfo) Size() int64        { return 1 }
-func (f fakeInfo) Mode() os.FileMode  { return f.mode }
+// Name ...
+func (f fakeInfo) Name() string { return "tunnels" }
+
+// Size ...
+func (f fakeInfo) Size() int64 { return 1 }
+
+// Mode ...
+func (f fakeInfo) Mode() os.FileMode { return f.mode }
+
+// ModTime ...
 func (f fakeInfo) ModTime() time.Time { return time.Time{} }
-func (f fakeInfo) IsDir() bool        { return f.mode.IsDir() }
+
+// IsDir ...
+func (f fakeInfo) IsDir() bool { return f.mode.IsDir() }
+
+// Sys ...
 func (f fakeInfo) Sys() any {
 	if f.sys != nil {
 		return f.sys
@@ -26,6 +37,7 @@ func (f fakeInfo) Sys() any {
 	return &syscall.Stat_t{Uid: f.uid}
 }
 
+// TestValidateCapabilityInfo ...
 func TestValidateCapabilityInfo(t *testing.T) {
 	rootFile := fakeInfo{mode: 0o755, uid: 0}
 	rootDir := fakeInfo{mode: os.ModeDir | 0o755, uid: 0}
@@ -55,6 +67,7 @@ func TestValidateCapabilityInfo(t *testing.T) {
 	}
 }
 
+// TestValidateCapabilityTarget_UserOwnedTree ...
 func TestValidateCapabilityTarget_UserOwnedTree(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "tunnels")
@@ -66,6 +79,7 @@ func TestValidateCapabilityTarget_UserOwnedTree(t *testing.T) {
 	}
 }
 
+// TestClearSudoTimestampRunsCommand ...
 func TestClearSudoTimestampRunsCommand(t *testing.T) {
 	var got []string
 	prev := runCommand
@@ -81,6 +95,7 @@ func TestClearSudoTimestampRunsCommand(t *testing.T) {
 	}
 }
 
+// TestQuotedPath ...
 func TestQuotedPath(t *testing.T) {
 	if quotedPath("") != "'[BINARY]'" {
 		t.Fatal(quotedPath(""))

@@ -13,6 +13,7 @@ func dnsQueryMsg(name string) *dns.Msg {
 	return m
 }
 
+// TestDNSListDecision_WhitelistTakesPriority ...
 func TestDNSListDecision_WhitelistTakesPriority(t *testing.T) {
 	prevBL := DNSBlockList.Load()
 	prevWL := DNSWhiteList.Load()
@@ -21,13 +22,9 @@ func TestDNSListDecision_WhitelistTakesPriority(t *testing.T) {
 		DNSWhiteList.Store(prevWL)
 	})
 
-	// Domain is on both block and white lists.
 	blockedDomain := "both.example.com"
-	// Only blocklisted.
 	onlyBlocked := "ads.tracker.example"
-	// Only whitelisted.
 	onlyWhite := "safe.partner.example"
-	// On neither list.
 	clean := "clean.example.com"
 
 	DNSBlockList.Store(NewCatalog(
@@ -39,7 +36,6 @@ func TestDNSListDecision_WhitelistTakesPriority(t *testing.T) {
 		[]*DomainSet{DomainSetFromDomains([]string{blockedDomain, onlyWhite})},
 	))
 
-	// Whitelisted + blocklisted → allowed (whitelist wins).
 	blocked, tag := dnsListDecision(dnsQueryMsg(blockedDomain))
 	if blocked {
 		t.Fatalf("%s should be allowed (whitelist priority), got blocked tag=%q", blockedDomain, tag)
@@ -50,12 +46,10 @@ func TestDNSListDecision_WhitelistTakesPriority(t *testing.T) {
 	if !isWhitelisted(dnsQueryMsg(blockedDomain)) {
 		t.Fatal("expected isWhitelisted true")
 	}
-	// isBlocked still reports true when called alone — decision must skip it.
 	if ok, _ := isBlocked(dnsQueryMsg(blockedDomain)); !ok {
 		t.Fatal("expected isBlocked true for dual-listed domain (decision still must allow)")
 	}
 
-	// Blocklist only → blocked.
 	blocked, tag = dnsListDecision(dnsQueryMsg(onlyBlocked))
 	if !blocked {
 		t.Fatalf("%s should be blocked", onlyBlocked)
@@ -64,19 +58,16 @@ func TestDNSListDecision_WhitelistTakesPriority(t *testing.T) {
 		t.Fatalf("block tag = %q, want Ads", tag)
 	}
 
-	// Whitelist only → allowed.
 	blocked, tag = dnsListDecision(dnsQueryMsg(onlyWhite))
 	if blocked {
 		t.Fatalf("%s should be allowed (whitelist only), tag=%q", onlyWhite, tag)
 	}
 
-	// Neither → allowed.
 	blocked, tag = dnsListDecision(dnsQueryMsg(clean))
 	if blocked {
 		t.Fatalf("%s should be allowed (not listed), tag=%q", clean, tag)
 	}
 
-	// Trailing-dot / case variants of dual-listed domain still allow.
 	for _, name := range []string{"BOTH.EXAMPLE.COM", "both.example.com.", "Both.Example.Com."} {
 		blocked, tag = dnsListDecision(dnsQueryMsg(name))
 		if blocked {
@@ -85,6 +76,7 @@ func TestDNSListDecision_WhitelistTakesPriority(t *testing.T) {
 	}
 }
 
+// TestIsWhitelistedAndIsBlocked_NilCatalogs ...
 func TestIsWhitelistedAndIsBlocked_NilCatalogs(t *testing.T) {
 	prevBL := DNSBlockList.Load()
 	prevWL := DNSWhiteList.Load()
@@ -117,6 +109,7 @@ func TestIsWhitelistedAndIsBlocked_NilCatalogs(t *testing.T) {
 	}
 }
 
+// TestDNSAMapping ...
 func TestDNSAMapping(t *testing.T) {
 
 	dnsRecords := []*types.DNSRecord{
@@ -225,6 +218,7 @@ func TestDNSAMapping(t *testing.T) {
 	}
 }
 
+// TestDNSAMappingWithNilRecords ...
 func TestDNSAMappingWithNilRecords(t *testing.T) {
 
 	dnsRecords := []*types.DNSRecord{
@@ -254,6 +248,7 @@ func TestDNSAMappingWithNilRecords(t *testing.T) {
 	t.Log("Nil records handled correctly ✓")
 }
 
+// TestDNSAMappingWildcardBehavior ...
 func TestDNSAMappingWildcardBehavior(t *testing.T) {
 	dnsRecords := []*types.DNSRecord{
 		{
@@ -335,6 +330,7 @@ func TestDNSAMappingWildcardBehavior(t *testing.T) {
 	}
 }
 
+// TestDNSAMappingEmptyArray ...
 func TestDNSAMappingEmptyArray(t *testing.T) {
 
 	emptyRecords := []*types.DNSRecord{}
@@ -347,6 +343,7 @@ func TestDNSAMappingEmptyArray(t *testing.T) {
 	t.Log("Empty array handled correctly ✓")
 }
 
+// TestDNSAMappingComplexDomains ...
 func TestDNSAMappingComplexDomains(t *testing.T) {
 	dnsRecords := []*types.DNSRecord{
 		{
@@ -416,6 +413,7 @@ func TestDNSAMappingComplexDomains(t *testing.T) {
 	}
 }
 
+// TestDNSAMappingSingleLabel ...
 func TestDNSAMappingSingleLabel(t *testing.T) {
 	records := []*types.DNSRecord{
 		{

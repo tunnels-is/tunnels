@@ -93,6 +93,7 @@ type BandwidthHistory struct {
 	records []BandwidthRecord
 }
 
+// Append ...
 func (bh *BandwidthHistory) Append(r BandwidthRecord) {
 	bh.mu.Lock()
 	defer bh.mu.Unlock()
@@ -109,13 +110,12 @@ func (bh *BandwidthHistory) Append(r BandwidthRecord) {
 	bh.records = append(bh.records, r)
 }
 
+// Snapshot ...
 func (bh *BandwidthHistory) Snapshot() []BandwidthRecord {
 	return bh.SnapshotSince(time.Time{})
 }
 
-// SnapshotSince copies records at or after cutoff. A zero cutoff copies the
-// whole buffer. The returned slice has its own backing array, so the caller
-// can retain it without pinning discarded samples.
+// SnapshotSince ...
 func (bh *BandwidthHistory) SnapshotSince(cutoff time.Time) []BandwidthRecord {
 	bh.mu.RLock()
 	defer bh.mu.RUnlock()
@@ -190,8 +190,8 @@ type TUN struct {
 	deviceID       string
 	punchIn        chan punchDatagram
 	punchWant      chan [4]byte
-	punchInject chan []byte
-	punchPoke   chan struct{}
+	punchInject    chan []byte
+	punchPoke      chan struct{}
 	punchPending   map[[4]byte]struct{}
 	punchMu        sync.Mutex
 	punchDirect    map[[4]byte]punchInstall
@@ -199,6 +199,7 @@ type TUN struct {
 	punchMTULogged map[[4]byte]struct{}
 }
 
+// GetState ...
 func (t *TUN) GetState() TunnelState {
 	ts := t.state.Load()
 	if ts == nil {
@@ -208,10 +209,12 @@ func (t *TUN) GetState() TunnelState {
 	return *ts
 }
 
+// SetState ...
 func (t *TUN) SetState(state TunnelState) {
 	t.state.Store(&state)
 }
 
+// RecordBandwidth ...
 func (t *TUN) RecordBandwidth() {
 	defer RecoverAndLog()
 
@@ -254,6 +257,7 @@ func (t *TUN) RecordBandwidth() {
 	}
 }
 
+// MarshalJSON ...
 func (t *TUN) MarshalJSON() ([]byte, error) {
 	eb := BandwidthBytesToString(t.egressBytes.Load())
 	ib := BandwidthBytesToString(t.ingressBytes.Load())
@@ -280,6 +284,7 @@ func (t *TUN) MarshalJSON() ([]byte, error) {
 	})
 }
 
+// InitBlockedPorts ...
 func (t *TUN) InitBlockedPorts(ports []uint16) {
 	if len(ports) == 0 {
 		return
@@ -296,6 +301,7 @@ func (t *TUN) InitBlockedPorts(ports []uint16) {
 	}
 }
 
+// IngressBytes ...
 func (t *TUN) IngressBytes() int64 {
 	if t == nil {
 		return 0
@@ -303,6 +309,7 @@ func (t *TUN) IngressBytes() int64 {
 	return t.ingressBytes.Load()
 }
 
+// EgressBytes ...
 func (t *TUN) EgressBytes() int64 {
 	if t == nil {
 		return 0
@@ -310,14 +317,17 @@ func (t *TUN) EgressBytes() int64 {
 	return t.egressBytes.Load()
 }
 
+// IngressString ...
 func (t *TUN) IngressString() string {
 	return BandwidthBytesToString(t.IngressBytes())
 }
 
+// EgressString ...
 func (t *TUN) EgressString() string {
 	return BandwidthBytesToString(t.EgressBytes())
 }
 
+// Meta ...
 func (t *TUN) Meta() *TunnelMeta {
 	if t == nil {
 		return nil
@@ -325,7 +335,7 @@ func (t *TUN) Meta() *TunnelMeta {
 	return t.meta.Load()
 }
 
-// CloneTunnelMeta deep-copies list fields used by the editor.
+// CloneTunnelMeta ...
 func CloneTunnelMeta(src *TunnelMeta) *TunnelMeta {
 	if src == nil {
 		return nil

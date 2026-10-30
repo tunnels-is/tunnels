@@ -6,19 +6,6 @@ import (
 	"fyne.io/fyne/v2"
 )
 
-// Wayland wp-fractional-scale-v1 reports scale in 120ths. GLFW sizes the
-// EGL buffer with integer truncation:
-//
-//	fb = (logical * numerator) / 120
-//
-// The compositor sizes the viewport with round-half-away-from-zero:
-//
-//	fb = (logical * numerator + 60) / 120
-//
-// When those differ by a pixel the compositor bilinear-scales the whole
-// window — fonts look sharp, then muddy, then sharp again as the edge is
-// dragged. alignLogical picks the nearest logical size where they agree,
-// walking in the direction the user is already resizing.
 const waylandScaleBase = 120
 
 func scaleToNumerator(scale float32) int {

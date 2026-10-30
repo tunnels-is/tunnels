@@ -13,9 +13,6 @@ import (
 	"github.com/tunnels-is/tunnels/client"
 )
 
-// keepLocalAPIKey copies a key saved on this device when the server omits it.
-// Login responses do not include the API key. The plaintext is only returned
-// when the key is created.
 func keepLocalAPIKey(u *client.User) {
 	if u == nil || u.ID == "" || u.APIKey != "" {
 		return
@@ -32,8 +29,6 @@ func keepLocalAPIKey(u *client.User) {
 	}
 }
 
-// Login modes. Kept as the original integers because they map to controller
-// endpoints and preferences already stored on disk.
 const (
 	modeLogin     = 1
 	modeRegister  = 2
@@ -79,7 +74,6 @@ func (a *App) loginPage() fyne.CanvasObject {
 
 	remember := newSwitch(a.loginRemember, func(v bool) { a.loginRemember = v })
 
-	// Control server picker.
 	servers := []*client.ControlServer{}
 	if a.config != nil {
 		servers = a.config.ControlServers
@@ -303,7 +297,6 @@ func (a *App) loginPage() fyne.CanvasObject {
 		a.rebuild()
 	}
 
-	// Primary switch between the two everyday flows; everything else is a link.
 	tabs := newSegmented([]segItem{
 		{"login", "Sign in"},
 		{"register", "Register"},
@@ -331,7 +324,6 @@ func (a *App) loginPage() fyne.CanvasObject {
 	}
 	body = append(body, actionRow)
 
-	// Secondary flows.
 	var links []fyne.CanvasObject
 	switch mode {
 	case modeLogin:

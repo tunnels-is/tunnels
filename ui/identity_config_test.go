@@ -7,6 +7,7 @@ import (
 	"testing"
 )
 
+// TestAppIDIsDesktopFileStem ...
 func TestAppIDIsDesktopFileStem(t *testing.T) {
 	if strings.HasSuffix(appID, ".desktop") {
 		t.Fatalf("appID %q ends in .desktop; the compositor shows that word as the application name", appID)
@@ -16,6 +17,7 @@ func TestAppIDIsDesktopFileStem(t *testing.T) {
 	}
 }
 
+// TestMigrateFyneConfigDir ...
 func TestMigrateFyneConfigDir(t *testing.T) {
 	root := t.TempDir()
 	oldPath := filepath.Join(root, legacyAppID)
@@ -38,8 +40,6 @@ func TestMigrateFyneConfigDir(t *testing.T) {
 		t.Fatalf("old config dir still present: %v", err)
 	}
 
-	// A second launch must not move a directory back over settings that
-	// already live under the new id.
 	if err := os.Mkdir(oldPath, 0o755); err != nil {
 		t.Fatal(err)
 	}

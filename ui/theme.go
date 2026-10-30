@@ -9,9 +9,6 @@ import (
 	"fyne.io/fyne/v2/theme"
 )
 
-// Inter files are Latin subsets (see fonts/README.md). Full Inter expands to
-// tens of MB of parsed OpenType tables inside go-text.
-//
 //go:embed fonts/Inter-Regular.ttf
 var interRegular []byte
 
@@ -23,8 +20,6 @@ var (
 	resInterSemibold = fyne.NewStaticResource("Inter-SemiBold.ttf", interSemibold)
 )
 
-// Design tokens at 100%. Everything the UI measures derives from these, so
-// zoom is a single multiplier applied here rather than a canvas transform.
 const (
 	baseSp1 float32 = 4
 	baseSp2 float32 = 8
@@ -62,10 +57,8 @@ const (
 	baseLogFn    float32 = 150
 )
 
-// radFull is a radius cap, not a measurement, so it never scales.
 const radFull float32 = 999
 
-// Live tokens. Recomputed by applyZoomTokens; read everywhere else.
 var (
 	sp1, sp2, sp3, sp4, sp5, sp6, sp8            float32
 	radSm, radMd, radLg                          float32
@@ -76,26 +69,17 @@ var (
 	segHeight, segInset, logLevelCol             float32
 	logFnCol                                     float32
 
-	// rtPad cancels the padding widget.RichText bakes around its text; it has
-	// to track SizeNameInnerPadding exactly, which is sp2.
 	rtPad float32
 )
 
-// uiZoom is the live zoom multiplier. 1 is 100%.
 var uiZoom float32 = 1
 
-// z scales a one-off measurement that has no named token.
 func z(n float32) float32 { return n * uiZoom }
 
-// snapDIP rounds a zoomed size to a whole device-independent pixel so
-// coverage-AA text and SVG icons land on the pixel grid instead of being
-// bilinear-filtered between pixels.
 func snapDIP(n float32) float32 {
 	return float32(math.Round(float64(n)))
 }
 
-// applyZoomTokens recomputes every token for a zoom factor. Callers must
-// refresh the theme afterwards so Fyne drops its cached sizes.
 func applyZoomTokens(f float32) {
 	uiZoom = f
 
@@ -122,8 +106,6 @@ func applyZoomTokens(f float32) {
 
 func init() { applyZoomTokens(1) }
 
-// Custom theme names so RichText segments can pick up palette tones and the
-// 12px step, which Fyne has no built-in name for.
 const (
 	colMuted     fyne.ThemeColorName = "tunnelsMuted"
 	colFaint     fyne.ThemeColorName = "tunnelsFaint"
@@ -134,20 +116,17 @@ const (
 )
 
 type palette struct {
-	// Surfaces, dark to light in dark mode (and the reverse in light mode).
-	Base100 color.NRGBA // cards, sidebar, inputs
-	Base200 color.NRGBA // window background
-	Base300 color.NRGBA // borders
-	Elevate color.NRGBA // hovered/raised surface
-	Divider color.NRGBA // hairlines inside cards
-	Input   color.NRGBA // entry/select fill, inset against Base100
+	Base100 color.NRGBA
+	Base200 color.NRGBA
+	Base300 color.NRGBA
+	Elevate color.NRGBA
+	Divider color.NRGBA
+	Input   color.NRGBA
 
-	// Text.
 	Content color.NRGBA
 	Muted   color.NRGBA
 	Faint   color.NRGBA
 
-	// Accents. Each has a solid tone plus a low-alpha wash for badges.
 	Primary        color.NRGBA
 	PrimaryHover   color.NRGBA
 	PrimaryContent color.NRGBA
@@ -178,7 +157,6 @@ func withAlpha(c color.NRGBA, a uint8) color.NRGBA {
 	return c
 }
 
-// Palettes match the original daisyUI tunnels / tunnels-dark / suzko themes.
 var palettes = map[string]palette{
 	"tunnels-dark": {
 		Base100: hex(0x0c, 0x0c, 0x0e), Base200: hex(0x04, 0x04, 0x05), Base300: hex(0x1c, 0x1c, 0x20),
@@ -237,6 +215,7 @@ type appTheme struct {
 	pal  palette
 }
 
+// Color ...
 func (t *appTheme) Color(n fyne.ThemeColorName, _ fyne.ThemeVariant) color.Color {
 	p := t.pal
 	switch n {
@@ -309,6 +288,7 @@ func (t *appTheme) Color(n fyne.ThemeColorName, _ fyne.ThemeVariant) color.Color
 	return theme.DefaultTheme().Color(n, theme.VariantLight)
 }
 
+// Font ...
 func (t *appTheme) Font(s fyne.TextStyle) fyne.Resource {
 	if s.Monospace || s.Symbol {
 		return theme.DefaultTheme().Font(s)
@@ -319,10 +299,12 @@ func (t *appTheme) Font(s fyne.TextStyle) fyne.Resource {
 	return resInterRegular
 }
 
+// Icon ...
 func (t *appTheme) Icon(n fyne.ThemeIconName) fyne.Resource {
 	return theme.DefaultTheme().Icon(n)
 }
 
+// Size ...
 func (t *appTheme) Size(n fyne.ThemeSizeName) float32 {
 	switch n {
 	case theme.SizeNamePadding:

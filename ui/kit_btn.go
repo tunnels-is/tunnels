@@ -28,8 +28,6 @@ const (
 	kSm
 )
 
-// kBtn is the only button in the app. Stock Fyne buttons are never used, so
-// every clickable surface shares one set of metrics and states.
 type kBtn struct {
 	widget.BaseWidget
 	label    string
@@ -65,6 +63,7 @@ func (b *kBtn) withIcon(res fyne.Resource) *kBtn {
 	return b
 }
 
+// Set ...
 func (b *kBtn) Set(label string, kind kKind, tap func()) {
 	b.onTap = tap
 	same := b.label == label && b.kind == kind && b.icon == nil && !b.hidden
@@ -78,6 +77,7 @@ func (b *kBtn) Set(label string, kind kKind, tap func()) {
 	}
 }
 
+// SetIconOnly ...
 func (b *kBtn) SetIconOnly(res fyne.Resource, kind kKind, tap func()) {
 	b.onTap = tap
 	same := b.label == "" && b.kind == kind && b.icon == res && !b.hidden
@@ -91,6 +91,7 @@ func (b *kBtn) SetIconOnly(res fyne.Resource, kind kKind, tap func()) {
 	}
 }
 
+// SetHidden ...
 func (b *kBtn) SetHidden(h bool) {
 	if b.hidden == h {
 		if h {
@@ -106,16 +107,19 @@ func (b *kBtn) SetHidden(h bool) {
 	}
 }
 
+// Disable ...
 func (b *kBtn) Disable() {
 	b.disabled = true
 	b.Refresh()
 }
 
+// Enable ...
 func (b *kBtn) Enable() {
 	b.disabled = false
 	b.Refresh()
 }
 
+// Tapped ...
 func (b *kBtn) Tapped(*fyne.PointEvent) {
 	if b.disabled || b.hidden || b.onTap == nil {
 		return
@@ -123,6 +127,7 @@ func (b *kBtn) Tapped(*fyne.PointEvent) {
 	b.onTap()
 }
 
+// MouseIn ...
 func (b *kBtn) MouseIn(*desktop.MouseEvent) {
 	if b.disabled {
 		return
@@ -131,14 +136,17 @@ func (b *kBtn) MouseIn(*desktop.MouseEvent) {
 	b.Refresh()
 }
 
+// MouseOut ...
 func (b *kBtn) MouseOut() {
 	b.hovered = false
 	b.pressed = false
 	b.Refresh()
 }
 
+// MouseMoved ...
 func (b *kBtn) MouseMoved(*desktop.MouseEvent) {}
 
+// MouseDown ...
 func (b *kBtn) MouseDown(*desktop.MouseEvent) {
 	if b.disabled {
 		return
@@ -147,11 +155,13 @@ func (b *kBtn) MouseDown(*desktop.MouseEvent) {
 	b.Refresh()
 }
 
+// MouseUp ...
 func (b *kBtn) MouseUp(*desktop.MouseEvent) {
 	b.pressed = false
 	b.Refresh()
 }
 
+// Cursor ...
 func (b *kBtn) Cursor() desktop.Cursor {
 	if b.disabled {
 		return desktop.DefaultCursor
@@ -173,6 +183,7 @@ func (b *kBtn) fontSize() float32 {
 	return fsBody
 }
 
+// CreateRenderer ...
 func (b *kBtn) CreateRenderer() fyne.WidgetRenderer {
 	bg := surface(radSm, color.Transparent, nil)
 	lab := canvas.NewText(b.label, pal().Content)
@@ -196,8 +207,10 @@ type kBtnRenderer struct {
 	objs   []fyne.CanvasObject
 }
 
+// Destroy ...
 func (r *kBtnRenderer) Destroy() {}
 
+// Objects ...
 func (r *kBtnRenderer) Objects() []fyne.CanvasObject {
 	if r.objs == nil {
 		r.objs = []fyne.CanvasObject{r.bg, r.ico, r.lab}
@@ -216,6 +229,7 @@ func (r *kBtnRenderer) iconSize() float32 {
 	return iconSize
 }
 
+// MinSize ...
 func (r *kBtnRenderer) MinSize() fyne.Size {
 	if r.b.hidden {
 		return fyne.NewSize(0, 0)
@@ -235,6 +249,7 @@ func (r *kBtnRenderer) MinSize() fyne.Size {
 	return fyne.NewSize(w, h)
 }
 
+// Layout ...
 func (r *kBtnRenderer) Layout(size fyne.Size) {
 	r.bg.Resize(size)
 	r.bg.Move(fyne.NewPos(0, 0))
@@ -262,6 +277,7 @@ func (r *kBtnRenderer) Layout(size fyne.Size) {
 	r.lab.Move(fyne.NewPos(x+is+sp2, (size.Height-lms.Height)/2))
 }
 
+// Refresh ...
 func (r *kBtnRenderer) Refresh() {
 	iconChanged := r.apply()
 	r.bg.Refresh()
@@ -328,7 +344,7 @@ func (r *kBtnRenderer) colors() (bg, fg, stroke color.NRGBA, fgName fyne.ThemeCo
 		if r.b.hovered {
 			bg = p.Hover
 		}
-	default: // ghost
+	default:
 		bg, fg, fgName = color.NRGBA{}, p.Muted, colMuted
 		if r.b.hovered {
 			bg, fg, fgName = p.Hover, p.Content, colContent
@@ -359,7 +375,6 @@ func darken(c color.NRGBA, d uint8) color.NRGBA {
 	return c
 }
 
-// Shorthand constructors used across the pages.
 func primaryBtn(label string, fn func()) *kBtn { return newKBtn(label, kPrimary, fn) }
 func successBtn(label string, fn func()) *kBtn { return newKBtn(label, kSuccess, fn) }
 func dangerBtn(label string, fn func()) *kBtn  { return newKBtn(label, kDanger, fn) }

@@ -12,6 +12,7 @@ import (
 	"github.com/tunnels-is/tunnels/types"
 )
 
+// TestPublicRegistrationEnabledByDefault ...
 func TestPublicRegistrationEnabledByDefault(t *testing.T) {
 	setupTestDB(t)
 	securityReviewLogger()
@@ -25,6 +26,7 @@ func TestPublicRegistrationEnabledByDefault(t *testing.T) {
 	}
 }
 
+// TestDisablePublicRegistration_RejectsAnonymous ...
 func TestDisablePublicRegistration_RejectsAnonymous(t *testing.T) {
 	setupTestDB(t)
 	securityReviewLogger()
@@ -50,6 +52,7 @@ func TestDisablePublicRegistration_RejectsAnonymous(t *testing.T) {
 	}
 }
 
+// TestDisablePublicRegistration_CLIFlag ...
 func TestDisablePublicRegistration_CLIFlag(t *testing.T) {
 	setupTestDB(t)
 	securityReviewLogger()
@@ -67,6 +70,7 @@ func TestDisablePublicRegistration_CLIFlag(t *testing.T) {
 	}
 }
 
+// TestDisablePublicRegistration_AdminUIStillWorks ...
 func TestDisablePublicRegistration_AdminUIStillWorks(t *testing.T) {
 	setupTestDB(t)
 	securityReviewLogger()

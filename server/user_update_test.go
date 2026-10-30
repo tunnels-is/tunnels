@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 )
 
+// TestHandleClientUserUpdate_APIKeyServerGenerated ...
 func TestHandleClientUserUpdate_APIKeyServerGenerated(t *testing.T) {
 	setupTestDB(t)
 	if logger == nil {

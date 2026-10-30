@@ -2,6 +2,7 @@ package client
 
 import "time"
 
+// AutoConnect ...
 func AutoConnect() {
 	defer RecoverAndLog()
 	autoConnectWith(PublicConnect)

@@ -7,6 +7,7 @@ import (
 	"testing"
 )
 
+// TestLinuxDesktopEntryIdentifiesApp ...
 func TestLinuxDesktopEntryIdentifiesApp(t *testing.T) {
 	got := linuxDesktopEntry("/opt/tunnels/tunnels-app")
 	for _, want := range []string{
@@ -24,6 +25,7 @@ func TestLinuxDesktopEntryIdentifiesApp(t *testing.T) {
 	}
 }
 
+// TestDesktopQuoteEscapes ...
 func TestDesktopQuoteEscapes(t *testing.T) {
 	got := desktopQuote(`/tmp/foo"bar`)
 	if got != `"/tmp/foo\"bar"` {

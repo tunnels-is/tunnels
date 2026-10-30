@@ -68,6 +68,7 @@ func newLazyBind(inner conn.Bind, serverPriv, serverPub []byte, bufferSize, rate
 	}
 }
 
+// Open ...
 func (b *LazyBind) Open(port uint16) ([]conn.ReceiveFunc, uint16, error) {
 	fns, actualPort, err := b.inner.Open(port)
 	if err != nil {
@@ -87,6 +88,7 @@ func (b *LazyBind) Open(port uint16) ([]conn.ReceiveFunc, uint16, error) {
 	return wrapped, actualPort, nil
 }
 
+// Close ...
 func (b *LazyBind) Close() error {
 
 	b.closeMu.Lock()
@@ -101,22 +103,31 @@ func (b *LazyBind) Close() error {
 	return b.inner.Close()
 }
 
+// Shutdown ...
 func (b *LazyBind) Shutdown() {
 	b.closeOnce.Do(func() {
 		close(b.done)
 	})
 }
 
+// WipeKeys ...
 func (b *LazyBind) WipeKeys() {
 	b.handshakeWG.Wait()
 	zeroBytes(b.serverPriv)
 	zeroBytes(b.serverPub)
 }
 
-func (b *LazyBind) SetMark(mark uint32) error                     { return b.inner.SetMark(mark) }
-func (b *LazyBind) Send(bufs [][]byte, ep conn.Endpoint) error    { return b.inner.Send(bufs, ep) }
+// SetMark ...
+func (b *LazyBind) SetMark(mark uint32) error { return b.inner.SetMark(mark) }
+
+// Send ...
+func (b *LazyBind) Send(bufs [][]byte, ep conn.Endpoint) error { return b.inner.Send(bufs, ep) }
+
+// ParseEndpoint ...
 func (b *LazyBind) ParseEndpoint(s string) (conn.Endpoint, error) { return b.inner.ParseEndpoint(s) }
-func (b *LazyBind) BatchSize() int                                { return b.inner.BatchSize() }
+
+// BatchSize ...
+func (b *LazyBind) BatchSize() int { return b.inner.BatchSize() }
 
 func (b *LazyBind) handshakeRateAllowed(ip netip.Addr) bool {
 	b.rateMu.Lock()

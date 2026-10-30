@@ -24,12 +24,10 @@ type ServerConfig struct {
 
 	AllowedOrigins []string
 
-	AdminAPIKey      string
-	DBurl            string
-	TwoFactorKey     string
-	CookieSigningKey string
-	// DisablePublicRegistration rejects unauthenticated POST /client/user/create.
-	// Admin UI create (/ui/user/create) is unaffected. Off by default.
+	AdminAPIKey               string
+	DBurl                     string
+	TwoFactorKey              string
+	CookieSigningKey          string
 	DisablePublicRegistration bool
 	PayKey                    string
 	CertPem                   string
@@ -60,12 +58,8 @@ type Device struct {
 
 	WireGuardIPv6 string `json:"WireGuardIPv6,omitempty"`
 
-	// DiscoKey is the device's punch public key. It is not the WireGuard key.
 	DiscoKey string `json:"DiscoKey,omitempty"`
 
-	// P2PAllowAll and P2PAllowIPs are the full-IP allows last announced to
-	// the device's wg-server. Port-specific rules are not stored here; those
-	// flows stay on the server firewall and are never punched.
 	P2PAllowAll bool     `json:"P2PAllowAll,omitempty"`
 	P2PAllowIPs []string `json:"P2PAllowIPs,omitempty"`
 }
@@ -108,8 +102,6 @@ type Server struct {
 
 	EnableFirewall bool `json:"EnableFirewall"`
 
-	// DiscoKey is the wg-server's punch public key, pinned the same way as
-	// WireGuardPubKey. Clients seal reflex requests to it.
 	DiscoKey string `json:"DiscoKey,omitempty"`
 
 	InsecureSkipVerify bool `json:"InsecureSkipVerify,omitempty"`
@@ -199,9 +191,6 @@ type WGPeer struct {
 	WireGuardIPv6 string `json:"WireGuardIPv6,omitempty"`
 }
 
-// P2PPeer is one device a client is allowed to punch. The controller only
-// returns a peer when both firewalls already admit the other's tunnel IP
-// on every port.
 type P2PPeer struct {
 	DeviceID     string `json:"DeviceID"`
 	DiscoKey     string `json:"DiscoKey"`
@@ -209,7 +198,6 @@ type P2PPeer struct {
 	WireGuardIP  string `json:"WireGuardIP"`
 }
 
-// P2PLocate is where a wg-server should forward a rendezvous.
 type P2PLocate struct {
 	DeviceID    string `json:"DeviceID"`
 	DiscoKey    string `json:"DiscoKey,omitempty"`

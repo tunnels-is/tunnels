@@ -1,11 +1,4 @@
 #!/bin/bash
-# Wrap a Mach-O binary in a double-clickable macOS .app bundle.
-#
-# Usage:
-#   ./scripts/package-darwin-app.sh <binary> <out.app> <version> [icon.png]
-#
-# version is used for CFBundleShortVersionString / CFBundleVersion (leading "v" stripped).
-# icon.png defaults to cmd/fyne/appicon.png relative to the repo root.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -19,9 +12,7 @@ APPICON_PNG="${4:-$REPO_ROOT/cmd/fyne/appicon.png}"
 BUNDLE_VERSION="${VERSION#v}"
 BUNDLE_ID="is.tunnels.app"
 APP_NAME="Tunnels"
-# CFBundleExecutable: admin launcher script (double-click entrypoint).
 EXEC_NAME="tunnels-app"
-# Real Fyne binary lives next to the launcher inside Contents/MacOS/.
 REAL_BIN_NAME="tunnels-app.bin"
 ASKPASS_NAME="tunnels-askpass"
 
@@ -42,8 +33,6 @@ make_icns() {
 	iconset="$tmp/icon.iconset"
 	mkdir -p "$iconset"
 
-	# iconutil requires this exact set of filenames/sizes.
-	# Write @2x via temp names first — sips warns on @2x suffixes in --out paths.
 	for size in 16 32 128 256 512; do
 		name="icon_${size}x${size}"
 		sips -z "$size" "$size" "$png" --out "$iconset/${name}.png" >/dev/null
@@ -55,16 +44,6 @@ make_icns() {
 	rm -rf "$tmp"
 }
 
-# Launcher elevates via `sudo -A` (GUI askpass), then exec's the real binary.
-#
-# Why not `osascript … with administrator privileges` + double-fork?
-# That spawns an anon root process outside the user's LaunchServices/Aqua
-# session → CFPasteboard XPC "Connection invalid", RunningBoard
-# `anon<tunnels-app.bin>` / NotVisible, and a frozen Fyne UI on click.
-#
-# Starting through this .app entrypoint and `exec sudo -A …` keeps the process
-# in the user GUI session chain (same pattern as `sudo App` from Terminal).
-# No basePath / HOME / config-dir changes.
 write_launcher() {
 	local macos_dir="$1"
 	local launcher="$macos_dir/$EXEC_NAME"
@@ -72,7 +51,6 @@ write_launcher() {
 
 	cat >"$askpass" <<'ASKPASS'
 #!/bin/bash
-# Password helper for `sudo -A`. Prints the password on stdout; errors cancel sudo.
 set -euo pipefail
 osascript <<'APPLESCRIPT'
 try
@@ -88,7 +66,6 @@ ASKPASS
 
 	cat >"$launcher" <<'LAUNCHER'
 #!/bin/bash
-# Tunnels.app entrypoint — elevate with sudo askpass, then become the Fyne binary.
 set -euo pipefail
 
 DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -100,7 +77,6 @@ if [ ! -x "$BIN" ]; then
 	exit 1
 fi
 
-# Already root (e.g. nested sudo) — run the app directly.
 if [ "$(id -u)" -eq 0 ]; then
 	exec "$BIN" "$@"
 fi
@@ -111,9 +87,6 @@ if [ ! -x "$ASKPASS" ]; then
 fi
 
 export SUDO_ASKPASS="$ASKPASS"
-# -A: use askpass GUI instead of a TTY.
-# exec replaces this launcher so Dock keeps a single Tunnels.app process that
-# stays in the LaunchServices/GUI session (unlike osascript+double-fork).
 exec sudo -A -p "" "$BIN" "$@"
 LAUNCHER
 	chmod 755 "$launcher"
@@ -124,8 +97,6 @@ trap 'rm -f "$TMP_ICNS"' EXIT
 
 make_icns "$APPICON_PNG" "$TMP_ICNS"
 
-# Replace any existing bundle. Root-owned leftovers (logs/config from elevated
-# runs) can make a plain rm -rf fail — move aside first when needed.
 if [ -e "$APP_PATH" ]; then
 	if rm -rf "$APP_PATH" 2>/dev/null; then
 		:
@@ -141,7 +112,6 @@ if [ -e "$APP_PATH" ]; then
 fi
 mkdir -p "$APP_PATH/Contents/MacOS" "$APP_PATH/Contents/Resources"
 
-# Real Fyne binary + sudo askpass launcher (CFBundleExecutable = tunnels-app).
 cp "$BINARY" "$APP_PATH/Contents/MacOS/$REAL_BIN_NAME"
 chmod +x "$APP_PATH/Contents/MacOS/$REAL_BIN_NAME"
 write_launcher "$APP_PATH/Contents/MacOS"
@@ -185,8 +155,6 @@ EOF
 
 printf 'APPL????' >"$APP_PATH/Contents/PkgInfo"
 
-# Ad-hoc sign so macOS treats it as a local app.
-# Distribution still needs a Developer ID cert + notarization.
 if command -v codesign >/dev/null 2>&1; then
 	codesign --force --deep --sign - "$APP_PATH" 2>/dev/null || true
 fi

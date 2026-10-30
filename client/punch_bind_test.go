@@ -7,18 +7,29 @@ import (
 	wgconn "golang.zx2c4.com/wireguard/conn"
 )
 
-// punchStubBind is the smallest Bind that lets Open/Close run without a socket.
 type punchStubBind struct{}
 
+// Open ...
 func (punchStubBind) Open(port uint16) ([]wgconn.ReceiveFunc, uint16, error) {
 	return nil, port, nil
 }
-func (punchStubBind) Close() error                                  { return nil }
-func (punchStubBind) SetMark(uint32) error                          { return nil }
-func (punchStubBind) Send([][]byte, wgconn.Endpoint) error          { return nil }
-func (punchStubBind) ParseEndpoint(string) (wgconn.Endpoint, error) { return nil, nil }
-func (punchStubBind) BatchSize() int                                { return 1 }
 
+// Close ...
+func (punchStubBind) Close() error { return nil }
+
+// SetMark ...
+func (punchStubBind) SetMark(uint32) error { return nil }
+
+// Send ...
+func (punchStubBind) Send([][]byte, wgconn.Endpoint) error { return nil }
+
+// ParseEndpoint ...
+func (punchStubBind) ParseEndpoint(string) (wgconn.Endpoint, error) { return nil, nil }
+
+// BatchSize ...
+func (punchStubBind) BatchSize() int { return 1 }
+
+// TestPunchBindSurvivesWireGuardRebind ...
 func TestPunchBindSurvivesWireGuardRebind(t *testing.T) {
 	prevS := STATE.Load()
 	prevC := CONFIG.Load()
@@ -35,8 +46,6 @@ func TestPunchBindSurvivesWireGuardRebind(t *testing.T) {
 	}
 	waitPunchLoop(t, b, true)
 
-	// WireGuard's first Up, and every later route change, does Close then Open
-	// on this same bind. Close used to retire the loop for good.
 	if err := b.Close(); err != nil {
 		t.Fatal(err)
 	}

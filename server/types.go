@@ -23,16 +23,15 @@ type User struct {
 	DeviceToken *DeviceToken `json:"DeviceToken,omitempty"`
 	APIKey      string       `json:"APIKey"`
 
-	Password         string    `json:"Password"`
-	Password2        string    `json:"-"`
-	ConfirmCode      string    `json:"ConfirmCode"`
-	LastResetRequest time.Time `json:"-"`
-	RecoveryCodes    []byte    `json:"RecoveryCodes"`
-	TwoFactorCode    []byte    `json:"TwoFactorCode"`
-	TwoFactorEnabled bool      `json:"TwoFactorEnabled"`
-	// LastTOTP is the last authenticator code accepted for this account.
-	LastTOTP string         `json:"LastTOTP,omitempty"`
-	Tokens   []*DeviceToken `json:"Tokens"`
+	Password         string         `json:"Password"`
+	Password2        string         `json:"-"`
+	ConfirmCode      string         `json:"ConfirmCode"`
+	LastResetRequest time.Time      `json:"-"`
+	RecoveryCodes    []byte         `json:"RecoveryCodes"`
+	TwoFactorCode    []byte         `json:"TwoFactorCode"`
+	TwoFactorEnabled bool           `json:"TwoFactorEnabled"`
+	LastTOTP         string         `json:"LastTOTP,omitempty"`
+	Tokens           []*DeviceToken `json:"Tokens"`
 
 	IsAdmin bool        `json:"IsAdmin"`
 	Groups  []uuid.UUID `json:"Groups"`
@@ -42,6 +41,7 @@ type User struct {
 	SubExpiration time.Time   `json:"SubExpiration"`
 }
 
+// ToMinifiedUser ...
 func (u *User) ToMinifiedUser() MinifiedUser {
 	return MinifiedUser{
 		ID:       u.ID.String(),
@@ -59,6 +59,7 @@ type MinifiedUser struct {
 	IsManager bool   `json:"IsManager"`
 }
 
+// RemoveSensitiveInformation ...
 func (u *User) RemoveSensitiveInformation() {
 	if u.Key != nil && u.Key.Key != "" {
 		ks := strings.Split(u.Key.Key, "-")
@@ -77,9 +78,6 @@ func (u *User) RemoveSensitiveInformation() {
 	u.LastTOTP = ""
 	u.APIKey = ""
 
-	// Session secrets: keep only the current DeviceToken.DT (needed by the
-	// client for subsequent auth). Strip every other Tokens[].DT so login and
-	// admin list/get responses cannot impersonate other devices.
 	currentDT := ""
 	if u.DeviceToken != nil {
 		currentDT = u.DeviceToken.DT

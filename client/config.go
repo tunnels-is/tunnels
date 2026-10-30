@@ -120,6 +120,7 @@ func loadConfigFromDisk(newConfig bool) error {
 	return writeConfigToDisk()
 }
 
+// DefaultConfig ...
 func DefaultConfig() *Config {
 	conf := &Config{
 		DebugLogging:      false,
@@ -299,6 +300,7 @@ func parseTunnelFile(path, ext string) (*TunnelMeta, error) {
 	return tunnel, nil
 }
 
+// SetConfig ...
 func SetConfig(config *Config) (err error) {
 	defer RecoverAndLog()
 
@@ -328,8 +330,6 @@ func SetConfig(config *Config) (err error) {
 	return err
 }
 
-// validateDNSListConfig rejects blocklist/whitelist tags that could escape the
-// list directories on disk (path traversal via Tag).
 func validateDNSListConfig(config *Config) error {
 	if config == nil {
 		return nil

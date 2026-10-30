@@ -7,6 +7,7 @@ import (
 	"testing"
 )
 
+// TestGetDomainAndSubDomain ...
 func TestGetDomainAndSubDomain(t *testing.T) {
 	tests := []struct {
 		name              string
@@ -72,6 +73,7 @@ func TestGetDomainAndSubDomain(t *testing.T) {
 	}
 }
 
+// TestCheckIfPlainDomain ...
 func TestCheckIfPlainDomain(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -120,6 +122,7 @@ func TestCheckIfPlainDomain(t *testing.T) {
 	}
 }
 
+// TestIsDefaultTunnelName ...
 func TestIsDefaultTunnelName(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -168,6 +171,7 @@ func TestIsDefaultTunnelName(t *testing.T) {
 	}
 }
 
+// TestCreateFolder_NewDirectory ...
 func TestCreateFolder_NewDirectory(t *testing.T) {
 	dir := t.TempDir()
 	target := filepath.Join(dir, "newdir")
@@ -189,6 +193,7 @@ func TestCreateFolder_NewDirectory(t *testing.T) {
 	}
 }
 
+// TestCreateFolder_AlreadyExists ...
 func TestCreateFolder_AlreadyExists(t *testing.T) {
 	dir := t.TempDir()
 	target := filepath.Join(dir, "existing")
@@ -203,6 +208,7 @@ func TestCreateFolder_AlreadyExists(t *testing.T) {
 	}
 }
 
+// TestCreateFolder_CreatesMissingParents ...
 func TestCreateFolder_CreatesMissingParents(t *testing.T) {
 	dir := t.TempDir()
 	target := filepath.Join(dir, "no", "such", "parent")
@@ -223,10 +229,9 @@ func TestCreateFolder_CreatesMissingParents(t *testing.T) {
 	}
 }
 
+// TestCreateFolder_ReturnsErrorInsteadOfExiting ...
 func TestCreateFolder_ReturnsErrorInsteadOfExiting(t *testing.T) {
 	dir := t.TempDir()
-	// A file where a directory is wanted: MkdirAll cannot succeed, so this is
-	// the path that used to call os.Exit(1) and take the whole app down.
 	blocker := filepath.Join(dir, "blocker")
 	if err := os.WriteFile(blocker, []byte("x"), 0o600); err != nil {
 		t.Fatal(err)
@@ -237,6 +242,7 @@ func TestCreateFolder_ReturnsErrorInsteadOfExiting(t *testing.T) {
 	}
 }
 
+// TestInitBaseFoldersAndPaths_CreatesAllSubdirs ...
 func TestInitBaseFoldersAndPaths_CreatesAllSubdirs(t *testing.T) {
 	dir := t.TempDir()
 
@@ -276,6 +282,7 @@ func TestInitBaseFoldersAndPaths_CreatesAllSubdirs(t *testing.T) {
 	}
 }
 
+// TestInitBaseFoldersAndPaths_TrailingSeparator ...
 func TestInitBaseFoldersAndPaths_TrailingSeparator(t *testing.T) {
 	dir := t.TempDir()
 	withTrailing := dir + string(os.PathSeparator)
@@ -292,6 +299,7 @@ func TestInitBaseFoldersAndPaths_TrailingSeparator(t *testing.T) {
 	}
 }
 
+// TestInitBaseFoldersAndPaths_SetsConfigFileName ...
 func TestInitBaseFoldersAndPaths_SetsConfigFileName(t *testing.T) {
 	dir := t.TempDir()
 
@@ -310,6 +318,7 @@ func TestInitBaseFoldersAndPaths_SetsConfigFileName(t *testing.T) {
 	}
 }
 
+// TestVerifyAndWriteFile_CreatesNewFile ...
 func TestVerifyAndWriteFile_CreatesNewFile(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "testfile")
@@ -332,6 +341,7 @@ func TestVerifyAndWriteFile_CreatesNewFile(t *testing.T) {
 	}
 }
 
+// TestVerifyAndWriteFile_SkipsMatchingFile ...
 func TestVerifyAndWriteFile_SkipsMatchingFile(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "testfile")
@@ -350,6 +360,7 @@ func TestVerifyAndWriteFile_SkipsMatchingFile(t *testing.T) {
 	}
 }
 
+// TestVerifyAndWriteFile_ReplaceTamperedFile ...
 func TestVerifyAndWriteFile_ReplaceTamperedFile(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "testfile")
@@ -377,6 +388,7 @@ func TestVerifyAndWriteFile_ReplaceTamperedFile(t *testing.T) {
 	}
 }
 
+// TestVerifyAndWriteFile_ReplaceTruncatedFile ...
 func TestVerifyAndWriteFile_ReplaceTruncatedFile(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "testfile")

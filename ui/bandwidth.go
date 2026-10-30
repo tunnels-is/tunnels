@@ -11,16 +11,11 @@ import (
 	"github.com/tunnels-is/tunnels/client"
 )
 
-// bwRange is one selectable window over the history.
 type bwRange struct {
 	label   string
 	seconds int
 }
 
-// The client samples once a second and keeps MaxBandwidthRecords (86400) of
-// them, so 24h is the whole buffer. The web UI also offers 7d, which can never
-// show more than a day of data, so that option is left out rather than showing
-// a range that silently tops out.
 var bwRanges = []bwRange{
 	{"1m", 60},
 	{"5m", 300},
@@ -50,8 +45,6 @@ func (a *App) setBWRange(sec int) {
 	a.reloadCurrent()
 }
 
-// bwRangePicker is the shared window selector. One control drives every chart,
-// as in the web UI, rather than a copy per tunnel.
 func (a *App) bwRangePicker() fyne.CanvasObject {
 	cur := a.bwRangeSeconds()
 	items := make([]segItem, 0, len(bwRanges))
@@ -74,10 +67,6 @@ func (a *App) bwRangePicker() fyne.CanvasObject {
 	})
 }
 
-// ---------------------------------------------------------------- aggregation
-
-// bucketSizeFor mirrors the web UI's thinning table: long windows are averaged
-// into buckets so the chart stays legible instead of drawing 86400 bars.
 func bucketSizeFor(rangeSeconds int) int {
 	switch {
 	case rangeSeconds <= 300:
@@ -93,13 +82,10 @@ func bucketSizeFor(rangeSeconds int) int {
 	}
 }
 
-// bwStats is one direction's summary over the selected window.
 type bwStats struct {
 	current, avg, peak, total int64
 }
 
-// summarise computes stats from the raw samples, not the drawing buckets:
-// averaging first would report a peak-of-averages and understate real spikes.
 func summarise(recs []client.BandwidthRecord) (down, up bwStats) {
 	if len(recs) == 0 {
 		return
@@ -121,13 +107,8 @@ func summarise(recs []client.BandwidthRecord) (down, up bwStats) {
 	return
 }
 
-// maxChartBars caps how many bars are drawn. The reference thinning table alone
-// still yields 360 bars for a 6h window, which at typical card widths is under
-// 2px each and reads as a solid block rather than a graph.
 const maxChartBars = 140
 
-// displayBuckets thins the window down to something drawable: the reference
-// bucket size first, then a further pass if that still leaves too many bars.
 func displayBuckets(recs []client.BandwidthRecord, rangeSeconds int) []client.BandwidthRecord {
 	size := bucketSizeFor(rangeSeconds)
 	if n := len(recs); n > maxChartBars*size {
@@ -136,7 +117,6 @@ func displayBuckets(recs []client.BandwidthRecord, rangeSeconds int) []client.Ba
 	return bucket(recs, size)
 }
 
-// bucket averages consecutive samples so the chart has one bar per bucket.
 func bucket(recs []client.BandwidthRecord, size int) []client.BandwidthRecord {
 	if size <= 1 || len(recs) == 0 {
 		return recs
@@ -163,13 +143,6 @@ func bucket(recs []client.BandwidthRecord, size int) []client.BandwidthRecord {
 	return out
 }
 
-// ---------------------------------------------------------------- panel
-
-// bandwidthPanel draws live throughput for one tunnel: download above the
-// centre line, upload below, with the full stat grid underneath.
-//
-// It owns everything it shows and re-reads the tunnel's history once a second.
-// One self-updating widget avoids rebuilding the page just to move a graph.
 type bandwidthPanel struct {
 	widget.BaseWidget
 	tun     *client.TUN
@@ -195,7 +168,6 @@ func (p *bandwidthPanel) stop() {
 	})
 }
 
-// samples returns a copy of the records inside the selected window.
 func (p *bandwidthPanel) samples() []client.BandwidthRecord {
 	if p.tun == nil {
 		return nil
@@ -210,6 +182,7 @@ func (p *bandwidthPanel) samples() []client.BandwidthRecord {
 
 var bwStatCols = []string{"NOW", "AVG", "PEAK", "TOTAL"}
 
+// CreateRenderer ...
 func (p *bandwidthPanel) CreateRenderer() fyne.WidgetRenderer {
 	pl := pal()
 	r := &bwRenderer{
@@ -237,7 +210,7 @@ type bwRenderer struct {
 	p    *bandwidthPanel
 	mid  *canvas.Rectangle
 	rule *canvas.Rectangle
-	bars []*canvas.Rectangle // 2 per bucket: download then upload
+	bars []*canvas.Rectangle
 
 	down, up       *canvas.Text
 	window, empty  *canvas.Text
@@ -278,6 +251,7 @@ func (r *bwRenderer) run() {
 	}
 }
 
+// Destroy ...
 func (r *bwRenderer) Destroy() {
 	r.p.stop()
 }
@@ -343,6 +317,7 @@ func (r *bwRenderer) refreshData() {
 	r.empty.Color = pl.Faint
 }
 
+// Objects ...
 func (r *bwRenderer) Objects() []fyne.CanvasObject {
 	need := 2 + len(r.bars) + 6 + len(r.heads)*3
 	if cap(r.objs) < need {
@@ -361,14 +336,14 @@ func (r *bwRenderer) Objects() []fyne.CanvasObject {
 	return out
 }
 
+// MinSize ...
 func (r *bwRenderer) MinSize() fyne.Size {
-	rows := r.down.MinSize().Height + z(3) // rate line
+	rows := r.down.MinSize().Height + z(3)
 	chart := z(64)
 	grid := r.heads[0].MinSize().Height + r.dCells[0].MinSize().Height*2 + sp3*2
 	return fyne.NewSize(z(300), rows+chart+grid+sp5*2)
 }
 
-// statCols splits the width into a label column plus four right-aligned values.
 func (r *bwRenderer) statCols(width float32) (labelW float32, cols []cellRect) {
 	labelW = z(84)
 	avail := width - labelW
@@ -380,8 +355,8 @@ func (r *bwRenderer) statCols(width float32) (labelW float32, cols []cellRect) {
 	return
 }
 
+// Layout ...
 func (r *bwRenderer) Layout(size fyne.Size) {
-	// Rate readouts, with the window summary trailing.
 	dms := r.down.MinSize()
 	r.down.Move(fyne.NewPos(0, 0))
 	r.up.Move(fyne.NewPos(dms.Width+sp5, 0))
@@ -399,7 +374,6 @@ func (r *bwRenderer) Layout(size fyne.Size) {
 
 	r.drawBars(size.Width, mid, chartH)
 
-	// Stat grid under a rule.
 	gridTop := top + chartH + sp4
 	r.rule.Resize(fyne.NewSize(size.Width, z(1)))
 	r.rule.Move(fyne.NewPos(0, gridTop))
@@ -435,8 +409,6 @@ func (r *bwRenderer) drawBars(width, mid, chartH float32) {
 		return
 	}
 
-	// Scale both series against the single largest sample so download and
-	// upload stay comparable rather than each filling its own half.
 	var peak int64 = 1
 	for _, rec := range r.buckets {
 		if rec.IngressBytes > peak {
@@ -469,6 +441,7 @@ func (r *bwRenderer) drawBars(width, mid, chartH float32) {
 	}
 }
 
+// Refresh ...
 func (r *bwRenderer) Refresh() {
 	r.refreshData()
 	if sz := r.p.Size(); sz.Width > 0 {

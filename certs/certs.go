@@ -26,6 +26,7 @@ const (
 	ECDSA
 )
 
+// MakeCert ...
 func MakeCert(ct CertType, certPath string, keyPath string, ips []string, domains []string, org string, expirationDate time.Time, saveToDisk bool) (c tls.Certificate, err error) {
 	defer func() {
 		r := recover()
@@ -141,6 +142,7 @@ type Certs struct {
 	CertBytes   []byte
 }
 
+// MakeCertificate ...
 func MakeCertificate(ct CertType, certPath string, keyPath string, ips []string, domains []string, org string, expirationDate time.Time, saveToDisk bool) (CR *Certs, err error) {
 	defer func() {
 		r := recover()
@@ -264,8 +266,6 @@ func MakeCertificate(ct CertType, certPath string, keyPath string, ips []string,
 	return
 }
 
-// openPrivateKeyFile creates/truncates a private key file at 0600 and forces
-// that mode even if the file already existed with looser permissions.
 func openPrivateKeyFile(path string) (*os.File, error) {
 	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {

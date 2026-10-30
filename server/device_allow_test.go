@@ -24,6 +24,7 @@ func nonCanonicalWGKey(fill byte) string {
 	return canon[:8] + "\n" + canon[8:]
 }
 
+// TestCanonicalWireGuardPublicKey ...
 func TestCanonicalWireGuardPublicKey(t *testing.T) {
 	canon := canonWGKey(0x11)
 	got, err := canonicalWireGuardPublicKey(canon)
@@ -44,6 +45,7 @@ func TestCanonicalWireGuardPublicKey(t *testing.T) {
 	}
 }
 
+// TestClientDeviceCreate_IgnoresCallerIdentityAndPunchPolicy ...
 func TestClientDeviceCreate_IgnoresCallerIdentityAndPunchPolicy(t *testing.T) {
 	setupTestDB(t)
 	securityReviewLogger()
@@ -110,6 +112,7 @@ func TestClientDeviceCreate_IgnoresCallerIdentityAndPunchPolicy(t *testing.T) {
 	}
 }
 
+// TestClientDeviceCreate_RejectsNonCanonicalKey ...
 func TestClientDeviceCreate_RejectsNonCanonicalKey(t *testing.T) {
 	setupTestDB(t)
 	securityReviewLogger()
@@ -154,6 +157,7 @@ func TestClientDeviceCreate_RejectsNonCanonicalKey(t *testing.T) {
 	}
 }
 
+// TestAdminDeviceCreate_DropsPunchPolicyAndCallerAddress ...
 func TestAdminDeviceCreate_DropsPunchPolicyAndCallerAddress(t *testing.T) {
 	setupTestDB(t)
 	securityReviewLogger()
@@ -193,6 +197,7 @@ func TestAdminDeviceCreate_DropsPunchPolicyAndCallerAddress(t *testing.T) {
 	}
 }
 
+// TestAdminDeviceUpdate_KeepsIdentityAddressAndPunchPolicy ...
 func TestAdminDeviceUpdate_KeepsIdentityAddressAndPunchPolicy(t *testing.T) {
 	setupTestDB(t)
 	securityReviewLogger()

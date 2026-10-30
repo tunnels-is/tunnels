@@ -7,18 +7,12 @@ import (
 	"time"
 )
 
-// maxCustomDNSListContent caps the editable custom list size (UI + API).
-// Request bodies are already limited to 2 MiB; this is an extra safety bound.
-const maxCustomDNSListContent = 1 << 20 // 1 MiB
+const maxCustomDNSListContent = 1 << 20
 
-// DNSListContent is the get/set payload for the local custom block/white list files.
 type DNSListContent struct {
-	// Kind is "blocklist" or "whitelist".
-	Kind string
-	// Content is the raw file text (one domain per line).
+	Kind    string
 	Content string
-	// Count is the number of valid domain lines after parse (set on response).
-	Count int
+	Count   int
 }
 
 func normalizeDNSListKind(kind string) (string, error) {
@@ -47,7 +41,6 @@ func customDNSListDirAndEnsure(kind string) (dir string, starter string, ensureC
 	}
 }
 
-// getCustomDNSListContent returns the on-disk custom list file for kind.
 func getCustomDNSListContent(kind string) (*DNSListContent, error) {
 	kind, err := normalizeDNSListKind(kind)
 	if err != nil {
@@ -76,8 +69,6 @@ func getCustomDNSListContent(kind string) (*DNSListContent, error) {
 	return &DNSListContent{Kind: kind, Content: string(data), Count: count}, nil
 }
 
-// setCustomDNSListContent writes the custom list file and hot-reloads that list
-// into the in-memory catalog without re-downloading remote lists.
 func setCustomDNSListContent(kind, content string) (*DNSListContent, error) {
 	kind, err := normalizeDNSListKind(kind)
 	if err != nil {
@@ -111,8 +102,6 @@ func setCustomDNSListContent(kind, content string) (*DNSListContent, error) {
 		return nil, err
 	}
 
-	// Empty save re-seeds the starter template so the file stays non-empty for
-	// reload logic and users still get format hints.
 	toWrite := content
 	if strings.TrimSpace(toWrite) == "" {
 		toWrite = starter
@@ -130,7 +119,6 @@ func setCustomDNSListContent(kind, content string) (*DNSListContent, error) {
 		return nil, fmt.Errorf("saved but could not parse list: %w", err)
 	}
 
-	// Update Count / LastDownload on the custom config entry.
 	var lists []*BlockList
 	switch kind {
 	case "blocklist":
@@ -156,8 +144,6 @@ func setCustomDNSListContent(kind, content string) (*DNSListContent, error) {
 	return &DNSListContent{Kind: kind, Content: toWrite, Count: count}, nil
 }
 
-// applyCustomListToCatalog replaces the custom entry in the live catalog while
-// keeping other already-loaded lists (no remote re-download).
 func applyCustomListToCatalog(kind string, config *Config, customSet *DomainSet) error {
 	var lists []*BlockList
 	var prev *DomainCatalog
@@ -181,7 +167,6 @@ func applyCustomListToCatalog(kind string, config *Config, customSet *DomainSet)
 		return nil
 	}
 
-	// Whether custom is enabled in config (default true if missing).
 	customEnabled := true
 	customTag := customDNSListTag
 	for _, l := range lists {
@@ -192,7 +177,6 @@ func applyCustomListToCatalog(kind string, config *Config, customSet *DomainSet)
 		}
 	}
 
-	// Preserve every already-loaded non-custom list from the previous catalog.
 	prevByTag := prev.Snapshot()
 	if prevByTag == nil {
 		prevByTag = map[string]*DomainSet{}

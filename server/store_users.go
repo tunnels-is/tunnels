@@ -200,9 +200,6 @@ func findUserByEmail(email string) (*User, error) {
 	return found, err
 }
 
-// updateUserDeviceTokens loads the user inside the write transaction and
-// saves whatever mutate returns. Callers must change that fresh list.
-// Assigning a list built before the transaction puts revoked tokens back.
 func updateUserDeviceTokens(id uuid.UUID, mutate func([]*DeviceToken) []*DeviceToken) ([]*DeviceToken, error) {
 	if mutate == nil {
 		return nil, errors.New("missing token update")
@@ -261,8 +258,6 @@ func updateUserSubTime(u *User) error {
 	})
 }
 
-// upgradeLegacyUserSecrets hashes a plaintext API key or device token that
-// just authenticated. The write re-reads the user so a newer key is left alone.
 func upgradeLegacyUserSecrets(id uuid.UUID, presented string) error {
 	if presented == "" {
 		return nil
@@ -488,8 +483,6 @@ func updateUserTwoFactorCodes(upd *twoFactorUpdate) error {
 		if err := bboltUnmarshal(v, user); err != nil {
 			return err
 		}
-		// The presented recovery code is checked on the stored record in this
-		// write. A second re-enroll cannot pass on a code this write consumes.
 		if code := strings.ToUpper(strings.TrimSpace(upd.ConsumeRecovery)); code != "" {
 			plain, err := Decrypt(user.RecoveryCodes, []byte(loadSecret("TwoFactorKey")))
 			if err != nil {
@@ -524,8 +517,6 @@ func updateUserTwoFactorCodes(upd *twoFactorUpdate) error {
 
 var errTOTPReused = errors.New("authenticator code already used")
 
-// acceptTOTPCode records otp on the stored user. A second accept of the same
-// code fails. Old records have an empty LastTOTP and still accept the first code.
 func acceptTOTPCode(userID uuid.UUID, otp string) error {
 	if otp == "" {
 		return errTOTPReused
@@ -553,8 +544,6 @@ func acceptTOTPCode(userID uuid.UUID, otp string) error {
 	})
 }
 
-// acceptResetAuth consumes one recovery code and records the authenticator
-// code in the same write. A reused code does not remove a recovery code.
 func acceptResetAuth(userID uuid.UUID, otp, recovery string) error {
 	if otp == "" {
 		return errTOTPReused
@@ -664,7 +653,6 @@ func activateUserKey(subExpiration time.Time, key *LicenseKey, userID uuid.UUID)
 		if err := bboltUnmarshal(v, user); err != nil {
 			return err
 		}
-		// Disabled is set only by an admin update. A license must not clear it.
 		user.Trial = false
 		user.SubExpiration = subExpiration
 		user.Key = key

@@ -12,8 +12,7 @@ import (
 	"golang.org/x/crypto/curve25519"
 )
 
-// DiscoPrivateFor derives the punch key from a WireGuard private key.
-// The derivation is domain-separated so the two keys can never collide.
+// DiscoPrivateFor ...
 func DiscoPrivateFor(wgPriv [32]byte) [32]byte {
 	mac := hmac.New(sha256.New, wgPriv[:])
 	mac.Write([]byte("tunnels.is punch disco key v1"))
@@ -24,7 +23,7 @@ func DiscoPrivateFor(wgPriv [32]byte) [32]byte {
 	return priv
 }
 
-// NewPrivate returns a fresh clamped Curve25519 private key.
+// NewPrivate ...
 func NewPrivate() ([32]byte, error) {
 	var priv [32]byte
 	if _, err := rand.Read(priv[:]); err != nil {
@@ -40,7 +39,7 @@ func clamp(priv *[32]byte) {
 	priv[31] |= 64
 }
 
-// Public returns the Curve25519 public key for priv.
+// Public ...
 func Public(priv [32]byte) ([32]byte, error) {
 	var pub [32]byte
 	raw, err := curve25519.X25519(priv[:], curve25519.Basepoint)
@@ -51,12 +50,12 @@ func Public(priv [32]byte) ([32]byte, error) {
 	return pub, nil
 }
 
-// EncodeKey encodes a 32-byte key as standard base64.
+// EncodeKey ...
 func EncodeKey(k [32]byte) string {
 	return base64.StdEncoding.EncodeToString(k[:])
 }
 
-// DecodeKey parses a standard-base64 32-byte key.
+// DecodeKey ...
 func DecodeKey(s string) ([32]byte, error) {
 	var out [32]byte
 	raw, err := base64.StdEncoding.DecodeString(s)
@@ -86,7 +85,7 @@ func sessionKey(priv, peerPub [32]byte) ([32]byte, error) {
 	return key, nil
 }
 
-// Seal encrypts plaintext for receiverPub. The result is nonce || ciphertext.
+// Seal ...
 func Seal(senderPriv, receiverPub [32]byte, plaintext []byte) ([]byte, error) {
 	key, err := sessionKey(senderPriv, receiverPub)
 	if err != nil {
@@ -105,7 +104,7 @@ func Seal(senderPriv, receiverPub [32]byte, plaintext []byte) ([]byte, error) {
 	return aead.Seal(out, nonce[:], plaintext, nil), nil
 }
 
-// Open decrypts a nonce || ciphertext box from senderPub.
+// Open ...
 func Open(receiverPriv, senderPub [32]byte, box []byte) ([]byte, error) {
 	if len(box) < chacha20poly1305.NonceSizeX {
 		return nil, fmt.Errorf("box too short")

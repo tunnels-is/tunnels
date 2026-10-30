@@ -5,6 +5,7 @@ import (
 	"testing"
 )
 
+// TestDefaultConfig_KillSwitchDefaults ...
 func TestDefaultConfig_KillSwitchDefaults(t *testing.T) {
 	conf := DefaultConfig()
 	if conf.KillSwitchIPv4 {
@@ -15,6 +16,7 @@ func TestDefaultConfig_KillSwitchDefaults(t *testing.T) {
 	}
 }
 
+// TestApplyMissingKillSwitchDefaults_IPv6OnWhenAbsent ...
 func TestApplyMissingKillSwitchDefaults_IPv6OnWhenAbsent(t *testing.T) {
 	cfg := &Config{}
 	applyMissingKillSwitchDefaults([]byte(`{"APIIP":"127.0.0.1"}`), cfg)
@@ -32,6 +34,7 @@ func TestApplyMissingKillSwitchDefaults_IPv6OnWhenAbsent(t *testing.T) {
 	}
 }
 
+// TestValidateTunnelMeta_NoPerTunnelKillSwitchRule ...
 func TestValidateTunnelMeta_NoPerTunnelKillSwitchRule(t *testing.T) {
 	tun := &TunnelMeta{IFName: "tunt", Tag: "t1", EnableDefaultRoute: false}
 	for _, e := range validateTunnelMeta(tun, "") {
@@ -41,6 +44,7 @@ func TestValidateTunnelMeta_NoPerTunnelKillSwitchRule(t *testing.T) {
 	}
 }
 
+// TestKillSwitchSupportedOnThisPlatform ...
 func TestKillSwitchSupportedOnThisPlatform(t *testing.T) {
 	if !killSwitchSupported() {
 		t.Skip("no blackhole implementation on this OS")

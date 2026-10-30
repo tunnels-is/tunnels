@@ -8,9 +8,6 @@ import (
 	"github.com/vishvananda/netlink"
 )
 
-// RFC ranges that are never a default-route internet destination.
-// Link-local (IMDS) often has no local address and no more-specific
-// route, so scraping ip addr/route cannot see it.
 var rfcNeverInternetV4 = []string{
 	"169.254.0.0/16",
 	"127.0.0.0/8",
@@ -21,19 +18,15 @@ var rfcNeverInternetV6 = []string{
 	"::1/128",
 }
 
-// Hypervisor fabric anycast: these are intercepted on the default
-// interface but look like ordinary unicast via the default gateway
-// (no local address, often no extra route). Routing cannot express them.
 var fabricAnycastV4 = []string{
-	"168.63.129.16/32",   // Azure wireserver
-	"100.100.100.200/32", // Alibaba metadata
+	"168.63.129.16/32",
+	"100.100.100.200/32",
 }
 
 var fabricAnycastV6 = []string{
-	"fd00:ec2::254/128", // AWS IPv6 IMDS
+	"fd00:ec2::254/128",
 }
 
-// attachedPrefix is one address or non-default route on the host.
 type attachedPrefix struct {
 	IPNet    *net.IPNet
 	LinkName string
@@ -62,8 +55,6 @@ func overlayNets(cfg *Config) []*net.IPNet {
 	return out
 }
 
-// egressDropCIDRs is the destination set dropped on the internet-iface hop:
-// RFC never-internet + hypervisor anycast + every non-overlay prefix on this box.
 func egressDropCIDRs(cfg *Config) (v4, v6 []string, err error) {
 	v4 = mergeCIDRs(rfcNeverInternetV4, fabricAnycastV4)
 	v6 = mergeCIDRs(rfcNeverInternetV6, fabricAnycastV6)

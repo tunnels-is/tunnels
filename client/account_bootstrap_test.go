@@ -9,16 +9,13 @@ import (
 	"github.com/tunnels-is/tunnels/types"
 )
 
-// TestBootstrapSeesTunnelsOnlyAfterActivation pins down the startup ordering the
-// desktop UI depends on: tunnels live in a per-account workspace, so nothing is
-// readable until that account has been activated.
+// TestBootstrapSeesTunnelsOnlyAfterActivation ...
 func TestBootstrapSeesTunnelsOnlyAfterActivation(t *testing.T) {
 	base := t.TempDir()
 
 	prevState := STATE.Load()
 	t.Cleanup(func() { STATE.Store(prevState) })
 
-	// No pre-creation: ensureAccountDirs creates missing parents itself.
 	accounts := filepath.Join(base, "accounts") + string(os.PathSeparator)
 
 	s := &State{
@@ -37,8 +34,6 @@ func TestBootstrapSeesTunnelsOnlyAfterActivation(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// A tunnel file exists on disk for this account, as it would after the user
-	// has created one in a previous session.
 	meta := &TunnelMeta{Tag: "default", IFName: "tunnels", MTU: 1420, ConfigFormat: ".json"}
 	blob, err := json.Marshal(meta)
 	if err != nil {
@@ -50,12 +45,10 @@ func TestBootstrapSeesTunnelsOnlyAfterActivation(t *testing.T) {
 
 	clearTunnelMetaMap()
 
-	// This is what the UI did at startup: read state without activating first.
 	if got := len(GetFullState().Tunnels); got != 0 {
 		t.Fatalf("precondition: expected no tunnels before activation, got %d", got)
 	}
 
-	// Activating the workspace is what makes them readable.
 	if err := ActivateAccount(userID); err != nil {
 		t.Fatalf("ActivateAccount: %v", err)
 	}

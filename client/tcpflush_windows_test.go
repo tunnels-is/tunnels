@@ -6,6 +6,7 @@ import (
 	"testing"
 )
 
+// Test_ipString ...
 func Test_ipString(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -65,6 +66,7 @@ func Test_ipString(t *testing.T) {
 	}
 }
 
+// Test_portString ...
 func Test_portString(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -124,6 +126,7 @@ func Test_portString(t *testing.T) {
 	}
 }
 
+// Test_ipString_RoundTrip ...
 func Test_ipString_RoundTrip(t *testing.T) {
 
 	knownIPs := []struct {
@@ -145,6 +148,7 @@ func Test_ipString_RoundTrip(t *testing.T) {
 	}
 }
 
+// Test_portString_CommonPorts ...
 func Test_portString_CommonPorts(t *testing.T) {
 
 	commonPorts := map[string]uint32{

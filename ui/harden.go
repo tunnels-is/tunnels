@@ -13,22 +13,10 @@ import (
 	"github.com/tunnels-is/tunnels/client"
 )
 
-// fyneDisableDPIEnv is Fyne's switch to skip glfw.GetVideoMode() while
-// resolving window scale. During a display reconfigure that call returns
-// nil; Fyne 2.8.0 and earlier panics in getMonitorScale (#6467). 2.8.1+
-// nil-checks it. Darwin still sets this so detectScale never walks the
-// monitor list mid-reconfigure. Linux keeps DPI detection for HiDPI X11.
 const fyneDisableDPIEnv = "FYNE_DISABLE_DPI_DETECTION"
 
-// fynePlatformEnv selects GLFW's backend. Fyne otherwise forces X11 on
-// compositors without server-side decorations (GNOME), and the compositor
-// then bilinear-scales that 1× XWayland buffer at 125%/150% — the blur
-// that goes away when display scale is set back to 100%. Native Wayland
-// gets a framebuffer at the compositor scale (texScale) instead.
 const fynePlatformEnv = "FYNE_PLATFORM"
 
-// hardenFyne must run before app.NewWithID / NewWindow. It does not
-// override a value the user already set.
 func hardenFyne() {
 	if runtime.GOOS == "darwin" {
 		if os.Getenv(fyneDisableDPIEnv) == "" {
@@ -53,11 +41,6 @@ func preferWayland() {
 	_ = os.Setenv(fynePlatformEnv, "wayland")
 }
 
-// preferCompositorDecorations drops GLFW's libdecor CSD — the GTK/cairo
-// title bar that ignores Cosmic/KDE/Sway themes — when the compositor
-// can draw its own decorations. Must run before fyne initializes GLFW.
-//
-// GNOME/Mutter has no xdg-decoration, so libdecor stays there.
 func preferCompositorDecorations() {
 	if !shouldDisableLibdecor() {
 		return
@@ -77,7 +60,6 @@ func gnomeNeedsLibdecor(desktop string) bool {
 	if !strings.Contains(u, "GNOME") {
 		return false
 	}
-	// COSMIC can carry leftover GNOME tokens; it advertises SSD.
 	if strings.Contains(u, "COSMIC") {
 		return false
 	}
@@ -102,13 +84,6 @@ func (a *App) shutdown() {
 	}
 }
 
-// surviveWindowClose hides the window instead of quitting. The title-bar
-// close button leaves the process in the tray (installTray). The same hide
-// keeps the run loop up when GLFW delivers a close because the display went
-// away. App.Quit() still destroys the window (Close bypasses the intercept).
-//
-// Runs after installTray. SetSystemTrayWindow installs its own hide intercept,
-// and this one replaces it so the display-loss path stays in this function.
 func (a *App) surviveWindowClose() {
 	if a.win == nil {
 		return
@@ -125,9 +100,6 @@ func (a *App) surviveWindowClose() {
 	}
 }
 
-// installQuitMenu wires Cmd/Ctrl+Q. On macOS, SetMainMenu lands in the native
-// menu bar. On Linux and Windows it would paint a second in-window File bar
-// on top of the system title bar, so those platforms keep the shortcut only.
 func (a *App) installQuitMenu() {
 	if a.win == nil {
 		return

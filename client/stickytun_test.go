@@ -19,19 +19,35 @@ func newFakeTUN() *fakeTUN {
 	return &fakeTUN{name: "tunnels", events: make(chan tun.Event)}
 }
 
-func (f *fakeTUN) File() *os.File                         { return nil }
+// File ...
+func (f *fakeTUN) File() *os.File { return nil }
+
+// Read ...
 func (f *fakeTUN) Read([][]byte, []int, int) (int, error) { return 0, nil }
-func (f *fakeTUN) Write([][]byte, int) (int, error)       { return 0, nil }
-func (f *fakeTUN) MTU() (int, error)                      { return 1420, nil }
-func (f *fakeTUN) Name() (string, error)                  { return f.name, nil }
-func (f *fakeTUN) Events() <-chan tun.Event               { return f.events }
-func (f *fakeTUN) BatchSize() int                         { return 1 }
+
+// Write ...
+func (f *fakeTUN) Write([][]byte, int) (int, error) { return 0, nil }
+
+// MTU ...
+func (f *fakeTUN) MTU() (int, error) { return 1420, nil }
+
+// Name ...
+func (f *fakeTUN) Name() (string, error) { return f.name, nil }
+
+// Events ...
+func (f *fakeTUN) Events() <-chan tun.Event { return f.events }
+
+// BatchSize ...
+func (f *fakeTUN) BatchSize() int { return 1 }
+
+// Close ...
 func (f *fakeTUN) Close() error {
 	f.closeCnt++
 	f.closed = true
 	return nil
 }
 
+// TestStickyTUN_CloseDoesNotReleaseOS ...
 func TestStickyTUN_CloseDoesNotReleaseOS(t *testing.T) {
 	inner := newFakeTUN()
 	s := newStickyTUN(inner)
@@ -46,6 +62,7 @@ func TestStickyTUN_CloseDoesNotReleaseOS(t *testing.T) {
 	}
 }
 
+// TestStickyTUN_ReleaseClosesOS ...
 func TestStickyTUN_ReleaseClosesOS(t *testing.T) {
 	inner := newFakeTUN()
 	s := newStickyTUN(inner)
@@ -64,6 +81,7 @@ func TestStickyTUN_ReleaseClosesOS(t *testing.T) {
 	}
 }
 
+// TestBuildWGIPC_ReplacePeers ...
 func TestBuildWGIPC_ReplacePeers(t *testing.T) {
 	s := buildWGIPC("aa", "bb", "1.2.3.4", "51820")
 	for _, want := range []string{
@@ -78,6 +96,7 @@ func TestBuildWGIPC_ReplacePeers(t *testing.T) {
 	}
 }
 
+// TestWGDeviceAlive_Nil ...
 func TestWGDeviceAlive_Nil(t *testing.T) {
 	if wgDeviceAlive(nil) {
 		t.Fatal("nil device is not alive")

@@ -8,6 +8,7 @@ import (
 	"testing"
 )
 
+// TestValidIfaceName ...
 func TestValidIfaceName(t *testing.T) {
 	ok := []string{"eth0", "wg0", "ens18", "br-ex"}
 	for _, n := range ok {
@@ -23,6 +24,7 @@ func TestValidIfaceName(t *testing.T) {
 	}
 }
 
+// TestCriticalConfigChanged ...
 func TestCriticalConfigChanged(t *testing.T) {
 	a := &Config{WireGuardSubnet: "10.0.0.0/24", WireGuardIface: "wg0", InternetIface: "eth0", WireGuardPort: 51820, ServerID: "a"}
 	b := *a
@@ -39,6 +41,7 @@ func TestCriticalConfigChanged(t *testing.T) {
 	}
 }
 
+// TestLoadOrGenerateLocalPrivKey_RefusesInsecurePerms ...
 func TestLoadOrGenerateLocalPrivKey_RefusesInsecurePerms(t *testing.T) {
 	dir := t.TempDir()
 	setPrivateKeyPath(filepath.Join(dir, "wg-config.json"))
@@ -51,6 +54,7 @@ func TestLoadOrGenerateLocalPrivKey_RefusesInsecurePerms(t *testing.T) {
 	}
 }
 
+// TestAddPeerIPC_ReplacesAllowedIPs ...
 func TestAddPeerIPC_ReplacesAllowedIPs(t *testing.T) {
 	got := fmtAddPeer("deadbeef", "10.0.0.2/32")
 	if !containsAll(got, "replace_allowed_ips=true", "allowed_ip=10.0.0.2/32") {

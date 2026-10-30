@@ -7,6 +7,7 @@ import (
 	"testing"
 )
 
+// TestSendRequestToURL_RefusesRedirectWithDeviceToken ...
 func TestSendRequestToURL_RefusesRedirectWithDeviceToken(t *testing.T) {
 	stolen := make(chan string, 1)
 	evil := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -37,6 +38,7 @@ func TestSendRequestToURL_RefusesRedirectWithDeviceToken(t *testing.T) {
 	}
 }
 
+// TestSendRequestToURL_RejectsOversizedBody ...
 func TestSendRequestToURL_RejectsOversizedBody(t *testing.T) {
 	prev := maxControllerResponseBytes
 	maxControllerResponseBytes = 64
@@ -54,6 +56,7 @@ func TestSendRequestToURL_RejectsOversizedBody(t *testing.T) {
 	}
 }
 
+// TestSendRequestToURL_AcceptsBodyAtLimit ...
 func TestSendRequestToURL_AcceptsBodyAtLimit(t *testing.T) {
 	prev := maxControllerResponseBytes
 	maxControllerResponseBytes = 64

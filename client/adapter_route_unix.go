@@ -217,6 +217,7 @@ func delIPv6Route(network string, gateway string, metric string) (err error) {
 	return
 }
 
+// AdjustRoutersForTunneling ...
 func AdjustRoutersForTunneling() (err error) {
 	defer RecoverAndLog()
 

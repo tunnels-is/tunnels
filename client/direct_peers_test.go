@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 )
 
+// TestDirectPeersSnapshot ...
 func TestDirectPeersSnapshot(t *testing.T) {
 	if got := (*TUN)(nil).DirectPeers(); got != nil {
 		t.Fatalf("nil tunnel returned %#v", got)

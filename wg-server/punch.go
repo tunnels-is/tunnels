@@ -37,10 +37,6 @@ func enqueuePunch(from string, pkt []byte) {
 	}
 }
 
-// dispatchPunch answers a reflex request by echoing the source address, and
-// acknowledges an MTU probe. Introductions are ordinary packets inside the
-// WireGuard tunnel, so this process keeps no peer directory, disco keys, or
-// punch policy. A rendezvous or forward from an older client is ignored.
 func dispatchPunch(fromStr string, pkt []byte) {
 	from, err := netip.ParseAddrPort(fromStr)
 	if err != nil || !from.IsValid() {

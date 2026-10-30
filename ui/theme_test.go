@@ -7,6 +7,7 @@ import (
 	"fyne.io/fyne/v2/theme"
 )
 
+// TestApplyZoomTokensSnapsTypeAndIcons ...
 func TestApplyZoomTokensSnapsTypeAndIcons(t *testing.T) {
 	t.Cleanup(func() { applyZoomTokens(1) })
 
@@ -20,7 +21,6 @@ func TestApplyZoomTokensSnapsTypeAndIcons(t *testing.T) {
 	}
 
 	applyZoomTokens(1.1)
-	// 11*1.1=12.1→12, 12*1.1=13.2→13, 13*1.1=14.3→14, 15*1.1=16.5→17, 19*1.1=20.9→21, 16*1.1=17.6→18
 	if fsCaption != 12 || fsSmall != 13 || fsBody != 14 || fsLarge != 17 || fsTitle != 21 {
 		t.Fatalf("110%% type: caption=%v small=%v body=%v large=%v title=%v",
 			fsCaption, fsSmall, fsBody, fsLarge, fsTitle)
@@ -30,6 +30,7 @@ func TestApplyZoomTokensSnapsTypeAndIcons(t *testing.T) {
 	}
 }
 
+// TestIconImageUsesPixelScale ...
 func TestIconImageUsesPixelScale(t *testing.T) {
 	img := iconImage(theme.ConfirmIcon())
 	if img.FillMode != canvas.ImageFillContain {

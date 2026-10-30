@@ -15,6 +15,7 @@ func wintunDLLPath() string {
 	return filepath.Join(filepath.Dir(ex), "wintun.dll")
 }
 
+// ValidateAdapterID ...
 func ValidateAdapterID(meta *TunnelMeta) error {
 	return nil
 }
@@ -23,6 +24,7 @@ func resolveTUNCreateName(logical string) string {
 	return logical
 }
 
+// OSSpecificInit ...
 func OSSpecificInit() error {
 	fb, err := WintunDLL.ReadFile("wintun.dll")
 	if err != nil {
@@ -42,6 +44,7 @@ func OSSpecificInit() error {
 	return nil
 }
 
+// AdminCheck ...
 func AdminCheck() {
 	defer RecoverAndLog()
 

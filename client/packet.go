@@ -12,6 +12,7 @@ func ipv4FragInfo(packet []byte) (isFragmented, isTrailing bool) {
 	return
 }
 
+// ProcessEgressPacket ...
 func (t *TUN) ProcessEgressPacket(p *[]byte) (sendRemote bool) {
 	packet := *p
 
@@ -78,8 +79,6 @@ func (t *TUN) ProcessEgressPacket(p *[]byte) (sendRemote bool) {
 		t.EP_IPv4Header[17] = t.EP_NAT_IP[1]
 		t.EP_IPv4Header[18] = t.EP_NAT_IP[2]
 		t.EP_IPv4Header[19] = t.EP_NAT_IP[3]
-		// The kernel and the TUN offload path already checksummed this packet.
-		// Recompute only after NAT rewrites an address.
 		RecalculateIPv4HeaderChecksum(t.EP_IPv4Header)
 		if !isFragmented {
 			RecalculateTransportChecksum(t.EP_IPv4Header, t.EP_TPHeader)
@@ -97,6 +96,7 @@ func (t *TUN) ProcessEgressPacket(p *[]byte) (sendRemote bool) {
 	return true
 }
 
+// ProcessIngressPacket ...
 func (t *TUN) ProcessIngressPacket(packet []byte) bool {
 	if len(packet) < 1 {
 		return false
@@ -156,6 +156,7 @@ func (t *TUN) ProcessIngressPacket(packet []byte) bool {
 	return true
 }
 
+// RecalculateIPv4HeaderChecksum ...
 func RecalculateIPv4HeaderChecksum(bytes []byte) {
 	bytes[10] = 0
 	bytes[11] = 0
@@ -174,6 +175,7 @@ func RecalculateIPv4HeaderChecksum(bytes []byte) {
 	bytes[11] = byte(^csum & 0xFF)
 }
 
+// RecalculateTransportChecksum ...
 func RecalculateTransportChecksum(IPv4Header []byte, TPPacket []byte) {
 	switch IPv4Header[9] {
 	case 6:

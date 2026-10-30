@@ -23,6 +23,7 @@ func withEnv(t *testing.T, key, value string, unset bool) {
 	_ = os.Setenv(key, value)
 }
 
+// TestHardenFyneSetsDPIEnvWhenUnset ...
 func TestHardenFyneSetsDPIEnvWhenUnset(t *testing.T) {
 	withEnv(t, fyneDisableDPIEnv, "", true)
 	withEnv(t, fynePlatformEnv, "", true)
@@ -41,6 +42,7 @@ func TestHardenFyneSetsDPIEnvWhenUnset(t *testing.T) {
 	}
 }
 
+// TestHardenFyneLeavesExistingDPIEnv ...
 func TestHardenFyneLeavesExistingDPIEnv(t *testing.T) {
 	withEnv(t, fyneDisableDPIEnv, "0", false)
 	withEnv(t, fynePlatformEnv, "", true)
@@ -52,6 +54,7 @@ func TestHardenFyneLeavesExistingDPIEnv(t *testing.T) {
 	}
 }
 
+// TestHardenFynePrefersWaylandWhenSessionIsWayland ...
 func TestHardenFynePrefersWaylandWhenSessionIsWayland(t *testing.T) {
 	withEnv(t, fynePlatformEnv, "", true)
 	withEnv(t, "WAYLAND_DISPLAY", "wayland-0", false)
@@ -69,6 +72,7 @@ func TestHardenFynePrefersWaylandWhenSessionIsWayland(t *testing.T) {
 	}
 }
 
+// TestHardenFyneLeavesExistingPlatform ...
 func TestHardenFyneLeavesExistingPlatform(t *testing.T) {
 	withEnv(t, fynePlatformEnv, "x11", false)
 	withEnv(t, "WAYLAND_DISPLAY", "wayland-0", false)
@@ -79,6 +83,7 @@ func TestHardenFyneLeavesExistingPlatform(t *testing.T) {
 	}
 }
 
+// TestHardenFyneSkipsWaylandWithoutSession ...
 func TestHardenFyneSkipsWaylandWithoutSession(t *testing.T) {
 	withEnv(t, fynePlatformEnv, "", true)
 	withEnv(t, "WAYLAND_DISPLAY", "", true)
@@ -89,6 +94,7 @@ func TestHardenFyneSkipsWaylandWithoutSession(t *testing.T) {
 	}
 }
 
+// TestGnomeNeedsLibdecor ...
 func TestGnomeNeedsLibdecor(t *testing.T) {
 	cases := []struct {
 		desktop string
@@ -111,6 +117,7 @@ func TestGnomeNeedsLibdecor(t *testing.T) {
 	}
 }
 
+// TestShouldDisableLibdecor ...
 func TestShouldDisableLibdecor(t *testing.T) {
 	withEnv(t, "WAYLAND_DISPLAY", "", true)
 	withEnv(t, "XDG_CURRENT_DESKTOP", "COSMIC", false)

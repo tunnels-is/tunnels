@@ -5,6 +5,7 @@ import (
 	"testing"
 )
 
+// TestRecalculateIPv4HeaderChecksum ...
 func TestRecalculateIPv4HeaderChecksum(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -77,6 +78,7 @@ func TestRecalculateIPv4HeaderChecksum(t *testing.T) {
 	}
 }
 
+// TestRecalculateIPv4HeaderChecksumConsistency ...
 func TestRecalculateIPv4HeaderChecksumConsistency(t *testing.T) {
 
 	header := []byte{
@@ -98,6 +100,7 @@ func TestRecalculateIPv4HeaderChecksumConsistency(t *testing.T) {
 	t.Logf("Consistent checksum: 0x%04x ✓", checksum1)
 }
 
+// TestRecalculateTransportChecksum_TCP ...
 func TestRecalculateTransportChecksum_TCP(t *testing.T) {
 
 	ipHeader := []byte{
@@ -129,6 +132,7 @@ func TestRecalculateTransportChecksum_TCP(t *testing.T) {
 	t.Logf("TCP Checksum: 0x%04x ✓", checksum)
 }
 
+// TestRecalculateTransportChecksum_UDP ...
 func TestRecalculateTransportChecksum_UDP(t *testing.T) {
 
 	ipHeader := []byte{
@@ -156,6 +160,7 @@ func TestRecalculateTransportChecksum_UDP(t *testing.T) {
 	t.Logf("UDP Checksum: 0x%04x ✓", checksum)
 }
 
+// TestRecalculateTransportChecksumConsistency_TCP ...
 func TestRecalculateTransportChecksumConsistency_TCP(t *testing.T) {
 
 	ipHeader := []byte{
@@ -183,6 +188,7 @@ func TestRecalculateTransportChecksumConsistency_TCP(t *testing.T) {
 	t.Logf("Consistent TCP checksum: 0x%04x ✓", checksum1)
 }
 
+// TestRecalculateTransportChecksumConsistency_UDP ...
 func TestRecalculateTransportChecksumConsistency_UDP(t *testing.T) {
 
 	ipHeader := []byte{
@@ -208,6 +214,7 @@ func TestRecalculateTransportChecksumConsistency_UDP(t *testing.T) {
 	t.Logf("Consistent UDP checksum: 0x%04x ✓", checksum1)
 }
 
+// TestChecksumWithData ...
 func TestChecksumWithData(t *testing.T) {
 
 	ipHeader := []byte{

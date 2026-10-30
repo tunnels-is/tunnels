@@ -33,6 +33,7 @@ func wgServerGatewayIP(subnet string) (net.IP, error) {
 	return gw, nil
 }
 
+// NormalizeAllowedHost ...
 func NormalizeAllowedHost(s string) (string, error) {
 	s = strings.TrimSpace(s)
 	if rest, ok := strings.CutPrefix(s, "*:"); ok {
@@ -54,6 +55,7 @@ func NormalizeAllowedHost(s string) (string, error) {
 	return "", fmt.Errorf("allowed host must be IP, IP:PORT, or *:PORT: %s", s)
 }
 
+// AnnounceAllowedHosts ...
 func (t *TUN) AnnounceAllowedHosts(allowed []string, allowAll bool) error {
 	sr := t.ServerResponse
 	if sr == nil || sr.WireGuardSubnet == "" {

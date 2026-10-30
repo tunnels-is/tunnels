@@ -10,6 +10,7 @@ import (
 	"github.com/tunnels-is/tunnels/punch"
 )
 
+// TestReflexEchoesSourceAndDropsRendezvous ...
 func TestReflexEchoesSourceAndDropsRendezvous(t *testing.T) {
 	priv, err := punch.NewPrivate()
 	if err != nil {

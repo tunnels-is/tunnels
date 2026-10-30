@@ -22,6 +22,7 @@ type adapter struct {
 	GatewayMetric string
 }
 
+// Addr ...
 func (t *adapter) Addr() (err error) {
 	cmd := hiddenCommand(
 		"netsh",
@@ -62,6 +63,7 @@ func (t *adapter) Addr() (err error) {
 	return nil
 }
 
+// AddrV6 ...
 func (t *adapter) AddrV6() (err error) {
 	ipv6Addr := t.IPv6Address
 	if ipv6Addr == "" {
@@ -108,6 +110,7 @@ func (t *adapter) AddrV6() (err error) {
 	return nil
 }
 
+// SetMTU ...
 func (t *adapter) SetMTU() error {
 	cmd := hiddenCommand(
 		"netsh",
@@ -219,6 +222,7 @@ func (t *adapter) applyTunnelRoutes(tun *TUN) (err error) {
 	return
 }
 
+// Connect ...
 func (t *adapter) Connect(tun *TUN) (err error) {
 	err = t.configureAdapter()
 	if err != nil {
@@ -234,8 +238,10 @@ func (t *adapter) Connect(tun *TUN) (err error) {
 	return
 }
 
+// Delete ...
 func (t *adapter) Delete() error { return nil }
 
+// Disconnect ...
 func (t *adapter) Disconnect(tun *TUN) (err error) {
 	defer RecoverAndLog()
 

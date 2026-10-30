@@ -2,6 +2,7 @@ package client
 
 import "testing"
 
+// TestControlServer_effectivePort_hotswap443to444 ...
 func TestControlServer_effectivePort_hotswap443to444(t *testing.T) {
 	cases := []struct {
 		name string
@@ -28,6 +29,7 @@ func TestControlServer_effectivePort_hotswap443to444(t *testing.T) {
 	}
 }
 
+// TestControlServer_GetURL_hotswap ...
 func TestControlServer_GetURL_hotswap(t *testing.T) {
 	c := &ControlServer{Host: "api.tunnels.is", Port: "443"}
 	got := c.GetURL("/client/servers")

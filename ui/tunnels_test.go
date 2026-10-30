@@ -9,6 +9,7 @@ import (
 	"github.com/tunnels-is/tunnels/types"
 )
 
+// TestTunnelView_FilterByServerTag ...
 func TestTunnelView_FilterByServerTag(t *testing.T) {
 	id := uuid.MustParse("11111111-1111-1111-1111-111111111111")
 	a := &App{
@@ -27,6 +28,7 @@ func TestTunnelView_FilterByServerTag(t *testing.T) {
 	}
 }
 
+// TestTunnelsPage_BuildsCards ...
 func TestTunnelsPage_BuildsCards(t *testing.T) {
 	fy := test.NewApp()
 	t.Cleanup(fy.Quit)

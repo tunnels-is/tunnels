@@ -183,6 +183,7 @@ func delIPv6Route(network string, _ string, _ string) (err error) {
 	return
 }
 
+// AdjustRoutersForTunneling ...
 func AdjustRoutersForTunneling() (err error) {
 	return nil
 }

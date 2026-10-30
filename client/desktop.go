@@ -11,13 +11,11 @@ import (
 	"github.com/tunnels-is/tunnels/version"
 )
 
-// ErrTunnelConnected is returned when a tunnel cannot be modified while up.
 var ErrTunnelConnected = errors.New("tunnel is connected")
 
-var uiLogHandler atomic.Value // func(string)
+var uiLogHandler atomic.Value
 
-// SetUILogHandler registers an in-process log sink. The callback must not
-// block: the log processor calls it on every line. Pass nil to clear.
+// SetUILogHandler ...
 func SetUILogHandler(fn func(string)) {
 	if fn == nil {
 		uiLogHandler.Store(func(string) {})
@@ -38,7 +36,7 @@ func emitUILog(line string) {
 	fn(line)
 }
 
-// SnapshotLogs returns a copy of the in-memory log buffer.
+// SnapshotLogs ...
 func SnapshotLogs() []string {
 	PollLogMu.Lock()
 	defer PollLogMu.Unlock()
@@ -47,27 +45,27 @@ func SnapshotLogs() []string {
 	return out
 }
 
-// GetUsers returns every saved account on disk.
+// GetUsers ...
 func GetUsers() ([]*User, error) {
 	return getUsers()
 }
 
-// SaveUser writes the account file and activates its workspace.
+// SaveUser ...
 func SaveUser(u *User) error {
 	return saveUser(u)
 }
 
-// DeleteUser removes a saved account by its folder hash.
+// DeleteUser ...
 func DeleteUser(hash string) error {
 	return delUser(hash)
 }
 
-// ActivateAccount switches the on-disk workspace to userID's account.
+// ActivateAccount ...
 func ActivateAccount(userID string) error {
 	return activateAccountByUserID(userID)
 }
 
-// GetLocalDevices lists devices created on this machine for userID's account.
+// GetLocalDevices ...
 func GetLocalDevices(userID string) ([]LocalDeviceInfo, error) {
 	if userID != "" {
 		if err := activateAccountByUserID(userID); err != nil {
@@ -84,8 +82,7 @@ func GetLocalDevices(userID string) ([]LocalDeviceInfo, error) {
 	return list, nil
 }
 
-// ControllerRequest posts JSON to a configured control server. When
-// deviceToken is set, X-Device-Token / X-UID are sent.
+// ControllerRequest ...
 func ControllerRequest(server *ControlServer, path string, body any, uid, deviceToken string) ([]byte, int, error) {
 	if err := authorizeControlServer(server); err != nil {
 		return nil, 403, err
@@ -119,7 +116,7 @@ func ControllerRequest(server *ControlServer, path string, body any, uid, device
 	return resp, code, nil
 }
 
-// ControllerError extracts an Error field from a controller JSON body.
+// ControllerError ...
 func ControllerError(body []byte, fallback string) string {
 	if len(body) == 0 {
 		if fallback != "" {
@@ -165,7 +162,7 @@ func getSystemTimezone() string {
 	return ""
 }
 
-// GetFullState snapshots config, tunnels, and runtime state.
+// GetFullState ...
 func GetFullState() (s *StateResponse) {
 	defer RecoverAndLog()
 	state := STATE.Load()

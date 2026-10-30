@@ -6,11 +6,7 @@ import (
 	"strings"
 )
 
-// AdmitsAllPorts reports whether a device's firewall announcement allows
-// every port from peer. A bare IP admits every port. An IP:port or *:port
-// entry does not: those flows stay on the wg-server, which can see the port.
-// allowAll is the device's AllowAll flag. firewallOff means the server is
-// not enforcing a policy, which admits every peer.
+// AdmitsAllPorts ...
 func AdmitsAllPorts(firewallOff, allowAll bool, entries []string, peer netip.Addr) bool {
 	if !peer.IsValid() {
 		return false
@@ -38,11 +34,7 @@ func AdmitsAllPorts(firewallOff, allowAll bool, entries []string, peer netip.Add
 	return false
 }
 
-// PairAdmitted reports whether a direct path between A and B is allowed.
-// Both sides must already admit the other's tunnel IP on every port, because
-// a direct WireGuard peer carries both directions and the servers never see
-// another byte. firewallOff on a side admits everyone, matching a disabled
-// firewall.
+// PairAdmitted ...
 func PairAdmitted(aFirewallOff, aAllowAll bool, aEntries []string, aIP netip.Addr, bFirewallOff, bAllowAll bool, bEntries []string, bIP netip.Addr) bool {
 	return AdmitsAllPorts(aFirewallOff, aAllowAll, aEntries, bIP) &&
 		AdmitsAllPorts(bFirewallOff, bAllowAll, bEntries, aIP)

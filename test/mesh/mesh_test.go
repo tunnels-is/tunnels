@@ -172,6 +172,7 @@ func (x *ctrl) req(method, path string, body any, hdr map[string]string, out any
 	return resp.StatusCode
 }
 
+// TestMesh ...
 func TestMesh(t *testing.T) {
 	if _, err := exec.LookPath(containerCLI()); err != nil {
 		t.Skip("podman or docker not available")

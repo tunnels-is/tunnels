@@ -6,6 +6,7 @@ import (
 	"testing"
 )
 
+// TestSafeTunnelTag ...
 func TestSafeTunnelTag(t *testing.T) {
 	good := []string{"tunnels", "tunnel-123", "my_tun", "A1"}
 	bad := []string{"", "../etc/passwd", "a/b", "a\\b", "..", "with space", "dot.name"}
@@ -21,8 +22,8 @@ func TestSafeTunnelTag(t *testing.T) {
 	}
 }
 
+// TestSafeListTag ...
 func TestSafeListTag(t *testing.T) {
-	// Default blocklist tags and path-traversal attempts.
 	good := []string{"Ads", "AdultContent", "Malware", "my_list-1"}
 	bad := []string{"", "../tunnels.conf", "..\\windows", "a/b", "dot.name", "has space"}
 	for _, g := range good {
@@ -37,6 +38,7 @@ func TestSafeListTag(t *testing.T) {
 	}
 }
 
+// TestListFilePath ...
 func TestListFilePath(t *testing.T) {
 	base := filepath.Join(t.TempDir(), "blocklists") + string(os.PathSeparator)
 
@@ -56,6 +58,7 @@ func TestListFilePath(t *testing.T) {
 	}
 }
 
+// TestValidateDNSListConfig_RejectsTraversalTags ...
 func TestValidateDNSListConfig_RejectsTraversalTags(t *testing.T) {
 	err := validateDNSListConfig(&Config{
 		DNSBlockLists: []*BlockList{{Tag: "../evil", URL: "https://example.com/list"}},
@@ -72,6 +75,7 @@ func TestValidateDNSListConfig_RejectsTraversalTags(t *testing.T) {
 	}
 }
 
+// TestProcessBlockList_RejectsBadTag ...
 func TestProcessBlockList_RejectsBadTag(t *testing.T) {
 	prev := STATE.Load()
 	t.Cleanup(func() { STATE.Store(prev) })
@@ -86,7 +90,6 @@ func TestProcessBlockList_RejectsBadTag(t *testing.T) {
 	if r.set != nil {
 		t.Fatal("processBlockList should not load domains for a bad tag")
 	}
-	// Ensure no file was written outside the blocklist dir.
 	entries, _ := os.ReadDir(dir)
 	if len(entries) != 0 {
 		t.Fatalf("expected no files under blocklist dir, got %v", entries)

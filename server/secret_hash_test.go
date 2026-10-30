@@ -8,6 +8,7 @@ import (
 	gobolt "go.etcd.io/bbolt"
 )
 
+// TestSecretMatches_HashAndLegacy ...
 func TestSecretMatches_HashAndLegacy(t *testing.T) {
 	raw := "plain-secret"
 	hashed := hashSecret(raw)
@@ -25,6 +26,7 @@ func TestSecretMatches_HashAndLegacy(t *testing.T) {
 	}
 }
 
+// TestFindServerByAPIKey_UpgradesLegacy ...
 func TestFindServerByAPIKey_UpgradesLegacy(t *testing.T) {
 	setupTestDB(t)
 	s := &types.Server{
@@ -80,6 +82,7 @@ func TestFindServerByAPIKey_UpgradesLegacy(t *testing.T) {
 	}
 }
 
+// TestUpdateServer_SameKeyKeepsPin ...
 func TestUpdateServer_SameKeyKeepsPin(t *testing.T) {
 	setupTestDB(t)
 	s := &types.Server{ID: uuid.New(), APIKey: "same-key", WireGuardPubKey: "pinned-key"}
@@ -111,6 +114,7 @@ func TestUpdateServer_SameKeyKeepsPin(t *testing.T) {
 	}
 }
 
+// TestAuthenticate_UpgradesLegacyTokenAndAPIKey ...
 func TestAuthenticate_UpgradesLegacyTokenAndAPIKey(t *testing.T) {
 	setupTestDB(t)
 	token := &DeviceToken{DT: "legacy-dt", N: "phone"}
@@ -173,6 +177,7 @@ func TestAuthenticate_UpgradesLegacyTokenAndAPIKey(t *testing.T) {
 	}
 }
 
+// TestIssueLoginDeviceToken_StoresHashReturnsPlaintext ...
 func TestIssueLoginDeviceToken_StoresHashReturnsPlaintext(t *testing.T) {
 	setupTestDB(t)
 	u := &User{ID: uuid.New(), Email: "hash-login@example.com"}
@@ -208,6 +213,7 @@ func TestIssueLoginDeviceToken_StoresHashReturnsPlaintext(t *testing.T) {
 	}
 }
 
+// TestOpenDB_HashesLegacySecrets ...
 func TestOpenDB_HashesLegacySecrets(t *testing.T) {
 	dir := t.TempDir()
 	path := dir + "/legacy.db"

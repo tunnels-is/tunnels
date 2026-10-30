@@ -24,15 +24,13 @@ type punchDatagram struct {
 	data []byte
 }
 
-// DirectPeer is one hole-punched WireGuard peer on this tunnel. It is a
-// snapshot for the UI: the public key stays on the install record.
 type DirectPeer struct {
 	DeviceID string
 	TunnelIP string
 	Endpoint string
 }
 
-// DirectPeers copies the direct paths currently installed on t.
+// DirectPeers ...
 func (t *TUN) DirectPeers() []DirectPeer {
 	if t == nil {
 		return nil
@@ -59,8 +57,6 @@ func (t *TUN) DirectPeers() []DirectPeer {
 	return out
 }
 
-// punchInstall is one direct WireGuard peer this tunnel added. The public
-// key is kept so a revoke can remove that peer without wiping the server peer.
 type punchInstall struct {
 	id    uuid.UUID
 	wgPub [32]byte
@@ -75,9 +71,6 @@ type punchBind struct {
 	retryMu sync.Mutex
 	retry   map[uuid.UUID]punchInstall
 
-	// loopMu guards looping. WireGuard rebinds by Close then Open on the
-	// same Bind. Close must not retire the punch loop, and Open must
-	// bring it back if a rebind won the race and the loop had exited.
 	loopMu  sync.Mutex
 	looping bool
 }
@@ -98,6 +91,7 @@ func newPunchBind(inner wgconn.Bind, tun *TUN) wgconn.Bind {
 	return b
 }
 
+// Open ...
 func (b *punchBind) Open(port uint16) ([]wgconn.ReceiveFunc, uint16, error) {
 	fns, actual, err := b.inner.Open(port)
 	if err != nil {
@@ -156,20 +150,26 @@ func (b *punchBind) wrap(inner wgconn.ReceiveFunc) wgconn.ReceiveFunc {
 	}
 }
 
+// Close ...
 func (b *punchBind) Close() error {
-	// Pause only. The userspace WireGuard device calls Close before every
-	// Open, including the first Up and every route rebind. A later Open
-	// clears this and keeps the same loop.
 	b.closed.Store(true)
 	return b.inner.Close()
 }
+
+// SetMark ...
 func (b *punchBind) SetMark(mark uint32) error { return b.inner.SetMark(mark) }
+
+// Send ...
 func (b *punchBind) Send(bufs [][]byte, ep wgconn.Endpoint) error {
 	return b.inner.Send(bufs, ep)
 }
+
+// ParseEndpoint ...
 func (b *punchBind) ParseEndpoint(s string) (wgconn.Endpoint, error) {
 	return b.inner.ParseEndpoint(s)
 }
+
+// BatchSize ...
 func (b *punchBind) BatchSize() int { return b.inner.BatchSize() }
 
 func (b *punchBind) loop() {
@@ -379,7 +379,6 @@ func (b *punchBind) apply(tun *TUN, eng *punch.Engine, res punch.Result) {
 		}
 		err = b.sendOne(d.Data, ep, d.MTU)
 		if err != nil && d.MTU && eng != nil && isMsgTooBig(err) {
-			// The local stack refused this size. Treat it as too big immediately.
 			b.apply(tun, eng, eng.MTUUnsent(d.Peer, time.Now()))
 			continue
 		}
@@ -417,9 +416,6 @@ func (b *punchBind) apply(tun *TUN, eng *punch.Engine, res punch.Result) {
 	}
 }
 
-// sendOne sends one punch datagram. df is set only around a path-MTU probe
-// and restored before returning, so a configured MTU never leaves DF on and
-// a probe does not keep DF on the WireGuard data path.
 func (b *punchBind) sendOne(data []byte, ep wgconn.Endpoint, df bool) error {
 	if df {
 		restore := setBindDontFrag(b.inner)

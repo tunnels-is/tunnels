@@ -11,6 +11,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// TestDefaultConfig ...
 func TestDefaultConfig(t *testing.T) {
 	conf := DefaultConfig()
 
@@ -82,6 +83,7 @@ func TestDefaultConfig(t *testing.T) {
 	t.Logf("Default config validation passed")
 }
 
+// TestWriteConfigToDisk_JSON ...
 func TestWriteConfigToDisk_JSON(t *testing.T) {
 
 	originalState := STATE.Load()
@@ -157,6 +159,7 @@ func TestWriteConfigToDisk_JSON(t *testing.T) {
 	}
 }
 
+// TestWriteConfigToDisk_YAML ...
 func TestWriteConfigToDisk_YAML(t *testing.T) {
 
 	originalState := STATE.Load()
@@ -232,6 +235,7 @@ func TestWriteConfigToDisk_YAML(t *testing.T) {
 	}
 }
 
+// TestReadConfigFileFromDisk_JSON ...
 func TestReadConfigFileFromDisk_JSON(t *testing.T) {
 
 	originalState := STATE.Load()
@@ -298,6 +302,7 @@ func TestReadConfigFileFromDisk_JSON(t *testing.T) {
 	}
 }
 
+// TestReadConfigFileFromDisk_YAML ...
 func TestReadConfigFileFromDisk_YAML(t *testing.T) {
 
 	originalState := STATE.Load()
@@ -364,6 +369,7 @@ func TestReadConfigFileFromDisk_YAML(t *testing.T) {
 	}
 }
 
+// TestConfigFileErrors ...
 func TestConfigFileErrors(t *testing.T) {
 
 	originalState := STATE.Load()
@@ -445,6 +451,7 @@ func TestConfigFileErrors(t *testing.T) {
 	}
 }
 
+// TestTunnelConfigFormats ...
 func TestTunnelConfigFormats(t *testing.T) {
 	originalState := STATE.Load()
 	defer STATE.Store(originalState)
@@ -521,6 +528,7 @@ func TestTunnelConfigFormats(t *testing.T) {
 	}
 }
 
+// TestTunnelConfigFormatPreservation ...
 func TestTunnelConfigFormatPreservation(t *testing.T) {
 	originalState := STATE.Load()
 	defer STATE.Store(originalState)
@@ -587,6 +595,7 @@ func TestTunnelConfigFormatPreservation(t *testing.T) {
 	}
 }
 
+// TestTunnelSkipsInvalidExtensions ...
 func TestTunnelSkipsInvalidExtensions(t *testing.T) {
 	originalState := STATE.Load()
 	defer STATE.Store(originalState)
@@ -648,6 +657,7 @@ func TestTunnelSkipsInvalidExtensions(t *testing.T) {
 	t.Log("Invalid extension filtering test passed")
 }
 
+// TestTunnelSkipsEmptyTag ...
 func TestTunnelSkipsEmptyTag(t *testing.T) {
 	originalState := STATE.Load()
 	defer STATE.Store(originalState)
@@ -692,6 +702,7 @@ func TestTunnelSkipsEmptyTag(t *testing.T) {
 	t.Log("Empty tag filtering test passed")
 }
 
+// TestTunnelInvalidContent ...
 func TestTunnelInvalidContent(t *testing.T) {
 	originalState := STATE.Load()
 	defer STATE.Store(originalState)
@@ -721,6 +732,7 @@ func TestTunnelInvalidContent(t *testing.T) {
 	t.Log("Invalid content error handling test passed")
 }
 
+// TestTunnelInvalidYAMLContent ...
 func TestTunnelInvalidYAMLContent(t *testing.T) {
 	originalState := STATE.Load()
 	defer STATE.Store(originalState)
@@ -750,6 +762,7 @@ func TestTunnelInvalidYAMLContent(t *testing.T) {
 	t.Log("Invalid YAML content error handling test passed")
 }
 
+// TestTunnelDirectoriesAreSkipped ...
 func TestTunnelDirectoriesAreSkipped(t *testing.T) {
 	originalState := STATE.Load()
 	defer STATE.Store(originalState)
@@ -796,6 +809,7 @@ func clearTunnelMap() {
 	})
 }
 
+// TestConfigRoundTrip ...
 func TestConfigRoundTrip(t *testing.T) {
 
 	originalState := STATE.Load()

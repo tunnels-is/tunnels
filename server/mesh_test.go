@@ -33,6 +33,7 @@ func callWGMesh(t *testing.T, server *types.Server) (*httptest.ResponseRecorder,
 	return w, resp
 }
 
+// TestHandleWGMesh_SiblingSelection ...
 func TestHandleWGMesh_SiblingSelection(t *testing.T) {
 	setupTestDB(t)
 	if logger == nil {
@@ -84,6 +85,7 @@ func TestHandleWGMesh_SiblingSelection(t *testing.T) {
 	}
 }
 
+// TestHandleWGMesh_NoMeshGroup ...
 func TestHandleWGMesh_NoMeshGroup(t *testing.T) {
 	setupTestDB(t)
 	if logger == nil {
@@ -102,6 +104,7 @@ func TestHandleWGMesh_NoMeshGroup(t *testing.T) {
 	}
 }
 
+// TestValidateServerMesh ...
 func TestValidateServerMesh(t *testing.T) {
 	setupTestDB(t)
 	meshTestLogger()
@@ -148,6 +151,7 @@ func TestValidateServerMesh(t *testing.T) {
 	}
 }
 
+// TestMeshGroupDelete_ClearsMembers ...
 func TestMeshGroupDelete_ClearsMembers(t *testing.T) {
 	setupTestDB(t)
 	meshTestLogger()

@@ -2,10 +2,6 @@ package client
 
 import "net"
 
-// ipv4HostOnLink reports whether dest is already covered by a connected
-// IPv4 prefix. A via-gateway /32 for an on-link peer (same podman/LAN
-// subnet) breaks reachability: traffic hairpins through the default
-// gateway instead of going L2.
 func ipv4HostOnLink(network string) bool {
 	if network == "" || network == "default" {
 		return false

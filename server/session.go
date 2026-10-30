@@ -25,9 +25,6 @@ import (
 
 var recoveryConsumeMu sync.Mutex
 
-// deviceTokenMatchesLogout reports whether dt should be revoked for form.
-// Prefer LogoutToken (raw session secret). When Tokens[].DT is redacted in API
-// responses, clients revoke other sessions by LogoutName + LogoutCreated.
 func deviceTokenMatchesLogout(dt *DeviceToken, lf *logoutRequest) bool {
 	if dt == nil || lf == nil {
 		return false
@@ -41,7 +38,6 @@ func deviceTokenMatchesLogout(dt *DeviceToken, lf *logoutRequest) bool {
 	if dt.N != lf.LogoutName {
 		return false
 	}
-	// Compare at second resolution so JSON/RFC3339 round-trips match.
 	return dt.Created.Unix() == lf.LogoutCreated.Unix()
 }
 
@@ -106,9 +102,6 @@ func capDeviceTokens(tokens []*DeviceToken) []*DeviceToken {
 	return tokens[:20]
 }
 
-// issueLoginDeviceToken rotates the presented token, or appends one new
-// token, on the list stored in the database. A list held by the caller is
-// not written back.
 func issueLoginDeviceToken(user *User, form *loginRequest) error {
 	if user == nil || form == nil {
 		return errors.New("missing login")

@@ -6,6 +6,7 @@ import (
 	"testing"
 )
 
+// TestWriteFileWithBackupCreatesNewFile ...
 func TestWriteFileWithBackupCreatesNewFile(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "tunnels.conf")
 
@@ -25,6 +26,7 @@ func TestWriteFileWithBackupCreatesNewFile(t *testing.T) {
 	}
 }
 
+// TestWriteFileWithBackupSkipsIdenticalContent ...
 func TestWriteFileWithBackupSkipsIdenticalContent(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "tunnels.conf")
 	if err := os.WriteFile(path, []byte("same"), 0o600); err != nil {
@@ -40,6 +42,7 @@ func TestWriteFileWithBackupSkipsIdenticalContent(t *testing.T) {
 	}
 }
 
+// TestWriteFileWithBackupBacksUpChangedContent ...
 func TestWriteFileWithBackupBacksUpChangedContent(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "tunnels.conf")
 	if err := os.WriteFile(path, []byte("old"), 0o600); err != nil {
@@ -67,6 +70,7 @@ func TestWriteFileWithBackupBacksUpChangedContent(t *testing.T) {
 	}
 }
 
+// TestWriteFileWithBackupRefusesForeignOwner ...
 func TestWriteFileWithBackupRefusesForeignOwner(t *testing.T) {
 	if os.Getuid() != 0 {
 		t.Skip("requires root to chown the test file to another uid")

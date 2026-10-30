@@ -114,8 +114,6 @@ func clientAuthMiddleware(next http.Handler) http.Handler {
 			sendError(w, 401, "Unauthorized")
 			return
 		}
-		// A zero subscription time means no expiry is stored. The token itself
-		// does not expire.
 		if !user.SubExpiration.IsZero() && time.Now().After(user.SubExpiration) {
 			sendError(w, 403, "subscription expired")
 			return
@@ -172,8 +170,6 @@ func originAllowed(origin string) bool {
 
 func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// "*" echoes the request Origin. Do not set
-		// Access-Control-Allow-Credentials while that entry is allowed.
 		if origin := r.Header.Get("Origin"); originAllowed(origin) {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 			w.Header().Add("Vary", "Origin")

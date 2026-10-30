@@ -34,6 +34,7 @@ func (c ruleConflict) drainCommand() string {
 	return fmt.Sprintf("%s -t %s %s", c.bin, c.table, delForm)
 }
 
+// String ...
 func (c ruleConflict) String() string {
 	return fmt.Sprintf(
 		"%s %s/%s rule #%d — %s clash on %q\n"+
@@ -156,6 +157,7 @@ func hasFlagValue(rule, flag, value string) bool {
 	return false
 }
 
+// ShowActiveRules ...
 func ShowActiveRules() error {
 	return showActiveRulesWith(os.Stdout, defaultRuleDumper)
 }

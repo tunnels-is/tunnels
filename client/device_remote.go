@@ -87,13 +87,12 @@ type createDeviceControllerResponse struct {
 	WANCIDR       string        `json:"WANCIDR"`
 }
 
-// CreateDeviceResult is the one-shot WireGuard config returned when creating
-// a remote device from this machine.
 type CreateDeviceResult struct {
 	WGConfig string        `json:"WGConfig"`
 	Device   *types.Device `json:"Device"`
 }
 
+// CreateDeviceWithKeys ...
 func CreateDeviceWithKeys(form *CreateDeviceWithKeysForm) (any, int) {
 	if err := authorizeControlServer(form.Server); err != nil {
 		return &ErrorResponse{Error: err.Error()}, 403

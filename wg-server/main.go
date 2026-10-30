@@ -87,6 +87,7 @@ var (
 	activeConfig atomic.Pointer[Config]
 )
 
+// Init ...
 func Init(ctx context.Context, controllerURL, apiKey, configPath string, insecureSkipVerify bool, logLevel string, showNewRules bool, done chan<- struct{}) {
 	defer func() {
 		if done != nil {

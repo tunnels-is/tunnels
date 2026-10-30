@@ -39,8 +39,6 @@ const (
 
 func openDB(path string) (err error) {
 	if st, statErr := os.Stat(path); statErr == nil {
-		// Fail only if world-accessible. Group-readable (0640) is common
-		// for a dedicated service account and must not block production.
 		if mode := st.Mode().Perm(); mode&0o007 != 0 {
 			return fmt.Errorf("database %s is world-accessible (mode %o, want 0600)", path, mode)
 		}
@@ -202,8 +200,6 @@ func backfillServerIndexes(tx *gobolt.Tx) error {
 	return sweepPlainAPIKeyIndex(tx, srvApikeyIdx, bucketServers, func(s *types.Server) string { return s.APIKey })
 }
 
-// sweepPlainAPIKeyIndex drops an index entry whose key is still the raw secret
-// after the record itself stores the hash.
 func sweepPlainAPIKeyIndex[T any](tx *gobolt.Tx, idx *gobolt.Bucket, recordBucket string, apiKey func(*T) string) error {
 	if idx == nil {
 		return nil

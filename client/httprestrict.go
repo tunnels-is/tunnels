@@ -73,11 +73,9 @@ func isPublicIP(ip net.IP) bool {
 		return false
 	}
 	if ip4 := ip.To4(); ip4 != nil {
-		// RFC 6598 CGNAT 100.64.0.0/10
 		if ip4[0] == 100 && ip4[1] >= 64 && ip4[1] <= 127 {
 			return false
 		}
-		// IPv4 link-local (also covered by IsLinkLocalUnicast on some platforms)
 		if ip4[0] == 169 && ip4[1] == 254 {
 			return false
 		}

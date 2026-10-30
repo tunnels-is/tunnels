@@ -16,15 +16,30 @@ type captureTUN struct {
 	pkts   int
 }
 
-func (c *captureTUN) File() *os.File           { return nil }
-func (c *captureTUN) MTU() (int, error)        { return 1420, nil }
-func (c *captureTUN) Name() (string, error)    { return "cap", nil }
+// File ...
+func (c *captureTUN) File() *os.File { return nil }
+
+// MTU ...
+func (c *captureTUN) MTU() (int, error) { return 1420, nil }
+
+// Name ...
+func (c *captureTUN) Name() (string, error) { return "cap", nil }
+
+// Events ...
 func (c *captureTUN) Events() <-chan tun.Event { return nil }
+
+// Read ...
 func (c *captureTUN) Read([][]byte, []int, int) (int, error) {
 	return 0, nil
 }
-func (c *captureTUN) Close() error   { return nil }
+
+// Close ...
+func (c *captureTUN) Close() error { return nil }
+
+// BatchSize ...
 func (c *captureTUN) BatchSize() int { return 128 }
+
+// Write ...
 func (c *captureTUN) Write(bufs [][]byte, _ int) (int, error) {
 	c.mu.Lock()
 	c.writes++
@@ -47,6 +62,7 @@ func tcpIngressBuf(offset int) []byte {
 	return buf
 }
 
+// TestIngressWriteBatches ...
 func TestIngressWriteBatches(t *testing.T) {
 	capDev := &captureTUN{}
 	pt := newProcessingTUN(capDev, &TUN{})

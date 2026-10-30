@@ -224,7 +224,6 @@ func handleWGConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Occupancy oracle: someone else's key looks the same as an unknown key.
 	deviceIP, deviceIPv6 := ownedDeviceIPs(d, user.ID, serverID)
 
 	sendObject(w, map[string]any{
@@ -241,8 +240,6 @@ func handleWGConfig(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// userMayConnect is the shared gate for hub peers and the P2P directory.
-// A zero subscription time means no expiry is stored.
 func userMayConnect(owner *User, server *types.Server, now time.Time) bool {
 	if owner == nil || server == nil || owner.Disabled {
 		return false
@@ -276,9 +273,6 @@ func ownedDeviceIPs(d *types.Device, userID, serverID uuid.UUID) (ip, ipv6 strin
 	return d.WireGuardIP, d.WireGuardIPv6
 }
 
-// wgPublicKeyBytes decodes a WireGuard public key. StdEncoding accepts
-// spellings that are not identical as text (a newline, or spare bits in the
-// last character) and still yield the same 32 bytes.
 func wgPublicKeyBytes(key string) ([]byte, bool) {
 	b, err := base64.StdEncoding.DecodeString(strings.TrimSpace(key))
 	if err != nil || len(b) != 32 {
@@ -287,9 +281,6 @@ func wgPublicKeyBytes(key string) ([]byte, bool) {
 	return b, true
 }
 
-// canonicalWireGuardPublicKey accepts only the standard base64 spelling of
-// 32 bytes. The decoder also accepts a newline or non-zero unused bits, and
-// those spellings are rejected here.
 func canonicalWireGuardPublicKey(key string) (string, error) {
 	key = strings.TrimSpace(key)
 	if key == "" {
@@ -306,8 +297,6 @@ func canonicalWireGuardPublicKey(key string) (string, error) {
 	return canon, nil
 }
 
-// acceptDeviceWireGuardKey requires a canonical device key that is not a
-// server public key.
 func acceptDeviceWireGuardKey(key string) (string, error) {
 	canon, err := canonicalWireGuardPublicKey(key)
 	if err != nil {
@@ -409,9 +398,6 @@ func handleWGServerConfigFetch(w http.ResponseWriter, r *http.Request) {
 	sendObject(w, resp)
 }
 
-// pinWireGuardPubKey records the node's pubkey on first bind. A different
-// key is rejected until an admin rotates the server API key (which clears
-// WireGuardPubKey). Same key on restart is a no-op.
 func pinWireGuardPubKey(server *types.Server, pubKeyB64 string) error {
 	if pubKeyB64 == "" {
 		return nil

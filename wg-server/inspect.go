@@ -54,6 +54,7 @@ func newInspectingTUN(inner tun.Device, cfg *Config) (*inspectingTUN, error) {
 	return t, nil
 }
 
+// Write ...
 func (t *inspectingTUN) Write(bufs [][]byte, offset int) (int, error) {
 	kept := bufs[:0]
 	for _, buf := range bufs {
@@ -73,6 +74,7 @@ func (t *inspectingTUN) Write(bufs [][]byte, offset int) (int, error) {
 	return t.Device.Write(kept, offset)
 }
 
+// Read ...
 func (t *inspectingTUN) Read(bufs [][]byte, sizes []int, offset int) (int, error) {
 	n, err := t.Device.Read(bufs, sizes, offset)
 	if err != nil {
@@ -91,6 +93,7 @@ func (t *inspectingTUN) Read(bufs [][]byte, sizes []int, offset int) (int, error
 	return out, nil
 }
 
+// File ...
 func (t *inspectingTUN) File() *os.File {
 	return t.Device.File()
 }

@@ -7,6 +7,7 @@ import (
 	"github.com/tunnels-is/tunnels/types"
 )
 
+// TestDeleteUser_CascadesDevices ...
 func TestDeleteUser_CascadesDevices(t *testing.T) {
 	setupTestDB(t)
 	u := testUser("cascade@example.com", "")
@@ -35,6 +36,7 @@ func TestDeleteUser_CascadesDevices(t *testing.T) {
 	}
 }
 
+// TestDeleteServer_CascadesDevices ...
 func TestDeleteServer_CascadesDevices(t *testing.T) {
 	setupTestDB(t)
 	srv := &types.Server{ID: uuid.New(), Tag: "s", APIKey: "srvkey"}
@@ -64,6 +66,7 @@ func TestDeleteServer_CascadesDevices(t *testing.T) {
 	}
 }
 
+// TestDeleteGroup_ScrubsMembership ...
 func TestDeleteGroup_ScrubsMembership(t *testing.T) {
 	setupTestDB(t)
 	g := &Group{ID: uuid.New(), Tag: "g"}

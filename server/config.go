@@ -53,6 +53,7 @@ func parseServerConfig(path string) (*types.ServerConfig, error) {
 	return cfg, nil
 }
 
+// LoadServerConfig ...
 func LoadServerConfig(path string) (err error) {
 	cfg, err := parseServerConfig(path)
 	if err != nil {
@@ -62,6 +63,7 @@ func LoadServerConfig(path string) (err error) {
 	return nil
 }
 
+// SaveServerConfig ...
 func SaveServerConfig(path string) (err error) {
 	cfg := Config.Load()
 
@@ -95,6 +97,7 @@ func SaveServerConfig(path string) (err error) {
 	return nil
 }
 
+// LoadWGConfig ...
 func LoadWGConfig(path string) error {
 	nb, err := os.ReadFile(path)
 	if err != nil {
@@ -117,6 +120,7 @@ func LoadWGConfig(path string) error {
 	return nil
 }
 
+// SaveWGConfig ...
 func SaveWGConfig(path string) error {
 	bootstrap := WGConfig.Load()
 	if bootstrap == nil {

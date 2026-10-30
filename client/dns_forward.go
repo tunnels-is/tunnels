@@ -13,6 +13,7 @@ import (
 	"github.com/tunnels-is/tunnels/types"
 )
 
+// ResolveDomainLocal ...
 func ResolveDomainLocal(tun *TUN, m *dns.Msg, w dns.ResponseWriter) {
 	if len(tun.ServerResponse.DNSServers) == 0 {
 		return
@@ -62,6 +63,7 @@ func ResolveDomainLocal(tun *TUN, m *dns.Msg, w dns.ResponseWriter) {
 	}
 }
 
+// ResolveDomain ...
 func ResolveDomain(m *dns.Msg, w dns.ResponseWriter) (err error) {
 	if GlobalBlockEnabled(m, w) {
 		DEBUG("global dns lock enabled due to connection switching")
@@ -106,6 +108,7 @@ func ResolveDomain(m *dns.Msg, w dns.ResponseWriter) (err error) {
 	return nil
 }
 
+// ProcessDNSMsg ...
 func ProcessDNSMsg(m *dns.Msg, DNS *types.DNSRecord) (rm *dns.Msg) {
 	rm = new(dns.Msg)
 	rm.SetReply(m)
@@ -148,6 +151,7 @@ func ProcessDNSMsg(m *dns.Msg, DNS *types.DNSRecord) (rm *dns.Msg) {
 	return
 }
 
+// GlobalBlockEnabled ...
 func GlobalBlockEnabled(m *dns.Msg, w dns.ResponseWriter) bool {
 	if DNSGlobalBlock.Load() {
 		_ = w.WriteMsg(m)
@@ -158,6 +162,7 @@ func GlobalBlockEnabled(m *dns.Msg, w dns.ResponseWriter) bool {
 	return false
 }
 
+// ResolveDNSAsHTTPS ...
 func ResolveDNSAsHTTPS(m *dns.Msg, w dns.ResponseWriter) (err error) {
 	if GlobalBlockEnabled(m, w) {
 		DEBUG("global dns lock enabled due to connection switching")

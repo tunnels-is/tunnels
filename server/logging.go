@@ -7,18 +7,22 @@ import (
 	"os"
 )
 
+// INFO ...
 func INFO(x ...any) {
 	logger.Info("INFO", "msg", buildOut(x))
 }
 
+// WARN ...
 func WARN(x ...any) {
 	logger.Warn("WARN", "msg", buildOut(x))
 }
 
+// ERR ...
 func ERR(x ...any) {
 	logger.Error("ERROR", "msg", buildOut(x))
 }
 
+// ADMIN ...
 func ADMIN(x ...any) {
 	logger.Warn("ADMIN", "msg", buildOut(x))
 }

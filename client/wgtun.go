@@ -14,9 +14,6 @@ import (
 	"golang.zx2c4.com/wireguard/tun"
 )
 
-// Ingress is handed to the TUN a few packets at a time. Writing each one is a
-// syscall, which dominated receive CPU. Hold a short batch so the TUN GRO path
-// can merge a flow into one large write. 1ms keeps interactive packets moving.
 const (
 	ingressBatchPackets = 32
 	ingressBatchBytes   = 48 * 1024
@@ -58,14 +55,10 @@ func (p *processingTUN) tun() *TUN {
 	return p.tunnel.Load()
 }
 
+// Read ...
 func (p *processingTUN) Read(bufs [][]byte, sizes []int, offset int) (int, error) {
 	defer RecoverAndLog()
 	t := p.tun()
-	// Punch introductions have to reach WireGuard while this read is idle.
-	// Polling the TUN fd and then calling Device.Read loses that wake: the
-	// runtime poller and a second poll share the fd, and a blocking Read
-	// ignores the poke until the next real packet. A background reader owns
-	// Device.Read; this side waits on the poke channel.
 	if t != nil && t.punchPoke != nil {
 		return p.readWithoutFile(bufs, sizes, offset)
 	}
@@ -195,6 +188,7 @@ func (p *processingTUN) readWithoutFile(bufs [][]byte, sizes []int, offset int) 
 	}
 }
 
+// Write ...
 func (p *processingTUN) Write(bufs [][]byte, offset int) (int, error) {
 	defer RecoverAndLog()
 	p.ingressMu.Lock()

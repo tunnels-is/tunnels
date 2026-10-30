@@ -25,8 +25,6 @@ func handleAdminDeviceUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Tag, WireGuard key, and server are the mutable fields. Identity,
-	// assigned addresses, and punch policy stay on the stored record.
 	var wgKey string
 	if key := strings.TrimSpace(form.Device.WireGuardKey); key != "" {
 		canon, keyErr := acceptDeviceWireGuardKey(key)
@@ -274,8 +272,6 @@ func handleClientDeviceCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Tag, server, and WireGuard key are the only caller fields. The owner,
-	// id, addresses, and punch policy come from the server.
 	device := &types.Device{
 		ID:           uuid.New(),
 		CreatedAt:    time.Now(),

@@ -21,13 +21,13 @@ func securityReviewLogger() {
 	}
 }
 
+// TestGenerateSelfSigned_MatchesAPILoader ...
 func TestGenerateSelfSigned_MatchesAPILoader(t *testing.T) {
 	dir := t.TempDir()
 	certPath := filepath.Join(dir, "cert.pem")
 	keyPath := filepath.Join(dir, "key.pem")
 	ip := "10.99.7.2"
 
-	// Same call generateSelfSignedCerts uses (empty DNS SAN, IP override).
 	_, err := certs.MakeCertificate(
 		certs.ECDSA,
 		certPath,
@@ -75,6 +75,7 @@ func TestGenerateSelfSigned_MatchesAPILoader(t *testing.T) {
 	}
 }
 
+// TestIsValidDomain_LetsEncryptGate ...
 func TestIsValidDomain_LetsEncryptGate(t *testing.T) {
 	ok := []string{"example.com", "vpn.example.com", "a-b.example.co.uk"}
 	for _, d := range ok {
@@ -90,6 +91,7 @@ func TestIsValidDomain_LetsEncryptGate(t *testing.T) {
 	}
 }
 
+// TestGenerateLetsEncrypt_RejectsInvalidDomain ...
 func TestGenerateLetsEncrypt_RejectsInvalidDomain(t *testing.T) {
 	securityReviewLogger()
 	if err := generateLetsEncryptCerts(context.Background(), ""); err == nil {
@@ -100,6 +102,7 @@ func TestGenerateLetsEncrypt_RejectsInvalidDomain(t *testing.T) {
 	}
 }
 
+// TestMakeCertificate_DoesNotOverwriteExisting ...
 func TestMakeCertificate_DoesNotOverwriteExisting(t *testing.T) {
 	dir := t.TempDir()
 	certPath := filepath.Join(dir, "cert.pem")

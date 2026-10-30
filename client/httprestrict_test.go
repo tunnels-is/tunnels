@@ -7,6 +7,7 @@ import (
 	"testing"
 )
 
+// TestRequirePublicHTTPSURL ...
 func TestRequirePublicHTTPSURL(t *testing.T) {
 	if err := requirePublicHTTPSURL(&url.URL{Scheme: "http", Host: "example.com"}); err == nil {
 		t.Fatal("http must be refused")
@@ -28,6 +29,7 @@ func TestRequirePublicHTTPSURL(t *testing.T) {
 	}
 }
 
+// TestCheckPublicHTTPSRedirect_LimitsHops ...
 func TestCheckPublicHTTPSRedirect_LimitsHops(t *testing.T) {
 	req, err := http.NewRequest(http.MethodGet, "https://192.0.2.1/next", nil)
 	if err != nil {
@@ -39,6 +41,7 @@ func TestCheckPublicHTTPSRedirect_LimitsHops(t *testing.T) {
 	}
 }
 
+// TestRequirePublicHTTPSURL_HostnameResolvesPrivate ...
 func TestRequirePublicHTTPSURL_HostnameResolvesPrivate(t *testing.T) {
 	prev := lookupIPFunc
 	t.Cleanup(func() { lookupIPFunc = prev })
@@ -50,6 +53,7 @@ func TestRequirePublicHTTPSURL_HostnameResolvesPrivate(t *testing.T) {
 	}
 }
 
+// TestIsPublicIP_CGNAT ...
 func TestIsPublicIP_CGNAT(t *testing.T) {
 	if isPublicIP(net.ParseIP("100.64.0.1")) {
 		t.Fatal("CGNAT must not be public")
@@ -59,6 +63,7 @@ func TestIsPublicIP_CGNAT(t *testing.T) {
 	}
 }
 
+// TestOfficialControllerHost ...
 func TestOfficialControllerHost(t *testing.T) {
 	if !isOfficialControllerHost("api.tunnels.is") {
 		t.Fatal("exact host must match")
@@ -71,6 +76,7 @@ func TestOfficialControllerHost(t *testing.T) {
 	}
 }
 
+// TestValidateListURL_RefusesPrivateInitialHop ...
 func TestValidateListURL_RefusesPrivateInitialHop(t *testing.T) {
 	if err := validateListURL("https://127.0.0.1/list"); err == nil {
 		t.Fatal("loopback list URL must be refused")
@@ -86,6 +92,7 @@ func TestValidateListURL_RefusesPrivateInitialHop(t *testing.T) {
 	}
 }
 
+// TestOfficialControllerHost_CaseInsensitive ...
 func TestOfficialControllerHost_CaseInsensitive(t *testing.T) {
 	if !isOfficialControllerHost("API.TUNNELS.IS") {
 		t.Fatal("exact host match should be case-insensitive")

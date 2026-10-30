@@ -13,14 +13,29 @@ import (
 
 type benchDevice struct{}
 
-func (benchDevice) File() *os.File                          { return nil }
-func (benchDevice) Read([][]byte, []int, int) (int, error)  { return 0, nil }
+// File ...
+func (benchDevice) File() *os.File { return nil }
+
+// Read ...
+func (benchDevice) Read([][]byte, []int, int) (int, error) { return 0, nil }
+
+// Write ...
 func (benchDevice) Write(bufs [][]byte, _ int) (int, error) { return len(bufs), nil }
-func (benchDevice) MTU() (int, error)                       { return benchMTU, nil }
-func (benchDevice) Name() (string, error)                   { return "bench", nil }
-func (benchDevice) Events() <-chan tun.Event                { return nil }
-func (benchDevice) Close() error                            { return nil }
-func (benchDevice) BatchSize() int                          { return benchBatch }
+
+// MTU ...
+func (benchDevice) MTU() (int, error) { return benchMTU, nil }
+
+// Name ...
+func (benchDevice) Name() (string, error) { return "bench", nil }
+
+// Events ...
+func (benchDevice) Events() <-chan tun.Event { return nil }
+
+// Close ...
+func (benchDevice) Close() error { return nil }
+
+// BatchSize ...
+func (benchDevice) BatchSize() int { return benchBatch }
 
 const (
 	benchMTU   = 1420
@@ -194,6 +209,7 @@ func batchBytes(master [][]byte) int64 {
 	return n
 }
 
+// BenchmarkInspectWrite ...
 func BenchmarkInspectWrite(b *testing.B) {
 	for _, sc := range benchScenarios() {
 		b.Run(sc.name, func(b *testing.B) {
@@ -211,6 +227,7 @@ func BenchmarkInspectWrite(b *testing.B) {
 	}
 }
 
+// BenchmarkInspectWriteParallel ...
 func BenchmarkInspectWriteParallel(b *testing.B) {
 	for _, sc := range benchScenarios() {
 		b.Run(sc.name, func(b *testing.B) {
@@ -228,6 +245,7 @@ func BenchmarkInspectWriteParallel(b *testing.B) {
 	}
 }
 
+// TestBenchScenariosAdmitAsExpected ...
 func TestBenchScenariosAdmitAsExpected(t *testing.T) {
 	for _, sc := range benchScenarios() {
 		insp, master := sc.build()
@@ -248,6 +266,7 @@ func TestBenchScenariosAdmitAsExpected(t *testing.T) {
 	}
 }
 
+// TestBuildFragShape ...
 func TestBuildFragShape(t *testing.T) {
 	_, master := buildFrag("10.0.0.5:5000", benchMTU)
 	if len(master) != benchBatch {

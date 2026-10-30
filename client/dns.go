@@ -22,12 +22,14 @@ const (
 	maxDoHResponseSize = 65536
 )
 
+// FullCleanDNSCache ...
 func FullCleanDNSCache() {
 	defer RecoverAndLog()
 	INFO("Dumping DNS cache")
 	DNSCache.Clear()
 }
 
+// CleanDNSCache ...
 func CleanDNSCache() {
 	defer func() {
 		time.Sleep(30 * time.Second)
@@ -49,6 +51,7 @@ func CleanDNSCache() {
 	})
 }
 
+// InitDNSHandler ...
 func InitDNSHandler() {
 	DEBUG("Starting DNS Handler")
 	DNSClient.Dialer = new(net.Dialer)
@@ -60,6 +63,7 @@ func InitDNSHandler() {
 	DNSClient.ReadTimeout = 5 * time.Second
 }
 
+// StartUDPDNSHandler ...
 func StartUDPDNSHandler() {
 	defer RecoverAndLog()
 
@@ -171,6 +175,7 @@ func forwardDNS(m *dns.Msg, w dns.ResponseWriter, defaultRouteConnected bool, co
 	}
 }
 
+// DNSQuery ...
 func DNSQuery(w dns.ResponseWriter, m *dns.Msg) {
 	defer RecoverAndLog()
 
@@ -184,8 +189,6 @@ func DNSQuery(w dns.ResponseWriter, m *dns.Msg) {
 		return
 	}
 
-	// Whitelist always wins: a domain on any enabled whitelist is allowed even
-	// if it also appears on a block list (block check is skipped entirely).
 	blocked, tag := dnsListDecision(m)
 
 	var DNSTunnel *TUN
@@ -267,6 +270,7 @@ func cacheDNSReply(reply *dns.Msg) {
 	DNSCache.Store(name, cached)
 }
 
+// DNSCacheCheck ...
 func DNSCacheCheck(m *dns.Msg, w dns.ResponseWriter) bool {
 	nameAndType := m.Question[0].Name + strconv.FormatUint(uint64(m.Question[0].Qtype), 10)
 
@@ -306,8 +310,6 @@ func DNSCacheCheck(m *dns.Msg, w dns.ResponseWriter) bool {
 	return true
 }
 
-// dnsListDecision applies whitelist-over-blocklist priority.
-// If the name is whitelisted, blocked is always false.
 func dnsListDecision(m *dns.Msg) (blocked bool, tag string) {
 	if isWhitelisted(m) {
 		return false, ""

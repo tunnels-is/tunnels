@@ -11,8 +11,6 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// Set by -disablePublicRegistration. Also honored from config.json
-// DisablePublicRegistration (config reload applies without restart).
 var disablePublicRegistrationCLI bool
 
 func publicRegistrationDisabled() bool {
@@ -38,9 +36,6 @@ func handleAdminUserCreate(w http.ResponseWriter, r *http.Request) {
 	createUserFromRequest(w, r, false)
 }
 
-// registrationDenied is the public answer for a reserved name, a name that is
-// already registered, and the lost race to create that name. It is not used
-// for a missing or short password, which stay fast.
 const registrationDenied = "Unable to complete registration"
 
 func validateRegisterForm(form *registerRequest) (int, string) {
@@ -136,7 +131,6 @@ func createUserFromRequest(w http.ResponseWriter, r *http.Request, limit bool) {
 	err = createUser(newUser)
 	if err != nil {
 		if errors.Is(err, errEmailRegistered) {
-			// newRegisteredUser already paid for a cost-13 hash.
 			sendError(w, 400, registrationDenied)
 			return
 		}
@@ -147,9 +141,6 @@ func createUserFromRequest(w http.ResponseWriter, r *http.Request, limit bool) {
 	sendObject(w, newUser)
 }
 
-// rejectRegistration spends one password compare, then returns the generic
-// registration error. Public registration counts that compare against the
-// same per-IP limit as account creation. Over the limit, the compare is skipped.
 func rejectRegistration(w http.ResponseWriter, r *http.Request, limit bool, password string) {
 	if limit && !takeAuthSlot(authLimitRegister, "", clientIP(r)) {
 		sendError(w, 429, "too many attempts, try again later")

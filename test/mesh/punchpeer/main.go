@@ -1,9 +1,3 @@
-// Command punchpeer is the mesh e2e client. It brings up userspace WireGuard
-// the same way meshpeer does, then runs the punch engine on that socket.
-// The allow file is this client's firewall: empty denies, IP:port stays on
-// the servers, and a bare IP permits a direct path. A peer is introduced
-// through the tunnel when traffic is sent to its tunnel IP. The controller
-// is used only to learn the wg-server disco key for the reflex echo.
 package main
 
 import (
@@ -373,6 +367,7 @@ func newPunchBind(inner conn.Bind) *punchBind {
 	return &punchBind{inner: inner, in: make(chan datagram, 128)}
 }
 
+// Open ...
 func (b *punchBind) Open(port uint16) ([]conn.ReceiveFunc, uint16, error) {
 	fns, actual, err := b.inner.Open(port)
 	if err != nil {
@@ -418,14 +413,23 @@ func (b *punchBind) wrap(inner conn.ReceiveFunc) conn.ReceiveFunc {
 	}
 }
 
-func (b *punchBind) Close() error              { return b.inner.Close() }
+// Close ...
+func (b *punchBind) Close() error { return b.inner.Close() }
+
+// SetMark ...
 func (b *punchBind) SetMark(mark uint32) error { return b.inner.SetMark(mark) }
+
+// Send ...
 func (b *punchBind) Send(bufs [][]byte, ep conn.Endpoint) error {
 	return b.inner.Send(bufs, ep)
 }
+
+// ParseEndpoint ...
 func (b *punchBind) ParseEndpoint(s string) (conn.Endpoint, error) {
 	return b.inner.ParseEndpoint(s)
 }
+
+// BatchSize ...
 func (b *punchBind) BatchSize() int { return b.inner.BatchSize() }
 
 func b64ToHex(s string) (string, error) {

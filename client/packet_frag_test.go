@@ -30,6 +30,7 @@ func newBareTUN() *TUN {
 	return t
 }
 
+// TestProcessEgress_TrailingFragmentNotCorrupted ...
 func TestProcessEgress_TrailingFragmentNotCorrupted(t *testing.T) {
 	tun := newBareTUN()
 
@@ -49,6 +50,7 @@ func TestProcessEgress_TrailingFragmentNotCorrupted(t *testing.T) {
 	}
 }
 
+// TestProcessEgress_TrailingFragmentIgnoresPortBlock ...
 func TestProcessEgress_TrailingFragmentIgnoresPortBlock(t *testing.T) {
 	tun := newBareTUN()
 
@@ -68,6 +70,7 @@ func TestProcessEgress_TrailingFragmentIgnoresPortBlock(t *testing.T) {
 	}
 }
 
+// TestProcessEgress_DropsUDPToWireGuardEndpoint ...
 func TestProcessEgress_DropsUDPToWireGuardEndpoint(t *testing.T) {
 	tun := newBareTUN()
 	tun.wgEndpointSet = true
@@ -85,6 +88,7 @@ func TestProcessEgress_DropsUDPToWireGuardEndpoint(t *testing.T) {
 	}
 }
 
+// TestProcessEgress_AllowsTCPToWireGuardEndpoint ...
 func TestProcessEgress_AllowsTCPToWireGuardEndpoint(t *testing.T) {
 	tun := newBareTUN()
 	tun.wgEndpointSet = true
@@ -98,6 +102,7 @@ func TestProcessEgress_AllowsTCPToWireGuardEndpoint(t *testing.T) {
 	}
 }
 
+// TestProcessEgress_AllowsUDPToOtherHosts ...
 func TestProcessEgress_AllowsUDPToOtherHosts(t *testing.T) {
 	tun := newBareTUN()
 	tun.wgEndpointSet = true
@@ -111,6 +116,7 @@ func TestProcessEgress_AllowsUDPToOtherHosts(t *testing.T) {
 	}
 }
 
+// TestProcessEgress_DropsUDPFragmentToEndpoint ...
 func TestProcessEgress_DropsUDPFragmentToEndpoint(t *testing.T) {
 	tun := newBareTUN()
 	tun.wgEndpointSet = true
@@ -122,6 +128,7 @@ func TestProcessEgress_DropsUDPFragmentToEndpoint(t *testing.T) {
 	}
 }
 
+// TestProcess_IPv6PassThrough ...
 func TestProcess_IPv6PassThrough(t *testing.T) {
 	tun := newBareTUN()
 	v6 := make([]byte, 40)
@@ -142,6 +149,7 @@ func TestProcess_IPv6PassThrough(t *testing.T) {
 	}
 }
 
+// TestTranslateIP_Slash25 ...
 func TestTranslateIP_Slash25(t *testing.T) {
 	tun := newBareTUN()
 	_, natNet, _ := net.ParseCIDR("192.168.9.0/24")
@@ -161,6 +169,7 @@ func TestTranslateIP_Slash25(t *testing.T) {
 	}
 }
 
+// TestTranslateIP_Slash24And32 ...
 func TestTranslateIP_Slash24And32(t *testing.T) {
 	tun := newBareTUN()
 	_, n24, _ := net.ParseCIDR("192.168.9.0/24")
@@ -179,6 +188,7 @@ func TestTranslateIP_Slash24And32(t *testing.T) {
 	}
 }
 
+// TestTranslateIP_UnchangedIsFalse ...
 func TestTranslateIP_UnchangedIsFalse(t *testing.T) {
 	tun := newBareTUN()
 	got, ok := tun.translateIP([4]byte{10, 0, 0, 3})
@@ -214,6 +224,7 @@ func checksumsMatch(pkt []byte) bool {
 	return bytes.Equal(cp, pkt)
 }
 
+// TestProcessEgress_NoNATLeavesChecksums ...
 func TestProcessEgress_NoNATLeavesChecksums(t *testing.T) {
 	tun := newBareTUN()
 	l4 := make([]byte, 20)
@@ -230,6 +241,7 @@ func TestProcessEgress_NoNATLeavesChecksums(t *testing.T) {
 	}
 }
 
+// TestProcessIngress_NoNATLeavesChecksums ...
 func TestProcessIngress_NoNATLeavesChecksums(t *testing.T) {
 	tun := newBareTUN()
 	l4 := make([]byte, 20)
@@ -245,6 +257,7 @@ func TestProcessIngress_NoNATLeavesChecksums(t *testing.T) {
 	}
 }
 
+// TestProcessEgress_NATRewritesChecksum ...
 func TestProcessEgress_NATRewritesChecksum(t *testing.T) {
 	tun := newBareTUN()
 	_, natNet, _ := net.ParseCIDR("192.168.9.0/24")

@@ -1,11 +1,5 @@
 //go:build linux
 
-// Command conenat is the full-cone UDP NAT used by the mesh punch test.
-// Linux conntrack MASQUERADE is symmetric: it only accepts replies from the
-// exact address a socket just talked to, so two clients cannot punch through
-// it. This process port-preserves each LAN UDP source on the public address
-// and accepts packets from any remote. TCP is left to conntrack MASQUERADE
-// so clients can still reach the controller over HTTPS.
 package main
 
 import (
@@ -62,14 +56,9 @@ func main() {
 	log.Printf("pub %s on %s, lan %s on %s", pubIP, pubIface, lanIP, lanIface)
 
 	relaxReversePath()
-	// Docker mounts a --sysctl key read-only, so ip_forward is already 1 and
-	// a write fails. Accept the value when it is already what we need.
 	if err := ensureProc("/proc/sys/net/ipv4/ip_forward", "1"); err != nil {
 		log.Fatalf("ip_forward: %v", err)
 	}
-	// all.route_localnet is OR'd onto every interface, including the LAN
-	// interface attached after the container starts. Docker mounts these
-	// sysctls read-only, so the test sets them with --sysctl.
 	if err := ensureProc("/proc/sys/net/ipv4/conf/all/route_localnet", "1"); err != nil {
 		log.Fatalf("route_localnet: %v", err)
 	}
@@ -80,9 +69,6 @@ func main() {
 	if err := run("ip", "route", "add", "local", "0.0.0.0/0", "dev", "lo", "table", "100"); err != nil {
 		log.Fatalf("ip route local: %v", err)
 	}
-	// Conntrack remembers the first TPROXY redirect and then swallows later
-	// packets of the same flow, so a handshake gets through and keepalives
-	// do not. UDP must stay untracked for the full-cone relay.
 	for _, args := range [][]string{
 		{"iptables", "-t", "raw", "-A", "PREROUTING", "-i", lanIface, "-p", "udp", "-j", "CT", "--notrack"},
 		{"iptables", "-t", "raw", "-A", "PREROUTING", "-i", pubIface, "-p", "udp", "-j", "CT", "--notrack"},
@@ -156,10 +142,6 @@ func (n *nat) mapping(client netip.AddrPort) *flow {
 	if client.Port() == 0 {
 		return nil
 	}
-	// A normal socket, not a transparent one. A transparent socket bound to
-	// this port is eligible for every locally routed UDP packet once the
-	// TPROXY mark makes 0.0.0.0/0 local, so it would swallow the client's
-	// later packets and the handshake would never be followed by data.
 	lc := net.ListenConfig{Control: func(_, _ string, c syscall.RawConn) error {
 		return c.Control(func(fd uintptr) {
 			_ = unix.SetsockoptInt(int(fd), unix.SOL_SOCKET, unix.SO_RCVBUF, 4<<20)
@@ -219,9 +201,6 @@ func rawSocket() (int, error) {
 			rawErr = err
 			return
 		}
-		// IP_TRANSPARENT lets the header carry the server's source address.
-		// A raw socket is not in the UDP demux, so it does not steal the
-		// client's packets from the TPROXY listener.
 		if err := unix.SetsockoptInt(fd, unix.IPPROTO_IP, unix.IP_TRANSPARENT, 1); err != nil {
 			unix.Close(fd)
 			rawErr = err

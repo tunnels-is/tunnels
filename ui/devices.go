@@ -108,8 +108,6 @@ func (a *App) devicesPage() fyne.CanvasObject {
 	return pageShell("Devices", sub, actions, wrapBody(cards...))
 }
 
-// deviceStatus is the badge on a device card. A live tunnel wins over a
-// device that merely lives on this machine.
 func deviceStatus(d types.Device, ids, pubs map[string]struct{}, conn map[string]struct{}) (string, tone) {
 	pill, t := "Remote", toneNeutral
 	if deviceOnThisMachine(d, ids, pubs) {

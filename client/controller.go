@@ -14,18 +14,16 @@ import (
 	"time"
 )
 
-// errControllerRedirect is returned when the controller answers with a
-// redirect. Redirects are refused so X-Device-Token is never re-sent to
-// a different Location (Go does not strip custom auth headers).
 var errControllerRedirect = errors.New("refusing to follow controller redirect (X-Device-Token must not leave the configured controller URL)")
 
-const defaultMaxControllerResponseBytes int64 = 50 << 20 // 50 MiB
+const defaultMaxControllerResponseBytes int64 = 50 << 20
 
 var (
 	maxControllerResponseBytes    = defaultMaxControllerResponseBytes
 	errControllerResponseTooLarge = errors.New("controller response exceeds size limit")
 )
 
+// SendRequestToURL ...
 func SendRequestToURL(tc *tls.Config, method string, url string, data any, timeoutMS int, validateCert bool, certPath string, extraHeaders ...map[string]string) ([]byte, int, error) {
 	defer RecoverAndLog()
 
@@ -167,6 +165,7 @@ func authorizeControlServer(s *ControlServer) error {
 	return errors.New("host not in configured control servers")
 }
 
+// ForwardToController ...
 func ForwardToController(req *ForwardRequest) (any, int) {
 	defer RecoverAndLog()
 

@@ -12,6 +12,7 @@ import (
 	"github.com/tunnels-is/tunnels/certs"
 )
 
+// TestTLSConfigForController_SkipVerifyIgnoresPath ...
 func TestTLSConfigForController_SkipVerifyIgnoresPath(t *testing.T) {
 	cfg, err := tlsConfigForController(false, "/no/such/cert.pem")
 	if err != nil {
@@ -25,6 +26,7 @@ func TestTLSConfigForController_SkipVerifyIgnoresPath(t *testing.T) {
 	}
 }
 
+// TestTLSConfigForController_SystemRootsWhenNoPath ...
 func TestTLSConfigForController_SystemRootsWhenNoPath(t *testing.T) {
 	cfg, err := tlsConfigForController(true, "")
 	if err != nil {
@@ -38,6 +40,7 @@ func TestTLSConfigForController_SystemRootsWhenNoPath(t *testing.T) {
 	}
 }
 
+// TestTLSConfigForController_MissingFileFailsClosed ...
 func TestTLSConfigForController_MissingFileFailsClosed(t *testing.T) {
 	_, err := tlsConfigForController(true, filepath.Join(t.TempDir(), "missing.pem"))
 	if err == nil {
@@ -45,6 +48,7 @@ func TestTLSConfigForController_MissingFileFailsClosed(t *testing.T) {
 	}
 }
 
+// TestTLSConfigForController_InvalidPEMFailsClosed ...
 func TestTLSConfigForController_InvalidPEMFailsClosed(t *testing.T) {
 	p := filepath.Join(t.TempDir(), "bad.pem")
 	if err := os.WriteFile(p, []byte("not a cert"), 0o600); err != nil {
@@ -56,6 +60,7 @@ func TestTLSConfigForController_InvalidPEMFailsClosed(t *testing.T) {
 	}
 }
 
+// TestTLSConfigForController_CustomRootVerifiesSelfSigned ...
 func TestTLSConfigForController_CustomRootVerifiesSelfSigned(t *testing.T) {
 	dir := t.TempDir()
 	certPath := filepath.Join(dir, "cert.pem")

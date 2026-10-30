@@ -95,6 +95,7 @@ func uniqueWGKey(i int) string {
 	return base64.StdEncoding.EncodeToString(raw)
 }
 
+// TestHandleWGPeers_Unauthorized ...
 func TestHandleWGPeers_Unauthorized(t *testing.T) {
 	setupWGTest(t)
 	w, _ := callWGPeers(t, "", "")
@@ -103,6 +104,7 @@ func TestHandleWGPeers_Unauthorized(t *testing.T) {
 	}
 }
 
+// TestHandleWGPeers_BadLimit ...
 func TestHandleWGPeers_BadLimit(t *testing.T) {
 	apiKey, _ := setupWGTest(t)
 	for _, bad := range []string{"?limit=abc", "?limit=0", "?limit=-3"} {
@@ -113,6 +115,7 @@ func TestHandleWGPeers_BadLimit(t *testing.T) {
 	}
 }
 
+// TestHandleWGPeers_BadOffset ...
 func TestHandleWGPeers_BadOffset(t *testing.T) {
 	apiKey, _ := setupWGTest(t)
 	for _, bad := range []string{"?offset=abc", "?offset=-1"} {
@@ -123,6 +126,7 @@ func TestHandleWGPeers_BadOffset(t *testing.T) {
 	}
 }
 
+// TestHandleWGPeers_EmptyDB ...
 func TestHandleWGPeers_EmptyDB(t *testing.T) {
 	apiKey, _ := setupWGTest(t)
 	w, resp := callWGPeers(t, apiKey, "?limit=10")
@@ -140,6 +144,7 @@ func TestHandleWGPeers_EmptyDB(t *testing.T) {
 	}
 }
 
+// TestHandleWGPeers_DefaultLimit ...
 func TestHandleWGPeers_DefaultLimit(t *testing.T) {
 	apiKey, _ := setupWGTest(t)
 	w, resp := callWGPeers(t, apiKey, "")
@@ -151,6 +156,7 @@ func TestHandleWGPeers_DefaultLimit(t *testing.T) {
 	}
 }
 
+// TestHandleWGPeers_MaxLimitCap ...
 func TestHandleWGPeers_MaxLimitCap(t *testing.T) {
 	apiKey, _ := setupWGTest(t)
 	_, resp := callWGPeers(t, apiKey, "?limit=99999")
@@ -159,6 +165,7 @@ func TestHandleWGPeers_MaxLimitCap(t *testing.T) {
 	}
 }
 
+// TestHandleWGPeers_SinglePage ...
 func TestHandleWGPeers_SinglePage(t *testing.T) {
 	apiKey, srvID := setupWGTest(t)
 	for i := 0; i < 5; i++ {
@@ -174,6 +181,7 @@ func TestHandleWGPeers_SinglePage(t *testing.T) {
 	}
 }
 
+// TestHandleWGPeers_Pagination ...
 func TestHandleWGPeers_Pagination(t *testing.T) {
 	apiKey, srvID := setupWGTest(t)
 	for i := 0; i < 7; i++ {
@@ -219,6 +227,7 @@ func TestHandleWGPeers_Pagination(t *testing.T) {
 	}
 }
 
+// TestHandleWGPeers_SkipsEmptyAndInvalidKeys ...
 func TestHandleWGPeers_SkipsEmptyAndInvalidKeys(t *testing.T) {
 	apiKey, srvID := setupWGTest(t)
 
@@ -248,6 +257,7 @@ func TestHandleWGPeers_SkipsEmptyAndInvalidKeys(t *testing.T) {
 	}
 }
 
+// TestHandleWGPeers_PartialPageEndsPagination ...
 func TestHandleWGPeers_PartialPageEndsPagination(t *testing.T) {
 	apiKey, srvID := setupWGTest(t)
 
@@ -305,6 +315,7 @@ func callWGConfigFetch(t *testing.T, apiKey, pubKey string) *httptest.ResponseRe
 	return w
 }
 
+// TestHandleWGServerConfigFetch_PinsThenRejectsReplacement ...
 func TestHandleWGServerConfigFetch_PinsThenRejectsReplacement(t *testing.T) {
 	apiKey, id := setupWGTest(t)
 	first := makeWGKey()
@@ -334,6 +345,7 @@ func TestHandleWGServerConfigFetch_PinsThenRejectsReplacement(t *testing.T) {
 	}
 }
 
+// TestHandleWGServerConfigFetch_NewAPIKeyAllowsNewPubKey ...
 func TestHandleWGServerConfigFetch_NewAPIKeyAllowsNewPubKey(t *testing.T) {
 	apiKey, id := setupWGTest(t)
 	first := makeWGKey()

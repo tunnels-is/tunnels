@@ -8,6 +8,7 @@ import (
 	"testing"
 )
 
+// TestValidateUserKeyFile ...
 func TestValidateUserKeyFile(t *testing.T) {
 	dir := t.TempDir()
 
@@ -35,7 +36,6 @@ func TestValidateUserKeyFile(t *testing.T) {
 		t.Fatal("world-readable key file must be rejected by validateUserKeyFile")
 	}
 
-	// warnIfInsecureSecretFile must not panic / must tolerate loose perms (soft warn).
 	warnIfInsecureSecretFile(insecure)
 	warnIfInsecureSecretFile(secure)
 	warnIfInsecureSecretFile(filepath.Join(dir, "missing.key"))

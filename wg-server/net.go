@@ -143,7 +143,6 @@ func drainForwardRules(bin, wg, internetIface string) {
 	drainRule(bin, "-D", "FORWARD", "-j", chain)
 	_ = exec.Command(bin, "-F", chain).Run()
 	_ = exec.Command(bin, "-X", chain).Run()
-	// Previous builds used a shared TUNNELS_FWD name.
 	drainRule(bin, "-D", "FORWARD", "-j", tunnelsFwdChainPrefix)
 	_ = exec.Command(bin, "-F", tunnelsFwdChainPrefix).Run()
 	_ = exec.Command(bin, "-X", tunnelsFwdChainPrefix).Run()
@@ -229,10 +228,6 @@ func allowWireGuardPort(port int) error {
 	return execIP6Tables("-A", "INPUT", "-p", "udp", "--dport", portStr, "-j", "ACCEPT")
 }
 
-// dropHostInput inserts INPUT DROP on the WG/mesh TUN so decrypted
-// packets cannot reach host services (SSH, API, other local IPs).
-// -I so this wins over later generic INPUT ACCEPTs. FORWARD (P2P,
-// internet egress, mesh transit) is unchanged.
 func dropHostInput(iface string) error {
 	if err := execIPTables("-I", "INPUT", "-i", iface, "-j", "DROP"); err != nil {
 		return err
@@ -316,6 +311,7 @@ func ensureTunnelsFwdChain(bin func(...string) error, chain string) error {
 	return bin("-I", "FORWARD", "1", "-j", chain)
 }
 
+// PreviewRules ...
 func PreviewRules(cfg *Config) []string {
 	var lines []string
 	lines = append(lines, previewInputLines(cfg)...)

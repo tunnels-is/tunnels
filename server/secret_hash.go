@@ -7,8 +7,6 @@ import (
 	"strings"
 )
 
-// secretHashPrefix marks a SHA-256 hex digest of an API key or device token.
-// The prefix keeps a hash distinct from a legacy plaintext UUID or test key.
 const secretHashPrefix = "h1:"
 
 func hashSecret(raw string) string {
@@ -32,8 +30,6 @@ func storedSecretIsHash(stored string) bool {
 	return true
 }
 
-// storeSecret returns the value to persist. An empty string and an existing
-// hash are kept. Any other string is hashed.
 func storeSecret(raw string) string {
 	if raw == "" || storedSecretIsHash(raw) {
 		return raw
@@ -41,8 +37,6 @@ func storeSecret(raw string) string {
 	return hashSecret(raw)
 }
 
-// secretMatches reports whether presented is the secret stored in stored.
-// stored is either h1: plus the SHA-256 hex digest, or a legacy plaintext value.
 func secretMatches(stored, presented string) bool {
 	if stored == "" || presented == "" {
 		return false
@@ -56,9 +50,6 @@ func secretMatches(stored, presented string) bool {
 	return subtle.ConstantTimeCompare([]byte(stored), []byte(presented)) == 1
 }
 
-// apiKeyRotated reports whether incoming replaces oldStored.
-// Echoing the stored value, or sending the plaintext of that value, is not a
-// rotation. An empty incoming value clears a key that was set.
 func apiKeyRotated(oldStored, incoming string) bool {
 	if incoming == "" {
 		return oldStored != ""
@@ -77,8 +68,6 @@ func copyDeviceToken(t *DeviceToken) *DeviceToken {
 	return &c
 }
 
-// hashUserSecrets rewrites plaintext API keys and device tokens on user.
-// It returns the previous API key when that field was hashed.
 func hashUserSecrets(user *User) (oldAPIKey string, changed bool) {
 	if user == nil {
 		return "", false
@@ -102,9 +91,6 @@ func hashUserSecrets(user *User) (oldAPIKey string, changed bool) {
 	return oldAPIKey, changed
 }
 
-// userRecordForStore copies user and hashes secrets on the copy.
-// The caller's API key and device tokens stay plaintext so a response can
-// still show a key that was just created.
 func userRecordForStore(user *User) *User {
 	if user == nil {
 		return nil

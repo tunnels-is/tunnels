@@ -2,16 +2,15 @@ package ui
 
 import "testing"
 
+// TestBufferSizeOKAt125Percent ...
 func TestBufferSizeOKAt125Percent(t *testing.T) {
-	const num = 150 // 125%
-	// logical % 4 == 0 or 1: GLFW trunc matches compositor round
+	const num = 150
 	for _, w := range []int{800, 801, 804, 805, 1200} {
 		if !bufferSizeOK(w, num) {
 			t.Fatalf("%d should be sharp at 125%% (glfw=%d compositor=%d)",
 				w, glfwFramebuffer(w, num), compositorFramebuffer(w, num))
 		}
 	}
-	// logical % 4 == 2 or 3: 0.5+ fractional pixel, compositor stretches
 	for _, w := range []int{802, 803, 806, 807} {
 		if bufferSizeOK(w, num) {
 			t.Fatalf("%d should be blurry at 125%% (glfw=%d compositor=%d)",
@@ -20,6 +19,7 @@ func TestBufferSizeOKAt125Percent(t *testing.T) {
 	}
 }
 
+// TestAlignLogicalGrowsToNextSharpSize ...
 func TestAlignLogicalGrowsToNextSharpSize(t *testing.T) {
 	const num = 150
 	if got := alignLogical(802, num, true); got != 804 {
@@ -33,6 +33,7 @@ func TestAlignLogicalGrowsToNextSharpSize(t *testing.T) {
 	}
 }
 
+// TestAlignLogicalShrinksToPrevSharpSize ...
 func TestAlignLogicalShrinksToPrevSharpSize(t *testing.T) {
 	const num = 150
 	if got := alignLogical(802, num, false); got != 801 {
@@ -43,6 +44,7 @@ func TestAlignLogicalShrinksToPrevSharpSize(t *testing.T) {
 	}
 }
 
+// TestAlignLogicalNoOpAtIntegerScale ...
 func TestAlignLogicalNoOpAtIntegerScale(t *testing.T) {
 	for _, w := range []int{800, 801, 802, 803} {
 		if got := alignLogical(w, 120, true); got != w {
@@ -54,6 +56,7 @@ func TestAlignLogicalNoOpAtIntegerScale(t *testing.T) {
 	}
 }
 
+// TestScaleToNumerator ...
 func TestScaleToNumerator(t *testing.T) {
 	if n := scaleToNumerator(1.25); n != 150 {
 		t.Fatalf("1.25 → %d, want 150", n)
@@ -66,8 +69,9 @@ func TestScaleToNumerator(t *testing.T) {
 	}
 }
 
+// TestAlignLogical150PercentOdds ...
 func TestAlignLogical150PercentOdds(t *testing.T) {
-	const num = 180 // 150%
+	const num = 180
 	if bufferSizeOK(800, num) != true {
 		t.Fatal("800 even should be sharp at 150%")
 	}

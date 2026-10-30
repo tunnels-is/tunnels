@@ -7,6 +7,7 @@ import (
 	"github.com/tunnels-is/tunnels/types"
 )
 
+// TestParseBlockedPorts ...
 func TestParseBlockedPorts(t *testing.T) {
 	ports, bad := parseBlockedPorts([]string{"25", "443", "25", "0", "65536", "nope", "80"})
 	if len(bad) != 3 || bad[0] != "0" || bad[1] != "65536" || bad[2] != "nope" {
@@ -17,6 +18,7 @@ func TestParseBlockedPorts(t *testing.T) {
 	}
 }
 
+// TestTunnelDNSRowsSkipsNil ...
 func TestTunnelDNSRowsSkipsNil(t *testing.T) {
 	a := test.NewApp()
 	t.Cleanup(a.Quit)

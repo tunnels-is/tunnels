@@ -6,6 +6,7 @@ import (
 	"testing"
 )
 
+// TestCheckKeyFilePermissions ...
 func TestCheckKeyFilePermissions(t *testing.T) {
 	dir := t.TempDir()
 

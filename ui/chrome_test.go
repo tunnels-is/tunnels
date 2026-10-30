@@ -11,6 +11,7 @@ import (
 	"fyne.io/fyne/v2/theme"
 )
 
+// TestWrapToWidth_ShortStaysOneLine ...
 func TestWrapToWidth_ShortStaysOneLine(t *testing.T) {
 	a := test.NewApp()
 	t.Cleanup(a.Quit)
@@ -23,6 +24,7 @@ func TestWrapToWidth_ShortStaysOneLine(t *testing.T) {
 	}
 }
 
+// TestWrapToWidth_LongPathBreaks ...
 func TestWrapToWidth_LongPathBreaks(t *testing.T) {
 	a := test.NewApp()
 	t.Cleanup(a.Quit)
@@ -45,6 +47,7 @@ func TestWrapToWidth_LongPathBreaks(t *testing.T) {
 	}
 }
 
+// TestWrapToWidth_MonoASCIIDoesNotExceed ...
 func TestWrapToWidth_MonoASCIIDoesNotExceed(t *testing.T) {
 	a := test.NewApp()
 	t.Cleanup(a.Quit)
@@ -64,6 +67,7 @@ func TestWrapToWidth_MonoASCIIDoesNotExceed(t *testing.T) {
 	}
 }
 
+// TestWrapToWidth_TrailingSpaceDoesNotMakeBlankLine ...
 func TestWrapToWidth_TrailingSpaceDoesNotMakeBlankLine(t *testing.T) {
 	a := test.NewApp()
 	t.Cleanup(a.Quit)
@@ -72,13 +76,13 @@ func TestWrapToWidth_TrailingSpaceDoesNotMakeBlankLine(t *testing.T) {
 	style := fyne.TextStyle{Monospace: true}
 	s := "hello world"
 	fit := fyne.MeasureText(s, fsSmall, style).Width
-	// A trailing space that does not fit must not become a second blank line.
 	lines := wrapToWidth(s+" ", fit, fsSmall, style)
 	if len(lines) != 1 || lines[0] != s {
 		t.Fatalf("got %#v, want %q on one line", lines, s)
 	}
 }
 
+// TestKvRowGrowsForLongPath ...
 func TestKvRowGrowsForLongPath(t *testing.T) {
 	a := test.NewApp()
 	t.Cleanup(a.Quit)
@@ -118,6 +122,7 @@ func countRects(o fyne.CanvasObject) int {
 	return n
 }
 
+// TestFactListHasNoRules ...
 func TestFactListHasNoRules(t *testing.T) {
 	a := test.NewApp()
 	t.Cleanup(a.Quit)
@@ -136,6 +141,7 @@ func TestFactListHasNoRules(t *testing.T) {
 	}
 }
 
+// TestCardHeadFitsTitleAndActions ...
 func TestCardHeadFitsTitleAndActions(t *testing.T) {
 	a := test.NewApp()
 	t.Cleanup(a.Quit)
@@ -167,6 +173,7 @@ func TestCardHeadFitsTitleAndActions(t *testing.T) {
 	}
 }
 
+// TestDetailCardGapsMatch ...
 func TestDetailCardGapsMatch(t *testing.T) {
 	a := test.NewApp()
 	t.Cleanup(a.Quit)
@@ -194,6 +201,7 @@ func TestDetailCardGapsMatch(t *testing.T) {
 	}
 }
 
+// TestWrapFlowPacksToContent ...
 func TestWrapFlowPacksToContent(t *testing.T) {
 	a := test.NewApp()
 	t.Cleanup(a.Quit)
@@ -236,6 +244,7 @@ func TestWrapFlowPacksToContent(t *testing.T) {
 	}
 }
 
+// TestHugCardStaysContentWidth ...
 func TestHugCardStaysContentWidth(t *testing.T) {
 	a := test.NewApp()
 	t.Cleanup(a.Quit)
@@ -262,6 +271,7 @@ func TestHugCardStaysContentWidth(t *testing.T) {
 	}
 }
 
+// TestSectionHeadPaintsTitleAndRule ...
 func TestSectionHeadPaintsTitleAndRule(t *testing.T) {
 	a := test.NewApp()
 	t.Cleanup(a.Quit)
@@ -295,6 +305,7 @@ func TestSectionHeadPaintsTitleAndRule(t *testing.T) {
 	}
 }
 
+// TestSectionHeadSpansAllColumns ...
 func TestSectionHeadSpansAllColumns(t *testing.T) {
 	a := test.NewApp()
 	t.Cleanup(a.Quit)
@@ -317,6 +328,7 @@ func TestSectionHeadSpansAllColumns(t *testing.T) {
 	}
 }
 
+// TestFullRowSpansAllColumns ...
 func TestFullRowSpansAllColumns(t *testing.T) {
 	a := test.NewApp()
 	t.Cleanup(a.Quit)

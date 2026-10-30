@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 )
 
+// TestIntro_DropsLocalPunchTargets ...
 func TestIntro_DropsLocalPunchTargets(t *testing.T) {
 	aPriv, err := NewPrivate()
 	if err != nil {
@@ -77,6 +78,7 @@ func sameAddrPorts(got, want []netip.AddrPort) bool {
 	return true
 }
 
+// TestIntroExchangeReachesDirectPath ...
 func TestIntroExchangeReachesDirectPath(t *testing.T) {
 	aPriv, _ := NewPrivate()
 	bPriv, _ := NewPrivate()
@@ -162,7 +164,6 @@ func TestIntroExchangeReachesDirectPath(t *testing.T) {
 		t.Fatal("origin did not punch the peer address")
 	}
 
-	// Two pongs each way promote the direct path.
 	fromB := b.OnPacket(aReflex, aPing.Data, now)
 	var pong Datagram
 	for _, d := range fromB.Sends {
@@ -197,6 +198,7 @@ func TestIntroExchangeReachesDirectPath(t *testing.T) {
 	}
 }
 
+// TestIntroSkipsPublicDestinations ...
 func TestIntroSkipsPublicDestinations(t *testing.T) {
 	a := NewEngine(uuid.New(), mustKey(t), [32]byte{1}, netip.MustParseAddr("10.0.0.5"))
 	a.SetLocalPolicy(true, false, nil)
@@ -230,6 +232,7 @@ func mustKey(t *testing.T) [32]byte {
 	return k
 }
 
+// TestIntroRejectedByLocalFirewall ...
 func TestIntroRejectedByLocalFirewall(t *testing.T) {
 	aPriv, _ := NewPrivate()
 	bPriv, _ := NewPrivate()

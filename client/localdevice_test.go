@@ -5,6 +5,7 @@ import (
 	"testing"
 )
 
+// TestLocalDevice_SaveLoadByServerID ...
 func TestLocalDevice_SaveLoadByServerID(t *testing.T) {
 	dir := t.TempDir()
 	STATE.Store(&State{BasePath: dir + string(os.PathSeparator)})

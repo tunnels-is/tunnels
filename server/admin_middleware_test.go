@@ -9,6 +9,7 @@ import (
 	"github.com/tunnels-is/tunnels/types"
 )
 
+// TestAdminUI_APIKeyDoesNotSkipSession ...
 func TestAdminUI_APIKeyDoesNotSkipSession(t *testing.T) {
 	setupTestDB(t)
 	securityReviewLogger()
@@ -26,7 +27,6 @@ func TestAdminUI_APIKeyDoesNotSkipSession(t *testing.T) {
 		called = true
 		w.WriteHeader(http.StatusOK)
 	})
-	// The API-key check runs first. The admin UI check still requires a session.
 	stacked := applyMiddleware(inner, xAdminAPIKeyMiddleware, adminUIMiddleware)
 	req := httptest.NewRequest(http.MethodPost, "/ui/servers", nil)
 	req.Header.Set("X-API-KEY", apiKey)

@@ -7,6 +7,7 @@ import (
 	"testing"
 )
 
+// TestAccountWorkspace_SaveLoadActivate ...
 func TestAccountWorkspace_SaveLoadActivate(t *testing.T) {
 	dir := t.TempDir()
 	STATE.Store(&State{BasePath: dir + string(os.PathSeparator)})
@@ -107,6 +108,7 @@ func TestAccountWorkspace_SaveLoadActivate(t *testing.T) {
 	}
 }
 
+// TestEncryptAccountBlob_UsesFolderHashOnly ...
 func TestEncryptAccountBlob_UsesFolderHashOnly(t *testing.T) {
 	hash := "aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899"
 	if len(hash) != 64 {
@@ -139,6 +141,7 @@ func TestEncryptAccountBlob_UsesFolderHashOnly(t *testing.T) {
 	}
 }
 
+// TestActivateSoleAccount ...
 func TestActivateSoleAccount(t *testing.T) {
 	dir := t.TempDir()
 	prev := STATE.Load()
@@ -175,6 +178,7 @@ func TestActivateSoleAccount(t *testing.T) {
 	}
 }
 
+// TestActivateAccountIfNone_PicksFirstWhenSeveral ...
 func TestActivateAccountIfNone_PicksFirstWhenSeveral(t *testing.T) {
 	dir := t.TempDir()
 	prev := STATE.Load()

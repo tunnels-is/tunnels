@@ -13,11 +13,6 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
-// ---------------------------------------------------------------- log row
-
-// logRow renders one parsed log line as timestamp / level / message columns.
-// A list of these replaces the editable multiline entry the log used to be:
-// levels can be colour-coded and the text is monospaced and read-only.
 type logRow struct {
 	widget.BaseWidget
 	when  string
@@ -99,6 +94,7 @@ func (r *logRow) heightFor(width float32) float32 {
 	return logLineHeight()*float32(n) + 2
 }
 
+// CreateRenderer ...
 func (r *logRow) CreateRenderer() fyne.WidgetRenderer {
 	p := pal()
 	d := &logRowRenderer{
@@ -127,8 +123,10 @@ type logRowRenderer struct {
 	laidLvl  string
 }
 
+// Destroy ...
 func (d *logRowRenderer) Destroy() {}
 
+// Objects ...
 func (d *logRowRenderer) Objects() []fyne.CanvasObject {
 	if d.objs == nil {
 		d.rebuildObjs()
@@ -161,6 +159,7 @@ func (d *logRowRenderer) ensureMsgs(n int) {
 	}
 }
 
+// MinSize ...
 func (d *logRowRenderer) MinSize() fyne.Size {
 	w := d.r.Size().Width
 	h := logLineHeight() + 2
@@ -170,6 +169,7 @@ func (d *logRowRenderer) MinSize() fyne.Size {
 	return fyne.NewSize(z(400), h)
 }
 
+// Layout ...
 func (d *logRowRenderer) Layout(size fyne.Size) {
 	same := d.laidW == size.Width && d.laidWhen == d.r.when && d.laidMsg == d.r.msg &&
 		d.laidFn == d.r.fn && d.laidLvl == d.r.level
@@ -222,6 +222,7 @@ func (d *logRowRenderer) Layout(size fyne.Size) {
 	}
 }
 
+// Refresh ...
 func (d *logRowRenderer) Refresh() {
 	d.apply()
 	d.laidW = 0
@@ -258,10 +259,6 @@ func logLevelColor(level string) color.Color {
 	}
 }
 
-// splitLogLine pulls apart the client's log format, which is
-// "<time> || <LEVEL> || <func> || <message>" (see client/logging.go). Shorter
-// lines are tolerated, and any remaining " || " stays in the message so a
-// payload that happens to contain the separator is not truncated.
 func splitLogLine(line string) (when, level, fn, msg string) {
 	parts := strings.Split(line, " || ")
 	for i := range parts {
@@ -278,8 +275,6 @@ func splitLogLine(line string) (when, level, fn, msg string) {
 		return parts[0], parts[1], parts[2], strings.Join(parts[3:], " || ")
 	}
 }
-
-// ---------------------------------------------------------------- page
 
 func (a *App) recomputeLogView() {
 	a.logView = a.filteredLogs()
@@ -416,10 +411,9 @@ func (a *App) filteredLogs() []string {
 	return out
 }
 
-// compactLogTheme drops the theme padding widget.List inserts between items,
-// which is what made log lines look double-spaced.
 type compactLogTheme struct{ fyne.Theme }
 
+// Size ...
 func (t compactLogTheme) Size(n fyne.ThemeSizeName) float32 {
 	if n == theme.SizeNamePadding {
 		return 1

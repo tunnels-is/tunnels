@@ -59,6 +59,7 @@ func main() {
 	}
 }
 
+// ResolveAndRequest ...
 func ResolveAndRequest(domain string) ([16]byte, int, string, error) {
 	var err error
 	ips, err := net.LookupIP(domain)
@@ -119,6 +120,7 @@ func ResolveAndRequest(domain string) ([16]byte, int, string, error) {
 	return sum, resp.StatusCode, ips[0].String(), nil
 }
 
+// SendDiscordWebhook ...
 func SendDiscordWebhook(webhookURL string, message string) error {
 	type Payload struct {
 		Content string `json:"content"`

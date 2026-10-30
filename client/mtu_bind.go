@@ -8,7 +8,6 @@ import (
 	wgconn "golang.zx2c4.com/wireguard/conn"
 )
 
-// unwrapBind walks the punch and protect wrappers to the socket bind.
 func unwrapBind(b wgconn.Bind) wgconn.Bind {
 	for b != nil {
 		switch v := b.(type) {
@@ -29,8 +28,6 @@ func unwrapBind(b wgconn.Bind) wgconn.Bind {
 	return nil
 }
 
-// walkUDPConns visits the stdlib UDP sockets inside a WireGuard bind.
-// WinRingBind has no net.UDPConn; the Windows file handles that socket itself.
 func walkUDPConns(b wgconn.Bind, fn func(*net.UDPConn, bool)) {
 	b = unwrapBind(b)
 	if b == nil || fn == nil {
@@ -59,9 +56,6 @@ func walkUDPConns(b wgconn.Bind, fn func(*net.UDPConn, bool)) {
 	}
 }
 
-// setBindDontFrag sets DF on the WireGuard UDP sockets for one probe send.
-// The returned function puts the previous socket option back. Call it even
-// when discovery is unused so a configured MTU never leaves DF enabled.
 func setBindDontFrag(b wgconn.Bind) func() {
 	var undos []func()
 	walkUDPConns(b, func(c *net.UDPConn, v6 bool) {

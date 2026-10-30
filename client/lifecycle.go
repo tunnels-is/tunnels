@@ -42,6 +42,7 @@ func printInfo() {
 	)
 }
 
+// InitService ...
 func InitService() error {
 	defer RecoverAndLog()
 
@@ -141,6 +142,7 @@ func registerBackgroundSignals() {
 	})
 }
 
+// LaunchTunnels ...
 func LaunchTunnels() {
 	defer RecoverAndLog()
 

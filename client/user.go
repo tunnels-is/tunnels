@@ -209,6 +209,7 @@ func getUsers() (ul []*User, err error) {
 	return ul, nil
 }
 
+// Decrypt ...
 func Decrypt(data, key []byte) ([]byte, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
@@ -231,6 +232,7 @@ func Decrypt(data, key []byte) ([]byte, error) {
 	return gcm.Open(nil, nonce, ciphertext, nil)
 }
 
+// Encrypt ...
 func Encrypt(text, key []byte) ([]byte, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {

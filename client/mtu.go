@@ -15,8 +15,7 @@ import (
 const (
 	serverMTUProbeWait = 450 * time.Millisecond
 	serverMTUCacheTTL  = 10 * time.Minute
-	// mssFloor is the smallest TCP MSS a clamp will advertise.
-	mssFloor = 536
+	mssFloor           = 536
 )
 
 type mtuCacheEntry struct {
@@ -29,9 +28,6 @@ var (
 	mtuCache   = map[string]mtuCacheEntry{}
 )
 
-// resolvedMTU returns the tunnel interface MTU. A configured value is kept.
-// Zero discovers the server path and, if that fails, falls back to 1420.
-// The discovered value is not written back onto meta.
 func resolvedMTU(meta *TunnelMeta, serverIP, port string) int32 {
 	if meta != nil && meta.MTU > 0 {
 		return meta.MTU
@@ -86,7 +82,6 @@ func storeServerMTU(key string, mtu int) {
 	mtuCacheMu.Unlock()
 }
 
-// discoverPathMTU probes raddr with DF set and returns the inner MTU that fits.
 func discoverPathMTU(raddr *net.UDPAddr) (int, error) {
 	if raddr == nil || raddr.IP == nil {
 		return 0, errors.New("no address")
@@ -182,7 +177,7 @@ func probeOnce(conn *net.UDPConn, payload int) (fits, localTooBig bool, err erro
 	return punch.IsMTUAck(buf[:n]), false, nil
 }
 
-// LinkMTU is the live interface MTU, or 0 when the adapter is not up.
+// LinkMTU ...
 func (t *TUN) LinkMTU() int32 {
 	if t == nil {
 		return 0
@@ -206,9 +201,6 @@ func (t *TUN) peerPathMTU(ip [4]byte) int {
 	return t.punchMTU[ip]
 }
 
-// notePeerMTU records a direct peer whose path is smaller than the interface.
-// The interface MTU stays at the server-path measurement. A tighter peer gets
-// a per-destination route where the OS supports one, plus an MSS clamp.
 func (t *TUN) notePeerMTU(p punch.PathMTU) {
 	if t == nil || !p.Peer.WGIP.Is4() || p.Inner < punch.MinInnerMTU {
 		return
@@ -279,9 +271,6 @@ func (t *TUN) logPeerMTUDrop(ip [4]byte, mtu int) {
 	}
 }
 
-// fitPeerMTU clamps a TCP SYN MSS to a tighter peer, and drops UDP that would
-// leave as an outer datagram bigger than that peer. TCP data is left alone:
-// the route MTU is what keeps those segments in range.
 func (t *TUN) fitPeerMTU(packet []byte, dst [4]byte, fragmented bool) bool {
 	if t == nil || fragmented {
 		return true

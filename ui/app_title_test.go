@@ -2,6 +2,7 @@ package ui
 
 import "testing"
 
+// TestFormatWindowTitleDisconnected ...
 func TestFormatWindowTitleDisconnected(t *testing.T) {
 	got := formatWindowTitle(false, 0, 0, nil)
 	if got != "disconnected" {
@@ -9,6 +10,7 @@ func TestFormatWindowTitleDisconnected(t *testing.T) {
 	}
 }
 
+// TestFormatWindowTitleConnectedRateAndNames ...
 func TestFormatWindowTitleConnectedRateAndNames(t *testing.T) {
 	got := formatWindowTitle(true, 12_000, 3_000, []string{"home", "work"})
 	want := "12 KB/s - 3 KB/s - home - work"
@@ -17,6 +19,7 @@ func TestFormatWindowTitleConnectedRateAndNames(t *testing.T) {
 	}
 }
 
+// TestFormatWindowTitleConnectedNoNames ...
 func TestFormatWindowTitleConnectedNoNames(t *testing.T) {
 	got := formatWindowTitle(true, 0, 0, nil)
 	want := "0 B/s - 0 B/s"

@@ -45,10 +45,10 @@ func setupCustomListTestEnv(t *testing.T) (blockDir, whiteDir string) {
 	return blockDir, whiteDir
 }
 
+// TestGetSetCustomDNSListContent_Whitelist ...
 func TestGetSetCustomDNSListContent_Whitelist(t *testing.T) {
 	_, whiteDir := setupCustomListTestEnv(t)
 
-	// Missing file is created with starter content.
 	got, err := getCustomDNSListContent("whitelist")
 	if err != nil {
 		t.Fatal(err)
@@ -68,8 +68,6 @@ func TestGetSetCustomDNSListContent_Whitelist(t *testing.T) {
 	if out.Count != 2 {
 		t.Fatalf("count=%d want 2 (duplicate EXAMPLE.COM collapsed in parse count?)", out.Count)
 	}
-	// tryAddLine accepts both lines before unique dedup in Build — count is lines accepted.
-	// EXAMPLE.COM and allow.example.com both succeed → count 2. Unique set len may be 2.
 
 	data, err := os.ReadFile(filepath.Join(whiteDir, customDNSListTag))
 	if err != nil {
@@ -79,7 +77,6 @@ func TestGetSetCustomDNSListContent_Whitelist(t *testing.T) {
 		t.Fatalf("file content mismatch")
 	}
 
-	// Live catalog should include the domain.
 	if ok, _ := DNSWhiteList.Load().Has("allow.example.com"); !ok {
 		t.Fatal("whitelist catalog missing allow.example.com")
 	}
@@ -87,7 +84,6 @@ func TestGetSetCustomDNSListContent_Whitelist(t *testing.T) {
 		t.Fatal("whitelist catalog missing also.example.com")
 	}
 
-	// Config count updated.
 	cfg := CONFIG.Load()
 	found := false
 	for _, wl := range cfg.DNSWhiteLists {
@@ -102,7 +98,6 @@ func TestGetSetCustomDNSListContent_Whitelist(t *testing.T) {
 		t.Fatal("custom whitelist missing from config")
 	}
 
-	// Round-trip get.
 	got, err = getCustomDNSListContent("whitelist")
 	if err != nil {
 		t.Fatal(err)
@@ -112,10 +107,10 @@ func TestGetSetCustomDNSListContent_Whitelist(t *testing.T) {
 	}
 }
 
+// TestSetCustomDNSListContent_Blocklist ...
 func TestSetCustomDNSListContent_Blocklist(t *testing.T) {
 	setupCustomListTestEnv(t)
 
-	// Seed another list in the catalog so we prove it is preserved.
 	other := DomainSetFromDomains([]string{"remote.ads.example"})
 	DNSBlockList.Store(NewCatalog([]string{"Ads"}, []*DomainSet{other}))
 
@@ -136,6 +131,7 @@ func TestSetCustomDNSListContent_Blocklist(t *testing.T) {
 	}
 }
 
+// TestSetCustomDNSListContent_EmptyReseedsTemplate ...
 func TestSetCustomDNSListContent_EmptyReseedsTemplate(t *testing.T) {
 	setupCustomListTestEnv(t)
 	out, err := setCustomDNSListContent("whitelist", "   \n\t  ")
@@ -147,6 +143,7 @@ func TestSetCustomDNSListContent_EmptyReseedsTemplate(t *testing.T) {
 	}
 }
 
+// TestSetCustomDNSListContent_InvalidKind ...
 func TestSetCustomDNSListContent_InvalidKind(t *testing.T) {
 	setupCustomListTestEnv(t)
 	if _, err := setCustomDNSListContent("nope", "x.com"); err == nil {
@@ -157,6 +154,7 @@ func TestSetCustomDNSListContent_InvalidKind(t *testing.T) {
 	}
 }
 
+// TestSetCustomDNSListContent_TooLarge ...
 func TestSetCustomDNSListContent_TooLarge(t *testing.T) {
 	setupCustomListTestEnv(t)
 	big := strings.Repeat("a.example.com\n", maxCustomDNSListContent)
@@ -165,10 +163,10 @@ func TestSetCustomDNSListContent_TooLarge(t *testing.T) {
 	}
 }
 
+// TestDNSListDecision_AfterCustomWhitelistSave ...
 func TestDNSListDecision_AfterCustomWhitelistSave(t *testing.T) {
 	setupCustomListTestEnv(t)
 
-	// Domain on both lists — whitelist should win after save.
 	DNSBlockList.Store(NewCatalog(
 		[]string{"Ads"},
 		[]*DomainSet{DomainSetFromDomains([]string{"both.example.com"})},

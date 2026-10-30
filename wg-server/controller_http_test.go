@@ -9,6 +9,7 @@ import (
 	"testing"
 )
 
+// TestRequireHTTPSControllerURL ...
 func TestRequireHTTPSControllerURL(t *testing.T) {
 	cases := []struct {
 		in      string
@@ -33,6 +34,7 @@ func TestRequireHTTPSControllerURL(t *testing.T) {
 	}
 }
 
+// TestControllerHTTPClient_NoRedirects ...
 func TestControllerHTTPClient_NoRedirects(t *testing.T) {
 	var secondHits int
 	second := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -71,6 +73,7 @@ func TestControllerHTTPClient_NoRedirects(t *testing.T) {
 	}
 }
 
+// TestFetchConfig_RequiresHTTPS ...
 func TestFetchConfig_RequiresHTTPS(t *testing.T) {
 	_, err := fetchConfig("http://127.0.0.1:1", "key", "", false, true)
 	if err == nil {

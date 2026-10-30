@@ -2,6 +2,7 @@ package client
 
 import "testing"
 
+// TestCloneConfigDoesNotAliasBool ...
 func TestCloneConfigDoesNotAliasBool(t *testing.T) {
 	orig := CONFIG.Load()
 	if orig == nil {
@@ -15,6 +16,7 @@ func TestCloneConfigDoesNotAliasBool(t *testing.T) {
 	}
 }
 
+// TestValidationError ...
 func TestValidationError(t *testing.T) {
 	err := &ValidationError{Messages: []string{"a", "b"}}
 	if err.Error() != "a; b" {
@@ -22,6 +24,7 @@ func TestValidationError(t *testing.T) {
 	}
 }
 
+// TestControllerError ...
 func TestControllerError(t *testing.T) {
 	if got := ControllerError([]byte(`{"Error":"nope"}`), "fb"); got != "nope" {
 		t.Fatalf("got %q", got)

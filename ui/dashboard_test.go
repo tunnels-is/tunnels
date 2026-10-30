@@ -11,6 +11,7 @@ import (
 	"github.com/tunnels-is/tunnels/types"
 )
 
+// TestStageCentersShortContent ...
 func TestStageCentersShortContent(t *testing.T) {
 	fy := test.NewApp()
 	t.Cleanup(fy.Quit)
@@ -31,6 +32,7 @@ func TestStageCentersShortContent(t *testing.T) {
 	}
 }
 
+// TestStageTopsTallContent ...
 func TestStageTopsTallContent(t *testing.T) {
 	fy := test.NewApp()
 	t.Cleanup(fy.Quit)
@@ -44,6 +46,7 @@ func TestStageTopsTallContent(t *testing.T) {
 	}
 }
 
+// TestDashboardPageBuilds ...
 func TestDashboardPageBuilds(t *testing.T) {
 	fy := test.NewApp()
 	t.Cleanup(fy.Quit)

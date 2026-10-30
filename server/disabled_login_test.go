@@ -15,6 +15,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+// TestDisabledUser_CannotLoginOrMintTokens ...
 func TestDisabledUser_CannotLoginOrMintTokens(t *testing.T) {
 	setupTestDB(t)
 	securityReviewLogger()
@@ -55,6 +56,7 @@ func TestDisabledUser_CannotLoginOrMintTokens(t *testing.T) {
 	}
 }
 
+// TestDisabledAdmin_CannotUILogin ...
 func TestDisabledAdmin_CannotUILogin(t *testing.T) {
 	setupTestDB(t)
 	securityReviewLogger()
@@ -89,6 +91,7 @@ func TestDisabledAdmin_CannotUILogin(t *testing.T) {
 	}
 }
 
+// TestDisabledLogin_MatchesBadPassword ...
 func TestDisabledLogin_MatchesBadPassword(t *testing.T) {
 	setupTestDB(t)
 	securityReviewLogger()
@@ -157,6 +160,7 @@ func TestDisabledLogin_MatchesBadPassword(t *testing.T) {
 	}
 }
 
+// TestAdminLogin_NonAdminMatchesBadPassword ...
 func TestAdminLogin_NonAdminMatchesBadPassword(t *testing.T) {
 	setupTestDB(t)
 	securityReviewLogger()
@@ -256,6 +260,7 @@ func TestAdminLogin_NonAdminMatchesBadPassword(t *testing.T) {
 	}
 }
 
+// TestDisabledUser_CannotResetPassword ...
 func TestDisabledUser_CannotResetPassword(t *testing.T) {
 	setupTestDB(t)
 	securityReviewLogger()
@@ -298,6 +303,7 @@ func TestDisabledUser_CannotResetPassword(t *testing.T) {
 	}
 }
 
+// TestResetPassword_RequiresRecoveryCode ...
 func TestResetPassword_RequiresRecoveryCode(t *testing.T) {
 	setupTestDB(t)
 	securityReviewLogger()

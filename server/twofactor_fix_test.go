@@ -43,6 +43,7 @@ func postTwoFactorConfirm(t *testing.T, user *User, password, recovery, secret s
 	return w
 }
 
+// TestValidTOTPSecret ...
 func TestValidTOTPSecret(t *testing.T) {
 	if !validTOTPSecret("ABCDEFGHIJKLMNOP") {
 		t.Fatal("client-style secret must be accepted")
@@ -52,6 +53,7 @@ func TestValidTOTPSecret(t *testing.T) {
 	}
 }
 
+// TestTwoFactorConfirm_RejectsBadSecretBeforeEnrollment ...
 func TestTwoFactorConfirm_RejectsBadSecretBeforeEnrollment(t *testing.T) {
 	setupTestDB(t)
 	securityReviewLogger()
@@ -91,6 +93,7 @@ func TestTwoFactorConfirm_RejectsBadSecretBeforeEnrollment(t *testing.T) {
 	}
 }
 
+// TestTwoFactorConfirm_ConsumesRecoveryAndKeepsPassword ...
 func TestTwoFactorConfirm_ConsumesRecoveryAndKeepsPassword(t *testing.T) {
 	setupTestDB(t)
 	securityReviewLogger()
@@ -222,6 +225,7 @@ func TestTwoFactorConfirm_ConsumesRecoveryAndKeepsPassword(t *testing.T) {
 	}
 }
 
+// TestTwoFactorConfirm_FirstEnrollmentStillOmitsRecovery ...
 func TestTwoFactorConfirm_FirstEnrollmentStillOmitsRecovery(t *testing.T) {
 	setupTestDB(t)
 	securityReviewLogger()
@@ -266,6 +270,7 @@ func TestTwoFactorConfirm_FirstEnrollmentStillOmitsRecovery(t *testing.T) {
 	}
 }
 
+// TestTwoFactorConfirm_OneRecoveryCodeWinsTheRace ...
 func TestTwoFactorConfirm_OneRecoveryCodeWinsTheRace(t *testing.T) {
 	setupTestDB(t)
 	securityReviewLogger()
@@ -336,6 +341,7 @@ func TestTwoFactorConfirm_OneRecoveryCodeWinsTheRace(t *testing.T) {
 	}
 }
 
+// TestTOTPCode_RejectedWhenReused ...
 func TestTOTPCode_RejectedWhenReused(t *testing.T) {
 	setupTestDB(t)
 	securityReviewLogger()
@@ -370,6 +376,7 @@ func TestTOTPCode_RejectedWhenReused(t *testing.T) {
 	}
 }
 
+// TestResetPassword_RejectsReusedTOTP ...
 func TestResetPassword_RejectsReusedTOTP(t *testing.T) {
 	setupTestDB(t)
 	securityReviewLogger()
@@ -446,6 +453,7 @@ func TestResetPassword_RejectsReusedTOTP(t *testing.T) {
 	}
 }
 
+// TestValidateUserTwoFactor_PanicFailsClosed ...
 func TestValidateUserTwoFactor_PanicFailsClosed(t *testing.T) {
 	setupTestDB(t)
 	okKey := withTwoFactorKey(t)

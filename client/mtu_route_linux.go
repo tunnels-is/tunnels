@@ -8,9 +8,6 @@ import (
 	"github.com/vishvananda/netlink"
 )
 
-// addPeerMTURoute installs a /32 on the tunnel with its own MTU.
-// It does not go through addIPv4Route: that helper skips /32s that sit on a
-// connected prefix, and it has no MTU field.
 func addPeerMTURoute(ifName, ip string, mtu int) error {
 	link, dst, err := peerRoute(ifName, ip)
 	if err != nil {

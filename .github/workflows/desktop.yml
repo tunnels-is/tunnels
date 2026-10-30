@@ -1,6 +1,3 @@
-# Fyne desktop app for Linux, Windows, and macOS.
-# Called from test.yml (pull requests and branch pushes), release.yml (v* tags),
-# and release-desktop.yml (manual).
 name: Desktop
 
 on:

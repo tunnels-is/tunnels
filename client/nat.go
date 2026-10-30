@@ -4,9 +4,6 @@ import (
 	"net"
 )
 
-// translateIP rewrites ip when a NAT rule matches. The bool is true only when
-// the address changed, so the packet path can leave an already-valid checksum
-// alone. Walking a full TCP segment here is most of the per-packet cost.
 func (t *TUN) translateIP(ip [4]byte) ([4]byte, bool) {
 	t.natMu.RLock()
 	mapped, ok := t.NATEgress[ip]
@@ -50,6 +47,7 @@ func (t *TUN) translateIP(ip [4]byte) ([4]byte, bool) {
 	return ip, false
 }
 
+// InitNatMaps ...
 func (t *TUN) InitNatMaps() (err error) {
 	meta := t.meta.Load()
 	DEBUG("Initializing NAT maps for tunnel:", meta.IFName)

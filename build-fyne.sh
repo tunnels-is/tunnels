@@ -59,9 +59,6 @@ build_linux() {
         -o "$BIN_DIR/tunnels-app-linux-amd64" \
         ./cmd/fyne
     echo "    -> bin/tunnels-app-linux-amd64"
-    # ELF files cannot embed an icon. Ship PNG + .desktop whose basename
-    # matches the Wayland app_id (is.tunnels). The running app also copies
-    # these into ~/.local/share so Cosmic/GNOME alt-tab can resolve them.
     cp -f "$APPICON" "$BIN_DIR/tunnels.png"
     cp -f "$APPICON" "$BIN_DIR/is.tunnels.png"
     cp -f cmd/fyne/packaging/is.tunnels.desktop "$BIN_DIR/is.tunnels.desktop"
@@ -97,7 +94,6 @@ build_windows() {
         exit 1
     fi
     echo "    CC=$cc"
-    # -H windowsgui is ignored by the external linker; also set PE subsystem.
     CC="$cc" CGO_ENABLED=1 GOOS=windows GOARCH=amd64 go build \
         -trimpath \
         -ldflags "$LDFLAGS -H windowsgui -extldflags=-Wl,--subsystem,windows" \
@@ -115,7 +111,6 @@ package_darwin() {
 
 build_darwin() {
     require_host darwin
-    # External link so the Mach-O gets an LC_UUID (current macOS rejects binaries without one).
     local ldflags="$LDFLAGS -linkmode=external"
 
     echo "==> Building darwin/arm64 (Fyne)"

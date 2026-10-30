@@ -6,9 +6,6 @@ import (
 	"runtime"
 )
 
-// migrateLegacyFyneConfig moves Fyne's settings directory from legacyAppID
-// to appID. Fyne reads that directory inside NewWithID, so this has to run
-// first. An existing new directory is left alone.
 func migrateLegacyFyneConfig() {
 	root := fyneConfigRoot()
 	if root == "" {

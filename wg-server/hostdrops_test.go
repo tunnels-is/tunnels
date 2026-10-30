@@ -18,6 +18,7 @@ func attached(cidr, link string) attachedPrefix {
 	return attachedPrefix{IPNet: mustCIDR(cidr), LinkName: link}
 }
 
+// TestDropCIDRsFromAttached_SkipsOverlayAndDefault ...
 func TestDropCIDRsFromAttached_SkipsOverlayAndDefault(t *testing.T) {
 	v4, v6 := dropCIDRsFromAttached(
 		[]attachedPrefix{
@@ -56,6 +57,7 @@ func TestDropCIDRsFromAttached_SkipsOverlayAndDefault(t *testing.T) {
 	}
 }
 
+// TestDropCIDRsFromAttached_EmptySkipKeepsOverlay ...
 func TestDropCIDRsFromAttached_EmptySkipKeepsOverlay(t *testing.T) {
 	v4, _ := dropCIDRsFromAttached(
 		[]attachedPrefix{attached("10.201.0.1/16", "wg0")},
@@ -67,6 +69,7 @@ func TestDropCIDRsFromAttached_EmptySkipKeepsOverlay(t *testing.T) {
 	}
 }
 
+// TestMergeCIDRs_DropsMoreSpecificAndDefault ...
 func TestMergeCIDRs_DropsMoreSpecificAndDefault(t *testing.T) {
 	got := mergeCIDRs(
 		[]string{"169.254.0.0/16", "10.0.1.0/24"},
@@ -85,6 +88,7 @@ func TestMergeCIDRs_DropsMoreSpecificAndDefault(t *testing.T) {
 	}
 }
 
+// TestPrefixInOverlay_MoreSpecificInside ...
 func TestPrefixInOverlay_MoreSpecificInside(t *testing.T) {
 	overlay := []*net.IPNet{mustCIDR("10.201.0.0/16")}
 	if !prefixInOverlay(mustCIDR("10.201.4.0/24"), overlay) {
@@ -98,6 +102,7 @@ func TestPrefixInOverlay_MoreSpecificInside(t *testing.T) {
 	}
 }
 
+// TestEgressDropCIDRs_AlwaysHasRFCAndFabric ...
 func TestEgressDropCIDRs_AlwaysHasRFCAndFabric(t *testing.T) {
 	cfg := &Config{
 		WireGuardSubnet: "10.201.0.0/16",
@@ -138,6 +143,7 @@ func cidrsCover(cidrs []string, ip string) bool {
 	return false
 }
 
+// TestCollectHostDropCIDRs_IncludesLoopbackExcludesDefault ...
 func TestCollectHostDropCIDRs_IncludesLoopbackExcludesDefault(t *testing.T) {
 	v4, _, err := collectHostDropCIDRs(nil, nil)
 	if err != nil {

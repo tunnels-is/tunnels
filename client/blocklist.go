@@ -19,13 +19,9 @@ const (
 	dnsListScanBuf    = 64 * 1024
 	dnsListMaxLineLen = 1024 * 1024
 
-	// customDNSListTag is the local user-editable blocklist/whitelist filename
-	// and config tag (blocklists/custom, whitelists/custom).
 	customDNSListTag = "custom"
 )
 
-// customBlockListFileContent is written when blocklists/custom is missing.
-// Comments keep the file non-empty so local load does not treat it as absent.
 const customBlockListFileContent = `# Tunnels custom DNS block list
 # Domains listed here are blocked by the local DNS resolver.
 # One domain per line. Lines starting with # are ignored.
@@ -170,7 +166,6 @@ func sanitizeBlockListConfig(config *Config) bool {
 		config.DNSBlockLists = GetDefaultBlockLists()
 		changed = true
 	}
-	// Re-ensure after any full replacement of the list slice.
 	if ensureCustomBlockListInConfig(config) {
 		changed = true
 	}
@@ -195,7 +190,6 @@ func processBlockList(bl *BlockList, force bool, prevByTag map[string]*DomainSet
 	}
 	lowerTag := strings.ToLower(bl.Tag)
 
-	// Local custom list: recreate the starter file if someone deleted it.
 	if bl.URL == "" && strings.EqualFold(bl.Tag, customDNSListTag) {
 		if err := ensureCustomBlockListFile(state.BlockListPath); err != nil {
 			ERROR("unable to create custom blocklist file: ", err)
@@ -267,8 +261,6 @@ func processBlockList(bl *BlockList, force bool, prevByTag map[string]*DomainSet
 	}
 }
 
-// ensureCustomDNSListFile creates <dir>/custom when missing or empty.
-// Existing non-empty files (including user edits) are left untouched.
 func ensureCustomDNSListFile(dir, content string) error {
 	if dir == "" {
 		return nil
@@ -290,9 +282,6 @@ func ensureCustomBlockListFile(blockListDir string) error {
 	return ensureCustomDNSListFile(blockListDir, customBlockListFileContent)
 }
 
-// ensureCustomDNSListInSlice ensures an enabled "custom" list exists and is first.
-// If missing, it is prepended (Enabled=true). If present but not first, it is
-// moved to the front. Existing Enabled/URL/etc. are otherwise left unchanged.
 func ensureCustomDNSListInSlice(lists *[]*BlockList) bool {
 	if lists == nil {
 		return false
@@ -311,7 +300,6 @@ func ensureCustomDNSListInSlice(lists *[]*BlockList) bool {
 	if idx == 0 {
 		return false
 	}
-	// Keep custom at the top of the list for UI and defaults.
 	custom := (*lists)[idx]
 	out := make([]*BlockList, 0, len(*lists))
 	out = append(out, custom)
@@ -447,6 +435,7 @@ retry:
 	return nil
 }
 
+// GetDefaultBlockLists ...
 func GetDefaultBlockLists() []*BlockList {
 	dlt := time.Now().AddDate(-2, 0, 0)
 	bl := []*BlockList{
@@ -494,7 +483,6 @@ func GetDefaultBlockLists() []*BlockList {
 	}
 
 	for i := range bl {
-		// custom already has LastDownload/Enabled from newCustomDNSList.
 		if bl[i].Tag == customDNSListTag {
 			continue
 		}
@@ -504,6 +492,7 @@ func GetDefaultBlockLists() []*BlockList {
 	return bl
 }
 
+// CheckIfURL ...
 func CheckIfURL(s string) bool {
 	if strings.HasPrefix(s, "https://") {
 		return true

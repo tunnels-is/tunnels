@@ -8,11 +8,11 @@ import (
 	"strings"
 )
 
-// ValidationError is a set of field-level problems (tunnel save, etc.).
 type ValidationError struct {
 	Messages []string
 }
 
+// Error ...
 func (e *ValidationError) Error() string {
 	if e == nil {
 		return ""
@@ -28,19 +28,14 @@ var allowedConfigFormats = map[string]struct{}{
 	"": {}, ".json": {}, ".conf": {}, ".yaml": {}, ".yml": {},
 }
 
-// safeTunnelTag validates tunnel tags used as on-disk identifiers.
 func safeTunnelTag(tag string) bool {
 	return tagCharCheck.MatchString(tag)
 }
 
-// safeListTag validates DNS blocklist/whitelist tags used as filenames under
-// blocklists/ and whitelists/. Same charset as tunnel tags to prevent path traversal.
 func safeListTag(tag string) bool {
 	return tagCharCheck.MatchString(tag)
 }
 
-// listFilePath joins baseDir with a validated, lowercased list tag and ensures
-// the result stays inside baseDir (no ".." / separator escapes).
 func listFilePath(baseDir, tag string) (string, error) {
 	if !safeListTag(tag) {
 		return "", fmt.Errorf("invalid list tag %q: only a-z A-Z 0-9 _ - allowed", tag)

@@ -46,6 +46,7 @@ func flowLen(p *fwPeer) int {
 	return len(p.flows)
 }
 
+// TestInitFirewall_RejectsLargeSubnet ...
 func TestInitFirewall_RejectsLargeSubnet(t *testing.T) {
 	if err := initFirewall("10.0.0.0/8", ""); err == nil {
 		t.Fatal("subnet larger than /16 must be rejected")
@@ -55,6 +56,7 @@ func TestInitFirewall_RejectsLargeSubnet(t *testing.T) {
 	}
 }
 
+// TestV4Offset ...
 func TestV4Offset(t *testing.T) {
 	setupFW(t, "10.0.0.0/24", "")
 	for _, tc := range []struct {
@@ -75,6 +77,7 @@ func TestV4Offset(t *testing.T) {
 	}
 }
 
+// TestResetPeer_DefaultDeny ...
 func TestResetPeer_DefaultDeny(t *testing.T) {
 	setupFW(t, "10.0.0.0/24", "")
 	resetPeer("10.0.0.5")
@@ -84,6 +87,7 @@ func TestResetPeer_DefaultDeny(t *testing.T) {
 	}
 }
 
+// TestSetAllowed_ReplaceAndClear ...
 func TestSetAllowed_ReplaceAndClear(t *testing.T) {
 	setupFW(t, "10.0.0.0/24", "")
 	resetPeer("10.0.0.5")
@@ -108,6 +112,7 @@ func TestSetAllowed_ReplaceAndClear(t *testing.T) {
 	}
 }
 
+// TestSetAllowed_AllowAll ...
 func TestSetAllowed_AllowAll(t *testing.T) {
 	setupFW(t, "10.0.0.0/24", "")
 	resetPeer("10.0.0.5")
@@ -130,6 +135,7 @@ func TestSetAllowed_AllowAll(t *testing.T) {
 	}
 }
 
+// TestResetPeer_AllowAllDefaultsOff ...
 func TestResetPeer_AllowAllDefaultsOff(t *testing.T) {
 	setupFW(t, "10.0.0.0/24", "")
 	resetPeer("10.0.0.5")
@@ -138,6 +144,7 @@ func TestResetPeer_AllowAllDefaultsOff(t *testing.T) {
 	}
 }
 
+// TestFlow_TouchAndMatch ...
 func TestFlow_TouchAndMatch(t *testing.T) {
 	setupFW(t, "10.0.0.0/24", "")
 	resetPeer("10.0.0.5")
@@ -157,6 +164,7 @@ func TestFlow_TouchAndMatch(t *testing.T) {
 	}
 }
 
+// TestCleanFlows_AgesIdleKeepsActive ...
 func TestCleanFlows_AgesIdleKeepsActive(t *testing.T) {
 	setupFW(t, "10.0.0.0/24", "")
 	resetPeer("10.0.0.5")
@@ -182,6 +190,7 @@ func TestCleanFlows_AgesIdleKeepsActive(t *testing.T) {
 	}
 }
 
+// TestResetPeer_WipesPriorState ...
 func TestResetPeer_WipesPriorState(t *testing.T) {
 	setupFW(t, "10.0.0.0/24", "")
 	resetPeer("10.0.0.5")
@@ -202,6 +211,7 @@ func TestResetPeer_WipesPriorState(t *testing.T) {
 	}
 }
 
+// TestDualStack_SharesEntry ...
 func TestDualStack_SharesEntry(t *testing.T) {
 	setupFW(t, "10.0.0.0/24", "fd00::/64")
 	resetPeer("10.0.0.5", "fd00::5")
@@ -212,6 +222,7 @@ func TestDualStack_SharesEntry(t *testing.T) {
 	}
 }
 
+// TestV6Map_CleanupOnReuse ...
 func TestV6Map_CleanupOnReuse(t *testing.T) {
 	setupFW(t, "10.0.0.0/24", "fd00::/64")
 	resetPeer("10.0.0.5", "fd00::aaaa")
@@ -225,6 +236,7 @@ func TestV6Map_CleanupOnReuse(t *testing.T) {
 	}
 }
 
+// TestFirewallSnapshot ...
 func TestFirewallSnapshot(t *testing.T) {
 	setupFW(t, "10.0.0.0/24", "")
 	resetPeer("10.0.0.5")
@@ -240,6 +252,7 @@ func TestFirewallSnapshot(t *testing.T) {
 	}
 }
 
+// TestParseACLEntry ...
 func TestParseACLEntry(t *testing.T) {
 	for _, tc := range []struct {
 		in      string
@@ -276,6 +289,7 @@ func TestParseACLEntry(t *testing.T) {
 	}
 }
 
+// TestSetAllowed_PortRules ...
 func TestSetAllowed_PortRules(t *testing.T) {
 	setupFW(t, "10.0.0.0/24", "")
 	resetPeer("10.0.0.5")
@@ -306,6 +320,7 @@ func TestSetAllowed_PortRules(t *testing.T) {
 	}
 }
 
+// TestSetAllowed_BareHostSupersedesPort ...
 func TestSetAllowed_BareHostSupersedesPort(t *testing.T) {
 	setupFW(t, "10.0.0.0/24", "")
 	resetPeer("10.0.0.5")
@@ -320,6 +335,7 @@ func TestSetAllowed_BareHostSupersedesPort(t *testing.T) {
 	}
 }
 
+// TestL4Ports ...
 func TestL4Ports(t *testing.T) {
 	l4 := []byte{0x00, 0x16, 0x30, 0x39}
 	for _, proto := range []byte{6, protoUDP} {
@@ -336,6 +352,7 @@ func TestL4Ports(t *testing.T) {
 	}
 }
 
+// TestFwPeer_ConcurrentSafe ...
 func TestFwPeer_ConcurrentSafe(t *testing.T) {
 	setupFW(t, "10.0.0.0/24", "")
 	resetPeer("10.0.0.5")
@@ -368,6 +385,7 @@ func TestFwPeer_ConcurrentSafe(t *testing.T) {
 	wg.Wait()
 }
 
+// TestApplyPeerFirewallSlot_MovesOnIPChange ...
 func TestApplyPeerFirewallSlot_MovesOnIPChange(t *testing.T) {
 	setupFW(t, "10.0.0.0/24", "")
 	applyPeerFirewallSlot("abc", "10.0.0.10", "")

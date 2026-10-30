@@ -7,6 +7,7 @@ import (
 	"time"
 )
 
+// NewSignal ...
 func NewSignal(tag string, ctx context.Context, sleep time.Duration, logFunc func(string), method func()) *Signal {
 	newSignal := &Signal{
 		Ctx:    ctx,
@@ -27,6 +28,7 @@ type Signal struct {
 	Sleep  time.Duration
 }
 
+// Start ...
 func (s *Signal) Start() {
 	defer func() {
 		r := recover()

@@ -120,10 +120,7 @@ func activateSoleAccount() error {
 	return activateAccountByUserID(users[0].ID)
 }
 
-// ActivateAccountIfNone activates a saved account when none is active.
-// The headless CLI uses this so AutoConnect has a workspace. The desktop
-// UI picks among several accounts itself; a single saved account is
-// activated earlier in InitService.
+// ActivateAccountIfNone ...
 func ActivateAccountIfNone() error {
 	s := STATE.Load()
 	if s != nil && s.ActiveAccountHash != "" {

@@ -84,6 +84,7 @@ func setFrag(pkt []byte, id, offsetUnits uint16, more bool) {
 	binary.BigEndian.PutUint16(pkt[6:8], ff)
 }
 
+// TestParseIPHeader_IPv4UDP ...
 func TestParseIPHeader_IPv4UDP(t *testing.T) {
 	pkt := buildIPv4UDP(t, "10.0.0.5", "10.0.0.10", 1234, 5678, []byte("hi"))
 	src, dst, proto, l4, frag, ok := parseIPHeader(pkt)
@@ -104,6 +105,7 @@ func TestParseIPHeader_IPv4UDP(t *testing.T) {
 	}
 }
 
+// TestParseIPHeader_IPv6UDP ...
 func TestParseIPHeader_IPv6UDP(t *testing.T) {
 	pkt := buildIPv6UDP(t, "fd00::5", "fd00::10", 1234, 5678, []byte("hi"))
 	src, dst, proto, _, _, ok := parseIPHeader(pkt)
@@ -118,6 +120,7 @@ func TestParseIPHeader_IPv6UDP(t *testing.T) {
 	}
 }
 
+// TestParseIPHeader_TooShort ...
 func TestParseIPHeader_TooShort(t *testing.T) {
 	for _, n := range []int{0, 1, 10, 19} {
 		if _, _, _, _, _, ok := parseIPHeader(make([]byte, n)); ok {
@@ -126,6 +129,7 @@ func TestParseIPHeader_TooShort(t *testing.T) {
 	}
 }
 
+// TestParseIPHeader_BadVersion ...
 func TestParseIPHeader_BadVersion(t *testing.T) {
 	pkt := make([]byte, 40)
 	pkt[0] = 0x70
@@ -134,6 +138,7 @@ func TestParseIPHeader_BadVersion(t *testing.T) {
 	}
 }
 
+// TestParseIPHeader_BadIHL ...
 func TestParseIPHeader_BadIHL(t *testing.T) {
 	pkt := make([]byte, 20)
 	pkt[0] = 0x40
@@ -142,6 +147,7 @@ func TestParseIPHeader_BadIHL(t *testing.T) {
 	}
 }
 
+// TestParseIPHeader_BadTotalLen ...
 func TestParseIPHeader_BadTotalLen(t *testing.T) {
 	pkt := buildIPv4UDP(t, "10.0.0.5", "10.0.0.10", 1, 2, []byte("x"))
 	binary.BigEndian.PutUint16(pkt[2:4], 9999)
@@ -184,6 +190,7 @@ func allowFor(t *testing.T, dst string, srcs ...string) {
 	entry(t, dst).setAllowed(hostRules(t, srcs...), false)
 }
 
+// TestAllow_DefaultDenyForPeerToPeer ...
 func TestAllow_DefaultDenyForPeerToPeer(t *testing.T) {
 	insp := newTestInspector(t)
 	resetPeer("10.0.0.5")
@@ -194,6 +201,7 @@ func TestAllow_DefaultDenyForPeerToPeer(t *testing.T) {
 	}
 }
 
+// TestAllow_ServerIPUnreachableByPeers ...
 func TestAllow_ServerIPUnreachableByPeers(t *testing.T) {
 	insp := newTestInspector(t)
 
@@ -207,6 +215,7 @@ func TestAllow_ServerIPUnreachableByPeers(t *testing.T) {
 	}
 }
 
+// TestAllow_FirewallDisabled ...
 func TestAllow_FirewallDisabled(t *testing.T) {
 	insp := newTestInspectorNoFirewall(t)
 
@@ -225,6 +234,7 @@ func TestAllow_FirewallDisabled(t *testing.T) {
 	}
 }
 
+// TestAllow_ServerOriginatedPasses ...
 func TestAllow_ServerOriginatedPasses(t *testing.T) {
 	insp := newTestInspector(t)
 
@@ -234,6 +244,7 @@ func TestAllow_ServerOriginatedPasses(t *testing.T) {
 	}
 }
 
+// TestAllow_AllowlistedSrcPasses ...
 func TestAllow_AllowlistedSrcPasses(t *testing.T) {
 	insp := newTestInspector(t)
 	allowFor(t, "10.0.0.10", "10.0.0.5")
@@ -249,6 +260,7 @@ func TestAllow_AllowlistedSrcPasses(t *testing.T) {
 	}
 }
 
+// TestAllow_RevokeDropsConntrackFlow ...
 func TestAllow_RevokeDropsConntrackFlow(t *testing.T) {
 	insp := newTestInspector(t)
 	resetPeer("10.0.0.3")
@@ -266,6 +278,7 @@ func TestAllow_RevokeDropsConntrackFlow(t *testing.T) {
 	}
 }
 
+// TestAllow_RevokeKeepsOwnOutboundFlow ...
 func TestAllow_RevokeKeepsOwnOutboundFlow(t *testing.T) {
 	insp := newTestInspector(t)
 	resetPeer("10.0.0.2")
@@ -281,6 +294,7 @@ func TestAllow_RevokeKeepsOwnOutboundFlow(t *testing.T) {
 	}
 }
 
+// TestAllow_RevokeReestablishesOnOutbound ...
 func TestAllow_RevokeReestablishesOnOutbound(t *testing.T) {
 	insp := newTestInspector(t)
 	resetPeer("10.0.0.3")
@@ -300,6 +314,7 @@ func TestAllow_RevokeReestablishesOnOutbound(t *testing.T) {
 	}
 }
 
+// TestAllow_HostPortRule ...
 func TestAllow_HostPortRule(t *testing.T) {
 	insp := newTestInspector(t)
 	resetPeer("10.0.0.10")
@@ -320,6 +335,7 @@ func TestAllow_HostPortRule(t *testing.T) {
 	}
 }
 
+// TestAllow_AnyHostPortRule ...
 func TestAllow_AnyHostPortRule(t *testing.T) {
 	insp := newTestInspector(t)
 	resetPeer("10.0.0.10")
@@ -342,6 +358,7 @@ func TestAllow_AnyHostPortRule(t *testing.T) {
 	}
 }
 
+// TestParseIPHeader_Fragments ...
 func TestParseIPHeader_Fragments(t *testing.T) {
 	head := buildIPv4UDP(t, "10.0.0.5", "10.0.0.10", 1, 2, make([]byte, 8))
 	setFrag(head, 4242, 0, true)
@@ -358,6 +375,7 @@ func TestParseIPHeader_Fragments(t *testing.T) {
 	}
 }
 
+// TestAllow_FragmentsAlwaysDropped ...
 func TestAllow_FragmentsAlwaysDropped(t *testing.T) {
 	insp := newTestInspector(t)
 	resetPeer("10.0.0.10")
@@ -380,6 +398,7 @@ func TestAllow_FragmentsAlwaysDropped(t *testing.T) {
 	}
 }
 
+// TestAllow_OrphanTrailingFragmentDropped ...
 func TestAllow_OrphanTrailingFragmentDropped(t *testing.T) {
 	insp := newTestInspector(t)
 	resetPeer("10.0.0.10")
@@ -396,6 +415,7 @@ func TestAllow_OrphanTrailingFragmentDropped(t *testing.T) {
 	}
 }
 
+// TestAllow_FragmentedToDeniedPortDropped ...
 func TestAllow_FragmentedToDeniedPortDropped(t *testing.T) {
 	insp := newTestInspector(t)
 	resetPeer("10.0.0.10")
@@ -416,6 +436,7 @@ func TestAllow_FragmentedToDeniedPortDropped(t *testing.T) {
 	}
 }
 
+// TestAllow_FragmentBareHostRule ...
 func TestAllow_FragmentBareHostRule(t *testing.T) {
 	insp := newTestInspector(t)
 	allowFor(t, "10.0.0.10", "10.0.0.5")
@@ -429,6 +450,7 @@ func TestAllow_FragmentBareHostRule(t *testing.T) {
 	}
 }
 
+// TestAllow_FragmentBareHostOrderIndependent ...
 func TestAllow_FragmentBareHostOrderIndependent(t *testing.T) {
 	insp := newTestInspector(t)
 	allowFor(t, "10.0.0.10", "10.0.0.5")
@@ -448,6 +470,7 @@ func TestAllow_FragmentBareHostOrderIndependent(t *testing.T) {
 	}
 }
 
+// TestAllow_FragmentPortRuleNeedsHead ...
 func TestAllow_FragmentPortRuleNeedsHead(t *testing.T) {
 	insp := newTestInspector(t)
 	setRule("10.0.0.10", "10.0.0.5:5000")
@@ -459,6 +482,7 @@ func TestAllow_FragmentPortRuleNeedsHead(t *testing.T) {
 	}
 }
 
+// TestAllow_FragmentConntrackReturn ...
 func TestAllow_FragmentConntrackReturn(t *testing.T) {
 	insp := newTestInspector(t)
 	resetPeer("10.0.0.2")
@@ -479,6 +503,7 @@ func TestAllow_FragmentConntrackReturn(t *testing.T) {
 	}
 }
 
+// TestInspector_ServerIPUsesMaskedPrefix ...
 func TestInspector_ServerIPUsesMaskedPrefix(t *testing.T) {
 	setupFW(t, "10.0.0.0/22", "")
 	insp, err := newInspectingTUN(nil, &Config{
@@ -493,6 +518,7 @@ func TestInspector_ServerIPUsesMaskedPrefix(t *testing.T) {
 	}
 }
 
+// TestAllow_ConntrackReturnPath ...
 func TestAllow_ConntrackReturnPath(t *testing.T) {
 	insp := newTestInspector(t)
 	resetPeer("10.0.0.3")
@@ -509,6 +535,7 @@ func TestAllow_ConntrackReturnPath(t *testing.T) {
 	}
 }
 
+// TestAllow_ConntrackNoUnsolicitedReturn ...
 func TestAllow_ConntrackNoUnsolicitedReturn(t *testing.T) {
 	insp := newTestInspector(t)
 	resetPeer("10.0.0.3")
@@ -520,6 +547,7 @@ func TestAllow_ConntrackNoUnsolicitedReturn(t *testing.T) {
 	}
 }
 
+// TestAllow_AllowAllAdmitsAnySource ...
 func TestAllow_AllowAllAdmitsAnySource(t *testing.T) {
 	insp := newTestInspector(t)
 	resetPeer("10.0.0.10")
@@ -533,6 +561,7 @@ func TestAllow_AllowAllAdmitsAnySource(t *testing.T) {
 	}
 }
 
+// TestHandleControl_AllowAll ...
 func TestHandleControl_AllowAll(t *testing.T) {
 	insp := newTestInspector(t)
 	resetPeer("10.0.0.5")
@@ -546,6 +575,7 @@ func TestHandleControl_AllowAll(t *testing.T) {
 	}
 }
 
+// TestAllow_NonPeerToPeerAlwaysPasses ...
 func TestAllow_NonPeerToPeerAlwaysPasses(t *testing.T) {
 	insp := newTestInspector(t)
 	allowFor(t, "10.0.0.10")
@@ -556,6 +586,7 @@ func TestAllow_NonPeerToPeerAlwaysPasses(t *testing.T) {
 	}
 }
 
+// TestAllow_MalformedDropped ...
 func TestAllow_MalformedDropped(t *testing.T) {
 	insp := newTestInspector(t)
 	if insp.allow([]byte{0x00, 0x00}) {
@@ -563,6 +594,7 @@ func TestAllow_MalformedDropped(t *testing.T) {
 	}
 }
 
+// TestAllow_ConntrackOnlyAfterAdmit ...
 func TestAllow_ConntrackOnlyAfterAdmit(t *testing.T) {
 	insp := newTestInspector(t)
 	resetPeer("10.0.0.2")
@@ -579,6 +611,7 @@ func TestAllow_ConntrackOnlyAfterAdmit(t *testing.T) {
 	}
 }
 
+// TestAllow_IPv6 ...
 func TestAllow_IPv6(t *testing.T) {
 	insp := newTestInspector(t)
 	resetPeer("10.0.0.10", "fd00::10")
@@ -595,6 +628,7 @@ func TestAllow_IPv6(t *testing.T) {
 	}
 }
 
+// TestHandleControl_UpdatesACL ...
 func TestHandleControl_UpdatesACL(t *testing.T) {
 	insp := newTestInspector(t)
 	resetPeer("10.0.0.5")
@@ -613,6 +647,7 @@ func TestHandleControl_UpdatesACL(t *testing.T) {
 	}
 }
 
+// TestHandleControl_IgnoresWrongPort ...
 func TestHandleControl_IgnoresWrongPort(t *testing.T) {
 	insp := newTestInspector(t)
 	pkt := buildIPv4UDP(t, "10.0.0.5", insp.serverIPv4.String(), 1, 12345, []byte(`{"Allowed":[]}`))
@@ -621,6 +656,7 @@ func TestHandleControl_IgnoresWrongPort(t *testing.T) {
 	}
 }
 
+// TestHandleControl_IgnoresWrongDst ...
 func TestHandleControl_IgnoresWrongDst(t *testing.T) {
 	insp := newTestInspector(t)
 	pkt := buildIPv4UDP(t, "10.0.0.5", "10.0.0.10", 1, aclControlPort, []byte(`{"Allowed":[]}`))
@@ -629,6 +665,7 @@ func TestHandleControl_IgnoresWrongDst(t *testing.T) {
 	}
 }
 
+// TestHandleControl_NonUDPIgnored ...
 func TestHandleControl_NonUDPIgnored(t *testing.T) {
 	insp := newTestInspector(t)
 	pkt := buildIPv4UDP(t, "10.0.0.5", insp.serverIPv4.String(), 1, aclControlPort, nil)
@@ -638,6 +675,7 @@ func TestHandleControl_NonUDPIgnored(t *testing.T) {
 	}
 }
 
+// TestHandleControl_TrailingFragmentNotControl ...
 func TestHandleControl_TrailingFragmentNotControl(t *testing.T) {
 	insp := newTestInspector(t)
 	resetPeer("10.0.0.5")
@@ -653,6 +691,7 @@ func TestHandleControl_TrailingFragmentNotControl(t *testing.T) {
 	}
 }
 
+// TestHandleControl_FirstFragmentStillControl ...
 func TestHandleControl_FirstFragmentStillControl(t *testing.T) {
 	insp := newTestInspector(t)
 	resetPeer("10.0.0.5")
@@ -665,6 +704,7 @@ func TestHandleControl_FirstFragmentStillControl(t *testing.T) {
 	}
 }
 
+// TestHandleControl_SrcOutsideWGSubnet ...
 func TestHandleControl_SrcOutsideWGSubnet(t *testing.T) {
 	insp := newTestInspector(t)
 
@@ -677,6 +717,7 @@ func TestHandleControl_SrcOutsideWGSubnet(t *testing.T) {
 	}
 }
 
+// TestHandleControl_BadJSON ...
 func TestHandleControl_BadJSON(t *testing.T) {
 	insp := newTestInspector(t)
 	resetPeer("10.0.0.5")
@@ -689,6 +730,7 @@ func TestHandleControl_BadJSON(t *testing.T) {
 	}
 }
 
+// TestHandleControl_EmptyListIsolatesSender ...
 func TestHandleControl_EmptyListIsolatesSender(t *testing.T) {
 	insp := newTestInspector(t)
 	resetPeer("10.0.0.5")
@@ -701,6 +743,7 @@ func TestHandleControl_EmptyListIsolatesSender(t *testing.T) {
 	}
 }
 
+// TestHandleControl_EmptyListClearsPolicy ...
 func TestHandleControl_EmptyListClearsPolicy(t *testing.T) {
 	insp := newTestInspector(t)
 	resetPeer("10.0.0.5")
@@ -720,6 +763,7 @@ func TestHandleControl_EmptyListClearsPolicy(t *testing.T) {
 	}
 }
 
+// TestHandleControl_CrossServerIPAccepted ...
 func TestHandleControl_CrossServerIPAccepted(t *testing.T) {
 	insp := newTestInspector(t)
 	resetPeer("10.0.0.5")
@@ -733,6 +777,7 @@ func TestHandleControl_CrossServerIPAccepted(t *testing.T) {
 	}
 }
 
+// TestHandleControl_AnnounceWithoutEntryDropped ...
 func TestHandleControl_AnnounceWithoutEntryDropped(t *testing.T) {
 	insp := newTestInspector(t)
 
@@ -745,6 +790,7 @@ func TestHandleControl_AnnounceWithoutEntryDropped(t *testing.T) {
 	}
 }
 
+// TestHandleControl_IPv6 ...
 func TestHandleControl_IPv6(t *testing.T) {
 	insp := newTestInspector(t)
 	resetPeer("10.0.0.5", "fd00::5")
@@ -793,6 +839,7 @@ func buildIPv6FragUDP(t *testing.T, src, dst string, sport, dport uint16, id uin
 	return pkt
 }
 
+// TestParseIPHeader_IPv6FirstFragment ...
 func TestParseIPHeader_IPv6FirstFragment(t *testing.T) {
 	pkt := buildIPv6FragUDP(t, "fd00::5", "fd00::10", 1234, 5678, 0xDEADBEEF, 0, true, []byte("hi"))
 	src, dst, proto, l4, frag, ok := parseIPHeader(pkt)
@@ -816,6 +863,7 @@ func TestParseIPHeader_IPv6FirstFragment(t *testing.T) {
 	}
 }
 
+// TestParseIPHeader_IPv6TrailingFragment ...
 func TestParseIPHeader_IPv6TrailingFragment(t *testing.T) {
 	pkt := buildIPv6FragUDP(t, "fd00::5", "fd00::10", 0, 0, 7, 10, false, []byte("restofdata"))
 	_, _, _, _, frag, ok := parseIPHeader(pkt)
@@ -830,6 +878,7 @@ func TestParseIPHeader_IPv6TrailingFragment(t *testing.T) {
 	}
 }
 
+// TestParseIPHeader_IPv6HopByHopSkipped ...
 func TestParseIPHeader_IPv6HopByHopSkipped(t *testing.T) {
 
 	udp := buildIPv6UDP(t, "fd00::5", "fd00::10", 42, 43, nil)
@@ -856,6 +905,7 @@ func TestParseIPHeader_IPv6HopByHopSkipped(t *testing.T) {
 	}
 }
 
+// TestParseIPHeader_IPv6TruncatedExtHeader ...
 func TestParseIPHeader_IPv6TruncatedExtHeader(t *testing.T) {
 	pkt := buildIPv6UDP(t, "fd00::5", "fd00::10", 1, 2, nil)
 	pkt[6] = 44
@@ -866,6 +916,7 @@ func TestParseIPHeader_IPv6TruncatedExtHeader(t *testing.T) {
 	}
 }
 
+// TestAllow_IPv6FragmentedDatagramAdmitted ...
 func TestAllow_IPv6FragmentedDatagramAdmitted(t *testing.T) {
 	insp := newTestInspector(t)
 	resetPeer("10.0.0.5", "fd00::5")

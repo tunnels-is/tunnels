@@ -6,6 +6,7 @@ import (
 	"github.com/tunnels-is/tunnels/types"
 )
 
+// TestServerWGAddr ...
 func TestServerWGAddr(t *testing.T) {
 	cases := []struct {
 		name string

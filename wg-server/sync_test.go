@@ -20,10 +20,11 @@ func testControllerCfg(srv *httptest.Server, apiKey string) *Config {
 	return &Config{
 		ControllerURL:      srv.URL,
 		APIKey:             apiKey,
-		InsecureSkipVerify: true, // test TLS cert is self-signed
+		InsecureSkipVerify: true,
 	}
 }
 
+// TestQueryPeer_OK ...
 func TestQueryPeer_OK(t *testing.T) {
 	want := types.WGPeer{
 		PublicKeyHex:  "deadbeef",
@@ -58,6 +59,7 @@ func TestQueryPeer_OK(t *testing.T) {
 	}
 }
 
+// TestQueryPeer_Denied ...
 func TestQueryPeer_Denied(t *testing.T) {
 	for _, code := range []int{http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound} {
 		srv := startTLSController(t, func(w http.ResponseWriter, r *http.Request) {
@@ -76,6 +78,7 @@ func TestQueryPeer_Denied(t *testing.T) {
 	}
 }
 
+// TestQueryPeer_ServerErrorIsUnknown ...
 func TestQueryPeer_ServerErrorIsUnknown(t *testing.T) {
 	srv := startTLSController(t, func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -89,6 +92,7 @@ func TestQueryPeer_ServerErrorIsUnknown(t *testing.T) {
 	}
 }
 
+// TestQueryPeer_QueryEscaping ...
 func TestQueryPeer_QueryEscaping(t *testing.T) {
 	var seen string
 	srv := startTLSController(t, func(w http.ResponseWriter, r *http.Request) {
@@ -108,6 +112,7 @@ func TestQueryPeer_QueryEscaping(t *testing.T) {
 	}
 }
 
+// TestQueryPeer_HTTPControllerURLRejected ...
 func TestQueryPeer_HTTPControllerURLRejected(t *testing.T) {
 	cfg := &Config{ControllerURL: "http://127.0.0.1:1", APIKey: "k"}
 	initSyncClient(cfg)
@@ -116,6 +121,7 @@ func TestQueryPeer_HTTPControllerURLRejected(t *testing.T) {
 	}
 }
 
+// TestQueryPeer_RedirectNotFollowed ...
 func TestQueryPeer_RedirectNotFollowed(t *testing.T) {
 	var evilHits int
 	evil := startTLSController(t, func(w http.ResponseWriter, r *http.Request) {

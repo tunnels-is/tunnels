@@ -8,6 +8,7 @@ import (
 	"github.com/tunnels-is/tunnels/types"
 )
 
+// TestOriginAllowed ...
 func TestOriginAllowed(t *testing.T) {
 	prev := Config.Load()
 	defer Config.Store(prev)
@@ -35,6 +36,7 @@ func TestOriginAllowed(t *testing.T) {
 	}
 }
 
+// TestCORSMiddleware ...
 func TestCORSMiddleware(t *testing.T) {
 	prev := Config.Load()
 	defer Config.Store(prev)

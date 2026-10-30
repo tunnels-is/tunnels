@@ -13,6 +13,7 @@ import (
 	"github.com/tunnels-is/tunnels/types"
 )
 
+// TestLogin_UnknownEmailPaysBcrypt ...
 func TestLogin_UnknownEmailPaysBcrypt(t *testing.T) {
 	setupTestDB(t)
 	securityReviewLogger()
@@ -45,6 +46,7 @@ func TestLogin_UnknownEmailPaysBcrypt(t *testing.T) {
 	}
 }
 
+// TestLogin_EmptyEmailAndRateLimitStayFast ...
 func TestLogin_EmptyEmailAndRateLimitStayFast(t *testing.T) {
 	setupTestDB(t)
 	securityReviewLogger()
@@ -81,6 +83,7 @@ func TestLogin_EmptyEmailAndRateLimitStayFast(t *testing.T) {
 	}
 }
 
+// TestRegister_RejectedNamePaysBcrypt ...
 func TestRegister_RejectedNamePaysBcrypt(t *testing.T) {
 	setupTestDB(t)
 	securityReviewLogger()

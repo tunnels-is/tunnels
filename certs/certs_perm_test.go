@@ -7,11 +7,11 @@ import (
 	"time"
 )
 
+// TestOpenPrivateKeyFile_Mode0600 ...
 func TestOpenPrivateKeyFile_Mode0600(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "key.pem")
 
-	// Pre-create with loose perms — openPrivateKeyFile should force 0600.
 	if err := os.WriteFile(path, []byte("old"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -34,6 +34,7 @@ func TestOpenPrivateKeyFile_Mode0600(t *testing.T) {
 	}
 }
 
+// TestMakeCert_WritesKeyWith0600 ...
 func TestMakeCert_WritesKeyWith0600(t *testing.T) {
 	dir := t.TempDir()
 	certPath := filepath.Join(dir, "api.crt")

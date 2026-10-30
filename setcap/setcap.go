@@ -14,11 +14,11 @@ import (
 
 const capabilitySet = "cap_net_raw,cap_net_bind_service,cap_net_admin+eip"
 
-// runCommand is replaced in tests.
 var runCommand = func(name string, args ...string) error {
 	return exec.Command(name, args...).Run()
 }
 
+// CheckCapabilities ...
 func CheckCapabilities() (err error) {
 	orig := cap.GetProc()
 	defer orig.SetProc()
@@ -97,9 +97,6 @@ func quotedPath(path string) string {
 	return "'" + strings.ReplaceAll(path, "'", `'\''`) + "'"
 }
 
-// resolveCapabilityTarget returns the real binary path. The file and its
-// directory must be owned by root and not writable by group or other, so
-// setcap cannot be pointed at a path a local user can replace.
 func resolveCapabilityTarget() (string, error) {
 	exe, err := os.Executable()
 	if err != nil {

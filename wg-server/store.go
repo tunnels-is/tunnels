@@ -32,6 +32,7 @@ func newPeerStore(subnet, subnet6 string) *PeerStore {
 	}
 }
 
+// GetOrAssign ...
 func (ps *PeerStore) GetOrAssign(deviceID, pubKeyB64 string) (string, string, error) {
 	ps.mu.Lock()
 	defer ps.mu.Unlock()
@@ -66,6 +67,7 @@ func (ps *PeerStore) GetOrAssign(deviceID, pubKeyB64 string) (string, string, er
 	return ip, ipv6, nil
 }
 
+// Get ...
 func (ps *PeerStore) Get(deviceID string) (PeerRecord, bool) {
 	ps.mu.RLock()
 	defer ps.mu.RUnlock()
@@ -73,6 +75,7 @@ func (ps *PeerStore) Get(deviceID string) (PeerRecord, bool) {
 	return rec, ok
 }
 
+// DeviceIDByIP ...
 func (ps *PeerStore) DeviceIDByIP(ip string) (string, bool) {
 	ps.mu.RLock()
 	defer ps.mu.RUnlock()
@@ -84,6 +87,7 @@ func (ps *PeerStore) DeviceIDByIP(ip string) (string, bool) {
 	return "", false
 }
 
+// Set ...
 func (ps *PeerStore) Set(deviceID, ip, ipv6, pubKeyB64 string) {
 	ps.mu.Lock()
 	defer ps.mu.Unlock()
@@ -97,6 +101,7 @@ func (ps *PeerStore) Set(deviceID, ip, ipv6, pubKeyB64 string) {
 	ps.byPubKey[pubKeyB64] = deviceID
 }
 
+// DeleteByPubKey ...
 func (ps *PeerStore) DeleteByPubKey(pubKeyB64 string) {
 	ps.mu.Lock()
 	defer ps.mu.Unlock()

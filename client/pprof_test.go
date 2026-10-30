@@ -7,6 +7,7 @@ import (
 	"testing"
 )
 
+// TestCanonicalizePprofAddr ...
 func TestCanonicalizePprofAddr(t *testing.T) {
 	got, err := canonicalizePprofAddr("")
 	if err != nil || got != defaultPprofAddr {
@@ -28,6 +29,7 @@ func TestCanonicalizePprofAddr(t *testing.T) {
 	}
 }
 
+// TestPprofMuxServesHeap ...
 func TestPprofMuxServesHeap(t *testing.T) {
 	srv := httptest.NewServer(pprofMux())
 	t.Cleanup(srv.Close)

@@ -29,6 +29,7 @@ func requirePhysicalGateway() (state *State, gateway net.IP, err error) {
 	return state, *gwPtr, nil
 }
 
+// PreConnectCheck ...
 func PreConnectCheck(meta *TunnelMeta) (int, error) {
 	s := STATE.Load()
 	if !s.adminState {
@@ -113,6 +114,7 @@ func startLiveSession(tunnel *TUN) {
 	watchWGDevice(tunnel)
 }
 
+// PublicConnect ...
 func PublicConnect(cr *ConnectionRequest) (code int, connectErr error) {
 	if cr.ServerID == "" {
 		ERROR("No Server id found when connecting: ", cr)
@@ -242,8 +244,6 @@ func PublicConnect(cr *ConnectionRequest) (code int, connectErr error) {
 		return 502, hexErr
 	}
 
-	// Resolve once, after the server /32 is pinned to the physical gateway.
-	// A non-zero config MTU is used as-is. Zero discovers and is not saved back.
 	linkMTU := resolvedMTU(meta, cr.ServerIP, serverResp.WireGuardPort)
 
 	if handled, code, err := tryReplaceLiveWG(oldTunnel, tunnel, wgCfg, meta, ipcConf, state, linkMTU); handled {
@@ -499,6 +499,7 @@ func copyIPv4Bytes(dst *[4]byte, ip net.IP) {
 	dst[3] = ip[3]
 }
 
+// InitializeTunnelFromCRR ...
 func InitializeTunnelFromCRR(t *TUN) (err error) {
 	DNSGlobalBlock.Store(true)
 	defer func() {

@@ -68,9 +68,6 @@ func licensePaidThrough(u *User) time.Time {
 	return u.Key.Created.AddDate(0, u.Key.Months, 0)
 }
 
-// nextSubExpirationFromLemon never stacks another product term on Lemon
-// status "active". Prefer LS expires_at. If that is missing, honor the
-// original paid-through date and do not extend past it.
 func nextSubExpirationFromLemon(u *User, status string, expiresAt *time.Time) (time.Time, bool) {
 	if u == nil {
 		return time.Time{}, false

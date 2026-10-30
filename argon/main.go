@@ -17,6 +17,7 @@ type Argon struct {
 	KeyLength   uint32
 }
 
+// Key ...
 func (a *Argon) Key(password string, skipSalt bool) (key []byte, err error) {
 	salt := make([]byte, a.SaltLength)
 	if !skipSalt {
@@ -28,6 +29,7 @@ func (a *Argon) Key(password string, skipSalt bool) (key []byte, err error) {
 	return
 }
 
+// GenerateUserFolderHash ...
 func GenerateUserFolderHash(userID string) (key []byte, err error) {
 	a := &Argon{
 		Memory:      20 * 1024,
@@ -45,6 +47,7 @@ func GenerateUserFolderHash(userID string) (key []byte, err error) {
 	return
 }
 
+// GetKeyFromLocalInfo ...
 func GetKeyFromLocalInfo(extraParams ...any) (key []byte, err error) {
 	preHash := ""
 	wd, err := os.Getwd()

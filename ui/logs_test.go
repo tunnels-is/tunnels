@@ -8,6 +8,7 @@ import (
 	"fyne.io/fyne/v2/test"
 )
 
+// TestLogRowWrapsLongMessage ...
 func TestLogRowWrapsLongMessage(t *testing.T) {
 	a := test.NewApp()
 	t.Cleanup(a.Quit)
@@ -33,6 +34,7 @@ func TestLogRowWrapsLongMessage(t *testing.T) {
 	}
 }
 
+// TestLogRowWrapCacheReusesLines ...
 func TestLogRowWrapCacheReusesLines(t *testing.T) {
 	a := test.NewApp()
 	t.Cleanup(a.Quit)
@@ -57,6 +59,7 @@ func TestLogRowWrapCacheReusesLines(t *testing.T) {
 	}
 }
 
+// TestLogRowShortMessageStaysOneLine ...
 func TestLogRowShortMessageStaysOneLine(t *testing.T) {
 	a := test.NewApp()
 	t.Cleanup(a.Quit)

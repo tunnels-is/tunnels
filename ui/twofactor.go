@@ -104,7 +104,6 @@ func (a *App) twoFactorPage() fyne.CanvasObject {
 }
 
 func parseOTPSecret(uri string) string {
-	// otpauth://...&secret=XXXX or secret=XXXX&...
 	for _, part := range strings.Split(uri, "&") {
 		if i := strings.Index(strings.ToLower(part), "secret="); i >= 0 {
 			return part[i+len("secret="):]

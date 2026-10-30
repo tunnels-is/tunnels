@@ -9,9 +9,6 @@ import (
 	"golang.zx2c4.com/wireguard/tun"
 )
 
-// introTUN watches packets entering the tunnel and swallows introductions
-// arriving from it. An introduction is delivered by making the next Read
-// return it, so WireGuard encrypts it toward the peer tunnel IP.
 type introTUN struct {
 	tun.Device
 	inject chan []byte
@@ -71,6 +68,7 @@ func (t *introTUN) start() {
 	})
 }
 
+// Read ...
 func (t *introTUN) Read(bufs [][]byte, sizes []int, offset int) (int, error) {
 	t.start()
 	for {
@@ -97,6 +95,7 @@ func (t *introTUN) Read(bufs [][]byte, sizes []int, offset int) (int, error) {
 	}
 }
 
+// Write ...
 func (t *introTUN) Write(bufs [][]byte, offset int) (int, error) {
 	keep := make([][]byte, 0, len(bufs))
 	for _, buf := range bufs {

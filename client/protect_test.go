@@ -6,6 +6,7 @@ import (
 	"testing"
 )
 
+// TestNewProtectBindWrapsWhenIfIndexSet ...
 func TestNewProtectBindWrapsWhenIfIndexSet(t *testing.T) {
 	plain := newProtectBind(0)
 	if _, ok := plain.(*ifaceProtectBind); ok {
@@ -21,6 +22,7 @@ func TestNewProtectBindWrapsWhenIfIndexSet(t *testing.T) {
 	}
 }
 
+// TestParseRouteGetGateway ...
 func TestParseRouteGetGateway(t *testing.T) {
 	out := `
    route to: default
@@ -41,6 +43,7 @@ destination: default
 	}
 }
 
+// TestRegisterProtectHostDedupes ...
 func TestRegisterProtectHostDedupes(t *testing.T) {
 	tun := &TUN{}
 	registerProtectHost(tun, "74.63.223.157")
@@ -52,6 +55,7 @@ func TestRegisterProtectHostDedupes(t *testing.T) {
 	}
 }
 
+// TestBuildWGIPCIncludesFwMarkReplacePeersAndEndpoint ...
 func TestBuildWGIPCIncludesFwMarkReplacePeersAndEndpoint(t *testing.T) {
 	s := buildWGIPC("aa", "bb", "74.63.223.157", "51820")
 	wantMark := fmt.Sprintf("fwmark=%d", wgProtectMark)

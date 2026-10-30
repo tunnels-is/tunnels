@@ -2,6 +2,7 @@ package wgserver
 
 import "testing"
 
+// TestNextIP_SkipsBroadcast ...
 func TestNextIP_SkipsBroadcast(t *testing.T) {
 	ps := newPeerStore("10.9.9.0/30", "")
 	ip, _, err := ps.GetOrAssign("devA", "keyA")
@@ -16,6 +17,7 @@ func TestNextIP_SkipsBroadcast(t *testing.T) {
 	}
 }
 
+// TestNextIP_ReusesFreedAddress ...
 func TestNextIP_ReusesFreedAddress(t *testing.T) {
 	ps := newPeerStore("10.0.0.0/24", "")
 

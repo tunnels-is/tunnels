@@ -7,25 +7,17 @@ import (
 )
 
 const (
-	// MinInnerMTU is the smallest tunnel MTU we will install.
-	MinInnerMTU = 1280
-	// DefaultInnerMTU is the IPv6-safe fallback when discovery gets no answer.
+	MinInnerMTU     = 1280
 	DefaultInnerMTU = 1420
-	// MaxOuterMTU is the largest outer IP packet a probe may be. A later
-	// direct peer on a 1500-byte path must still fit under the interface MTU.
-	MaxOuterMTU = 1500
-	// IPv4WGOverhead is outer IPv4 + UDP + WireGuard (20+8+32).
-	IPv4WGOverhead = 60
-	// IPv6WGOverhead is outer IPv6 + UDP + WireGuard (40+8+32).
-	IPv6WGOverhead = 80
-	// MTUProbeTimeout is how long a padded ping may go unanswered.
-	// The punch loop polls once a second, so this is noticed on the next ticks.
+	MaxOuterMTU     = 1500
+	IPv4WGOverhead  = 60
+	IPv6WGOverhead  = 80
 	MTUProbeTimeout = 2 * time.Second
 
 	mtuSearchSteps = 16
 )
 
-// Overhead is the outer IP, UDP, and WireGuard header cost for an inner packet.
+// Overhead ...
 func Overhead(v6 bool) int {
 	if v6 {
 		return IPv6WGOverhead
@@ -33,12 +25,12 @@ func Overhead(v6 bool) int {
 	return IPv4WGOverhead
 }
 
-// MinOuter is the smallest outer packet that can carry MinInnerMTU.
+// MinOuter ...
 func MinOuter(v6 bool) int {
 	return MinInnerMTU + Overhead(v6)
 }
 
-// ProbePayloadLen is the UDP payload length of an outer IP packet of size outer.
+// ProbePayloadLen ...
 func ProbePayloadLen(outer int, v6 bool) int {
 	n := 28
 	if v6 {
@@ -47,8 +39,7 @@ func ProbePayloadLen(outer int, v6 bool) int {
 	return outer - n
 }
 
-// PingPlainForOuter is the sealed-ping plaintext length that occupies an
-// outer IP packet of size outer. The first 8 bytes are the txid.
+// PingPlainForOuter ...
 func PingPlainForOuter(outer int, v6 bool) (int, bool) {
 	plain := ProbePayloadLen(outer, v6) - directPacketLen(0)
 	if plain < 8 || directPacketLen(plain) > MaxPacket {
@@ -57,7 +48,6 @@ func PingPlainForOuter(outer int, v6 bool) (int, bool) {
 	return plain, true
 }
 
-// PathMTU is one peer's measured inner MTU, from this side's send path.
 type PathMTU struct {
 	Peer  Peer
 	Inner int
@@ -77,17 +67,14 @@ func (s *session) resetMTU() {
 	s.mtuSteps = 0
 }
 
-// SetDiscoverMTU turns on per-peer probes after a direct path is trusted.
-// A configured interface MTU leaves this off: the interface already caps every peer.
+// SetDiscoverMTU ...
 func (e *Engine) SetDiscoverMTU(on bool) {
 	e.mu.Lock()
 	e.discover = on
 	e.mu.Unlock()
 }
 
-// MTUUnsent reports that the in-flight probe for peer never left the host
-// (the local stack refused it, typically EMSGSIZE). That size is too big
-// and is not retried.
+// MTUUnsent ...
 func (e *Engine) MTUUnsent(peer uuid.UUID, now time.Time) Result {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -101,8 +88,6 @@ func (e *Engine) MTUUnsent(peer uuid.UUID, now time.Time) Result {
 	return r
 }
 
-// armMTULocked starts a search on a newly trusted path. fresh drops a
-// previous result so a different endpoint is measured again.
 func (e *Engine) armMTULocked(s *session, r *Result, now time.Time, fresh bool) {
 	if !e.discover || s == nil || !s.direct.IsValid() {
 		return
@@ -132,7 +117,6 @@ func (e *Engine) pollMTULocked(s *session, r *Result, now time.Time) {
 	if now.Sub(s.mtuSent) < MTUProbeTimeout {
 		return
 	}
-	// One retry, and only for the opening 1500-byte probe. Later steps are single-shot.
 	if s.mtuOuter == MaxOuterMTU && !s.mtuRetried {
 		s.mtuRetried = true
 		e.launchMTULocked(s, r, s.mtuOuter, now)

@@ -9,6 +9,7 @@ import (
 	"github.com/xlzd/gotp"
 )
 
+// GetQRCode ...
 func GetQRCode(form *TwoFactorConfirm) (*QRCode, error) {
 	if form.Email == "" {
 		return nil, errors.New("email missing")

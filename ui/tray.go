@@ -18,14 +18,6 @@ const (
 	trayExitLabel        = "Exit"
 )
 
-// installTray registers the status icon. Left click shows the window.
-// Right click lists each tunnel, then Auto-connect and Exit.
-// SetSystemTrayWindow also hides the window on close; surviveWindowClose
-// runs after this and keeps that hide, including when the display itself
-// goes away.
-//
-// The title-bar minimize button stays with the compositor. On Wayland,
-// xdg-shell does not report iconify, so that click cannot hide to the tray.
 func (a *App) installTray() {
 	if a.fyneApp == nil || a.win == nil {
 		return
@@ -43,8 +35,6 @@ func (a *App) installTray() {
 	desk.SetSystemTrayWindow(a.win)
 }
 
-// ensureTrayTitle gives the status icon a name. A plain go build does not
-// embed FyneApp.toml, so Fyne would otherwise label the icon with the app id.
 func ensureTrayTitle(fy fyne.App) {
 	meta := fy.Metadata()
 	if meta.Name != "" {
@@ -57,17 +47,12 @@ func ensureTrayTitle(fy fyne.App) {
 	app.SetMetadata(meta)
 }
 
-// newTrayMenu builds the status icon menu. Exit is last and marked quit so
-// Fyne does not append a second Quit item that skips client shutdown.
 func (a *App) newTrayMenu() *fyne.Menu {
 	items, sig := a.trayItems()
 	a.traySig = sig
 	return fyne.NewMenu("", items...)
 }
 
-// syncTray rebuilds the menu when a tunnel comes up, goes down, or the
-// saved list changes. The title pump calls this about once a second, so
-// an unchanged signature leaves the open menu alone.
 func (a *App) syncTray() {
 	if a.trayMenu == nil {
 		return
@@ -81,11 +66,6 @@ func (a *App) syncTray() {
 	a.trayMenu.Refresh()
 }
 
-// trayItems is the right-click menu.
-// Each saved tunnel is one row. A live tunnel reads "name - ONLINE" and a
-// click disconnects it. A tunnel that is down shows its name and a click
-// connects it. Auto-connect sits where Disconnect used to, just above Exit,
-// and always brings up the default tunnel.
 func (a *App) trayItems() ([]*fyne.MenuItem, string) {
 	rows := a.trayTunnelRows()
 	var items []*fyne.MenuItem
@@ -118,8 +98,6 @@ type trayTunnelRow struct {
 	online bool
 }
 
-// trayTunnelRows is every saved tunnel, plus any live tunnel that has no
-// saved row yet, so it can still be disconnected. Names are alphabetical.
 func (a *App) trayTunnelRows() []trayTunnelRow {
 	live := map[string]*client.TUN{}
 	for _, tun := range disconnectableTunnels(a.active) {
@@ -165,7 +143,6 @@ func trayTunnelLabel(tag string, online bool) string {
 	return tag
 }
 
-// trayToggleTunnel disconnects a live tunnel and connects one that is down.
 func (a *App) trayToggleTunnel(tag string) {
 	for _, tun := range disconnectableTunnels(a.active) {
 		got := tunnelDisconnectTag(tun)
@@ -180,9 +157,6 @@ func (a *App) trayToggleTunnel(tag string) {
 	a.connectTunnelByTag(tag)
 }
 
-// trayAutoConnect connects the way the dashboard Connect button does.
-// A probe that already ran is reused. Otherwise the server list is measured
-// and the closest one is passed to connectToServer.
 func (a *App) trayAutoConnect() {
 	if srv, ok := a.closestServer(); ok {
 		a.connectToServer(srv)
@@ -234,8 +208,6 @@ func (a *App) trayAutoConnect() {
 	}()
 }
 
-// disconnectableTunnels is every live tunnel the tray can still tear down.
-// Tunnels already disconnecting are left out so the item can go idle.
 func disconnectableTunnels(active []*client.TUN) []*client.TUN {
 	var out []*client.TUN
 	for _, tun := range active {

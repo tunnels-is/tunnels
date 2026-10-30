@@ -5,6 +5,7 @@ import (
 	"strconv"
 )
 
+// BandwidthBytesToString ...
 func BandwidthBytesToString(b int64) string {
 	if b <= 999 {
 		intS := strconv.FormatInt(b, 10)

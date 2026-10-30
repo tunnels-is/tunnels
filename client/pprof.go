@@ -50,8 +50,6 @@ func pprofMux() *http.ServeMux {
 	return mux
 }
 
-// canonicalizePprofAddr requires a loopback host. Heap profiles can contain
-// tokens and keys, so this must never bind a public interface.
 func canonicalizePprofAddr(addr string) (string, error) {
 	addr = strings.TrimSpace(addr)
 	if addr == "" {

@@ -27,6 +27,7 @@ const (
 	gwB     = "10.0.1.1"
 )
 
+// TestMeshPunch ...
 func TestMeshPunch(t *testing.T) {
 	if _, err := os.Stat("/dev/net/tun"); err != nil {
 		t.Skip("/dev/net/tun is not available")

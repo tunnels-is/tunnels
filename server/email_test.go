@@ -2,6 +2,7 @@ package main
 
 import "testing"
 
+// TestNormalizeEmail ...
 func TestNormalizeEmail(t *testing.T) {
 	if got := normalizeEmail("  Admin@Example.COM "); got != "admin@example.com" {
 		t.Fatalf("got %q", got)
@@ -11,6 +12,7 @@ func TestNormalizeEmail(t *testing.T) {
 	}
 }
 
+// TestIsReservedAccountEmail ...
 func TestIsReservedAccountEmail(t *testing.T) {
 	if !isReservedAccountEmail("ADMIN") || !isReservedAccountEmail(" admin ") {
 		t.Fatal("admin must be reserved")

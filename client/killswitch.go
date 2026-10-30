@@ -12,12 +12,7 @@ import (
 )
 
 const (
-	// killSwitchMetric is the sink default. A lower metric wins, so the
-	// tunnel default (metric 0 or 1) stays ahead of it and a physical
-	// default is moved above it.
-	killSwitchMetric = 50
-	// killSwitchDemotedMetric is where a physical default sits while the
-	// switch is on. It is worse than killSwitchMetric.
+	killSwitchMetric        = 50
 	killSwitchDemotedMetric = 100
 )
 
@@ -25,9 +20,6 @@ var killSwitchMu sync.Mutex
 
 var killSwitchWatchOnce sync.Once
 
-// applyConfiguredKillSwitch installs or removes IPv4/IPv6 blackhole
-// defaults to match CONFIG. Routes stay until the matching setting is
-// turned off — not on disconnect, crash, or process exit.
 func applyConfiguredKillSwitch() error {
 	cfg := CONFIG.Load()
 	if cfg == nil {
@@ -64,10 +56,6 @@ func syncKillSwitch(want4, want6 bool) error {
 		disableKillSwitchIPv6()
 	}
 
-	// Reinstall the WireGuard protect table / host /32s / socket pin if a
-	// tunnel is up. The IPv4 blackhole is in the main table; marked WG
-	// packets use table wgProtectTable and must not be left pointing at a
-	// stale default after demoteLowMetricDefaults.
 	refreshEndpointProtect()
 	return first
 }
@@ -102,9 +90,6 @@ func killSwitchWatchLoop() {
 	}
 }
 
-// demotePhysicalDefault reports whether a default route should be moved
-// above the kill-switch sink. Narrower prefixes never reach this check.
-// Tunnel defaults, the protect table, and the sink itself stay put.
 func demotePhysicalDefault(isDefault, blackhole, tunnelLink, tunnelGateway, protectTable bool, priority int) bool {
 	if !isDefault || blackhole || tunnelLink || tunnelGateway || protectTable {
 		return false
@@ -121,9 +106,6 @@ const (
 	defaultChoicePhysical
 )
 
-// classifyDefaultRoute reads `route -n get default` output. A physical
-// default is the only one the kill switch removes. A tunnel default and a
-// blackhole stay.
 func classifyDefaultRoute(out string, tunnels, gateways map[string]struct{}) defaultRouteChoice {
 	if routeGetOutputHasBlackhole(out) {
 		return defaultChoiceBlackhole
@@ -168,8 +150,6 @@ func routeGetValue(out, key string) string {
 	return ""
 }
 
-// netstatHasBlackholeDefault reports a blackhole default in netstat -rn
-// output. The B flag is RTF_BLACKHOLE.
 func netstatHasBlackholeDefault(out string) bool {
 	for _, line := range strings.Split(out, "\n") {
 		fields := strings.Fields(line)
@@ -219,9 +199,6 @@ func routeGetGateway(out string) net.IP {
 	return append(net.IP(nil), ip...)
 }
 
-// raisePhysicalDefault reports whether a Windows default route should be
-// moved above the loopback sink. Prefix length 0 is the default. Loopback
-// and tunnel defaults stay.
 func raisePhysicalDefault(prefixLen, metric int, loopback, tunnel bool) bool {
 	if prefixLen != 0 || loopback || tunnel {
 		return false

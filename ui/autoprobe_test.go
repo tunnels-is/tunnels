@@ -8,9 +8,7 @@ import (
 	"github.com/tunnels-is/tunnels/types"
 )
 
-// TestAutoProbeDecision covers the first probe: signed in, exactly once.
-// A tunnel that is already up still needs a measurement, because the
-// dashboard keeps the closest server on screen above the live tunnels.
+// TestAutoProbeDecision ...
 func TestAutoProbeDecision(t *testing.T) {
 	cs := &client.ControlServer{ID: "cs-1", Host: "api.tunnels.is", Port: "443"}
 	sid := uuid.MustParse("11111111-1111-1111-1111-111111111111")
@@ -79,8 +77,7 @@ func TestAutoProbeDecision(t *testing.T) {
 	}
 }
 
-// TestAutoProbeRunsOnce guards the chain fetchServers -> maybeAutoProbe against
-// re-probing every time the server list is refreshed.
+// TestAutoProbeRunsOnce ...
 func TestAutoProbeRunsOnce(t *testing.T) {
 	cs := &client.ControlServer{ID: "cs-1", Host: "api.tunnels.is", Port: "443"}
 	a := &App{
@@ -90,7 +87,6 @@ func TestAutoProbeRunsOnce(t *testing.T) {
 	if a.autoProbeState() != autoProbeRun {
 		t.Fatal("expected the first call to probe")
 	}
-	// runProbe sets this; simulate it without sending packets.
 	a.probedOnce = true
 	if got := a.autoProbeState(); got != autoProbeSkip {
 		t.Errorf("second call = %v, want skip", got)

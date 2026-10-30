@@ -33,7 +33,6 @@ const (
 	pageConnections pageID = "connections"
 )
 
-// App is the Fyne desktop UI. It talks to the client package in-process.
 type App struct {
 	fyneApp   fyne.App
 	win       fyne.Window
@@ -120,7 +119,7 @@ type App struct {
 	titleHavePrev bool
 }
 
-// Run starts the desktop window. The client service must already be initialized.
+// Run ...
 func Run(icon []byte) {
 	defer recoverRun("Run")
 	hardenFyne()
@@ -140,12 +139,9 @@ func newApp(icon []byte) *App {
 		fy.SetIcon(iconRes)
 	}
 
-	// Apply the saved zoom before anything is built so the first layout is
-	// already at the right scale.
 	zoom := loadZoom(fy)
 
 	w := fy.NewWindow("disconnected")
-	// GLFW is initialized by NewWindow; the native window is created on Show.
 	setLinuxWindowIdentity()
 	registerLinuxDesktop(icon)
 	if iconRes != nil {
@@ -172,8 +168,6 @@ func newApp(icon []byte) *App {
 	a.pageBox = container.New(railLayout{}, a.side, a.content)
 	shell := container.New(&shellLayout{win: w}, a.pageBox, a.toastBox, a.busyBox)
 	w.SetContent(shell)
-	// Fyne pads window content by default, which draws a border of window
-	// background around the whole app. The shell manages its own gutters.
 	w.SetPadded(false)
 
 	a.keepDisplayAwake()
@@ -219,10 +213,6 @@ func (a *App) bootstrap() {
 	}
 }
 
-// startupFetch loads the server list in the background so the dashboard can
-// probe without waiting for input. bootstrap runs before the window is shown,
-// so nothing here may block: fetchServers hands off to a goroutine and the
-// probe is chained from its completion.
 func (a *App) startupFetch() {
 	a.fetchServers(false)
 }
@@ -236,9 +226,6 @@ func (a *App) show(id pageID) {
 	prev := a.current
 	a.teardownPage()
 	a.current = id
-	// Login is a focused, full-window flow: the rail has nothing to offer yet.
-	// Hiding a child does not re-run the parent layout, so refresh the page
-	// container explicitly or it keeps the rail's gap.
 	if a.side != nil {
 		wasHidden := a.side.Hidden
 		if id == pageLogin {

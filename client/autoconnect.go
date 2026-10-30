@@ -420,6 +420,7 @@ func prepareAutoConnectForm(form *AutoConnectForm) (int, error) {
 	return 0, nil
 }
 
+// ProbeBestServer ...
 func ProbeBestServer(form *AutoConnectForm) (*AutoConnectResponse, int, error) {
 	defer RecoverAndLog()
 	if code, err := prepareAutoConnectForm(form); err != nil {
@@ -439,6 +440,7 @@ func ProbeBestServer(form *AutoConnectForm) (*AutoConnectResponse, int, error) {
 	}, 200, nil
 }
 
+// CountryAutoConnect ...
 func CountryAutoConnect(form *AutoConnectForm) (*AutoConnectResponse, int, error) {
 	defer RecoverAndLog()
 

@@ -7,6 +7,7 @@ import (
 	"time"
 )
 
+// TestCheckIfURL ...
 func TestCheckIfURL(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -76,6 +77,7 @@ func TestCheckIfURL(t *testing.T) {
 	}
 }
 
+// TestGetDefaultBlockLists ...
 func TestGetDefaultBlockLists(t *testing.T) {
 	lists := GetDefaultBlockLists()
 
@@ -138,6 +140,7 @@ func TestGetDefaultBlockLists(t *testing.T) {
 	t.Logf("Total default block lists: %d", len(lists))
 }
 
+// TestGetDefaultWhiteLists ...
 func TestGetDefaultWhiteLists(t *testing.T) {
 	lists := GetDefaultWhiteLists()
 
@@ -184,6 +187,7 @@ func TestGetDefaultWhiteLists(t *testing.T) {
 	t.Logf("Total default white lists: %d", len(lists))
 }
 
+// TestEnsureCustomDNSListFiles ...
 func TestEnsureCustomDNSListFiles(t *testing.T) {
 	cases := []struct {
 		name    string
@@ -210,7 +214,6 @@ func TestEnsureCustomDNSListFiles(t *testing.T) {
 				t.Fatalf("unexpected custom file content:\n%s", data)
 			}
 
-			// Existing non-empty file must not be overwritten.
 			user := []byte("keep.example.com\n")
 			if err := os.WriteFile(path, user, 0o600); err != nil {
 				t.Fatal(err)
@@ -226,7 +229,6 @@ func TestEnsureCustomDNSListFiles(t *testing.T) {
 				t.Fatalf("user file was overwritten: %q", data)
 			}
 
-			// Empty file is recreated.
 			if err := os.WriteFile(path, nil, 0o600); err != nil {
 				t.Fatal(err)
 			}
@@ -244,6 +246,7 @@ func TestEnsureCustomDNSListFiles(t *testing.T) {
 	}
 }
 
+// TestEnsureCustomDNSListInConfig ...
 func TestEnsureCustomDNSListInConfig(t *testing.T) {
 	t.Run("whitelist", func(t *testing.T) {
 		cfg := &Config{}
@@ -323,7 +326,6 @@ func TestEnsureCustomDNSListInConfig(t *testing.T) {
 		if cfg.DNSBlockLists[1].Tag != "Ads" || cfg.DNSBlockLists[2].Tag != "Malware" {
 			t.Fatalf("unexpected order: %+v", cfg.DNSBlockLists)
 		}
-		// Already first → no change.
 		if ensureCustomBlockListInConfig(cfg) {
 			t.Fatal("expected no change when custom already first")
 		}

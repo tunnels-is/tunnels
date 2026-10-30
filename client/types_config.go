@@ -49,6 +49,7 @@ func (c *ControlServer) effectivePort() string {
 	return c.Port
 }
 
+// GetHostAndPort ...
 func (c *ControlServer) GetHostAndPort() string {
 	hostPort := c.Host
 	if p := c.effectivePort(); p != "" {
@@ -57,6 +58,7 @@ func (c *ControlServer) GetHostAndPort() string {
 	return hostPort
 }
 
+// GetURL ...
 func (c *ControlServer) GetURL(path string) string {
 	url := c.GetHostAndPort()
 	path = strings.TrimPrefix(path, "/")
@@ -66,12 +68,7 @@ func (c *ControlServer) GetURL(path string) string {
 }
 
 type Config struct {
-	// KillSwitchIPv4 blackholes 0.0.0.0/0 until the user turns it off.
-	// Off by default. When on, controller/VPN endpoints are pinned /32.
 	KillSwitchIPv4 bool
-	// KillSwitchIPv6 blackholes ::/0 until the user turns it off.
-	// Off by default in newly generated configs (existing configs that omit
-	// the key are still migrated to on via applyMissingKillSwitchDefaults).
 	KillSwitchIPv6 bool
 
 	ControlServers    []*ControlServer

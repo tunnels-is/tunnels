@@ -51,6 +51,7 @@ func clearActiveTunnels() {
 	})
 }
 
+// TestAutoConnect_OnlyFlaggedTunnelsWithServerID ...
 func TestAutoConnect_OnlyFlaggedTunnelsWithServerID(t *testing.T) {
 	setupAutoConnectHome(t)
 
@@ -99,6 +100,7 @@ func TestAutoConnect_OnlyFlaggedTunnelsWithServerID(t *testing.T) {
 	}
 }
 
+// TestAutoConnect_SkipsBusyTunnel ...
 func TestAutoConnect_SkipsBusyTunnel(t *testing.T) {
 	setupAutoConnectHome(t)
 
@@ -121,6 +123,7 @@ func TestAutoConnect_SkipsBusyTunnel(t *testing.T) {
 	}
 }
 
+// TestAutoConnect_NoAccountIsNoop ...
 func TestAutoConnect_NoAccountIsNoop(t *testing.T) {
 	dir := t.TempDir()
 	prevS := STATE.Load()
@@ -146,6 +149,7 @@ func TestAutoConnect_NoAccountIsNoop(t *testing.T) {
 	}
 }
 
+// TestAutoConnect_ReportsConnectError ...
 func TestAutoConnect_ReportsConnectError(t *testing.T) {
 	setupAutoConnectHome(t)
 	def := FindTunnel(DefaultTunnelName)
@@ -157,6 +161,7 @@ func TestAutoConnect_ReportsConnectError(t *testing.T) {
 	})
 }
 
+// TestPersistTunnelServerID ...
 func TestPersistTunnelServerID(t *testing.T) {
 	setupAutoConnectHome(t)
 	def := FindTunnel(DefaultTunnelName)
@@ -183,6 +188,7 @@ func TestPersistTunnelServerID(t *testing.T) {
 	}
 }
 
+// TestServerConnectUsesDefaultTunnel ...
 func TestServerConnectUsesDefaultTunnel(t *testing.T) {
 	cr := &ConnectionRequest{Tag: "should-be-replaced"}
 	code, err := ServerConnect(cr)

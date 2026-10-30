@@ -7,8 +7,7 @@ import (
 
 const minWANIPv4Prefix = 8
 
-// ValidateWANCIDR accepts an empty string, or an IPv4 prefix of /8 or
-// more specific. IPv6 WANs are rejected (IPv6 is not tunneled).
+// ValidateWANCIDR ...
 func ValidateWANCIDR(cidr string) error {
 	if cidr == "" {
 		return nil

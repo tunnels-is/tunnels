@@ -29,6 +29,7 @@ func testUser(email, apiKey string) *User {
 	}
 }
 
+// TestOpenDB ...
 func TestOpenDB(t *testing.T) {
 	setupTestDB(t)
 
@@ -37,6 +38,7 @@ func TestOpenDB(t *testing.T) {
 	}
 }
 
+// TestCreateUser ...
 func TestCreateUser(t *testing.T) {
 	setupTestDB(t)
 	u := testUser("test@example.com", "apikey123")
@@ -80,6 +82,7 @@ func TestCreateUser(t *testing.T) {
 	}
 }
 
+// TestCreateUser_NoAPIKey ...
 func TestCreateUser_NoAPIKey(t *testing.T) {
 	setupTestDB(t)
 	u := testUser("nokey@example.com", "")
@@ -97,6 +100,7 @@ func TestCreateUser_NoAPIKey(t *testing.T) {
 	}
 }
 
+// TestFindUserByID_NotFound ...
 func TestFindUserByID_NotFound(t *testing.T) {
 	setupTestDB(t)
 	found, err := findUserByID(uuid.New())
@@ -108,6 +112,7 @@ func TestFindUserByID_NotFound(t *testing.T) {
 	}
 }
 
+// TestFindUserByEmail_NotFound ...
 func TestFindUserByEmail_NotFound(t *testing.T) {
 	setupTestDB(t)
 	found, err := findUserByEmail("ghost@example.com")
@@ -119,6 +124,7 @@ func TestFindUserByEmail_NotFound(t *testing.T) {
 	}
 }
 
+// TestGetUsers ...
 func TestGetUsers(t *testing.T) {
 	setupTestDB(t)
 	for i := 0; i < 5; i++ {
@@ -148,6 +154,7 @@ func TestGetUsers(t *testing.T) {
 	}
 }
 
+// TestUpdateUserDeviceTokens ...
 func TestUpdateUserDeviceTokens(t *testing.T) {
 	setupTestDB(t)
 	u := testUser("tokens@example.com", "")
@@ -169,6 +176,7 @@ func TestUpdateUserDeviceTokens(t *testing.T) {
 	}
 }
 
+// TestUpdateUserDeviceTokens_NotFound ...
 func TestUpdateUserDeviceTokens_NotFound(t *testing.T) {
 	setupTestDB(t)
 	_, err := updateUserDeviceTokens(uuid.New(), func(current []*DeviceToken) []*DeviceToken {
@@ -179,6 +187,7 @@ func TestUpdateUserDeviceTokens_NotFound(t *testing.T) {
 	}
 }
 
+// TestUpdateUserSubTime ...
 func TestUpdateUserSubTime(t *testing.T) {
 	setupTestDB(t)
 	u := testUser("sub@example.com", "")
@@ -195,6 +204,7 @@ func TestUpdateUserSubTime(t *testing.T) {
 	}
 }
 
+// TestUpdateUserSubTime_NotFound ...
 func TestUpdateUserSubTime_NotFound(t *testing.T) {
 	setupTestDB(t)
 	err := updateUserSubTime(&User{Email: "nobody@example.com"})
@@ -203,6 +213,7 @@ func TestUpdateUserSubTime_NotFound(t *testing.T) {
 	}
 }
 
+// TestUpdateUser ...
 func TestUpdateUser(t *testing.T) {
 	setupTestDB(t)
 	u := testUser("update@example.com", "oldkey")
@@ -234,6 +245,7 @@ func TestUpdateUser(t *testing.T) {
 	}
 }
 
+// TestUpdateUser_ClearAPIKey ...
 func TestUpdateUser_ClearAPIKey(t *testing.T) {
 	setupTestDB(t)
 	u := testUser("clear@example.com", "mykey")
@@ -246,6 +258,7 @@ func TestUpdateUser_ClearAPIKey(t *testing.T) {
 	}
 }
 
+// TestUpdateUser_NotFound ...
 func TestUpdateUser_NotFound(t *testing.T) {
 	setupTestDB(t)
 	err := updateUser(&userUpdateRequest{UID: uuid.New()})
@@ -254,6 +267,7 @@ func TestUpdateUser_NotFound(t *testing.T) {
 	}
 }
 
+// TestUpdateUserAdmin ...
 func TestUpdateUserAdmin(t *testing.T) {
 	setupTestDB(t)
 	u := testUser("admin@example.com", "")
@@ -287,6 +301,7 @@ func TestUpdateUserAdmin(t *testing.T) {
 	}
 }
 
+// TestUpdateUserAdmin_SameEmail ...
 func TestUpdateUserAdmin_SameEmail(t *testing.T) {
 	setupTestDB(t)
 	u := testUser("same@example.com", "")
@@ -304,6 +319,7 @@ func TestUpdateUserAdmin_SameEmail(t *testing.T) {
 	}
 }
 
+// TestUpdateUserAdmin_EmptyEmail ...
 func TestUpdateUserAdmin_EmptyEmail(t *testing.T) {
 	setupTestDB(t)
 	u := testUser("keep@example.com", "")
@@ -324,6 +340,7 @@ func TestUpdateUserAdmin_EmptyEmail(t *testing.T) {
 	}
 }
 
+// TestUpdateUserAdmin_NotFound ...
 func TestUpdateUserAdmin_NotFound(t *testing.T) {
 	setupTestDB(t)
 	err := updateUserAdmin(&adminUserUpdateRequest{TargetUserID: uuid.New()})
@@ -332,6 +349,7 @@ func TestUpdateUserAdmin_NotFound(t *testing.T) {
 	}
 }
 
+// TestUpdateUserTwoFactorCodes ...
 func TestUpdateUserTwoFactorCodes(t *testing.T) {
 	setupTestDB(t)
 	u := testUser("2fa@example.com", "")
@@ -357,6 +375,7 @@ func TestUpdateUserTwoFactorCodes(t *testing.T) {
 	}
 }
 
+// TestUpdateUserTwoFactorCodes_NotFound ...
 func TestUpdateUserTwoFactorCodes_NotFound(t *testing.T) {
 	setupTestDB(t)
 	err := updateUserTwoFactorCodes(&twoFactorUpdate{UID: uuid.New()})
@@ -365,6 +384,7 @@ func TestUpdateUserTwoFactorCodes_NotFound(t *testing.T) {
 	}
 }
 
+// TestResetUserPassword ...
 func TestResetUserPassword(t *testing.T) {
 	setupTestDB(t)
 	u := testUser("reset@example.com", "reset-api-key")
@@ -404,6 +424,7 @@ func apiKeyIndexHas(t *testing.T, key string) bool {
 	return found
 }
 
+// TestLogoutAll_ClearsAPIKey ...
 func TestLogoutAll_ClearsAPIKey(t *testing.T) {
 	setupTestDB(t)
 	keep := &DeviceToken{DT: "keep", N: "k"}
@@ -434,6 +455,7 @@ func TestLogoutAll_ClearsAPIKey(t *testing.T) {
 	}
 }
 
+// TestDisableUser_ClearsTokensAndAPIKey ...
 func TestDisableUser_ClearsTokensAndAPIKey(t *testing.T) {
 	setupTestDB(t)
 	u := testUser("disable@example.com", "disable-api-key")
@@ -456,6 +478,7 @@ func TestDisableUser_ClearsTokensAndAPIKey(t *testing.T) {
 	}
 }
 
+// TestResetUserPassword_NotFound ...
 func TestResetUserPassword_NotFound(t *testing.T) {
 	setupTestDB(t)
 	err := resetUserPassword(&User{ID: uuid.New()})
@@ -464,6 +487,7 @@ func TestResetUserPassword_NotFound(t *testing.T) {
 	}
 }
 
+// TestActivateUserKey ...
 func TestActivateUserKey(t *testing.T) {
 	setupTestDB(t)
 	u := testUser("activate@example.com", "")
@@ -489,6 +513,7 @@ func TestActivateUserKey(t *testing.T) {
 	}
 }
 
+// TestActivateUserKey_NotFound ...
 func TestActivateUserKey_NotFound(t *testing.T) {
 	setupTestDB(t)
 	err := activateUserKey(time.Now(), nil, uuid.New())
@@ -497,6 +522,7 @@ func TestActivateUserKey_NotFound(t *testing.T) {
 	}
 }
 
+// TestCreateDevice ...
 func TestCreateDevice(t *testing.T) {
 	setupTestDB(t)
 	uid := uuid.New()
@@ -516,6 +542,7 @@ func TestCreateDevice(t *testing.T) {
 	}
 }
 
+// TestFindDeviceByID_NotFound ...
 func TestFindDeviceByID_NotFound(t *testing.T) {
 	setupTestDB(t)
 	found, err := findDeviceByID(uuid.New())
@@ -527,6 +554,7 @@ func TestFindDeviceByID_NotFound(t *testing.T) {
 	}
 }
 
+// TestGetDevicesByUserID_Multiple ...
 func TestGetDevicesByUserID_Multiple(t *testing.T) {
 	setupTestDB(t)
 	u1, u2 := uuid.New(), uuid.New()
@@ -554,6 +582,7 @@ func TestGetDevicesByUserID_Multiple(t *testing.T) {
 	}
 }
 
+// TestUpdateDevice ...
 func TestUpdateDevice(t *testing.T) {
 	setupTestDB(t)
 	uid := uuid.New()
@@ -576,6 +605,7 @@ func TestUpdateDevice(t *testing.T) {
 	}
 }
 
+// TestUpdateDevice_ChangeUserID ...
 func TestUpdateDevice_ChangeUserID(t *testing.T) {
 	setupTestDB(t)
 	u1, u2 := uuid.New(), uuid.New()
@@ -596,6 +626,7 @@ func TestUpdateDevice_ChangeUserID(t *testing.T) {
 	}
 }
 
+// TestDeleteDeviceByID ...
 func TestDeleteDeviceByID(t *testing.T) {
 	setupTestDB(t)
 	uid := uuid.New()
@@ -617,6 +648,7 @@ func TestDeleteDeviceByID(t *testing.T) {
 	}
 }
 
+// TestDeleteDeviceByID_NonExistent ...
 func TestDeleteDeviceByID_NonExistent(t *testing.T) {
 	setupTestDB(t)
 	if err := deleteDeviceByID(uuid.New()); err != nil {
@@ -624,6 +656,7 @@ func TestDeleteDeviceByID_NonExistent(t *testing.T) {
 	}
 }
 
+// TestFindDeviceByWGKey ...
 func TestFindDeviceByWGKey(t *testing.T) {
 	setupTestDB(t)
 	d := &types.Device{ID: uuid.New(), UserID: uuid.New(), WireGuardKey: "wgkey-a"}
@@ -648,6 +681,7 @@ func TestFindDeviceByWGKey(t *testing.T) {
 	}
 }
 
+// TestCreateDevice_DuplicateWGKey ...
 func TestCreateDevice_DuplicateWGKey(t *testing.T) {
 	setupTestDB(t)
 	first := &types.Device{ID: uuid.New(), UserID: uuid.New(), WireGuardKey: "shared"}
@@ -670,6 +704,7 @@ func TestCreateDevice_DuplicateWGKey(t *testing.T) {
 	}
 }
 
+// TestCreateDevice_EmptyWGKeyAllowsMany ...
 func TestCreateDevice_EmptyWGKeyAllowsMany(t *testing.T) {
 	setupTestDB(t)
 	for i := 0; i < 3; i++ {
@@ -682,6 +717,7 @@ func TestCreateDevice_EmptyWGKeyAllowsMany(t *testing.T) {
 	}
 }
 
+// TestUpdateDevice_ChangeWGKey ...
 func TestUpdateDevice_ChangeWGKey(t *testing.T) {
 	setupTestDB(t)
 	d := &types.Device{ID: uuid.New(), UserID: uuid.New(), WireGuardKey: "old"}
@@ -703,6 +739,7 @@ func TestUpdateDevice_ChangeWGKey(t *testing.T) {
 	}
 }
 
+// TestUpdateDevice_DuplicateWGKey ...
 func TestUpdateDevice_DuplicateWGKey(t *testing.T) {
 	setupTestDB(t)
 	a := &types.Device{ID: uuid.New(), UserID: uuid.New(), WireGuardKey: "key-a"}
@@ -725,6 +762,7 @@ func TestUpdateDevice_DuplicateWGKey(t *testing.T) {
 	}
 }
 
+// TestDeleteDeviceByID_RemovesWGKeyIndex ...
 func TestDeleteDeviceByID_RemovesWGKeyIndex(t *testing.T) {
 	setupTestDB(t)
 	d := &types.Device{ID: uuid.New(), UserID: uuid.New(), WireGuardKey: "gone"}
@@ -741,6 +779,7 @@ func TestDeleteDeviceByID_RemovesWGKeyIndex(t *testing.T) {
 	}
 }
 
+// TestGetDevices ...
 func TestGetDevices(t *testing.T) {
 	setupTestDB(t)
 	for i := 0; i < 5; i++ {
@@ -763,6 +802,7 @@ func TestGetDevices(t *testing.T) {
 	}
 }
 
+// TestGetDevices_PaginationWalksAllOnce ...
 func TestGetDevices_PaginationWalksAllOnce(t *testing.T) {
 	setupTestDB(t)
 	const total = 13
@@ -811,6 +851,7 @@ func TestGetDevices_PaginationWalksAllOnce(t *testing.T) {
 	}
 }
 
+// TestGetDevices_OffsetBeyondEnd ...
 func TestGetDevices_OffsetBeyondEnd(t *testing.T) {
 	setupTestDB(t)
 	for i := 0; i < 3; i++ {
@@ -826,6 +867,7 @@ func TestGetDevices_OffsetBeyondEnd(t *testing.T) {
 	}
 }
 
+// TestGetDevices_StableOrder ...
 func TestGetDevices_StableOrder(t *testing.T) {
 	setupTestDB(t)
 	for i := 0; i < 8; i++ {
@@ -862,6 +904,7 @@ func TestGetDevices_StableOrder(t *testing.T) {
 	}
 }
 
+// TestCreateServer ...
 func TestCreateServer(t *testing.T) {
 	setupTestDB(t)
 	s := &types.Server{ID: uuid.New(), Tag: "srv", Country: "US", IP: "1.2.3.4", Port: "443"}
@@ -875,6 +918,7 @@ func TestCreateServer(t *testing.T) {
 	}
 }
 
+// TestFindServerByID_NotFound ...
 func TestFindServerByID_NotFound(t *testing.T) {
 	setupTestDB(t)
 	found, err := findServerByID(uuid.New())
@@ -886,6 +930,7 @@ func TestFindServerByID_NotFound(t *testing.T) {
 	}
 }
 
+// TestUpdateServer ...
 func TestUpdateServer(t *testing.T) {
 	setupTestDB(t)
 	s := &types.Server{ID: uuid.New(), Tag: "orig", Country: "US", IP: "1.2.3.4", Port: "443"}
@@ -919,6 +964,7 @@ func TestUpdateServer(t *testing.T) {
 	}
 }
 
+// TestUpdateServer_NotFound ...
 func TestUpdateServer_NotFound(t *testing.T) {
 	setupTestDB(t)
 	_, err := updateServer(&types.Server{ID: uuid.New()})
@@ -927,6 +973,7 @@ func TestUpdateServer_NotFound(t *testing.T) {
 	}
 }
 
+// TestFindAllServers ...
 func TestFindAllServers(t *testing.T) {
 	setupTestDB(t)
 	for i := 0; i < 3; i++ {
@@ -952,6 +999,7 @@ func TestFindAllServers(t *testing.T) {
 	}
 }
 
+// TestFindServersWithoutGroups ...
 func TestFindServersWithoutGroups(t *testing.T) {
 	setupTestDB(t)
 	for i := 0; i < 3; i++ {
@@ -975,6 +1023,7 @@ func TestFindServersWithoutGroups(t *testing.T) {
 	}
 }
 
+// TestFindServersByGroups ...
 func TestFindServersByGroups(t *testing.T) {
 	setupTestDB(t)
 	g1, g2 := uuid.New(), uuid.New()
@@ -1009,6 +1058,7 @@ func TestFindServersByGroups(t *testing.T) {
 	}
 }
 
+// TestFindServerByAPIKey ...
 func TestFindServerByAPIKey(t *testing.T) {
 	setupTestDB(t)
 	s := &types.Server{ID: uuid.New(), Tag: "wg", APIKey: "wg-key", WireGuardPort: 51820}
@@ -1028,6 +1078,7 @@ func TestFindServerByAPIKey(t *testing.T) {
 	}
 }
 
+// TestFindServerByAPIKey_NotFound ...
 func TestFindServerByAPIKey_NotFound(t *testing.T) {
 	setupTestDB(t)
 	found, err := findServerByAPIKey("nope")
@@ -1039,6 +1090,7 @@ func TestFindServerByAPIKey_NotFound(t *testing.T) {
 	}
 }
 
+// TestUpdateServer_RotateAPIKey ...
 func TestUpdateServer_RotateAPIKey(t *testing.T) {
 	setupTestDB(t)
 	s := &types.Server{ID: uuid.New(), APIKey: "old", WireGuardPubKey: "pinned-key"}
@@ -1063,6 +1115,7 @@ func TestUpdateServer_RotateAPIKey(t *testing.T) {
 	}
 }
 
+// TestCreateGroup ...
 func TestCreateGroup(t *testing.T) {
 	setupTestDB(t)
 	g := &Group{ID: uuid.New(), Tag: "grp", Description: "desc"}
@@ -1076,6 +1129,7 @@ func TestCreateGroup(t *testing.T) {
 	}
 }
 
+// TestFindGroupByID_NotFound ...
 func TestFindGroupByID_NotFound(t *testing.T) {
 	setupTestDB(t)
 	found, err := findGroupByID(uuid.New())
@@ -1087,6 +1141,7 @@ func TestFindGroupByID_NotFound(t *testing.T) {
 	}
 }
 
+// TestUpdateGroup ...
 func TestUpdateGroup(t *testing.T) {
 	setupTestDB(t)
 	g := &Group{ID: uuid.New(), Tag: "orig", Description: "old"}
@@ -1102,6 +1157,7 @@ func TestUpdateGroup(t *testing.T) {
 	}
 }
 
+// TestUpdateGroup_NotFound ...
 func TestUpdateGroup_NotFound(t *testing.T) {
 	setupTestDB(t)
 	err := updateGroup(&Group{ID: uuid.New()})
@@ -1110,6 +1166,7 @@ func TestUpdateGroup_NotFound(t *testing.T) {
 	}
 }
 
+// TestDeleteGroupByID ...
 func TestDeleteGroupByID(t *testing.T) {
 	setupTestDB(t)
 	g := &Group{ID: uuid.New(), Tag: "del"}
@@ -1125,6 +1182,7 @@ func TestDeleteGroupByID(t *testing.T) {
 	}
 }
 
+// TestListGroups ...
 func TestListGroups(t *testing.T) {
 	setupTestDB(t)
 	for i := 0; i < 3; i++ {
@@ -1140,6 +1198,7 @@ func TestListGroups(t *testing.T) {
 	}
 }
 
+// TestAddToGroup_User ...
 func TestAddToGroup_User(t *testing.T) {
 	setupTestDB(t)
 	g := &Group{ID: uuid.New(), Tag: "ug"}
@@ -1163,6 +1222,7 @@ func TestAddToGroup_User(t *testing.T) {
 	}
 }
 
+// TestAddToGroup_Server ...
 func TestAddToGroup_Server(t *testing.T) {
 	setupTestDB(t)
 	g := &Group{ID: uuid.New(), Tag: "sg"}
@@ -1180,6 +1240,7 @@ func TestAddToGroup_Server(t *testing.T) {
 	}
 }
 
+// TestAddToGroup_Device_Unsupported ...
 func TestAddToGroup_Device_Unsupported(t *testing.T) {
 	setupTestDB(t)
 	g := &Group{ID: uuid.New(), Tag: "dg"}
@@ -1192,6 +1253,7 @@ func TestAddToGroup_Device_Unsupported(t *testing.T) {
 	}
 }
 
+// TestAddToGroup_InvalidType ...
 func TestAddToGroup_InvalidType(t *testing.T) {
 	setupTestDB(t)
 	err := addToGroup(uuid.New(), uuid.New(), "invalid")
@@ -1200,6 +1262,7 @@ func TestAddToGroup_InvalidType(t *testing.T) {
 	}
 }
 
+// TestAddToGroup_NotFound ...
 func TestAddToGroup_NotFound(t *testing.T) {
 	setupTestDB(t)
 	err := addToGroup(uuid.New(), uuid.New(), "user")
@@ -1208,6 +1271,7 @@ func TestAddToGroup_NotFound(t *testing.T) {
 	}
 }
 
+// TestRemoveFromGroup_User ...
 func TestRemoveFromGroup_User(t *testing.T) {
 	setupTestDB(t)
 	g := &Group{ID: uuid.New(), Tag: "rg"}
@@ -1226,6 +1290,7 @@ func TestRemoveFromGroup_User(t *testing.T) {
 	}
 }
 
+// TestRemoveFromGroup_Server ...
 func TestRemoveFromGroup_Server(t *testing.T) {
 	setupTestDB(t)
 	g := &Group{ID: uuid.New(), Tag: "rsg"}
@@ -1242,6 +1307,7 @@ func TestRemoveFromGroup_Server(t *testing.T) {
 	}
 }
 
+// TestRemoveFromGroup_InvalidType ...
 func TestRemoveFromGroup_InvalidType(t *testing.T) {
 	setupTestDB(t)
 	err := removeFromGroup(uuid.New(), uuid.New(), "invalid")
@@ -1250,6 +1316,7 @@ func TestRemoveFromGroup_InvalidType(t *testing.T) {
 	}
 }
 
+// TestRemoveFromGroup_NotFound ...
 func TestRemoveFromGroup_NotFound(t *testing.T) {
 	setupTestDB(t)
 	gid := uuid.New()
@@ -1261,6 +1328,7 @@ func TestRemoveFromGroup_NotFound(t *testing.T) {
 	}
 }
 
+// TestFindEntitiesByGroupID ...
 func TestFindEntitiesByGroupID(t *testing.T) {
 	setupTestDB(t)
 	g := &Group{ID: uuid.New(), Tag: "find"}
@@ -1307,6 +1375,7 @@ func TestFindEntitiesByGroupID(t *testing.T) {
 	}
 }
 
+// TestCreateServer_WithAPIKey ...
 func TestCreateServer_WithAPIKey(t *testing.T) {
 	setupTestDB(t)
 	s := &types.Server{
@@ -1330,6 +1399,7 @@ func TestCreateServer_WithAPIKey(t *testing.T) {
 	}
 }
 
+// TestCreateServer_NoAPIKey ...
 func TestCreateServer_NoAPIKey(t *testing.T) {
 	setupTestDB(t)
 	s := &types.Server{ID: uuid.New(), Tag: "no-key", WireGuardPort: 51820}
@@ -1347,6 +1417,7 @@ func TestCreateServer_NoAPIKey(t *testing.T) {
 	}
 }
 
+// TestUpdateServer_ClearAPIKey ...
 func TestUpdateServer_ClearAPIKey(t *testing.T) {
 	setupTestDB(t)
 	s := &types.Server{ID: uuid.New(), APIKey: "clear"}
@@ -1364,6 +1435,7 @@ func TestUpdateServer_ClearAPIKey(t *testing.T) {
 	}
 }
 
+// TestGetUsers_Empty ...
 func TestGetUsers_Empty(t *testing.T) {
 	setupTestDB(t)
 	users, err := getUsers(10, 0)
@@ -1375,6 +1447,7 @@ func TestGetUsers_Empty(t *testing.T) {
 	}
 }
 
+// TestGetDevices_Empty ...
 func TestGetDevices_Empty(t *testing.T) {
 	setupTestDB(t)
 	dl, err := getDevices(10, 0)
@@ -1386,6 +1459,7 @@ func TestGetDevices_Empty(t *testing.T) {
 	}
 }
 
+// TestFindAllServers_Empty ...
 func TestFindAllServers_Empty(t *testing.T) {
 	setupTestDB(t)
 	servers, err := findAllServers(100, 0)
@@ -1397,6 +1471,7 @@ func TestFindAllServers_Empty(t *testing.T) {
 	}
 }
 
+// TestListGroups_Empty ...
 func TestListGroups_Empty(t *testing.T) {
 	setupTestDB(t)
 	groups, err := listGroups(100, 0)
@@ -1408,6 +1483,7 @@ func TestListGroups_Empty(t *testing.T) {
 	}
 }
 
+// TestListGroups_LimitOffset ...
 func TestListGroups_LimitOffset(t *testing.T) {
 	setupTestDB(t)
 	for i := 0; i < 3; i++ {
@@ -1425,6 +1501,7 @@ func TestListGroups_LimitOffset(t *testing.T) {
 	}
 }
 
+// TestOpenDB_BackfillIndexes ...
 func TestOpenDB_BackfillIndexes(t *testing.T) {
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "test.db")

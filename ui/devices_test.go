@@ -10,6 +10,7 @@ import (
 	"github.com/tunnels-is/tunnels/types"
 )
 
+// TestDeviceView_LocalFirstThenNewestCreated ...
 func TestDeviceView_LocalFirstThenNewestCreated(t *testing.T) {
 	localID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
 	now := time.Date(2026, 8, 26, 12, 0, 0, 0, time.UTC)
@@ -37,6 +38,7 @@ func TestDeviceView_LocalFirstThenNewestCreated(t *testing.T) {
 	}
 }
 
+// TestDeviceView_MatchesLocalByPubkey ...
 func TestDeviceView_MatchesLocalByPubkey(t *testing.T) {
 	now := time.Now()
 	a := &App{
@@ -52,6 +54,7 @@ func TestDeviceView_MatchesLocalByPubkey(t *testing.T) {
 	}
 }
 
+// TestDeviceView_SeveralLocalStayOnTop ...
 func TestDeviceView_SeveralLocalStayOnTop(t *testing.T) {
 	aID := uuid.MustParse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
 	bID := uuid.MustParse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
@@ -74,6 +77,7 @@ func TestDeviceView_SeveralLocalStayOnTop(t *testing.T) {
 	}
 }
 
+// TestDeviceStatus_ConnectedWinsOverLocal ...
 func TestDeviceStatus_ConnectedWinsOverLocal(t *testing.T) {
 	id := uuid.MustParse("11111111-1111-1111-1111-111111111111")
 	d := types.Device{ID: id, WireGuardIP: "10.9.0.2", WireGuardKey: "pub"}
@@ -97,6 +101,7 @@ func TestDeviceStatus_ConnectedWinsOverLocal(t *testing.T) {
 	}
 }
 
+// TestDeviceStatus_EmptyIPIsNotConnected ...
 func TestDeviceStatus_EmptyIPIsNotConnected(t *testing.T) {
 	d := types.Device{ID: uuid.New()}
 	conn := map[string]struct{}{"": {}}
@@ -106,6 +111,7 @@ func TestDeviceStatus_EmptyIPIsNotConnected(t *testing.T) {
 	}
 }
 
+// TestDevicesPage_BuildsCards ...
 func TestDevicesPage_BuildsCards(t *testing.T) {
 	fy := test.NewApp()
 	t.Cleanup(fy.Quit)
@@ -128,6 +134,7 @@ func TestDevicesPage_BuildsCards(t *testing.T) {
 	}
 }
 
+// TestDeviceView_FilterStillApplies ...
 func TestDeviceView_FilterStillApplies(t *testing.T) {
 	id := uuid.New()
 	a := &App{

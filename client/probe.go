@@ -8,7 +8,6 @@ import (
 	"github.com/tunnels-is/tunnels/types"
 )
 
-// ServerProbe is one server's measured round-trip time.
 type ServerProbe struct {
 	Tag      string
 	IP       string
@@ -18,7 +17,7 @@ type ServerProbe struct {
 	OK       bool
 }
 
-// LatencyMS is the round trip in milliseconds, or -1 when unreachable.
+// LatencyMS ...
 func (p ServerProbe) LatencyMS() int64 {
 	if !p.OK {
 		return -1
@@ -26,14 +25,9 @@ func (p ServerProbe) LatencyMS() int64 {
 	return p.Latency.Milliseconds()
 }
 
-// probeConcurrency bounds in-flight pings. The existing auto-connect path
-// probes serially, which costs up to autoConnectPingTimeout per server; a
-// dashboard showing every server needs them measured in parallel.
 const probeConcurrency = 8
 
-// ProbeServers measures ICMP round-trip time to every server, fastest first.
-// Unreachable servers are included with OK false so the caller can tell
-// "no answer" apart from "not measured".
+// ProbeServers ...
 func ProbeServers(servers []types.Server) []ServerProbe {
 	defer RecoverAndLog()
 
@@ -64,7 +58,6 @@ func ProbeServers(servers []types.Server) []ServerProbe {
 	}
 	wg.Wait()
 
-	// Reachable servers first, by latency; unreachable keep a stable order.
 	sort.SliceStable(out, func(i, j int) bool {
 		if out[i].OK != out[j].OK {
 			return out[i].OK

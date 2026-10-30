@@ -9,6 +9,7 @@ import (
 	"github.com/tunnels-is/tunnels/types"
 )
 
+// TestServerView_FilterByCountry ...
 func TestServerView_FilterByCountry(t *testing.T) {
 	a := &App{
 		filterServers: "iceland",
@@ -23,6 +24,7 @@ func TestServerView_FilterByCountry(t *testing.T) {
 	}
 }
 
+// TestServersPage_BuildsCards ...
 func TestServersPage_BuildsCards(t *testing.T) {
 	fy := test.NewApp()
 	t.Cleanup(fy.Quit)

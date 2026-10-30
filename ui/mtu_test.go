@@ -2,6 +2,7 @@ package ui
 
 import "testing"
 
+// TestParseMTUText ...
 func TestParseMTUText(t *testing.T) {
 	if got := parseMTUText("", 1420); got != 0 {
 		t.Fatalf("empty = %d, want 0", got)

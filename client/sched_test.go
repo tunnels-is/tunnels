@@ -6,6 +6,7 @@ import (
 	"time"
 )
 
+// TestEnqueueEvent_DropsWhenFull ...
 func TestEnqueueEvent_DropsWhenFull(t *testing.T) {
 	ch := make(chan *event, 1)
 	ch <- &event{}
@@ -15,6 +16,7 @@ func TestEnqueueEvent_DropsWhenFull(t *testing.T) {
 	}
 }
 
+// TestStartBackgroundTask_DropsWhenFull ...
 func TestStartBackgroundTask_DropsWhenFull(t *testing.T) {
 	n := cap(concurrencyMonitor)
 	for i := 0; i < n; i++ {
@@ -31,6 +33,7 @@ func TestStartBackgroundTask_DropsWhenFull(t *testing.T) {
 	}
 }
 
+// TestBackgroundTask_DropsWhenMonitorFull ...
 func TestBackgroundTask_DropsWhenMonitorFull(t *testing.T) {
 	mon := make(chan *backgroundTask, 1)
 	mon <- &backgroundTask{tag: "fill"}
