@@ -45,11 +45,11 @@ func TestIntro_DropsLocalPunchTargets(t *testing.T) {
 		t.Fatal(err)
 	}
 	now := time.Now()
+	b.NoteTraffic(aIP)
 	pinged := pingTargets(b.OnPacket(netip.AddrPortFrom(aIP, IntroPort), pkt, now))
 	if !sameAddrPorts(pinged, []netip.AddrPort{public, cgnat}) {
 		t.Fatalf("first pings: %v", pinged)
 	}
-	b.NoteTraffic(aIP)
 	later := pingTargets(b.Poll(now.Add(Keepalive)))
 	if !sameAddrPorts(later, []netip.AddrPort{public, cgnat}) {
 		t.Fatalf("keepalive pings: %v", later)
@@ -116,6 +116,7 @@ func TestIntroExchangeReachesDirectPath(t *testing.T) {
 	giveReflex(b, bID, b.Poll(now), bReflex)
 
 	a.NoteTraffic(bIP)
+	b.NoteTraffic(aIP)
 	now = now.Add(time.Second)
 	sent := a.Poll(now)
 	var intro Datagram
@@ -251,5 +252,58 @@ func TestIntroRejectedByLocalFirewall(t *testing.T) {
 	res := b.OnPacket(netip.AddrPortFrom(aIP, IntroPort), pkt, time.Now())
 	if len(res.Sends) != 0 || len(res.Up) != 0 {
 		t.Fatalf("firewall should drop the intro: %+v", res)
+	}
+}
+
+// TestIntro_RejectsMismatchedSource ...
+func TestIntro_RejectsMismatchedSource(t *testing.T) {
+	aPub, err := Public(mustKey(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	aIP := netip.MustParseAddr("10.0.0.5")
+	bIP := netip.MustParseAddr("10.0.1.8")
+	other := netip.MustParseAddr("10.0.0.9")
+	b := NewEngine(uuid.New(), mustKey(t), [32]byte{2}, bIP)
+	b.SetLocalPolicy(true, false, nil)
+	cand := netip.MustParseAddrPort("198.51.100.10:41000")
+	pkt, err := BuildIntro(uuid.New(), aPub, [32]byte{1}, aIP, []netip.AddrPort{cand})
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now()
+	b.NoteTraffic(aIP)
+	res := b.OnPacket(netip.AddrPortFrom(other, IntroPort), pkt, now)
+	if len(res.Sends) != 0 || len(res.Up) != 0 {
+		t.Fatalf("mismatched source was accepted: %+v", res)
+	}
+	if pings := pingTargets(b.Poll(now.Add(Keepalive))); len(pings) != 0 {
+		t.Fatalf("mismatched intro was stored: %v", pings)
+	}
+}
+
+// TestIntro_UnsolicitedDoesNotPing ...
+func TestIntro_UnsolicitedDoesNotPing(t *testing.T) {
+	aPub, err := Public(mustKey(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	aIP := netip.MustParseAddr("10.0.0.5")
+	bIP := netip.MustParseAddr("10.0.1.8")
+	b := NewEngine(uuid.New(), mustKey(t), [32]byte{2}, bIP)
+	b.SetLocalPolicy(true, false, nil)
+	cand := netip.MustParseAddrPort("198.51.100.10:41000")
+	pkt, err := BuildIntro(uuid.New(), aPub, [32]byte{1}, aIP, []netip.AddrPort{cand})
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now()
+	res := b.OnPacket(netip.AddrPortFrom(aIP, IntroPort), pkt, now)
+	if len(res.Sends) != 0 || len(res.Up) != 0 {
+		t.Fatalf("unsolicited intro sent packets: %+v", res)
+	}
+	b.NoteTraffic(aIP)
+	if pings := pingTargets(b.Poll(now.Add(time.Second))); !sameAddrPorts(pings, []netip.AddrPort{cand}) {
+		t.Fatalf("wanted intro did not ping: %v", pings)
 	}
 }

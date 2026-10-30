@@ -206,6 +206,10 @@ func runMTUExchange(t *testing.T, a, b *Engine, now time.Time, accept func([]byt
 		"a": netip.MustParseAddrPort("198.51.100.10:41000"),
 		"b": netip.MustParseAddrPort("198.51.100.20:42000"),
 	}
+	overlay := map[string]netip.Addr{
+		"a": netip.MustParseAddr("10.0.0.5"),
+		"b": netip.MustParseAddr("10.0.1.8"),
+	}
 	flip := map[string]string{"a": "b", "b": "a"}
 	for steps := 0; steps < 80 && len(q) > 0; steps++ {
 		item := q[0]
@@ -213,7 +217,11 @@ func runMTUExchange(t *testing.T, a, b *Engine, now time.Time, accept func([]byt
 		if item.d.Server {
 			continue
 		}
-		res := other[item.from].OnPacket(selfAddr[item.from], item.d.Data, now)
+		from := selfAddr[item.from]
+		if item.d.Tunnel {
+			from = netip.AddrPortFrom(overlay[item.from], IntroPort)
+		}
+		res := other[item.from].OnPacket(from, item.d.Data, now)
 		push(flip[item.from], res)
 	}
 	bIP := netip.MustParseAddr("10.0.1.8")

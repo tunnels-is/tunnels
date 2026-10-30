@@ -12,7 +12,7 @@ import (
 type introTUN struct {
 	tun.Device
 	inject chan []byte
-	intros chan []byte
+	intros chan tunnelIntro
 	poke   chan struct{}
 	onWant func(netip.Addr)
 
@@ -25,7 +25,7 @@ func wrapIntroTUN(inner tun.Device, onWant func(netip.Addr)) (*introTUN, error) 
 	return &introTUN{
 		Device: inner,
 		inject: make(chan []byte, 16),
-		intros: make(chan []byte, 16),
+		intros: make(chan tunnelIntro, 16),
 		poke:   make(chan struct{}, 1),
 		onWant: onWant,
 	}, nil
@@ -103,9 +103,9 @@ func (t *introTUN) Write(bufs [][]byte, offset int) (int, error) {
 			continue
 		}
 		pkt := buf[offset:]
-		if payload, ok := introPayload(pkt); ok {
+		if src, payload, ok := introPayload(pkt); ok {
 			select {
-			case t.intros <- payload:
+			case t.intros <- tunnelIntro{from: src, data: payload}:
 			default:
 			}
 			continue
@@ -132,12 +132,17 @@ func (t *introTUN) queue(pkt []byte) {
 	}
 }
 
-func introPayload(pkt []byte) ([]byte, bool) {
-	_, _, payload, ok := punch.UnwrapIPv4UDP(pkt, punch.IntroPort)
+type tunnelIntro struct {
+	from netip.Addr
+	data []byte
+}
+
+func introPayload(pkt []byte) (netip.Addr, []byte, bool) {
+	src, _, payload, ok := punch.UnwrapIPv4UDP(pkt, punch.IntroPort)
 	if !ok || punch.TypeOf(payload) != punch.TypeIntro {
-		return nil, false
+		return netip.Addr{}, nil, false
 	}
-	return append([]byte(nil), payload...), true
+	return src, append([]byte(nil), payload...), true
 }
 
 func ipv4TCPUDPDest(pkt []byte) (netip.Addr, bool) {

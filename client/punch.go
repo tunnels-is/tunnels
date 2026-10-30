@@ -9,6 +9,7 @@ import (
 	neturl "net/url"
 	"runtime/debug"
 	"sort"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -395,6 +396,15 @@ func (b *punchBind) apply(tun *TUN, eng *punch.Engine, res punch.Result) {
 		}
 		ip := up.Peer.WGIP.As4()
 		inst := punchInstall{id: up.Peer.DeviceID, wgPub: up.Peer.WGPub, via: up.Via}
+		allowed, err := tun.punchKeyAllowed(ip, inst.wgPub)
+		if err != nil {
+			ERROR("punch install ", up.Peer.WGIP.String(), ": ", err)
+			continue
+		}
+		if !allowed {
+			INFO("punch: skip install, key already in use ", up.Peer.WGIP.String())
+			continue
+		}
 		if err := applyDirectIPC(tun.wgDevice, ip, inst); err != nil {
 			ERROR("punch install ", up.Peer.WGIP.String(), ": ", err)
 			continue
@@ -422,6 +432,39 @@ func (b *punchBind) sendOne(data []byte, ep wgconn.Endpoint, df bool) error {
 		defer restore()
 	}
 	return b.inner.Send([][]byte{data}, ep)
+}
+
+func (t *TUN) punchKeyAllowed(ip [4]byte, wgPub [32]byte) (bool, error) {
+	if t == nil || t.wgDevice == nil {
+		return false, fmt.Errorf("wireguard device is not up")
+	}
+	ipc, err := t.wgDevice.IpcGet()
+	if err != nil {
+		return false, err
+	}
+	t.punchMu.Lock()
+	cur, have := t.punchDirect[ip]
+	t.punchMu.Unlock()
+	punchPub := [32]byte{}
+	if have {
+		punchPub = cur.wgPub
+	}
+	return directKeyAllowed(ipc, have, punchPub, wgPub), nil
+}
+
+func directKeyAllowed(ipc string, havePunch bool, punchPub, wgPub [32]byte) bool {
+	want := hex.EncodeToString(wgPub[:])
+	present := false
+	for _, line := range strings.Split(ipc, "\n") {
+		if strings.TrimSpace(line) == "public_key="+want {
+			present = true
+			break
+		}
+	}
+	if !present {
+		return true
+	}
+	return havePunch && punchPub == wgPub
 }
 
 func applyDirectIPC(dev *wgdevice.Device, ip [4]byte, inst punchInstall) error {

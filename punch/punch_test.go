@@ -130,6 +130,7 @@ func TestEnginePunchesAndRefuses(t *testing.T) {
 	}
 	other := map[string]*Engine{"a": b, "b": a}
 	selfAddr := map[string]netip.AddrPort{"a": aReflex, "b": bReflex}
+	overlay := map[string]netip.Addr{"a": aIP, "b": bIP}
 	flip := map[string]string{"a": "b", "b": "a"}
 	for steps := 0; steps < 64 && len(q) > 0; steps++ {
 		item := q[0]
@@ -137,7 +138,11 @@ func TestEnginePunchesAndRefuses(t *testing.T) {
 		if item.d.Server {
 			continue
 		}
-		res := other[item.from].OnPacket(selfAddr[item.from], item.d.Data, now)
+		from := selfAddr[item.from]
+		if item.d.Tunnel {
+			from = netip.AddrPortFrom(overlay[item.from], IntroPort)
+		}
+		res := other[item.from].OnPacket(from, item.d.Data, now)
 		push(flip[item.from], res)
 	}
 	if _, ok := a.Direct(bIP); !ok {

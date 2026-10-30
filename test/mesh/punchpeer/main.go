@@ -134,8 +134,8 @@ func main() {
 	var complained bool
 	for {
 		select {
-		case payload := <-it.intros:
-			apply(dev, it, &instMu, inst, eng.OnPacket(netip.AddrPort{}, payload, time.Now()), *endpoint, pb)
+		case in := <-it.intros:
+			apply(dev, it, &instMu, inst, eng.OnPacket(netip.AddrPortFrom(in.from, punch.IntroPort), in.data, time.Now()), *endpoint, pb)
 		case pkt := <-pb.in:
 			from, err := netip.ParseAddrPort(pkt.from)
 			if err != nil {

@@ -282,7 +282,7 @@ func (e *Engine) OnPacket(from netip.AddrPort, pkt []byte, now time.Time) Result
 		e.reflex = ap
 		e.reflexAt = now
 	case TypeIntro:
-		e.onIntroLocked(&r, pkt, now)
+		e.onIntroLocked(&r, from, pkt, now)
 	case TypePing:
 		e.onPingLocked(&r, from, pkt)
 	case TypePong:
@@ -309,9 +309,9 @@ func (e *Engine) introPacketLocked() ([]byte, bool) {
 	return pkt, true
 }
 
-func (e *Engine) onIntroLocked(r *Result, pkt []byte, now time.Time) {
+func (e *Engine) onIntroLocked(r *Result, from netip.AddrPort, pkt []byte, now time.Time) {
 	msg, err := ParseIntro(pkt)
-	if err != nil || msg.Src == e.self || !e.punchableLocked(msg.WGIP) {
+	if err != nil || msg.Src == e.self || !from.IsValid() || from.Addr() != msg.WGIP || !e.punchableLocked(msg.WGIP) {
 		return
 	}
 	s := e.peers[msg.Src]
@@ -330,6 +330,9 @@ func (e *Engine) onIntroLocked(r *Result, pkt []byte, now time.Time) {
 		e.byIP[msg.WGIP] = msg.Src
 	}
 	s.cands = publicPunchTargets(msg.Candidates)
+	if _, ok := e.want[msg.WGIP]; !ok {
+		return
+	}
 	for _, c := range s.cands {
 		if ping, err := e.pingLocked(s, c); err == nil {
 			r.Sends = append(r.Sends, Datagram{To: c, Data: ping})
