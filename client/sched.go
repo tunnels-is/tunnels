@@ -12,7 +12,7 @@ func enqueueEvent(channel chan *event, method func()) {
 		method: method,
 	}:
 	default:
-		panic("priority channel full")
+		logDirect("priority channel full, dropping event")
 	}
 }
 
@@ -26,7 +26,7 @@ func startBackgroundTask(tag string, ctx context.Context, method func()) {
 		method:  method,
 	}:
 	default:
-		panic("concurrency monitor is full")
+		logDirect("concurrency monitor is full, dropping " + tag)
 	}
 }
 
@@ -38,6 +38,6 @@ func (s *backgroundTask) execute() {
 	select {
 	case s.monitor <- s:
 	default:
-		panic("monitor channel is full")
+		logDirect("monitor channel is full, dropping " + s.tag)
 	}
 }
