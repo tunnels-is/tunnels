@@ -2,6 +2,8 @@ module github.com/tunnels-is/tunnels
 
 go 1.26.0
 
+toolchain go1.26.10
+
 require (
 	fyne.io/fyne/v2 v2.8.1
 	github.com/NdoleStudio/lemonsqueezy-go v1.2.4
@@ -18,7 +20,7 @@ require (
 	go.etcd.io/bbolt v1.4.0
 	go.mongodb.org/mongo-driver v1.17.7
 	golang.org/x/crypto v0.58.0
-	golang.org/x/net v0.61.0
+	golang.org/x/net v0.62.0
 	golang.org/x/sys v0.49.0
 	golang.org/x/term v0.47.0
 	golang.zx2c4.com/wireguard v0.0.0-20250521234502-f333402bd9cb
@@ -67,7 +69,7 @@ require (
 	github.com/xdg-go/stringprep v1.0.4 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78 // indirect
 	github.com/yuin/goldmark v1.8.2 // indirect
-	golang.org/x/image v0.24.0 // indirect
+	golang.org/x/image v0.47.0 // indirect
 	golang.org/x/mod v0.41.0 // indirect
 	golang.org/x/sync v0.24.0 // indirect
 	golang.org/x/text v0.43.0 // indirect
