@@ -282,6 +282,113 @@ func TestIntro_RejectsMismatchedSource(t *testing.T) {
 	}
 }
 
+// TestIntro_RepeatWaitsForKeepalive ...
+func TestIntro_RepeatWaitsForKeepalive(t *testing.T) {
+	aPub, err := Public(mustKey(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var aWG [32]byte
+	aWG[0] = 1
+	aID := uuid.New()
+	aIP := netip.MustParseAddr("10.0.0.5")
+	bIP := netip.MustParseAddr("10.0.1.8")
+	b := NewEngine(uuid.New(), mustKey(t), [32]byte{2}, bIP)
+	b.SetLocalPolicy(false, false, []string{aIP.String()})
+	first := netip.MustParseAddrPort("198.51.100.10:41000")
+	second := netip.MustParseAddrPort("198.51.100.20:42000")
+	now := time.Now()
+	b.NoteTraffic(aIP)
+
+	pkt, err := BuildIntro(aID, aPub, aWG, aIP, []netip.AddrPort{first})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pings := pingTargets(b.OnPacket(netip.AddrPortFrom(aIP, IntroPort), pkt, now)); !sameAddrPorts(pings, []netip.AddrPort{first}) {
+		t.Fatalf("first intro: %v", pings)
+	}
+	pkt, err = BuildIntro(aID, aPub, aWG, aIP, []netip.AddrPort{second})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pings := pingTargets(b.OnPacket(netip.AddrPortFrom(aIP, IntroPort), pkt, now.Add(time.Second))); len(pings) != 0 {
+		t.Fatalf("intro inside keepalive pinged: %v", pings)
+	}
+	if pings := pingTargets(b.Poll(now.Add(Keepalive - time.Millisecond))); len(pings) != 0 {
+		t.Fatalf("probe before keepalive: %v", pings)
+	}
+	if pings := pingTargets(b.Poll(now.Add(Keepalive))); !sameAddrPorts(pings, []netip.AddrPort{second}) {
+		t.Fatalf("probe after keepalive: %v", pings)
+	}
+}
+
+// TestIntro_DirectPathSkipsCandidatePings ...
+func TestIntro_DirectPathSkipsCandidatePings(t *testing.T) {
+	aPriv := mustKey(t)
+	aPub, err := Public(aPriv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bPriv := mustKey(t)
+	bPub, err := Public(bPriv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var aWG [32]byte
+	aWG[0] = 1
+	aID, bID := uuid.New(), uuid.New()
+	aIP := netip.MustParseAddr("10.0.0.5")
+	bIP := netip.MustParseAddr("10.0.1.8")
+	b := NewEngine(bID, bPriv, [32]byte{2}, bIP)
+	b.SetLocalPolicy(false, false, []string{aIP.String()})
+	current := netip.MustParseAddrPort("198.51.100.10:41000")
+	fresh := netip.MustParseAddrPort("198.51.100.20:42000")
+	now := time.Now()
+	b.NoteTraffic(aIP)
+
+	pkt, err := BuildIntro(aID, aPub, aWG, aIP, []netip.AddrPort{current})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pings := pingTargets(b.OnPacket(netip.AddrPortFrom(aIP, IntroPort), pkt, now)); !sameAddrPorts(pings, []netip.AddrPort{current}) {
+		t.Fatalf("first intro: %v", pings)
+	}
+	for txid := uint64(1); txid <= 2; txid++ {
+		pong, err := BuildPong(aPriv, bPub, aID, bID, txid, current)
+		if err != nil {
+			t.Fatal(err)
+		}
+		res := b.OnPacket(current, pong, now)
+		if txid == 2 && (len(res.Up) != 1 || res.Up[0].Via != current) {
+			t.Fatalf("direct path %+v", res.Up)
+		}
+	}
+	pkt, err = BuildIntro(aID, aPub, aWG, aIP, []netip.AddrPort{fresh})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pings := pingTargets(b.OnPacket(netip.AddrPortFrom(aIP, IntroPort), pkt, now.Add(time.Second))); len(pings) != 0 {
+		t.Fatalf("intro on a live path pinged: %v", pings)
+	}
+	if pings := pingTargets(b.Poll(now.Add(Keepalive))); !sameAddrPorts(pings, []netip.AddrPort{current}) {
+		t.Fatalf("live path probe: %v", pings)
+	}
+	td, err := BuildTeardown(aPriv, bPub, aID, bID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	down := b.OnPacket(current, td, now.Add(Keepalive))
+	if len(down.Down) != 1 {
+		t.Fatalf("teardown %+v", down.Down)
+	}
+	if pings := pingTargets(b.Poll(now.Add(Keepalive + time.Second))); len(pings) != 0 {
+		t.Fatalf("probe before the next keepalive: %v", pings)
+	}
+	if pings := pingTargets(b.Poll(now.Add(2 * Keepalive))); !sameAddrPorts(pings, []netip.AddrPort{fresh}) {
+		t.Fatalf("stored candidate after the path dropped: %v", pings)
+	}
+}
+
 // TestIntro_UnsolicitedDoesNotPing ...
 func TestIntro_UnsolicitedDoesNotPing(t *testing.T) {
 	aPub, err := Public(mustKey(t))

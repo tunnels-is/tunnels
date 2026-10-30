@@ -221,14 +221,7 @@ func (e *Engine) Poll(now time.Time) Result {
 		if s == nil || s.directUp {
 			continue
 		}
-		if len(s.cands) > 0 && (s.lastProbe.IsZero() || now.Sub(s.lastProbe) >= Keepalive) {
-			for _, c := range s.cands {
-				if ping, err := e.pingLocked(s, c); err == nil {
-					r.Sends = append(r.Sends, Datagram{To: c, Data: ping})
-				}
-			}
-			s.lastProbe = now
-		}
+		e.probeCandidatesLocked(s, &r, now)
 		if !s.lastAdv.IsZero() && now.Sub(s.lastAdv) < RendezvousEvery {
 			continue
 		}
@@ -333,20 +326,28 @@ func (e *Engine) onIntroLocked(r *Result, from netip.AddrPort, pkt []byte, now t
 	if _, ok := e.want[msg.WGIP]; !ok {
 		return
 	}
-	for _, c := range s.cands {
-		if ping, err := e.pingLocked(s, c); err == nil {
-			r.Sends = append(r.Sends, Datagram{To: c, Data: ping})
-		}
-	}
-	if len(s.cands) > 0 {
-		s.lastProbe = now
-	}
+	e.probeCandidatesLocked(s, r, now)
 	if s.lastAdv.IsZero() || now.Sub(s.lastAdv) >= RendezvousEvery {
 		if reply, ok := e.introPacketLocked(); ok {
 			r.Sends = append(r.Sends, Datagram{Tunnel: true, To: netip.AddrPortFrom(msg.WGIP, IntroPort), Data: reply})
 			s.lastAdv = now
 		}
 	}
+}
+
+func (e *Engine) probeCandidatesLocked(s *session, r *Result, now time.Time) {
+	if s == nil || s.directUp || len(s.cands) == 0 {
+		return
+	}
+	if !s.lastProbe.IsZero() && now.Sub(s.lastProbe) < Keepalive {
+		return
+	}
+	for _, c := range s.cands {
+		if ping, err := e.pingLocked(s, c); err == nil {
+			r.Sends = append(r.Sends, Datagram{To: c, Data: ping})
+		}
+	}
+	s.lastProbe = now
 }
 
 func (e *Engine) onPingLocked(r *Result, from netip.AddrPort, pkt []byte) {
