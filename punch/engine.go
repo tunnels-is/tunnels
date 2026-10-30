@@ -166,6 +166,27 @@ func (e *Engine) punchableLocked(ip netip.Addr) bool {
 	return ip.Is4() && ip.IsPrivate() && e.admitsLocked(ip)
 }
 
+// publicPunchTarget reports whether an address named in an introduction is a
+// public IPv4 endpoint we will punch. Loopback, link-local, multicast, and
+// private ranges are dropped. A ping we actually receive is not checked here.
+func publicPunchTarget(ap netip.AddrPort) bool {
+	if !ap.IsValid() || ap.Port() == 0 {
+		return false
+	}
+	ip := ap.Addr()
+	return ip.Is4() && ip.IsGlobalUnicast() && !ip.IsPrivate()
+}
+
+func publicPunchTargets(in []netip.AddrPort) []netip.AddrPort {
+	out := make([]netip.AddrPort, 0, len(in))
+	for _, c := range in {
+		if publicPunchTarget(c) {
+			out = append(out, c)
+		}
+	}
+	return out
+}
+
 // NoteTraffic asks the engine to punch the device that owns this tunnel IP.
 // Only private IPv4 is a candidate. A public destination is WAN traffic, and
 // an introduction must not be sent there.
@@ -331,11 +352,8 @@ func (e *Engine) onIntroLocked(r *Result, pkt []byte, now time.Time) {
 		e.peers[msg.Src] = s
 		e.byIP[msg.WGIP] = msg.Src
 	}
-	s.cands = append([]netip.AddrPort(nil), msg.Candidates...)
+	s.cands = publicPunchTargets(msg.Candidates)
 	for _, c := range s.cands {
-		if !c.IsValid() {
-			continue
-		}
 		if ping, err := e.pingLocked(s, c); err == nil {
 			r.Sends = append(r.Sends, Datagram{To: c, Data: ping})
 		}
