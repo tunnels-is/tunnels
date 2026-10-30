@@ -172,7 +172,8 @@ func originAllowed(origin string) bool {
 
 func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-
+		// "*" echoes the request Origin. Do not set
+		// Access-Control-Allow-Credentials while that entry is allowed.
 		if origin := r.Header.Get("Origin"); originAllowed(origin) {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 			w.Header().Add("Vary", "Origin")
