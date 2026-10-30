@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/subtle"
+	"errors"
 	"log/slog"
 	"math/big"
 	"net/http"
@@ -74,11 +75,9 @@ func handleClientResetPassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	recoveryConsumeMu.Lock()
-	recErr := acceptResetAuth(user.ID, otp, form.Recovery)
-	recoveryConsumeMu.Unlock()
-	if recErr != nil {
-		sendError(w, 401, genericAuthErr)
+	if err := previewResetAuth(user.ID, otp, form.Recovery); err != nil {
+		code, msg := resetAuthStatus(err)
+		sendError(w, code, msg)
 		return
 	}
 
@@ -87,16 +86,25 @@ func handleClientResetPassword(w http.ResponseWriter, r *http.Request) {
 		sendError(w, 500, "Unable to generate a secure password, please contact customer support")
 		return
 	}
-	user.Password = string(hash)
 
-	err = resetUserPassword(user)
-	if err != nil {
-		sendError(w, 401, "Database error, please try again in a moment")
+	recoveryConsumeMu.Lock()
+	recErr := acceptResetAuth(user.ID, otp, form.Recovery, string(hash))
+	recoveryConsumeMu.Unlock()
+	if recErr != nil {
+		code, msg := resetAuthStatus(recErr)
+		sendError(w, code, msg)
 		return
 	}
 
 	clearAuthSlot(authLimitReset, form.Email, ip)
 	w.WriteHeader(200)
+}
+
+func resetAuthStatus(err error) (int, string) {
+	if errors.Is(err, errTOTPReused) || errors.Is(err, errRecoveryNotFound) || errors.Is(err, errRecoveryDecrypt) {
+		return 401, "invalid email or reset code"
+	}
+	return 401, "Database error, please try again in a moment"
 }
 
 func passwordLengthError(pw string) string {

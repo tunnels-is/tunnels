@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -450,6 +451,88 @@ func TestResetPassword_RejectsReusedTOTP(t *testing.T) {
 	}
 	if strings.Contains(plain, used) || !strings.Contains(plain, spare) {
 		t.Fatalf("recovery codes: %q", plain)
+	}
+}
+
+// TestAcceptResetAuth_WritesPasswordWithCode ...
+func TestAcceptResetAuth_WritesPasswordWithCode(t *testing.T) {
+	setupTestDB(t)
+	okKey := withTwoFactorKey(t)
+	const keep = "KEEPCODERESET111"
+	const used = "USEDCODERESET222"
+	recBlob, err := Encrypt(keep+" "+used, []byte(okKey))
+	if err != nil {
+		t.Fatal(err)
+	}
+	u := &User{
+		ID: uuid.New(), Email: "atomic-reset@test.local", Password: "old-hash",
+		APIKey: "atomic-api-key", RecoveryCodes: recBlob,
+		Tokens: []*DeviceToken{{DT: "tok", N: "n"}},
+	}
+	if err := createUser(u); err != nil {
+		t.Fatal(err)
+	}
+
+	unchanged := func() {
+		t.Helper()
+		stored, err := findUserByID(u.ID)
+		if err != nil || stored == nil {
+			t.Fatal(err)
+		}
+		if stored.Password != "old-hash" || stored.LastTOTP != "" || stored.APIKey == "" || len(stored.Tokens) != 1 {
+			t.Fatalf("reset mutated the user: %+v", stored)
+		}
+		if !apiKeyIndexHas(t, "atomic-api-key") {
+			t.Fatal("api key index dropped before the password write")
+		}
+		plain, err := Decrypt(stored.RecoveryCodes, []byte(okKey))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(plain, keep) || !strings.Contains(plain, used) {
+			t.Fatalf("recovery codes: %q", plain)
+		}
+	}
+
+	if err := acceptResetAuth(u.ID, "123456", "NOPE", "new-hash"); !errors.Is(err, errRecoveryNotFound) {
+		t.Fatalf("wrong recovery: %v", err)
+	}
+	unchanged()
+	if err := acceptResetAuth(u.ID, "", used, "new-hash"); !errors.Is(err, errTOTPReused) {
+		t.Fatalf("empty code: %v", err)
+	}
+	unchanged()
+	if err := acceptResetAuth(u.ID, "123456", used, ""); err == nil {
+		t.Fatal("empty hash was accepted")
+	}
+	unchanged()
+
+	if err := acceptResetAuth(u.ID, "123456", used, "new-hash"); err != nil {
+		t.Fatal(err)
+	}
+	stored, err := findUserByID(u.ID)
+	if err != nil || stored == nil {
+		t.Fatal(err)
+	}
+	if stored.Password != "new-hash" || stored.LastTOTP != "123456" || stored.APIKey != "" || len(stored.Tokens) != 0 {
+		t.Fatalf("committed reset: %+v", stored)
+	}
+	if apiKeyIndexHas(t, "atomic-api-key") {
+		t.Fatal("api key index still contains the reset key")
+	}
+	plain, err := Decrypt(stored.RecoveryCodes, []byte(okKey))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(plain, used) || !strings.Contains(plain, keep) {
+		t.Fatalf("recovery codes: %q", plain)
+	}
+	if err := acceptResetAuth(u.ID, "123456", keep, "other-hash"); !errors.Is(err, errTOTPReused) {
+		t.Fatalf("reused code: %v", err)
+	}
+	stored, err = findUserByID(u.ID)
+	if err != nil || stored == nil || stored.Password != "new-hash" {
+		t.Fatalf("reused code changed the password: %+v %v", stored, err)
 	}
 }
 

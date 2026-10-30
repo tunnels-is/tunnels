@@ -544,52 +544,87 @@ func acceptTOTPCode(userID uuid.UUID, otp string) error {
 	})
 }
 
-func acceptResetAuth(userID uuid.UUID, otp, recovery string) error {
+func nextRecoveryState(user *User, otp, recovery string) ([]byte, error) {
 	if otp == "" {
-		return errTOTPReused
+		return nil, errTOTPReused
 	}
-	return db.Update(func(tx *gobolt.Tx) error {
-		b := tx.Bucket([]byte(bucketUsers))
-		key := []byte(userID.String())
-		v := b.Get(key)
-		if v == nil {
-			return errors.New("user not found")
+	if subtle.ConstantTimeCompare([]byte(user.LastTOTP), []byte(otp)) == 1 {
+		return nil, errTOTPReused
+	}
+	recoveryUpper := strings.ToUpper(strings.TrimSpace(recovery))
+	plain, err := Decrypt(user.RecoveryCodes, []byte(loadSecret("TwoFactorKey")))
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", errRecoveryDecrypt, err)
+	}
+	found := false
+	remaining := make([]string, 0)
+	for _, part := range strings.Fields(plain) {
+		if part == recoveryUpper {
+			found = true
+			continue
 		}
-		user := new(User)
-		if err := bboltUnmarshal(v, user); err != nil {
+		remaining = append(remaining, part)
+	}
+	if !found {
+		return nil, errRecoveryNotFound
+	}
+	blob, err := Encrypt(strings.Join(remaining, " "), []byte(loadSecret("TwoFactorKey")))
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", errRecoveryDecrypt, err)
+	}
+	return blob, nil
+}
+
+func loadResetUser(tx *gobolt.Tx, userID uuid.UUID) (key []byte, user *User, err error) {
+	b := tx.Bucket([]byte(bucketUsers))
+	key = []byte(userID.String())
+	v := b.Get(key)
+	if v == nil {
+		return nil, nil, errors.New("user not found")
+	}
+	user = new(User)
+	if err = bboltUnmarshal(v, user); err != nil {
+		return nil, nil, err
+	}
+	return key, user, nil
+}
+
+func previewResetAuth(userID uuid.UUID, otp, recovery string) error {
+	return db.View(func(tx *gobolt.Tx) error {
+		_, user, err := loadResetUser(tx, userID)
+		if err != nil {
 			return err
 		}
-		if subtle.ConstantTimeCompare([]byte(user.LastTOTP), []byte(otp)) == 1 {
-			return errTOTPReused
-		}
-		recoveryUpper := strings.ToUpper(strings.TrimSpace(recovery))
-		plain, err := Decrypt(user.RecoveryCodes, []byte(loadSecret("TwoFactorKey")))
+		_, err = nextRecoveryState(user, otp, recovery)
+		return err
+	})
+}
+
+func acceptResetAuth(userID uuid.UUID, otp, recovery, passwordHash string) error {
+	if passwordHash == "" {
+		return errors.New("missing password hash")
+	}
+	return db.Update(func(tx *gobolt.Tx) error {
+		key, user, err := loadResetUser(tx, userID)
 		if err != nil {
-			return fmt.Errorf("%w: %w", errRecoveryDecrypt, err)
+			return err
 		}
-		found := false
-		remaining := make([]string, 0)
-		for _, part := range strings.Fields(plain) {
-			if part == recoveryUpper {
-				found = true
-				continue
-			}
-			remaining = append(remaining, part)
-		}
-		if !found {
-			return errRecoveryNotFound
-		}
-		blob, err := Encrypt(strings.Join(remaining, " "), []byte(loadSecret("TwoFactorKey")))
+		blob, err := nextRecoveryState(user, otp, recovery)
 		if err != nil {
-			return fmt.Errorf("%w: %w", errRecoveryDecrypt, err)
+			return err
 		}
 		user.RecoveryCodes = blob
 		user.LastTOTP = otp
+		user.Password = passwordHash
+		user.Tokens = []*DeviceToken{}
+		if err := dropUserAPIKey(tx, user); err != nil {
+			return err
+		}
 		data, err := bboltMarshal(user)
 		if err != nil {
 			return err
 		}
-		return b.Put(key, data)
+		return tx.Bucket([]byte(bucketUsers)).Put(key, data)
 	})
 }
 
