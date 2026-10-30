@@ -8,6 +8,75 @@ import (
 	"github.com/google/uuid"
 )
 
+func TestIntro_DropsLocalPunchTargets(t *testing.T) {
+	aPriv, err := NewPrivate()
+	if err != nil {
+		t.Fatal(err)
+	}
+	aPub, err := Public(aPriv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var aWG [32]byte
+	aWG[0] = 1
+	aID := uuid.New()
+	aIP := netip.MustParseAddr("10.0.0.5")
+	bIP := netip.MustParseAddr("10.0.1.8")
+	b := NewEngine(uuid.New(), mustKey(t), [32]byte{2}, bIP)
+	b.SetLocalPolicy(false, false, []string{aIP.String()})
+
+	public := netip.MustParseAddrPort("198.51.100.10:41000")
+	cgnat := netip.MustParseAddrPort("100.64.0.1:9")
+	cands := []netip.AddrPort{
+		public,
+		cgnat,
+		netip.MustParseAddrPort("127.0.0.1:1"),
+		netip.MustParseAddrPort("169.254.169.254:80"),
+		netip.MustParseAddrPort("10.1.1.1:9"),
+		netip.MustParseAddrPort("192.168.1.1:9"),
+		netip.MustParseAddrPort("172.16.0.1:9"),
+		netip.MustParseAddrPort("198.51.100.10:0"),
+		netip.MustParseAddrPort("255.255.255.255:9"),
+		netip.MustParseAddrPort("[2001:db8::1]:9"),
+	}
+	pkt, err := BuildIntro(aID, aPub, aWG, aIP, cands)
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now()
+	pinged := pingTargets(b.OnPacket(netip.AddrPortFrom(aIP, IntroPort), pkt, now))
+	if !sameAddrPorts(pinged, []netip.AddrPort{public, cgnat}) {
+		t.Fatalf("first pings: %v", pinged)
+	}
+	b.NoteTraffic(aIP)
+	later := pingTargets(b.Poll(now.Add(Keepalive)))
+	if !sameAddrPorts(later, []netip.AddrPort{public, cgnat}) {
+		t.Fatalf("keepalive pings: %v", later)
+	}
+}
+
+func pingTargets(res Result) []netip.AddrPort {
+	var out []netip.AddrPort
+	for _, d := range res.Sends {
+		if TypeOf(d.Data) == TypePing {
+			out = append(out, d.To)
+		}
+	}
+	return out
+}
+
+func sameAddrPorts(got, want []netip.AddrPort) bool {
+	if len(got) != len(want) {
+		return false
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			return false
+		}
+	}
+	return true
+}
+
 func TestIntroExchangeReachesDirectPath(t *testing.T) {
 	aPriv, _ := NewPrivate()
 	bPriv, _ := NewPrivate()
