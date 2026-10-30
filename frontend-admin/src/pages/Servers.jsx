@@ -21,7 +21,7 @@ function Modal({ title, onClose, children }) {
 
 const inputClass = "w-full bg-[#fdfcf8] border border-[#e7e3d7] rounded px-3 py-1.5 text-[13px] text-[#0a0a0a] placeholder-[#a3a3a3] focus:outline-none focus:border-[#0a0a0a]";
 
-const emptyForm = () => ({ Tag: '', InfraTag: '', IP: '', Port: '443', Country: '', WireGuardSubnet: '', WireGuardSubnet6: '', WireGuardPort: 51820, WireGuardIface: 'wg0', InternetIface: '', EnableFirewall: true, WANID: '' });
+const emptyForm = () => ({ Tag: '', InfraTag: '', IP: '', Port: '443', Country: '', WireGuardSubnet: '', WireGuardSubnet6: '', WireGuardPort: 51820, WireGuardIface: 'wg0', InternetIface: '', WANID: '' });
 
 export default function Servers() {
   const navigate = useNavigate();
@@ -79,7 +79,7 @@ export default function Servers() {
     setCreating(true);
     try {
       const resp = await apiPost('/ui/server/create', {
-        Server: { ...createForm, WireGuardPort: Number(createForm.WireGuardPort) || 0 },
+        Server: { ...createForm, EnableFirewall: true, WireGuardPort: Number(createForm.WireGuardPort) || 0 },
       });
       if (resp.status === 200) {
         const data = await resp.json().catch(() => ({}));
@@ -150,9 +150,7 @@ export default function Servers() {
             <span className="text-[11px] text-[#525252] truncate" title={s.WAN ? `${s.WAN.Tag} (${s.WAN.CIDR})` : (s.WANID || '')}>
               {s.WAN ? s.WAN.Tag : <span className="text-[#a3a3a3]">—</span>}
             </span>
-            <span className={`text-[12px] ${s.EnableFirewall ? 'text-[#15803d]' : 'text-[#a3a3a3]'}`}>
-              {s.EnableFirewall ? 'On' : 'Off'}
-            </span>
+            <span className="text-[12px] text-[#15803d]">On</span>
             <span className="text-[11px] text-[#a3a3a3] font-mono truncate">
               {s.WireGuardPubKey ? s.WireGuardPubKey.slice(0, 16) + '…' : '—'}
             </span>
@@ -258,13 +256,6 @@ export default function Servers() {
                   <option key={w.ID} value={w.ID}>{w.Tag} ({w.CIDR})</option>
                 ))}
               </select>
-            </div>
-            <div>
-              <label className="block text-[11px] text-[#a3a3a3] uppercase tracking-wider mb-1">Firewall</label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" checked={!!createForm.EnableFirewall} onChange={set('EnableFirewall')} className="accent-[#1d4ed8]" />
-                <span className="text-[12px] text-[#525252]">{createForm.EnableFirewall ? 'Enabled' : 'Disabled'}</span>
-              </label>
             </div>
             {createError && <p className="text-[12px] text-[#dc2626]">{createError}</p>}
             <div className="flex justify-end gap-2 pt-2">

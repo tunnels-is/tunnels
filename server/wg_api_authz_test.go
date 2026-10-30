@@ -173,23 +173,24 @@ func TestPunchPeersFor_SkipsInactiveOwners(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	add := func(owner *User, server *types.Server, ip, tag string) *types.Device {
+	add := func(owner *User, server *types.Server, ip, tag string, allow ...string) *types.Device {
 		t.Helper()
 		d := &types.Device{
 			ID: uuid.New(), UserID: owner.ID, ServerID: server.ID,
 			WireGuardIP: ip, WireGuardKey: tag + "-wg", DiscoKey: tag + "-disco", Tag: tag,
+			P2PAllowIPs: allow,
 		}
 		if err := createDevice(d); err != nil {
 			t.Fatal(err)
 		}
 		return d
 	}
-	self := add(selfUser, open, "10.8.0.2", "self")
-	okDev := add(active, open, "10.8.0.3", "ok")
-	add(disabled, open, "10.8.0.4", "disabled")
-	add(expired, open, "10.8.0.5", "expired")
-	add(outsider, locked, "10.8.0.6", "outsider")
-	memberDev := add(member, locked, "10.8.0.7", "member")
+	self := add(selfUser, open, "10.8.0.2", "self", "10.8.0.3", "10.8.0.4", "10.8.0.5", "10.8.0.6", "10.8.0.7")
+	okDev := add(active, open, "10.8.0.3", "ok", "10.8.0.2")
+	add(disabled, open, "10.8.0.4", "disabled", "10.8.0.2")
+	add(expired, open, "10.8.0.5", "expired", "10.8.0.2")
+	add(outsider, locked, "10.8.0.6", "outsider", "10.8.0.2")
+	memberDev := add(member, locked, "10.8.0.7", "member", "10.8.0.2")
 
 	peers, err := punchPeersFor(self, open)
 	if err != nil {

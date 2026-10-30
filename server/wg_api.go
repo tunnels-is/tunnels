@@ -235,7 +235,7 @@ func handleWGConfig(w http.ResponseWriter, r *http.Request) {
 		"WireGuardSubnet":  server.WireGuardSubnet,
 		"WireGuardSubnet6": server.WireGuardSubnet6,
 		"WANCIDR":          wanCIDRForServer(server),
-		"EnableFirewall":   server.EnableFirewall,
+		"EnableFirewall":   true,
 		"DiscoKey":         server.DiscoKey,
 	})
 }
@@ -391,7 +391,7 @@ func handleWGServerConfigFetch(w http.ResponseWriter, r *http.Request) {
 		WireGuardSubnet6:  server.WireGuardSubnet6,
 		WireGuardIface:    server.WireGuardIface,
 		InternetIface:     server.InternetIface,
-		EnableFirewall:    server.EnableFirewall,
+		EnableFirewall:    true,
 		DiscoKey:          server.DiscoKey,
 	}
 

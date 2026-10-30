@@ -14,8 +14,7 @@ import (
 const aclControlPort = 51821
 
 type aclAnnouncement struct {
-	AllowAll bool     `json:"AllowAll,omitempty"`
-	Allowed  []string `json:"Allowed"`
+	Allowed []string `json:"Allowed"`
 }
 
 func wgServerGatewayIP(subnet string) (net.IP, error) {
@@ -56,7 +55,7 @@ func NormalizeAllowedHost(s string) (string, error) {
 }
 
 // AnnounceAllowedHosts ...
-func (t *TUN) AnnounceAllowedHosts(allowed []string, allowAll bool) error {
+func (t *TUN) AnnounceAllowedHosts(allowed []string, _ bool) error {
 	sr := t.ServerResponse
 	if sr == nil || sr.WireGuardSubnet == "" {
 		return errors.New("no WireGuard subnet known for tunnel")
@@ -72,7 +71,7 @@ func (t *TUN) AnnounceAllowedHosts(allowed []string, allowAll bool) error {
 	if allowed == nil {
 		allowed = []string{}
 	}
-	payload, err := json.Marshal(&aclAnnouncement{AllowAll: allowAll, Allowed: allowed})
+	payload, err := json.Marshal(&aclAnnouncement{Allowed: allowed})
 	if err != nil {
 		return fmt.Errorf("marshal announcement: %w", err)
 	}
@@ -104,7 +103,7 @@ func (t *TUN) announceAllowedHostsWithRetry() {
 		if m == nil {
 			return
 		}
-		if err := t.AnnounceAllowedHosts(m.AllowedHosts, m.AllowAll); err != nil {
+		if err := t.AnnounceAllowedHosts(m.AllowedHosts, false); err != nil {
 			DEBUG("allowed hosts announce failed: ", err)
 		}
 	}

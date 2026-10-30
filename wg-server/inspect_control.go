@@ -23,8 +23,7 @@ func parseACLPayload(payload []byte) (entries []aclEntry, allowAll bool, ok bool
 		return nil, false, false
 	}
 	var msg struct {
-		AllowAll bool     `json:"AllowAll"`
-		Allowed  []string `json:"Allowed"`
+		Allowed []string `json:"Allowed"`
 	}
 	if err := json.Unmarshal(payload, &msg); err != nil {
 		return nil, false, false
@@ -39,5 +38,5 @@ func parseACLPayload(payload []byte) (entries []aclEntry, allowAll bool, ok bool
 			entries = append(entries, e)
 		}
 	}
-	return entries, msg.AllowAll, true
+	return entries, false, true
 }

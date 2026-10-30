@@ -215,22 +215,22 @@ func TestAllow_ServerIPUnreachableByPeers(t *testing.T) {
 	}
 }
 
-// TestAllow_FirewallDisabled ...
-func TestAllow_FirewallDisabled(t *testing.T) {
+// TestAllow_ConfigFlagDoesNotDisable ...
+func TestAllow_ConfigFlagDoesNotDisable(t *testing.T) {
 	insp := newTestInspectorNoFirewall(t)
 
 	p2p := buildIPv4UDP(t, "10.0.0.5", "10.0.0.10", 1, 2, nil)
-	if !insp.allow(p2p) {
-		t.Fatal("firewall disabled => peer-to-peer must pass")
+	if insp.allow(p2p) {
+		t.Fatal("a false config flag must not turn the firewall off")
 	}
 
 	toServer := buildIPv4UDP(t, "10.0.0.5", insp.serverIPv4.String(), 1, 2, nil)
 	if insp.allow(toServer) {
-		t.Fatal("server WG IP must be blocked even with firewall disabled")
+		t.Fatal("server WG IP must stay blocked")
 	}
 	toServer6 := buildIPv6UDP(t, "fd00::5", insp.serverIPv6.String(), 1, 2, nil)
 	if insp.allow(toServer6) {
-		t.Fatal("v6 server WG IP must be blocked even with firewall disabled")
+		t.Fatal("v6 server WG IP must stay blocked")
 	}
 }
 
@@ -561,17 +561,20 @@ func TestAllow_AllowAllAdmitsAnySource(t *testing.T) {
 	}
 }
 
-// TestHandleControl_AllowAll ...
-func TestHandleControl_AllowAll(t *testing.T) {
+// TestHandleControl_AllowAllIgnored ...
+func TestHandleControl_AllowAllIgnored(t *testing.T) {
 	insp := newTestInspector(t)
 	resetPeer("10.0.0.5")
 	pkt := buildIPv4UDP(t, "10.0.0.5", insp.serverIPv4.String(), 1, aclControlPort,
-		[]byte(`{"AllowAll":true,"Allowed":[]}`))
+		[]byte(`{"AllowAll":true,"Allowed":["10.0.0.9"]}`))
 	if !handleControl(insp, pkt) {
 		t.Fatal("expected consume")
 	}
-	if !entry(t, "10.0.0.5").allowedContains(mustAddr(t, "10.0.0.123"), 80) {
-		t.Fatal("AllowAll announcement must permit any source")
+	if entry(t, "10.0.0.5").allowedContains(mustAddr(t, "10.0.0.123"), 80) {
+		t.Fatal("AllowAll must not permit an unlisted source")
+	}
+	if !entry(t, "10.0.0.5").allowedContains(mustAddr(t, "10.0.0.9"), 80) {
+		t.Fatal("an explicit allow entry must still admit that source")
 	}
 }
 

@@ -191,7 +191,7 @@ func benchScenarios() []benchScenario {
 			benchScenario{fmt.Sprintf("frag-portrule/%d", sz), func() (*inspectingTUN, [][]byte) {
 				return buildFrag("10.0.0.5:5000", sz)
 			}},
-			benchScenario{fmt.Sprintf("firewall-off/%d", sz), func() (*inspectingTUN, [][]byte) {
+			benchScenario{fmt.Sprintf("unfrag-flag-ignored/%d", sz), func() (*inspectingTUN, [][]byte) {
 				insp := newBenchInspector(false)
 				resetPeer("10.0.0.5")
 				return insp, batchUnfrag("10.0.0.5", "10.0.0.10", 5000, sz)
@@ -256,7 +256,7 @@ func TestBenchScenariosAdmitAsExpected(t *testing.T) {
 			t.Fatalf("%s: Write error: %v", sc.name, err)
 		}
 		want := len(master)
-		if strings.Contains(sc.name, "denied") || strings.HasPrefix(sc.name, "frag-") {
+		if strings.Contains(sc.name, "denied") || strings.Contains(sc.name, "flag-ignored") || strings.HasPrefix(sc.name, "frag-") {
 			want = 0
 		}
 		if n != want {

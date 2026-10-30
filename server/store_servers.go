@@ -105,7 +105,7 @@ func updateServer(server *types.Server) (*types.Server, error) {
 		existing.WireGuardSubnet6 = server.WireGuardSubnet6
 		existing.InternetIface = server.InternetIface
 		existing.InsecureSkipVerify = server.InsecureSkipVerify
-		existing.EnableFirewall = server.EnableFirewall
+		existing.EnableFirewall = true
 		existing.WANID = server.WANID
 		existing.MeshGroupID = server.MeshGroupID
 		existing.WireGuardMeshPort = server.WireGuardMeshPort
@@ -203,6 +203,7 @@ func createServer(server *types.Server) error {
 		b := tx.Bucket([]byte(bucketServers))
 
 		server.WAN = nil
+		server.EnableFirewall = true
 		stored := *server
 		stored.APIKey = storeSecret(server.APIKey)
 		id := server.ID.String()

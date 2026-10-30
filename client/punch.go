@@ -68,7 +68,6 @@ type punchBind struct {
 	inner   wgconn.Bind
 	tun     atomic.Pointer[TUN]
 	closed  atomic.Bool
-	fwOff   atomic.Bool
 	retryMu sync.Mutex
 	retry   map[uuid.UUID]punchInstall
 
@@ -291,12 +290,10 @@ func (b *punchBind) buildEngine(tun *TUN) *punch.Engine {
 func (b *punchBind) pushLocalPolicy(tun *TUN, eng *punch.Engine) punch.Result {
 	m := tun.meta.Load()
 	var entries []string
-	allowAll := false
 	if m != nil {
 		entries = m.AllowedHosts
-		allowAll = m.AllowAll
 	}
-	return eng.SetLocalPolicy(b.fwOff.Load(), allowAll, entries)
+	return eng.SetLocalPolicy(false, false, entries)
 }
 
 func (b *punchBind) refreshWG(tun *TUN, eng *punch.Engine) {
@@ -306,7 +303,6 @@ func (b *punchBind) refreshWG(tun *TUN, eng *punch.Engine) {
 	}
 	cfg := b.fetchWG(tun)
 	if cfg != nil {
-		b.fwOff.Store(!cfg.EnableFirewall)
 		if cfg.DiscoKey != "" {
 			if key, err := punch.DecodeKey(cfg.DiscoKey); err == nil {
 				eng.SetServerDisco(key)
@@ -684,11 +680,9 @@ func (t *TUN) punchAllowsIngress(src [4]byte) bool {
 		return true
 	}
 	m := t.meta.Load()
-	fw := t.ServerResponse != nil && t.ServerResponse.EnableFirewall
-	allowAll := m != nil && m.AllowAll
 	var entries []string
 	if m != nil {
 		entries = m.AllowedHosts
 	}
-	return punch.AdmitsAllPorts(!fw, allowAll, entries, netip.AddrFrom4(src))
+	return punch.AdmitsAllPorts(false, false, entries, netip.AddrFrom4(src))
 }

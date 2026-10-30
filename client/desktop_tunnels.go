@@ -86,7 +86,7 @@ func DeleteTunnel(tag string) error {
 }
 
 // SetTunnelPeers ...
-func SetTunnelPeers(tag string, allowedHosts []string, allowAll bool) ([]string, error) {
+func SetTunnelPeers(tag string, allowedHosts []string, _ bool) ([]string, error) {
 	meta, ok := TunnelMetaMap.Load(tag)
 	if !ok {
 		return nil, errors.New("tunnel not found")
@@ -107,7 +107,7 @@ func SetTunnelPeers(tag string, allowedHosts []string, allowAll bool) ([]string,
 	}
 
 	meta.AllowedHosts = hosts
-	meta.AllowAll = allowAll
+	meta.AllowAll = false
 	TunnelMetaMap.Store(meta.Tag, meta)
 	if err := writeTunnelsToDisk(meta.Tag); err != nil {
 		return nil, err
@@ -119,7 +119,7 @@ func SetTunnelPeers(tag string, allowedHosts []string, allowAll bool) ([]string,
 			return true
 		}
 		if t.GetState() >= TunnelConnected {
-			if err := t.AnnounceAllowedHosts(hosts, allowAll); err != nil {
+			if err := t.AnnounceAllowedHosts(hosts, false); err != nil {
 				DEBUG("peer list announce failed: ", err)
 			}
 		}

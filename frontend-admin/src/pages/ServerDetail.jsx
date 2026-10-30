@@ -70,7 +70,6 @@ export default function ServerDetail() {
       WireGuardPort: server.WireGuardPort || 51820,
       WireGuardIface: server.WireGuardIface || 'wg0',
       InternetIface: server.InternetIface || '',
-      EnableFirewall: !!server.EnableFirewall,
       WANID: server.WANID || '',
     });
     setError('');
@@ -82,7 +81,7 @@ export default function ServerDetail() {
     setError('');
     try {
       const resp = await apiPost('/ui/server/update', {
-        Server: { ...server, ...form, WireGuardPort: Number(form.WireGuardPort) || 0 },
+        Server: { ...server, ...form, EnableFirewall: true, WireGuardPort: Number(form.WireGuardPort) || 0 },
       });
       if (resp.status === 200) {
         setEditing(false);
@@ -362,16 +361,7 @@ export default function ServerDetail() {
             )}
           </Row>
           <Row label="Firewall">
-            {editing ? (
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="checkbox" checked={!!form.EnableFirewall} onChange={set('EnableFirewall')} className="accent-[#1d4ed8]" />
-                <span className="text-[12px] text-[#525252]">{form.EnableFirewall ? 'Yes' : 'No'}</span>
-              </label>
-            ) : (
-              <span className={server.EnableFirewall ? 'text-[#15803d]' : 'text-[#a3a3a3]'}>
-                {server.EnableFirewall ? 'Yes' : 'No'}
-              </span>
-            )}
+            <span className="text-[12px] text-[#15803d]">On</span>
           </Row>
         </div>
     </div>

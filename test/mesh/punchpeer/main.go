@@ -143,19 +143,18 @@ func main() {
 			}
 			apply(dev, it, &instMu, inst, eng.OnPacket(from, pkt.data, time.Now()), *endpoint, pb)
 		case <-tick.C:
-			allowAll, entries, text := readAllow(*allowPath)
+			entries, text := readAllow(*allowPath)
 			if !haveAllow || text != lastAllow {
-				if err := announce(*wgIP, gw, allowAll, entries); err != nil {
+				if err := announce(*wgIP, gw, entries); err != nil {
 					fmt.Printf("announce: %v\n", err)
 				} else {
-					fmt.Printf("announced allowall=%v entries=%v\n", allowAll, entries)
+					fmt.Printf("announced allowall=false entries=%v\n", entries)
 				}
 				lastAllow = text
 				haveAllow = true
 			} else if time.Now().Unix()%2 == 0 {
-				_ = announce(*wgIP, gw, allowAll, entries)
+				_ = announce(*wgIP, gw, entries)
 			}
-			fwOff := false
 			cfg, err := api.wgConfig()
 			if err != nil {
 				if !complained {
@@ -170,9 +169,8 @@ func main() {
 						ready = true
 					}
 				}
-				fwOff = !cfg.EnableFirewall
 			}
-			apply(dev, it, &instMu, inst, eng.SetLocalPolicy(fwOff, allowAll, entries), *endpoint, pb)
+			apply(dev, it, &instMu, inst, eng.SetLocalPolicy(false, false, entries), *endpoint, pb)
 			apply(dev, it, &instMu, inst, eng.Poll(time.Now()), *endpoint, pb)
 		}
 	}
@@ -248,10 +246,10 @@ func apply(dev *device.Device, it *introTUN, mu *sync.Mutex, inst map[uuid.UUID]
 	}
 }
 
-func readAllow(path string) (allowAll bool, entries []string, text string) {
+func readAllow(path string) (entries []string, text string) {
 	b, err := os.ReadFile(path)
 	if err != nil {
-		return false, nil, ""
+		return nil, ""
 	}
 	text = string(b)
 	for _, line := range strings.Split(text, "\n") {
@@ -260,19 +258,18 @@ func readAllow(path string) (allowAll bool, entries []string, text string) {
 			continue
 		}
 		if line == "*" || strings.EqualFold(line, "allowall") {
-			allowAll = true
 			continue
 		}
 		entries = append(entries, line)
 	}
-	return allowAll, entries, text
+	return entries, text
 }
 
-func announce(local string, gw netip.Addr, allowAll bool, entries []string) error {
+func announce(local string, gw netip.Addr, entries []string) error {
 	if entries == nil {
 		entries = []string{}
 	}
-	body, err := json.Marshal(map[string]any{"AllowAll": allowAll, "Allowed": entries})
+	body, err := json.Marshal(map[string]any{"AllowAll": false, "Allowed": entries})
 	if err != nil {
 		return err
 	}
@@ -311,8 +308,7 @@ func (a *api) wgConfig() (*wgServer, error) {
 }
 
 type wgServer struct {
-	EnableFirewall bool   `json:"EnableFirewall"`
-	DiscoKey       string `json:"DiscoKey"`
+	DiscoKey string `json:"DiscoKey"`
 }
 
 func (a *api) do(method, url string, body any) ([]byte, int, error) {

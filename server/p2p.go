@@ -12,7 +12,6 @@ import (
 
 type p2pPolicyRequest struct {
 	DeviceID string   `json:"DeviceID"`
-	AllowAll bool     `json:"AllowAll"`
 	AllowIPs []string `json:"AllowIPs"`
 }
 
@@ -118,7 +117,7 @@ func handleWGP2PPolicy(w http.ResponseWriter, r *http.Request) {
 		}
 		ips = append(ips, addr.String())
 	}
-	if err := setDevicePunchPolicy(id, form.AllowAll, ips); err != nil {
+	if err := setDevicePunchPolicy(id, false, ips); err != nil {
 		sendError(w, 500, "Failed to store policy")
 		return
 	}
@@ -230,7 +229,7 @@ func punchPeersFor(self *types.Device, home *types.Server) ([]types.P2PPeer, err
 		if err != nil || !peerIP.Is4() {
 			continue
 		}
-		if !punch.PairAdmitted(!home.EnableFirewall, self.P2PAllowAll, self.P2PAllowIPs, selfIP, !peerSrv.EnableFirewall, d.P2PAllowAll, d.P2PAllowIPs, peerIP) {
+		if !punch.PairAdmitted(false, false, self.P2PAllowIPs, selfIP, false, false, d.P2PAllowIPs, peerIP) {
 			continue
 		}
 		out = append(out, types.P2PPeer{

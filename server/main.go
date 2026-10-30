@@ -365,6 +365,7 @@ func initializeDefaultServer() error {
 		WireGuardSubnet:    defaultWGSubnet,
 		InternetIface:      internetIface,
 		InsecureSkipVerify: wgCfg.InsecureSkipVerify,
+		EnableFirewall:     true,
 	}
 	if err := createServer(server); err != nil {
 		return fmt.Errorf("create default server: %w", err)

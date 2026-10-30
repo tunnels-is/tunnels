@@ -316,7 +316,7 @@ func configFromResponse(r *types.WGServerConfigResponse, privKey []byte, control
 		WireGuardSubnet6:  r.WireGuardSubnet6,
 		WireGuardIface:    r.WireGuardIface,
 		InternetIface:     r.InternetIface,
-		EnableFirewall:    r.EnableFirewall,
+		EnableFirewall:    true,
 		ConfigPath:        configPath,
 
 		InsecureSkipVerify: insecureSkipVerify,

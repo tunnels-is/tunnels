@@ -9,6 +9,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/cookiejar"
 	"os"
@@ -252,8 +253,8 @@ func TestMesh(t *testing.T) {
 
 	assertEnrolledOnSeparateServers(t, c, uA, uB, srvA, srvB, devA, devB, pubA, pubB)
 
-	startClient(t, "mcliA", cliAIP, privA, devA, "")
-	startClient(t, "mcliB", cliBIP, privB, devB, "clientB")
+	startClient(t, "mcliA", cliAIP, privA, devA, "", devB.WGIP)
+	startClient(t, "mcliB", cliBIP, privB, devB, "clientB", devA.WGIP)
 	waitClientUp(t, "mcliA", devA.WGIP)
 	waitClientUp(t, "mcliB", devB.WGIP)
 	waitPeerAuthorized(t, "mwgA", devA.WGIP)
@@ -479,6 +480,7 @@ func waitMeshRoutes(t *testing.T) {
 type deviceInfo struct {
 	ID         string
 	WGIP       string
+	Subnet     string
 	ServerID   string
 	ServerPub  string
 	ServerIP   string
@@ -517,11 +519,27 @@ func createDevice(t *testing.T, c *ctrl, u userInfo, serverID, pubKey, tag strin
 	return deviceInfo{
 		ID:         resp.Device.ID,
 		WGIP:       resp.Device.WireGuardIP,
+		Subnet:     resp.ServerSubnet,
 		ServerID:   sid,
 		ServerPub:  resp.ServerPubKey,
 		ServerIP:   resp.ServerIP,
 		ServerPort: port,
 	}
+}
+
+func wgGateway(subnet string) (string, error) {
+	_, ipNet, err := net.ParseCIDR(subnet)
+	if err != nil {
+		return "", err
+	}
+	base := ipNet.IP.To4()
+	if base == nil {
+		return "", fmt.Errorf("subnet %s is not IPv4", subnet)
+	}
+	gw := make(net.IP, len(base))
+	copy(gw, base)
+	gw[3]++
+	return gw.String(), nil
 }
 
 func startWGServer(t *testing.T, name, ip, apiKey string) {
@@ -550,10 +568,14 @@ func startWGServer(t *testing.T, name, ip, apiKey string) {
 		image, "/server", "-wg", "-wgConfigPath", "/data/wg-config.json", "-silent=false")
 }
 
-func startClient(t *testing.T, name, ip, priv string, dev deviceInfo, dummyName string) {
+func startClient(t *testing.T, name, ip, priv string, dev deviceInfo, dummyName, allowPeer string) {
 	t.Helper()
-	peerCmd := fmt.Sprintf("/meshpeer -priv %s -serverpub %s -endpoint %s:%d -ip %s -allowed %s",
-		priv, dev.ServerPub, dev.ServerIP, dev.ServerPort, dev.WGIP, wanCIDR)
+	gw, err := wgGateway(dev.Subnet)
+	if err != nil {
+		t.Fatalf("gateway for %s: %v", dev.WGIP, err)
+	}
+	peerCmd := fmt.Sprintf("/meshpeer -priv %s -serverpub %s -endpoint %s:%d -ip %s -allowed %s -allow %s -gw %s",
+		priv, dev.ServerPub, dev.ServerIP, dev.ServerPort, dev.WGIP, wanCIDR, allowPeer, gw)
 	script := peerCmd
 	if dummyName != "" {
 		script = fmt.Sprintf("/dummyhttp -addr %s:%d -name %s >/tmp/dummyhttp.log 2>&1 & exec %s",

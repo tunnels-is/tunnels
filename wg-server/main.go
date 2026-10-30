@@ -64,11 +64,8 @@ func refreshControllerConfig() {
 		cleanupNet(old)
 		os.Exit(1)
 	}
-	if old.EnableFirewall != next.EnableFirewall {
-		if d := inspectDevice.Load(); d != nil {
-			d.firewall.Store(next.EnableFirewall)
-		}
-		INFO("firewall flag updated from controller: ", next.EnableFirewall)
+	if d := inspectDevice.Load(); d != nil {
+		d.firewall.Store(true)
 	}
 	activeConfig.Store(next)
 }

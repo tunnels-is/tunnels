@@ -219,10 +219,6 @@ func PublicConnect(cr *ConnectionRequest) (code int, connectErr error) {
 	serverResp := serverResponseFromWG(cr, wgCfg)
 	tunnel.ServerResponse = serverResp
 
-	if !wgCfg.EnableFirewall && (len(meta.AllowedHosts) > 0 || !meta.AllowAll) {
-		SECURITY("server ", cr.ServerID, " has its peer firewall DISABLED — this tunnel's allowed-hosts policy is NOT enforced")
-	}
-
 	err = InitializeTunnelFromCRR(tunnel)
 	if err != nil {
 		return 502, err
@@ -446,7 +442,7 @@ func serverResponseFromWG(cr *ConnectionRequest, wgCfg *wgServerConfig) *types.S
 		WireGuardSubnet:  wgCfg.WireGuardSubnet,
 		WireGuardSubnet6: wgCfg.WireGuardSubnet6,
 		WANCIDR:          wgCfg.WANCIDR,
-		EnableFirewall:   wgCfg.EnableFirewall,
+		EnableFirewall:   true,
 	}
 }
 

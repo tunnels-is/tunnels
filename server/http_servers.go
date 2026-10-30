@@ -30,6 +30,7 @@ func handleAdminServerGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	server.EnableFirewall = true
 	attachWANs(server)
 	sendObject(w, server)
 }
@@ -49,6 +50,11 @@ func handleAdminServerList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	for _, s := range servers {
+		if s != nil {
+			s.EnableFirewall = true
+		}
+	}
 	attachWANs(servers...)
 	sendObject(w, servers)
 }
@@ -74,6 +80,7 @@ func handleAdminServerDelete(w http.ResponseWriter, r *http.Request) {
 func sanitizeServerForClient(s *types.Server) *types.Server {
 	c := *s
 	c.APIKey = ""
+	c.EnableFirewall = true
 	return &c
 }
 
@@ -192,6 +199,7 @@ func applyWGDefaults(s *types.Server) {
 	if s.WireGuardIface == "" {
 		s.WireGuardIface = "wg0"
 	}
+	s.EnableFirewall = true
 }
 
 func validateServerWGFields(s *types.Server) error {

@@ -4,11 +4,14 @@ import (
 	"bufio"
 	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"flag"
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 
 	"golang.zx2c4.com/wireguard/conn"
 	"golang.zx2c4.com/wireguard/device"
@@ -42,6 +45,8 @@ func main() {
 	endpoint := flag.String("endpoint", "", "wg-server endpoint host:port")
 	wgIP := flag.String("ip", "", "this client's WireGuard IP (no mask)")
 	allowed := flag.String("allowed", "", "AllowedIPs / routed CIDR (the WAN)")
+	allowPeer := flag.String("allow", "", "peer WireGuard IP to admit on every port")
+	gateway := flag.String("gw", "", "hub firewall control address")
 	mtu := flag.Int("mtu", 1380, "tunnel MTU")
 	flag.Parse()
 
@@ -90,6 +95,40 @@ func main() {
 		os.Exit(1)
 	}
 
+	if *allowPeer != "" && *gateway != "" {
+		go announceLoop(*wgIP, *gateway, *allowPeer)
+	}
+
 	fmt.Printf("meshpeer up: iface=%s ip=%s endpoint=%s allowed=%s\n", *iface, *wgIP, *endpoint, *allowed)
 	select {}
+}
+
+func announceLoop(local, gw, peer string) {
+	body, err := json.Marshal(map[string]any{"AllowAll": false, "Allowed": []string{peer}})
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "announce:", err)
+		return
+	}
+	for {
+		if err := sendACL(local, gw, body); err != nil {
+			fmt.Printf("announce: %v\n", err)
+		} else {
+			fmt.Printf("announced allow %s to %s\n", peer, gw)
+		}
+		time.Sleep(2 * time.Second)
+	}
+}
+
+func sendACL(local, gw string, body []byte) error {
+	conn, err := net.DialUDP("udp4",
+		&net.UDPAddr{IP: net.ParseIP(local)},
+		&net.UDPAddr{IP: net.ParseIP(gw), Port: 51821},
+	)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+	_ = conn.SetWriteDeadline(time.Now().Add(time.Second))
+	_, err = conn.Write(body)
+	return err
 }

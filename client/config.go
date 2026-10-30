@@ -241,7 +241,14 @@ func loadTunnelsFromDisk() (err error) {
 			return nil
 		}
 
+		clearedAllowAll := tunnel.AllowAll
+		tunnel.AllowAll = false
 		TunnelMetaMap.Store(tunnel.Tag, tunnel)
+		if clearedAllowAll {
+			if werr := writeTunnelsToDisk(tunnel.Tag); werr != nil {
+				return werr
+			}
+		}
 		DEBUG("Loaded tunnel:", tunnel.Tag)
 		if tunnel.Tag == DefaultTunnelName {
 			foundDefault = true

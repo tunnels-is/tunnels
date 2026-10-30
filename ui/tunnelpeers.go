@@ -34,11 +34,10 @@ func (a *App) tunnelPeersPage() fyne.CanvasObject {
 	}
 	connected := a.activeByTag()[meta.Tag] != nil
 	peers := append([]string(nil), meta.AllowedHosts...)
-	allowAll := meta.AllowAll
 
-	apply := func(next []string, all bool) {
+	apply := func(next []string) {
 		go func() {
-			_, err := client.SetTunnelPeers(meta.Tag, next, all)
+			_, err := client.SetTunnelPeers(meta.Tag, next, false)
 			a.uiDo(func() {
 				if err != nil {
 					a.fail(err.Error())
@@ -51,22 +50,12 @@ func (a *App) tunnelPeersPage() fyne.CanvasObject {
 		}()
 	}
 
-	desc := fmt.Sprintf("%d peer(s) may reach this device.", len(peers))
+	desc := fmt.Sprintf("%d peer(s) may reach this device. Only these addresses may open connections.", len(peers))
 	statusTone := toneSuccess
-	switch {
-	case allowAll:
-		desc = "The firewall is off for this device — any VPN peer can reach it."
-		statusTone = toneWarning
-	case len(peers) == 0:
-		desc = "No peers can reach this device while the firewall is on."
+	if len(peers) == 0 {
+		desc = "No peers can reach this device."
 		statusTone = toneNeutral
 	}
-
-	mode := card("Firewall", desc, settingList(
-		settingRow("Allow all peers",
-			"Turn off allowlisting and accept traffic from every peer on the VPN.",
-			newSwitch(allowAll, func(v bool) { apply(peers, v) })),
-	))
 
 	entry := kEntry("IP, IP:PORT or *:PORT", "")
 	add := primaryBtn("Add peer", func() {
@@ -84,7 +73,7 @@ func (a *App) tunnelPeersPage() fyne.CanvasObject {
 				return
 			}
 		}
-		apply(append(peers, ip), allowAll)
+		apply(append(peers, ip))
 	})
 	entry.OnSubmitted = func(string) { add.Tapped(nil) }
 
@@ -98,7 +87,7 @@ func (a *App) tunnelPeersPage() fyne.CanvasObject {
 					next = append(next, x)
 				}
 			}
-			apply(next, allowAll)
+			apply(next)
 		}).small()
 		rows = append(rows, insetEach(sp2, 0, sp2, 0,
 			splitRow(monoText(p, fsBody, pal().Content), del)))
@@ -107,7 +96,7 @@ func (a *App) tunnelPeersPage() fyne.CanvasObject {
 		rows = append(rows, emptyRow("No peers allowed."))
 	}
 
-	list := cardBox("Allowed peers", "Only these addresses may open connections to this device.", nil,
+	list := cardBox("Allowed peers", desc, nil,
 		vstack(sp4,
 			capWidth(formWidth, container.NewBorder(nil, nil, nil, hstack(0, hspace(sp2), add), entry)),
 			settingList(rows...),
@@ -117,6 +106,6 @@ func (a *App) tunnelPeersPage() fyne.CanvasObject {
 	if connected {
 		sub = meta.Tag + " · connected"
 	}
-	head := hstack(sp2, badge(map[bool]string{true: "enforcing", false: "open"}[!allowAll], statusTone), back)
-	return pageShell("Firewall", sub, head, scrollBody(mode, list))
+	head := hstack(sp2, badge("enforcing", statusTone), back)
+	return pageShell("Firewall", sub, head, scrollBody(list))
 }

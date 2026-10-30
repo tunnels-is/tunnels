@@ -30,7 +30,7 @@ type inspectingTUN struct {
 
 func newInspectingTUN(inner tun.Device, cfg *Config) (*inspectingTUN, error) {
 	t := &inspectingTUN{Device: inner}
-	t.firewall.Store(cfg.EnableFirewall)
+	t.firewall.Store(true)
 
 	if cfg.WireGuardSubnet != "" {
 		p, err := netip.ParsePrefix(cfg.WireGuardSubnet)

@@ -100,13 +100,8 @@ func attachInspectingTUN(tunDev tun.Device, cfg *Config) (*inspectingTUN, error)
 		return nil, fmt.Errorf("inspector setup: %w", err)
 	}
 	inspectDevice.Store(tunInterface)
-	if cfg.EnableFirewall {
-		INFO("firewall enabled on ", cfg.WireGuardIface,
-			" — peer-to-peer ingress denied by default, control port udp/", aclControlPort)
-	} else {
-		INFO("firewall disabled on ", cfg.WireGuardIface,
-			" — peer-to-peer traffic unrestricted, server WG IP blocked for peers")
-	}
+	INFO("firewall enabled on ", cfg.WireGuardIface,
+		" — peer-to-peer ingress denied by default, control port udp/", aclControlPort)
 	return tunInterface, nil
 }
 

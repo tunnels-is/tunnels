@@ -67,7 +67,7 @@ func createServerDeviceFull(cr *ConnectionRequest, serverID string, pubKey strin
 		WireGuardSubnet:  resp.ServerSubnet,
 		WireGuardSubnet6: resp.ServerSubnet6,
 		WANCIDR:          resp.WANCIDR,
-		EnableFirewall:   false,
+		EnableFirewall:   true,
 	}, resp.Device, nil
 }
 

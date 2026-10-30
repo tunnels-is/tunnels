@@ -211,7 +211,7 @@ func createLocalDeviceForServer(cr *ConnectionRequest, serverID, tag string) (*L
 }
 
 func mergeWGServerConfig(cfg, full *wgServerConfig) {
-	cfg.EnableFirewall = full.EnableFirewall
+	cfg.EnableFirewall = true
 	if full.WireGuardPubKey != "" {
 		cfg.WireGuardPubKey = full.WireGuardPubKey
 	}
