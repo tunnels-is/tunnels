@@ -143,12 +143,12 @@ func handleWGPeer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if dev == nil {
-		sendError(w, 404, "device not found")
+		sendDeny(w, 404, "device not found")
 		return
 	}
 
 	if dev.ServerID != server.ID {
-		sendError(w, 401, "device not allowed on this server")
+		sendDeny(w, 401, "device not allowed on this server")
 		return
 	}
 
@@ -158,7 +158,7 @@ func handleWGPeer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if code, msg := wgUserConnectStatus(user, server); code != 0 {
-		sendError(w, code, msg)
+		sendDeny(w, code, msg)
 		return
 	}
 

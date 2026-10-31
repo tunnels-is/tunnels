@@ -2,6 +2,7 @@ package wgserver
 
 import (
 	"crypto/hmac"
+	"crypto/subtle"
 	"encoding/base64"
 	"hash"
 
@@ -15,6 +16,7 @@ const (
 	noiseIdentifier   = "WireGuard v1 zx2c4 Jason@zx2c4.com"
 	msgInitiationSize = 148
 	labelMAC1         = "mac1----"
+	labelCookie       = "cookie--"
 )
 
 func validMAC1(pkt, serverPub []byte) bool {
@@ -101,6 +103,42 @@ func tryDecryptInitiator(pkt []byte, serverPriv, serverPub []byte) (pubKeyB64 st
 	if err != nil {
 		return "", false
 	}
+	defer zeroBytes(plaintext)
+	if len(plaintext) != 32 {
+		return "", false
+	}
+
+	// The static block is encrypted to the server but not authenticated as the
+	// sender. The timestamp opens only with the static-static DH, which an
+	// attacker who merely knows the victim's public key cannot produce.
+	Hi = noiseHash(Hi, pkt[40:88])
+	ss, err := curve25519.X25519(serverPriv, plaintext)
+	if err != nil {
+		return "", false
+	}
+	defer zeroBytes(ss)
+	if sharedSecretZero(ss) {
+		return "", false
+	}
+	_, k2 := noiseKDF2(chainingKey, ss)
+	defer zeroBytes(k2)
+	aead, err = chacha20poly1305.New(k2)
+	if err != nil {
+		return "", false
+	}
+	opened, err := aead.Open(nil, nonce, pkt[88:116], Hi)
+	if err != nil {
+		return "", false
+	}
+	zeroBytes(opened)
 
 	return base64.StdEncoding.EncodeToString(plaintext), true
+}
+
+func sharedSecretZero(b []byte) bool {
+	var acc byte
+	for _, v := range b {
+		acc |= v
+	}
+	return subtle.ConstantTimeCompare([]byte{acc}, []byte{0}) == 1
 }

@@ -184,6 +184,11 @@ type ServerConnectResponse struct {
 	EnableFirewall bool `json:"EnableFirewall,omitempty"`
 }
 
+// WGPeerDecisionDeny is the controller's explicit "this key is not a peer" answer.
+// A hub removes a live peer only when /wg/peer returns this decision. Other
+// non-200 responses, including a hub-key 401, leave the peer in place.
+const WGPeerDecisionDeny = "deny"
+
 type WGPeer struct {
 	PublicKeyHex  string `json:"PublicKeyHex"`
 	DeviceID      string `json:"DeviceID"`

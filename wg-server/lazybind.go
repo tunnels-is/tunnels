@@ -13,9 +13,10 @@ import (
 const (
 	msgInitiation byte = 1
 
-	maxRateWindowIPs = 200_000
+	rateSlotCount = 4096
 
 	maxConcurrentHandshakes = 128
+	maxKnownHandshakes      = 32
 
 	deniedKeyTTL  = 10 * time.Second
 	maxDeniedKeys = 65_536
@@ -26,9 +27,10 @@ type bufferedPkt struct {
 	ep   conn.Endpoint
 }
 
-type ipRate struct {
+type rateSlot struct {
+	key   [16]byte
+	sec   int64
 	count int
-	start time.Time
 }
 
 type LazyBind struct {
@@ -43,12 +45,20 @@ type LazyBind struct {
 	serverPriv []byte
 	serverPub  []byte
 
-	rateMu     sync.Mutex
-	ratePerIP  int
-	rateWindow map[netip.Addr]*ipRate
+	nowFn     func() time.Time
+	rateMu    sync.Mutex
+	ratePerIP int
+	rateSlots [rateSlotCount]rateSlot
 
 	handshakeSem chan struct{}
+	knownSem     chan struct{}
 	handshakeWG  sync.WaitGroup
+
+	cookieMu       sync.Mutex
+	cookieSecret   [32]byte
+	cookieSecretAt time.Time
+	cookieSec      int64
+	cookieSent     int
 
 	deniedMu   sync.Mutex
 	deniedKeys map[string]time.Time
@@ -62,8 +72,8 @@ func newLazyBind(inner conn.Bind, serverPriv, serverPub []byte, bufferSize, rate
 		serverPriv:   serverPriv,
 		serverPub:    serverPub,
 		ratePerIP:    ratePerIP,
-		rateWindow:   make(map[netip.Addr]*ipRate),
 		handshakeSem: make(chan struct{}, maxConcurrentHandshakes),
+		knownSem:     make(chan struct{}, maxKnownHandshakes),
 		deniedKeys:   make(map[string]time.Time),
 	}
 }
@@ -115,6 +125,9 @@ func (b *LazyBind) WipeKeys() {
 	b.handshakeWG.Wait()
 	zeroBytes(b.serverPriv)
 	zeroBytes(b.serverPub)
+	b.cookieMu.Lock()
+	zeroBytes(b.cookieSecret[:])
+	b.cookieMu.Unlock()
 }
 
 // SetMark ...
@@ -129,34 +142,70 @@ func (b *LazyBind) ParseEndpoint(s string) (conn.Endpoint, error) { return b.inn
 // BatchSize ...
 func (b *LazyBind) BatchSize() int { return b.inner.BatchSize() }
 
+func (b *LazyBind) now() time.Time {
+	if b.nowFn != nil {
+		return b.nowFn()
+	}
+	return time.Now()
+}
+
+func ratePrefixKey(ip netip.Addr) ([16]byte, bool) {
+	var key [16]byte
+	if !ip.IsValid() {
+		return key, false
+	}
+	ip = ip.Unmap()
+	if ip.Is4() {
+		addr := ip.As4()
+		key[0] = 4
+		key[1] = addr[0]
+		key[2] = addr[1]
+		key[3] = addr[2]
+		return key, true
+	}
+	if ip.Is6() {
+		addr := ip.As16()
+		key[0] = 6
+		copy(key[1:9], addr[:8])
+		return key, true
+	}
+	return key, false
+}
+
+func rateSlotIndex(key [16]byte) uint32 {
+	h := uint32(2166136261)
+	for _, c := range key {
+		h ^= uint32(c)
+		h *= 16777619
+	}
+	return h % rateSlotCount
+}
+
 func (b *LazyBind) handshakeRateAllowed(ip netip.Addr) bool {
-	b.rateMu.Lock()
-	defer b.rateMu.Unlock()
-
-	now := time.Now()
-	r, ok := b.rateWindow[ip]
-	if ok {
-		if now.Sub(r.start) >= time.Second {
-			r.count = 1
-			r.start = now
-			return true
-		}
-		r.count++
-		return r.count <= b.ratePerIP
-	}
-
-	if len(b.rateWindow) > 1000 {
-		for k, v := range b.rateWindow {
-			if now.Sub(v.start) >= time.Second {
-				delete(b.rateWindow, k)
-			}
-		}
-	}
-	if len(b.rateWindow) >= maxRateWindowIPs {
+	key, ok := ratePrefixKey(ip)
+	if !ok {
 		return false
 	}
-	b.rateWindow[ip] = &ipRate{count: 1, start: now}
-	return true
+	limit := b.ratePerIP
+	if limit <= 0 {
+		limit = 100
+	}
+	slot := &b.rateSlots[rateSlotIndex(key)]
+	now := b.now().Unix()
+
+	b.rateMu.Lock()
+	defer b.rateMu.Unlock()
+	if slot.sec == now && slot.key != key {
+		return false
+	}
+	if slot.sec != now || slot.key != key {
+		slot.key = key
+		slot.sec = now
+		slot.count = 1
+		return true
+	}
+	slot.count++
+	return slot.count <= limit
 }
 
 func (b *LazyBind) recentlyDenied(pubKeyB64 string) bool {
@@ -214,33 +263,7 @@ func (b *LazyBind) wrapReceive(inner conn.ReceiveFunc) conn.ReceiveFunc {
 				continue
 			}
 			if isHandshakeInit(data) {
-
-				if !validMAC1(data, b.serverPub) {
-					continue
-				}
-				srcIP := eps[i].DstIP()
-				if !b.handshakeRateAllowed(srcIP) {
-					WARN("LazyBind: handshake rate limit exceeded for ", srcIP)
-					continue
-				}
-
-				select {
-				case b.handshakeSem <- struct{}{}:
-					pkt := &bufferedPkt{
-						data: make([]byte, len(data)),
-						ep:   eps[i],
-					}
-					copy(pkt.data, data)
-
-					b.handshakeWG.Add(1)
-					go func() {
-						defer b.handshakeWG.Done()
-						defer func() { <-b.handshakeSem }()
-						b.handleInitiation(pkt)
-					}()
-				default:
-					WARN("LazyBind: handshake concurrency limit reached, dropping packet")
-				}
+				b.takeHandshake(data, eps[i])
 				continue
 			}
 
@@ -277,19 +300,87 @@ func (b *LazyBind) requeue(pkt *bufferedPkt) {
 	case b.requeueCh <- pkt:
 	case <-b.done:
 	default:
-		WARN("LazyBind: requeue buffer full, dropping handshake packet")
+		slowWarn.do("requeue-full", "LazyBind: requeue buffer full, dropping handshake packet")
 	}
 }
 
-func (b *LazyBind) handleInitiation(pkt *bufferedPkt) {
+func (b *LazyBind) handshakeBusy() bool {
+	return len(b.handshakeSem) >= cap(b.handshakeSem)
+}
+
+func (b *LazyBind) takeHandshake(data []byte, ep conn.Endpoint) {
+	if ep == nil || !validMAC1(data, b.serverPub) {
+		return
+	}
+	if !b.handshakeRateAllowed(ep.DstIP()) {
+		slowWarn.do("handshake-rate", "LazyBind: handshake rate limit exceeded for ", ep.DstIP())
+		return
+	}
+	if b.handshakeBusy() || !b.offerHandshake(data, ep, true) {
+		b.cookieOrKnown(data, ep)
+	}
+}
+
+func (b *LazyBind) cookieOrKnown(data []byte, ep conn.Endpoint) {
+	src := ep.DstToBytes()
+	if !b.validMAC2(data, src) {
+		reply, err := b.writeCookieReply(data, src)
+		if err != nil {
+			slowWarn.do("cookie", "LazyBind: cookie reply: ", err)
+			return
+		}
+		if err := b.Send([][]byte{reply}, ep); err != nil {
+			slowWarn.do("cookie", "LazyBind: cookie send: ", err)
+		}
+		return
+	}
+	if !b.offerHandshake(data, ep, false) {
+		slowWarn.do("handshake-slots", "LazyBind: handshake concurrency limit reached, dropping packet")
+	}
+}
+
+func (b *LazyBind) offerHandshake(data []byte, ep conn.Endpoint, allowLookup bool) bool {
+	sem := b.handshakeSem
+	if !allowLookup {
+		sem = b.knownSem
+	}
+	select {
+	case sem <- struct{}{}:
+	default:
+		return false
+	}
+	pkt := &bufferedPkt{
+		data: append([]byte(nil), data...),
+		ep:   ep,
+	}
+	b.handshakeWG.Add(1)
+	go func() {
+		defer b.handshakeWG.Done()
+		defer func() { <-sem }()
+		b.handleInitiation(pkt, allowLookup)
+	}()
+	return true
+}
+
+func (b *LazyBind) handleInitiation(pkt *bufferedPkt, allowLookup bool) {
 	pubKeyB64, ok := tryDecryptInitiator(pkt.data, b.serverPriv, b.serverPub)
 	if !ok {
-
-		b.requeue(pkt)
+		slowWarn.do("bad-initiation", "LazyBind: dropping initiation that failed the timestamp check")
 		return
 	}
 
 	if b.recentlyDenied(pubKeyB64) {
+		return
+	}
+
+	if hexKey, err := b64ToHex(pubKeyB64); err == nil {
+		if _, installed := installedPeerAddrs.Load(hexKey); installed {
+			b.requeue(pkt)
+			b.refreshInstalled(pubKeyB64)
+			return
+		}
+	}
+	if !allowLookup {
 		return
 	}
 
@@ -299,16 +390,21 @@ func (b *LazyBind) handleInitiation(pkt *bufferedPkt) {
 	case authDenied:
 		b.noteDenied(pubKeyB64)
 		INFO("LazyBind: peer no longer authorized, removing → ", pubKeyB64[:12], "…")
-		if hexKey, err := b64ToHex(pubKeyB64); err == nil {
-			_ = removePeer(hexKey)
-			installedPeerAddrs.Delete(hexKey)
-			peerStore.DeleteByPubKey(pubKeyB64)
-		}
-
 	case authUnknown:
-
 		b.requeue(pkt)
 	}
+}
+
+func (b *LazyBind) refreshInstalled(pubKeyB64 string) {
+	if !claimPeerRefresh(pubKeyB64, time.Now()) {
+		return
+	}
+	go func() {
+		if reconcilePeer(pubKeyB64) == authDenied {
+			b.noteDenied(pubKeyB64)
+			INFO("LazyBind: peer no longer authorized, removing → ", pubKeyB64[:12], "…")
+		}
+	}()
 }
 
 func isHandshakeInit(pkt []byte) bool {

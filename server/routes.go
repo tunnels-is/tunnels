@@ -7,6 +7,8 @@ import (
 	"log/slog"
 	"net/http"
 	"time"
+
+	"github.com/tunnels-is/tunnels/types"
 )
 
 func launchAPIServer() {
@@ -156,6 +158,20 @@ func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
 func sendError(w http.ResponseWriter, code int, msg string, slogArgs ...any) {
 	logger.Error(msg, slogArgs...)
 	responsePayload := map[string]string{"Error": msg}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(code)
+	err := json.NewEncoder(w).Encode(responsePayload)
+	if err != nil {
+		logger.Error("unable to write JSON errResponse:", slog.Any("err", err))
+	}
+}
+
+func sendDeny(w http.ResponseWriter, code int, msg string, slogArgs ...any) {
+	logger.Error(msg, slogArgs...)
+	responsePayload := map[string]string{
+		"Error":    msg,
+		"Decision": types.WGPeerDecisionDeny,
+	}
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(code)
 	err := json.NewEncoder(w).Encode(responsePayload)

@@ -257,6 +257,7 @@ func TestHandleWGPeer_DisabledUserRejected(t *testing.T) {
 	if w.Code != http.StatusForbidden {
 		t.Fatalf("disabled user should be rejected with 403, got %d", w.Code)
 	}
+	assertPeerDeny(t, w)
 }
 
 // TestHandleWGPeer_ExpiredSubscriptionRejected ...
@@ -271,6 +272,7 @@ func TestHandleWGPeer_ExpiredSubscriptionRejected(t *testing.T) {
 	if w.Code != http.StatusForbidden {
 		t.Fatalf("expired subscription should be rejected with 403, got %d", w.Code)
 	}
+	assertPeerDeny(t, w)
 }
 
 // TestHandleWGPeer_ZeroSubExpirationAllowed ...
@@ -283,5 +285,61 @@ func TestHandleWGPeer_ZeroSubExpirationAllowed(t *testing.T) {
 	w := callWGPeerAuthz(t, server, pubKey)
 	if w.Code != http.StatusOK {
 		t.Fatalf("zero SubExpiration should not expire access, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestHandleWGPeer_ExplicitDenyAndLookupErrors(t *testing.T) {
+	server := setupWGPeerTest(t)
+	pubKey := seedUserWithDevice(t, server, &User{
+		ID:            uuid.New(),
+		Email:         "deny-shape@example.com",
+		SubExpiration: time.Now().Add(24 * time.Hour),
+	})
+
+	missing := callWGPeerAuthz(t, server, uniqueWGKey(7))
+	if missing.Code != http.StatusNotFound {
+		t.Fatalf("missing device: got %d %s", missing.Code, missing.Body.String())
+	}
+	assertPeerDeny(t, missing)
+
+	other := &types.Server{ID: uuid.New(), Tag: "other", APIKey: "other"}
+	wrong := callWGPeerAuthz(t, other, pubKey)
+	if wrong.Code != http.StatusUnauthorized {
+		t.Fatalf("wrong server: got %d %s", wrong.Code, wrong.Body.String())
+	}
+	assertPeerDeny(t, wrong)
+
+	bad := callWGPeerAuthz(t, server, "not-a-key")
+	if bad.Code != http.StatusBadRequest {
+		t.Fatalf("bad pubkey: got %d %s", bad.Code, bad.Body.String())
+	}
+	assertNoPeerDecision(t, bad)
+
+	empty := callWGPeerAuthz(t, server, "")
+	if empty.Code != http.StatusBadRequest {
+		t.Fatalf("empty pubkey: got %d %s", empty.Code, empty.Body.String())
+	}
+	assertNoPeerDecision(t, empty)
+}
+
+func assertPeerDeny(t *testing.T, w *httptest.ResponseRecorder) {
+	t.Helper()
+	var body map[string]string
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode: %v body=%s", err, w.Body.String())
+	}
+	if body["Decision"] != types.WGPeerDecisionDeny {
+		t.Fatalf("Decision=%q body=%s", body["Decision"], w.Body.String())
+	}
+}
+
+func assertNoPeerDecision(t *testing.T, w *httptest.ResponseRecorder) {
+	t.Helper()
+	var body map[string]string
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode: %v body=%s", err, w.Body.String())
+	}
+	if _, ok := body["Decision"]; ok {
+		t.Fatalf("lookup error included Decision: %s", w.Body.String())
 	}
 }
