@@ -157,11 +157,15 @@ type Network struct {
 	NatIPNet *net.IPNet `json:"-"`
 }
 
+// DNSRecord is one configured name. A one-label Wildcard zone covers names
+// under it only when ShortWildcard is set. A zone that already contains a
+// dot does that when Wildcard is set.
 type DNSRecord struct {
-	Domain   string   `json:"Domain"`
-	Wildcard bool     `json:"Wildcard"`
-	IP       []string `json:"IP"`
-	TXT      []string `json:"TXT"`
+	Domain        string   `json:"Domain"`
+	Wildcard      bool     `json:"Wildcard"`
+	ShortWildcard bool     `json:"ShortWildcard,omitempty"`
+	IP            []string `json:"IP"`
+	TXT           []string `json:"TXT"`
 }
 
 type ServerConnectResponse struct {

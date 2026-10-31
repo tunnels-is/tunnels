@@ -40,18 +40,45 @@ func DNSAMapping(records []*types.DNSRecord, fullDomain string) *types.DNSRecord
 			continue
 		}
 		zone := normalizeDNSName(record.Domain)
-		if zone == "" {
+		if !dnsZoneMatch(record, query, zone) {
 			continue
 		}
-		if query != zone && !(record.Wildcard && strings.HasSuffix(query, "."+zone)) {
-			continue
-		}
-		if len(zone) > bestLen {
+		// A longer zone wins. At the same length, a name that is not a
+		// wildcard wins over one that is. The first of those stays.
+		if best == nil || len(zone) > bestLen || (len(zone) == bestLen && best.Wildcard && !record.Wildcard) {
 			best = records[i]
 			bestLen = len(zone)
 		}
 	}
 	return best
+}
+
+// DNSWildcardCovers ...
+func DNSWildcardCovers(record *types.DNSRecord) bool {
+	if record == nil || !record.Wildcard {
+		return false
+	}
+	zone := normalizeDNSName(record.Domain)
+	return zone != "" && wildcardDepthAllowed(record, zone)
+}
+
+// A dotted wildcard covers every name under the zone. A one-label wildcard
+// covers only its own name unless ShortWildcard is set. The apex always matches.
+func dnsZoneMatch(record *types.DNSRecord, query, zone string) bool {
+	if zone == "" {
+		return false
+	}
+	if query == zone {
+		return true
+	}
+	return record.Wildcard && wildcardDepthAllowed(record, zone) && strings.HasSuffix(query, "."+zone)
+}
+
+func wildcardDepthAllowed(record *types.DNSRecord, zone string) bool {
+	if strings.Contains(zone, ".") {
+		return true
+	}
+	return record.ShortWildcard
 }
 
 func normalizeDNSName(name string) string {

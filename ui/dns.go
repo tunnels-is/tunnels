@@ -59,7 +59,7 @@ func (a *App) dnsPage() fyne.CanvasObject {
 		}
 		name := r.Domain
 		badges := []fyne.CanvasObject{}
-		if r.Wildcard {
+		if client.DNSWildcardCovers(r) {
 			badges = append(badges, badge("wildcard", tonePrimary))
 		}
 		edit := newIconBtn(theme.DocumentCreateIcon(), kGhost, func() { a.editDNSRecord(i, r) }).small()
@@ -271,21 +271,24 @@ func (a *App) editDNSRecord(index int, rec *types.DNSRecord) {
 	ips := kMultiline(strings.Join(rec.IP, "\n"), 3)
 	txt := kMultiline(strings.Join(rec.TXT, "\n"), 3)
 	wild := bindCheck("Match subdomains (wildcard)", rec.Wildcard, nil)
+	short := bindCheck("Also cover a one-label name", rec.ShortWildcard, nil)
 	form := container.New(fixedLayout{w: z(420)}, vstack(sp3,
 		field("Domain", domain),
 		fieldWith("IP addresses", "One per line.", ips),
 		fieldWith("TXT records", "One per line.", txt),
-		wild,
+		fieldWith("", "A name with a dot covers every name under it. A one-label name covers only itself unless the extra box is checked.", wild),
+		short,
 	))
 	d := dialog.NewCustomConfirm("DNS record", "Save", "Cancel", form, func(ok bool) {
 		if !ok {
 			return
 		}
 		cp := types.DNSRecord{
-			Domain:   strings.TrimSpace(domain.Text),
-			Wildcard: wild.Checked,
-			IP:       splitLines(ips.Text),
-			TXT:      splitLines(txt.Text),
+			Domain:        strings.TrimSpace(domain.Text),
+			Wildcard:      wild.Checked,
+			ShortWildcard: short.Checked,
+			IP:            splitLines(ips.Text),
+			TXT:           splitLines(txt.Text),
 		}
 		a.updateConfig("Saving record", func(c *client.Config) {
 			list := append([]*types.DNSRecord(nil), c.DNSRecords...)

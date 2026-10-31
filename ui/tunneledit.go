@@ -278,7 +278,7 @@ func tunnelDNSRows(records []*types.DNSRecord, onEdit func(int, *types.DNSRecord
 			name = "unnamed"
 		}
 		title := []fyne.CanvasObject{text(name, fsBody, pal().Content, false)}
-		if r.Wildcard {
+		if client.DNSWildcardCovers(r) {
 			title = append(title, badge("wildcard", tonePrimary))
 		}
 		target := strings.Join(r.IP, ", ")
@@ -328,9 +328,12 @@ func (a *App) editTunnelDNSRoute(rec *types.DNSRecord, onSave func(types.DNSReco
 		current = rec.Domain
 	}
 	domain := kEntry("example.com", current)
+	shortOn := rec != nil && rec.ShortWildcard
+	short := bindCheck("Also cover a one-label name", shortOn, nil)
 	form := container.New(fixedLayout{w: z(420)}, vstack(sp3,
-		hint("Lookups for this domain, and any name under it, are sent through this tunnel. The query goes to the tunnel's DNS servers from the tunnel address, so the lookup travels inside the tunnel."),
+		hint("A name with a dot covers that name and every name under it. A one-label name covers only itself unless the extra box is checked. The query goes to the tunnel's DNS servers from the tunnel address, so the lookup travels inside the tunnel."),
 		field("Domain", domain),
+		short,
 	))
 	d := dialog.NewCustomConfirm("Route domain", "Save", "Cancel", form, func(ok bool) {
 		if !ok || onSave == nil {
@@ -341,7 +344,7 @@ func (a *App) editTunnelDNSRoute(rec *types.DNSRecord, onSave func(types.DNSReco
 			a.fail("A domain is required")
 			return
 		}
-		onSave(types.DNSRecord{Domain: name, Wildcard: true})
+		onSave(types.DNSRecord{Domain: name, Wildcard: true, ShortWildcard: short.Checked})
 	}, a.win)
 	d.Resize(fyne.NewSize(z(460), z(320)))
 	d.Show()
@@ -355,21 +358,24 @@ func (a *App) editTunnelDNSRecord(rec *types.DNSRecord, onSave func(types.DNSRec
 	ips := kMultiline(strings.Join(rec.IP, "\n"), 3)
 	txt := kMultiline(strings.Join(rec.TXT, "\n"), 3)
 	wild := bindCheck("Match subdomains (wildcard)", rec.Wildcard, nil)
+	short := bindCheck("Also cover a one-label name", rec.ShortWildcard, nil)
 	form := container.New(fixedLayout{w: z(420)}, vstack(sp3,
 		field("Domain", domain),
 		fieldWith("IP addresses", "One per line.", ips),
 		fieldWith("TXT records", "One per line.", txt),
-		wild,
+		fieldWith("", "A name with a dot covers every name under it. A one-label name covers only itself unless the extra box is checked.", wild),
+		short,
 	))
 	d := dialog.NewCustomConfirm("DNS record", "Save", "Cancel", form, func(ok bool) {
 		if !ok || onSave == nil {
 			return
 		}
 		cp := types.DNSRecord{
-			Domain:   strings.TrimSpace(domain.Text),
-			Wildcard: wild.Checked,
-			IP:       splitLines(ips.Text),
-			TXT:      splitLines(txt.Text),
+			Domain:        strings.TrimSpace(domain.Text),
+			Wildcard:      wild.Checked,
+			ShortWildcard: short.Checked,
+			IP:            splitLines(ips.Text),
+			TXT:           splitLines(txt.Text),
 		}
 		if cp.Domain == "" {
 			a.fail("A domain is required")

@@ -447,10 +447,9 @@ func TestDNSAMappingSingleLabel(t *testing.T) {
 			shouldFind:     true,
 		},
 		{
-			name:           "https service name under single label",
-			fullDomain:     "_8080._https.loganisgay.",
-			expectedDomain: "loganisgay",
-			shouldFind:     true,
+			name:       "single label wildcard does not cover deeper names",
+			fullDomain: "_8080._https.loganisgay.",
+			shouldFind: false,
 		},
 		{
 			name:           "case insensitive public name",
@@ -499,5 +498,52 @@ func TestDNSAMappingSingleLabel(t *testing.T) {
 	}
 	if got := DNSAMapping(exact, "loganisgay."); got == nil {
 		t.Fatal("apex of a single-label record must match without wildcard")
+	}
+
+	opted := []*types.DNSRecord{{
+		Domain:        "loganisgay",
+		Wildcard:      true,
+		ShortWildcard: true,
+		IP:            []string{"10.0.1.3"},
+	}}
+	if got := DNSAMapping(opted, "_8080._https.loganisgay."); got == nil || got.Domain != "loganisgay" {
+		t.Fatalf("opted-in single-label wildcard should cover the deeper name, got %+v", got)
+	}
+}
+
+func TestDNSAMapping_ShortZoneAndExactTie(t *testing.T) {
+	short := []*types.DNSRecord{{
+		Domain:   "com",
+		Wildcard: true,
+		IP:       []string{"192.0.2.1"},
+	}}
+	if got := DNSAMapping(short, "example.com"); got != nil {
+		t.Fatalf("one-label wildcard covered example.com: %+v", got)
+	}
+	if got := DNSAMapping(short, "com."); got == nil {
+		t.Fatal("the one-label name itself must still match")
+	}
+	short[0].ShortWildcard = true
+	if got := DNSAMapping(short, "a.b.com."); got == nil || got.IP[0] != "192.0.2.1" {
+		t.Fatalf("opted-in short wildcard missed a.b.com: %+v", got)
+	}
+
+	both := []*types.DNSRecord{
+		{Domain: "example.com", Wildcard: true, IP: []string{"192.0.2.1"}},
+		{Domain: "example.com", Wildcard: false, IP: []string{"192.0.2.9"}},
+	}
+	if got := DNSAMapping(both, "example.com"); got == nil || got.IP[0] != "192.0.2.9" {
+		t.Fatalf("exact record lost the tie: %+v", got)
+	}
+	if got := DNSAMapping(both, "www.example.com"); got == nil || got.IP[0] != "192.0.2.1" {
+		t.Fatalf("dotted wildcard should still cover www: %+v", got)
+	}
+
+	exactFirst := []*types.DNSRecord{
+		{Domain: "example.com", Wildcard: false, IP: []string{"192.0.2.9"}},
+		{Domain: "example.com", Wildcard: true, IP: []string{"192.0.2.1"}},
+	}
+	if got := DNSAMapping(exactFirst, "example.com"); got == nil || got.IP[0] != "192.0.2.9" {
+		t.Fatalf("exact record listed first lost the tie: %+v", got)
 	}
 }
