@@ -1,7 +1,6 @@
 package wgserver
 
 import (
-	"bytes"
 	"net/netip"
 	"testing"
 	"time"
@@ -28,7 +27,7 @@ func TestReflexEchoesSourceAndDropsRendezvous(t *testing.T) {
 	}
 	id := uuid.New()
 	from := netip.MustParseAddrPort("203.0.113.9:40000")
-	req, err := punch.BuildReflexReq(id, cli, pub, time.Now())
+	req, err := punch.BuildReflexReq(id, cli, pub, time.Now(), 9)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -58,9 +57,12 @@ func TestReflexEchoesSourceAndDropsRendezvous(t *testing.T) {
 	if gotTo != from {
 		t.Fatalf("echo to %s, want %s", gotTo, from)
 	}
-	want := punch.BuildReflexResp(id, from)
-	if !bytes.Equal(got, want) {
-		t.Fatalf("echo %x, want %x", got, want)
+	gotID, gotAP, gotNonce, err := punch.OpenReflexResp(cli, pub, got)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gotID != id || gotAP != from || gotNonce != 9 {
+		t.Fatalf("echo id=%s addr=%s nonce=%d", gotID, gotAP, gotNonce)
 	}
 
 	called := false

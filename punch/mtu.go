@@ -143,8 +143,7 @@ func (e *Engine) launchMTULocked(s *session, r *Result, outer int, now time.Time
 		e.finishMTULocked(s, r)
 		return
 	}
-	s.txid++
-	pkt, err := BuildPingPad(e.disco, s.peer.DiscoPub, e.self, s.peer.DeviceID, s.txid, plain)
+	pkt, err := e.pingPadLocked(s, plain, now)
 	if err != nil {
 		e.finishMTULocked(s, r)
 		return

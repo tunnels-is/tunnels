@@ -157,19 +157,8 @@ func newMTUPair(t *testing.T) (a, b *Engine, now time.Time) {
 	now = time.Now()
 	aReflex := netip.MustParseAddrPort("198.51.100.10:41000")
 	bReflex := netip.MustParseAddrPort("198.51.100.20:42000")
-	deliverReflex := func(eng *Engine, id uuid.UUID, res Result, ap netip.AddrPort) {
-		for _, d := range res.Sends {
-			if !d.Server || TypeOf(d.Data) != TypeReflexReq {
-				continue
-			}
-			if _, _, err := OpenReflexReq(srvPriv, d.Data, now); err != nil {
-				t.Fatal(err)
-			}
-			eng.OnPacket(netip.AddrPort{}, BuildReflexResp(id, ap), now)
-		}
-	}
-	deliverReflex(a, aID, a.Poll(now), aReflex)
-	deliverReflex(b, bID, b.Poll(now), bReflex)
+	deliverReflex(t, a, srvPriv, aID, aReflex, a.Poll(now), now)
+	deliverReflex(t, b, srvPriv, bID, bReflex, b.Poll(now), now)
 	a.NoteTraffic(bIP)
 	b.NoteTraffic(aIP)
 	return a, b, now

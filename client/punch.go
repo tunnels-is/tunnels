@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/netip"
 	neturl "net/url"
 	"runtime/debug"
@@ -284,7 +285,19 @@ func (b *punchBind) buildEngine(tun *TUN) *punch.Engine {
 	eng := punch.NewEngine(id, disco, wgPub, ip)
 	meta := tun.meta.Load()
 	eng.SetDiscoverMTU(meta == nil || meta.MTU == 0)
+	b.rememberServer(tun, eng)
 	return eng
+}
+
+func (b *punchBind) rememberServer(tun *TUN, eng *punch.Engine) {
+	if tun == nil || eng == nil || tun.CR == nil || tun.ServerResponse == nil {
+		return
+	}
+	ep, err := netip.ParseAddrPort(net.JoinHostPort(tun.CR.ServerIP, tun.ServerResponse.WireGuardPort))
+	if err != nil || !ep.IsValid() {
+		return
+	}
+	eng.SetServerEndpoint(ep)
 }
 
 func (b *punchBind) pushLocalPolicy(tun *TUN, eng *punch.Engine) punch.Result {
@@ -301,6 +314,7 @@ func (b *punchBind) refreshWG(tun *TUN, eng *punch.Engine) {
 	if cr == nil || cr.Server == nil || tun.deviceID == "" {
 		return
 	}
+	b.rememberServer(tun, eng)
 	cfg := b.fetchWG(tun)
 	if cfg != nil {
 		if cfg.DiscoKey != "" {

@@ -60,11 +60,15 @@ func handleReflex(from netip.AddrPort, pkt []byte) {
 	if !ok {
 		return
 	}
-	id, _, err := punch.OpenReflexReq(priv, pkt, time.Now())
+	id, pub, nonce, err := punch.OpenReflexReq(priv, pkt, time.Now())
 	if err != nil {
 		return
 	}
-	sendPunch(from, punch.BuildReflexResp(id, from))
+	resp, err := punch.BuildReflexResp(priv, pub, id, from, nonce)
+	if err != nil {
+		return
+	}
+	sendPunch(from, resp)
 }
 
 func sendPunch(to netip.AddrPort, pkt []byte) {

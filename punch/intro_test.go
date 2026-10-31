@@ -100,20 +100,8 @@ func TestIntroExchangeReachesDirectPath(t *testing.T) {
 	now := time.Now()
 	aReflex := netip.MustParseAddrPort("198.51.100.10:41000")
 	bReflex := netip.MustParseAddrPort("198.51.100.20:42000")
-	giveReflex := func(eng *Engine, id uuid.UUID, res Result, ap netip.AddrPort) {
-		t.Helper()
-		for _, d := range res.Sends {
-			if !d.Server || TypeOf(d.Data) != TypeReflexReq {
-				continue
-			}
-			if _, _, err := OpenReflexReq(srvPriv, d.Data, now); err != nil {
-				t.Fatal(err)
-			}
-			eng.OnPacket(netip.AddrPort{}, BuildReflexResp(id, ap), now)
-		}
-	}
-	giveReflex(a, aID, a.Poll(now), aReflex)
-	giveReflex(b, bID, b.Poll(now), bReflex)
+	deliverReflex(t, a, srvPriv, aID, aReflex, a.Poll(now), now)
+	deliverReflex(t, b, srvPriv, bID, bReflex, b.Poll(now), now)
 
 	a.NoteTraffic(bIP)
 	b.NoteTraffic(aIP)
@@ -354,7 +342,7 @@ func TestIntro_DirectPathSkipsCandidatePings(t *testing.T) {
 		t.Fatalf("first intro: %v", pings)
 	}
 	for txid := uint64(1); txid <= 2; txid++ {
-		pong, err := BuildPong(aPriv, bPub, aID, bID, txid, current)
+		pong, err := BuildPong(aPriv, bPub, aID, bID, txid)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -373,7 +361,7 @@ func TestIntro_DirectPathSkipsCandidatePings(t *testing.T) {
 	if pings := pingTargets(b.Poll(now.Add(Keepalive))); !sameAddrPorts(pings, []netip.AddrPort{current}) {
 		t.Fatalf("live path probe: %v", pings)
 	}
-	td, err := BuildTeardown(aPriv, bPub, aID, bID)
+	td, err := BuildTeardown(aPriv, bPub, aID, bID, 1)
 	if err != nil {
 		t.Fatal(err)
 	}

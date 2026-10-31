@@ -78,6 +78,9 @@ func main() {
 	pb := newPunchBind(conn.NewDefaultBind())
 	disco := punch.DiscoPrivateFor(wgPriv)
 	eng := punch.NewEngine(self, disco, wgPub, ip)
+	if ep, err := netip.ParseAddrPort(*endpoint); err == nil {
+		eng.SetServerEndpoint(ep)
+	}
 	it, err := wrapIntroTUN(rawTUN, func(dst netip.Addr) {
 		eng.NoteTraffic(dst)
 	})

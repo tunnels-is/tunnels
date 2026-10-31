@@ -51,24 +51,60 @@ func TestReflexRoundTrip(t *testing.T) {
 	}
 	dev := uuid.New()
 	now := time.Now()
-	req, err := BuildReflexReq(dev, cliPriv, srvPub, now)
+	req, err := BuildReflexReq(dev, cliPriv, srvPub, now, 7)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !Is(req) || TypeOf(req) != TypeReflexReq {
 		t.Fatalf("reflex type %d", TypeOf(req))
 	}
-	gotID, gotPub, err := OpenReflexReq(srvPriv, req, now)
+	gotID, gotPub, nonce, err := OpenReflexReq(srvPriv, req, now)
 	if err != nil {
 		t.Fatal(err)
 	}
 	wantPub, _ := Public(cliPriv)
-	if gotID != dev || gotPub != wantPub {
+	if gotID != dev || gotPub != wantPub || nonce != 7 {
 		t.Fatalf("reflex identity mismatch")
 	}
-	if _, _, err := OpenReflexReq(srvPriv, req, now.Add(5*time.Minute)); err == nil {
+	if _, _, _, err := OpenReflexReq(srvPriv, req, now.Add(5*time.Minute)); err == nil {
 		t.Fatal("stale reflex must fail")
 	}
+	resp, err := BuildReflexResp(srvPriv, wantPub, dev, netip.MustParseAddrPort("198.51.100.10:41000"), nonce)
+	if err != nil {
+		t.Fatal(err)
+	}
+	id, ap, gotNonce, err := OpenReflexResp(cliPriv, srvPub, resp)
+	if err != nil || id != dev || ap.String() != "198.51.100.10:41000" || gotNonce != nonce {
+		t.Fatalf("reflex response %s %v", ap, err)
+	}
+	flipped := append([]byte(nil), resp...)
+	flipped[headerLen] ^= 0xff
+	if _, _, _, err := OpenReflexResp(cliPriv, srvPub, flipped); err == nil {
+		t.Fatal("retyped reflex response opened")
+	}
+}
+
+var testHub = netip.MustParseAddrPort("192.0.2.8:51820")
+
+func deliverReflex(t *testing.T, eng *Engine, srvPriv [32]byte, id uuid.UUID, ap netip.AddrPort, res Result, now time.Time) {
+	t.Helper()
+	eng.SetServerEndpoint(testHub)
+	for _, d := range res.Sends {
+		if !d.Server || TypeOf(d.Data) != TypeReflexReq {
+			continue
+		}
+		_, pub, nonce, err := OpenReflexReq(srvPriv, d.Data, now)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp, err := BuildReflexResp(srvPriv, pub, id, ap, nonce)
+		if err != nil {
+			t.Fatal(err)
+		}
+		eng.OnPacket(testHub, resp, now)
+		return
+	}
+	t.Fatal("no reflex request")
 }
 
 // TestEnginePunchesAndRefuses ...
@@ -93,22 +129,8 @@ func TestEnginePunchesAndRefuses(t *testing.T) {
 	now := time.Now()
 	aReflex := netip.MustParseAddrPort("198.51.100.10:41000")
 	bReflex := netip.MustParseAddrPort("198.51.100.20:42000")
-	deliverReflex := func(eng *Engine, id uuid.UUID, ap netip.AddrPort, res Result) {
-		for _, d := range res.Sends {
-			if !d.Server || TypeOf(d.Data) != TypeReflexReq {
-				continue
-			}
-			if _, _, err := OpenReflexReq(srvPriv, d.Data, now); err != nil {
-				t.Fatal(err)
-			}
-			eng.OnPacket(netip.AddrPort{}, BuildReflexResp(id, ap), now)
-			return
-		}
-	}
-	ar := a.Poll(now)
-	br := b.Poll(now)
-	deliverReflex(a, aID, aReflex, ar)
-	deliverReflex(b, bID, bReflex, br)
+	deliverReflex(t, a, srvPriv, aID, aReflex, a.Poll(now), now)
+	deliverReflex(t, b, srvPriv, bID, bReflex, b.Poll(now), now)
 
 	a.NoteTraffic(bIP)
 	b.NoteTraffic(aIP)

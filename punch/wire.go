@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	Version byte = 1
+	Version byte = 2
 
 	TypeReflexReq  byte = 1
 	TypeReflexResp byte = 2
@@ -215,15 +215,35 @@ func checksumIPv4(hdr []byte) {
 	hdr[11] = byte(^csum & 0xFF)
 }
 
+func reflexReqAAD(id uuid.UUID, pub [32]byte) []byte {
+	aad := make([]byte, headerLen+idLen+keyLen)
+	copy(aad[:4], magic[:])
+	aad[4] = Version
+	aad[5] = TypeReflexReq
+	putID(aad[headerLen:], id)
+	copy(aad[headerLen+idLen:], pub[:])
+	return aad
+}
+
+func reflexRespAAD(id uuid.UUID) []byte {
+	aad := make([]byte, headerLen+idLen)
+	copy(aad[:4], magic[:])
+	aad[4] = Version
+	aad[5] = TypeReflexResp
+	putID(aad[headerLen:], id)
+	return aad
+}
+
 // BuildReflexReq ...
-func BuildReflexReq(device uuid.UUID, discoPriv, serverPub [32]byte, now time.Time) ([]byte, error) {
+func BuildReflexReq(device uuid.UUID, discoPriv, serverPub [32]byte, now time.Time, nonce uint64) ([]byte, error) {
 	pub, err := Public(discoPriv)
 	if err != nil {
 		return nil, err
 	}
-	var plain [8]byte
-	binary.BigEndian.PutUint64(plain[:], uint64(now.UnixNano()))
-	box, err := Seal(discoPriv, serverPub, plain[:])
+	var plain [16]byte
+	binary.BigEndian.PutUint64(plain[:8], uint64(now.UnixNano()))
+	binary.BigEndian.PutUint64(plain[8:], nonce)
+	box, err := Seal(discoPriv, serverPub, plain[:], reflexReqAAD(device, pub))
 	if err != nil {
 		return nil, err
 	}
@@ -235,56 +255,156 @@ func BuildReflexReq(device uuid.UUID, discoPriv, serverPub [32]byte, now time.Ti
 }
 
 // OpenReflexReq ...
-func OpenReflexReq(serverPriv [32]byte, pkt []byte, now time.Time) (uuid.UUID, [32]byte, error) {
+func OpenReflexReq(serverPriv [32]byte, pkt []byte, now time.Time) (uuid.UUID, [32]byte, uint64, error) {
 	var pub [32]byte
 	body, err := bodyOf(pkt, TypeReflexReq)
 	if err != nil {
-		return uuid.UUID{}, pub, err
+		return uuid.UUID{}, pub, 0, err
 	}
-	if len(body) < idLen+keyLen+nonceLen+8+16 {
-		return uuid.UUID{}, pub, fmt.Errorf("short reflex request")
+	if len(body) != idLen+keyLen+nonceLen+16+16 {
+		return uuid.UUID{}, pub, 0, fmt.Errorf("short reflex request")
 	}
 	id := getID(body)
 	copy(pub[:], body[idLen:idLen+keyLen])
-	plain, err := Open(serverPriv, pub, body[idLen+keyLen:])
+	plain, err := Open(serverPriv, pub, body[idLen+keyLen:], reflexReqAAD(id, pub))
 	if err != nil {
-		return uuid.UUID{}, pub, err
+		return uuid.UUID{}, pub, 0, err
 	}
-	if len(plain) != 8 {
-		return uuid.UUID{}, pub, fmt.Errorf("bad reflex timestamp")
+	if len(plain) != 16 {
+		return uuid.UUID{}, pub, 0, fmt.Errorf("bad reflex request")
 	}
-	ts := time.Unix(0, int64(binary.BigEndian.Uint64(plain)))
+	ts := time.Unix(0, int64(binary.BigEndian.Uint64(plain[:8])))
 	if ts.Before(now.Add(-ReflexSkew)) || ts.After(now.Add(ReflexSkew)) {
-		return uuid.UUID{}, pub, fmt.Errorf("reflex timestamp outside skew")
+		return uuid.UUID{}, pub, 0, fmt.Errorf("reflex timestamp outside skew")
 	}
-	return id, pub, nil
+	return id, pub, binary.BigEndian.Uint64(plain[8:]), nil
 }
 
 // BuildReflexResp ...
-func BuildReflexResp(device uuid.UUID, observed netip.AddrPort) []byte {
-	body := make([]byte, idLen+addrLen+2)
+func BuildReflexResp(serverPriv, clientPub [32]byte, device uuid.UUID, observed netip.AddrPort, nonce uint64) ([]byte, error) {
+	var plain [8 + addrLen + 2]byte
+	binary.BigEndian.PutUint64(plain[:8], nonce)
+	putAddrPort(plain[8:], observed)
+	box, err := Seal(serverPriv, clientPub, plain[:], reflexRespAAD(device))
+	if err != nil {
+		return nil, err
+	}
+	body := make([]byte, idLen+len(box))
 	putID(body, device)
-	putAddrPort(body[idLen:], observed)
-	return frame(TypeReflexResp, body)
+	copy(body[idLen:], box)
+	return frame(TypeReflexResp, body), nil
 }
 
-// ParseReflexResp ...
-func ParseReflexResp(pkt []byte) (uuid.UUID, netip.AddrPort, error) {
+// OpenReflexResp ...
+func OpenReflexResp(clientPriv, serverPub [32]byte, pkt []byte) (uuid.UUID, netip.AddrPort, uint64, error) {
 	body, err := bodyOf(pkt, TypeReflexResp)
 	if err != nil {
-		return uuid.UUID{}, netip.AddrPort{}, err
+		return uuid.UUID{}, netip.AddrPort{}, 0, err
 	}
-	if len(body) != idLen+addrLen+2 {
-		return uuid.UUID{}, netip.AddrPort{}, fmt.Errorf("bad reflex response length")
+	if len(body) != idLen+nonceLen+8+addrLen+2+16 {
+		return uuid.UUID{}, netip.AddrPort{}, 0, fmt.Errorf("bad reflex response length")
 	}
-	return getID(body), getAddrPort(body[idLen:]), nil
+	id := getID(body)
+	plain, err := Open(clientPriv, serverPub, body[idLen:], reflexRespAAD(id))
+	if err != nil {
+		return uuid.UUID{}, netip.AddrPort{}, 0, err
+	}
+	if len(plain) != 8+addrLen+2 {
+		return uuid.UUID{}, netip.AddrPort{}, 0, fmt.Errorf("bad reflex response")
+	}
+	return id, getAddrPort(plain[8:]), binary.BigEndian.Uint64(plain[:8]), nil
+}
+
+func directAAD(typ byte, src, dst uuid.UUID, eph [32]byte) []byte {
+	aad := make([]byte, headerLen+idLen*2+keyLen)
+	copy(aad[:4], magic[:])
+	aad[4] = Version
+	aad[5] = typ
+	putID(aad[headerLen:], src)
+	putID(aad[headerLen+idLen:], dst)
+	copy(aad[headerLen+idLen*2:], eph[:])
+	return aad
+}
+
+func sealDirect(typ byte, key, eph [32]byte, src, dst uuid.UUID, plain []byte) ([]byte, error) {
+	box, err := sealKey(key, plain, directAAD(typ, src, dst, eph))
+	if err != nil {
+		return nil, err
+	}
+	body := make([]byte, idLen*2+keyLen+len(box))
+	putID(body, src)
+	putID(body[idLen:], dst)
+	copy(body[idLen*2:idLen*2+keyLen], eph[:])
+	copy(body[idLen*2+keyLen:], box)
+	return frame(typ, body), nil
+}
+
+func splitDirect(pkt []byte, typ byte) (src, dst uuid.UUID, eph [32]byte, box []byte, err error) {
+	body, err := bodyOf(pkt, typ)
+	if err != nil {
+		return src, dst, eph, nil, err
+	}
+	if len(body) < idLen*2+keyLen+nonceLen+16 {
+		return src, dst, eph, nil, fmt.Errorf("short punch body")
+	}
+	src = getID(body)
+	dst = getID(body[idLen:])
+	copy(eph[:], body[idLen*2:idLen*2+keyLen])
+	box = body[idLen*2+keyLen:]
+	return src, dst, eph, box, nil
+}
+
+func openDirect(typ byte, key [32]byte, pkt []byte) (plain []byte, src, dst uuid.UUID, eph [32]byte, err error) {
+	src, dst, eph, box, err := splitDirect(pkt, typ)
+	if err != nil {
+		return nil, src, dst, eph, err
+	}
+	plain, err = openKey(key, box, directAAD(typ, src, dst, eph))
+	return plain, src, dst, eph, err
+}
+
+func buildSealed(typ byte, srcPriv, dstPub [32]byte, src, dst uuid.UUID, plain []byte) ([]byte, error) {
+	ephPriv, err := NewPrivate()
+	if err != nil {
+		return nil, err
+	}
+	ephPub, err := Public(ephPriv)
+	if err != nil {
+		return nil, err
+	}
+	send, _, err := directionalKeys(srcPriv, dstPub)
+	if err != nil {
+		return nil, err
+	}
+	return sealDirect(typ, send, ephPub, src, dst, plain)
+}
+
+func openSealed(typ byte, dstPriv, srcPub [32]byte, pkt []byte) (plain []byte, src, dst uuid.UUID, err error) {
+	_, recv, err := directionalKeys(dstPriv, srcPub)
+	if err != nil {
+		return nil, src, dst, err
+	}
+	plain, src, dst, _, err = openDirect(typ, recv, pkt)
+	return plain, src, dst, err
+}
+
+func pingTxid(plain []byte) (uint64, error) {
+	if len(plain) < 8 {
+		return 0, fmt.Errorf("bad ping body")
+	}
+	for _, b := range plain[8:] {
+		if b != 0 {
+			return 0, fmt.Errorf("bad ping body")
+		}
+	}
+	return binary.BigEndian.Uint64(plain[:8]), nil
 }
 
 // BuildPing ...
 func BuildPing(srcPriv, dstPub [32]byte, src, dst uuid.UUID, txid uint64) ([]byte, error) {
 	var plain [8]byte
 	binary.BigEndian.PutUint64(plain[:], txid)
-	return sealDirect(TypePing, srcPriv, dstPub, src, dst, plain[:])
+	return buildSealed(TypePing, srcPriv, dstPub, src, dst, plain[:])
 }
 
 // BuildPingPad ...
@@ -297,23 +417,24 @@ func BuildPingPad(srcPriv, dstPub [32]byte, src, dst uuid.UUID, txid uint64, pla
 	}
 	plain := make([]byte, plainLen)
 	binary.BigEndian.PutUint64(plain[:8], txid)
-	return sealDirect(TypePing, srcPriv, dstPub, src, dst, plain)
+	return buildSealed(TypePing, srcPriv, dstPub, src, dst, plain)
 }
 
 // OpenPing ...
 func OpenPing(dstPriv, srcPub [32]byte, pkt []byte) (src, dst uuid.UUID, txid uint64, err error) {
-	plain, src, dst, err := openDirect(TypePing, dstPriv, srcPub, pkt)
+	plain, src, dst, err := openSealed(TypePing, dstPriv, srcPub, pkt)
 	if err != nil {
 		return src, dst, 0, err
 	}
-	if len(plain) < 8 {
-		return src, dst, 0, fmt.Errorf("bad ping body")
+	txid, err = pingTxid(plain)
+	if err != nil {
+		return src, dst, 0, err
 	}
-	return src, dst, binary.BigEndian.Uint64(plain[:8]), nil
+	return src, dst, txid, nil
 }
 
 func directPacketLen(plainLen int) int {
-	return headerLen + idLen*2 + nonceLen + plainLen + 16
+	return headerLen + idLen*2 + keyLen + nonceLen + plainLen + 16
 }
 
 // BuildMTUProbe ...
@@ -343,63 +464,41 @@ func MTUAckFor(pkt []byte) []byte {
 }
 
 // BuildPong ...
-func BuildPong(srcPriv, dstPub [32]byte, src, dst uuid.UUID, txid uint64, observed netip.AddrPort) ([]byte, error) {
-	plain := make([]byte, 8+addrLen+2)
-	binary.BigEndian.PutUint64(plain[:8], txid)
-	putAddrPort(plain[8:], observed)
-	return sealDirect(TypePong, srcPriv, dstPub, src, dst, plain)
+func BuildPong(srcPriv, dstPub [32]byte, src, dst uuid.UUID, txid uint64) ([]byte, error) {
+	var plain [8]byte
+	binary.BigEndian.PutUint64(plain[:], txid)
+	return buildSealed(TypePong, srcPriv, dstPub, src, dst, plain[:])
 }
 
 // OpenPong ...
-func OpenPong(dstPriv, srcPub [32]byte, pkt []byte) (src, dst uuid.UUID, txid uint64, observed netip.AddrPort, err error) {
-	plain, src, dst, err := openDirect(TypePong, dstPriv, srcPub, pkt)
+func OpenPong(dstPriv, srcPub [32]byte, pkt []byte) (src, dst uuid.UUID, txid uint64, err error) {
+	plain, src, dst, err := openSealed(TypePong, dstPriv, srcPub, pkt)
 	if err != nil {
-		return src, dst, 0, netip.AddrPort{}, err
+		return src, dst, 0, err
 	}
-	if len(plain) != 8+addrLen+2 {
-		return src, dst, 0, netip.AddrPort{}, fmt.Errorf("bad pong body")
+	if len(plain) != 8 {
+		return src, dst, 0, fmt.Errorf("bad pong body")
 	}
-	return src, dst, binary.BigEndian.Uint64(plain[:8]), getAddrPort(plain[8:]), nil
+	return src, dst, binary.BigEndian.Uint64(plain), nil
 }
 
 // BuildTeardown ...
-func BuildTeardown(srcPriv, dstPub [32]byte, src, dst uuid.UUID) ([]byte, error) {
-	return sealDirect(TypeTeardown, srcPriv, dstPub, src, dst, []byte{1})
+func BuildTeardown(srcPriv, dstPub [32]byte, src, dst uuid.UUID, epoch uint64) ([]byte, error) {
+	var plain [8]byte
+	binary.BigEndian.PutUint64(plain[:], epoch)
+	return buildSealed(TypeTeardown, srcPriv, dstPub, src, dst, plain[:])
 }
 
 // OpenTeardown ...
-func OpenTeardown(dstPriv, srcPub [32]byte, pkt []byte) (src, dst uuid.UUID, err error) {
-	_, src, dst, err = openDirect(TypeTeardown, dstPriv, srcPub, pkt)
-	return src, dst, err
-}
-
-func sealDirect(typ byte, srcPriv, dstPub [32]byte, src, dst uuid.UUID, plain []byte) ([]byte, error) {
-	box, err := Seal(srcPriv, dstPub, plain)
+func OpenTeardown(dstPriv, srcPub [32]byte, pkt []byte) (src, dst uuid.UUID, epoch uint64, err error) {
+	plain, src, dst, err := openSealed(TypeTeardown, dstPriv, srcPub, pkt)
 	if err != nil {
-		return nil, err
+		return src, dst, 0, err
 	}
-	body := make([]byte, idLen*2+len(box))
-	putID(body, src)
-	putID(body[idLen:], dst)
-	copy(body[idLen*2:], box)
-	return frame(typ, body), nil
-}
-
-func openDirect(typ byte, dstPriv, srcPub [32]byte, pkt []byte) ([]byte, uuid.UUID, uuid.UUID, error) {
-	body, err := bodyOf(pkt, typ)
-	if err != nil {
-		return nil, uuid.UUID{}, uuid.UUID{}, err
+	if len(plain) != 8 {
+		return src, dst, 0, fmt.Errorf("bad teardown")
 	}
-	if len(body) < idLen*2+nonceLen+16 {
-		return nil, uuid.UUID{}, uuid.UUID{}, fmt.Errorf("short punch body")
-	}
-	src := getID(body)
-	dst := getID(body[idLen:])
-	plain, err := Open(dstPriv, srcPub, body[idLen*2:])
-	if err != nil {
-		return nil, src, dst, err
-	}
-	return plain, src, dst, nil
+	return src, dst, binary.BigEndian.Uint64(plain), nil
 }
 
 // TypeOf ...
