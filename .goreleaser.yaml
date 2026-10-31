@@ -69,6 +69,20 @@ archives:
       {{- .Os }}_
       {{- .Arch }}
 
+# Snapshots and local publishes skip the SBOM, so make release and
+# releaser-build-release.sh do not need syft. The tag workflow sets
+# TUNNELS_RELEASE_SBOM=1. Signing is not configured here: GoReleaser OSS
+# cannot skip signs, and a missing signature file fails a local publish.
+checksum:
+  name_template: "tunnels_{{ .Version }}_checksums.txt"
+  algorithm: sha256
+sboms:
+  - artifacts: archive
+    documents:
+      - "{{ .ArtifactName }}.sbom.json"
+    disable: '{{ if or .IsSnapshot (ne (index .Env "TUNNELS_RELEASE_SBOM") "1") }}true{{ else }}false{{ end }}'
+    args: ["$artifact", "--output", "spdx-json=$document"]
+
 release:
   draft: true
   replace_existing_draft: true

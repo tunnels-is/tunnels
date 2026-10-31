@@ -11,6 +11,9 @@ permissions:
 jobs:
   goreleaser:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -25,6 +28,20 @@ jobs:
       - name: Check go.mod and go.sum
         run: go mod tidy -diff
 
+      - name: Install Syft
+        shell: bash
+        run: |
+          set -euo pipefail
+          dir="${RUNNER_TEMP}/syft-bin"
+          mkdir -p "$dir"
+          curl -sSfL https://raw.githubusercontent.com/anchore/syft/v1.55.0/install.sh | sh -s -- -b "$dir" v1.55.0
+          echo "$dir" >> "$GITHUB_PATH"
+          bin="$dir/syft"
+          if [ -f "$dir/syft.exe" ]; then
+            bin="$dir/syft.exe"
+          fi
+          "$bin" version
+
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
@@ -33,6 +50,19 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TUNNELS_RELEASE_SBOM: "1"
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v4.1.2
+        with:
+          cosign-release: v3.1.4
+
+      - name: Sign release artifacts
+        shell: bash
+        env:
+          COSIGN_YES: "true"
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash ./scripts/release-sign-dist.sh ./builds
 
   desktop:
     needs: goreleaser
@@ -43,3 +73,4 @@ jobs:
     permissions:
       contents: write
       actions: write
+      id-token: write

@@ -120,13 +120,47 @@ jobs:
           path: ${{ env.ASSET }}
           if-no-files-found: error
 
+      - name: Install Syft
+        if: inputs.upload_release && startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: |
+          set -euo pipefail
+          dir="${RUNNER_TEMP}/syft-bin"
+          mkdir -p "$dir"
+          curl -sSfL https://raw.githubusercontent.com/anchore/syft/v1.55.0/install.sh | sh -s -- -b "$dir" v1.55.0
+          echo "$dir" >> "$GITHUB_PATH"
+          bin="$dir/syft"
+          if [ -f "$dir/syft.exe" ]; then
+            bin="$dir/syft.exe"
+          fi
+          "$bin" version
+
+      - name: Install Cosign
+        if: inputs.upload_release && startsWith(github.ref, 'refs/tags/')
+        uses: sigstore/cosign-installer@v4.1.2
+        with:
+          cosign-release: v3.1.4
+
+      - name: Sign desktop package
+        if: inputs.upload_release && startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        env:
+          COSIGN_YES: "true"
+        run: bash ./scripts/release-attest.sh "$ASSET"
+
       - name: Upload desktop app to release
         if: inputs.upload_release && startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
           draft: true
-          files: ${{ env.ASSET }}
+          files: |
+            ${{ env.ASSET }}
+            ${{ env.ASSET }}.sha256
+            ${{ env.ASSET }}.sbom.json
+            ${{ env.ASSET }}.sigstore.json
+            ${{ env.ASSET }}.sha256.sigstore.json
+            ${{ env.ASSET }}.sbom.json.sigstore.json
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
