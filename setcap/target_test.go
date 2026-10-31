@@ -90,8 +90,27 @@ func TestClearSudoTimestampRunsCommand(t *testing.T) {
 	t.Cleanup(func() { runCommand = prev })
 
 	clearSudoTimestamp()
-	if len(got) != 2 || got[0] != "sudo" || got[1] != "-kK" {
+	if len(got) != 2 || got[0] != "/usr/bin/sudo" || got[1] != "-kK" {
 		t.Fatalf("command = %q", got)
+	}
+}
+
+func TestSudoPasswordBufferWipesSource(t *testing.T) {
+	src := []byte("secret")
+	buf := sudoPasswordBuffer(src)
+	for _, b := range src {
+		if b != 0 {
+			t.Fatal("source still holds the password")
+		}
+	}
+	if len(buf) != 7 || string(buf[:6]) != "secret" || buf[6] != '\n' {
+		t.Fatal("stdin buffer is not the password plus a newline")
+	}
+	clearBytes(buf)
+	for _, b := range buf {
+		if b != 0 {
+			t.Fatal("buffer still holds the password")
+		}
 	}
 }
 

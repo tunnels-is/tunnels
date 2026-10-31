@@ -2,6 +2,7 @@ package setcap
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -13,6 +14,8 @@ import (
 )
 
 const capabilitySet = "cap_net_raw,cap_net_bind_service,cap_net_admin+eip"
+
+const sudoBin = "/usr/bin/sudo"
 
 var runCommand = func(name string, args ...string) error {
 	return exec.Command(name, args...).Run()
@@ -61,11 +64,30 @@ func CheckCapabilities() (err error) {
 	}
 	defer clearBytes(bytePassword)
 
-	cmd := exec.Command("sudo", "-S", "/usr/sbin/setcap", capabilitySet, target)
-	cmd.Stdin = strings.NewReader(string(bytePassword) + "\n")
+	buf := sudoPasswordBuffer(bytePassword)
+	defer clearBytes(buf)
+
+	cmd := exec.Command(sudoBin, "-S", "/usr/sbin/setcap", capabilitySet, target)
 	cmd.Stdout = os.Stdout
-	err = cmd.Run()
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		return err
+	}
+	if err := cmd.Start(); err != nil {
+		_ = stdin.Close()
+		return err
+	}
+	werr := writeAll(stdin, buf)
+	clearBytes(buf)
+	cerr := stdin.Close()
+	err = cmd.Wait()
 	clearSudoTimestamp()
+	if werr != nil {
+		return werr
+	}
+	if cerr != nil {
+		return cerr
+	}
 	if err != nil {
 		fmt.Printf("\n\033[1;31m  ✗  Unable to set capabilities: %s\033[0m\n\n"+
 			"  To grant permissions manually, run:\n"+
@@ -81,7 +103,31 @@ func CheckCapabilities() (err error) {
 }
 
 func clearSudoTimestamp() {
-	_ = runCommand("sudo", "-kK")
+	_ = runCommand(sudoBin, "-kK")
+}
+
+func sudoPasswordBuffer(password []byte) []byte {
+	buf := make([]byte, len(password)+1)
+	copy(buf, password)
+	buf[len(password)] = '\n'
+	clearBytes(password)
+	return buf
+}
+
+func writeAll(w io.Writer, b []byte) error {
+	for len(b) > 0 {
+		n, err := w.Write(b)
+		if n > 0 {
+			b = b[n:]
+		}
+		if err != nil {
+			return err
+		}
+		if n == 0 {
+			return io.ErrShortWrite
+		}
+	}
+	return nil
 }
 
 func clearBytes(b []byte) {
