@@ -22,6 +22,9 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: Check go.mod and go.sum
+        run: go mod tidy -diff
+
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:

@@ -4,7 +4,6 @@ project_name: tunnels
 
 before:
   hooks:
-    - go mod tidy
     - ./build-parser.sh
 
 builds:

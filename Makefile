@@ -1,10 +1,10 @@
-.PHONY: test test-server test-client test-coverage test-verbose clean build-server build-client build-app build release release-test lint mod-tidy pre-commit ci help
+.PHONY: test test-server test-client test-coverage test-verbose clean build-server build-client build-app build release release-test lint mod-tidy mod-check pre-commit ci help
 
 .DEFAULT_GOAL := help
 
 help:
 	@echo 'Usage: make <target>'
-	@echo 'Targets: test test-server test-coverage test-verbose test-count clean build-server build-client build-app build release release-test lint mod-tidy pre-commit ci'
+	@echo 'Targets: test test-server test-coverage test-verbose test-count clean build-server build-client build-app build release release-test lint mod-tidy mod-check pre-commit ci'
 
 test:
 	@echo "Running all tests..."
@@ -70,8 +70,12 @@ mod-tidy:
 	@go mod tidy
 	@go mod verify
 
+mod-check:
+	@echo "Checking go.mod and go.sum..."
+	@go mod tidy -diff
+
 pre-commit: mod-tidy test lint
 	@echo "Pre-commit checks passed!"
 
-ci: test lint
+ci: mod-check test lint
 	@echo "CI checks passed!"

@@ -15,7 +15,6 @@ import (
 var listReloadMu sync.Mutex
 
 const (
-	maxDNSListSize    = 128 * 1024 * 1024
 	dnsListScanBuf    = 64 * 1024
 	dnsListMaxLineLen = 1024 * 1024
 
@@ -408,13 +407,17 @@ retry:
 	}
 	defer resp.Body.Close()
 
+	return installFullList(path, resp.Body, resp.ContentLength)
+}
+
+func installFullList(path string, body io.Reader, contentLength int64) error {
 	tmp := path + ".tmp"
 	f, err := os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
 	if err != nil {
 		return err
 	}
 
-	written, copyErr := io.Copy(f, io.LimitReader(resp.Body, maxDNSListSize))
+	written, copyErr := io.Copy(f, body)
 	closeErr := f.Close()
 	if copyErr != nil {
 		_ = os.Remove(tmp)
@@ -427,6 +430,10 @@ retry:
 	if written == 0 {
 		_ = os.Remove(tmp)
 		return fmt.Errorf("empty list body")
+	}
+	if contentLength >= 0 && written != contentLength {
+		_ = os.Remove(tmp)
+		return fmt.Errorf("incomplete list download")
 	}
 	if err := os.Rename(tmp, path); err != nil {
 		_ = os.Remove(tmp)

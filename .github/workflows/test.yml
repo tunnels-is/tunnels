@@ -30,6 +30,9 @@ jobs:
       - name: Download dependencies
         run: go mod download
 
+      - name: Check go.mod and go.sum
+        run: go mod tidy -diff
+
       - name: Run tests
         run: go test -v -race ./...
 
