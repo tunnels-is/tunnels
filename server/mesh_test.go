@@ -187,3 +187,129 @@ func TestMeshGroupDelete_ClearsMembers(t *testing.T) {
 		}
 	}
 }
+
+// TestValidateServerMesh_SubnetRules covers the shared A-14 subnet rules on
+// the controller side.
+func TestValidateServerMesh_SubnetRules(t *testing.T) {
+	setupTestDB(t)
+	meshTestLogger()
+
+	mg := &types.MeshGroup{ID: uuid.New(), Tag: "g"}
+	if err := createMeshGroup(mg); err != nil {
+		t.Fatal(err)
+	}
+	sib := &types.Server{
+		ID: uuid.New(), APIKey: uuid.NewString(), MeshGroupID: mg.ID.String(),
+		WireGuardSubnet: "10.3.0.0/16", WireGuardSubnet6: "fd00:3::/64", WireGuardPort: 51820,
+	}
+	if err := createServer(sib); err != nil {
+		t.Fatal(err)
+	}
+
+	cases := []struct {
+		name   string
+		v4, v6 string
+		ok     bool
+	}{
+		{"valid v4 only", "10.4.0.0/16", "", true},
+		{"valid v4+v6", "10.4.0.0/16", "fd00:4::/64", true},
+		{"missing v4", "", "fd00:4::/64", false},
+		{"v4 /0", "0.0.0.0/0", "", false},
+		{"v4 too broad", "10.0.0.0/7", "", false},
+		{"v4 host bits", "10.4.0.1/16", "", false},
+		{"v4 malformed", "10.4.0.0/xx", "", false},
+		{"v4 field holds v6", "fd00:4::/64", "", false},
+		{"v6 /0", "10.4.0.0/16", "::/0", false},
+		{"v6 too broad", "10.4.0.0/16", "fd00::/16", false},
+		{"v6 field holds v4", "10.4.0.0/16", "10.5.0.0/16", false},
+		{"v6 overlaps sibling", "10.4.0.0/16", "fd00:3::/48", false},
+		{"v4 contains sibling", "10.0.0.0/8", "", false},
+	}
+	for _, c := range cases {
+		err := validateServerMesh(&types.Server{
+			ID: uuid.New(), MeshGroupID: mg.ID.String(), WireGuardPort: 51820,
+			WireGuardMeshPort: 51821, WireGuardSubnet: c.v4, WireGuardSubnet6: c.v6,
+		})
+		if (err == nil) != c.ok {
+			t.Errorf("%s: err=%v, want ok=%v", c.name, err, c.ok)
+		}
+	}
+}
+
+// TestHandleWGMesh_FiltersInvalidSiblings ensures the controller never serves
+// sibling subnets that fail the shared mesh rules, even if they are already
+// stored (legacy rows / direct DB edits bypassing validateServerMesh).
+func TestHandleWGMesh_FiltersInvalidSiblings(t *testing.T) {
+	setupTestDB(t)
+	meshTestLogger()
+	mg := uuid.New().String()
+
+	caller := &types.Server{
+		ID: uuid.New(), APIKey: uuid.NewString(), MeshGroupID: mg,
+		WireGuardPubKey: uniqueWGKey(1001), IP: "10.0.0.1",
+		WireGuardSubnet: "10.0.0.0/22", WireGuardPort: 51820,
+	}
+	good := &types.Server{
+		ID: uuid.New(), APIKey: uuid.NewString(), MeshGroupID: mg, Tag: "good",
+		WireGuardPubKey: uniqueWGKey(1002), IP: "2.2.2.2",
+		WireGuardSubnet: "10.3.0.0/16", WireGuardSubnet6: "::/0", WireGuardPort: 51820,
+	}
+	broad := &types.Server{
+		ID: uuid.New(), APIKey: uuid.NewString(), MeshGroupID: mg, Tag: "broad",
+		WireGuardPubKey: uniqueWGKey(1003), IP: "3.3.3.3",
+		WireGuardSubnet: "0.0.0.0/1", WireGuardPort: 51820,
+	}
+	overlapsCaller := &types.Server{
+		ID: uuid.New(), APIKey: uuid.NewString(), MeshGroupID: mg, Tag: "overlaps-caller",
+		WireGuardPubKey: uniqueWGKey(1004), IP: "4.4.4.4",
+		WireGuardSubnet: "10.0.2.0/24", WireGuardPort: 51820,
+	}
+	for _, s := range []*types.Server{caller, good, broad, overlapsCaller} {
+		if err := createServer(s); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	w, resp := callWGMesh(t, caller)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+	if len(resp.Peers) != 1 {
+		t.Fatalf("expected only the good sibling, got %d: %+v", len(resp.Peers), resp.Peers)
+	}
+	if p := resp.Peers[0]; p.Endpoint != "2.2.2.2:51821" ||
+		len(p.AllowedSubnets) != 1 || p.AllowedSubnets[0] != "10.3.0.0/16" {
+		t.Fatalf("unexpected peer %+v (the ::/0 v6 subnet must be stripped)", p)
+	}
+}
+
+// TestHandleWGMesh_DuplicateSiblingKeys: two siblings advertising the same
+// WireGuard key are ambiguous; neither is served.
+func TestHandleWGMesh_DuplicateSiblingKeys(t *testing.T) {
+	setupTestDB(t)
+	meshTestLogger()
+	mg := uuid.New().String()
+	dup := uniqueWGKey(1005)
+	caller := &types.Server{
+		ID: uuid.New(), APIKey: uuid.NewString(), MeshGroupID: mg,
+		WireGuardPubKey: uniqueWGKey(1006), IP: "10.0.0.1",
+		WireGuardSubnet: "10.0.0.0/22", WireGuardPort: 51820,
+	}
+	a := &types.Server{
+		ID: uuid.New(), APIKey: uuid.NewString(), MeshGroupID: mg,
+		WireGuardPubKey: dup, IP: "2.2.2.2", WireGuardSubnet: "10.3.0.0/16", WireGuardPort: 51820,
+	}
+	b := &types.Server{
+		ID: uuid.New(), APIKey: uuid.NewString(), MeshGroupID: mg,
+		WireGuardPubKey: dup, IP: "3.3.3.3", WireGuardSubnet: "10.4.0.0/16", WireGuardPort: 51820,
+	}
+	for _, s := range []*types.Server{caller, a, b} {
+		if err := createServer(s); err != nil {
+			t.Fatal(err)
+		}
+	}
+	_, resp := callWGMesh(t, caller)
+	if len(resp.Peers) != 0 {
+		t.Fatalf("duplicate-key siblings must not be served, got %+v", resp.Peers)
+	}
+}

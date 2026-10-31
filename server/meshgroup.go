@@ -4,8 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"net"
 	"net/http"
+	"net/netip"
 	"time"
 
 	"github.com/google/uuid"
@@ -126,6 +126,27 @@ func validateServerMesh(s *types.Server) error {
 		return errors.New("mesh group not found")
 	}
 
+	if s.WireGuardSubnet == "" {
+		return errors.New("WireGuardSubnet is required for mesh group members")
+	}
+	own4, err := types.ValidateMeshSubnet(s.WireGuardSubnet)
+	if err != nil {
+		return fmt.Errorf("WireGuardSubnet: %w", err)
+	}
+	if !own4.Addr().Is4() {
+		return fmt.Errorf("WireGuardSubnet %s must be an IPv4 prefix", s.WireGuardSubnet)
+	}
+	var own6 netip.Prefix
+	if s.WireGuardSubnet6 != "" {
+		own6, err = types.ValidateMeshSubnet(s.WireGuardSubnet6)
+		if err != nil {
+			return fmt.Errorf("WireGuardSubnet6: %w", err)
+		}
+		if !own6.Addr().Is6() {
+			return fmt.Errorf("WireGuardSubnet6 %s must be an IPv6 prefix", s.WireGuardSubnet6)
+		}
+	}
+
 	siblings, err := findServersByMeshGroup(s.MeshGroupID)
 	if err != nil {
 		return err
@@ -134,26 +155,20 @@ func validateServerMesh(s *types.Server) error {
 		if sib.ID == s.ID {
 			continue
 		}
-		if cidrsOverlap(s.WireGuardSubnet, sib.WireGuardSubnet) {
-			return fmt.Errorf("WireGuardSubnet %s overlaps mesh sibling %q (%s)", s.WireGuardSubnet, sib.Tag, sib.WireGuardSubnet)
-		}
-		if cidrsOverlap(s.WireGuardSubnet6, sib.WireGuardSubnet6) {
-			return fmt.Errorf("WireGuardSubnet6 %s overlaps mesh sibling %q (%s)", s.WireGuardSubnet6, sib.Tag, sib.WireGuardSubnet6)
+		for _, sibSubnet := range []string{sib.WireGuardSubnet, sib.WireGuardSubnet6} {
+			sp, ok := types.ParseLocalSubnet(sibSubnet)
+			if !ok {
+				continue
+			}
+			if types.MeshSubnetsOverlap(own4, sp) {
+				return fmt.Errorf("WireGuardSubnet %s overlaps mesh sibling %q (%s)", s.WireGuardSubnet, sib.Tag, sibSubnet)
+			}
+			if types.MeshSubnetsOverlap(own6, sp) {
+				return fmt.Errorf("WireGuardSubnet6 %s overlaps mesh sibling %q (%s)", s.WireGuardSubnet6, sib.Tag, sibSubnet)
+			}
 		}
 	}
 	return nil
-}
-
-func cidrsOverlap(a, b string) bool {
-	if a == "" || b == "" {
-		return false
-	}
-	_, na, err1 := net.ParseCIDR(a)
-	_, nb, err2 := net.ParseCIDR(b)
-	if err1 != nil || err2 != nil {
-		return false
-	}
-	return na.Contains(nb.IP) || nb.Contains(na.IP)
 }
 
 func handleAdminMeshGroupGet(w http.ResponseWriter, r *http.Request) {

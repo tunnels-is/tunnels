@@ -463,6 +463,8 @@ func handleWGMesh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	candidates := make([]types.WGMeshPeer, 0, len(siblings))
+	tags := make(map[string]string, len(siblings))
 	for _, s := range siblings {
 		if s.ID == server.ID {
 			continue
@@ -478,12 +480,26 @@ func handleWGMesh(w http.ResponseWriter, r *http.Request) {
 		if s.WireGuardSubnet6 != "" {
 			subnets = append(subnets, s.WireGuardSubnet6)
 		}
-		resp.Peers = append(resp.Peers, types.WGMeshPeer{
+		tags[hexKey] = s.Tag
+		candidates = append(candidates, types.WGMeshPeer{
 			PublicKeyHex:   hexKey,
 			Endpoint:       net.JoinHostPort(s.IP, strconv.Itoa(meshPortForServer(s))),
 			AllowedSubnets: subnets,
 		})
 	}
+
+	// A-14: apply the same mesh subnet rules wg-server enforces, so a bad
+	// sibling record (legacy data, direct DB edit) is never served.
+	valid, rejected := types.ValidateMeshPeers(
+		[]string{server.WireGuardSubnet, server.WireGuardSubnet6}, candidates)
+	for _, rj := range rejected {
+		what := "sibling " + strconv.Quote(tags[rj.PublicKeyHex])
+		if rj.Subnet != "" {
+			what += " subnet " + rj.Subnet
+		}
+		WARN("mesh: not serving ", what, " to server ", server.ID.String(), ": ", rj.Err)
+	}
+	resp.Peers = append(resp.Peers, valid...)
 
 	sendObject(w, resp)
 }

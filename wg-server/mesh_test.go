@@ -114,3 +114,56 @@ func TestFetchMesh_HTTPRejected(t *testing.T) {
 		t.Fatal("expected error for http:// controller URL")
 	}
 }
+
+// TestValidMeshSubnet_SharedRules checks validMeshSubnet now enforces the
+// shared types.ValidateMeshSubnet rules (A-14), not just "not /0".
+func TestValidMeshSubnet_SharedRules(t *testing.T) {
+	for _, in := range []string{
+		"0.0.0.0/1", "128.0.0.0/1", "10.0.0.0/7", "2000::/3",
+		"10.3.0.1/16", "127.0.0.0/8", "::ffff:10.0.0.0/104",
+	} {
+		if validMeshSubnet(in) {
+			t.Errorf("validMeshSubnet(%q) = true, want false", in)
+		}
+	}
+}
+
+// TestDesiredMeshPeers covers the hub-side filtering of a controller mesh
+// response: invalid/overbroad subnets, overlap with the hub's own subnets,
+// and cross-peer overlap (both claims dropped).
+func TestDesiredMeshPeers(t *testing.T) {
+	own := []string{"10.0.0.1/22", "fd00::/64"}
+	resp := &types.WGMeshResponse{Peers: []types.WGMeshPeer{
+		{PublicKeyHex: "", Endpoint: "9.9.9.9:1", AllowedSubnets: []string{"10.9.0.0/16"}},
+		{PublicKeyHex: "aa", Endpoint: "1.1.1.1:51821", AllowedSubnets: []string{"10.3.0.0/16", "fd00:3::/64"}},
+		{PublicKeyHex: "bb", Endpoint: "2.2.2.2:51821", AllowedSubnets: []string{"0.0.0.0/0", "0.0.0.0/1"}},
+		{PublicKeyHex: "cc", Endpoint: "3.3.3.3:51821", AllowedSubnets: []string{"10.0.1.0/24", "10.5.0.0/16"}},
+		{PublicKeyHex: "dd", Endpoint: "4.4.4.4:51821", AllowedSubnets: []string{"fd00::/48"}},
+		{PublicKeyHex: "ee", Endpoint: "5.5.5.5:51821", AllowedSubnets: []string{"10.6.0.0/16"}},
+		{PublicKeyHex: "ff", Endpoint: "6.6.6.6:51821", AllowedSubnets: []string{"10.6.128.0/17", "10.7.0.0/16"}},
+	}}
+	got := desiredMeshPeers(resp, own)
+
+	want := map[string][]string{
+		"aa": {"10.3.0.0/16", "fd00:3::/64"},
+		"cc": {"10.5.0.0/16"},
+		"ff": {"10.7.0.0/16"},
+	}
+	if len(got) != len(want) {
+		t.Fatalf("got %d peers %+v, want %v", len(got), got, want)
+	}
+	for k, subnets := range want {
+		p, ok := got[k]
+		if !ok {
+			t.Fatalf("missing peer %s in %+v", k, got)
+		}
+		if len(p.AllowedSubnets) != len(subnets) {
+			t.Fatalf("peer %s subnets %v, want %v", k, p.AllowedSubnets, subnets)
+		}
+		for i := range subnets {
+			if p.AllowedSubnets[i] != subnets[i] {
+				t.Fatalf("peer %s subnets %v, want %v", k, p.AllowedSubnets, subnets)
+			}
+		}
+	}
+}

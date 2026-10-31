@@ -99,13 +99,11 @@ func setupMesh(cfg *Config, logLevel string) error {
 	return nil
 }
 
+// validMeshSubnet reports whether subnet passes the shared mesh subnet rules
+// (types.ValidateMeshSubnet).
 func validMeshSubnet(subnet string) bool {
-	_, ipnet, err := net.ParseCIDR(subnet)
-	if err != nil {
-		return false
-	}
-	ones, _ := ipnet.Mask.Size()
-	return ones != 0
+	_, err := types.ValidateMeshSubnet(subnet)
+	return err == nil
 }
 
 func ipcSetMesh(conf []byte) error {
@@ -194,7 +192,7 @@ func reconcileMesh() {
 		return
 	}
 
-	desired := desiredMeshPeers(resp)
+	desired := desiredMeshPeers(resp, []string{cfg.WireGuardSubnet, cfg.WireGuardSubnet6})
 
 	meshMu.Lock()
 	defer meshMu.Unlock()
@@ -207,25 +205,25 @@ func reconcileMesh() {
 	addMissingMeshPeers(cfg, desired)
 }
 
-func desiredMeshPeers(resp *types.WGMeshResponse) map[string]types.WGMeshPeer {
-	desired := make(map[string]types.WGMeshPeer, len(resp.Peers))
-	for _, p := range resp.Peers {
-		if p.PublicKeyHex == "" {
-			continue
+// desiredMeshPeers filters the controller's mesh response through the shared
+// types.ValidateMeshPeers rules: each subnet must pass ValidateMeshSubnet,
+// must not overlap this hub's own WireGuard subnets (ownSubnets), and must
+// not overlap a subnet claimed by another peer (both claims are dropped).
+// Peers left with no subnets, or with an empty/duplicated key, are skipped.
+func desiredMeshPeers(resp *types.WGMeshResponse, ownSubnets []string) map[string]types.WGMeshPeer {
+	valid, rejected := types.ValidateMeshPeers(ownSubnets, resp.Peers)
+	for _, rj := range rejected {
+		switch {
+		case rj.PublicKeyHex == "":
+			// Empty key: historically skipped silently.
+		case rj.Subnet != "":
+			WARN("mesh: rejecting subnet ", rj.Subnet, " from peer ", shortPubHex(rj.PublicKeyHex), ": ", rj.Err)
+		default:
+			WARN("mesh: peer ", shortPubHex(rj.PublicKeyHex), " skipped: ", rj.Err)
 		}
-		subnets := make([]string, 0, len(p.AllowedSubnets))
-		for _, s := range p.AllowedSubnets {
-			if !validMeshSubnet(s) {
-				WARN("mesh: rejecting invalid/overbroad subnet ", s, " from peer ", shortPubHex(p.PublicKeyHex))
-				continue
-			}
-			subnets = append(subnets, s)
-		}
-		if len(subnets) == 0 {
-			WARN("mesh: peer ", shortPubHex(p.PublicKeyHex), " has no valid subnets, skipping")
-			continue
-		}
-		p.AllowedSubnets = subnets
+	}
+	desired := make(map[string]types.WGMeshPeer, len(valid))
+	for _, p := range valid {
 		desired[p.PublicKeyHex] = p
 	}
 	return desired
