@@ -31,18 +31,23 @@ type Signal struct {
 // Start ...
 func (s *Signal) Start() {
 	defer func() {
-		r := recover()
-		if r != nil {
-			if s.Log != nil {
-				s.Log(fmt.Sprintf("err: %s \n %s", r, string(debug.Stack())))
-			}
-		}
 		s.Log("goroutine exit: " + s.Tag)
 	}()
 
 	for s.Ctx.Err() == nil {
-		s.Method()
+		s.runMethod()
 		time.Sleep(s.Sleep)
 		s.Log("goroutine restart: " + s.Tag)
 	}
+}
+
+// runMethod catches a panic from this iteration so the loop keeps running.
+func (s *Signal) runMethod() {
+	defer func() {
+		r := recover()
+		if r != nil && s.Log != nil {
+			s.Log(fmt.Sprintf("err: %s \n %s", r, string(debug.Stack())))
+		}
+	}()
+	s.Method()
 }
