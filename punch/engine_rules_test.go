@@ -8,7 +8,7 @@ import (
 	"github.com/google/uuid"
 )
 
-func TestV2_RetypeAndReflectionFail(t *testing.T) {
+func TestEngine_RetypeAndReflectionFail(t *testing.T) {
 	aPriv := mustKey(t)
 	bPriv := mustKey(t)
 	aPub, bPub := mustPublic(t, aPriv), mustPublic(t, bPriv)
@@ -26,15 +26,9 @@ func TestV2_RetypeAndReflectionFail(t *testing.T) {
 	if _, _, _, err := OpenPing(aPriv, bPub, ping); err == nil {
 		t.Fatal("a reflected ping opened")
 	}
-	for _, v := range []byte{1, 2} {
-		old := append([]byte{'T', 'N', 'L', 'P', v, TypePing}, ping...)
-		if _, _, _, err := OpenPing(bPriv, aPub, old); err == nil {
-			t.Fatalf("version %d framed packet was accepted", v)
-		}
-	}
 }
 
-func TestV2_PongMustMatchPing(t *testing.T) {
+func TestEngine_PongMustMatchPing(t *testing.T) {
 	aPriv := mustKey(t)
 	aPub := mustPublic(t, aPriv)
 	var aWG [32]byte
@@ -78,7 +72,7 @@ func TestV2_PongMustMatchPing(t *testing.T) {
 	}
 }
 
-func TestV2_TeardownReplayAndReflexSource(t *testing.T) {
+func TestEngine_TeardownReplayAndReflexSource(t *testing.T) {
 	aPriv := mustKey(t)
 	aPub := mustPublic(t, aPriv)
 	bPriv := mustKey(t)
@@ -167,7 +161,7 @@ func TestV2_TeardownReplayAndReflexSource(t *testing.T) {
 	}
 }
 
-func TestV2_OtherAddressDoesNotKeepDirectAlive(t *testing.T) {
+func TestEngine_OtherAddressDoesNotKeepDirectAlive(t *testing.T) {
 	aPriv := mustKey(t)
 	aPub := mustPublic(t, aPriv)
 	bPriv := mustKey(t)
@@ -212,7 +206,7 @@ func TestV2_OtherAddressDoesNotKeepDirectAlive(t *testing.T) {
 	}
 }
 
-func TestV2_FreshPingsDoNotGrowCandidates(t *testing.T) {
+func TestEngine_FreshPingsDoNotGrowCandidates(t *testing.T) {
 	aPriv := mustKey(t)
 	aPub := mustPublic(t, aPriv)
 	bPriv := mustKey(t)

@@ -112,9 +112,6 @@ func TestIntroExchangeReachesDirectPath(t *testing.T) {
 		if d.Tunnel && d.Type == TypeIntro {
 			intro = d
 		}
-		if d.Server && d.Type == TypeRendezvous {
-			t.Fatal("introduction must not ask the server to relay a rendezvous")
-		}
 	}
 	if intro.Data == nil || intro.To.Addr() != bIP || intro.To.Port() != IntroPort {
 		t.Fatalf("intro %+v", intro.To)

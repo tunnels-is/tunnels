@@ -14,7 +14,7 @@ import (
 // DiscoPrivateFor ...
 func DiscoPrivateFor(wgPriv [32]byte) [32]byte {
 	mac := hmac.New(sha256.New, wgPriv[:])
-	mac.Write([]byte("tunnels.is punch disco key v1"))
+	mac.Write([]byte("tunnels.is punch disco key"))
 	sum := mac.Sum(nil)
 	var priv [32]byte
 	copy(priv[:], sum)
@@ -95,14 +95,14 @@ func kdf(shared, sender, receiver []byte, label string) [32]byte {
 }
 
 const (
-	labelDirect = "tunnels.is punch v3"
-	labelEE     = "tunnels.is punch v3 ee"
-	labelTag    = "tunnels.is punch v3 tag"
-	labelHP     = "tunnels.is punch v3 hp"
-	labelBind   = "tunnels.is punch v3 bind"
+	labelDirect = "tunnels.is punch direct"
+	labelEE     = "tunnels.is punch ee"
+	labelTag    = "tunnels.is punch tag"
+	labelHP     = "tunnels.is punch hp"
+	labelBind   = "tunnels.is punch bind"
 
-	labelSessTag = "tunnels.is punch v3 session tag"
-	labelSessHP  = "tunnels.is punch v3 session hp"
+	labelSessTag = "tunnels.is punch session tag"
+	labelSessHP  = "tunnels.is punch session hp"
 )
 
 // pairKeys are everything two disco keys derive for direct packets. The

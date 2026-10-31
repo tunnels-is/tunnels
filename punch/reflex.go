@@ -11,7 +11,7 @@ import (
 	"golang.org/x/crypto/curve25519"
 )
 
-// Reflex v3 (hardened) is a Noise-X-like request to the hub disco key and
+// Reflex is a Noise-X-like request to the hub disco key and
 // an ephemeral-keyed response, with no clear header on either:
 //
 // request (MinPacket bytes):
@@ -21,11 +21,11 @@ import (
 //	        pre-filter only holders of the hub pub can produce
 //	mask  = BLAKE2s(Kh, "eph" | salt)
 //	sBox  = AEAD_k1{client disco pub}, k1 = KDF(DH(e, hub))
-//	pBox  = AEAD_k2{ver type device ts nonce | pad}, k2 = KDF(es | ss | client)
+//	pBox  = AEAD_k2{type device ts nonce | pad}, k2 = KDF(es | ss | client)
 //
 // response (MinPacket bytes):
 //
-//	salt(16) | chk(16) | h^mask(32) | AEAD_kr{ver type nonce addr | pad}
+//	salt(16) | chk(16) | h^mask(32) | AEAD_kr{type nonce addr | pad}
 //	kb    = KDF(es | ss | client), bound to e
 //	chk   = BLAKE2s(kb, "resp" | salt)[:16], mask = BLAKE2s(kb, "hp" | salt)
 //	kr    = KDF(kb | DH(h, e)), h a fresh hub ephemeral
@@ -39,20 +39,20 @@ import (
 // Every key is fresh per request, so the boxes use the all-zero nonce.
 
 const (
-	labelReflexS    = "tunnels.is punch v3 reflex s"
-	labelReflexReq  = "tunnels.is punch v3 reflex req"
-	labelReflexBase = "tunnels.is punch v3 reflex base"
-	labelReflexResp = "tunnels.is punch v3 reflex resp"
-	labelHubDemux   = "tunnels.is punch v3 hub demux"
+	labelReflexS    = "tunnels.is punch reflex s"
+	labelReflexReq  = "tunnels.is punch reflex req"
+	labelReflexBase = "tunnels.is punch reflex base"
+	labelReflexResp = "tunnels.is punch reflex resp"
+	labelHubDemux   = "tunnels.is punch hub demux"
 
 	reqChkLen        = 8
 	respChkLen       = 16
 	reflexReqPrefix  = saltLen + reqChkLen + keyLen
 	reflexSBoxLen    = keyLen + 16
-	reflexReqPlain   = 2 + idLen + 8 + 8
+	reflexReqPlain   = 1 + idLen + 8 + 8
 	reflexReqLen     = MinPacket
 	reflexRespPrefix = saltLen + respChkLen + keyLen
-	reflexRespPlain  = 2 + 8 + addrLen + 2
+	reflexRespPlain  = 1 + 8 + addrLen + 2
 	reflexRespLen    = MinPacket
 
 	// replayCacheMax bounds the hub reflex replay cache.
@@ -212,11 +212,10 @@ func BuildReflexReq(device uuid.UUID, discoPriv, serverPub [32]byte, now time.Ti
 	}
 	pkt = append(pkt, sBox...)
 	plain := make([]byte, reflexReqLen-len(pkt)-16)
-	plain[0] = Version
-	plain[1] = TypeReflexReq
-	putID(plain[2:], device)
-	binary.BigEndian.PutUint64(plain[2+idLen:], uint64(now.UnixNano()))
-	binary.BigEndian.PutUint64(plain[2+idLen+8:], nonce)
+	plain[0] = TypeReflexReq
+	putID(plain[1:], device)
+	binary.BigEndian.PutUint64(plain[1+idLen:], uint64(now.UnixNano()))
+	binary.BigEndian.PutUint64(plain[1+idLen+8:], nonce)
 	pBox, err := sealNonce(k2, zeroNonce[:], plain, pkt)
 	wipe(plain)
 	if err != nil {
@@ -286,18 +285,18 @@ func (h *HubKey) OpenReflexReq(pkt []byte, now time.Time) (ReflexRequest, error)
 		return out, err
 	}
 	defer wipe(plain)
-	if len(plain) < reflexReqPlain || plain[0] != Version || plain[1] != TypeReflexReq {
+	if len(plain) < reflexReqPlain || plain[0] != TypeReflexReq {
 		wipe32(&base)
 		return out, fmt.Errorf("bad reflex request")
 	}
-	ts := time.Unix(0, int64(binary.BigEndian.Uint64(plain[2+idLen:])))
+	ts := time.Unix(0, int64(binary.BigEndian.Uint64(plain[1+idLen:])))
 	if ts.Before(now.Add(-ReflexSkew)) || ts.After(now.Add(ReflexSkew)) {
 		wipe32(&base)
 		return out, fmt.Errorf("reflex timestamp outside skew")
 	}
-	out.Device = getID(plain[2:])
+	out.Device = getID(plain[1:])
 	out.DiscoPub = clientPub
-	out.Nonce = binary.BigEndian.Uint64(plain[2+idLen+8:])
+	out.Nonce = binary.BigEndian.Uint64(plain[1+idLen+8:])
 	out.ephPub = ephPub
 	out.base = base
 	out.expires = ts.Add(ReflexSkew)
@@ -336,10 +335,9 @@ func BuildReflexResp(req *ReflexRequest, observed netip.AddrPort) ([]byte, error
 	pkt = append(pkt, respChk(req.base, salt[:])...)
 	pkt = append(pkt, masked[:]...)
 	plain := make([]byte, reflexRespLen-reflexRespPrefix-16)
-	plain[0] = Version
-	plain[1] = TypeReflexResp
-	binary.BigEndian.PutUint64(plain[2:10], req.Nonce)
-	putAddrPort(plain[10:], observed)
+	plain[0] = TypeReflexResp
+	binary.BigEndian.PutUint64(plain[1:9], req.Nonce)
+	putAddrPort(plain[9:], observed)
 	box, err := sealNonce(kr, zeroNonce[:], plain, pkt)
 	wipe(plain)
 	if err != nil {
@@ -374,13 +372,13 @@ func OpenReflexResp(pend *ReflexPending, pkt []byte) (netip.AddrPort, error) {
 		return netip.AddrPort{}, err
 	}
 	defer wipe(plain)
-	if len(plain) < reflexRespPlain || plain[0] != Version || plain[1] != TypeReflexResp {
+	if len(plain) < reflexRespPlain || plain[0] != TypeReflexResp {
 		return netip.AddrPort{}, fmt.Errorf("bad reflex response")
 	}
-	if binary.BigEndian.Uint64(plain[2:10]) != pend.nonce {
+	if binary.BigEndian.Uint64(plain[1:9]) != pend.nonce {
 		return netip.AddrPort{}, fmt.Errorf("reflex nonce mismatch")
 	}
-	return getAddrPort(plain[10:]), nil
+	return getAddrPort(plain[9:]), nil
 }
 
 // ReplayCache remembers reflex request ephemerals until their timestamp

@@ -110,14 +110,14 @@ func TestReflexEchoesSourceAndDropsRendezvous(t *testing.T) {
 		return nil
 	})
 	defer restore()
-	old := make([]byte, punch.MinPacket)
-	copy(old, []byte{'T', 'N', 'L', 'P', punch.Version, punch.TypeRendezvous})
-	dispatchPunch(from.String(), old)
-	fwd := make([]byte, punch.MinPacket)
-	copy(fwd, []byte{'T', 'N', 'L', 'P', punch.Version, punch.TypeForward})
-	dispatchPunch(from.String(), fwd)
+	framed := make([]byte, punch.MinPacket)
+	copy(framed, []byte{'T', 'N', 'L', 'P', punch.TypeIntro})
+	dispatchPunch(from.String(), framed)
+	junk := make([]byte, punch.MinPacket)
+	copy(junk, []byte{'T', 'N', 'L', 'P', punch.TypePing})
+	dispatchPunch(from.String(), junk)
 	if called {
-		t.Fatal("rendezvous or forward was answered")
+		t.Fatal("a framed packet on the underlay was answered")
 	}
 }
 

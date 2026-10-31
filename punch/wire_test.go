@@ -18,7 +18,7 @@ func assertNoClear(t *testing.T, what string, pkt []byte, secrets map[string][]b
 	}
 }
 
-type v3Pair struct {
+type enginePair struct {
 	a, b         *Engine
 	aPriv, bPriv [32]byte
 	aID, bID     uuid.UUID
@@ -29,9 +29,9 @@ type v3Pair struct {
 
 // punchPair runs two engines through intro, ping and pong until both have
 // a direct path, recording every underlay packet.
-func punchPair(t *testing.T, now time.Time) *v3Pair {
+func punchPair(t *testing.T, now time.Time) *enginePair {
 	t.Helper()
-	p := &v3Pair{
+	p := &enginePair{
 		aPriv: mustKey(t), bPriv: mustKey(t),
 		aID: uuid.New(), bID: uuid.New(),
 		aIP: netip.MustParseAddr("10.0.0.5"), bIP: netip.MustParseAddr("10.0.1.8"),
@@ -90,7 +90,7 @@ func punchPair(t *testing.T, now time.Time) *v3Pair {
 	return p
 }
 
-func TestV3_DirectPacketsCarryNoIdentifiers(t *testing.T) {
+func TestWire_DirectPacketsCarryNoIdentifiers(t *testing.T) {
 	p := punchPair(t, time.Now())
 	aPub, bPub := mustPublic(t, p.aPriv), mustPublic(t, p.bPriv)
 	p.a.mu.Lock()
@@ -128,7 +128,7 @@ func TestV3_DirectPacketsCarryNoIdentifiers(t *testing.T) {
 	assertNoClear(t, "teardown", td, secrets)
 }
 
-func TestV3_TagsRotateAndDifferPerDirection(t *testing.T) {
+func TestWire_TagsRotateAndDifferPerDirection(t *testing.T) {
 	aPriv, bPriv := mustKey(t), mustKey(t)
 	aPub, bPub := mustPublic(t, aPriv), mustPublic(t, bPriv)
 	aID, bID := uuid.New(), uuid.New()
@@ -182,7 +182,7 @@ func firstSlotTag(t *testing.T, key [32]byte, w int64) [tagLen]byte {
 	return [tagLen]byte{}
 }
 
-func TestV3_WrongKeyOrTagRejected(t *testing.T) {
+func TestWire_WrongKeyOrTagRejected(t *testing.T) {
 	aPriv, bPriv, cPriv := mustKey(t), mustKey(t), mustKey(t)
 	aPub, bPub := mustPublic(t, aPriv), mustPublic(t, bPriv)
 	aID, bID := uuid.New(), uuid.New()
@@ -251,7 +251,7 @@ func TestV3_WrongKeyOrTagRejected(t *testing.T) {
 	}
 }
 
-func TestV3_TagMapFollowsWindowAndSessions(t *testing.T) {
+func TestWire_TagMapFollowsWindowAndSessions(t *testing.T) {
 	aPriv, bPriv := mustKey(t), mustKey(t)
 	aPub, bPub := mustPublic(t, aPriv), mustPublic(t, bPriv)
 	aID, bID := uuid.New(), uuid.New()
@@ -290,7 +290,7 @@ func TestV3_TagMapFollowsWindowAndSessions(t *testing.T) {
 	}
 }
 
-func TestV3_SessionKeyNeedsStaticBinding(t *testing.T) {
+func TestWire_SessionKeyNeedsStaticBinding(t *testing.T) {
 	aPriv, bPriv := mustKey(t), mustKey(t)
 	aPub, bPub := mustPublic(t, aPriv), mustPublic(t, bPriv)
 	aID, bID := uuid.New(), uuid.New()
@@ -354,7 +354,7 @@ func TestV3_SessionKeyNeedsStaticBinding(t *testing.T) {
 	}
 }
 
-func TestV3_EngineTeardownEpochAndReplay(t *testing.T) {
+func TestWire_EngineTeardownEpochAndReplay(t *testing.T) {
 	p := punchPair(t, time.Now())
 	now := time.Now().Add(2 * time.Second)
 	p.a.mu.Lock()
@@ -379,7 +379,7 @@ func TestV3_EngineTeardownEpochAndReplay(t *testing.T) {
 	}
 }
 
-func TestV3_ReflexCarriesNoIdentifiers(t *testing.T) {
+func TestWire_ReflexCarriesNoIdentifiers(t *testing.T) {
 	srvPriv := mustKey(t)
 	srvPub := mustPublic(t, srvPriv)
 	cli := mustKey(t)
@@ -432,7 +432,7 @@ func TestV3_ReflexCarriesNoIdentifiers(t *testing.T) {
 	}
 }
 
-func TestV3_ReflexRejections(t *testing.T) {
+func TestWire_ReflexRejections(t *testing.T) {
 	srvPriv := mustKey(t)
 	srvPub := mustPublic(t, srvPriv)
 	cli := mustKey(t)
@@ -487,7 +487,7 @@ func TestV3_ReflexRejections(t *testing.T) {
 	}
 }
 
-func TestV3_EngineReflexMatchesNonce(t *testing.T) {
+func TestWire_EngineReflexMatchesNonce(t *testing.T) {
 	srvPriv := mustKey(t)
 	srvPub := mustPublic(t, srvPriv)
 	id := uuid.New()
@@ -537,7 +537,7 @@ func TestV3_EngineReflexMatchesNonce(t *testing.T) {
 	}
 }
 
-func TestV3_PacketLengthsMatchMTUMath(t *testing.T) {
+func TestWire_PacketLengthsMatchMTUMath(t *testing.T) {
 	aPriv, bPriv := mustKey(t), mustKey(t)
 	for _, n := range []int{8, 100, 1000} {
 		pkt, err := BuildPingPad(aPriv, mustPublic(t, bPriv), uuid.New(), uuid.New(), 1, n)
@@ -548,7 +548,7 @@ func TestV3_PacketLengthsMatchMTUMath(t *testing.T) {
 			t.Fatalf("ping %d is %d bytes, want %d", n, len(pkt), directPacketLen(n))
 		}
 	}
-	if directPacketLen(0) != 16+32+24+4+32+16 {
+	if directPacketLen(0) != 16+32+24+3+32+16 {
 		t.Fatal("direct overhead changed")
 	}
 	if _, err := BuildPingPad(aPriv, mustPublic(t, bPriv), uuid.New(), uuid.New(), 1, MaxPacket); err == nil {

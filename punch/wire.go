@@ -13,17 +13,11 @@ import (
 )
 
 const (
-	Version byte = 3
-
 	TypeReflexReq  byte = 1
 	TypeReflexResp byte = 2
-	TypeRendezvous byte = 3
 	TypePing       byte = 4
 	TypePong       byte = 5
 	TypeTeardown   byte = 6
-	TypeForward    byte = 7
-	TypeMTUProbe   byte = 8
-	TypeMTUAck     byte = 9
 	TypeIntro      byte = 10
 )
 
@@ -34,7 +28,8 @@ const IntroPort uint16 = 47318
 var magic = [4]byte{'T', 'N', 'L', 'P'}
 
 const (
-	headerLen = 6
+	// headerLen is the Intro frame header: magic(4) | type(1).
+	headerLen = 5
 	keyLen    = 32
 	nonceLen  = 24
 	idLen     = 16
@@ -53,8 +48,8 @@ const (
 	// sessSlack windows either side of the learned peer window are
 	// precomputed for session tags.
 	sessSlack = 1
-	// innerHdrLen is the sealed {version, type, body length} prefix.
-	innerHdrLen = 4
+	// innerHdrLen is the sealed {type, body length} prefix.
+	innerHdrLen = 3
 	// MinPacket is the smallest underlay punch datagram; every non-MTU
 	// punch packet is padded to a bucket at least this large.
 	MinPacket = 192
@@ -84,14 +79,13 @@ func Is(pkt []byte) bool {
 }
 
 func isFramed(pkt []byte) bool {
-	return len(pkt) >= headerLen && [4]byte(pkt[:4]) == magic && pkt[4] == Version
+	return len(pkt) >= headerLen && [4]byte(pkt[:4]) == magic
 }
 
 func frame(typ byte, body []byte) []byte {
 	out := make([]byte, headerLen+len(body))
 	copy(out[:4], magic[:])
-	out[4] = Version
-	out[5] = typ
+	out[4] = typ
 	copy(out[headerLen:], body)
 	return out
 }
@@ -100,8 +94,8 @@ func bodyOf(pkt []byte, typ byte) ([]byte, error) {
 	if !isFramed(pkt) {
 		return nil, fmt.Errorf("not a punch packet")
 	}
-	if pkt[5] != typ {
-		return nil, fmt.Errorf("punch type %d, want %d", pkt[5], typ)
+	if pkt[4] != typ {
+		return nil, fmt.Errorf("punch type %d, want %d", pkt[4], typ)
 	}
 	if len(pkt) > MaxPacket {
 		return nil, fmt.Errorf("punch packet too large")
@@ -307,9 +301,9 @@ func xor32(a, b [32]byte) [32]byte {
 	return out
 }
 
-// Direct packets (Ping, Pong, Teardown), v3 hardened:
+// Direct packets (Ping, Pong, Teardown):
 //
-//	tag(16) | eph^mask(32) | nonce(24) | AEAD{ver(1) type(1) len(2) src(16) dst(16) body | zero pad}
+//	tag(16) | eph^mask(32) | nonce(24) | AEAD{type(1) len(2) src(16) dst(16) body | zero pad}
 //
 // tag  = BLAKE2s(tagKey, window | seq)[:16]: single use, per direction,
 //
@@ -318,7 +312,7 @@ func xor32(a, b [32]byte) [32]byte {
 //	sides, so the first four bytes never collide with WG types 1..4.
 //
 // mask = BLAKE2s(hpKey, nonce); hpKey follows the tag phase.
-// AAD  = tag | eph^mask. Version and type live inside the sealed part.
+// AAD  = tag | eph^mask. The type lives inside the sealed part.
 //
 // Non-MTU packets are padded to padBuckets; MTU pings are sized exactly.
 
@@ -377,9 +371,8 @@ func sealDirect(typ byte, out directOut, eph [32]byte, src, dst uuid.UUID, body 
 	pkt = append(pkt, out.tag[:]...)
 	pkt = append(pkt, masked[:]...)
 	plain := make([]byte, n-directPrefix-nonceLen-16)
-	plain[0] = Version
-	plain[1] = typ
-	binary.BigEndian.PutUint16(plain[2:4], uint16(len(body)))
+	plain[0] = typ
+	binary.BigEndian.PutUint16(plain[1:3], uint16(len(body)))
 	putID(plain[innerHdrLen:], src)
 	putID(plain[innerHdrLen+idLen:], dst)
 	copy(plain[innerHdrLen+idLen*2:], body)
@@ -415,15 +408,15 @@ func (p *directParts) open(key [32]byte) (typ byte, body []byte, src, dst uuid.U
 	if err != nil {
 		return 0, nil, src, dst, err
 	}
-	if len(plain) < innerHdrLen+idLen*2 || plain[0] != Version {
+	if len(plain) < innerHdrLen+idLen*2 {
 		return 0, nil, src, dst, fmt.Errorf("bad punch plaintext")
 	}
-	n := int(binary.BigEndian.Uint16(plain[2:4]))
+	n := int(binary.BigEndian.Uint16(plain[1:3]))
 	off := innerHdrLen + idLen*2
 	if off+n > len(plain) {
 		return 0, nil, src, dst, fmt.Errorf("bad punch body length")
 	}
-	return plain[1], plain[off : off+n], getID(plain[innerHdrLen:]), getID(plain[innerHdrLen+idLen:]), nil
+	return plain[0], plain[off : off+n], getID(plain[innerHdrLen:]), getID(plain[innerHdrLen+idLen:]), nil
 }
 
 // staticTagMatch checks a tag against every static slot around now. Only
@@ -574,7 +567,7 @@ func directPacketLen(plainLen int) int {
 // their marker is keyed with a public constant: it hides the probe from
 // naive pattern matching (no fixed bytes) but not from anyone who reads
 // this code. Probes are size-revealing by design; acks are bucket padded.
-var mtuKey = kdf([]byte("tunnels.is punch v3 mtu"), nil, nil, "mtu marker")
+var mtuKey = kdf([]byte("tunnels.is punch mtu"), nil, nil, "mtu marker")
 
 const mtuChkLen = 16
 
@@ -685,5 +678,5 @@ func TypeOf(pkt []byte) byte {
 	if !isFramed(pkt) {
 		return 0
 	}
-	return pkt[5]
+	return pkt[4]
 }
