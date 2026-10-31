@@ -1,6 +1,7 @@
 package wgserver
 
 import (
+	"bytes"
 	"net/netip"
 	"testing"
 	"time"
@@ -27,7 +28,7 @@ func TestReflexEchoesSourceAndDropsRendezvous(t *testing.T) {
 	}
 	id := uuid.New()
 	from := netip.MustParseAddrPort("203.0.113.9:40000")
-	req, err := punch.BuildReflexReq(id, cli, pub, time.Now(), 9)
+	req, pend, err := punch.BuildReflexReq(id, cli, pub, time.Now(), 9)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -57,12 +58,49 @@ func TestReflexEchoesSourceAndDropsRendezvous(t *testing.T) {
 	if gotTo != from {
 		t.Fatalf("echo to %s, want %s", gotTo, from)
 	}
-	gotID, gotAP, gotNonce, err := punch.OpenReflexResp(cli, pub, got)
+	gotAP, err := punch.OpenReflexResp(&pend, got)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if gotID != id || gotAP != from || gotNonce != 9 {
-		t.Fatalf("echo id=%s addr=%s nonce=%d", gotID, gotAP, gotNonce)
+	if gotAP != from || pend.Nonce() != 9 {
+		t.Fatalf("echo addr=%s nonce=%d", gotAP, pend.Nonce())
+	}
+	if bytes.Contains(got, id[:]) {
+		t.Fatal("reflex response carries the device UUID in clear")
+	}
+
+	// The same request again (same ephemeral, inside its window) is a
+	// replay and is not answered.
+	got = nil
+	dispatchPunch(from.String(), req)
+	if got != nil {
+		t.Fatal("replayed reflex request was answered")
+	}
+
+	// A tampered request (salt no longer matches its keyed check) is not
+	// answered.
+	tampered := append([]byte(nil), req...)
+	tampered[4] ^= 2
+	dispatchPunch(from.String(), tampered)
+	if got != nil {
+		t.Fatal("tampered reflex request was answered")
+	}
+
+	// A request from a client that does not hold its claimed disco key
+	// (inner static box swapped in from another request) is not answered.
+	other, err := punch.NewPrivate()
+	if err != nil {
+		t.Fatal(err)
+	}
+	req2, _, err := punch.BuildReflexReq(id, other, pub, time.Now(), 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mixed := append([]byte(nil), req...)
+	copy(mixed[len(mixed)-72:], req2[len(req2)-72:])
+	dispatchPunch(from.String(), mixed)
+	if got != nil {
+		t.Fatal("spliced reflex request was answered")
 	}
 
 	called := false
@@ -72,13 +110,60 @@ func TestReflexEchoesSourceAndDropsRendezvous(t *testing.T) {
 		return nil
 	})
 	defer restore()
-	old := make([]byte, 48)
+	old := make([]byte, punch.MinPacket)
 	copy(old, []byte{'T', 'N', 'L', 'P', punch.Version, punch.TypeRendezvous})
 	dispatchPunch(from.String(), old)
-	fwd := make([]byte, 48)
+	fwd := make([]byte, punch.MinPacket)
 	copy(fwd, []byte{'T', 'N', 'L', 'P', punch.Version, punch.TypeForward})
 	dispatchPunch(from.String(), fwd)
 	if called {
 		t.Fatal("rendezvous or forward was answered")
+	}
+}
+
+// TestMTUProbeAnsweredWithBoundAck ...
+func TestMTUProbeAnsweredWithBoundAck(t *testing.T) {
+	var got []byte
+	deliverPunchMu.Lock()
+	prev := deliverPunch
+	deliverPunch = func(_ netip.AddrPort, pkt []byte) error {
+		got = append([]byte(nil), pkt...)
+		return nil
+	}
+	deliverPunchMu.Unlock()
+	defer func() {
+		deliverPunchMu.Lock()
+		deliverPunch = prev
+		deliverPunchMu.Unlock()
+	}()
+	probe, err := punch.BuildMTUProbe(1200)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dispatchPunch("203.0.113.9:40000", probe)
+	if !punch.MTUAckMatches(probe, got) || len(got) != punch.MinPacket {
+		t.Fatalf("probe not acked (%d bytes)", len(got))
+	}
+	ack := got
+	got = nil
+	dispatchPunch("203.0.113.9:40000", ack)
+	if got != nil {
+		t.Fatal("an ack was answered")
+	}
+}
+
+// TestReplayCacheBoundedUnderFlood ...
+func TestReplayCacheBoundedUnderFlood(t *testing.T) {
+	c := punch.NewReplayCache(16)
+	now := time.Now()
+	for i := 0; i < 1000; i++ {
+		var id [32]byte
+		id[0], id[1] = byte(i), byte(i>>8)
+		if !c.Fresh(id, now.Add(time.Minute), now) {
+			t.Fatal("fresh id rejected")
+		}
+		if c.Len() > 16 {
+			t.Fatalf("cache grew to %d", c.Len())
+		}
 	}
 }

@@ -9,9 +9,13 @@ import (
 )
 
 var (
-	punchMu        sync.Mutex
-	punchDiscoPriv [32]byte
-	punchDiscoOK   bool
+	punchMu  sync.RWMutex // write: key swap; read: held while a request is opened
+	punchHub *punch.HubKey
+
+	// punchReplay drops a reflex request whose ephemeral was already seen
+	// inside its timestamp window. Fixed size (punch.ReplayCache evicts the
+	// oldest entry when full).
+	punchReplay = punch.NewReplayCache(0)
 
 	punchSem = make(chan struct{}, 32)
 
@@ -20,9 +24,16 @@ var (
 )
 
 func setPunchDisco(priv [32]byte) {
+	hub, err := punch.NewHubKey(priv)
+	if err != nil {
+		WARN("punch disco key: ", err)
+		return
+	}
 	punchMu.Lock()
-	punchDiscoPriv = priv
-	punchDiscoOK = true
+	if punchHub != nil {
+		punchHub.Wipe()
+	}
+	punchHub = hub
 	punchMu.Unlock()
 }
 
@@ -42,29 +53,37 @@ func dispatchPunch(fromStr string, pkt []byte) {
 	if err != nil || !from.IsValid() {
 		return
 	}
-	switch punch.TypeOf(pkt) {
-	case punch.TypeReflexReq:
-		handleReflex(from, pkt)
-	case punch.TypeMTUProbe:
-		if ack := punch.MTUAckFor(pkt); ack != nil {
-			sendPunch(from, ack)
-		}
+	// Nothing on the wire says what a punch packet is: an MTU probe carries
+	// a keyed marker, a reflex request a check keyed by the hub's public key.
+	// Anything else is dropped without an answer.
+	if ack := punch.MTUAckFor(pkt); ack != nil {
+		sendPunch(from, ack)
+		return
 	}
+	handleReflex(from, pkt)
 }
 
 func handleReflex(from netip.AddrPort, pkt []byte) {
-	punchMu.Lock()
-	priv := punchDiscoPriv
-	ok := punchDiscoOK
-	punchMu.Unlock()
-	if !ok {
+	now := time.Now()
+	punchMu.RLock()
+	hub := punchHub
+	if hub == nil || !hub.IsReflexReq(pkt) {
+		punchMu.RUnlock()
 		return
 	}
-	id, pub, nonce, err := punch.OpenReflexReq(priv, pkt, time.Now())
+	// The device UUID and disco pub inside the request are only used to
+	// authenticate it; the hub keeps no per-device state and asks no one.
+	req, err := hub.OpenReflexReq(pkt, now)
+	punchMu.RUnlock()
 	if err != nil {
 		return
 	}
-	resp, err := punch.BuildReflexResp(priv, pub, id, from, nonce)
+	if !punchReplay.Fresh(req.ReplayID(), req.Expires(), now) {
+		req.Wipe()
+		return
+	}
+	resp, err := punch.BuildReflexResp(&req, from)
+	req.Wipe()
 	if err != nil {
 		return
 	}

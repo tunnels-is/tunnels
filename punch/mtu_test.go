@@ -69,13 +69,23 @@ func TestMTUProbeAck(t *testing.T) {
 		t.Fatalf("probe %d", len(pkt))
 	}
 	ack := MTUAckFor(pkt)
-	if !IsMTUAck(ack) {
+	if !MTUAckMatches(pkt, ack) {
 		t.Fatal("ack")
+	}
+	if len(ack) != MinPacket {
+		t.Fatalf("ack %d bytes, want bucket %d", len(ack), MinPacket)
 	}
 	if MTUAckFor(ack) != nil {
 		t.Fatal("ack must not ack an ack")
 	}
-	if _, err := BuildMTUProbe(headerLen - 1); err == nil {
+	other, err := BuildMTUProbe(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if MTUAckMatches(other, ack) {
+		t.Fatal("ack must be bound to its probe")
+	}
+	if _, err := BuildMTUProbe(MinPacket - 1); err == nil {
 		t.Fatal("short probe")
 	}
 }
@@ -96,7 +106,7 @@ func TestEngineIgnoredProbeLeavesPathUp(t *testing.T) {
 	a, b, now := newMTUPair(t)
 	a.SetDiscoverMTU(true)
 	runMTUExchange(t, a, b, now, func(pkt []byte) bool {
-		return TypeOf(pkt) != TypePing || len(pkt) < 200
+		return len(pkt) <= MinPacket
 	})
 	if _, ok := a.Direct(netip.MustParseAddr("10.0.1.8")); !ok {
 		t.Fatal("ignored mtu probe took the direct path down")
@@ -112,10 +122,10 @@ func TestEngineIgnoredProbeLeavesPathUp(t *testing.T) {
 			if d.MTU {
 				continue
 			}
-			if TypeOf(d.Data) == TypePing {
+			if d.Type == TypePing {
 				back := b.OnPacket(netip.MustParseAddrPort("198.51.100.10:41000"), d.Data, now)
 				for _, p := range back.Sends {
-					if TypeOf(p.Data) == TypePong {
+					if p.Type == TypePong {
 						a.OnPacket(netip.MustParseAddrPort("198.51.100.20:42000"), p.Data, now)
 					}
 				}

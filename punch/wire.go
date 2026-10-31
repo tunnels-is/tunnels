@@ -1,16 +1,19 @@
 package punch
 
 import (
+	"crypto/rand"
 	"encoding/binary"
 	"fmt"
 	"net/netip"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
+	"golang.org/x/crypto/chacha20poly1305"
 )
 
 const (
-	Version byte = 2
+	Version byte = 3
 
 	TypeReflexReq  byte = 1
 	TypeReflexResp byte = 2
@@ -26,6 +29,8 @@ const (
 
 const IntroPort uint16 = 47318
 
+// magic frames Intro messages only. Intros travel inside the WireGuard
+// tunnel to IntroPort, so the magic never appears on the underlay.
 var magic = [4]byte{'T', 'N', 'L', 'P'}
 
 const (
@@ -34,14 +39,51 @@ const (
 	nonceLen  = 24
 	idLen     = 16
 	addrLen   = 16
+	tagLen    = 16
+	saltLen   = 16
+	tagWindow = time.Minute
+	// tagSlack windows either side of the receiver's current window are
+	// accepted for static (first-flight) tags, so peers whose clocks differ
+	// by up to ReflexSkew still meet.
+	tagSlack = 2
+	// staticSeqs / sessSeqs are the per-window send budgets (and receive
+	// precompute depth) for static and session tags. Each tag is single use.
+	staticSeqs = 32
+	sessSeqs   = 64
+	// sessSlack windows either side of the learned peer window are
+	// precomputed for session tags.
+	sessSlack = 1
+	// innerHdrLen is the sealed {version, type, body length} prefix.
+	innerHdrLen = 4
+	// MinPacket is the smallest underlay punch datagram; every non-MTU
+	// punch packet is padded to a bucket at least this large.
+	MinPacket = 192
 )
+
+// padBuckets are the fixed sizes control packets are padded to. Only MTU
+// pings and MTU probes deviate: their size is the measurement.
+var padBuckets = [...]int{192, 384, 768, 1536}
 
 const MaxPacket = 2048
 
 const ReflexSkew = 2 * time.Minute
 
-// Is ...
+// LooksLikeWireGuard reports whether pkt starts like a WireGuard message:
+// a little-endian u32 type 1..4, i.e. one type byte and three zero bytes.
+func LooksLikeWireGuard(pkt []byte) bool {
+	return len(pkt) >= 4 && pkt[0] >= 1 && pkt[0] <= 4 && pkt[1] == 0 && pkt[2] == 0 && pkt[3] == 0
+}
+
+// Is reports whether an underlay datagram should go to the punch engine
+// rather than WireGuard. Punch packets carry no clear marker; instead every
+// sender guarantees its first four bytes never look like WireGuard (salts
+// are rerolled, WG-looking tags are skipped), so the split is exact in both
+// directions: WG always starts with {1..4,0,0,0}, punch never does.
 func Is(pkt []byte) bool {
+	return len(pkt) >= MinPacket && len(pkt) <= MaxPacket && !LooksLikeWireGuard(pkt)
+}
+
+func isFramed(pkt []byte) bool {
 	return len(pkt) >= headerLen && [4]byte(pkt[:4]) == magic && pkt[4] == Version
 }
 
@@ -55,7 +97,7 @@ func frame(typ byte, body []byte) []byte {
 }
 
 func bodyOf(pkt []byte, typ byte) ([]byte, error) {
-	if !Is(pkt) {
+	if !isFramed(pkt) {
 		return nil, fmt.Errorf("not a punch packet")
 	}
 	if pkt[5] != typ {
@@ -215,177 +257,265 @@ func checksumIPv4(hdr []byte) {
 	hdr[11] = byte(^csum & 0xFF)
 }
 
-func reflexReqAAD(id uuid.UUID, pub [32]byte) []byte {
-	aad := make([]byte, headerLen+idLen+keyLen)
-	copy(aad[:4], magic[:])
-	aad[4] = Version
-	aad[5] = TypeReflexReq
-	putID(aad[headerLen:], id)
-	copy(aad[headerLen+idLen:], pub[:])
-	return aad
-}
-
-func reflexRespAAD(id uuid.UUID) []byte {
-	aad := make([]byte, headerLen+idLen)
-	copy(aad[:4], magic[:])
-	aad[4] = Version
-	aad[5] = TypeReflexResp
-	putID(aad[headerLen:], id)
-	return aad
-}
-
-// BuildReflexReq ...
-func BuildReflexReq(device uuid.UUID, discoPriv, serverPub [32]byte, now time.Time, nonce uint64) ([]byte, error) {
-	pub, err := Public(discoPriv)
+func sealNonce(key [32]byte, nonce, plain, aad []byte) ([]byte, error) {
+	aead, err := chacha20poly1305.NewX(key[:])
 	if err != nil {
 		return nil, err
 	}
-	var plain [16]byte
-	binary.BigEndian.PutUint64(plain[:8], uint64(now.UnixNano()))
-	binary.BigEndian.PutUint64(plain[8:], nonce)
-	box, err := Seal(discoPriv, serverPub, plain[:], reflexReqAAD(device, pub))
+	return aead.Seal(nil, nonce, plain, aad), nil
+}
+
+func openNonce(key [32]byte, nonce, ct, aad []byte) ([]byte, error) {
+	aead, err := chacha20poly1305.NewX(key[:])
 	if err != nil {
 		return nil, err
 	}
-	body := make([]byte, idLen+keyLen+len(box))
-	putID(body, device)
-	copy(body[idLen:idLen+keyLen], pub[:])
-	copy(body[idLen+keyLen:], box)
-	return frame(TypeReflexReq, body), nil
+	return aead.Open(nil, nonce, ct, aad)
 }
 
-// OpenReflexReq ...
-func OpenReflexReq(serverPriv [32]byte, pkt []byte, now time.Time) (uuid.UUID, [32]byte, uint64, error) {
-	var pub [32]byte
-	body, err := bodyOf(pkt, TypeReflexReq)
-	if err != nil {
-		return uuid.UUID{}, pub, 0, err
+var zeroNonce [nonceLen]byte
+
+// padLen is the bucket a packet of n bytes is padded to.
+func padLen(n int) int {
+	for _, b := range padBuckets {
+		if n <= b {
+			return b
+		}
 	}
-	if len(body) != idLen+keyLen+nonceLen+16+16 {
-		return uuid.UUID{}, pub, 0, fmt.Errorf("short reflex request")
-	}
-	id := getID(body)
-	copy(pub[:], body[idLen:idLen+keyLen])
-	plain, err := Open(serverPriv, pub, body[idLen+keyLen:], reflexReqAAD(id, pub))
-	if err != nil {
-		return uuid.UUID{}, pub, 0, err
-	}
-	if len(plain) != 16 {
-		return uuid.UUID{}, pub, 0, fmt.Errorf("bad reflex request")
-	}
-	ts := time.Unix(0, int64(binary.BigEndian.Uint64(plain[:8])))
-	if ts.Before(now.Add(-ReflexSkew)) || ts.After(now.Add(ReflexSkew)) {
-		return uuid.UUID{}, pub, 0, fmt.Errorf("reflex timestamp outside skew")
-	}
-	return id, pub, binary.BigEndian.Uint64(plain[8:]), nil
+	return n
 }
 
-// BuildReflexResp ...
-func BuildReflexResp(serverPriv, clientPub [32]byte, device uuid.UUID, observed netip.AddrPort, nonce uint64) ([]byte, error) {
-	var plain [8 + addrLen + 2]byte
-	binary.BigEndian.PutUint64(plain[:8], nonce)
-	putAddrPort(plain[8:], observed)
-	box, err := Seal(serverPriv, clientPub, plain[:], reflexRespAAD(device))
+// newSalt returns a random salt whose first four bytes never look like a
+// WireGuard header. Salted packets start with their salt.
+func newSalt() ([saltLen]byte, error) {
+	var s [saltLen]byte
+	for {
+		if _, err := rand.Read(s[:]); err != nil {
+			return s, err
+		}
+		if !LooksLikeWireGuard(s[:]) {
+			return s, nil
+		}
+	}
+}
+
+func xor32(a, b [32]byte) [32]byte {
+	var out [32]byte
+	for i := range out {
+		out[i] = a[i] ^ b[i]
+	}
+	return out
+}
+
+// Direct packets (Ping, Pong, Teardown), v3 hardened:
+//
+//	tag(16) | eph^mask(32) | nonce(24) | AEAD{ver(1) type(1) len(2) src(16) dst(16) body | zero pad}
+//
+// tag  = BLAKE2s(tagKey, window | seq)[:16]: single use, per direction,
+//
+//	from the static pair key before a session exists and from the session
+//	(ee) key after. Tags that would look like WireGuard are skipped by both
+//	sides, so the first four bytes never collide with WG types 1..4.
+//
+// mask = BLAKE2s(hpKey, nonce); hpKey follows the tag phase.
+// AAD  = tag | eph^mask. Version and type live inside the sealed part.
+//
+// Non-MTU packets are padded to padBuckets; MTU pings are sized exactly.
+
+type directOut struct {
+	key [32]byte
+	hp  [32]byte
+	tag [tagLen]byte
+}
+
+type directParts struct {
+	tag    [tagLen]byte
+	masked [32]byte
+	nonce  []byte
+	ct     []byte
+	aad    []byte
+}
+
+const directPrefix = tagLen + keyLen
+
+func window(now time.Time) int64 {
+	return now.Unix() / int64(tagWindow/time.Second)
+}
+
+// slotTag is the tag for sequence seq of window w. ok is false when the tag
+// would look like a WireGuard header; that slot is never used.
+func slotTag(tagKey [32]byte, w int64, seq int) (tag [tagLen]byte, ok bool) {
+	var b [10]byte
+	binary.BigEndian.PutUint64(b[:8], uint64(w))
+	binary.BigEndian.PutUint16(b[8:], uint16(seq))
+	sum := prf(tagKey, b[:])
+	copy(tag[:], sum[:tagLen])
+	return tag, !LooksLikeWireGuard(tag[:])
+}
+
+func ephMask(hp [32]byte, nonce []byte) [32]byte {
+	return prf(hp, nonce)
+}
+
+func sealDirect(typ byte, out directOut, eph [32]byte, src, dst uuid.UUID, body []byte, exact bool) ([]byte, error) {
+	if len(body) > 0xffff {
+		return nil, fmt.Errorf("punch body too large")
+	}
+	n := directPacketLen(len(body))
+	if !exact {
+		n = padLen(n)
+	}
+	if n > MaxPacket {
+		return nil, fmt.Errorf("punch packet too large")
+	}
+	nonce := make([]byte, nonceLen)
+	if _, err := rand.Read(nonce); err != nil {
+		return nil, err
+	}
+	masked := xor32(eph, ephMask(out.hp, nonce))
+	pkt := make([]byte, 0, n)
+	pkt = append(pkt, out.tag[:]...)
+	pkt = append(pkt, masked[:]...)
+	plain := make([]byte, n-directPrefix-nonceLen-16)
+	plain[0] = Version
+	plain[1] = typ
+	binary.BigEndian.PutUint16(plain[2:4], uint16(len(body)))
+	putID(plain[innerHdrLen:], src)
+	putID(plain[innerHdrLen+idLen:], dst)
+	copy(plain[innerHdrLen+idLen*2:], body)
+	ct, err := sealNonce(out.key, nonce, plain, pkt[:directPrefix])
+	wipe(plain)
 	if err != nil {
 		return nil, err
 	}
-	body := make([]byte, idLen+len(box))
-	putID(body, device)
-	copy(body[idLen:], box)
-	return frame(TypeReflexResp, body), nil
+	pkt = append(pkt, nonce...)
+	pkt = append(pkt, ct...)
+	return pkt, nil
 }
 
-// OpenReflexResp ...
-func OpenReflexResp(clientPriv, serverPub [32]byte, pkt []byte) (uuid.UUID, netip.AddrPort, uint64, error) {
-	body, err := bodyOf(pkt, TypeReflexResp)
+func splitDirect(pkt []byte) (directParts, error) {
+	var p directParts
+	if len(pkt) < directPacketLen(0) || len(pkt) > MaxPacket {
+		return p, fmt.Errorf("bad punch length")
+	}
+	copy(p.tag[:], pkt[:tagLen])
+	copy(p.masked[:], pkt[tagLen:directPrefix])
+	p.nonce = pkt[directPrefix : directPrefix+nonceLen]
+	p.ct = pkt[directPrefix+nonceLen:]
+	p.aad = pkt[:directPrefix]
+	return p, nil
+}
+
+func (p *directParts) eph(hp [32]byte) [32]byte {
+	return xor32(p.masked, ephMask(hp, p.nonce))
+}
+
+func (p *directParts) open(key [32]byte) (typ byte, body []byte, src, dst uuid.UUID, err error) {
+	plain, err := openNonce(key, p.nonce, p.ct, p.aad)
 	if err != nil {
-		return uuid.UUID{}, netip.AddrPort{}, 0, err
+		return 0, nil, src, dst, err
 	}
-	if len(body) != idLen+nonceLen+8+addrLen+2+16 {
-		return uuid.UUID{}, netip.AddrPort{}, 0, fmt.Errorf("bad reflex response length")
+	if len(plain) < innerHdrLen+idLen*2 || plain[0] != Version {
+		return 0, nil, src, dst, fmt.Errorf("bad punch plaintext")
 	}
-	id := getID(body)
-	plain, err := Open(clientPriv, serverPub, body[idLen:], reflexRespAAD(id))
-	if err != nil {
-		return uuid.UUID{}, netip.AddrPort{}, 0, err
+	n := int(binary.BigEndian.Uint16(plain[2:4]))
+	off := innerHdrLen + idLen*2
+	if off+n > len(plain) {
+		return 0, nil, src, dst, fmt.Errorf("bad punch body length")
 	}
-	if len(plain) != 8+addrLen+2 {
-		return uuid.UUID{}, netip.AddrPort{}, 0, fmt.Errorf("bad reflex response")
-	}
-	return id, getAddrPort(plain[8:]), binary.BigEndian.Uint64(plain[:8]), nil
+	return plain[1], plain[off : off+n], getID(plain[innerHdrLen:]), getID(plain[innerHdrLen+idLen:]), nil
 }
 
-func directAAD(typ byte, src, dst uuid.UUID, eph [32]byte) []byte {
-	aad := make([]byte, headerLen+idLen*2+keyLen)
-	copy(aad[:4], magic[:])
-	aad[4] = Version
-	aad[5] = typ
-	putID(aad[headerLen:], src)
-	putID(aad[headerLen+idLen:], dst)
-	copy(aad[headerLen+idLen*2:], eph[:])
-	return aad
+// staticTagMatch checks a tag against every static slot around now. Only
+// the stateless helpers use it; the engine keeps an O(1) map instead.
+func staticTagMatch(tagKey [32]byte, tag [tagLen]byte, now time.Time) bool {
+	w := window(now)
+	for d := int64(-tagSlack); d <= tagSlack; d++ {
+		for seq := 0; seq < staticSeqs; seq++ {
+			t, ok := slotTag(tagKey, w+d, seq)
+			if ok && hmacEqual(t[:], tag[:]) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
-func sealDirect(typ byte, key, eph [32]byte, src, dst uuid.UUID, plain []byte) ([]byte, error) {
-	box, err := sealKey(key, plain, directAAD(typ, src, dst, eph))
-	if err != nil {
-		return nil, err
+// statelessSeq hands the stateless builders distinct slots so that up to
+// staticSeqs packets per window never share a (single-use) tag. It starts
+// at a random offset; the engine itself uses per-session counters.
+var statelessSeq atomic.Uint32
+
+func init() {
+	var b [4]byte
+	if _, err := rand.Read(b[:]); err == nil {
+		statelessSeq.Store(binary.BigEndian.Uint32(b[:]))
 	}
-	body := make([]byte, idLen*2+keyLen+len(box))
-	putID(body, src)
-	putID(body[idLen:], dst)
-	copy(body[idLen*2:idLen*2+keyLen], eph[:])
-	copy(body[idLen*2+keyLen:], box)
-	return frame(typ, body), nil
 }
 
-func splitDirect(pkt []byte, typ byte) (src, dst uuid.UUID, eph [32]byte, box []byte, err error) {
-	body, err := bodyOf(pkt, typ)
-	if err != nil {
-		return src, dst, eph, nil, err
+func randomStaticTag(tagKey [32]byte, now time.Time) ([tagLen]byte, error) {
+	w := window(now)
+	for i := 0; i < staticSeqs; i++ {
+		seq := int(statelessSeq.Add(1) % staticSeqs)
+		if t, ok := slotTag(tagKey, w, seq); ok {
+			return t, nil
+		}
 	}
-	if len(body) < idLen*2+keyLen+nonceLen+16 {
-		return src, dst, eph, nil, fmt.Errorf("short punch body")
-	}
-	src = getID(body)
-	dst = getID(body[idLen:])
-	copy(eph[:], body[idLen*2:idLen*2+keyLen])
-	box = body[idLen*2+keyLen:]
-	return src, dst, eph, box, nil
+	return [tagLen]byte{}, errTagBudget
 }
 
-func openDirect(typ byte, key [32]byte, pkt []byte) (plain []byte, src, dst uuid.UUID, eph [32]byte, err error) {
-	src, dst, eph, box, err := splitDirect(pkt, typ)
-	if err != nil {
-		return nil, src, dst, eph, err
-	}
-	plain, err = openKey(key, box, directAAD(typ, src, dst, eph))
-	return plain, src, dst, eph, err
-}
-
-func buildSealed(typ byte, srcPriv, dstPub [32]byte, src, dst uuid.UUID, plain []byte) ([]byte, error) {
+func buildSealedAt(typ byte, srcPriv, dstPub [32]byte, src, dst uuid.UUID, plain []byte, now time.Time, exact bool) ([]byte, error) {
 	ephPriv, err := NewPrivate()
 	if err != nil {
 		return nil, err
 	}
 	ephPub, err := Public(ephPriv)
+	wipe32(&ephPriv)
 	if err != nil {
 		return nil, err
 	}
-	send, _, err := directionalKeys(srcPriv, dstPub)
+	k, err := derivePair(srcPriv, dstPub)
 	if err != nil {
 		return nil, err
 	}
-	return sealDirect(typ, send, ephPub, src, dst, plain)
+	defer k.wipe()
+	tag, err := randomStaticTag(k.tagSend, now)
+	if err != nil {
+		return nil, err
+	}
+	out := directOut{key: k.send, hp: k.hpSend, tag: tag}
+	return sealDirect(typ, out, ephPub, src, dst, plain, exact)
 }
 
-func openSealed(typ byte, dstPriv, srcPub [32]byte, pkt []byte) (plain []byte, src, dst uuid.UUID, err error) {
-	_, recv, err := directionalKeys(dstPriv, srcPub)
+func buildSealed(typ byte, srcPriv, dstPub [32]byte, src, dst uuid.UUID, plain []byte) ([]byte, error) {
+	return buildSealedAt(typ, srcPriv, dstPub, src, dst, plain, time.Now(), false)
+}
+
+func openSealedAt(typ byte, dstPriv, srcPub [32]byte, pkt []byte, now time.Time) (plain []byte, src, dst uuid.UUID, err error) {
+	p, err := splitDirect(pkt)
 	if err != nil {
 		return nil, src, dst, err
 	}
-	plain, src, dst, _, err = openDirect(typ, recv, pkt)
-	return plain, src, dst, err
+	k, err := derivePair(dstPriv, srcPub)
+	if err != nil {
+		return nil, src, dst, err
+	}
+	defer k.wipe()
+	if !staticTagMatch(k.tagRecv, p.tag, now) {
+		return nil, src, dst, fmt.Errorf("unknown punch tag")
+	}
+	got, plain, src, dst, err := p.open(k.recv)
+	if err != nil {
+		return nil, src, dst, err
+	}
+	if got != typ {
+		return nil, src, dst, fmt.Errorf("punch type %d, want %d", got, typ)
+	}
+	return plain, src, dst, nil
+}
+
+func openSealed(typ byte, dstPriv, srcPub [32]byte, pkt []byte) (plain []byte, src, dst uuid.UUID, err error) {
+	return openSealedAt(typ, dstPriv, srcPub, pkt, time.Now())
 }
 
 func pingTxid(plain []byte) (uint64, error) {
@@ -407,7 +537,8 @@ func BuildPing(srcPriv, dstPub [32]byte, src, dst uuid.UUID, txid uint64) ([]byt
 	return buildSealed(TypePing, srcPriv, dstPub, src, dst, plain[:])
 }
 
-// BuildPingPad ...
+// BuildPingPad builds an MTU ping of exactly directPacketLen(plainLen)
+// bytes. MTU pings are not bucket padded: their size is the measurement.
 func BuildPingPad(srcPriv, dstPub [32]byte, src, dst uuid.UUID, txid uint64, plainLen int) ([]byte, error) {
 	if plainLen < 8 {
 		return nil, fmt.Errorf("short ping")
@@ -417,7 +548,7 @@ func BuildPingPad(srcPriv, dstPub [32]byte, src, dst uuid.UUID, txid uint64, pla
 	}
 	plain := make([]byte, plainLen)
 	binary.BigEndian.PutUint64(plain[:8], txid)
-	return buildSealed(TypePing, srcPriv, dstPub, src, dst, plain)
+	return buildSealedAt(TypePing, srcPriv, dstPub, src, dst, plain, time.Now(), true)
 }
 
 // OpenPing ...
@@ -433,34 +564,81 @@ func OpenPing(dstPriv, srcPub [32]byte, pkt []byte) (src, dst uuid.UUID, txid ui
 	return src, dst, txid, nil
 }
 
+// directPacketLen is the unpadded UDP payload size of a direct packet whose
+// body (txid plus padding for pings) is plainLen bytes.
 func directPacketLen(plainLen int) int {
-	return headerLen + idLen*2 + keyLen + nonceLen + plainLen + 16
+	return tagLen + keyLen + nonceLen + innerHdrLen + idLen*2 + plainLen + 16
+}
+
+// MTU probes to the hub are sent before the hub disco key is known, so
+// their marker is keyed with a public constant: it hides the probe from
+// naive pattern matching (no fixed bytes) but not from anyone who reads
+// this code. Probes are size-revealing by design; acks are bucket padded.
+var mtuKey = kdf([]byte("tunnels.is punch v3 mtu"), nil, nil, "mtu marker")
+
+const mtuChkLen = 16
+
+func mtuProbeChk(salt []byte) []byte {
+	sum := prf(mtuKey, []byte("probe"), salt)
+	return sum[:mtuChkLen]
+}
+
+func mtuAckChk(probeSalt, salt []byte) []byte {
+	sum := prf(mtuKey, []byte("ack"), probeSalt, salt)
+	return sum[:mtuChkLen]
 }
 
 // BuildMTUProbe ...
 func BuildMTUProbe(payloadLen int) ([]byte, error) {
-	if payloadLen < headerLen || payloadLen > MaxPacket {
+	if payloadLen < MinPacket || payloadLen > MaxPacket {
 		return nil, fmt.Errorf("bad mtu probe length")
 	}
-	return frame(TypeMTUProbe, make([]byte, payloadLen-headerLen)), nil
+	salt, err := newSalt()
+	if err != nil {
+		return nil, err
+	}
+	pkt := make([]byte, payloadLen)
+	copy(pkt, salt[:])
+	copy(pkt[saltLen:], mtuProbeChk(salt[:]))
+	if _, err := rand.Read(pkt[saltLen+mtuChkLen:]); err != nil {
+		return nil, err
+	}
+	return pkt, nil
 }
 
-// BuildMTUAck ...
-func BuildMTUAck() []byte {
-	return frame(TypeMTUAck, nil)
+// IsMTUProbe ...
+func IsMTUProbe(pkt []byte) bool {
+	if !Is(pkt) {
+		return false
+	}
+	return hmacEqual(pkt[saltLen:saltLen+mtuChkLen], mtuProbeChk(pkt[:saltLen]))
 }
 
-// IsMTUAck ...
-func IsMTUAck(pkt []byte) bool {
-	return len(pkt) == headerLen && TypeOf(pkt) == TypeMTUAck
-}
-
-// MTUAckFor ...
+// MTUAckFor returns the ack for an MTU probe, or nil. The ack is one
+// MinPacket bucket, never larger than the probe.
 func MTUAckFor(pkt []byte) []byte {
-	if TypeOf(pkt) != TypeMTUProbe || len(pkt) < headerLen || len(pkt) > MaxPacket {
+	if !IsMTUProbe(pkt) {
 		return nil
 	}
-	return BuildMTUAck()
+	salt, err := newSalt()
+	if err != nil {
+		return nil
+	}
+	ack := make([]byte, MinPacket)
+	copy(ack, salt[:])
+	copy(ack[saltLen:], mtuAckChk(pkt[:saltLen], salt[:]))
+	if _, err := rand.Read(ack[saltLen+mtuChkLen:]); err != nil {
+		return nil
+	}
+	return ack
+}
+
+// MTUAckMatches reports whether ack answers probe.
+func MTUAckMatches(probe, ack []byte) bool {
+	if len(probe) < MinPacket || len(ack) != MinPacket || LooksLikeWireGuard(ack) {
+		return false
+	}
+	return hmacEqual(ack[saltLen:saltLen+mtuChkLen], mtuAckChk(probe[:saltLen], ack[:saltLen]))
 }
 
 // BuildPong ...
@@ -501,9 +679,10 @@ func OpenTeardown(dstPriv, srcPub [32]byte, pkt []byte) (src, dst uuid.UUID, epo
 	return src, dst, binary.BigEndian.Uint64(plain), nil
 }
 
-// TypeOf ...
+// TypeOf returns the type of a TNLP-framed message. Only Intros are framed,
+// and they travel inside the tunnel; underlay packets have no clear type.
 func TypeOf(pkt []byte) byte {
-	if !Is(pkt) {
+	if !isFramed(pkt) {
 		return 0
 	}
 	return pkt[5]

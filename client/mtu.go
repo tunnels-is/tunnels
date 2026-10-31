@@ -166,7 +166,8 @@ func probeOnce(conn *net.UDPConn, payload int) (fits, localTooBig bool, err erro
 		}
 		return false, false, err
 	}
-	buf := make([]byte, 64)
+	// The ack is a fixed-size, probe-bound reply (punch.MinPacket bytes).
+	buf := make([]byte, 2*punch.MinPacket)
 	n, err := conn.Read(buf)
 	if err != nil {
 		if ne, ok := err.(net.Error); ok && ne.Timeout() {
@@ -174,7 +175,7 @@ func probeOnce(conn *net.UDPConn, payload int) (fits, localTooBig bool, err erro
 		}
 		return false, false, err
 	}
-	return punch.IsMTUAck(buf[:n]), false, nil
+	return punch.MTUAckMatches(pkt, buf[:n]), false, nil
 }
 
 // LinkMTU ...

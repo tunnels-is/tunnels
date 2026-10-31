@@ -3,6 +3,7 @@ package punch
 import (
 	"crypto/rand"
 	"encoding/binary"
+	"errors"
 	"net/netip"
 	"sync"
 	"time"
@@ -21,7 +22,22 @@ const (
 	maxPongPaths   = 16
 	maxOutstanding = 16
 	maxFreshPerSec = 4
+
+	// maxPeers bounds sessions (and so the tag map: at most
+	// (2*tagSlack+1)*staticSeqs + (2*sessSlack+1)*sessSeqs tags per peer).
+	maxPeers = 512
+	// staticGrace is how long static tags are still accepted from a peer
+	// after its first session-tagged packet, for packets already in flight.
+	staticGrace = 3 * time.Second
+	// sessIdle rekeys a session that has not carried a packet for this long
+	// while no direct path is up, so a restarted peer can start over.
+	sessIdle = 60 * time.Second
 )
+
+// timerJitter is the ± fraction applied to keepalive, candidate probe and
+// reflex timers (crypto/rand). Tests that pin exact timer boundaries set
+// it to 0.
+var timerJitter = 0.25
 
 type Peer struct {
 	DeviceID uuid.UUID
@@ -35,8 +51,11 @@ type Datagram struct {
 	Tunnel bool
 	To     netip.AddrPort
 	Data   []byte
-	MTU    bool
-	Peer   uuid.UUID
+	// Type is the punch message type of Data, for local bookkeeping only;
+	// it is not visible on the wire.
+	Type byte
+	MTU  bool
+	Peer uuid.UUID
 }
 
 type Path struct {
@@ -67,6 +86,9 @@ type Engine struct {
 	reflexAt    time.Time
 	reflexNonce uint64
 	reflexWait  bool
+	reflexPend  ReflexPending
+	reflexGap   time.Duration
+	jitter      float64
 
 	allowAll bool
 	allow    []string
@@ -76,6 +98,31 @@ type Engine struct {
 	byIP    map[netip.Addr]uuid.UUID
 	want    map[netip.Addr]struct{}
 	introAt map[netip.Addr]time.Time
+
+	// tags maps every unused receive tag of every session (static slots
+	// around tagWin, session slots around the peer's learned window) to its
+	// slot, so a direct packet finds its key in O(1). Tags are removed on
+	// use, which is the replay check.
+	tags      map[[tagLen]byte]tagRef
+	tagWin    int64
+	tagsDirty bool
+}
+
+type tagRef struct {
+	id   uuid.UUID
+	slot rxSlot
+}
+
+type rxSlot struct {
+	sess bool
+	w    int64
+	seq  int
+}
+
+type txSlot struct {
+	set bool
+	w   int64
+	seq int
 }
 
 type sentPing struct {
@@ -102,13 +149,19 @@ type session struct {
 	ephLive     bool
 	peerEph     [32]byte
 	havePeerEph bool
-	staticSend  [32]byte
-	staticRecv  [32]byte
+	static      pairKeys
 	haveStatic  bool
-	sendKey     [32]byte
-	recvKey     [32]byte
+	sess        sessKeys
 	haveSess    bool
 	sessSeen    bool
+	confirmedAt time.Time
+	skew        int64
+	lastRx      time.Time
+	txStatic    txSlot
+	txSess      txSlot
+	rx          map[rxSlot][tagLen]byte
+	used        map[rxSlot]struct{}
+	probeGap    time.Duration
 	freshAt     time.Time
 	freshN      int
 
@@ -138,6 +191,8 @@ func NewEngine(self uuid.UUID, discoPriv, wgPub [32]byte, wgIP netip.Addr) *Engi
 		byIP:     make(map[netip.Addr]uuid.UUID),
 		want:     make(map[netip.Addr]struct{}),
 		introAt:  make(map[netip.Addr]time.Time),
+		tags:     make(map[[tagLen]byte]tagRef),
+		jitter:   timerJitter,
 	}
 }
 
@@ -175,12 +230,11 @@ func (e *Engine) SetLocalPolicy(firewallOff, allowAll bool, entries []string) Re
 		}
 		if s.directUp {
 			r.Down = append(r.Down, id)
-			if pkt, err := e.teardownLocked(s); err == nil && s.direct.IsValid() {
-				r.Sends = append(r.Sends, Datagram{To: s.direct, Data: pkt})
+			if pkt, err := e.teardownLocked(s, time.Now()); err == nil && s.direct.IsValid() {
+				r.Sends = append(r.Sends, Datagram{To: s.direct, Data: pkt, Type: TypeTeardown})
 			}
 		}
-		delete(e.peers, id)
-		delete(e.byIP, s.peer.WGIP)
+		e.dropSessionLocked(id, s)
 	}
 	return r
 }
@@ -241,13 +295,16 @@ func (e *Engine) Poll(now time.Time) Result {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	var r Result
-	if e.haveSrv && (e.reflexAt.IsZero() || now.Sub(e.reflexAt) >= ReflexEvery) {
+	if e.haveSrv && (e.reflexAt.IsZero() || now.Sub(e.reflexAt) >= e.reflexGap) {
 		if nonce, err := newNonce(); err == nil {
-			if pkt, err := BuildReflexReq(e.self, e.disco, e.server, now, nonce); err == nil {
+			if pkt, pend, err := BuildReflexReq(e.self, e.disco, e.server, now, nonce); err == nil {
+				e.reflexPend.Wipe()
+				e.reflexPend = pend
 				e.reflexNonce = nonce
 				e.reflexWait = true
-				r.Sends = append(r.Sends, Datagram{Server: true, Data: pkt})
+				r.Sends = append(r.Sends, Datagram{Server: true, Data: pkt, Type: TypeReflexReq})
 				e.reflexAt = now
+				e.reflexGap = e.jittered(ReflexEvery)
 			}
 		}
 	}
@@ -261,7 +318,7 @@ func (e *Engine) Poll(now time.Time) Result {
 				continue
 			}
 			if pkt, ok := e.introPacketLocked(); ok {
-				r.Sends = append(r.Sends, Datagram{Tunnel: true, To: netip.AddrPortFrom(ip, IntroPort), Data: pkt})
+				r.Sends = append(r.Sends, Datagram{Tunnel: true, To: netip.AddrPortFrom(ip, IntroPort), Data: pkt, Type: TypeIntro})
 				e.introAt[ip] = now
 			}
 			continue
@@ -275,8 +332,13 @@ func (e *Engine) Poll(now time.Time) Result {
 			continue
 		}
 		if pkt, ok := e.introPacketLocked(); ok {
-			r.Sends = append(r.Sends, Datagram{Tunnel: true, To: netip.AddrPortFrom(ip, IntroPort), Data: pkt})
+			r.Sends = append(r.Sends, Datagram{Tunnel: true, To: netip.AddrPortFrom(ip, IntroPort), Data: pkt, Type: TypeIntro})
 			s.lastAdv = now
+		}
+	}
+	for _, s := range e.peers {
+		if s.haveSess && !s.directUp && !s.lastRx.IsZero() && now.Sub(s.lastRx) > sessIdle {
+			e.rekeyLocked(s)
 		}
 	}
 	for id, s := range e.peers {
@@ -292,16 +354,18 @@ func (e *Engine) Poll(now time.Time) Result {
 		seen, ok := s.alive[s.direct]
 		if !ok || now.Sub(seen) > DirectTimeout {
 			r.Down = append(r.Down, id)
-			if pkt, err := e.teardownLocked(s); err == nil {
-				r.Sends = append(r.Sends, Datagram{To: s.direct, Data: pkt})
+			if pkt, err := e.teardownLocked(s, now); err == nil {
+				r.Sends = append(r.Sends, Datagram{To: s.direct, Data: pkt, Type: TypeTeardown})
 			}
 			s.dropDirectLocked()
+			e.rekeyLocked(s)
 			continue
 		}
-		if now.Sub(s.lastProbe) >= Keepalive {
+		if now.Sub(s.lastProbe) >= s.gap() {
 			if pkt, err := e.pingLocked(s, s.direct, now); err == nil {
-				r.Sends = append(r.Sends, Datagram{To: s.direct, Data: pkt})
+				r.Sends = append(r.Sends, Datagram{To: s.direct, Data: pkt, Type: TypePing})
 				s.lastProbe = now
+				s.probeGap = e.jittered(Keepalive)
 			}
 		}
 		e.pollMTULocked(s, &r, now)
@@ -314,19 +378,62 @@ func (e *Engine) OnPacket(from netip.AddrPort, pkt []byte, now time.Time) Result
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	var r Result
-	switch TypeOf(pkt) {
-	case TypeReflexResp:
-		e.onReflexLocked(from, pkt, now)
-	case TypeIntro:
+	if TypeOf(pkt) == TypeIntro {
+		// Intros arrive through the tunnel, never on the underlay.
 		e.onIntroLocked(&r, from, pkt, now)
-	case TypePing:
-		e.onPingLocked(&r, from, pkt, now)
-	case TypePong:
-		e.onPongLocked(&r, from, pkt, now)
-	case TypeTeardown:
-		e.onTeardownLocked(&r, pkt)
+		return r
+	}
+	if !Is(pkt) {
+		return r
+	}
+	if s, ref, ok := e.lookupTagLocked(pkt, now); ok {
+		e.onDirectLocked(&r, from, s, ref, pkt, now)
+		return r
+	}
+	if e.haveSrvEP && from == e.serverEP {
+		e.onReflexLocked(from, pkt, now)
 	}
 	return r
+}
+
+// jittered spreads a timer by ±e.jitter using crypto/rand.
+func (e *Engine) jittered(d time.Duration) time.Duration {
+	if e.jitter <= 0 {
+		return d
+	}
+	var b [8]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return d
+	}
+	u := float64(binary.BigEndian.Uint64(b[:])>>11) / float64(uint64(1)<<53)
+	return time.Duration(float64(d) * (1 - e.jitter + 2*e.jitter*u))
+}
+
+func (s *session) gap() time.Duration {
+	if s.probeGap <= 0 {
+		return Keepalive
+	}
+	return s.probeGap
+}
+
+func (e *Engine) onDirectLocked(r *Result, from netip.AddrPort, s *session, ref tagRef, pkt []byte, now time.Time) {
+	admitted := e.admitsLocked(s.peer.WGIP)
+	typ, body, ok := e.openFromPeer(s, ref, pkt, now)
+	if !ok {
+		return
+	}
+	switch typ {
+	case TypePing:
+		if admitted {
+			e.onPingLocked(r, from, s, body, now)
+		}
+	case TypePong:
+		if admitted {
+			e.onPongLocked(r, from, s, body, now)
+		}
+	case TypeTeardown:
+		e.onTeardownLocked(r, s, body)
+	}
 }
 
 func (e *Engine) introPacketLocked() ([]byte, bool) {
@@ -347,20 +454,24 @@ func (e *Engine) introPacketLocked() ([]byte, bool) {
 
 func (e *Engine) onIntroLocked(r *Result, from netip.AddrPort, pkt []byte, now time.Time) {
 	msg, err := ParseIntro(pkt)
-	if err != nil || msg.Src == e.self || !from.IsValid() || from.Addr() != msg.WGIP || !e.punchableLocked(msg.WGIP) {
+	if err != nil || msg.Src == e.self || msg.DiscoPub == e.discoPub || !from.IsValid() || from.Addr() != msg.WGIP || !e.punchableLocked(msg.WGIP) {
 		return
 	}
 	s := e.peers[msg.Src]
+	if s == nil && len(e.peers) >= maxPeers {
+		return
+	}
 	if s == nil || s.peer.WGPub != msg.WGPub || s.peer.DiscoPub != msg.DiscoPub || s.peer.WGIP != msg.WGIP {
 		if s != nil && s.directUp {
 			r.Down = append(r.Down, msg.Src)
 		}
 		if s != nil {
-			delete(e.byIP, s.peer.WGIP)
+			e.dropSessionLocked(msg.Src, s)
 		}
 		s = newSession(Peer{DeviceID: msg.Src, DiscoPub: msg.DiscoPub, WGPub: msg.WGPub, WGIP: msg.WGIP})
 		e.peers[msg.Src] = s
 		e.byIP[msg.WGIP] = msg.Src
+		e.tagsDirty = true
 	}
 	s.cands = capAddrs(publicPunchTargets(msg.Candidates), maxCands)
 	if _, ok := e.want[msg.WGIP]; !ok {
@@ -369,7 +480,7 @@ func (e *Engine) onIntroLocked(r *Result, from netip.AddrPort, pkt []byte, now t
 	e.probeCandidatesLocked(s, r, now)
 	if s.lastAdv.IsZero() || now.Sub(s.lastAdv) >= RendezvousEvery {
 		if reply, ok := e.introPacketLocked(); ok {
-			r.Sends = append(r.Sends, Datagram{Tunnel: true, To: netip.AddrPortFrom(msg.WGIP, IntroPort), Data: reply})
+			r.Sends = append(r.Sends, Datagram{Tunnel: true, To: netip.AddrPortFrom(msg.WGIP, IntroPort), Data: reply, Type: TypeIntro})
 			s.lastAdv = now
 		}
 	}
@@ -379,26 +490,19 @@ func (e *Engine) probeCandidatesLocked(s *session, r *Result, now time.Time) {
 	if s == nil || s.directUp || len(s.cands) == 0 {
 		return
 	}
-	if !s.lastProbe.IsZero() && now.Sub(s.lastProbe) < Keepalive {
+	if !s.lastProbe.IsZero() && now.Sub(s.lastProbe) < s.gap() {
 		return
 	}
 	for _, c := range s.cands {
 		if ping, err := e.pingLocked(s, c, now); err == nil {
-			r.Sends = append(r.Sends, Datagram{To: c, Data: ping})
+			r.Sends = append(r.Sends, Datagram{To: c, Data: ping, Type: TypePing})
 		}
 	}
 	s.lastProbe = now
+	s.probeGap = e.jittered(Keepalive)
 }
 
-func (e *Engine) onPingLocked(r *Result, from netip.AddrPort, pkt []byte, now time.Time) {
-	s, claimed := e.peerFromHeader(pkt)
-	if s == nil || !e.admitsLocked(s.peer.WGIP) {
-		return
-	}
-	plain, src, dst, err := e.openFromPeer(s, TypePing, pkt)
-	if err != nil || src != claimed || dst != e.self {
-		return
-	}
+func (e *Engine) onPingLocked(r *Result, from netip.AddrPort, s *session, plain []byte, now time.Time) {
 	txid, err := pingTxid(plain)
 	if err != nil {
 		return
@@ -409,26 +513,21 @@ func (e *Engine) onPingLocked(r *Result, from netip.AddrPort, pkt []byte, now ti
 	}
 	var body [8]byte
 	binary.BigEndian.PutUint64(body[:], txid)
-	pong, err := e.sealToPeer(s, TypePong, body[:])
+	pong, err := e.sealToPeer(s, TypePong, body[:], now, false)
 	if err != nil {
 		return
 	}
-	r.Sends = append(r.Sends, Datagram{To: from, Data: pong})
+	r.Sends = append(r.Sends, Datagram{To: from, Data: pong, Type: TypePong})
 	if containsAddr(s.cands, from) || len(s.cands) >= maxCands || len(s.pongs) >= maxPongPaths {
 		return
 	}
 	if ping, err := e.pingLocked(s, from, now); err == nil {
-		r.Sends = append(r.Sends, Datagram{To: from, Data: ping})
+		r.Sends = append(r.Sends, Datagram{To: from, Data: ping, Type: TypePing})
 	}
 }
 
-func (e *Engine) onPongLocked(r *Result, from netip.AddrPort, pkt []byte, now time.Time) {
-	s, claimed := e.peerFromHeader(pkt)
-	if s == nil || !e.admitsLocked(s.peer.WGIP) {
-		return
-	}
-	plain, src, dst, err := e.openFromPeer(s, TypePong, pkt)
-	if err != nil || src != claimed || dst != e.self || len(plain) != 8 {
+func (e *Engine) onPongLocked(r *Result, from netip.AddrPort, s *session, plain []byte, now time.Time) {
+	if len(plain) != 8 {
 		return
 	}
 	txid := binary.BigEndian.Uint64(plain)
@@ -448,7 +547,7 @@ func (e *Engine) onPongLocked(r *Result, from netip.AddrPort, pkt []byte, now ti
 	s.alive[from] = now
 	if s.pongs[from] == 1 {
 		if ping, err := e.pingLocked(s, from, now); err == nil {
-			r.Sends = append(r.Sends, Datagram{To: from, Data: ping})
+			r.Sends = append(r.Sends, Datagram{To: from, Data: ping, Type: TypePing})
 		}
 	}
 	if s.pongs[from] < PongsToTrust {
@@ -462,17 +561,14 @@ func (e *Engine) onPongLocked(r *Result, from netip.AddrPort, pkt []byte, now ti
 	s.direct = best
 	s.directUp = true
 	s.lastProbe = now
+	s.probeGap = e.jittered(Keepalive)
 	r.Up = append(r.Up, Path{Peer: s.peer, Via: best})
 	e.armMTULocked(s, r, now, !s.mtuActive || changed)
 }
 
-func (e *Engine) onTeardownLocked(r *Result, pkt []byte) {
-	s, claimed := e.peerFromHeader(pkt)
-	if s == nil {
-		return
-	}
-	plain, src, dst, err := e.openFromPeer(s, TypeTeardown, pkt)
-	if err != nil || src != claimed || dst != e.self || len(plain) != 8 {
+func (e *Engine) onTeardownLocked(r *Result, s *session, plain []byte) {
+	claimed := s.peer.DeviceID
+	if len(plain) != 8 {
 		return
 	}
 	epoch := binary.BigEndian.Uint64(plain)
@@ -484,6 +580,9 @@ func (e *Engine) onTeardownLocked(r *Result, pkt []byte) {
 		r.Down = append(r.Down, claimed)
 	}
 	s.dropDirectLocked()
+	// The peer rekeys after sending a teardown; follow it so both sides
+	// return to the static phase with fresh ephemerals.
+	e.rekeyLocked(s)
 }
 
 func (e *Engine) pingLocked(s *session, to netip.AddrPort, now time.Time) ([]byte, error) {
@@ -491,7 +590,7 @@ func (e *Engine) pingLocked(s *session, to netip.AddrPort, now time.Time) ([]byt
 	rememberPing(s, s.txid, to, now)
 	var plain [8]byte
 	binary.BigEndian.PutUint64(plain[:], s.txid)
-	pkt, err := e.sealToPeer(s, TypePing, plain[:])
+	pkt, err := e.sealToPeer(s, TypePing, plain[:], now, false)
 	if err != nil {
 		delete(s.outstanding, s.txid)
 		return nil, err
@@ -504,7 +603,7 @@ func (e *Engine) pingPadLocked(s *session, plainLen int, now time.Time) ([]byte,
 	rememberPing(s, s.txid, s.direct, now)
 	plain := make([]byte, plainLen)
 	binary.BigEndian.PutUint64(plain[:8], s.txid)
-	pkt, err := e.sealToPeer(s, TypePing, plain)
+	pkt, err := e.sealToPeer(s, TypePing, plain, now, true)
 	if err != nil {
 		delete(s.outstanding, s.txid)
 		return nil, err
@@ -576,29 +675,216 @@ func (e *Engine) onReflexLocked(from netip.AddrPort, pkt []byte, now time.Time) 
 	if !e.haveSrv || !e.haveSrvEP || !e.reflexWait || from != e.serverEP {
 		return
 	}
-	id, ap, nonce, err := OpenReflexResp(e.disco, e.server, pkt)
-	if err != nil || id != e.self || nonce != e.reflexNonce || !publicPunchTarget(ap) {
+	if e.reflexPend.Nonce() != e.reflexNonce {
 		return
 	}
+	ap, err := OpenReflexResp(&e.reflexPend, pkt)
+	if err != nil || !publicPunchTarget(ap) {
+		return
+	}
+	e.reflexPend.Wipe()
 	e.reflex = ap
 	e.reflexWait = false
 	e.reflexAt = now
 }
 
-func (e *Engine) peerFromHeader(pkt []byte) (*session, uuid.UUID) {
-	if len(pkt) < headerLen+idLen {
-		return nil, uuid.UUID{}
+func (e *Engine) dropSessionLocked(id uuid.UUID, s *session) {
+	if e.peers[id] == s {
+		delete(e.peers, id)
 	}
-	var claimed uuid.UUID
-	copy(claimed[:], pkt[headerLen:headerLen+idLen])
-	return e.peers[claimed], claimed
+	if e.byIP[s.peer.WGIP] == id {
+		delete(e.byIP, s.peer.WGIP)
+	}
+	for slot := range s.rx {
+		e.dropSlotLocked(id, s, slot)
+	}
+	s.wipeKeys()
+	e.tagsDirty = true
 }
 
-func (e *Engine) teardownLocked(s *session) ([]byte, error) {
+// staticOpen reports whether static (first-flight) tags from s are
+// still accepted: until the first session-tagged packet, plus a short grace.
+func staticOpen(s *session, now time.Time) bool {
+	return s.confirmedAt.IsZero() || now.Sub(s.confirmedAt) < staticGrace
+}
+
+func clampSkew(d int64) int64 {
+	if d < -tagSlack {
+		return -tagSlack
+	}
+	if d > tagSlack {
+		return tagSlack
+	}
+	return d
+}
+
+// wantSlot reports whether slot should be in the receive map at window w.
+func wantSlot(s *session, slot rxSlot, w int64, now time.Time) bool {
+	if slot.sess {
+		c := w + s.skew
+		return s.haveSess && slot.seq < sessSeqs && slot.w >= c-sessSlack && slot.w <= c+sessSlack
+	}
+	return staticOpen(s, now) && slot.seq < staticSeqs && slot.w >= w-tagSlack && slot.w <= w+tagSlack
+}
+
+// refreshTagsLocked keeps e.tags equal to the union of every session's
+// wanted, unused receive slots. Work is incremental: on a window change
+// each session computes only the slots of the new windows.
+func (e *Engine) refreshTagsLocked(now time.Time) {
+	w := window(now)
+	if !e.tagsDirty && w == e.tagWin {
+		return
+	}
+	for id, s := range e.peers {
+		e.syncTagsLocked(id, s, w, now)
+	}
+	e.tagWin = w
+	e.tagsDirty = false
+}
+
+func (e *Engine) dropSlotLocked(id uuid.UUID, s *session, slot rxSlot) {
+	tag, ok := s.rx[slot]
+	if !ok {
+		return
+	}
+	delete(s.rx, slot)
+	if ref, ok := e.tags[tag]; ok && ref.id == id && ref.slot == slot {
+		delete(e.tags, tag)
+	}
+}
+
+func (e *Engine) addSlotLocked(id uuid.UUID, s *session, slot rxSlot, key [32]byte) {
+	if _, ok := s.rx[slot]; ok {
+		return
+	}
+	if _, used := s.used[slot]; used {
+		return
+	}
+	tag, ok := slotTag(key, slot.w, slot.seq)
+	if !ok {
+		return
+	}
+	s.rx[slot] = tag
+	e.tags[tag] = tagRef{id: id, slot: slot}
+}
+
+func (e *Engine) syncTagsLocked(id uuid.UUID, s *session, w int64, now time.Time) {
+	if s.rx == nil {
+		s.rx = make(map[rxSlot][tagLen]byte)
+	}
+	if s.used == nil {
+		s.used = make(map[rxSlot]struct{})
+	}
+	for slot := range s.rx {
+		if !wantSlot(s, slot, w, now) {
+			e.dropSlotLocked(id, s, slot)
+		}
+	}
+	// A used slot can only become wanted again while its window is within
+	// reach of the widest acceptance range, so older ones are forgotten.
+	floor := w - tagSlack - sessSlack
+	for slot := range s.used {
+		if slot.w < floor {
+			delete(s.used, slot)
+		}
+	}
+	if err := e.ensureStatic(s); err != nil {
+		return
+	}
+	if staticOpen(s, now) {
+		for d := int64(-tagSlack); d <= tagSlack; d++ {
+			for seq := 0; seq < staticSeqs; seq++ {
+				e.addSlotLocked(id, s, rxSlot{w: w + d, seq: seq}, s.static.tagRecv)
+			}
+		}
+	}
+	if s.haveSess {
+		c := w + s.skew
+		for d := int64(-sessSlack); d <= sessSlack; d++ {
+			for seq := 0; seq < sessSeqs; seq++ {
+				e.addSlotLocked(id, s, rxSlot{sess: true, w: c + d, seq: seq}, s.sess.tagRecv)
+			}
+		}
+	}
+}
+
+func (e *Engine) lookupTagLocked(pkt []byte, now time.Time) (*session, tagRef, bool) {
+	if len(pkt) < directPacketLen(0) {
+		return nil, tagRef{}, false
+	}
+	e.refreshTagsLocked(now)
+	var tag [tagLen]byte
+	copy(tag[:], pkt[:tagLen])
+	ref, ok := e.tags[tag]
+	if !ok {
+		return nil, tagRef{}, false
+	}
+	s := e.peers[ref.id]
+	if s == nil {
+		return nil, tagRef{}, false
+	}
+	if !ref.slot.sess && !staticOpen(s, now) {
+		return nil, tagRef{}, false
+	}
+	return s, ref, true
+}
+
+// consumeLocked retires a receive slot after a packet authenticated with it.
+func (e *Engine) consumeLocked(s *session, ref tagRef) {
+	e.dropSlotLocked(ref.id, s, ref.slot)
+	s.used[ref.slot] = struct{}{}
+}
+
+// nextTag returns the next unused send tag of the current window. Each tag
+// is used once; when a window's budget runs out sends wait for the next.
+func (s *session) nextTag(sessPhase bool, now time.Time) ([tagLen]byte, error) {
+	tx, key, max := &s.txStatic, s.static.tagSend, staticSeqs
+	if sessPhase {
+		tx, key, max = &s.txSess, s.sess.tagSend, sessSeqs
+	}
+	w := window(now)
+	if !tx.set || tx.w != w {
+		*tx = txSlot{set: true, w: w}
+	}
+	for tx.seq < max {
+		seq := tx.seq
+		tx.seq++
+		if tag, ok := slotTag(key, w, seq); ok {
+			return tag, nil
+		}
+	}
+	return [tagLen]byte{}, errTagBudget
+}
+
+var errTagBudget = errors.New("punch tag budget exhausted for this window")
+
+// rekeyLocked forgets the session keys and ephemerals of s, so the next
+// exchange starts from the static phase with fresh ephemerals.
+func (e *Engine) rekeyLocked(s *session) {
+	s.sess.wipe()
+	s.haveSess = false
+	s.sessSeen = false
+	s.confirmedAt = time.Time{}
+	s.skew = 0
+	s.txSess = txSlot{}
+	wipe32(&s.ephPriv)
+	s.ephPub = [32]byte{}
+	s.ephLive = false
+	s.peerEph = [32]byte{}
+	s.havePeerEph = false
+	for slot := range s.used {
+		if slot.sess {
+			delete(s.used, slot)
+		}
+	}
+	e.tagsDirty = true
+}
+
+func (e *Engine) teardownLocked(s *session, now time.Time) ([]byte, error) {
 	s.epoch++
 	var plain [8]byte
 	binary.BigEndian.PutUint64(plain[:], s.epoch)
-	return e.sealToPeer(s, TypeTeardown, plain[:])
+	return e.sealToPeer(s, TypeTeardown, plain[:], now, false)
 }
 
 func newNonce() (uint64, error) {
@@ -666,44 +952,66 @@ func (e *Engine) ensureStatic(s *session) error {
 	if s.haveStatic {
 		return nil
 	}
-	send, recv, err := directionalKeys(e.disco, s.peer.DiscoPub)
+	k, err := derivePair(e.disco, s.peer.DiscoPub)
 	if err != nil {
 		return err
 	}
-	s.staticSend = send
-	s.staticRecv = recv
+	s.static = k
 	s.haveStatic = true
 	return nil
 }
 
-func (s *session) commitEE(ourPub, peerPub [32]byte) {
-	if s.haveSess || !s.ephLive || !s.havePeerEph {
+func (s *session) wipeKeys() {
+	s.static.wipe()
+	s.haveStatic = false
+	wipe32(&s.ephPriv)
+	s.ephLive = false
+	s.sess.wipe()
+	s.haveSess = false
+	s.rx = nil
+	s.used = nil
+}
+
+func (e *Engine) commitEELocked(s *session) {
+	if s.haveSess || !s.ephLive || !s.havePeerEph || !s.haveStatic {
 		return
 	}
-	send, recv, err := deriveEE(s.ephPriv, s.peerEph, ourPub, peerPub)
+	k, err := deriveEE(s.ephPriv, s.peerEph, e.discoPub, s.peer.DiscoPub, s.static.bind)
 	if err != nil {
 		return
 	}
-	s.sendKey = send
-	s.recvKey = recv
+	s.sess = k
 	wipe32(&s.ephPriv)
 	s.ephLive = false
 	s.haveSess = true
+	e.tagsDirty = true
 }
 
-func (e *Engine) sealToPeer(s *session, typ byte, plain []byte) ([]byte, error) {
+// sealToPeer seals a direct packet. Before the peer has proven it holds the
+// session (sessSeen) the static tag and mask are used, with the session AEAD
+// key once we have it; afterwards everything comes from the session keys.
+func (e *Engine) sealToPeer(s *session, typ byte, plain []byte, now time.Time, exact bool) ([]byte, error) {
 	if err := s.ensureEph(); err != nil {
 		return nil, err
 	}
 	if err := e.ensureStatic(s); err != nil {
 		return nil, err
 	}
-	s.commitEE(e.discoPub, s.peer.DiscoPub)
-	key := s.staticSend
+	e.commitEELocked(s)
+	sessPhase := s.haveSess && s.sessSeen
+	out := directOut{key: s.static.send, hp: s.static.hpSend}
 	if s.haveSess {
-		key = s.sendKey
+		out.key = s.sess.send
 	}
-	return sealDirect(typ, key, s.ephPub, e.self, s.peer.DeviceID, plain)
+	if sessPhase {
+		out.hp = s.sess.hpSend
+	}
+	tag, err := s.nextTag(sessPhase, now)
+	if err != nil {
+		return nil, err
+	}
+	out.tag = tag
+	return sealDirect(typ, out, s.ephPub, e.self, s.peer.DeviceID, plain, exact)
 }
 
 type openTry struct {
@@ -711,59 +1019,82 @@ type openTry struct {
 	kind byte
 }
 
-func (e *Engine) openFromPeer(s *session, typ byte, pkt []byte) (plain []byte, src, dst uuid.UUID, err error) {
-	if err = s.ensureEph(); err != nil {
-		return nil, src, dst, err
+// openFromPeer authenticates a direct packet whose tag matched ref. Kinds:
+// 0 static AEAD key (first flight, only before the peer used the session),
+// 1 session key, 2 tentative session key from the packet's ephemeral.
+// Session-tagged packets only open with kind 1.
+func (e *Engine) openFromPeer(s *session, ref tagRef, pkt []byte, now time.Time) (typ byte, body []byte, ok bool) {
+	if err := s.ensureEph(); err != nil {
+		return 0, nil, false
 	}
-	if err = e.ensureStatic(s); err != nil {
-		return nil, src, dst, err
+	if err := e.ensureStatic(s); err != nil {
+		return 0, nil, false
 	}
-	src, dst, eph, box, err := splitDirect(pkt, typ)
+	parts, err := splitDirect(pkt)
 	if err != nil {
-		return nil, src, dst, err
+		return 0, nil, false
 	}
-	aad := directAAD(typ, src, dst, eph)
 	tries := make([]openTry, 0, 3)
-	if s.haveSess {
-		tries = append(tries, openTry{key: s.recvKey, kind: 1})
-	}
-	var tentSend, tentRecv [32]byte
-	if !s.haveSess && s.ephLive && eph != ([32]byte{}) {
-		tentSend, tentRecv, err = deriveEE(s.ephPriv, eph, e.discoPub, s.peer.DiscoPub)
-		if err == nil {
-			tries = append(tries, openTry{key: tentRecv, kind: 2})
+	var eph [32]byte
+	var tent sessKeys
+	defer tent.wipe()
+	if ref.slot.sess {
+		if !s.haveSess {
+			return 0, nil, false
+		}
+		tries = append(tries, openTry{key: s.sess.recv, kind: 1})
+	} else {
+		eph = parts.eph(s.static.hpRecv)
+		if s.haveSess {
+			tries = append(tries, openTry{key: s.sess.recv, kind: 1})
+		}
+		if !s.haveSess && s.ephLive && eph != ([32]byte{}) {
+			if tent, err = deriveEE(s.ephPriv, eph, e.discoPub, s.peer.DiscoPub, s.static.bind); err == nil {
+				tries = append(tries, openTry{key: tent.recv, kind: 2})
+			}
+		}
+		if !s.sessSeen {
+			tries = append(tries, openTry{key: s.static.recv, kind: 0})
 		}
 	}
-	if !s.sessSeen {
-		tries = append(tries, openTry{key: s.staticRecv, kind: 0})
-	}
 	var kind byte
+	var src, dst uuid.UUID
 	opened := false
 	for _, try := range tries {
-		plain, err = openKey(try.key, box, aad)
+		typ, body, src, dst, err = parts.open(try.key)
 		if err == nil {
 			kind = try.kind
 			opened = true
 			break
 		}
 	}
-	if !opened {
-		return nil, src, dst, err
+	if !opened || src != s.peer.DeviceID || dst != e.self {
+		return 0, nil, false
+	}
+	e.consumeLocked(s, ref)
+	s.lastRx = now
+	if skew := clampSkew(ref.slot.w - window(now)); skew != s.skew {
+		s.skew = skew
+		e.tagsDirty = true
+	}
+	if ref.slot.sess && s.confirmedAt.IsZero() {
+		s.confirmedAt = now
 	}
 	if kind == 2 {
-		s.sendKey = tentSend
-		s.recvKey = tentRecv
+		s.sess = tent
+		tent = sessKeys{}
 		wipe32(&s.ephPriv)
 		s.ephLive = false
 		s.haveSess = true
+		e.tagsDirty = true
 	}
 	if kind == 1 || kind == 2 {
 		s.sessSeen = true
 	}
-	if eph != ([32]byte{}) {
+	if !ref.slot.sess && eph != ([32]byte{}) {
 		s.peerEph = eph
 		s.havePeerEph = true
 	}
-	s.commitEE(e.discoPub, s.peer.DiscoPub)
-	return plain, src, dst, nil
+	e.commitEELocked(s)
+	return typ, body, true
 }

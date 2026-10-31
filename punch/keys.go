@@ -8,7 +8,6 @@ import (
 	"fmt"
 
 	"golang.org/x/crypto/blake2s"
-	"golang.org/x/crypto/chacha20poly1305"
 	"golang.org/x/crypto/curve25519"
 )
 
@@ -95,76 +94,114 @@ func kdf(shared, sender, receiver []byte, label string) [32]byte {
 	return key
 }
 
-func directionalKeys(priv, peerPub [32]byte) (send, recv [32]byte, err error) {
+const (
+	labelDirect = "tunnels.is punch v3"
+	labelEE     = "tunnels.is punch v3 ee"
+	labelTag    = "tunnels.is punch v3 tag"
+	labelHP     = "tunnels.is punch v3 hp"
+	labelBind   = "tunnels.is punch v3 bind"
+
+	labelSessTag = "tunnels.is punch v3 session tag"
+	labelSessHP  = "tunnels.is punch v3 session hp"
+)
+
+// pairKeys are everything two disco keys derive for direct packets. The
+// send/recv fields are per direction: our send is the peer's recv.
+type pairKeys struct {
+	send, recv       [32]byte
+	tagSend, tagRecv [32]byte
+	hpSend, hpRecv   [32]byte
+	bind             [32]byte
+}
+
+func (k *pairKeys) wipe() {
+	wipe32(&k.send)
+	wipe32(&k.recv)
+	wipe32(&k.tagSend)
+	wipe32(&k.tagRecv)
+	wipe32(&k.hpSend)
+	wipe32(&k.hpRecv)
+	wipe32(&k.bind)
+}
+
+func derivePair(priv, peerPub [32]byte) (pairKeys, error) {
+	var k pairKeys
 	ourPub, err := Public(priv)
 	if err != nil {
-		return send, recv, err
+		return k, err
 	}
 	shared, err := curve25519.X25519(priv[:], peerPub[:])
 	if err != nil {
-		return send, recv, err
+		return k, err
 	}
 	defer wipe(shared)
-	send = kdf(shared, ourPub[:], peerPub[:], "tunnels.is punch v2")
-	recv = kdf(shared, peerPub[:], ourPub[:], "tunnels.is punch v2")
-	return send, recv, nil
+	k.send = kdf(shared, ourPub[:], peerPub[:], labelDirect)
+	k.recv = kdf(shared, peerPub[:], ourPub[:], labelDirect)
+	k.tagSend = kdf(shared, ourPub[:], peerPub[:], labelTag)
+	k.tagRecv = kdf(shared, peerPub[:], ourPub[:], labelTag)
+	k.hpSend = kdf(shared, ourPub[:], peerPub[:], labelHP)
+	k.hpRecv = kdf(shared, peerPub[:], ourPub[:], labelHP)
+	lo, hi := ourPub, peerPub
+	if string(lo[:]) > string(hi[:]) {
+		lo, hi = hi, lo
+	}
+	k.bind = kdf(shared, lo[:], hi[:], labelBind)
+	return k, nil
 }
 
-func deriveEE(ephPriv, peerEph, ourPub, peerPub [32]byte) (send, recv [32]byte, err error) {
+// sessKeys are the per-session keys derived from the ephemeral-ephemeral
+// DH. Once both sides hold them, AEAD keys, receive tags and the eph mask all
+// come from here, so traffic after the first exchange stays unreadable and
+// unlinkable even if both disco privates leak later.
+type sessKeys struct {
+	send, recv       [32]byte
+	tagSend, tagRecv [32]byte
+	hpSend, hpRecv   [32]byte
+}
+
+func (k *sessKeys) wipe() {
+	wipe32(&k.send)
+	wipe32(&k.recv)
+	wipe32(&k.tagSend)
+	wipe32(&k.tagRecv)
+	wipe32(&k.hpSend)
+	wipe32(&k.hpRecv)
+}
+
+// deriveEE mixes the ephemeral-ephemeral DH with the static pair binding,
+// so a session key can only be derived by holders of both disco privates.
+func deriveEE(ephPriv, peerEph, ourPub, peerPub, bind [32]byte) (k sessKeys, err error) {
 	shared, err := curve25519.X25519(ephPriv[:], peerEph[:])
 	if err != nil {
-		return send, recv, err
+		return k, err
 	}
 	defer wipe(shared)
-	send = kdf(shared, ourPub[:], peerPub[:], "tunnels.is punch v2 ee")
-	recv = kdf(shared, peerPub[:], ourPub[:], "tunnels.is punch v2 ee")
-	return send, recv, nil
+	ikm := make([]byte, 0, len(shared)+len(bind))
+	ikm = append(ikm, shared...)
+	ikm = append(ikm, bind[:]...)
+	defer wipe(ikm)
+	k.send = kdf(ikm, ourPub[:], peerPub[:], labelEE)
+	k.recv = kdf(ikm, peerPub[:], ourPub[:], labelEE)
+	k.tagSend = kdf(ikm, ourPub[:], peerPub[:], labelSessTag)
+	k.tagRecv = kdf(ikm, peerPub[:], ourPub[:], labelSessTag)
+	k.hpSend = kdf(ikm, ourPub[:], peerPub[:], labelSessHP)
+	k.hpRecv = kdf(ikm, peerPub[:], ourPub[:], labelSessHP)
+	return k, nil
 }
 
-func sealKey(key [32]byte, plaintext, aad []byte) ([]byte, error) {
-	aead, err := chacha20poly1305.NewX(key[:])
+func prf(key [32]byte, parts ...[]byte) [32]byte {
+	var out [32]byte
+	h, err := blake2s.New256(key[:])
 	if err != nil {
-		return nil, err
+		return out
 	}
-	var nonce [chacha20poly1305.NonceSizeX]byte
-	if _, err := rand.Read(nonce[:]); err != nil {
-		return nil, err
+	for _, p := range parts {
+		_, _ = h.Write(p)
 	}
-	out := make([]byte, len(nonce), len(nonce)+len(plaintext)+aead.Overhead())
-	copy(out, nonce[:])
-	return aead.Seal(out, nonce[:], plaintext, aad), nil
+	copy(out[:], h.Sum(nil))
+	return out
 }
 
-func openKey(key [32]byte, box, aad []byte) ([]byte, error) {
-	if len(box) < chacha20poly1305.NonceSizeX+16 {
-		return nil, fmt.Errorf("box too short")
-	}
-	aead, err := chacha20poly1305.NewX(key[:])
-	if err != nil {
-		return nil, err
-	}
-	nonce := box[:chacha20poly1305.NonceSizeX]
-	plain, err := aead.Open(nil, nonce, box[chacha20poly1305.NonceSizeX:], aad)
-	if err != nil {
-		return nil, err
-	}
-	return plain, nil
-}
-
-// Seal ...
-func Seal(senderPriv, receiverPub [32]byte, plaintext, aad []byte) ([]byte, error) {
-	send, _, err := directionalKeys(senderPriv, receiverPub)
-	if err != nil {
-		return nil, err
-	}
-	return sealKey(send, plaintext, aad)
-}
-
-// Open ...
-func Open(receiverPriv, senderPub [32]byte, box, aad []byte) ([]byte, error) {
-	_, recv, err := directionalKeys(receiverPriv, senderPub)
-	if err != nil {
-		return nil, err
-	}
-	return openKey(recv, box, aad)
+func hmacEqual(a, b []byte) bool {
+	return hmac.Equal(a, b)
 }

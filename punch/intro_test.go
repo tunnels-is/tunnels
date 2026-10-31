@@ -59,7 +59,7 @@ func TestIntro_DropsLocalPunchTargets(t *testing.T) {
 func pingTargets(res Result) []netip.AddrPort {
 	var out []netip.AddrPort
 	for _, d := range res.Sends {
-		if TypeOf(d.Data) == TypePing {
+		if d.Type == TypePing {
 			out = append(out, d.To)
 		}
 	}
@@ -109,10 +109,10 @@ func TestIntroExchangeReachesDirectPath(t *testing.T) {
 	sent := a.Poll(now)
 	var intro Datagram
 	for _, d := range sent.Sends {
-		if d.Tunnel && TypeOf(d.Data) == TypeIntro {
+		if d.Tunnel && d.Type == TypeIntro {
 			intro = d
 		}
-		if d.Server && TypeOf(d.Data) == TypeRendezvous {
+		if d.Server && d.Type == TypeRendezvous {
 			t.Fatal("introduction must not ask the server to relay a rendezvous")
 		}
 	}
@@ -128,10 +128,10 @@ func TestIntroExchangeReachesDirectPath(t *testing.T) {
 	var back Datagram
 	var bPing bool
 	for _, d := range reply.Sends {
-		if d.Tunnel && TypeOf(d.Data) == TypeIntro {
+		if d.Tunnel && d.Type == TypeIntro {
 			back = d
 		}
-		if !d.Tunnel && !d.Server && d.To == aReflex && TypeOf(d.Data) == TypePing {
+		if !d.Tunnel && !d.Server && d.To == aReflex && d.Type == TypePing {
 			bPing = true
 		}
 	}
@@ -145,7 +145,7 @@ func TestIntroExchangeReachesDirectPath(t *testing.T) {
 	learned := a.OnPacket(netip.AddrPortFrom(bIP, IntroPort), back.Data, now)
 	var aPing Datagram
 	for _, d := range learned.Sends {
-		if d.To == bReflex && TypeOf(d.Data) == TypePing {
+		if d.To == bReflex && d.Type == TypePing {
 			aPing = d
 		}
 	}
@@ -156,7 +156,7 @@ func TestIntroExchangeReachesDirectPath(t *testing.T) {
 	fromB := b.OnPacket(aReflex, aPing.Data, now)
 	var pong Datagram
 	for _, d := range fromB.Sends {
-		if TypeOf(d.Data) == TypePong {
+		if d.Type == TypePong {
 			pong = d
 		}
 	}
@@ -167,7 +167,7 @@ func TestIntroExchangeReachesDirectPath(t *testing.T) {
 	second := a.Poll(now.Add(Keepalive))
 	var ping2 Datagram
 	for _, d := range second.Sends {
-		if d.To == bReflex && TypeOf(d.Data) == TypePing {
+		if d.To == bReflex && d.Type == TypePing {
 			ping2 = d
 		}
 	}
@@ -177,7 +177,7 @@ func TestIntroExchangeReachesDirectPath(t *testing.T) {
 	again := b.OnPacket(aReflex, ping2.Data, now.Add(Keepalive))
 	var pong2 Datagram
 	for _, d := range again.Sends {
-		if TypeOf(d.Data) == TypePong {
+		if d.Type == TypePong {
 			pong2 = d
 		}
 	}

@@ -20,18 +20,17 @@ func TestV2_RetypeAndReflectionFail(t *testing.T) {
 	if _, _, _, err := OpenPing(bPriv, aPub, ping); err != nil {
 		t.Fatal(err)
 	}
-	retyped := append([]byte(nil), ping...)
-	retyped[5] = TypeTeardown
-	if _, _, _, err := OpenTeardown(bPriv, aPub, retyped); err == nil {
+	if _, _, _, err := OpenTeardown(bPriv, aPub, ping); err == nil {
 		t.Fatal("a ping opened as a teardown")
 	}
 	if _, _, _, err := OpenPing(aPriv, bPub, ping); err == nil {
 		t.Fatal("a reflected ping opened")
 	}
-	old := append([]byte(nil), ping...)
-	old[4] = 1
-	if Is(old) {
-		t.Fatal("version 1 packet was accepted")
+	for _, v := range []byte{1, 2} {
+		old := append([]byte{'T', 'N', 'L', 'P', v, TypePing}, ping...)
+		if _, _, _, err := OpenPing(bPriv, aPub, old); err == nil {
+			t.Fatalf("version %d framed packet was accepted", v)
+		}
 	}
 }
 
@@ -127,18 +126,21 @@ func TestV2_TeardownReplayAndReflexSource(t *testing.T) {
 	res := b.Poll(now.Add(time.Second))
 	var req []byte
 	for _, d := range res.Sends {
-		if d.Server && TypeOf(d.Data) == TypeReflexReq {
+		if d.Server && d.Type == TypeReflexReq {
 			req = d.Data
 		}
 	}
 	if req == nil {
 		t.Fatal("no reflex request")
 	}
-	_, pub, nonce, err := OpenReflexReq(srvPriv, req, now.Add(time.Second))
+	rq, err := OpenReflexReq(srvPriv, req, now.Add(time.Second))
 	if err != nil {
 		t.Fatal(err)
 	}
-	resp, err := BuildReflexResp(srvPriv, pub, bID, current, nonce)
+	if rq.Device != bID {
+		t.Fatal("reflex device mismatch")
+	}
+	resp, err := BuildReflexResp(&rq, current)
 	if err != nil {
 		t.Fatal(err)
 	}

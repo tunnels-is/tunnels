@@ -51,36 +51,41 @@ func TestReflexRoundTrip(t *testing.T) {
 	}
 	dev := uuid.New()
 	now := time.Now()
-	req, err := BuildReflexReq(dev, cliPriv, srvPub, now, 7)
+	req, pend, err := BuildReflexReq(dev, cliPriv, srvPub, now, 7)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !Is(req) || TypeOf(req) != TypeReflexReq {
-		t.Fatalf("reflex type %d", TypeOf(req))
+	if !Is(req) || len(req) != MinPacket || LooksLikeWireGuard(req) {
+		t.Fatalf("reflex request len %d", len(req))
 	}
-	gotID, gotPub, nonce, err := OpenReflexReq(srvPriv, req, now)
+	got, err := OpenReflexReq(srvPriv, req, now)
 	if err != nil {
 		t.Fatal(err)
 	}
 	wantPub, _ := Public(cliPriv)
-	if gotID != dev || gotPub != wantPub || nonce != 7 {
+	if got.Device != dev || got.DiscoPub != wantPub || got.Nonce != 7 {
 		t.Fatalf("reflex identity mismatch")
 	}
-	if _, _, _, err := OpenReflexReq(srvPriv, req, now.Add(5*time.Minute)); err == nil {
+	if _, err := OpenReflexReq(srvPriv, req, now.Add(5*time.Minute)); err == nil {
 		t.Fatal("stale reflex must fail")
 	}
-	resp, err := BuildReflexResp(srvPriv, wantPub, dev, netip.MustParseAddrPort("198.51.100.10:41000"), nonce)
+	resp, err := BuildReflexResp(&got, netip.MustParseAddrPort("198.51.100.10:41000"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	id, ap, gotNonce, err := OpenReflexResp(cliPriv, srvPub, resp)
-	if err != nil || id != dev || ap.String() != "198.51.100.10:41000" || gotNonce != nonce {
+	ap, err := OpenReflexResp(&pend, resp)
+	if err != nil || ap.String() != "198.51.100.10:41000" || pend.Nonce() != 7 {
 		t.Fatalf("reflex response %s %v", ap, err)
 	}
 	flipped := append([]byte(nil), resp...)
-	flipped[headerLen] ^= 0xff
-	if _, _, _, err := OpenReflexResp(cliPriv, srvPub, flipped); err == nil {
-		t.Fatal("retyped reflex response opened")
+	flipped[reflexRespPrefix+1] ^= 0xff
+	if _, err := OpenReflexResp(&pend, flipped); err == nil {
+		t.Fatal("tampered reflex response opened")
+	}
+	resalted := append([]byte(nil), resp...)
+	resalted[0] ^= 0x80
+	if _, err := OpenReflexResp(&pend, resalted); err == nil {
+		t.Fatal("re-salted reflex response opened")
 	}
 }
 
@@ -90,14 +95,17 @@ func deliverReflex(t *testing.T, eng *Engine, srvPriv [32]byte, id uuid.UUID, ap
 	t.Helper()
 	eng.SetServerEndpoint(testHub)
 	for _, d := range res.Sends {
-		if !d.Server || TypeOf(d.Data) != TypeReflexReq {
+		if !d.Server || d.Type != TypeReflexReq {
 			continue
 		}
-		_, pub, nonce, err := OpenReflexReq(srvPriv, d.Data, now)
+		req, err := OpenReflexReq(srvPriv, d.Data, now)
 		if err != nil {
 			t.Fatal(err)
 		}
-		resp, err := BuildReflexResp(srvPriv, pub, id, ap, nonce)
+		if req.Device != id {
+			t.Fatalf("reflex device %s, want %s", req.Device, id)
+		}
+		resp, err := BuildReflexResp(&req, ap)
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -154,6 +154,7 @@ func (e *Engine) launchMTULocked(s *session, r *Result, outer int, now time.Time
 	r.Sends = append(r.Sends, Datagram{
 		To:   s.direct,
 		Data: pkt,
+		Type: TypePing,
 		MTU:  true,
 		Peer: s.peer.DeviceID,
 	})
