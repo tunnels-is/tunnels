@@ -75,7 +75,6 @@ func newRegisteredUser(form *registerRequest) (*User, error) {
 	newUser.ID = uuid.New()
 	newUser.Email = form.Email
 	newUser.Updated = time.Now()
-	newUser.Trial = true
 	newUser.SubExpiration = time.Now().AddDate(0, 0, 1)
 	newUser.Groups = make([]uuid.UUID, 0)
 	newUser.Tokens = make([]*DeviceToken, 0)
@@ -285,7 +284,7 @@ func handleAdminUserLatest(w http.ResponseWriter, r *http.Request) {
 
 	const topN = 100
 	const batchSize = 100
-	users, total, trial, active, err := getUsersLatest(topN, batchSize)
+	users, total, active, err := getUsersLatest(topN, batchSize)
 	if err != nil {
 		sendError(w, 500, "Unknown error, please try again in a moment")
 		return
@@ -296,7 +295,6 @@ func handleAdminUserLatest(w http.ResponseWriter, r *http.Request) {
 	sendObject(w, userLatestResponse{
 		Users:             users,
 		Total:             total,
-		Trial:             trial,
 		ActiveSubscribers: active,
 	})
 }

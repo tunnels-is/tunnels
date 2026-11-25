@@ -34,7 +34,6 @@ func TestGetUsersLatest(t *testing.T) {
 	for i := 0; i < 15; i++ {
 		u := testUser(fmt.Sprintf("latest%d@example.com", i), "")
 		u.Updated = now.Add(-time.Duration(i) * time.Hour)
-		u.Trial = i%3 == 0
 		if i%2 == 0 {
 			u.SubExpiration = now.Add(24 * time.Hour)
 		} else {
@@ -45,7 +44,7 @@ func TestGetUsersLatest(t *testing.T) {
 		}
 	}
 
-	users, total, trial, active, err := getUsersLatest(5, 4)
+	users, total, active, err := getUsersLatest(5, 4)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -63,10 +62,6 @@ func TestGetUsersLatest(t *testing.T) {
 		if users[i].Updated.After(users[i-1].Updated) {
 			t.Fatalf("not sorted DESC at %d", i)
 		}
-	}
-
-	if trial != 5 {
-		t.Fatalf("trial=%d want 5", trial)
 	}
 
 	if active != 8 {

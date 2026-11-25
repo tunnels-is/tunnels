@@ -1,16 +1,10 @@
 package main
 
 import (
-	"context"
-	"crypto/rand"
 	"crypto/subtle"
 	"errors"
 	"log/slog"
-	"math/big"
 	"net/http"
-	"strconv"
-	"strings"
-	"time"
 
 	"github.com/xlzd/gotp"
 	"golang.org/x/crypto/bcrypt"
@@ -115,115 +109,4 @@ func passwordLengthError(pw string) string {
 		return "Password is too long, maximum 72 characters"
 	}
 	return ""
-}
-
-func handleClientActivateLicense(w http.ResponseWriter, r *http.Request) {
-	defer BasicRecover()
-
-	form := new(licenseActivateRequest)
-	err := decodeBody(r, form)
-	if err != nil {
-		sendError(w, 400, err.Error())
-		return
-	}
-
-	user := getUserFromContext(r.Context())
-	if user == nil {
-		sendError(w, 401, "Unauthorized")
-		return
-	}
-
-	INFO("KEY attempt:", redactKey(form.Key))
-
-	lemonClient := lc.Load()
-	key, resp, err := lemonClient.Licenses.Validate(context.Background(), form.Key, "")
-	if err != nil {
-		if resp != nil && resp.Body != nil {
-			sendError(w, 500, "unexpected error, please try again")
-			return
-		}
-		sendError(w, 500, "unexpected error, please try again")
-		return
-	}
-
-	if key.LicenseKey.ActivationUsage > 0 {
-		sendError(w, 400, "key is already in use, please contact customer support")
-		return
-	}
-
-	if err := applyLemonLicense(user, key.Meta.ProductName, key.LicenseKey.Key, key.LicenseKey.CreatedAt, key.LicenseKey.ExpiresAt); err != nil {
-		ADMIN("unable to parse license key name:", err)
-		sendError(w, 500, "Something went wrong, please contact customer support")
-		return
-	}
-
-	activeKey, resp, err := lemonClient.Licenses.Activate(context.Background(), form.Key, "tunnels")
-	if err != nil {
-		if resp != nil && resp.Body != nil {
-			sendError(w, 500, "unexpected error, please try again")
-			return
-		}
-		sendError(w, 500, "unexpected error, please try again")
-		return
-	}
-
-	if activeKey.Error != "" {
-		sendError(w, 400, activeKey.Error)
-		return
-	}
-
-	user.Trial = false
-	err = activateUserKey(user.SubExpiration, user.Key, user.ID)
-	if err != nil {
-		sendError(w, 500, "unexpected error, please contact support")
-		return
-	}
-
-	if key != nil {
-		INFO("KEY: Activated:", redactKey(key.LicenseKey.Key))
-	}
-
-	w.WriteHeader(200)
-}
-
-func applyLemonLicense(user *User, productName, licenseKey string, created time.Time, expiresAt *time.Time) error {
-	if strings.Contains(strings.ToLower(productName), "anonymous") {
-		base := user.SubExpiration
-		if base.Before(time.Now()) {
-			base = time.Now()
-		}
-		jitter, _ := rand.Int(rand.Reader, big.NewInt(60))
-		user.SubExpiration = base.AddDate(0, 1, 0).Add(time.Duration(jitter.Int64()+60) * time.Minute)
-		INFO("KEY +1:", redactKey(licenseKey), " - check activation in lemon")
-
-		user.Key = &LicenseKey{
-			Created: created,
-			Months:  1,
-			Key:     "unknown",
-		}
-	} else {
-		ns := strings.Split(productName, " ")
-		months, err := strconv.Atoi(ns[0])
-		if err != nil {
-			return err
-		}
-
-		base := user.SubExpiration
-		if base.Before(time.Now()) {
-			base = time.Now()
-		}
-		jitter2, _ := rand.Int(rand.Reader, big.NewInt(600))
-		user.SubExpiration = base.AddDate(0, months, 0).Add(time.Duration(jitter2.Int64()+60) * time.Minute)
-		INFO("KEY +", months, ":", redactKey(licenseKey), " - check activate in lemon")
-
-		user.Key = &LicenseKey{
-			Created: created,
-			Months:  months,
-			Key:     licenseKey,
-		}
-	}
-	if expiresAt != nil && !expiresAt.IsZero() {
-		user.SubExpiration = expiresAt.UTC()
-	}
-	return nil
 }

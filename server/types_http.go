@@ -22,12 +22,6 @@ type getDeviceRequest struct {
 	DeviceID uuid.UUID
 }
 
-type licenseActivateRequest struct {
-	UID         uuid.UUID `json:"UID"`
-	DeviceToken string    `json:"DeviceToken"`
-	Key         string
-}
-
 type registerRequest struct {
 	Email                 string
 	Password              string
@@ -91,7 +85,6 @@ type listUsersRequest struct {
 type userLatestResponse struct {
 	Users             []*User `json:"Users"`
 	Total             int64   `json:"Total"`
-	Trial             int64   `json:"Trial"`
 	ActiveSubscribers int64   `json:"ActiveSubscribers"`
 }
 

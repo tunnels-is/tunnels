@@ -90,10 +90,6 @@ func registerClientRoutes(mux *http.ServeMux) {
 	mux.Handle("GET /client/wg/config", clientMW(handleWGConfig))
 	mux.Handle("GET /client/p2p/peers", clientMW(handleClientP2PPeers))
 	mux.Handle("POST /client/device/disco", clientMW(handleClientP2PDisco))
-
-	if loadSecret("PayKey") != "" {
-		mux.Handle("POST /client/key/activate", clientMW(handleClientActivateLicense))
-	}
 }
 
 func registerAdminRoutes(mux *http.ServeMux) {

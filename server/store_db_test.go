@@ -278,7 +278,6 @@ func TestUpdateUserAdmin(t *testing.T) {
 		TargetUserID:  u.ID,
 		Email:         "new@example.com",
 		Disabled:      true,
-		Trial:         true,
 		SubExpiration: exp,
 	}); err != nil {
 		t.Fatal(err)
@@ -293,8 +292,8 @@ func TestUpdateUserAdmin(t *testing.T) {
 	if found == nil {
 		t.Fatal("new email should resolve")
 	}
-	if !found.Disabled || !found.Trial {
-		t.Fatal("flags not set")
+	if !found.Disabled {
+		t.Fatal("Disabled not set")
 	}
 	if !found.SubExpiration.Truncate(time.Second).Equal(exp) {
 		t.Fatal("sub expiration mismatch")
@@ -487,26 +486,20 @@ func TestResetUserPassword_NotFound(t *testing.T) {
 	}
 }
 
-// TestActivateUserKey ...
+// TestActivateUserKey writes subscription expiration for an existing user.
 func TestActivateUserKey(t *testing.T) {
 	setupTestDB(t)
 	u := testUser("activate@example.com", "")
-	u.Disabled = true
-	u.Trial = true
 	createUser(u)
 
 	exp := time.Now().Add(365 * 24 * time.Hour).Truncate(time.Second)
-	key := &LicenseKey{Created: time.Now(), Months: 12, Key: "LIC-KEY"}
-	if err := activateUserKey(exp, key, u.ID); err != nil {
+	if err := activateUserKey(exp, u.ID); err != nil {
 		t.Fatal(err)
 	}
 
 	found, _ := findUserByID(u.ID)
-	if !found.Disabled || found.Trial {
-		t.Fatalf("Disabled=%v Trial=%v, license activation must leave Disabled set", found.Disabled, found.Trial)
-	}
-	if found.Key == nil || found.Key.Key != "LIC-KEY" {
-		t.Fatal("license key not set")
+	if found == nil {
+		t.Fatal("user not found")
 	}
 	if !found.SubExpiration.Truncate(time.Second).Equal(exp) {
 		t.Fatal("sub expiration mismatch")
@@ -516,7 +509,7 @@ func TestActivateUserKey(t *testing.T) {
 // TestActivateUserKey_NotFound ...
 func TestActivateUserKey_NotFound(t *testing.T) {
 	setupTestDB(t)
-	err := activateUserKey(time.Now(), nil, uuid.New())
+	err := activateUserKey(time.Now(), uuid.New())
 	if err == nil {
 		t.Fatal("expected error")
 	}

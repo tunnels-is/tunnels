@@ -147,147 +147,32 @@ func TestUser_ToMinifiedUser_DoesNotIncludeSensitiveData(t *testing.T) {
 
 // TestUser_RemoveSensitiveInformation ...
 func TestUser_RemoveSensitiveInformation(t *testing.T) {
-	tests := []struct {
-		name                string
-		user                *User
-		expectedKeyRedacted string
-	}{
-		{
-			name: "user with key containing dashes",
-			user: &User{
-				ID:            uuid.New(),
-				Email:         "test@example.com",
-				Password:      "hashed-password",
-				Password2:     "password2",
-				ConfirmCode:   "ABC123",
-				RecoveryCodes: []byte("recovery1,recovery2"),
-				TwoFactorCode: []byte("123456"),
-				Key: &LicenseKey{
-					Key:     "prefix-part1-part2-LASTPART",
-					Created: time.Now(),
-					Months:  12,
-				},
-			},
-			expectedKeyRedacted: "LASTPART",
-		},
-		{
-			name: "user with key without dashes",
-			user: &User{
-				ID:            uuid.New(),
-				Email:         "test2@example.com",
-				Password:      "password",
-				Password2:     "password2",
-				ConfirmCode:   "XYZ789",
-				RecoveryCodes: []byte("codes"),
-				TwoFactorCode: []byte("654321"),
-				Key: &LicenseKey{
-					Key:     "SINGLEPARTHARDKEY",
-					Created: time.Now(),
-					Months:  6,
-				},
-			},
-			expectedKeyRedacted: "SINGL…",
-		},
-		{
-			name: "user with empty key",
-			user: &User{
-				ID:            uuid.New(),
-				Email:         "test3@example.com",
-				Password:      "password",
-				Password2:     "password2",
-				ConfirmCode:   "CONFIRM",
-				RecoveryCodes: []byte("recovery"),
-				TwoFactorCode: []byte("2fa"),
-				Key: &LicenseKey{
-					Key:     "",
-					Created: time.Now(),
-					Months:  3,
-				},
-			},
-			expectedKeyRedacted: "",
-		},
-		{
-			name: "user without license key",
-			user: &User{
-				ID:            uuid.New(),
-				Email:         "test4@example.com",
-				Password:      "password",
-				Password2:     "password2",
-				ConfirmCode:   "CODE",
-				RecoveryCodes: []byte("recovery"),
-				TwoFactorCode: []byte("2fa"),
-				Key:           nil,
-			},
-			expectedKeyRedacted: "",
-		},
-		{
-			name: "user with key containing single dash",
-			user: &User{
-				ID:            uuid.New(),
-				Email:         "test5@example.com",
-				Password:      "password",
-				Password2:     "password2",
-				ConfirmCode:   "CODE",
-				RecoveryCodes: []byte("recovery"),
-				TwoFactorCode: []byte("2fa"),
-				Key: &LicenseKey{
-					Key:     "PART1-PART2",
-					Created: time.Now(),
-					Months:  1,
-				},
-			},
-			expectedKeyRedacted: "PART2",
-		},
-		{
-			name: "user with key containing multiple dashes",
-			user: &User{
-				ID:            uuid.New(),
-				Email:         "test6@example.com",
-				Password:      "password",
-				Password2:     "password2",
-				ConfirmCode:   "CODE",
-				RecoveryCodes: []byte("recovery"),
-				TwoFactorCode: []byte("2fa"),
-				Key: &LicenseKey{
-					Key:     "A-B-C-D-E-F-LAST",
-					Created: time.Now(),
-					Months:  24,
-				},
-			},
-			expectedKeyRedacted: "LAST",
-		},
+	user := &User{
+		ID:            uuid.New(),
+		Email:         "test@example.com",
+		Password:      "hashed-password",
+		Password2:     "password2",
+		ConfirmCode:   "ABC123",
+		RecoveryCodes: []byte("recovery1,recovery2"),
+		TwoFactorCode: []byte("123456"),
 	}
 
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			tc.user.RemoveSensitiveInformation()
+	user.RemoveSensitiveInformation()
 
-			if tc.user.Password != "" {
-				t.Errorf("Password should be empty, got %q", tc.user.Password)
-			}
-			if tc.user.Password2 != "" {
-				t.Errorf("Password2 should be empty, got %q", tc.user.Password2)
-			}
-			if tc.user.ConfirmCode != "" {
-				t.Errorf("ConfirmCode should be empty, got %q", tc.user.ConfirmCode)
-			}
-			if tc.user.RecoveryCodes != nil {
-				t.Errorf("RecoveryCodes should be nil, got %v", tc.user.RecoveryCodes)
-			}
-			if tc.user.TwoFactorCode != nil {
-				t.Errorf("TwoFactorCode should be nil, got %v", tc.user.TwoFactorCode)
-			}
-
-			if tc.user.Key != nil {
-				if tc.user.Key.Key != tc.expectedKeyRedacted {
-					t.Errorf("Key.Key = %q, expected %q", tc.user.Key.Key, tc.expectedKeyRedacted)
-				}
-			} else if tc.expectedKeyRedacted != "" {
-				t.Error("Expected key to be present but was nil")
-			}
-
-			t.Logf("RemoveSensitiveInformation() correctly sanitized user %q ✓", tc.user.Email)
-		})
+	if user.Password != "" {
+		t.Errorf("Password should be empty, got %q", user.Password)
+	}
+	if user.Password2 != "" {
+		t.Errorf("Password2 should be empty, got %q", user.Password2)
+	}
+	if user.ConfirmCode != "" {
+		t.Errorf("ConfirmCode should be empty, got %q", user.ConfirmCode)
+	}
+	if user.RecoveryCodes != nil {
+		t.Errorf("RecoveryCodes should be nil, got %v", user.RecoveryCodes)
+	}
+	if user.TwoFactorCode != nil {
+		t.Errorf("TwoFactorCode should be nil, got %v", user.TwoFactorCode)
 	}
 }
 

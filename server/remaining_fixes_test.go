@@ -425,27 +425,6 @@ func TestWGConfig_HidesForeignKeyAndExpiredSub(t *testing.T) {
 	}
 }
 
-// TestNextSubExpirationFromLemon_DoesNotStack ...
-func TestNextSubExpirationFromLemon_DoesNotStack(t *testing.T) {
-	created := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
-	u := &User{
-		SubExpiration: created.AddDate(0, 12, 0),
-		Key:           &LicenseKey{Created: created, Months: 12, Key: "k"},
-	}
-	exp, update := nextSubExpirationFromLemon(u, "active", nil)
-	if update {
-		t.Fatalf("must not restack an already-granted term, got %v", exp)
-	}
-	expiredAt := created.AddDate(0, 12, 0)
-	got, ok := nextSubExpirationFromLemon(u, "active", &expiredAt)
-	if !ok || !got.Equal(expiredAt) {
-		t.Fatalf("expires_at not honored: ok=%v got=%v", ok, got)
-	}
-	if _, ok := nextSubExpirationFromLemon(u, "expired", nil); ok {
-		t.Fatal("expired status must not renew")
-	}
-}
-
 // TestTokenUpdate_DoesNotRestoreListClearedByReset ...
 func TestTokenUpdate_DoesNotRestoreListClearedByReset(t *testing.T) {
 	setupTestDB(t)

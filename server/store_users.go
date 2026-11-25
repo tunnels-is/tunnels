@@ -36,7 +36,7 @@ func getUsers(limit, offset int64) ([]*User, error) {
 	return users, err
 }
 
-func getUsersLatest(topN, batchSize int) (users []*User, total, trial, active int64, err error) {
+func getUsersLatest(topN, batchSize int) (users []*User, total, active int64, err error) {
 	if topN <= 0 {
 		topN = 100
 	}
@@ -50,9 +50,6 @@ func getUsersLatest(topN, batchSize int) (users []*User, total, trial, active in
 	flushBatch := func() {
 		for _, u := range batch {
 			total++
-			if u.Trial {
-				trial++
-			}
 			if !u.Disabled && u.SubExpiration.After(now) {
 				active++
 			}
@@ -87,9 +84,9 @@ func getUsersLatest(topN, batchSize int) (users []*User, total, trial, active in
 		return nil
 	})
 	if err != nil {
-		return nil, 0, 0, 0, err
+		return nil, 0, 0, err
 	}
-	return top, total, trial, active, nil
+	return top, total, active, nil
 }
 
 func insertUserByUpdatedDesc(list []*User, u *User, n int) []*User {
@@ -676,7 +673,7 @@ func deleteUserByID(id uuid.UUID) error {
 	})
 }
 
-func activateUserKey(subExpiration time.Time, key *LicenseKey, userID uuid.UUID) error {
+func activateUserKey(subExpiration time.Time, userID uuid.UUID) error {
 	idStr := userID.String()
 	return db.Update(func(tx *gobolt.Tx) error {
 		b := tx.Bucket([]byte(bucketUsers))
@@ -688,9 +685,7 @@ func activateUserKey(subExpiration time.Time, key *LicenseKey, userID uuid.UUID)
 		if err := bboltUnmarshal(v, user); err != nil {
 			return err
 		}
-		user.Trial = false
 		user.SubExpiration = subExpiration
-		user.Key = key
 		data, err := bboltMarshal(user)
 		if err != nil {
 			return err

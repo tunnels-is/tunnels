@@ -36,9 +36,7 @@ type User struct {
 	IsAdmin bool        `json:"IsAdmin"`
 	Groups  []uuid.UUID `json:"Groups"`
 
-	Trial         bool        `json:"Trial"`
-	Key           *LicenseKey `json:"Key"`
-	SubExpiration time.Time   `json:"SubExpiration"`
+	SubExpiration time.Time `json:"SubExpiration"`
 }
 
 // ToMinifiedUser ...

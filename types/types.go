@@ -29,7 +29,6 @@ type ServerConfig struct {
 	TwoFactorKey              string
 	CookieSigningKey          string
 	DisablePublicRegistration bool
-	PayKey                    string
 	CertPem                   string
 	KeyPem                    string
 

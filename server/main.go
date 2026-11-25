@@ -16,7 +16,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/NdoleStudio/lemonsqueezy-go"
 	"github.com/google/uuid"
 	"github.com/jackpal/gateway"
 	"github.com/tunnels-is/tunnels/signal"
@@ -39,8 +38,6 @@ var (
 	wgConfigPath     string
 
 	logger *slog.Logger
-
-	lc atomic.Pointer[lemonsqueezy.Client]
 )
 
 func main() {
@@ -210,16 +207,6 @@ func startAuthServer(ctx context.Context) {
 		panic(err)
 	}
 
-	if loadSecret("PayKey") != "" {
-		lemonClient := lemonsqueezy.New(lemonsqueezy.WithAPIKey(loadSecret("PayKey")))
-		if lemonClient == nil {
-			logger.Error("Unable to initialize lemon queezy client", slog.Any("err", err))
-			os.Exit(1)
-		}
-		lc.Store(lemonClient)
-		go signal.NewSignal("SUBSCANNER", ctx, 12*time.Hour, goroutineLogger, scanSubs)
-	}
-
 	go signal.NewSignal("API", ctx, 1*time.Second, goroutineLogger, launchAPIServer)
 
 	go signal.NewSignal("PWRESET-CLEAN", ctx, passwordResetCleanEvery, goroutineLogger, cleanPasswordResetAttempts)
@@ -313,7 +300,6 @@ func initializeAdminUser() error {
 	newUser.IsAdmin = true
 	newUser.Email = "admin"
 	newUser.Updated = time.Now()
-	newUser.Trial = false
 	newUser.APIKey = uuid.NewString()
 	newUser.SubExpiration = time.Now().AddDate(100, 0, 0)
 	newUser.Groups = make([]uuid.UUID, 0)

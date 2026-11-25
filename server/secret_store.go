@@ -15,8 +15,6 @@ func loadStringSliceKey(key string) []string {
 func loadSecret(key string) (v string) {
 	config := Config.Load()
 	switch key {
-	case "PayKey":
-		return config.PayKey
 	case "CertPem":
 		return config.CertPem
 	case "KeyPem":
