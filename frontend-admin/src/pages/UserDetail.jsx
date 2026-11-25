@@ -55,7 +55,6 @@ export default function UserDetail() {
     setForm({
       IsManager: user.IsManager,
       Disabled: user.Disabled,
-      Trial: user.Trial,
       SubExpiration: user.SubExpiration ? new Date(user.SubExpiration) : null,
     });
     setError('');
@@ -72,7 +71,6 @@ export default function UserDetail() {
         TargetUserID: id,
         Disabled: form.Disabled,
         IsManager: form.IsManager,
-        Trial: form.Trial,
         SubExpiration: form.SubExpiration ? form.SubExpiration.toISOString() : undefined,
       });
       if (resp.status === 200) {
@@ -202,17 +200,7 @@ export default function UserDetail() {
             <span className={user.Disabled ? 'text-[#dc2626]' : 'text-[#a3a3a3]'}>{user.Disabled ? 'Yes' : 'No'}</span>
           )}
         </Row>
-        <Row label="Trial">
-          {editing ? (
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" checked={form.Trial} onChange={set('Trial')} className="accent-[#1d4ed8]" />
-              <span className="text-[12px] text-[#525252]">{form.Trial ? 'Yes' : 'No'}</span>
-            </label>
-          ) : (
-            <span className={user.Trial ? 'text-[#b45309]' : 'text-[#a3a3a3]'}>{user.Trial ? 'Yes' : 'No'}</span>
-          )}
-        </Row>
-        <Row label="Sub Expiry">
+        <Row label="Access until">
           {editing ? (
             <DatePicker
               selected={form.SubExpiration}
@@ -221,7 +209,7 @@ export default function UserDetail() {
               timeFormat="HH:mm"
               timeIntervals={15}
               dateFormat="dd/MM/yyyy HH:mm"
-              placeholderText="No expiry"
+              placeholderText="No date"
               isClearable
               popperPlacement="bottom-start"
             />

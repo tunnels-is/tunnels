@@ -150,7 +150,7 @@ func TestClientAuthMiddleware_RejectsExpiredSubscription(t *testing.T) {
 	if w := call(unset.Email); w.Code != http.StatusOK || !called {
 		t.Fatalf("unset: %d %s called=%v", w.Code, w.Body.String(), called)
 	}
-	if w := call(expired.Email); w.Code != http.StatusForbidden || called || !strings.Contains(w.Body.String(), "subscription expired") {
+	if w := call(expired.Email); w.Code != http.StatusForbidden || called || !strings.Contains(w.Body.String(), "access expired") {
 		t.Fatalf("expired: %d %s called=%v", w.Code, w.Body.String(), called)
 	}
 }
@@ -601,8 +601,8 @@ func TestCreateUser_StoresNormalizedEmail(t *testing.T) {
 	}
 }
 
-// TestEmailIndex_NormalizedLookupAndSubTime ...
-func TestEmailIndex_NormalizedLookupAndSubTime(t *testing.T) {
+// TestEmailIndex_NormalizedLookupAndRename ...
+func TestEmailIndex_NormalizedLookupAndRename(t *testing.T) {
 	setupTestDB(t)
 	u := &User{ID: uuid.New(), Email: "Mixed.Case@Example.COM"}
 	if err := createUser(u); err != nil {
@@ -615,15 +615,6 @@ func TestEmailIndex_NormalizedLookupAndSubTime(t *testing.T) {
 	got, err = findUserByEmail("MIXED.CASE@EXAMPLE.COM")
 	if err != nil || got == nil {
 		t.Fatalf("upper lookup: %v %#v", err, got)
-	}
-
-	exp := time.Now().Add(30 * 24 * time.Hour).Truncate(time.Second)
-	if err := updateUserSubTime(&User{Email: "Mixed.Case@Example.COM", SubExpiration: exp}); err != nil {
-		t.Fatalf("sub time by mixed-case email: %v", err)
-	}
-	found, _ := findUserByID(u.ID)
-	if !found.SubExpiration.Truncate(time.Second).Equal(exp) {
-		t.Fatalf("sub expiration mismatch: %v vs %v", found.SubExpiration, exp)
 	}
 
 	if err := updateUserAdmin(&adminUserUpdateRequest{

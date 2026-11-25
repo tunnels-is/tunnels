@@ -53,7 +53,7 @@ func (a *App) accountsPage() fyne.CanvasObject {
 		cards = append(cards, cardBox(email, server, remove, vstack(sp4,
 			vstack(0,
 				kvRow("User ID", u.ID, true),
-				kvRow("Subscription", fmtTime(u.SubExpiration), false),
+				kvRow("Access until", fmtTime(u.SubExpiration), false),
 			),
 			hstack(sp2, use),
 		)))

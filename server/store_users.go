@@ -227,34 +227,6 @@ func updateUserDeviceTokens(id uuid.UUID, mutate func([]*DeviceToken) []*DeviceT
 	return stored, nil
 }
 
-func updateUserSubTime(u *User) error {
-	return db.Update(func(tx *gobolt.Tx) error {
-		b := tx.Bucket([]byte(bucketUsers))
-		id := u.ID.String()
-		v := b.Get([]byte(id))
-		if v == nil && u.Email != "" {
-			uid := emailIndexGet(tx.Bucket([]byte(bucketUsersEmailIndex)), u.Email)
-			if uid != nil {
-				id = string(uid)
-				v = b.Get(uid)
-			}
-		}
-		if v == nil {
-			return errors.New("user not found")
-		}
-		user := new(User)
-		if err := bboltUnmarshal(v, user); err != nil {
-			return err
-		}
-		user.SubExpiration = u.SubExpiration
-		data, err := bboltMarshal(user)
-		if err != nil {
-			return err
-		}
-		return b.Put([]byte(id), data)
-	})
-}
-
 func upgradeLegacyUserSecrets(id uuid.UUID, presented string) error {
 	if presented == "" {
 		return nil
@@ -410,7 +382,6 @@ func updateUserAdmin(form *adminUserUpdateRequest) error {
 		}
 
 		user.Disabled = form.Disabled
-		user.Trial = form.Trial
 		if user.Disabled {
 			user.Tokens = []*DeviceToken{}
 			if err := dropUserAPIKey(tx, user); err != nil {
@@ -670,27 +641,5 @@ func deleteUserByID(id uuid.UUID) error {
 			return D.UserID.String() == idStr
 		})
 		return b.Delete([]byte(idStr))
-	})
-}
-
-func activateUserKey(subExpiration time.Time, userID uuid.UUID) error {
-	idStr := userID.String()
-	return db.Update(func(tx *gobolt.Tx) error {
-		b := tx.Bucket([]byte(bucketUsers))
-		v := b.Get([]byte(idStr))
-		if v == nil {
-			return errors.New("user not found")
-		}
-		user := new(User)
-		if err := bboltUnmarshal(v, user); err != nil {
-			return err
-		}
-		user.SubExpiration = subExpiration
-		data, err := bboltMarshal(user)
-		if err != nil {
-			return err
-		}
-		id := user.ID.String()
-		return b.Put([]byte(id), data)
 	})
 }

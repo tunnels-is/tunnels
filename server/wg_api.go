@@ -203,7 +203,7 @@ func handleWGConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !user.SubExpiration.IsZero() && time.Now().After(user.SubExpiration) {
-		sendError(w, 403, "subscription expired")
+		sendError(w, 403, "access expired")
 		return
 	}
 
@@ -258,7 +258,7 @@ func wgUserConnectStatus(user *User, server *types.Server) (int, string) {
 		return 403, "user account is disabled"
 	}
 	if !user.SubExpiration.IsZero() && time.Now().After(user.SubExpiration) {
-		return 403, "user subscription has expired"
+		return 403, "user access has expired"
 	}
 	if !hasSharedOrNoGroup(user.Groups, server.Groups) {
 		return 401, "user/device not allowed to connect"

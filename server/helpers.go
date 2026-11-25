@@ -20,14 +20,6 @@ func BasicRecover() {
 	}
 }
 
-func redactKey(k string) string {
-	const show = 5
-	if len(k) <= show {
-		return "…"
-	}
-	return k[:show] + "…"
-}
-
 var totpAlphabet = []rune("ABCDEFGHIJKLMNOPQRSTUVWXYZ234567")
 
 func generateCode() string {

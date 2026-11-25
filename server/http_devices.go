@@ -251,7 +251,7 @@ func handleClientDeviceCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !user.SubExpiration.IsZero() && time.Now().After(user.SubExpiration) {
-		sendError(w, 403, "subscription expired")
+		sendError(w, 403, "access expired")
 		return
 	}
 

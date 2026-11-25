@@ -53,8 +53,6 @@ type User struct {
 	DeviceToken           *DeviceToken   `json:",omitempty"`
 	Tokens                []*DeviceToken `json:"Tokens"`
 	OrgID                 string         `json:"OrgID" `
-	Key                   *LicenseKey    `json:"Key"`
-	Trial                 bool           `json:"Trial"`
 	Disabled              bool           `json:"Disabled"`
 	TwoFactorEnabled      bool           `json:"TwoFactorEnabled"`
 	Updated               time.Time      `json:"Updated"`
@@ -65,10 +63,4 @@ type User struct {
 
 	ControlServer *ControlServer
 	SaveFileHash  string
-}
-
-type LicenseKey struct {
-	Created time.Time
-	Months  int
-	Key     string
 }

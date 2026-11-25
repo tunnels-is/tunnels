@@ -1,17 +1,10 @@
 package main
 
 import (
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
 )
-
-type LicenseKey struct {
-	Created time.Time
-	Months  int
-	Key     string
-}
 
 type User struct {
 	ID uuid.UUID `json:"_id"`
@@ -59,15 +52,6 @@ type MinifiedUser struct {
 
 // RemoveSensitiveInformation ...
 func (u *User) RemoveSensitiveInformation() {
-	if u.Key != nil && u.Key.Key != "" {
-		ks := strings.Split(u.Key.Key, "-")
-		if len(ks) < 2 {
-			u.Key.Key = redactKey(u.Key.Key)
-		} else {
-			u.Key.Key = ks[len(ks)-1]
-		}
-	}
-
 	u.Password = ""
 	u.Password2 = ""
 	u.ConfirmCode = ""

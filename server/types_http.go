@@ -178,7 +178,6 @@ type adminUserUpdateRequest struct {
 	TargetUserID  uuid.UUID `json:"TargetUserID"`
 	Email         string    `json:"Email,omitempty"`
 	Disabled      bool      `json:"Disabled"`
-	Trial         bool      `json:"Trial"`
 	SubExpiration time.Time `json:"SubExpiration,omitempty"`
 }
 

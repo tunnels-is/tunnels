@@ -84,7 +84,6 @@ export default function Users() {
         setUsers(Array.isArray(data.Users) ? data.Users : []);
         setStats({
           Total: data.Total ?? 0,
-          Trial: data.Trial ?? 0,
           ActiveSubscribers: data.ActiveSubscribers ?? 0,
         });
         setHasMore(false);
@@ -239,8 +238,7 @@ export default function Users() {
       {stats && (
         <div className="flex flex-wrap items-center gap-2 mb-4">
           <StatPill label="Total" value={stats.Total} />
-          <StatPill label="Trial" value={stats.Trial} />
-          <StatPill label="Active subs" value={stats.ActiveSubscribers} />
+          <StatPill label="Active" value={stats.ActiveSubscribers} />
           <span className="text-[11px] text-[#a3a3a3]">Showing 100 most recently updated</span>
         </div>
       )}
@@ -255,7 +253,7 @@ export default function Users() {
 
       <div className="bg-white border border-[#e7e3d7] rounded-lg overflow-x-auto card-shadow">
         <div className="grid grid-cols-[1fr_80px_80px_80px_160px_160px] min-w-[840px] gap-4 px-4 py-2 border-b border-[#e7e3d7] bg-[#ffffff]">
-          {['Email', 'Admin', 'Manager', 'Disabled', 'Sub Expiry', 'Updated'].map((h) => (
+          {['Email', 'Admin', 'Manager', 'Disabled', 'Access until', 'Updated'].map((h) => (
             <span key={h} className="text-[10px] text-[#a3a3a3] uppercase tracking-wider">{h}</span>
           ))}
         </div>

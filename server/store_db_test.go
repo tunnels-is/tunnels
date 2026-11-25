@@ -187,32 +187,6 @@ func TestUpdateUserDeviceTokens_NotFound(t *testing.T) {
 	}
 }
 
-// TestUpdateUserSubTime ...
-func TestUpdateUserSubTime(t *testing.T) {
-	setupTestDB(t)
-	u := testUser("sub@example.com", "")
-	createUser(u)
-
-	exp := time.Now().Add(30 * 24 * time.Hour).Truncate(time.Second)
-	if err := updateUserSubTime(&User{Email: "sub@example.com", SubExpiration: exp}); err != nil {
-		t.Fatal(err)
-	}
-
-	found, _ := findUserByID(u.ID)
-	if !found.SubExpiration.Truncate(time.Second).Equal(exp) {
-		t.Fatalf("expected %v, got %v", exp, found.SubExpiration)
-	}
-}
-
-// TestUpdateUserSubTime_NotFound ...
-func TestUpdateUserSubTime_NotFound(t *testing.T) {
-	setupTestDB(t)
-	err := updateUserSubTime(&User{Email: "nobody@example.com"})
-	if err == nil {
-		t.Fatal("expected error")
-	}
-}
-
 // TestUpdateUser ...
 func TestUpdateUser(t *testing.T) {
 	setupTestDB(t)
@@ -481,35 +455,6 @@ func TestDisableUser_ClearsTokensAndAPIKey(t *testing.T) {
 func TestResetUserPassword_NotFound(t *testing.T) {
 	setupTestDB(t)
 	err := resetUserPassword(&User{ID: uuid.New()})
-	if err == nil {
-		t.Fatal("expected error")
-	}
-}
-
-// TestActivateUserKey writes subscription expiration for an existing user.
-func TestActivateUserKey(t *testing.T) {
-	setupTestDB(t)
-	u := testUser("activate@example.com", "")
-	createUser(u)
-
-	exp := time.Now().Add(365 * 24 * time.Hour).Truncate(time.Second)
-	if err := activateUserKey(exp, u.ID); err != nil {
-		t.Fatal(err)
-	}
-
-	found, _ := findUserByID(u.ID)
-	if found == nil {
-		t.Fatal("user not found")
-	}
-	if !found.SubExpiration.Truncate(time.Second).Equal(exp) {
-		t.Fatal("sub expiration mismatch")
-	}
-}
-
-// TestActivateUserKey_NotFound ...
-func TestActivateUserKey_NotFound(t *testing.T) {
-	setupTestDB(t)
-	err := activateUserKey(time.Now(), uuid.New())
 	if err == nil {
 		t.Fatal("expected error")
 	}

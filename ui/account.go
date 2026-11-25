@@ -2,10 +2,8 @@ package ui
 
 import (
 	"encoding/json"
-	"fmt"
 	"sort"
 	"strings"
-	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
@@ -21,7 +19,6 @@ func (a *App) accountPage() fyne.CanvasObject {
 	tabs := newSegmented([]segItem{
 		{"account", "Overview"},
 		{"logins", "Sessions"},
-		{"license", "License"},
 	}, a.accountTab, func(key string) {
 		a.accountTab = key
 		a.reloadCurrent()
@@ -31,8 +28,6 @@ func (a *App) accountPage() fyne.CanvasObject {
 	switch a.accountTab {
 	case "logins":
 		content = a.accountLoginsTab(u)
-	case "license":
-		content = a.accountLicenseTab(u)
 	default:
 		content = a.accountInfoTab(u)
 	}
@@ -41,11 +36,7 @@ func (a *App) accountPage() fyne.CanvasObject {
 	if title == "" {
 		title = "Anonymous account"
 	}
-	sub := "Trial"
-	if !u.Trial {
-		sub = "Subscription until " + fmtTime(u.SubExpiration)
-	}
-	return pageShell(title, sub, tabs, content)
+	return pageShell(title, "Access until "+fmtTime(u.SubExpiration), tabs, content)
 }
 
 func (a *App) accountInfoTab(u *client.User) fyne.CanvasObject {
@@ -58,8 +49,7 @@ func (a *App) accountInfoTab(u *client.User) fyne.CanvasObject {
 		kvRow("Email", email, false),
 		kvRow("User ID", u.ID, true),
 		kvRow("Last updated", fmtTime(u.Updated), false),
-		kvRow("Subscription", fmtTime(u.SubExpiration), false),
-		kvRow("Trial", boolLabel(u.Trial), false),
+		kvRow("Access until", fmtTime(u.SubExpiration), false),
 	))
 
 	apiKey := cardBox("API key",
@@ -211,59 +201,4 @@ func (a *App) accountLoginsTab(u *client.User) fyne.CanvasObject {
 	return scrollBody(card("Active sessions",
 		"Every signed-in device holds its own token. Revoke any you do not recognise.",
 		settingList(rows...)))
-}
-
-func (a *App) accountLicenseTab(u *client.User) fyne.CanvasObject {
-	entry := kEntry("TUN-XXXX-XXXX-XXXX", "")
-	activate := primaryBtn("Activate", func() {
-		key := strings.TrimSpace(entry.Text)
-		if key == "" {
-			a.fail("License key is required")
-			return
-		}
-		go func() {
-			_, _, err := a.callController("/client/key/activate", map[string]any{"Key": key}, true)
-			a.uiDo(func() {
-				if err != nil {
-					a.fail(err.Error())
-					return
-				}
-				u.Key = &client.LicenseKey{Key: "[shown on next sign-in]", Created: time.Now()}
-				a.setUser(u)
-				a.note("License activated")
-				a.rebuild()
-			})
-		}()
-	})
-
-	cards := []fyne.CanvasObject{}
-	if u.Key != nil && u.Key.Key != "" {
-		cards = append(cards, card("Active license", "", vstack(0,
-			kvRow("Key", u.Key.Key, true),
-			kvRow("Activated", fmtTime(u.Key.Created), false),
-			kvRow("Term", monthsLabel(u.Key.Months), false),
-		)))
-	}
-	cards = append(cards, card("Add a license key",
-		"Paste a key to extend your subscription.",
-		capWidth(formWidth, vstack(sp3, field("License key", entry), hstack(0, activate)))))
-	return scrollBody(cards...)
-}
-
-func monthsLabel(m int) string {
-	switch {
-	case m <= 0:
-		return "—"
-	case m == 1:
-		return "1 month"
-	default:
-		return fmt.Sprintf("%d months", m)
-	}
-}
-
-func boolLabel(v bool) string {
-	if v {
-		return "Active"
-	}
-	return "—"
 }
