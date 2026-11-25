@@ -75,7 +75,7 @@ func newRegisteredUser(form *registerRequest) (*User, error) {
 	newUser.ID = uuid.New()
 	newUser.Email = form.Email
 	newUser.Updated = time.Now()
-	newUser.SubExpiration = time.Now().AddDate(0, 0, 1)
+	//	newUser.SubExpiration = time.Now().AddDate(0, 0, 1)
 	newUser.Groups = make([]uuid.UUID, 0)
 	newUser.Tokens = make([]*DeviceToken, 0)
 

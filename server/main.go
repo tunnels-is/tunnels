@@ -301,7 +301,6 @@ func initializeAdminUser() error {
 	newUser.Email = "admin"
 	newUser.Updated = time.Now()
 	newUser.APIKey = uuid.NewString()
-	newUser.SubExpiration = time.Now().AddDate(100, 0, 0)
 	newUser.Groups = make([]uuid.UUID, 0)
 	newUser.Tokens = make([]*DeviceToken, 0)
 	if err := createUser(newUser); err != nil {
