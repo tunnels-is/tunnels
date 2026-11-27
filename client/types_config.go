@@ -43,9 +43,6 @@ func (c *ControlServer) effectivePort() string {
 	if c == nil {
 		return ""
 	}
-	if c.Host == "api.tunnels.is" && c.Port == "443" {
-		return "444"
-	}
 	return c.Port
 }
 

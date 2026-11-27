@@ -2,15 +2,15 @@ package client
 
 import "testing"
 
-// TestControlServer_effectivePort_hotswap443to444 ...
-func TestControlServer_effectivePort_hotswap443to444(t *testing.T) {
+// TestControlServer_effectivePort ...
+func TestControlServer_effectivePort(t *testing.T) {
 	cases := []struct {
 		name string
 		host string
 		port string
 		want string
 	}{
-		{"api 443 → 444", "api.tunnels.is", "443", "444"},
+		{"api 443 stays", "api.tunnels.is", "443", "443"},
 		{"api 444 stays", "api.tunnels.is", "444", "444"},
 		{"api empty stays empty", "api.tunnels.is", "", ""},
 		{"other host 443 stays", "controller.example.com", "443", "443"},
@@ -29,11 +29,11 @@ func TestControlServer_effectivePort_hotswap443to444(t *testing.T) {
 	}
 }
 
-// TestControlServer_GetURL_hotswap ...
-func TestControlServer_GetURL_hotswap(t *testing.T) {
+// TestControlServer_GetURL ...
+func TestControlServer_GetURL(t *testing.T) {
 	c := &ControlServer{Host: "api.tunnels.is", Port: "443"}
 	got := c.GetURL("/client/servers")
-	want := "https://api.tunnels.is:444/client/servers"
+	want := "https://api.tunnels.is:443/client/servers"
 	if got != want {
 		t.Fatalf("GetURL() = %q, want %q", got, want)
 	}
